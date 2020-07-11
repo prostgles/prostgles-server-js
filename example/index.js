@@ -6,9 +6,9 @@ var io = require('socket.io')(http);
 http.listen(3000);
 var fs = require('fs');
 
-let prostgles = require('../index.js');
+let prostgles = require('../dist/index.js');
 
-prostgles.init({
+prostgles({
     dbConnection: {
         host: "localhost",
         port: "5432",
