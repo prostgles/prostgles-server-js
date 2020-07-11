@@ -46,51 +46,17 @@ prostgles.init({
     
     isReady: async (dbo) => {
             
-        /* Benchmarking */
+        /* Benchmarking 10000 inserts */
         var tl = Date.now(), inserts = []
         for(var i = 0; i < 10000; i++){
             const data = { rgb: "black", xy: `${Math.random() * 400};${Math.random() * 400}` };
             inserts.push(data);
         }
-        await dbo.pixels.insert(inserts).then(console.log);
-
-
-        
-        // let subs = []
-        // for(let i = 0; i < 100; i++){
-        //     let sub = dbo.pixels.subscribe({ }, {}, (data) => {
-        //         console.log(i, data.length)
-        //     });
-        //     console.log(sub)
-        //     subs.push(sub)
-        // }
-
-        // setTimeout(() => {
-        //     subs.map((s, i)=> {
-        //         if(i > 0) s.unsubscribe();
-        //     })
-        // }, 1000)
-
-        // await Promise.all(inserts.map(dbo.pixels.insert));   , { returning: "" }
-        // await dbo.pixels.update(inserts.map((d, i) => [{ id: i}, d]));      
+        await dbo.pixels.insert(inserts);
         console.log(Date.now() - tl, "ms");
-        dbo.pixels.remove({});
+        
         dbo.pixels.count({}).then(console.log);
 
-
-		app.get('/prostgles-client-js/index.js', (req, res) => {
-            
-			var allowedOrigins = ['http://localhost:6969', 'https://prostgles.com'];
-			var origin = req.headers.origin;
-			if(allowedOrigins.indexOf(origin) > -1){
-				res.setHeader('Access-Control-Allow-Origin', origin);
-			}
-			res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-			res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-			res.header('Access-Control-Allow-Credentials', true);
-
-			res.sendFile(path.join(__dirname+'/../../prostgles-client-js/index.js'));
-		});
         
 		app.get('/', (req, res) => {
 			res.sendFile(path.join(__dirname+'/home.html'));
@@ -100,15 +66,14 @@ prostgles.init({
 			res.status(404).send('Page not found');
 		});
     },
-	onSocketConnect: async ({ socket, dbo }) => {
-        fs.readFile('home.html', function(err, buf){
-            // it's possible to embed binary data
-            // within arbitrarily-complex objects
-            socket.emit('home', { image: true, buffer: buf });
-        });
+	// onSocketConnect: async ({ socket, dbo }) => {
+    //     /* Sending file */
+    //     fs.readFile('home.html', function(err, buf){
+    //         socket.emit('home', { image: true, buffer: buf });
+    //     });
 
-        return true;
-    },
+    //     return true;
+    // },
 	// onSocketDisconnect: async ({ socket, dbo }) => {
     //     return true;
     // },
