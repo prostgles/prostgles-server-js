@@ -1,0 +1,83 @@
+
+	  
+<!DOCTYPE html>
+<html>
+	<head>
+        <title> Prostgles </title>
+        
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js" integrity="sha512-v8ng/uGxkge3d1IJuEo6dJP8JViyvms0cly9pnbfRxT6/31c3dRWxIiwGnMSWwZjHKOuY3EVmijs7k1jz/9bLA==" crossorigin="anonymous"></script>
+        <script crossorigin="anonymous" src="https://prostgles.com/prostgles-client-js/index.js" type="text/javascript" type="module"></script>	
+	</head>
+	<body>
+
+		<script>
+            
+            const socket = io({
+                // query: "dawdwa",
+                'reconnection': true,
+                'reconnectionDelay': 1000,
+                'reconnectionDelayMax' : 5000,
+                'reconnectionAttempts': 5 
+            });
+            socket.on("home", console.log)
+
+            psqlWS.init({
+                socket, 
+                isReady: (db, methods) => {
+                    window.db = db;
+                    window.methods = methods;
+                    setTimeout(async ()=>{
+                        db.pixels.find({}).then(console.log)
+                        /* Benchmarking */
+                        if(true ){
+                            var l = Date.now(), sum = 0, totalTime = 0, tl = Date.now(), inserts = []
+                            for(var i = 0; i < 1000; i++){
+                                const data = { rgb: "black", xy: `${Math.random() * 400};${Math.random() * 400}` };
+                                inserts.push(data);
+                                // methods.insertPixel(data)
+                                //  db.pixels.insert(data);
+                                // await db.pixels.update({ id: i }, data);
+                                
+                                if(Date.now() - l < 1000) sum++;
+                                else {
+                                    l = Date.now();
+                                    console.log(sum);
+                                    sum = 0;
+                                }
+                            }
+                            window.data = inserts;
+                            // await Promise.all(inserts.map(d => db.pixels.insert(d)));
+                            await Promise.all(inserts.map(db.pixels.insert)); /* <-- biiig cpu&ram overflow due to full array passed as param3 */
+                            // await Promise.all(inserts.map(methods.insertPixel));
+                            // await db.pixels.insert(inserts)
+                            // await methods.insertPixel(inserts)
+
+                            
+                            console.log(Date.now() - tl, "ms");
+                            // db.pixels.subscribe({ rgb: { $not: null } }, { limit: 9999 }, (d) => {
+                            //     console.log(d)
+                            //     let rects = d.map(d => {
+                            //         // db.pixels.update({ id: d.id }, { drawn: true });
+
+                            //         if(d.xy){
+                            //             const coords = d.xy.split(";").map(d => +d);
+                            //             if(coords.length === 2){
+                            //                 return new RECTANGLE({ x: coords[0], y: coords[1], w: 4, h: 4, style: { fillStyle: d.rgb }})
+                            //             }
+                            //         }
+                            //     }).filter(s => s);
+                            //     var cnv = document.body.querySelector("comp-canvas");
+                            //     cnv.render(rects);
+                            //     console.log(Date.now() - tl, "ms render");
+                            // });
+                        }
+                    }, 1)
+                },
+                onDisconnect: (err, res) => {
+                    // location.reload();
+                }
+            });
+		</script>
+	</body>
+</html>

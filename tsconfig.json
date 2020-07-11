@@ -1,0 +1,22 @@
+{
+  "files": ["lib/index.ts"],
+  "compilerOptions": {
+    "target": "es6",
+    "lib": [
+      "es2019"
+    ],
+    // "strict": true,
+    "module": "commonjs",
+    // "removeComments": true,
+    "sourceMap": true,
+    "rootDir": "./lib",
+    "outDir": "dist",
+    // "outFile": "bundle.js",
+    // "moduleResolution": "node"
+    "declaration": true,
+    "declarationMap": true
+  },
+  "exclude": [
+    "dist"
+  ]
+}

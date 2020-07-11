@@ -1,0 +1,31 @@
+{
+  "name": "prostgles-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "directories": {
+    "example": "example"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/prostgles/prostgles-server-js.git"
+  },
+  "author": "Stefan L",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/prostgles/prostgles-server-js/issues"
+  },
+  "homepage": "https://github.com/prostgles/prostgles-server-js#readme",
+  "dependencies": {
+    "bluebird": "^3.7.2",
+    "pg-promise": "^10.5.7"
+  },
+  "devDependencies": {
+    "@types/node": "^14.0.14",
+    "typescript": "^3.9.6"
+  }
+}
