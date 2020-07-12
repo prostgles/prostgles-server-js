@@ -243,6 +243,7 @@ export type OnReady = {
     db: DB;
 }
 
+const fs = require('fs');
 export class Prostgles {
     dbConnection: DbConnection = {
         host: "localhost",
@@ -263,11 +264,12 @@ export class Prostgles {
     onSocketConnect?({ socket: Socket, dbo: any});
     onSocketDisconnect?({ socket: Socket, dbo: any});
     sqlFilePath?: string;
+    tsGeneratedTypesDir?: string;
 
     constructor(params: InitOptions){
         if(!params) throw "InitOptions missing";
         if(!params.io) console.error("io missing. WebSockets disabled");
-        const unknownParams = Object.keys(params).filter(key => !["isReady", "dbConnection", "dbOptions", "publishMethods", "io", "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect", "onSocketDisconnect", "sqlFilePath"].includes(key))
+        const unknownParams = Object.keys(params).filter(key => !["tsTypesDir", "isReady", "dbConnection", "dbOptions", "publishMethods", "io", "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect", "onSocketDisconnect", "sqlFilePath"].includes(key))
         if(unknownParams.length){ 
             console.error(`Unrecognised InitOptions params: ${unknownParams.join()}`);
         }
@@ -293,8 +295,14 @@ export class Prostgles {
         try {
             /* 3. Make DBO object from all tables and views */
             
-            this.dboBuilder = new DboBuilder(this.db, this.schema)
+            this.dboBuilder = new DboBuilder(this.db, this.schema);
             this.dbo = await this.dboBuilder.init();
+
+            if(this.tsGeneratedTypesDir){
+                const fileName = "db_schema_generated_types.ts" //`dbo_${this.schema}_types.ts`;
+                console.log("typescript schema definition file ready -> " + fileName)
+                fs.writeFileSync(this.tsGeneratedTypesDir + fileName, this.dboBuilder.tsTypesDefinition);
+            }
 
             /* 4. Set publish and auth listeners */ //makeDBO(db, allTablesViews, pubSubManager, false)
             await this.setSocketEvents();

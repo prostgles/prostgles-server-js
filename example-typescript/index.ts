@@ -13,8 +13,8 @@ var fs = require('fs');
 // console.log(Prostgles({}));
 // Prostgles({ })
 
-var prostgles = require("prostgles-server");
-
+var prostgles = require("../dist/index");
+// import { DBObj } from "./dbo_public_types";
 
 prostgles({
     dbConnection: {
@@ -31,11 +31,12 @@ prostgles({
     sqlFilePath: path.join(__dirname+'/init.sql'),
     
     io,
+    tsGeneratedTypesDir: path.join(__dirname + '/'),
 	publish: ({ socket, dbo }) => {
 		// if(!socket || !socket._user.admin && !socket._user.id){
 		// 	return false;
         // }
-        
+
         return {
             pixels: "*", 
         }
@@ -54,6 +55,8 @@ prostgles({
     
     isReady: async (dbo) => {
             
+        // let d = <DBObj>dbo;
+        
         /* Benchmarking 10000 inserts */
         var tl = Date.now(), inserts = []
         for(var i = 0; i < 10000; i++){

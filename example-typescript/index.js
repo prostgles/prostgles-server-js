@@ -1,23 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -38,10 +19,11 @@ var http = require('http').createServer(app);
 var io = require("socket.io")(http);
 http.listen(3000);
 var fs = require('fs');
-const Prostgles = __importStar(require("../dist/index.js"));
-var prostgles = require("prostgles-server");
+// import * as Prostgles from "../dist/index.js";
 // Prostgles({ io, dbConnection: {  }})
-console.log(Prostgles);
+// console.log(Prostgles({}));
+// Prostgles({ })
+var prostgles = require("../dist/index");
 prostgles({
     dbConnection: {
         host: "localhost",
@@ -56,6 +38,7 @@ prostgles({
     },
     sqlFilePath: path_1.default.join(__dirname + '/init.sql'),
     io,
+    tsGeneratedTypesDir: path_1.default.join(__dirname + '/'),
     publish: ({ socket, dbo }) => {
         // if(!socket || !socket._user.admin && !socket._user.id){
         // 	return false;
@@ -75,6 +58,7 @@ prostgles({
         };
     },
     isReady: (dbo) => __awaiter(void 0, void 0, void 0, function* () {
+        let d = dbo;
         /* Benchmarking 10000 inserts */
         var tl = Date.now(), inserts = [];
         for (var i = 0; i < 10000; i++) {

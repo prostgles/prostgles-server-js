@@ -52,13 +52,23 @@ export type TableOrViewInfo = TableInfo & ViewInfo & {
 
 type ColumnInfo = {
     name: string;
+
+    /* Simplified data type */
     data_type: string;
+
+    /* values starting with underscore means it's an array of that data type */
+    udt_name: string;
+
+    element_type: string;
 }
 
 type LocalParams = {
     socket: any;
     func: () => any;
     has_rules: boolean;
+}
+function capitalizeFirstLetter(string: string) : string {
+    return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
 export class ViewHandler {
@@ -68,6 +78,11 @@ export class ViewHandler {
     column_names: string[];
     tableOrViewInfo: TableOrViewInfo;
     columnSet: any;
+    tsDataDef: string = "";
+    tsDataName: string = "";
+    tsDboDefs: string[];
+    tsDboDef: string;
+    tsDboName: string = "";
 
     pubSubManager: PubSubManager;
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager){
@@ -88,9 +103,29 @@ export class ViewHandler {
             })
             ), { table: this.name }
         );
+        
+        this.tsDataName = capitalizeFirstLetter(this.name);
+        this.tsDataDef = `type ${this.tsDataName} = {\n`;
+        this.columns.map(({ name, udt_name }) => {
+            this.tsDataDef += `     ${name}?: ${postgresToTsType(udt_name)};\n`
+        });
+        this.tsDataDef += "};";
+
+        this.tsDboDefs = [
+            `   find: (filter: object, selectParams: SelectParams , param3_unused?:any) => Promise<${this.tsDataName}[]>;`,
+            `   findOne: (filter: object, selectParams: SelectParams , param3_unused?:any) => Promise<${this.tsDataName}>;`,
+            `   subscribe: (filter, params: SelectParams, onData: (items: ${this.tsDataName}[]) => any) => { unsubscribe: () => any };`,
+            `   count: (filter: object) => Promise<number>;`
+        ];
+        this.makeDef();
     }
 
-    async find(filter: object, selectParams: SelectParams , param3_unused = null, tableRules: TableRule, localParams?: LocalParams){
+    makeDef(){
+        this.tsDboName = `DBO_${this.name}`;
+        this.tsDboDef = `type ${this.tsDboName} = {\n ${this.tsDboDefs.join("\n")} \n};\n`;
+    }
+
+    async find(filter: object, selectParams: SelectParams , param3_unused = null, tableRules: TableRule, localParams?: LocalParams): Promise<object[]>{
         if(filter && !isPojoObject(filter)) throw `invalid update filter -> ${JSON.stringify(filter)} \n Expecting an object or undefined`;
         try {
             const { select = "*", limit = null, offset = null, orderBy = null, expectOne = false } = selectParams || {};
@@ -135,7 +170,7 @@ export class ViewHandler {
         }                             
     }
 
-    findOne(filter: object, selectParams: SelectParams, param3_unused, table_rules: TableRule, localParams: LocalParams): Promise<object[]>{
+    findOne(filter: object, selectParams: SelectParams, param3_unused, table_rules: TableRule, localParams: LocalParams): Promise<object>{
 
         const { select = "*", orderBy = null, expectOne = true } = selectParams || {};
   
@@ -145,7 +180,7 @@ export class ViewHandler {
             throw ` Issue with ${this.name}.findOne: \n -> ` + e;
         }
     }
-    count(filter: object, param2_unused, param3_unused, table_rules: TableRule, localParams: any = {}): Promise<any>{
+    count(filter: object, param2_unused, param3_unused, table_rules: TableRule, localParams: any = {}): Promise<number>{
         
         try {
             return this.find(filter, { select: "", limit: 1 }, null, table_rules, localParams)
@@ -161,7 +196,7 @@ export class ViewHandler {
     }
 
 
-    subscribe(filter, params: SelectParams, localFunc: ()=>any, table_rules: TableRule, localParams: LocalParams){
+    subscribe(filter, params: SelectParams, localFunc: (items: object[]) => any, table_rules: TableRule, localParams: LocalParams){
         if(!localParams && !localFunc) throw " missing data. provide -> localFunc | localParams { socket } "; 
 
         const { filterFields, forcedFilter } = get(table_rules, "select") || {},
@@ -646,6 +681,11 @@ export class TableHandler extends ViewHandler {
     
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager){
         super(db, tableOrViewInfo, pubSubManager);
+        this.tsDboDefs = this.tsDboDefs.concat([
+            `   update: (filter: object, newData: ${this.tsDataName}, params: UpdateParams) => Promise<any>;`,
+            `   insert: (data: (${this.tsDataName} | ${this.tsDataName}[]), param2: InsertParams) => Promise<any>;`,
+        ]);
+        this.makeDef();
 
         this.remove = this.delete;
 
@@ -654,7 +694,8 @@ export class TableHandler extends ViewHandler {
             queries: 0,
             throttle_queries_per_sec: 500,
             batching: null
-        }
+        };
+
     }
 
     /* TO DO: Maybe finished query batching */
@@ -919,6 +960,11 @@ export class DboBuilder {
     dbo: DbHandler;
     pubSubManager: PubSubManager;
 
+    pojoDefinitions: string[];
+    dboDefinition: string;
+
+    tsTypesDefinition: string;
+
     constructor(db: DB, schema: string = "public"){
         this.db = db;
         this.schema = schema;
@@ -929,13 +975,51 @@ export class DboBuilder {
     async init(): Promise<DbHandler>{
         
         this.tablesOrViews = await this.db.any(getTablesForSchemaPostgresSQL(this.schema));
+
+        let allDataDefs = "";
+        let allDboDefs = "";
+        const common_types = 
+`/* This file was generated by prostgles ${(new Date).toUTCString()} */
+
+type FieldFilter = object | string[] | "*" | "";
+type OrderBy = { key: string, asc: boolean}[] | { [key: string]: boolean }[] | string | string[];
+        
+type SelectParams = {
+    select?: FieldFilter;
+    limit?: number;
+    offset?: number;
+    orderBy?: OrderBy;
+    expectOne?: boolean;
+}
+type UpdateParams = {
+    returning?: FieldFilter;
+    onConflictDoNothing?: boolean;
+    fixIssues?: boolean;
+    multi?: boolean;
+}
+type InsertParams = {
+    returning?: FieldFilter;
+    onConflictDoNothing?: boolean;
+    fixIssues?: boolean;
+}
+type DeleteParams = {
+    returning?: FieldFilter;
+};
+`
+        this.dboDefinition = `export type DBObj = {\n`;
         this.tablesOrViews.map(tov => {
             if(tov.is_view){
                 this.dbo[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager);
             } else {
                 this.dbo[tov.name] = new TableHandler(this.db, tov, this.pubSubManager);
             }
+            allDataDefs += this.dbo[tov.name].tsDataDef + "\n";
+            allDboDefs += this.dbo[tov.name].tsDboDef;
+            this.dboDefinition += ` ${tov.name}: ${this.dbo[tov.name].tsDboName};\n`;
         });
+        this.dboDefinition += "};\n";
+        
+        this.tsTypesDefinition = [common_types, allDataDefs, allDboDefs, this.dboDefinition].join("\n");
         
         return this.dbo;
             // let dbo = makeDBO(db, allTablesViews, pubSubManager, true);
@@ -975,12 +1059,12 @@ let pgp: PGP = pgPromise({
 
 function getTablesForSchemaPostgresSQL(schema: string){
     return " \
-        SELECT t.table_schema as schema, t.table_name as name,json_agg((SELECT x FROM (SELECT c.column_name as name, c.data_type, c.element_type) as x)) as columns  \
+        SELECT t.table_schema as schema, t.table_name as name,json_agg((SELECT x FROM (SELECT c.column_name as name, c.data_type, c.udt_name, c.element_type) as x)) as columns  \
         , CASE WHEN t.table_type = 'VIEW' THEN true ELSE false END as is_view \
         , array_to_json(vr.table_names) as parent_tables \
         FROM information_schema.tables t  \
         INNER join (  \
-            SELECT c.table_schema, c.table_name, c.column_name, c.data_type, e.data_type as element_type  \
+            SELECT c.table_schema, c.table_name, c.column_name, c.data_type, c.udt_name, e.data_type as element_type  \
             FROM information_schema.columns c    \
             LEFT JOIN (SELECT * FROM information_schema.element_types )   e  \
                  ON ((c.table_catalog, c.table_schema, c.table_name, 'TABLE', c.dtd_identifier)  \
@@ -1022,4 +1106,63 @@ function validateObj(obj: object, allowedKeys: string[]): object{
 
 function isPlainObject(o) {
     return Object(o) === o && Object.getPrototypeOf(o) === Object.prototype;
+}
+
+function postgresToTsType(data_type: string, elem_data_type?: string ): string{
+    switch (data_type) {
+        case 'bpchar':
+        case 'char':
+        case 'varchar':
+        case 'text':
+        case 'citext':
+        case 'uuid':
+        case 'bytea':
+        case 'inet':
+        case 'time':
+        case 'timetz':
+        case 'interval':
+        case 'name':
+            return 'string'
+        case 'int2':
+        case 'int4':
+        case 'int8':
+        case 'float4':
+        case 'float8':
+        case 'numeric':
+        case 'money':
+        case 'oid':
+            return 'number'
+        case 'bool':
+            return 'boolean'
+        case 'json':
+        case 'jsonb':
+            return 'Object'
+        case 'date':
+        case 'timestamp':
+        case 'timestamptz':
+            return 'Date'
+        case '_int2':
+        case '_int4':
+        case '_int8':
+        case '_float4':
+        case '_float8':
+        case '_numeric':
+        case '_money':
+            return 'Array<number>'
+        case '_bool':
+            return 'Array<number>'
+        case '_varchar':
+        case '_text':
+        case '_citext':                    
+        case '_uuid':
+        case '_bytea':
+            return 'Array<string>'
+        case '_json':
+        case '_jsonb':
+            return 'Array<Object>'
+        case '_timestamptz':
+            return 'Array<Date>'
+        default:
+            return 'any'
+    }
 }

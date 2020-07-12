@@ -60,6 +60,7 @@ prostgles({
                 //let res = await dbo.pixels.insert(data);
                 // console.log(Date.now() - tl, "ms");
                 console.log(data)// res;
+                dbo.pixels.insert({ blb: data })
             }
         }
     },

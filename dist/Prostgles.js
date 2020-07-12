@@ -32,6 +32,7 @@ function getDbConnection(dbConnection, options) {
     return db;
 }
 const QueryFile = require('pg-promise').QueryFile;
+const fs = require('fs');
 class Prostgles {
     constructor(params) {
         this.dbConnection = {
@@ -43,8 +44,8 @@ class Prostgles {
         if (!params)
             throw "InitOptions missing";
         if (!params.io)
-            throw console.error("io missing. WebSockets disabled");
-        const unknownParams = Object.keys(params).filter(key => !["isReady", "dbConnection", "dbOptions", "publishMethods", "io", "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect", "onSocketDisconnect", "sqlFilePath"].includes(key));
+            console.error("io missing. WebSockets disabled");
+        const unknownParams = Object.keys(params).filter(key => !["tsTypesDir", "isReady", "dbConnection", "dbOptions", "publishMethods", "io", "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect", "onSocketDisconnect", "sqlFilePath"].includes(key));
         if (unknownParams.length) {
             console.error(`Unrecognised InitOptions params: ${unknownParams.join()}`);
         }
@@ -67,6 +68,11 @@ class Prostgles {
                 /* 3. Make DBO object from all tables and views */
                 this.dboBuilder = new DboBuilder_1.DboBuilder(this.db, this.schema);
                 this.dbo = yield this.dboBuilder.init();
+                if (this.tsGeneratedTypesDir) {
+                    const fileName = "db_schema_generated_types.ts"; //`dbo_${this.schema}_types.ts`;
+                    console.log("typescript schema definition file ready -> " + fileName);
+                    fs.writeFileSync(this.tsGeneratedTypesDir + fileName, this.dboBuilder.tsTypesDefinition);
+                }
                 /* 4. Set publish and auth listeners */ //makeDBO(db, allTablesViews, pubSubManager, false)
                 yield this.setSocketEvents();
                 /* 5. Finish init and provide DBO object */

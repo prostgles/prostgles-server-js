@@ -75,7 +75,7 @@ export declare class PubSubManager {
     addSync(syncParams: AddSyncParams): Promise<string>;
     parseCondition: (condition: string) => string;
     addSub(subscriptionParams: AddSubscriptionParams): Promise<string>;
-    removeLocalSub(table_name: string, condition: string, func: () => any): void;
+    removeLocalSub(table_name: string, condition: string, func: (items: object[]) => any): void;
     onSocketDisconnected(socket: any, channel_name: any): void;
     dropTrigger(table_name: any): void;
     getTriggerName(table_name: any): string;

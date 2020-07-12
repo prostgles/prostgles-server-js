@@ -6,5 +6,6 @@ CREATE TABLE IF NOT EXISTS pixels (
     rgb     TEXT,
     xy      TEXT,
     last_updated BIGINT,
-    drawn   BOOLEAN
+    drawn   BOOLEAN,
+    blb     BYTEA
 );

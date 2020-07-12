@@ -11,6 +11,8 @@
 	</head>
 	<body>
         <input type = "file"/>
+        
+        <div class="wrapper"></div>
 		<script>
             
             const socket = io();
@@ -18,10 +20,33 @@
             prostgles({
                 socket, 
                 isReady: (db, methods) => {
-                    db.pixels.find({}).then(console.log);
+                    window.db = db;
+                    db.pixels.subscribe({ blb: { $not: null }}, { limit: 2 }, items => {
+                        let div = document.querySelector(".wrapper");
+                        div.innerHTML = "";
+
+                        items.map(item => {
+                            let img = document.createElement("img");
+                            var bytes = new Uint8Array(item.blb);
+
+                            img.style = "width: 100px; height: 100px;";
+                            img.src = 'data:image/jpg;base64, ' + arrayBufferToBase64(item.blb)
+                            div.append(img);
+                        });
+                    });
+
+                    function arrayBufferToBase64( buffer ) {
+                        var binary = '';
+                        var bytes = new Uint8Array( buffer );
+                        var len = bytes.byteLength;
+                        for (var i = 0; i < len; i++) {
+                            binary += String.fromCharCode( bytes[ i ] );
+                        }
+                        return window.btoa( binary );
+                    }
+
 
                     document.querySelector("input").onchange = e => {
-                        console.log(e.target.files)
                         methods.upload(e.target.files[0])
                     }
                 },

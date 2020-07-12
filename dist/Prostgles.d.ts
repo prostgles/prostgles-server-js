@@ -163,6 +163,7 @@ export declare class Prostgles {
         dbo: any;
     }): any;
     sqlFilePath?: string;
+    tsGeneratedTypesDir?: string;
     constructor(params: InitOptions);
     checkDb(): void;
     init(isReady: (dbo: DbHandler, db: DB) => any): Promise<boolean>;

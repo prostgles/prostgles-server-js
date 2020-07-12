@@ -28,6 +28,8 @@ export declare type TableOrViewInfo = TableInfo & ViewInfo & {
 declare type ColumnInfo = {
     name: string;
     data_type: string;
+    udt_name: string;
+    element_type: string;
 };
 declare type LocalParams = {
     socket: any;
@@ -41,12 +43,18 @@ export declare class ViewHandler {
     column_names: string[];
     tableOrViewInfo: TableOrViewInfo;
     columnSet: any;
+    tsDataDef: string;
+    tsDataName: string;
+    tsDboDefs: string[];
+    tsDboDef: string;
+    tsDboName: string;
     pubSubManager: PubSubManager;
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager);
-    find(filter: object, selectParams: SelectParams, param3_unused: any, tableRules: TableRule, localParams?: LocalParams): Promise<any>;
-    findOne(filter: object, selectParams: SelectParams, param3_unused: any, table_rules: TableRule, localParams: LocalParams): Promise<object[]>;
-    count(filter: object, param2_unused: any, param3_unused: any, table_rules: TableRule, localParams?: any): Promise<any>;
-    subscribe(filter: any, params: SelectParams, localFunc: () => any, table_rules: TableRule, localParams: LocalParams): Promise<{
+    makeDef(): void;
+    find(filter: object, selectParams: SelectParams, param3_unused: any, tableRules: TableRule, localParams?: LocalParams): Promise<object[]>;
+    findOne(filter: object, selectParams: SelectParams, param3_unused: any, table_rules: TableRule, localParams: LocalParams): Promise<object>;
+    count(filter: object, param2_unused: any, param3_unused: any, table_rules: TableRule, localParams?: any): Promise<number>;
+    subscribe(filter: any, params: SelectParams, localFunc: (items: object[]) => any, table_rules: TableRule, localParams: LocalParams): Promise<{
         channelName: string;
     }> | Readonly<{
         unsubscribe: () => void;
@@ -120,6 +128,9 @@ export declare class DboBuilder {
     schema: string;
     dbo: DbHandler;
     pubSubManager: PubSubManager;
+    pojoDefinitions: string[];
+    dboDefinition: string;
+    tsTypesDefinition: string;
     constructor(db: DB, schema?: string);
     init(): Promise<DbHandler>;
 }

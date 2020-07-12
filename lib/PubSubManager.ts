@@ -760,7 +760,7 @@ export class PubSubManager {
         }
     }
 
-    removeLocalSub(table_name: string, condition: string, func: ()=>any){
+    removeLocalSub(table_name: string, condition: string, func: (items: object[])=>any){
         let cond = this.parseCondition(condition);
         if(get(this.subs, [table_name, cond, "subs"])){
             this.subs[table_name][cond].subs.map((sub, i) => {
