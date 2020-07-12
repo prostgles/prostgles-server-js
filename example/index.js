@@ -22,7 +22,7 @@ prostgles({
     },
     sqlFilePath: path.join(__dirname+'/init.sql'),
     
-    ioObj: io,
+    io,
 	publish: ({ socket, dbo }) => {        
         return {
             pixels: "*", 
@@ -50,6 +50,18 @@ prostgles({
         app.get('*', function(req, res){
 			res.status(404).send('Page not found');
 		});
+    },
+
+    publishMethods: ({ socket, dbo }) => { 
+
+        return {
+            upload: async (data) => {
+                // let  tl = Date.now();
+                //let res = await dbo.pixels.insert(data);
+                // console.log(Date.now() - tl, "ms");
+                console.log(data)// res;
+            }
+        }
     },
 	// onSocketConnect: async ({ socket, dbo }) => {
     //     /* Sending file */

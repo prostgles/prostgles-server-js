@@ -40,6 +40,14 @@ class Prostgles {
         };
         this.schema = "public";
         this.wsChannelNamePrefix = "_psqlWS_";
+        if (!params)
+            throw "InitOptions missing";
+        if (!params.io)
+            throw console.error("io missing. WebSockets disabled");
+        const unknownParams = Object.keys(params).filter(key => !["isReady", "dbConnection", "dbOptions", "publishMethods", "io", "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect", "onSocketDisconnect", "sqlFilePath"].includes(key));
+        if (unknownParams.length) {
+            console.error(`Unrecognised InitOptions params: ${unknownParams.join()}`);
+        }
         Object.assign(this, params);
     }
     checkDb() {

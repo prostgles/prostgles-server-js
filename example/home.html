@@ -10,7 +10,7 @@
         <script src="https://unpkg.com/prostgles-client@1.0.1/dist/index.js" type="text/javascript"></script>	
 	</head>
 	<body>
-
+        <input type = "file"/>
 		<script>
             
             const socket = io();
@@ -18,7 +18,12 @@
             prostgles({
                 socket, 
                 isReady: (db, methods) => {
-                    db.pixels.find({}).then(console.log)
+                    db.pixels.find({}).then(console.log);
+
+                    document.querySelector("input").onchange = e => {
+                        console.log(e.target.files)
+                        methods.upload(e.target.files[0])
+                    }
                 },
                 onDisconnect: (err, res) => {
                     // location.reload();

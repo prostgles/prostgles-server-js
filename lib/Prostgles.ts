@@ -265,6 +265,13 @@ export class Prostgles {
     sqlFilePath?: string;
 
     constructor(params: InitOptions){
+        if(!params) throw "InitOptions missing";
+        if(!params.io) console.error("io missing. WebSockets disabled");
+        const unknownParams = Object.keys(params).filter(key => !["isReady", "dbConnection", "dbOptions", "publishMethods", "io", "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect", "onSocketDisconnect", "sqlFilePath"].includes(key))
+        if(unknownParams.length){ 
+            console.error(`Unrecognised InitOptions params: ${unknownParams.join()}`);
+        }
+        
         Object.assign(this, params);
     }
 
