@@ -682,8 +682,10 @@ export class TableHandler extends ViewHandler {
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager){
         super(db, tableOrViewInfo, pubSubManager);
         this.tsDboDefs = this.tsDboDefs.concat([
-            `   update: (filter: object, newData: ${this.tsDataName}, params: UpdateParams) => Promise<any>;`,
-            `   insert: (data: (${this.tsDataName} | ${this.tsDataName}[]), param2: InsertParams) => Promise<any>;`,
+            `   update: (filter: object, newData: ${this.tsDataName}, params: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
+            `   upsert: (filter: object, newData: ${this.tsDataName}, params: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
+            `   insert: (data: (${this.tsDataName} | ${this.tsDataName}[]), param2: InsertParams) => Promise<void | ${this.tsDataName}>;`,
+            `   delete: (filter: object, params: DeleteParams) => Promise<void | ${this.tsDataName}>;`,
         ]);
         this.makeDef();
 
@@ -712,10 +714,6 @@ export class TableHandler extends ViewHandler {
 
             return true;
         }
-    }
-   
-    remove(filter: object, newData: object, params: UpdateParams, tableRules: TableRule, localParams: LocalParams = null){
-        return this.delete(filter, newData, params, tableRules, localParams);
     }
 
     async update(filter: object, newData: object, params: UpdateParams, tableRules: TableRule, localParams: LocalParams = null){
@@ -856,8 +854,12 @@ export class TableHandler extends ViewHandler {
         
         return this.db[queryType](_query, { _psqlWS_tableName: this.name });
     };
+   
+    remove(filter: object, params: UpdateParams, param3_unused: null, tableRules: TableRule, localParams: LocalParams = null){
+        return this.delete(filter, params, param3_unused , tableRules, localParams);
+    }
 
-    upsert(filter, newData, params, table_rules, localParams: LocalParams = null){
+    upsert(filter, newData, params: UpdateParams, table_rules, localParams: LocalParams = null){
         
         return this.find(filter, { select: "", limit: 1 }, {}, table_rules, localParams)
             .then(exists => {
