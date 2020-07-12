@@ -1,12 +1,20 @@
-const express = require('express');
+import express from 'express';
 const app = express();
-const path = require('path');
+import path from 'path';
 var http = require('http').createServer(app);
-var io = require('socket.io')(http);
+
+import * as socketio from "socket.io";
+var io = require("socket.io")(http);
 http.listen(3000);
 var fs = require('fs');
 
-let prostgles = require('../dist/index.js');
+// import * as Prostgles from "../dist/index.js";
+// Prostgles({ io, dbConnection: {  }})
+// console.log(Prostgles({}));
+// Prostgles({ })
+
+var prostgles = require("prostgles-server");
+
 
 prostgles({
     dbConnection: {
@@ -22,7 +30,7 @@ prostgles({
     },
     sqlFilePath: path.join(__dirname+'/init.sql'),
     
-    ioObj: io,
+    io,
 	publish: ({ socket, dbo }) => {
 		// if(!socket || !socket._user.admin && !socket._user.id){
 		// 	return false;

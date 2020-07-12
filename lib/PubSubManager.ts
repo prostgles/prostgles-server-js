@@ -6,7 +6,7 @@
 import { PostgresNotifListenManager } from "./PostgresNotifListenManager";
 import { get } from "./utils";
 import { TableOrViewInfo, TableInfo, DbHandler, TableHandler } from "./DboBuilder";
-import { TableRule, SelectParams, DB, OrderBy } from "./index";
+import { TableRule, SelectParams, DB, OrderBy } from "./Prostgles";
 
 type SyncParams = {
     socket_id: string; 

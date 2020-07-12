@@ -6,6 +6,7 @@
         "es2019"
       ],
       // "strict": true,
+      "esModuleInterop" : true,
       "module": "commonjs",
       // "removeComments": true,
       "sourceMap": true,

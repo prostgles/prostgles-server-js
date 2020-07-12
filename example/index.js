@@ -23,24 +23,9 @@ prostgles({
     sqlFilePath: path.join(__dirname+'/init.sql'),
     
     ioObj: io,
-	publish: ({ socket, dbo }) => {
-		// if(!socket || !socket._user.admin && !socket._user.id){
-		// 	return false;
-        // }
-        
+	publish: ({ socket, dbo }) => {        
         return {
             pixels: "*", 
-        }
-    },
-    publishMethods: ({ socket, dbo }) => { 
-
-        return {
-            insertPixel: async (data) => {
-                // let  tl = Date.now();
-                let res = await dbo.pixels.insert(data);
-                // console.log(Date.now() - tl, "ms");
-                return res;
-            }
         }
     },
     

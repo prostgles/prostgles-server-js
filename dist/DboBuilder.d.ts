@@ -3,7 +3,7 @@ declare global {
     export interface Promise<T> extends Bluebird<T> {
     }
 }
-import { DB, TableRule, OrderBy, SelectParams, InsertParams, UpdateParams, DeleteParams } from "./index";
+import { DB, TableRule, OrderBy, SelectParams, InsertParams, UpdateParams, DeleteParams } from "./Prostgles";
 import { PubSubManager } from "./PubSubManager";
 /**
  * @example

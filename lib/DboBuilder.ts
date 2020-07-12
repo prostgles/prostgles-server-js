@@ -11,7 +11,7 @@ import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 
 import { get } from "./utils";
-import { DB, TableRule, OrderBy, SelectRule, InsertRule, UpdateRule, DeleteRule, SyncRule, SelectParams, InsertParams, UpdateParams, DeleteParams } from "./index";
+import { DB, TableRule, OrderBy, SelectRule, InsertRule, UpdateRule, DeleteRule, SyncRule, SelectParams, InsertParams, UpdateParams, DeleteParams } from "./Prostgles";
 import { PubSubManager } from "./PubSubManager";
 import { promises } from "fs";
 /**
