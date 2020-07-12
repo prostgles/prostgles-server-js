@@ -13,7 +13,14 @@
 
 		<script>
             
-            const socket = io();
+            const socket = io({
+                // query: "dawdwa",
+                'reconnection': true,
+                'reconnectionDelay': 1000,
+                'reconnectionDelayMax' : 5000,
+                'reconnectionAttempts': 5 
+            });
+            socket.on("home", console.log)
 
             prostgles({
                 socket, 

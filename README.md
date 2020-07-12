@@ -1,1 +1,1 @@
-# prostgles-server-js
+# prostgles-server
