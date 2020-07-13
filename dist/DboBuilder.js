@@ -220,7 +220,7 @@ class ViewHandler {
             return result;
         };
         if (!isPlainObject(filter))
-            throw "expecting an object but got -> " + JSON.parse(filter);
+            throw "expecting an object but got -> " + JSON.stringify(filter);
         let result = "";
         let _filter = Object.assign({}, filter);
         if (forcedFilter) {
@@ -237,15 +237,6 @@ class ViewHandler {
             else
                 return " WHERE " + cond;
         }
-    }
-    getCustomParsers() {
-        return [{
-                aliases: ["@@"],
-                get: (key, val) => {
-                    console.log(this.columns.find(({ name }) => name === key));
-                    return key + " > ${" + key + "} ";
-                }
-            }];
     }
     /* NEW API !!! :) */
     getCondition(filter, allowed_colnames) {
@@ -526,8 +517,10 @@ class TableHandler extends ViewHandler {
     constructor(db, tableOrViewInfo, pubSubManager) {
         super(db, tableOrViewInfo, pubSubManager);
         this.tsDboDefs = this.tsDboDefs.concat([
-            `   update: (filter: object, newData: ${this.tsDataName}, params: UpdateParams) => Promise<any>;`,
-            `   insert: (data: (${this.tsDataName} | ${this.tsDataName}[]), param2: InsertParams) => Promise<any>;`,
+            `   update: (filter: object, newData: ${this.tsDataName}, params: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
+            `   upsert: (filter: object, newData: ${this.tsDataName}, params: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
+            `   insert: (data: (${this.tsDataName} | ${this.tsDataName}[]), param2: InsertParams) => Promise<void | ${this.tsDataName}>;`,
+            `   delete: (filter: object, params: DeleteParams) => Promise<void | ${this.tsDataName}>;`,
         ]);
         this.makeDef();
         this.remove = this.delete;
@@ -551,9 +544,6 @@ class TableHandler extends ViewHandler {
         if (this.io_stats.queries > this.io_stats.throttle_queries_per_sec) {
             return true;
         }
-    }
-    remove(filter, newData, params, tableRules, localParams = null) {
-        return this.delete(filter, newData, params, tableRules, localParams);
     }
     update(filter, newData, params, tableRules, localParams = null) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -677,6 +667,9 @@ class TableHandler extends ViewHandler {
         return this.db[queryType](_query, { _psqlWS_tableName: this.name });
     }
     ;
+    remove(filter, params, param3_unused, tableRules, localParams = null) {
+        return this.delete(filter, params, param3_unused, tableRules, localParams);
+    }
     upsert(filter, newData, params, table_rules, localParams = null) {
         return this.find(filter, { select: "", limit: 1 }, {}, table_rules, localParams)
             .then(exists => {

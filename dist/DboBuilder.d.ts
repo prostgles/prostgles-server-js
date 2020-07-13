@@ -36,6 +36,11 @@ declare type LocalParams = {
     func: () => any;
     has_rules: boolean;
 };
+declare type Filter = object | {
+    $and: Filter[];
+} | {
+    $or: Filter[];
+} | {};
 export declare class ViewHandler {
     db: DB;
     name: string;
@@ -51,21 +56,17 @@ export declare class ViewHandler {
     pubSubManager: PubSubManager;
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager);
     makeDef(): void;
-    find(filter: object, selectParams: SelectParams, param3_unused: any, tableRules: TableRule, localParams?: LocalParams): Promise<object[]>;
-    findOne(filter: object, selectParams: SelectParams, param3_unused: any, table_rules: TableRule, localParams: LocalParams): Promise<object>;
-    count(filter: object, param2_unused: any, param3_unused: any, table_rules: TableRule, localParams?: any): Promise<number>;
-    subscribe(filter: any, params: SelectParams, localFunc: (items: object[]) => any, table_rules: TableRule, localParams: LocalParams): Promise<{
+    find(filter: Filter, selectParams: SelectParams, param3_unused: any, tableRules: TableRule, localParams?: LocalParams): Promise<object[]>;
+    findOne(filter: Filter, selectParams: SelectParams, param3_unused: any, table_rules: TableRule, localParams: LocalParams): Promise<object>;
+    count(filter: Filter, param2_unused: any, param3_unused: any, table_rules: TableRule, localParams?: any): Promise<number>;
+    subscribe(filter: Filter, params: SelectParams, localFunc: (items: object[]) => any, table_rules: TableRule, localParams: LocalParams): Promise<{
         channelName: string;
     }> | Readonly<{
         unsubscribe: () => void;
     }>;
     prepareColumnSet(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean): string;
-    prepareWhere(filter: any, forcedFilter: object, filterFields: FieldFilter, excludeWhere?: boolean): any;
-    getCustomParsers(): {
-        aliases: string[];
-        get: (key: any, val: any) => string;
-    }[];
-    getCondition(filter: any, allowed_colnames: string[]): string;
+    prepareWhere(filter: Filter, forcedFilter: object, filterFields: FieldFilter, excludeWhere?: boolean): any;
+    getCondition(filter: object, allowed_colnames: string[]): string;
     prepareSort(orderBy: OrderBy, allowed_cols: any): string;
     prepareLimitQuery(limit: number, maxLimit: number): string;
     prepareOffsetQuery(offset: number): string;
@@ -107,13 +108,13 @@ export declare class TableHandler extends ViewHandler {
     };
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager);
     willBatch(query: string): boolean;
-    remove(filter: object, newData: object, params: UpdateParams, tableRules: TableRule, localParams?: LocalParams): any;
-    update(filter: object, newData: object, params: UpdateParams, tableRules: TableRule, localParams?: LocalParams): Promise<any>;
+    update(filter: Filter, newData: object, params: UpdateParams, tableRules: TableRule, localParams?: LocalParams): Promise<any>;
     validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues }: ValidatedParams): ValidDataAndColumnSet;
     insert(data: (object | object[]), param2: InsertParams, param3_unused: any, tableRules: TableRule, localParams?: any): Promise<any>;
-    delete(filter: any, params: DeleteParams, param3_unused: any, table_rules: TableRule, localParams?: LocalParams): any;
-    upsert(filter: any, newData: any, params: any, table_rules: any, localParams?: LocalParams): Promise<any>;
-    sync(filter: any, params: SelectParams, param3_unused: any, table_rules: TableRule, localParams: LocalParams): Promise<{
+    delete(filter: Filter, params: DeleteParams, param3_unused: any, table_rules: TableRule, localParams?: LocalParams): any;
+    remove(filter: Filter, params: UpdateParams, param3_unused: null, tableRules: TableRule, localParams?: LocalParams): any;
+    upsert(filter: Filter, newData: object, params: UpdateParams, table_rules: TableRule, localParams?: LocalParams): Promise<any>;
+    sync(filter: Filter, params: SelectParams, param3_unused: any, table_rules: TableRule, localParams: LocalParams): Promise<{
         channelName: string;
         id_fields: string[];
         synced_field: string;

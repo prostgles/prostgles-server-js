@@ -22,7 +22,7 @@ import { promises } from "fs";
  * 
  * field_name: false -> means all fields except this
  */
-export type FieldFilter = object | string[] | "*" | "";
+export type FieldFilter = object | string[] | "*" | "" ;
 
 // type DBO = {
 //     { [key: strign]: }
@@ -70,6 +70,8 @@ type LocalParams = {
 function capitalizeFirstLetter(string: string) : string {
     return string.charAt(0).toUpperCase() + string.slice(1);
 }
+
+type Filter = object | { $and: Filter[] } | { $or: Filter[] } | {};
 
 export class ViewHandler {
     db: DB;
@@ -125,7 +127,7 @@ export class ViewHandler {
         this.tsDboDef = `type ${this.tsDboName} = {\n ${this.tsDboDefs.join("\n")} \n};\n`;
     }
 
-    async find(filter: object, selectParams: SelectParams , param3_unused = null, tableRules: TableRule, localParams?: LocalParams): Promise<object[]>{
+    async find(filter: Filter, selectParams: SelectParams , param3_unused = null, tableRules: TableRule, localParams?: LocalParams): Promise<object[]>{
         if(filter && !isPojoObject(filter)) throw `invalid update filter -> ${JSON.stringify(filter)} \n Expecting an object or undefined`;
         try {
             const { select = "*", limit = null, offset = null, orderBy = null, expectOne = false } = selectParams || {};
@@ -170,7 +172,7 @@ export class ViewHandler {
         }                             
     }
 
-    findOne(filter: object, selectParams: SelectParams, param3_unused, table_rules: TableRule, localParams: LocalParams): Promise<object>{
+    findOne(filter: Filter, selectParams: SelectParams, param3_unused, table_rules: TableRule, localParams: LocalParams): Promise<object>{
 
         const { select = "*", orderBy = null, expectOne = true } = selectParams || {};
   
@@ -180,7 +182,7 @@ export class ViewHandler {
             throw ` Issue with ${this.name}.findOne: \n -> ` + e;
         }
     }
-    count(filter: object, param2_unused, param3_unused, table_rules: TableRule, localParams: any = {}): Promise<number>{
+    count(filter: Filter, param2_unused, param3_unused, table_rules: TableRule, localParams: any = {}): Promise<number>{
         
         try {
             return this.find(filter, { select: "", limit: 1 }, null, table_rules, localParams)
@@ -196,7 +198,7 @@ export class ViewHandler {
     }
 
 
-    subscribe(filter, params: SelectParams, localFunc: (items: object[]) => any, table_rules: TableRule, localParams: LocalParams){
+    subscribe(filter: Filter, params: SelectParams, localFunc: (items: object[]) => any, table_rules: TableRule, localParams: LocalParams){
         if(!localParams && !localFunc) throw " missing data. provide -> localFunc | localParams { socket } "; 
 
         const { filterFields, forcedFilter } = get(table_rules, "select") || {},
@@ -288,7 +290,7 @@ export class ViewHandler {
     //     // return result;
     // }
 
-    prepareWhere(filter: any, forcedFilter: object, filterFields: FieldFilter, excludeWhere = false){
+    prepareWhere(filter: Filter, forcedFilter: object, filterFields: FieldFilter, excludeWhere = false){
         const parseFilter = (f: any, parentFilter: any = null) => {
             let result = "";
             let keys = Object.keys(f);
@@ -314,7 +316,7 @@ export class ViewHandler {
             return result;
         }
 
-        if(!isPlainObject(filter)) throw "expecting an object but got -> " + JSON.parse(filter);
+        if(!isPlainObject(filter)) throw "expecting an object but got -> " + JSON.stringify(filter);
         
         let result = "";
         let _filter = { ... filter };
@@ -334,18 +336,8 @@ export class ViewHandler {
         }
     }
 
-    getCustomParsers(){
-        return [{ 
-            aliases: ["@@"], 
-            get: (key, val) => {
-                console.log(this.columns.find(({ name }) => name === key));
-                return key + " > ${" + key + "} "
-            } 
-        }]
-    }
-
     /* NEW API !!! :) */
-    getCondition(filter, allowed_colnames: string[]){
+    getCondition(filter: object, allowed_colnames: string[]){
         
         const parseDataType = (key, col = null) => {
                 const _col = col || this.columns.find(({ name }) => name === key);
@@ -716,7 +708,7 @@ export class TableHandler extends ViewHandler {
         }
     }
 
-    async update(filter: object, newData: object, params: UpdateParams, tableRules: TableRule, localParams: LocalParams = null){
+    async update(filter: Filter, newData: object, params: UpdateParams, tableRules: TableRule, localParams: LocalParams = null){
         if(!newData || !Object.keys(newData).length) throw "no update data provided";
         if(!filter || !isPojoObject(filter)) throw `invalid update filter -> ${JSON.stringify(filter)} \n Expecting an object `;
 
@@ -822,7 +814,7 @@ export class TableHandler extends ViewHandler {
         return this.db.tx(t => t[queryType](query));
     };
     
-    delete(filter, params: DeleteParams, param3_unused, table_rules: TableRule, localParams: LocalParams = null){    //{ socket, func, has_rules = false, socketDb } = {}
+    delete(filter: Filter, params: DeleteParams, param3_unused, table_rules: TableRule, localParams: LocalParams = null){    //{ socket, func, has_rules = false, socketDb } = {}
         const { returning } = params || {};
 
         if(!filter) throw `invalid/missing filter object -> ${JSON.stringify(filter)} \n Expecting empty object or something like { some_column: "filter_value" }`;
@@ -855,11 +847,11 @@ export class TableHandler extends ViewHandler {
         return this.db[queryType](_query, { _psqlWS_tableName: this.name });
     };
    
-    remove(filter: object, params: UpdateParams, param3_unused: null, tableRules: TableRule, localParams: LocalParams = null){
+    remove(filter: Filter, params: UpdateParams, param3_unused: null, tableRules: TableRule, localParams: LocalParams = null){
         return this.delete(filter, params, param3_unused , tableRules, localParams);
     }
 
-    upsert(filter, newData, params: UpdateParams, table_rules, localParams: LocalParams = null){
+    upsert(filter: Filter, newData: object, params: UpdateParams, table_rules: TableRule, localParams: LocalParams = null){
         
         return this.find(filter, { select: "", limit: 1 }, {}, table_rules, localParams)
             .then(exists => {
@@ -878,7 +870,7 @@ export class TableHandler extends ViewHandler {
     };
 
     /* External request. Cannot sync from server */
-    async sync(filter, params: SelectParams, param3_unused, table_rules: TableRule, localParams: LocalParams){
+    async sync(filter: Filter, params: SelectParams, param3_unused, table_rules: TableRule, localParams: LocalParams){
         const { socket } = localParams || {};
 
         if(!socket) throw "INTERNAL ERROR: socket missing";

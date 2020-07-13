@@ -24,6 +24,7 @@ var fs = require('fs');
 // console.log(Prostgles({}));
 // Prostgles({ })
 var prostgles = require("../dist/index");
+// import { DBObj } from "./dbo_public_types";
 prostgles({
     dbConnection: {
         host: "localhost",
@@ -58,7 +59,7 @@ prostgles({
         };
     },
     isReady: (dbo) => __awaiter(void 0, void 0, void 0, function* () {
-        let d = dbo;
+        // let d = <DBObj>dbo;
         /* Benchmarking 10000 inserts */
         var tl = Date.now(), inserts = [];
         for (var i = 0; i < 10000; i++) {

@@ -391,6 +391,7 @@ export class Prostgles {
                 
                 /*  RUN Raw sql from client IF PUBLISHED
                 */
+                let fullSchema = [];
                 if(this.publishRawSQL && typeof this.publishRawSQL === "function"){
                     const canRunSQL = await this.publishRawSQL({ socket, dbo });
 
@@ -436,7 +437,8 @@ export class Prostgles {
                         });
                         if(db){
                             // let allTablesViews = await db.any(STEP2_GET_ALL_TABLES_AND_COLUMNS);
-                            schema.sql = allTablesViews;
+                            fullSchema = allTablesViews;
+                            schema.sql = {};
                         } else console.error("db missing");
                     }
                 }
@@ -482,7 +484,7 @@ export class Prostgles {
                 });
                 
                 const methods = await publishParser.getMethods({ publishMethods: this.publishMethods, socket, dbo });
-                socket.emit(WS_CHANNEL_NAME.SCHEMA, { schema, methods: Object.keys(methods) });
+                socket.emit(WS_CHANNEL_NAME.SCHEMA, { schema, methods: Object.keys(methods), ...(fullSchema? { fullSchema } : {}) });
 
                 function makeSocketError(cb, err){
                     const err_msg = err.toString();
