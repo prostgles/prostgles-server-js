@@ -23,20 +23,22 @@ var fs = require('fs');
 // Prostgles({ io, dbConnection: {  }})
 // console.log(Prostgles({}));
 // Prostgles({ })
-var prostgles = require("../dist/index");
-// import { DBObj } from "./dbo_public_types";
-prostgles({
+// var prostgles = require("../dist/index");
+// import prostgles from "prostgles-server";
+const index_1 = __importDefault(require("../dist/index"));
+index_1.default({
     dbConnection: {
         host: "localhost",
-        port: "5432",
+        port: 5432,
+        database: "example",
         user: process.env.PRGL_USER,
         password: process.env.PRGL_PWD
     },
-    dbOptions: {
-        application_name: "prostgles_api",
-        max: 100,
-        poolIdleTimeout: 10000
-    },
+    // dbOptions: {
+    //     application_name: "prostgles_api",
+    //     max: 100,
+    //     poolIdleTimeout: 10000
+    // },
     sqlFilePath: path_1.default.join(__dirname + '/init.sql'),
     io,
     tsGeneratedTypesDir: path_1.default.join(__dirname + '/'),
@@ -45,7 +47,18 @@ prostgles({
         // 	return false;
         // }
         return {
-            pixels: "*",
+            pixels: {
+                delete: 22,
+                select: {
+                    fields: [{ rgb: false }]
+                },
+            },
+            sql_tables: {
+                delete: 22,
+                select: {
+                    fields: [{ rgb: false }]
+                },
+            }
         };
     },
     publishMethods: ({ socket, dbo }) => {
@@ -59,7 +72,6 @@ prostgles({
         };
     },
     isReady: (dbo) => __awaiter(void 0, void 0, void 0, function* () {
-        // let d = <DBObj>dbo;
         /* Benchmarking 10000 inserts */
         var tl = Date.now(), inserts = [];
         for (var i = 0; i < 10000; i++) {

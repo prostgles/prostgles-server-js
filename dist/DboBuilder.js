@@ -26,6 +26,8 @@ class ViewHandler {
         this.tsDataDef = "";
         this.tsDataName = "";
         this.tsDboName = "";
+        this.tsFieldFilter = "";
+        this.tsFieldFilterName = "";
         if (!db || !tableOrViewInfo)
             throw "";
         this.db = db;
@@ -36,16 +38,18 @@ class ViewHandler {
         this.pubSubManager = pubSubManager;
         this.columnSet = new pgp.helpers.ColumnSet(this.columns.map(({ name, data_type }) => (Object.assign({ name }, (["json", "jsonb"].includes(data_type) ? { mod: ":json" } : {})))), { table: this.name });
         this.tsDataName = capitalizeFirstLetter(this.name);
+        this.tsFieldFilterName = "FieldFilter_" + this.name;
         this.tsDataDef = `type ${this.tsDataName} = {\n`;
         this.columns.map(({ name, udt_name }) => {
             this.tsDataDef += `     ${name}?: ${postgresToTsType(udt_name)};\n`;
         });
         this.tsDataDef += "};";
+        // this.tsFieldFilter = `type ${this.tsFieldFilterName} = {} | ${this.column_names.map(d => " { [" + JSON.stringify(d) + "]: boolean } ").join(" | ")} `
         this.tsDboDefs = [
-            `   find: (filter: object, selectParams: SelectParams , param3_unused?:any) => Promise<${this.tsDataName}[]>;`,
-            `   findOne: (filter: object, selectParams: SelectParams , param3_unused?:any) => Promise<${this.tsDataName}>;`,
-            `   subscribe: (filter, params: SelectParams, onData: (items: ${this.tsDataName}[]) => any) => { unsubscribe: () => any };`,
-            `   count: (filter: object) => Promise<number>;`
+            `   find: (filter?: object, selectParams?: SelectParams , param3_unused?:any) => Promise<${this.tsDataName}[]>;`,
+            `   findOne: (filter?: object, selectParams?: SelectParams , param3_unused?:any) => Promise<${this.tsDataName}>;`,
+            `   subscribe: (filter: object, params: SelectParams, onData: (items: ${this.tsDataName}[]) => any) => { unsubscribe: () => any };`,
+            `   count: (filter?: object) => Promise<number>;`
         ];
         this.makeDef();
     }
@@ -53,11 +57,14 @@ class ViewHandler {
         this.tsDboName = `DBO_${this.name}`;
         this.tsDboDef = `type ${this.tsDboName} = {\n ${this.tsDboDefs.join("\n")} \n};\n`;
     }
+    getFullDef() {
+        return [];
+    }
     find(filter, selectParams, param3_unused = null, tableRules, localParams) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (filter && !isPojoObject(filter))
-                throw `invalid update filter -> ${JSON.stringify(filter)} \n Expecting an object or undefined`;
             try {
+                if (filter && !isPojoObject(filter))
+                    throw `invalid update filter -> ${JSON.stringify(filter)} \n Expecting an object or undefined`;
                 const { select = "*", limit = null, offset = null, orderBy = null, expectOne = false } = selectParams || {};
                 let fields, filterFields, forcedFilter, maxLimit;
                 if (tableRules) {
@@ -87,17 +94,17 @@ class ViewHandler {
                     return this.db.any(_query);
             }
             catch (e) {
-                throw ` Issue with ${this.name}.find: \n -> ` + e;
+                throw ` Issue with dbo.${this.name}.find: \n -> ` + e;
             }
         });
     }
     findOne(filter, selectParams, param3_unused, table_rules, localParams) {
-        const { select = "*", orderBy = null, expectOne = true } = selectParams || {};
         try {
+            const { select = "*", orderBy = null, expectOne = true } = selectParams || {};
             return this.find(filter, { select, orderBy, limit: 1, expectOne }, null, table_rules, localParams);
         }
         catch (e) {
-            throw ` Issue with ${this.name}.findOne: \n -> ` + e;
+            throw ` Issue with dbo.${this.name}.findOne: \n -> ` + e;
         }
     }
     count(filter, param2_unused, param3_unused, table_rules, localParams = {}) {
@@ -110,50 +117,55 @@ class ViewHandler {
             });
         }
         catch (e) {
-            throw ` Issue with ${this.name}.count: \n -> ` + e;
+            throw ` Issue with dbo.${this.name}.count: \n -> ` + e;
         }
     }
     subscribe(filter, params, localFunc, table_rules, localParams) {
-        if (!localParams && !localFunc)
-            throw " missing data. provide -> localFunc | localParams { socket } ";
-        const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {}, condition = this.prepareWhere(filter, forcedFilter, filterFields, true);
-        if (!localFunc) {
-            return this.find(filter, Object.assign(Object.assign({}, params), { limit: 0 }), null, table_rules, localParams)
-                .then(isValid => {
-                const { socket = null } = localParams;
-                return this.pubSubManager.addSub({
+        try {
+            if (!localParams && !localFunc)
+                throw " missing data. provide -> localFunc | localParams { socket } ";
+            const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {}, condition = this.prepareWhere(filter, forcedFilter, filterFields, true);
+            if (!localFunc) {
+                return this.find(filter, Object.assign(Object.assign({}, params), { limit: 0 }), null, table_rules, localParams)
+                    .then(isValid => {
+                    const { socket = null } = localParams;
+                    return this.pubSubManager.addSub({
+                        table_info: this.tableOrViewInfo,
+                        socket,
+                        table_rules,
+                        condition,
+                        func: localFunc,
+                        filter: Object.assign({}, filter),
+                        params: Object.assign({}, params),
+                        channel_name: null,
+                        socket_id: socket.id,
+                        table_name: this.name,
+                        last_throttled: 0
+                    }).then(channelName => ({ channelName }));
+                });
+            }
+            else {
+                this.pubSubManager.addSub({
                     table_info: this.tableOrViewInfo,
-                    socket,
+                    socket: null,
                     table_rules,
                     condition,
                     func: localFunc,
                     filter: Object.assign({}, filter),
                     params: Object.assign({}, params),
                     channel_name: null,
-                    socket_id: socket.id,
+                    socket_id: null,
                     table_name: this.name,
                     last_throttled: 0
                 }).then(channelName => ({ channelName }));
-            });
+                const unsubscribe = () => {
+                    this.pubSubManager.removeLocalSub(this.name, condition, localFunc);
+                };
+                return Object.freeze({ unsubscribe });
+            }
         }
-        else {
-            this.pubSubManager.addSub({
-                table_info: this.tableOrViewInfo,
-                socket: null,
-                table_rules,
-                condition,
-                func: localFunc,
-                filter: Object.assign({}, filter),
-                params: Object.assign({}, params),
-                channel_name: null,
-                socket_id: null,
-                table_name: this.name,
-                last_throttled: 0
-            }).then(channelName => ({ channelName }));
-            const unsubscribe = () => {
-                this.pubSubManager.removeLocalSub(this.name, condition, localFunc);
-            };
-            return Object.freeze({ unsubscribe });
+        catch (e) {
+            throw ` Issue with dbo.${this.name}.subscribe: \n -> ` + e;
         }
     }
     // getdFindCondition(filter: object, table_rules: TableRule, excludeWhere = false): string {
@@ -447,14 +459,24 @@ class ViewHandler {
     */
     parseFieldFilter(fieldParams = "*", allow_empty = true) {
         const all_fields = this.column_names.slice(0);
-        let colNames = null;
+        let colNames = null, initialParams = JSON.stringify(fieldParams);
         if (fieldParams) {
+            /*
+                "field1, field2, field4" | "*"
+            */
             if (typeof fieldParams === "string") {
                 fieldParams = fieldParams.split(",").map(k => k.trim());
             }
+            /* string[] */
             if (Array.isArray(fieldParams) && !fieldParams.find(f => typeof f !== "string")) {
+                /*
+                    ["*"]
+                */
                 if (fieldParams[0] === "*") {
                     return all_fields.slice(0);
+                    /*
+                        [""]
+                    */
                 }
                 else if (fieldParams[0] === "") {
                     if (allow_empty) {
@@ -463,12 +485,19 @@ class ViewHandler {
                     else {
                         throw "Empty value not allowed";
                     }
+                    /*
+                        ["field1", "field2", "field3"]
+                    */
                 }
                 else {
                     colNames = fieldParams.slice(0);
                 }
+                /*
+                    { field1: true, field2: true } = only field1 and field2
+                    { field1: false, field2: false } = all fields except field1 and field2
+                */
             }
-            else if (typeof fieldParams === "object") {
+            else if (isPlainObject(fieldParams)) {
                 if (Object.keys(fieldParams).length) {
                     let keys = Object.keys(fieldParams);
                     if (keys[0] === "") {
@@ -493,7 +522,7 @@ class ViewHandler {
                 }
             }
             else {
-                throw "unrecognised fields statement: " + fieldParams;
+                throw "unrecognised field filter.\nExpecting -> string | string[] | { [field]: boolean } \nReceived -> " + initialParams;
             }
             validate(colNames);
         }
@@ -501,7 +530,7 @@ class ViewHandler {
         function validate(cols) {
             let bad_keys = cols.filter(col => !all_fields.includes(col));
             if (bad_keys && bad_keys.length) {
-                throw "unrecognised fields: " + bad_keys.join();
+                throw "unrecognised or illegal fields: " + bad_keys.join();
             }
         }
     }
@@ -517,10 +546,10 @@ class TableHandler extends ViewHandler {
     constructor(db, tableOrViewInfo, pubSubManager) {
         super(db, tableOrViewInfo, pubSubManager);
         this.tsDboDefs = this.tsDboDefs.concat([
-            `   update: (filter: object, newData: ${this.tsDataName}, params: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
-            `   upsert: (filter: object, newData: ${this.tsDataName}, params: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
-            `   insert: (data: (${this.tsDataName} | ${this.tsDataName}[]), param2: InsertParams) => Promise<void | ${this.tsDataName}>;`,
-            `   delete: (filter: object, params: DeleteParams) => Promise<void | ${this.tsDataName}>;`,
+            `   update: (filter: object, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
+            `   upsert: (filter: object, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
+            `   insert: (data: (${this.tsDataName} | ${this.tsDataName}[]), params?: InsertParams) => Promise<void | ${this.tsDataName}>;`,
+            `   delete: (filter: object, params?: DeleteParams) => Promise<void | ${this.tsDataName}>;`,
         ]);
         this.makeDef();
         this.remove = this.delete;
@@ -547,20 +576,20 @@ class TableHandler extends ViewHandler {
     }
     update(filter, newData, params, tableRules, localParams = null) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (!newData || !Object.keys(newData).length)
-                throw "no update data provided";
-            if (!filter || !isPojoObject(filter))
-                throw `invalid update filter -> ${JSON.stringify(filter)} \n Expecting an object `;
-            let forcedFilter = {}, returningFields = "*", filterFields = "*", fields = "*";
-            if (tableRules) {
-                if (!tableRules.update)
-                    throw "update rules missing for " + this.name;
-                ({ forcedFilter, returningFields, fields, filterFields } = tableRules.update);
-                if (!fields)
-                    throw ` invalid update rule for ${this.name}. fields missing `;
-            }
-            let { returning, multi = true, onConflictDoNothing = false, fixIssues = false } = params || {};
             try {
+                if (!newData || !Object.keys(newData).length)
+                    throw "no update data provided";
+                if (!filter || !isPojoObject(filter))
+                    throw `invalid update filter -> ${JSON.stringify(filter)} \n Expecting an object `;
+                let forcedFilter = {}, returningFields = "*", filterFields = "*", fields = "*";
+                if (tableRules) {
+                    if (!tableRules.update)
+                        throw "update rules missing for " + this.name;
+                    ({ forcedFilter, returningFields, fields, filterFields } = tableRules.update);
+                    if (!fields)
+                        throw ` invalid update rule for ${this.name}. fields missing `;
+                }
+                let { returning, multi = true, onConflictDoNothing = false, fixIssues = false } = params || {};
                 /* Update all allowed fields (fields) except the forcedFilter (so that the user cannot change the forced filter values) */
                 let _fields = this.parseFieldFilter(fields);
                 if (forcedFilter) {
@@ -580,7 +609,7 @@ class TableHandler extends ViewHandler {
                 return this.db.tx(t => t[qType](query));
             }
             catch (e) {
-                throw ` Issue with ${this.name}.update: \n -> ` + e;
+                throw ` Issue with dbo.${this.name}.update: \n -> ` + e;
             }
         });
     }
@@ -599,125 +628,145 @@ class TableHandler extends ViewHandler {
     }
     insert(data, param2, param3_unused, tableRules, localParams = {}) {
         return __awaiter(this, void 0, void 0, function* () {
-            const { returning, onConflictDoNothing, fixIssues = false } = param2 || {};
-            let returningFields, forcedData, fields;
-            if (tableRules) {
-                if (!tableRules.insert)
-                    throw "insert rules missing for " + this.name;
-                returningFields = tableRules.insert.forcedData;
-                forcedData = tableRules.insert.forcedData;
-                fields = tableRules.insert.fields;
-                if (!fields)
-                    throw ` invalid insert rule for ${this.name}. fields missing `;
+            try {
+                const { returning, onConflictDoNothing, fixIssues = false } = param2 || {};
+                let returningFields, forcedData, fields;
+                if (tableRules) {
+                    if (!tableRules.insert)
+                        throw "insert rules missing for " + this.name;
+                    returningFields = tableRules.insert.forcedData;
+                    forcedData = tableRules.insert.forcedData;
+                    fields = tableRules.insert.fields;
+                    if (!fields)
+                        throw ` invalid insert rule for ${this.name}. fields missing `;
+                }
+                if (!data)
+                    throw "Provide data in param1";
+                const makeQuery = (row) => {
+                    if (!isPojoObject(row))
+                        throw "invalid insert data provided -> " + JSON.stringify(row);
+                    const { data, columnSet } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues });
+                    return pgp.helpers.insert(data, columnSet);
+                };
+                let conflict_query = "";
+                if (typeof onConflictDoNothing === "boolean" && onConflictDoNothing) {
+                    conflict_query = " ON CONFLICT DO NOTHING ";
+                }
+                let query = "";
+                if (Array.isArray(data)) {
+                    // if(returning) throw "Sorry but [returning] is dissalowed for multi insert";
+                    let queries = data.map(p => {
+                        return makeQuery(p) + conflict_query;
+                    });
+                    query = pgp.helpers.concat(queries);
+                }
+                else {
+                    query = makeQuery(data);
+                }
+                let queryType = "none";
+                if (returning) {
+                    query += " RETURNING " + this.prepareColumnSet(returning, returningFields, false);
+                    queryType = "one";
+                }
+                return this.db.tx(t => t[queryType](query));
             }
-            if (!data)
-                throw "Provide data in param1";
-            const makeQuery = (row) => {
-                if (!isPojoObject(row))
-                    throw "invalid insert data provided -> " + JSON.stringify(row);
-                const { data, columnSet } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues });
-                return pgp.helpers.insert(data, columnSet);
-            };
-            let conflict_query = "";
-            if (typeof onConflictDoNothing === "boolean" && onConflictDoNothing) {
-                conflict_query = " ON CONFLICT DO NOTHING ";
+            catch (e) {
+                throw ` Issue with dbo.${this.name}.insert: \n -> ` + e;
             }
-            let query = "";
-            if (Array.isArray(data)) {
-                // if(returning) throw "Sorry but [returning] is dissalowed for multi insert";
-                let queries = data.map(p => {
-                    return makeQuery(p) + conflict_query;
-                });
-                query = pgp.helpers.concat(queries);
-            }
-            else {
-                query = makeQuery(data);
-            }
-            let queryType = "none";
-            if (returning) {
-                query += " RETURNING " + this.prepareColumnSet(returning, returningFields, false);
-                queryType = "one";
-            }
-            return this.db.tx(t => t[queryType](query));
         });
     }
     ;
     delete(filter, params, param3_unused, table_rules, localParams = null) {
-        const { returning } = params || {};
-        if (!filter)
-            throw `invalid/missing filter object -> ${JSON.stringify(filter)} \n Expecting empty object or something like { some_column: "filter_value" }`;
-        // table_rules = table_rules || {};
-        let forcedFilter = null, filterFields = null, returningFields = null;
-        if (table_rules) {
-            if (!table_rules.delete)
-                throw "delete rules missing";
-            forcedFilter = table_rules.delete.forcedFilter;
-            filterFields = table_rules.delete.filterFields;
-            returningFields = table_rules.delete.returningFields;
-            if (!filterFields)
-                throw ` invalid delete rule for ${this.name}. filterFields missing `;
+        try {
+            const { returning } = params || {};
+            if (!filter)
+                throw `invalid/missing filter object -> ${JSON.stringify(filter)} \n Expecting empty object or something like { some_column: "filter_value" }`;
+            // table_rules = table_rules || {};
+            let forcedFilter = null, filterFields = null, returningFields = null;
+            if (table_rules) {
+                if (!table_rules.delete)
+                    throw "delete rules missing";
+                forcedFilter = table_rules.delete.forcedFilter;
+                filterFields = table_rules.delete.filterFields;
+                returningFields = table_rules.delete.returningFields;
+                if (!filterFields)
+                    throw ` invalid delete rule for ${this.name}. filterFields missing `;
+            }
+            let queryType = 'none';
+            let _query = pgp.as.format("DELETE FROM ${_psqlWS_tableName:raw} ", { _psqlWS_tableName: this.name });
+            _query += this.prepareWhere(filter, forcedFilter, filterFields);
+            if (returning) {
+                queryType = "any";
+                _query += " RETURNING " + this.prepareColumnSet(returning, returningFields);
+            }
+            return this.db[queryType](_query, { _psqlWS_tableName: this.name });
         }
-        let queryType = 'none';
-        let _query = pgp.as.format("DELETE FROM ${_psqlWS_tableName:raw} ", { _psqlWS_tableName: this.name });
-        _query += this.prepareWhere(filter, forcedFilter, filterFields);
-        if (returning) {
-            queryType = "any";
-            _query += " RETURNING " + this.prepareColumnSet(returning, returningFields);
+        catch (e) {
+            throw ` Issue with dbo.${this.name}.delete: \n -> ` + e;
         }
-        return this.db[queryType](_query, { _psqlWS_tableName: this.name });
     }
     ;
     remove(filter, params, param3_unused, tableRules, localParams = null) {
         return this.delete(filter, params, param3_unused, tableRules, localParams);
     }
     upsert(filter, newData, params, table_rules, localParams = null) {
-        return this.find(filter, { select: "", limit: 1 }, {}, table_rules, localParams)
-            .then(exists => {
-            if (exists && exists.length) {
-                // console.log(filter, "exists");
-                return this.update(filter, newData, params, table_rules, localParams);
-            }
-            else {
-                // console.log(filter, "existnts")
-                return this.insert(Object.assign(Object.assign({}, newData), filter), params, null, table_rules, localParams);
-            }
-        });
-        // .catch(existnts => {
-        //     console.log(filter, "existnts")
-        //     return this.insert({ ...filter, ...newData}, params);
-        // });
+        try {
+            return this.find(filter, { select: "", limit: 1 }, {}, table_rules, localParams)
+                .then(exists => {
+                if (exists && exists.length) {
+                    // console.log(filter, "exists");
+                    return this.update(filter, newData, params, table_rules, localParams);
+                }
+                else {
+                    // console.log(filter, "existnts")
+                    return this.insert(Object.assign(Object.assign({}, newData), filter), params, null, table_rules, localParams);
+                }
+            });
+            // .catch(existnts => {
+            //     console.log(filter, "existnts")
+            //     return this.insert({ ...filter, ...newData}, params);
+            // });
+        }
+        catch (e) {
+            throw ` Issue with dbo.${this.name}.upsert: \n -> ` + e;
+        }
     }
     ;
     /* External request. Cannot sync from server */
     sync(filter, params, param3_unused, table_rules, localParams) {
         return __awaiter(this, void 0, void 0, function* () {
-            const { socket } = localParams || {};
-            if (!socket)
-                throw "INTERNAL ERROR: socket missing";
-            if (!table_rules || !table_rules.sync || !table_rules.select)
-                throw "INTERNAL ERROR: sync or select rules missing";
-            let { id_fields, synced_field, allow_delete } = table_rules.sync;
-            if (!id_fields || !synced_field) {
-                const err = "id_fields OR synced_field missing from publish";
-                console.error(err);
-                throw err;
+            try {
+                const { socket } = localParams || {};
+                if (!socket)
+                    throw "INTERNAL ERROR: socket missing";
+                if (!table_rules || !table_rules.sync || !table_rules.select)
+                    throw "INTERNAL ERROR: sync or select rules missing";
+                let { id_fields, synced_field, allow_delete } = table_rules.sync;
+                if (!id_fields || !synced_field) {
+                    const err = "id_fields OR synced_field missing from publish";
+                    console.error(err);
+                    throw err;
+                }
+                id_fields = this.parseFieldFilter(id_fields, false);
+                /* Step 1: parse command and params */
+                return this.find(filter, { select: [...id_fields, synced_field], limit: 0 }, null, table_rules, localParams)
+                    .then(isValid => {
+                    const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {};
+                    // let final_filter = getFindFilter(filter, table_rules);
+                    return this.pubSubManager.addSync({
+                        table_info: this.tableOrViewInfo,
+                        condition: this.prepareWhere(filter, forcedFilter, filterFields, true),
+                        id_fields, synced_field, allow_delete,
+                        socket,
+                        table_rules,
+                        filter: Object.assign({}, filter),
+                        params: Object.assign({}, params)
+                    }).then(channelName => ({ channelName, id_fields, synced_field }));
+                });
             }
-            id_fields = this.parseFieldFilter(id_fields, false);
-            /* Step 1: parse command and params */
-            return this.find(filter, { select: [...id_fields, synced_field], limit: 0 }, null, table_rules, localParams)
-                .then(isValid => {
-                const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {};
-                // let final_filter = getFindFilter(filter, table_rules);
-                return this.pubSubManager.addSync({
-                    table_info: this.tableOrViewInfo,
-                    condition: this.prepareWhere(filter, forcedFilter, filterFields, true),
-                    id_fields, synced_field, allow_delete,
-                    socket,
-                    table_rules,
-                    filter: Object.assign({}, filter),
-                    params: Object.assign({}, params)
-                }).then(channelName => ({ channelName, id_fields, synced_field }));
-            });
+            catch (e) {
+                throw ` Issue with dbo.${this.name}.sync: \n -> ` + e;
+            }
             /*
             REPLICATION
 
@@ -757,33 +806,35 @@ class DboBuilder {
     }
     init() {
         return __awaiter(this, void 0, void 0, function* () {
-            this.tablesOrViews = yield this.db.any(getTablesForSchemaPostgresSQL(this.schema));
+            this.tablesOrViews = yield getTablesForSchemaPostgresSQL(this.db, this.schema);
             let allDataDefs = "";
             let allDboDefs = "";
-            const common_types = `/* This file was generated by prostgles ${(new Date).toUTCString()} */
+            const common_types = `/* This file was generated by Prostgles 
+* ${(new Date).toUTCString()} 
+*/
 
-type FieldFilter = object | string[] | "*" | "";
-type OrderBy = { key: string, asc: boolean}[] | { [key: string]: boolean }[] | string | string[];
+export type FieldFilter = object | string[] | "*" | "";
+export type OrderBy = { key: string, asc: boolean }[] | { [key: string]: boolean }[] | string | string[];
         
-type SelectParams = {
+export type SelectParams = {
     select?: FieldFilter;
     limit?: number;
     offset?: number;
     orderBy?: OrderBy;
     expectOne?: boolean;
 }
-type UpdateParams = {
+export type UpdateParams = {
     returning?: FieldFilter;
     onConflictDoNothing?: boolean;
     fixIssues?: boolean;
     multi?: boolean;
 }
-type InsertParams = {
+export type InsertParams = {
     returning?: FieldFilter;
     onConflictDoNothing?: boolean;
     fixIssues?: boolean;
 }
-type DeleteParams = {
+export type DeleteParams = {
     returning?: FieldFilter;
 };
 `;
@@ -816,34 +867,36 @@ let pgp = pgPromise({
 // }
 /* UTILS */
 /* UTILS */
-function getTablesForSchemaPostgresSQL(schema) {
-    return " \
-        SELECT t.table_schema as schema, t.table_name as name,json_agg((SELECT x FROM (SELECT c.column_name as name, c.data_type, c.udt_name, c.element_type) as x)) as columns  \
-        , CASE WHEN t.table_type = 'VIEW' THEN true ELSE false END as is_view \
-        , array_to_json(vr.table_names) as parent_tables \
-        FROM information_schema.tables t  \
-        INNER join (  \
-            SELECT c.table_schema, c.table_name, c.column_name, c.data_type, c.udt_name, e.data_type as element_type  \
-            FROM information_schema.columns c    \
-            LEFT JOIN (SELECT * FROM information_schema.element_types )   e  \
-                 ON ((c.table_catalog, c.table_schema, c.table_name, 'TABLE', c.dtd_identifier)  \
-                  = (e.object_catalog, e.object_schema, e.object_name, e.object_type, e.collection_type_identifier))  \
-        ) c  \
-        ON t.table_name = c.table_name  \
-        AND t.table_schema = c.table_schema  \
-        LEFT JOIN ( \
-            SELECT cl_r.relname as view_name, array_agg(DISTINCT cl_d.relname) AS table_names \
-            FROM pg_rewrite AS r \
-            JOIN pg_class AS cl_r ON r.ev_class=cl_r.oid \
-            JOIN pg_depend AS d ON r.oid=d.objid \
-            JOIN pg_class AS cl_d ON d.refobjid=cl_d.oid \
-            WHERE cl_d.relkind IN ('r','v') \
-            AND cl_d.relname <> cl_r.relname \
-            GROUP BY cl_r.relname \
-        ) vr \
-        ON t.table_name = vr.view_name \
-        where t.table_schema = '" + schema + "' AND t.table_name <> 'spatial_ref_sys'  \
-        GROUP BY t.table_schema, t.table_name, t.table_type, vr.table_names";
+function getTablesForSchemaPostgresSQL(db, schema) {
+    const query = " \
+    SELECT t.table_schema as schema, t.table_name as name,json_agg((SELECT x FROM (SELECT c.column_name as name, c.data_type, c.udt_name, c.element_type) as x)) as columns  \
+    , CASE WHEN t.table_type = 'VIEW' THEN true ELSE false END as is_view \
+    , array_to_json(vr.table_names) as parent_tables \
+    FROM information_schema.tables t  \
+    INNER join (  \
+        SELECT c.table_schema, c.table_name, c.column_name, c.data_type, c.udt_name, e.data_type as element_type  \
+        FROM information_schema.columns c    \
+        LEFT JOIN (SELECT * FROM information_schema.element_types )   e  \
+             ON ((c.table_catalog, c.table_schema, c.table_name, 'TABLE', c.dtd_identifier)  \
+              = (e.object_catalog, e.object_schema, e.object_name, e.object_type, e.collection_type_identifier))  \
+    ) c  \
+    ON t.table_name = c.table_name  \
+    AND t.table_schema = c.table_schema  \
+    LEFT JOIN ( \
+        SELECT cl_r.relname as view_name, array_agg(DISTINCT cl_d.relname) AS table_names \
+        FROM pg_rewrite AS r \
+        JOIN pg_class AS cl_r ON r.ev_class=cl_r.oid \
+        JOIN pg_depend AS d ON r.oid=d.objid \
+        JOIN pg_class AS cl_d ON d.refobjid=cl_d.oid \
+        WHERE cl_d.relkind IN ('r','v') \
+        AND cl_d.relname <> cl_r.relname \
+        GROUP BY cl_r.relname \
+    ) vr \
+    ON t.table_name = vr.view_name \
+    where t.table_schema = ${schema} AND t.table_name <> 'spatial_ref_sys'  \
+    GROUP BY t.table_schema, t.table_name, t.table_type, vr.table_names";
+    // console.log(pgp.as.format(query, { schema }), schema);
+    return db.any(query, { schema });
 }
 /**
 * Throw error if illegal keys found in object

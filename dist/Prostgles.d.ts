@@ -66,67 +66,82 @@ export declare type UpdateRequestData = UpdateRequestDataOne | UpdateRequestData
 export declare type SelectRule = {
     fields: FieldFilter;
     maxLimit?: number;
-    forcedFilter: object;
-    filterFields: FieldFilter;
-    validate(...SelectRequestData: any[]): SelectRequestData;
+    forcedFilter?: object;
+    filterFields?: FieldFilter;
+    validate?(...SelectRequestData: any[]): SelectRequestData;
 };
 export declare type InsertRule = {
     fields: FieldFilter;
-    forcedData: object;
-    returningFields: FieldFilter;
-    validate(...InsertRequestData: any[]): InsertRequestData;
+    forcedData?: object;
+    returningFields?: FieldFilter;
+    validate?(...InsertRequestData: any[]): InsertRequestData;
 };
 export declare type UpdateRule = {
     fields: FieldFilter;
-    forcedFilter: object;
-    filterFields: FieldFilter;
-    returningFields: FieldFilter;
-    validate(...UpdateRequestData: any[]): UpdateRequestData;
+    forcedFilter?: object;
+    filterFields?: FieldFilter;
+    returningFields?: FieldFilter;
+    validate?(...UpdateRequestData: any[]): UpdateRequestData;
 };
 export declare type DeleteRule = {
-    forcedFilter: object;
-    filterFields: FieldFilter;
-    returningFields: FieldFilter;
+    forcedFilter?: object;
+    filterFields?: FieldFilter;
+    returningFields?: FieldFilter;
     validate?(...UpdateRequestData: any[]): UpdateRequestData;
 };
 export declare type SyncRule = {
     id_fields: string[];
     synced_field: string;
-    allow_delete: boolean;
+    allow_delete?: boolean;
 };
 export declare type SubscribeRule = {
     throttle?: number;
 };
 export declare type TableRule = {
-    select: SelectRule;
-    insert: InsertRule;
-    update: UpdateRule;
-    delete: DeleteRule;
-    sync: SyncRule;
-    subscribe: SubscribeRule;
+    select?: SelectRule;
+    insert?: InsertRule;
+    update?: UpdateRule;
+    delete?: DeleteRule;
+    sync?: SyncRule;
+    subscribe?: SubscribeRule;
 };
 export declare type ViewRule = {
     select: SelectRule;
 };
-export declare type Publish = {
-    tablesOrViews: {
-        [key: string]: TableRule | ViewRule | "*";
-    };
+export declare type PublishTableRule = {
+    select?: SelectRule | "*";
+    insert?: InsertRule | "*";
+    update?: UpdateRule | "*";
+    delete?: DeleteRule | "*";
+    sync?: SyncRule;
+    subscribe?: SubscribeRule | "*";
 };
-export declare type ParsedPublish = {
-    tablesOrViewsHandle: {
-        [key: string]: TableRule | ViewRule;
-    };
+export declare type PublishViewRule = {
+    select: SelectRule | "*";
 };
-export declare type InitOptions = {
+export declare type RequestParams = {
+    dbo?: DbHandler;
+    socket?: any;
+};
+export declare type PublishedTablesAndViews = {
+    [key: string]: PublishTableRule | PublishViewRule | "*";
+} | "*";
+export declare type Publish = PublishedTablesAndViews | ((params: RequestParams) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>));
+export declare type Method = (...args: any) => (any | Promise<any>);
+export declare type ProstglesInitOptions = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
-    publishMethods?(): any;
-    io: any;
+    publishMethods?: ((params: RequestParams) => {
+        [key: string]: Method;
+    });
+    tsGeneratedTypesDir?: string;
+    io?: any;
     publish?: Publish;
     schema?: string;
+    sqlFilePath?: string;
+    isReady(dbo: any): void;
     publishRawSQL?: any;
-    wsChannelNamePrefix: string;
+    wsChannelNamePrefix?: string;
     onSocketConnect?({ socket: Socket, dbo: any }: {
         socket: any;
         dbo: any;
@@ -135,8 +150,6 @@ export declare type InitOptions = {
         socket: any;
         dbo: any;
     }): any;
-    sqlFilePath?: string;
-    isReady(dbo: any): void;
 };
 export declare type OnReady = {
     dbo: DbHandler;
@@ -164,7 +177,7 @@ export declare class Prostgles {
     }): any;
     sqlFilePath?: string;
     tsGeneratedTypesDir?: string;
-    constructor(params: InitOptions);
+    constructor(params: ProstglesInitOptions);
     checkDb(): void;
     init(isReady: (dbo: DbHandler, db: DB) => any): Promise<boolean>;
     runSQLFile(filePath: string): Promise<void>;

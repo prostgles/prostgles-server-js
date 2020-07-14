@@ -113,13 +113,13 @@ export type SelectRule = {
     maxLimit?: number;
 
     // Filter added to every query (e.g. user_id) to restrict access
-    forcedFilter: object;
+    forcedFilter?: object;
 
     // Fields user can filter by
-    filterFields: FieldFilter;
+    filterFields?: FieldFilter;
 
     // Validation logic to check/update data for each request
-    validate(...SelectRequestData): SelectRequestData
+    validate?(...SelectRequestData): SelectRequestData
 }
 export type InsertRule = {
 
@@ -127,13 +127,13 @@ export type InsertRule = {
     fields: FieldFilter;
 
     // Data to include/overwrite on each insert
-    forcedData: object;
+    forcedData?: object;
 
     // Fields user can view after inserting
-    returningFields: FieldFilter;
+    returningFields?: FieldFilter;
 
     // Validation logic to check/update data for each request
-    validate(...InsertRequestData): InsertRequestData
+    validate?(...InsertRequestData): InsertRequestData
 }
 export type UpdateRule = {
 
@@ -142,27 +142,27 @@ export type UpdateRule = {
 
     // Filter added to every query (e.g. user_id) to restrict access
     // This filter cannot be updated
-    forcedFilter: object;
+    forcedFilter?: object;
 
     // Fields user can use to find the updates
-    filterFields: FieldFilter;
+    filterFields?: FieldFilter;
 
     // Fields user can view after updating
-    returningFields: FieldFilter;
+    returningFields?: FieldFilter;
 
     // Validation logic to check/update data for each request
-    validate(...UpdateRequestData): UpdateRequestData
+    validate?(...UpdateRequestData): UpdateRequestData
 }
 export type DeleteRule = {
     
     // Filter added to every query (e.g. user_id) to restrict access
-    forcedFilter: object;
+    forcedFilter?: object;
 
     // Fields user can filter by
-    filterFields: FieldFilter;
+    filterFields?: FieldFilter;
 
     // Fields user can view after deleting
-    returningFields: FieldFilter;
+    returningFields?: FieldFilter;
 
     // Validation logic to check/update data for each request
     validate?(...UpdateRequestData): UpdateRequestData
@@ -175,49 +175,59 @@ export type SyncRule = {
     /* Numerical incrementing (last updated timestamp) fieldname used to sync items */
     synced_field: string;
 
-    allow_delete: boolean;
+    allow_delete?: boolean;
 }
 export type SubscribeRule = {
     throttle?: number;
 }
 
 export type TableRule = {
-    select: SelectRule;
-    insert: InsertRule;
-    update: UpdateRule;
-    delete: DeleteRule;
-    sync: SyncRule;
-    subscribe: SubscribeRule;
-}
+    select?: SelectRule;
+    insert?: InsertRule;
+    update?: UpdateRule;
+    delete?: DeleteRule;
+    sync?: SyncRule;
+    subscribe?: SubscribeRule;
+};
 export type ViewRule = {
     select: SelectRule;
-}
-export type Publish = {
-    tablesOrViews: {[key:string]: TableRule | ViewRule | "*" }
-}
-export type ParsedPublish = {
-    tablesOrViewsHandle: {[key:string]: TableRule | ViewRule }
-}
+};
+export type PublishTableRule = {
+    select?: SelectRule | "*";
+    insert?: InsertRule | "*";
+    update?: UpdateRule | "*";
+    delete?: DeleteRule | "*";
+    sync?: SyncRule;
+    subscribe?: SubscribeRule | "*";
+};
+export type PublishViewRule = {
+    select: SelectRule | "*";
+};
+// export type Publish = {
+//     tablesOrViews: {[key:string]: TableRule | ViewRule | "*" }
+// }
+export type RequestParams = { dbo?: DbHandler, socket?: any };
 
+export type PublishedTablesAndViews = { [key:string]: PublishTableRule | PublishViewRule | "*" } | "*" ;
+export type Publish = PublishedTablesAndViews | ((params: RequestParams) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>)); 
 
-export type InitOptions = {
+export type Method = (...args: any) => ( any | Promise<any> );
+
+export type ProstglesInitOptions = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
-    publishMethods?(): any, 
-    io: any,
+    publishMethods?: ((params: RequestParams) => { [key:string]: Method }), 
+    tsGeneratedTypesDir?: string;
+    io?: any,
     publish?: Publish, 
     schema?: string;
-    // auth, 
-    publishRawSQL?: any;
-    wsChannelNamePrefix: string;
-    onSocketConnect?({ socket: Socket, dbo: any});
-    onSocketDisconnect?({ socket: Socket, dbo: any});
     sqlFilePath?: string;
     isReady(dbo: any): void;
-}
-
-type PublishedMethods = {
-    [key: string]: any;
+    // auth, 
+    publishRawSQL?: any;
+    wsChannelNamePrefix?: string;
+    onSocketConnect?({ socket: Socket, dbo: any});
+    onSocketDisconnect?({ socket: Socket, dbo: any});
 }
 
 interface ISocketSetup {
@@ -266,12 +276,12 @@ export class Prostgles {
     sqlFilePath?: string;
     tsGeneratedTypesDir?: string;
 
-    constructor(params: InitOptions){
-        if(!params) throw "InitOptions missing";
-        if(!params.io) console.error("io missing. WebSockets disabled");
-        const unknownParams = Object.keys(params).filter(key => !["tsTypesDir", "isReady", "dbConnection", "dbOptions", "publishMethods", "io", "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect", "onSocketDisconnect", "sqlFilePath"].includes(key))
+    constructor(params: ProstglesInitOptions){
+        if(!params) throw "ProstglesInitOptions missing";
+        if(!params.io) console.warn("io missing. WebSockets will not be set up");
+        const unknownParams = Object.keys(params).filter(key => !["tsGeneratedTypesDir", "isReady", "dbConnection", "dbOptions", "publishMethods", "io", "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect", "onSocketDisconnect", "sqlFilePath"].includes(key))
         if(unknownParams.length){ 
-            console.error(`Unrecognised InitOptions params: ${unknownParams.join()}`);
+            console.error(`Unrecognised ProstglesInitOptions params: ${unknownParams.join()}`);
         }
         
         Object.assign(this, params);
@@ -299,7 +309,7 @@ export class Prostgles {
             this.dbo = await this.dboBuilder.init();
 
             if(this.tsGeneratedTypesDir){
-                const fileName = "db_schema_generated_types.ts" //`dbo_${this.schema}_types.ts`;
+                const fileName = "DBoGenerated.ts" //`dbo_${this.schema}_types.ts`;
                 console.log("typescript schema definition file ready -> " + fileName)
                 fs.writeFileSync(this.tsGeneratedTypesDir + fileName, this.dboBuilder.tsTypesDefinition);
             }

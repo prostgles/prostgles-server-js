@@ -42,12 +42,12 @@ class Prostgles {
         this.schema = "public";
         this.wsChannelNamePrefix = "_psqlWS_";
         if (!params)
-            throw "InitOptions missing";
+            throw "ProstglesInitOptions missing";
         if (!params.io)
-            console.error("io missing. WebSockets disabled");
-        const unknownParams = Object.keys(params).filter(key => !["tsTypesDir", "isReady", "dbConnection", "dbOptions", "publishMethods", "io", "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect", "onSocketDisconnect", "sqlFilePath"].includes(key));
+            console.warn("io missing. WebSockets will not be set up");
+        const unknownParams = Object.keys(params).filter(key => !["tsGeneratedTypesDir", "isReady", "dbConnection", "dbOptions", "publishMethods", "io", "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect", "onSocketDisconnect", "sqlFilePath"].includes(key));
         if (unknownParams.length) {
-            console.error(`Unrecognised InitOptions params: ${unknownParams.join()}`);
+            console.error(`Unrecognised ProstglesInitOptions params: ${unknownParams.join()}`);
         }
         Object.assign(this, params);
     }
@@ -69,7 +69,7 @@ class Prostgles {
                 this.dboBuilder = new DboBuilder_1.DboBuilder(this.db, this.schema);
                 this.dbo = yield this.dboBuilder.init();
                 if (this.tsGeneratedTypesDir) {
-                    const fileName = "db_schema_generated_types.ts"; //`dbo_${this.schema}_types.ts`;
+                    const fileName = "DBoGenerated.ts"; //`dbo_${this.schema}_types.ts`;
                     console.log("typescript schema definition file ready -> " + fileName);
                     fs.writeFileSync(this.tsGeneratedTypesDir + fileName, this.dboBuilder.tsTypesDefinition);
                 }

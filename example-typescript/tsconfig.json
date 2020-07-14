@@ -18,6 +18,7 @@
       "declarationMap": true
     },
     "exclude": [
-      "dist"
+      "dist",
+      "DBoGenerated.ts"
     ]
 }

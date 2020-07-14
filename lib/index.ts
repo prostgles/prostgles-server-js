@@ -1,6 +1,6 @@
-import { Prostgles, InitOptions } from "./Prostgles";
+import { Prostgles, ProstglesInitOptions } from "./Prostgles";
 
-function prostgles(params: InitOptions){
+function prostgles(params: ProstglesInitOptions){
 
     let prgl = new Prostgles(params);
     prgl.init(params.isReady);
