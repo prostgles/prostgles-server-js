@@ -66,6 +66,7 @@ type LocalParams = {
     socket: any;
     func: () => any;
     has_rules: boolean;
+    testRule: boolean;
 }
 function capitalizeFirstLetter(string: string) : string {
     return string.charAt(0).toUpperCase() + string.slice(1);
@@ -135,6 +136,41 @@ export class ViewHandler {
         return []
     }
 
+    async validateViewRules(fields: FieldFilter, filterFields: FieldFilter, returningFields: FieldFilter, forcedFilter: object){
+
+        /* Safely test publish rules */
+        if(fields) {
+            try {
+                this.parseFieldFilter(fields);
+            } catch(e){
+                throw ` issue with fields: \nVALUE: ` + JSON.stringify(fields, null, 2) + "\nERROR: " + e;
+            }
+        }
+        if(filterFields) {
+            try {
+                this.parseFieldFilter(filterFields);
+            } catch(e){
+                throw ` issue with filterFields: \nVALUE: ` + JSON.stringify(filterFields, null, 2) + "\nERROR: " + e;
+            }
+        }
+        if(returningFields) {
+            try {
+                this.parseFieldFilter(returningFields);
+            } catch(e){
+                throw " issue with returningFields: \nVALUE: " + JSON.stringify(returningFields, null, 2) + "\nERROR: " + e;
+            }
+        }
+        if(forcedFilter) {
+            try {
+                await this.find(forcedFilter, { limit: 0 });
+            } catch(e){
+                throw " issue with forcedFilter: \nVALUE: " + JSON.stringify(forcedFilter, null, 2) + "\nERROR: " + e;
+            }
+        }
+
+        return true;
+    }
+
     async find(filter: Filter, selectParams?: SelectParams , param3_unused = null, tableRules?: TableRule, localParams?: LocalParams): Promise<object[]>{
         try {
             if(filter && !isPojoObject(filter)) throw `invalid update filter -> ${JSON.stringify(filter)} \n Expecting an object or undefined`;
@@ -146,6 +182,9 @@ export class ViewHandler {
                 forcedFilter: object,
                 maxLimit: number;
 
+
+            const { testRule = false } = localParams || {};
+
             if(tableRules){
                 if(!tableRules.select) throw "select rules missing for " + this.name;
                 fields = tableRules.select.fields;
@@ -154,6 +193,13 @@ export class ViewHandler {
                 maxLimit = tableRules.select.maxLimit;
 
                 if(!fields)  throw ` invalid select rule for ${this.name}. fields missing `;
+
+                if(testRule){
+                    if(maxLimit && !Number.isInteger(maxLimit)) throw " invalid maxLimit, expecting integer but got " + maxLimit;
+
+                    await this.validateViewRules(fields, filterFields, null, forcedFilter);
+                    return [];
+                }
             }
 
             // console.log(this.parseFieldFilter(select));
@@ -189,6 +235,7 @@ export class ViewHandler {
             throw ` Issue with dbo.${this.name}.findOne: \n -> ` + e;
         }
     }
+
     count(filter?: Filter, param2_unused?, param3_unused?, table_rules?: TableRule, localParams: any = {}): Promise<number>{
         
         try {
@@ -203,7 +250,6 @@ export class ViewHandler {
             throw ` Issue with dbo.${this.name}.count: \n -> ` + e;
         } 
     }
-
 
     subscribe(filter: Filter, params: SelectParams, localFunc: (items: object[]) => any, table_rules?: TableRule, localParams?: LocalParams){
         try {
@@ -660,7 +706,7 @@ export class ViewHandler {
                     return all_fields.slice(0);
                 }
             } else {
-                throw "unrecognised field filter.\nExpecting ->     string | string[] | { [field]: boolean } \nReceived ->  " + initialParams;
+                throw " unrecognised field filter.\nExpected ->     string | string[] | { [field]: boolean } \n Received ->  " + initialParams;
             }
 
             validate(colNames);
@@ -743,18 +789,39 @@ export class TableHandler extends ViewHandler {
 
     async update(filter: Filter, newData: object, params: UpdateParams, tableRules: TableRule, localParams: LocalParams = null){
         try {
-            if(!newData || !Object.keys(newData).length) throw "no update data provided";
-            if(!filter || !isPojoObject(filter)) throw `invalid update filter -> ${JSON.stringify(filter)} \n Expecting an object `;
+
+            const { testRule = false } = localParams || {};
+            if(!testRule){
+                if(!newData || !Object.keys(newData).length) throw "no update data provided";
+                if(!filter || !isPojoObject(filter)) throw `invalid update filter -> ${JSON.stringify(filter)} \n Expecting an object `;
+            }
 
             let forcedFilter: object = {},
+                forcedData: object = {},
                 returningFields: FieldFilter = "*",
                 filterFields: FieldFilter = "*",
                 fields: FieldFilter = "*";
+
             if(tableRules){
                 if(!tableRules.update) throw "update rules missing for " + this.name;
-                ({ forcedFilter, returningFields, fields, filterFields } = tableRules.update);
+                ({ forcedFilter, forcedData, returningFields, fields, filterFields } = tableRules.update);
 
                 if(!fields)  throw ` invalid update rule for ${this.name}. fields missing `;
+
+                /* Safely test publish rules */
+                if(testRule){
+                    await this.validateViewRules(fields, filterFields, returningFields, forcedFilter);
+                    if(forcedData) {
+                        try {
+                            const { data, columnSet } = this.validateNewData({ row: forcedData, forcedData: null, allowedFields: "*", tableRules, fixIssues: false });
+                            let query = pgp.helpers.update(data, columnSet) + " WHERE FALSE ";
+                            await this.db.any("EXPLAIN " + query);
+                        } catch(e){
+                            throw " issue with forcedData: \nVALUE: " + JSON.stringify(forcedData, null, 2) + "\nERROR: " + e;
+                        }
+                    }
+                    return true;
+                }
             }
 
             let { returning, multi = true, onConflictDoNothing = false, fixIssues = false } = params || {};
@@ -767,7 +834,7 @@ export class TableHandler extends ViewHandler {
                 _fields = _fields.filter(fkey => !_forcedFilterKeys.includes(fkey))
             }
             
-            const { data, columnSet} = this.validateNewData({ row: newData, forcedData: null, allowedFields: _fields, tableRules, fixIssues });
+            const { data, columnSet } = this.validateNewData({ row: newData, forcedData, allowedFields: _fields, tableRules, fixIssues });
             let query = pgp.helpers.update(data, columnSet);
 
             query += this.prepareWhere(filter, forcedFilter, filterFields);
@@ -798,10 +865,11 @@ export class TableHandler extends ViewHandler {
         return { data, columnSet: cs }
     }
     
-    async insert(data: (object | object[]), param2?: InsertParams, param3_unused?, tableRules?: TableRule, localParams: any = {}){
+    async insert(data: (object | object[]), param2?: InsertParams, param3_unused?, tableRules?: TableRule, localParams: LocalParams = null){
         try {
 
             const { returning, onConflictDoNothing, fixIssues = false } = param2 || {};
+            const { testRule = false } = localParams || {};
 
             let returningFields: FieldFilter,
                 forcedData: object,
@@ -809,17 +877,35 @@ export class TableHandler extends ViewHandler {
     
             if(tableRules){
                 if(!tableRules.insert) throw "insert rules missing for " + this.name;
-                returningFields = tableRules.insert.forcedData;
+                returningFields = tableRules.insert.returningFields;
                 forcedData = tableRules.insert.forcedData;
                 fields = tableRules.insert.fields;
     
-                if(!fields)  throw ` invalid insert rule for ${this.name}. fields missing `;
+                if(!fields) throw ` invalid insert rule for ${this.name}. fields missing `;
+
+                /* Safely test publish rules */
+                if(testRule){
+                    await this.validateViewRules(fields, null, returningFields, null);
+                    if(forcedData) {
+                        const keys = Object.keys(forcedData);
+                        if(keys.length){
+                            try {
+                                const values = pgp.helpers.values(forcedData),
+                                    colNames = this.prepareColumnSet(keys, this.column_names);
+                                await this.db.any("EXPLAIN INSERT INTO ${name:raw} (${colNames:raw}) SELECT * FROM ( VALUES ${values:raw} ) t WHERE FALSE;", { name: this.name, colNames, values })
+                            } catch(e){
+                                throw " issue with forcedData: \nVALUE: " + JSON.stringify(forcedData, null, 2) + "\nERROR: " + e;
+                            }
+                        }
+                    }
+                    return true;
+                }
             }
             
-            if(!data) throw "Provide data in param1";        
+            if(!data) throw "Provide data in param1";
             const makeQuery = (row) => {
                 if(!isPojoObject(row)) throw "invalid insert data provided -> " + JSON.stringify(row);
-                const { data, columnSet} = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues})
+                const { data, columnSet } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues })
                 return pgp.helpers.insert(data, columnSet);
             };
     
@@ -845,7 +931,7 @@ export class TableHandler extends ViewHandler {
                 query += " RETURNING " + this.prepareColumnSet(returning, returningFields, false);
                 queryType = "one"
             }
-    
+            
             return this.db.tx(t => t[queryType](query));
         } catch(e){
             throw ` Issue with dbo.${this.name}.insert: \n -> ` + e;
@@ -864,6 +950,7 @@ export class TableHandler extends ViewHandler {
                 filterFields: FieldFilter = null,
                 returningFields: FieldFilter = null;
 
+            const { testRule = false } = localParams || {};
             if(table_rules){
                 if(!table_rules.delete) throw "delete rules missing";
                 forcedFilter = table_rules.delete.forcedFilter;
@@ -871,6 +958,32 @@ export class TableHandler extends ViewHandler {
                 returningFields = table_rules.delete.returningFields;
 
                 if(!filterFields)  throw ` invalid delete rule for ${this.name}. filterFields missing `;
+
+                /* Safely test publish rules */
+                if(testRule){
+                    if(filterFields) {
+                        try {
+                            this.parseFieldFilter(filterFields);
+                        } catch(e){
+                            throw ` issue with filterFields: \nVALUE: ` + JSON.stringify(filterFields, null, 2) + "\nERROR: " + e;
+                        }
+                    }
+                    if(returningFields) {
+                        try {
+                            this.parseFieldFilter(returningFields);
+                        } catch(e){
+                            throw " issue with returningFields: \nVALUE: " + JSON.stringify(returningFields, null, 2) + "\nERROR: " + e;
+                        }
+                    }
+                    if(forcedFilter) {
+                        try {
+                            this.find(forcedFilter, { limit: 0 });
+                        } catch(e){
+                            throw " issue with forcedFilter: \nVALUE: " + JSON.stringify(forcedFilter, null, 2) + "\nERROR: " + e;
+                        }
+                    }
+                    return true;
+                }
             }
 
             let queryType = 'none';                        

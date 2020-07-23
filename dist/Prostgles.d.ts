@@ -79,6 +79,7 @@ export declare type InsertRule = {
 export declare type UpdateRule = {
     fields: FieldFilter;
     forcedFilter?: object;
+    forcedData?: object;
     filterFields?: FieldFilter;
     returningFields?: FieldFilter;
     validate?(...UpdateRequestData: any[]): UpdateRequestData;
@@ -139,7 +140,7 @@ export declare type ProstglesInitOptions = {
     publish?: Publish;
     schema?: string;
     sqlFilePath?: string;
-    isReady(dbo: any): void;
+    isReady(dbo: any, db: DB): void;
     publishRawSQL?: any;
     wsChannelNamePrefix?: string;
     onSocketConnect?({ socket: Socket, dbo: any }: {

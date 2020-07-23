@@ -48,13 +48,13 @@ prostgles({
         return {
             pixels: {
 
-                delete: 22,
+                delete: "*",
                 select: {
                     fields: [{ rgb: false }]
                 },
             }, 
             sql_tables: {
-                delete: 22,
+                delete: "*",
                 select: {
                     fields: [{ rgb: false }]
                 },

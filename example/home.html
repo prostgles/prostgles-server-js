@@ -10,7 +10,6 @@
         <script src="https://unpkg.com/prostgles-client@latest/dist/prostgles.js" type="text/javascript"></script>	
 	</head>
 	<body>
-        <input type = "file"/>
         
         <div class="wrapper"></div>
 		<script>
@@ -21,33 +20,14 @@
                 socket, 
                 isReady: (db, methods) => {
                     window.db = db;
-                    db.pixels.subscribe({ blb: { $not: null }}, { limit: 2 }, items => {
-                        let div = document.querySelector(".wrapper");
-                        div.innerHTML = "";
+                    try {
 
-                        items.map(item => {
-                            let img = document.createElement("img");
-                            var bytes = new Uint8Array(item.blb);
-
-                            img.style = "width: 100px; height: 100px;";
-                            img.src = 'data:image/jpg;base64, ' + arrayBufferToBase64(item.blb)
-                            div.append(img);
-                        });
-                    });
-
-                    function arrayBufferToBase64( buffer ) {
-                        var binary = '';
-                        var bytes = new Uint8Array( buffer );
-                        var len = bytes.byteLength;
-                        for (var i = 0; i < len; i++) {
-                            binary += String.fromCharCode( bytes[ i ] );
-                        }
-                        return window.btoa( binary );
-                    }
-
-
-                    document.querySelector("input").onchange = e => {
-                        methods.upload(e.target.files[0])
+                        db.pixels.subscribe({ rgb: { $not: null }}, { limit: 2 }, items => {
+                            let div = document.querySelector(".wrapper");
+                            div.innerHTML = JSON.stringify(items, null, 2);
+                        });     
+                    } catch(e){
+                        
                     }
                 },
                 onDisconnect: (err, res) => {

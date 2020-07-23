@@ -25,22 +25,38 @@ prostgles({
     io,
 	publish: ({ socket, dbo }) => {        
         return {
-            pixels: "*", 
+            pixels: {
+                select: {
+                    fields: {
+                        rgbb: 1
+                    }
+                },
+                insert: {
+                    fields: {
+                        rgb: 1,
+                        xy: 1
+                    }
+                },
+                update: {
+                    fields: "*",
+                    // forcedData: { rgb: 2, id: 2 }
+                }
+            }, 
         }
     },
     
-    isReady: async (dbo) => {
+    isReady: async (dbo, db) => {
             
         /* Benchmarking 10000 inserts */
-        var tl = Date.now(), inserts = []
-        for(var i = 0; i < 10000; i++){
-            const data = { rgb: "black", xy: `${Math.random() * 400};${Math.random() * 400}` };
-            inserts.push(data);
-        }
-        await dbo.pixels.insert(inserts);
-        console.log(Date.now() - tl, "ms");
+        // var tl = Date.now(), inserts = []
+        // for(var i = 0; i < 10000; i++){
+        //     const data = { rgb: "black", xy: `${Math.random() * 400};${Math.random() * 400}` };
+        //     inserts.push(data);
+        // }
+        // await dbo.pixels.insert(inserts);
+        // console.log(Date.now() - tl, "ms");
         
-        dbo.pixels.count({}).then(console.log);
+        // dbo.pixels.count({}).then(console.log);
 
         
 		app.get('/', (req, res) => {

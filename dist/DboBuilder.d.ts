@@ -35,6 +35,7 @@ declare type LocalParams = {
     socket: any;
     func: () => any;
     has_rules: boolean;
+    testRule: boolean;
 };
 declare type Filter = object | {
     $and: Filter[];
@@ -59,6 +60,7 @@ export declare class ViewHandler {
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager);
     makeDef(): void;
     getFullDef(): any[];
+    validateViewRules(fields: FieldFilter, filterFields: FieldFilter, returningFields: FieldFilter, forcedFilter: object): Promise<boolean>;
     find(filter: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<object[]>;
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: any, table_rules?: TableRule, localParams?: LocalParams): Promise<object>;
     count(filter?: Filter, param2_unused?: any, param3_unused?: any, table_rules?: TableRule, localParams?: any): Promise<number>;
@@ -113,7 +115,7 @@ export declare class TableHandler extends ViewHandler {
     willBatch(query: string): boolean;
     update(filter: Filter, newData: object, params: UpdateParams, tableRules: TableRule, localParams?: LocalParams): Promise<any>;
     validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues }: ValidatedParams): ValidDataAndColumnSet;
-    insert(data: (object | object[]), param2?: InsertParams, param3_unused?: any, tableRules?: TableRule, localParams?: any): Promise<any>;
+    insert(data: (object | object[]), param2?: InsertParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
     delete(filter: Filter, params?: DeleteParams, param3_unused?: any, table_rules?: TableRule, localParams?: LocalParams): any;
     remove(filter: Filter, params?: UpdateParams, param3_unused?: null, tableRules?: TableRule, localParams?: LocalParams): any;
     upsert(filter: Filter, newData?: object, params?: UpdateParams, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
