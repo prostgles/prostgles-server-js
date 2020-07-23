@@ -961,27 +961,7 @@ export class TableHandler extends ViewHandler {
 
                 /* Safely test publish rules */
                 if(testRule){
-                    if(filterFields) {
-                        try {
-                            this.parseFieldFilter(filterFields);
-                        } catch(e){
-                            throw ` issue with filterFields: \nVALUE: ` + JSON.stringify(filterFields, null, 2) + "\nERROR: " + e;
-                        }
-                    }
-                    if(returningFields) {
-                        try {
-                            this.parseFieldFilter(returningFields);
-                        } catch(e){
-                            throw " issue with returningFields: \nVALUE: " + JSON.stringify(returningFields, null, 2) + "\nERROR: " + e;
-                        }
-                    }
-                    if(forcedFilter) {
-                        try {
-                            this.find(forcedFilter, { limit: 0 });
-                        } catch(e){
-                            throw " issue with forcedFilter: \nVALUE: " + JSON.stringify(forcedFilter, null, 2) + "\nERROR: " + e;
-                        }
-                    }
+                    this.validateViewRules(null, filterFields, returningFields, forcedFilter);
                     return true;
                 }
             }
