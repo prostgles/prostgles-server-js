@@ -21,8 +21,9 @@ const PubSubManager_1 = require("./PubSubManager");
 function capitalizeFirstLetter(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
 }
+const shortestPath_1 = require("./shortestPath");
 class ViewHandler {
-    constructor(db, tableOrViewInfo, pubSubManager) {
+    constructor(db, tableOrViewInfo, pubSubManager, dboBuilder) {
         this.tsDataDef = "";
         this.tsDataName = "";
         this.tsDboName = "";
@@ -36,6 +37,9 @@ class ViewHandler {
         this.columns = tableOrViewInfo.columns;
         this.column_names = tableOrViewInfo.columns.map(c => c.name);
         this.pubSubManager = pubSubManager;
+        this.dboBuilder = dboBuilder;
+        this.joins = this.dboBuilder.joins;
+        this.joinPaths = this.dboBuilder.joinPaths;
         this.columnSet = new pgp.helpers.ColumnSet(this.columns.map(({ name, data_type }) => (Object.assign({ name }, (["json", "jsonb"].includes(data_type) ? { mod: ":json" } : {})))), { table: this.name });
         this.tsDataName = capitalizeFirstLetter(this.name);
         this.tsFieldFilterName = "FieldFilter_" + this.name;
@@ -98,14 +102,317 @@ class ViewHandler {
             return true;
         });
     }
-    find(filter, selectParams, param3_unused = null, tableRules, localParams) {
+    getShortestJoin(table1, table2, startAlias, isInner = false) {
+        // let searchedTables = [], result; 
+        // while (!result && searchedTables.length <= this.joins.length * 2){
+        // }
+        let toOne = true, query = this.joins.map(({ tables, on, type }, i) => {
+            if (type.split("-")[1] === "many") {
+                toOne = false;
+            }
+            const tl = `tl${startAlias + i}`, tr = `tr${startAlias + i}`;
+            return `FROM ${tables[0]} ${tl} ${isInner ? "INNER" : "LEFT"} JOIN ${tables[1]} ${tr} ON ${Object.keys(on).map(lKey => `${tl}.${lKey} = ${tr}.${on[lKey]}`).join("\nAND ")}`;
+        }).join("\n");
+        return { query, toOne: false };
+    }
+    buildJoinQuery(q) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!this.dboBuilder.joinPaths)
+                yield this.dboBuilder.parseJoins();
+            this.joinPaths = this.dboBuilder.joinPaths;
+            const getJoins = (source, target) => {
+                let result = [];
+                /* Find the join path between tables */
+                let jp = this.joinPaths.find(j => j.t1 === source && j.t2 === target);
+                if (!jp)
+                    throw `Could not find a join from ${source} to ${target}`;
+                /* Make the join chain info excluding root table */
+                result = jp.path.slice(1).map((t2, i, arr) => {
+                    const t1 = i === 0 ? source : arr[i - 1];
+                    if (!this.joins)
+                        this.joins = JSON.parse(JSON.stringify(this.dboBuilder.joins));
+                    /* Get join options */
+                    const jo = this.joins.find(j => j.tables.includes(t1) && j.tables.includes(t2));
+                    if (!jo)
+                        throw "INTERNAL ERROR -> could not find join relationship";
+                    let on = [];
+                    Object.keys(jo.on).map(leftKey => {
+                        const rightKey = jo.on[leftKey];
+                        /* Left table is joining on keys */
+                        if (jo.tables[0] === t1) {
+                            on.push([leftKey, rightKey]);
+                            /* Left table is joining on values */
+                        }
+                        else {
+                            on.push([rightKey, leftKey]);
+                        }
+                    });
+                    return {
+                        table: t2,
+                        on
+                    };
+                });
+                return result;
+            }, makeQuery = (innerJoin = false, table, select, limit, targetLimit, targetSelect, expectOne, joins) => {
+                const sourceAlias = "t0", sSel = select.map(s => `${sourceAlias}.${s}`).join(","), targetAlias = `t1`, tSel = targetSelect.map(s => `${targetAlias}.${s}`).join(","), tSelSubQ = targetSelect.map(s => `t${joins.length - 1}.${s}`).join(","), multiSelect = `json_agg((SELECT x FROM (SELECT ${tSel}) as x))`, LIMIT_FIELD_NAME = "prostgles_inner_json_arr_limit", firstOn = joins[0].on, targetIsNull = firstOn.map(o => `t0.${o[0]} = t1.${o[1]}`).join(" AND ");
+                if (expectOne)
+                    targetLimit = null;
+                return "" +
+                    `SELECT ${sSel}, \n` + (expectOne ?
+                    `CASE WHEN bit_or(CASE WHEN t1.${LIMIT_FIELD_NAME} IS NULL THEN 0 ELSE 1 END) = 1 THEN row_to_json((SELECT x FROM (SELECT ${tSel}) AS x)) as colors ` :
+                    `CASE WHEN bit_or(CASE WHEN t1.${LIMIT_FIELD_NAME} IS NULL THEN 0 ELSE 1 END) = 1 THEN ${multiSelect} ELSE '[]' END AS colors`) + "\n" +
+                    `FROM ${table} t0 \n` +
+                    `LEFT JOIN (\n` +
+                    `   SELECT ${firstOn.map(o => `t0.${o[1]}`).join()} ,\n` +
+                    ((targetLimit) ? `   row_number() over (partition by ${firstOn.map(o => o[1]).join()}) as ${LIMIT_FIELD_NAME},\n` : "") +
+                    `   ${tSelSubQ},\n` +
+                    joins.map(({ table, on }, it) => {
+                        if (it === 0)
+                            return `    FROM ${table} t0`;
+                        return `    LEFT JOIN ${table} t${it} \n` +
+                            `   ON ${on.map(o => `t${it - 1}.${o[0]} = t${it}.${o[1]}`).join(" AND \n")}`;
+                    }).join("\n") +
+                    `) t1\n` +
+                    `ON ${firstOn.map(o => `t0.${o[0]} = t1.${o[1]}`).join(" AND \n")}` + `\n` +
+                    `WHERE ` + (innerJoin ? ` t1.${LIMIT_FIELD_NAME} IS NOT NULL` : " TRUE") + "\n" +
+                    ((targetLimit) ?
+                        `AND (${LIMIT_FIELD_NAME} IS NULL OR ${LIMIT_FIELD_NAME} <= ${targetLimit + 1} )\n` : "") +
+                    ((targetLimit) ?
+                        `GROUP BY ${sSel}\n` : "") +
+                    `LIMIT ${limit}\n\n`;
+            }, makeQuery2 = (q1, isJoined = false) => {
+                const makeJoinChain = (q1, q2, depth = 0) => {
+                    const paths = getJoins(q1.table, q2.table);
+                    // console.log(JSON.stringify(paths, null, 2));
+                    return `` +
+                        // `-- [source select ALL] +root.ctid (-root.agg_name or safe rename agg for hoisting) \n` +
+                        `   SELECT ${q1.allFields.concat(CTID_PREFIX).map(field => `${q1.table}.${field}`).join(", ")}\n` +
+                        // `-- [target select]\n` +             
+                        `   , CASE WHEN ${q2.table}.${CTID_PREFIX} IS NULL THEN NULL ELSE row_to_json((select x from (select ${q2.select.concat((q2.joins || []).map(j => j.table)).map(field => `${q2.table}.${field}`)}) as x)) END AS ${q2.table} \n` +
+                        `   , row_number() over(partition by ${q1.table}.${CTID_PREFIX} order by ${q2.table}.${CTID_PREFIX}) as ${CTID_PREFIX}${q2.table}group_rownum \n` +
+                        `      FROM (\n` +
+                        `           select *, \n` +
+                        `           row_number() over() as ${CTID_PREFIX} \n` +
+                        `           from ${q1.table}        -- [source table] \n` +
+                        `           order by ${q1.orderBy}\n` +
+                        `      ) ${q1.table}\n` +
+                        `${paths.map(({ table, on }, i) => {
+                            const prevTable = i === 0 ? q1.table : paths[i - 1].table;
+                            let iQ = table;
+                            if (i === paths.length - 1) {
+                                let iiQ = makeQuery2(q2, true);
+                                iQ = "" +
+                                    "   (\n" +
+                                    `       SELECT *,\n` +
+                                    `       row_number() over() as ${CTID_PREFIX}\n` +
+                                    `       FROM (\n` +
+                                    `           ${iiQ}\n` +
+                                    `       ) ${q2.table}        -- [target table]\n` +
+                                    `       WHERE ${q2.where}       -- [target filter]\n` +
+                                    `       ORDER BY ${q2.orderBy}  -- [target order]\n` +
+                                    `   ) ${q2.table}\n`;
+                            }
+                            return "" +
+                                `   LEFT JOIN ${iQ}\n` +
+                                `   ON ${on.map(([c1, c2]) => `${prevTable}.${c1} = ${table}.${c2}`).join(" AND ")}\n`;
+                        }).join("")}`;
+                    // WHY NOT THIS???
+                    // `
+                    // explain 
+                    // SELECT t.id, t.username
+                    // , json_agg(t.comments) as comments
+                    // FROM (
+                    //         select u.id, u.username -- [source select]
+                    //         , CASE WHEN c.ctid IS NULL THEN NULL ELSE row_to_json((select x from (select c.id, c.content) as x)) END AS comments 
+                    //         , row_number() over(partition by u.ctid order by c.id desc) as group_rownum 
+                    //         from users u
+                    //         left join posts p
+                    //         on p.user_id = u.id
+                    //         left join comments c
+                    //         on c.post_id = p.id
+                    //         order by u.id, -- [source order]
+                    //         c.id -- [target order]
+                    // ) t
+                    // WHERE t.group_rownum < 2 -- [target limit]
+                    // group by t.id, t.username
+                    // limit 15 -- [source limit]`
+                };
+                const CTID_PREFIX = "prostgles_ctid_not_ctid_actually_", q2 = utils_1.get(q1, "joins.0"), expectingOne = Boolean(q2 && q2.limit === 1);
+                if (!q2) {
+                    return `` +
+                        `SELECT ${(isJoined ? "*" : q1.select.join(", "))}\n` +
+                        `FROM ${q1.table}\n`;
+                    // +                `WHERE ${q1.where}\n`;
+                }
+                return "" +
+                    `SELECT ${(isJoined ? q1.allFields : q1.select).map(field => `${q1.table}.${field}`).join(", ")} --[source select]\n` +
+                    // ` -- [JSON_ARR]\n` +
+                    (expectingOne ? "" : `, coalesce(json_agg((${q1.table}.${q2.table})) FILTER (WHERE ${q1.table}.${q2.table} IS NOT NULL), '[]') as ${q2.table}\n`) +
+                    // `-- [JSON_OBJ]\n` +
+                    (!expectingOne ? "" : `, ${q1.table}.${q2.table} \n`) +
+                    `FROM (\n\n` +
+                    `${makeJoinChain(q1, q2)}\n` +
+                    `) ${q1.table} \n\n` +
+                    // `-- [target limit] -- [JSON_ARR]\n` +   
+                    (expectingOne ? "" : `WHERE (${q1.table}.${CTID_PREFIX}${q2.table}group_rownum <= ${q2.limit})\n`) +
+                    // `-- [JSON_OBJ]\n` +
+                    (!expectingOne ? "" : `WHERE (${q1.table}.${CTID_PREFIX}${q2.table}group_rownum = 1 OR ${q1.table}.${CTID_PREFIX}${q2.table}group_rownum IS NULL)\n`) +
+                    // `-- [source filter]\n` +
+                    `AND ${q1.where}\n` +
+                    // `-- [JSON_ARR]       grouped by source ctid to ensure source table does not collapse due to small select \n` +
+                    (expectingOne ? "" : `GROUP BY ${(isJoined ? q1.allFields : q1.select).concat(CTID_PREFIX).map(field => `${q1.table}.${field}`).join(", ")} \n`) +
+                    `ORDER BY ${q1.orderBy.join(", ")}      -- [source order]\n` +
+                    (isJoined ? `` : `LIMIT ${q1.limit}                      -- [source limit]\n`);
+            }, makeQuery3 = (q1) => {
+                return `WITH _posts AS (
+                SELECT *, row_to_json((select x from (select id, title) as x)) as posts
+                FROM posts
+        ), _comments AS (
+                SELECT comments.ctid, comments.id, comments.post_id, comments.user_id, row_to_json((select x from (select _posts.id, json_agg(_posts.posts) as posts) as x)) as posts
+                FROM comments
+                LEFT JOIN _posts
+                ON comments.post_id = _posts.id
+                WHERE comments.id IS NOT NULL
+                GROUP BY comments.ctid, comments.id, comments.post_id, comments.user_id, _posts.id
+                ORDER BY comments.ctid
+        ), _users AS (
+                SELECT users.id, users.username, COALESCE( json_agg((SELECT x FROM (SELECT _comments.id, _comments.posts) AS x)) FILTER (WHERE _comments.ctid IS NOT NULL), '[]') as comments
+                FROM users
+                LEFT JOIN _comments
+                ON users.id = _comments.user_id
+                GROUP BY users.id, users.username
+                LIMIT 15
+        )
+        
+        SELECT *
+        FROM _users
+        LIMIT 15`;
+            };
+            // console.log(makeQuery2({ 
+            //     select: ["id", "username"],
+            //     allFields: this.dboBuilder.dbo.users.column_names,
+            //     table: "users",
+            //     where: "TRUE",
+            //     limit: 5,
+            //     offset: 0,
+            //     orderBy: ["id"],
+            //     isLeftJoin: true,
+            //     joins: [
+            //         {
+            //             select: ["id", "title", "user_id"],
+            //             allFields: this.dboBuilder.dbo.posts.column_names,
+            //             table: "posts",
+            //             where: "TRUE",
+            //             limit: 5,
+            //             offset: 0,
+            //             orderBy: ["id"],
+            //             isLeftJoin: true,
+            //         }
+            //     ]
+            // }))
+            // console.log(makeQuery2({ 
+            //     select: ["id", "username"],
+            //     allFields: this.dboBuilder.dbo.users.column_names,
+            //     table: "users",
+            //     where: "TRUE",
+            //     limit: 5,
+            //     offset: 0,
+            //     orderBy: ["id"],
+            //     isLeftJoin: true,
+            //     joins: [
+            //         {
+            //             select: ["id", "title", "user_id"],
+            //             allFields: this.dboBuilder.dbo.posts.column_names,
+            //             table: "posts",
+            //             where: "TRUE",
+            //             limit: 5,
+            //             offset: 0,
+            //             orderBy: ["id"],
+            //             isLeftJoin: true,
+            //             joins: [
+            //                 {
+            //                     select: ["id","content"],
+            //                     allFields: this.dboBuilder.dbo.comments.column_names,
+            //                     table: "comments",
+            //                     where: "id IS NOT NULL",
+            //                     limit: 5,
+            //                     offset: 0,
+            //                     orderBy: ["id desc"],
+            //                     isLeftJoin: true
+            //                 }
+            //             ]
+            //         }
+            //     ]
+            // }));
+            return makeQuery2(q);
+            // console.log(makeQuery2({ 
+            //     select: ["id","content"],
+            //     allFields: this.dboBuilder.dbo.comments.column_names,
+            //     table: "comments",
+            //     where: "id IS NOT NULL",
+            //     limit: 5,
+            //     offset: 0,
+            //     orderBy: ["id desc"],
+            //     isLeftJoin: true,
+            //     joins: [
+            //         {
+            //             select: ["id", "title", "user_id"],
+            //             allFields: this.dboBuilder.dbo.posts.column_names,
+            //             table: "posts",
+            //             where: "TRUE",
+            //             limit: 45,
+            //             offset: 0,
+            //             orderBy: ["id"],
+            //             isLeftJoin: true,
+            //         }
+            //     ]
+            // }))
+            // const q = makeQuery(false, "colors", ["id"], 5, 5, ["pixel_id"], false, getJoins("colors", "drawings"))
+            // console.log(q);
+            // const q1 = makeQuery(false, "drawings", ["id"], 5, 5, ["rgb"], false, getJoins("drawings", "pixels"))
+            // console.log(q1);
+            // let tableAlias = "t" + joinLevel,
+            //     joins = query.joins.map(j => {
+            //         // const joinOptions = this.joins.find(jo => jo.)
+            //         // this.dboBuilder.prostgles.publishParser.getValidatedRequestRule({ tableName: j.table, command: "find" })
+            //         //j.
+            //     })
+            // let result = `
+            //     SELECT ${query.select}
+            //     FROM ${query.table} ${tableAlias}
+            // `;
+            // return `
+            // select p.id
+            // --, case when json_agg(c.*)::text = '[null]' then '[]' else json_agg(c.*) end as colors     -- many
+            // , row_to_json((c.*)) as colors                                                              -- one
+            // from pixels p
+            // left join colors c
+            // on p.rgb = c.rgb
+            // --group by p.id
+            // limit 10
+            // `;
+        });
+    }
+    parseSelect(select, tableAlias = "t1") {
+        if (!select)
+            throw "empty select";
+    }
+    // makeJoin(root: { filter: Filter, selectParams?: SelectParams, tableRules?: TableRule }, joins: { table: string, filter: Filter, selectParams?: SelectParams, tableRules?: TableRule }[]){
+    //     const rootQ = this.makeSelectStatement(root.filter, root.selectParams, null, root.tableRules, { tableAlias: "t1" });
+    //     joins.map(j => {
+    //         this.dboBuilder.
+    //         this.joinPaths.find(jp => jp.t1 === this.name && jp.t2 === j.table);
+    //     });
+    // }
+    makeSelectStatement(filter, selectParams, param3_unused = null, tableRules, localParams) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 if (filter && !isPojoObject(filter))
                     throw `invalid update filter -> ${JSON.stringify(filter)} \n Expecting an object or undefined`;
                 const { select = "*", limit = null, offset = null, orderBy = null, expectOne = false } = selectParams || {};
                 let fields, filterFields, forcedFilter, maxLimit;
-                const { testRule = false } = localParams || {};
+                // this.buildJoinQuery(undefined, undefined);
+                const { testRule = false, tableAlias = "t1" } = localParams || {};
                 if (tableRules) {
                     if (!tableRules.select)
                         throw "select rules missing for " + this.name;
@@ -119,20 +426,44 @@ class ViewHandler {
                         if (maxLimit && !Number.isInteger(maxLimit))
                             throw " invalid maxLimit, expecting integer but got " + maxLimit;
                         yield this.validateViewRules(fields, filterFields, null, forcedFilter);
-                        return [];
+                        return {};
                     }
                 }
                 // console.log(this.parseFieldFilter(select));
-                let columnSet = this.prepareColumnSet(select, fields);
-                let _query = pgp.as.format(" SELECT ${select:raw} FROM ${_psqlWS_tableName:name} ", { select: columnSet, _psqlWS_tableName: this.name });
-                _query += this.prepareWhere(filter, forcedFilter, filterFields);
-                _query += this.prepareSort(orderBy, fields);
-                _query += this.prepareLimitQuery(limit, maxLimit);
-                _query += this.prepareOffsetQuery(offset);
+                let columnSet = this.prepareSelect(select, fields, null, tableAlias);
+                // console.log(this.prepareSelect(select, fields, null , tableAlias))
+                let _query = pgp.as.format(" SELECT ${select:raw} FROM ${_psqlWS_tableName:name} ${tableAlias:name} ", { select: columnSet, _psqlWS_tableName: this.name, tableAlias });
+                const _where = this.prepareWhere(filter, forcedFilter, filterFields, null, tableAlias), _order = this.prepareSort(orderBy, fields, tableAlias), _limit = this.prepareLimitQuery(limit, maxLimit), _offset = this.prepareOffsetQuery(offset);
+                _query += _where;
+                _query += _order;
+                _query += _limit;
+                _query += _offset;
                 // console.log(_query)
                 /* TO FINISH */
                 // if(select_rules.validate){
                 // }
+                return {
+                    query: _query,
+                    select: columnSet.split(","),
+                    where: _where,
+                    limit: _limit,
+                    offset: _offset
+                };
+            }
+            catch (e) {
+                throw ` Issue with dbo.${this.name}.find: \n -> ` + e;
+            }
+        });
+    }
+    find(filter, selectParams, param3_unused = null, tableRules, localParams) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                filter = filter || {};
+                const { expectOne = false } = selectParams || {};
+                const { testRule = false } = localParams || {};
+                const statement = yield this.makeSelectStatement(filter, selectParams, param3_unused, tableRules, localParams), _query = statement.query;
+                if (testRule)
+                    return [];
                 if (expectOne)
                     return this.db.one(_query);
                 else
@@ -218,7 +549,7 @@ class ViewHandler {
     //     if(table_rules) select_rules = table_rules.select; 
     //     return this.prepareCondition(filter, select_rules.forcedFilter, select_rules.filterFields, excludeWhere);
     // }
-    prepareColumnSet(selectParams = "*", allowed_cols, allow_empty = true) {
+    prepareColumnSet(selectParams = "*", allowed_cols, allow_empty = true, onlyNames = true) {
         let all_columns = this.column_names.slice(0), allowedFields = all_columns.slice(0), resultFields = [];
         if (selectParams) {
             resultFields = this.parseFieldFilter(selectParams, allow_empty);
@@ -229,26 +560,22 @@ class ViewHandler {
         let col_names = (resultFields || []).filter(f => !allowedFields || allowedFields.includes(f));
         try {
             let colSet = new pgp.helpers.ColumnSet(col_names);
-            return colSet.names;
+            return onlyNames ? colSet.names : colSet;
         }
         catch (e) {
             throw e;
         }
     }
-    // prepareCondition(filter: object, forcedFilter: object, filterFields: FieldFilter, excludeWhere = false): string {
-    //     return this.getWhere(filter, forcedFilter, filterFields, excludeWhere);
-    //     // let final_filter = this.prepareFieldValues(filter, forcedFilter, filterFields),
-    //     //     final_filter_keys = Object.keys(final_filter),
-    //     //     result = "";
-    //     // if(final_filter_keys.length){
-    //     //     if(!excludeWhere) {
-    //     //         result += " WHERE ";
-    //     //     }
-    //     //     result += this.getCondition({ ...final_filter }, null);
-    //     // }
-    //     // return result;
-    // }
-    prepareWhere(filter, forcedFilter, filterFields, excludeWhere = false) {
+    prepareSelect(selectParams = "*", allowed_cols, allow_empty = true, tableAlias) {
+        if (tableAlias) {
+            let cs = this.prepareColumnSet(selectParams, allowed_cols, true, false);
+            return cs.columns.map(col => pgp.as.format("${tableAlias:name}.${name:name}", { tableAlias, name: col.name })).join(", ");
+        }
+        else {
+            return this.prepareColumnSet(selectParams, allowed_cols, true, true);
+        }
+    }
+    prepareWhere(filter, forcedFilter, filterFields, excludeWhere = false, tableAlias) {
         const parseFilter = (f, parentFilter = null) => {
             let result = "";
             let keys = Object.keys(f);
@@ -272,7 +599,7 @@ class ViewHandler {
                 }
             }
             else if (!group) {
-                result = this.getCondition(Object.assign({}, f), this.parseFieldFilter(filterFields));
+                result = this.getCondition(Object.assign({}, f), this.parseFieldFilter(filterFields), tableAlias);
             }
             return result;
         };
@@ -294,9 +621,13 @@ class ViewHandler {
             else
                 return " WHERE " + cond;
         }
+        return "";
     }
     /* NEW API !!! :) */
-    getCondition(filter, allowed_colnames) {
+    getCondition(filter, allowed_colnames, tableAlias) {
+        let prefix = "";
+        if (tableAlias)
+            prefix = pgp.as.format("$1:name.", tableAlias);
         const parseDataType = (key, col = null) => {
             const _col = col || this.columns.find(({ name }) => name === key);
             if (_col && _col.data_type === "ARRAY") {
@@ -304,31 +635,31 @@ class ViewHandler {
             }
             return " ${data} ";
         }, conditionParsers = [
-            { aliases: ["$nin"], get: (key, val, col) => " ${key:name} NOT IN (${data:csv}) " },
-            { aliases: ["$in"], get: (key, val, col) => " ${key:name} IN (${data:csv}) " },
+            { aliases: ["$nin"], get: (key, val, col) => "${prefix:raw}${key:name} NOT IN (${data:csv}) " },
+            { aliases: ["$in"], get: (key, val, col) => "${prefix:raw}${key:name} IN (${data:csv}) " },
             { aliases: ["@@"], get: (key, val, col) => {
                     if (col && val && val.to_tsquery && Array.isArray(val.to_tsquery)) {
                         if (col.data_type === "tsvector") {
-                            return pgp.as.format(" ${key:name} @@ to_tsquery(${data:csv}) ", { key, data: val.to_tsquery });
+                            return pgp.as.format("${prefix:raw}${key:name} @@ to_tsquery(${data:csv}) ", { key, data: val.to_tsquery, prefix });
                         }
                         else {
-                            return pgp.as.format(" to_tsvector(${key:name}::text) @@ to_tsquery(${data:csv}) ", { key, data: val.to_tsquery });
+                            return pgp.as.format(" to_tsvector(${prefix:raw}${key:name}::text) @@ to_tsquery(${data:csv}) ", { key, data: val.to_tsquery, prefix });
                         }
                     }
                     else
                         throw `expecting { field_name: { "@@": { to_tsquery: [ ...params ] } } } `;
                 } },
-            { aliases: ["@>"], get: (key, val, col) => " ${key:name} @> " + parseDataType(key, col) },
-            { aliases: ["<@"], get: (key, val, col) => " ${key:name} <@ " + parseDataType(key, col) },
-            { aliases: ["&&"], get: (key, val, col) => " ${key:name} && " + parseDataType(key, col) },
-            { aliases: ["=", "$eq", "$equal"], get: (key, val, col) => " ${key:name} =  " + parseDataType(key, col) },
-            { aliases: [">", "$gt", "$greater"], get: (key, val, col) => " ${key:name} >  " + parseDataType(key, col) },
-            { aliases: [">=", "$gte", "$greaterOrEqual"], get: (key, val, col) => " ${key:name} >= " + parseDataType(key, col) },
-            { aliases: ["<", "$lt", "$less"], get: (key, val, col) => " ${key:name} <  " + parseDataType(key, col) },
-            { aliases: ["<=", "$lte", "$lessOrEqual"], get: (key, val, col) => " ${key:name} <= " + parseDataType(key, col) },
-            { aliases: ["$ilike"], get: (key, val, col) => " ${key:name}::text ilike ${data} " },
-            { aliases: ["<>", "$ne", "$not"], get: (key, val, col) => " ${key:name} " + (val === null ? " IS NOT NULL " : (" <> " + parseDataType(key, col))) },
-            { aliases: ["$isNull", "$null"], get: (key, val, col) => " ${key:name} " + `  IS ${!val ? " NOT " : ""} NULL ` }
+            { aliases: ["@>"], get: (key, val, col) => "${prefix:raw}${key:name} @> " + parseDataType(key, col) },
+            { aliases: ["<@"], get: (key, val, col) => "${prefix:raw}${key:name} <@ " + parseDataType(key, col) },
+            { aliases: ["&&"], get: (key, val, col) => "${prefix:raw}${key:name} && " + parseDataType(key, col) },
+            { aliases: ["=", "$eq", "$equal"], get: (key, val, col) => "${prefix:raw}${key:name} =  " + parseDataType(key, col) },
+            { aliases: [">", "$gt", "$greater"], get: (key, val, col) => "${prefix:raw}${key:name} >  " + parseDataType(key, col) },
+            { aliases: [">=", "$gte", "$greaterOrEqual"], get: (key, val, col) => "${prefix:raw}${key:name} >= " + parseDataType(key, col) },
+            { aliases: ["<", "$lt", "$less"], get: (key, val, col) => "${prefix:raw}${key:name} <  " + parseDataType(key, col) },
+            { aliases: ["<=", "$lte", "$lessOrEqual"], get: (key, val, col) => "${prefix:raw}${key:name} <= " + parseDataType(key, col) },
+            { aliases: ["$ilike"], get: (key, val, col) => "${prefix:raw}${key:name}::text ilike ${data} " },
+            { aliases: ["<>", "$ne", "$not"], get: (key, val, col) => "${prefix:raw}${key:name} " + (val === null ? " IS NOT NULL " : (" <> " + parseDataType(key, col))) },
+            { aliases: ["$isNull", "$null"], get: (key, val, col) => "${prefix:raw}${key:name} " + `  IS ${!val ? " NOT " : ""} NULL ` }
         ], condAliases = conditionParsers.map(c => c.aliases).flat();
         let data = Object.assign({}, filter);
         if (allowed_colnames) {
@@ -342,7 +673,7 @@ class ViewHandler {
             .map(fKey => {
             let d = data[fKey], col = this.columns.find(({ name }) => name === fKey);
             if (d === null) {
-                return pgp.as.format(" ${key:name} IS NULL ", { key: fKey });
+                return pgp.as.format("${prefix:raw}${key:name} IS NULL ", { key: fKey, prefix });
             }
             if (isPlainObject(d)) {
                 if (Object.keys(d).length) {
@@ -351,14 +682,13 @@ class ViewHandler {
                         if (!op) {
                             throw "Unrecognised operand: " + operand_key;
                         }
-                        return pgp.as.format(op.get(fKey, d[operand_key], col), { key: fKey, data: d[operand_key] });
+                        return pgp.as.format(op.get(fKey, d[operand_key], col), { key: fKey, data: d[operand_key], prefix });
                     });
                     // if(Object.keys(d).length){
                     // } else throw `\n Unrecognised statement for field ->   ${fKey}: ` + JSON.stringify(d);
                 }
             }
-            return pgp.as.format(" ${key:name} = " + parseDataType(fKey), { key: fKey, data: data[fKey] });
-            ;
+            return pgp.as.format("${prefix:raw}${key:name} = " + parseDataType(fKey), { key: fKey, data: data[fKey], prefix });
         }).flat()
             .sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
             .join(" AND ");
@@ -369,7 +699,7 @@ class ViewHandler {
         */
     }
     /* This relates only to SELECT */
-    prepareSort(orderBy, allowed_cols) {
+    prepareSort(orderBy, allowed_cols, tableAlias) {
         let column_names = this.column_names.slice(0);
         if (!orderBy)
             return "";
@@ -418,7 +748,7 @@ class ViewHandler {
             return "";
         let bad_param = _ob.find(({ key }) => !column_names.includes(key) || (allowedFields.length && !allowedFields.includes(key)));
         if (!bad_param) {
-            return " ORDER BY " + (_ob.map(({ key, asc }) => `${pgp.as.format("$1:name", key)} ${asc ? " ASC " : " DESC "}`).join(", "));
+            return " ORDER BY " + (_ob.map(({ key, asc }) => `${tableAlias ? pgp.as.format("$1:name.", tableAlias) : ""}${pgp.as.format("$1:name", key)} ${asc ? " ASC " : " DESC "}`).join(", "));
         }
         else {
             throw "Unrecognised orderBy fields or params: " + bad_param.key;
@@ -588,8 +918,8 @@ function isPojoObject(obj) {
     return true;
 }
 class TableHandler extends ViewHandler {
-    constructor(db, tableOrViewInfo, pubSubManager) {
-        super(db, tableOrViewInfo, pubSubManager);
+    constructor(db, tableOrViewInfo, pubSubManager, dboBuilder) {
+        super(db, tableOrViewInfo, pubSubManager, dboBuilder);
         this.tsDboDefs = this.tsDboDefs.concat([
             `   update: (filter: object, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
             `   upsert: (filter: object, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
@@ -667,7 +997,7 @@ class TableHandler extends ViewHandler {
                 let qType = "none";
                 if (returning) {
                     qType = multi ? "any" : "one";
-                    query += " RETURNING " + this.prepareColumnSet(returning, returningFields);
+                    query += " RETURNING " + this.prepareSelect(returning, returningFields);
                 }
                 return this.db.tx(t => t[qType](query));
             }
@@ -710,7 +1040,7 @@ class TableHandler extends ViewHandler {
                             const keys = Object.keys(forcedData);
                             if (keys.length) {
                                 try {
-                                    const values = pgp.helpers.values(forcedData), colNames = this.prepareColumnSet(keys, this.column_names);
+                                    const values = pgp.helpers.values(forcedData), colNames = this.prepareSelect(keys, this.column_names);
                                     yield this.db.any("EXPLAIN INSERT INTO ${name:raw} (${colNames:raw}) SELECT * FROM ( VALUES ${values:raw} ) t WHERE FALSE;", { name: this.name, colNames, values });
                                 }
                                 catch (e) {
@@ -746,7 +1076,7 @@ class TableHandler extends ViewHandler {
                 }
                 let queryType = "none";
                 if (returning) {
-                    query += " RETURNING " + this.prepareColumnSet(returning, returningFields, false);
+                    query += " RETURNING " + this.prepareSelect(returning, returningFields, false);
                     queryType = "one";
                 }
                 return this.db.tx(t => t[queryType](query));
@@ -760,6 +1090,7 @@ class TableHandler extends ViewHandler {
     delete(filter, params, param3_unused, table_rules, localParams = null) {
         try {
             const { returning } = params || {};
+            filter = filter || {};
             if (!filter)
                 throw `invalid/missing filter object -> ${JSON.stringify(filter)} \n Expecting empty object or something like { some_column: "filter_value" }`;
             // table_rules = table_rules || {};
@@ -775,30 +1106,7 @@ class TableHandler extends ViewHandler {
                     throw ` invalid delete rule for ${this.name}. filterFields missing `;
                 /* Safely test publish rules */
                 if (testRule) {
-                    if (filterFields) {
-                        try {
-                            this.parseFieldFilter(filterFields);
-                        }
-                        catch (e) {
-                            throw ` issue with filterFields: \nVALUE: ` + JSON.stringify(filterFields, null, 2) + "\nERROR: " + e;
-                        }
-                    }
-                    if (returningFields) {
-                        try {
-                            this.parseFieldFilter(returningFields);
-                        }
-                        catch (e) {
-                            throw " issue with returningFields: \nVALUE: " + JSON.stringify(returningFields, null, 2) + "\nERROR: " + e;
-                        }
-                    }
-                    if (forcedFilter) {
-                        try {
-                            this.find(forcedFilter, { limit: 0 });
-                        }
-                        catch (e) {
-                            throw " issue with forcedFilter: \nVALUE: " + JSON.stringify(forcedFilter, null, 2) + "\nERROR: " + e;
-                        }
-                    }
+                    this.validateViewRules(null, filterFields, returningFields, forcedFilter);
                     return true;
                 }
             }
@@ -807,7 +1115,7 @@ class TableHandler extends ViewHandler {
             _query += this.prepareWhere(filter, forcedFilter, filterFields);
             if (returning) {
                 queryType = "any";
-                _query += " RETURNING " + this.prepareColumnSet(returning, returningFields);
+                _query += " RETURNING " + this.prepareSelect(returning, returningFields);
             }
             return this.db[queryType](_query, { _psqlWS_tableName: this.name });
         }
@@ -906,13 +1214,96 @@ class TableHandler extends ViewHandler {
     }
 }
 exports.TableHandler = TableHandler;
+const Prostgles_1 = require("./Prostgles");
 class DboBuilder {
-    constructor(db, schema = "public") {
+    constructor(prostgles) {
         this.schema = "public";
-        this.db = db;
-        this.schema = schema;
+        this.prostgles = prostgles;
+        this.db = this.prostgles.db;
+        this.schema = this.prostgles.schema || "public";
         this.dbo = {};
+        // this.joins = this.prostgles.joins;
         this.pubSubManager = new PubSubManager_1.PubSubManager(this.db, this.dbo);
+    }
+    parseJoins() {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.prostgles.joins) {
+                let joins = yield this.prostgles.joins;
+                joins = JSON.parse(JSON.stringify(joins));
+                this.joins = joins;
+                console.log(joins);
+                // Validate joins
+                try {
+                    // 1 find duplicates
+                    const dup = joins.find(j => j.tables[0] === j.tables[1] ||
+                        joins.find(jj => j.tables.join() !== jj.tables.join() &&
+                            j.tables.slice().sort().join() === jj.tables.slice().sort().join()));
+                    if (dup) {
+                        throw "Duplicate join declaration for table: " + dup.tables[0];
+                    }
+                    // 2 find incorrect tables
+                    const missing = joins.map(j => j.tables).flat().find(t => !this.dbo[t]);
+                    if (missing) {
+                        throw "Table not found: " + missing;
+                    }
+                    // 3 find incorrect fields
+                    joins.map(({ tables, on }) => {
+                        const t1 = tables[0], t2 = tables[1], f1s = Object.keys(on), f2s = Object.values(on);
+                        [[t1, f1s], [t2, f2s]].map(v => {
+                            var t = v[0], f = v[1];
+                            if (!this.dbo[t])
+                                throw "Table not found: " + t;
+                            const m1 = f.filter(k => !this.dbo[t].column_names.includes(k));
+                            if (m1 && m1.length) {
+                                throw `Table ${t}(${this.dbo[t].column_names.join()}) has no fields named: ${m1.join()}`;
+                            }
+                        });
+                    });
+                    // 4 find incorrect/missing join types
+                    const expected_types = " \n\n-> Expecting: " + Prostgles_1.JOIN_TYPES.map(t => JSON.stringify(t)).join(` | `);
+                    const mt = joins.find(j => !j.type);
+                    if (mt)
+                        throw "Join type missing for: " + JSON.stringify(mt, null, 2) + expected_types;
+                    const it = joins.find(j => !Prostgles_1.JOIN_TYPES.includes(j.type));
+                    if (it)
+                        throw "Incorrect join type for: " + JSON.stringify(it, null, 2) + expected_types;
+                }
+                catch (e) {
+                    console.error("JOINS VALIDATION ERROR \n-> ", e);
+                }
+                // Make joins graph
+                this.joinGraph = {};
+                this.joins.map(({ tables }) => {
+                    let _t = tables.slice().sort(), t1 = _t[0], t2 = _t[1];
+                    this.joinGraph[t1] = this.joinGraph[t1] || {};
+                    this.joinGraph[t1][t2] = 1;
+                    this.joinGraph[t2] = this.joinGraph[t2] || {};
+                    this.joinGraph[t2][t1] = 1;
+                });
+                const tables = this.joins.map(t => t.tables).flat();
+                this.joinPaths = [];
+                tables.map(t1 => {
+                    tables.map(t2 => {
+                        const spath = shortestPath_1.findShortestPath(this.joinGraph, t1, t2);
+                        if (spath && spath.distance < Infinity) {
+                            if (!this.joinPaths.find(j => j.t1 === t1 && j.t2 === t2)) {
+                                this.joinPaths.push({ t1, t2, path: spath.path });
+                            }
+                            if (!this.joinPaths.find(j => j.t2 === t1 && j.t1 === t2)) {
+                                this.joinPaths.push({ t1: t2, t2: t1, path: spath.path.slice().reverse() });
+                            }
+                        }
+                    });
+                });
+                // console.log(this.joinPaths)
+                // console.log(888, this.prostgles.joins);
+                // console.log(this.joinGraph, findShortestPath(this.joinGraph, "colors", "drawings"));
+                // console.log(this.dbo.pixels.column_names)
+            }
+            return this.joinPaths;
+        });
+    }
+    buildJoinPaths() {
     }
     init() {
         return __awaiter(this, void 0, void 0, function* () {
@@ -951,15 +1342,16 @@ export type DeleteParams = {
             this.dboDefinition = `export type DBObj = {\n`;
             this.tablesOrViews.map(tov => {
                 if (tov.is_view) {
-                    this.dbo[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager);
+                    this.dbo[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this);
                 }
                 else {
-                    this.dbo[tov.name] = new TableHandler(this.db, tov, this.pubSubManager);
+                    this.dbo[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this);
                 }
                 allDataDefs += this.dbo[tov.name].tsDataDef + "\n";
                 allDboDefs += this.dbo[tov.name].tsDboDef;
                 this.dboDefinition += ` ${tov.name}: ${this.dbo[tov.name].tsDboName};\n`;
             });
+            yield this.parseJoins();
             this.dboDefinition += "};\n";
             this.tsTypesDefinition = [common_types, allDataDefs, allDboDefs, this.dboDefinition].join("\n");
             return this.dbo;

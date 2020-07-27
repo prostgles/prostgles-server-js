@@ -129,6 +129,15 @@ export declare type PublishedTablesAndViews = {
 } | "*";
 export declare type Publish = PublishedTablesAndViews | ((params: RequestParams) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>));
 export declare type Method = (...args: any) => (any | Promise<any>);
+export declare const JOIN_TYPES: readonly ["one-many", "many-one", "one-one", "many-many"];
+export declare type Join = {
+    tables: [string, string];
+    on: {
+        [key: string]: string;
+    };
+    type: typeof JOIN_TYPES[number];
+};
+export declare type Joins = Join[];
 export declare type ProstglesInitOptions = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
@@ -138,6 +147,7 @@ export declare type ProstglesInitOptions = {
     tsGeneratedTypesDir?: string;
     io?: any;
     publish?: Publish;
+    joins?: Joins;
     schema?: string;
     sqlFilePath?: string;
     isReady(dbo: any, db: DB): void;
@@ -165,6 +175,7 @@ export declare class Prostgles {
     publishMethods?(): any;
     io: any;
     publish?: Publish;
+    joins?: Joins;
     schema: string;
     publishRawSQL?: any;
     wsChannelNamePrefix: string;
@@ -178,6 +189,7 @@ export declare class Prostgles {
     }): any;
     sqlFilePath?: string;
     tsGeneratedTypesDir?: string;
+    publishParser: PublishParser;
     constructor(params: ProstglesInitOptions);
     checkDb(): void;
     init(isReady: (dbo: DbHandler, db: DB) => any): Promise<boolean>;
@@ -199,10 +211,9 @@ export declare class PublishParser {
     publishRawSQL?: any;
     dbo: DbHandler;
     constructor(publish: any, publishMethods: any, publishRawSQL: any, dbo: DbHandler);
-    getDboRequestRules({ tableName, command, socket }: DboTableCommand): Promise<TableRule>;
     getMethods(socket: any): Promise<{}>;
     getSchemaFromPublish(socket: any): Promise<{}>;
-    getCommandRules({ tableName, command, socket }: DboTableCommand): Promise<any>;
+    getValidatedRequestRule({ tableName, command, socket }: DboTableCommand): Promise<TableRule>;
     getTableRules({ tableName, socket }: DboTable): Promise<any>;
 }
 export {};

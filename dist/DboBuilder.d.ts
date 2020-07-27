@@ -3,7 +3,8 @@ declare global {
     export interface Promise<T> extends Bluebird<T> {
     }
 }
-import { DB, TableRule, OrderBy, SelectParams, InsertParams, UpdateParams, DeleteParams } from "./Prostgles";
+import * as pgPromise from 'pg-promise';
+import { DB, TableRule, OrderBy, SelectParams, InsertParams, UpdateParams, DeleteParams, Joins, Prostgles } from "./Prostgles";
 import { PubSubManager } from "./PubSubManager";
 /**
  * @example
@@ -32,16 +33,34 @@ declare type ColumnInfo = {
     element_type: string;
 };
 declare type LocalParams = {
-    socket: any;
-    func: () => any;
-    has_rules: boolean;
-    testRule: boolean;
+    socket?: any;
+    func?: () => any;
+    has_rules?: boolean;
+    testRule?: boolean;
+    tableAlias?: string;
 };
 declare type Filter = object | {
     $and: Filter[];
 } | {
     $or: Filter[];
 } | {};
+declare type Query = {
+    select: string[];
+    allFields: string[];
+    table: string;
+    where: string;
+    orderBy: string[];
+    limit: number;
+    offset: number;
+    isLeftJoin: boolean;
+    joins?: Query[];
+};
+declare type JoinPaths = {
+    t1: string;
+    t2: string;
+    path: string[];
+}[];
+import { Graph } from "./shortestPath";
 export declare class ViewHandler {
     db: DB;
     name: string;
@@ -56,11 +75,31 @@ export declare class ViewHandler {
     tsDboName: string;
     tsFieldFilter: string;
     tsFieldFilterName: string;
+    joins: Joins;
+    joinGraph: Graph;
+    joinPaths: JoinPaths;
+    dboBuilder: DboBuilder;
     pubSubManager: PubSubManager;
-    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager);
+    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder);
     makeDef(): void;
     getFullDef(): any[];
     validateViewRules(fields: FieldFilter, filterFields: FieldFilter, returningFields: FieldFilter, forcedFilter: object): Promise<boolean>;
+    getShortestJoin(table1: string, table2: string, startAlias: number, isInner?: boolean): {
+        query: string;
+        toOne: boolean;
+    };
+    buildJoinQuery(q: Query): Promise<string>;
+    parseSelect(select: "*" | {
+        [key: string]: (number | string | object);
+    }, tableAlias?: string): void;
+    makeSelectStatement(filter: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<{
+        query?: string;
+        select?: string[];
+        where?: string[];
+        order?: string;
+        limit?: string;
+        offset?: string;
+    }>;
     find(filter: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<object[]>;
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: any, table_rules?: TableRule, localParams?: LocalParams): Promise<object>;
     count(filter?: Filter, param2_unused?: any, param3_unused?: any, table_rules?: TableRule, localParams?: any): Promise<number>;
@@ -69,10 +108,11 @@ export declare class ViewHandler {
     }> | Readonly<{
         unsubscribe: () => void;
     }>;
-    prepareColumnSet(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean): string;
-    prepareWhere(filter: Filter, forcedFilter: object, filterFields: FieldFilter, excludeWhere?: boolean): any;
-    getCondition(filter: object, allowed_colnames: string[]): string;
-    prepareSort(orderBy: OrderBy, allowed_cols: any): string;
+    prepareColumnSet(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, onlyNames?: boolean): string | pgPromise.ColumnSet;
+    prepareSelect(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, tableAlias?: string): string;
+    prepareWhere(filter: Filter, forcedFilter: object, filterFields: FieldFilter, excludeWhere?: boolean, tableAlias?: string): any;
+    getCondition(filter: object, allowed_colnames: string[], tableAlias?: string): string;
+    prepareSort(orderBy: OrderBy, allowed_cols: any, tableAlias?: string): string;
     prepareLimitQuery(limit: number, maxLimit: number): string;
     prepareOffsetQuery(offset: number): string;
     intersectColumns(allowedFields: FieldFilter, dissallowedFields: FieldFilter, fixIssues?: boolean): string[];
@@ -111,7 +151,7 @@ export declare class TableHandler extends ViewHandler {
         queries: number;
         batching: string[];
     };
-    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager);
+    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder);
     willBatch(query: string): boolean;
     update(filter: Filter, newData: object, params: UpdateParams, tableRules: TableRule, localParams?: LocalParams): Promise<any>;
     validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues }: ValidatedParams): ValidDataAndColumnSet;
@@ -137,7 +177,13 @@ export declare class DboBuilder {
     pojoDefinitions: string[];
     dboDefinition: string;
     tsTypesDefinition: string;
-    constructor(db: DB, schema?: string);
+    joins: Joins;
+    joinGraph: Graph;
+    joinPaths: JoinPaths;
+    prostgles: Prostgles;
+    constructor(prostgles: Prostgles);
+    parseJoins(): Promise<JoinPaths>;
+    buildJoinPaths(): void;
     init(): Promise<DbHandler>;
 }
 export {};
