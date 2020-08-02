@@ -314,7 +314,7 @@ export class Prostgles {
 
         /* 2. Execute any SQL file if provided */
         if(this.sqlFilePath){
-            await this.runSQLFile(this.sqlFilePath)
+            await this.runSQLFile(this.sqlFilePath);
         }
 
         try {
@@ -330,6 +330,7 @@ export class Prostgles {
             }
 
             this.publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo);
+            this.dboBuilder.publishParser = this.publishParser;
 
             /* 4. Set publish and auth listeners */ //makeDBO(db, allTablesViews, pubSubManager, false)
             await this.setSocketEvents();
@@ -347,7 +348,7 @@ export class Prostgles {
         // console.log(module.parent.path);
         let _actualFilePath = sql(filePath)  // module.parent.path + filePath;
         return this.db.multi(_actualFilePath).then((data)=>{
-            console.log(filePath + "    file run successfuly");
+            console.log("Prostgles: SQL file executed successfuly -> " + filePath);
         }).catch((err)=>{
             console.log(filePath + "    file error: ", err);
         });
@@ -357,36 +358,6 @@ export class Prostgles {
             return new QueryFile(fullPath, { minify: false });
         }
     }
-
-    // async getTableRule(tableName: string, command: string, socket: Socket): Promise<boolean> {
-    //     if(!socket) return undefined;
-    //     else {
-
-    //         if(!this.dbo){
-    //             throw "INTERNAL ERROR: DBO missing";
-    //         } else {
-    //             let valid_table_command_rules = null;
-
-    //             try {
-    //                 const schm = get(socket, `prostgles.schema.${tableName}.${command}`);
-    //                 // console.log(schm, get(socket, `prostgles.schema`));
-    //                 if(schm && schm.err) throw schm.err;
-                    
-    //                 valid_table_command_rules = await this.publishParser.getValidatedRequestRule({ tableName, command, socket });
-
-    //                 if(!valid_table_command_rules){
-    //                     throw `Invalid OR disallowed request: ${tableName}.${command} `;
-    //                 } else {
-    //                     return valid_table_command_rules;
-    //                 }
-    //             } catch(e) {
-    //                 throw ("Published rules error: \n->" + e.toString());
-    //                 // throw ("INTERNAL PUBLISH ERROR");
-    //                 // return null;
-    //             }
-    //         }
-    //     }
-    // }
 
     async setSocketEvents(){
         this.checkDb();
@@ -519,7 +490,7 @@ export class Prostgles {
                 try {
                     schema = await publishParser.getSchemaFromPublish(socket);
                 } catch(e){
-                    // console.error(e);
+                    console.error(`\nProstgles PUBLISH VALIDATION ERROR (after socket connected):\n    ->`, e);
                 }
                 socket.prostgles = socket.prostgles || {};
                 socket.prostgles.schema = schema;
@@ -577,7 +548,16 @@ export class Prostgles {
                     }
                 }
                 const methods = await publishParser.getMethods({ publishMethods: this.publishMethods, socket, dbo });
-                socket.emit(WS_CHANNEL_NAME.SCHEMA, { schema, methods: Object.keys(methods), ...(fullSchema? { fullSchema } : {}) });
+                let joinTables = [];
+                if(this.joins){
+                    joinTables = Array.from(new Set(this.joins.map(j => j.tables).flat().filter(t => schema[t])));
+                }
+                socket.emit(WS_CHANNEL_NAME.SCHEMA, { 
+                    schema, 
+                    methods: Object.keys(methods), 
+                    ...(fullSchema? { fullSchema } : {}),
+                    joinTables
+                });
 
                 function makeSocketError(cb, err){
                     const err_msg = err.toString();
@@ -637,7 +617,7 @@ const RULE_TO_METHODS = [
     },
    { 
        rule: "select", 
-       methods: ["findOne", "find", "subscribe", "unsubscribe"], 
+       methods: ["findOne", "find", "subscribe", "unsubscribe", "count"], 
        no_limits: { fields: "*", filterFields: "*" }, 
        allowed_params: ["fields", "filterFields", "forcedFilter", "validate", "maxLimit"] ,
        hint: ` expecting "*" | true | { fields: ( string | string[] | {} )  }`
@@ -711,7 +691,8 @@ export class PublishParser {
             if(_publish && Object.keys(_publish).length){
                 await Promise.all(
                     Object.keys(_publish).map(async tableName => {
-            
+                        if(!this.dbo[tableName]) throw `Table ${tableName} does not exist\nExpecting one of: ${Object.keys(this.dbo).join(", ")}`;
+
                         const table_rules = await this.getTableRules({ socket, tableName });
             
                         if(table_rules){
@@ -726,10 +707,13 @@ export class PublishParser {
                                 });
         
                                 /* Infer methods if not specified */
-                                if(methods.includes("insert") && methods.includes("update") && table_rules.upsert !== false) methods = [ ...methods, "upsert" ];
+                                if(methods.includes("insert") && methods.includes("update") && methods.includes("select") && table_rules.upsert !== false) { 
+                                    methods = [ ...methods, "upsert" ];
+                                } else {
+                                    methods = methods.filter(m => m !== "upsert");
+                                }
                                 if(methods.includes("find") && table_rules.count !== false) methods = [ ...methods, "count"];
                                 if(methods.includes("find") && table_rules.subscribe !== false) methods = [ ...methods, "subscribe" ];
-            
                             }
                             
                             await Promise.all(methods.map(async method => {
@@ -748,7 +732,6 @@ export class PublishParser {
                                             await this.dbo[tableName][method]({}, {}, {}, valid_table_command_rules, { socket, has_rules: true, testRule: true }); 
                                                 
                                         } catch(e) {
-                                            console.error(`INTERNAL PUBLISH ERROR AT publish.${tableName}.${method}: \n->`, e);
                                             err = "INTERNAL PUBLISH ERROR";
                                             schema[tableName][method] = { err };
 
@@ -760,6 +743,7 @@ export class PublishParser {
                                                     schema[tableName].count = schema[tableName][method];
                                                 }
                                             }
+                                            throw `publish.${tableName}.${method}: \n   -> ${e}`;
                                         }
                                     }
                                 }
@@ -773,7 +757,8 @@ export class PublishParser {
             
     
         } catch (e) {
-            console.error("getSchemaFromPublish: ", e)
+            console.error("Prostgles \nERRORS IN PUBLISH: ", e);
+            throw e;
         }
     
         return schema;
@@ -801,7 +786,9 @@ export class PublishParser {
         if(!table_rule) throw "Invalid or disallowed table: " + tableName;
 
         if(command === "upsert"){
-            if(!table_rule.update || !table_rule.insert) throw `Invalid or disallowed command: upsert`;
+            if(!table_rule.update || !table_rule.insert){
+                throw `Invalid or disallowed command: upsert`;
+            }
         }
 
         if(!this.publish) throw "publish is missing";
@@ -838,7 +825,7 @@ export class PublishParser {
                         .find(method => {
                             let rm = RULE_TO_METHODS.find(r => r.rule === method);
                             if(!rm){
-                                throw `Invalid table_rule method found for ${tableName} -> ${method} `;
+                                throw `Invalid rule in publish.${tableName} -> ${method} \nExpecting any of: ${RULE_TO_METHODS.map(r => r.rule).join(", ")}`;
                             }
                             
                             if(typeof table_rules[method] === "boolean" || table_rules[method] === "*"){
@@ -849,7 +836,7 @@ export class PublishParser {
     
                             let iparam = method_params.find(p => !rm.allowed_params.includes(p));
                             if(iparam){
-                                throw `Invalid table_rule param found for ${tableName}.${method} -> ${iparam}`;
+                                throw `Invalid setting in publish.${tableName}.${method} -> ${iparam}. \n Expecting any of: ${rm.allowed_params.join(", ")}`;
                             }
                         });                
                 }
@@ -858,7 +845,7 @@ export class PublishParser {
                
             return table_rules;
         } catch (e) {
-            throw "getTableRules failed: " + e;
+            throw e;
         }
     }
 

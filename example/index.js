@@ -8,6 +8,10 @@ var fs = require('fs');
 
 let prostgles = require('../dist/index.js');
 
+const mongo = require('mongodb').MongoClient
+const url = 'mongodb://localhost:27017';
+
+
 prostgles({
     dbConnection: {
         host: "localhost",
@@ -53,6 +57,7 @@ prostgles({
     ],
     
     isReady: async (dbo, db) => {
+        // await db.any(`VACUUM ANALYZE`);
             
         /* Benchmarking inserts */
         const TITLES = ["Wdwlkwdlkdaw", "Titlte tttt", "How to 2", "SresrjKJK!", "HDDSD "],
@@ -64,162 +69,91 @@ prostgles({
             colors = [],
             users = [],
             posts = [],
-            comments = [];
-        for(var i = 0; i < 1000; i++){
-            pixels.push({ rgb: ["red", "blue", "green"][Math.round(Math.random()*2)], xy: `${Math.random() * 400};${Math.random() * 400}`, color_id: 2 });
-            drawings.push({ pixel_id: Math.round(Math.random() * 1000) });
-            colors.push({ rgb: ["red", "blue", "green"][Math.round(Math.random()*2)] })
-
-            users.push({ username: USRN[Math.round(Math.random()*USRN.length - 1)]  })
-            posts.push({ user_id: Math.round(Math.random()*1000 - 1), title: TITLES[Math.round(Math.random()*TITLES.length - 1)] });
-            comments.push({ user_id: Math.round(Math.random()*1000 - 1), post_id: Math.round(Math.random()*1000 - 1), content: CNTNT[Math.round(Math.random()*CNTNT.length - 1)] });
-        }
-
-        await dbo.pixels.insert(pixels);
-        await dbo.drawings.insert(drawings);
-        await dbo.colors.insert(colors);
-
-        posts.push({ user_id: 1, title: ";this da one"});
-        posts.push({ user_id: 1, title: ";this anodar one"});
-        posts.push({ user_id: 1, title: "zzz"});
-        comments.push({ user_id: 1, post_id: 1, content: "pull up pull up" });
-    
-
-        await dbo.users.insert(users);
-        await dbo.posts.insert(posts);
-        await dbo.comments.insert(comments);
-        console.log(Date.now() - tl, "ms");
+            comments = [],
+            size = 1000;
 
 
-        let q = await (dbo.users.buildJoinQuery({ 
-            select: ["id", "username"],
-            allFields: dbo.users.column_names,
-            table: "users",
-            where: "id = 1",
-            limit: 5,
-            offset: 0,
-            orderBy: ["id"],
-            isLeftJoin: true,
-            joins: [
-                {
-                    select: ["id", "title", "user_id"],
-                    allFields: dbo.posts.column_names,
-                    table: "posts",
-                    where: "true or title ilike '%one%'",
-                    limit: 4,
-                    offset: 0,
-                    orderBy: ["true"],
-                    isLeftJoin: true,
-                    joins: [
-                        {
-                            select: ["id", "username"],
-                            allFields: dbo.users.column_names,
-                            table: "users",
-                            where: "id = 1",
-                            limit: 1,
-                            offset: 0,
-                            orderBy: ["id"],
-                            isLeftJoin: true,
-                            joins: [
-                                {
-                                    select: ["id","content"],
-                                    allFields: dbo.comments.column_names,
-                                    table: "comments",
-                                    where: "id IS NOT NULL",
-                                    limit: 2,
-                                    offset: 0,
-                                    orderBy: ["id desc"],
-                                    isLeftJoin: true
-                                }
-                            ]
-                        }
+            // let _users = [], _posts = [], _comments = [];
+            // for(var ii = 0; ii < 10; ii++){
+            //     for(var i = 0; i < size; i++){
+            //         // pixels.push({ rgb: ["red", "blue", "green"][Math.round(Math.random()*2)], xy: `${Math.random() * 400};${Math.random() * 400}`, color_id: 2 });
+            //         // drawings.push({ pixel_id: Math.round(Math.random() * size) });
+            //         // colors.push({ rgb: ["red", "blue", "green"][Math.round(Math.random()*2)] })
+        
+            //         _users.push({ username: USRN[Math.round(Math.random()*USRN.length - 1)]  })
+            //         _posts.push({ user_id: Math.round(Math.random()*size - 1), title: TITLES[Math.round(Math.random()*TITLES.length - 1)] });
+            //         _comments.push({ user_id: Math.round(Math.random()*size - 1), post_id: Math.round(Math.random()*size - 1), content: CNTNT[Math.round(Math.random()*CNTNT.length - 1)] });
+            //     }
+        
+            //     // await dbo.pixels.insert(pixels);
+            //     // await dbo.drawings.insert(drawings);
+            //     // await dbo.colors.insert(colors);
+        
+            //     _posts.push({ user_id: 1, title: ";this da one"});
+            //     _posts.push({ user_id: 1, title: ";this anodar one"});
+            //     _posts.push({ user_id: 1, title: "zzz"});
+            //     // comments.push({ user_id: 1, post_id: 1, content: "pull up pull up" });
+            
+        
+            //     await dbo.users.insert(_users);
+            //     await dbo.posts.insert(_posts);
+            //     await dbo.comments.insert(_comments);
+            //     // await users.insertMany(_users);
+            //     // await posts.insertMany(_posts);
+            //     // await comments.insertMany(_comments);
 
+            //     console.log(Date.now() - tl, "ms");
+            //     _users = [];
+            //      _posts = [];
+            //      _comments = [];
+            // }
 
-                        // {
-                        //     select: ["id","content"],
-                        //     allFields: dbo.comments.column_names,
-                        //     table: "comments",
-                        //     where: "id IS NOT NULL",
-                        //     limit: 2,
-                        //     offset: 0,
-                        //     orderBy: ["true"],
-                        //     isLeftJoin: true
-                        // }
-                    ]
-                }
-            ]
-        }));
-
-        // let q = await (dbo.users.buildJoinQuery({ 
-        //     select: ["id", "username"],
-        //     allFields: dbo.users.column_names,
-        //     table: "users",
-        //     where: "id = 1",
-        //     limit: 5,
-        //     offset: 0,
-        //     orderBy: ["id"],
-        //     isLeftJoin: true,
-        //     joins: [
-        //         {
-        //             select: ["id", "title", "user_id"],
-        //             allFields: dbo.posts.column_names,
-        //             table: "posts",
-        //             where: "TRUE",
-        //             limit: 5,
-        //             offset: 0,
-        //             orderBy: ["id"],
-        //             isLeftJoin: true,
-        //             joins: [
-        //                 {
-        //                     select: ["id","content"],
-        //                     allFields: dbo.comments.column_names,
-        //                     table: "comments",
-        //                     where: "id IS NOT NULL",
-        //                     limit: 2,
-        //                     offset: 0,
-        //                     orderBy: ["id desc"],
-        //                     isLeftJoin: true
-        //                 }
-        //             ]
+        // mongo.connect(url, {
+        //     useNewUrlParser: true,
+        //     useUnifiedTopology: true
+        //     }, async (err, client) => {
+        //         console.log(22222);
+        //         if (err) {
+        //         console.error(err)
+        //         return
         //         }
-        //     ]
-        // }));
-        console.time("qqq")
-        let res = await db.any(q);
-        console.timeEnd("qqq")
-        console.log(JSON.stringify(res, null, 2));
 
 
-        // db.any(`
-        // select users.username 
-        // ,json_agg((
-        //         posts.*
-        // )) FILTER (WHERE posts.ctid IS NOT NULL) as posts
-        // from users
-        // left join (
-        //         SELECT posts.ctid, posts.user_id , posts.id, posts.title, json_agg((comments.*)) FILTER (WHERE comments.ctid IS NOT NULL) as comments
-        //         FROM posts
-        //         left join comments
-        //         on posts.id = comments.post_id
-        //         group by  posts.ctid, posts.id, posts.title, posts.user_id
-        // ) posts
-        // on users.id = posts.user_id
-        // group by users.ctid, users.username LIMIT 10`).then(console.log)
+        //         const db = client.db('stw');
 
-        // db.any(`
-        // select p.id
-        // --, case when json_agg(c.*)::text = '[null]' then '[]' else json_agg(c.*) end as colors
-        // , row_to_json((c.*)) as colors
-        // from pixels p
-        // left join colors c
-        // on p.rgb = c.rgb
-        // --group by p.id
-        // limit 10
-        // `).then(console.log)
-        
-        // dbo.colors.insert([{ rgb: "black" }, { rgb: "black"}, { rgb: "green"}, { rgb: "green"}, { rgb: "green"}]);
-        
-        // dbo.pixels.count({}).then(console.log);
+        //         const users = db.collection('users');
+        //         const posts = await db.collection('posts');
+        //         const comments = db.collection('comments');
+        //         await posts.drop();
+        //         await dbo.posts.delete({});
+
+        //         // await posts.insertOne({ user_id: 1, title: ";this da one"});
+        //         // await posts.insertOne({ user_id: 1, title: ";this anodar one"});
+        //         // await posts.insertOne({ user_id: 1, title: "zzz"});
+                
+
+        //         // console.time("mongo")
+        //         // let mRes = await posts.countDocuments({ $or: [{ title: /ttt/ }, { user_id: { $in: [1,2,3,4,5,6,6,7,8,95,6]} } ]});//, { projection: { user_id: 1, title: 1, _id: 0 } }).sort({ user_id: -1, title: -1 }).limit(100).toArray();
+        //         // console.timeEnd("mongo");
+        //         // console.log(mRes, await posts.countDocuments());
+                
+
+        //         // console.time("pro")
+        //         // let pRes = await dbo.posts.count({ $or: [ {title: { $ilike: '%ttt%'}}, { user_id: { $in: [1,2,3,4,5,6,6,7,8,95,6]} } ] });//, { select: { user_id: 1, title: 1 }, orderBy: { user_id: false, title: false }});
+        //         // console.timeEnd("pro");
+        //         // console.log(pRes, await dbo.posts.count({}));
+                
+        //         // console.log("posts count ", await posts.countDocuments());
+        // });
+
+        // console.time("qqq")
+        // let res = await db.any(q);
+        // console.timeEnd("qqq");
+        // console.log(res)
+
+        // console.log(JSON.stringify(res, null, 2));
+        // console.log(q);
+
 
         
 		app.get('/', (req, res) => {
@@ -235,9 +169,7 @@ prostgles({
         return {
             pixels: {
                 select: {
-                    fields: {
-                        rgb: 1
-                    }
+                    fields: "*"
                 },
                 insert: {
                     fields: {
@@ -249,8 +181,12 @@ prostgles({
                     fields: "*",
                     // forcedData: { rgb: 2, id: 2 }
                 },
-                // delete: "*"
+                delete: "*"
             }, 
+            drawings: "*",
+            users: "*",
+            posts: "*",
+            comments: "*"
         }
     },
 

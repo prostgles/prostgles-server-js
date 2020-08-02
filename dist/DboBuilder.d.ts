@@ -4,7 +4,7 @@ declare global {
     }
 }
 import * as pgPromise from 'pg-promise';
-import { DB, TableRule, OrderBy, SelectParams, InsertParams, UpdateParams, DeleteParams, Joins, Prostgles } from "./Prostgles";
+import { DB, TableRule, OrderBy, SelectParams, InsertParams, UpdateParams, DeleteParams, Joins, Prostgles, PublishParser } from "./Prostgles";
 import { PubSubManager } from "./PubSubManager";
 /**
  * @example
@@ -47,6 +47,7 @@ declare type Filter = object | {
 declare type Query = {
     select: string[];
     allFields: string[];
+    aggs?: string[];
     table: string;
     where: string;
     orderBy: string[];
@@ -83,23 +84,20 @@ export declare class ViewHandler {
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder);
     makeDef(): void;
     getFullDef(): any[];
-    validateViewRules(fields: FieldFilter, filterFields: FieldFilter, returningFields: FieldFilter, forcedFilter: object): Promise<boolean>;
+    validateViewRules(fields: FieldFilter, filterFields: FieldFilter, returningFields: FieldFilter, forcedFilter: object, rule: string): Promise<boolean>;
     getShortestJoin(table1: string, table2: string, startAlias: number, isInner?: boolean): {
         query: string;
         toOne: boolean;
     };
     buildJoinQuery(q: Query): Promise<string>;
-    parseSelect(select: "*" | {
-        [key: string]: (number | string | object);
-    }, tableAlias?: string): void;
-    makeSelectStatement(filter: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<{
-        query?: string;
-        select?: string[];
-        where?: string[];
-        order?: string;
-        limit?: string;
-        offset?: string;
-    }>;
+    getAggs(select: object): {
+        field: string;
+        query: string;
+        alias: string;
+    }[];
+    buildQueryTree(filter: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<Query>;
+    checkFilter(filter: any): void;
+    prepareValidatedQuery(filter: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams, validatedAggAliases?: string[]): Promise<Query>;
     find(filter: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<object[]>;
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: any, table_rules?: TableRule, localParams?: LocalParams): Promise<object>;
     count(filter?: Filter, param2_unused?: any, param3_unused?: any, table_rules?: TableRule, localParams?: any): Promise<number>;
@@ -112,9 +110,9 @@ export declare class ViewHandler {
     prepareSelect(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, tableAlias?: string): string;
     prepareWhere(filter: Filter, forcedFilter: object, filterFields: FieldFilter, excludeWhere?: boolean, tableAlias?: string): any;
     getCondition(filter: object, allowed_colnames: string[], tableAlias?: string): string;
-    prepareSort(orderBy: OrderBy, allowed_cols: any, tableAlias?: string): string;
-    prepareLimitQuery(limit: number, maxLimit: number): string;
-    prepareOffsetQuery(offset: number): string;
+    prepareSort(orderBy: OrderBy, allowed_cols: any, tableAlias?: string, excludeOrder?: boolean, validatedAggAliases?: string[]): string;
+    prepareLimitQuery(limit: number, maxLimit: number): number;
+    prepareOffsetQuery(offset: number): number;
     intersectColumns(allowedFields: FieldFilter, dissallowedFields: FieldFilter, fixIssues?: boolean): string[];
     /**
     * Prepare and validate field object:
@@ -156,8 +154,8 @@ export declare class TableHandler extends ViewHandler {
     update(filter: Filter, newData: object, params: UpdateParams, tableRules: TableRule, localParams?: LocalParams): Promise<any>;
     validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues }: ValidatedParams): ValidDataAndColumnSet;
     insert(data: (object | object[]), param2?: InsertParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
-    delete(filter: Filter, params?: DeleteParams, param3_unused?: any, table_rules?: TableRule, localParams?: LocalParams): any;
-    remove(filter: Filter, params?: UpdateParams, param3_unused?: null, tableRules?: TableRule, localParams?: LocalParams): any;
+    delete(filter: Filter, params?: DeleteParams, param3_unused?: any, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
+    remove(filter: Filter, params?: UpdateParams, param3_unused?: null, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
     upsert(filter: Filter, newData?: object, params?: UpdateParams, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
     sync(filter: Filter, params: SelectParams, param3_unused: any, table_rules: TableRule, localParams: LocalParams): Promise<{
         channelName: string;
@@ -181,6 +179,7 @@ export declare class DboBuilder {
     joinGraph: Graph;
     joinPaths: JoinPaths;
     prostgles: Prostgles;
+    publishParser: PublishParser;
     constructor(prostgles: Prostgles);
     parseJoins(): Promise<JoinPaths>;
     buildJoinPaths(): void;

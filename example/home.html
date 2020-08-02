@@ -18,17 +18,18 @@
 
             prostgles({
                 socket, 
-                isReady: (db, methods) => {
+                isReady: async (db, methods) => {
                     window.db = db;
                     try {
 
-                        db.pixels.subscribe({ rgb: { $not: null }}, { limit: 2 }, items => {
-                            let div = document.querySelector(".wrapper");
-                            div.innerHTML = JSON.stringify(items, null, 2);
-                        });     
+                        // db.users.subscribe({}, { select: { id: 1, posts: "*" } , limit: 2 }, items => {
+                        //     let div = document.querySelector(".wrapper");
+                        //     div.innerHTML = JSON.stringify(items, null, 2);
+                        // });
                     } catch(e){
                         
                     }
+                    // console.log(await db.users.find({}, { select: { posts: "*" } , limit: 1 }) );
                 },
                 onDisconnect: (err, res) => {
                     // location.reload();

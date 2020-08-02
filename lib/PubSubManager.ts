@@ -981,7 +981,11 @@ export class PubSubManager {
 
 
 /* Get only the specified properties of an object */
-function filterObj(obj: object, keys: string[] = []): object{
+export function filterObj(obj: object, keys: string[] = []): object{
+    if(!keys.length) {
+        // console.warn("filterObj: returning empty object");
+        return {};
+    }
     if(obj && keys.length){
         let res = {};
         keys.map(k => {
