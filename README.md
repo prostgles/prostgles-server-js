@@ -4,7 +4,7 @@
 $ npm install prostgles-server
 ```
 
-## Initialization
+## Usage
 
 ```js
 const express = require('express');
