@@ -13,10 +13,8 @@ const path = require('path');
 var http = require('http').createServer(app);
 var io = require('socket.io')(http);
 http.listen(3000);
-var fs = require('fs');
 
 let prostgles = require('prostgles-server');
-
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname+'/home.html'));
