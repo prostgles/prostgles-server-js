@@ -17,10 +17,12 @@ prostgles({
     password: process.env.PRGL_PWD
   },
   isReady: async (dbo) => {
+  
     const users = await dbo.users.find(
       { }, 
       { orderBy: { created: -1 }, limit: 10 }
     );
+    
   }
 });
 ```
@@ -48,10 +50,12 @@ prostgles({
   io,
   publish: "*",
   isReady: async (dbo) => {
+  
     const users = await dbo.users.find(
       { }, 
       { orderBy: { created: -1 }, limit: 10 }
     );
+    
   }
 });
 ```
