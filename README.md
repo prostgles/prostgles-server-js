@@ -6,8 +6,6 @@ $ npm install prostgles-server
 
 ## Initialization
 
-Loading and initializing the library with [Initialization Options]:
-
 ```js
 const express = require('express');
 const app = express();
