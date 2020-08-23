@@ -30,7 +30,7 @@ prostgles({
   io,
   publish: "*",    
   isReady: async (dbo) => {
-    await dbo.users.find({}, { orderBy: { created: -1 }, limit: 10 });
+    const users = await dbo.users.find({}, { orderBy: { created: -1 }, limit: 10 });
   }
 });
 ```
