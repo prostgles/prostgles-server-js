@@ -25,7 +25,7 @@ prostgles({
   },
   isReady: async (dbo) => {
     const users = await dbo.users.find(
-      { name: { $ilike: "%paul%" }, 
+      { }, 
       { orderBy: { created: -1 }, limit: 10 }
     );
   }
