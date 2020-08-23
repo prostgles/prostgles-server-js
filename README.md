@@ -16,10 +16,6 @@ http.listen(3000);
 
 let prostgles = require('prostgles-server');
 
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname+'/home.html'));
-});
-
 prostgles({
   dbConnection: {
     host: "localhost",
@@ -27,10 +23,11 @@ prostgles({
     user: process.env.PRGL_USER,
     password: process.env.PRGL_PWD
   },
-  io,
-  publish: "*",    
   isReady: async (dbo) => {
-    const users = await dbo.users.find({}, { orderBy: { created: -1 }, limit: 10 });
+    const users = await dbo.users.find(
+      { name: { $ilike: "%paul%" }, 
+      { orderBy: { created: -1 }, limit: 10 }
+    );
   }
 });
 ```
