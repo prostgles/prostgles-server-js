@@ -143,9 +143,11 @@ export declare type Joins = Join[];
 export declare type ProstglesInitOptions = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
-    publishMethods?: ((params: RequestParams) => {
+    publishMethods?: ((socket?: any, dbo?: DbHandler) => {
         [key: string]: Method;
-    });
+    } | Promise<{
+        [key: string]: Method;
+    }>);
     tsGeneratedTypesDir?: string;
     io?: any;
     publish?: Publish;
