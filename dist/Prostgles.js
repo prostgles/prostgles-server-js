@@ -64,10 +64,12 @@ class Prostgles {
                 console.log("typescript schema definition file ready -> " + fileName);
                 fs.writeFileSync(this.tsGeneratedTypesDir + fileName, this.dboBuilder.tsTypesDefinition);
             }
-            this.publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo);
-            this.dboBuilder.publishParser = this.publishParser;
-            /* 4. Set publish and auth listeners */ //makeDBO(db, allTablesViews, pubSubManager, false)
-            await this.setSocketEvents();
+            if (this.publish) {
+                this.publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo);
+                this.dboBuilder.publishParser = this.publishParser;
+                /* 4. Set publish and auth listeners */ //makeDBO(db, allTablesViews, pubSubManager, false)
+                await this.setSocketEvents();
+            }
             /* 5. Finish init and provide DBO object */
             isReady(this.dbo, this.db);
             return true;
@@ -113,7 +115,7 @@ class Prostgles {
             let allTablesViews = this.dboBuilder.tablesOrViews;
             try {
                 if (this.onSocketConnect)
-                    await this.onSocketConnect({ socket, dbo });
+                    await this.onSocketConnect(socket, dbo);
                 /*  RUN Client request from Publish.
                     Checks request against publish and if OK run it with relevant publish functions. Local (server) requests do not check the policy
                 */
@@ -175,7 +177,7 @@ class Prostgles {
                 socket.on("disconnect", function () {
                     // subscriptions = subscriptions.filter(sub => sub.socket.id !== socket.id);
                     if (this.onSocketDisconnect) {
-                        this.onSocketDisconnect({ socket, dbo });
+                        this.onSocketDisconnect(socket, dbo);
                     }
                 });
                 socket.on(WS_CHANNEL_NAME.METHOD, async function ({ method, params }, cb = (...callback) => { }) {
@@ -212,7 +214,7 @@ class Prostgles {
                 */
                 let fullSchema = [];
                 if (this.publishRawSQL && typeof this.publishRawSQL === "function") {
-                    const canRunSQL = await this.publishRawSQL({ socket, dbo });
+                    const canRunSQL = await this.publishRawSQL(socket, dbo);
                     // console.log("canRunSQL", canRunSQL, socket.handshake.headers["x-real-ip"]);//, allTablesViews);
                     if (canRunSQL && typeof canRunSQL === "boolean" || canRunSQL === "*") {
                         socket.on(WS_CHANNEL_NAME.SQL, function ({ query, params, options, justRows = false }, cb = (...callback) => { }) {
@@ -339,7 +341,7 @@ class PublishParser {
     }
     async getMethods(socket) {
         let methods = {};
-        const _methods = await applyParamsIfFunc(this.publishMethods, { socket, dbo: this.dbo });
+        const _methods = await applyParamsIfFunc(this.publishMethods, socket, this.dbo);
         if (_methods && Object.keys(_methods).length) {
             Object.keys(_methods).map(key => {
                 if (_methods[key] && (typeof _methods[key] === "function" || typeof _methods[key].then === "function")) {
@@ -357,7 +359,7 @@ class PublishParser {
         let schema = {};
         try {
             /* Publish tables and views based on socket */
-            const _publish = await applyParamsIfFunc(this.publish, { socket, dbo: this.dbo });
+            const _publish = await applyParamsIfFunc(this.publish, socket, this.dbo);
             if (_publish && Object.keys(_publish).length) {
                 await Promise.all(Object.keys(_publish).map(async (tableName) => {
                     if (!this.dbo[tableName])
@@ -462,8 +464,8 @@ class PublishParser {
         try {
             if (!socket || !tableName)
                 throw "publish OR socket OR dbo OR tableName are missing";
-            let _publish = await applyParamsIfFunc(this.publish, { socket, dbo: this.dbo });
-            let table_rules = applyParamsIfFunc(_publish[tableName], { socket, dbo: this.dbo });
+            let _publish = await applyParamsIfFunc(this.publish, socket, this.dbo);
+            let table_rules = applyParamsIfFunc(_publish[tableName], socket, this.dbo);
             if (table_rules) {
                 /* Add no limits */
                 if (typeof table_rules === "boolean" || table_rules === "*") {
@@ -503,10 +505,10 @@ class PublishParser {
     }
 }
 exports.PublishParser = PublishParser;
-function applyParamsIfFunc(maybeFunc, params) {
+function applyParamsIfFunc(maybeFunc, ...params) {
     if ((maybeFunc !== null && maybeFunc !== undefined) &&
         (typeof maybeFunc === "function" || typeof maybeFunc.then === "function")) {
-        return maybeFunc(params);
+        return maybeFunc(...params);
     }
     return maybeFunc;
 }

@@ -72,7 +72,7 @@ prostgles({
             comments = [],
             size = 1000;
 
-
+        console.log(await dbo.comments.find({}, { limit: 2 }))
             // let _users = [], _posts = [], _comments = [];
             // for(var ii = 0; ii < 10; ii++){
             //     for(var i = 0; i < size; i++){
@@ -165,7 +165,7 @@ prostgles({
 		});
     },
 
-	publish: ({ socket, dbo }) => {        
+	publish: (socket, dbo) => {
         return {
             pixels: {
                 select: {
@@ -183,25 +183,25 @@ prostgles({
                 },
                 delete: "*"
             }, 
-            drawings: "*",
-            users: "*",
-            posts: "*",
-            comments: "*"
+            // drawings: "*",
+            // users: "*",
+            // posts: "*",
+            // comments: "*"
         }
     },
 
-    publishMethods: ({ socket, dbo }) => { 
+    // publishMethods: ( socket, dbo) => { 
 
-        return {
-            upload: async (data) => {
-                // let  tl = Date.now();
-                //let res = await dbo.pixels.insert(data);
-                // console.log(Date.now() - tl, "ms");
-                console.log(data)// res;
-                dbo.pixels.insert({ blb: data })
-            }
-        }
-    },
+    //     return {
+    //         upload: async (data) => {
+    //             // let  tl = Date.now();
+    //             //let res = await dbo.pixels.insert(data);
+    //             // console.log(Date.now() - tl, "ms");
+    //             console.log(data)// res;
+    //             dbo.pixels.insert({ blb: data })
+    //         }
+    //     }
+    // },
 	// onSocketConnect: async ({ socket, dbo }) => {
     //     /* Sending file */
     //     fs.readFile('home.html', function(err, buf){

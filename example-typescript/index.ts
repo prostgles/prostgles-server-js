@@ -4,7 +4,7 @@ import path from 'path';
 var http = require('http').createServer(app);
 
 import * as socketio from "socket.io";
-import { type } from 'os';
+import { type, userInfo } from 'os';
 var io = require("socket.io")(http);
 http.listen(3000);
 var fs = require('fs');
@@ -14,14 +14,16 @@ var fs = require('fs');
 // console.log(Prostgles({}));
 // Prostgles({ })
 
-// var prostgles = require("../dist/index");
+var prostgles = require("../dist/index");
 
 
 // import prostgles from "prostgles-server";
-import prostgles from "../dist/index";
-import { TableHandler } from '../dist/DboBuilder';
+// import prostgles from "../dist/index";
+// import { TableHandler } from '../dist/DboBuilder';
 // type DBObj = any;
 import { DBObj } from "./DBoGenerated";
+import { TableHandler } from 'prostgles-server/dist/DboBuilder';
+
 
 prostgles({
     dbConnection: {
@@ -40,7 +42,7 @@ prostgles({
     
     io,
     tsGeneratedTypesDir: path.join(__dirname + '/'),
-	publish: ({ socket, dbo }) => {
+	publish: (socket, dbo ) => {
 		// if(!socket || !socket._user.admin && !socket._user.id){
 		// 	return false;
         // }
@@ -50,24 +52,25 @@ prostgles({
 
                 delete: "*",
                 select: {
-                    fields: [{ rgb: false }]
+                    fields: { rgb: false }
                 },
             }, 
-            sql_tables: {
-                delete: "*",
-                select: {
-                    fields: [{ rgb: false }]
-                },
-                // update: "*"
-            }
+            // sql_tables: {
+            //     delete: "*",
+            //     select: {
+            //         fields: { rgb: false }
+            //     },
+            //     // update: "*"
+            // }
         }
     },
-    publishMethods: ({ socket, dbo }) => { 
+    publishMethods: (socket, dbo: DBObj) => { 
 
         return {
             insertPixel: async (data) => {
+                
                 // let  tl = Date.now();
-                let res = await (<TableHandler>dbo.pixels).insert(data);
+                let res = await (dbo.pixels).insert(data);
                 // console.log(Date.now() - tl, "ms");
                 return res;
             }
@@ -75,6 +78,8 @@ prostgles({
     },
     
     isReady: async (dbo: DBObj) => {
+
+        
         
         /* Benchmarking 10000 inserts */
         var tl = Date.now(), inserts = []
@@ -85,8 +90,9 @@ prostgles({
         await dbo.pixels.insert(inserts);
         console.log(Date.now() - tl, "ms");
         
-        dbo.pixels.count({}).then(console.log);
+        const c = await dbo.pixels.count({});//.then(console.log);
 
+        
         
 		app.get('/', (req, res) => {
 			res.sendFile(path.join(__dirname+'/home.html'));

@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import { DboBuilder, DbHandler } from "./DboBuilder";
@@ -17,6 +18,7 @@ export declare type OrderBy = {
     [key: string]: boolean;
 }[] | string | string[];
 import { FieldFilter } from "./DboBuilder";
+import { Socket } from "dgram";
 export declare type SelectParams = {
     select?: FieldFilter;
     limit?: number;
@@ -127,7 +129,7 @@ export declare type RequestParams = {
 export declare type PublishedTablesAndViews = {
     [key: string]: PublishTableRule | PublishViewRule | "*";
 } | "*";
-export declare type Publish = PublishedTablesAndViews | ((params: RequestParams) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>));
+export declare type Publish = PublishedTablesAndViews | ((socket?: any, dbo?: DbHandler) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>));
 export declare type Method = (...args: any) => (any | Promise<any>);
 export declare const JOIN_TYPES: readonly ["one-many", "many-one", "one-one", "many-many"];
 export declare type Join = {
@@ -153,14 +155,8 @@ export declare type ProstglesInitOptions = {
     isReady(dbo: any, db: DB): void;
     publishRawSQL?: any;
     wsChannelNamePrefix?: string;
-    onSocketConnect?({ socket: Socket, dbo: any }: {
-        socket: any;
-        dbo: any;
-    }): any;
-    onSocketDisconnect?({ socket: Socket, dbo: any }: {
-        socket: any;
-        dbo: any;
-    }): any;
+    onSocketConnect?(socket: Socket, dbo: any): any;
+    onSocketDisconnect?(socket: Socket, dbo: any): any;
 };
 export declare type OnReady = {
     dbo: DbHandler;
@@ -179,14 +175,8 @@ export declare class Prostgles {
     schema: string;
     publishRawSQL?: any;
     wsChannelNamePrefix: string;
-    onSocketConnect?({ socket: Socket, dbo: any }: {
-        socket: any;
-        dbo: any;
-    }): any;
-    onSocketDisconnect?({ socket: Socket, dbo: any }: {
-        socket: any;
-        dbo: any;
-    }): any;
+    onSocketConnect?(socket: Socket, dbo: any): any;
+    onSocketDisconnect?(socket: Socket, dbo: any): any;
     sqlFilePath?: string;
     tsGeneratedTypesDir?: string;
     publishParser: PublishParser;

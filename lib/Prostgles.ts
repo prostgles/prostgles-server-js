@@ -214,7 +214,7 @@ export type PublishViewRule = {
 export type RequestParams = { dbo?: DbHandler, socket?: any };
 
 export type PublishedTablesAndViews = { [key:string]: PublishTableRule | PublishViewRule | "*" } | "*" ;
-export type Publish = PublishedTablesAndViews | ((params: RequestParams) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>)); 
+export type Publish = PublishedTablesAndViews | ((socket?: any, dbo?: DbHandler) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>)); 
 
 export type Method = (...args: any) => ( any | Promise<any> );
 export const JOIN_TYPES = ["one-many", "many-one", "one-one", "many-many"] as const;
@@ -239,16 +239,16 @@ export type ProstglesInitOptions = {
     // auth, 
     publishRawSQL?: any;
     wsChannelNamePrefix?: string;
-    onSocketConnect?({ socket: Socket, dbo: any});
-    onSocketDisconnect?({ socket: Socket, dbo: any});
+    onSocketConnect?(socket: Socket, dbo: any);
+    onSocketDisconnect?(socket: Socket, dbo: any);
 }
 
 interface ISocketSetup {
     db: DB;
     dbo: DbHandler;
     io: any;
-    onSocketConnect?({ socket: Socket, dbo: any});
-    onSocketDisconnect?({ socket: Socket, dbo: any});
+    onSocketConnect?(socket: Socket, dbo: any);
+    onSocketDisconnect?(socket: Socket, dbo: any);
     publish: Publish,
     publishMethods: any;
     publishRawSQL?: any,
@@ -285,8 +285,8 @@ export class Prostgles {
     // auth, 
     publishRawSQL?: any;
     wsChannelNamePrefix: string = "_psqlWS_";
-    onSocketConnect?({ socket: Socket, dbo: any});
-    onSocketDisconnect?({ socket: Socket, dbo: any});
+    onSocketConnect?(socket: Socket, dbo: any);
+    onSocketDisconnect?(socket: Socket, dbo: any);
     sqlFilePath?: string;
     tsGeneratedTypesDir?: string;
     publishParser: PublishParser;
@@ -329,11 +329,13 @@ export class Prostgles {
                 fs.writeFileSync(this.tsGeneratedTypesDir + fileName, this.dboBuilder.tsTypesDefinition);
             }
 
-            this.publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo);
-            this.dboBuilder.publishParser = this.publishParser;
+            if(this.publish){
+                this.publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo);
+                this.dboBuilder.publishParser = this.publishParser;
+                /* 4. Set publish and auth listeners */ //makeDBO(db, allTablesViews, pubSubManager, false)
+                await this.setSocketEvents();
+            }
 
-            /* 4. Set publish and auth listeners */ //makeDBO(db, allTablesViews, pubSubManager, false)
-            await this.setSocketEvents();
 
             /* 5. Finish init and provide DBO object */
             isReady(this.dbo, this.db);
@@ -387,7 +389,7 @@ export class Prostgles {
             let allTablesViews = this.dboBuilder.tablesOrViews;
 
             try {
-                if(this.onSocketConnect) await this.onSocketConnect({ socket, dbo });
+                if(this.onSocketConnect) await this.onSocketConnect(socket, dbo);
                 
                 /*  RUN Client request from Publish.
                     Checks request against publish and if OK run it with relevant publish functions. Local (server) requests do not check the policy 
@@ -460,7 +462,7 @@ export class Prostgles {
                 socket.on("disconnect", function(){
                     // subscriptions = subscriptions.filter(sub => sub.socket.id !== socket.id);
                     if(this.onSocketDisconnect){
-                        this.onSocketDisconnect({ socket, dbo });
+                        this.onSocketDisconnect( socket, dbo);
                     }
                 });
 
@@ -498,7 +500,7 @@ export class Prostgles {
                 */
                 let fullSchema = [];
                 if(this.publishRawSQL && typeof this.publishRawSQL === "function"){
-                    const canRunSQL = await this.publishRawSQL({ socket, dbo });
+                    const canRunSQL = await this.publishRawSQL(socket, dbo);
 
                     // console.log("canRunSQL", canRunSQL, socket.handshake.headers["x-real-ip"]);//, allTablesViews);
 
@@ -665,7 +667,7 @@ export class PublishParser {
     async getMethods(socket: any){
         let methods = {};
     
-        const _methods = await applyParamsIfFunc(this.publishMethods, { socket, dbo: this.dbo });
+        const _methods = await applyParamsIfFunc(this.publishMethods, socket, this.dbo);
     
         if(_methods && Object.keys(_methods).length){
             Object.keys(_methods).map(key => {
@@ -686,7 +688,7 @@ export class PublishParser {
         
         try {
             /* Publish tables and views based on socket */
-            const _publish = await applyParamsIfFunc(this.publish, { socket, dbo: this.dbo });
+            const _publish = await applyParamsIfFunc(this.publish, socket, this.dbo);
     
             if(_publish && Object.keys(_publish).length){
                 await Promise.all(
@@ -803,9 +805,9 @@ export class PublishParser {
         try {
             if(!socket || !tableName) throw "publish OR socket OR dbo OR tableName are missing";
     
-            let _publish = await applyParamsIfFunc(this.publish, { socket, dbo: this.dbo });
+            let _publish = await applyParamsIfFunc(this.publish, socket, this.dbo );
     
-            let table_rules = applyParamsIfFunc(_publish[tableName], { socket, dbo: this.dbo });
+            let table_rules = applyParamsIfFunc(_publish[tableName],  socket, this.dbo );
             if(table_rules){
                 /* Add no limits */
                 if(typeof table_rules === "boolean" || table_rules === "*"){
@@ -853,12 +855,12 @@ export class PublishParser {
 
 
                             
-function applyParamsIfFunc(maybeFunc: any, params: any): any{
+function applyParamsIfFunc(maybeFunc: any, ...params: any): any{
     if(
         (maybeFunc !== null && maybeFunc !== undefined) &&
         (typeof maybeFunc === "function" || typeof maybeFunc.then === "function")
     ){
-        return maybeFunc(params);
+        return maybeFunc(...params);
     }
 
     return maybeFunc;

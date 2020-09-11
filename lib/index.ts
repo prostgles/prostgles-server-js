@@ -1,4 +1,5 @@
 import { Prostgles, ProstglesInitOptions } from "./Prostgles";
+import { TableHandler, ViewHandler } from "./DboBuilder";
 
 function prostgles(params: ProstglesInitOptions){
 
@@ -12,7 +13,7 @@ function prostgles(params: ProstglesInitOptions){
 //     prgl.init(params.isReady);
 // }
 
-export = prostgles;
+export = prostgles;//{ , TableHandler, ViewHandler };
 
 
 

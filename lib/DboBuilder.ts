@@ -423,7 +423,7 @@ export class ViewHandler {
             aggs: string[],
             joinQueries: Query[] = [];
 
-        console.log("add checks for when to REINDEX TABLE CONCURRENTLY ... \nand also if join columns are missing indexes\nand also if running out of disk space!! (in nodejs)")
+        // console.log("add checks for when to REINDEX TABLE CONCURRENTLY ... \nand also if join columns are missing indexes\nand also if running out of disk space!! (in nodejs)")
 
         if(isPlainObject(select)){
             if(
@@ -581,10 +581,10 @@ export class ViewHandler {
             const q = await this.buildQueryTree(filter, selectParams, param3_unused, tableRules, localParams),
                 _query = await this.buildJoinQuery(q);
 
-            console.log(_query);
+            // console.log(_query);
 
             if(testRule) return [];
-            if(expectOne) return this.db.one(_query);
+            if(expectOne) return this.db.oneOrNone(_query);
             else return this.db.any(_query);
 
         } catch(e){
@@ -596,7 +596,8 @@ export class ViewHandler {
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?, table_rules?: TableRule, localParams?: LocalParams): Promise<object>{
 
         try {
-            const { select = "*", orderBy = null, expectOne = true } = selectParams || {};
+            const expectOne = true;
+            const { select = "*", orderBy = null } = selectParams || {};
             return this.find(filter, { select, orderBy, limit: 1, expectOne }, null, table_rules, localParams);
         } catch(e){
             if(localParams && localParams.testRule) throw e;

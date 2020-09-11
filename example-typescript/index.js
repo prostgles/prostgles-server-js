@@ -23,10 +23,8 @@ var fs = require('fs');
 // Prostgles({ io, dbConnection: {  }})
 // console.log(Prostgles({}));
 // Prostgles({ })
-// var prostgles = require("../dist/index");
-// import prostgles from "prostgles-server";
-const index_1 = __importDefault(require("../dist/index"));
-index_1.default({
+var prostgles = require("../dist/index");
+prostgles({
     dbConnection: {
         host: "localhost",
         port: 5432,
@@ -42,7 +40,7 @@ index_1.default({
     sqlFilePath: path_1.default.join(__dirname + '/init.sql'),
     io,
     tsGeneratedTypesDir: path_1.default.join(__dirname + '/'),
-    publish: ({ socket, dbo }) => {
+    publish: (socket, dbo) => {
         // if(!socket || !socket._user.admin && !socket._user.id){
         // 	return false;
         // }
@@ -50,22 +48,16 @@ index_1.default({
             pixels: {
                 delete: "*",
                 select: {
-                    fields: [{ rgb: false }]
+                    fields: { rgb: false }
                 },
             },
-            sql_tables: {
-                delete: "*",
-                select: {
-                    fields: [{ rgb: false }]
-                },
-            }
         };
     },
-    publishMethods: ({ socket, dbo }) => {
+    publishMethods: (socket, dbo) => {
         return {
             insertPixel: (data) => __awaiter(void 0, void 0, void 0, function* () {
                 // let  tl = Date.now();
-                let res = yield dbo.pixels.insert(data);
+                let res = yield (dbo.pixels).insert(data);
                 // console.log(Date.now() - tl, "ms");
                 return res;
             })
@@ -80,7 +72,7 @@ index_1.default({
         }
         yield dbo.pixels.insert(inserts);
         console.log(Date.now() - tl, "ms");
-        dbo.pixels.count({}).then(console.log);
+        const c = yield dbo.pixels.count({}); //.then(console.log);
         app.get('/', (req, res) => {
             res.sendFile(path_1.default.join(__dirname + '/home.html'));
         });
