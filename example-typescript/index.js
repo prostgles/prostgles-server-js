@@ -17,7 +17,7 @@ const app = express_1.default();
 const path_1 = __importDefault(require("path"));
 var http = require('http').createServer(app);
 var io = require("socket.io")(http);
-http.listen(3000);
+http.listen(3001);
 var fs = require('fs');
 // import * as Prostgles from "../dist/index.js";
 // Prostgles({ io, dbConnection: {  }})
@@ -53,7 +53,7 @@ prostgles({
             },
         };
     },
-    publishMethods: (socket, dbo) => {
+    publishMethods: ({ socket, dbo }, s) => {
         return {
             insertPixel: (data) => __awaiter(void 0, void 0, void 0, function* () {
                 // let  tl = Date.now();
