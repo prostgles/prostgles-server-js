@@ -7,7 +7,7 @@
         
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <script src="https://unpkg.com/socket.io-client@2.3.0/dist/socket.io.slim.js" type="text/javascript"></script>
-        <script src="https://unpkg.com/prostgles-client@latest/dist/prostgles.js" type="text/javascript"></script>	
+        <script src="https://unpkg.com/prostgles-client@1.0.13/dist/prostgles.dev.js" type="text/javascript"></script>	
 	</head>
 	<body>
         
@@ -21,6 +21,7 @@
                 socket, 
                 isReady: async (db, methods) => {
                     window.db = db;
+                    initCanvas(db);
                     try {
 
                         // db.users.subscribe({}, { select: { id: 1, posts: "*" } , limit: 2 }, items => {
@@ -37,46 +38,79 @@
                 }
             });
 
-            window.onload = function() {
+            function initCanvas(dbo){
                 var canvas = document.getElementById('canvas');
                 var ctx = canvas.getContext('2d');
-                var width  = window.innerWidth;
-                var height = window.innerHeight;
-                canvas.height = height;
-                canvas.width = width;
-                canvas.addEventListener('mousedown', function(e) {
-                this.down = true;  
-                this.X = e.pageX ;
-                this.Y = e.pageY ;
-                this.color = rgb();
-                }, 0);
-                canvas.addEventListener('mouseup', function() {
-                this.down = false;      
-                }, 0);
-                canvas.addEventListener('mousemove', function(e) {
-                this.style.cursor = 'pointer';
-                if(this.down) {
-                    ctx.beginPath();
-                    ctx.moveTo(this.X, this.Y);
-                    ctx.lineCap = 'round';
-                    ctx.lineWidth = 3;
-                    ctx.lineTo(e.pageX , e.pageY );
-                    ctx.strokeStyle = this.color;
-                    ctx.stroke();
 
-                    this.X = e.pageX ;
-                    this.Y = e.pageY ;
-                }
-                }, 0);
+                dbo.points.delete({});
 
-                function rgb() {
-                    color = 'rgb(';
-                    for(var i = 0; i< 3; i++) {
-                        color += Math.floor(Math.random() * 255)+',';
+                const ps = dbo.points.getSync({});
+                ps.subscribeAll(draw);
+                // dbo.points.subscribe({}, { orderBy: "id", select: ["x", "y", "color", "id"] }, draw)
+
+                function draw(points){
+                    console.log(points)
+                    if(points && points.length > 1){
+                        ctx.beginPath();
+                        ctx.moveTo(points[0].x, [points[0].y]);
+                        ctx.lineCap = 'round';
+                        ctx.lineWidth = 3;
+
+                        points.map(({ x, y }, i) => {
+                            if(i){
+                                ctx.lineTo(x, y);
+                            }
+                        })
+
+                        ctx.strokeStyle = "red";
+                        ctx.stroke();
+                    } else {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
                     }
-                    return color.replace(/\,$/,')');
-                }    
-            };
+                }
+
+
+                // window.onload = function() {
+                    var width  = window.innerWidth;
+                    var height = window.innerHeight;
+                    canvas.height = height;
+                    canvas.width = width;
+                    canvas.addEventListener('mousedown', function(e) {
+                        this.down = true;
+                        this.X = e.pageX ;
+                        this.Y = e.pageY ;
+                        this.color = rgb();
+                        this.line_id = null;// Math.random() + "" + Date.now();
+
+
+                        // dbo.points.insert({ id: Date.now(), color: this.color, x: this.X, y: this.Y, line_id: this.line_id })
+                        // ps.upsert([{ id: Date.now(), color: this.color, x: this.X, y: this.Y, line_id: this.line_id}])
+                    }, 0);
+                    canvas.addEventListener('mouseup', function() {
+                        this.down = false;    
+                    }, 0);
+                    canvas.addEventListener('mousemove', function(e) {
+                        this.style.cursor = 'pointer';
+                        if(this.down) {
+
+                            // dbo.points.insert({ id: Date.now(), color: this.color, x: e.pageX, y: e.pageY, line_id: this.line_id })
+                            ps.upsert([{ id: Date.now(), color: null, x: e.pageX, y: e.pageY, line_id: this.line_id }])
+
+                            this.X = e.pageX ;
+                            this.Y = e.pageY ;
+                        }
+                    }, 0);
+
+                    function rgb() {
+                        color = 'rgb(';
+                        for(var i = 0; i< 3; i++) {
+                            color += Math.floor(Math.random() * 255)+',';
+                        }
+                        return color.replace(/\,$/,')');
+                    }    
+                // };
+            }
+
 		</script>
 	</body>
 </html>

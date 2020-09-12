@@ -545,7 +545,7 @@ export class PubSubManager {
     /* Returns a sync channel */
     async addSync(syncParams: AddSyncParams){
         const { socket = null, table_info = null, table_rules = null, synced_field = null, allow_delete = null, id_fields = [], filter = {}, params = {}, condition = "", throttle = 10 } = syncParams || {};
-        
+        let conditionParsed = this.parseCondition(condition);
         if(!socket || !table_info) throw "socket or table_info missing";
         
 
@@ -561,7 +561,7 @@ export class PubSubManager {
                     channel_name,
                     table_name,
                     filter,
-                    condition,
+                    condition: conditionParsed,
                     synced_field, 
                     id_fields,
                     allow_delete,
@@ -638,7 +638,7 @@ export class PubSubManager {
 
         let sync = upsertSync();
         
-        await this.addTrigger({ table_name, condition });
+        await this.addTrigger({ table_name, condition: conditionParsed });
 
         return channel_name;
     }
@@ -776,7 +776,9 @@ export class PubSubManager {
     }
 
     onSocketDisconnected(socket, channel_name){
-        process.on('warning', e => console.warn(e.stack));
+        // process.on('warning', e => {
+        //     console.warn(e.stack)
+        // });
         if(this.subs){
             Object.keys(this.subs).map(table_name => {
                 Object.keys(this.subs[table_name]).map(condition => {

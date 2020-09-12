@@ -167,6 +167,17 @@ prostgles({
 
 	publish: (socket, dbo) => {
         return {
+            points: {
+                select: "*",
+                insert: "*",
+                delete: "*",
+                update: "*",
+                sync: {
+                    synced_field: "synced",
+                    id_fields: ["id"],
+                    allow_delete: true
+                }
+            },
             pixels: {
                 select: {
                     fields: "*"

@@ -407,6 +407,7 @@ class PubSubManager {
     /* Returns a sync channel */
     async addSync(syncParams) {
         const { socket = null, table_info = null, table_rules = null, synced_field = null, allow_delete = null, id_fields = [], filter = {}, params = {}, condition = "", throttle = 10 } = syncParams || {};
+        let conditionParsed = this.parseCondition(condition);
         if (!socket || !table_info)
             throw "socket or table_info missing";
         const { name: table_name } = table_info, channel_name = `${this.socketChannelPreffix}.${table_name}.${JSON.stringify(filter)}.sync`;
@@ -418,7 +419,7 @@ class PubSubManager {
                 channel_name,
                 table_name,
                 filter,
-                condition,
+                condition: conditionParsed,
                 synced_field,
                 id_fields,
                 allow_delete,
@@ -482,7 +483,7 @@ class PubSubManager {
         };
         // const { min_id, max_id, count, max_synced } = params;
         let sync = upsertSync();
-        await this.addTrigger({ table_name, condition });
+        await this.addTrigger({ table_name, condition: conditionParsed });
         return channel_name;
     }
     /* Must return a channel for socket */
@@ -595,7 +596,9 @@ class PubSubManager {
         }
     }
     onSocketDisconnected(socket, channel_name) {
-        process.on('warning', e => console.warn(e.stack));
+        // process.on('warning', e => {
+        //     console.warn(e.stack)
+        // });
         if (this.subs) {
             Object.keys(this.subs).map(table_name => {
                 Object.keys(this.subs[table_name]).map(condition => {
