@@ -1164,7 +1164,7 @@ export class TableHandler extends ViewHandler {
 
             const { testRule = false } = localParams || {};
             if(!testRule){
-                if(!newData || !Object.keys(newData).length) throw "no update data provided";
+                if(!newData || !Object.keys(newData).length) throw "no update data provided\nEXPECTING db.table.update(filter, updateData, options)";
                 this.checkFilter(filter);
             }
 
@@ -1395,7 +1395,7 @@ export class TableHandler extends ViewHandler {
             let { id_fields, synced_field, allow_delete }: SyncRule = table_rules.sync;
 
             if(!id_fields || !synced_field){
-                const err = "id_fields OR synced_field missing from publish";
+                const err = "INTERNAL ERROR: id_fields OR synced_field missing from publish";
                 console.error(err);
                 throw err;
             }
