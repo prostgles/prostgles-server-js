@@ -202,7 +202,8 @@ export declare class PublishParser {
     publishMethods?: any;
     publishRawSQL?: any;
     dbo: DbHandler;
-    constructor(publish: any, publishMethods: any, publishRawSQL: any, dbo: DbHandler);
+    db: DB;
+    constructor(publish: any, publishMethods: any, publishRawSQL: any, dbo: DbHandler, db: DB);
     getMethods(socket: any): Promise<{}>;
     getSchemaFromPublish(socket: any): Promise<{}>;
     getValidatedRequestRule({ tableName, command, socket }: DboTableCommand): Promise<TableRule>;

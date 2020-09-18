@@ -65,7 +65,7 @@ class Prostgles {
                 fs.writeFileSync(this.tsGeneratedTypesDir + fileName, this.dboBuilder.tsTypesDefinition);
             }
             if (this.publish) {
-                this.publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo);
+                this.publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo, this.db);
                 this.dboBuilder.publishParser = this.publishParser;
                 /* 4. Set publish and auth listeners */ //makeDBO(db, allTablesViews, pubSubManager, false)
                 await this.setSocketEvents();
@@ -104,7 +104,7 @@ class Prostgles {
             METHOD: `${this.wsChannelNamePrefix}.method`,
             SCHEMA: `${this.wsChannelNamePrefix}.schema`
         };
-        let publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo);
+        let publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo, this.db);
         if (!this.io)
             return;
         this.io.on('connection', async (socket) => {
@@ -182,7 +182,7 @@ class Prostgles {
                 });
                 socket.on(WS_CHANNEL_NAME.METHOD, async function ({ method, params }, cb = (...callback) => { }) {
                     try {
-                        const methods = await publishParser.getMethods({ publishMethods: this.publishMethods, socket, dbo });
+                        const methods = await publishParser.getMethods({ publishMethods: this.publishMethods, socket, dbo, db });
                         if (!methods || !methods[method]) {
                             cb("Invalid method");
                         }
@@ -261,7 +261,7 @@ class Prostgles {
                             console.error("db missing");
                     }
                 }
-                const methods = await publishParser.getMethods({ publishMethods: this.publishMethods, socket, dbo });
+                const methods = await publishParser.getMethods({ publishMethods: this.publishMethods, socket, dbo, db });
                 let joinTables = [];
                 if (this.joins) {
                     joinTables = Array.from(new Set(this.joins.map(j => j.tables).flat().filter(t => schema[t])));
@@ -331,17 +331,18 @@ const RULE_TO_METHODS = [
 // const ALL_PUBLISH_METHODS = ["update", "upsert", "delete", "insert", "find", "findOne", "subscribe", "unsubscribe", "sync", "unsync", "remove"];
 const ALL_PUBLISH_METHODS = RULE_TO_METHODS.map(r => r.methods).flat();
 class PublishParser {
-    constructor(publish, publishMethods, publishRawSQL, dbo) {
+    constructor(publish, publishMethods, publishRawSQL, dbo, db) {
         this.publish = publish;
         this.publishMethods = publishMethods;
         this.publishRawSQL = publishRawSQL;
         this.dbo = dbo;
+        this.db = db;
         if (!this.dbo || !this.publish)
             throw "INTERNAL ERROR: dbo and/or publish missing";
     }
     async getMethods(socket) {
         let methods = {};
-        const _methods = await applyParamsIfFunc(this.publishMethods, socket, this.dbo);
+        const _methods = await applyParamsIfFunc(this.publishMethods, socket, this.dbo, this.db);
         if (_methods && Object.keys(_methods).length) {
             Object.keys(_methods).map(key => {
                 if (_methods[key] && (typeof _methods[key] === "function" || typeof _methods[key].then === "function")) {

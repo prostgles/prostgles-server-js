@@ -330,7 +330,7 @@ export class Prostgles {
             }
 
             if(this.publish){
-                this.publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo);
+                this.publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo, this.db);
                 this.dboBuilder.publishParser = this.publishParser;
                 /* 4. Set publish and auth listeners */ //makeDBO(db, allTablesViews, pubSubManager, false)
                 await this.setSocketEvents();
