@@ -237,22 +237,22 @@ export type ProstglesInitOptions = {
     sqlFilePath?: string;
     isReady(dbo: any, db: DB): void;
     // auth, 
-    publishRawSQL?: any;
+    publishRawSQL?(socket: Socket, dbo: any): any;
     wsChannelNamePrefix?: string;
     onSocketConnect?(socket: Socket, dbo: any);
     onSocketDisconnect?(socket: Socket, dbo: any);
 }
 
-interface ISocketSetup {
-    db: DB;
-    dbo: DbHandler;
-    io: any;
-    onSocketConnect?(socket: Socket, dbo: any);
-    onSocketDisconnect?(socket: Socket, dbo: any);
-    publish: Publish,
-    publishMethods: any;
-    publishRawSQL?: any,
-}
+// interface ISocketSetup {
+//     db: DB;
+//     dbo: DbHandler;
+//     io: any;
+//     onSocketConnect?(socket: Socket, dbo: any);
+//     onSocketDisconnect?(socket: Socket, dbo: any);
+//     publish: Publish,
+//     publishMethods: any;
+//     publishRawSQL?: any,
+// }
 /*
     1. Connect to db
     2. Execute any SQL file if provided

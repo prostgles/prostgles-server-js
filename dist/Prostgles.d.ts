@@ -155,7 +155,7 @@ export declare type ProstglesInitOptions = {
     schema?: string;
     sqlFilePath?: string;
     isReady(dbo: any, db: DB): void;
-    publishRawSQL?: any;
+    publishRawSQL?(socket: Socket, dbo: any): any;
     wsChannelNamePrefix?: string;
     onSocketConnect?(socket: Socket, dbo: any): any;
     onSocketDisconnect?(socket: Socket, dbo: any): any;

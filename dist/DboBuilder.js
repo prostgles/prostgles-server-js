@@ -434,6 +434,7 @@ class ViewHandler {
         }
     }
     count(filter, param2_unused, param3_unused, table_rules, localParams = {}) {
+        filter = filter || {};
         try {
             return this.find(filter, { select: "", limit: 0 }, null, table_rules, localParams)
                 .then(allowed => {

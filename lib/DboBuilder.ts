@@ -606,7 +606,7 @@ export class ViewHandler {
     }
 
     count(filter?: Filter, param2_unused?, param3_unused?, table_rules?: TableRule, localParams: any = {}): Promise<number>{
-        
+        filter = filter || {};
         try {
             return this.find(filter, { select: "", limit: 0 }, null, table_rules, localParams)
             .then(allowed => {
