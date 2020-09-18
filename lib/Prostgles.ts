@@ -228,7 +228,7 @@ export type Joins = Join[];
 export type ProstglesInitOptions = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
-    publishMethods?: (socket?: any, dbo?: DbHandler | any) => { [key:string]: Method } | Promise<{ [key:string]: Method }>, 
+    publishMethods?: (socket?: any, dbo?: DbHandler | any, db?: DB) => { [key:string]: Method } | Promise<{ [key:string]: Method }>, 
     tsGeneratedTypesDir?: string;
     io?: any,
     publish?: Publish,
