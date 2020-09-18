@@ -214,7 +214,7 @@ export type PublishViewRule = {
 export type RequestParams = { dbo?: DbHandler, socket?: any };
 
 export type PublishedTablesAndViews = { [key:string]: PublishTableRule | PublishViewRule | "*" } | "*" ;
-export type Publish = PublishedTablesAndViews | ((socket?: any, dbo?: DbHandler) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>)); 
+export type Publish = PublishedTablesAndViews | ((socket?: any, dbo?: DbHandler, db?: DB) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>)); 
 
 export type Method = (...args: any) => ( any | Promise<any> );
 export const JOIN_TYPES = ["one-many", "many-one", "one-one", "many-many"] as const;
@@ -237,7 +237,7 @@ export type ProstglesInitOptions = {
     sqlFilePath?: string;
     isReady(dbo: any, db: DB): void;
     // auth, 
-    publishRawSQL?(socket: Socket, dbo: any): any;
+    publishRawSQL?(socket: Socket, dbo: any, db?: DB): any;
     wsChannelNamePrefix?: string;
     onSocketConnect?(socket: Socket, dbo: any);
     onSocketDisconnect?(socket: Socket, dbo: any);
@@ -469,7 +469,7 @@ export class Prostgles {
                 
                 socket.on(WS_CHANNEL_NAME.METHOD, async function({ method, params }: SocketMethodRequest, cb = (...callback) => {} ){
                     try {
-                        const methods = await publishParser.getMethods({ publishMethods: this.publishMethods, socket, dbo, db });
+                        const methods = await publishParser.getMethods(socket);
                         
                         if(!methods || !methods[method]){
                             cb("Invalid method");
@@ -500,7 +500,7 @@ export class Prostgles {
                 */
                 let fullSchema = [];
                 if(this.publishRawSQL && typeof this.publishRawSQL === "function"){
-                    const canRunSQL = await this.publishRawSQL(socket, dbo);
+                    const canRunSQL = await this.publishRawSQL(socket, dbo, db);
 
                     // console.log("canRunSQL", canRunSQL, socket.handshake.headers["x-real-ip"]);//, allTablesViews);
 
@@ -549,7 +549,7 @@ export class Prostgles {
                         } else console.error("db missing");
                     }
                 }
-                const methods = await publishParser.getMethods({ publishMethods: this.publishMethods, socket, dbo, db });
+                const methods = await publishParser.getMethods(socket);
                 let joinTables = [];
                 if(this.joins){
                     joinTables = Array.from(new Set(this.joins.map(j => j.tables).flat().filter(t => schema[t])));
@@ -690,7 +690,7 @@ export class PublishParser {
         
         try {
             /* Publish tables and views based on socket */
-            const _publish = await applyParamsIfFunc(this.publish, socket, this.dbo);
+            const _publish = await applyParamsIfFunc(this.publish, socket, this.dbo, this.db);
     
             if(_publish && Object.keys(_publish).length){
                 await Promise.all(

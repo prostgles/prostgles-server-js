@@ -129,7 +129,7 @@ export declare type RequestParams = {
 export declare type PublishedTablesAndViews = {
     [key: string]: PublishTableRule | PublishViewRule | "*";
 } | "*";
-export declare type Publish = PublishedTablesAndViews | ((socket?: any, dbo?: DbHandler) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>));
+export declare type Publish = PublishedTablesAndViews | ((socket?: any, dbo?: DbHandler, db?: DB) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>));
 export declare type Method = (...args: any) => (any | Promise<any>);
 export declare const JOIN_TYPES: readonly ["one-many", "many-one", "one-one", "many-many"];
 export declare type Join = {
@@ -155,7 +155,7 @@ export declare type ProstglesInitOptions = {
     schema?: string;
     sqlFilePath?: string;
     isReady(dbo: any, db: DB): void;
-    publishRawSQL?(socket: Socket, dbo: any): any;
+    publishRawSQL?(socket: Socket, dbo: any, db?: DB): any;
     wsChannelNamePrefix?: string;
     onSocketConnect?(socket: Socket, dbo: any): any;
     onSocketDisconnect?(socket: Socket, dbo: any): any;

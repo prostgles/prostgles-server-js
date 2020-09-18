@@ -182,7 +182,7 @@ class Prostgles {
                 });
                 socket.on(WS_CHANNEL_NAME.METHOD, async function ({ method, params }, cb = (...callback) => { }) {
                     try {
-                        const methods = await publishParser.getMethods({ publishMethods: this.publishMethods, socket, dbo, db });
+                        const methods = await publishParser.getMethods(socket);
                         if (!methods || !methods[method]) {
                             cb("Invalid method");
                         }
@@ -214,7 +214,7 @@ class Prostgles {
                 */
                 let fullSchema = [];
                 if (this.publishRawSQL && typeof this.publishRawSQL === "function") {
-                    const canRunSQL = await this.publishRawSQL(socket, dbo);
+                    const canRunSQL = await this.publishRawSQL(socket, dbo, db);
                     // console.log("canRunSQL", canRunSQL, socket.handshake.headers["x-real-ip"]);//, allTablesViews);
                     if (canRunSQL && typeof canRunSQL === "boolean" || canRunSQL === "*") {
                         socket.on(WS_CHANNEL_NAME.SQL, function ({ query, params, options, justRows = false }, cb = (...callback) => { }) {
@@ -261,7 +261,7 @@ class Prostgles {
                             console.error("db missing");
                     }
                 }
-                const methods = await publishParser.getMethods({ publishMethods: this.publishMethods, socket, dbo, db });
+                const methods = await publishParser.getMethods(socket);
                 let joinTables = [];
                 if (this.joins) {
                     joinTables = Array.from(new Set(this.joins.map(j => j.tables).flat().filter(t => schema[t])));
@@ -360,7 +360,7 @@ class PublishParser {
         let schema = {};
         try {
             /* Publish tables and views based on socket */
-            const _publish = await applyParamsIfFunc(this.publish, socket, this.dbo);
+            const _publish = await applyParamsIfFunc(this.publish, socket, this.dbo, this.db);
             if (_publish && Object.keys(_publish).length) {
                 await Promise.all(Object.keys(_publish).map(async (tableName) => {
                     if (!this.dbo[tableName])
