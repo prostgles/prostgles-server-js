@@ -140,14 +140,15 @@ export declare type Join = {
     type: typeof JOIN_TYPES[number];
 };
 export declare type Joins = Join[];
+export declare type publishMethods = (socket?: any, dbo?: DbHandler | any, db?: DB) => {
+    [key: string]: Method;
+} | Promise<{
+    [key: string]: Method;
+}>;
 export declare type ProstglesInitOptions = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
-    publishMethods?: (socket?: any, dbo?: DbHandler | any, db?: DB) => {
-        [key: string]: Method;
-    } | Promise<{
-        [key: string]: Method;
-    }>;
+    publishMethods?: publishMethods;
     tsGeneratedTypesDir?: string;
     io?: any;
     publish?: Publish;
@@ -157,8 +158,8 @@ export declare type ProstglesInitOptions = {
     isReady(dbo: any, db: DB): void;
     publishRawSQL?(socket: Socket, dbo: any, db?: DB): any;
     wsChannelNamePrefix?: string;
-    onSocketConnect?(socket: Socket, dbo: any): any;
-    onSocketDisconnect?(socket: Socket, dbo: any): any;
+    onSocketConnect?(socket: Socket, dbo: any, db?: DB): any;
+    onSocketDisconnect?(socket: Socket, dbo: any, db?: DB): any;
 };
 export declare type OnReady = {
     dbo: DbHandler;
@@ -170,15 +171,15 @@ export declare class Prostgles {
     db: DB;
     dbo: DbHandler;
     dboBuilder: DboBuilder;
-    publishMethods?(): any;
+    publishMethods?: publishMethods;
     io: any;
     publish?: Publish;
     joins?: Joins;
     schema: string;
     publishRawSQL?: any;
     wsChannelNamePrefix: string;
-    onSocketConnect?(socket: Socket, dbo: any): any;
-    onSocketDisconnect?(socket: Socket, dbo: any): any;
+    onSocketConnect?(socket: Socket, dbo: any, db?: DB): any;
+    onSocketDisconnect?(socket: Socket, dbo: any, db?: DB): any;
     sqlFilePath?: string;
     tsGeneratedTypesDir?: string;
     publishParser: PublishParser;

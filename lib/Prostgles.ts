@@ -225,10 +225,12 @@ export type Join = {
 };
 export type Joins = Join[];
 
+export type publishMethods = (socket?: any, dbo?: DbHandler | any, db?: DB) => { [key:string]: Method } | Promise<{ [key:string]: Method }>;
+
 export type ProstglesInitOptions = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
-    publishMethods?: (socket?: any, dbo?: DbHandler | any, db?: DB) => { [key:string]: Method } | Promise<{ [key:string]: Method }>, 
+    publishMethods?: publishMethods,
     tsGeneratedTypesDir?: string;
     io?: any,
     publish?: Publish,
@@ -239,8 +241,8 @@ export type ProstglesInitOptions = {
     // auth, 
     publishRawSQL?(socket: Socket, dbo: any, db?: DB): any;
     wsChannelNamePrefix?: string;
-    onSocketConnect?(socket: Socket, dbo: any);
-    onSocketDisconnect?(socket: Socket, dbo: any);
+    onSocketConnect?(socket: Socket, dbo: any, db?: DB);
+    onSocketDisconnect?(socket: Socket, dbo: any, db?: DB);
 }
 
 // interface ISocketSetup {
@@ -277,7 +279,7 @@ export class Prostgles {
     dbo: DbHandler;
     dboBuilder: DboBuilder;
 
-    publishMethods?(): any;
+    publishMethods?: publishMethods;
     io: any;
     publish?: Publish;
     joins?: Joins;
@@ -285,8 +287,8 @@ export class Prostgles {
     // auth, 
     publishRawSQL?: any;
     wsChannelNamePrefix: string = "_psqlWS_";
-    onSocketConnect?(socket: Socket, dbo: any);
-    onSocketDisconnect?(socket: Socket, dbo: any);
+    onSocketConnect?(socket: Socket, dbo: any, db?: DB);
+    onSocketDisconnect?(socket: Socket, dbo: any, db?: DB);
     sqlFilePath?: string;
     tsGeneratedTypesDir?: string;
     publishParser: PublishParser;
@@ -389,7 +391,7 @@ export class Prostgles {
             let allTablesViews = this.dboBuilder.tablesOrViews;
 
             try {
-                if(this.onSocketConnect) await this.onSocketConnect(socket, dbo);
+                if(this.onSocketConnect) await this.onSocketConnect(socket, dbo, db);
                 
                 /*  RUN Client request from Publish.
                     Checks request against publish and if OK run it with relevant publish functions. Local (server) requests do not check the policy 

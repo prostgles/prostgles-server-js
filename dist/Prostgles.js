@@ -115,7 +115,7 @@ class Prostgles {
             let allTablesViews = this.dboBuilder.tablesOrViews;
             try {
                 if (this.onSocketConnect)
-                    await this.onSocketConnect(socket, dbo);
+                    await this.onSocketConnect(socket, dbo, db);
                 /*  RUN Client request from Publish.
                     Checks request against publish and if OK run it with relevant publish functions. Local (server) requests do not check the policy
                 */
