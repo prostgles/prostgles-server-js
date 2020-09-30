@@ -287,8 +287,8 @@ export class Prostgles {
     // auth, 
     publishRawSQL?: any;
     wsChannelNamePrefix: string = "_psqlWS_";
-    onSocketConnect?(socket: Socket, dbo: any, db?: DB);
-    onSocketDisconnect?(socket: Socket, dbo: any, db?: DB);
+    onSocketConnect?(socket: Socket | any, dbo: any, db?: DB);
+    onSocketDisconnect?(socket: Socket | any, dbo: any, db?: DB);
     sqlFilePath?: string;
     tsGeneratedTypesDir?: string;
     publishParser: PublishParser;
@@ -477,7 +477,7 @@ export class Prostgles {
                             cb("Invalid method");
                         } else {
                             try {
-                                const res = await methods[method](params);
+                                const res = await methods[method](...params);
                                 cb(null, res);
                             } catch(err){
                                 makeSocketError(cb, err);

@@ -188,7 +188,7 @@ class Prostgles {
                         }
                         else {
                             try {
-                                const res = await methods[method](params);
+                                const res = await methods[method](...params);
                                 cb(null, res);
                             }
                             catch (err) {

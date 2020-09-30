@@ -768,6 +768,13 @@ export class ViewHandler {
             conditionParsers = [
                 { aliases: ["$nin"],                            get: (key, val, col) => "${key:raw} NOT IN (${data:csv}) " },
                 { aliases: ["$in"],                             get: (key, val, col) => "${key:raw} IN (${data:csv}) " },
+                { aliases: ["$tsQuery"],                        get: (key, val, col) => {
+                    if(col.data_type === "tsvector"){
+                        return pgp.as.format("${key:raw} @@ to_tsquery(${data:csv}) ", { key: getRawFieldName(key), data: val, prefix }); 
+                    } else {
+                        return pgp.as.format(" to_tsvector(${key:raw}::text) @@ to_tsquery(${data:csv}) ", { key, data: val, prefix }); 
+                    } 
+                } },
 
                 { aliases: ["@@"],                              get: (key, val, col) => {
                     if(col && val && val.to_tsquery && Array.isArray(val.to_tsquery)){
@@ -789,7 +796,10 @@ export class ViewHandler {
                 { aliases: [">=", "$gte", "$greaterOrEqual"],   get: (key, val, col) => "${key:raw} >= " + parseDataType(key ,col) },
                 { aliases: ["<", "$lt", "$less"],               get: (key, val, col) => "${key:raw} <  " + parseDataType(key ,col) },
                 { aliases: ["<=", "$lte", "$lessOrEqual"],      get: (key, val, col) => "${key:raw} <= " + parseDataType(key ,col) },
-                { aliases: ["$ilike"],                          get: (key, val, col) => "${key:raw}::text ilike ${data} " },
+                { aliases: ["$ilike"],                          get: (key, val, col) => "${key:raw}::text ILIKE ${data}::text " },
+                { aliases: ["$like"],                           get: (key, val, col) => "${key:raw}::text LIKE ${data}::text " },
+                { aliases: ["$notIlike"],                       get: (key, val, col) => "${key:raw}::text NOT ILIKE ${data}::text " },
+                { aliases: ["$notLike"],                        get: (key, val, col) => "${key:raw}::text NOT LIKE ${data}::text " },
                 { aliases: ["<>", "$ne", "$not"],               get: (key, val, col) => "${key:raw} " + (val === null? " IS NOT NULL " : (" <> " + parseDataType(key, col))) },
                 { aliases: ["$isNull", "$null"],                get: (key, val, col) => "${key:raw} " + `  IS ${!val? " NOT " : ""} NULL ` }
             ];

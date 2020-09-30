@@ -178,8 +178,8 @@ export declare class Prostgles {
     schema: string;
     publishRawSQL?: any;
     wsChannelNamePrefix: string;
-    onSocketConnect?(socket: Socket, dbo: any, db?: DB): any;
-    onSocketDisconnect?(socket: Socket, dbo: any, db?: DB): any;
+    onSocketConnect?(socket: Socket | any, dbo: any, db?: DB): any;
+    onSocketDisconnect?(socket: Socket | any, dbo: any, db?: DB): any;
     sqlFilePath?: string;
     tsGeneratedTypesDir?: string;
     publishParser: PublishParser;

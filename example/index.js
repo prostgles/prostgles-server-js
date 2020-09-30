@@ -3,7 +3,7 @@ const app = express();
 const path = require('path');
 var http = require('http').createServer(app);
 var io = require('socket.io')(http);
-http.listen(3000);
+http.listen(3001);
 var fs = require('fs');
 
 let prostgles = require('../dist/index.js');
