@@ -35,7 +35,7 @@ prostgles({
     },
     
     io,    
-    isReady: async (dbo, db) => {
+    onReady: async (dbo, db) => {
 
     },
 

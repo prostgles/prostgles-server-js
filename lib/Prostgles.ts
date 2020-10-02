@@ -181,6 +181,8 @@ export type SyncRule = {
     synced_field: string;
 
     allow_delete?: boolean;
+
+    min_throttle?: number;
 }
 export type SubscribeRule = {
     throttle?: number;

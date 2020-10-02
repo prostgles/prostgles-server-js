@@ -96,6 +96,7 @@ export declare type SyncRule = {
     id_fields: string[];
     synced_field: string;
     allow_delete?: boolean;
+    min_throttle?: number;
 };
 export declare type SubscribeRule = {
     throttle?: number;

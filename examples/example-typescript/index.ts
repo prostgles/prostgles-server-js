@@ -14,7 +14,7 @@ var fs = require('fs');
 // console.log(Prostgles({}));
 // Prostgles({ })
 
-var prostgles = require("../dist/index");
+var prostgles = require("../../dist/index");
 
 
 // import prostgles from "prostgles-server";

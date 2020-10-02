@@ -566,7 +566,7 @@ export class PubSubManager {
                     id_fields,
                     allow_delete,
                     table_rules,
-                    throttle,
+                    throttle: Math.max(throttle || 10, table_rules.sync.min_throttle || 10),
                     last_throttled: 0,
                     socket_id: socket.id,
                     is_sync: true,
