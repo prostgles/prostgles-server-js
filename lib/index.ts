@@ -4,7 +4,7 @@ import { TableHandler, ViewHandler } from "./DboBuilder";
 function prostgles(params: ProstglesInitOptions){
 
     let prgl = new Prostgles(params);
-    prgl.init(params.isReady);
+    prgl.init(params.onReady);
 }
 
 

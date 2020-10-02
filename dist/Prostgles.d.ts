@@ -155,7 +155,7 @@ export declare type ProstglesInitOptions = {
     joins?: Joins;
     schema?: string;
     sqlFilePath?: string;
-    isReady(dbo: any, db: DB): void;
+    onReady(dbo: any, db: DB): void;
     publishRawSQL?(socket: Socket, dbo: any, db?: DB): any;
     wsChannelNamePrefix?: string;
     onSocketConnect?(socket: Socket, dbo: any, db?: DB): any;
@@ -185,7 +185,7 @@ export declare class Prostgles {
     publishParser: PublishParser;
     constructor(params: ProstglesInitOptions);
     checkDb(): void;
-    init(isReady: (dbo: DbHandler, db: DB) => any): Promise<boolean>;
+    init(onReady: (dbo: DbHandler, db: DB) => any): Promise<boolean>;
     runSQLFile(filePath: string): Promise<void>;
     setSocketEvents(): Promise<void>;
 }

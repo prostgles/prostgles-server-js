@@ -584,6 +584,12 @@ export class ViewHandler {
             // console.log(_query);
 
             if(testRule) return [];
+
+            if(selectParams){
+                const good_params = ["select", "orderBy", "offset", "limit", "expectOne"];
+                const bad_params = Object.keys(selectParams).filter(k => !good_params.includes(k));
+                if(bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
+            }
             if(expectOne) return this.db.oneOrNone(_query);
             else return this.db.any(_query);
 
@@ -597,8 +603,13 @@ export class ViewHandler {
 
         try {
             const expectOne = true;
-            const { select = "*", orderBy = null } = selectParams || {};
-            return this.find(filter, { select, orderBy, limit: 1, expectOne }, null, table_rules, localParams);
+            const { select = "*", orderBy = null, offset = 0 } = selectParams || {};
+            if(selectParams){
+                const good_params = ["select", "orderBy", "offset"];
+                const bad_params = Object.keys(selectParams).filter(k => !good_params.includes(k));
+                if(bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
+            }
+            return this.find(filter, { select, orderBy, limit: 1, offset, expectOne }, null, table_rules, localParams);
         } catch(e){
             if(localParams && localParams.testRule) throw e;
             throw `Issue with dbo.${this.name}.findOne:\n     -> ` + e;
@@ -1208,6 +1219,13 @@ export class TableHandler extends ViewHandler {
 
             let { returning, multi = true, onConflictDoNothing = false, fixIssues = false } = params || {};
 
+
+            if(params){
+                const good_params = ["returning", "multi", "onConflictDoNothing", "fixIssues"];
+                const bad_params = Object.keys(params).filter(k => !good_params.includes(k));
+                if(bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
+            }
+
             /* Update all allowed fields (fields) except the forcedFilter (so that the user cannot change the forced filter values) */
             let _fields = this.parseFieldFilter(fields);
 
@@ -1297,6 +1315,13 @@ export class TableHandler extends ViewHandler {
             if(typeof onConflictDoNothing === "boolean" && onConflictDoNothing){
                 conflict_query = " ON CONFLICT DO NOTHING ";
             }
+
+
+            if(param2){
+                const good_params = ["returning", "multi", "onConflictDoNothing", "fixIssues"];
+                const bad_params = Object.keys(param2).filter(k => !good_params.includes(k));
+                if(bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
+            }
     
             let query = "";
             if(Array.isArray(data)){
@@ -1348,6 +1373,13 @@ export class TableHandler extends ViewHandler {
                     await this.validateViewRules(null, filterFields, returningFields, forcedFilter, "delete");
                     return true;
                 }
+            }
+
+
+            if(params){
+                const good_params = ["returning"];
+                const bad_params = Object.keys(params).filter(k => !good_params.includes(k));
+                if(bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
             }
 
             let queryType = 'none';                        

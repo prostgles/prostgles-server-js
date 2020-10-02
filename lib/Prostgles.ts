@@ -237,7 +237,7 @@ export type ProstglesInitOptions = {
     joins?: Joins,
     schema?: string;
     sqlFilePath?: string;
-    isReady(dbo: any, db: DB): void;
+    onReady(dbo: any, db: DB): void;
     // auth, 
     publishRawSQL?(socket: Socket, dbo: any, db?: DB): any;
     wsChannelNamePrefix?: string;
@@ -296,7 +296,7 @@ export class Prostgles {
     constructor(params: ProstglesInitOptions){
         if(!params) throw "ProstglesInitOptions missing";
         if(!params.io) console.warn("io missing. WebSockets will not be set up");
-        const unknownParams = Object.keys(params).filter(key => !["joins", "tsGeneratedTypesDir", "isReady", "dbConnection", "dbOptions", "publishMethods", "io", "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect", "onSocketDisconnect", "sqlFilePath"].includes(key))
+        const unknownParams = Object.keys(params).filter(key => !["joins", "tsGeneratedTypesDir", "onReady", "dbConnection", "dbOptions", "publishMethods", "io", "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect", "onSocketDisconnect", "sqlFilePath"].includes(key))
         if(unknownParams.length){ 
             console.error(`Unrecognised ProstglesInitOptions params: ${unknownParams.join()}`);
         }
@@ -308,7 +308,7 @@ export class Prostgles {
         if(!this.db || !this.db.connect) throw "something went wrong getting a db connection";
     }
 
-    async init(isReady: (dbo: DbHandler, db: DB) => any){
+    async init(onReady: (dbo: DbHandler, db: DB) => any){
 
         /* 1. Connect to db */
         this.db = getDbConnection(this.dbConnection, this.dbOptions);
@@ -340,7 +340,7 @@ export class Prostgles {
 
 
             /* 5. Finish init and provide DBO object */
-            isReady(this.dbo, this.db);
+            onReady(this.dbo, this.db);
 
             return true;
         } catch (e) {
@@ -637,7 +637,7 @@ const RULE_TO_METHODS = [
        rule: "sync", methods: ["sync", "unsync"], 
        no_limits: null,
        allowed_params: ["id_fields", "synced_field", "sync_type", "allow_delete"],
-       hint: ` expecting "*" | true | { id_fields: [string], synced_field: string }`
+       hint: ` expecting "*" | true | { id_fields: string[], synced_field: string }`
     },
     { 
         rule: "subscribe", methods: ["subscribe"], 
