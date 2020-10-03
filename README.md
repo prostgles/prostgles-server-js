@@ -6,6 +6,7 @@
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/prostgles/prostgles-server-js/blob/master/LICENSE)
 [![npm version](https://img.shields.io/npm/v/prostgles-server.svg?style=flat)](https://www.npmjs.com/package/prostgles-server)
 [![Dependency Status](https://david-dm.org/prostgles/prostgles-server-js/status.svg)](https://david-dm.org/prostgles/prostgles-server-js/status.svg#info=dependencies)
+[![Known Vulnerabilities](https://snyk.io/test/github/prostgles/prostgles-server-js/badge.svg)](https://snyk.io/test/github/prostgles/prostgles-server-js)
 
 
 ## Features
