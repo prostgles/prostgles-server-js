@@ -250,7 +250,7 @@ class PubSubManager {
                     }
                 }
                 else {
-                    console.error("SYNC onPullRequest UNEXPECTED CASE");
+                    console.error("SYNC onPullRequest UNEXPECTED CASE\n Data item does not exist on server and insert is not allowed !???");
                     return false;
                 }
                 return true;
@@ -489,7 +489,7 @@ class PubSubManager {
     /* Must return a channel for socket */
     /* The distinct list of channel names must have a corresponding trigger in the database */
     async addSub(subscriptionParams) {
-        const { socket = null, func = null, table_info = null, table_rules = null, filter = {}, params = {}, condition = "" } = subscriptionParams || {};
+        const { socket = null, func = null, table_info = null, table_rules = null, filter = {}, params = {}, condition = "", subOne = false } = subscriptionParams || {};
         let throttle = subscriptionParams.throttle || 10;
         if ((!socket && !func) || !table_info)
             throw "socket/func or table_info missing";
@@ -513,7 +513,8 @@ class PubSubManager {
                 throttle,
                 is_throttling: null,
                 last_throttled: 0,
-                is_ready
+                is_ready,
+                subOne
             };
             this.subs[table_name] = this.subs[table_name] || {};
             this.subs[table_name][condition] = this.subs[table_name][condition] || { subs: [] };

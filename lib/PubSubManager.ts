@@ -181,8 +181,9 @@ export class PubSubManager {
 
         const { table_name, filter, params, table_rules, socket_id, channel_name, func, subOne = false } = sub;
         return new Promise((resolve, reject) => {
-            this.dbo[table_name][subOne? "findOne":"find"](filter, params, null, table_rules)
+            this.dbo[table_name][subOne? "findOne" : "find"](filter, params, null, table_rules)
                 .then(data => {
+                    
                     if(socket_id && this.sockets[socket_id]){
                         // console.log(data.length)
                         this.sockets[socket_id].emit(channel_name, { data }, () => {
@@ -355,7 +356,7 @@ export class PubSubManager {
                             throw e;
                         }
                     } else {
-                        console.error("SYNC onPullRequest UNEXPECTED CASE");
+                        console.error("SYNC onPullRequest UNEXPECTED CASE\n Data item does not exist on server and insert is not allowed !???");
                         return false
                     }
                     return true;
@@ -649,7 +650,7 @@ export class PubSubManager {
     /* Must return a channel for socket */
     /* The distinct list of channel names must have a corresponding trigger in the database */
     async addSub(subscriptionParams: AddSubscriptionParams){
-        const { socket = null, func = null, table_info = null, table_rules = null, filter = {}, params = {}, condition = "" } = subscriptionParams || {};
+        const { socket = null, func = null, table_info = null, table_rules = null, filter = {}, params = {}, condition = "", subOne = false } = subscriptionParams || {};
         let throttle = subscriptionParams.throttle || 10;
         if((!socket && !func) || !table_info) throw "socket/func or table_info missing";
 
@@ -678,7 +679,8 @@ export class PubSubManager {
                         throttle,
                         is_throttling: null,
                         last_throttled: 0,
-                        is_ready
+                        is_ready,
+                        subOne
                     };
 
                 this.subs[table_name] = this.subs[table_name] || {};

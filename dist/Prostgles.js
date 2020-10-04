@@ -132,8 +132,9 @@ class Prostgles {
                             throw `Invalid OR disallowed request: ${tableName}.${command} `;
                     }
                     catch (err) {
-                        const _err_msg = err.toString();
-                        cb(_err_msg);
+                        // const _err_msg = err.toString();
+                        // cb({ msg: _err_msg, err });
+                        cb(err);
                         // console.warn("runPublishedRequest ERROR: ", err, socket._user);
                     }
                 });
@@ -246,8 +247,8 @@ class Prostgles {
                     joinTables
                 });
                 function makeSocketError(cb, err) {
-                    const err_msg = err.toString();
-                    cb({ err_msg, err });
+                    const err_msg = err.toString(), e = { err_msg, err };
+                    cb(e);
                 }
             }
             catch (e) {

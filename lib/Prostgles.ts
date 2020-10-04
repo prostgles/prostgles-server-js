@@ -135,7 +135,7 @@ export type InsertRule = {
     returningFields?: FieldFilter;
 
     // Validation logic to check/update data for each request
-    validate?(...InsertRequestData): InsertRequestData
+    validate?: (row: object) => object
 }
 export type UpdateRule = {
 
@@ -156,7 +156,7 @@ export type UpdateRule = {
     returningFields?: FieldFilter;
 
     // Validation logic to check/update data for each request
-    validate?(...UpdateRequestData): UpdateRequestData
+    validate?: (row: object) => object | Promise<object>
 }
 export type DeleteRule = {
     
@@ -410,8 +410,9 @@ export class Prostgles {
                         } else throw `Invalid OR disallowed request: ${tableName}.${command} `;
                             
                     } catch(err) {
-                        const _err_msg = err.toString();
-                        cb(_err_msg);
+                        // const _err_msg = err.toString();
+                        // cb({ msg: _err_msg, err });
+                        cb(err)
                         // console.warn("runPublishedRequest ERROR: ", err, socket._user);
                     }
                 });
@@ -532,8 +533,9 @@ export class Prostgles {
                 });
 
                 function makeSocketError(cb, err){
-                    const err_msg = err.toString();
-                    cb({ err_msg, err });
+                    const err_msg = err.toString(),
+                        e = { err_msg, err };
+                    cb(e);
                 }
             } catch(e) {
                 console.error("setSocketEvents: ", e)
