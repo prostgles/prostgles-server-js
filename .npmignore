@@ -1,1 +1,5 @@
 /examples
+.Trash-1000/
+.gitignore
+BACKUP
+node_modules
