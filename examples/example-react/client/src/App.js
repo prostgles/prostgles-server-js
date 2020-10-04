@@ -14,7 +14,7 @@ export default class App extends React.Component {
   componentDidMount(){
     prostgles({
         socket: io(), 
-        isReady: async (db) => {
+        onReady: async (db) => {
           const itemsSync = db.items.getSync({});
           itemsSync.subscribeAll(items => {
             this.setState({ items });

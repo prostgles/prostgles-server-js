@@ -10,7 +10,7 @@
   "dependencies": {
     "bluebird": "^3.7.2",
     "express": "^4.17.1",
-    "prostgles-server": "^1.0.17",
+    "prostgles-server": "^1.0.18",
     "socket.io": "^2.3.0"
   },
   "author": "",

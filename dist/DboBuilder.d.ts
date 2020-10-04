@@ -38,6 +38,7 @@ declare type LocalParams = {
     has_rules?: boolean;
     testRule?: boolean;
     tableAlias?: string;
+    subOne?: boolean;
 };
 declare type Filter = object | {
     $and: Filter[];
@@ -102,6 +103,11 @@ export declare class ViewHandler {
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: any, table_rules?: TableRule, localParams?: LocalParams): Promise<object>;
     count(filter?: Filter, param2_unused?: any, param3_unused?: any, table_rules?: TableRule, localParams?: any): Promise<number>;
     subscribe(filter: Filter, params: SelectParams, localFunc: (items: object[]) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<{
+        channelName: string;
+    }> | Readonly<{
+        unsubscribe: () => void;
+    }>;
+    subscribeOne(filter: Filter, params: SelectParams, localFunc: (items: object) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<{
         channelName: string;
     }> | Readonly<{
         unsubscribe: () => void;

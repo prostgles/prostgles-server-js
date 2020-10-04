@@ -4,7 +4,7 @@ const path = require('path');
 const { join } = require('path');
 var http = require('http').createServer(app);
 var io = require('socket.io')(http);
-http.listen(3000);
+http.listen(3001);
 
 let prostgles = require('prostgles-server');
 

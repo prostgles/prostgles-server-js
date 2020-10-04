@@ -96,9 +96,9 @@ class PubSubManager {
     pushSubData(sub) {
         if (!sub)
             throw "pushSubData: invalid sub";
-        const { table_name, filter, params, table_rules, socket_id, channel_name, func } = sub;
+        const { table_name, filter, params, table_rules, socket_id, channel_name, func, subOne = false } = sub;
         return new Promise((resolve, reject) => {
-            this.dbo[table_name].find(filter, params, null, table_rules)
+            this.dbo[table_name][subOne ? "findOne" : "find"](filter, params, null, table_rules)
                 .then(data => {
                 if (socket_id && this.sockets[socket_id]) {
                     // console.log(data.length)
@@ -424,7 +424,7 @@ class PubSubManager {
                 id_fields,
                 allow_delete,
                 table_rules,
-                throttle: Math.max(throttle || 10, table_rules.sync.min_throttle || 10),
+                throttle: Math.max(throttle || 0, table_rules.sync.min_throttle || 0),
                 last_throttled: 0,
                 socket_id: socket.id,
                 is_sync: true,

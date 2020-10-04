@@ -136,33 +136,6 @@ class Prostgles {
                         cb(_err_msg);
                         // console.warn("runPublishedRequest ERROR: ", err, socket._user);
                     }
-                    // OLD
-                    // if(!dbo){
-                    //     cb("Internal error");
-                    //     throw "INTERNAL ERROR: DBO missing";
-                    // } else {
-                    //     let valid_table_command_rules = null;
-                    //     try {
-                    //         valid_table_command_rules = await publishParser.getDboRequestRules({ tableName, command, socket });
-                    //         const schm = get(socket, `prostgles.schema.${tableName}.${command}`);
-                    //         // console.log(schm, get(socket, `prostgles.schema`));
-                    //         if(schm && schm.err) throw schm.err;
-                    //     } catch(e) {
-                    //         console.error("Published rules error", e);
-                    //         cb("INTERNAL PUBLISH ERROR");
-                    //         // return null;
-                    //     }
-                    //     try { /* Channel name will only include client-sent params so we ignore table_rules enforced params */
-                    //         if(valid_table_command_rules){
-                    //             let res = await dbo[tableName][command](param1, param2, param3, valid_table_command_rules, { socket, has_rules: true }); 
-                    //             cb(null, res);
-                    //         } else throw `Invalid OR disallowed request: ${tableName}.${command} `;
-                    //     } catch(err) {
-                    //         const _err_msg = err.toString();
-                    //         cb(_err_msg);
-                    //         // console.warn("runPublishedRequest ERROR: ", err, socket._user);
-                    //     }
-                    // }
                 });
                 /*
                     TODO FINISH
@@ -284,6 +257,7 @@ class Prostgles {
     }
 }
 exports.Prostgles = Prostgles;
+const insertParams = ["fields", "forcedData", "returningFields", "validate"];
 const RULE_TO_METHODS = [
     {
         rule: "insert",
@@ -316,14 +290,12 @@ const RULE_TO_METHODS = [
     {
         rule: "sync", methods: ["sync", "unsync"],
         no_limits: null,
-        allowed_params: ["id_fields", "synced_field", "sync_type", "allow_delete"],
+        allowed_params: ["id_fields", "synced_field", "sync_type", "allow_delete", "min_throttle"],
         hint: ` expecting "*" | true | { id_fields: string[], synced_field: string }`
     },
     {
-        rule: "subscribe", methods: ["subscribe"],
-        no_limits: {
-            throttle: 10
-        },
+        rule: "subscribe", methods: ["subscribe", "subscribeOne"],
+        no_limits: { throttle: 10 },
         allowed_params: ["throttle"],
         hint: ` expecting "*" | true | { throttle: number }`
     }

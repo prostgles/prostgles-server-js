@@ -469,7 +469,7 @@ class ViewHandler {
             if (!localFunc) {
                 return this.find(filter, { ...params, limit: 0 }, null, table_rules, localParams)
                     .then(isValid => {
-                    const { socket = null } = localParams;
+                    const { socket = null, subOne = false } = localParams;
                     return this.pubSubManager.addSub({
                         table_info: this.tableOrViewInfo,
                         socket,
@@ -481,11 +481,13 @@ class ViewHandler {
                         channel_name: null,
                         socket_id: socket.id,
                         table_name: this.name,
-                        last_throttled: 0
+                        last_throttled: 0,
+                        subOne
                     }).then(channelName => ({ channelName }));
                 });
             }
             else {
+                const { subOne = false } = localParams || {};
                 this.pubSubManager.addSub({
                     table_info: this.tableOrViewInfo,
                     socket: null,
@@ -497,7 +499,8 @@ class ViewHandler {
                     channel_name: null,
                     socket_id: null,
                     table_name: this.name,
-                    last_throttled: 0
+                    last_throttled: 0,
+                    subOne
                 }).then(channelName => ({ channelName }));
                 const unsubscribe = () => {
                     this.pubSubManager.removeLocalSub(this.name, condition, localFunc);
@@ -510,6 +513,9 @@ class ViewHandler {
                 throw e;
             throw `Issue with dbo.${this.name}.subscribe:\n ->      ` + e;
         }
+    }
+    subscribeOne(filter, params, localFunc, table_rules, localParams) {
+        return this.subscribe(filter, params, localFunc, table_rules, { ...(localParams || {}), subOne: true });
     }
     prepareColumnSet(selectParams = "*", allowed_cols, allow_empty = true, onlyNames = true) {
         let all_columns = this.column_names.slice(0), allowedFields = all_columns.slice(0), resultFields = [];

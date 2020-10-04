@@ -43,6 +43,7 @@ declare type SubscriptionParams = {
     last_throttled: number;
     is_throttling?: any;
     is_ready?: boolean;
+    subOne?: boolean;
 };
 declare type AddSubscriptionParams = SubscriptionParams & {
     condition: string;

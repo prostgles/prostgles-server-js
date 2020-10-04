@@ -11,7 +11,10 @@ import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 
 import { get } from "./utils";
-import { DB, TableRule, OrderBy, SelectRule, InsertRule, UpdateRule, DeleteRule, SyncRule, SelectParams, InsertParams, UpdateParams, DeleteParams, Joins, Join, Prostgles, PublishParser } from "./Prostgles";
+import { 
+    DB, TableRule, OrderBy, SelectRule, InsertRule, UpdateRule, DeleteRule, SyncRule, SelectParams, 
+    InsertParams, UpdateParams, DeleteParams, Joins, Join, Prostgles, PublishParser 
+} from "./Prostgles";
 import { PubSubManager, filterObj } from "./PubSubManager";
 
 /**
@@ -68,6 +71,7 @@ type LocalParams = {
     has_rules?: boolean;
     testRule?: boolean;
     tableAlias?: string;
+    subOne?: boolean;
 }
 function capitalizeFirstLetter(string: string) : string {
     return string.charAt(0).toUpperCase() + string.slice(1);
@@ -644,7 +648,7 @@ export class ViewHandler {
                 return this.find(filter, { ...params, limit: 0 }, null, table_rules, localParams)
                 .then(isValid => {
     
-                    const { socket = null } = localParams;
+                    const { socket = null, subOne = false } = localParams;
                     return this.pubSubManager.addSub({
                         table_info: this.tableOrViewInfo, 
                         socket, 
@@ -656,10 +660,12 @@ export class ViewHandler {
                         channel_name: null,
                         socket_id: socket.id,
                         table_name: this.name,
-                        last_throttled: 0
+                        last_throttled: 0,
+                        subOne
                     }).then(channelName => ({ channelName }));
                 });
             } else {
+                const { subOne = false } = localParams || {};
                 this.pubSubManager.addSub({
                     table_info: this.tableOrViewInfo, 
                     socket: null, 
@@ -671,7 +677,8 @@ export class ViewHandler {
                     channel_name: null,
                     socket_id: null,
                     table_name: this.name,
-                    last_throttled: 0
+                    last_throttled: 0,
+                    subOne
                 }).then(channelName => ({ channelName }));
                 const unsubscribe = () => {
                         this.pubSubManager.removeLocalSub(this.name, condition, localFunc)
@@ -681,8 +688,11 @@ export class ViewHandler {
         } catch(e){
             if(localParams && localParams.testRule) throw e;
             throw `Issue with dbo.${this.name}.subscribe:\n ->      ` + e;
-        } 
-        
+        }        
+    }
+
+    subscribeOne(filter: Filter, params: SelectParams, localFunc: (items: object) => any, table_rules?: TableRule, localParams?: LocalParams){
+        return this.subscribe(filter, params, localFunc, table_rules, { ...(localParams || {}), subOne: true });
     }
 
     prepareColumnSet(selectParams: FieldFilter = "*", allowed_cols: FieldFilter, allow_empty: boolean = true, onlyNames: boolean = true): string | pgPromise.ColumnSet {

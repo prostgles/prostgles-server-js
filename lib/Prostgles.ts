@@ -414,40 +414,6 @@ export class Prostgles {
                         cb(_err_msg);
                         // console.warn("runPublishedRequest ERROR: ", err, socket._user);
                     }
-
-
-                    // OLD
-                    // if(!dbo){
-                    //     cb("Internal error");
-                    //     throw "INTERNAL ERROR: DBO missing";
-                    // } else {
-                    //     let valid_table_command_rules = null;
-
-                    //     try {
-                    //         valid_table_command_rules = await publishParser.getDboRequestRules({ tableName, command, socket });
-                    //         const schm = get(socket, `prostgles.schema.${tableName}.${command}`);
-                    //         // console.log(schm, get(socket, `prostgles.schema`));
-                    //         if(schm && schm.err) throw schm.err;
-
-
-                    //     } catch(e) {
-                    //         console.error("Published rules error", e);
-                    //         cb("INTERNAL PUBLISH ERROR");
-                    //         // return null;
-                    //     }
-
-                    //     try { /* Channel name will only include client-sent params so we ignore table_rules enforced params */
-                    //         if(valid_table_command_rules){
-                    //             let res = await dbo[tableName][command](param1, param2, param3, valid_table_command_rules, { socket, has_rules: true }); 
-                    //             cb(null, res);
-                    //         } else throw `Invalid OR disallowed request: ${tableName}.${command} `;
-                                
-                    //     } catch(err) {
-                    //         const _err_msg = err.toString();
-                    //         cb(_err_msg);
-                    //         // console.warn("runPublishedRequest ERROR: ", err, socket._user);
-                    //     }
-                    // }
                 });
                 
 
@@ -605,48 +571,47 @@ type DboTableCommand = Request & DboTable & {
     command: string;
 }
 
+const insertParams: Array<keyof InsertRule> = ["fields", "forcedData", "returningFields", "validate"];
 
 const RULE_TO_METHODS = [
    { 
        rule: "insert",
        methods: ["insert", "upsert"], 
-       no_limits: { fields: "*" }, 
-       allowed_params: ["fields", "forcedData", "returningFields", "validate"] ,
+       no_limits: <SelectRule>{ fields: "*" }, 
+       allowed_params: <Array<keyof InsertRule>>["fields", "forcedData", "returningFields", "validate"] ,
        hint: ` expecting "*" | true | { fields: string | string[] | {}  }`
     },
    { 
        rule: "update", 
        methods: ["update", "upsert"], 
-       no_limits: { fields: "*", filterFields: "*", returningFields: "*"  }, 
-       allowed_params: ["fields", "filterFields", "forcedFilter", "forcedData", "returningFields", "validate"] ,
+       no_limits: <UpdateRule>{ fields: "*", filterFields: "*", returningFields: "*"  }, 
+       allowed_params: <Array<keyof UpdateRule>>["fields", "filterFields", "forcedFilter", "forcedData", "returningFields", "validate"] ,
        hint: ` expecting "*" | true | { fields: string | string[] | {}  }`
     },
    { 
        rule: "select", 
        methods: ["findOne", "find", "subscribe", "unsubscribe", "count"], 
-       no_limits: { fields: "*", filterFields: "*" }, 
-       allowed_params: ["fields", "filterFields", "forcedFilter", "validate", "maxLimit"] ,
+       no_limits: <SelectRule>{ fields: "*", filterFields: "*" }, 
+       allowed_params: <Array<keyof SelectRule>>["fields", "filterFields", "forcedFilter", "validate", "maxLimit"] ,
        hint: ` expecting "*" | true | { fields: ( string | string[] | {} )  }`
     },
    { 
        rule: "delete", 
        methods: ["delete", "remove"], 
-       no_limits: { filterFields: "*" } , 
-       allowed_params: ["filterFields", "forcedFilter", "returningFields", "validate"] ,
+       no_limits: <DeleteRule>{ filterFields: "*" } , 
+       allowed_params: <Array<keyof DeleteRule>>["filterFields", "forcedFilter", "returningFields", "validate"] ,
        hint: ` expecting "*" | true | { filterFields: ( string | string[] | {} ) }`
     },
    { 
        rule: "sync", methods: ["sync", "unsync"], 
        no_limits: null,
-       allowed_params: ["id_fields", "synced_field", "sync_type", "allow_delete"],
+       allowed_params: <Array<keyof SyncRule>>["id_fields", "synced_field", "sync_type", "allow_delete", "min_throttle"],
        hint: ` expecting "*" | true | { id_fields: string[], synced_field: string }`
     },
     { 
-        rule: "subscribe", methods: ["subscribe"], 
-        no_limits: {
-            throttle: 10
-        },
-        allowed_params: ["throttle"],
+        rule: "subscribe", methods: ["subscribe", "subscribeOne"], 
+        no_limits: <SubscribeRule>{  throttle: 10  },
+        allowed_params: <Array<keyof SubscribeRule>>["throttle"],
         hint: ` expecting "*" | true | { throttle: number }`
      }
 ];
@@ -842,7 +807,7 @@ export class PublishParser {
                             let method_params = Object.keys(table_rules[method]);
     
     
-                            let iparam = method_params.find(p => !rm.allowed_params.includes(p));
+                            let iparam = method_params.find(p => !rm.allowed_params.includes(<never>p));
                             if(iparam){
                                 throw `Invalid setting in publish.${tableName}.${method} -> ${iparam}. \n Expecting any of: ${rm.allowed_params.join(", ")}`;
                             }
