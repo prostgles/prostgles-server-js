@@ -14,10 +14,10 @@ function capitalizeFirstLetter(string) {
 }
 const shortestPath_1 = require("./shortestPath");
 function makeErr(err) {
-    throw {
+    return Promise.reject({
         ...PubSubManager_1.filterObj(err, ["column", "code", "table", "constraint"]),
         code_info: sqlErrCodeToMsg(err.code)
-    };
+    });
 }
 class ViewHandler {
     constructor(db, tableOrViewInfo, pubSubManager, dboBuilder) {
@@ -1090,8 +1090,8 @@ class TableHandler extends ViewHandler {
             let query = "";
             if (Array.isArray(data)) {
                 // if(returning) throw "Sorry but [returning] is dissalowed for multi insert";
-                let queries = await Promise.all(data.map(p => {
-                    return makeQuery(p) + conflict_query;
+                let queries = await Promise.all(data.map(async (p) => {
+                    return await makeQuery(p) + conflict_query;
                 }));
                 query = pgp.helpers.concat(queries);
             }
@@ -1103,6 +1103,7 @@ class TableHandler extends ViewHandler {
                 query += " RETURNING " + this.prepareSelect(returning, returningFields, false);
                 queryType = "one";
             }
+            // console.log(query);
             return this.db.tx(t => t[queryType](query)).catch(makeErr);
         }
         catch (e) {

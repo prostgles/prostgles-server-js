@@ -31,14 +31,14 @@ class PubSubManager {
                         // console.log(this.subs)
                         return;
                     }
-                    /* Need to throttle the subscriptions */
+                    /* Throttle the subscriptions */
                     for (var i = 0; i < subs.length; i++) {
                         var sub = subs[i];
                         if (this.dbo[sub.table_name] &&
                             sub.is_ready &&
                             (sub.socket_id && this.sockets[sub.socket_id]) || sub.func) {
                             const throttle = sub.throttle;
-                            if (sub.last_throttled < Date.now() - throttle) {
+                            if (sub.last_throttled <= Date.now() - throttle) {
                                 /* It is assumed the policy was checked before this point */
                                 this.pushSubData(sub);
                                 sub.last_throttled = Date.now();
@@ -497,7 +497,7 @@ class PubSubManager {
         if (pubThrottle && Number.isInteger(pubThrottle) && pubThrottle > 0) {
             throttle = pubThrottle;
         }
-        let channel_name = `${this.socketChannelPreffix}.${table_info.name}.${JSON.stringify(filter)}.${JSON.stringify(params)}`;
+        let channel_name = `${this.socketChannelPreffix}.${table_info.name}.${JSON.stringify(filter)}.${JSON.stringify(params)}.${subOne ? "o" : "m"}`;
         this.upsertSocket(socket, channel_name);
         const upsertSub = (newSubData) => {
             const { table_name, condition: _cond, is_ready = false } = newSubData, condition = this.parseCondition(_cond), newSub = {

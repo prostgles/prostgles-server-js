@@ -342,7 +342,11 @@ export class Prostgles {
 
 
             /* 5. Finish init and provide DBO object */
-            onReady(this.dbo, this.db);
+            try {
+                onReady(this.dbo, this.db);
+            } catch(err){
+                console.error("Prostgles: Error within onReady: \n", err)
+            }
 
             return true;
         } catch (e) {
@@ -602,7 +606,7 @@ const RULE_TO_METHODS = [
        methods: ["delete", "remove"], 
        no_limits: <DeleteRule>{ filterFields: "*" } , 
        allowed_params: <Array<keyof DeleteRule>>["filterFields", "forcedFilter", "returningFields", "validate"] ,
-       hint: ` expecting "*" | true | { filterFields: ( string | string[] | {} ) }`
+       hint: ` expecting "*" | true | { filterFields: ( string | string[] | {} ) } \n Will use "select", "update", "delete" and "insert" rules`
     },
    { 
        rule: "sync", methods: ["sync", "unsync"], 
@@ -612,9 +616,9 @@ const RULE_TO_METHODS = [
     },
     { 
         rule: "subscribe", methods: ["subscribe", "subscribeOne"], 
-        no_limits: <SubscribeRule>{  throttle: 10  },
+        no_limits: <SubscribeRule>{  throttle: 0  },
         allowed_params: <Array<keyof SubscribeRule>>["throttle"],
-        hint: ` expecting "*" | true | { throttle: number }`
+        hint: ` expecting "*" | true | { throttle: number } \n Will use "select" rules`
      }
 ];
 // const ALL_PUBLISH_METHODS = ["update", "upsert", "delete", "insert", "find", "findOne", "subscribe", "unsubscribe", "sync", "unsync", "remove"];
@@ -793,7 +797,10 @@ export class PublishParser {
                 } else if(Object.keys(table_rules).length){
                     
                     if(table_rules.select && table_rules.subscribe !== false){
-                        table_rules.subscribe = { ...RULE_TO_METHODS.find(r => r.rule === "subscribe").no_limits };
+                        table_rules.subscribe = { 
+                            ...RULE_TO_METHODS.find(r => r.rule === "subscribe").no_limits,
+                            ...(typeof table_rules.subscribe !== "string"? table_rules.subscribe : {})
+                        };
                     }
                     Object.keys(table_rules)
                         .filter(m => table_rules[m])
