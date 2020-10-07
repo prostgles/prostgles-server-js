@@ -199,6 +199,7 @@ declare type DboTable = Request & {
 declare type DboTableCommand = Request & DboTable & {
     command: string;
 };
+export declare function flat(arr: any): any;
 export declare class PublishParser {
     publish: any;
     publishMethods?: any;

@@ -8,6 +8,7 @@ exports.DboBuilder = exports.TableHandler = exports.ViewHandler = void 0;
 const Bluebird = require("bluebird");
 const pgPromise = require("pg-promise");
 const utils_1 = require("./utils");
+const Prostgles_1 = require("./Prostgles");
 const PubSubManager_1 = require("./PubSubManager");
 function capitalizeFirstLetter(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
@@ -659,7 +660,7 @@ class ViewHandler {
                 throw 'invalid columns in filter: ' + invalidColumn;
             }
         }
-        let template = Object.keys(data)
+        let template = Prostgles_1.flat(Object.keys(data)
             .map(fKey => {
             let d = data[fKey], col = this.columns.find(({ name }) => name === fKey);
             if (d === null) {
@@ -679,7 +680,7 @@ class ViewHandler {
                 }
             }
             return pgp.as.format("${key:raw} = " + parseDataType(fKey), { key: getRawFieldName(fKey), data: data[fKey], prefix });
-        }).flat()
+        }))
             .sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
             .join(" AND ");
         return template; //pgp.as.format(template, data);
@@ -1251,7 +1252,7 @@ class TableHandler extends ViewHandler {
     }
 }
 exports.TableHandler = TableHandler;
-const Prostgles_1 = require("./Prostgles");
+const Prostgles_2 = require("./Prostgles");
 class DboBuilder {
     constructor(prostgles) {
         this.schema = "public";
@@ -1278,7 +1279,7 @@ class DboBuilder {
                     throw "Duplicate join declaration for table: " + dup.tables[0];
                 }
                 // 2 find incorrect tables
-                const missing = joins.map(j => j.tables).flat().find(t => !this.dbo[t]);
+                const missing = Prostgles_1.flat(joins.map(j => j.tables)).find(t => !this.dbo[t]);
                 if (missing) {
                     throw "Table not found: " + missing;
                 }
@@ -1296,11 +1297,11 @@ class DboBuilder {
                     });
                 });
                 // 4 find incorrect/missing join types
-                const expected_types = " \n\n-> Expecting: " + Prostgles_1.JOIN_TYPES.map(t => JSON.stringify(t)).join(` | `);
+                const expected_types = " \n\n-> Expecting: " + Prostgles_2.JOIN_TYPES.map(t => JSON.stringify(t)).join(` | `);
                 const mt = joins.find(j => !j.type);
                 if (mt)
                     throw "Join type missing for: " + JSON.stringify(mt, null, 2) + expected_types;
-                const it = joins.find(j => !Prostgles_1.JOIN_TYPES.includes(j.type));
+                const it = joins.find(j => !Prostgles_2.JOIN_TYPES.includes(j.type));
                 if (it)
                     throw "Incorrect join type for: " + JSON.stringify(it, null, 2) + expected_types;
             }
@@ -1316,7 +1317,7 @@ class DboBuilder {
                 this.joinGraph[t2] = this.joinGraph[t2] || {};
                 this.joinGraph[t2][t1] = 1;
             });
-            const tables = this.joins.map(t => t.tables).flat();
+            const tables = Prostgles_1.flat(this.joins.map(t => t.tables));
             this.joinPaths = [];
             tables.map(t1 => {
                 tables.map(t2 => {

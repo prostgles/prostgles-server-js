@@ -13,7 +13,7 @@ export default class App extends React.Component {
 
   componentDidMount(){
     prostgles({
-        socket: io(), 
+        socket: io("http://prostgles.com:3001/"), 
         onReady: async (db) => {
           const itemsSync = db.items.getSync({});
           itemsSync.subscribeAll(items => {

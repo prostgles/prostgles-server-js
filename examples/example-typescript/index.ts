@@ -47,7 +47,7 @@ prostgles({
     
     onReady: async (dbo: DBObj) => {
 
-        let plane = await dbo.planes.findOne()
+        let plane = await dbo.planes.findOne({},{  })
             
         
 		app.get('/', (req, res) => {

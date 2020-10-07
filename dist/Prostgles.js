@@ -4,7 +4,7 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PublishParser = exports.Prostgles = exports.JOIN_TYPES = void 0;
+exports.PublishParser = exports.flat = exports.Prostgles = exports.JOIN_TYPES = void 0;
 const promise = require("bluebird");
 const pgPromise = require("pg-promise");
 'use strict';
@@ -243,7 +243,7 @@ class Prostgles {
                 const methods = await publishParser.getMethods(socket);
                 let joinTables = [];
                 if (this.joins) {
-                    joinTables = Array.from(new Set(this.joins.map(j => j.tables).flat().filter(t => schema[t])));
+                    joinTables = Array.from(new Set(flat(this.joins.map(j => j.tables)).filter(t => schema[t])));
                 }
                 socket.emit(WS_CHANNEL_NAME.SCHEMA, {
                     schema,
@@ -307,7 +307,11 @@ const RULE_TO_METHODS = [
     }
 ];
 // const ALL_PUBLISH_METHODS = ["update", "upsert", "delete", "insert", "find", "findOne", "subscribe", "unsubscribe", "sync", "unsync", "remove"];
-const ALL_PUBLISH_METHODS = RULE_TO_METHODS.map(r => r.methods).flat();
+// const ALL_PUBLISH_METHODS = RULE_TO_METHODS.map(r => r.methods).flat();
+function flat(arr) {
+    return arr.reduce((acc, val) => [...acc, ...val], []);
+}
+exports.flat = flat;
 class PublishParser {
     constructor(publish, publishMethods, publishRawSQL, dbo, db) {
         this.publish = publish;

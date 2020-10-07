@@ -13,7 +13,7 @@ import pg = require('pg-promise/typescript/pg-subset');
 import { get } from "./utils";
 import { 
     DB, TableRule, OrderBy, SelectRule, InsertRule, UpdateRule, DeleteRule, SyncRule, SelectParams, 
-    InsertParams, UpdateParams, DeleteParams, Joins, Join, Prostgles, PublishParser 
+    InsertParams, UpdateParams, DeleteParams, Joins, Join, Prostgles, PublishParser, flat 
 } from "./Prostgles";
 import { PubSubManager, filterObj } from "./PubSubManager";
 
@@ -845,7 +845,7 @@ export class ViewHandler {
             }
         }
 
-        let template = Object.keys(data)
+        let template = flat(Object.keys(data)
             .map(fKey=>{
                 let d = data[fKey],
                     col = this.columns.find(({ name }) => name === fKey);
@@ -869,7 +869,7 @@ export class ViewHandler {
                 }
 
                 return pgp.as.format("${key:raw} = " + parseDataType(fKey), { key: getRawFieldName(fKey), data: data[fKey], prefix });
-            }).flat()
+            }))
             .sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
             .join(" AND ");
 
@@ -1581,7 +1581,7 @@ export class DboBuilder {
                 }
 
                 // 2 find incorrect tables
-                const missing = joins.map(j => j.tables).flat().find(t => !this.dbo[t]);
+                const missing = flat(joins.map(j => j.tables)).find(t => !this.dbo[t]);
                 if(missing){
                     throw "Table not found: " + missing;
                 }
@@ -1628,7 +1628,7 @@ export class DboBuilder {
                 this.joinGraph[t2] = this.joinGraph[t2] || {};
                 this.joinGraph[t2][t1] = 1;
             });
-            const tables = this.joins.map(t => t.tables).flat();
+            const tables = flat(this.joins.map(t => t.tables));
             this.joinPaths = [];
             tables.map(t1 => {
                 tables.map(t2 => {

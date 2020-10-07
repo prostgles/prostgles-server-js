@@ -115,7 +115,7 @@ export declare class ViewHandler {
     prepareColumnSet(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, onlyNames?: boolean): string | pgPromise.ColumnSet;
     prepareSelect(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, tableAlias?: string): string;
     prepareWhere(filter: Filter, forcedFilter: object, filterFields: FieldFilter, excludeWhere?: boolean, tableAlias?: string): any;
-    getCondition(filter: object, allowed_colnames: string[], tableAlias?: string): string;
+    getCondition(filter: object, allowed_colnames: string[], tableAlias?: string): any;
     prepareSort(orderBy: OrderBy, allowed_cols: any, tableAlias?: string, excludeOrder?: boolean, validatedAggAliases?: string[]): string;
     prepareLimitQuery(limit: number, maxLimit: number): number;
     prepareOffsetQuery(offset: number): number;
