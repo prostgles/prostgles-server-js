@@ -316,8 +316,8 @@ const RULE_TO_METHODS = [
 // const ALL_PUBLISH_METHODS = RULE_TO_METHODS.map(r => r.methods).flat();
 function flat(arr) {
     // let res = arr.reduce((acc, val) => [ ...acc, ...val ], []);
-    let res = arr.reduce(function (flat, toFlatten) {
-        return flat.concat(Array.isArray(toFlatten) ? flat(toFlatten) : toFlatten);
+    let res = arr.reduce(function (farr, toFlatten) {
+        return farr.concat(Array.isArray(toFlatten) ? flat(toFlatten) : toFlatten);
     }, []);
     // console.log(arr, res)
     return res;
