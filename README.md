@@ -96,7 +96,7 @@ prostgles({
 
       prostgles({
           socket: io(), 
-          isReady: async (db) => {
+          onReady: async (db) => {
             
           }
       });
