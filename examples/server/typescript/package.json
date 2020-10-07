@@ -1,0 +1,17 @@
+{
+  "name": "typescript",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "tsc && node index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/socket.io": "^2.1.11",
+    "express": "^4.17.1",
+    "prostgles-server": "^1.0.29",
+    "socket.io": "^2.3.0"
+  }
+}
