@@ -669,7 +669,14 @@ export class PublishParser {
         
         try {
             /* Publish tables and views based on socket */
-            const _publish = await applyParamsIfFunc(this.publish, socket, this.dbo, this.db);
+            let _publish = await applyParamsIfFunc(this.publish, socket, this.dbo, this.db);
+
+            if(_publish === "*"){
+                _publish = {}
+                Object.keys(this.dbo).map(tableName => {
+                    _publish[tableName] = "*";
+                })
+            }
     
             if(_publish && Object.keys(_publish).length){
                 await Promise.all(
