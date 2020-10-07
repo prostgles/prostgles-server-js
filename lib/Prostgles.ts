@@ -625,7 +625,12 @@ const RULE_TO_METHODS = [
 // const ALL_PUBLISH_METHODS = RULE_TO_METHODS.map(r => r.methods).flat();
 
 export function flat(arr){
-    return arr.reduce((acc, val) => [ ...acc, ...val ], [])
+    // let res = arr.reduce((acc, val) => [ ...acc, ...val ], []);
+    let res =  arr.reduce(function (flat, toFlatten) {
+        return flat.concat(Array.isArray(toFlatten) ? flat(toFlatten) : toFlatten);
+      }, []);
+    // console.log(arr, res)
+    return res;
 }
 
 export class PublishParser {

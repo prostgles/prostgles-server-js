@@ -3,6 +3,15 @@
  *  Copyright (c) Stefan L. All rights reserved.
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PublishParser = exports.flat = exports.Prostgles = exports.JOIN_TYPES = void 0;
 const promise = require("bluebird");
@@ -47,41 +56,43 @@ class Prostgles {
         if (!this.db || !this.db.connect)
             throw "something went wrong getting a db connection";
     }
-    async init(onReady) {
-        /* 1. Connect to db */
-        this.db = getDbConnection(this.dbConnection, this.dbOptions);
-        this.checkDb();
-        /* 2. Execute any SQL file if provided */
-        if (this.sqlFilePath) {
-            await this.runSQLFile(this.sqlFilePath);
-        }
-        try {
-            /* 3. Make DBO object from all tables and views */
-            this.dboBuilder = new DboBuilder_1.DboBuilder(this);
-            this.dbo = await this.dboBuilder.init();
-            if (this.tsGeneratedTypesDir) {
-                const fileName = "DBoGenerated.ts"; //`dbo_${this.schema}_types.ts`;
-                console.log("typescript schema definition file ready -> " + fileName);
-                fs.writeFileSync(this.tsGeneratedTypesDir + fileName, this.dboBuilder.tsTypesDefinition);
+    init(onReady) {
+        return __awaiter(this, void 0, void 0, function* () {
+            /* 1. Connect to db */
+            this.db = getDbConnection(this.dbConnection, this.dbOptions);
+            this.checkDb();
+            /* 2. Execute any SQL file if provided */
+            if (this.sqlFilePath) {
+                yield this.runSQLFile(this.sqlFilePath);
             }
-            if (this.publish) {
-                this.publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo, this.db);
-                this.dboBuilder.publishParser = this.publishParser;
-                /* 4. Set publish and auth listeners */ //makeDBO(db, allTablesViews, pubSubManager, false)
-                await this.setSocketEvents();
-            }
-            /* 5. Finish init and provide DBO object */
             try {
-                onReady(this.dbo, this.db);
+                /* 3. Make DBO object from all tables and views */
+                this.dboBuilder = new DboBuilder_1.DboBuilder(this);
+                this.dbo = yield this.dboBuilder.init();
+                if (this.tsGeneratedTypesDir) {
+                    const fileName = "DBoGenerated.ts"; //`dbo_${this.schema}_types.ts`;
+                    console.log("typescript schema definition file ready -> " + fileName);
+                    fs.writeFileSync(this.tsGeneratedTypesDir + fileName, this.dboBuilder.tsTypesDefinition);
+                }
+                if (this.publish) {
+                    this.publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo, this.db);
+                    this.dboBuilder.publishParser = this.publishParser;
+                    /* 4. Set publish and auth listeners */ //makeDBO(db, allTablesViews, pubSubManager, false)
+                    yield this.setSocketEvents();
+                }
+                /* 5. Finish init and provide DBO object */
+                try {
+                    onReady(this.dbo, this.db);
+                }
+                catch (err) {
+                    console.error("Prostgles: Error within onReady: \n", err);
+                }
+                return true;
             }
-            catch (err) {
-                console.error("Prostgles: Error within onReady: \n", err);
+            catch (e) {
+                throw "init issues: " + e.toString();
             }
-            return true;
-        }
-        catch (e) {
-            throw "init issues: " + e.toString();
-        }
+        });
     }
     runSQLFile(filePath) {
         // console.log(module.parent.path);
@@ -96,169 +107,164 @@ class Prostgles {
             return new QueryFile(fullPath, { minify: false });
         }
     }
-    async setSocketEvents() {
-        this.checkDb();
-        if (!this.dbo)
-            throw "dbo missing";
-        let needType = this.publishRawSQL && typeof this.publishRawSQL === "function";
-        let DATA_TYPES = !needType ? [] : await this.db.any("SELECT oid, typname FROM pg_type");
-        let USER_TABLES = !needType ? [] : await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
-        const WS_CHANNEL_NAME = {
-            DEFAULT: `${this.wsChannelNamePrefix}.`,
-            SQL: `${this.wsChannelNamePrefix}.sql`,
-            METHOD: `${this.wsChannelNamePrefix}.method`,
-            SCHEMA: `${this.wsChannelNamePrefix}.schema`
-        };
-        let publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo, this.db);
-        if (!this.io)
-            return;
-        this.io.on('connection', async (socket) => {
-            if (!this.db || !this.dbo)
-                throw "db/dbo missing";
-            let dbo = this.dbo;
-            let db = this.db;
-            let allTablesViews = this.dboBuilder.tablesOrViews;
-            try {
-                if (this.onSocketConnect)
-                    await this.onSocketConnect(socket, dbo, db);
-                /*  RUN Client request from Publish.
-                    Checks request against publish and if OK run it with relevant publish functions. Local (server) requests do not check the policy
-                */
-                socket.on(WS_CHANNEL_NAME.DEFAULT, async ({ tableName, command, param1, param2, param3 }, cb = (...callback) => { }) => {
-                    try { /* Channel name will only include client-sent params so we ignore table_rules enforced params */
-                        if (!socket)
-                            throw "socket missing??!!";
-                        let valid_table_command_rules = await this.publishParser.getValidatedRequestRule({ tableName, command, socket });
-                        if (valid_table_command_rules) {
-                            let res = await dbo[tableName][command](param1, param2, param3, valid_table_command_rules, { socket, has_rules: true });
-                            cb(null, res);
-                        }
-                        else
-                            throw `Invalid OR disallowed request: ${tableName}.${command} `;
-                    }
-                    catch (err) {
-                        // const _err_msg = err.toString();
-                        // cb({ msg: _err_msg, err });
-                        cb(err);
-                        // console.warn("runPublishedRequest ERROR: ", err, socket._user);
-                    }
-                });
-                /*
-                    TODO FINISH
-
-                    auth: {
-                        login: (data, { socket, dbo }) => {},
-                        register: (data, { socket, dbo }) => {},
-                        logout: (data, { socket, dbo }) => {},
-                        onChange: (state, { socket, dbo }) => {},
-                    }
-                */
-                socket.on("disconnect", function () {
-                    // subscriptions = subscriptions.filter(sub => sub.socket.id !== socket.id);
-                    if (this.onSocketDisconnect) {
-                        this.onSocketDisconnect(socket, dbo);
-                    }
-                });
-                socket.on(WS_CHANNEL_NAME.METHOD, async function ({ method, params }, cb = (...callback) => { }) {
-                    try {
-                        const methods = await publishParser.getMethods(socket);
-                        if (!methods || !methods[method]) {
-                            cb("Invalid method");
-                        }
-                        else {
-                            try {
-                                const res = await methods[method](...params);
+    setSocketEvents() {
+        return __awaiter(this, void 0, void 0, function* () {
+            this.checkDb();
+            if (!this.dbo)
+                throw "dbo missing";
+            let needType = this.publishRawSQL && typeof this.publishRawSQL === "function";
+            let DATA_TYPES = !needType ? [] : yield this.db.any("SELECT oid, typname FROM pg_type");
+            let USER_TABLES = !needType ? [] : yield this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
+            const WS_CHANNEL_NAME = {
+                DEFAULT: `${this.wsChannelNamePrefix}.`,
+                SQL: `${this.wsChannelNamePrefix}.sql`,
+                METHOD: `${this.wsChannelNamePrefix}.method`,
+                SCHEMA: `${this.wsChannelNamePrefix}.schema`
+            };
+            let publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo, this.db);
+            if (!this.io)
+                return;
+            this.io.on('connection', (socket) => __awaiter(this, void 0, void 0, function* () {
+                if (!this.db || !this.dbo)
+                    throw "db/dbo missing";
+                let dbo = this.dbo;
+                let db = this.db;
+                let allTablesViews = this.dboBuilder.tablesOrViews;
+                try {
+                    if (this.onSocketConnect)
+                        yield this.onSocketConnect(socket, dbo, db);
+                    /*  RUN Client request from Publish.
+                        Checks request against publish and if OK run it with relevant publish functions. Local (server) requests do not check the policy
+                    */
+                    socket.on(WS_CHANNEL_NAME.DEFAULT, ({ tableName, command, param1, param2, param3 }, cb = (...callback) => { }) => __awaiter(this, void 0, void 0, function* () {
+                        try { /* Channel name will only include client-sent params so we ignore table_rules enforced params */
+                            if (!socket)
+                                throw "socket missing??!!";
+                            let valid_table_command_rules = yield this.publishParser.getValidatedRequestRule({ tableName, command, socket });
+                            if (valid_table_command_rules) {
+                                let res = yield dbo[tableName][command](param1, param2, param3, valid_table_command_rules, { socket, has_rules: true });
                                 cb(null, res);
+                            }
+                            else
+                                throw `Invalid OR disallowed request: ${tableName}.${command} `;
+                        }
+                        catch (err) {
+                            // const _err_msg = err.toString();
+                            // cb({ msg: _err_msg, err });
+                            cb(err);
+                            // console.warn("runPublishedRequest ERROR: ", err, socket._user);
+                        }
+                    }));
+                    /*
+                        TODO FINISH
+    
+                        auth: {
+                            login: (data, { socket, dbo }) => {},
+                            register: (data, { socket, dbo }) => {},
+                            logout: (data, { socket, dbo }) => {},
+                            onChange: (state, { socket, dbo }) => {},
+                        }
+                    */
+                    socket.on("disconnect", function () {
+                        // subscriptions = subscriptions.filter(sub => sub.socket.id !== socket.id);
+                        if (this.onSocketDisconnect) {
+                            this.onSocketDisconnect(socket, dbo);
+                        }
+                    });
+                    socket.on(WS_CHANNEL_NAME.METHOD, function ({ method, params }, cb = (...callback) => { }) {
+                        return __awaiter(this, void 0, void 0, function* () {
+                            try {
+                                const methods = yield publishParser.getMethods(socket);
+                                if (!methods || !methods[method]) {
+                                    cb("Invalid method");
+                                }
+                                else {
+                                    try {
+                                        const res = yield methods[method](...params);
+                                        cb(null, res);
+                                    }
+                                    catch (err) {
+                                        makeSocketError(cb, err);
+                                    }
+                                }
                             }
                             catch (err) {
                                 makeSocketError(cb, err);
+                                console.warn("method ERROR: ", err, socket._user);
                             }
-                        }
+                        });
+                    });
+                    let schema = {};
+                    try {
+                        schema = yield publishParser.getSchemaFromPublish(socket);
                     }
-                    catch (err) {
-                        makeSocketError(cb, err);
-                        console.warn("method ERROR: ", err, socket._user);
+                    catch (e) {
+                        console.error(`\nProstgles PUBLISH VALIDATION ERROR (after socket connected):\n    ->`, e);
                     }
-                });
-                let schema = {};
-                try {
-                    schema = await publishParser.getSchemaFromPublish(socket);
-                }
-                catch (e) {
-                    console.error(`\nProstgles PUBLISH VALIDATION ERROR (after socket connected):\n    ->`, e);
-                }
-                socket.prostgles = socket.prostgles || {};
-                socket.prostgles.schema = schema;
-                /*  RUN Raw sql from client IF PUBLISHED
-                */
-                let fullSchema = [];
-                if (this.publishRawSQL && typeof this.publishRawSQL === "function") {
-                    const canRunSQL = await this.publishRawSQL(socket, dbo, db);
-                    // console.log("canRunSQL", canRunSQL, socket.handshake.headers["x-real-ip"]);//, allTablesViews);
-                    if (canRunSQL && typeof canRunSQL === "boolean" || canRunSQL === "*") {
-                        socket.on(WS_CHANNEL_NAME.SQL, function ({ query, params, options, justRows = false }, cb = (...callback) => { }) {
-                            // console.log(query, options)
-                            if (options && options.statement) {
-                                try {
-                                    cb(null, pgp.as.format(query, params));
-                                }
-                                catch (err) {
-                                    cb(err.toString());
-                                }
-                            }
-                            else if (db) {
-                                db.result(query, params)
-                                    .then((qres) => {
-                                    const { duration, fields, rows, rowCount } = qres;
-                                    if (fields && DATA_TYPES.length) {
-                                        qres.fields = fields.map(f => {
-                                            const dataType = DATA_TYPES.find(dt => +dt.oid === +f.dataTypeID), tableName = USER_TABLES.find(t => +t.relid === +f.tableID), { name } = f;
-                                            return {
-                                                name,
-                                                ...(dataType ? { dataType: dataType.typname } : {}),
-                                                ...(tableName ? { tableName: tableName.relname } : {}),
-                                            };
-                                        });
+                    socket.prostgles = socket.prostgles || {};
+                    socket.prostgles.schema = schema;
+                    /*  RUN Raw sql from client IF PUBLISHED
+                    */
+                    let fullSchema = [];
+                    if (this.publishRawSQL && typeof this.publishRawSQL === "function") {
+                        const canRunSQL = yield this.publishRawSQL(socket, dbo, db);
+                        // console.log("canRunSQL", canRunSQL, socket.handshake.headers["x-real-ip"]);//, allTablesViews);
+                        if (canRunSQL && typeof canRunSQL === "boolean" || canRunSQL === "*") {
+                            socket.on(WS_CHANNEL_NAME.SQL, function ({ query, params, options, justRows = false }, cb = (...callback) => { }) {
+                                // console.log(query, options)
+                                if (options && options.statement) {
+                                    try {
+                                        cb(null, pgp.as.format(query, params));
                                     }
-                                    cb(null, qres);
-                                    // return qres;//{ duration, fields, rows, rowCount };
-                                })
-                                    .catch(err => {
-                                    makeSocketError(cb, err);
-                                    // Promise.reject(err.toString());
-                                });
+                                    catch (err) {
+                                        cb(err.toString());
+                                    }
+                                }
+                                else if (db) {
+                                    db.result(query, params)
+                                        .then((qres) => {
+                                        const { duration, fields, rows, rowCount } = qres;
+                                        if (fields && DATA_TYPES.length) {
+                                            qres.fields = fields.map(f => {
+                                                const dataType = DATA_TYPES.find(dt => +dt.oid === +f.dataTypeID), tableName = USER_TABLES.find(t => +t.relid === +f.tableID), { name } = f;
+                                                return Object.assign(Object.assign({ name }, (dataType ? { dataType: dataType.typname } : {})), (tableName ? { tableName: tableName.relname } : {}));
+                                            });
+                                        }
+                                        cb(null, qres);
+                                        // return qres;//{ duration, fields, rows, rowCount };
+                                    })
+                                        .catch(err => {
+                                        makeSocketError(cb, err);
+                                        // Promise.reject(err.toString());
+                                    });
+                                }
+                                else
+                                    console.error("db missing");
+                            });
+                            if (db) {
+                                // let allTablesViews = await db.any(STEP2_GET_ALL_TABLES_AND_COLUMNS);
+                                fullSchema = allTablesViews;
+                                schema.sql = {};
                             }
                             else
                                 console.error("db missing");
-                        });
-                        if (db) {
-                            // let allTablesViews = await db.any(STEP2_GET_ALL_TABLES_AND_COLUMNS);
-                            fullSchema = allTablesViews;
-                            schema.sql = {};
                         }
-                        else
-                            console.error("db missing");
+                    }
+                    const methods = yield publishParser.getMethods(socket);
+                    let joinTables = [];
+                    if (this.joins) {
+                        joinTables = Array.from(new Set(flat(this.joins.map(j => j.tables)).filter(t => schema[t])));
+                    }
+                    socket.emit(WS_CHANNEL_NAME.SCHEMA, Object.assign(Object.assign({ schema, methods: Object.keys(methods) }, (fullSchema ? { fullSchema } : {})), { joinTables }));
+                    function makeSocketError(cb, err) {
+                        const err_msg = err.toString(), e = { err_msg, err };
+                        cb(e);
                     }
                 }
-                const methods = await publishParser.getMethods(socket);
-                let joinTables = [];
-                if (this.joins) {
-                    joinTables = Array.from(new Set(flat(this.joins.map(j => j.tables)).filter(t => schema[t])));
+                catch (e) {
+                    console.error("setSocketEvents: ", e);
                 }
-                socket.emit(WS_CHANNEL_NAME.SCHEMA, {
-                    schema,
-                    methods: Object.keys(methods),
-                    ...(fullSchema ? { fullSchema } : {}),
-                    joinTables
-                });
-                function makeSocketError(cb, err) {
-                    const err_msg = err.toString(), e = { err_msg, err };
-                    cb(e);
-                }
-            }
-            catch (e) {
-                console.error("setSocketEvents: ", e);
-            }
+            }));
         });
     }
 }
@@ -309,7 +315,12 @@ const RULE_TO_METHODS = [
 // const ALL_PUBLISH_METHODS = ["update", "upsert", "delete", "insert", "find", "findOne", "subscribe", "unsubscribe", "sync", "unsync", "remove"];
 // const ALL_PUBLISH_METHODS = RULE_TO_METHODS.map(r => r.methods).flat();
 function flat(arr) {
-    return arr.reduce((acc, val) => [...acc, ...val], []);
+    // let res = arr.reduce((acc, val) => [ ...acc, ...val ], []);
+    let res = arr.reduce(function (flat, toFlatten) {
+        return flat.concat(Array.isArray(toFlatten) ? flat(toFlatten) : toFlatten);
+    }, []);
+    // console.log(arr, res)
+    return res;
 }
 exports.flat = flat;
 class PublishParser {
@@ -322,183 +333,190 @@ class PublishParser {
         if (!this.dbo || !this.publish)
             throw "INTERNAL ERROR: dbo and/or publish missing";
     }
-    async getMethods(socket) {
-        let methods = {};
-        const _methods = await applyParamsIfFunc(this.publishMethods, socket, this.dbo, this.db);
-        if (_methods && Object.keys(_methods).length) {
-            Object.keys(_methods).map(key => {
-                if (_methods[key] && (typeof _methods[key] === "function" || typeof _methods[key].then === "function")) {
-                    methods[key] = _methods[key];
-                }
-                else {
-                    throw `invalid publishMethods item -> ${key} \n Expecting a function or promise`;
-                }
-            });
-        }
-        return methods;
+    getMethods(socket) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let methods = {};
+            const _methods = yield applyParamsIfFunc(this.publishMethods, socket, this.dbo, this.db);
+            if (_methods && Object.keys(_methods).length) {
+                Object.keys(_methods).map(key => {
+                    if (_methods[key] && (typeof _methods[key] === "function" || typeof _methods[key].then === "function")) {
+                        methods[key] = _methods[key];
+                    }
+                    else {
+                        throw `invalid publishMethods item -> ${key} \n Expecting a function or promise`;
+                    }
+                });
+            }
+            return methods;
+        });
     }
     /* Should only be called once on socket connection */
-    async getSchemaFromPublish(socket) {
-        let schema = {};
-        try {
-            /* Publish tables and views based on socket */
-            let _publish = await this.getPublish(socket);
-            if (_publish && Object.keys(_publish).length) {
-                await Promise.all(Object.keys(_publish).map(async (tableName) => {
-                    if (!this.dbo[tableName])
-                        throw `Table ${tableName} does not exist\nExpecting one of: ${Object.keys(this.dbo).join(", ")}`;
-                    const table_rules = await this.getTableRules({ socket, tableName });
-                    if (table_rules) {
-                        schema[tableName] = {};
-                        let methods = [];
-                        if (typeof table_rules === "object") {
-                            /* apply method if not falsy */
-                            RULE_TO_METHODS.map(rtms => {
-                                if (table_rules[rtms.rule])
-                                    methods = [...methods, ...rtms.methods];
-                            });
-                            /* Infer methods if not specified */
-                            if (methods.includes("insert") && methods.includes("update") && methods.includes("select") && table_rules.upsert !== false) {
-                                methods = [...methods, "upsert"];
+    getSchemaFromPublish(socket) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let schema = {};
+            try {
+                /* Publish tables and views based on socket */
+                let _publish = yield this.getPublish(socket);
+                if (_publish && Object.keys(_publish).length) {
+                    yield Promise.all(Object.keys(_publish).map((tableName) => __awaiter(this, void 0, void 0, function* () {
+                        if (!this.dbo[tableName])
+                            throw `Table ${tableName} does not exist\nExpecting one of: ${Object.keys(this.dbo).join(", ")}`;
+                        const table_rules = yield this.getTableRules({ socket, tableName });
+                        if (table_rules) {
+                            schema[tableName] = {};
+                            let methods = [];
+                            if (typeof table_rules === "object") {
+                                /* apply method if not falsy */
+                                RULE_TO_METHODS.map(rtms => {
+                                    if (table_rules[rtms.rule])
+                                        methods = [...methods, ...rtms.methods];
+                                });
+                                /* Infer methods if not specified */
+                                if (methods.includes("insert") && methods.includes("update") && methods.includes("select") && table_rules.upsert !== false) {
+                                    methods = [...methods, "upsert"];
+                                }
+                                else {
+                                    methods = methods.filter(m => m !== "upsert");
+                                }
+                                if (methods.includes("find") && table_rules.count !== false)
+                                    methods = [...methods, "count"];
+                                if (methods.includes("find") && table_rules.subscribe !== false)
+                                    methods = [...methods, "subscribe"];
                             }
-                            else {
-                                methods = methods.filter(m => m !== "upsert");
-                            }
-                            if (methods.includes("find") && table_rules.count !== false)
-                                methods = [...methods, "count"];
-                            if (methods.includes("find") && table_rules.subscribe !== false)
-                                methods = [...methods, "subscribe"];
-                        }
-                        await Promise.all(methods.map(async (method) => {
-                            if (method === "sync" && table_rules[method]) {
-                                /* Pass sync info */
-                                schema[tableName][method] = table_rules[method];
-                            }
-                            else {
-                                schema[tableName][method] = {};
-                                /* Test for issues with the publish rules */
-                                if (["update", "find", "findOne", "insert", "delete", "upsert"].includes(method)) {
-                                    let err = null;
-                                    try {
-                                        let valid_table_command_rules = await this.getValidatedRequestRule({ tableName, command: method, socket });
-                                        await this.dbo[tableName][method]({}, {}, {}, valid_table_command_rules, { socket, has_rules: true, testRule: true });
-                                    }
-                                    catch (e) {
-                                        err = "INTERNAL PUBLISH ERROR";
-                                        schema[tableName][method] = { err };
-                                        if (["find", "findOne"].includes(method)) {
-                                            if (schema[tableName].subscribe) {
-                                                schema[tableName].subscribe = schema[tableName][method];
-                                            }
-                                            if (schema[tableName].count) {
-                                                schema[tableName].count = schema[tableName][method];
-                                            }
+                            yield Promise.all(methods.map((method) => __awaiter(this, void 0, void 0, function* () {
+                                if (method === "sync" && table_rules[method]) {
+                                    /* Pass sync info */
+                                    schema[tableName][method] = table_rules[method];
+                                }
+                                else {
+                                    schema[tableName][method] = {};
+                                    /* Test for issues with the publish rules */
+                                    if (["update", "find", "findOne", "insert", "delete", "upsert"].includes(method)) {
+                                        let err = null;
+                                        try {
+                                            let valid_table_command_rules = yield this.getValidatedRequestRule({ tableName, command: method, socket });
+                                            yield this.dbo[tableName][method]({}, {}, {}, valid_table_command_rules, { socket, has_rules: true, testRule: true });
                                         }
-                                        throw `publish.${tableName}.${method}: \n   -> ${e}`;
+                                        catch (e) {
+                                            err = "INTERNAL PUBLISH ERROR";
+                                            schema[tableName][method] = { err };
+                                            if (["find", "findOne"].includes(method)) {
+                                                if (schema[tableName].subscribe) {
+                                                    schema[tableName].subscribe = schema[tableName][method];
+                                                }
+                                                if (schema[tableName].count) {
+                                                    schema[tableName].count = schema[tableName][method];
+                                                }
+                                            }
+                                            throw `publish.${tableName}.${method}: \n   -> ${e}`;
+                                        }
                                     }
                                 }
+                            })));
+                        }
+                        return true;
+                    })));
+                }
+            }
+            catch (e) {
+                console.error("Prostgles \nERRORS IN PUBLISH: ", e);
+                throw e;
+            }
+            return schema;
+        });
+    }
+    getPublish(socket) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let _publish = yield applyParamsIfFunc(this.publish, socket, this.dbo, this.db);
+            if (_publish === "*") {
+                let publish = {};
+                Object.keys(this.dbo).map(tableName => {
+                    publish[tableName] = "*";
+                });
+                return publish;
+            }
+            return _publish;
+        });
+    }
+    getValidatedRequestRule({ tableName, command, socket }) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!this.dbo)
+                throw "INTERNAL ERROR: dbo is missing";
+            if (!command || !tableName)
+                throw "command OR tableName are missing";
+            let rtm = RULE_TO_METHODS.find(rtms => rtms.methods.includes(command));
+            if (!rtm) {
+                throw "Invalid command: " + command;
+            }
+            /* Must be local request -> allow everything */
+            if (!socket)
+                return undefined;
+            /* Get any publish errors for socket */
+            const schm = utils_1.get(socket, `prostgles.schema.${tableName}.${command}`);
+            // console.log(schm, get(socket, `prostgles.schema`));
+            if (schm && schm.err)
+                throw schm.err;
+            let table_rule = yield this.getTableRules({ tableName, socket });
+            if (!table_rule)
+                throw "Invalid or disallowed table: " + tableName;
+            if (command === "upsert") {
+                if (!table_rule.update || !table_rule.insert) {
+                    throw `Invalid or disallowed command: upsert`;
+                }
+            }
+            if (!this.publish)
+                throw "publish is missing";
+            if (rtm && table_rule && table_rule[rtm.rule]) {
+                return table_rule;
+            }
+            else
+                throw `Invalid or disallowed command: ${command}`;
+        });
+    }
+    getTableRules({ tableName, socket }) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                if (!socket || !tableName)
+                    throw "publish OR socket OR dbo OR tableName are missing";
+                let _publish = yield this.getPublish(socket);
+                let table_rules = applyParamsIfFunc(_publish[tableName], socket, this.dbo, this.db);
+                if (table_rules) {
+                    /* Add no limits */
+                    if (typeof table_rules === "boolean" || table_rules === "*") {
+                        table_rules = {};
+                        RULE_TO_METHODS.map(r => {
+                            table_rules[r.rule] = Object.assign({}, r.no_limits);
+                        });
+                        /* Check for invalid limits */
+                    }
+                    else if (Object.keys(table_rules).length) {
+                        if (table_rules.select && table_rules.subscribe !== false) {
+                            table_rules.subscribe = Object.assign(Object.assign({}, RULE_TO_METHODS.find(r => r.rule === "subscribe").no_limits), (typeof table_rules.subscribe !== "string" ? table_rules.subscribe : {}));
+                        }
+                        Object.keys(table_rules)
+                            .filter(m => table_rules[m])
+                            .find(method => {
+                            let rm = RULE_TO_METHODS.find(r => r.rule === method);
+                            if (!rm) {
+                                throw `Invalid rule in publish.${tableName} -> ${method} \nExpecting any of: ${RULE_TO_METHODS.map(r => r.rule).join(", ")}`;
                             }
-                        }));
+                            if (typeof table_rules[method] === "boolean" || table_rules[method] === "*") {
+                                table_rules[method] = Object.assign({}, rm.no_limits);
+                            }
+                            let method_params = Object.keys(table_rules[method]);
+                            let iparam = method_params.find(p => !rm.allowed_params.includes(p));
+                            if (iparam) {
+                                throw `Invalid setting in publish.${tableName}.${method} -> ${iparam}. \n Expecting any of: ${rm.allowed_params.join(", ")}`;
+                            }
+                        });
                     }
-                    return true;
-                }));
-            }
-        }
-        catch (e) {
-            console.error("Prostgles \nERRORS IN PUBLISH: ", e);
-            throw e;
-        }
-        return schema;
-    }
-    async getPublish(socket) {
-        let _publish = await applyParamsIfFunc(this.publish, socket, this.dbo, this.db);
-        if (_publish === "*") {
-            let publish = {};
-            Object.keys(this.dbo).map(tableName => {
-                publish[tableName] = "*";
-            });
-            return publish;
-        }
-        return _publish;
-    }
-    async getValidatedRequestRule({ tableName, command, socket }) {
-        if (!this.dbo)
-            throw "INTERNAL ERROR: dbo is missing";
-        if (!command || !tableName)
-            throw "command OR tableName are missing";
-        let rtm = RULE_TO_METHODS.find(rtms => rtms.methods.includes(command));
-        if (!rtm) {
-            throw "Invalid command: " + command;
-        }
-        /* Must be local request -> allow everything */
-        if (!socket)
-            return undefined;
-        /* Get any publish errors for socket */
-        const schm = utils_1.get(socket, `prostgles.schema.${tableName}.${command}`);
-        // console.log(schm, get(socket, `prostgles.schema`));
-        if (schm && schm.err)
-            throw schm.err;
-        let table_rule = await this.getTableRules({ tableName, socket });
-        if (!table_rule)
-            throw "Invalid or disallowed table: " + tableName;
-        if (command === "upsert") {
-            if (!table_rule.update || !table_rule.insert) {
-                throw `Invalid or disallowed command: upsert`;
-            }
-        }
-        if (!this.publish)
-            throw "publish is missing";
-        if (rtm && table_rule && table_rule[rtm.rule]) {
-            return table_rule;
-        }
-        else
-            throw `Invalid or disallowed command: ${command}`;
-    }
-    async getTableRules({ tableName, socket }) {
-        try {
-            if (!socket || !tableName)
-                throw "publish OR socket OR dbo OR tableName are missing";
-            let _publish = await this.getPublish(socket);
-            let table_rules = applyParamsIfFunc(_publish[tableName], socket, this.dbo, this.db);
-            if (table_rules) {
-                /* Add no limits */
-                if (typeof table_rules === "boolean" || table_rules === "*") {
-                    table_rules = {};
-                    RULE_TO_METHODS.map(r => {
-                        table_rules[r.rule] = { ...r.no_limits };
-                    });
-                    /* Check for invalid limits */
                 }
-                else if (Object.keys(table_rules).length) {
-                    if (table_rules.select && table_rules.subscribe !== false) {
-                        table_rules.subscribe = {
-                            ...RULE_TO_METHODS.find(r => r.rule === "subscribe").no_limits,
-                            ...(typeof table_rules.subscribe !== "string" ? table_rules.subscribe : {})
-                        };
-                    }
-                    Object.keys(table_rules)
-                        .filter(m => table_rules[m])
-                        .find(method => {
-                        let rm = RULE_TO_METHODS.find(r => r.rule === method);
-                        if (!rm) {
-                            throw `Invalid rule in publish.${tableName} -> ${method} \nExpecting any of: ${RULE_TO_METHODS.map(r => r.rule).join(", ")}`;
-                        }
-                        if (typeof table_rules[method] === "boolean" || table_rules[method] === "*") {
-                            table_rules[method] = { ...rm.no_limits };
-                        }
-                        let method_params = Object.keys(table_rules[method]);
-                        let iparam = method_params.find(p => !rm.allowed_params.includes(p));
-                        if (iparam) {
-                            throw `Invalid setting in publish.${tableName}.${method} -> ${iparam}. \n Expecting any of: ${rm.allowed_params.join(", ")}`;
-                        }
-                    });
-                }
+                return table_rules;
             }
-            return table_rules;
-        }
-        catch (e) {
-            throw e;
-        }
+            catch (e) {
+                throw e;
+            }
+        });
     }
 }
 exports.PublishParser = PublishParser;
