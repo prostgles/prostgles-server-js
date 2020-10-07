@@ -17,13 +17,8 @@ const app = express_1.default();
 const path_1 = __importDefault(require("path"));
 var http = require('http').createServer(app);
 var io = require("socket.io")(http);
-http.listen(3001);
-var fs = require('fs');
-// import * as Prostgles from "../dist/index.js";
-// Prostgles({ io, dbConnection: {  }})
-// console.log(Prostgles({}));
-// Prostgles({ })
-var prostgles = require("../dist/index");
+http.listen(3000);
+var prostgles = require("../../dist/index");
 prostgles({
     dbConnection: {
         host: "localhost",
@@ -45,34 +40,21 @@ prostgles({
         // 	return false;
         // }
         return {
-            pixels: {
-                delete: "*",
-                select: {
-                    fields: { rgb: false }
-                },
-            },
+            planes: "*"
         };
     },
-    publishMethods: ({ socket, dbo }, s) => {
-        return {
-            insertPixel: (data) => __awaiter(void 0, void 0, void 0, function* () {
-                // let  tl = Date.now();
-                let res = yield (dbo.pixels).insert(data);
-                // console.log(Date.now() - tl, "ms");
-                return res;
-            })
-        };
-    },
-    isReady: (dbo) => __awaiter(void 0, void 0, void 0, function* () {
-        /* Benchmarking 10000 inserts */
-        var tl = Date.now(), inserts = [];
-        for (var i = 0; i < 10000; i++) {
-            const data = { rgb: "black", xy: `${Math.random() * 400};${Math.random() * 400}` };
-            inserts.push(data);
-        }
-        yield dbo.pixels.insert(inserts);
-        console.log(Date.now() - tl, "ms");
-        const c = yield dbo.pixels.count({}); //.then(console.log);
+    // publishMethods: (socket, dbo: DBObj) => { 
+    //     return {
+    //         insertPlanes: async (data) => {
+    //             // let  tl = Date.now();
+    //             let res = await (dbo.planes).insert(data);
+    //             // console.log(Date.now() - tl, "ms");
+    //             return res;
+    //         }
+    //     }
+    // },
+    onReady: (dbo) => __awaiter(void 0, void 0, void 0, function* () {
+        let plane = yield dbo.planes.findOne();
         app.get('/', (req, res) => {
             res.sendFile(path_1.default.join(__dirname + '/home.html'));
         });

@@ -406,7 +406,7 @@ class PubSubManager {
     }
     /* Returns a sync channel */
     async addSync(syncParams) {
-        const { socket = null, table_info = null, table_rules = null, synced_field = null, allow_delete = null, id_fields = [], filter = {}, params = {}, condition = "", throttle = 10 } = syncParams || {};
+        const { socket = null, table_info = null, table_rules = null, synced_field = null, allow_delete = null, id_fields = [], filter = {}, params = {}, condition = "", throttle = 0 } = syncParams || {};
         let conditionParsed = this.parseCondition(condition);
         if (!socket || !table_info)
             throw "socket or table_info missing";

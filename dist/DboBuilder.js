@@ -15,6 +15,7 @@ function capitalizeFirstLetter(string) {
 const shortestPath_1 = require("./shortestPath");
 function makeErr(err) {
     return Promise.reject({
+        // ...err,
         ...PubSubManager_1.filterObj(err, ["column", "code", "table", "constraint"]),
         code_info: sqlErrCodeToMsg(err.code)
     });
@@ -398,7 +399,7 @@ class ViewHandler {
         catch (e) {
             if (localParams && localParams.testRule)
                 throw e;
-            throw ` Issue with dbo.${this.name}.find: \n    -> ` + e;
+            throw { err: e, msg: `Issue with dbo.${this.name}.find()` };
         }
     }
     async find(filter, selectParams, param3_unused = null, tableRules, localParams) {
@@ -430,7 +431,7 @@ class ViewHandler {
         catch (e) {
             if (localParams && localParams.testRule)
                 throw e;
-            throw `Issue with dbo.${this.name}.find:\n    -> ` + e;
+            throw { err: e, msg: `Issue with dbo.${this.name}.find()` };
         }
     }
     findOne(filter, selectParams, param3_unused, table_rules, localParams) {
@@ -448,7 +449,7 @@ class ViewHandler {
         catch (e) {
             if (localParams && localParams.testRule)
                 throw e;
-            throw `Issue with dbo.${this.name}.findOne:\n     -> ` + e;
+            throw { err: e, msg: `Issue with dbo.${this.name}.findOne()` };
         }
     }
     count(filter, param2_unused, param3_unused, table_rules, localParams = {}) {
@@ -464,7 +465,7 @@ class ViewHandler {
         catch (e) {
             if (localParams && localParams.testRule)
                 throw e;
-            throw `Issue with dbo.${this.name}.count:\n     -> ` + e;
+            throw { err: e, msg: `Issue with dbo.${this.name}.count()` };
         }
     }
     subscribe(filter, params, localFunc, table_rules, localParams) {
@@ -517,7 +518,7 @@ class ViewHandler {
         catch (e) {
             if (localParams && localParams.testRule)
                 throw e;
-            throw `Issue with dbo.${this.name}.subscribe:\n ->      ` + e;
+            throw { err: e, msg: `Issue with dbo.${this.name}.subscribe()` };
         }
     }
     subscribeOne(filter, params, localFunc, table_rules, localParams) {
@@ -1018,7 +1019,7 @@ class TableHandler extends ViewHandler {
         catch (e) {
             if (localParams && localParams.testRule)
                 throw e;
-            throw { msg: `Issue with dbo.${this.name}.update:\n    -> ` + JSON.stringify(e), err: e };
+            throw { err: e, msg: `Issue with dbo.${this.name}.update()` };
         }
     }
     ;
@@ -1109,7 +1110,7 @@ class TableHandler extends ViewHandler {
         catch (e) {
             if (localParams && localParams.testRule)
                 throw e;
-            throw { msg: `Issue with dbo.${this.name}.insert:\n    -> ` + JSON.stringify(e), err: e };
+            throw { err: e, msg: `Issue with dbo.${this.name}.insert()` };
         }
     }
     ;
@@ -1154,7 +1155,7 @@ class TableHandler extends ViewHandler {
         catch (e) {
             if (localParams && localParams.testRule)
                 throw e;
-            throw `Issue with dbo.${this.name}.delete:\n    -> ` + e;
+            throw { err: e, msg: `Issue with dbo.${this.name}.delete()` };
         }
     }
     ;
@@ -1182,7 +1183,7 @@ class TableHandler extends ViewHandler {
         catch (e) {
             if (localParams && localParams.testRule)
                 throw e;
-            throw `Issue with dbo.${this.name}.upsert:\n    -> ` + e;
+            throw { err: e, msg: `Issue with dbo.${this.name}.upsert()` };
         }
     }
     ;
@@ -1220,7 +1221,7 @@ class TableHandler extends ViewHandler {
         catch (e) {
             if (localParams && localParams.testRule)
                 throw e;
-            throw `Issue with dbo.${this.name}.sync:\n     -> ` + e;
+            throw { err: e, msg: `Issue with dbo.${this.name}.sync()` };
         }
         /*
         REPLICATION

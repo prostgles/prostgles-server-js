@@ -2,27 +2,11 @@ import express from 'express';
 const app = express();
 import path from 'path';
 var http = require('http').createServer(app);
-
-import * as socketio from "socket.io";
-import { type, userInfo } from 'os';
 var io = require("socket.io")(http);
 http.listen(3000);
-var fs = require('fs');
-
-// import * as Prostgles from "../dist/index.js";
-// Prostgles({ io, dbConnection: {  }})
-// console.log(Prostgles({}));
-// Prostgles({ })
-
 var prostgles = require("../../dist/index");
 
-
-// import prostgles from "prostgles-server";
-// import prostgles from "../dist/index";
-// import { TableHandler } from '../dist/DboBuilder';
-// type DBObj = any;
 import { DBObj } from "./DBoGenerated";
-import { TableHandler } from 'prostgles-server/dist/DboBuilder';
 
 
 prostgles({
@@ -39,7 +23,6 @@ prostgles({
     //     poolIdleTimeout: 10000
     // },
     sqlFilePath: path.join(__dirname+'/init.sql'),
-    
     io,
     tsGeneratedTypesDir: path.join(__dirname + '/'),
 	publish: (socket, dbo ) => {
@@ -48,51 +31,24 @@ prostgles({
         // }
 
         return {
-            pixels: {
-
-                delete: "*",
-                select: {
-                    fields: { rgb: false }
-                },
-            }, 
-            // sql_tables: {
-            //     delete: "*",
-            //     select: {
-            //         fields: { rgb: false }
-            //     },
-            //     // update: "*"
-            // }
+            planes: "*"
         }
     },
-    publishMethods: (socket, dbo: DBObj) => { 
-
-        return {
-            insertPixel: async (data) => {
-                
-                // let  tl = Date.now();
-                let res = await (dbo.pixels).insert(data);
-                // console.log(Date.now() - tl, "ms");
-                return res;
-            }
-        }
-    },
+    // publishMethods: (socket, dbo: DBObj) => { 
+    //     return {
+    //         insertPlanes: async (data) => {
+    //             // let  tl = Date.now();
+    //             let res = await (dbo.planes).insert(data);
+    //             // console.log(Date.now() - tl, "ms");
+    //             return res;
+    //         }
+    //     }
+    // },
     
-    isReady: async (dbo: DBObj) => {
+    onReady: async (dbo: DBObj) => {
 
-        
-        
-        /* Benchmarking 10000 inserts */
-        var tl = Date.now(), inserts = []
-        for(var i = 0; i < 10000; i++){
-            const data = { rgb: "black", xy: `${Math.random() * 400};${Math.random() * 400}` };
-            inserts.push(data);
-        }
-        await dbo.pixels.insert(inserts);
-        console.log(Date.now() - tl, "ms");
-        
-        const c = await dbo.pixels.count({});//.then(console.log);
-
-        
+        let plane = await dbo.planes.findOne()
+            
         
 		app.get('/', (req, res) => {
 			res.sendFile(path.join(__dirname+'/home.html'));
@@ -103,11 +59,6 @@ prostgles({
 		});
     },
 	// onSocketConnect: async ({ socket, dbo }) => {
-    //     /* Sending file */
-    //     fs.readFile('home.html', function(err, buf){
-    //         socket.emit('home', { image: true, buffer: buf });
-    //     });
-
     //     return true;
     // },
 	// onSocketDisconnect: async ({ socket, dbo }) => {

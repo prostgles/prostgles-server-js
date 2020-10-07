@@ -35,7 +35,7 @@ prostgles({
     user: process.env.PG_USER,
     password: process.env.PG_PASS
   },
-  isReady: async (dbo) => {
+  onReady: async (dbo) => {
   
     const posts = await dbo.posts.find(
       { title: { $ilike: "%car%" } }, 
@@ -71,7 +71,7 @@ prostgles({
   },
   io,
   publish: "*", // Full unrestricted access to the database
-  isReady: async (dbo) => {
+  onReady: async (dbo) => {
     
   }
 });
@@ -87,19 +87,15 @@ prostgles({
         <title> Prostgles </title>
         
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <script src="https://unpkg.com/socket.io-client@2.3.0/dist/socket.io.slim.js" type="text/javascript"></script>
-        <script src="https://unpkg.com/prostgles-client@1.0.13/dist/prostgles.js" type="text/javascript"></script>	
+        <script src="https://unpkg.com/socket.io-client@latest/dist/socket.io.slim.js" type="text/javascript"></script>
+        <script src="https://unpkg.com/prostgles-client@latest/dist/index.js" type="text/javascript"></script>	
 	</head>
 	<body>
         
-    <div class="wrapper"></div>
-    <canvas id="canvas" width="100%" height="100%"></canvas>
 		<script>
-            
-      const socket = io();
 
       prostgles({
-          socket, 
+          socket: io(), 
           isReady: async (db) => {
             
           }
