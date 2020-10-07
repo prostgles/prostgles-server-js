@@ -669,14 +669,8 @@ export class PublishParser {
         
         try {
             /* Publish tables and views based on socket */
-            let _publish = await applyParamsIfFunc(this.publish, socket, this.dbo, this.db);
+            let _publish = await this.getPublish(socket);
 
-            if(_publish === "*"){
-                _publish = {}
-                Object.keys(this.dbo).map(tableName => {
-                    _publish[tableName] = "*";
-                })
-            }
     
             if(_publish && Object.keys(_publish).length){
                 await Promise.all(
@@ -753,6 +747,20 @@ export class PublishParser {
     
         return schema;
     }
+
+    async getPublish(socket){
+        let _publish = await applyParamsIfFunc(this.publish, socket, this.dbo, this.db);
+
+        if(_publish === "*"){
+            let publish = {}
+            Object.keys(this.dbo).map(tableName => {
+                publish[tableName] = "*";
+            });
+            return publish;
+        }
+
+        return _publish;
+    }
     
     async getValidatedRequestRule({ tableName, command, socket }: DboTableCommand): Promise<TableRule>{
         if(!this.dbo) throw "INTERNAL ERROR: dbo is missing";
@@ -793,9 +801,9 @@ export class PublishParser {
         try {
             if(!socket || !tableName) throw "publish OR socket OR dbo OR tableName are missing";
     
-            let _publish = await applyParamsIfFunc(this.publish, socket, this.dbo );
+            let _publish = await this.getPublish(socket);
     
-            let table_rules = applyParamsIfFunc(_publish[tableName],  socket, this.dbo );
+            let table_rules = applyParamsIfFunc(_publish[tableName],  socket, this.dbo, this.db );
             if(table_rules){
                 /* Add no limits */
                 if(typeof table_rules === "boolean" || table_rules === "*"){
