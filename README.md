@@ -84,24 +84,25 @@ prostgles({
 <!DOCTYPE html>
 <html>
 	<head>
-        <title> Prostgles </title>
-        
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <script src="https://unpkg.com/socket.io-client@latest/dist/socket.io.slim.js" type="text/javascript"></script>
-        <script src="https://unpkg.com/prostgles-client@latest/dist/index.js" type="text/javascript"></script>	
+		<title> Prostgles </title>
+
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<script src="https://unpkg.com/socket.io-client@latest/dist/socket.io.slim.js" type="text/javascript"></script>
+		<script src="https://unpkg.com/prostgles-client@latest/dist/index.js" type="text/javascript"></script>	
 	</head>
 	<body>
-        
+
 		<script>
 
-      prostgles({
-          socket: io(), 
-          onReady: async (db) => {
-            
-          }
-      });
+			prostgles({
+				socket: io(), 
+				onReady: async (db) => {
+
+				}
+			});
 
 		</script>
+		
 	</body>
 </html>
 
