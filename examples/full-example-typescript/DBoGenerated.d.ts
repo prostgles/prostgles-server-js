@@ -42,6 +42,9 @@ declare type DBO_airports = {
     subscribe: (filter: object, params: SelectParams, onData: (items: Airports[]) => any) => {
         unsubscribe: () => any;
     };
+    subscribeOne: (filter: object, params: SelectParams, onData: (item: Airports) => any) => {
+        unsubscribe: () => any;
+    };
     count: (filter?: object) => Promise<number>;
     update: (filter: object, newData: Airports, params?: UpdateParams) => Promise<void | Airports>;
     upsert: (filter: object, newData: Airports, params?: UpdateParams) => Promise<void | Airports>;
@@ -52,6 +55,9 @@ declare type DBO_planes = {
     find: (filter?: object, selectParams?: SelectParams, param3_unused?: any) => Promise<Planes[]>;
     findOne: (filter?: object, selectParams?: SelectParams, param3_unused?: any) => Promise<Planes>;
     subscribe: (filter: object, params: SelectParams, onData: (items: Planes[]) => any) => {
+        unsubscribe: () => any;
+    };
+    subscribeOne: (filter: object, params: SelectParams, onData: (item: Planes) => any) => {
         unsubscribe: () => any;
     };
     count: (filter?: object) => Promise<number>;

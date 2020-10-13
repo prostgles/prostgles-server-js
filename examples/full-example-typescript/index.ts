@@ -3,7 +3,7 @@ const app = express();
 import path from 'path';
 var http = require('http').createServer(app);
 var io = require("socket.io")(http);
-http.listen(3000);
+http.listen(30009);
 var prostgles = require("../../dist/index");
 
 import { DBObj } from "./DBoGenerated";
@@ -30,6 +30,7 @@ prostgles({
 		// 	return false;
         // }
 
+
         return {
             planes: "*"
         }
@@ -47,8 +48,8 @@ prostgles({
     
     onReady: async (dbo: DBObj) => {
 
-        let plane = await dbo.planes.findOne({},{  })
-            
+        let plane = await dbo.planes.findOne();
+        
         
 		app.get('/', (req, res) => {
 			res.sendFile(path.join(__dirname+'/home.html'));

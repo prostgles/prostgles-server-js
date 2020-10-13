@@ -17,7 +17,7 @@ const app = express_1.default();
 const path_1 = __importDefault(require("path"));
 var http = require('http').createServer(app);
 var io = require("socket.io")(http);
-http.listen(3000);
+http.listen(30009);
 var prostgles = require("../../dist/index");
 prostgles({
     dbConnection: {
@@ -54,7 +54,7 @@ prostgles({
     //     }
     // },
     onReady: (dbo) => __awaiter(void 0, void 0, void 0, function* () {
-        let plane = yield dbo.planes.findOne();
+        let plane = yield dboo.planes.findOne();
         app.get('/', (req, res) => {
             res.sendFile(path_1.default.join(__dirname + '/home.html'));
         });

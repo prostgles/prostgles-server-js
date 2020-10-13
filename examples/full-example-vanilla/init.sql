@@ -25,18 +25,15 @@
 -- );
 
 
-DROP TABLE IF EXISTS points CASCADE;
-CREATE TABLE IF NOT EXISTS points (
+DROP TABLE IF EXISTS "Points" CASCADE;
+CREATE TABLE IF NOT EXISTS "Points" (
     id      NUMERIC,
     color     TEXT,
     x       NUMERIC,
     y       NUMERIC,
     line_id TEXT,
-    synced  BIGINT
+    "Synced"  BIGINT
 );
-
-
-
 
 
 

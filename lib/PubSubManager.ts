@@ -8,6 +8,14 @@ import { get } from "./utils";
 import { TableOrViewInfo, TableInfo, DbHandler, TableHandler } from "./DboBuilder";
 import { TableRule, SelectParams, DB, OrderBy } from "./Prostgles";
 
+import * as Bluebird from "bluebird";
+import * as pgPromise from 'pg-promise';
+import pg = require('pg-promise/typescript/pg-subset');
+type PGP = pgPromise.IMain<{}, pg.IClient>;
+let pgp: PGP = pgPromise({
+    promiseLib: Bluebird
+});
+
 type SyncParams = {
     socket_id: string; 
     channel_name: string;
@@ -823,11 +831,10 @@ export class PubSubManager {
     // }
 
     dropTrigger(table_name){
-        const trigger_name = this.getTriggerName(table_name);
         this.db.any(`
-            DROP TRIGGER IF EXISTS ${trigger_name}_insert ON ${table_name};
-            DROP TRIGGER IF EXISTS ${trigger_name}_update ON ${table_name};
-            DROP TRIGGER IF EXISTS ${trigger_name}_delete ON ${table_name};
+            DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_insert")} ON ${table_name};
+            DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_update")} ON ${table_name};
+            DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_delete")} ON ${table_name};
         `).then(res => {
             // console.error("Dropped trigger result: ", res);
         })
@@ -836,8 +843,8 @@ export class PubSubManager {
         });
     }
 
-    getTriggerName(table_name){
-        return `prostgles_triggers_${table_name}`
+    getTriggerName(table_name, suffix){
+        return pgp.as.format("$1:name", [`prostgles_triggers_${table_name}_${suffix}`]);
     }
     /* 
         A table will only have a trigger with all conditions (for different subs) 
@@ -862,11 +869,11 @@ export class PubSubManager {
             _condts = [...this.triggers[table_name], condition];
         }
 
-        const trigger_name = this.getTriggerName(table_name),
-            func_name = `prostgles_funcs_${table_name}`,
+        const func_name_escaped = pgp.as.format("$1:name", [`prostgles_funcs_${table_name}`]),
+            table_name_escaped = pgp.as.format("$1:name", [table_name]),
             delimiter = PubSubManager.DELIMITER,
             query = ` BEGIN;
-                CREATE OR REPLACE FUNCTION ${func_name}() RETURNS TRIGGER AS $$
+                CREATE OR REPLACE FUNCTION ${func_name_escaped}() RETURNS TRIGGER AS $$
         
                 DECLARE condition_ids TEXT := '';            
                 
@@ -911,28 +918,28 @@ export class PubSubManager {
                 END;
             $$ LANGUAGE plpgsql;
 
-            DROP TRIGGER IF EXISTS ${trigger_name}_insert ON ${table_name};
-            CREATE TRIGGER ${trigger_name}_insert
-            AFTER INSERT ON ${table_name}
+            DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_insert")} ON ${table_name_escaped};
+            CREATE TRIGGER ${this.getTriggerName(table_name, "_insert")}
+            AFTER INSERT ON ${table_name_escaped}
             REFERENCING NEW TABLE AS new_table
-            FOR EACH STATEMENT EXECUTE PROCEDURE ${func_name}();
+            FOR EACH STATEMENT EXECUTE PROCEDURE ${func_name_escaped}();
 
-            DROP TRIGGER IF EXISTS ${trigger_name}_update ON ${table_name};
-            CREATE TRIGGER ${trigger_name}_update
-            AFTER UPDATE ON ${table_name}
+            DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_update")} ON ${table_name_escaped};
+            CREATE TRIGGER ${this.getTriggerName(table_name, "_update")}
+            AFTER UPDATE ON ${table_name_escaped}
             REFERENCING OLD TABLE AS old_table NEW TABLE AS new_table
-            FOR EACH STATEMENT EXECUTE PROCEDURE ${func_name}();
+            FOR EACH STATEMENT EXECUTE PROCEDURE ${func_name_escaped}();
 
-            DROP TRIGGER IF EXISTS ${trigger_name}_delete ON ${table_name};
-            CREATE TRIGGER ${trigger_name}_delete
-            AFTER DELETE ON ${table_name}
+            DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_delete")} ON ${table_name_escaped};
+            CREATE TRIGGER ${this.getTriggerName(table_name, "_delete")}
+            AFTER DELETE ON ${table_name_escaped}
             REFERENCING OLD TABLE AS old_table
-            FOR EACH STATEMENT EXECUTE PROCEDURE ${func_name}();
+            FOR EACH STATEMENT EXECUTE PROCEDURE ${func_name_escaped}();
 
             COMMIT;
         `;
         
-
+// console.log(query)
         this.addTriggerPool = this.addTriggerPool || [];
         this.addTriggerPool.push({ table_name, condition });
 
@@ -956,7 +963,7 @@ export class PubSubManager {
             // console.log("added new trigger: ", { table_name, condition });
             return true;
         }).catch(err => {
-            console.log(317, err, query);
+            console.error(317, err, query);
             return Promise.reject(err);
         });
 

@@ -165,7 +165,7 @@ class Prostgles {
                             onChange: (state, { socket, dbo }) => {},
                         }
                     */
-                    socket.on("disconnect", function () {
+                    socket.on("disconnect", () => {
                         // subscriptions = subscriptions.filter(sub => sub.socket.id !== socket.id);
                         if (this.onSocketDisconnect) {
                             this.onSocketDisconnect(socket, dbo);
@@ -419,7 +419,7 @@ class PublishParser {
                 }
             }
             catch (e) {
-                console.error("Prostgles \nERRORS IN PUBLISH: ", e);
+                console.error("Prostgles \nERRORS IN PUBLISH: ", JSON.stringify(e));
                 throw e;
             }
             return schema;

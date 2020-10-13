@@ -19,12 +19,19 @@ const pgPromise = require("pg-promise");
 const utils_1 = require("./utils");
 const Prostgles_1 = require("./Prostgles");
 const PubSubManager_1 = require("./PubSubManager");
+let pgp = pgPromise({
+    promiseLib: Bluebird
+    // ,query: function (e) { console.log({psql: e.query, params: e.params}); }
+});
+const asName = (str) => {
+    return pgp.as.format("$1:name", [str]);
+};
 function capitalizeFirstLetter(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
 }
 const shortestPath_1 = require("./shortestPath");
-function makeErr(err) {
-    return Promise.reject(Object.assign(Object.assign({}, PubSubManager_1.filterObj(err, ["column", "code", "table", "constraint"])), { code_info: sqlErrCodeToMsg(err.code) }));
+function makeErr(err, localParams) {
+    return Promise.reject(Object.assign(Object.assign(Object.assign({}, ((!localParams || !localParams.socket) ? err : {})), PubSubManager_1.filterObj(err, ["column", "code", "table", "constraint"])), { code_info: sqlErrCodeToMsg(err.code) }));
 }
 class ViewHandler {
     constructor(db, tableOrViewInfo, pubSubManager, dboBuilder) {
@@ -57,6 +64,7 @@ class ViewHandler {
             `   find: (filter?: object, selectParams?: SelectParams , param3_unused?:any) => Promise<${this.tsDataName}[]>;`,
             `   findOne: (filter?: object, selectParams?: SelectParams , param3_unused?:any) => Promise<${this.tsDataName}>;`,
             `   subscribe: (filter: object, params: SelectParams, onData: (items: ${this.tsDataName}[]) => any) => { unsubscribe: () => any };`,
+            `   subscribeOne: (filter: object, params: SelectParams, onData: (item: ${this.tsDataName}) => any) => { unsubscribe: () => any };`,
             `   count: (filter?: object) => Promise<number>;`
         ];
         this.makeDef();
@@ -76,7 +84,7 @@ class ViewHandler {
                     this.parseFieldFilter(fields);
                 }
                 catch (e) {
-                    throw ` issue with publish.${this.name}.${rule}.fields: \nVALUE: ` + JSON.stringify(fields, null, 2) + "\nERROR: " + e;
+                    throw ` issue with publish.${this.name}.${rule}.fields: \nVALUE: ` + JSON.stringify(fields, null, 2) + "\nERROR: " + JSON.stringify(e, null, 2);
                 }
             }
             if (filterFields) {
@@ -84,7 +92,7 @@ class ViewHandler {
                     this.parseFieldFilter(filterFields);
                 }
                 catch (e) {
-                    throw ` issue with publish.${this.name}.${rule}.filterFields: \nVALUE: ` + JSON.stringify(filterFields, null, 2) + "\nERROR: " + e;
+                    throw ` issue with publish.${this.name}.${rule}.filterFields: \nVALUE: ` + JSON.stringify(filterFields, null, 2) + "\nERROR: " + JSON.stringify(e, null, 2);
                 }
             }
             if (returningFields) {
@@ -92,7 +100,7 @@ class ViewHandler {
                     this.parseFieldFilter(returningFields);
                 }
                 catch (e) {
-                    throw ` issue with publish.${this.name}.${rule}.returningFields: \nVALUE: ` + JSON.stringify(returningFields, null, 2) + "\nERROR: " + e;
+                    throw ` issue with publish.${this.name}.${rule}.returningFields: \nVALUE: ` + JSON.stringify(returningFields, null, 2) + "\nERROR: " + JSON.stringify(e, null, 2);
                 }
             }
             if (forcedFilter) {
@@ -100,7 +108,7 @@ class ViewHandler {
                     yield this.find(forcedFilter, { limit: 0 });
                 }
                 catch (e) {
-                    throw ` issue with publish.${this.name}.${rule}.forcedFilter: \nVALUE: ` + JSON.stringify(forcedFilter, null, 2) + "\nERROR: " + e;
+                    throw ` issue with publish.${this.name}.${rule}.forcedFilter: \nVALUE: ` + JSON.stringify(forcedFilter, null, 2) + "\nERROR: " + JSON.stringify(e, null, 2);
                 }
             }
             return true;
@@ -171,7 +179,7 @@ class ViewHandler {
                     }
                     return `` +
                         `   SELECT ${select} \n ` +
-                        `   FROM ${q.table}\n` +
+                        `   FROM ${asName(q.table)}\n` +
                         `   ${q.where}\n` +
                         `   ${groupBy}\n` +
                         `   ${q.orderBy}\n` +
@@ -194,18 +202,18 @@ class ViewHandler {
                 FROM (
                     SELECT 
                      -- [source full sellect + ctid to group by]
-                    ${q.allFields.concat(["ctid"]).map(field => `${q.table}.${field}`).concat(joins.map(j => `${j.table}.${j.table}_${PREF}_json, ${j.table}.${j.table}_${PREF}_rowid_sorted`)).concat(
+                    ${q.allFields.concat(["ctid"]).map(field => `${asName(q.table)}.${asName(field)}`).concat(joins.map(j => `${asName(`${j.table}.${j.table}_${PREF}_json`)}, ${asName(`${j.table}.${j.table}_${PREF}_rowid_sorted`)}`)).concat(
                 // ${j.joins && j.joins.length? " ORDER BY  " : ""}
-                joins.map(j => `row_number() over(partition by ${j.table}_${PREF}_rowid_sorted, ${q.table}.ctid ) AS ${j.table}_${PREF}_dupes_rowid`)).join("\n, ")}
+                joins.map(j => `row_number() over(partition by ${asName(`${j.table}_${PREF}_rowid_sorted, ${q.table}.ctid`)} ) AS ${asName(`${j.table}_${PREF}_dupes_rowid`)}`)).join("\n, ")}
                     FROM (
                         SELECT *, row_number() over() as ctid
-                        FROM ${q.table}
+                        FROM ${asName(q.table)}
 
                         -- [source filter]
                         ${q.where}
                         
 
-                    ) ${q.table}
+                    ) ${asName(q.table)}
                     ${joins.map(j => joinTables(q, j)).join("\n")}
                 ) t
             ) t            
@@ -218,22 +226,22 @@ class ViewHandler {
                     const paths = getJoins(q1.table, q2.table);
                     return `${paths.map(({ table, on }, i) => {
                         const prevTable = i === 0 ? q1.table : paths[i - 1].table;
-                        let iQ = table;
+                        let iQ = asName(table);
                         /* If target table then add filters, options, etc */
                         if (i === paths.length - 1) {
                             iQ = "" +
                                 "   (\n" +
                                 `       SELECT *,\n` +
-                                `       row_number() over() as ${table}_${PREF}_rowid_sorted,\n` +
-                                `       row_to_json((select x from (SELECT ${(q2.select.concat((q2.joins || []).map(j => j.table))).join(", ")}) as x)) AS ${q2.table}_${PREF}_json\n` +
+                                `       row_number() over() as ${asName(`${table}_${PREF}_rowid_sorted`)},\n` +
+                                `       row_to_json((select x from (SELECT ${(q2.select.concat((q2.joins || []).map(j => j.table))).join(", ")}) as x)) AS ${asName(`${q2.table}_${PREF}_json`)} \n` +
                                 `       FROM (\n` +
                                 `           ${makeQuery3(q2, true)}\n` +
-                                `       ) ${q2.table}        -- [target table]\n` +
-                                `   ) ${q2.table}\n`;
+                                `       ) ${asName(q2.table)}        -- [target table]\n` +
+                                `   ) ${asName(q2.table)}\n`;
                         }
                         return "" +
                             `   ${q2.isLeftJoin ? "LEFT" : "INNER"} JOIN ${iQ}\n` +
-                            `   ON ${on.map(([c1, c2]) => `${prevTable}.${c1} = ${table}.${c2}`).join("\n AND ")}\n`;
+                            `   ON ${on.map(([c1, c2]) => `${asName(prevTable)}.${asName(c1)} = ${asName(table)}.${asName(c2)}`).join("\n AND ")}\n`;
                     }).join("")}`;
                 }
                 makeQuery3;
@@ -436,9 +444,9 @@ class ViewHandler {
                         throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
                 }
                 if (expectOne)
-                    return this.db.oneOrNone(_query).catch(makeErr);
+                    return this.db.oneOrNone(_query).catch(err => makeErr(err, localParams));
                 else
-                    return this.db.any(_query).catch(err => { makeErr(err); return []; });
+                    return this.db.any(_query).catch(err => makeErr(err, localParams));
             }
             catch (e) {
                 if (localParams && localParams.testRule)
@@ -471,7 +479,7 @@ class ViewHandler {
             return this.find(filter, { select: "", limit: 0 }, null, table_rules, localParams)
                 .then(allowed => {
                 const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {};
-                let query = "SELECT COUNT(*) FROM ${_psqlWS_tableName:raw} " + this.prepareWhere(filter, forcedFilter, filterFields, false);
+                let query = "SELECT COUNT(*) FROM ${_psqlWS_tableName:name} " + this.prepareWhere(filter, forcedFilter, filterFields, false);
                 return this.db.one(query, { _psqlWS_tableName: this.name }).then(({ count }) => +count);
             });
         }
@@ -546,6 +554,9 @@ class ViewHandler {
             allowedFields = this.parseFieldFilter(allowed_cols, allow_empty);
         }
         let col_names = (resultFields || []).filter(f => !allowedFields || allowedFields.includes(f));
+        /* Maintain allowed cols order */
+        if (selectParams === "*" && allowedFields && allowedFields.length)
+            col_names = allowedFields;
         try {
             let colSet = new pgp.helpers.ColumnSet(col_names);
             return onlyNames ? colSet.names : colSet;
@@ -669,7 +680,7 @@ class ViewHandler {
             const invalidColumn = Object.keys(data)
                 .find(fName => !allowed_colnames.includes(fName));
             if (invalidColumn) {
-                throw 'invalid columns in filter: ' + invalidColumn;
+                throw 'disallowed/inexistent columns in filter: ' + invalidColumn;
             }
         }
         let template = Prostgles_1.flat(Object.keys(data)
@@ -909,7 +920,7 @@ class ViewHandler {
                         return all_fields.filter(col => !disallowed.includes(col));
                     }
                     else {
-                        return all_fields.filter(col => allowed.includes(col));
+                        return [...allowed];
                     }
                 }
                 else {
@@ -925,7 +936,7 @@ class ViewHandler {
         function validate(cols) {
             let bad_keys = cols.filter(col => !all_fields.includes(col));
             if (bad_keys && bad_keys.length) {
-                throw "\nUnrecognised or illegal fields: " + bad_keys.join();
+                throw "\nUnrecognised or illegal fields: " + bad_keys.join(", ");
             }
         }
     }
@@ -1028,7 +1039,7 @@ class TableHandler extends ViewHandler {
                     qType = multi ? "any" : "one";
                     query += " RETURNING " + this.prepareSelect(returning, returningFields);
                 }
-                return this.db.tx(t => t[qType](query)).catch(makeErr);
+                return this.db.tx(t => t[qType](query)).catch(err => makeErr(err, localParams));
             }
             catch (e) {
                 if (localParams && localParams.testRule)
@@ -1072,7 +1083,7 @@ class TableHandler extends ViewHandler {
                             if (keys.length) {
                                 try {
                                     const values = pgp.helpers.values(forcedData), colNames = this.prepareSelect(keys, this.column_names);
-                                    yield this.db.any("EXPLAIN INSERT INTO ${name:raw} (${colNames:raw}) SELECT * FROM ( VALUES ${values:raw} ) t WHERE FALSE;", { name: this.name, colNames, values });
+                                    yield this.db.any("EXPLAIN INSERT INTO ${name:name} (${colNames:raw}) SELECT * FROM ( VALUES ${values:raw} ) t WHERE FALSE;", { name: this.name, colNames, values });
                                 }
                                 catch (e) {
                                     throw "\nissue with forcedData: \nVALUE: " + JSON.stringify(forcedData, null, 2) + "\nERROR: " + e;
@@ -1121,7 +1132,7 @@ class TableHandler extends ViewHandler {
                     queryType = "one";
                 }
                 // console.log(query);
-                return this.db.tx(t => t[queryType](query)).catch(makeErr);
+                return this.db.tx(t => t[queryType](query)).catch(err => makeErr(err, localParams));
             }
             catch (e) {
                 if (localParams && localParams.testRule)
@@ -1161,14 +1172,13 @@ class TableHandler extends ViewHandler {
                         throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
                 }
                 let queryType = 'none';
-                let _query = pgp.as.format("DELETE FROM ${_psqlWS_tableName:raw} ", { _psqlWS_tableName: this.name });
+                let _query = pgp.as.format("DELETE FROM $1:name", [this.name]);
                 _query += this.prepareWhere(filter, forcedFilter, filterFields);
                 if (returning) {
                     queryType = "any";
                     _query += " RETURNING " + this.prepareSelect(returning, returningFields);
                 }
-                return this.db[queryType](_query, { _psqlWS_tableName: this.name }).catch(makeErr);
-                ;
+                return this.db[queryType](_query, { _psqlWS_tableName: this.name }).catch(err => makeErr(err, localParams));
             }
             catch (e) {
                 if (localParams && localParams.testRule)
@@ -1420,10 +1430,6 @@ export type DeleteParams = {
     }
 }
 exports.DboBuilder = DboBuilder;
-let pgp = pgPromise({
-    promiseLib: Bluebird
-    // ,query: function (e) { console.log({psql: e.query, params: e.params}); }
-});
 // export async function makeDBO(db: DB): Promise<DbHandler> {
 //     return await DBO.build(db, "public");
 // }

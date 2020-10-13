@@ -434,10 +434,10 @@ export class Prostgles {
                 */
 
 
-                socket.on("disconnect", function(){
+                socket.on("disconnect", () => {
                     // subscriptions = subscriptions.filter(sub => sub.socket.id !== socket.id);
                     if(this.onSocketDisconnect){
-                        this.onSocketDisconnect( socket, dbo);
+                        this.onSocketDisconnect(socket, dbo);
                     }
                 });
 
@@ -746,7 +746,7 @@ export class PublishParser {
             
     
         } catch (e) {
-            console.error("Prostgles \nERRORS IN PUBLISH: ", e);
+            console.error("Prostgles \nERRORS IN PUBLISH: ", JSON.stringify(e));
             throw e;
         }
     
