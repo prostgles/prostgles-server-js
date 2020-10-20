@@ -176,7 +176,7 @@ export class ViewHandler {
         this.tsDboDefs = [
             `   find: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<${this.tsDataName}[]>;`,
             `   findOne: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<${this.tsDataName}>;`,
-            `   subscribe: (filter: ${filterDef}t, params: SelectParams, onData: (items: ${this.tsDataName}[]) => any) => Promise<{ unsubscribe: () => any }>;`,
+            `   subscribe: (filter: ${filterDef}, params: SelectParams, onData: (items: ${this.tsDataName}[]) => any) => Promise<{ unsubscribe: () => any }>;`,
             `   subscribeOne: (filter: ${filterDef}, params: SelectParams, onData: (item: ${this.tsDataName}) => any) => Promise<{ unsubscribe: () => any }>;`,
             `   count: (filter?: ${filterDef}) => Promise<number>;`
         ];
