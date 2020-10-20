@@ -6,6 +6,7 @@ var io = require('socket.io')(http, { path: "/teztz" });
 http.listen(3001);
 
 let prostgles = require('../../dist/index.js');
+// let prostgles = require('prostgles-server');
 
 
 prostgles({

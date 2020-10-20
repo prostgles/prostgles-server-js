@@ -75,8 +75,6 @@ export declare class ViewHandler {
     tsDboDefs: string[];
     tsDboDef: string;
     tsDboName: string;
-    tsFieldFilter: string;
-    tsFieldFilterName: string;
     joins: Joins;
     joinGraph: Graph;
     joinPaths: JoinPaths;

@@ -26,8 +26,11 @@ let pgp = pgPromise({
 const asName = (str) => {
     return pgp.as.format("$1:name", [str]);
 };
+function replaceNonAlphaNumeric(string) {
+    return string.replace(/[\W_]+/g, "_");
+}
 function capitalizeFirstLetter(string) {
-    return string.charAt(0).toUpperCase() + string.slice(1);
+    return replaceNonAlphaNumeric(string).charAt(0).toUpperCase() + string.slice(1);
 }
 const shortestPath_1 = require("./shortestPath");
 function makeErr(err, localParams) {
@@ -38,8 +41,6 @@ class ViewHandler {
         this.tsDataDef = "";
         this.tsDataName = "";
         this.tsDboName = "";
-        this.tsFieldFilter = "";
-        this.tsFieldFilterName = "";
         if (!db || !tableOrViewInfo)
             throw "";
         this.db = db;
@@ -53,25 +54,26 @@ class ViewHandler {
         this.joinPaths = this.dboBuilder.joinPaths;
         this.columnSet = new pgp.helpers.ColumnSet(this.columns.map(({ name, data_type }) => (Object.assign({ name }, (["json", "jsonb"].includes(data_type) ? { mod: ":json" } : {})))), { table: this.name });
         this.tsDataName = capitalizeFirstLetter(this.name);
-        this.tsFieldFilterName = "FieldFilter_" + this.name;
-        this.tsDataDef = `type ${this.tsDataName} = {\n`;
+        this.tsDataDef = `export type ${this.tsDataName} = {\n`;
         this.columns.map(({ name, udt_name }) => {
-            this.tsDataDef += `     ${name}?: ${postgresToTsType(udt_name)};\n`;
+            this.tsDataDef += `     ${replaceNonAlphaNumeric(name)}?: ${postgresToTsType(udt_name)};\n`;
         });
         this.tsDataDef += "};";
-        // this.tsFieldFilter = `type ${this.tsFieldFilterName} = {} | ${this.column_names.map(d => " { [" + JSON.stringify(d) + "]: boolean } ").join(" | ")} `
+        this.tsDataDef += "\n";
+        this.tsDataDef += `export type ${this.tsDataName}_Filter = ${this.tsDataName} | object | { $and: (${this.tsDataName} | object)[] } | { $or: (${this.tsDataName} | object)[] } `;
+        const filterDef = ` ${this.tsDataName}_Filter `;
         this.tsDboDefs = [
-            `   find: (filter?: object, selectParams?: SelectParams , param3_unused?:any) => Promise<${this.tsDataName}[]>;`,
-            `   findOne: (filter?: object, selectParams?: SelectParams , param3_unused?:any) => Promise<${this.tsDataName}>;`,
-            `   subscribe: (filter: object, params: SelectParams, onData: (items: ${this.tsDataName}[]) => any) => { unsubscribe: () => any };`,
-            `   subscribeOne: (filter: object, params: SelectParams, onData: (item: ${this.tsDataName}) => any) => { unsubscribe: () => any };`,
-            `   count: (filter?: object) => Promise<number>;`
+            `   find: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<${this.tsDataName}[]>;`,
+            `   findOne: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<${this.tsDataName}>;`,
+            `   subscribe: (filter: ${filterDef}t, params: SelectParams, onData: (items: ${this.tsDataName}[]) => any) => Promise<{ unsubscribe: () => any }>;`,
+            `   subscribeOne: (filter: ${filterDef}, params: SelectParams, onData: (item: ${this.tsDataName}) => any) => Promise<{ unsubscribe: () => any }>;`,
+            `   count: (filter?: ${filterDef}) => Promise<number>;`
         ];
         this.makeDef();
     }
     makeDef() {
         this.tsDboName = `DBO_${this.name}`;
-        this.tsDboDef = `type ${this.tsDboName} = {\n ${this.tsDboDefs.join("\n")} \n};\n`;
+        this.tsDboDef = `export type ${this.tsDboName} = {\n ${this.tsDboDefs.join("\n")} \n};\n`;
     }
     getFullDef() {
         return [];
@@ -1384,6 +1386,8 @@ class DboBuilder {
 * ${(new Date).toUTCString()} 
 */
 
+export type Filter = object | {} | undefined;
+export type GroupFilter = { $and: Filter } | { $or: Filter };
 export type FieldFilter = object | string[] | "*" | "";
 export type OrderBy = { key: string, asc: boolean }[] | { [key: string]: boolean }[] | string | string[];
         
