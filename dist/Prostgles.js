@@ -281,6 +281,7 @@ const RULE_TO_METHODS = [
         rule: "insert",
         methods: ["insert", "upsert"],
         no_limits: { fields: "*" },
+        table_only: true,
         allowed_params: ["fields", "forcedData", "returningFields", "validate"],
         hint: ` expecting "*" | true | { fields: string | string[] | {}  }`
     },
@@ -288,6 +289,7 @@ const RULE_TO_METHODS = [
         rule: "update",
         methods: ["update", "upsert"],
         no_limits: { fields: "*", filterFields: "*", returningFields: "*" },
+        table_only: true,
         allowed_params: ["fields", "filterFields", "forcedFilter", "forcedData", "returningFields", "validate"],
         hint: ` expecting "*" | true | { fields: string | string[] | {}  }`
     },
@@ -302,18 +304,21 @@ const RULE_TO_METHODS = [
         rule: "delete",
         methods: ["delete", "remove"],
         no_limits: { filterFields: "*" },
+        table_only: true,
         allowed_params: ["filterFields", "forcedFilter", "returningFields", "validate"],
         hint: ` expecting "*" | true | { filterFields: ( string | string[] | {} ) } \n Will use "select", "update", "delete" and "insert" rules`
     },
     {
         rule: "sync", methods: ["sync", "unsync"],
         no_limits: null,
+        table_only: true,
         allowed_params: ["id_fields", "synced_field", "sync_type", "allow_delete", "min_throttle"],
         hint: ` expecting "*" | true | { id_fields: string[], synced_field: string }`
     },
     {
         rule: "subscribe", methods: ["subscribe", "subscribeOne"],
         no_limits: { throttle: 0 },
+        table_only: true,
         allowed_params: ["throttle"],
         hint: ` expecting "*" | true | { throttle: number } \n Will use "select" rules`
     }
@@ -490,7 +495,9 @@ class PublishParser {
                     /* Add no limits */
                     if (typeof table_rules === "boolean" || table_rules === "*") {
                         table_rules = {};
-                        RULE_TO_METHODS.map(r => {
+                        RULE_TO_METHODS
+                            .filter(r => !this.dbo[tableName].is_view || !r.table_only)
+                            .map(r => {
                             table_rules[r.rule] = Object.assign({}, r.no_limits);
                         });
                         /* Check for invalid limits */

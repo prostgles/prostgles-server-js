@@ -41,6 +41,7 @@ class ViewHandler {
         this.tsDataDef = "";
         this.tsDataName = "";
         this.tsDboName = "";
+        this.is_view = true;
         if (!db || !tableOrViewInfo)
             throw "";
         this.db = db;
@@ -970,6 +971,7 @@ class TableHandler extends ViewHandler {
             throttle_queries_per_sec: 500,
             batching: null
         };
+        this.is_view = false;
     }
     /* TO DO: Maybe finished query batching */
     willBatch(query) {

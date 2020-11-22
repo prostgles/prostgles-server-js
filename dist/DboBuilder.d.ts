@@ -81,6 +81,7 @@ export declare class ViewHandler {
     joinPaths: JoinPaths;
     dboBuilder: DboBuilder;
     t: pgPromise.ITask<{}>;
+    is_view: boolean;
     pubSubManager: PubSubManager;
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>);
     makeDef(): void;

@@ -140,6 +140,7 @@ export class ViewHandler {
     joinPaths: JoinPaths;
     dboBuilder: DboBuilder;
     t: pgPromise.ITask<{}>;
+    is_view: boolean = true;
 
     pubSubManager: PubSubManager;
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>){
@@ -1197,7 +1198,7 @@ export class TableHandler extends ViewHandler {
             throttle_queries_per_sec: 500,
             batching: null
         };
-
+        this.is_view = false;
     }
 
     /* TO DO: Maybe finished query batching */

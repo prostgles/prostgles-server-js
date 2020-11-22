@@ -10,7 +10,7 @@ import { strict } from "assert";
 'use strict';
 
 import { get } from "./utils";
-import { DboBuilder, DbHandler, DbHandlerTX } from "./DboBuilder";
+import { DboBuilder, DbHandler, DbHandlerTX, TableHandler, ViewHandler } from "./DboBuilder";
 import { PubSubManager } from "./PubSubManager";
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -592,13 +592,15 @@ const RULE_TO_METHODS = [
        rule: "insert",
        methods: ["insert", "upsert"], 
        no_limits: <SelectRule>{ fields: "*" }, 
+       table_only: true,
        allowed_params: <Array<keyof InsertRule>>["fields", "forcedData", "returningFields", "validate"] ,
        hint: ` expecting "*" | true | { fields: string | string[] | {}  }`
     },
    { 
        rule: "update", 
        methods: ["update", "upsert"], 
-       no_limits: <UpdateRule>{ fields: "*", filterFields: "*", returningFields: "*"  }, 
+       no_limits: <UpdateRule>{ fields: "*", filterFields: "*", returningFields: "*"  },
+       table_only: true, 
        allowed_params: <Array<keyof UpdateRule>>["fields", "filterFields", "forcedFilter", "forcedData", "returningFields", "validate"] ,
        hint: ` expecting "*" | true | { fields: string | string[] | {}  }`
     },
@@ -613,21 +615,24 @@ const RULE_TO_METHODS = [
        rule: "delete", 
        methods: ["delete", "remove"], 
        no_limits: <DeleteRule>{ filterFields: "*" } , 
+       table_only: true,
        allowed_params: <Array<keyof DeleteRule>>["filterFields", "forcedFilter", "returningFields", "validate"] ,
        hint: ` expecting "*" | true | { filterFields: ( string | string[] | {} ) } \n Will use "select", "update", "delete" and "insert" rules`
     },
    { 
        rule: "sync", methods: ["sync", "unsync"], 
        no_limits: null,
+       table_only: true,
        allowed_params: <Array<keyof SyncRule>>["id_fields", "synced_field", "sync_type", "allow_delete", "min_throttle"],
        hint: ` expecting "*" | true | { id_fields: string[], synced_field: string }`
     },
     { 
         rule: "subscribe", methods: ["subscribe", "subscribeOne"], 
         no_limits: <SubscribeRule>{  throttle: 0  },
+        table_only: true,
         allowed_params: <Array<keyof SubscribeRule>>["throttle"],
         hint: ` expecting "*" | true | { throttle: number } \n Will use "select" rules`
-     }
+    }
 ];
 // const ALL_PUBLISH_METHODS = ["update", "upsert", "delete", "insert", "find", "findOne", "subscribe", "unsubscribe", "sync", "unsync", "remove"];
 // const ALL_PUBLISH_METHODS = RULE_TO_METHODS.map(r => r.methods).flat();
@@ -821,9 +826,11 @@ export class PublishParser {
                 /* Add no limits */
                 if(typeof table_rules === "boolean" || table_rules === "*"){
                     table_rules = {};
-                    RULE_TO_METHODS.map(r => { 
-                        table_rules[r.rule] = { ...r.no_limits };
-                    });
+                    RULE_TO_METHODS
+                        .filter(r => !(this.dbo[tableName] as TableHandler | ViewHandler).is_view || !r.table_only)
+                        .map(r => {
+                            table_rules[r.rule] = { ...r.no_limits };
+                        });
     
                 /* Check for invalid limits */
                 } else if(Object.keys(table_rules).length){
