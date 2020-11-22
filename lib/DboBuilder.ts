@@ -81,6 +81,7 @@ type LocalParams = {
     testRule?: boolean;
     tableAlias?: string;
     subOne?: boolean;
+    dbTX?: any;
 }
 function replaceNonAlphaNumeric(string: string): string {
     return string.replace(/[\W_]+/g,"_");
@@ -138,12 +139,14 @@ export class ViewHandler {
     joinGraph: Graph;
     joinPaths: JoinPaths;
     dboBuilder: DboBuilder;
+    t: pgPromise.ITask<{}>;
 
     pubSubManager: PubSubManager;
-    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder){
+    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>){
         if(!db || !tableOrViewInfo) throw "";
 
         this.db = db;
+        this.t = t;
         this.tableOrViewInfo = tableOrViewInfo;
         this.name = tableOrViewInfo.name;
         this.columns = tableOrViewInfo.columns;
@@ -505,7 +508,7 @@ export class ViewHandler {
                     }
                     if(isLocal || joinTableRules){
     
-                        const joinQuery = await this.dboBuilder.dbo[jTable].buildQueryTree(jFilter, { select: jSelect, limit: jLimit, offset: jOffset, orderBy: jOrder }, param3_unused, joinTableRules, localParams);
+                        const joinQuery = await (this.dboBuilder.dbo[jTable] as TableHandler).buildQueryTree(jFilter, { select: jSelect, limit: jLimit, offset: jOffset, orderBy: jOrder }, param3_unused, joinTableRules, localParams);
                         joinQuery.isLeftJoin = isLeftJoin;
                         joinQueries.push(joinQuery);
                     }
@@ -611,14 +614,13 @@ export class ViewHandler {
             // console.log(_query);
 
             if(testRule) return [];
-
             if(selectParams){
                 const good_params = ["select", "orderBy", "offset", "limit", "expectOne"];
                 const bad_params = Object.keys(selectParams).filter(k => !good_params.includes(k));
                 if(bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
             }
-            if(expectOne) return this.db.oneOrNone(_query).catch(err => makeErr(err, localParams));
-            else return this.db.any(_query).catch(err => makeErr(err, localParams));
+            if(expectOne) return (this.t || this.db).oneOrNone(_query).catch(err => makeErr(err, localParams));
+            else return (this.t || this.db).any(_query).catch(err => makeErr(err, localParams));
 
         } catch(e){
             if(localParams && localParams.testRule) throw e;
@@ -651,7 +653,7 @@ export class ViewHandler {
                 const { filterFields, forcedFilter } = get(table_rules, "select") || {};
                 
                 let query = "SELECT COUNT(*) FROM ${_psqlWS_tableName:name} " + this.prepareWhere(filter, forcedFilter, filterFields, false);
-                return this.db.one(query, { _psqlWS_tableName: this.name }).then(({ count }) => + count);
+                return (this.t || this.db).one(query, { _psqlWS_tableName: this.name }).then(({ count }) => + count);
             });
         } catch(e){
             if(localParams && localParams.testRule) throw e;
@@ -661,7 +663,7 @@ export class ViewHandler {
 
     subscribe(filter: Filter, params: SelectParams, localFunc: (items: object[]) => any, table_rules?: TableRule, localParams?: LocalParams){
         try {
-      
+            if(this.t) throw "subscribe not allowed within transactions";
             if(!localParams && !localFunc) throw " missing data. provide -> localFunc | localParams { socket } "; 
 
             const { filterFields, forcedFilter } = get(table_rules, "select") || {},
@@ -1177,8 +1179,8 @@ export class TableHandler extends ViewHandler {
         batching: string[]
     }
     
-    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder){
-        super(db, tableOrViewInfo, pubSubManager, dboBuilder);
+    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>){
+        super(db, tableOrViewInfo, pubSubManager, dboBuilder, t);
         this.tsDboDefs = this.tsDboDefs.concat([
             `   update: (filter: object, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
             `   upsert: (filter: object, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
@@ -1283,6 +1285,9 @@ export class TableHandler extends ViewHandler {
                 qType = multi? "any" : "one";
                 query += " RETURNING " + this.prepareSelect(returning, returningFields);
             }
+            if(this.t){
+                return this.t[qType](query).catch(err => makeErr(err, localParams));
+            }
             return this.db.tx(t => t[qType](query)).catch(err => makeErr(err, localParams));
         } catch(e){
             if(localParams && localParams.testRule) throw e;
@@ -1382,6 +1387,7 @@ export class TableHandler extends ViewHandler {
                 queryType = "one"
             }
             // console.log(query);
+            if(this.t) return this.t[queryType](query).catch(err => makeErr(err, localParams));
             return this.db.tx(t => t[queryType](query)).catch(err => makeErr(err, localParams));
         } catch(e){
             if(localParams && localParams.testRule) throw e;
@@ -1434,7 +1440,7 @@ export class TableHandler extends ViewHandler {
                 _query += " RETURNING " + this.prepareSelect(returning, returningFields);
             }
             
-            return this.db[queryType](_query, { _psqlWS_tableName: this.name }).catch(err => makeErr(err, localParams));
+            return (this.t || this.db)[queryType](_query, { _psqlWS_tableName: this.name }).catch(err => makeErr(err, localParams));
         } catch(e){
             if(localParams && localParams.testRule) throw e;
             throw { err: e, msg: `Issue with dbo.${this.name}.delete()` };
@@ -1469,6 +1475,7 @@ export class TableHandler extends ViewHandler {
 
     /* External request. Cannot sync from server */
     async sync(filter: Filter, params: SelectParams, param3_unused, table_rules: TableRule, localParams: LocalParams){
+        if(this.t) throw "Sync not allowed within transactions";
         try {
             const { socket } = localParams || {};
 
@@ -1537,14 +1544,22 @@ export class TableHandler extends ViewHandler {
     }
 
 }
-
-export interface DbHandler {
+type TransactionHandler = {
+    (): Promise<TxHandler>
+}
+interface _DbHandler {
     [key: string]: TableHandler | ViewHandler
 }
 
+export type DbHandler = { tx: TransactionHandler } | _DbHandler
+
+export interface TxHandler {
+    [key: string]: TableHandler | ViewHandler;
+}
+
 import { JOIN_TYPES } from "./Prostgles";
-import { strict } from "assert";
-import { join } from "path";
+import { strict, rejects } from "assert";
+import { join, resolve } from "path";
 
 export class DboBuilder {
     tablesOrViews: TableOrViewInfo[];
@@ -1571,7 +1586,7 @@ export class DboBuilder {
         this.prostgles = prostgles;
         this.db = this.prostgles.db;
         this.schema = this.prostgles.schema || "public";
-        this.dbo = {};
+        this.dbo = { };
         // this.joins = this.prostgles.joins;
         this.pubSubManager = new PubSubManager(this.db, this.dbo);
     }
@@ -1612,9 +1627,9 @@ export class DboBuilder {
                             f = <string[]>v[1];
                             
                         if(!this.dbo[t]) throw "Table not found: " + t;
-                        const m1 = f.filter(k => !this.dbo[t].column_names.includes(k))
+                        const m1 = f.filter(k => !(this.dbo[t] as TableHandler).column_names.includes(k))
                         if(m1 && m1.length){
-                            throw `Table ${t}(${this.dbo[t].column_names.join()}) has no fields named: ${m1.join()}`;
+                            throw `Table ${t}(${(this.dbo[t] as TableHandler).column_names.join()}) has no fields named: ${m1.join()}`;
                         }
                     })
                 });
@@ -1716,9 +1731,9 @@ export type DeleteParams = {
             } else {
                 this.dbo[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this);
             }
-            allDataDefs += this.dbo[tov.name].tsDataDef + "\n";
-            allDboDefs += this.dbo[tov.name].tsDboDef;
-            this.dboDefinition += ` ${tov.name}: ${this.dbo[tov.name].tsDboName};\n`;
+            allDataDefs += (this.dbo[tov.name] as TableHandler).tsDataDef + "\n";
+            allDboDefs += (this.dbo[tov.name] as TableHandler).tsDboDef;
+            this.dboDefinition += ` ${tov.name}: ${(this.dbo[tov.name] as TableHandler).tsDboName};\n`;
         });
 
         await this.parseJoins();
@@ -1726,6 +1741,21 @@ export type DeleteParams = {
         this.dboDefinition += "};\n";
         
         this.tsTypesDefinition = [common_types, allDataDefs, allDboDefs, this.dboDefinition].join("\n");
+
+        this.dbo.tx = async () => {
+            return new Promise((resolve, reject) => {
+                this.db.tx((t) => {
+                    let txDB = {};
+                    this.tablesOrViews.map(tov => {
+                        if(tov.is_view){
+                            txDB[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, t);
+                        } else {
+                            txDB[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t);
+                        }
+                    });
+                });
+            });
+        }
         
         return this.dbo;
             // let dbo = makeDBO(db, allTablesViews, pubSubManager, true);

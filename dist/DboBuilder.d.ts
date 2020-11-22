@@ -39,6 +39,7 @@ declare type LocalParams = {
     testRule?: boolean;
     tableAlias?: string;
     subOne?: boolean;
+    dbTX?: any;
 };
 declare type Filter = object | {
     $and: Filter[];
@@ -79,8 +80,9 @@ export declare class ViewHandler {
     joinGraph: Graph;
     joinPaths: JoinPaths;
     dboBuilder: DboBuilder;
+    t: pgPromise.ITask<{}>;
     pubSubManager: PubSubManager;
-    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder);
+    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>);
     makeDef(): void;
     getFullDef(): any[];
     validateViewRules(fields: FieldFilter, filterFields: FieldFilter, returningFields: FieldFilter, forcedFilter: object, rule: string): Promise<boolean>;
@@ -153,7 +155,7 @@ export declare class TableHandler extends ViewHandler {
         queries: number;
         batching: string[];
     };
-    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder);
+    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>);
     willBatch(query: string): boolean;
     update(filter: Filter, newData: object, params: UpdateParams, tableRules: TableRule, localParams?: LocalParams): Promise<any>;
     validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues }: ValidatedParams): ValidDataAndColumnSet;
@@ -167,7 +169,16 @@ export declare class TableHandler extends ViewHandler {
         synced_field: string;
     }>;
 }
-export interface DbHandler {
+declare type TransactionHandler = {
+    (): Promise<TxHandler>;
+};
+interface _DbHandler {
+    [key: string]: TableHandler | ViewHandler;
+}
+export declare type DbHandler = {
+    tx: TransactionHandler;
+} | _DbHandler;
+export interface TxHandler {
     [key: string]: TableHandler | ViewHandler;
 }
 export declare class DboBuilder {
