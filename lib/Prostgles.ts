@@ -216,7 +216,7 @@ export type PublishViewRule = {
 export type RequestParams = { dbo?: DbHandler, socket?: any };
 
 export type PublishedTablesAndViews = { [key:string]: PublishTableRule | PublishViewRule | "*" } | "*" ;
-export type Publish = PublishedTablesAndViews | ((socket?: any, dbo?: DbHandler, db?: DB) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>)); 
+export type Publish = PublishedTablesAndViews | ((socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>)); 
 
 export type Method = (...args: any) => ( any | Promise<any> );
 export const JOIN_TYPES = ["one-many", "many-one", "one-one", "many-many"] as const;
@@ -227,7 +227,7 @@ export type Join = {
 };
 export type Joins = Join[];
 
-export type publishMethods = (socket?: any, dbo?: DbHandler | any, db?: DB) => { [key:string]: Method } | Promise<{ [key:string]: Method }>;
+export type publishMethods = (socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB) => { [key:string]: Method } | Promise<{ [key:string]: Method }>;
 
 export type ProstglesInitOptions = {
     dbConnection: DbConnection;

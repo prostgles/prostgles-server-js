@@ -8,6 +8,7 @@ const io = require("socket.io")(http);
 http.listen(3001);
 
 import { DBObj } from "./DBoGenerated";
+import { TableHandler, DbHandler } from '../../../dist/DboBuilder';
 
 prostgles({
 	dbConnection: {
@@ -21,7 +22,10 @@ prostgles({
 	io,
 	tsGeneratedTypesDir: path.join(__dirname + '/'),
 	transactions: "tt",
-	publish: (socket, dbo ) => "*",
+	publish: (socket, dbo: DBObj) => {
+		
+		return {};
+	},
 	onReady: async (dbo: DBObj, db) => {
 		await db.any(`CREATE TABLE IF NOT EXISTS "table" (id text);`)
 		await dbo.items.delete({});

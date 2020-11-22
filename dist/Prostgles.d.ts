@@ -130,7 +130,7 @@ export declare type RequestParams = {
 export declare type PublishedTablesAndViews = {
     [key: string]: PublishTableRule | PublishViewRule | "*";
 } | "*";
-export declare type Publish = PublishedTablesAndViews | ((socket?: any, dbo?: DbHandler, db?: DB) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>));
+export declare type Publish = PublishedTablesAndViews | ((socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>));
 export declare type Method = (...args: any) => (any | Promise<any>);
 export declare const JOIN_TYPES: readonly ["one-many", "many-one", "one-one", "many-many"];
 export declare type Join = {
@@ -141,7 +141,7 @@ export declare type Join = {
     type: typeof JOIN_TYPES[number];
 };
 export declare type Joins = Join[];
-export declare type publishMethods = (socket?: any, dbo?: DbHandler | any, db?: DB) => {
+export declare type publishMethods = (socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB) => {
     [key: string]: Method;
 } | Promise<{
     [key: string]: Method;

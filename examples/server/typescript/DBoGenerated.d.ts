@@ -45,6 +45,15 @@ export declare type Items_Filter = Items | object | {
 } | {
     $or: (Items | object)[];
 };
+export declare type Items2 = {
+    name?: string;
+    id?: number;
+};
+export declare type Items2_Filter = Items2 | object | {
+    $and: (Items2 | object)[];
+} | {
+    $or: (Items2 | object)[];
+};
 export declare type Table = {
     id?: string;
 };
@@ -75,6 +84,21 @@ export declare type DBO_items = {
     upsert: (filter: object, newData: Items, params?: UpdateParams) => Promise<void | Items>;
     insert: (data: (Items | Items[]), params?: InsertParams) => Promise<void | Items>;
     delete: (filter: object, params?: DeleteParams) => Promise<void | Items>;
+};
+export declare type DBO_items2 = {
+    find: (filter?: Items2_Filter, selectParams?: SelectParams) => Promise<Items2[]>;
+    findOne: (filter?: Items2_Filter, selectParams?: SelectParams) => Promise<Items2>;
+    subscribe: (filter: Items2_Filter, params: SelectParams, onData: (items: Items2[]) => any) => Promise<{
+        unsubscribe: () => any;
+    }>;
+    subscribeOne: (filter: Items2_Filter, params: SelectParams, onData: (item: Items2) => any) => Promise<{
+        unsubscribe: () => any;
+    }>;
+    count: (filter?: Items2_Filter) => Promise<number>;
+    update: (filter: object, newData: Items2, params?: UpdateParams) => Promise<void | Items2>;
+    upsert: (filter: object, newData: Items2, params?: UpdateParams) => Promise<void | Items2>;
+    insert: (data: (Items2 | Items2[]), params?: InsertParams) => Promise<void | Items2>;
+    delete: (filter: object, params?: DeleteParams) => Promise<void | Items2>;
 };
 export declare type DBO_table = {
     find: (filter?: Table_Filter, selectParams?: SelectParams) => Promise<Table[]>;
@@ -108,6 +132,7 @@ export declare type DBO_transaction = {
 };
 export declare type DBObj = {
     items: DBO_items;
+    items2: DBO_items2;
     table: DBO_table;
     transaction: DBO_transaction;
     tt: (t: TxCB) => Promise<any | void>;

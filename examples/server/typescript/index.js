@@ -23,7 +23,15 @@ index_1.default({
     io,
     tsGeneratedTypesDir: path_1.default.join(__dirname + '/'),
     transactions: "tt",
-    publish: (socket, dbo) => "*",
+    publish: (socket, dbo) => {
+        // const dd: DbHandler = {}
+        // dd.aad.
+        // return {
+        // 	items: "*",
+        // 	items2: "*"
+        // }
+        return {};
+    },
     onReady: async (dbo, db) => {
         await db.any(`CREATE TABLE IF NOT EXISTS "table" (id text);`);
         await dbo.items.delete({});
