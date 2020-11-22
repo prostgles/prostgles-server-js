@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import { DboBuilder, DbHandler } from "./DboBuilder";
+import { DboBuilder, DbHandler, DbHandlerTX } from "./DboBuilder";
 export declare type DB = pgPromise.IDatabase<{}, pg.IClient>;
 declare type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 declare type DbConnectionOpts = pg.IDefaults;
@@ -157,6 +157,7 @@ export declare type ProstglesInitOptions = {
     schema?: string;
     sqlFilePath?: string;
     onReady(dbo: any, db: DB): void;
+    transactions?: string | boolean;
     publishRawSQL?(socket: Socket, dbo: any, db?: DB): any;
     wsChannelNamePrefix?: string;
     onSocketConnect?(socket: Socket, dbo: any, db?: DB): any;
@@ -170,13 +171,14 @@ export declare class Prostgles {
     dbConnection: DbConnection;
     dbOptions: DbConnectionOpts;
     db: DB;
-    dbo: DbHandler;
+    dbo: DbHandler | DbHandlerTX;
     dboBuilder: DboBuilder;
     publishMethods?: publishMethods;
     io: any;
     publish?: Publish;
     joins?: Joins;
     schema: string;
+    transactions?: string | boolean;
     publishRawSQL?: any;
     wsChannelNamePrefix: string;
     onSocketConnect?(socket: Socket | any, dbo: any, db?: DB): any;
@@ -186,7 +188,7 @@ export declare class Prostgles {
     publishParser: PublishParser;
     constructor(params: ProstglesInitOptions);
     checkDb(): void;
-    init(onReady: (dbo: DbHandler, db: DB) => any): Promise<boolean>;
+    init(onReady: (dbo: DbHandler | DbHandlerTX, db: DB) => any): Promise<boolean>;
     runSQLFile(filePath: string): Promise<void>;
     setSocketEvents(): Promise<void>;
 }
@@ -204,9 +206,9 @@ export declare class PublishParser {
     publish: any;
     publishMethods?: any;
     publishRawSQL?: any;
-    dbo: DbHandler;
+    dbo: DbHandler | DbHandlerTX;
     db: DB;
-    constructor(publish: any, publishMethods: any, publishRawSQL: any, dbo: DbHandler, db: DB);
+    constructor(publish: any, publishMethods: any, publishRawSQL: any, dbo: DbHandler | DbHandlerTX, db: DB);
     getMethods(socket: any): Promise<{}>;
     getSchemaFromPublish(socket: any): Promise<{}>;
     getPublish(socket: any): Promise<any>;

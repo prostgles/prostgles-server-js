@@ -169,23 +169,26 @@ export declare class TableHandler extends ViewHandler {
         synced_field: string;
     }>;
 }
-declare type TransactionHandler = {
-    (): Promise<TxHandler>;
-};
-interface _DbHandler {
-    [key: string]: TableHandler | ViewHandler;
-}
-export declare type DbHandler = {
-    tx: TransactionHandler;
-} | _DbHandler;
 export interface TxHandler {
     [key: string]: TableHandler | ViewHandler;
 }
+export declare type TxCB = {
+    (t: TxHandler): (any | void);
+};
+export declare type TX = {
+    (t: TxCB): Promise<(any | void)>;
+};
+export interface DbHandler {
+    [key: string]: TableHandler | ViewHandler;
+}
+export declare type DbHandlerTX = {
+    [key: string]: TX;
+} | DbHandler;
 export declare class DboBuilder {
     tablesOrViews: TableOrViewInfo[];
     db: DB;
     schema: string;
-    dbo: DbHandler;
+    dbo: DbHandler | DbHandlerTX;
     pubSubManager: PubSubManager;
     pojoDefinitions: string[];
     dboDefinition: string;
@@ -198,7 +201,7 @@ export declare class DboBuilder {
     constructor(prostgles: Prostgles);
     parseJoins(): Promise<JoinPaths>;
     buildJoinPaths(): void;
-    init(): Promise<DbHandler>;
+    init(): Promise<DbHandler | DbHandlerTX>;
 }
 export {};
 //# sourceMappingURL=DboBuilder.d.ts.map

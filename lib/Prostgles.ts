@@ -10,7 +10,7 @@ import { strict } from "assert";
 'use strict';
 
 import { get } from "./utils";
-import { DboBuilder, DbHandler } from "./DboBuilder";
+import { DboBuilder, DbHandler, DbHandlerTX } from "./DboBuilder";
 import { PubSubManager } from "./PubSubManager";
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -241,6 +241,7 @@ export type ProstglesInitOptions = {
     sqlFilePath?: string;
     onReady(dbo: any, db: DB): void;
     // auth, 
+    transactions?: string | boolean;
     publishRawSQL?(socket: Socket, dbo: any, db?: DB): any;
     wsChannelNamePrefix?: string;
     onSocketConnect?(socket: Socket, dbo: any, db?: DB);
@@ -278,7 +279,7 @@ export class Prostgles {
     };
     dbOptions: DbConnectionOpts;
     db: DB;
-    dbo: DbHandler;
+    dbo: DbHandler | DbHandlerTX;
     dboBuilder: DboBuilder;
 
     publishMethods?: publishMethods;
@@ -286,6 +287,7 @@ export class Prostgles {
     publish?: Publish;
     joins?: Joins;
     schema: string = "public";
+    transactions?: string | boolean;
     // auth, 
     publishRawSQL?: any;
     wsChannelNamePrefix: string = "_psqlWS_";
@@ -298,7 +300,13 @@ export class Prostgles {
     constructor(params: ProstglesInitOptions){
         if(!params) throw "ProstglesInitOptions missing";
         if(!params.io) console.warn("io missing. WebSockets will not be set up");
-        const unknownParams = Object.keys(params).filter(key => !["joins", "tsGeneratedTypesDir", "onReady", "dbConnection", "dbOptions", "publishMethods", "io", "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect", "onSocketDisconnect", "sqlFilePath"].includes(key))
+        let config: Array<keyof ProstglesInitOptions> = [
+            "transactions", "joins", "tsGeneratedTypesDir",
+            "onReady", "dbConnection", "dbOptions", "publishMethods", "io", 
+            "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect", 
+            "onSocketDisconnect", "sqlFilePath"
+        ];
+        const unknownParams = Object.keys(params).filter((key: string) => !(config as string[]).includes(key))
         if(unknownParams.length){ 
             console.error(`Unrecognised ProstglesInitOptions params: ${unknownParams.join()}`);
         }
@@ -310,7 +318,7 @@ export class Prostgles {
         if(!this.db || !this.db.connect) throw "something went wrong getting a db connection";
     }
 
-    async init(onReady: (dbo: DbHandler, db: DB) => any){
+    async init(onReady: (dbo: DbHandler | DbHandlerTX, db: DB) => any){
 
         /* 1. Connect to db */
         this.db = getDbConnection(this.dbConnection, this.dbOptions);
@@ -637,10 +645,10 @@ export class PublishParser {
     publish: any;
     publishMethods?: any;
     publishRawSQL?: any;
-    dbo: DbHandler;
+    dbo: DbHandler | DbHandlerTX;
     db: DB
 
-    constructor(publish: any, publishMethods: any, publishRawSQL: any, dbo: DbHandler, db: DB){
+    constructor(publish: any, publishMethods: any, publishRawSQL: any, dbo: DbHandler | DbHandlerTX, db: DB){
         this.publish = publish;
         this.publishMethods = publishMethods;
         this.publishRawSQL = publishRawSQL;

@@ -1547,15 +1547,21 @@ export class TableHandler extends ViewHandler {
 type TransactionHandler = {
     (): Promise<TxHandler>
 }
-interface _DbHandler {
-    [key: string]: TableHandler | ViewHandler
-}
-
-export type DbHandler = { tx: TransactionHandler } | _DbHandler
-
 export interface TxHandler {
     [key: string]: TableHandler | ViewHandler;
 }
+export type TxCB = {
+    (t: TxHandler): (any | void);
+}
+export type TX = {
+    (t: TxCB): Promise<(any | void)>;
+}
+export interface DbHandler {
+    [key: string]: TableHandler | ViewHandler;
+}
+
+export type DbHandlerTX = { [key: string]: TX } | DbHandler
+
 
 import { JOIN_TYPES } from "./Prostgles";
 import { strict, rejects } from "assert";
@@ -1567,7 +1573,7 @@ export class DboBuilder {
     db: DB;
     schema: string = "public";
 
-    dbo: DbHandler;
+    dbo: DbHandler | DbHandlerTX;
     pubSubManager: PubSubManager;
 
     pojoDefinitions: string[];
@@ -1588,7 +1594,7 @@ export class DboBuilder {
         this.schema = this.prostgles.schema || "public";
         this.dbo = { };
         // this.joins = this.prostgles.joins;
-        this.pubSubManager = new PubSubManager(this.db, this.dbo);
+        this.pubSubManager = new PubSubManager(this.db, this.dbo as DbHandler);
     }
 
     async parseJoins(): Promise<JoinPaths> {
@@ -1686,7 +1692,7 @@ export class DboBuilder {
         
     }
 
-    async init(): Promise<DbHandler>{
+    async init(): Promise<DbHandler | DbHandlerTX>{
         
         this.tablesOrViews = await getTablesForSchemaPostgresSQL(this.db, this.schema);
 
@@ -1711,7 +1717,7 @@ export type SelectParams = {
 }
 export type UpdateParams = {
     returning?: FieldFilter;
-    onConflictDoNothing?: boolean;
+    onConflictDoNothing?: boolean;TxHandler
     fixIssues?: boolean;
     multi?: boolean;
 }
@@ -1722,6 +1728,9 @@ export type InsertParams = {
 }
 export type DeleteParams = {
     returning?: FieldFilter;
+};
+export type TxCB = {
+    (t: DBObj): (any | void | Promise<(any | void)>)
 };
 `
         this.dboDefinition = `export type DBObj = {\n`;
@@ -1738,22 +1747,26 @@ export type DeleteParams = {
 
         await this.parseJoins();
 
+        let txKey = "tx";
+        if(this.prostgles.transactions){
+            if(typeof this.prostgles.transactions === "string") txKey = this.prostgles.transactions;
+            this.dboDefinition += ` ${txKey}: (t: TxCB) => Promise<any | void> ;\n`;
+        }
         this.dboDefinition += "};\n";
         
         this.tsTypesDefinition = [common_types, allDataDefs, allDboDefs, this.dboDefinition].join("\n");
 
-        this.dbo.tx = async () => {
-            return new Promise((resolve, reject) => {
-                this.db.tx((t) => {
-                    let txDB = {};
-                    this.tablesOrViews.map(tov => {
-                        if(tov.is_view){
-                            txDB[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, t);
-                        } else {
-                            txDB[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t);
-                        }
-                    });
+        this.dbo[txKey] = (cb: TxCB) => {
+            return this.db.tx((t) => {
+                let txDB = {};
+                this.tablesOrViews.map(tov => {
+                    if(tov.is_view){
+                        txDB[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, t);
+                    } else {
+                        txDB[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t);
+                    }
                 });
+                return cb(txDB);
             });
         }
         

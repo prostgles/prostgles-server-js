@@ -1410,7 +1410,7 @@ export type SelectParams = {
 }
 export type UpdateParams = {
     returning?: FieldFilter;
-    onConflictDoNothing?: boolean;
+    onConflictDoNothing?: boolean;TxHandler
     fixIssues?: boolean;
     multi?: boolean;
 }
@@ -1421,6 +1421,9 @@ export type InsertParams = {
 }
 export type DeleteParams = {
     returning?: FieldFilter;
+};
+export type TxCB = {
+    (t: DBObj): (any | void | Promise<(any | void)>)
 };
 `;
             this.dboDefinition = `export type DBObj = {\n`;
@@ -1436,23 +1439,28 @@ export type DeleteParams = {
                 this.dboDefinition += ` ${tov.name}: ${this.dbo[tov.name].tsDboName};\n`;
             });
             yield this.parseJoins();
+            let txKey = "tx";
+            if (this.prostgles.transactions) {
+                if (typeof this.prostgles.transactions === "string")
+                    txKey = this.prostgles.transactions;
+                this.dboDefinition += ` ${txKey}: (t: TxCB) => Promise<any | void> ;\n`;
+            }
             this.dboDefinition += "};\n";
             this.tsTypesDefinition = [common_types, allDataDefs, allDboDefs, this.dboDefinition].join("\n");
-            this.dbo.tx = () => __awaiter(this, void 0, void 0, function* () {
-                return new Promise((resolve, reject) => {
-                    this.db.tx((t) => {
-                        let txDB = {};
-                        this.tablesOrViews.map(tov => {
-                            if (tov.is_view) {
-                                txDB[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, t);
-                            }
-                            else {
-                                txDB[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t);
-                            }
-                        });
+            this.dbo[txKey] = (cb) => {
+                return this.db.tx((t) => {
+                    let txDB = {};
+                    this.tablesOrViews.map(tov => {
+                        if (tov.is_view) {
+                            txDB[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, t);
+                        }
+                        else {
+                            txDB[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t);
+                        }
                     });
+                    return cb(txDB);
                 });
-            });
+            };
             return this.dbo;
             // let dbo = makeDBO(db, allTablesViews, pubSubManager, true);
         });

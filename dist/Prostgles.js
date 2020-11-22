@@ -46,7 +46,13 @@ class Prostgles {
             throw "ProstglesInitOptions missing";
         if (!params.io)
             console.warn("io missing. WebSockets will not be set up");
-        const unknownParams = Object.keys(params).filter(key => !["joins", "tsGeneratedTypesDir", "onReady", "dbConnection", "dbOptions", "publishMethods", "io", "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect", "onSocketDisconnect", "sqlFilePath"].includes(key));
+        let config = [
+            "transactions", "joins", "tsGeneratedTypesDir",
+            "onReady", "dbConnection", "dbOptions", "publishMethods", "io",
+            "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect",
+            "onSocketDisconnect", "sqlFilePath"
+        ];
+        const unknownParams = Object.keys(params).filter((key) => !config.includes(key));
         if (unknownParams.length) {
             console.error(`Unrecognised ProstglesInitOptions params: ${unknownParams.join()}`);
         }
