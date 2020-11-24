@@ -12,12 +12,15 @@ import { strict } from "assert";
 import { get } from "./utils";
 import { DboBuilder, DbHandler, DbHandlerTX, TableHandler, ViewHandler } from "./DboBuilder";
 import { PubSubManager } from "./PubSubManager";
-
+ 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 let pgp: PGP = pgPromise({
     promiseLib: promise
     // ,query: function (e) { console.log({psql: e.query, params: e.params}); }
 });
+
+/* Casts count/sum/max to bigint. Needs rework to remove casting "+count" and other issues; */
+// pgp.pg.types.setTypeParser(20, BigInt);
 
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
@@ -215,7 +218,7 @@ export type PublishViewRule = {
 // }
 export type RequestParams = { dbo?: DbHandler, socket?: any };
 
-export type PublishedTablesAndViews = { [key:string]: PublishTableRule | PublishViewRule | "*" } | "*" ;
+export type PublishedTablesAndViews = { [key: string]: PublishTableRule | PublishViewRule | "*" } | "*" ;
 export type Publish = PublishedTablesAndViews | ((socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>)); 
 
 export type Method = (...args: any) => ( any | Promise<any> );
@@ -705,8 +708,11 @@ export class PublishParser {
                 let txKey = "tx";
                 if(!this.prostgles.transactions) txKey = "";
                 if(typeof this.prostgles.transactions === "string") txKey = this.prostgles.transactions;
-                await Promise.all(
-                    Object.keys(_publish).filter(k => !txKey || txKey !== k).map(async tableName => {
+                
+                const tableNames = Object.keys(_publish).filter(k => !txKey || txKey !== k);
+                
+                await Promise.all(tableNames                 
+                    .map(async tableName => {
                         if(!this.dbo[tableName]) throw `Table ${tableName} does not exist\nExpecting one of: ${Object.keys(this.dbo).join(", ")}`;
 
                         const table_rules = await this.getTableRules({ socket, tableName });

@@ -67,8 +67,8 @@ class ViewHandler {
         this.filterDef = ` ${this.tsDataName}_Filter `;
         const filterDef = this.filterDef;
         this.tsDboDefs = [
-            `   find: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<${this.tsDataName}[] | object[]>;`,
-            `   findOne: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<${this.tsDataName} | object>;`,
+            `   find: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<${this.tsDataName}[] | any[]>;`,
+            `   findOne: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<${this.tsDataName} | any>;`,
             `   subscribe: (filter: ${filterDef}, params: SelectParams, onData: (items: ${this.tsDataName}[]) => any) => Promise<{ unsubscribe: () => any }>;`,
             `   subscribeOne: (filter: ${filterDef}, params: SelectParams, onData: (item: ${this.tsDataName}) => any) => Promise<{ unsubscribe: () => any }>;`,
             `   count: (filter?: ${filterDef}) => Promise<number>;`
@@ -185,13 +185,18 @@ class ViewHandler {
                             groupBy = `GROUP BY ${q.select.join(", ")}\n`;
                         }
                     }
-                    return `` +
-                        `   SELECT ${select} \n ` +
-                        `   FROM ${asName(q.table)}\n` +
-                        `   ${q.where}\n` +
-                        `   ${groupBy}\n` +
-                        `   ${q.orderBy}\n` +
-                        (isJoined ? "" : `LIMIT ${q.limit}\nOFFSET ${q.offset || 0}`);
+                    let res = "" +
+                        `SELECT ${select} \n` +
+                        `FROM ${asName(q.table)}\n`;
+                    if (q.where)
+                        res += `${q.where}\n`;
+                    if (groupBy)
+                        res += `${groupBy}\n`;
+                    if (q.orderBy)
+                        res += `${q.orderBy}\n`;
+                    if (!isJoined)
+                        res += `LIMIT ${q.limit} \nOFFSET ${q.offset || 0}\n`;
+                    return res;
                 }
                 else {
                     // if(q.aggs && q.aggs && q.aggs.length) throw "Cannot join an aggregate";
@@ -648,26 +653,30 @@ class ViewHandler {
                 const f2 = filter[t2];
                 if (!this.dboBuilder.dbo[t2])
                     throw "Invalid or dissallowed table: " + t2;
+                /* Nested $exists not allowed */
+                if (f2) {
+                    // if
+                }
                 const makeTableChain = (paths, depth = 0, finalFilter = "") => {
                     const join = paths[depth], table = join.table;
                     const prevTable = depth === 0 ? join.source : paths[depth - 1].table;
-                    let cond = `${join.on.map(([c1, c2]) => `${asName(prevTable)}.${asName(c1)} = ${asName(table)}.${asName(c2)}`).join("\n AND ")}\n`;
+                    let cond = `${join.on.map(([c1, c2]) => `${asName(prevTable)}.${asName(c1)} = ${asName(table)}.${asName(c2)}`).join("\n AND ")}`;
                     // console.log(join, cond);
-                    let j = `` +
-                        `   SELECT 1 \n` +
-                        `   FROM ${asName(table)} \n` +
-                        `   WHERE ${cond} \n`; //
+                    let j = `SELECT 1 \n` +
+                        `FROM ${asName(table)} \n` +
+                        `WHERE ${cond} \n`; //
+                    if (depth === paths.length - 1 && finalFilter) {
+                        j += `AND ${finalFilter} \n`;
+                    }
+                    const indent = (a, b) => a;
                     if (depth < paths.length - 1) {
-                        j += `    AND ${makeTableChain(paths, depth + 1)}`;
+                        j += `AND ${makeTableChain(paths, depth + 1, finalFilter)} \n`;
                     }
-                    else {
-                        if (finalFilter)
-                            j += `    AND ${finalFilter} `;
-                    }
+                    j = indent(j, depth + 1);
                     let res = `EXISTS ( \n` +
-                        `   ${j} \n` +
-                        `   )`;
-                    return res;
+                        j +
+                        `) \n`;
+                    return indent(res, depth);
                 };
                 let t2Rules = undefined, forcedFilter, filterFields, tableAlias;
                 if (localParams && localParams.socket && this.dboBuilder.publishParser) {
@@ -677,6 +686,7 @@ class ViewHandler {
                     ({ forcedFilter, filterFields } = t2Rules.select);
                 }
                 const finalWhere = yield this.dboBuilder.dbo[t2].prepareWhere(f2, forcedFilter, filterFields, true, tableAlias);
+                // console.log(f2, finalWhere);
                 res = makeTableChain(this.getJoins(t1, t2), 0, finalWhere);
                 return res;
             })))).join(" AND \n");
@@ -1513,28 +1523,28 @@ export type TxCB = {
                 allDboDefs += this.dbo[tov.name].tsDboDef;
                 this.dboDefinition += ` ${tov.name}: ${this.dbo[tov.name].tsDboName};\n`;
             });
-            let txKey = "tx";
             if (this.prostgles.transactions) {
+                let txKey = "tx";
                 if (typeof this.prostgles.transactions === "string")
                     txKey = this.prostgles.transactions;
                 this.dboDefinition += ` ${txKey}: (t: TxCB) => Promise<any | void> ;\n`;
+                this.dbo[txKey] = (cb) => {
+                    return this.db.tx((t) => {
+                        let txDB = {};
+                        this.tablesOrViews.map(tov => {
+                            if (tov.is_view) {
+                                txDB[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
+                            }
+                            else {
+                                txDB[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
+                            }
+                        });
+                        return cb(txDB);
+                    });
+                };
             }
             this.dboDefinition += "};\n";
             this.tsTypesDefinition = [common_types, allDataDefs, allDboDefs, this.dboDefinition].join("\n");
-            this.dbo[txKey] = (cb) => {
-                return this.db.tx((t) => {
-                    let txDB = {};
-                    this.tablesOrViews.map(tov => {
-                        if (tov.is_view) {
-                            txDB[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
-                        }
-                        else {
-                            txDB[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
-                        }
-                    });
-                    return cb(txDB);
-                });
-            };
             return this.dbo;
             // let dbo = makeDBO(db, allTablesViews, pubSubManager, true);
         });
@@ -1900,5 +1910,27 @@ function sqlErrCodeToMsg(code) {
       https://www.postgresql.org/docs/13/errcodes-appendix.html
       JSON.stringify([...THE_table_$0.rows].map(t => [...t.children].map(u => u.innerText)).filter((d, i) => i && d.length > 1).reduce((a, v)=>({ ...a, [v[0]]: v[1] }), {}))
     */
+}
+/**
+ * Indents the given string
+ * @param {string} str  The string to be indented.
+ * @param {number} numOfIndents  The amount of indentations to place at the
+ *     beginning of each line of the string.
+ * @param {number=} opt_spacesPerIndent  Optional.  If specified, this should be
+ *     the number of spaces to be used for each tab that would ordinarily be
+ *     used to indent the text.  These amount of spaces will also be used to
+ *     replace any tab characters that already exist within the string.
+ * @return {string}  The new string with each line beginning with the desired
+ *     amount of indentation.
+ */
+function indent(str, numOfIndents, opt_spacesPerIndent = 0) {
+    str = str.replace(/^(?=.)/gm, new Array(numOfIndents + 1).join('\t'));
+    opt_spacesPerIndent = opt_spacesPerIndent + 1 || 0;
+    numOfIndents = new Array(opt_spacesPerIndent).join(' '); // re-use
+    return opt_spacesPerIndent
+        ? str.replace(/^\t+/g, function (tabs) {
+            return tabs.replace(/./g, numOfIndents);
+        })
+        : str;
 }
 //# sourceMappingURL=DboBuilder.js.map

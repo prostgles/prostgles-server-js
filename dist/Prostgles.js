@@ -384,7 +384,9 @@ class PublishParser {
                         txKey = "";
                     if (typeof this.prostgles.transactions === "string")
                         txKey = this.prostgles.transactions;
-                    yield Promise.all(Object.keys(_publish).filter(k => !txKey || txKey !== k).map((tableName) => __awaiter(this, void 0, void 0, function* () {
+                    const tableNames = Object.keys(_publish).filter(k => !txKey || txKey !== k);
+                    yield Promise.all(tableNames
+                        .map((tableName) => __awaiter(this, void 0, void 0, function* () {
                         if (!this.dbo[tableName])
                             throw `Table ${tableName} does not exist\nExpecting one of: ${Object.keys(this.dbo).join(", ")}`;
                         const table_rules = yield this.getTableRules({ socket, tableName });

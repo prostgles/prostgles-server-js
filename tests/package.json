@@ -12,6 +12,6 @@
     "@types/socket.io": "^2.1.11",
     "express": "^4.17.1",
     "prostgles-server": "^1.0.33",
-    "socket.io": "^2.3.0"
+    "socket.io": "^3.0.3"
   }
 }
