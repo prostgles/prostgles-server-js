@@ -309,6 +309,32 @@ export class ViewHandler {
             const PREF = `prostgles_prefix_to_avoid_collisions`,
                 joins = q.joins || [],
                 aggs = q.aggs || [];
+
+
+            const joinTables = (q1: Query, q2: Query) => {
+                const paths = this.getJoins(q1.table, q2.table);
+
+                return `${paths.map(({ table, on }, i) => {
+                    const prevTable = i === 0? q1.table : paths[i - 1].table;
+                    let iQ = asName(table);
+
+                    /* If target table then add filters, options, etc */
+                    if(i === paths.length - 1){
+                        iQ = "" +
+                        "   (\n" +
+                        `       SELECT *,\n` +
+                        `       row_number() over() as ${asName(`${table}_${PREF}_rowid_sorted`)},\n` +
+                        `       row_to_json((select x from (SELECT ${(q2.select.concat((q2.joins || []).map(j => j.table))).join(", ")}) as x)) AS ${asName(`${q2.table}_${PREF}_json`)} \n` +
+                        `       FROM (\n`+
+                        `           ${makeQuery3(q2, true)}\n` +
+                        `       ) ${asName(q2.table)}        -- [target table]\n` +
+                        `   ) ${asName(q2.table)}\n`;
+                    }
+                    return  "" +
+                    `   ${q2.isLeftJoin? "LEFT" : "INNER"} JOIN ${iQ}\n` +
+                    `   ON ${on.map(([c1, c2]) => `${asName(prevTable)}.${asName(c1)} = ${asName(table)}.${asName(c2)}`).join("\n AND ")}\n`
+                }).join("")}`
+            }
                 
             /* Leaf query */
             if(!joins.length){
@@ -343,24 +369,26 @@ export class ViewHandler {
               ${(isJoined? q.allFields : q.select).concat(aggs? aggs : []).filter(s => s).concat(
                 joins.map(j =>
                     j.limit === 1? 
-                    `         json_agg(${j.table}_${PREF}_json::jsonb ORDER BY ${j.table}_${PREF}_rowid_sorted)   FILTER (WHERE ${j.table}_${PREF}_limit <= ${j.limit} AND ${j.table}_${PREF}_dupes_rowid = 1 AND ${j.table}_${PREF}_json IS NOT NULL)->0  AS ${j.table}` :
-                    `COALESCE(json_agg(${j.table}_${PREF}_json::jsonb ORDER BY ${j.table}_${PREF}_rowid_sorted)   FILTER (WHERE ${j.table}_${PREF}_limit <= ${j.limit} AND ${j.table}_${PREF}_dupes_rowid = 1 AND ${j.table}_${PREF}_json IS NOT NULL), '[]')  AS ${j.table}`
+                    `         json_agg(${asName(`${j.table}_${PREF}_json`)}::jsonb ORDER BY ${asName(`${j.table}_${PREF}_rowid_sorted`)})   FILTER (WHERE ${asName(`${j.table}_${PREF}_limit`)} <= ${j.limit} AND ${asName(`${j.table}_${PREF}_dupes_rowid`)} = 1 AND ${asName(`${j.table}_${PREF}_json`)} IS NOT NULL)->0  AS ${asName(j.table)}` :
+                    `COALESCE(json_agg(${asName(`${j.table}_${PREF}_json`)}::jsonb ORDER BY ${asName(`${j.table}_${PREF}_rowid_sorted`)})   FILTER (WHERE ${asName(`${j.table}_${PREF}_limit`)} <= ${j.limit} AND ${asName(`${j.table}_${PREF}_dupes_rowid`)} = 1 AND ${asName(`${j.table}_${PREF}_json`)} IS NOT NULL), '[]')  AS ${asName(j.table)}`
                 )
               ).join(", ")}
             FROM (
                 SELECT *,
                 ${joins.map(j => 
-                    `row_number() over(partition by ${j.table}_${PREF}_dupes_rowid, ctid order by ${j.table}_${PREF}_rowid_sorted) AS ${j.table}_${PREF}_limit`
+                    `row_number() over(partition by ${asName(`${j.table}_${PREF}_dupes_rowid`)}, ctid order by ${asName(`${j.table}_${PREF}_rowid_sorted`)}) AS ${j.table}_${PREF}_limit`
                 ).join(", ")}
                 FROM (
                     SELECT 
                      -- [source full sellect + ctid to group by]
                     ${q.allFields.concat(["ctid"]).map(field => `${asName(q.table)}.${asName(field)}`).concat(
-                        joins.map(j => `${asName(`${j.table}.${j.table}_${PREF}_json`)}, ${asName(`${j.table}.${j.table}_${PREF}_rowid_sorted`)}`)
-                    ).concat(
+                        joins.map(j => 
+                            asName(j.table) + "." + asName(`${j.table}_${PREF}_json`) + ", " + asName(j.table) + "." + asName(`${j.table}_${PREF}_rowid_sorted`)
+                        ).concat(
                         // ${j.joins && j.joins.length? " ORDER BY  " : ""}
-                        joins.map(j => `row_number() over(partition by ${asName(`${j.table}_${PREF}_rowid_sorted, ${q.table}.ctid`)} ) AS ${asName(`${j.table}_${PREF}_dupes_rowid`)}`)
-                    ).join("\n, ")}
+                            joins.map(j => `row_number() over(partition by ${asName(`${j.table}_${PREF}_rowid_sorted`)}, ${asName(q.table)}.ctid ) AS ${asName(`${j.table}_${PREF}_dupes_rowid`)}`)
+                        ).join("\n, ")
+                    )}
                     FROM (
                         SELECT *, row_number() over() as ctid
                         FROM ${asName(q.table)}
@@ -379,30 +407,6 @@ export class ViewHandler {
             `-- [source limit] \n` +
             (isJoined? "" : `LIMIT ${q.limit || 0}\nOFFSET ${q.offset || 0}\n`);
 
-            function joinTables(q1: Query, q2: Query){
-                const paths = this.getJoins(q1.table, q2.table);
-
-                return `${paths.map(({ table, on }, i) => {
-                    const prevTable = i === 0? q1.table : paths[i - 1].table;
-                    let iQ = asName(table);
-
-                    /* If target table then add filters, options, etc */
-                    if(i === paths.length - 1){
-                        iQ = "" +
-                        "   (\n" +
-                        `       SELECT *,\n` +
-                        `       row_number() over() as ${asName(`${table}_${PREF}_rowid_sorted`)},\n` +
-                        `       row_to_json((select x from (SELECT ${(q2.select.concat((q2.joins || []).map(j => j.table))).join(", ")}) as x)) AS ${asName(`${q2.table}_${PREF}_json`)} \n` +
-                        `       FROM (\n`+
-                        `           ${makeQuery3(q2, true)}\n` +
-                        `       ) ${asName(q2.table)}        -- [target table]\n` +
-                        `   ) ${asName(q2.table)}\n`;
-                    }
-                    return  "" +
-                    `   ${q2.isLeftJoin? "LEFT" : "INNER"} JOIN ${iQ}\n` +
-                    `   ON ${on.map(([c1, c2]) => `${asName(prevTable)}.${asName(c1)} = ${asName(table)}.${asName(c2)}`).join("\n AND ")}\n`
-                }).join("")}`
-            }
             // WHY NOT THIS?
         //     return `WITH _posts AS (
         //         SELECT *, row_to_json((select x from (select id, title) as x)) as posts

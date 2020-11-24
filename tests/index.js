@@ -81,6 +81,7 @@ index_1.default({
             const expect1 = await dbo.items.count({ name: "tx" });
             if (expect1 !== 1)
                 throw "dbo.tx failed";
+            /* Aggregate functions example */
             const aggs = await dbo.items.findOne({}, {
                 select: {
                     id: "$count",
@@ -92,6 +93,14 @@ index_1.default({
             // console.log([id, total, distinct_names] )
             if (id != 4 || total != 4 || distinct_names != 3)
                 throw "Aggregation query failed";
+            /* Joins example */
+            const items = await dbo.items.find({}, {
+                select: {
+                    "*": 1,
+                    items3: "*"
+                }
+            });
+            console.log(items);
             console.log("All tests successful");
         }
         catch (err) {
