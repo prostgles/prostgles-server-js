@@ -49,13 +49,14 @@ prostgles({
 	onReady: async (dbo: DBObj, db) => {
 		
     app.get('*', function(req, res){
-      console.log(req.originalUrl)
+      // console.log(req.originalUrl)
 			res.sendFile(path.join(__dirname+'/index.html'));
 		});
 
 		try {
 			await dbo.items.delete({ });
 			await dbo.items2.delete({ });
+			console.log(await dbo.items3.update({},{ name: "2" }, { returning: "*" }));
 			// await dbo.items3.delete({ });
 	
 

@@ -827,8 +827,8 @@ export class ViewHandler {
             if(!this.dboBuilder.dbo[t2]) throw "Invalid or dissallowed table: " + t2;
 
             /* Nested $exists not allowed */
-            if(f2){
-                // if
+            if(f2 && Object.keys(f2).includes("$exists")){
+                throw "Nested exists dissallowed";
             }
     
             const makeTableChain = (paths: JoinInfo, depth: number = 0, finalFilter: string = "") => {
@@ -1402,7 +1402,9 @@ export class TableHandler extends ViewHandler {
         let data = this.prepareFieldValues(row, forcedData, allowedFields, fixIssues);
         const dataKeys = Object.keys(data);
 
-        if(!dataKeys.length) throw "missing/invalid data provided";
+        if(!data || !dataKeys.length) {
+            // throw "missing/invalid data provided";
+        }
         let cs = new pgp.helpers.ColumnSet(this.columnSet.columns.filter(c => dataKeys.includes(c.name)), { table: this.name });
 
         return { data, columnSet: cs }
@@ -1416,6 +1418,7 @@ export class TableHandler extends ViewHandler {
 
             let returningFields: FieldFilter,
                 forcedData: object,
+                validate: any,
                 fields: FieldFilter;
     
             if(tableRules){
@@ -1423,6 +1426,7 @@ export class TableHandler extends ViewHandler {
                 returningFields = tableRules.insert.returningFields;
                 forcedData = tableRules.insert.forcedData;
                 fields = tableRules.insert.fields;
+                validate = tableRules.insert.validate;
     
                 if(!fields) throw ` invalid insert rule for ${this.name}. fields missing `;
 
@@ -1450,16 +1454,19 @@ export class TableHandler extends ViewHandler {
                 conflict_query = " ON CONFLICT DO NOTHING ";
             }
             
-            if(!data) throw "Provide data in param1";
+            if(!data) data = {}; //throw "Provide data in param1";
             let returningSelect = returning? (" RETURNING " + this.prepareSelect(returning, returningFields, false)) : "";
-            const makeQuery = async (row) => {
+            const makeQuery = async (row, isOne = false) => {
                 if(!isPojoObject(row)) throw "\ninvalid insert data provided -> " + JSON.stringify(row);
                 const { data, columnSet } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues });
                 let _data = { ...data };
-                if(tableRules && tableRules.insert && tableRules.insert.validate){
-                    _data = await tableRules.insert.validate(row)
+                if(validate){
+                    _data = await validate(row)
                 }
-                return pgp.helpers.insert(_data, columnSet) + conflict_query + returningSelect;
+                let insertQ = "";
+                if(!Object.keys(_data).length) insertQ = `INSERT INTO ${asName(this.name)} DEFAULT VALUES `;
+                else insertQ = pgp.helpers.insert(_data, columnSet); 
+                return insertQ + conflict_query + returningSelect;
             };
     
         
@@ -1483,7 +1490,7 @@ export class TableHandler extends ViewHandler {
                 query = pgp.helpers.concat(queries);
                 if(returning) queryType = "many";
             } else {
-                query = await makeQuery(data);
+                query = await makeQuery(data, true);
                 if(returning) queryType = "one";
             }
             
@@ -1819,7 +1826,7 @@ export type SelectParams = {
 }
 export type UpdateParams = {
     returning?: FieldFilter;
-    onConflictDoNothing?: boolean;TxHandler
+    onConflictDoNothing?: boolean;
     fixIssues?: boolean;
     multi?: boolean;
 }

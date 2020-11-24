@@ -49,12 +49,13 @@ index_1.default({
     ],
     onReady: async (dbo, db) => {
         app.get('*', function (req, res) {
-            console.log(req.originalUrl);
+            // console.log(req.originalUrl)
             res.sendFile(path_1.default.join(__dirname + '/index.html'));
         });
         try {
             await dbo.items.delete({});
             await dbo.items2.delete({});
+            console.log(await dbo.items3.update({}, { name: "2" }, { returning: "*" }));
             // await dbo.items3.delete({ });
             /* Exists filter example */
             await dbo.items.insert([{ name: "a" }, { name: "a" }, { name: "b" }]);

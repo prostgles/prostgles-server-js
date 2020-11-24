@@ -21,7 +21,6 @@ export declare type SelectParams = {
 export declare type UpdateParams = {
     returning?: FieldFilter;
     onConflictDoNothing?: boolean;
-    TxHandler: any;
     fixIssues?: boolean;
     multi?: boolean;
 };

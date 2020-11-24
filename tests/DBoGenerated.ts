@@ -16,7 +16,7 @@ export type SelectParams = {
 }
 export type UpdateParams = {
     returning?: FieldFilter;
-    onConflictDoNothing?: boolean;TxHandler
+    onConflictDoNothing?: boolean;
     fixIssues?: boolean;
     multi?: boolean;
 }

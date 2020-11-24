@@ -654,8 +654,8 @@ class ViewHandler {
                 if (!this.dboBuilder.dbo[t2])
                     throw "Invalid or dissallowed table: " + t2;
                 /* Nested $exists not allowed */
-                if (f2) {
-                    // if
+                if (f2 && Object.keys(f2).includes("$exists")) {
+                    throw "Nested exists dissallowed";
                 }
                 const makeTableChain = (paths, depth = 0, finalFilter = "") => {
                     const join = paths[depth], table = join.table;
@@ -1146,8 +1146,9 @@ class TableHandler extends ViewHandler {
         }
         let data = this.prepareFieldValues(row, forcedData, allowedFields, fixIssues);
         const dataKeys = Object.keys(data);
-        if (!dataKeys.length)
-            throw "missing/invalid data provided";
+        if (!data || !dataKeys.length) {
+            // throw "missing/invalid data provided";
+        }
         let cs = new pgp.helpers.ColumnSet(this.columnSet.columns.filter(c => dataKeys.includes(c.name)), { table: this.name });
         return { data, columnSet: cs };
     }
@@ -1156,13 +1157,14 @@ class TableHandler extends ViewHandler {
             try {
                 const { returning, onConflictDoNothing, fixIssues = false } = param2 || {};
                 const { testRule = false } = localParams || {};
-                let returningFields, forcedData, fields;
+                let returningFields, forcedData, validate, fields;
                 if (tableRules) {
                     if (!tableRules.insert)
                         throw "insert rules missing for " + this.name;
                     returningFields = tableRules.insert.returningFields;
                     forcedData = tableRules.insert.forcedData;
                     fields = tableRules.insert.fields;
+                    validate = tableRules.insert.validate;
                     if (!fields)
                         throw ` invalid insert rule for ${this.name}. fields missing `;
                     /* Safely test publish rules */
@@ -1188,17 +1190,22 @@ class TableHandler extends ViewHandler {
                     conflict_query = " ON CONFLICT DO NOTHING ";
                 }
                 if (!data)
-                    throw "Provide data in param1";
+                    data = {}; //throw "Provide data in param1";
                 let returningSelect = returning ? (" RETURNING " + this.prepareSelect(returning, returningFields, false)) : "";
-                const makeQuery = (row) => __awaiter(this, void 0, void 0, function* () {
+                const makeQuery = (row, isOne = false) => __awaiter(this, void 0, void 0, function* () {
                     if (!isPojoObject(row))
                         throw "\ninvalid insert data provided -> " + JSON.stringify(row);
                     const { data, columnSet } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues });
                     let _data = Object.assign({}, data);
-                    if (tableRules && tableRules.insert && tableRules.insert.validate) {
-                        _data = yield tableRules.insert.validate(row);
+                    if (validate) {
+                        _data = yield validate(row);
                     }
-                    return pgp.helpers.insert(_data, columnSet) + conflict_query + returningSelect;
+                    let insertQ = "";
+                    if (!Object.keys(_data).length)
+                        insertQ = `INSERT INTO ${asName(this.name)} DEFAULT VALUES `;
+                    else
+                        insertQ = pgp.helpers.insert(_data, columnSet);
+                    return insertQ + conflict_query + returningSelect;
                 });
                 if (param2) {
                     const good_params = ["returning", "multi", "onConflictDoNothing", "fixIssues"];
@@ -1220,7 +1227,7 @@ class TableHandler extends ViewHandler {
                         queryType = "many";
                 }
                 else {
-                    query = yield makeQuery(data);
+                    query = yield makeQuery(data, true);
                     if (returning)
                         queryType = "one";
                 }
@@ -1494,7 +1501,7 @@ export type SelectParams = {
 }
 export type UpdateParams = {
     returning?: FieldFilter;
-    onConflictDoNothing?: boolean;TxHandler
+    onConflictDoNothing?: boolean;
     fixIssues?: boolean;
     multi?: boolean;
 }
