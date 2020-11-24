@@ -488,7 +488,10 @@ export class ViewHandler {
                 /* Validate fields from aggs */
                 await this.prepareValidatedQuery({}, { select: aggFields }, param3_unused, tableRules, localParams);
             }
-            joins = Object.keys(select).filter(key => !aggAliases.includes(key) && ( select[key] === "*" || isPlainObject(select[key]) ) );
+            joins = Object.keys(select).filter(key => 
+                !aggAliases.includes(key) && 
+                ( select[key] === "*" || isPlainObject(select[key]) ) 
+            );
             if(joins && joins.length){
                 if(!this.joinPaths) throw "Joins not allowed";
                 for(let i = 0; i < joins.length; i++){
@@ -535,9 +538,12 @@ export class ViewHandler {
             } 
             
             mainSelect = filterObj(<object>select, Object.keys(select).filter(key => !(aggAliases.concat(joins).includes(key))));
+            /* Allow empty select */
             if(Object.keys(mainSelect).length < 1) mainSelect = "";
+
+            /* Select star already selects all fields */
             if(Object.keys(select).includes("*")) {
-                if(Object.values(select).find(v => [true, false, 1, 0].includes(v))) throw "\nCannot use all ('*') together with other fields ";
+                if(Object.keys(select).find(key => key !== "*" && [true, false, 1, 0].includes(select[key]))) throw "\nCannot use all ('*') together with other fields ";
                 mainSelect = "*";
             }
         }

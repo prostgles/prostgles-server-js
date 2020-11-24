@@ -70,7 +70,7 @@ prostgles({
     password: process.env.PRGL_PWD
   },
   io,
-  publish: "*", // Full unrestricted access to the database
+  publish: "*", // Unrestricted INSERT/SELECT/UPDATE/DELETE access to the tables in the database
   onReady: async (dbo) => {
     
   }
