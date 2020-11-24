@@ -208,7 +208,8 @@ export declare class PublishParser {
     publishRawSQL?: any;
     dbo: DbHandler | DbHandlerTX;
     db: DB;
-    constructor(publish: any, publishMethods: any, publishRawSQL: any, dbo: DbHandler | DbHandlerTX, db: DB);
+    prostgles: Prostgles;
+    constructor(publish: any, publishMethods: any, publishRawSQL: any, dbo: DbHandler | DbHandlerTX, db: DB, prostgles: Prostgles);
     getMethods(socket: any): Promise<{}>;
     getSchemaFromPublish(socket: any): Promise<{}>;
     getPublish(socket: any): Promise<any>;

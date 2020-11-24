@@ -24,25 +24,31 @@ index_1.default({
     tsGeneratedTypesDir: path_1.default.join(__dirname + '/'),
     transactions: "tt",
     publish: (socket, dbo) => {
-        // const dd: DbHandler = {}
-        // dd.aad.
-        // return {
-        // 	items: "*",
-        // 	items2: "*"
-        // }
-        return {};
+        return "*";
     },
+    joins: [
+        {
+            tables: ["items", "items2"],
+            on: { name: "name" },
+            type: "many-many"
+        },
+        {
+            tables: ["items2", "items3"],
+            on: { name: "name" },
+            type: "many-many"
+        }
+    ],
     onReady: async (dbo, db) => {
-        await db.any(`CREATE TABLE IF NOT EXISTS "table" (id text);`);
-        await dbo.items.delete({});
-        /* Transaction example */
-        dbo.tt(async (t) => {
-            const r = await t.items.insert({ name: "tr" }, { returning: "*" });
-            console.log(r);
-            console.log(await t.items.find());
-            throw "err"; // Any errors will revert all data-changing commands using the transaction object ( t )
+        app.get("*", (req, res) => {
+            console.log(req.originalUrl);
         });
-        console.log(await dbo.items.find()); // Item not present due to transaction block error
+        try {
+            await dbo.items.insert([{ name: "a" }, { name: "a" }]);
+            console.log(await dbo.items.find());
+        }
+        catch (err) {
+            console.error(err);
+        }
     },
 });
 //# sourceMappingURL=index.js.map

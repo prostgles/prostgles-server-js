@@ -37,15 +37,17 @@ function makeErr(err, localParams) {
     return Promise.reject(Object.assign(Object.assign(Object.assign({}, ((!localParams || !localParams.socket) ? err : {})), PubSubManager_1.filterObj(err, ["column", "code", "table", "constraint"])), { code_info: sqlErrCodeToMsg(err.code) }));
 }
 class ViewHandler {
-    constructor(db, tableOrViewInfo, pubSubManager, dboBuilder, t) {
+    constructor(db, tableOrViewInfo, pubSubManager, dboBuilder, t, joinPaths) {
         this.tsDataDef = "";
         this.tsDataName = "";
         this.tsDboName = "";
         this.is_view = true;
+        this.filterDef = "";
         if (!db || !tableOrViewInfo)
             throw "";
         this.db = db;
         this.t = t;
+        this.joinPaths = joinPaths;
         this.tableOrViewInfo = tableOrViewInfo;
         this.name = tableOrViewInfo.name;
         this.columns = tableOrViewInfo.columns;
@@ -53,7 +55,6 @@ class ViewHandler {
         this.pubSubManager = pubSubManager;
         this.dboBuilder = dboBuilder;
         this.joins = this.dboBuilder.joins;
-        this.joinPaths = this.dboBuilder.joinPaths;
         this.columnSet = new pgp.helpers.ColumnSet(this.columns.map(({ name, data_type }) => (Object.assign({ name }, (["json", "jsonb"].includes(data_type) ? { mod: ":json" } : {})))), { table: this.name });
         this.tsDataName = capitalizeFirstLetter(this.name);
         this.tsDataDef = `export type ${this.tsDataName} = {\n`;
@@ -63,10 +64,11 @@ class ViewHandler {
         this.tsDataDef += "};";
         this.tsDataDef += "\n";
         this.tsDataDef += `export type ${this.tsDataName}_Filter = ${this.tsDataName} | object | { $and: (${this.tsDataName} | object)[] } | { $or: (${this.tsDataName} | object)[] } `;
-        const filterDef = ` ${this.tsDataName}_Filter `;
+        this.filterDef = ` ${this.tsDataName}_Filter `;
+        const filterDef = this.filterDef;
         this.tsDboDefs = [
-            `   find: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<${this.tsDataName}[]>;`,
-            `   findOne: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<${this.tsDataName}>;`,
+            `   find: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<${this.tsDataName}[] | object[]>;`,
+            `   findOne: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<${this.tsDataName} | object>;`,
             `   subscribe: (filter: ${filterDef}, params: SelectParams, onData: (items: ${this.tsDataName}[]) => any) => Promise<{ unsubscribe: () => any }>;`,
             `   subscribeOne: (filter: ${filterDef}, params: SelectParams, onData: (item: ${this.tsDataName}) => any) => Promise<{ unsubscribe: () => any }>;`,
             `   count: (filter?: ${filterDef}) => Promise<number>;`
@@ -131,45 +133,47 @@ class ViewHandler {
         }).join("\n");
         return { query, toOne: false };
     }
+    getJoins(source, target) {
+        let result = [];
+        if (!this.joinPaths)
+            throw "Joins dissallowed";
+        /* Find the join path between tables */
+        let jp = this.joinPaths.find(j => j.t1 === source && j.t2 === target);
+        if (!jp)
+            throw `Joining ${source} <-> ${target} dissallowed or missing`;
+        /* Make the join chain info excluding root table */
+        result = jp.path.slice(1).map((t2, i, arr) => {
+            const t1 = i === 0 ? source : arr[i - 1];
+            if (!this.joins)
+                this.joins = JSON.parse(JSON.stringify(this.dboBuilder.joins));
+            /* Get join options */
+            const jo = this.joins.find(j => j.tables.includes(t1) && j.tables.includes(t2));
+            if (!jo)
+                throw "INTERNAL ERROR -> could not find join relationship";
+            let on = [];
+            Object.keys(jo.on).map(leftKey => {
+                const rightKey = jo.on[leftKey];
+                /* Left table is joining on keys */
+                if (jo.tables[0] === t1) {
+                    on.push([leftKey, rightKey]);
+                    /* Left table is joining on values */
+                }
+                else {
+                    on.push([rightKey, leftKey]);
+                }
+            });
+            return {
+                source,
+                target,
+                table: t2,
+                on
+            };
+        });
+        return result;
+    }
     buildJoinQuery(q) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (this.dboBuilder.prostgles.joins && !this.dboBuilder.joinPaths)
-                yield this.dboBuilder.parseJoins();
-            this.joinPaths = this.dboBuilder.joinPaths;
-            const getJoins = (source, target) => {
-                let result = [];
-                /* Find the join path between tables */
-                let jp = this.joinPaths.find(j => j.t1 === source && j.t2 === target);
-                if (!jp)
-                    throw `Could not find a join from ${source} to ${target}`;
-                /* Make the join chain info excluding root table */
-                result = jp.path.slice(1).map((t2, i, arr) => {
-                    const t1 = i === 0 ? source : arr[i - 1];
-                    if (!this.joins)
-                        this.joins = JSON.parse(JSON.stringify(this.dboBuilder.joins));
-                    /* Get join options */
-                    const jo = this.joins.find(j => j.tables.includes(t1) && j.tables.includes(t2));
-                    if (!jo)
-                        throw "INTERNAL ERROR -> could not find join relationship";
-                    let on = [];
-                    Object.keys(jo.on).map(leftKey => {
-                        const rightKey = jo.on[leftKey];
-                        /* Left table is joining on keys */
-                        if (jo.tables[0] === t1) {
-                            on.push([leftKey, rightKey]);
-                            /* Left table is joining on values */
-                        }
-                        else {
-                            on.push([rightKey, leftKey]);
-                        }
-                    });
-                    return {
-                        table: t2,
-                        on
-                    };
-                });
-                return result;
-            }, makeQuery3 = (q, isJoined = false) => {
+            const makeQuery3 = (q, isJoined = false) => {
                 const PREF = `prostgles_prefix_to_avoid_collisions`, joins = q.joins || [], aggs = q.aggs || [];
                 /* Leaf query */
                 if (!joins.length) {
@@ -227,7 +231,7 @@ class ViewHandler {
                     `-- [source limit] \n` +
                     (isJoined ? "" : `LIMIT ${q.limit || 0}\nOFFSET ${q.offset || 0}\n`);
                 function joinTables(q1, q2) {
-                    const paths = getJoins(q1.table, q2.table);
+                    const paths = this.getJoins(q1.table, q2.table);
                     return `${paths.map(({ table, on }, i) => {
                         const prevTable = i === 0 ? q1.table : paths[i - 1].table;
                         let iQ = asName(table);
@@ -248,7 +252,6 @@ class ViewHandler {
                             `   ON ${on.map(([c1, c2]) => `${asName(prevTable)}.${asName(c1)} = ${asName(table)}.${asName(c2)}`).join("\n AND ")}\n`;
                     }).join("")}`;
                 }
-                makeQuery3;
                 // WHY NOT THIS?
                 //     return `WITH _posts AS (
                 //         SELECT *, row_to_json((select x from (select id, title) as x)) as posts
@@ -298,7 +301,9 @@ class ViewHandler {
             return a;
         })
             .map(({ field, parser, alias }) => ({ field, alias, query: pgp.as.format(parser.get(), { field, alias }) }));
-        return nonAliased.concat(aliased);
+        let res = nonAliased.concat(aliased);
+        // console.log(res);
+        return res;
     }
     buildQueryTree(filter, selectParams, param3_unused = null, tableRules, localParams) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -312,7 +317,7 @@ class ViewHandler {
                     Object.values(select).find(v => (v === 0 || v === false)))
                     throw "\nCannot include and exclude fields at the same time";
                 _Aggs = this.getAggs(PubSubManager_1.filterObj(select, Object.keys(select).filter(key => select[key] !== "*"))) || [];
-                let aggFields = _Aggs.map(a => a.field);
+                let aggFields = Array.from(new Set(_Aggs.map(a => a.field)));
                 aggAliases = _Aggs.map(a => a.alias);
                 aggs = _Aggs.map(a => a.query);
                 if (aggs.length) {
@@ -321,7 +326,7 @@ class ViewHandler {
                 }
                 joins = Object.keys(select).filter(key => !aggAliases.includes(key) && (select[key] === "*" || isPlainObject(select[key])));
                 if (joins && joins.length) {
-                    if (!this.dboBuilder.joinPaths)
+                    if (!this.joinPaths)
                         throw "Joins not allowed";
                     for (let i = 0; i < joins.length; i++) {
                         let jKey = joins[i], jParams = select[jKey], jTable = jKey, isLeftJoin = true, jSelectAlias = jTable, jSelect = jParams, jFilter = {}, jLimit = undefined, jOffset = undefined, jOrder = undefined;
@@ -413,7 +418,7 @@ class ViewHandler {
                     allFields: this.column_names,
                     orderBy: [this.prepareSort(orderBy, fields, tableAlias, null, validatedAggAliases)],
                     select: this.prepareSelect(select, fields, null, tableAlias).split(","),
-                    where: this.prepareWhere(filter, forcedFilter, filterFields, null, tableAlias),
+                    where: yield this.prepareWhere(filter, forcedFilter, filterFields, null, tableAlias),
                     limit: this.prepareLimitQuery(limit, maxLimit),
                     offset: this.prepareOffsetQuery(offset)
                 };
@@ -447,6 +452,7 @@ class ViewHandler {
                     if (bad_params && bad_params.length)
                         throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
                 }
+                // console.log(_query);
                 if (expectOne)
                     return (this.t || this.db).oneOrNone(_query).catch(err => makeErr(err, localParams));
                 else
@@ -478,75 +484,79 @@ class ViewHandler {
         }
     }
     count(filter, param2_unused, param3_unused, table_rules, localParams = {}) {
-        filter = filter || {};
-        try {
-            return this.find(filter, { select: "", limit: 0 }, null, table_rules, localParams)
-                .then(allowed => {
-                const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {};
-                let query = "SELECT COUNT(*) FROM ${_psqlWS_tableName:name} " + this.prepareWhere(filter, forcedFilter, filterFields, false);
-                return (this.t || this.db).one(query, { _psqlWS_tableName: this.name }).then(({ count }) => +count);
-            });
-        }
-        catch (e) {
-            if (localParams && localParams.testRule)
-                throw e;
-            throw { err: e, msg: `Issue with dbo.${this.name}.count()` };
-        }
+        return __awaiter(this, void 0, void 0, function* () {
+            filter = filter || {};
+            try {
+                return yield this.find(filter, { select: "", limit: 0 }, null, table_rules, localParams)
+                    .then((allowed) => __awaiter(this, void 0, void 0, function* () {
+                    const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {};
+                    let query = "SELECT COUNT(*) FROM ${_psqlWS_tableName:name} " + (yield this.prepareWhere(filter, forcedFilter, filterFields, false));
+                    return (this.t || this.db).one(query, { _psqlWS_tableName: this.name }).then(({ count }) => +count);
+                }));
+            }
+            catch (e) {
+                if (localParams && localParams.testRule)
+                    throw e;
+                throw { err: e, msg: `Issue with dbo.${this.name}.count()` };
+            }
+        });
     }
     subscribe(filter, params, localFunc, table_rules, localParams) {
-        try {
-            if (this.t)
-                throw "subscribe not allowed within transactions";
-            if (!localParams && !localFunc)
-                throw " missing data. provide -> localFunc | localParams { socket } ";
-            const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {}, condition = this.prepareWhere(filter, forcedFilter, filterFields, true);
-            if (!localFunc) {
-                return this.find(filter, Object.assign(Object.assign({}, params), { limit: 0 }), null, table_rules, localParams)
-                    .then(isValid => {
-                    const { socket = null, subOne = false } = localParams;
-                    return this.pubSubManager.addSub({
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                if (this.t)
+                    throw "subscribe not allowed within transactions";
+                if (!localParams && !localFunc)
+                    throw " missing data. provide -> localFunc | localParams { socket } ";
+                const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {}, condition = yield this.prepareWhere(filter, forcedFilter, filterFields, true);
+                if (!localFunc) {
+                    return yield this.find(filter, Object.assign(Object.assign({}, params), { limit: 0 }), null, table_rules, localParams)
+                        .then(isValid => {
+                        const { socket = null, subOne = false } = localParams;
+                        return this.pubSubManager.addSub({
+                            table_info: this.tableOrViewInfo,
+                            socket,
+                            table_rules,
+                            condition,
+                            func: localFunc,
+                            filter: Object.assign({}, filter),
+                            params: Object.assign({}, params),
+                            channel_name: null,
+                            socket_id: socket.id,
+                            table_name: this.name,
+                            last_throttled: 0,
+                            subOne
+                        }).then(channelName => ({ channelName }));
+                    });
+                }
+                else {
+                    const { subOne = false } = localParams || {};
+                    this.pubSubManager.addSub({
                         table_info: this.tableOrViewInfo,
-                        socket,
+                        socket: null,
                         table_rules,
                         condition,
                         func: localFunc,
                         filter: Object.assign({}, filter),
                         params: Object.assign({}, params),
                         channel_name: null,
-                        socket_id: socket.id,
+                        socket_id: null,
                         table_name: this.name,
                         last_throttled: 0,
                         subOne
                     }).then(channelName => ({ channelName }));
-                });
+                    const unsubscribe = () => {
+                        this.pubSubManager.removeLocalSub(this.name, condition, localFunc);
+                    };
+                    return Object.freeze({ unsubscribe });
+                }
             }
-            else {
-                const { subOne = false } = localParams || {};
-                this.pubSubManager.addSub({
-                    table_info: this.tableOrViewInfo,
-                    socket: null,
-                    table_rules,
-                    condition,
-                    func: localFunc,
-                    filter: Object.assign({}, filter),
-                    params: Object.assign({}, params),
-                    channel_name: null,
-                    socket_id: null,
-                    table_name: this.name,
-                    last_throttled: 0,
-                    subOne
-                }).then(channelName => ({ channelName }));
-                const unsubscribe = () => {
-                    this.pubSubManager.removeLocalSub(this.name, condition, localFunc);
-                };
-                return Object.freeze({ unsubscribe });
+            catch (e) {
+                if (localParams && localParams.testRule)
+                    throw e;
+                throw { err: e, msg: `Issue with dbo.${this.name}.subscribe()` };
             }
-        }
-        catch (e) {
-            if (localParams && localParams.testRule)
-                throw e;
-            throw { err: e, msg: `Issue with dbo.${this.name}.subscribe()` };
-        }
+        });
     }
     subscribeOne(filter, params, localFunc, table_rules, localParams) {
         return this.subscribe(filter, params, localFunc, table_rules, Object.assign(Object.assign({}, (localParams || {})), { subOne: true }));
@@ -581,142 +591,202 @@ class ViewHandler {
         }
     }
     prepareWhere(filter, forcedFilter, filterFields, excludeWhere = false, tableAlias) {
-        const parseFilter = (f, parentFilter = null) => {
-            let result = "";
-            let keys = Object.keys(f);
-            if (!keys.length)
-                return result;
-            if ((keys.includes("$and") || keys.includes("$or"))) {
-                if (keys.length > 1)
-                    throw "\n$and/$or filter must contain only one array property. e.g.: { $and: [...] } OR { $or: [...] } ";
-                if (parentFilter && Object.keys(parentFilter).includes(""))
-                    throw "$and/$or filter can only be placed at the root or within another $and/$or filter";
-            }
-            const { $and, $or } = f, group = $and || $or;
-            if (group && group.length) {
-                const operand = $and ? " AND " : " OR ";
-                let conditions = group.map(gf => parseFilter(gf, group)).filter(c => c);
-                if (conditions && conditions.length) {
-                    if (conditions.length === 1)
-                        return conditions.join(operand);
-                    else
-                        return ` ( ${conditions.sort().join(operand)} ) `;
+        return __awaiter(this, void 0, void 0, function* () {
+            const parseFilter = (f, parentFilter = null) => __awaiter(this, void 0, void 0, function* () {
+                let result = "";
+                let keys = Object.keys(f);
+                if (!keys.length)
+                    return result;
+                if ((keys.includes("$and") || keys.includes("$or"))) {
+                    if (keys.length > 1)
+                        throw "\n$and/$or filter must contain only one array property. e.g.: { $and: [...] } OR { $or: [...] } ";
+                    if (parentFilter && Object.keys(parentFilter).includes(""))
+                        throw "$and/$or filter can only be placed at the root or within another $and/$or filter";
                 }
+                const { $and, $or } = f, group = $and || $or;
+                if (group && group.length) {
+                    const operand = $and ? " AND " : " OR ";
+                    let conditions = (yield Promise.all(group.map((gf) => __awaiter(this, void 0, void 0, function* () { return yield parseFilter(gf, group); })))).filter(c => c);
+                    if (conditions && conditions.length) {
+                        if (conditions.length === 1)
+                            return conditions.join(operand);
+                        else
+                            return ` ( ${conditions.sort().join(operand)} ) `;
+                    }
+                }
+                else if (!group) {
+                    result = yield this.getCondition(Object.assign({}, f), this.parseFieldFilter(filterFields), tableAlias);
+                }
+                return result;
+            });
+            if (!isPlainObject(filter))
+                throw "\nInvalid filter\nExpecting an object but got -> " + JSON.stringify(filter);
+            let result = "";
+            let _filter = Object.assign({}, filter);
+            if (forcedFilter) {
+                _filter = {
+                    $and: [forcedFilter, _filter].filter(f => f)
+                };
             }
-            else if (!group) {
-                result = this.getCondition(Object.assign({}, f), this.parseFieldFilter(filterFields), tableAlias);
+            // let keys = Object.keys(filter);
+            // if(!keys.length) return result;
+            let cond = yield parseFilter(_filter, null);
+            if (cond) {
+                if (excludeWhere)
+                    return cond;
+                else
+                    return " WHERE " + cond;
             }
-            return result;
-        };
-        if (!isPlainObject(filter))
-            throw "\nInvalid filter\nExpecting an object but got -> " + JSON.stringify(filter);
-        let result = "";
-        let _filter = Object.assign({}, filter);
-        if (forcedFilter) {
-            _filter = {
-                $and: [forcedFilter, _filter].filter(f => f)
-            };
-        }
-        // let keys = Object.keys(filter);
-        // if(!keys.length) return result;
-        let cond = parseFilter(_filter, null);
-        if (cond) {
-            if (excludeWhere)
-                return cond;
-            else
-                return " WHERE " + cond;
-        }
-        return "";
+            return "";
+        });
     }
-    /* NEW API !!! :) */
-    getCondition(filter, allowed_colnames, tableAlias) {
-        let prefix = "";
-        const getRawFieldName = (field) => {
-            if (tableAlias)
-                return pgp.as.format("$1:name.$2:name", [tableAlias, field]);
-            else
-                return pgp.as.format("$1:name", [field]);
-        };
-        const parseDataType = (key, col = null) => {
-            const _col = col || this.columns.find(({ name }) => name === key);
-            if (_col && _col.data_type === "ARRAY") {
-                return " ARRAY[${data:csv}] ";
-            }
-            return " ${data} ";
-        }, conditionParsers = [
-            { aliases: ["$nin"], get: (key, val, col) => "${key:raw} NOT IN (${data:csv}) " },
-            { aliases: ["$in"], get: (key, val, col) => "${key:raw} IN (${data:csv}) " },
-            { aliases: ["$tsQuery"], get: (key, val, col) => {
-                    if (col.data_type === "tsvector") {
-                        return pgp.as.format("${key:raw} @@ to_tsquery(${data:csv}) ", { key: getRawFieldName(key), data: val, prefix });
+    prepareExistCondition(filter, localParams) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let res = "";
+            const t1 = this.name;
+            return (yield Promise.all(Object.keys(filter).map((t2) => __awaiter(this, void 0, void 0, function* () {
+                const f2 = filter[t2];
+                if (!this.dboBuilder.dbo[t2])
+                    throw "Invalid or dissallowed table: " + t2;
+                const makeTableChain = (paths, depth = 0, finalFilter = "") => {
+                    const join = paths[depth], table = join.table;
+                    const prevTable = depth === 0 ? join.source : paths[depth - 1].table;
+                    let cond = `${join.on.map(([c1, c2]) => `${asName(prevTable)}.${asName(c1)} = ${asName(table)}.${asName(c2)}`).join("\n AND ")}\n`;
+                    // console.log(join, cond);
+                    let j = `` +
+                        `   SELECT 1 \n` +
+                        `   FROM ${asName(table)} \n` +
+                        `   WHERE ${cond} \n`; //
+                    if (depth < paths.length - 1) {
+                        j += `    AND ${makeTableChain(paths, depth + 1)}`;
                     }
                     else {
-                        return pgp.as.format(" to_tsvector(${key:raw}::text) @@ to_tsquery(${data:csv}) ", { key, data: val, prefix });
+                        if (finalFilter)
+                            j += `    AND ${finalFilter} `;
                     }
-                } },
-            { aliases: ["@@"], get: (key, val, col) => {
-                    if (col && val && val.to_tsquery && Array.isArray(val.to_tsquery)) {
+                    let res = `EXISTS ( \n` +
+                        `   ${j} \n` +
+                        `   )`;
+                    return res;
+                };
+                let t2Rules = undefined, forcedFilter, filterFields, tableAlias;
+                if (localParams && localParams.socket && this.dboBuilder.publishParser) {
+                    t2Rules = yield this.dboBuilder.publishParser.getValidatedRequestRule({ tableName: t2, command: "find", socket: localParams.socket });
+                    if (!t2Rules || !t2Rules.select)
+                        throw "Dissallowed";
+                    ({ forcedFilter, filterFields } = t2Rules.select);
+                }
+                const finalWhere = yield this.dboBuilder.dbo[t2].prepareWhere(f2, forcedFilter, filterFields, true, tableAlias);
+                res = makeTableChain(this.getJoins(t1, t2), 0, finalWhere);
+                return res;
+            })))).join(" AND \n");
+        });
+    }
+    /* NEW API !!! :) */
+    getCondition(filter, allowed_colnames, tableAlias, localParams) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let prefix = "";
+            const getRawFieldName = (field) => {
+                if (tableAlias)
+                    return pgp.as.format("$1:name.$2:name", [tableAlias, field]);
+                else
+                    return pgp.as.format("$1:name", [field]);
+            };
+            const parseDataType = (key, col = null) => {
+                const _col = col || this.columns.find(({ name }) => name === key);
+                if (_col && _col.data_type === "ARRAY") {
+                    return " ARRAY[${data:csv}] ";
+                }
+                return " ${data} ";
+            }, conditionParsers = [
+                // { aliases: ["$exists"],                         get: (key, val, col) =>  },                
+                { aliases: ["$nin"], get: (key, val, col) => "${key:raw} NOT IN (${data:csv}) " },
+                { aliases: ["$in"], get: (key, val, col) => "${key:raw} IN (${data:csv}) " },
+                { aliases: ["$tsQuery"], get: (key, val, col) => {
                         if (col.data_type === "tsvector") {
-                            return pgp.as.format("${key:raw} @@ to_tsquery(${data:csv}) ", { key: getRawFieldName(key), data: val.to_tsquery, prefix });
+                            return pgp.as.format("${key:raw} @@ to_tsquery(${data:csv}) ", { key: getRawFieldName(key), data: val, prefix });
                         }
                         else {
-                            return pgp.as.format(" to_tsvector(${key:raw}::text) @@ to_tsquery(${data:csv}) ", { key, data: val.to_tsquery, prefix });
+                            return pgp.as.format(" to_tsvector(${key:raw}::text) @@ to_tsquery(${data:csv}) ", { key, data: val, prefix });
                         }
-                    }
-                    else
-                        throw `expecting { field_name: { "@@": { to_tsquery: [ ...params ] } } } `;
-                } },
-            { aliases: ["@>"], get: (key, val, col) => "${key:raw} @> " + parseDataType(key, col) },
-            { aliases: ["<@"], get: (key, val, col) => "${key:raw} <@ " + parseDataType(key, col) },
-            { aliases: ["&&"], get: (key, val, col) => "${key:raw} && " + parseDataType(key, col) },
-            { aliases: ["=", "$eq", "$equal"], get: (key, val, col) => "${key:raw} =  " + parseDataType(key, col) },
-            { aliases: [">", "$gt", "$greater"], get: (key, val, col) => "${key:raw} >  " + parseDataType(key, col) },
-            { aliases: [">=", "$gte", "$greaterOrEqual"], get: (key, val, col) => "${key:raw} >= " + parseDataType(key, col) },
-            { aliases: ["<", "$lt", "$less"], get: (key, val, col) => "${key:raw} <  " + parseDataType(key, col) },
-            { aliases: ["<=", "$lte", "$lessOrEqual"], get: (key, val, col) => "${key:raw} <= " + parseDataType(key, col) },
-            { aliases: ["$ilike"], get: (key, val, col) => "${key:raw}::text ILIKE ${data}::text " },
-            { aliases: ["$like"], get: (key, val, col) => "${key:raw}::text LIKE ${data}::text " },
-            { aliases: ["$notIlike"], get: (key, val, col) => "${key:raw}::text NOT ILIKE ${data}::text " },
-            { aliases: ["$notLike"], get: (key, val, col) => "${key:raw}::text NOT LIKE ${data}::text " },
-            { aliases: ["<>", "$ne", "$not"], get: (key, val, col) => "${key:raw} " + (val === null ? " IS NOT NULL " : (" <> " + parseDataType(key, col))) },
-            { aliases: ["$isNull", "$null"], get: (key, val, col) => "${key:raw} " + `  IS ${!val ? " NOT " : ""} NULL ` }
-        ];
-        let data = Object.assign({}, filter);
-        if (allowed_colnames) {
-            const invalidColumn = Object.keys(data)
-                .find(fName => !allowed_colnames.includes(fName));
-            if (invalidColumn) {
-                throw 'disallowed/inexistent columns in filter: ' + invalidColumn;
-            }
-        }
-        let template = Prostgles_1.flat(Object.keys(data)
-            .map(fKey => {
-            let d = data[fKey], col = this.columns.find(({ name }) => name === fKey);
-            if (d === null) {
-                return pgp.as.format("${key:raw} IS NULL ", { key: getRawFieldName(fKey), prefix });
-            }
-            if (isPlainObject(d)) {
-                if (Object.keys(d).length) {
-                    return Object.keys(d).map(operand_key => {
-                        const op = conditionParsers.find(o => operand_key && o.aliases.includes(operand_key));
-                        if (!op) {
-                            throw "Unrecognised operand: " + operand_key;
+                    } },
+                { aliases: ["@@"], get: (key, val, col) => {
+                        if (col && val && val.to_tsquery && Array.isArray(val.to_tsquery)) {
+                            if (col.data_type === "tsvector") {
+                                return pgp.as.format("${key:raw} @@ to_tsquery(${data:csv}) ", { key: getRawFieldName(key), data: val.to_tsquery, prefix });
+                            }
+                            else {
+                                return pgp.as.format(" to_tsvector(${key:raw}::text) @@ to_tsquery(${data:csv}) ", { key, data: val.to_tsquery, prefix });
+                            }
                         }
-                        return pgp.as.format(op.get(fKey, d[operand_key], col), { key: getRawFieldName(fKey), data: d[operand_key], prefix });
-                    });
-                    // if(Object.keys(d).length){
-                    // } else throw `\n Unrecognised statement for field ->   ${fKey}: ` + JSON.stringify(d);
+                        else
+                            throw `expecting { field_name: { "@@": { to_tsquery: [ ...params ] } } } `;
+                    } },
+                { aliases: ["@>", "$contains"], get: (key, val, col) => "${key:raw} @> " + parseDataType(key, col) },
+                { aliases: ["<@", "$containedBy"], get: (key, val, col) => "${key:raw} <@ " + parseDataType(key, col) },
+                { aliases: ["&&", "$overlaps"], get: (key, val, col) => "${key:raw} && " + parseDataType(key, col) },
+                { aliases: ["=", "$eq", "$equal"], get: (key, val, col) => "${key:raw} =  " + parseDataType(key, col) },
+                { aliases: [">", "$gt", "$greater"], get: (key, val, col) => "${key:raw} >  " + parseDataType(key, col) },
+                { aliases: [">=", "$gte", "$greaterOrEqual"], get: (key, val, col) => "${key:raw} >= " + parseDataType(key, col) },
+                { aliases: ["<", "$lt", "$less"], get: (key, val, col) => "${key:raw} <  " + parseDataType(key, col) },
+                { aliases: ["<=", "$lte", "$lessOrEqual"], get: (key, val, col) => "${key:raw} <= " + parseDataType(key, col) },
+                { aliases: ["$ilike"], get: (key, val, col) => "${key:raw}::text ILIKE ${data}::text " },
+                { aliases: ["$like"], get: (key, val, col) => "${key:raw}::text LIKE ${data}::text " },
+                { aliases: ["$notIlike"], get: (key, val, col) => "${key:raw}::text NOT ILIKE ${data}::text " },
+                { aliases: ["$notLike"], get: (key, val, col) => "${key:raw}::text NOT LIKE ${data}::text " },
+                { aliases: ["<>", "$ne", "$not"], get: (key, val, col) => "${key:raw} " + (val === null ? " IS NOT NULL " : (" <> " + parseDataType(key, col))) },
+                { aliases: ["$isNull", "$null"], get: (key, val, col) => "${key:raw} " + `  IS ${!val ? " NOT " : ""} NULL ` }
+            ];
+            let data = Object.assign({}, filter);
+            /* Exists join filter */
+            let filterKeys = Object.keys(data).filter(k => k !== "$exists");
+            let existsFilter = data["$exists"];
+            let existsCond = "";
+            if (existsFilter) {
+                existsCond = yield this.prepareExistCondition(existsFilter, localParams);
+            }
+            if (allowed_colnames) {
+                const invalidColumn = filterKeys
+                    .find(fName => !allowed_colnames.includes(fName));
+                if (invalidColumn) {
+                    throw 'disallowed/inexistent columns in filter: ' + invalidColumn;
                 }
             }
-            return pgp.as.format("${key:raw} = " + parseDataType(fKey), { key: getRawFieldName(fKey), data: data[fKey], prefix });
-        }))
-            .sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
-            .join(" AND ");
-        return template; //pgp.as.format(template, data);
-        /*
-            SHOULD CHECK DATA TYPES TO AVOID "No operator matches the given data type" error
-            console.log(table.columns)
-        */
+            let templates = Prostgles_1.flat(filterKeys
+                .map(fKey => {
+                let d = data[fKey], col = this.columns.find(({ name }) => name === fKey);
+                if (d === null) {
+                    return pgp.as.format("${key:raw} IS NULL ", { key: getRawFieldName(fKey), prefix });
+                }
+                if (isPlainObject(d)) {
+                    if (Object.keys(d).length) {
+                        return Object.keys(d).map(operand_key => {
+                            const op = conditionParsers.find(o => operand_key && o.aliases.includes(operand_key));
+                            if (!op) {
+                                throw "Unrecognised operand: " + operand_key;
+                            }
+                            let _d = d[operand_key];
+                            if (col.element_type && !Array.isArray(_d))
+                                _d = [_d];
+                            return pgp.as.format(op.get(fKey, _d, col), { key: getRawFieldName(fKey), data: _d, prefix });
+                        });
+                        // if(Object.keys(d).length){
+                        // } else throw `\n Unrecognised statement for field ->   ${fKey}: ` + JSON.stringify(d);
+                    }
+                }
+                return pgp.as.format("${key:raw} = " + parseDataType(fKey), { key: getRawFieldName(fKey), data: data[fKey], prefix });
+            }));
+            if (existsCond)
+                templates.push(existsCond);
+            templates = templates.sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
+                .join(" AND \n");
+            // console.log(templates)
+            return templates; //pgp.as.format(template, data);
+            /*
+                SHOULD CHECK DATA TYPES TO AVOID "No operator matches the given data type" error
+                console.log(table.columns)
+            */
+        });
     }
     /* This relates only to SELECT */
     prepareSort(orderBy, allowed_cols, tableAlias, excludeOrder = false, validatedAggAliases) {
@@ -955,13 +1025,13 @@ function isPojoObject(obj) {
     return true;
 }
 class TableHandler extends ViewHandler {
-    constructor(db, tableOrViewInfo, pubSubManager, dboBuilder, t) {
-        super(db, tableOrViewInfo, pubSubManager, dboBuilder, t);
+    constructor(db, tableOrViewInfo, pubSubManager, dboBuilder, t, joinPaths) {
+        super(db, tableOrViewInfo, pubSubManager, dboBuilder, t, joinPaths);
         this.tsDboDefs = this.tsDboDefs.concat([
-            `   update: (filter: object, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
-            `   upsert: (filter: object, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
+            `   update: (filter: ${this.filterDef}, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
+            `   upsert: (filter: ${this.filterDef}, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
             `   insert: (data: (${this.tsDataName} | ${this.tsDataName}[]), params?: InsertParams) => Promise<void | ${this.tsDataName}>;`,
-            `   delete: (filter: object, params?: DeleteParams) => Promise<void | ${this.tsDataName}>;`,
+            `   delete: (filter: ${this.filterDef}, params?: DeleteParams) => Promise<void | ${this.tsDataName}>;`,
         ]);
         this.makeDef();
         this.remove = this.delete;
@@ -1038,7 +1108,7 @@ class TableHandler extends ViewHandler {
                     nData = yield tableRules.update.validate(nData);
                 }
                 let query = pgp.helpers.update(nData, columnSet);
-                query += this.prepareWhere(filter, forcedFilter, filterFields);
+                query += yield this.prepareWhere(filter, forcedFilter, filterFields);
                 if (onConflictDoNothing)
                     query += " ON CONFLICT DO NOTHING ";
                 let qType = "none";
@@ -1103,8 +1173,13 @@ class TableHandler extends ViewHandler {
                         return true;
                     }
                 }
+                let conflict_query = "";
+                if (typeof onConflictDoNothing === "boolean" && onConflictDoNothing) {
+                    conflict_query = " ON CONFLICT DO NOTHING ";
+                }
                 if (!data)
                     throw "Provide data in param1";
+                let returningSelect = returning ? (" RETURNING " + this.prepareSelect(returning, returningFields, false)) : "";
                 const makeQuery = (row) => __awaiter(this, void 0, void 0, function* () {
                     if (!isPojoObject(row))
                         throw "\ninvalid insert data provided -> " + JSON.stringify(row);
@@ -1113,12 +1188,8 @@ class TableHandler extends ViewHandler {
                     if (tableRules && tableRules.insert && tableRules.insert.validate) {
                         _data = yield tableRules.insert.validate(row);
                     }
-                    return pgp.helpers.insert(_data, columnSet);
+                    return pgp.helpers.insert(_data, columnSet) + conflict_query + returningSelect;
                 });
-                let conflict_query = "";
-                if (typeof onConflictDoNothing === "boolean" && onConflictDoNothing) {
-                    conflict_query = " ON CONFLICT DO NOTHING ";
-                }
                 if (param2) {
                     const good_params = ["returning", "multi", "onConflictDoNothing", "fixIssues"];
                     const bad_params = Object.keys(param2).filter(k => !good_params.includes(k));
@@ -1126,20 +1197,22 @@ class TableHandler extends ViewHandler {
                         throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
                 }
                 let query = "";
+                let queryType = "none";
                 if (Array.isArray(data)) {
                     // if(returning) throw "Sorry but [returning] is dissalowed for multi insert";
                     let queries = yield Promise.all(data.map((p) => __awaiter(this, void 0, void 0, function* () {
-                        return (yield makeQuery(p)) + conflict_query;
+                        const q = yield makeQuery(p);
+                        return q;
                     })));
+                    // console.log(queries)
                     query = pgp.helpers.concat(queries);
+                    if (returning)
+                        queryType = "many";
                 }
                 else {
                     query = yield makeQuery(data);
-                }
-                let queryType = "none";
-                if (returning) {
-                    query += " RETURNING " + this.prepareSelect(returning, returningFields, false);
-                    queryType = "one";
+                    if (returning)
+                        queryType = "one";
                 }
                 // console.log(query);
                 if (this.t)
@@ -1185,7 +1258,7 @@ class TableHandler extends ViewHandler {
                 }
                 let queryType = 'none';
                 let _query = pgp.as.format("DELETE FROM $1:name", [this.name]);
-                _query += this.prepareWhere(filter, forcedFilter, filterFields);
+                _query += yield this.prepareWhere(filter, forcedFilter, filterFields);
                 if (returning) {
                     queryType = "any";
                     _query += " RETURNING " + this.prepareSelect(returning, returningFields);
@@ -1250,19 +1323,20 @@ class TableHandler extends ViewHandler {
                 id_fields = this.parseFieldFilter(id_fields, false);
                 /* Step 1: parse command and params */
                 return this.find(filter, { select: [...id_fields, synced_field], limit: 0 }, null, table_rules, localParams)
-                    .then(isValid => {
+                    .then((isValid) => __awaiter(this, void 0, void 0, function* () {
                     const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {};
+                    const condition = yield this.prepareWhere(filter, forcedFilter, filterFields, true);
                     // let final_filter = getFindFilter(filter, table_rules);
                     return this.pubSubManager.addSync({
                         table_info: this.tableOrViewInfo,
-                        condition: this.prepareWhere(filter, forcedFilter, filterFields, true),
+                        condition,
                         id_fields, synced_field, allow_delete,
                         socket,
                         table_rules,
                         filter: Object.assign({}, filter),
                         params: Object.assign({}, params)
                     }).then(channelName => ({ channelName, id_fields, synced_field }));
-                });
+                }));
             }
             catch (e) {
                 if (localParams && localParams.testRule)
@@ -1325,8 +1399,9 @@ class DboBuilder {
                     if (dup) {
                         throw "Duplicate join declaration for table: " + dup.tables[0];
                     }
+                    const tovNames = this.tablesOrViews.map(t => t.name);
                     // 2 find incorrect tables
-                    const missing = Prostgles_1.flat(joins.map(j => j.tables)).find(t => !this.dbo[t]);
+                    const missing = Prostgles_1.flat(joins.map(j => j.tables)).find(t => !tovNames.includes(t));
                     if (missing) {
                         throw "Table not found: " + missing;
                     }
@@ -1335,11 +1410,12 @@ class DboBuilder {
                         const t1 = tables[0], t2 = tables[1], f1s = Object.keys(on), f2s = Object.values(on);
                         [[t1, f1s], [t2, f2s]].map(v => {
                             var t = v[0], f = v[1];
-                            if (!this.dbo[t])
+                            let tov = this.tablesOrViews.find(_t => _t.name === t);
+                            if (!tov)
                                 throw "Table not found: " + t;
-                            const m1 = f.filter(k => !this.dbo[t].column_names.includes(k));
+                            const m1 = f.filter(k => !tov.columns.map(c => c.name).includes(k));
                             if (m1 && m1.length) {
-                                throw `Table ${t}(${this.dbo[t].column_names.join()}) has no fields named: ${m1.join()}`;
+                                throw `Table ${t}(${tov.columns.map(c => c.name).join()}) has no fields named: ${m1.join()}`;
                             }
                         });
                     });
@@ -1382,7 +1458,6 @@ class DboBuilder {
                 // console.log(this.joinPaths)
                 // console.log(888, this.prostgles.joins);
                 // console.log(this.joinGraph, findShortestPath(this.joinGraph, "colors", "drawings"));
-                // console.log(this.dbo.pixels.column_names)
             }
             return this.joinPaths;
         });
@@ -1394,10 +1469,7 @@ class DboBuilder {
             this.tablesOrViews = yield getTablesForSchemaPostgresSQL(this.db, this.schema);
             let allDataDefs = "";
             let allDboDefs = "";
-            const common_types = `/* This file was generated by Prostgles 
-* ${(new Date).toUTCString()} 
-*/
-
+            const common_types = `
 export type Filter = object | {} | undefined;
 export type GroupFilter = { $and: Filter } | { $or: Filter };
 export type FieldFilter = object | string[] | "*" | "";
@@ -1429,18 +1501,18 @@ export type TxCB = {
 };
 `;
             this.dboDefinition = `export type DBObj = {\n`;
+            yield this.parseJoins();
             this.tablesOrViews.map(tov => {
                 if (tov.is_view) {
-                    this.dbo[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this);
+                    this.dbo[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, null, this.joinPaths);
                 }
                 else {
-                    this.dbo[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this);
+                    this.dbo[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, null, this.joinPaths);
                 }
                 allDataDefs += this.dbo[tov.name].tsDataDef + "\n";
                 allDboDefs += this.dbo[tov.name].tsDboDef;
                 this.dboDefinition += ` ${tov.name}: ${this.dbo[tov.name].tsDboName};\n`;
             });
-            yield this.parseJoins();
             let txKey = "tx";
             if (this.prostgles.transactions) {
                 if (typeof this.prostgles.transactions === "string")
@@ -1454,10 +1526,10 @@ export type TxCB = {
                     let txDB = {};
                     this.tablesOrViews.map(tov => {
                         if (tov.is_view) {
-                            txDB[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, t);
+                            txDB[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
                         }
                         else {
-                            txDB[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t);
+                            txDB[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
                         }
                     });
                     return cb(txDB);

@@ -105,6 +105,14 @@ type Query = {
     joins?: Query[];
 }
 
+export type JoinInfo = { 
+    table: string, 
+    on: [[string, string]], 
+    expectOne: boolean, 
+    source: string, 
+    target: string 
+}[]
+
 type JoinPaths = {
     t1: string;
     t2: string;
@@ -141,13 +149,15 @@ export class ViewHandler {
     dboBuilder: DboBuilder;
     t: pgPromise.ITask<{}>;
     is_view: boolean = true;
+    filterDef: string = "";
 
     pubSubManager: PubSubManager;
-    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>){
+    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, joinPaths?: JoinPaths){
         if(!db || !tableOrViewInfo) throw "";
 
         this.db = db;
         this.t = t;
+        this.joinPaths = joinPaths;
         this.tableOrViewInfo = tableOrViewInfo;
         this.name = tableOrViewInfo.name;
         this.columns = tableOrViewInfo.columns;
@@ -156,7 +166,6 @@ export class ViewHandler {
         this.pubSubManager = pubSubManager;
         this.dboBuilder = dboBuilder;
         this.joins = this.dboBuilder.joins;
-        this.joinPaths = this.dboBuilder.joinPaths;
 
         this.columnSet = new pgp.helpers.ColumnSet(
             this.columns.map(({ name, data_type }) => ({
@@ -174,12 +183,12 @@ export class ViewHandler {
         this.tsDataDef += "};";
         this.tsDataDef += "\n";
         this.tsDataDef += `export type ${this.tsDataName}_Filter = ${this.tsDataName} | object | { $and: (${this.tsDataName} | object)[] } | { $or: (${this.tsDataName} | object)[] } `;
-
-        const filterDef = ` ${this.tsDataName}_Filter `;
+        this.filterDef = ` ${this.tsDataName}_Filter `;
+        const filterDef = this.filterDef;
         
         this.tsDboDefs = [
-            `   find: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<${this.tsDataName}[]>;`,
-            `   findOne: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<${this.tsDataName}>;`,
+            `   find: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<${this.tsDataName}[] | object[]>;`,
+            `   findOne: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<${this.tsDataName} | object>;`,
             `   subscribe: (filter: ${filterDef}, params: SelectParams, onData: (items: ${this.tsDataName}[]) => any) => Promise<{ unsubscribe: () => any }>;`,
             `   subscribeOne: (filter: ${filterDef}, params: SelectParams, onData: (item: ${this.tsDataName}) => any) => Promise<{ unsubscribe: () => any }>;`,
             `   count: (filter?: ${filterDef}) => Promise<number>;`
@@ -249,51 +258,54 @@ export class ViewHandler {
         return { query, toOne: false }
     }
 
-    async buildJoinQuery(q: Query): Promise<string> {
-        if(this.dboBuilder.prostgles.joins && !this.dboBuilder.joinPaths) await this.dboBuilder.parseJoins();
-        this.joinPaths = this.dboBuilder.joinPaths;
+    private getJoins(source: string, target: string): JoinInfo {
+        let result = [];
 
-        const getJoins = (source: string, target: string): { table: string, on: [[string, string]], expectOne: boolean }[] => {
-            let result = [];
+        if(!this.joinPaths) throw "Joins dissallowed";
 
-            /* Find the join path between tables */
-            let jp = this.joinPaths.find(j => j.t1 === source && j.t2 === target);
-            if(!jp) throw `Could not find a join from ${source} to ${target}`;
+        /* Find the join path between tables */
+        let jp = this.joinPaths.find(j => j.t1 === source && j.t2 === target);
+        if(!jp) throw `Joining ${source} <-> ${target} dissallowed or missing`;
 
-            /* Make the join chain info excluding root table */
-            result = jp.path.slice(1).map((t2, i, arr) => {
-                const t1 = i === 0? source : arr[i-1];
-                
-                if(!this.joins) this.joins = JSON.parse(JSON.stringify(this.dboBuilder.joins));
+        /* Make the join chain info excluding root table */
+        result = jp.path.slice(1).map((t2, i, arr) => {
+            const t1 = i === 0? source : arr[i-1];
+            
+            if(!this.joins) this.joins = JSON.parse(JSON.stringify(this.dboBuilder.joins));
 
-                /* Get join options */
-                const jo = this.joins.find(j => j.tables.includes(t1) && j.tables.includes(t2));
-                if(!jo) throw "INTERNAL ERROR -> could not find join relationship";
+            /* Get join options */
+            const jo = this.joins.find(j => j.tables.includes(t1) && j.tables.includes(t2));
+            if(!jo) throw "INTERNAL ERROR -> could not find join relationship";
 
-                let on = [];
+            let on = [];
 
-                Object.keys(jo.on).map(leftKey => {
-                    const rightKey = jo.on[leftKey];
+            Object.keys(jo.on).map(leftKey => {
+                const rightKey = jo.on[leftKey];
 
-                    /* Left table is joining on keys */
-                    if(jo.tables[0] === t1){
-                        on.push([leftKey, rightKey])
+                /* Left table is joining on keys */
+                if(jo.tables[0] === t1){
+                    on.push([leftKey, rightKey])
 
-                    /* Left table is joining on values */
-                    } else {
-                        on.push([rightKey, leftKey])
-    
-                    }
-                });
+                /* Left table is joining on values */
+                } else {
+                    on.push([rightKey, leftKey])
 
-                return {
-                    table: t2,
-                    on
-                };
+                }
             });
-            return result;
-        },
-        makeQuery3 = (q: Query, isJoined: boolean = false) => {
+
+            return {
+                source,
+                target,
+                table: t2,
+                on
+            };
+        });
+        return result;
+    }
+
+    async buildJoinQuery(q: Query): Promise<string> {
+
+        const makeQuery3 = (q: Query, isJoined: boolean = false) => {
             const PREF = `prostgles_prefix_to_avoid_collisions`,
                 joins = q.joins || [],
                 aggs = q.aggs || [];
@@ -365,7 +377,7 @@ export class ViewHandler {
             (isJoined? "" : `LIMIT ${q.limit || 0}\nOFFSET ${q.offset || 0}\n`);
 
             function joinTables(q1: Query, q2: Query){
-                const paths = getJoins(q1.table, q2.table);
+                const paths = this.getJoins(q1.table, q2.table);
 
                 return `${paths.map(({ table, on }, i) => {
                     const prevTable = i === 0? q1.table : paths[i - 1].table;
@@ -387,7 +399,7 @@ export class ViewHandler {
                     `   ${q2.isLeftJoin? "LEFT" : "INNER"} JOIN ${iQ}\n` +
                     `   ON ${on.map(([c1, c2]) => `${asName(prevTable)}.${asName(c1)} = ${asName(table)}.${asName(c2)}`).join("\n AND ")}\n`
                 }).join("")}`
-            }makeQuery3
+            }
             // WHY NOT THIS?
         //     return `WITH _posts AS (
         //         SELECT *, row_to_json((select x from (select id, title) as x)) as posts
@@ -440,7 +452,9 @@ export class ViewHandler {
                 return a;
             })
             .map(({ field, parser, alias }) => ({ field, alias, query: pgp.as.format(parser.get(), { field, alias }) }));
-        return nonAliased.concat(aliased);
+        let res = nonAliased.concat(aliased);
+        // console.log(res);
+        return res;
     }
 
     async buildQueryTree(filter: Filter, selectParams?: SelectParams , param3_unused = null, tableRules?: TableRule, localParams?: LocalParams): Promise<Query> {
@@ -463,7 +477,8 @@ export class ViewHandler {
             ) throw "\nCannot include and exclude fields at the same time";
 
             _Aggs = this.getAggs(filterObj(<object>select, Object.keys(select).filter(key => select[key] !== "*") )) || [];
-            let aggFields = _Aggs.map(a => a.field);
+            let aggFields = Array.from(new Set(_Aggs.map(a => a.field)));
+            
             aggAliases = _Aggs.map(a => a.alias);
             aggs = _Aggs.map(a => a.query);
             if(aggs.length){
@@ -472,7 +487,7 @@ export class ViewHandler {
             }
             joins = Object.keys(select).filter(key => !aggAliases.includes(key) && ( select[key] === "*" || isPlainObject(select[key]) ) );
             if(joins && joins.length){
-                if(!this.dboBuilder.joinPaths) throw "Joins not allowed";
+                if(!this.joinPaths) throw "Joins not allowed";
                 for(let i = 0; i < joins.length; i++){
                     let jKey = joins[i],
                         jParams = select[jKey],
@@ -523,7 +538,6 @@ export class ViewHandler {
                 mainSelect = "*";
             }
         }
-        
         
         let q = await this.prepareValidatedQuery(filter, { ...selectParams, select: mainSelect }, param3_unused, tableRules, localParams, aggAliases);
         q.joins = joinQueries;
@@ -584,7 +598,7 @@ export class ViewHandler {
                 allFields: this.column_names,
                 orderBy: [this.prepareSort(orderBy, fields, tableAlias, null, validatedAggAliases)],
                 select: this.prepareSelect(select, fields, null, tableAlias).split(","),
-                where: this.prepareWhere(filter, forcedFilter, filterFields, null, tableAlias),
+                where: await this.prepareWhere(filter, forcedFilter, filterFields, null, tableAlias),
                 limit: this.prepareLimitQuery(limit, maxLimit),
                 offset: this.prepareOffsetQuery(offset)
             };
@@ -620,6 +634,7 @@ export class ViewHandler {
                 const bad_params = Object.keys(selectParams).filter(k => !good_params.includes(k));
                 if(bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
             }
+            // console.log(_query);
             if(expectOne) return (this.t || this.db).oneOrNone(_query).catch(err => makeErr(err, localParams));
             else return (this.t || this.db).any(_query).catch(err => makeErr(err, localParams));
 
@@ -646,14 +661,14 @@ export class ViewHandler {
         }
     }
 
-    count(filter?: Filter, param2_unused?, param3_unused?, table_rules?: TableRule, localParams: any = {}): Promise<number>{
+    async count(filter?: Filter, param2_unused?, param3_unused?, table_rules?: TableRule, localParams: any = {}): Promise<number>{
         filter = filter || {};
         try {
-            return this.find(filter, { select: "", limit: 0 }, null, table_rules, localParams)
-            .then(allowed => {
+            return await this.find(filter, { select: "", limit: 0 }, null, table_rules, localParams)
+            .then(async allowed => {
                 const { filterFields, forcedFilter } = get(table_rules, "select") || {};
                 
-                let query = "SELECT COUNT(*) FROM ${_psqlWS_tableName:name} " + this.prepareWhere(filter, forcedFilter, filterFields, false);
+                let query = "SELECT COUNT(*) FROM ${_psqlWS_tableName:name} " + await this.prepareWhere(filter, forcedFilter, filterFields, false);
                 return (this.t || this.db).one(query, { _psqlWS_tableName: this.name }).then(({ count }) => + count);
             });
         } catch(e){
@@ -662,16 +677,16 @@ export class ViewHandler {
         } 
     }
 
-    subscribe(filter: Filter, params: SelectParams, localFunc: (items: object[]) => any, table_rules?: TableRule, localParams?: LocalParams){
+    async subscribe(filter: Filter, params: SelectParams, localFunc: (items: object[]) => any, table_rules?: TableRule, localParams?: LocalParams){
         try {
             if(this.t) throw "subscribe not allowed within transactions";
             if(!localParams && !localFunc) throw " missing data. provide -> localFunc | localParams { socket } "; 
 
             const { filterFields, forcedFilter } = get(table_rules, "select") || {},
-                condition = this.prepareWhere(filter, forcedFilter, filterFields, true);
+                condition = await this.prepareWhere(filter, forcedFilter, filterFields, true);
             
             if(!localFunc) {
-                return this.find(filter, { ...params, limit: 0 }, null, table_rules, localParams)
+                return await this.find(filter, { ...params, limit: 0 }, null, table_rules, localParams)
                 .then(isValid => {
     
                     const { socket = null, subOne = false } = localParams;
@@ -752,8 +767,8 @@ export class ViewHandler {
         }
     }
 
-    prepareWhere(filter: Filter, forcedFilter: object, filterFields: FieldFilter, excludeWhere = false, tableAlias?: string){
-        const parseFilter = (f: any, parentFilter: any = null) => {
+    async prepareWhere(filter: Filter, forcedFilter: object, filterFields: FieldFilter, excludeWhere = false, tableAlias?: string){
+        const parseFilter = async (f: any, parentFilter: any = null) => {
             let result = "";
             let keys = Object.keys(f);
             if(!keys.length) return result;
@@ -767,13 +782,13 @@ export class ViewHandler {
 
             if(group && group.length){
                 const operand = $and? " AND " : " OR ";
-                let conditions = group.map(gf => parseFilter(gf, group)).filter(c => c);
+                let conditions = (await Promise.all(group.map(async gf => await parseFilter(gf, group)))).filter(c => c);
                 if(conditions && conditions.length){
                     if(conditions.length === 1) return conditions.join(operand);
                     else return ` ( ${conditions.sort().join(operand)} ) `;
                 }       
             } else if(!group) {
-                result = this.getCondition({ ...f }, this.parseFieldFilter(filterFields), tableAlias);
+                result = await this.getCondition({ ...f }, this.parseFieldFilter(filterFields), tableAlias);
             }
             return result;
         }
@@ -791,7 +806,7 @@ export class ViewHandler {
         // let keys = Object.keys(filter);
         // if(!keys.length) return result;
         
-        let cond = parseFilter(_filter, null);
+        let cond = await parseFilter(_filter, null);
         if(cond) {
             if(excludeWhere) return cond;
             else return " WHERE " + cond;
@@ -799,8 +814,63 @@ export class ViewHandler {
         return "";
     }
 
+    async prepareExistCondition(filter: object, localParams: LocalParams): Promise<string> {
+        let res = "";
+        const t1 = this.name;
+
+        return (await Promise.all(Object.keys(filter).map(async t2 => {
+            const f2 = filter[t2];
+
+            if(!this.dboBuilder.dbo[t2]) throw "Invalid or dissallowed table: " + t2;
+    
+            const makeTableChain = (paths: JoinInfo, depth: number = 0, finalFilter: string = "") => {
+    
+                const join = paths[depth],
+                    table = join.table;
+    
+                
+                const prevTable = depth === 0? join.source : paths[depth - 1].table;
+    
+                let cond = `${join.on.map(([c1, c2]) => 
+                    `${asName(prevTable)}.${asName(c1)} = ${asName(table)}.${asName(c2)}`).join("\n AND ")
+                }\n`;
+                // console.log(join, cond);
+    
+                let j = `` +
+                    `   SELECT 1 \n` +
+                    `   FROM ${asName(table)} \n` +
+                    `   WHERE ${cond} \n`;//
+    
+                if(depth < paths.length - 1){
+                    j += `    AND ${makeTableChain(paths, depth + 1)}`
+                } else {
+                    if(finalFilter) j += `    AND ${finalFilter} `;
+                }
+    
+                let res = `EXISTS ( \n` +
+                `   ${j} \n` +
+                `   )`;
+                return res;
+            }
+    
+            let t2Rules: TableRule = undefined,
+                forcedFilter,
+                filterFields,
+                tableAlias;
+            if(localParams && localParams.socket && this.dboBuilder.publishParser){
+                t2Rules = await this.dboBuilder.publishParser.getValidatedRequestRule({ tableName: t2, command: "find", socket: localParams.socket });
+                if(!t2Rules || !t2Rules.select) throw "Dissallowed";
+                ({ forcedFilter, filterFields } = t2Rules.select);
+            }
+    
+            const finalWhere = await (this.dboBuilder.dbo[t2] as TableHandler).prepareWhere(f2, forcedFilter, filterFields, true, tableAlias)
+            res = makeTableChain(this.getJoins(t1, t2), 0, finalWhere);
+            return res;
+        }))).join(" AND \n");
+    }
+
     /* NEW API !!! :) */
-    getCondition(filter: object, allowed_colnames: string[], tableAlias?: string){
+    async getCondition(filter: object, allowed_colnames: string[], tableAlias?: string, localParams?: LocalParams){
         let prefix = "";
         const getRawFieldName = (field) => {
             if(tableAlias) return pgp.as.format("$1:name.$2:name", [tableAlias, field]);
@@ -814,6 +884,7 @@ export class ViewHandler {
                 return " ${data} ";
             },
             conditionParsers = [
+                // { aliases: ["$exists"],                         get: (key, val, col) =>  },                
                 { aliases: ["$nin"],                            get: (key, val, col) => "${key:raw} NOT IN (${data:csv}) " },
                 { aliases: ["$in"],                             get: (key, val, col) => "${key:raw} IN (${data:csv}) " },
                 { aliases: ["$tsQuery"],                        get: (key, val, col) => {
@@ -835,9 +906,9 @@ export class ViewHandler {
                     } else throw `expecting { field_name: { "@@": { to_tsquery: [ ...params ] } } } `;
                 }},
 
-                { aliases: ["@>"],                              get: (key, val, col) => "${key:raw} @> " + parseDataType(key ,col) },
-                { aliases: ["<@"],                              get: (key, val, col) => "${key:raw} <@ " + parseDataType(key ,col) },
-                { aliases: ["&&"],                              get: (key, val, col) => "${key:raw} && " + parseDataType(key ,col) },
+                { aliases: ["@>", "$contains"],                 get: (key, val, col) => "${key:raw} @> " + parseDataType(key ,col) },
+                { aliases: ["<@", "$containedBy"],              get: (key, val, col) => "${key:raw} <@ " + parseDataType(key ,col) },
+                { aliases: ["&&", "$overlaps"],                 get: (key, val, col) => "${key:raw} && " + parseDataType(key ,col) },
 
                 { aliases: ["=", "$eq", "$equal"],              get: (key, val, col) => "${key:raw} =  " + parseDataType(key ,col) },
                 { aliases: [">", "$gt", "$greater"],            get: (key, val, col) => "${key:raw} >  " + parseDataType(key ,col) },
@@ -854,8 +925,16 @@ export class ViewHandler {
 
         let data = { ...filter };
 
+        /* Exists join filter */
+        let filterKeys = Object.keys(data).filter(k => k !== "$exists");
+        let existsFilter = data["$exists"];
+        let existsCond = "";
+        if(existsFilter){
+            existsCond = await this.prepareExistCondition(existsFilter, localParams);
+        }
+
         if(allowed_colnames){
-            const invalidColumn = Object.keys(data)
+            const invalidColumn = filterKeys
                 .find(fName => !allowed_colnames.includes(fName));
 
             if(invalidColumn){
@@ -863,7 +942,7 @@ export class ViewHandler {
             }
         }
 
-        let template = flat(Object.keys(data)
+        let templates = flat(filterKeys
             .map(fKey=>{
                 let d = data[fKey],
                     col = this.columns.find(({ name }) => name === fKey);
@@ -878,7 +957,9 @@ export class ViewHandler {
                             if(!op){
                                 throw "Unrecognised operand: " + operand_key;
                             }
-                            return pgp.as.format(op.get(fKey, d[operand_key], col), { key: getRawFieldName(fKey), data: d[operand_key], prefix });
+                            let _d = d[operand_key];
+                            if(col.element_type && !Array.isArray(_d)) _d = [_d];
+                            return pgp.as.format(op.get(fKey, _d, col), { key: getRawFieldName(fKey), data: _d, prefix });
                         });
                         // if(Object.keys(d).length){
 
@@ -887,11 +968,15 @@ export class ViewHandler {
                 }
 
                 return pgp.as.format("${key:raw} = " + parseDataType(fKey), { key: getRawFieldName(fKey), data: data[fKey], prefix });
-            }))
-            .sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
-            .join(" AND ");
+            }));
 
-        return template; //pgp.as.format(template, data);
+            if(existsCond) templates.push(existsCond);
+
+        templates = templates.sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
+            .join(" AND \n");
+
+        // console.log(templates)
+        return templates; //pgp.as.format(template, data);
                             
         /* 
             SHOULD CHECK DATA TYPES TO AVOID "No operator matches the given data type" error
@@ -1180,13 +1265,13 @@ export class TableHandler extends ViewHandler {
         batching: string[]
     }
     
-    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>){
-        super(db, tableOrViewInfo, pubSubManager, dboBuilder, t);
+    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, joinPaths?: JoinPaths){
+        super(db, tableOrViewInfo, pubSubManager, dboBuilder, t, joinPaths);
         this.tsDboDefs = this.tsDboDefs.concat([
-            `   update: (filter: object, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
-            `   upsert: (filter: object, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
+            `   update: (filter: ${this.filterDef}, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
+            `   upsert: (filter: ${this.filterDef}, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
             `   insert: (data: (${this.tsDataName} | ${this.tsDataName}[]), params?: InsertParams) => Promise<void | ${this.tsDataName}>;`,
-            `   delete: (filter: object, params?: DeleteParams) => Promise<void | ${this.tsDataName}>;`,
+            `   delete: (filter: ${this.filterDef}, params?: DeleteParams) => Promise<void | ${this.tsDataName}>;`,
         ]);
         this.makeDef();
 
@@ -1278,7 +1363,7 @@ export class TableHandler extends ViewHandler {
             }
             let query = pgp.helpers.update(nData, columnSet);
 
-            query += this.prepareWhere(filter, forcedFilter, filterFields);
+            query += await this.prepareWhere(filter, forcedFilter, filterFields);
             if(onConflictDoNothing) query += " ON CONFLICT DO NOTHING ";
 
             let qType = "none";
@@ -1310,7 +1395,7 @@ export class TableHandler extends ViewHandler {
         return { data, columnSet: cs }
     }
     
-    async insert(data: (object | object[]), param2?: InsertParams, param3_unused?, tableRules?: TableRule, localParams: LocalParams = null){
+    async insert(data: (object | object[]), param2?: InsertParams, param3_unused?, tableRules?: TableRule, localParams: LocalParams = null): Promise<object | object[] | boolean>{
         try {
 
             const { returning, onConflictDoNothing, fixIssues = false } = param2 || {};
@@ -1346,8 +1431,14 @@ export class TableHandler extends ViewHandler {
                     return true;
                 }
             }
+
+            let conflict_query = "";
+            if(typeof onConflictDoNothing === "boolean" && onConflictDoNothing){
+                conflict_query = " ON CONFLICT DO NOTHING ";
+            }
             
             if(!data) throw "Provide data in param1";
+            let returningSelect = returning? (" RETURNING " + this.prepareSelect(returning, returningFields, false)) : "";
             const makeQuery = async (row) => {
                 if(!isPojoObject(row)) throw "\ninvalid insert data provided -> " + JSON.stringify(row);
                 const { data, columnSet } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues });
@@ -1355,14 +1446,10 @@ export class TableHandler extends ViewHandler {
                 if(tableRules && tableRules.insert && tableRules.insert.validate){
                     _data = await tableRules.insert.validate(row)
                 }
-                return pgp.helpers.insert(_data, columnSet);
+                return pgp.helpers.insert(_data, columnSet) + conflict_query + returningSelect;
             };
     
         
-            let conflict_query = "";
-            if(typeof onConflictDoNothing === "boolean" && onConflictDoNothing){
-                conflict_query = " ON CONFLICT DO NOTHING ";
-            }
 
 
             if(param2){
@@ -1372,21 +1459,21 @@ export class TableHandler extends ViewHandler {
             }
     
             let query = "";
+            let queryType = "none";
             if(Array.isArray(data)){
                 // if(returning) throw "Sorry but [returning] is dissalowed for multi insert";
-                let queries = await Promise.all(data.map(async p => { 
-                    return await makeQuery(p) + conflict_query 
+                let queries = await Promise.all(data.map(async p => {
+                    const q = await makeQuery(p);
+                    return q;
                 }));
+                // console.log(queries)
                 query = pgp.helpers.concat(queries);
+                if(returning) queryType = "many";
             } else {
                 query = await makeQuery(data);
+                if(returning) queryType = "one";
             }
             
-            let queryType = "none";
-            if(returning){
-                query += " RETURNING " + this.prepareSelect(returning, returningFields, false);
-                queryType = "one"
-            }
             // console.log(query);
             if(this.t) return this.t[queryType](query).catch(err => makeErr(err, localParams));
             return this.db.tx(t => t[queryType](query)).catch(err => makeErr(err, localParams));
@@ -1434,7 +1521,7 @@ export class TableHandler extends ViewHandler {
             let queryType = 'none';
             let _query = pgp.as.format("DELETE FROM $1:name", [this.name] ) ;
 
-            _query += this.prepareWhere(filter, forcedFilter, filterFields);
+            _query += await this.prepareWhere(filter, forcedFilter, filterFields);
 
             if(returning){
                 queryType = "any";
@@ -1496,14 +1583,15 @@ export class TableHandler extends ViewHandler {
 
             /* Step 1: parse command and params */
             return this.find(filter, { select: [...id_fields, synced_field], limit: 0 }, null, table_rules, localParams)
-                .then(isValid => {
+                .then(async isValid => {
 
                     const { filterFields, forcedFilter } = get(table_rules, "select") || {};
+                    const condition = await this.prepareWhere(filter, forcedFilter, filterFields, true);
 
                     // let final_filter = getFindFilter(filter, table_rules);
                     return this.pubSubManager.addSync({
                         table_info: this.tableOrViewInfo, 
-                        condition: this.prepareWhere(filter, forcedFilter, filterFields, true),
+                        condition,
                         id_fields, synced_field, allow_delete,
                         socket,
                         table_rules,
@@ -1616,9 +1704,10 @@ export class DboBuilder {
                 if(dup){
                     throw "Duplicate join declaration for table: " + dup.tables[0];
                 }
+                const tovNames = this.tablesOrViews.map(t => t.name);
 
                 // 2 find incorrect tables
-                const missing = flat(joins.map(j => j.tables)).find(t => !this.dbo[t]);
+                const missing = flat(joins.map(j => j.tables)).find(t => !tovNames.includes(t));
                 if(missing){
                     throw "Table not found: " + missing;
                 }
@@ -1633,12 +1722,13 @@ export class DboBuilder {
                         var t = <string>v[0],
                             f = <string[]>v[1];
                             
-                        if(!this.dbo[t]) throw "Table not found: " + t;
-                        const m1 = f.filter(k => !(this.dbo[t] as TableHandler).column_names.includes(k))
+                        let tov = this.tablesOrViews.find(_t => _t.name === t);
+                        if(!tov) throw "Table not found: " + t;
+                        const m1 = f.filter(k => !tov.columns.map(c => c.name).includes(k))
                         if(m1 && m1.length){
-                            throw `Table ${t}(${(this.dbo[t] as TableHandler).column_names.join()}) has no fields named: ${m1.join()}`;
+                            throw `Table ${t}(${tov.columns.map(c => c.name).join()}) has no fields named: ${m1.join()}`;
                         }
-                    })
+                    });
                 });
 
                 // 4 find incorrect/missing join types
@@ -1683,7 +1773,7 @@ export class DboBuilder {
             // console.log(this.joinPaths)
             // console.log(888, this.prostgles.joins);
             // console.log(this.joinGraph, findShortestPath(this.joinGraph, "colors", "drawings"));
-            // console.log(this.dbo.pixels.column_names)
+           
         }
 
         return this.joinPaths;
@@ -1700,10 +1790,7 @@ export class DboBuilder {
         let allDataDefs = "";
         let allDboDefs = "";
         const common_types = 
-`/* This file was generated by Prostgles 
-* ${(new Date).toUTCString()} 
-*/
-
+`
 export type Filter = object | {} | undefined;
 export type GroupFilter = { $and: Filter } | { $or: Filter };
 export type FieldFilter = object | string[] | "*" | "";
@@ -1735,18 +1822,20 @@ export type TxCB = {
 };
 `
         this.dboDefinition = `export type DBObj = {\n`;
+
+        await this.parseJoins();
+
         this.tablesOrViews.map(tov => {
             if(tov.is_view){
-                this.dbo[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this);
+                this.dbo[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, null, this.joinPaths);
             } else {
-                this.dbo[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this);
+                this.dbo[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, null, this.joinPaths);
             }
             allDataDefs += (this.dbo[tov.name] as TableHandler).tsDataDef + "\n";
             allDboDefs += (this.dbo[tov.name] as TableHandler).tsDboDef;
             this.dboDefinition += ` ${tov.name}: ${(this.dbo[tov.name] as TableHandler).tsDboName};\n`;
         });
 
-        await this.parseJoins();
 
         let txKey = "tx";
         if(this.prostgles.transactions){
@@ -1762,9 +1851,9 @@ export type TxCB = {
                 let txDB = {};
                 this.tablesOrViews.map(tov => {
                     if(tov.is_view){
-                        txDB[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, t);
+                        txDB[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
                     } else {
-                        txDB[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t);
+                        txDB[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
                     }
                 });
                 return cb(txDB);
