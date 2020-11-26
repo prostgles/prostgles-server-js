@@ -664,7 +664,7 @@ class ViewHandler {
             return "";
         });
     }
-    prepareExistCondition(filter, localParams) {
+    prepareExistCondition(filter, localParams, notJoined = false) {
         return __awaiter(this, void 0, void 0, function* () {
             let res = "";
             const t1 = this.name;
@@ -712,7 +712,12 @@ class ViewHandler {
                     throw "Issue with preparing $exists query for table " + t2 + "\n->" + JSON.stringify(err);
                 }
                 // console.log(f2, finalWhere);
-                res = makeTableChain(this.getJoins(t1, t2), 0, finalWhere);
+                if (notJoined) {
+                    res = ` EXISTS (SELECT 1 \nFROM ${asName(t2)} \n${finalWhere}) `;
+                }
+                else {
+                    res = makeTableChain(this.getJoins(t1, t2), 0, finalWhere);
+                }
                 return res;
             })))).join(" AND \n");
         });
@@ -774,11 +779,11 @@ class ViewHandler {
             ];
             let data = Object.assign({}, filter);
             /* Exists join filter */
-            let filterKeys = Object.keys(data).filter(k => k !== "$exists");
-            let existsFilter = data["$exists"];
+            const EXISTS_KEYS = ["$exists", "$joinsTo"];
+            let filterKeys = Object.keys(data).filter(k => !EXISTS_KEYS.includes(k));
             let existsCond = "";
-            if (existsFilter) {
-                existsCond = yield this.prepareExistCondition(existsFilter, localParams);
+            if (filterKeys.length) {
+                existsCond = (yield Promise.all(filterKeys.map((k) => __awaiter(this, void 0, void 0, function* () { return yield this.prepareExistCondition(data[k], localParams, k === "$exists"); })))).join(" AND ");
             }
             if (allowed_colnames) {
                 const invalidColumn = filterKeys

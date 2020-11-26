@@ -126,7 +126,7 @@ export declare class ViewHandler {
     prepareSelect(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, tableAlias?: string): string;
     private getFinalFilterObj;
     prepareWhere(filter: Filter, forcedFilter: object, filterFields: FieldFilter, excludeWhere?: boolean, tableAlias?: string): Promise<string>;
-    prepareExistCondition(filter: object, localParams: LocalParams): Promise<string>;
+    prepareExistCondition(filter: object, localParams: LocalParams, notJoined?: boolean): Promise<string>;
     getCondition(filter: object, allowed_colnames: string[], tableAlias?: string, localParams?: LocalParams): Promise<any>;
     prepareSort(orderBy: OrderBy, allowed_cols: any, tableAlias?: string, excludeOrder?: boolean, validatedAggAliases?: string[]): string;
     prepareLimitQuery(limit: number, maxLimit: number): number;
