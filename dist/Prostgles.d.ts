@@ -70,7 +70,7 @@ export declare type SelectRule = {
     maxLimit?: number;
     forcedFilter?: object;
     filterFields?: FieldFilter;
-    validate?(...SelectRequestData: any[]): SelectRequestData;
+    validate?(SelectRequestData: any): SelectRequestData;
 };
 export declare type InsertRule = {
     fields: FieldFilter;

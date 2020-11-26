@@ -124,6 +124,7 @@ export declare class ViewHandler {
     }>>;
     prepareColumnSet(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, onlyNames?: boolean): string | pgPromise.ColumnSet;
     prepareSelect(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, tableAlias?: string): string;
+    private getFinalFilterObj;
     prepareWhere(filter: Filter, forcedFilter: object, filterFields: FieldFilter, excludeWhere?: boolean, tableAlias?: string): Promise<string>;
     prepareExistCondition(filter: object, localParams: LocalParams): Promise<string>;
     getCondition(filter: object, allowed_colnames: string[], tableAlias?: string, localParams?: LocalParams): Promise<any>;

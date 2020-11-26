@@ -460,6 +460,12 @@ class ViewHandler {
                     if (bad_params && bad_params.length)
                         throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
                 }
+                /* Apply publish validation */
+                // if(tableRules && tableRules.select && tableRules.select.validate){
+                //     const forcedFilter = tableRules.select.forcedFilter || {};
+                //     /* Filters have been validated up to this point */
+                //     await tableRules.select.validate({ filter: { ...filter, ...forcedFilter }, params: selectParams });
+                // }
                 // console.log(_query);
                 if (expectOne)
                     return (this.t || this.db).oneOrNone(_query).catch(err => makeErr(err, localParams));
@@ -598,6 +604,17 @@ class ViewHandler {
             return this.prepareColumnSet(selectParams, allowed_cols, true, true);
         }
     }
+    getFinalFilterObj(filter, forcedFilter) {
+        let _filter = Object.assign({}, filter);
+        if (!isPlainObject(_filter))
+            throw "\nInvalid filter\nExpecting an object but got -> " + JSON.stringify(filter);
+        if (forcedFilter) {
+            _filter = {
+                $and: [forcedFilter, _filter].filter(f => f)
+            };
+        }
+        return _filter;
+    }
     prepareWhere(filter, forcedFilter, filterFields, excludeWhere = false, tableAlias) {
         return __awaiter(this, void 0, void 0, function* () {
             const parseFilter = (f, parentFilter = null) => __awaiter(this, void 0, void 0, function* () {
@@ -629,7 +646,6 @@ class ViewHandler {
             });
             if (!isPlainObject(filter))
                 throw "\nInvalid filter\nExpecting an object but got -> " + JSON.stringify(filter);
-            let result = "";
             let _filter = Object.assign({}, filter);
             if (forcedFilter) {
                 _filter = {
@@ -688,7 +704,13 @@ class ViewHandler {
                         throw "Dissallowed";
                     ({ forcedFilter, filterFields } = t2Rules.select);
                 }
-                const finalWhere = yield this.dboBuilder.dbo[t2].prepareWhere(f2, forcedFilter, filterFields, true, tableAlias);
+                let finalWhere;
+                try {
+                    finalWhere = yield this.dboBuilder.dbo[t2].prepareWhere(f2, forcedFilter, filterFields, true, tableAlias);
+                }
+                catch (err) {
+                    throw "Issue with preparing $exists query for table " + t2 + "\n->" + JSON.stringify(err);
+                }
                 // console.log(f2, finalWhere);
                 res = makeTableChain(this.getJoins(t1, t2), 0, finalWhere);
                 return res;
@@ -762,7 +784,7 @@ class ViewHandler {
                 const invalidColumn = filterKeys
                     .find(fName => !allowed_colnames.includes(fName));
                 if (invalidColumn) {
-                    throw 'disallowed/inexistent columns in filter: ' + invalidColumn;
+                    throw `Table: ${this.name} -> disallowed/inexistent columns in filter: ${invalidColumn}`;
                 }
             }
             let templates = Prostgles_1.flat(filterKeys

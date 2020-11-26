@@ -124,7 +124,7 @@ export type SelectRule = {
     filterFields?: FieldFilter;
 
     // Validation logic to check/update data for each request
-    validate?(...SelectRequestData): SelectRequestData
+    validate?(SelectRequestData): SelectRequestData
 }
 export type InsertRule = {
 

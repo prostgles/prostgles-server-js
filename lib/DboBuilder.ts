@@ -647,6 +647,15 @@ export class ViewHandler {
                 const bad_params = Object.keys(selectParams).filter(k => !good_params.includes(k));
                 if(bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
             }
+
+            /* Apply publish validation */
+            // if(tableRules && tableRules.select && tableRules.select.validate){
+            //     const forcedFilter = tableRules.select.forcedFilter || {};
+                
+            //     /* Filters have been validated up to this point */
+            //     await tableRules.select.validate({ filter: { ...filter, ...forcedFilter }, params: selectParams });
+            // }
+
             // console.log(_query);
             if(expectOne) return (this.t || this.db).oneOrNone(_query).catch(err => makeErr(err, localParams));
             else return (this.t || this.db).any(_query).catch(err => makeErr(err, localParams));
@@ -780,6 +789,20 @@ export class ViewHandler {
         }
     }
 
+    private getFinalFilterObj(filter: Filter, forcedFilter: object): object {
+
+        let _filter = { ... filter };
+        if(!isPlainObject(_filter)) throw "\nInvalid filter\nExpecting an object but got -> " + JSON.stringify(filter);
+
+        if(forcedFilter){
+            _filter = {
+                $and: [forcedFilter, _filter].filter(f => f)
+            }
+        }
+
+        return _filter;
+    }
+
     async prepareWhere(filter: Filter, forcedFilter: object, filterFields: FieldFilter, excludeWhere = false, tableAlias?: string){
         const parseFilter = async (f: any, parentFilter: any = null) => {
             let result = "";
@@ -808,7 +831,7 @@ export class ViewHandler {
 
         if(!isPlainObject(filter)) throw "\nInvalid filter\nExpecting an object but got -> " + JSON.stringify(filter);
         
-        let result = "";
+
         let _filter = { ... filter };
         if(forcedFilter){
             _filter = {
@@ -885,7 +908,12 @@ export class ViewHandler {
                 ({ forcedFilter, filterFields } = t2Rules.select);
             }
             
-            const finalWhere = await (this.dboBuilder.dbo[t2] as TableHandler).prepareWhere(f2, forcedFilter, filterFields, true, tableAlias)
+            let finalWhere;
+            try {
+                finalWhere = await (this.dboBuilder.dbo[t2] as TableHandler).prepareWhere(f2, forcedFilter, filterFields, true, tableAlias)
+            } catch(err) {
+                throw "Issue with preparing $exists query for table " + t2 + "\n->" + JSON.stringify(err);
+            }
             // console.log(f2, finalWhere);
             res = makeTableChain(this.getJoins(t1, t2), 0, finalWhere);
             return res;
@@ -961,7 +989,7 @@ export class ViewHandler {
                 .find(fName => !allowed_colnames.includes(fName));
 
             if(invalidColumn){
-                throw 'disallowed/inexistent columns in filter: ' + invalidColumn;
+                throw `Table: ${this.name} -> disallowed/inexistent columns in filter: ${invalidColumn}`;
             }
         }
 
@@ -1685,7 +1713,7 @@ export type DbHandlerTX = { [key: string]: TX } | DbHandler
 import { JOIN_TYPES } from "./Prostgles";
 import { strict, rejects } from "assert";
 import { join, resolve } from "path";
-import { group } from "console";
+import { group, table } from "console";
 
 export class DboBuilder {
     tablesOrViews: TableOrViewInfo[];
