@@ -916,7 +916,7 @@ export class ViewHandler {
             }
             // console.log(f2, finalWhere);
             if(notJoined){
-                res = ` EXISTS (SELECT 1 \nFROM ${asName(t2)} \n${finalWhere}) `
+                res = ` EXISTS (SELECT 1 \nFROM ${asName(t2)} \n${finalWhere? `WHERE ${finalWhere}` : ""}) `
             } else {
                 res = makeTableChain(this.getJoins(t1, t2), 0, finalWhere);
             }
