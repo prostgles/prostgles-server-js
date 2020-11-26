@@ -983,9 +983,10 @@ export class ViewHandler {
         /* Exists join filter */
         const EXISTS_KEYS = ["$exists", "$joinsTo"];
         let filterKeys = Object.keys(data).filter(k => !EXISTS_KEYS.includes(k));
+        const existsKeys = Object.keys(data).filter(k => EXISTS_KEYS.includes(k));
         let existsCond = "";
-        if(filterKeys.length){
-            existsCond = (await Promise.all(filterKeys.map(async k => await this.prepareExistCondition(data[k], localParams, k === "$exists")))).join(" AND ");
+        if(existsKeys.length){
+            existsCond = (await Promise.all(existsKeys.map(async k => await this.prepareExistCondition(data[k], localParams, k === "$exists")))).join(" AND ");
         }
 
         if(allowed_colnames){
