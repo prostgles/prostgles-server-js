@@ -271,14 +271,14 @@ export class ViewHandler {
         }
 
         /* Make the join chain info excluding root table */
-        result = jp.path.slice(1).map((t2, i, arr) => {
+        result = (path || jp.path).slice(1).map((t2, i, arr) => {
             const t1 = i === 0? source : arr[i-1];
             
             if(!this.joins) this.joins = JSON.parse(JSON.stringify(this.dboBuilder.joins));
 
             /* Get join options */
             const jo = this.joins.find(j => j.tables.includes(t1) && j.tables.includes(t2));
-            if(!jo) throw "INTERNAL ERROR -> could not find join relationship";
+            if(!jo) throw `Joining ${t1} <-> ${t2} dissallowed or missing`;;
 
             let on = [];
 
