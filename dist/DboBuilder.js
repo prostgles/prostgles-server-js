@@ -133,12 +133,12 @@ class ViewHandler {
         }).join("\n");
         return { query, toOne: false };
     }
-    getJoins(source, target) {
+    getJoins(source, target, path) {
         let result = [];
         if (!this.joinPaths)
             throw "Joins dissallowed";
         /* Find the join path between tables */
-        let jp = this.joinPaths.find(j => j.t1 === source && j.t2 === target);
+        let jp = this.joinPaths.find(j => j.t1 === source && j.t2 === target && (!path || j.path.join() === path.join()));
         if (!jp)
             throw `Joining ${source} <-> ${target} dissallowed or missing`;
         /* Make the join chain info excluding root table */
@@ -664,14 +664,25 @@ class ViewHandler {
             return "";
         });
     }
-    prepareExistCondition(filter, localParams, notJoined = false) {
+    prepareExistCondition(filter, localParams, notJoined = false, exactPath) {
         return __awaiter(this, void 0, void 0, function* () {
             let res = "";
             const t1 = this.name;
-            return (yield Promise.all(Object.keys(filter).map((t2) => __awaiter(this, void 0, void 0, function* () {
-                const f2 = filter[t2];
-                if (!this.dboBuilder.dbo[t2])
-                    throw "Invalid or dissallowed table: " + t2;
+            return (yield Promise.all(Object.keys(filter).map((_t2) => __awaiter(this, void 0, void 0, function* () {
+                let t2 = _t2;
+                let paths;
+                let tablesToCheck = [t2];
+                if (exactPath) {
+                    paths = exactPath;
+                    tablesToCheck = paths;
+                    t2 = paths[paths.length - 1];
+                }
+                // console.log(filter, exactPath, tablesToCheck)
+                tablesToCheck.forEach(t => {
+                    if (!this.dboBuilder.dbo[t])
+                        throw "Invalid or dissallowed table: " + t;
+                });
+                const f2 = exactPath ? filter : filter[_t2];
                 /* Nested $exists not allowed */
                 if (f2 && Object.keys(f2).includes("$exists")) {
                     throw "Nested exists dissallowed";
@@ -699,6 +710,7 @@ class ViewHandler {
                 };
                 let t2Rules = undefined, forcedFilter, filterFields, tableAlias;
                 if (localParams && localParams.socket && this.dboBuilder.publishParser) {
+                    /* Need to think about joining through dissallowed tables */
                     t2Rules = yield this.dboBuilder.publishParser.getValidatedRequestRule({ tableName: t2, command: "find", socket: localParams.socket });
                     if (!t2Rules || !t2Rules.select)
                         throw "Dissallowed";
@@ -716,7 +728,10 @@ class ViewHandler {
                     res = ` EXISTS (SELECT 1 \nFROM ${exports.asName(t2)} \n${finalWhere ? `WHERE ${finalWhere}` : ""}) `;
                 }
                 else {
-                    res = makeTableChain(this.getJoins(t1, t2), 0, finalWhere);
+                    let _paths;
+                    if (paths)
+                        _paths = [t1, ...paths];
+                    res = makeTableChain(this.getJoins(t1, t2, _paths), 0, finalWhere);
                 }
                 return res;
             })))).join(" AND \n");
@@ -780,12 +795,28 @@ class ViewHandler {
             let data = Object.assign({}, filter);
             /* Exists join filter */
             const EXISTS_KEYS = ["$exists", "$joinsTo"];
-            let filterKeys = Object.keys(data).filter(k => !EXISTS_KEYS.includes(k));
-            const existsKeys = Object.keys(data).filter(k => EXISTS_KEYS.includes(k));
+            let existsKeys = Object.keys(data).filter(k => EXISTS_KEYS.includes(k)).map(key => ({
+                key,
+                notJoined: key === "$exists",
+                exactPaths: undefined
+            }));
+            let exactPaths;
+            /* Exists with exact path */
+            Object.keys(data).map(k => {
+                let isthis = k.includes(".") && !k.split(".").find(kt => !this.dboBuilder.dbo[kt]);
+                if (isthis) {
+                    existsKeys.push({
+                        key: k,
+                        notJoined: false,
+                        exactPaths: k.split(".")
+                    });
+                }
+            });
             let existsCond = "";
             if (existsKeys.length) {
-                existsCond = (yield Promise.all(existsKeys.map((k) => __awaiter(this, void 0, void 0, function* () { return yield this.prepareExistCondition(data[k], localParams, k === "$exists"); })))).join(" AND ");
+                existsCond = (yield Promise.all(existsKeys.map((k) => __awaiter(this, void 0, void 0, function* () { return yield this.prepareExistCondition(data[k.key], localParams, k.notJoined, k.exactPaths); })))).join(" AND ");
             }
+            let filterKeys = Object.keys(data).filter(k => !existsKeys.find(ek => ek.key === k));
             if (allowed_colnames) {
                 const invalidColumn = filterKeys
                     .find(fName => !allowed_colnames.includes(fName));

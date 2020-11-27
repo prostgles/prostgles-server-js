@@ -55,20 +55,38 @@ index_1.default({
         try {
             await dbo.items.delete({});
             await dbo.items2.delete({});
-            console.log(await dbo.items3.update({}, { name: "2" }, { returning: "*" }));
-            // await dbo.items3.delete({ });
+            await dbo.items3.delete({});
+            // console.log(await dbo.items3.update({},{ name: "2" }, { returning: "*" }));
             /* Exists filter example */
             await dbo.items.insert([{ name: "a" }, { name: "a" }, { name: "b" }]);
             await dbo.items2.insert([{ name: "a" }]);
             await dbo.items3.insert([{ name: "a" }]);
-            const expect2 = await dbo.items.count({
+            const expect0 = await dbo.items.count({
                 $and: [
-                    { $exists: { items3: { name: "a" } } },
-                    { $exists: { items2: { name: "a" } } }
+                    { $exists: { items2: { name: "a" } } },
+                    { $exists: { items3: { name: "b" } } },
                 ]
             });
-            if (expect2 !== 2)
+            if (expect0 !== 0)
                 throw "$exists query failed";
+            /* joinsTo filter example */
+            const expect2 = await dbo.items.find({
+                $and: [
+                    { $joinsTo: { items3: { name: "a" } } },
+                    { $joinsTo: { items2: { name: "a" } } }
+                ]
+            });
+            if (expect2.length !== 2)
+                throw "$joinsTo query failed";
+            /* joinsTo with exact path filter example */
+            const _expect2 = await dbo.items.find({
+                $and: [
+                    { "items2.items3": { name: "a" } },
+                    { $joinsTo: { items2: { name: "a" } } }
+                ]
+            });
+            if (_expect2.length !== 2)
+                throw "$joinsTo query failed";
             /* Transaction example */
             await dbo.tx(async (t) => {
                 await t.items.insert({ name: "tx" });
@@ -100,7 +118,9 @@ index_1.default({
                     items3: "*"
                 }
             });
-            console.log(items);
+            if (!items.length || !items.every(it => Array.isArray(it.items3))) {
+                throw "Joined select query failed";
+            }
             console.log("All tests successful");
         }
         catch (err) {
