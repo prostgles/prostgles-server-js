@@ -13,7 +13,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DboBuilder = exports.TableHandler = exports.ViewHandler = void 0;
+exports.DboBuilder = exports.TableHandler = exports.ViewHandler = exports.asName = void 0;
 const Bluebird = require("bluebird");
 const pgPromise = require("pg-promise");
 const utils_1 = require("./utils");
@@ -23,7 +23,7 @@ let pgp = pgPromise({
     promiseLib: Bluebird
     // ,query: function (e) { console.log({psql: e.query, params: e.params}); }
 });
-const asName = (str) => {
+exports.asName = (str) => {
     return pgp.as.format("$1:name", [str]);
 };
 function replaceNonAlphaNumeric(string) {
@@ -179,22 +179,22 @@ class ViewHandler {
                     const paths = this.getJoins(q1.table, q2.table);
                     return `${paths.map(({ table, on }, i) => {
                         const prevTable = i === 0 ? q1.table : paths[i - 1].table;
-                        let iQ = asName(table);
+                        let iQ = exports.asName(table);
                         /* If target table then add filters, options, etc */
                         if (i === paths.length - 1) {
                             iQ = "" +
                                 "   (\n" +
                                 `       SELECT *,\n` +
-                                `       row_number() over() as ${asName(`${table}_${PREF}_rowid_sorted`)},\n` +
-                                `       row_to_json((select x from (SELECT ${(q2.select.concat((q2.joins || []).map(j => j.table))).join(", ")}) as x)) AS ${asName(`${q2.table}_${PREF}_json`)} \n` +
+                                `       row_number() over() as ${exports.asName(`${table}_${PREF}_rowid_sorted`)},\n` +
+                                `       row_to_json((select x from (SELECT ${(q2.select.concat((q2.joins || []).map(j => j.table))).join(", ")}) as x)) AS ${exports.asName(`${q2.table}_${PREF}_json`)} \n` +
                                 `       FROM (\n` +
                                 `           ${makeQuery3(q2, true)}\n` +
-                                `       ) ${asName(q2.table)}        -- [target table]\n` +
-                                `   ) ${asName(q2.table)}\n`;
+                                `       ) ${exports.asName(q2.table)}        -- [target table]\n` +
+                                `   ) ${exports.asName(q2.table)}\n`;
                         }
                         return "" +
                             `   ${q2.isLeftJoin ? "LEFT" : "INNER"} JOIN ${iQ}\n` +
-                            `   ON ${on.map(([c1, c2]) => `${asName(prevTable)}.${asName(c1)} = ${asName(table)}.${asName(c2)}`).join("\n AND ")}\n`;
+                            `   ON ${on.map(([c1, c2]) => `${exports.asName(prevTable)}.${exports.asName(c1)} = ${exports.asName(table)}.${exports.asName(c2)}`).join("\n AND ")}\n`;
                     }).join("")}`;
                 };
                 /* Leaf query */
@@ -209,7 +209,7 @@ class ViewHandler {
                     }
                     let res = "" +
                         `SELECT ${select} \n` +
-                        `FROM ${asName(q.table)}\n`;
+                        `FROM ${exports.asName(q.table)}\n`;
                     if (q.where)
                         res += `${q.where}\n`;
                     if (groupBy)
@@ -229,26 +229,26 @@ class ViewHandler {
             -- root final
             SELECT
               ${(isJoined ? q.allFields : q.select).concat(aggs ? aggs : []).filter(s => s).concat(joins.map(j => j.limit === 1 ?
-                    `         json_agg(${asName(`${j.table}_${PREF}_json`)}::jsonb ORDER BY ${asName(`${j.table}_${PREF}_rowid_sorted`)})   FILTER (WHERE ${asName(`${j.table}_${PREF}_limit`)} <= ${j.limit} AND ${asName(`${j.table}_${PREF}_dupes_rowid`)} = 1 AND ${asName(`${j.table}_${PREF}_json`)} IS NOT NULL)->0  AS ${asName(j.table)}` :
-                    `COALESCE(json_agg(${asName(`${j.table}_${PREF}_json`)}::jsonb ORDER BY ${asName(`${j.table}_${PREF}_rowid_sorted`)})   FILTER (WHERE ${asName(`${j.table}_${PREF}_limit`)} <= ${j.limit} AND ${asName(`${j.table}_${PREF}_dupes_rowid`)} = 1 AND ${asName(`${j.table}_${PREF}_json`)} IS NOT NULL), '[]')  AS ${asName(j.table)}`)).join(", ")}
+                    `         json_agg(${exports.asName(`${j.table}_${PREF}_json`)}::jsonb ORDER BY ${exports.asName(`${j.table}_${PREF}_rowid_sorted`)})   FILTER (WHERE ${exports.asName(`${j.table}_${PREF}_limit`)} <= ${j.limit} AND ${exports.asName(`${j.table}_${PREF}_dupes_rowid`)} = 1 AND ${exports.asName(`${j.table}_${PREF}_json`)} IS NOT NULL)->0  AS ${exports.asName(j.table)}` :
+                    `COALESCE(json_agg(${exports.asName(`${j.table}_${PREF}_json`)}::jsonb ORDER BY ${exports.asName(`${j.table}_${PREF}_rowid_sorted`)})   FILTER (WHERE ${exports.asName(`${j.table}_${PREF}_limit`)} <= ${j.limit} AND ${exports.asName(`${j.table}_${PREF}_dupes_rowid`)} = 1 AND ${exports.asName(`${j.table}_${PREF}_json`)} IS NOT NULL), '[]')  AS ${exports.asName(j.table)}`)).join(", ")}
             FROM (
                 SELECT *,
-                ${joins.map(j => `row_number() over(partition by ${asName(`${j.table}_${PREF}_dupes_rowid`)}, ctid order by ${asName(`${j.table}_${PREF}_rowid_sorted`)}) AS ${j.table}_${PREF}_limit`).join(", ")}
+                ${joins.map(j => `row_number() over(partition by ${exports.asName(`${j.table}_${PREF}_dupes_rowid`)}, ctid order by ${exports.asName(`${j.table}_${PREF}_rowid_sorted`)}) AS ${j.table}_${PREF}_limit`).join(", ")}
                 FROM (
                     SELECT 
                      -- [source full sellect + ctid to group by]
-                    ${q.allFields.concat(["ctid"]).map(field => `${asName(q.table)}.${asName(field)}`).concat(joins.map(j => asName(j.table) + "." + asName(`${j.table}_${PREF}_json`) + ", " + asName(j.table) + "." + asName(`${j.table}_${PREF}_rowid_sorted`)).concat(
+                    ${q.allFields.concat(["ctid"]).map(field => `${exports.asName(q.table)}.${exports.asName(field)}`).concat(joins.map(j => exports.asName(j.table) + "." + exports.asName(`${j.table}_${PREF}_json`) + ", " + exports.asName(j.table) + "." + exports.asName(`${j.table}_${PREF}_rowid_sorted`)).concat(
                 // ${j.joins && j.joins.length? " ORDER BY  " : ""}
-                joins.map(j => `row_number() over(partition by ${asName(`${j.table}_${PREF}_rowid_sorted`)}, ${asName(q.table)}.ctid ) AS ${asName(`${j.table}_${PREF}_dupes_rowid`)}`)).join("\n, "))}
+                joins.map(j => `row_number() over(partition by ${exports.asName(`${j.table}_${PREF}_rowid_sorted`)}, ${exports.asName(q.table)}.ctid ) AS ${exports.asName(`${j.table}_${PREF}_dupes_rowid`)}`)).join("\n, "))}
                     FROM (
                         SELECT *, row_number() over() as ctid
-                        FROM ${asName(q.table)}
+                        FROM ${exports.asName(q.table)}
 
                         -- [source filter]
                         ${q.where}
                         
 
-                    ) ${asName(q.table)}
+                    ) ${exports.asName(q.table)}
                     ${joins.map(j => joinTables(q, j)).join("\n")}
                 ) t
             ) t            
@@ -679,10 +679,10 @@ class ViewHandler {
                 const makeTableChain = (paths, depth = 0, finalFilter = "") => {
                     const join = paths[depth], table = join.table;
                     const prevTable = depth === 0 ? join.source : paths[depth - 1].table;
-                    let cond = `${join.on.map(([c1, c2]) => `${asName(prevTable)}.${asName(c1)} = ${asName(table)}.${asName(c2)}`).join("\n AND ")}`;
+                    let cond = `${join.on.map(([c1, c2]) => `${exports.asName(prevTable)}.${exports.asName(c1)} = ${exports.asName(table)}.${exports.asName(c2)}`).join("\n AND ")}`;
                     // console.log(join, cond);
                     let j = `SELECT 1 \n` +
-                        `FROM ${asName(table)} \n` +
+                        `FROM ${exports.asName(table)} \n` +
                         `WHERE ${cond} \n`; //
                     if (depth === paths.length - 1 && finalFilter) {
                         j += `AND ${finalFilter} \n`;
@@ -713,7 +713,7 @@ class ViewHandler {
                 }
                 // console.log(f2, finalWhere);
                 if (notJoined) {
-                    res = ` EXISTS (SELECT 1 \nFROM ${asName(t2)} \n${finalWhere ? `WHERE ${finalWhere}` : ""}) `;
+                    res = ` EXISTS (SELECT 1 \nFROM ${exports.asName(t2)} \n${finalWhere ? `WHERE ${finalWhere}` : ""}) `;
                 }
                 else {
                     res = makeTableChain(this.getJoins(t1, t2), 0, finalWhere);
@@ -1233,7 +1233,7 @@ class TableHandler extends ViewHandler {
                     }
                     let insertQ = "";
                     if (!Object.keys(_data).length)
-                        insertQ = `INSERT INTO ${asName(this.name)} DEFAULT VALUES `;
+                        insertQ = `INSERT INTO ${exports.asName(this.name)} DEFAULT VALUES `;
                     else
                         insertQ = pgp.helpers.insert(_data, columnSet);
                     return insertQ + conflict_query + returningSelect;

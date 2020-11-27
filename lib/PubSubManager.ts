@@ -5,7 +5,7 @@
 
 import { PostgresNotifListenManager } from "./PostgresNotifListenManager";
 import { get } from "./utils";
-import { TableOrViewInfo, TableInfo, DbHandler, TableHandler } from "./DboBuilder";
+import { TableOrViewInfo, TableInfo, DbHandler, TableHandler, asName } from "./DboBuilder";
 import { TableRule, SelectParams, DB, OrderBy } from "./Prostgles";
 
 import * as Bluebird from "bluebird";
@@ -884,7 +884,7 @@ export class PubSubManager {
                         INTO condition_ids
                         FROM (
                             ${_condts.map((c, cIndex )=> `
-                                SELECT CASE WHEN EXISTS(SELECT 1 FROM old_table WHERE ${c}) THEN '${cIndex}' END AS c_ids
+                                SELECT CASE WHEN EXISTS(SELECT 1 FROM old_table as ${asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids
                             `).join(" UNION ALL ")}
                         ) t;
 
@@ -893,8 +893,8 @@ export class PubSubManager {
                         INTO condition_ids
                         FROM (
                             ${_condts.map((c, cIndex )=> `
-                                SELECT CASE WHEN EXISTS(SELECT 1 FROM old_table WHERE ${c}) THEN '${cIndex}' END AS c_ids UNION ALL 
-                                SELECT CASE WHEN EXISTS(SELECT 1 FROM new_table WHERE ${c}) THEN '${cIndex}' END AS c_ids
+                                SELECT CASE WHEN EXISTS(SELECT 1 FROM old_table as ${asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids UNION ALL 
+                                SELECT CASE WHEN EXISTS(SELECT 1 FROM new_table as ${asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids
                             `).join(" UNION ALL ")}
                         ) t;
                         
@@ -903,7 +903,7 @@ export class PubSubManager {
                         INTO condition_ids
                         FROM (
                             ${_condts.map((c, cIndex )=> `
-                                SELECT CASE WHEN EXISTS(SELECT 1 FROM new_table WHERE ${c}) THEN '${cIndex}' END AS c_ids
+                                SELECT CASE WHEN EXISTS(SELECT 1 FROM new_table as ${asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids
                             `).join(" UNION ALL ")}
                         ) t;
 

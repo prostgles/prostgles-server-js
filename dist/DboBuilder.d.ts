@@ -6,6 +6,7 @@ declare global {
 import * as pgPromise from 'pg-promise';
 import { DB, TableRule, OrderBy, SelectParams, InsertParams, UpdateParams, DeleteParams, Joins, Prostgles, PublishParser } from "./Prostgles";
 import { PubSubManager } from "./PubSubManager";
+export declare const asName: (str: string) => string;
 /**
  * @example
  * { field_name: (true | false) }

@@ -23,7 +23,7 @@ let pgp: PGP = pgPromise({
     // ,query: function (e) { console.log({psql: e.query, params: e.params}); }
 });
 
-const asName = (str: string): string => {
+export const asName = (str: string): string => {
     return pgp.as.format("$1:name", [str]);
 }
 /**

@@ -16,6 +16,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.filterObj = exports.PubSubManager = void 0;
 const PostgresNotifListenManager_1 = require("./PostgresNotifListenManager");
 const utils_1 = require("./utils");
+const DboBuilder_1 = require("./DboBuilder");
 const Bluebird = require("bluebird");
 const pgPromise = require("pg-promise");
 let pgp = pgPromise({
@@ -694,7 +695,7 @@ class PubSubManager {
                         INTO condition_ids
                         FROM (
                             ${_condts.map((c, cIndex) => `
-                                SELECT CASE WHEN EXISTS(SELECT 1 FROM old_table WHERE ${c}) THEN '${cIndex}' END AS c_ids
+                                SELECT CASE WHEN EXISTS(SELECT 1 FROM old_table as ${DboBuilder_1.asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids
                             `).join(" UNION ALL ")}
                         ) t;
 
@@ -703,8 +704,8 @@ class PubSubManager {
                         INTO condition_ids
                         FROM (
                             ${_condts.map((c, cIndex) => `
-                                SELECT CASE WHEN EXISTS(SELECT 1 FROM old_table WHERE ${c}) THEN '${cIndex}' END AS c_ids UNION ALL 
-                                SELECT CASE WHEN EXISTS(SELECT 1 FROM new_table WHERE ${c}) THEN '${cIndex}' END AS c_ids
+                                SELECT CASE WHEN EXISTS(SELECT 1 FROM old_table as ${DboBuilder_1.asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids UNION ALL 
+                                SELECT CASE WHEN EXISTS(SELECT 1 FROM new_table as ${DboBuilder_1.asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids
                             `).join(" UNION ALL ")}
                         ) t;
                         
@@ -713,7 +714,7 @@ class PubSubManager {
                         INTO condition_ids
                         FROM (
                             ${_condts.map((c, cIndex) => `
-                                SELECT CASE WHEN EXISTS(SELECT 1 FROM new_table WHERE ${c}) THEN '${cIndex}' END AS c_ids
+                                SELECT CASE WHEN EXISTS(SELECT 1 FROM new_table as ${DboBuilder_1.asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids
                             `).join(" UNION ALL ")}
                         ) t;
 

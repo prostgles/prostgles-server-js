@@ -76,7 +76,7 @@ export declare type InsertRule = {
     fields: FieldFilter;
     forcedData?: object;
     returningFields?: FieldFilter;
-    validate?: (row: object) => object;
+    validate?: (row: object) => object | Promise<object>;
 };
 export declare type UpdateRule = {
     fields: FieldFilter;
