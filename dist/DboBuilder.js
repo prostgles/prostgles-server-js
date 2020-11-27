@@ -138,7 +138,7 @@ class ViewHandler {
         if (!this.joinPaths)
             throw "Joins dissallowed";
         /* Find the join path between tables */
-        let jp = this.joinPaths.find(j => j.t1 === source && j.t2 === target || (path && j.path.join() === path.join()));
+        let jp = this.joinPaths.find(j => path ? j.path.join() === path.join() : j.t1 === source && j.t2 === target);
         if (!jp) {
             if (path)
                 throw `Joining through tables: ${path.join(", ")}  dissallowed or missing`;
