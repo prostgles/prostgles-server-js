@@ -803,7 +803,7 @@ class ViewHandler {
             let exactPaths;
             /* Exists with exact path */
             Object.keys(data).map(k => {
-                let isthis = k.includes(".") && !k.split(".").find(kt => !this.dboBuilder.dbo[kt]);
+                let isthis = isPlainObject(data[k]) && !this.column_names.includes(k) && !k.split(".").find(kt => !this.dboBuilder.dbo[kt]);
                 if (isthis) {
                     existsKeys.push({
                         key: k,

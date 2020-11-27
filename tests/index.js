@@ -81,6 +81,7 @@ index_1.default({
             /* joinsTo with exact path filter example */
             const _expect2 = await dbo.items.find({
                 $and: [
+                    { "items2": { name: "a" } },
                     { "items2.items3": { name: "a" } },
                     { $joinsTo: { items2: { name: "a" } } }
                 ]
