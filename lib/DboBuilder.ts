@@ -1504,7 +1504,7 @@ export class TableHandler extends ViewHandler {
                 const { data, columnSet } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues });
                 let _data = { ...data };
                 if(validate){
-                    _data = await validate(row)
+                    _data = await validate(_data);
                 }
                 let insertQ = "";
                 if(!Object.keys(_data).length) insertQ = `INSERT INTO ${asName(this.name)} DEFAULT VALUES `;

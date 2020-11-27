@@ -138,7 +138,7 @@ export type InsertRule = {
     returningFields?: FieldFilter;
 
     // Validation logic to check/update data for each request
-    validate?: (row: object) => object
+    validate?: (row: object) => object | Promise<object>
 }
 export type UpdateRule = {
 

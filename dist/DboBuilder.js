@@ -1229,7 +1229,7 @@ class TableHandler extends ViewHandler {
                     const { data, columnSet } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues });
                     let _data = Object.assign({}, data);
                     if (validate) {
-                        _data = yield validate(row);
+                        _data = yield validate(_data);
                     }
                     let insertQ = "";
                     if (!Object.keys(_data).length)
