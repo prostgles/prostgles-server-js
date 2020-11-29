@@ -113,15 +113,15 @@ export declare type ViewRule = {
     select: SelectRule;
 };
 export declare type PublishTableRule = {
-    select?: SelectRule | "*";
-    insert?: InsertRule | "*";
-    update?: UpdateRule | "*";
-    delete?: DeleteRule | "*";
+    select?: SelectRule | "*" | false | null;
+    insert?: InsertRule | "*" | false | null;
+    update?: UpdateRule | "*" | false | null;
+    delete?: DeleteRule | "*" | false | null;
     sync?: SyncRule;
     subscribe?: SubscribeRule | "*";
 };
 export declare type PublishViewRule = {
-    select: SelectRule | "*";
+    select: SelectRule | "*" | false | null;
 };
 export declare type RequestParams = {
     dbo?: DbHandler;
