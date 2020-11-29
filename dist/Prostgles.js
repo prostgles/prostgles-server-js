@@ -390,7 +390,7 @@ class PublishParser {
                         if (!this.dbo[tableName])
                             throw `Table ${tableName} does not exist\nExpecting one of: ${Object.keys(this.dbo).join(", ")}`;
                         const table_rules = yield this.getTableRules({ socket, tableName });
-                        if (table_rules) {
+                        if (table_rules && Object.keys(table_rules).length) {
                             schema[tableName] = {};
                             let methods = [];
                             if (typeof table_rules === "object") {

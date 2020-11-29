@@ -717,7 +717,7 @@ export class PublishParser {
 
                         const table_rules = await this.getTableRules({ socket, tableName });
             
-                        if(table_rules){
+                        if(table_rules && Object.keys(table_rules).length){
                             schema[tableName] = {};
                             let methods = [];
         
