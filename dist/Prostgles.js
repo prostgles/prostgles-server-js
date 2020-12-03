@@ -284,14 +284,14 @@ class Prostgles {
     }
 }
 exports.Prostgles = Prostgles;
-const insertParams = ["fields", "forcedData", "returningFields", "validate"];
+// const insertParams: Array<keyof InsertRule> = ["fields", "forcedData", "returningFields", "validate"];
 const RULE_TO_METHODS = [
     {
         rule: "insert",
         methods: ["insert", "upsert"],
         no_limits: { fields: "*" },
         table_only: true,
-        allowed_params: ["fields", "forcedData", "returningFields", "validate"],
+        allowed_params: ["fields", "forcedData", "returningFields", "validate", "preValidate"],
         hint: ` expecting "*" | true | { fields: string | string[] | {}  }`
     },
     {

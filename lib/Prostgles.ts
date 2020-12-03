@@ -600,7 +600,7 @@ type DboTableCommand = Request & DboTable & {
     command: string;
 }
 
-const insertParams: Array<keyof InsertRule> = ["fields", "forcedData", "returningFields", "validate"];
+// const insertParams: Array<keyof InsertRule> = ["fields", "forcedData", "returningFields", "validate"];
 
 const RULE_TO_METHODS = [
    { 
@@ -608,7 +608,7 @@ const RULE_TO_METHODS = [
        methods: ["insert", "upsert"], 
        no_limits: <SelectRule>{ fields: "*" }, 
        table_only: true,
-       allowed_params: <Array<keyof InsertRule>>["fields", "forcedData", "returningFields", "validate"] ,
+       allowed_params: <Array<keyof InsertRule>>["fields", "forcedData", "returningFields", "validate", "preValidate"] ,
        hint: ` expecting "*" | true | { fields: string | string[] | {}  }`
     },
    { 
