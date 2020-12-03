@@ -110,6 +110,16 @@ export declare class ViewHandler {
     buildQueryTree(filter: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<Query>;
     checkFilter(filter: any): void;
     prepareValidatedQuery(filter: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams, validatedAggAliases?: string[]): Promise<Query>;
+    getColumns(tableRules?: TableRule, localParams?: LocalParams): Promise<{
+        insert: boolean;
+        select: boolean;
+        update: boolean;
+        delete: boolean;
+        name: string;
+        data_type: string;
+        udt_name: string;
+        element_type: string;
+    }[]>;
     find(filter: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<object[]>;
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: any, table_rules?: TableRule, localParams?: LocalParams): Promise<object>;
     count(filter?: Filter, param2_unused?: any, param3_unused?: any, table_rules?: TableRule, localParams?: any): Promise<number>;

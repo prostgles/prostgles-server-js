@@ -449,6 +449,19 @@ class ViewHandler {
             }
         });
     }
+    getColumns(tableRules, localParams) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (tableRules || localParams) {
+                const selF = this.parseFieldFilter(utils_1.get(tableRules, "select.fields"));
+                const filF = this.parseFieldFilter(utils_1.get(tableRules, "select.filterFields"));
+                const insF = this.parseFieldFilter(utils_1.get(tableRules, "insert.fields"));
+                const updF = this.parseFieldFilter(utils_1.get(tableRules, "update.fields"));
+                const delF = this.parseFieldFilter(utils_1.get(tableRules, "delete.filterFields"));
+                return this.columns.map(c => (Object.assign(Object.assign({}, c), { insert: insF.includes(c.name), select: selF.includes(c.name), filter: filF.includes(c.name), update: updF.includes(c.name), delete: delF.includes(c.name) })));
+            }
+            return this.columns.map(c => (Object.assign(Object.assign({}, c), { insert: true, select: true, update: true, delete: true })));
+        });
+    }
     find(filter, selectParams, param3_unused = null, tableRules, localParams) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
@@ -1230,7 +1243,7 @@ class TableHandler extends ViewHandler {
             try {
                 const { returning, onConflictDoNothing, fixIssues = false } = param2 || {};
                 const { testRule = false } = localParams || {};
-                let returningFields, forcedData, validate, fields;
+                let returningFields, forcedData, validate, preValidate, fields;
                 if (tableRules) {
                     if (!tableRules.insert)
                         throw "insert rules missing for " + this.name;
@@ -1238,6 +1251,7 @@ class TableHandler extends ViewHandler {
                     forcedData = tableRules.insert.forcedData;
                     fields = tableRules.insert.fields;
                     validate = tableRules.insert.validate;
+                    preValidate = tableRules.insert.preValidate;
                     if (!fields)
                         throw ` invalid insert rule for ${this.name}. fields missing `;
                     /* Safely test publish rules */
@@ -1265,7 +1279,11 @@ class TableHandler extends ViewHandler {
                 if (!data)
                     data = {}; //throw "Provide data in param1";
                 let returningSelect = returning ? (" RETURNING " + this.prepareSelect(returning, returningFields, false)) : "";
-                const makeQuery = (row, isOne = false) => __awaiter(this, void 0, void 0, function* () {
+                const makeQuery = (_row, isOne = false) => __awaiter(this, void 0, void 0, function* () {
+                    let row = Object.assign({}, _row);
+                    if (preValidate) {
+                        row = yield preValidate(row);
+                    }
                     if (!isPojoObject(row))
                         throw "\ninvalid insert data provided -> " + JSON.stringify(row);
                     const { data, columnSet } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues });

@@ -631,6 +631,35 @@ export class ViewHandler {
         }  
     }
 
+    async getColumns(tableRules?: TableRule, localParams?: LocalParams){
+        if(tableRules || localParams){
+
+            const selF = this.parseFieldFilter(get(tableRules, "select.fields"));
+            const filF = this.parseFieldFilter(get(tableRules, "select.filterFields"));
+
+            const insF = this.parseFieldFilter(get(tableRules, "insert.fields"));
+
+            const updF = this.parseFieldFilter(get(tableRules, "update.fields"));
+
+            const delF = this.parseFieldFilter(get(tableRules, "delete.filterFields"));
+            return this.columns.map(c => ({
+                ...c,
+                insert: insF.includes(c.name),
+                select: selF.includes(c.name),
+                filter: filF.includes(c.name),
+                update: updF.includes(c.name),
+                delete: delF.includes(c.name)
+            }));
+        }
+        return this.columns.map(c => ({
+            ...c,
+            insert: true,
+            select: true,
+            update: true,
+            delete: true
+        }));
+    }
+
     async find(filter: Filter, selectParams?: SelectParams , param3_unused = null, tableRules?: TableRule, localParams?: LocalParams): Promise<object[]>{
         try {
             filter = filter || {};
@@ -1509,6 +1538,7 @@ export class TableHandler extends ViewHandler {
             let returningFields: FieldFilter,
                 forcedData: object,
                 validate: any,
+                preValidate: any,
                 fields: FieldFilter;
     
             if(tableRules){
@@ -1517,6 +1547,7 @@ export class TableHandler extends ViewHandler {
                 forcedData = tableRules.insert.forcedData;
                 fields = tableRules.insert.fields;
                 validate = tableRules.insert.validate;
+                preValidate = tableRules.insert.preValidate;
     
                 if(!fields) throw ` invalid insert rule for ${this.name}. fields missing `;
 
@@ -1546,8 +1577,13 @@ export class TableHandler extends ViewHandler {
             
             if(!data) data = {}; //throw "Provide data in param1";
             let returningSelect = returning? (" RETURNING " + this.prepareSelect(returning, returningFields, false)) : "";
-            const makeQuery = async (row, isOne = false) => {
+            const makeQuery = async (_row, isOne = false) => {
+                let row = { ..._row };
+                if(preValidate){
+                    row = await preValidate(row);
+                }
                 if(!isPojoObject(row)) throw "\ninvalid insert data provided -> " + JSON.stringify(row);
+
                 const { data, columnSet } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues });
                 let _data = { ...data };
                 if(validate){
@@ -1558,8 +1594,6 @@ export class TableHandler extends ViewHandler {
                 else insertQ = pgp.helpers.insert(_data, columnSet); 
                 return insertQ + conflict_query + returningSelect;
             };
-    
-        
 
 
             if(param2){

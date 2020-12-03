@@ -137,7 +137,10 @@ export type InsertRule = {
     // Fields user can view after inserting
     returningFields?: FieldFilter;
 
-    // Validation logic to check/update data for each request
+    // Validation logic to check/update data for each request. Happens before field check
+    preValidate?: (row: object) => object | Promise<object>
+
+    // Validation logic to check/update data for each request. Happens after field check
     validate?: (row: object) => object | Promise<object>
 }
 export type UpdateRule = {
