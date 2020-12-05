@@ -291,6 +291,7 @@ class Prostgles {
                         });
                     });
                     let schema = {};
+                    let rawSQL = false;
                     try {
                         schema = yield publishParser.getSchemaFromPublish(socket);
                     }
@@ -320,6 +321,10 @@ class Prostgles {
                                     db.result(query, params)
                                         .then((qres) => {
                                         const { duration, fields, rows, rowCount } = qres;
+                                        if (justRows) {
+                                            cb(null, rows);
+                                            return;
+                                        }
                                         if (fields && DATA_TYPES.length) {
                                             qres.fields = fields.map(f => {
                                                 const dataType = DATA_TYPES.find(dt => +dt.oid === +f.dataTypeID), tableName = USER_TABLES.find(t => +t.relid === +f.tableID), { name } = f;
@@ -340,7 +345,7 @@ class Prostgles {
                             if (db) {
                                 // let allTablesViews = await db.any(STEP2_GET_ALL_TABLES_AND_COLUMNS);
                                 fullSchema = allTablesViews;
-                                schema.sql = {};
+                                rawSQL = true;
                             }
                             else
                                 console.error("db missing");
@@ -351,7 +356,8 @@ class Prostgles {
                     if (this.joins) {
                         joinTables = Array.from(new Set(flat(this.joins.map(j => j.tables)).filter(t => schema[t])));
                     }
-                    socket.emit(WS_CHANNEL_NAME.SCHEMA, Object.assign(Object.assign({ schema, methods: Object.keys(methods) }, (fullSchema ? { fullSchema } : {})), { joinTables,
+                    socket.emit(WS_CHANNEL_NAME.SCHEMA, Object.assign(Object.assign({ schema, methods: Object.keys(methods) }, (fullSchema ? { fullSchema } : {})), { rawSQL,
+                        joinTables,
                         auth }));
                 }
                 catch (e) {

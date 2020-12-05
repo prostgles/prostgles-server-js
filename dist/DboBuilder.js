@@ -1087,6 +1087,11 @@ class ViewHandler {
                         }
                     }
                     validate(keys);
+                    keys.forEach(key => {
+                        const allowedVals = [true, false, 0, 1];
+                        if (!allowedVals.includes(fieldParams[key]))
+                            throw `Invalid field selection value for: { ${key}: ${fieldParams[key]} }. \n Allowed values: ${allowedVals.join(" OR ")}`;
+                    });
                     let allowed = keys.filter(key => fieldParams[key]), disallowed = keys.filter(key => !fieldParams[key]);
                     if (disallowed && disallowed.length) {
                         return all_fields.filter(col => !disallowed.includes(col));

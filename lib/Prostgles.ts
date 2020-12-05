@@ -238,9 +238,8 @@ export type publishMethods = (socket?: any, dbo?: DbHandler | DbHandlerTX | any,
 export type BasicSession = { sid: string, expires: number };
 export type Auth = {
     sidCookieName?: string; /* Name of the cookie that represents the session id. If provided, Prostgles will attempt to get the user on socket connection */
-    // sidParamName?: string; /* 
-    getUser: ({ sid: string }, dbo: any, db: DB, socket: any) => Promise<object | null | undefined>;
-    getClientUser: ({ sid: string }, dbo: any, db: DB, socket: any) => Promise<object>;
+    getUser: ({ sid: string }, dbo: any, db: DB, socket: any) => Promise<object | null | undefined>;    /* User data used on server */
+    getClientUser: ({ sid: string }, dbo: any, db: DB, socket: any) => Promise<object>;                 /* User data sent to client */
     register?: (params, dbo: any, db: DB, socket: any) => Promise<BasicSession>;
     login?: (params, dbo: any, db: DB, socket: any) => Promise<BasicSession>;
     logout?: (sid: string, dbo: any, db: DB, socket: any) => Promise<any>;
@@ -586,6 +585,7 @@ export class Prostgles {
                 });
                 
                 let schema: any = {};
+                let rawSQL = false;
                 
                 try {
                     schema = await publishParser.getSchemaFromPublish(socket);
@@ -617,6 +617,11 @@ export class Prostgles {
                                 db.result(query, params)
                                     .then((qres: any) => {
                                         const { duration, fields, rows, rowCount } = qres;
+                                        if(justRows) {
+                                            cb(null, rows);
+                                            return;
+                                        }
+
                                         if(fields && DATA_TYPES.length){
                                             qres.fields = fields.map(f => {
                                                 const dataType = DATA_TYPES.find(dt => +dt.oid === +f.dataTypeID),
@@ -643,7 +648,7 @@ export class Prostgles {
                         if(db){
                             // let allTablesViews = await db.any(STEP2_GET_ALL_TABLES_AND_COLUMNS);
                             fullSchema = allTablesViews;
-                            schema.sql = {};
+                            rawSQL = true;
                         } else console.error("db missing");
                     }
                 }
@@ -657,6 +662,7 @@ export class Prostgles {
                     schema, 
                     methods: Object.keys(methods), 
                     ...(fullSchema? { fullSchema } : {}),
+                    rawSQL,
                     joinTables,
                     auth
                 });
