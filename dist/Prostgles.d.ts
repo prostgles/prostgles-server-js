@@ -131,7 +131,7 @@ export declare type RequestParams = {
 export declare type PublishedTablesAndViews = {
     [key: string]: PublishTableRule | PublishViewRule | "*" | false | null;
 } | "*";
-export declare type Publish = PublishedTablesAndViews | ((socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>));
+export declare type Publish = PublishedTablesAndViews | ((socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB, user?: any) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>));
 export declare type Method = (...args: any) => (any | Promise<any>);
 export declare const JOIN_TYPES: readonly ["one-many", "many-one", "one-one", "many-many"];
 export declare type Join = {
@@ -142,11 +142,27 @@ export declare type Join = {
     type: typeof JOIN_TYPES[number];
 };
 export declare type Joins = Join[];
-export declare type publishMethods = (socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB) => {
+export declare type publishMethods = (socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB, user?: any) => {
     [key: string]: Method;
 } | Promise<{
     [key: string]: Method;
 }>;
+export declare type BasicSession = {
+    sid: string;
+    expires: number;
+};
+export declare type Auth = {
+    sidCookieName?: string;
+    getUser: ({ sid: string }: {
+        sid: any;
+    }, dbo: any, db: DB, socket: any) => Promise<object | null | undefined>;
+    getClientUser: ({ sid: string }: {
+        sid: any;
+    }, dbo: any, db: DB, socket: any) => Promise<object>;
+    register?: (params: any, dbo: any, db: DB, socket: any) => Promise<BasicSession>;
+    login?: (params: any, dbo: any, db: DB, socket: any) => Promise<BasicSession>;
+    logout?: (sid: string, dbo: any, db: DB, socket: any) => Promise<any>;
+};
 export declare type ProstglesInitOptions = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
@@ -163,6 +179,7 @@ export declare type ProstglesInitOptions = {
     wsChannelNamePrefix?: string;
     onSocketConnect?(socket: Socket, dbo: any, db?: DB): any;
     onSocketDisconnect?(socket: Socket, dbo: any, db?: DB): any;
+    auth?: Auth;
 };
 export declare type OnReady = {
     dbo: DbHandler;
@@ -187,10 +204,17 @@ export declare class Prostgles {
     sqlFilePath?: string;
     tsGeneratedTypesDir?: string;
     publishParser: PublishParser;
+    auth?: Auth;
     constructor(params: ProstglesInitOptions);
     checkDb(): void;
     init(onReady: (dbo: DbHandler | DbHandlerTX, db: DB) => any): Promise<boolean>;
     runSQLFile(filePath: string): Promise<void>;
+    getSID(socket: any): any;
+    getUser(socket: any): Promise<object>;
+    getUserFromCookieSession(socket: any): Promise<null | {
+        user: any;
+        clientUser: any;
+    }>;
     setSocketEvents(): Promise<void>;
 }
 declare type Request = {
@@ -213,9 +237,10 @@ export declare class PublishParser {
     constructor(publish: any, publishMethods: any, publishRawSQL: any, dbo: DbHandler | DbHandlerTX, db: DB, prostgles: Prostgles);
     getMethods(socket: any): Promise<{}>;
     getSchemaFromPublish(socket: any): Promise<{}>;
-    getPublish(socket: any): Promise<any>;
-    getValidatedRequestRule({ tableName, command, socket }: DboTableCommand): Promise<TableRule>;
-    getTableRules({ tableName, socket }: DboTable): Promise<any>;
+    getPublish(socket: any, user: any): Promise<any>;
+    getValidatedRequestRuleWusr({ tableName, command, socket }: DboTableCommand): Promise<TableRule>;
+    getValidatedRequestRule({ tableName, command, socket }: DboTableCommand, user: any): Promise<TableRule>;
+    getTableRules({ tableName, socket }: DboTable, user: any): Promise<any>;
 }
 export {};
 //# sourceMappingURL=Prostgles.d.ts.map

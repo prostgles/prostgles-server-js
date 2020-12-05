@@ -50,7 +50,7 @@ class Prostgles {
             "transactions", "joins", "tsGeneratedTypesDir",
             "onReady", "dbConnection", "dbOptions", "publishMethods", "io",
             "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect",
-            "onSocketDisconnect", "sqlFilePath"
+            "onSocketDisconnect", "sqlFilePath", "auth"
         ];
         const unknownParams = Object.keys(params).filter((key) => !config.includes(key));
         if (unknownParams.length) {
@@ -90,11 +90,22 @@ class Prostgles {
                     });
                 }
                 if (this.publish) {
+                    /* 3.9 Check auth config */
+                    if (this.auth) {
+                        const { sidCookieName, login, getUser, getClientUser } = this.auth;
+                        if (typeof sidCookieName !== "string" && !login) {
+                            throw "Invalid auth: Provide { sidCookieName: string } OR  { login: Function } ";
+                        }
+                        if (!getUser || !getClientUser)
+                            throw "getUser OR getClientUser missing from auth config";
+                    }
                     this.publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo, this.db, this);
                     this.dboBuilder.publishParser = this.publishParser;
                     /* 4. Set publish and auth listeners */ //makeDBO(db, allTablesViews, pubSubManager, false)
                     yield this.setSocketEvents();
                 }
+                else if (this.auth)
+                    throw "Auth config does not work without publish";
                 /* 5. Finish init and provide DBO object */
                 try {
                     onReady(this.dbo, this.db);
@@ -122,6 +133,52 @@ class Prostgles {
             return new QueryFile(fullPath, { minify: false });
         }
     }
+    getSID(socket) {
+        if (!this.auth)
+            return null;
+        const { sidCookieName } = this.auth;
+        if (!sidCookieName)
+            return null;
+        const cookie_str = utils_1.get(socket, "handshake.headers.cookie");
+        const cookie = parseCookieStr(cookie_str);
+        if (socket && cookie) {
+            return cookie[sidCookieName];
+        }
+        function parseCookieStr(cookie_str) {
+            if (!cookie_str || typeof cookie_str !== "string")
+                return {};
+            return cookie_str.replace(/\s/g, '').split(";").reduce((prev, current) => {
+                const [name, value] = current.split('=');
+                prev[name] = value;
+                return prev;
+            }, {});
+        }
+        return null;
+    }
+    getUser(socket) {
+        return __awaiter(this, void 0, void 0, function* () {
+            // console.log("conn", socket.handshake.query, socket._session)
+            const sid = this.getSID(socket);
+            if (!sid)
+                return null;
+            const { getUser, getClientUser } = this.auth;
+            return yield getUser({ sid }, this.dbo, this.db, socket);
+        });
+    }
+    getUserFromCookieSession(socket) {
+        return __awaiter(this, void 0, void 0, function* () {
+            // console.log("conn", socket.handshake.query, socket._session)
+            const sid = this.getSID(socket);
+            if (!sid)
+                return null;
+            const { getUser, getClientUser, sidCookieName } = this.auth;
+            const user = yield getUser({ sid }, this.dbo, this.db, socket);
+            const clientUser = yield getClientUser({ sid }, this.dbo, this.db, socket);
+            return {
+                user, clientUser
+            };
+        });
+    }
     setSocketEvents() {
         return __awaiter(this, void 0, void 0, function* () {
             this.checkDb();
@@ -134,7 +191,11 @@ class Prostgles {
                 DEFAULT: `${this.wsChannelNamePrefix}.`,
                 SQL: `${this.wsChannelNamePrefix}.sql`,
                 METHOD: `${this.wsChannelNamePrefix}.method`,
-                SCHEMA: `${this.wsChannelNamePrefix}.schema`
+                SCHEMA: `${this.wsChannelNamePrefix}.schema`,
+                /* Auth channels */
+                REGISTER: `${this.wsChannelNamePrefix}.register`,
+                LOGIN: `${this.wsChannelNamePrefix}.login`,
+                LOGOUT: `${this.wsChannelNamePrefix}.logout`,
             };
             let publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo, this.db, this);
             if (!this.io)
@@ -148,6 +209,35 @@ class Prostgles {
                 try {
                     if (this.onSocketConnect)
                         yield this.onSocketConnect(socket, dbo, db);
+                    let auth = {};
+                    if (this.auth) {
+                        const { register, login, logout } = this.auth;
+                        let handlers = [
+                            { func: register, ch: WS_CHANNEL_NAME.REGISTER, name: "register" },
+                            { func: login, ch: WS_CHANNEL_NAME.LOGIN, name: "login" },
+                            { func: logout, ch: WS_CHANNEL_NAME.LOGOUT, name: "logout" }
+                        ].filter(h => h.func);
+                        const usrData = yield this.getUserFromCookieSession(socket);
+                        if (usrData) {
+                            auth.user = usrData.clientUser;
+                            handlers = handlers.filter(h => h.name === "logout");
+                        }
+                        handlers.map(({ func, ch, name }) => {
+                            auth[name] = true;
+                            socket.on(ch, (params, cb = (...callback) => { }) => __awaiter(this, void 0, void 0, function* () {
+                                try {
+                                    if (!socket)
+                                        throw "socket missing??!!";
+                                    yield func(params, dbo, db, socket);
+                                    cb(null, true);
+                                }
+                                catch (err) {
+                                    console.error(name + " err", err);
+                                    cb(err);
+                                }
+                            }));
+                        });
+                    }
                     /*  RUN Client request from Publish.
                         Checks request against publish and if OK run it with relevant publish functions. Local (server) requests do not check the policy
                     */
@@ -155,7 +245,8 @@ class Prostgles {
                         try { /* Channel name will only include client-sent params so we ignore table_rules enforced params */
                             if (!socket)
                                 throw "socket missing??!!";
-                            let valid_table_command_rules = yield this.publishParser.getValidatedRequestRule({ tableName, command, socket });
+                            const user = yield this.getUser(socket);
+                            let valid_table_command_rules = yield this.publishParser.getValidatedRequestRule({ tableName, command, socket }, user);
                             if (valid_table_command_rules) {
                                 let res = yield dbo[tableName][command](param1, param2, param3, valid_table_command_rules, { socket, has_rules: true });
                                 cb(null, res);
@@ -170,16 +261,6 @@ class Prostgles {
                             // console.warn("runPublishedRequest ERROR: ", err, socket._user);
                         }
                     }));
-                    /*
-                        TODO FINISH
-    
-                        auth: {
-                            login: (data, { socket, dbo }) => {},
-                            register: (data, { socket, dbo }) => {},
-                            logout: (data, { socket, dbo }) => {},
-                            onChange: (state, { socket, dbo }) => {},
-                        }
-                    */
                     socket.on("disconnect", () => {
                         // subscriptions = subscriptions.filter(sub => sub.socket.id !== socket.id);
                         if (this.onSocketDisconnect) {
@@ -270,11 +351,8 @@ class Prostgles {
                     if (this.joins) {
                         joinTables = Array.from(new Set(flat(this.joins.map(j => j.tables)).filter(t => schema[t])));
                     }
-                    socket.emit(WS_CHANNEL_NAME.SCHEMA, Object.assign(Object.assign({ schema, methods: Object.keys(methods) }, (fullSchema ? { fullSchema } : {})), { joinTables }));
-                    function makeSocketError(cb, err) {
-                        const err_msg = err.toString(), e = { err_msg, err };
-                        cb(e);
-                    }
+                    socket.emit(WS_CHANNEL_NAME.SCHEMA, Object.assign(Object.assign({ schema, methods: Object.keys(methods) }, (fullSchema ? { fullSchema } : {})), { joinTables,
+                        auth }));
                 }
                 catch (e) {
                     console.error("setSocketEvents: ", e);
@@ -284,6 +362,10 @@ class Prostgles {
     }
 }
 exports.Prostgles = Prostgles;
+function makeSocketError(cb, err) {
+    const err_msg = err.toString(), e = { err_msg, err };
+    cb(e);
+}
 // const insertParams: Array<keyof InsertRule> = ["fields", "forcedData", "returningFields", "validate"];
 const RULE_TO_METHODS = [
     {
@@ -357,7 +439,8 @@ class PublishParser {
     getMethods(socket) {
         return __awaiter(this, void 0, void 0, function* () {
             let methods = {};
-            const _methods = yield applyParamsIfFunc(this.publishMethods, socket, this.dbo, this.db);
+            const user = yield this.prostgles.getUser(socket);
+            const _methods = yield applyParamsIfFunc(this.publishMethods, socket, this.dbo, this.db, user);
             if (_methods && Object.keys(_methods).length) {
                 Object.keys(_methods).map(key => {
                     if (_methods[key] && (typeof _methods[key] === "function" || typeof _methods[key].then === "function")) {
@@ -377,7 +460,8 @@ class PublishParser {
             let schema = {};
             try {
                 /* Publish tables and views based on socket */
-                let _publish = yield this.getPublish(socket);
+                const user = yield this.prostgles.getUser(socket);
+                let _publish = yield this.getPublish(socket, user);
                 if (_publish && Object.keys(_publish).length) {
                     let txKey = "tx";
                     if (!this.prostgles.transactions)
@@ -389,7 +473,7 @@ class PublishParser {
                         .map((tableName) => __awaiter(this, void 0, void 0, function* () {
                         if (!this.dbo[tableName])
                             throw `Table ${tableName} does not exist\nExpecting one of: ${Object.keys(this.dbo).join(", ")}`;
-                        const table_rules = yield this.getTableRules({ socket, tableName });
+                        const table_rules = yield this.getTableRules({ socket, tableName }, user);
                         if (table_rules && Object.keys(table_rules).length) {
                             schema[tableName] = {};
                             let methods = [];
@@ -422,7 +506,7 @@ class PublishParser {
                                     if (["update", "find", "findOne", "insert", "delete", "upsert"].includes(method)) {
                                         let err = null;
                                         try {
-                                            let valid_table_command_rules = yield this.getValidatedRequestRule({ tableName, command: method, socket });
+                                            let valid_table_command_rules = yield this.getValidatedRequestRule({ tableName, command: method, socket }, user);
                                             yield this.dbo[tableName][method]({}, {}, {}, valid_table_command_rules, { socket, has_rules: true, testRule: true });
                                         }
                                         catch (e) {
@@ -453,9 +537,9 @@ class PublishParser {
             return schema;
         });
     }
-    getPublish(socket) {
+    getPublish(socket, user) {
         return __awaiter(this, void 0, void 0, function* () {
-            let _publish = yield applyParamsIfFunc(this.publish, socket, this.dbo, this.db);
+            let _publish = yield applyParamsIfFunc(this.publish, socket, this.dbo, this.db, user);
             if (_publish === "*") {
                 let publish = {};
                 Object.keys(this.dbo).map(tableName => {
@@ -466,7 +550,13 @@ class PublishParser {
             return _publish;
         });
     }
-    getValidatedRequestRule({ tableName, command, socket }) {
+    getValidatedRequestRuleWusr({ tableName, command, socket }) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const user = yield this.prostgles.getUser(socket);
+            return yield this.getValidatedRequestRule({ tableName, command, socket }, user);
+        });
+    }
+    getValidatedRequestRule({ tableName, command, socket }, user) {
         return __awaiter(this, void 0, void 0, function* () {
             if (!this.dbo)
                 throw "INTERNAL ERROR: dbo is missing";
@@ -484,7 +574,7 @@ class PublishParser {
             // console.log(schm, get(socket, `prostgles.schema`));
             if (schm && schm.err)
                 throw schm.err;
-            let table_rule = yield this.getTableRules({ tableName, socket });
+            let table_rule = yield this.getTableRules({ tableName, socket }, user);
             if (!table_rule)
                 throw "Invalid or disallowed table: " + tableName;
             if (command === "upsert") {
@@ -501,13 +591,13 @@ class PublishParser {
                 throw `Invalid or disallowed command: ${command}`;
         });
     }
-    getTableRules({ tableName, socket }) {
+    getTableRules({ tableName, socket }, user) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 if (!socket || !tableName)
                     throw "publish OR socket OR dbo OR tableName are missing";
-                let _publish = yield this.getPublish(socket);
-                let table_rules = applyParamsIfFunc(_publish[tableName], socket, this.dbo, this.db);
+                let _publish = yield this.getPublish(socket, user);
+                let table_rules = applyParamsIfFunc(_publish[tableName], socket, this.dbo, this.db, user);
                 if (table_rules) {
                     /* Add no limits */
                     if (typeof table_rules === "boolean" || table_rules === "*") {

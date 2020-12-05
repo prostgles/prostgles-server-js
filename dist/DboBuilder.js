@@ -368,7 +368,7 @@ class ViewHandler {
                         let joinTableRules = undefined, isLocal = true;
                         if (localParams && localParams.socket) {
                             isLocal = false;
-                            joinTableRules = yield this.dboBuilder.publishParser.getValidatedRequestRule({ tableName: jTable, command: "find", socket: localParams.socket });
+                            joinTableRules = yield this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: jTable, command: "find", socket: localParams.socket });
                         }
                         if (isLocal || joinTableRules) {
                             const joinQuery = yield this.dboBuilder.dbo[jTable].buildQueryTree(jFilter, { select: jSelect, limit: jLimit, offset: jOffset, orderBy: jOrder }, param3_unused, joinTableRules, localParams);
@@ -735,7 +735,7 @@ class ViewHandler {
                 let t2Rules = undefined, forcedFilter, filterFields, tableAlias;
                 if (localParams && localParams.socket && this.dboBuilder.publishParser) {
                     /* Need to think about joining through dissallowed tables */
-                    t2Rules = yield this.dboBuilder.publishParser.getValidatedRequestRule({ tableName: t2, command: "find", socket: localParams.socket });
+                    t2Rules = yield this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: t2, command: "find", socket: localParams.socket });
                     if (!t2Rules || !t2Rules.select)
                         throw "Dissallowed";
                     ({ forcedFilter, filterFields } = t2Rules.select);

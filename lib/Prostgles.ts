@@ -222,7 +222,7 @@ export type PublishViewRule = {
 export type RequestParams = { dbo?: DbHandler, socket?: any };
 
 export type PublishedTablesAndViews = { [key: string]: PublishTableRule | PublishViewRule | "*" | false | null } | "*" ;
-export type Publish = PublishedTablesAndViews | ((socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>)); 
+export type Publish = PublishedTablesAndViews | ((socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB, user?: any) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>)); 
 
 export type Method = (...args: any) => ( any | Promise<any> );
 export const JOIN_TYPES = ["one-many", "many-one", "one-one", "many-many"] as const;
@@ -233,7 +233,18 @@ export type Join = {
 };
 export type Joins = Join[];
 
-export type publishMethods = (socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB) => { [key:string]: Method } | Promise<{ [key:string]: Method }>;
+export type publishMethods = (socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB, user?: any) => { [key:string]: Method } | Promise<{ [key:string]: Method }>;
+
+export type BasicSession = { sid: string, expires: number };
+export type Auth = {
+    sidCookieName?: string; /* Name of the cookie that represents the session id. If provided, Prostgles will attempt to get the user on socket connection */
+    // sidParamName?: string; /* 
+    getUser: ({ sid: string }, dbo: any, db: DB, socket: any) => Promise<object | null | undefined>;
+    getClientUser: ({ sid: string }, dbo: any, db: DB, socket: any) => Promise<object>;
+    register?: (params, dbo: any, db: DB, socket: any) => Promise<BasicSession>;
+    login?: (params, dbo: any, db: DB, socket: any) => Promise<BasicSession>;
+    logout?: (sid: string, dbo: any, db: DB, socket: any) => Promise<any>;
+}
 
 export type ProstglesInitOptions = {
     dbConnection: DbConnection;
@@ -252,6 +263,7 @@ export type ProstglesInitOptions = {
     wsChannelNamePrefix?: string;
     onSocketConnect?(socket: Socket, dbo: any, db?: DB);
     onSocketDisconnect?(socket: Socket, dbo: any, db?: DB);
+    auth?: Auth
 }
 
 // interface ISocketSetup {
@@ -302,6 +314,7 @@ export class Prostgles {
     sqlFilePath?: string;
     tsGeneratedTypesDir?: string;
     publishParser: PublishParser;
+    auth?: Auth;
 
     constructor(params: ProstglesInitOptions){
         if(!params) throw "ProstglesInitOptions missing";
@@ -310,7 +323,7 @@ export class Prostgles {
             "transactions", "joins", "tsGeneratedTypesDir",
             "onReady", "dbConnection", "dbOptions", "publishMethods", "io", 
             "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect", 
-            "onSocketDisconnect", "sqlFilePath"
+            "onSocketDisconnect", "sqlFilePath", "auth"
         ];
         const unknownParams = Object.keys(params).filter((key: string) => !(config as string[]).includes(key))
         if(unknownParams.length){ 
@@ -357,11 +370,21 @@ export class Prostgles {
             }
 
             if(this.publish){
+                /* 3.9 Check auth config */
+                if(this.auth){
+                    const { sidCookieName, login, getUser, getClientUser } = this.auth;
+                    if(typeof sidCookieName !== "string" && !login){
+                        throw "Invalid auth: Provide { sidCookieName: string } OR  { login: Function } ";
+                    }
+                    if(!getUser || !getClientUser) throw "getUser OR getClientUser missing from auth config";
+                }
+
                 this.publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo, this.db, this);
                 this.dboBuilder.publishParser = this.publishParser;
                 /* 4. Set publish and auth listeners */ //makeDBO(db, allTablesViews, pubSubManager, false)
                 await this.setSocketEvents();
-            }
+
+            } else if(this.auth) throw "Auth config does not work without publish";
 
 
             /* 5. Finish init and provide DBO object */
@@ -392,6 +415,55 @@ export class Prostgles {
         }
     }
 
+    getSID(socket: any){
+        if(!this.auth) return null;
+
+        const { sidCookieName } = this.auth;
+
+        if(!sidCookieName) return null;
+
+        const cookie_str = get(socket, "handshake.headers.cookie");
+        const cookie = parseCookieStr(cookie_str);
+        if(socket && cookie){
+            return cookie[sidCookieName];
+        }
+        function parseCookieStr(cookie_str: string): any {
+            if(!cookie_str || typeof cookie_str !== "string") return {}
+            return cookie_str.replace(/\s/g, '').split(";").reduce((prev, current) => {
+                const [name, value] = current.split('=');
+                prev[name] = value;
+                return prev
+            }, {});
+        }
+        return null;
+    }
+
+    async getUser(socket: any){
+        // console.log("conn", socket.handshake.query, socket._session)
+        const sid = this.getSID(socket);
+
+        if(!sid) return null;
+        const { getUser, getClientUser } = this.auth;
+
+        return await getUser({ sid }, this.dbo, this.db, socket);
+    }
+
+    async getUserFromCookieSession(socket: any): Promise<null | { user: any, clientUser: any }>{
+       
+        // console.log("conn", socket.handshake.query, socket._session)
+        const sid = this.getSID(socket);
+
+        if(!sid) return null;
+        const { getUser, getClientUser, sidCookieName } = this.auth;
+
+        const user = await getUser({ sid }, this.dbo, this.db, socket);
+        const clientUser = await getClientUser({ sid }, this.dbo, this.db, socket);
+
+        return {
+            user, clientUser
+        }
+    }
+
     async setSocketEvents(){
         this.checkDb();
 
@@ -405,7 +477,12 @@ export class Prostgles {
             DEFAULT: `${this.wsChannelNamePrefix}.`,
             SQL: `${this.wsChannelNamePrefix}.sql`,
             METHOD: `${this.wsChannelNamePrefix}.method`,
-            SCHEMA: `${this.wsChannelNamePrefix}.schema`
+            SCHEMA: `${this.wsChannelNamePrefix}.schema`,
+
+            /* Auth channels */
+            REGISTER: `${this.wsChannelNamePrefix}.register`,
+            LOGIN: `${this.wsChannelNamePrefix}.login`,
+            LOGOUT: `${this.wsChannelNamePrefix}.logout`,
         }
 
         let publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo, this.db, this);
@@ -420,6 +497,41 @@ export class Prostgles {
             let allTablesViews = this.dboBuilder.tablesOrViews;
             try {
                 if(this.onSocketConnect) await this.onSocketConnect(socket, dbo, db);
+
+                let auth: any = {};
+                if(this.auth){
+                    const { register, login, logout } = this.auth;
+                    let handlers = [
+                        { func: register,   ch: WS_CHANNEL_NAME.REGISTER,   name: "register"    },
+                        { func: login,      ch: WS_CHANNEL_NAME.LOGIN,      name: "login"       },
+                        { func: logout,     ch: WS_CHANNEL_NAME.LOGOUT,     name: "logout"      }
+                    ].filter(h => h.func);
+
+                    const usrData = await this.getUserFromCookieSession(socket);
+                    if(usrData){
+                        auth.user = usrData.clientUser;
+                        handlers = handlers.filter(h => h.name === "logout");
+                    }
+
+                    handlers.map(({ func, ch, name }) => {
+                        auth[name] = true;
+                        socket.on(ch, async (params: any, cb = (...callback) => {} ) => {
+                            
+                            try {
+                                if(!socket) throw "socket missing??!!";
+        
+                                await func(params, dbo, db, socket);
+
+                                cb(null, true);
+                                    
+                            } catch(err) {
+                                console.error(name + " err", err);
+                                cb(err)
+                            }
+                        });
+                    });
+
+                }
                 
                 /*  RUN Client request from Publish.
                     Checks request against publish and if OK run it with relevant publish functions. Local (server) requests do not check the policy 
@@ -429,7 +541,8 @@ export class Prostgles {
                     try { /* Channel name will only include client-sent params so we ignore table_rules enforced params */
                         if(!socket) throw "socket missing??!!";
 
-                        let valid_table_command_rules = await this.publishParser.getValidatedRequestRule({ tableName, command, socket });
+                        const user = await this.getUser(socket);
+                        let valid_table_command_rules = await this.publishParser.getValidatedRequestRule({ tableName, command, socket }, user);
                         if(valid_table_command_rules){
                             let res = await dbo[tableName][command](param1, param2, param3, valid_table_command_rules, { socket, has_rules: true }); 
                             cb(null, res);
@@ -442,18 +555,6 @@ export class Prostgles {
                         // console.warn("runPublishedRequest ERROR: ", err, socket._user);
                     }
                 });
-                
-
-                /*
-                    TODO FINISH
-
-                    auth: {
-                        login: (data, { socket, dbo }) => {},
-                        register: (data, { socket, dbo }) => {},
-                        logout: (data, { socket, dbo }) => {},
-                        onChange: (state, { socket, dbo }) => {},
-                    }
-                */
 
 
                 socket.on("disconnect", () => {
@@ -552,23 +653,24 @@ export class Prostgles {
                     joinTables = Array.from(new Set(flat(this.joins.map(j => j.tables)).filter(t => schema[t])));
                 }
                 
-                socket.emit(WS_CHANNEL_NAME.SCHEMA, { 
+                socket.emit(WS_CHANNEL_NAME.SCHEMA, {
                     schema, 
                     methods: Object.keys(methods), 
                     ...(fullSchema? { fullSchema } : {}),
-                    joinTables
+                    joinTables,
+                    auth
                 });
 
-                function makeSocketError(cb, err){
-                    const err_msg = err.toString(),
-                        e = { err_msg, err };
-                    cb(e);
-                }
             } catch(e) {
                 console.error("setSocketEvents: ", e)
             }        
         });
     }
+}
+function makeSocketError(cb, err){
+    const err_msg = err.toString(),
+        e = { err_msg, err };
+    cb(e);
 }
 
 type SocketRequestParams = {
@@ -683,7 +785,8 @@ export class PublishParser {
     async getMethods(socket: any){
         let methods = {};
     
-        const _methods = await applyParamsIfFunc(this.publishMethods, socket, this.dbo, this.db);
+        const user = await this.prostgles.getUser(socket);
+        const _methods = await applyParamsIfFunc(this.publishMethods, socket, this.dbo, this.db, user);
     
         if(_methods && Object.keys(_methods).length){
             Object.keys(_methods).map(key => {
@@ -704,7 +807,8 @@ export class PublishParser {
         
         try {
             /* Publish tables and views based on socket */
-            let _publish = await this.getPublish(socket);
+            const user = await this.prostgles.getUser(socket);
+            let _publish = await this.getPublish(socket, user);
 
     
             if(_publish && Object.keys(_publish).length){
@@ -718,7 +822,7 @@ export class PublishParser {
                     .map(async tableName => {
                         if(!this.dbo[tableName]) throw `Table ${tableName} does not exist\nExpecting one of: ${Object.keys(this.dbo).join(", ")}`;
 
-                        const table_rules = await this.getTableRules({ socket, tableName });
+                        const table_rules = await this.getTableRules({ socket, tableName }, user);
             
                         if(table_rules && Object.keys(table_rules).length){
                             schema[tableName] = {};
@@ -753,7 +857,7 @@ export class PublishParser {
 
                                         let err = null;
                                         try {
-                                            let valid_table_command_rules = await this.getValidatedRequestRule({ tableName, command: method, socket });
+                                            let valid_table_command_rules = await this.getValidatedRequestRule({ tableName, command: method, socket }, user);
                                             await this.dbo[tableName][method]({}, {}, {}, valid_table_command_rules, { socket, has_rules: true, testRule: true }); 
                                                 
                                         } catch(e) {
@@ -789,8 +893,8 @@ export class PublishParser {
         return schema;
     }
 
-    async getPublish(socket){
-        let _publish = await applyParamsIfFunc(this.publish, socket, this.dbo, this.db);
+    async getPublish(socket, user){
+        let _publish = await applyParamsIfFunc(this.publish, socket, this.dbo, this.db, user);
 
         if(_publish === "*"){
             let publish = {}
@@ -802,8 +906,12 @@ export class PublishParser {
 
         return _publish;
     }
+    async getValidatedRequestRuleWusr({ tableName, command, socket }: DboTableCommand): Promise<TableRule>{
+        const user = await this.prostgles.getUser(socket);
+        return await this.getValidatedRequestRule({ tableName, command, socket }, user);
+    }
     
-    async getValidatedRequestRule({ tableName, command, socket }: DboTableCommand): Promise<TableRule>{
+    async getValidatedRequestRule({ tableName, command, socket }: DboTableCommand, user): Promise<TableRule>{
         if(!this.dbo) throw "INTERNAL ERROR: dbo is missing";
 
         if(!command || !tableName) throw "command OR tableName are missing";
@@ -821,7 +929,7 @@ export class PublishParser {
         // console.log(schm, get(socket, `prostgles.schema`));
         if(schm && schm.err) throw schm.err;
 
-        let table_rule = await this.getTableRules({ tableName, socket });
+        let table_rule = await this.getTableRules({ tableName, socket }, user);
         if(!table_rule) throw "Invalid or disallowed table: " + tableName;
 
         if(command === "upsert"){
@@ -837,14 +945,14 @@ export class PublishParser {
         } else throw `Invalid or disallowed command: ${command}`;
     }
     
-    async getTableRules({ tableName, socket }: DboTable){
+    async getTableRules({ tableName, socket }: DboTable, user){
         
         try {
             if(!socket || !tableName) throw "publish OR socket OR dbo OR tableName are missing";
     
-            let _publish = await this.getPublish(socket);
+            let _publish = await this.getPublish(socket, user);
     
-            let table_rules = applyParamsIfFunc(_publish[tableName],  socket, this.dbo, this.db );
+            let table_rules = applyParamsIfFunc(_publish[tableName],  socket, this.dbo, this.db, user);
             if(table_rules){
                 /* Add no limits */
                 if(typeof table_rules === "boolean" || table_rules === "*"){

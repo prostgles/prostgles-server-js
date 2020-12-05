@@ -539,7 +539,7 @@ export class ViewHandler {
                     let joinTableRules = undefined, isLocal = true;
                     if(localParams && localParams.socket){
                         isLocal = false;
-                        joinTableRules = await this.dboBuilder.publishParser.getValidatedRequestRule({ tableName: jTable, command: "find", socket: localParams.socket });
+                        joinTableRules = await this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: jTable, command: "find", socket: localParams.socket });
                     }
                     if(isLocal || joinTableRules){
     
@@ -955,7 +955,7 @@ export class ViewHandler {
                 tableAlias;
             if(localParams && localParams.socket && this.dboBuilder.publishParser){
                 /* Need to think about joining through dissallowed tables */
-                t2Rules = await this.dboBuilder.publishParser.getValidatedRequestRule({ tableName: t2, command: "find", socket: localParams.socket });
+                t2Rules = await this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: t2, command: "find", socket: localParams.socket });
                 if(!t2Rules || !t2Rules.select) throw "Dissallowed";
                 ({ forcedFilter, filterFields } = t2Rules.select);
             }
