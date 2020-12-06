@@ -31,6 +31,8 @@ export type DeleteParams = {
 export type TxCB = {
     (t: DBObj): (any | void | Promise<(any | void)>)
 };
+export type JoinMaker = (filter?: object, select?: FieldFilter, options?: SelectParams) => any;
+
 
 export type Items = {
      name?: string;
@@ -115,11 +117,21 @@ export type DBO_transaction = {
    delete: (filter:  Transaction_Filter , params?: DeleteParams) => Promise<void | Transaction>; 
 };
 
+export type JoinMakerTables = {
+ items: JoinMaker;
+ items2: JoinMaker;
+ items3: JoinMaker;
+};
+
 export type DBObj = {
  items: DBO_items;
  items2: DBO_items2;
  items3: DBO_items3;
  table: DBO_table;
  transaction: DBO_transaction;
+ leftJoin: JoinMakerTables;
+ innerJoin: JoinMakerTables;
+ leftJoinOne: JoinMakerTables;
+ innerJoinOne: JoinMakerTables;
  tx: (t: TxCB) => Promise<any | void> ;
 };

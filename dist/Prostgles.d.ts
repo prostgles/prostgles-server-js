@@ -2,6 +2,7 @@
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import { DboBuilder, DbHandler, DbHandlerTX } from "./DboBuilder";
+declare type PGP = pgPromise.IMain<{}, pg.IClient>;
 export declare type DB = pgPromise.IDatabase<{}, pg.IClient>;
 declare type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 declare type DbConnectionOpts = pg.IDefaults;
@@ -180,6 +181,7 @@ export declare type ProstglesInitOptions = {
     onSocketConnect?(socket: Socket, dbo: any, db?: DB): any;
     onSocketDisconnect?(socket: Socket, dbo: any, db?: DB): any;
     auth?: Auth;
+    DEBUG_MODE?: boolean;
 };
 export declare type OnReady = {
     dbo: DbHandler;
@@ -189,6 +191,7 @@ export declare class Prostgles {
     dbConnection: DbConnection;
     dbOptions: DbConnectionOpts;
     db: DB;
+    pgp: PGP;
     dbo: DbHandler | DbHandlerTX;
     dboBuilder: DboBuilder;
     publishMethods?: publishMethods;
@@ -205,6 +208,7 @@ export declare class Prostgles {
     tsGeneratedTypesDir?: string;
     publishParser: PublishParser;
     auth?: Auth;
+    DEBUG_MODE?: boolean;
     constructor(params: ProstglesInitOptions);
     checkDb(): void;
     init(onReady: (dbo: DbHandler | DbHandlerTX, db: DB) => any): Promise<boolean>;

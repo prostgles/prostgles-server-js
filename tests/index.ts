@@ -21,8 +21,9 @@ prostgles({
 	io,
 	tsGeneratedTypesDir: path.join(__dirname + '/'),
 	transactions: true,
+	// DEBUG_MODE: true,
   publish: (socket, dbo: DBObj) => {
-		
+		return "*"
 		return {
 			items: {
 				select: {
@@ -58,7 +59,18 @@ prostgles({
 			await dbo.items2.delete({ });
 			await dbo.items3.delete({ });
 			// console.log(await dbo.items3.update({},{ name: "2" }, { returning: "*" }));
-	
+
+			/*EXPERIMENT*/
+			// let ins = [], ins2 = [], ins3 = [], names = ["a", "b", "c", "d", "e", "f", "g", "h", "i"];
+			// for(let i = 0; i < 1000; i++){
+			// 	ins.push({ name: randElem(names) })
+			// 	ins2.push({ name: randElem(names) })
+			// 	ins3.push({ name: randElem(names) })
+			// }
+			// await dbo.items.insert(ins);
+			// await dbo.items2.insert(ins2);
+			// await dbo.items3.insert(ins3);
+			// return;
 
 			/* Exists filter example */
 			await dbo.items.insert([{ name: "a" }, { name: "a" }, { name: "b" }]);
@@ -111,23 +123,26 @@ prostgles({
         { 
           select: { 
             id: "$count", 
+            max_id: { $max: "id" },
             total: { $count: ["id"] },
             distinct_names: { $countDistinct: ["name"] },
           }
         }
       );
-			const { id, total, distinct_names } = aggs;
+			const { id, total, distinct_names, max_id } = aggs;
 			// console.log([id, total, distinct_names] )
-			if(id != 4 || total != 4 || distinct_names != 3) throw "Aggregation query failed";
+			if(id != 4 || total != 4 || distinct_names != 3 || max_id != 4) throw "Aggregation query failed";
 
 			/* Joins example */
 			const items = await dbo.items.find({}, {
 				select: {
 					"*": 1,
-					items3: "*"
+					items3: "*",
+					items22: dbo.leftJoin.items2({}, "*")
 				}
 			});
-			if(!items.length || !items.every(it => Array.isArray(it.items3))){
+			if(!items.length || !items.every(it => Array.isArray(it.items3) && Array.isArray(it.items22))){
+				console.log(items[0].items3)
 				throw "Joined select query failed";
 			}
 
@@ -143,3 +158,8 @@ prostgles({
     
 	},
 });
+
+
+function randElem(items){
+	return items[Math.floor(Math.random() * items.length)];
+}

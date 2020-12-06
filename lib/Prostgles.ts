@@ -14,10 +14,6 @@ import { DboBuilder, DbHandler, DbHandlerTX, TableHandler, ViewHandler } from ".
 import { PubSubManager } from "./PubSubManager";
  
 type PGP = pgPromise.IMain<{}, pg.IClient>;
-let pgp: PGP = pgPromise({
-    promiseLib: promise
-    // ,query: function (e) { console.log({psql: e.query, params: e.params}); }
-});
 
 /* Casts count/sum/max to bigint. Needs rework to remove casting "+count" and other issues; */
 // pgp.pg.types.setTypeParser(20, BigInt);
@@ -27,7 +23,15 @@ type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 type DbConnectionOpts = pg.IDefaults;
 
 
-function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts): DB {
+function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts, debugQueries = false): { db: DB, pgp: PGP } {
+    let pgp: PGP = pgPromise({
+        promiseLib: promise,
+        ...(debugQueries? {
+            query: function (e) { 
+                console.log({psql: e.query, params: e.params}); 
+            }
+        } : {})
+    });
     pgp.pg.defaults.max = 70;
 
     if(options){
@@ -36,7 +40,7 @@ function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts):
     
     const db = pgp(dbConnection);
     
-    return db;
+    return { db, pgp };
 }
 
 
@@ -61,6 +65,7 @@ export type OrderBy = { key: string, asc: boolean}[] | { [key: string]: boolean 
 // type FieldFilter = object | string[] | "*";
 import { FieldFilter } from "./DboBuilder";
 import { Socket } from "dgram";
+import { type } from "os";
 
 export type SelectParams = {
     select?: FieldFilter;
@@ -262,7 +267,8 @@ export type ProstglesInitOptions = {
     wsChannelNamePrefix?: string;
     onSocketConnect?(socket: Socket, dbo: any, db?: DB);
     onSocketDisconnect?(socket: Socket, dbo: any, db?: DB);
-    auth?: Auth
+    auth?: Auth;
+    DEBUG_MODE?: boolean;
 }
 
 // interface ISocketSetup {
@@ -296,6 +302,7 @@ export class Prostgles {
     };
     dbOptions: DbConnectionOpts;
     db: DB;
+    pgp: PGP;
     dbo: DbHandler | DbHandlerTX;
     dboBuilder: DboBuilder;
 
@@ -314,6 +321,7 @@ export class Prostgles {
     tsGeneratedTypesDir?: string;
     publishParser: PublishParser;
     auth?: Auth;
+    DEBUG_MODE?: boolean = false;
 
     constructor(params: ProstglesInitOptions){
         if(!params) throw "ProstglesInitOptions missing";
@@ -322,7 +330,7 @@ export class Prostgles {
             "transactions", "joins", "tsGeneratedTypesDir",
             "onReady", "dbConnection", "dbOptions", "publishMethods", "io", 
             "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect", 
-            "onSocketDisconnect", "sqlFilePath", "auth"
+            "onSocketDisconnect", "sqlFilePath", "auth", "DEBUG_MODE"
         ];
         const unknownParams = Object.keys(params).filter((key: string) => !(config as string[]).includes(key))
         if(unknownParams.length){ 
@@ -339,7 +347,9 @@ export class Prostgles {
     async init(onReady: (dbo: DbHandler | DbHandlerTX, db: DB) => any){
 
         /* 1. Connect to db */
-        this.db = getDbConnection(this.dbConnection, this.dbOptions);
+        const { db, pgp } = getDbConnection(this.dbConnection, this.dbOptions, this.DEBUG_MODE);
+        this.db = db;
+        this.pgp = pgp;
         this.checkDb();
 
         /* 2. Execute any SQL file if provided */
@@ -491,8 +501,8 @@ export class Prostgles {
         this.io.on('connection', async (socket) => {
 
             if(!this.db || !this.dbo) throw "db/dbo missing";
-            let dbo = this.dbo;
-            let db = this.db;
+            let { dbo, db, pgp } = this;
+            
             let allTablesViews = this.dboBuilder.tablesOrViews;
             try {
                 if(this.onSocketConnect) await this.onSocketConnect(socket, dbo, db);
@@ -904,8 +914,8 @@ export class PublishParser {
 
         if(_publish === "*"){
             let publish = {}
-            Object.keys(this.dbo).map(tableName => {
-                publish[tableName] = "*";
+            this.prostgles.dboBuilder.tablesOrViews.map(tov => {
+                publish[tov.name] = "*";
             });
             return publish;
         }

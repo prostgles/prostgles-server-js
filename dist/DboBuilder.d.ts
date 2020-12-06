@@ -42,6 +42,11 @@ declare type LocalParams = {
     subOne?: boolean;
     dbTX?: any;
 };
+export declare type Aggregation = {
+    field: string;
+    query: string;
+    alias: string;
+};
 declare type Filter = object | {
     $and: Filter[];
 } | {
@@ -50,7 +55,7 @@ declare type Filter = object | {
 declare type Query = {
     select: string[];
     allFields: string[];
-    aggs?: string[];
+    aggs?: Aggregation[];
     table: string;
     where: string;
     orderBy: string[];
@@ -58,6 +63,8 @@ declare type Query = {
     offset: number;
     isLeftJoin: boolean;
     joins?: Query[];
+    joinAlias?: string;
+    $path?: string[];
 };
 export declare type JoinInfo = {
     table: string;
@@ -102,12 +109,10 @@ export declare class ViewHandler {
     };
     private getJoins;
     buildJoinQuery(q: Query): Promise<string>;
-    getAggs(select: object): {
-        field: string;
-        query: string;
-        alias: string;
-    }[];
-    buildQueryTree(filter: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<Query>;
+    getAggs(select: object): Aggregation[];
+    buildQueryTree(filter: Filter, selectParams?: SelectParams & {
+        alias?: string;
+    }, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<Query>;
     checkFilter(filter: any): void;
     prepareValidatedQuery(filter: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams, validatedAggAliases?: string[]): Promise<Query>;
     getColumns(tableRules?: TableRule, localParams?: LocalParams): Promise<{
@@ -201,9 +206,19 @@ export declare type TxCB = {
 export declare type TX = {
     (t: TxCB): Promise<(any | void)>;
 };
-export interface DbHandler {
+export declare type JoinMaker = (filter?: object, select?: FieldFilter, options?: SelectParams) => any;
+export declare type TableJoin = {
+    [key: string]: JoinMaker;
+};
+export declare type DbJoinMaker = {
+    innerJoin: TableJoin;
+    leftJoin: TableJoin;
+    innerJoinOne: TableJoin;
+    leftJoinOne: TableJoin;
+};
+export declare type DbHandler = {
     [key: string]: TableHandler | ViewHandler;
-}
+} & DbJoinMaker;
 export declare type DbHandlerTX = {
     [key: string]: TX;
 } | DbHandler;

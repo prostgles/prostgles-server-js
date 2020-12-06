@@ -19,17 +19,18 @@ const pgPromise = require("pg-promise");
 'use strict';
 const utils_1 = require("./utils");
 const DboBuilder_1 = require("./DboBuilder");
-let pgp = pgPromise({
-    promiseLib: promise
-    // ,query: function (e) { console.log({psql: e.query, params: e.params}); }
-});
-function getDbConnection(dbConnection, options) {
+function getDbConnection(dbConnection, options, debugQueries = false) {
+    let pgp = pgPromise(Object.assign({ promiseLib: promise }, (debugQueries ? {
+        query: function (e) {
+            console.log({ psql: e.query, params: e.params });
+        }
+    } : {})));
     pgp.pg.defaults.max = 70;
     if (options) {
         Object.assign(pgp.pg.defaults, options);
     }
     const db = pgp(dbConnection);
-    return db;
+    return { db, pgp };
 }
 const QueryFile = require('pg-promise').QueryFile;
 exports.JOIN_TYPES = ["one-many", "many-one", "one-one", "many-many"];
@@ -42,6 +43,7 @@ class Prostgles {
         };
         this.schema = "public";
         this.wsChannelNamePrefix = "_psqlWS_";
+        this.DEBUG_MODE = false;
         if (!params)
             throw "ProstglesInitOptions missing";
         if (!params.io)
@@ -50,7 +52,7 @@ class Prostgles {
             "transactions", "joins", "tsGeneratedTypesDir",
             "onReady", "dbConnection", "dbOptions", "publishMethods", "io",
             "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect",
-            "onSocketDisconnect", "sqlFilePath", "auth"
+            "onSocketDisconnect", "sqlFilePath", "auth", "DEBUG_MODE"
         ];
         const unknownParams = Object.keys(params).filter((key) => !config.includes(key));
         if (unknownParams.length) {
@@ -65,7 +67,9 @@ class Prostgles {
     init(onReady) {
         return __awaiter(this, void 0, void 0, function* () {
             /* 1. Connect to db */
-            this.db = getDbConnection(this.dbConnection, this.dbOptions);
+            const { db, pgp } = getDbConnection(this.dbConnection, this.dbOptions, this.DEBUG_MODE);
+            this.db = db;
+            this.pgp = pgp;
             this.checkDb();
             /* 2. Execute any SQL file if provided */
             if (this.sqlFilePath) {
@@ -203,8 +207,7 @@ class Prostgles {
             this.io.on('connection', (socket) => __awaiter(this, void 0, void 0, function* () {
                 if (!this.db || !this.dbo)
                     throw "db/dbo missing";
-                let dbo = this.dbo;
-                let db = this.db;
+                let { dbo, db, pgp } = this;
                 let allTablesViews = this.dboBuilder.tablesOrViews;
                 try {
                     if (this.onSocketConnect)
@@ -548,8 +551,8 @@ class PublishParser {
             let _publish = yield applyParamsIfFunc(this.publish, socket, this.dbo, this.db, user);
             if (_publish === "*") {
                 let publish = {};
-                Object.keys(this.dbo).map(tableName => {
-                    publish[tableName] = "*";
+                this.prostgles.dboBuilder.tablesOrViews.map(tov => {
+                    publish[tov.name] = "*";
                 });
                 return publish;
             }

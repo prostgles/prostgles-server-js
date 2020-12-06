@@ -34,7 +34,11 @@ function capitalizeFirstLetter(string) {
 }
 const shortestPath_1 = require("./shortestPath");
 function makeErr(err, localParams) {
+    // console.error(err)
     return Promise.reject(Object.assign(Object.assign(Object.assign({}, ((!localParams || !localParams.socket) ? err : {})), PubSubManager_1.filterObj(err, ["column", "code", "table", "constraint"])), { code_info: sqlErrCodeToMsg(err.code) }));
+}
+function parseError(e) {
+    return Object.keys(e || {}).length ? e : e.toString ? ("INTERNAL ERROR: " + e.toString()) : e;
 }
 class ViewHandler {
     constructor(db, tableOrViewInfo, pubSubManager, dboBuilder, t, joinPaths) {
@@ -137,12 +141,12 @@ class ViewHandler {
         let result = [];
         if (!this.joinPaths)
             throw "Joins dissallowed";
+        if (path && !path.length)
+            throw `Empty join path ( $path ) specified for ${source} <-> ${target}`;
         /* Find the join path between tables */
         let jp;
         if (!path) {
             jp = this.joinPaths.find(j => path ? j.path.join() === path.join() : j.t1 === source && j.t2 === target);
-            if (!jp)
-                throw `Joining ${source} <-...-> ${target} dissallowed or missing`;
         }
         else {
             jp = {
@@ -151,6 +155,8 @@ class ViewHandler {
                 path
             };
         }
+        if (!jp || !this.joinPaths.find(j => path ? j.path.join() === path.join() : j.t1 === source && j.t2 === target))
+            throw `Joining ${source} <-...-> ${target} dissallowed or missing`;
         /* Make the join chain info excluding root table */
         result = (path || jp.path).slice(1).map((t2, i, arr) => {
             const t1 = i === 0 ? source : arr[i - 1];
@@ -184,90 +190,143 @@ class ViewHandler {
     }
     buildJoinQuery(q) {
         return __awaiter(this, void 0, void 0, function* () {
-            const makeQuery3 = (q, isJoined = false) => {
-                const PREF = `prostgles_prefix_to_avoid_collisions`, joins = q.joins || [], aggs = q.aggs || [];
+            const makeQuery3 = (q, depth = 0, joinFields) => {
+                const PREF = `prostgles`, joins = q.joins || [], aggs = q.aggs || [], makePref = (q) => !q.joinAlias ? q.table : `${q.joinAlias || ""}_${q.table}`, makePrefANON = (joinAlias, table) => exports.asName(!joinAlias ? table : `${joinAlias || ""}_${table}`), makePrefAN = (q) => exports.asName(makePref(q));
+                const indentLine = (numInd, str, indentStr = "    ") => new Array(numInd).fill(indentStr).join("") + str;
+                const indStr = (numInd, str) => str.split("\n").map(s => indentLine(numInd, s)).join("\n");
+                const indjArr = (numInd, strArr, indentStr = "    ") => strArr.map(str => indentLine(numInd, str));
+                const indJ = (numInd, strArr, separator = " \n ", indentStr = "    ") => indjArr(numInd, strArr, indentStr).join(separator);
+                const selectArrComma = (strArr) => strArr.map((s, i, arr) => s + (i < arr.length - 1 ? " , " : " "));
+                const prefJCAN = (q, str) => exports.asName(`${q.joinAlias || q.table}_${PREF}_${str}`);
+                // const indent = (a, b) => a;
                 const joinTables = (q1, q2) => {
-                    const paths = this.getJoins(q1.table, q2.table);
-                    return `${paths.map(({ table, on }, i) => {
-                        const prevTable = i === 0 ? q1.table : paths[i - 1].table;
-                        let iQ = exports.asName(table);
+                    const paths = this.getJoins(q1.table, q2.table, q2.$path);
+                    return Prostgles_1.flat(paths.map(({ table, on }, i) => {
+                        const prevTable = i === 0 ? q1.table : (paths[i - 1].table);
+                        const thisAlias = makePrefANON(q2.joinAlias, table);
+                        const prevAlias = i === 0 ? makePrefAN(q1) : thisAlias;
+                        // If root then prev table is aliased from root query. Alias from join otherwise
+                        let iQ = [
+                            exports.asName(table) + ` ${thisAlias}`
+                        ];
                         /* If target table then add filters, options, etc */
                         if (i === paths.length - 1) {
-                            iQ = "" +
-                                "   (\n" +
-                                `       SELECT *,\n` +
-                                `       row_number() over() as ${exports.asName(`${table}_${PREF}_rowid_sorted`)},\n` +
-                                `       row_to_json((select x from (SELECT ${(q2.select.concat((q2.joins || []).map(j => j.table))).join(", ")}) as x)) AS ${exports.asName(`${q2.table}_${PREF}_json`)} \n` +
-                                `       FROM (\n` +
-                                `           ${makeQuery3(q2, true)}\n` +
-                                `       ) ${exports.asName(q2.table)}        -- [target table]\n` +
-                                `   ) ${exports.asName(q2.table)}\n`;
+                            const targetSelect = (q2.select.concat((q2.joins || []).map(j => j.joinAlias || j.table)).concat((q2.aggs || []).map(a => a.alias) || [])).filter(s => s).join(", ");
+                            iQ = [
+                                "(",
+                                ...indjArr(depth + 1, [
+                                    `-- 4. [target table] `,
+                                    `SELECT *,`,
+                                    `row_number() over() as ${prefJCAN(q2, `rowid_sorted`)},`,
+                                    `row_to_json((select x from (SELECT ${targetSelect}) as x)) AS ${prefJCAN(q2, `json`)}`,
+                                    `FROM (`,
+                                    ...Prostgles_1.flat(makeQuery3(q2, depth + 1, on.map(([c1, c2]) => exports.asName(c2))).split("\n")),
+                                    `) ${exports.asName(q2.table)}    `
+                                ]),
+                                `) ${thisAlias}`
+                            ];
                         }
-                        return "" +
-                            `   ${q2.isLeftJoin ? "LEFT" : "INNER"} JOIN ${iQ}\n` +
-                            `   ON ${on.map(([c1, c2]) => `${exports.asName(prevTable)}.${exports.asName(c1)} = ${exports.asName(table)}.${exports.asName(c2)}`).join("\n AND ")}\n`;
-                    }).join("")}`;
+                        let jres = [
+                            `${q2.isLeftJoin ? "LEFT" : "INNER"} JOIN `,
+                            ...iQ,
+                            `ON ${on.map(([c1, c2]) => `${prevAlias}.${exports.asName(c1)} = ${thisAlias}.${exports.asName(c2)} `).join(" AND ")}`
+                        ];
+                        return jres;
+                    }));
                 };
                 /* Leaf query */
                 if (!joins.length) {
-                    let select = (isJoined ? q.allFields : q.select).join(", "), groupBy = "";
+                    let select = (depth ? q.allFields : q.select), groupBy = "";
+                    // console.log(select, q);
                     if (q.aggs && q.aggs.length) {
                         q.select = q.select.filter(s => s && s.trim().length);
-                        select = q.select.concat(q.aggs).join(", ");
+                        const missingFields = joinFields.filter(jf => !q.select.includes(jf));
+                        let groupByFields = q.select;
+                        if (depth && missingFields.length) {
+                            q.select = Array.from(new Set(missingFields.concat(q.select)));
+                            groupByFields = q.select;
+                        }
+                        select = q.select.concat(q.aggs.map(a => a.query));
                         if (q.select.length) {
-                            groupBy = `GROUP BY ${q.select.join(", ")}\n`;
+                            groupBy = `GROUP BY ${groupByFields.join(", ")}\n`;
                         }
                     }
-                    let res = "" +
-                        `SELECT ${select} \n` +
-                        `FROM ${exports.asName(q.table)}\n`;
-                    if (q.where)
-                        res += `${q.where}\n`;
-                    if (groupBy)
-                        res += `${groupBy}\n`;
-                    if (q.orderBy)
-                        res += `${q.orderBy}\n`;
-                    if (!isJoined)
-                        res += `LIMIT ${q.limit} \nOFFSET ${q.offset || 0}\n`;
-                    return res;
+                    // let res = "" +
+                    // `SELECT -- leaf query\n` + 
+                    // `${select} \n` +
+                    // `FROM ${asName(q.table)}\n`;
+                    // if(q.where) res += `${q.where}\n`;
+                    // if(groupBy) res += `${groupBy}\n`;
+                    // if(q.orderBy) res+= `${q.orderBy}\n`;
+                    // if(!depth) res += `LIMIT ${q.limit} \nOFFSET ${q.offset || 0}\n`;
+                    let fres = indJ(depth, [
+                        `-- 0. or 5. [leaf query] `,
+                        `SELECT ` + select.join(", "),
+                        `FROM ${exports.asName(q.table)} `,
+                        q.where,
+                        groupBy,
+                        q.orderBy,
+                        !depth ? `LIMIT ${q.limit} ` : null,
+                        !depth ? `OFFSET ${q.offset || 0} ` : null
+                    ].filter(v => v));
+                    return fres;
                 }
                 else {
                     // if(q.aggs && q.aggs && q.aggs.length) throw "Cannot join an aggregate";
                     if (q.aggs && q.aggs.length && joins.find(j => j.aggs && j.aggs.length))
                         throw "Cannot join two aggregates";
                 }
-                return `
-            -- root final
-            SELECT
-              ${(isJoined ? q.allFields : q.select).concat(aggs ? aggs : []).filter(s => s).concat(joins.map(j => j.limit === 1 ?
-                    `         json_agg(${exports.asName(`${j.table}_${PREF}_json`)}::jsonb ORDER BY ${exports.asName(`${j.table}_${PREF}_rowid_sorted`)})   FILTER (WHERE ${exports.asName(`${j.table}_${PREF}_limit`)} <= ${j.limit} AND ${exports.asName(`${j.table}_${PREF}_dupes_rowid`)} = 1 AND ${exports.asName(`${j.table}_${PREF}_json`)} IS NOT NULL)->0  AS ${exports.asName(j.table)}` :
-                    `COALESCE(json_agg(${exports.asName(`${j.table}_${PREF}_json`)}::jsonb ORDER BY ${exports.asName(`${j.table}_${PREF}_rowid_sorted`)})   FILTER (WHERE ${exports.asName(`${j.table}_${PREF}_limit`)} <= ${j.limit} AND ${exports.asName(`${j.table}_${PREF}_dupes_rowid`)} = 1 AND ${exports.asName(`${j.table}_${PREF}_json`)} IS NOT NULL), '[]')  AS ${exports.asName(j.table)}`)).join(", ")}
-            FROM (
-                SELECT *,
-                ${joins.map(j => `row_number() over(partition by ${exports.asName(`${j.table}_${PREF}_dupes_rowid`)}, ctid order by ${exports.asName(`${j.table}_${PREF}_rowid_sorted`)}) AS ${j.table}_${PREF}_limit`).join(", ")}
-                FROM (
-                    SELECT 
-                     -- [source full sellect + ctid to group by]
-                    ${q.allFields.concat(["ctid"]).map(field => `${exports.asName(q.table)}.${exports.asName(field)}`).concat(joins.map(j => exports.asName(j.table) + "." + exports.asName(`${j.table}_${PREF}_json`) + ", " + exports.asName(j.table) + "." + exports.asName(`${j.table}_${PREF}_rowid_sorted`)).concat(
-                // ${j.joins && j.joins.length? " ORDER BY  " : ""}
-                joins.map(j => `row_number() over(partition by ${exports.asName(`${j.table}_${PREF}_rowid_sorted`)}, ${exports.asName(q.table)}.ctid ) AS ${exports.asName(`${j.table}_${PREF}_dupes_rowid`)}`)).join("\n, "))}
-                    FROM (
-                        SELECT *, row_number() over() as ctid
-                        FROM ${exports.asName(q.table)}
-
-                        -- [source filter]
-                        ${q.where}
-                        
-
-                    ) ${exports.asName(q.table)}
-                    ${joins.map(j => joinTables(q, j)).join("\n")}
-                ) t
-            ) t            
-            GROUP BY ${(aggs && aggs.length ? [] : ["ctid"]).concat(isJoined ? q.allFields : q.select).filter(s => s).join(", ")}\n` +
-                    `-- [source orderBy]   \n` +
-                    `   ${q.orderBy}\n` +
-                    `-- [source limit] \n` +
-                    (isJoined ? "" : `LIMIT ${q.limit || 0}\nOFFSET ${q.offset || 0}\n`);
+                const rootSelect = [
+                    " ",
+                    `-- 0. [root final]  `,
+                    "SELECT    ",
+                    ...selectArrComma((depth ? q.allFields : q.select).concat(aggs ? aggs.map(a => a.alias) : []).filter(s => s).concat(
+                    // Need to make join table names unique !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    joins.map((j, i) => {
+                        const jsq = `json_agg(${prefJCAN(j, `json`)}::jsonb ORDER BY ${prefJCAN(j, `rowid_sorted`)})   FILTER (WHERE ${prefJCAN(j, `limit`)} <= ${j.limit} AND ${prefJCAN(j, `dupes_rowid`)} = 1 AND ${prefJCAN(j, `json`)} IS NOT NULL)`;
+                        const resAlias = exports.asName(j.joinAlias || j.table);
+                        // If limit = 1 then return a single json object (first one)
+                        return (j.limit === 1 ? `${jsq}->0 ` : `COALESCE(${jsq}, '[]') `) + `  AS ${resAlias}`;
+                    }))),
+                    `FROM ( `,
+                    ...indjArr(depth + 1, [
+                        "-- 1. [subquery limit + dupes] ",
+                        "SELECT     ",
+                        ...selectArrComma([`t1.*`].concat(joins.map((j, i) => {
+                            return `row_number() over(partition by ${prefJCAN(j, `dupes_rowid`)}, ` +
+                                `ctid order by ${prefJCAN(j, `rowid_sorted`)}) AS ${prefJCAN(j, `limit`)}  `;
+                        }))),
+                        `FROM ( ----------- ${makePrefAN(q)}`,
+                        ...indjArr(depth + 1, [
+                            "-- 2. [source full select + ctid to group by] ",
+                            "SELECT ",
+                            ...selectArrComma(q.allFields.concat(["ctid"])
+                                .map(field => `${makePrefAN(q)}.${field}  `)
+                                .concat(joins.map((j, i) => makePrefAN(j) + "." + prefJCAN(j, `json`) + ", " + makePrefAN(j) + "." + prefJCAN(j, `rowid_sorted`)).concat(joins.map(j => `row_number() over(partition by ${makePrefAN(j)}.${prefJCAN(j, `rowid_sorted`)}, ${makePrefAN(q)}.ctid ) AS ${prefJCAN(j, `dupes_rowid`)}`)))),
+                            `FROM ( `,
+                            ...indjArr(depth + 1, [
+                                "-- 3. [source table] ",
+                                "SELECT ",
+                                "*, row_number() over() as ctid ",
+                                `FROM ${exports.asName(q.table)} `,
+                                `${q.where} `
+                            ]),
+                            `) ${makePrefAN(q)} `,
+                            ...Prostgles_1.flat(joins.map((j, i) => joinTables(q, j)))
+                        ]),
+                        ") t1"
+                    ]),
+                    ") t0",
+                    `GROUP BY ${(depth ? q.allFields : q.select).concat(aggs && aggs.length ? [] : [`ctid`]).filter(s => s).join(", ")} `,
+                    q.orderBy,
+                    depth ? null : `LIMIT ${q.limit || 0} OFFSET ${q.offset || 0}`,
+                    "-- eof 0. root",
+                    " "
+                ].filter(v => v);
+                let res = indJ(depth, rootSelect);
+                // res = indent(res, depth);
+                // console.log(res)   
+                return res;
                 // WHY NOT THIS?
                 //     return `WITH _posts AS (
                 //         SELECT *, row_to_json((select x from (select id, title) as x)) as posts
@@ -289,7 +348,7 @@ class ViewHandler {
                 //         LIMIT 15
                 // )
             };
-            return makeQuery3(q);
+            return makeQuery3(q, 0, []);
         });
     }
     getAggs(select) {
@@ -306,14 +365,16 @@ class ViewHandler {
             .map(field => ({ field, alias: field, parser: aggParsers.find(a => a.name === (select[field])) }))
             .filter((f) => f.parser)
             .map(({ field, parser, alias }) => ({ field, alias, query: pgp.as.format(parser.get(), { field, alias }) }));
-        let aliased = keys.filter(key => isPlainObject(select[key]) && Object.values(select[key]).find(v => Array.isArray(v)))
+        let aliased = keys.filter(key => isPlainObject(select[key]))
             .map(alias => ({ alias, parser: aggParsers.find(a => a.name === (Object.keys(select[alias])[0])) }))
             .filter((f) => f.parser)
             .map((a) => {
-            let arr = select[a.alias][a.parser.name];
-            if (!arr || !arr.length || arr.find(v => typeof v !== "string"))
-                throw "\nInvalid agg function call -> " + JSON.stringify(select[a.alias]) + "\nExpecting a string value";
-            a.field = select[a.alias][a.parser.name][0];
+            let data = select[a.alias][a.parser.name];
+            if (typeof data !== "string" &&
+                (!data ||
+                    Array.isArray(data) && data.find(v => typeof v !== "string")))
+                throw "\nInvalid aggregate function call -> " + JSON.stringify(select[a.alias]) + "\n Expecting { $aggFuncName: \"fieldName\" | [\"fieldName\"] }";
+            a.field = Array.isArray(data) ? data[0] : data;
             return a;
         })
             .map(({ field, parser, alias }) => ({ field, alias, query: pgp.as.format(parser.get(), { field, alias }) }));
@@ -324,9 +385,9 @@ class ViewHandler {
     buildQueryTree(filter, selectParams, param3_unused = null, tableRules, localParams) {
         return __awaiter(this, void 0, void 0, function* () {
             this.checkFilter(filter);
-            const { select } = selectParams || {};
+            const { select, alias } = selectParams || {};
             let mainSelect;
-            let joins, _Aggs, aggAliases = [], aggs, joinQueries = [];
+            let joinAliases, _Aggs, aggAliases = [], aggs, joinQueries = [];
             // console.log("add checks for when to REINDEX TABLE CONCURRENTLY ... \nand also if join columns are missing indexes\nand also if running out of disk space!! (in nodejs)")
             if (isPlainObject(select)) {
                 if (Object.values(select).find(v => (v === 1 || v === true)) &&
@@ -335,18 +396,21 @@ class ViewHandler {
                 _Aggs = this.getAggs(PubSubManager_1.filterObj(select, Object.keys(select).filter(key => select[key] !== "*"))) || [];
                 let aggFields = Array.from(new Set(_Aggs.map(a => a.field)));
                 aggAliases = _Aggs.map(a => a.alias);
-                aggs = _Aggs.map(a => a.query);
-                if (aggs.length) {
+                if (_Aggs.length) {
                     /* Validate fields from aggs */
                     yield this.prepareValidatedQuery({}, { select: aggFields }, param3_unused, tableRules, localParams);
                 }
-                joins = Object.keys(select).filter(key => !aggAliases.includes(key) &&
-                    (select[key] === "*" || isPlainObject(select[key])));
-                if (joins && joins.length) {
+                joinAliases = Object.keys(select)
+                    .filter(key => !aggAliases.includes(key) &&
+                    (select[key] === "*"
+                        ||
+                            isPlainObject(select[key])));
+                if (joinAliases && joinAliases.length) {
                     if (!this.joinPaths)
                         throw "Joins not allowed";
-                    for (let i = 0; i < joins.length; i++) {
-                        let jKey = joins[i], jParams = select[jKey], jTable = jKey, isLeftJoin = true, jSelectAlias = jTable, jSelect = jParams, jFilter = {}, jLimit = undefined, jOffset = undefined, jOrder = undefined;
+                    for (let i = 0; i < joinAliases.length; i++) {
+                        let jKey = joinAliases[i], jParams = select[jKey], jTable = jKey, isLeftJoin = true, jSelectAlias = jKey, jSelect = jParams, jFilter = {}, jLimit = undefined, jOffset = undefined, jOrder = undefined, jPath = undefined;
+                        /* Detailed join config */
                         if (isPlainObject(jParams)) {
                             /* Has params */
                             const joinKeys = Object.keys(jParams).filter(key => ["$innerJoin", "$leftJoin"].includes(key));
@@ -359,6 +423,7 @@ class ViewHandler {
                                 jLimit = jParams.limit;
                                 jOffset = jParams.offset;
                                 jOrder = jParams.orderBy;
+                                jPath = jParams.$path;
                                 isLeftJoin = joinKeys[0] === "$leftJoin";
                             }
                         }
@@ -371,13 +436,15 @@ class ViewHandler {
                             joinTableRules = yield this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: jTable, command: "find", socket: localParams.socket });
                         }
                         if (isLocal || joinTableRules) {
-                            const joinQuery = yield this.dboBuilder.dbo[jTable].buildQueryTree(jFilter, { select: jSelect, limit: jLimit, offset: jOffset, orderBy: jOrder }, param3_unused, joinTableRules, localParams);
+                            const joinQuery = yield this.dboBuilder.dbo[jTable].buildQueryTree(jFilter, { select: jSelect, limit: jLimit, offset: jOffset, orderBy: jOrder, alias: jSelectAlias }, param3_unused, joinTableRules, localParams);
                             joinQuery.isLeftJoin = isLeftJoin;
+                            joinQuery.joinAlias = jSelectAlias;
+                            joinQuery.$path = jPath;
                             joinQueries.push(joinQuery);
                         }
                     }
                 }
-                mainSelect = PubSubManager_1.filterObj(select, Object.keys(select).filter(key => !(aggAliases.concat(joins).includes(key))));
+                mainSelect = PubSubManager_1.filterObj(select, Object.keys(select).filter(key => !(aggAliases.concat(joinAliases).includes(key))));
                 /* Allow empty select */
                 if (Object.keys(mainSelect).length < 1)
                     mainSelect = "";
@@ -389,8 +456,12 @@ class ViewHandler {
                 }
             }
             let q = yield this.prepareValidatedQuery(filter, Object.assign(Object.assign({}, selectParams), { select: mainSelect }), param3_unused, tableRules, localParams, aggAliases);
+            const ambiguousAggName = q.select.find(s => aggAliases.includes(s));
+            if (ambiguousAggName)
+                throw `Cannot have select columns collide with aggregation alias for: ` + ambiguousAggName;
             q.joins = joinQueries;
-            q.aggs = aggs;
+            q.aggs = _Aggs;
+            q.joinAlias = alias;
             return q;
         });
     }
@@ -434,7 +505,7 @@ class ViewHandler {
                 return {
                     isLeftJoin: true,
                     table: this.name,
-                    allFields: this.column_names,
+                    allFields: this.column_names.map(exports.asName),
                     orderBy: [this.prepareSort(orderBy, fields, tableAlias, null, validatedAggAliases)],
                     select: this.prepareSelect(select, fields, null, tableAlias).split(","),
                     where: yield this.prepareWhere(filter, forcedFilter, filterFields, null, tableAlias),
@@ -443,9 +514,10 @@ class ViewHandler {
                 };
             }
             catch (e) {
+                // console.error(e)
                 if (localParams && localParams.testRule)
                     throw e;
-                throw { err: e, msg: `Issue with dbo.${this.name}.find()` };
+                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.find()` };
             }
         });
     }
@@ -499,7 +571,7 @@ class ViewHandler {
             catch (e) {
                 if (localParams && localParams.testRule)
                     throw e;
-                throw { err: e, msg: `Issue with dbo.${this.name}.find()` };
+                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.find()` };
             }
         });
     }
@@ -518,7 +590,7 @@ class ViewHandler {
         catch (e) {
             if (localParams && localParams.testRule)
                 throw e;
-            throw { err: e, msg: `Issue with dbo.${this.name}.findOne()` };
+            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.findOne()` };
         }
     }
     count(filter, param2_unused, param3_unused, table_rules, localParams = {}) {
@@ -535,7 +607,7 @@ class ViewHandler {
             catch (e) {
                 if (localParams && localParams.testRule)
                     throw e;
-                throw { err: e, msg: `Issue with dbo.${this.name}.count()` };
+                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.count()` };
             }
         });
     }
@@ -592,7 +664,7 @@ class ViewHandler {
             catch (e) {
                 if (localParams && localParams.testRule)
                     throw e;
-                throw { err: e, msg: `Issue with dbo.${this.name}.subscribe()` };
+                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.subscribe()` };
             }
         });
     }
@@ -1225,7 +1297,7 @@ class TableHandler extends ViewHandler {
             catch (e) {
                 if (localParams && localParams.testRule)
                     throw e;
-                throw { err: e, msg: `Issue with dbo.${this.name}.update()` };
+                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.update()` };
             }
         });
     }
@@ -1335,7 +1407,7 @@ class TableHandler extends ViewHandler {
             catch (e) {
                 if (localParams && localParams.testRule)
                     throw e;
-                throw { err: e, msg: `Issue with dbo.${this.name}.insert()` };
+                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.insert()` };
             }
         });
     }
@@ -1381,7 +1453,7 @@ class TableHandler extends ViewHandler {
             catch (e) {
                 if (localParams && localParams.testRule)
                     throw e;
-                throw { err: e, msg: `Issue with dbo.${this.name}.delete()` };
+                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.delete()` };
             }
         });
     }
@@ -1411,7 +1483,7 @@ class TableHandler extends ViewHandler {
             catch (e) {
                 if (localParams && localParams.testRule)
                     throw e;
-                throw { err: e, msg: `Issue with dbo.${this.name}.upsert()` };
+                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.upsert()` };
             }
         });
     }
@@ -1454,7 +1526,7 @@ class TableHandler extends ViewHandler {
             catch (e) {
                 if (localParams && localParams.testRule)
                     throw e;
-                throw { err: e, msg: `Issue with dbo.${this.name}.sync()` };
+                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.sync()` };
             }
             /*
             REPLICATION
@@ -1612,9 +1684,12 @@ export type DeleteParams = {
 export type TxCB = {
     (t: DBObj): (any | void | Promise<(any | void)>)
 };
+export type JoinMaker = (filter?: object, select?: FieldFilter, options?: SelectParams) => any;
+
 `;
             this.dboDefinition = `export type DBObj = {\n`;
             yield this.parseJoins();
+            let joinTableNames = [];
             this.tablesOrViews.map(tov => {
                 if (tov.is_view) {
                     this.dbo[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, null, this.joinPaths);
@@ -1625,7 +1700,42 @@ export type TxCB = {
                 allDataDefs += this.dbo[tov.name].tsDataDef + "\n";
                 allDboDefs += this.dbo[tov.name].tsDboDef;
                 this.dboDefinition += ` ${tov.name}: ${this.dbo[tov.name].tsDboName};\n`;
+                if (this.joinPaths && this.joinPaths.find(jp => [jp.t1, jp.t2].includes(tov.name))) {
+                    let table = tov.name;
+                    joinTableNames.push(table);
+                    this.dbo.innerJoin = this.dbo.innerJoin || {};
+                    this.dbo.leftJoin = this.dbo.leftJoin || {};
+                    this.dbo.innerJoinOne = this.dbo.innerJoinOne || {};
+                    this.dbo.leftJoinOne = this.dbo.leftJoinOne || {};
+                    this.dbo.leftJoin[table] = (filter, select, options = {}) => {
+                        return makeJoin(true, filter, select, options);
+                    };
+                    this.dbo.innerJoin[table] = (filter, select, options = {}) => {
+                        return makeJoin(false, filter, select, options);
+                    };
+                    this.dbo.leftJoinOne[table] = (filter, select, options = {}) => {
+                        return makeJoin(true, filter, select, Object.assign(Object.assign({}, options), { limit: 1 }));
+                    };
+                    this.dbo.innerJoinOne[table] = (filter, select, options = {}) => {
+                        return makeJoin(false, filter, select, Object.assign(Object.assign({}, options), { limit: 1 }));
+                    };
+                    function makeJoin(isLeft = true, filter, select, options) {
+                        return Object.assign({ [isLeft ? "$leftJoin" : "$innerJoin"]: table, filter,
+                            select }, options);
+                    }
+                }
             });
+            let joinBuilderDef = "";
+            if (joinTableNames.length) {
+                joinBuilderDef += "export type JoinMakerTables = {\n";
+                joinTableNames.map(tname => {
+                    joinBuilderDef += ` ${tname}: JoinMaker;\n`;
+                });
+                joinBuilderDef += "};\n";
+                ["leftJoin", "innerJoin", "leftJoinOne", "innerJoinOne"].map(joinType => {
+                    this.dboDefinition += ` ${joinType}: JoinMakerTables;\n`;
+                });
+            }
             if (this.prostgles.transactions) {
                 let txKey = "tx";
                 if (typeof this.prostgles.transactions === "string")
@@ -1647,7 +1757,7 @@ export type TxCB = {
                 };
             }
             this.dboDefinition += "};\n";
-            this.tsTypesDefinition = [common_types, allDataDefs, allDboDefs, this.dboDefinition].join("\n");
+            this.tsTypesDefinition = [common_types, allDataDefs, allDboDefs, joinBuilderDef, this.dboDefinition].join("\n");
             return this.dbo;
             // let dbo = makeDBO(db, allTablesViews, pubSubManager, true);
         });
@@ -2013,27 +2123,5 @@ function sqlErrCodeToMsg(code) {
       https://www.postgresql.org/docs/13/errcodes-appendix.html
       JSON.stringify([...THE_table_$0.rows].map(t => [...t.children].map(u => u.innerText)).filter((d, i) => i && d.length > 1).reduce((a, v)=>({ ...a, [v[0]]: v[1] }), {}))
     */
-}
-/**
- * Indents the given string
- * @param {string} str  The string to be indented.
- * @param {number} numOfIndents  The amount of indentations to place at the
- *     beginning of each line of the string.
- * @param {number=} opt_spacesPerIndent  Optional.  If specified, this should be
- *     the number of spaces to be used for each tab that would ordinarily be
- *     used to indent the text.  These amount of spaces will also be used to
- *     replace any tab characters that already exist within the string.
- * @return {string}  The new string with each line beginning with the desired
- *     amount of indentation.
- */
-function indent(str, numOfIndents, opt_spacesPerIndent = 0) {
-    str = str.replace(/^(?=.)/gm, new Array(numOfIndents + 1).join('\t'));
-    opt_spacesPerIndent = opt_spacesPerIndent + 1 || 0;
-    numOfIndents = new Array(opt_spacesPerIndent).join(' '); // re-use
-    return opt_spacesPerIndent
-        ? str.replace(/^\t+/g, function (tabs) {
-            return tabs.replace(/./g, numOfIndents);
-        })
-        : str;
 }
 //# sourceMappingURL=DboBuilder.js.map
