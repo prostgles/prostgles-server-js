@@ -46,6 +46,7 @@ export declare type Aggregation = {
     field: string;
     query: string;
     alias: string;
+    getQuery: (alias: string) => string;
 };
 declare type Filter = object | {
     $and: Filter[];

@@ -90,7 +90,12 @@ function capitalizeFirstLetter(string: string) : string {
     return replaceNonAlphaNumeric(string).charAt(0).toUpperCase() + string.slice(1);
 }
 
-export type Aggregation = { field: string, query: string, alias: string };
+export type Aggregation = { 
+    field: string, 
+    query: string, 
+    alias: string,
+    getQuery: (alias: string) => string;
+};
 
 type Filter = object | { $and: Filter[] } | { $or: Filter[] } | {};
 
@@ -361,8 +366,12 @@ export class ViewHandler {
                             q2.select.concat(
                                 (q2.joins || []).map(j => j.joinAlias || j.table)
                             ).concat(
-                                (q2.aggs || []).map(a => a.alias) || [])
+                                /* Rename aggs to avoid collision with join cols */
+                                (q2.aggs || []).map(a => asName(`agg_${a.alias}`) + " AS " + asName(a.alias)) || [])
                             ).filter(s => s).join(", ");
+
+                        const _iiQ = [makeQuery3(q2, depth + 1, on.map(([c1, c2]) => asName(c2)))];
+                        const iiQ = flat(_iiQ).split("\n");
 
                         iQ = [
                             "("
@@ -372,7 +381,7 @@ export class ViewHandler {
                             ,   `row_number() over() as ${prefJCAN(q2, `rowid_sorted`)},`
                             ,   `row_to_json((select x from (SELECT ${targetSelect}) as x)) AS ${prefJCAN(q2, `json`)}`
                             ,   `FROM (`
-                            ,   ...flat(makeQuery3(q2, depth + 1, on.map(([c1, c2]) => asName(c2))).split("\n"))
+                            ,   ...iiQ
                             ,   `) ${asName(q2.table)}    `
                         ])
                         ,   `) ${thisAlias}`
@@ -404,7 +413,9 @@ export class ViewHandler {
                         q.select = Array.from(new Set(missingFields.concat(q.select)));
                         groupByFields = q.select;
                     }
-                    select = q.select.concat(q.aggs.map(a => a.query));
+
+                    /* Rename aggs to avoid collision with join cols */
+                    select = q.select.concat(q.aggs.map(a => a.getQuery(`agg_${a.alias}`)));
                     if(q.select.length){
                         groupBy = `GROUP BY ${groupByFields.join(", ")}\n`;
                     }
@@ -440,7 +451,7 @@ export class ViewHandler {
                 " "
             ,   `-- 0. [root final]  `
             ,   "SELECT    "
-            ,...selectArrComma((depth? q.allFields : q.select).concat(aggs? aggs.map(a => a.alias) : []).filter(s => s).concat(
+            ,...selectArrComma((depth? q.allFields : q.select).concat((aggs || []).map(a => asName(a.alias))).filter(s => s).concat(
                 // Need to make join table names unique !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 joins.map((j, i)=> {
                     const jsq = `json_agg(${prefJCAN(j, `json`)}::jsonb ORDER BY ${prefJCAN(j, `rowid_sorted`)})   FILTER (WHERE ${prefJCAN(j, `limit`)} <= ${j.limit} AND ${prefJCAN(j, `dupes_rowid`)} = 1 AND ${prefJCAN(j, `json`)} IS NOT NULL)`;
@@ -543,7 +554,7 @@ export class ViewHandler {
         let nonAliased = keys.filter(key => typeof select[key] === "string")
             .map(field => ({ field, alias: field, parser: aggParsers.find(a => a.name === (select[field])) }))
             .filter((f: any) => f.parser)
-            .map(({ field, parser, alias }) => ({ field, alias, query: pgp.as.format(parser.get(), { field, alias }) }));
+            // .map(({ field, parser, alias }) => ({ field, alias, query: pgp.as.format(parser.get(), { field, alias }) }));
         
         let aliased = keys.filter(key => isPlainObject(select[key]))
             .map(alias => ({ alias, parser: aggParsers.find(a => a.name === (Object.keys(select[alias])[0])) }))
@@ -560,9 +571,15 @@ export class ViewHandler {
 
                 a.field = Array.isArray(data)? data[0] : data;
                 return a;
-            })
-            .map(({ field, parser, alias }) => ({ field, alias, query: pgp.as.format(parser.get(), { field, alias }) }));
-        let res = nonAliased.concat(aliased);
+            });
+
+            
+        let res = nonAliased.concat(aliased).map(({ field, parser, alias }) => ({ 
+            field, 
+            alias, 
+            query: pgp.as.format(parser.get(), { field, alias }),
+            getQuery: (alias: string) =>  pgp.as.format(parser.get(), { field, alias })
+        }));
         // console.log(res);
         return res;
     }
@@ -573,7 +590,7 @@ export class ViewHandler {
         let mainSelect;
 
         let joinAliases: string[],
-            _Aggs: { field: string, query: string, alias: string }[],
+            _Aggs: Aggregation[],
             aggAliases = [],
             aggs: string[],
             joinQueries: Query[] = [];
