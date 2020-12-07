@@ -370,8 +370,10 @@ export class ViewHandler {
                                 (q2.aggs || []).map(a => asName(`agg_${a.alias}`) + " AS " + asName(a.alias)) || [])
                             ).filter(s => s).join(", ");
 
-                        const _iiQ = [makeQuery3(q2, depth + 1, on.map(([c1, c2]) => asName(c2)))];
-                        const iiQ = flat(_iiQ).split("\n");
+                        const _iiQ = makeQuery3(q2, depth + 1, on.map(([c1, c2]) => asName(c2)));
+                        // console.log(_iiQ)
+                        // const iiQ = flat(_iiQ.split("\n"));
+                        const iiQ = [_iiQ];
 
                         iQ = [
                             "("
@@ -415,7 +417,7 @@ export class ViewHandler {
                     }
 
                     /* Rename aggs to avoid collision with join cols */
-                    select = q.select.concat(q.aggs.map(a => a.getQuery(`agg_${a.alias}`)));
+                    select = q.select.concat(q.aggs.map(a => !depth? a.query : a.getQuery(`agg_${a.alias}`)));
                     if(q.select.length){
                         groupBy = `GROUP BY ${groupByFields.join(", ")}\n`;
                     }
@@ -441,6 +443,7 @@ export class ViewHandler {
                 ,   !depth? `LIMIT ${q.limit} ` : null
                 ,   !depth? `OFFSET ${q.offset || 0} ` : null
                 ].filter(v => v) as unknown as string[]);
+                // console.log(fres);
                 return fres;
             } else {
                 // if(q.aggs && q.aggs && q.aggs.length) throw "Cannot join an aggregate";
@@ -452,7 +455,6 @@ export class ViewHandler {
             ,   `-- 0. [root final]  `
             ,   "SELECT    "
             ,...selectArrComma((depth? q.allFields : q.select).concat((aggs || []).map(a => asName(a.alias))).filter(s => s).concat(
-                // Need to make join table names unique !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 joins.map((j, i)=> {
                     const jsq = `json_agg(${prefJCAN(j, `json`)}::jsonb ORDER BY ${prefJCAN(j, `rowid_sorted`)})   FILTER (WHERE ${prefJCAN(j, `limit`)} <= ${j.limit} AND ${prefJCAN(j, `dupes_rowid`)} = 1 AND ${prefJCAN(j, `json`)} IS NOT NULL)`;
                     const resAlias = asName(j.joinAlias || j.table)
@@ -508,7 +510,7 @@ export class ViewHandler {
 
             let res = indJ(depth, rootSelect as unknown as string[]);
             // res = indent(res, depth);
-            // console.log(res)   
+            // console.log(res);
             return res;
 
 

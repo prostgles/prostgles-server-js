@@ -214,8 +214,10 @@ class ViewHandler {
                             const targetSelect = (q2.select.concat((q2.joins || []).map(j => j.joinAlias || j.table)).concat(
                             /* Rename aggs to avoid collision with join cols */
                             (q2.aggs || []).map(a => exports.asName(`agg_${a.alias}`) + " AS " + exports.asName(a.alias)) || [])).filter(s => s).join(", ");
-                            const _iiQ = [makeQuery3(q2, depth + 1, on.map(([c1, c2]) => exports.asName(c2)))];
-                            const iiQ = Prostgles_1.flat(_iiQ).split("\n");
+                            const _iiQ = makeQuery3(q2, depth + 1, on.map(([c1, c2]) => exports.asName(c2)));
+                            // console.log(_iiQ)
+                            // const iiQ = flat(_iiQ.split("\n"));
+                            const iiQ = [_iiQ];
                             iQ = [
                                 "(",
                                 ...indjArr(depth + 1, [
@@ -251,7 +253,7 @@ class ViewHandler {
                             groupByFields = q.select;
                         }
                         /* Rename aggs to avoid collision with join cols */
-                        select = q.select.concat(q.aggs.map(a => a.getQuery(`agg_${a.alias}`)));
+                        select = q.select.concat(q.aggs.map(a => !depth ? a.query : a.getQuery(`agg_${a.alias}`)));
                         if (q.select.length) {
                             groupBy = `GROUP BY ${groupByFields.join(", ")}\n`;
                         }
@@ -274,6 +276,7 @@ class ViewHandler {
                         !depth ? `LIMIT ${q.limit} ` : null,
                         !depth ? `OFFSET ${q.offset || 0} ` : null
                     ].filter(v => v));
+                    // console.log(fres);
                     return fres;
                 }
                 else {
@@ -285,9 +288,7 @@ class ViewHandler {
                     " ",
                     `-- 0. [root final]  `,
                     "SELECT    ",
-                    ...selectArrComma((depth ? q.allFields : q.select).concat((aggs || []).map(a => exports.asName(a.alias))).filter(s => s).concat(
-                    // Need to make join table names unique !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                    joins.map((j, i) => {
+                    ...selectArrComma((depth ? q.allFields : q.select).concat((aggs || []).map(a => exports.asName(a.alias))).filter(s => s).concat(joins.map((j, i) => {
                         const jsq = `json_agg(${prefJCAN(j, `json`)}::jsonb ORDER BY ${prefJCAN(j, `rowid_sorted`)})   FILTER (WHERE ${prefJCAN(j, `limit`)} <= ${j.limit} AND ${prefJCAN(j, `dupes_rowid`)} = 1 AND ${prefJCAN(j, `json`)} IS NOT NULL)`;
                         const resAlias = exports.asName(j.joinAlias || j.table);
                         // If limit = 1 then return a single json object (first one)
@@ -330,7 +331,7 @@ class ViewHandler {
                 ].filter(v => v);
                 let res = indJ(depth, rootSelect);
                 // res = indent(res, depth);
-                // console.log(res)   
+                // console.log(res);
                 return res;
                 // WHY NOT THIS?
                 //     return `WITH _posts AS (
