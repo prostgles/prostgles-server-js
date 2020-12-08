@@ -215,8 +215,8 @@ class ViewHandler {
                             /* Rename aggs to avoid collision with join cols */
                             (q2.aggs || []).map(a => exports.asName(`agg_${a.alias}`) + " AS " + exports.asName(a.alias)) || [])).filter(s => s).join(", ");
                             const _iiQ = makeQuery3(q2, depth + 1, on.map(([c1, c2]) => exports.asName(c2)));
+                            // const iiQ = flat(_iiQ.split("\n")); // prettify for debugging
                             // console.log(_iiQ)
-                            // const iiQ = flat(_iiQ.split("\n"));
                             const iiQ = [_iiQ];
                             iQ = [
                                 "(",
@@ -859,8 +859,12 @@ class ViewHandler {
                     return " ARRAY[${data:csv}] ";
                 }
                 return " ${data} ";
+            }, parseLocationFilter = () => {
             }, conditionParsers = [
                 // { aliases: ["$exists"],                         get: (key, val, col) =>  },                
+                { aliases: ["&&ST_MakeEnvelope"], get: (key, val, col) => {
+                        return "${key:raw} && ST_MakeEnvelope(${data:csv}) ";
+                    } },
                 { aliases: ["$nin"], get: (key, val, col) => "${key:raw} NOT IN (${data:csv}) " },
                 { aliases: ["$in"], get: (key, val, col) => "${key:raw} IN (${data:csv}) " },
                 { aliases: ["$tsQuery"], get: (key, val, col) => {
@@ -944,6 +948,7 @@ class ViewHandler {
                                 throw "Unrecognised operand: " + operand_key;
                             }
                             let _d = d[operand_key];
+                            /* Turn data into array if comparing to array type column */
                             if (col.element_type && !Array.isArray(_d))
                                 _d = [_d];
                             return pgp.as.format(op.get(fKey, _d, col), { key: getRawFieldName(fKey), data: _d, prefix });
