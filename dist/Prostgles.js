@@ -294,11 +294,13 @@ class Prostgles {
                         });
                     });
                     let schema = {};
+                    let publishValidationError;
                     let rawSQL = false;
                     try {
                         schema = yield publishParser.getSchemaFromPublish(socket);
                     }
                     catch (e) {
+                        publishValidationError = "Server Error: PUBLISH VALIDATION ERROR";
                         console.error(`\nProstgles PUBLISH VALIDATION ERROR (after socket connected):\n    ->`, e);
                     }
                     socket.prostgles = socket.prostgles || {};
@@ -361,7 +363,7 @@ class Prostgles {
                     }
                     socket.emit(WS_CHANNEL_NAME.SCHEMA, Object.assign(Object.assign({ schema, methods: Object.keys(methods) }, (fullSchema ? { fullSchema } : {})), { rawSQL,
                         joinTables,
-                        auth }));
+                        auth, err: publishValidationError }));
                 }
                 catch (e) {
                     console.error("setSocketEvents: ", e);

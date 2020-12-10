@@ -595,11 +595,13 @@ export class Prostgles {
                 });
                 
                 let schema: any = {};
+                let publishValidationError;
                 let rawSQL = false;
                 
                 try {
                     schema = await publishParser.getSchemaFromPublish(socket);
                 } catch(e){
+                    publishValidationError = "Server Error: PUBLISH VALIDATION ERROR";
                     console.error(`\nProstgles PUBLISH VALIDATION ERROR (after socket connected):\n    ->`, e);
                 }
                 socket.prostgles = socket.prostgles || {};
@@ -674,7 +676,8 @@ export class Prostgles {
                     ...(fullSchema? { fullSchema } : {}),
                     rawSQL,
                     joinTables,
-                    auth
+                    auth,
+                    err: publishValidationError
                 });
 
             } catch(e) {
