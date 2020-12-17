@@ -124,6 +124,7 @@ export declare type PublishTableRule = {
 };
 export declare type PublishViewRule = {
     select: SelectRule | "*" | false | null;
+    getColumns: boolean;
 };
 export declare type RequestParams = {
     dbo?: DbHandler;
@@ -142,7 +143,7 @@ export declare type Join = {
     };
     type: typeof JOIN_TYPES[number];
 };
-export declare type Joins = Join[];
+export declare type Joins = Join[] | "inferred";
 export declare type publishMethods = (socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB, user?: any) => {
     [key: string]: Method;
 } | Promise<{
@@ -167,16 +168,16 @@ export declare type Auth = {
 export declare type ProstglesInitOptions = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
-    publishMethods?: publishMethods;
     tsGeneratedTypesDir?: string;
     io?: any;
     publish?: Publish;
+    publishMethods?: publishMethods;
+    publishRawSQL?(socket: Socket, dbo: any, db?: DB): any;
     joins?: Joins;
     schema?: string;
     sqlFilePath?: string;
     onReady(dbo: any, db: DB): void;
     transactions?: string | boolean;
-    publishRawSQL?(socket: Socket, dbo: any, db?: DB): any;
     wsChannelNamePrefix?: string;
     onSocketConnect?(socket: Socket, dbo: any, db?: DB): any;
     onSocketDisconnect?(socket: Socket, dbo: any, db?: DB): any;

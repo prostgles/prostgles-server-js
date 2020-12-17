@@ -5,12 +5,15 @@ export declare type GroupFilter = {
     $or: Filter;
 };
 export declare type FieldFilter = object | string[] | "*" | "";
+export declare type AscOrDesc = 1 | -1 | boolean;
 export declare type OrderBy = {
     key: string;
-    asc: boolean;
+    asc: AscOrDesc;
 }[] | {
-    [key: string]: boolean;
-}[] | string | string[];
+    [key: string]: AscOrDesc;
+}[] | {
+    [key: string]: AscOrDesc;
+} | string | string[];
 export declare type SelectParams = {
     select?: FieldFilter;
     limit?: number;
@@ -47,6 +50,7 @@ export declare type Items_Filter = Items | object | {
     $or: (Items | object)[];
 };
 export declare type Items2 = {
+    items_id?: number;
     id?: number;
     hh?: Array<string>;
     name?: string;
@@ -83,6 +87,7 @@ export declare type Transaction_Filter = Transaction | object | {
     $or: (Transaction | object)[];
 };
 export declare type DBO_items = {
+    getColumns: () => Promise<any[]>;
     find: (filter?: Items_Filter, selectParams?: SelectParams) => Promise<Items[] | any[]>;
     findOne: (filter?: Items_Filter, selectParams?: SelectParams) => Promise<Items | any>;
     subscribe: (filter: Items_Filter, params: SelectParams, onData: (items: Items[]) => any) => Promise<{
@@ -98,6 +103,7 @@ export declare type DBO_items = {
     delete: (filter: Items_Filter, params?: DeleteParams) => Promise<void | Items>;
 };
 export declare type DBO_items2 = {
+    getColumns: () => Promise<any[]>;
     find: (filter?: Items2_Filter, selectParams?: SelectParams) => Promise<Items2[] | any[]>;
     findOne: (filter?: Items2_Filter, selectParams?: SelectParams) => Promise<Items2 | any>;
     subscribe: (filter: Items2_Filter, params: SelectParams, onData: (items: Items2[]) => any) => Promise<{
@@ -113,6 +119,7 @@ export declare type DBO_items2 = {
     delete: (filter: Items2_Filter, params?: DeleteParams) => Promise<void | Items2>;
 };
 export declare type DBO_items3 = {
+    getColumns: () => Promise<any[]>;
     find: (filter?: Items3_Filter, selectParams?: SelectParams) => Promise<Items3[] | any[]>;
     findOne: (filter?: Items3_Filter, selectParams?: SelectParams) => Promise<Items3 | any>;
     subscribe: (filter: Items3_Filter, params: SelectParams, onData: (items: Items3[]) => any) => Promise<{
@@ -128,6 +135,7 @@ export declare type DBO_items3 = {
     delete: (filter: Items3_Filter, params?: DeleteParams) => Promise<void | Items3>;
 };
 export declare type DBO_table = {
+    getColumns: () => Promise<any[]>;
     find: (filter?: Table_Filter, selectParams?: SelectParams) => Promise<Table[] | any[]>;
     findOne: (filter?: Table_Filter, selectParams?: SelectParams) => Promise<Table | any>;
     subscribe: (filter: Table_Filter, params: SelectParams, onData: (items: Table[]) => any) => Promise<{
@@ -143,6 +151,7 @@ export declare type DBO_table = {
     delete: (filter: Table_Filter, params?: DeleteParams) => Promise<void | Table>;
 };
 export declare type DBO_transaction = {
+    getColumns: () => Promise<any[]>;
     find: (filter?: Transaction_Filter, selectParams?: SelectParams) => Promise<Transaction[] | any[]>;
     findOne: (filter?: Transaction_Filter, selectParams?: SelectParams) => Promise<Transaction | any>;
     subscribe: (filter: Transaction_Filter, params: SelectParams, onData: (items: Transaction[]) => any) => Promise<{

@@ -16,7 +16,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PublishParser = exports.flat = exports.Prostgles = exports.JOIN_TYPES = void 0;
 const promise = require("bluebird");
 const pgPromise = require("pg-promise");
-'use strict';
+const pkgj = require('../package.json');
+const version = pkgj.version;
 const utils_1 = require("./utils");
 const DboBuilder_1 = require("./DboBuilder");
 function getDbConnection(dbConnection, options, debugQueries = false) {
@@ -357,13 +358,21 @@ class Prostgles {
                         }
                     }
                     const methods = yield publishParser.getMethods(socket);
-                    let joinTables = [];
+                    // let joinTables = [];
+                    let joinTables2 = [];
                     if (this.joins) {
-                        joinTables = Array.from(new Set(flat(this.joins.map(j => j.tables)).filter(t => schema[t])));
+                        // joinTables = Array.from(new Set(flat(this.dboBuilder.getJoins().map(j => j.tables)).filter(t => schema[t])));
+                        let _joinTables2 = this.dboBuilder.getJoinPaths()
+                            .filter(jp => ![jp.t1, jp.t2].find(t => !schema[t] || !schema[t].findOne)).map(jp => [jp.t1, jp.t2].sort());
+                        _joinTables2.map(jt => {
+                            if (!joinTables2.find(_jt => _jt.join() === jt.join())) {
+                                joinTables2.push(jt);
+                            }
+                        });
                     }
-                    socket.emit(WS_CHANNEL_NAME.SCHEMA, Object.assign(Object.assign({ schema, methods: Object.keys(methods) }, (fullSchema ? { fullSchema } : {})), { rawSQL,
-                        joinTables,
-                        auth, err: publishValidationError }));
+                    // console.log(joinTables2)
+                    socket.emit(WS_CHANNEL_NAME.SCHEMA, Object.assign(Object.assign({ schema, methods: Object.keys(methods) }, (fullSchema ? { fullSchema } : {})), { rawSQL, joinTables: joinTables2, auth,
+                        version, err: publishValidationError }));
                 }
                 catch (e) {
                     console.error("setSocketEvents: ", e);
@@ -379,6 +388,14 @@ function makeSocketError(cb, err) {
 }
 // const insertParams: Array<keyof InsertRule> = ["fields", "forcedData", "returningFields", "validate"];
 const RULE_TO_METHODS = [
+    {
+        rule: "getColumns",
+        methods: ["getColumns"],
+        no_limits: {},
+        table_only: false,
+        allowed_params: [],
+        hint: `  `
+    },
     {
         rule: "insert",
         methods: ["insert", "upsert"],
@@ -501,10 +518,13 @@ class PublishParser {
                                 else {
                                     methods = methods.filter(m => m !== "upsert");
                                 }
+                                /* Add implied methods unless specifically disabled */
                                 if (methods.includes("find") && table_rules.count !== false)
                                     methods = [...methods, "count"];
                                 if (methods.includes("find") && table_rules.subscribe !== false)
                                     methods = [...methods, "subscribe"];
+                                if (methods.includes("getColumns") && table_rules.getColumns !== false)
+                                    methods = [...methods, "getColumns"];
                             }
                             yield Promise.all(methods.map((method) => __awaiter(this, void 0, void 0, function* () {
                                 if (method === "sync" && table_rules[method]) {

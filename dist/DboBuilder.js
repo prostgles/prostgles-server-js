@@ -37,7 +37,9 @@ function makeErr(err, localParams) {
     // console.error(err)
     return Promise.reject(Object.assign(Object.assign(Object.assign({}, ((!localParams || !localParams.socket) ? err : {})), PubSubManager_1.filterObj(err, ["column", "code", "table", "constraint"])), { code_info: sqlErrCodeToMsg(err.code) }));
 }
+const EXISTS_KEYS = ["$exists", "$notExists", "$existsJoined", "$notExistsJoined"];
 function parseError(e) {
+    // console.error(e)
     return Object.keys(e || {}).length ? e : e.toString ? ("INTERNAL ERROR: " + e.toString()) : e;
 }
 class ViewHandler {
@@ -71,6 +73,7 @@ class ViewHandler {
         this.filterDef = ` ${this.tsDataName}_Filter `;
         const filterDef = this.filterDef;
         this.tsDboDefs = [
+            `   getColumns: () => Promise<any[]>;`,
             `   find: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<${this.tsDataName}[] | any[]>;`,
             `   findOne: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<${this.tsDataName} | any>;`,
             `   subscribe: (filter: ${filterDef}, params: SelectParams, onData: (items: ${this.tsDataName}[]) => any) => Promise<{ unsubscribe: () => any }>;`,
@@ -770,77 +773,82 @@ class ViewHandler {
             return "";
         });
     }
-    prepareExistCondition(filter, localParams, notJoined = false, exactPath) {
+    prepareExistCondition(eConfig, localParams) {
         return __awaiter(this, void 0, void 0, function* () {
             let res = "";
-            const t1 = this.name;
-            return (yield Promise.all(Object.keys(filter).map((_t2) => __awaiter(this, void 0, void 0, function* () {
-                let t2 = _t2;
-                let paths;
-                let tablesToCheck = [t2];
-                if (exactPath) {
-                    paths = exactPath;
-                    tablesToCheck = paths;
-                    t2 = paths[paths.length - 1];
-                }
-                // console.log(filter, exactPath, tablesToCheck)
-                tablesToCheck.forEach(t => {
-                    if (!this.dboBuilder.dbo[t])
-                        throw "Invalid or dissallowed table: " + t;
+            const thisTable = this.name;
+            let { f2, tables, isJoined } = eConfig;
+            let t2 = tables[tables.length - 1];
+            tables.forEach(t => {
+                if (!this.dboBuilder.dbo[t])
+                    throw "Invalid or dissallowed table: " + t;
+            });
+            /* Nested $exists not allowed */
+            if (f2 && Object.keys(f2).find(fk => EXISTS_KEYS.includes(fk))) {
+                throw "Nested exists dissallowed";
+            }
+            const makeTableChain = (finalFilter) => {
+                let joinPaths = [];
+                tables.map((t2, depth) => {
+                    let t1 = depth ? tables[depth - 1] : thisTable;
+                    let exactPaths = [t1, t2];
+                    if (!depth && eConfig.shortestJoin)
+                        exactPaths = undefined;
+                    joinPaths = joinPaths.concat(this.getJoins(t1, t2, exactPaths));
                 });
-                const f2 = exactPath ? filter : filter[_t2];
-                /* Nested $exists not allowed */
-                if (f2 && Object.keys(f2).includes("$exists")) {
-                    throw "Nested exists dissallowed";
-                }
-                const makeTableChain = (paths, depth = 0, finalFilter = "") => {
-                    const join = paths[depth], table = join.table;
-                    const prevTable = depth === 0 ? join.source : paths[depth - 1].table;
-                    let cond = `${join.on.map(([c1, c2]) => `${exports.asName(prevTable)}.${exports.asName(c1)} = ${exports.asName(table)}.${exports.asName(c2)}`).join("\n AND ")}`;
+                let r = makeJoin(joinPaths, 0);
+                // console.log(r);
+                return r;
+                function makeJoin(paths, ji) {
+                    const jp = paths[ji];
+                    let prevTable = ji ? paths[ji - 1].table : jp.source;
+                    let table = paths[ji].table;
+                    let tableAlias = exports.asName(ji < paths.length - 1 ? `jd${ji}` : table);
+                    let prevTableAlias = exports.asName(ji ? `jd${ji - 1}` : thisTable);
+                    let cond = `${jp.on.map(([c1, c2]) => `${prevTableAlias}.${exports.asName(c1)} = ${tableAlias}.${exports.asName(c2)}`).join("\n AND ")}`;
                     // console.log(join, cond);
                     let j = `SELECT 1 \n` +
-                        `FROM ${exports.asName(table)} \n` +
+                        `FROM ${exports.asName(table)} ${tableAlias} \n` +
                         `WHERE ${cond} \n`; //
-                    if (depth === paths.length - 1 && finalFilter) {
+                    if (ji === paths.length - 1 &&
+                        finalFilter) {
                         j += `AND ${finalFilter} \n`;
                     }
                     const indent = (a, b) => a;
-                    if (depth < paths.length - 1) {
-                        j += `AND ${makeTableChain(paths, depth + 1, finalFilter)} \n`;
+                    if (ji < paths.length - 1) {
+                        j += `AND ${makeJoin(paths, ji + 1)} \n`;
                     }
-                    j = indent(j, depth + 1);
+                    j = indent(j, ji + 1);
                     let res = `EXISTS ( \n` +
                         j +
                         `) \n`;
-                    return indent(res, depth);
-                };
-                let t2Rules = undefined, forcedFilter, filterFields, tableAlias;
-                if (localParams && localParams.socket && this.dboBuilder.publishParser) {
-                    /* Need to think about joining through dissallowed tables */
-                    t2Rules = yield this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: t2, command: "find", socket: localParams.socket });
-                    if (!t2Rules || !t2Rules.select)
-                        throw "Dissallowed";
-                    ({ forcedFilter, filterFields } = t2Rules.select);
+                    return indent(res, ji);
                 }
-                let finalWhere;
-                try {
-                    finalWhere = yield this.dboBuilder.dbo[t2].prepareWhere(f2, forcedFilter, filterFields, true, tableAlias);
-                }
-                catch (err) {
-                    throw "Issue with preparing $exists query for table " + t2 + "\n->" + JSON.stringify(err);
-                }
-                // console.log(f2, finalWhere);
-                if (notJoined) {
-                    res = ` EXISTS (SELECT 1 \nFROM ${exports.asName(t2)} \n${finalWhere ? `WHERE ${finalWhere}` : ""}) `;
-                }
-                else {
-                    let _paths;
-                    if (paths)
-                        _paths = [t1, ...paths];
-                    res = makeTableChain(this.getJoins(t1, t2, _paths), 0, finalWhere);
-                }
-                return res;
-            })))).join(" AND \n");
+            };
+            let t2Rules = undefined, forcedFilter, filterFields, tableAlias;
+            /* Check if allowed to view data */
+            if (localParams && localParams.socket && this.dboBuilder.publishParser) {
+                /* Need to think about joining through dissallowed tables */
+                t2Rules = yield this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: t2, command: "find", socket: localParams.socket });
+                if (!t2Rules || !t2Rules.select)
+                    throw "Dissallowed";
+                ({ forcedFilter, filterFields } = t2Rules.select);
+            }
+            let finalWhere;
+            try {
+                finalWhere = yield this.dboBuilder.dbo[t2].prepareWhere(f2, forcedFilter, filterFields, true, tableAlias);
+            }
+            catch (err) {
+                throw "Issue with preparing $exists query for table " + t2 + "\n->" + JSON.stringify(err);
+            }
+            // console.log(f2, finalWhere);
+            if (!isJoined) {
+                res = ` EXISTS (SELECT 1 \nFROM ${exports.asName(t2)} \n${finalWhere ? `WHERE ${finalWhere}` : ""}) `;
+            }
+            else {
+                res = makeTableChain(finalWhere);
+            }
+            return res;
         });
     }
     /* NEW API !!! :) */
@@ -904,27 +912,49 @@ class ViewHandler {
             ];
             let data = Object.assign({}, filter);
             /* Exists join filter */
-            const EXISTS_KEYS = ["$exists", "$joinsTo"];
-            let existsKeys = Object.keys(data).filter(k => EXISTS_KEYS.includes(k)).map(key => ({
-                key,
-                notJoined: key === "$exists",
-                exactPaths: undefined
-            }));
-            let exactPaths;
-            /* Exists with exact path */
-            Object.keys(data).map(k => {
-                let isthis = isPlainObject(data[k]) && !this.column_names.includes(k) && !k.split(".").find(kt => !this.dboBuilder.dbo[kt]);
-                if (isthis) {
-                    existsKeys.push({
-                        key: k,
-                        notJoined: false,
-                        exactPaths: k.split(".")
-                    });
+            const ERR = "Invalid exists filter. \nExpecting somethibng like: { $exists: { tableName.tableName2: Filter } } | { $exists: { \"**.tableName3\": Filter } }";
+            const SP_WILDCARD = "**";
+            let existsKeys = Object.keys(data)
+                .filter(k => EXISTS_KEYS.includes(k) && Object.keys(data[k] || {}).length)
+                .map(key => {
+                const isJoined = EXISTS_KEYS.slice(-2).includes(key);
+                let firstKey = Object.keys(data[key])[0], tables = firstKey.split("."), f2 = data[key][firstKey], shortestJoin = false;
+                if (!isJoined) {
+                    if (tables.length !== 1)
+                        throw "Expecting single table in exists filter. Example: { $exists: { tableName: Filter } }";
                 }
+                else {
+                    /* First part can be the ** param meaning shortest join */
+                    if (!tables.length)
+                        throw ERR + "\nBut got: " + data[key];
+                    if (tables[0] === SP_WILDCARD) {
+                        tables = tables.slice(1);
+                        shortestJoin = true;
+                    }
+                }
+                return {
+                    key,
+                    existType: key,
+                    isJoined,
+                    shortestJoin,
+                    f2,
+                    tables
+                };
             });
+            /* Exists with exact path */
+            // Object.keys(data).map(k => {
+            //     let isthis = isPlainObject(data[k]) && !this.column_names.includes(k) && !k.split(".").find(kt => !this.dboBuilder.dbo[kt]);
+            //     if(isthis) {
+            //         existsKeys.push({
+            //             key: k,
+            //             notJoined: false,
+            //             exactPaths: k.split(".")
+            //         });
+            //     }
+            // });
             let existsCond = "";
             if (existsKeys.length) {
-                existsCond = (yield Promise.all(existsKeys.map((k) => __awaiter(this, void 0, void 0, function* () { return yield this.prepareExistCondition(data[k.key], localParams, k.notJoined, k.exactPaths); })))).join(" AND ");
+                existsCond = (yield Promise.all(existsKeys.map((k) => __awaiter(this, void 0, void 0, function* () { return yield this.prepareExistCondition(k, localParams); })))).join(" AND ");
             }
             let filterKeys = Object.keys(data).filter(k => !existsKeys.find(ek => ek.key === k));
             if (allowed_colnames) {
@@ -1583,11 +1613,20 @@ class DboBuilder {
         // this.joins = this.prostgles.joins;
         this.pubSubManager = new PubSubManager_1.PubSubManager(this.db, this.dbo);
     }
+    getJoins() {
+        return this.joins;
+    }
+    getJoinPaths() {
+        return this.joinPaths;
+    }
     parseJoins() {
         return __awaiter(this, void 0, void 0, function* () {
             if (this.prostgles.joins) {
-                let joins = yield this.prostgles.joins;
-                joins = JSON.parse(JSON.stringify(joins));
+                let _joins = yield this.prostgles.joins;
+                if (typeof _joins === "string" && _joins === "inferred") {
+                    _joins = yield getInferredJoins(this.db, this.prostgles.schema);
+                }
+                let joins = JSON.parse(JSON.stringify(_joins));
                 this.joins = joins;
                 // console.log(joins);
                 // Validate joins
@@ -1673,7 +1712,8 @@ class DboBuilder {
 export type Filter = object | {} | undefined;
 export type GroupFilter = { $and: Filter } | { $or: Filter };
 export type FieldFilter = object | string[] | "*" | "";
-export type OrderBy = { key: string, asc: boolean }[] | { [key: string]: boolean }[] | string | string[];
+export type AscOrDesc = 1 | -1 | boolean;
+export type OrderBy = { key: string, asc: AscOrDesc }[] | { [key: string]: AscOrDesc }[] | { [key: string]: AscOrDesc } | string | string[];
         
 export type SelectParams = {
     select?: FieldFilter;
@@ -1786,19 +1826,26 @@ exports.DboBuilder = DboBuilder;
 /* UTILS */
 function getTablesForSchemaPostgresSQL(db, schema) {
     const query = " \
-    SELECT t.table_schema as schema, t.table_name as name,json_agg((SELECT x FROM (SELECT c.column_name as name, c.data_type, c.udt_name, c.element_type) as x)) as columns  \
-    , CASE WHEN t.table_type = 'VIEW' THEN true ELSE false END as is_view \
+    SELECT t.table_schema as schema, t.table_name as name \
+    , json_agg((SELECT x FROM (SELECT cc.column_name as name, cc.data_type, cc.udt_name, cc.element_type, cc.is_pkey) as x)) as columns  \
+    , t.table_type = 'VIEW' as is_view \
     , array_to_json(vr.table_names) as parent_tables \
     FROM information_schema.tables t  \
     INNER join (  \
-        SELECT c.table_schema, c.table_name, c.column_name, c.data_type, c.udt_name, e.data_type as element_type  \
+        SELECT c.table_schema, c.table_name, c.column_name, c.data_type, c.udt_name, e.data_type as element_type,  \
+        EXISTS ( \
+            SELECT 1    \
+            from information_schema.table_constraints as tc \
+            JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema  \
+            WHERE kcu.table_schema = c.table_schema AND kcu.table_name = c.table_name AND kcu.column_name = c.column_name AND tc.constraint_type IN ('PRIMARY KEY') \
+        ) as is_pkey    \
         FROM information_schema.columns c    \
         LEFT JOIN (SELECT * FROM information_schema.element_types )   e  \
              ON ((c.table_catalog, c.table_schema, c.table_name, 'TABLE', c.dtd_identifier)  \
               = (e.object_catalog, e.object_schema, e.object_name, e.object_type, e.collection_type_identifier))  \
-    ) c  \
-    ON t.table_name = c.table_name  \
-    AND t.table_schema = c.table_schema  \
+    ) cc  \
+    ON t.table_name = cc.table_name  \
+    AND t.table_schema = cc.table_schema  \
     LEFT JOIN ( \
         SELECT cl_r.relname as view_name, array_agg(DISTINCT cl_d.relname) AS table_names \
         FROM pg_rewrite AS r \
@@ -2138,5 +2185,52 @@ function sqlErrCodeToMsg(code) {
       https://www.postgresql.org/docs/13/errcodes-appendix.html
       JSON.stringify([...THE_table_$0.rows].map(t => [...t.children].map(u => u.innerText)).filter((d, i) => i && d.length > 1).reduce((a, v)=>({ ...a, [v[0]]: v[1] }), {}))
     */
+}
+function getInferredJoins(db, schema = "public") {
+    return __awaiter(this, void 0, void 0, function* () {
+        let joins = [];
+        let res = yield db.any(`SELECT
+            tc.table_schema, 
+            tc.constraint_name, 
+            tc.table_name, 
+            kcu.column_name, 
+            ccu.table_schema AS foreign_table_schema,
+            ccu.table_name AS foreign_table_name,
+            ccu.column_name AS foreign_column_name,
+            tc.constraint_type IN ('UNIQUE', 'PRIMARY KEY') as foreign_is_unique
+        FROM 
+            information_schema.table_constraints AS tc 
+            JOIN information_schema.key_column_usage AS kcu
+            ON tc.constraint_name = kcu.constraint_name
+            AND tc.table_schema = kcu.table_schema
+            JOIN information_schema.constraint_column_usage AS ccu
+            ON ccu.constraint_name = tc.constraint_name
+            AND ccu.table_schema = tc.table_schema
+        WHERE tc.table_schema=` + "${schema}" + ` AND tc.constraint_type = 'FOREIGN KEY' `, { schema });
+        res.map((d) => {
+            let eIdx = joins.findIndex(j => j.tables.includes(d.table_name) && j.tables.includes(d.foreign_table_name));
+            let existing = joins[eIdx];
+            if (existing) {
+                if (existing.tables[0] === d.table_name) {
+                    existing.on = Object.assign(Object.assign({}, existing.on), { [d.column_name]: d.foreign_column_name });
+                }
+                else {
+                    existing.on = Object.assign(Object.assign({}, existing.on), { [d.foreign_column_name]: d.column_name });
+                }
+                joins[eIdx] = existing;
+            }
+            else {
+                joins.push({
+                    tables: [d.table_name, d.foreign_table_name],
+                    on: {
+                        [d.column_name]: d.foreign_column_name
+                    },
+                    type: "many-many"
+                });
+            }
+        });
+        // console.log(joins);
+        return joins;
+    });
 }
 //# sourceMappingURL=DboBuilder.js.map

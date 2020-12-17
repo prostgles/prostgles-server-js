@@ -25,7 +25,12 @@ index_1.default({
     transactions: true,
     // DEBUG_MODE: true,
     publish: (socket, dbo) => {
-        return "*";
+        return {
+            items: {
+                select: "*",
+                getColumns: false
+            }
+        };
         return {
             items: {
                 select: {
@@ -37,6 +42,7 @@ index_1.default({
             }
         };
     },
+    // joins: "inferred",
     joins: [
         {
             tables: ["items", "items2"],
@@ -72,8 +78,9 @@ index_1.default({
             // return;
             /* Exists filter example */
             await dbo.items.insert([{ name: "a" }, { name: "a" }, { name: "b" }]);
-            await dbo.items2.insert([{ name: "a" }]);
+            await dbo.items2.insert([{ name: "a", items_id: 1 }]);
             await dbo.items3.insert([{ name: "a" }]);
+            // return;
             const expect0 = await dbo.items.count({
                 $and: [
                     { $exists: { items2: { name: "a" } } },
@@ -85,22 +92,22 @@ index_1.default({
             /* joinsTo filter example */
             const expect2 = await dbo.items.find({
                 $and: [
-                    { $joinsTo: { items3: { name: "a" } } },
-                    { $joinsTo: { items2: { name: "a" } } }
+                    { $existsJoined: { "**.items3": { name: "a" } } },
+                    { $existsJoined: { items2: { name: "a" } } }
                 ]
             });
             if (expect2.length !== 2)
-                throw "$joinsTo query failed";
-            /* joinsTo with exact path filter example */
+                throw "$exists query failed";
+            /* exists with exact path filter example */
             const _expect2 = await dbo.items.find({
                 $and: [
-                    { "items2": { name: "a" } },
-                    { "items2.items3": { name: "a" } },
-                    { $joinsTo: { items2: { name: "a" } } }
+                    // { "items2": { name: "a" } },
+                    // { "items2.items3": { name: "a" } },
+                    { $existsJoined: { items2: { name: "a" } } }
                 ]
             });
             if (_expect2.length !== 2)
-                throw "$joinsTo query failed";
+                throw "$wxists query failed";
             /* Transaction example */
             await dbo.tx(async (t) => {
                 await t.items.insert({ name: "tx" });
@@ -120,6 +127,9 @@ index_1.default({
                     max_id: { $max: "id" },
                     total: { $count: ["id"] },
                     distinct_names: { $countDistinct: ["name"] },
+                },
+                orderBy: {
+                    max_id: -1
                 }
             });
             const { id, total, distinct_names, max_id } = aggs;

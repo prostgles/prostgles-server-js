@@ -1,13 +1,19 @@
+
+
+
 DROP TABLE IF EXISTS items CASCADE;
 CREATE TABLE IF NOT EXISTS items (
 	id	SERIAL PRIMARY KEY,
+	-- id1 SERIAL,
 	h		TEXT[],
 	name	TEXT
+	-- PRIMARY KEY(id, id1)
 );
 
 DROP TABLE IF EXISTS items2 CASCADE;
 CREATE TABLE IF NOT EXISTS items2 (
 	id	SERIAL PRIMARY KEY,
+	items_id	INTEGER REFERENCES items(id),
 	hh		TEXT[],
 	name	TEXT
 );
@@ -18,10 +24,9 @@ CREATE TABLE IF NOT EXISTS items3 (
 	h		TEXT[],
 	name	TEXT
 );
-CREATE INDEX IF NOT EXISTS idx3 ON items(name);
-CREATE INDEX IF NOT EXISTS idx3 ON items2(name);
+CREATE INDEX IF NOT EXISTS idx1 ON items(name);
+CREATE INDEX IF NOT EXISTS idx2 ON items2(name);
 CREATE INDEX IF NOT EXISTS idx3 ON items3(name);
-
 
 /*
 

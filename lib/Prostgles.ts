@@ -6,8 +6,9 @@
 import * as promise from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import { strict } from "assert";
-'use strict';
+
+const pkgj = require('../package.json');
+const version = pkgj.version;
 
 import { get } from "./utils";
 import { DboBuilder, DbHandler, DbHandlerTX, TableHandler, ViewHandler } from "./DboBuilder";
@@ -220,6 +221,7 @@ export type PublishTableRule = {
 };
 export type PublishViewRule = {
     select: SelectRule | "*" | false | null;
+    getColumns: boolean;
 };
 // export type Publish = {
 //     tablesOrViews: {[key:string]: TableRule | ViewRule | "*" }
@@ -236,7 +238,7 @@ export type Join = {
     on: { [key: string]: string };
     type: typeof JOIN_TYPES[number];
 };
-export type Joins = Join[];
+export type Joins = Join[] | "inferred";
 
 export type publishMethods = (socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB, user?: any) => { [key:string]: Method } | Promise<{ [key:string]: Method }>;
 
@@ -253,17 +255,17 @@ export type Auth = {
 export type ProstglesInitOptions = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
-    publishMethods?: publishMethods,
     tsGeneratedTypesDir?: string;
-    io?: any,
-    publish?: Publish,
-    joins?: Joins,
+    io?: any;
+    publish?: Publish;
+    publishMethods?: publishMethods;
+    publishRawSQL?(socket: Socket, dbo: any, db?: DB): any;
+    joins?: Joins;
     schema?: string;
     sqlFilePath?: string;
     onReady(dbo: any, db: DB): void;
     // auth, 
     transactions?: string | boolean;
-    publishRawSQL?(socket: Socket, dbo: any, db?: DB): any;
     wsChannelNamePrefix?: string;
     onSocketConnect?(socket: Socket, dbo: any, db?: DB);
     onSocketDisconnect?(socket: Socket, dbo: any, db?: DB);
@@ -665,18 +667,29 @@ export class Prostgles {
                     }
                 }
                 const methods = await publishParser.getMethods(socket);
-                let joinTables = [];
+                // let joinTables = [];
+                let joinTables2 = [];
                 if(this.joins){
-                    joinTables = Array.from(new Set(flat(this.joins.map(j => j.tables)).filter(t => schema[t])));
+                    // joinTables = Array.from(new Set(flat(this.dboBuilder.getJoins().map(j => j.tables)).filter(t => schema[t])));
+                    let _joinTables2 = this.dboBuilder.getJoinPaths()
+                    .filter(jp => 
+                        ![jp.t1, jp.t2].find(t => !schema[t] || !schema[t].findOne)
+                    ).map(jp => [jp.t1, jp.t2].sort());
+                    _joinTables2.map(jt => {
+                        if(!joinTables2.find(_jt => _jt.join() === jt.join())){
+                            joinTables2.push(jt);
+                        }
+                    });
                 }
-                
+                // console.log(joinTables2)
                 socket.emit(WS_CHANNEL_NAME.SCHEMA, {
                     schema, 
                     methods: Object.keys(methods), 
                     ...(fullSchema? { fullSchema } : {}),
                     rawSQL,
-                    joinTables,
+                    joinTables: joinTables2,
                     auth,
+                    version,
                     err: publishValidationError
                 });
 
@@ -724,6 +737,14 @@ type DboTableCommand = Request & DboTable & {
 // const insertParams: Array<keyof InsertRule> = ["fields", "forcedData", "returningFields", "validate"];
 
 const RULE_TO_METHODS = [
+    { 
+        rule: "getColumns",
+        methods: ["getColumns"], 
+        no_limits: {}, 
+        table_only: false,
+        allowed_params: [],
+        hint: `  `
+    },
    { 
        rule: "insert",
        methods: ["insert", "upsert"], 
@@ -860,8 +881,10 @@ export class PublishParser {
                                 } else {
                                     methods = methods.filter(m => m !== "upsert");
                                 }
+                                /* Add implied methods unless specifically disabled */
                                 if(methods.includes("find") && table_rules.count !== false) methods = [ ...methods, "count"];
                                 if(methods.includes("find") && table_rules.subscribe !== false) methods = [ ...methods, "subscribe" ];
+                                if(methods.includes("getColumns") && table_rules.getColumns !== false) methods = [ ...methods, "getColumns"];
                             }
                             
                             await Promise.all(methods.map(async method => {

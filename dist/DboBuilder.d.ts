@@ -4,7 +4,7 @@ declare global {
     }
 }
 import * as pgPromise from 'pg-promise';
-import { DB, TableRule, OrderBy, SelectParams, InsertParams, UpdateParams, DeleteParams, Joins, Prostgles, PublishParser } from "./Prostgles";
+import { DB, TableRule, OrderBy, SelectParams, InsertParams, UpdateParams, DeleteParams, Join, Prostgles, PublishParser } from "./Prostgles";
 import { PubSubManager } from "./PubSubManager";
 export declare const asName: (str: string) => string;
 /**
@@ -32,6 +32,7 @@ declare type ColumnInfo = {
     data_type: string;
     udt_name: string;
     element_type: string;
+    is_pkey: boolean;
 };
 declare type LocalParams = {
     socket?: any;
@@ -80,6 +81,15 @@ declare type JoinPaths = {
     path: string[];
 }[];
 import { Graph } from "./shortestPath";
+declare const EXISTS_KEYS: string[];
+export declare type ExistsFilterConfig = {
+    key: string;
+    f2: Filter;
+    existType: typeof EXISTS_KEYS[number];
+    tables: string[];
+    isJoined: boolean;
+    shortestJoin: boolean;
+};
 export declare class ViewHandler {
     db: DB;
     name: string;
@@ -92,7 +102,7 @@ export declare class ViewHandler {
     tsDboDefs: string[];
     tsDboDef: string;
     tsDboName: string;
-    joins: Joins;
+    joins: Join[];
     joinGraph: Graph;
     joinPaths: JoinPaths;
     dboBuilder: DboBuilder;
@@ -117,14 +127,13 @@ export declare class ViewHandler {
     checkFilter(filter: any): void;
     prepareValidatedQuery(filter: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams, validatedAggAliases?: string[]): Promise<Query>;
     getColumns(tableRules?: TableRule, localParams?: LocalParams): Promise<{
-        insert: boolean;
-        select: boolean;
-        update: boolean;
-        delete: boolean;
         name: string;
         data_type: string;
-        udt_name: string;
-        element_type: string;
+        select: boolean;
+        insert: boolean;
+        update: boolean;
+        delete: boolean;
+        is_pkey: boolean;
     }[]>;
     find(filter: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<object[]>;
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: any, table_rules?: TableRule, localParams?: LocalParams): Promise<object>;
@@ -143,7 +152,7 @@ export declare class ViewHandler {
     prepareSelect(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, tableAlias?: string): string;
     private getFinalFilterObj;
     prepareWhere(filter: Filter, forcedFilter: object, filterFields: FieldFilter, excludeWhere?: boolean, tableAlias?: string): Promise<string>;
-    prepareExistCondition(filter: object, localParams: LocalParams, notJoined?: boolean, exactPath?: string[]): Promise<string>;
+    prepareExistCondition(eConfig: ExistsFilterConfig, localParams: LocalParams): Promise<string>;
     getCondition(filter: object, allowed_colnames: string[], tableAlias?: string, localParams?: LocalParams): Promise<any>;
     prepareSort(orderBy: OrderBy, allowed_cols: any, tableAlias?: string, excludeOrder?: boolean, validatedAggAliases?: string[]): string;
     prepareLimitQuery(limit: number, maxLimit: number): number;
@@ -232,12 +241,14 @@ export declare class DboBuilder {
     pojoDefinitions: string[];
     dboDefinition: string;
     tsTypesDefinition: string;
-    joins: Joins;
+    joins: Join[];
     joinGraph: Graph;
     joinPaths: JoinPaths;
     prostgles: Prostgles;
     publishParser: PublishParser;
     constructor(prostgles: Prostgles);
+    getJoins(): Join[];
+    getJoinPaths(): JoinPaths;
     parseJoins(): Promise<JoinPaths>;
     buildJoinPaths(): void;
     init(): Promise<DbHandler | DbHandlerTX>;

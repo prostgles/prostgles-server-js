@@ -16,6 +16,8 @@
 					db.items.subscribe({}, {}, items => {
 						document.body.innerText = JSON.stringify(items);
 					});
+					// console.log(await db.items.findOne())
+					// console.log(await db.items.getColumns())
 					window.db = db;
 					window.dbo = db;
 				}
