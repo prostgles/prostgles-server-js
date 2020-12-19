@@ -54,8 +54,13 @@ declare type Filter = object | {
 } | {
     $or: Filter[];
 } | {};
+declare type SelectFunc = {
+    alias: string;
+    getQuery: (alias: string, tableAlias?: string) => string;
+};
 declare type Query = {
     select: string[];
+    selectFuncs: SelectFunc[];
     allFields: string[];
     aggs?: Aggregation[];
     table: string;
@@ -112,6 +117,8 @@ export declare class ViewHandler {
     pubSubManager: PubSubManager;
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, joinPaths?: JoinPaths);
     makeDef(): void;
+    getSelectFunctions(select: any): void;
+    getRowHashSelect(tableRules: TableRule, alias?: string, tableAlias?: string): string;
     getFullDef(): any[];
     validateViewRules(fields: FieldFilter, filterFields: FieldFilter, returningFields: FieldFilter, forcedFilter: object, rule: string): Promise<boolean>;
     getShortestJoin(table1: string, table2: string, startAlias: number, isInner?: boolean): {
@@ -151,9 +158,9 @@ export declare class ViewHandler {
     prepareColumnSet(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, onlyNames?: boolean): string | pgPromise.ColumnSet;
     prepareSelect(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, tableAlias?: string): string;
     private getFinalFilterObj;
-    prepareWhere(filter: Filter, forcedFilter: object, filterFields: FieldFilter, excludeWhere?: boolean, tableAlias?: string): Promise<string>;
-    prepareExistCondition(eConfig: ExistsFilterConfig, localParams: LocalParams): Promise<string>;
-    getCondition(filter: object, allowed_colnames: string[], tableAlias?: string, localParams?: LocalParams): Promise<any>;
+    prepareWhere(filter: Filter, forcedFilter: object, filterFields: FieldFilter, excludeWhere: boolean, tableAlias: string, localParams: LocalParams, tableRule: TableRule): Promise<string>;
+    prepareExistCondition(eConfig: ExistsFilterConfig, localParams: LocalParams, tableRules: TableRule): Promise<string>;
+    getCondition(filter: object, allowed_colnames: string[], tableAlias?: string, localParams?: LocalParams, tableRules?: TableRule): Promise<any>;
     prepareSort(orderBy: OrderBy, allowed_cols: any, tableAlias?: string, excludeOrder?: boolean, validatedAggAliases?: string[]): string;
     prepareLimitQuery(limit: number, maxLimit: number): number;
     prepareOffsetQuery(offset: number): number;

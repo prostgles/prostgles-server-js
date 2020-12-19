@@ -500,7 +500,7 @@ class PublishParser {
                     yield Promise.all(tableNames
                         .map((tableName) => __awaiter(this, void 0, void 0, function* () {
                         if (!this.dbo[tableName])
-                            throw `Table ${tableName} does not exist\nExpecting one of: ${Object.keys(this.dbo).join(", ")}`;
+                            throw `Table ${tableName} does not exist\nExpecting one of: ${this.prostgles.dboBuilder.tablesOrViews.map(tov => tov.name).join(", ")}`;
                         const table_rules = yield this.getTableRules({ socket, tableName }, user);
                         if (table_rules && Object.keys(table_rules).length) {
                             schema[tableName] = {};

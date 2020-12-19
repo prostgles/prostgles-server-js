@@ -101,8 +101,14 @@ export type Aggregation = {
 
 type Filter = object | { $and: Filter[] } | { $or: Filter[] } | {};
 
+type SelectFunc = {
+    alias: string;
+    getQuery: (alias: string, tableAlias?: string) => string;
+}
+
 type Query = {
     select: string[];
+    selectFuncs: SelectFunc[];
     allFields: string[];
     aggs?: Aggregation[];
     table: string;
@@ -227,6 +233,27 @@ export class ViewHandler {
     makeDef(){
         this.tsDboName = `DBO_${this.name}`;
         this.tsDboDef = `export type ${this.tsDboName} = {\n ${this.tsDboDefs.join("\n")} \n};\n`;
+    }
+
+    getSelectFunctions(select: any){
+        if(select){
+            if(select.$rowhash){
+                
+            }
+        }
+    }
+
+    getRowHashSelect(tableRules: TableRule, alias?: string, tableAlias?: string): string {
+        let allowed_cols = this.column_names;
+        if(tableRules) allowed_cols = this.parseFieldFilter(get(tableRules, "select.fields"));
+        return "md5(" +
+            allowed_cols
+                .concat(["ctid"])
+                .sort()
+                .map(f => (tableAlias? (asName(tableAlias) + ".") : "") + asName(f))
+                .map(f => `md5(coalesce(${f}::text, 'dd'))`)
+                .join(" || ") + 
+        `)` + (alias? ` as ${asName(alias)}` : "");
     }
 
     getFullDef(){
@@ -433,7 +460,7 @@ export class ViewHandler {
                     /* Rename aggs to avoid collision with join cols */
                     select = q.select.concat(q.aggs.map(a => !depth? a.query : a.getQuery(`agg_${a.alias}`)));
                     if(q.select.length){
-                        groupBy = `GROUP BY ${groupByFields.join(", ")}\n`;
+                        groupBy = `GROUP BY ${groupByFields.concat((q.selectFuncs || []).map(sf => asName(sf.alias))).join(", ")}\n`;
                     }
                 }
                 
@@ -446,10 +473,10 @@ export class ViewHandler {
                 // if(groupBy) res += `${groupBy}\n`;
                 // if(q.orderBy) res+= `${q.orderBy}\n`;
                 // if(!depth) res += `LIMIT ${q.limit} \nOFFSET ${q.offset || 0}\n`;
-
+                // console.log(select, q.selectFuncs)
                 let fres = indJ(depth, [
                     `-- 0. or 5. [leaf query] `
-                ,   `SELECT ` + select.join(", ")
+                ,   `SELECT ` + select.concat((q.selectFuncs || []).map(sf => sf.getQuery("$rowhash"))).join(", ")
                 ,   `FROM ${asName(q.table)} `
                 ,   q.where
                 ,   groupBy
@@ -463,6 +490,8 @@ export class ViewHandler {
                 // if(q.aggs && q.aggs && q.aggs.length) throw "Cannot join an aggregate";
                 if(q.aggs && q.aggs.length && joins.find(j => j.aggs && j.aggs.length)) throw "Cannot join two aggregates";
             }
+
+            if(q.selectFuncs.length) throw "Functions within select not allowed in joins yet. -> " + q.selectFuncs.map(s => s.alias).join(", ");
             
             const rootSelect = [
                 " "
@@ -762,14 +791,25 @@ export class ViewHandler {
             // if(select_rules.validate){
 
             // }
+            let selectFuncs = [],
+                preparedSelect: string[] = [];
+            if(select && (select as any).$rowhash){
+                delete (select as any).$rowhash;
+                preparedSelect = this.prepareSelect(select, fields, null, tableAlias).split(",");
+                selectFuncs.push({
+                    alias: "$rowhash",
+                    getQuery: (alias: string, tableAlias?: string) => this.getRowHashSelect(tableRules, alias, tableAlias)
+                });
+            }
             
             return {
                 isLeftJoin: true,
                 table: this.name,
                 allFields: this.column_names.map(asName),
                 orderBy: [this.prepareSort(orderBy, fields, tableAlias, null, validatedAggAliases)],
-                select: this.prepareSelect(select, fields, null, tableAlias).split(","),
-                where: await this.prepareWhere(filter, forcedFilter, filterFields, null, tableAlias),
+                select: preparedSelect,
+                selectFuncs,
+                where: await this.prepareWhere(filter, forcedFilter, filterFields, null, tableAlias, localParams, tableRules),
                 limit: this.prepareLimitQuery(limit, maxLimit),
                 offset: this.prepareOffsetQuery(offset)
             };
@@ -886,7 +926,7 @@ export class ViewHandler {
             .then(async allowed => {
                 const { filterFields, forcedFilter } = get(table_rules, "select") || {};
                 
-                let query = "SELECT COUNT(*) FROM ${_psqlWS_tableName:name} " + await this.prepareWhere(filter, forcedFilter, filterFields, false);
+                let query = "SELECT COUNT(*) FROM ${_psqlWS_tableName:name} " + await this.prepareWhere(filter, forcedFilter, filterFields, false, null, localParams, table_rules);
                 return (this.t || this.db).one(query, { _psqlWS_tableName: this.name }).then(({ count }) => + count);
             });
         } catch(e){
@@ -901,7 +941,7 @@ export class ViewHandler {
             if(!localParams && !localFunc) throw " missing data. provide -> localFunc | localParams { socket } "; 
 
             const { filterFields, forcedFilter } = get(table_rules, "select") || {},
-                condition = await this.prepareWhere(filter, forcedFilter, filterFields, true);
+                condition = await this.prepareWhere(filter, forcedFilter, filterFields, true, null, localParams, table_rules);
             
             if(!localFunc) {
                 return await this.find(filter, { ...params, limit: 0 }, null, table_rules, localParams)
@@ -999,7 +1039,7 @@ export class ViewHandler {
         return _filter;
     }
 
-    async prepareWhere(filter: Filter, forcedFilter: object, filterFields: FieldFilter, excludeWhere = false, tableAlias?: string){
+    async prepareWhere(filter: Filter, forcedFilter: object, filterFields: FieldFilter, excludeWhere = false, tableAlias: string = null, localParams: LocalParams, tableRule: TableRule){
         const parseFilter = async (f: any, parentFilter: any = null) => {
             let result = "";
             let keys = Object.keys(f);
@@ -1020,7 +1060,7 @@ export class ViewHandler {
                     else return ` ( ${conditions.sort().join(operand)} ) `;
                 }       
             } else if(!group) {
-                result = await this.getCondition({ ...f }, this.parseFieldFilter(filterFields), tableAlias);
+                result = await this.getCondition({ ...f }, this.parseFieldFilter(filterFields), tableAlias, localParams, tableRule);
             }
             return result;
         }
@@ -1046,7 +1086,7 @@ export class ViewHandler {
         return "";
     }
 
-    async prepareExistCondition(eConfig: ExistsFilterConfig, localParams: LocalParams): Promise<string> {
+    async prepareExistCondition(eConfig: ExistsFilterConfig, localParams: LocalParams, tableRules: TableRule): Promise<string> {
         let res = "";
         const thisTable = this.name;
 
@@ -1133,7 +1173,7 @@ export class ViewHandler {
         
         let finalWhere;
         try {
-            finalWhere = await (this.dboBuilder.dbo[t2] as TableHandler).prepareWhere(f2, forcedFilter, filterFields, true, tableAlias)
+            finalWhere = await (this.dboBuilder.dbo[t2] as TableHandler).prepareWhere(f2, forcedFilter, filterFields, true, tableAlias, localParams, tableRules)
         } catch(err) {
             throw "Issue with preparing $exists query for table " + t2 + "\n->" + JSON.stringify(err);
         }
@@ -1147,7 +1187,7 @@ export class ViewHandler {
     }
 
     /* NEW API !!! :) */
-    async getCondition(filter: object, allowed_colnames: string[], tableAlias?: string, localParams?: LocalParams){
+    async getCondition(filter: object, allowed_colnames: string[], tableAlias?: string, localParams?: LocalParams, tableRules?: TableRule){
         let prefix = "";
         const getRawFieldName = (field) => {
             if(tableAlias) return pgp.as.format("$1:name.$2:name", [tableAlias, field]);
@@ -1257,10 +1297,17 @@ export class ViewHandler {
         
         let existsCond = "";
         if(existsKeys.length){
-            existsCond = (await Promise.all(existsKeys.map(async k => await this.prepareExistCondition(k,  localParams)))).join(" AND ");
+            existsCond = (await Promise.all(existsKeys.map(async k => await this.prepareExistCondition(k,  localParams, tableRules)))).join(" AND ");
         }
 
-        let filterKeys = Object.keys(data).filter(k => !existsKeys.find(ek => ek.key === k));
+        let rowHashKeys = ["$rowhash"],
+            rowHashCondition;
+        if(rowHashKeys[0] in (data || {})){
+            rowHashCondition = this.getRowHashSelect(tableRules ,tableAlias) + ` = ${pgp.as.format("$1", (data as any).$rowhash)}`;
+            delete (data as any).$rowhash;
+        }
+
+        let filterKeys = Object.keys(data).filter(k => !rowHashKeys.includes(k) && !existsKeys.find(ek => ek.key === k));
         if(allowed_colnames){
             const invalidColumn = filterKeys
                 .find(fName => !allowed_colnames.includes(fName));
@@ -1300,6 +1347,7 @@ export class ViewHandler {
             }));
 
             if(existsCond) templates.push(existsCond);
+            if(rowHashCondition) templates.push(rowHashCondition);
 
         templates = templates.sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
             .join(" AND \n");
@@ -1697,7 +1745,7 @@ export class TableHandler extends ViewHandler {
             }
             let query = pgp.helpers.update(nData, columnSet);
 
-            query += await this.prepareWhere(filter, forcedFilter, filterFields);
+            query += await this.prepareWhere(filter, forcedFilter, filterFields, false, null, localParams, tableRules);
             if(onConflictDoNothing) query += " ON CONFLICT DO NOTHING ";
 
             let qType = "none";
@@ -1867,7 +1915,7 @@ export class TableHandler extends ViewHandler {
             let queryType = 'none';
             let _query = pgp.as.format("DELETE FROM $1:name", [this.name] ) ;
 
-            _query += await this.prepareWhere(filter, forcedFilter, filterFields);
+            _query += await this.prepareWhere(filter, forcedFilter, filterFields, null, null, localParams, table_rules);
 
             if(returning){
                 queryType = "any";
@@ -1932,7 +1980,7 @@ export class TableHandler extends ViewHandler {
                 .then(async isValid => {
 
                     const { filterFields, forcedFilter } = get(table_rules, "select") || {};
-                    const condition = await this.prepareWhere(filter, forcedFilter, filterFields, true);
+                    const condition = await this.prepareWhere(filter, forcedFilter, filterFields, true, null, localParams, table_rules);
 
                     // let final_filter = getFindFilter(filter, table_rules);
                     return this.pubSubManager.addSync({

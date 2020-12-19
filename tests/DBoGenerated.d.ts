@@ -40,8 +40,8 @@ export declare type TxCB = {
 };
 export declare type JoinMaker = (filter?: object, select?: FieldFilter, options?: SelectParams) => any;
 export declare type Items = {
-    name?: string;
     h?: Array<string>;
+    name?: string;
     id?: number;
 };
 export declare type Items_Filter = Items | object | {
@@ -50,9 +50,9 @@ export declare type Items_Filter = Items | object | {
     $or: (Items | object)[];
 };
 export declare type Items2 = {
+    hh?: Array<string>;
     items_id?: number;
     id?: number;
-    hh?: Array<string>;
     name?: string;
 };
 export declare type Items2_Filter = Items2 | object | {
@@ -69,6 +69,16 @@ export declare type Items3_Filter = Items3 | object | {
     $and: (Items3 | object)[];
 } | {
     $or: (Items3 | object)[];
+};
+export declare type Items4 = {
+    h?: Array<string>;
+    id?: number;
+    name?: string;
+};
+export declare type Items4_Filter = Items4 | object | {
+    $and: (Items4 | object)[];
+} | {
+    $or: (Items4 | object)[];
 };
 export declare type Table = {
     id?: string;
@@ -134,6 +144,22 @@ export declare type DBO_items3 = {
     insert: (data: (Items3 | Items3[]), params?: InsertParams) => Promise<void | Items3>;
     delete: (filter: Items3_Filter, params?: DeleteParams) => Promise<void | Items3>;
 };
+export declare type DBO_items4 = {
+    getColumns: () => Promise<any[]>;
+    find: (filter?: Items4_Filter, selectParams?: SelectParams) => Promise<Items4[] | any[]>;
+    findOne: (filter?: Items4_Filter, selectParams?: SelectParams) => Promise<Items4 | any>;
+    subscribe: (filter: Items4_Filter, params: SelectParams, onData: (items: Items4[]) => any) => Promise<{
+        unsubscribe: () => any;
+    }>;
+    subscribeOne: (filter: Items4_Filter, params: SelectParams, onData: (item: Items4) => any) => Promise<{
+        unsubscribe: () => any;
+    }>;
+    count: (filter?: Items4_Filter) => Promise<number>;
+    update: (filter: Items4_Filter, newData: Items4, params?: UpdateParams) => Promise<void | Items4>;
+    upsert: (filter: Items4_Filter, newData: Items4, params?: UpdateParams) => Promise<void | Items4>;
+    insert: (data: (Items4 | Items4[]), params?: InsertParams) => Promise<void | Items4>;
+    delete: (filter: Items4_Filter, params?: DeleteParams) => Promise<void | Items4>;
+};
 export declare type DBO_table = {
     getColumns: () => Promise<any[]>;
     find: (filter?: Table_Filter, selectParams?: SelectParams) => Promise<Table[] | any[]>;
@@ -175,6 +201,7 @@ export declare type DBObj = {
     items: DBO_items;
     items2: DBO_items2;
     items3: DBO_items3;
+    items4: DBO_items4;
     table: DBO_table;
     transaction: DBO_transaction;
     leftJoin: JoinMakerTables;

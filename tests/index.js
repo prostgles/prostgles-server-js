@@ -24,12 +24,18 @@ index_1.default({
     tsGeneratedTypesDir: path_1.default.join(__dirname + '/'),
     transactions: true,
     // DEBUG_MODE: true,
+    // publishRawSQL: () => "*",
     publish: (socket, dbo) => {
+        return "*";
         return {
             items: {
-                select: "*",
-                getColumns: false
-            }
+                select: {
+                    fields: { id: 1, name: 1 }
+                },
+                update: "*"
+            },
+            items2: "*",
+            items3: "*"
         };
         return {
             items: {
@@ -148,6 +154,9 @@ index_1.default({
                 console.log(items[0].items3);
                 throw "Joined select query failed";
             }
+            const rowhash = await dbo.items.findOne({}, { select: { $rowhash: 1 } });
+            if (typeof rowhash.$rowhash !== "string")
+                throw "$rowhash query failed";
             console.log("All tests successful");
         }
         catch (err) {

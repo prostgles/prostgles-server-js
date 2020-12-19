@@ -860,7 +860,7 @@ export class PublishParser {
                 
                 await Promise.all(tableNames                 
                     .map(async tableName => {
-                        if(!this.dbo[tableName]) throw `Table ${tableName} does not exist\nExpecting one of: ${Object.keys(this.dbo).join(", ")}`;
+                        if(!this.dbo[tableName]) throw `Table ${tableName} does not exist\nExpecting one of: ${this.prostgles.dboBuilder.tablesOrViews.map(tov => tov.name).join(", ")}`;
 
                         const table_rules = await this.getTableRules({ socket, tableName }, user);
             
