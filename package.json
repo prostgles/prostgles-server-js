@@ -1,6 +1,6 @@
 {
   "name": "prostgles-server",
-  "version": "1.3.5",
+  "version": "1.3.7",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -8,6 +8,7 @@
     "dist": "dist"
   },
   "scripts": {
+    "start": "tsc --watch",
     "build": "tsc"
   },
   "repository": {

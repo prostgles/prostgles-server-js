@@ -632,14 +632,14 @@ export class ViewHandler {
     async buildQueryTree(filter: Filter, selectParams?: SelectParams & { alias?: string }, param3_unused = null, tableRules?: TableRule, localParams?: LocalParams): Promise<Query> {
         this.checkFilter(filter);
         const { select, alias } = selectParams || {};
-        let mainSelect;
+        let mainSelect = select;
 
         let joinAliases: string[],
             _Aggs: Aggregation[],
             aggAliases = [],
             aggs: string[],
             joinQueries: Query[] = [];
-
+            
         // console.log("add checks for when to REINDEX TABLE CONCURRENTLY ... \nand also if join columns are missing indexes\nand also if running out of disk space!! (in nodejs)")
         
         if(isPlainObject(select)){
@@ -791,11 +791,10 @@ export class ViewHandler {
             // if(select_rules.validate){
 
             // }
-            let selectFuncs = [],
-                preparedSelect: string[] = [];
+            let selectFuncs = [];
             if(select && (select as any).$rowhash){
                 delete (select as any).$rowhash;
-                preparedSelect = this.prepareSelect(select, fields, null, tableAlias).split(",");
+                
                 selectFuncs.push({
                     alias: "$rowhash",
                     getQuery: (alias: string, tableAlias?: string) => this.getRowHashSelect(tableRules, alias, tableAlias)
@@ -807,7 +806,7 @@ export class ViewHandler {
                 table: this.name,
                 allFields: this.column_names.map(asName),
                 orderBy: [this.prepareSort(orderBy, fields, tableAlias, null, validatedAggAliases)],
-                select: preparedSelect,
+                select: this.prepareSelect(select, fields, null, tableAlias).split(","),
                 selectFuncs,
                 where: await this.prepareWhere(filter, forcedFilter, filterFields, null, tableAlias, localParams, tableRules),
                 limit: this.prepareLimitQuery(limit, maxLimit),

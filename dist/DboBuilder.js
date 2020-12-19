@@ -421,7 +421,7 @@ class ViewHandler {
         return __awaiter(this, void 0, void 0, function* () {
             this.checkFilter(filter);
             const { select, alias } = selectParams || {};
-            let mainSelect;
+            let mainSelect = select;
             let joinAliases, _Aggs, aggAliases = [], aggs, joinQueries = [];
             // console.log("add checks for when to REINDEX TABLE CONCURRENTLY ... \nand also if join columns are missing indexes\nand also if running out of disk space!! (in nodejs)")
             if (isPlainObject(select)) {
@@ -537,10 +537,9 @@ class ViewHandler {
                 /* TO FINISH */
                 // if(select_rules.validate){
                 // }
-                let selectFuncs = [], preparedSelect = [];
+                let selectFuncs = [];
                 if (select && select.$rowhash) {
                     delete select.$rowhash;
-                    preparedSelect = this.prepareSelect(select, fields, null, tableAlias).split(",");
                     selectFuncs.push({
                         alias: "$rowhash",
                         getQuery: (alias, tableAlias) => this.getRowHashSelect(tableRules, alias, tableAlias)
@@ -551,7 +550,7 @@ class ViewHandler {
                     table: this.name,
                     allFields: this.column_names.map(exports.asName),
                     orderBy: [this.prepareSort(orderBy, fields, tableAlias, null, validatedAggAliases)],
-                    select: preparedSelect,
+                    select: this.prepareSelect(select, fields, null, tableAlias).split(","),
                     selectFuncs,
                     where: yield this.prepareWhere(filter, forcedFilter, filterFields, null, tableAlias, localParams, tableRules),
                     limit: this.prepareLimitQuery(limit, maxLimit),

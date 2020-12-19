@@ -86,6 +86,9 @@ index_1.default({
             await dbo.items.insert([{ name: "a" }, { name: "a" }, { name: "b" }]);
             await dbo.items2.insert([{ name: "a", items_id: 1 }]);
             await dbo.items3.insert([{ name: "a" }]);
+            const fo = await dbo.items.findOne(), f = await dbo.items.find();
+            if (!fo || !fo.name || !f.length || !f[0].name)
+                throw "findOne query failed";
             // return;
             const expect0 = await dbo.items.count({
                 $and: [
