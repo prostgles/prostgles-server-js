@@ -2382,7 +2382,8 @@ function getTablesForSchemaPostgresSQL(db: DB, schema: string): Promise<{
     ) vr \
     ON t.table_name = vr.view_name \
     where t.table_schema = ${schema} AND t.table_name <> 'spatial_ref_sys'  \
-    GROUP BY t.table_schema, t.table_name, t.table_type, vr.table_names";
+    GROUP BY t.table_schema, t.table_name, t.table_type, vr.table_names  \
+    ORDER BY schema, name ";
     // console.log(pgp.as.format(query, { schema }), schema);
     return db.any(query, { schema });
 }
