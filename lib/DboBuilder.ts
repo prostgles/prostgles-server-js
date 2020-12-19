@@ -2351,7 +2351,7 @@ function getTablesForSchemaPostgresSQL(db: DB, schema: string): Promise<{
 }[]>{
     const query = " \
     SELECT t.table_schema as schema, t.table_name as name \
-    , json_agg((SELECT x FROM (SELECT cc.column_name as name, cc.data_type, cc.udt_name, cc.element_type, cc.is_pkey) as x)) as columns  \
+    , json_agg((SELECT x FROM (SELECT cc.column_name as name, cc.data_type, cc.udt_name, cc.element_type, cc.is_pkey) as x) ORDER BY cc.column_name, cc.data_type ) as columns  \
     , t.table_type = 'VIEW' as is_view \
     , array_to_json(vr.table_names) as parent_tables \
     FROM information_schema.tables t  \

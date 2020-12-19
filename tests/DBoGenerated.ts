@@ -37,21 +37,21 @@ export type JoinMaker = (filter?: object, select?: FieldFilter, options?: Select
 
 export type Items = {
      h?: Array<string>;
-     name?: string;
      id?: number;
+     name?: string;
 };
 export type Items_Filter = Items | object | { $and: (Items | object)[] } | { $or: (Items | object)[] } 
 export type Items2 = {
      hh?: Array<string>;
-     items_id?: number;
      id?: number;
+     items_id?: number;
      name?: string;
 };
 export type Items2_Filter = Items2 | object | { $and: (Items2 | object)[] } | { $or: (Items2 | object)[] } 
 export type Items3 = {
      h?: Array<string>;
-     name?: string;
      id?: number;
+     name?: string;
 };
 export type Items3_Filter = Items3 | object | { $and: (Items3 | object)[] } | { $or: (Items3 | object)[] } 
 export type Items4 = {
