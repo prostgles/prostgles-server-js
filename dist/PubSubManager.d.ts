@@ -1,6 +1,7 @@
 import { PostgresNotifListenManager } from "./PostgresNotifListenManager";
 import { TableOrViewInfo, TableInfo, DbHandler } from "./DboBuilder";
-import { TableRule, SelectParams, DB } from "./Prostgles";
+import { TableRule, DB } from "./Prostgles";
+import { SelectParams } from "prostgles-types";
 declare type SyncParams = {
     socket_id: string;
     channel_name: string;

@@ -47,49 +47,10 @@ function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts, 
 
 const QueryFile = require('pg-promise').QueryFile;
 
-/**
- * [{ field_name: (true | false) }]
- * true -> ascending
- * false -> descending
- * Array order is maintained
- */
-export type OrderBy = { key: string, asc: boolean}[] | { [key: string]: boolean }[] | string | string[];
 
-// /**
-//  * @example
-//  * { field_name: (true | false) }
-//  * 
-//  * ["field_name1", "field_name2"]
-//  * 
-//  * field_name: false -> means all fields except this
-//  */
-// type FieldFilter = object | string[] | "*";
-import { FieldFilter } from "./DboBuilder";
 import { Socket } from "dgram";
 import { type } from "os";
-
-export type SelectParams = {
-    select?: FieldFilter;
-    limit?: number;
-    offset?: number;
-    orderBy?: OrderBy;
-    // agg?: { min?: FieldFilter, max?: FieldFilter, sum?: FieldFilter, avg?: FieldFilter, distinct?: FieldFilter };
-    expectOne?: boolean;
-}
-export type UpdateParams = {
-    returning?: FieldFilter;
-    onConflictDoNothing?: boolean;
-    fixIssues?: boolean;
-    multi?: boolean;
-}
-export type InsertParams = {
-    returning?: FieldFilter;
-    onConflictDoNothing?: boolean;
-    fixIssues?: boolean;
-}
-export type DeleteParams = {
-    returning?: FieldFilter;
-}
+import { FieldFilter, SelectParams } from "prostgles-types";
 
 export type InsertRequestData = {
     data: object | object[]
@@ -259,7 +220,7 @@ export type ProstglesInitOptions = {
     io?: any;
     publish?: Publish;
     publishMethods?: publishMethods;
-    publishRawSQL?(socket: Socket, dbo: any, db?: DB): any;
+    publishRawSQL?(socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB, user?: any): boolean | "*";
     joins?: Joins;
     schema?: string;
     sqlFilePath?: string;
@@ -612,7 +573,7 @@ export class Prostgles {
                 */
                 let fullSchema = [];
                 if(this.publishRawSQL && typeof this.publishRawSQL === "function"){
-                    const canRunSQL = await this.publishRawSQL(socket, dbo, db);
+                    const canRunSQL = await this.publishRawSQL(socket, dbo, db, await this.getUser(socket));
 
                     // console.log("canRunSQL", canRunSQL, socket.handshake.headers["x-real-ip"]);//, allTablesViews);
 

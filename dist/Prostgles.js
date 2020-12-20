@@ -310,7 +310,7 @@ class Prostgles {
                     */
                     let fullSchema = [];
                     if (this.publishRawSQL && typeof this.publishRawSQL === "function") {
-                        const canRunSQL = yield this.publishRawSQL(socket, dbo, db);
+                        const canRunSQL = yield this.publishRawSQL(socket, dbo, db, yield this.getUser(socket));
                         // console.log("canRunSQL", canRunSQL, socket.handshake.headers["x-real-ip"]);//, allTablesViews);
                         if (canRunSQL && typeof canRunSQL === "boolean" || canRunSQL === "*") {
                             socket.on(WS_CHANNEL_NAME.SQL, function ({ query, params, options, justRows = false }, cb = (...callback) => { }) {

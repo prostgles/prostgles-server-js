@@ -9,11 +9,18 @@ declare global { export interface Promise<T> extends Bluebird<T> {} }
 
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
+import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, InsertParams, UpdateParams, DeleteParams, OrderBy, DbJoinMaker 
+} from "prostgles-types";
+
+export type DbHandler = {
+    [key: string]: Partial<TableHandler>;
+  } & DbJoinMaker & {
+    sql?: (query: string, params?: any, options?: any) => Promise<any>;
+  };;
 
 import { get } from "./utils";
 import { 
-    DB, TableRule, OrderBy, SelectRule, InsertRule, UpdateRule, DeleteRule, SyncRule, SelectParams, 
-    InsertParams, UpdateParams, DeleteParams, Joins, Join, Prostgles, PublishParser, flat 
+    DB, TableRule, SelectRule, InsertRule, UpdateRule, DeleteRule, SyncRule, Joins, Join, Prostgles, PublishParser, flat 
 } from "./Prostgles";
 import { PubSubManager, filterObj } from "./PubSubManager";
 
@@ -26,26 +33,8 @@ let pgp: PGP = pgPromise({
 export const asName = (str: string): string => {
     return pgp.as.format("$1:name", [str]);
 }
-/**
- * @example
- * { field_name: (true | false) }
- * 
- * ["field_name1", "field_name2"]
- * 
- * field_name: false -> means all fields except this
- */
-export type FieldFilter = object | string[] | "*" | "" ;
+// export type FieldFilter = object | string[] | "*" | "" ;
 
-// type DBO = {
-//     { [key: strign]: }
-// }
-
-type Subscription = {
-    unsubscribe(...params:any): void;
-}
-type Sync = {
-    unsync(...params:any): void;
-}
 
 
 export type TableInfo = {
@@ -60,20 +49,6 @@ type ViewInfo = TableInfo & {
 
 export type TableOrViewInfo = TableInfo & ViewInfo & {
     is_view: boolean;
-}
-
-type ColumnInfo = {
-    name: string;
-
-    /* Simplified data type */
-    data_type: string;
-
-    /* values starting with underscore means it's an array of that data type */
-    udt_name: string;
-
-    element_type: string;
-
-    is_pkey: boolean;
 }
 
 type LocalParams = {
@@ -820,15 +795,7 @@ export class ViewHandler {
         }  
     }
 
-    async getColumns(tableRules?: TableRule, localParams?: LocalParams): Promise<{ 
-        name: string; 
-        data_type: string; 
-        select: boolean;  
-        insert: boolean;  
-        update: boolean;  
-        delete: boolean;
-        is_pkey: boolean;
-    }[]> {
+    async getColumns(tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]> {
         if(tableRules || localParams){
 
             const selF = this.parseFieldFilter(get(tableRules, "select.fields"));
@@ -2038,23 +2005,23 @@ export type TxCB = {
 export type TX = {
     (t: TxCB): Promise<(any | void)>;
 }
-export type JoinMaker = (filter?: object, select?: FieldFilter, options?: SelectParams) => any;
+// export type JoinMaker = (filter?: object, select?: FieldFilter, options?: SelectParams) => any;
 
-export type TableJoin = {
-    [key: string]: JoinMaker;
-}
-export type DbJoinMaker = {
-    innerJoin: TableJoin;
-    leftJoin: TableJoin;
-    innerJoinOne: TableJoin;
-    leftJoinOne: TableJoin;
-}
+// export type TableJoin = {
+//     [key: string]: JoinMaker;
+// }
+// export type DbJoinMaker = {
+//     innerJoin: TableJoin;
+//     leftJoin: TableJoin;
+//     innerJoinOne: TableJoin;
+//     leftJoinOne: TableJoin;
+// }
 
-export type DbHandler = {
-    [key: string]: TableHandler | ViewHandler;
-} & DbJoinMaker;
+// export type DbHandler = {
+//     [key: string]: TableHandler | ViewHandler;
+// } & DbJoinMaker;
 
-export type DbHandlerTX = { [key: string]: TX } | DbHandler
+export type DbHandlerTX = { [key: string]: TX } | DbHandler;
 
 
 import { JOIN_TYPES } from "./Prostgles";

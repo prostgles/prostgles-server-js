@@ -4,18 +4,15 @@ declare global {
     }
 }
 import * as pgPromise from 'pg-promise';
-import { DB, TableRule, OrderBy, SelectParams, InsertParams, UpdateParams, DeleteParams, Join, Prostgles, PublishParser } from "./Prostgles";
+import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, InsertParams, UpdateParams, DeleteParams, OrderBy, DbJoinMaker } from "prostgles-types";
+export declare type DbHandler = {
+    [key: string]: Partial<TableHandler>;
+} & DbJoinMaker & {
+    sql?: (query: string, params?: any, options?: any) => Promise<any>;
+};
+import { DB, TableRule, Join, Prostgles, PublishParser } from "./Prostgles";
 import { PubSubManager } from "./PubSubManager";
 export declare const asName: (str: string) => string;
-/**
- * @example
- * { field_name: (true | false) }
- *
- * ["field_name1", "field_name2"]
- *
- * field_name: false -> means all fields except this
- */
-export declare type FieldFilter = object | string[] | "*" | "";
 export declare type TableInfo = {
     schema: string;
     name: string;
@@ -26,13 +23,6 @@ declare type ViewInfo = TableInfo & {
 };
 export declare type TableOrViewInfo = TableInfo & ViewInfo & {
     is_view: boolean;
-};
-declare type ColumnInfo = {
-    name: string;
-    data_type: string;
-    udt_name: string;
-    element_type: string;
-    is_pkey: boolean;
 };
 declare type LocalParams = {
     socket?: any;
@@ -133,15 +123,7 @@ export declare class ViewHandler {
     }, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<Query>;
     checkFilter(filter: any): void;
     prepareValidatedQuery(filter: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams, validatedAggAliases?: string[]): Promise<Query>;
-    getColumns(tableRules?: TableRule, localParams?: LocalParams): Promise<{
-        name: string;
-        data_type: string;
-        select: boolean;
-        insert: boolean;
-        update: boolean;
-        delete: boolean;
-        is_pkey: boolean;
-    }[]>;
+    getColumns(tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]>;
     find(filter: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<object[]>;
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: any, table_rules?: TableRule, localParams?: LocalParams): Promise<object>;
     count(filter?: Filter, param2_unused?: any, param3_unused?: any, table_rules?: TableRule, localParams?: any): Promise<number>;
@@ -223,19 +205,6 @@ export declare type TxCB = {
 export declare type TX = {
     (t: TxCB): Promise<(any | void)>;
 };
-export declare type JoinMaker = (filter?: object, select?: FieldFilter, options?: SelectParams) => any;
-export declare type TableJoin = {
-    [key: string]: JoinMaker;
-};
-export declare type DbJoinMaker = {
-    innerJoin: TableJoin;
-    leftJoin: TableJoin;
-    innerJoinOne: TableJoin;
-    leftJoinOne: TableJoin;
-};
-export declare type DbHandler = {
-    [key: string]: TableHandler | ViewHandler;
-} & DbJoinMaker;
 export declare type DbHandlerTX = {
     [key: string]: TX;
 } | DbHandler;

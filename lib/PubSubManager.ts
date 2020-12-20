@@ -6,11 +6,12 @@
 import { PostgresNotifListenManager } from "./PostgresNotifListenManager";
 import { get } from "./utils";
 import { TableOrViewInfo, TableInfo, DbHandler, TableHandler, asName } from "./DboBuilder";
-import { TableRule, SelectParams, DB, OrderBy } from "./Prostgles";
+import { TableRule, DB } from "./Prostgles";
 
 import * as Bluebird from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
+import { SelectParams, OrderBy } from "prostgles-types";
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 let pgp: PGP = pgPromise({
     promiseLib: Bluebird

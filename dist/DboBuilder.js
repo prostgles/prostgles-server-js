@@ -16,6 +16,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.DboBuilder = exports.TableHandler = exports.ViewHandler = exports.asName = void 0;
 const Bluebird = require("bluebird");
 const pgPromise = require("pg-promise");
+;
 const utils_1 = require("./utils");
 const Prostgles_1 = require("./Prostgles");
 const PubSubManager_1 = require("./PubSubManager");

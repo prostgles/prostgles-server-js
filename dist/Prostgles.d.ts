@@ -6,41 +6,8 @@ declare type PGP = pgPromise.IMain<{}, pg.IClient>;
 export declare type DB = pgPromise.IDatabase<{}, pg.IClient>;
 declare type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 declare type DbConnectionOpts = pg.IDefaults;
-/**
- * [{ field_name: (true | false) }]
- * true -> ascending
- * false -> descending
- * Array order is maintained
- */
-export declare type OrderBy = {
-    key: string;
-    asc: boolean;
-}[] | {
-    [key: string]: boolean;
-}[] | string | string[];
-import { FieldFilter } from "./DboBuilder";
 import { Socket } from "dgram";
-export declare type SelectParams = {
-    select?: FieldFilter;
-    limit?: number;
-    offset?: number;
-    orderBy?: OrderBy;
-    expectOne?: boolean;
-};
-export declare type UpdateParams = {
-    returning?: FieldFilter;
-    onConflictDoNothing?: boolean;
-    fixIssues?: boolean;
-    multi?: boolean;
-};
-export declare type InsertParams = {
-    returning?: FieldFilter;
-    onConflictDoNothing?: boolean;
-    fixIssues?: boolean;
-};
-export declare type DeleteParams = {
-    returning?: FieldFilter;
-};
+import { FieldFilter, SelectParams } from "prostgles-types";
 export declare type InsertRequestData = {
     data: object | object[];
     returning: FieldFilter;
@@ -172,7 +139,7 @@ export declare type ProstglesInitOptions = {
     io?: any;
     publish?: Publish;
     publishMethods?: publishMethods;
-    publishRawSQL?(socket: Socket, dbo: any, db?: DB): any;
+    publishRawSQL?(socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB, user?: any): boolean | "*";
     joins?: Joins;
     schema?: string;
     sqlFilePath?: string;
