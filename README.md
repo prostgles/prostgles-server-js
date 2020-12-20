@@ -7,7 +7,7 @@
 [![npm version](https://img.shields.io/npm/v/prostgles-server.svg?style=flat)](https://www.npmjs.com/package/prostgles-server)
 [![Dependency Status](https://david-dm.org/prostgles/prostgles-server-js/status.svg)](https://david-dm.org/prostgles/prostgles-server-js/status.svg#info=dependencies)
 [![Known Vulnerabilities](https://snyk.io/test/github/prostgles/prostgles-server-js/badge.svg)](https://snyk.io/test/github/prostgles/prostgles-server-js)
-![tests](https://github.com/prostgles/prostgles-server-js/workflows/Postgres%20Service%20Example/badge.svg?branch=master)
+![tests](https://github.com/prostgles/prostgles-server-js/workflows/tests/badge.svg?branch=master)
 
 
 
