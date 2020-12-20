@@ -139,7 +139,7 @@ export declare type ProstglesInitOptions = {
     io?: any;
     publish?: Publish;
     publishMethods?: publishMethods;
-    publishRawSQL?(socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB, user?: any): boolean | "*";
+    publishRawSQL?(socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB, user?: any): ((boolean | "*") | Promise<(boolean | "*")>);
     joins?: Joins;
     schema?: string;
     sqlFilePath?: string;

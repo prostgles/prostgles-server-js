@@ -8,21 +8,25 @@ const io = require("socket.io")(http, { path: "/teztz" });
 http.listen(3001);
 
 import { DBObj } from "./DBoGenerated";
+import { DB } from '../dist/Prostgles';
 
 prostgles({
 	dbConnection: {
 		host: "localhost",
 		port: 5432,
 		database: "postgres",
-		user: process.env.PRGL_USER,
-		password: process.env.PRGL_PWD
+		user: "api",
+		password: "api"
 	},
 	sqlFilePath: path.join(__dirname+'/init.sql'),
 	io,
 	tsGeneratedTypesDir: path.join(__dirname + '/'),
 	transactions: true,
 	// DEBUG_MODE: true,
-	// publishRawSQL: () => "*",
+	
+  publishRawSQL: async (socket, dbo: DBObj, db: DB, user: any) => {
+    return Boolean(user && user.type === "admin")
+  },
   publish: (socket, dbo: DBObj) => {
 		return "*";
 		return  {

@@ -16,15 +16,17 @@ index_1.default({
         host: "localhost",
         port: 5432,
         database: "postgres",
-        user: process.env.PRGL_USER,
-        password: process.env.PRGL_PWD
+        user: "api",
+        password: "api"
     },
     sqlFilePath: path_1.default.join(__dirname + '/init.sql'),
     io,
     tsGeneratedTypesDir: path_1.default.join(__dirname + '/'),
     transactions: true,
     // DEBUG_MODE: true,
-    // publishRawSQL: () => "*",
+    publishRawSQL: async (socket, dbo, db, user) => {
+        return Boolean(user && user.type === "admin");
+    },
     publish: (socket, dbo) => {
         return "*";
         return {
