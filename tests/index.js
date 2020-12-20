@@ -163,9 +163,11 @@ index_1.default({
             if (typeof rowhash.$rowhash !== "string")
                 throw "$rowhash query failed";
             console.log("All tests successful");
+            process.exit(0);
         }
         catch (err) {
             console.error(err);
+            process.exit(1);
         }
     },
 });
