@@ -12,11 +12,11 @@ import { DB } from '../dist/Prostgles';
 
 prostgles({
 	dbConnection: {
-		host: "localhost",
-		port: 5432,
-		database: "postgres",
-		user: "api",
-		password: "api"
+		host: process.env.POSTGRES_HOST || "localhost",
+		port: +process.env.POSTGRES_PORT || 5432,
+		database: process.env.POSTGRES_DB || "postgres",
+		user: process.env.POSTGRES_USER || "api",
+		password:  process.env.POSTGRES_PASSWORD || "api"
 	},
 	sqlFilePath: path.join(__dirname+'/init.sql'),
 	io,
