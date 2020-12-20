@@ -79,6 +79,10 @@ jobs:
   vm-job:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        node-version: [10.x, 12.x, 14.x]
+        
     services:
       postgres:
         image: postgres:10.8
