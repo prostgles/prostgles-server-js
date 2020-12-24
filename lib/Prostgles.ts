@@ -716,14 +716,14 @@ type DboTableCommand = Request & DboTable & {
 // const insertParams: Array<keyof InsertRule> = ["fields", "forcedData", "returningFields", "validate"];
 
 const RULE_TO_METHODS = [
-    { 
-        rule: "getColumns",
-        methods: ["getColumns"], 
-        no_limits: {}, 
-        table_only: false,
-        allowed_params: [],
-        hint: `  `
-    },
+    // { 
+    //     rule: "getColumns",
+    //     methods: ["getColumns"], 
+    //     no_limits: {}, 
+    //     table_only: false,
+    //     allowed_params: [],
+    //     hint: `  `
+    // },
    { 
        rule: "insert",
        methods: ["insert", "upsert"], 
@@ -742,7 +742,7 @@ const RULE_TO_METHODS = [
     },
    { 
        rule: "select", 
-       methods: ["findOne", "find", "subscribe", "unsubscribe", "count"], 
+       methods: ["findOne", "find", "subscribe", "unsubscribe", "count", "getColumns"], 
        no_limits: <SelectRule>{ fields: "*", filterFields: "*" }, 
        allowed_params: <Array<keyof SelectRule>>["fields", "filterFields", "forcedFilter", "validate", "maxLimit"] ,
        hint: ` expecting "*" | true | { fields: ( string | string[] | {} )  }`
@@ -819,101 +819,12 @@ export class PublishParser {
     
         return methods;
     }
-    
-    /* Should only be called once on socket connection */
-    async getSchemaFromPublish(socket: any){
-        let schema = {};
-        
-        try {
-            /* Publish tables and views based on socket */
-            const user = await this.prostgles.getUser(socket);
-            let _publish = await this.getPublish(socket, user);
 
-    
-            if(_publish && Object.keys(_publish).length){
-                let txKey = "tx";
-                if(!this.prostgles.transactions) txKey = "";
-                if(typeof this.prostgles.transactions === "string") txKey = this.prostgles.transactions;
-                
-                const tableNames = Object.keys(_publish).filter(k => !txKey || txKey !== k);
-                
-                await Promise.all(tableNames                 
-                    .map(async tableName => {
-                        if(!this.dbo[tableName]) throw `Table ${tableName} does not exist\nExpecting one of: ${this.prostgles.dboBuilder.tablesOrViews.map(tov => tov.name).join(", ")}`;
-
-                        const table_rules = await this.getTableRules({ socket, tableName }, user);
-            
-                        if(table_rules && Object.keys(table_rules).length){
-                            schema[tableName] = {};
-                            let methods = [];
-        
-                            if(typeof table_rules === "object"){
-        
-                                /* apply method if not falsy */
-                                RULE_TO_METHODS.map(rtms => {
-                                    if(table_rules[rtms.rule]) methods = [ ...methods, ...rtms.methods ];
-                                });
-        
-                                /* Infer methods if not specified */
-                                if(methods.includes("insert") && methods.includes("update") && methods.includes("select") && table_rules.upsert !== false) { 
-                                    methods = [ ...methods, "upsert" ];
-                                } else {
-                                    methods = methods.filter(m => m !== "upsert");
-                                }
-                                /* Add implied methods unless specifically disabled */
-                                if(methods.includes("find") && table_rules.count !== false) methods = [ ...methods, "count"];
-                                if(methods.includes("find") && table_rules.subscribe !== false) methods = [ ...methods, "subscribe" ];
-                                if(methods.includes("find") && table_rules.getColumns !== false) methods = [ ...methods, "getColumns"];
-                            }
-                            
-                            await Promise.all(methods.map(async method => {
-                                if(method === "sync" && table_rules[method]){
-                                    /* Pass sync info */
-                                    schema[tableName][method] = table_rules[method];
-                                } else {
-                                    schema[tableName][method] = {};
-
-                                    /* Test for issues with the publish rules */
-                                    if(["update", "find", "findOne", "insert", "delete", "upsert"].includes(method)){
-
-                                        let err = null;
-                                        try {
-                                            let valid_table_command_rules = await this.getValidatedRequestRule({ tableName, command: method, socket }, user);
-                                            await this.dbo[tableName][method]({}, {}, {}, valid_table_command_rules, { socket, has_rules: true, testRule: true }); 
-                                                
-                                        } catch(e) {
-                                            err = "INTERNAL PUBLISH ERROR";
-                                            schema[tableName][method] = { err };
-
-                                            if(["find", "findOne"].includes(method)){
-                                                if(schema[tableName].subscribe){
-                                                    schema[tableName].subscribe = schema[tableName][method];
-                                                }
-                                                if(schema[tableName].count){
-                                                    schema[tableName].count = schema[tableName][method];
-                                                }
-                                            }
-                                            throw `publish.${tableName}.${method}: \n   -> ${e}`;
-                                        }
-                                    }
-                                }
-                            }));
-                        }
-                        
-                        return true;
-                    })
-                );
-            }
-            
-    
-        } catch (e) {
-            console.error("Prostgles \nERRORS IN PUBLISH: ", JSON.stringify(e));
-            throw e;
-        }
-    
-        return schema;
-    }
-
+    /**
+     * Parses the first level of publish. (If false then nothing if * then all tables and views)
+     * @param socket 
+     * @param user 
+     */
     async getPublish(socket, user){
         let _publish = await applyParamsIfFunc(this.publish, socket, this.dbo, this.db, user);
 
@@ -975,7 +886,8 @@ export class PublishParser {
     
             let table_rules = applyParamsIfFunc(_publish[tableName],  socket, this.dbo, this.db, user);
             if(table_rules){
-                /* Add no limits */
+
+                /* All methods allowed. Add no limits for table rules */
                 if(typeof table_rules === "boolean" || table_rules === "*"){
                     table_rules = {};
                     RULE_TO_METHODS
@@ -983,16 +895,61 @@ export class PublishParser {
                         .map(r => {
                             table_rules[r.rule] = { ...r.no_limits };
                         });
-    
-                /* Check for invalid limits */
-                } else if(Object.keys(table_rules).length){
+                } 
+                /* Add implied methods if not falsy */
+                RULE_TO_METHODS
+                    .filter(r => !(this.dbo[tableName] as TableHandler | ViewHandler).is_view || !r.table_only)
+                    .map(r => {
+                        r.methods.map(method => {
+                            if(table_rules[method] === undefined){
+                                if(method === "upsert" && !(table_rules.update && table_rules.insert)){
+                                    // return;
+                                } else {
+                                    table_rules[method] = {};
+                                }
+                            }
+                        })
+                    });
+                
+                /*
+                    Add defaults
+                    Check for invalid params 
+                */
+                if(Object.keys(table_rules).length){
                     
-                    if(table_rules.select && table_rules.subscribe !== false){
-                        table_rules.subscribe = { 
-                            ...RULE_TO_METHODS.find(r => r.rule === "subscribe").no_limits,
-                            ...(typeof table_rules.subscribe !== "string"? table_rules.subscribe : {})
-                        };
-                    }
+
+                    // let methods = Object.keys(table_rules);
+
+                    // /* Add implied secondary methods if not falsy */
+                    // RULE_TO_METHODS.map(rtms => {
+                    //     if(table_rules[rtms.rule]){
+                    //         rtms.methods.map(method => {
+                    //             if(table_rules[method] !== false){
+                    //                 table_rules[method] = {};
+                    //             }
+                    //         })
+                    //         methods = [ ...methods, ...rtms.methods ];
+                    //     }
+                    // });
+                    // /* Add complex implied methods unless specifically disabled */
+                    // if(methods.includes("insert") && methods.includes("update") && methods.includes("select") && table_rules.upsert !== false) { 
+                    //     methods = [ ...methods, "upsert" ];
+                    // } else {
+                    //     methods = methods.filter(m => m !== "upsert");
+                    // }
+                    // if(table_rules.select){
+                    //     ["count", "find", ]
+                    //     if(table_rules.count !== false) table_rules.count = {};
+                    //     if(table_rules.subscribe !== false) methods = [ ...methods, "subscribe" ];
+                    //     if(table_rules.getColumns !== false) methods = [ ...methods, "getColumns"];
+                    // }
+
+                    // if(table_rules.select && table_rules.subscribe !== false){
+                    //     table_rules.subscribe = { 
+                    //         ...RULE_TO_METHODS.find(r => r.rule === "subscribe").no_limits,
+                    //         ...(typeof table_rules.subscribe !== "string"? table_rules.subscribe : {})
+                    //     };
+                    // }
                     Object.keys(table_rules)
                         .filter(m => table_rules[m])
                         .find(method => {
@@ -1002,18 +959,17 @@ export class PublishParser {
                             }
                             
                             if(typeof table_rules[method] === "boolean" || table_rules[method] === "*"){
-                                table_rules[method] = { ...rm.no_limits };
+                                // table_rules[method] = { ...rm.no_limits };
                                 if(method === "sync") throw "Invalid sync rule. Expecting { id_fields: string[], synced_field: string } ";
                             }
+
                             let method_params = Object.keys(table_rules[method]);
-    
-    
                             let iparam = method_params.find(p => !rm.allowed_params.includes(<never>p));
                             if(iparam){
                                 throw `Invalid setting in publish.${tableName}.${method} -> ${iparam}. \n Expecting any of: ${rm.allowed_params.join(", ")}`;
                             }
 
-                            /* Add defaults */
+                            /* Add default params (if missing) */
                             if(method === "sync"){
                                 if(typeof get(table_rules, [method, "throttle"]) !== "number"){
                                     table_rules[method].throttle = 100;
@@ -1031,6 +987,106 @@ export class PublishParser {
         } catch (e) {
             throw e;
         }
+    }
+
+
+    
+    /* Prepares schema for client. Only allowed views and commands will be present */
+    async getSchemaFromPublish(socket: any){
+        let schema = {};
+        
+        try {
+            /* Publish tables and views based on socket */
+            const user = await this.prostgles.getUser(socket);
+            let _publish = await this.getPublish(socket, user);
+
+    
+            if(_publish && Object.keys(_publish).length){
+                let txKey = "tx";
+                if(!this.prostgles.transactions) txKey = "";
+                if(typeof this.prostgles.transactions === "string") txKey = this.prostgles.transactions;
+                
+                const tableNames = Object.keys(_publish).filter(k => !txKey || txKey !== k);
+                
+                await Promise.all(tableNames                 
+                    .map(async tableName => {
+                        if(!this.dbo[tableName]) throw `Table ${tableName} does not exist\nExpecting one of: ${this.prostgles.dboBuilder.tablesOrViews.map(tov => tov.name).join(", ")}`;
+
+                        const table_rules = await this.getTableRules({ socket, tableName }, user);
+            
+                        if(table_rules && Object.keys(table_rules).length){
+                            schema[tableName] = {};
+                            let methods = [];
+        
+                            if(typeof table_rules === "object"){
+        
+                                // /* Add simple implied methods methods if not falsy */
+                                // RULE_TO_METHODS.map(rtms => {
+                                //     if(table_rules[rtms.rule]) methods = [ ...methods, ...rtms.methods ];
+                                // });
+        
+                                // /* Add complex implied methods unless specifically disabled */
+                                // if(methods.includes("insert") && methods.includes("update") && methods.includes("select") && 
+                                //     table_rules.upsert !== false
+                                // ) { 
+                                //     methods = [ ...methods, "upsert" ];
+                                // } else {
+                                //     methods = methods.filter(m => m !== "upsert");
+                                // }
+                                // if(methods.includes("find") && table_rules.count !== false) methods = [ ...methods, "count"];
+                                // if(methods.includes("find") && table_rules.subscribe !== false) methods = [ ...methods, "subscribe" ];
+                                // if(methods.includes("find") && table_rules.getColumns !== false) methods = [ ...methods, "getColumns"];
+                            }
+                            
+                            await Promise.all(methods.map(async method => {
+                                if(method === "sync" && table_rules[method]){
+
+                                    /* Pass sync info */
+                                    schema[tableName][method] = table_rules[method];
+                                } else {
+
+                                    schema[tableName][method] = {};
+
+                                    /* Test for issues with the publish rules */
+                                    if(["update", "find", "findOne", "insert", "delete", "upsert"].includes(method)){
+
+                                        let err = null;
+                                        try {
+                                            let valid_table_command_rules = await this.getValidatedRequestRule({ tableName, command: method, socket }, user);
+                                            await this.dbo[tableName][method]({}, {}, {}, valid_table_command_rules, { socket, has_rules: true, testRule: true }); 
+                                                
+                                        } catch(e) {
+                                            err = "INTERNAL PUBLISH ERROR";
+                                            schema[tableName][method] = { err };
+
+                                            /* What is going on here???? */
+                                            // if(["find", "findOne"].includes(method)){
+                                            //     if(schema[tableName].subscribe){
+                                            //         schema[tableName].subscribe = schema[tableName][method];
+                                            //     }
+                                            //     if(schema[tableName].count){
+                                            //         schema[tableName].count = schema[tableName][method];
+                                            //     }
+                                            // }
+                                            throw `publish.${tableName}.${method}: \n   -> ${e}`;
+                                        }
+                                    }
+                                }
+                            }));
+                        }
+                        
+                        return true;
+                    })
+                );
+            }
+            
+    
+        } catch (e) {
+            console.error("Prostgles \nERRORS IN PUBLISH: ", JSON.stringify(e));
+            throw e;
+        }
+    
+        return schema;
     }
 
 }
