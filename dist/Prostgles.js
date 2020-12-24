@@ -551,7 +551,7 @@ class PublishParser {
                 let table_rules = applyParamsIfFunc(_publish[tableName], socket, this.dbo, this.db, user);
                 if (table_rules) {
                     /* All methods allowed. Add no limits for table rules */
-                    if (typeof table_rules === "boolean" || table_rules === "*") {
+                    if ([true, "*"].includes(table_rules)) {
                         table_rules = {};
                         RULE_TO_METHODS
                             .filter(r => !this.dbo[tableName].is_view || !r.table_only)
@@ -564,6 +564,9 @@ class PublishParser {
                         .filter(r => !this.dbo[tableName].is_view || !r.table_only)
                         .map(r => {
                         r.methods.map(method => {
+                            if ([true, "*"].includes(table_rules[method]) && method === r.rule && r.no_limits) {
+                                table_rules[method] = Object.assign({}, r.no_limits);
+                            }
                             if (table_rules[method] === undefined) {
                                 if (method === "upsert" && !(table_rules.update && table_rules.insert)) {
                                     // return;
