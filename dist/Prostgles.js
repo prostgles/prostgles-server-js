@@ -612,22 +612,24 @@ class PublishParser {
                         Object.keys(table_rules)
                             .filter(m => table_rules[m])
                             .find(method => {
-                            let rm = RULE_TO_METHODS.find(r => r.rule === method);
+                            let rm = RULE_TO_METHODS.find(r => r.rule === method || r.methods.includes(method));
                             if (!rm) {
-                                throw `Invalid rule in publish.${tableName} -> ${method} \nExpecting any of: ${RULE_TO_METHODS.map(r => r.rule).join(", ")}`;
+                                throw `Invalid rule in publish.${tableName} -> ${method} \nExpecting any of: ${flat(RULE_TO_METHODS.map(r => [r.rule, ...r.methods])).join(", ")}`;
                             }
-                            if (typeof table_rules[method] === "boolean" || table_rules[method] === "*") {
-                                // table_rules[method] = { ...rm.no_limits };
-                                if (method === "sync")
-                                    throw "Invalid sync rule. Expecting { id_fields: string[], synced_field: string } ";
-                            }
-                            let method_params = Object.keys(table_rules[method]);
-                            let iparam = method_params.find(p => !rm.allowed_params.includes(p));
-                            if (iparam) {
-                                throw `Invalid setting in publish.${tableName}.${method} -> ${iparam}. \n Expecting any of: ${rm.allowed_params.join(", ")}`;
+                            /* Check RULES for invalid params */
+                            /* Methods do not have params -> They use them from rules */
+                            if (method === rm.rule) {
+                                let method_params = Object.keys(table_rules[method]);
+                                let iparam = method_params.find(p => !rm.allowed_params.includes(p));
+                                if (iparam) {
+                                    throw `Invalid setting in publish.${tableName}.${method} -> ${iparam}. \n Expecting any of: ${rm.allowed_params.join(", ")}`;
+                                }
                             }
                             /* Add default params (if missing) */
                             if (method === "sync") {
+                                if (typeof table_rules[method] === "boolean" || table_rules[method] === "*") {
+                                    throw "Invalid sync rule. Expecting { id_fields: string[], synced_field: string } ";
+                                }
                                 if (typeof utils_1.get(table_rules, [method, "throttle"]) !== "number") {
                                     table_rules[method].throttle = 100;
                                 }
