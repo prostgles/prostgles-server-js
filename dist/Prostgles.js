@@ -563,10 +563,10 @@ class PublishParser {
                     RULE_TO_METHODS
                         .filter(r => !this.dbo[tableName].is_view || !r.table_only)
                         .map(r => {
+                        if ([true, "*"].includes(table_rules[r.rule]) && r.no_limits) {
+                            table_rules[r.rule] = Object.assign({}, r.no_limits);
+                        }
                         r.methods.map(method => {
-                            if ([true, "*"].includes(table_rules[method]) && method === r.rule && r.no_limits) {
-                                table_rules[method] = Object.assign({}, r.no_limits);
-                            }
                             if (table_rules[method] === undefined) {
                                 if (method === "upsert" && !(table_rules.update && table_rules.insert)) {
                                     // return;
@@ -630,7 +630,7 @@ class PublishParser {
                             }
                             /* Add default params (if missing) */
                             if (method === "sync") {
-                                if (typeof table_rules[method] === "boolean" || table_rules[method] === "*") {
+                                if ([true, "*"].includes(table_rules[method])) {
                                     throw "Invalid sync rule. Expecting { id_fields: string[], synced_field: string } ";
                                 }
                                 if (typeof utils_1.get(table_rules, [method, "throttle"]) !== "number") {
@@ -674,6 +674,7 @@ class PublishParser {
                             schema[tableName] = {};
                             let methods = [];
                             if (typeof table_rules === "object") {
+                                methods = Object.keys(table_rules);
                                 // /* Add simple implied methods methods if not falsy */
                                 // RULE_TO_METHODS.map(rtms => {
                                 //     if(table_rules[rtms.rule]) methods = [ ...methods, ...rtms.methods ];
