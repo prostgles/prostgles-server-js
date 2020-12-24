@@ -13,7 +13,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.filterObj = exports.PubSubManager = void 0;
+exports.filterObj = exports.PubSubManager = exports.DEFAULT_SYNC_BATCH_SIZE = void 0;
 const PostgresNotifListenManager_1 = require("./PostgresNotifListenManager");
 const utils_1 = require("./utils");
 const DboBuilder_1 = require("./DboBuilder");
@@ -22,6 +22,7 @@ const pgPromise = require("pg-promise");
 let pgp = pgPromise({
     promiseLib: Bluebird
 });
+exports.DEFAULT_SYNC_BATCH_SIZE = 50;
 class PubSubManager {
     constructor(db, dbo, wsChannelNamePrefix, pgChannelName) {
         /* Relay relevant data to relevant subscriptions */
@@ -149,7 +150,7 @@ class PubSubManager {
     }
     syncData(sync, clientData) {
         return __awaiter(this, void 0, void 0, function* () {
-            const { socket_id, channel_name, table_name, filter, table_rules, allow_delete = false, synced_field, id_fields = [] } = sync, socket = this.sockets[socket_id];
+            const { socket_id, channel_name, table_name, filter, table_rules, allow_delete = false, params, synced_field, id_fields = [], batch_size } = sync, socket = this.sockets[socket_id];
             if (sync.is_syncing) {
                 // console.log("SYNC THROTTLE")
                 return;
@@ -160,7 +161,7 @@ class PubSubManager {
             const sync_fields = [synced_field, ...id_fields.sort()], orderByAsc = sync_fields.reduce((a, v) => (Object.assign(Object.assign({}, a), { [v]: true })), {}), orderByDesc = sync_fields.reduce((a, v) => (Object.assign(Object.assign({}, a), { [v]: false })), {}), 
             // desc_params = { orderBy: [{ [synced_field]: false }].concat(id_fields.map(f => ({ [f]: false }) )) },
             // asc_params = { orderBy: [synced_field].concat(id_fields) },
-            BATCH_SIZE = 50, rowsIdsMatch = (a, b) => {
+            rowsIdsMatch = (a, b) => {
                 return a && b && !id_fields.find(key => a[key].toString() !== b[key].toString());
             }, rowsFullyMatch = (a, b) => {
                 return rowsIdsMatch(a, b) && a[synced_field].toString() === b[synced_field].toString();
@@ -190,7 +191,7 @@ class PubSubManager {
                 return res;
             }, getClientData = (from_synced = 0, offset = 0) => {
                 return new Promise((resolve, reject) => {
-                    const onPullRequest = { from_synced: from_synced || 0, offset: offset || 0, limit: BATCH_SIZE };
+                    const onPullRequest = { from_synced: from_synced || 0, offset: offset || 0, limit: batch_size };
                     socket.emit(channel_name, { onPullRequest }, (resp) => __awaiter(this, void 0, void 0, function* () {
                         if (resp && resp.data && Array.isArray(resp.data)) {
                             // console.log({ onPullRequest, resp }, socket._user)
@@ -209,7 +210,12 @@ class PubSubManager {
                 }
             }, getServerData = (from_synced = 0, offset = 0) => {
                 let _filter = Object.assign(Object.assign({}, filter), { [synced_field]: { $gte: from_synced || 0 } });
-                return this.dbo[table_name].find(_filter, { select: "*", orderBy: orderByAsc, offset: offset || 0, limit: BATCH_SIZE }, null, table_rules);
+                return this.dbo[table_name].find(_filter, {
+                    select: params.select,
+                    orderBy: orderByAsc,
+                    offset: offset || 0,
+                    limit: batch_size
+                }, null, table_rules);
             }, deleteData = (deleted) => __awaiter(this, void 0, void 0, function* () {
                 // console.log("deleteData deleteData  deleteData " + deleted.length);
                 if (allow_delete) {
@@ -236,7 +242,8 @@ class PubSubManager {
                     const id_filter = filterObj(d, id_fields);
                     /* To account for client time deviation */
                     // d[synced_field] = isExpress? (Date.now() + i) : Math.max(Date.now(), d[synced_field]);
-                    const exst = yield this.dbo[table_name].find(id_filter, { select: "*", orderBy: orderByAsc, limit: 1 }, null, table_rules);
+                    /* Select only the necessary fields when preparing to update */
+                    const exst = yield this.dbo[table_name].find(id_filter, { select: { [synced_field]: 1 }, orderBy: orderByAsc, limit: 1 }, null, table_rules);
                     if (exst && exst.length) {
                         if (table_rules.update && exst[0][synced_field] < d[synced_field]) {
                             try {
@@ -344,7 +351,7 @@ class PubSubManager {
                 }
                 return result;
             }), syncBatch = (from_synced) => __awaiter(this, void 0, void 0, function* () {
-                let offset = 0, limit = BATCH_SIZE, canContinue = true, min_synced = from_synced || 0, max_synced = from_synced;
+                let offset = 0, limit = batch_size, canContinue = true, min_synced = from_synced || 0, max_synced = from_synced;
                 let inserted = 0, updated = 0, pushed = 0, deleted = 0, total = 0;
                 // console.log("syncBatch", from_synced)
                 while (canContinue) {
@@ -418,7 +425,7 @@ class PubSubManager {
     /* Returns a sync channel */
     addSync(syncParams) {
         return __awaiter(this, void 0, void 0, function* () {
-            const { socket = null, table_info = null, table_rules = null, synced_field = null, allow_delete = null, id_fields = [], filter = {}, params = {}, condition = "", throttle = 0 } = syncParams || {};
+            const { socket = null, table_info = null, table_rules = null, synced_field = null, allow_delete = null, id_fields = [], filter = {}, params, condition = "", throttle = 0 } = syncParams || {};
             let conditionParsed = this.parseCondition(condition);
             if (!socket || !table_info)
                 throw "socket or table_info missing";
@@ -436,7 +443,8 @@ class PubSubManager {
                     id_fields,
                     allow_delete,
                     table_rules,
-                    throttle: Math.max(throttle || 0, table_rules.sync.min_throttle || 0),
+                    throttle: Math.max(throttle || 0, table_rules.sync.throttle || 0),
+                    batch_size: utils_1.get(table_rules, "sync.batch_size") || exports.DEFAULT_SYNC_BATCH_SIZE,
                     last_throttled: 0,
                     socket_id: socket.id,
                     is_sync: true,

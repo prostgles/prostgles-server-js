@@ -28,7 +28,7 @@ prostgles({
     return Boolean(user && user.type === "admin")
   },
   publish: (socket, dbo: DBObj) => {
-		return "*";
+		// return "*";
 		return  {
 			items: {
 				select: {
@@ -67,7 +67,7 @@ prostgles({
 	onReady: async (dbo: DBObj, db) => {
 		
     app.get('*', function(req, res){
-      // console.log(req.originalUrl)
+      console.log(req.originalUrl)
 			res.sendFile(path.join(__dirname+'/index.html'));
 		});
 
@@ -179,7 +179,10 @@ prostgles({
 
 
       console.log("All tests successful");
-			process.exit(0);
+			if(!process.env.NOSTOP){ 
+				console.log("Exiting")
+				process.exit(0);
+			}
 
 		} catch(err) {
 			console.error(err);

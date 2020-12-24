@@ -137,6 +137,7 @@ export declare class ViewHandler {
     } | Readonly<{
         unsubscribe: () => void;
     }>>;
+    getAllowedSelectFields(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean): string[];
     prepareColumnSet(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, onlyNames?: boolean): string | pgPromise.ColumnSet;
     prepareSelect(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, tableAlias?: string): string;
     private getFinalFilterObj;
@@ -159,8 +160,8 @@ export declare class ViewHandler {
     prepareFieldValues(obj: object, forcedData: object, allowed_cols: FieldFilter, fixIssues?: boolean): object;
     /**
     * Filter string array
-    * @param {FieldFilter} fieldParams - key filter param. e.g.: "*" OR ["key1", "key2"] OR []
-    * @param {boolean} allow_empty - allow empty select
+    * @param {FieldFilter} fieldParams - { col1: 0, col2: 0 } | { col1: true, col2: true } | "*" | ["key1", "key2"] | []
+    * @param {boolean} allow_empty - allow empty select. defaults to true
     */
     parseFieldFilter(fieldParams?: FieldFilter, allow_empty?: boolean): string[];
 }

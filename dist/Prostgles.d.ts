@@ -34,6 +34,9 @@ export declare type UpdateRequestDataBatch = {
 };
 export declare type UpdateRequestData = UpdateRequestDataOne | UpdateRequestDataBatch;
 export declare type SelectRule = {
+    /**
+     * Fields allowed to be selected.   Tip: Use false to exclude field
+     */
     fields: FieldFilter;
     maxLimit?: number;
     forcedFilter?: object;
@@ -62,10 +65,26 @@ export declare type DeleteRule = {
     validate?(...UpdateRequestData: any[]): UpdateRequestData;
 };
 export declare type SyncRule = {
+    /**
+     * Primary keys used in updating data
+     */
     id_fields: string[];
+    /**
+     * Numerical incrementing fieldname (last updated timestamp) used to sync items
+     */
     synced_field: string;
+    /**
+     * EXPERIMENTAL. Disabled by default. If true then server will attempt to delete any records missing from client.
+     */
     allow_delete?: boolean;
-    min_throttle?: number;
+    /**
+     * Throttle replication transmission in milliseconds. Defaults to 100
+     */
+    throttle?: number;
+    /**
+     * Number of rows to send per trip. Defaults to 50
+     */
+    batch_size?: number;
 };
 export declare type SubscribeRule = {
     throttle?: number;

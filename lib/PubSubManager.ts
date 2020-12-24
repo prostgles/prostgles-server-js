@@ -11,11 +11,12 @@ import { TableRule, DB } from "./Prostgles";
 import * as Bluebird from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import { SelectParams, OrderBy } from "prostgles-types";
+import { SelectParams, OrderBy, FieldFilter } from "prostgles-types";
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 let pgp: PGP = pgPromise({
     promiseLib: Bluebird
 });
+export const DEFAULT_SYNC_BATCH_SIZE = 50;
 
 type SyncParams = {
     socket_id: string; 
@@ -25,8 +26,11 @@ type SyncParams = {
     synced_field: string;
     allow_delete: boolean;
     id_fields: string[];
+    batch_size: number;
     filter: object;
-    params: SelectParams;
+    params: {
+        select: FieldFilter
+    };
     condition: string;
     is_syncing: boolean;
     throttle?: number;
@@ -42,7 +46,9 @@ type AddSyncParams = {
     allow_delete: boolean;
     id_fields: string[];
     filter: object;
-    params: SelectParams;
+    params: {
+        select: FieldFilter
+    };
     condition: string;
     throttle?: number;
 }
@@ -227,7 +233,11 @@ export class PubSubManager {
     }
 
     async syncData(sync: SyncParams, clientData){
-        const { socket_id, channel_name, table_name, filter, table_rules, allow_delete = false, synced_field, id_fields = [] } = sync,
+        const { 
+                socket_id, channel_name, table_name, filter, 
+                table_rules, allow_delete = false, params,
+                synced_field, id_fields = [], batch_size
+            } = sync,
             socket = this.sockets[socket_id];
 
         if(sync.is_syncing){
@@ -244,7 +254,6 @@ export class PubSubManager {
             orderByDesc = sync_fields.reduce((a, v) => ({ ...a, [v]: false }), {}),
             // desc_params = { orderBy: [{ [synced_field]: false }].concat(id_fields.map(f => ({ [f]: false }) )) },
             // asc_params = { orderBy: [synced_field].concat(id_fields) },
-            BATCH_SIZE = 50,
             rowsIdsMatch = (a, b) => {
                 return a && b && !id_fields.find(key => a[key].toString() !== b[key].toString())
             },
@@ -288,7 +297,7 @@ export class PubSubManager {
             },
             getClientData = (from_synced = 0, offset = 0) => {
                 return new Promise((resolve, reject) => {
-                    const onPullRequest = { from_synced: from_synced || 0, offset: offset || 0, limit: BATCH_SIZE };
+                    const onPullRequest = { from_synced: from_synced || 0, offset: offset || 0, limit: batch_size };
                     socket.emit(channel_name, { onPullRequest } , async (resp) => {
                         if(resp && resp.data && Array.isArray(resp.data)){
                             // console.log({ onPullRequest, resp }, socket._user)
@@ -312,7 +321,17 @@ export class PubSubManager {
                     [synced_field]: { $gte: from_synced || 0 }
                 };
 
-                return this.dbo[table_name].find(_filter, { select: "*", orderBy: (orderByAsc as OrderBy), offset: offset || 0, limit: BATCH_SIZE }, null, table_rules);
+                return this.dbo[table_name].find(
+                    _filter, 
+                    { 
+                        select: params.select, 
+                        orderBy: (orderByAsc as OrderBy), 
+                        offset: offset || 0, 
+                        limit: batch_size 
+                    }, 
+                    null, 
+                    table_rules
+                );
             },
             deleteData = async (deleted) => {
                 // console.log("deleteData deleteData  deleteData " + deleted.length);
@@ -345,7 +364,8 @@ export class PubSubManager {
                     /* To account for client time deviation */
                     // d[synced_field] = isExpress? (Date.now() + i) : Math.max(Date.now(), d[synced_field]);
 
-                    const exst = await this.dbo[table_name].find(id_filter, { select: "*", orderBy: (orderByAsc as OrderBy), limit: 1 }, null, table_rules);
+                    /* Select only the necessary fields when preparing to update */
+                    const exst = await this.dbo[table_name].find(id_filter, { select: { [synced_field]: 1 }, orderBy: (orderByAsc as OrderBy), limit: 1 }, null, table_rules);
                 
                     if(exst && exst.length){
                         if(table_rules.update && exst[0][synced_field] < d[synced_field]){
@@ -463,7 +483,7 @@ export class PubSubManager {
             },
             syncBatch = async (from_synced) => {
                 let offset = 0,
-                    limit = BATCH_SIZE,
+                    limit = batch_size,
                     canContinue = true,
                     min_synced = from_synced || 0,
                     max_synced = from_synced;
@@ -556,7 +576,11 @@ export class PubSubManager {
 
     /* Returns a sync channel */
     async addSync(syncParams: AddSyncParams){
-        const { socket = null, table_info = null, table_rules = null, synced_field = null, allow_delete = null, id_fields = [], filter = {}, params = {}, condition = "", throttle = 0 } = syncParams || {};
+        const { socket = null, table_info = null, table_rules = null, synced_field = null, 
+            allow_delete = null, id_fields = [], filter = {}, 
+            params, condition = "", throttle = 0 
+        } = syncParams || {};
+
         let conditionParsed = this.parseCondition(condition);
         if(!socket || !table_info) throw "socket or table_info missing";
         
@@ -578,7 +602,8 @@ export class PubSubManager {
                     id_fields,
                     allow_delete,
                     table_rules,
-                    throttle: Math.max(throttle || 0, table_rules.sync.min_throttle || 0),
+                    throttle: Math.max(throttle || 0, table_rules.sync.throttle || 0),
+                    batch_size: get(table_rules, "sync.batch_size") || DEFAULT_SYNC_BATCH_SIZE,
                     last_throttled: 0,
                     socket_id: socket.id,
                     is_sync: true,
@@ -660,7 +685,11 @@ export class PubSubManager {
     /* Must return a channel for socket */
     /* The distinct list of channel names must have a corresponding trigger in the database */
     async addSub(subscriptionParams: AddSubscriptionParams){
-        const { socket = null, func = null, table_info = null, table_rules = null, filter = {}, params = {}, condition = "", subOne = false } = subscriptionParams || {};
+        const { 
+            socket = null, func = null, table_info = null, table_rules = null, filter = {}, 
+            params = {}, condition = "", subOne = false 
+        } = subscriptionParams || {};
+
         let throttle = subscriptionParams.throttle || 10;
         if((!socket && !func) || !table_info) throw "socket/func or table_info missing";
 

@@ -716,7 +716,7 @@ class ViewHandler {
     subscribeOne(filter, params, localFunc, table_rules, localParams) {
         return this.subscribe(filter, params, localFunc, table_rules, Object.assign(Object.assign({}, (localParams || {})), { subOne: true }));
     }
-    prepareColumnSet(selectParams = "*", allowed_cols, allow_empty = true, onlyNames = true) {
+    getAllowedSelectFields(selectParams = "*", allowed_cols, allow_empty = true) {
         let all_columns = this.column_names.slice(0), allowedFields = all_columns.slice(0), resultFields = [];
         if (selectParams) {
             resultFields = this.parseFieldFilter(selectParams, allow_empty);
@@ -728,6 +728,11 @@ class ViewHandler {
         /* Maintain allowed cols order */
         if (selectParams === "*" && allowedFields && allowedFields.length)
             col_names = allowedFields;
+        return col_names;
+    }
+    prepareColumnSet(selectParams = "*", allowed_cols, allow_empty = true, onlyNames = true) {
+        let all_columns = this.column_names.slice(0);
+        let col_names = this.getAllowedSelectFields(selectParams, all_columns, allow_empty);
         try {
             let colSet = new pgp.helpers.ColumnSet(col_names);
             return onlyNames ? colSet.names : colSet;
@@ -1188,8 +1193,8 @@ class ViewHandler {
     }
     /**
     * Filter string array
-    * @param {FieldFilter} fieldParams - key filter param. e.g.: "*" OR ["key1", "key2"] OR []
-    * @param {boolean} allow_empty - allow empty select
+    * @param {FieldFilter} fieldParams - { col1: 0, col2: 0 } | { col1: true, col2: true } | "*" | ["key1", "key2"] | []
+    * @param {boolean} allow_empty - allow empty select. defaults to true
     */
     parseFieldFilter(fieldParams = "*", allow_empty = true) {
         const all_fields = this.column_names.slice(0);
@@ -1575,23 +1580,42 @@ class TableHandler extends ViewHandler {
     /* External request. Cannot sync from server */
     sync(filter, params, param3_unused, table_rules, localParams) {
         return __awaiter(this, void 0, void 0, function* () {
+            if (!localParams)
+                throw "Sync not allowed within the same server code";
+            const { socket } = localParams;
+            if (!socket)
+                throw "INTERNAL ERROR: socket missing";
+            if (!table_rules || !table_rules.sync || !table_rules.select)
+                throw "INTERNAL ERROR: sync or select rules missing";
             if (this.t)
                 throw "Sync not allowed within transactions";
+            const ALLOWED_PARAMS = ["select"];
+            const invalidParams = Object.keys(params || {}).filter(k => !ALLOWED_PARAMS.includes(k));
+            if (invalidParams.length)
+                throw "Invalid or dissallowed params found: " + invalidParams.join(", ");
             try {
-                const { socket } = localParams || {};
-                if (!socket)
-                    throw "INTERNAL ERROR: socket missing";
-                if (!table_rules || !table_rules.sync || !table_rules.select)
-                    throw "INTERNAL ERROR: sync or select rules missing";
                 let { id_fields, synced_field, allow_delete } = table_rules.sync;
+                const syncFields = [...id_fields, synced_field];
                 if (!id_fields || !synced_field) {
                     const err = "INTERNAL ERROR: id_fields OR synced_field missing from publish";
                     console.error(err);
                     throw err;
                 }
                 id_fields = this.parseFieldFilter(id_fields, false);
+                let allowedSelect = this.parseFieldFilter(utils_1.get(table_rules, "select.fields"), false);
+                if (syncFields.find(f => !allowedSelect.includes(f))) {
+                    throw `INTERNAL ERROR: sync field missing from publish.${this.name}.select.fields`;
+                }
+                let select = this.getAllowedSelectFields(utils_1.get(params || {}, "select") || "*", allowedSelect, false);
+                if (!select.length)
+                    throw "Empty select not allowed";
+                /* Add sync fields if missing */
+                syncFields.map(sf => {
+                    if (!select.includes(sf))
+                        select.push(sf);
+                });
                 /* Step 1: parse command and params */
-                return this.find(filter, { select: [...id_fields, synced_field], limit: 0 }, null, table_rules, localParams)
+                return this.find(filter, { select, limit: 0 }, null, table_rules, localParams)
                     .then((isValid) => __awaiter(this, void 0, void 0, function* () {
                     const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {};
                     const condition = yield this.prepareWhere(filter, forcedFilter, filterFields, true, null, localParams, table_rules);
@@ -1603,7 +1627,7 @@ class TableHandler extends ViewHandler {
                         socket,
                         table_rules,
                         filter: Object.assign({}, filter),
-                        params: Object.assign({}, params)
+                        params: { select }
                     }).then(channelName => ({ channelName, id_fields, synced_field }));
                 }));
             }

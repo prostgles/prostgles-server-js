@@ -20,6 +20,7 @@ const pkgj = require('../package.json');
 const version = pkgj.version;
 const utils_1 = require("./utils");
 const DboBuilder_1 = require("./DboBuilder");
+const PubSubManager_1 = require("./PubSubManager");
 function getDbConnection(dbConnection, options, debugQueries = false) {
     let pgp = pgPromise(Object.assign({ promiseLib: promise }, (debugQueries ? {
         query: function (e) {
@@ -431,7 +432,7 @@ const RULE_TO_METHODS = [
         rule: "sync", methods: ["sync", "unsync"],
         no_limits: null,
         table_only: true,
-        allowed_params: ["id_fields", "synced_field", "sync_type", "allow_delete", "min_throttle"],
+        allowed_params: ["id_fields", "synced_field", "sync_type", "allow_delete", "throttle", "batch_size"],
         hint: ` expecting "*" | true | { id_fields: string[], synced_field: string }`
     },
     {
@@ -653,11 +654,22 @@ class PublishParser {
                             }
                             if (typeof table_rules[method] === "boolean" || table_rules[method] === "*") {
                                 table_rules[method] = Object.assign({}, rm.no_limits);
+                                if (method === "sync")
+                                    throw "Invalid sync rule. Expecting { id_fields: string[], synced_field: string } ";
                             }
                             let method_params = Object.keys(table_rules[method]);
                             let iparam = method_params.find(p => !rm.allowed_params.includes(p));
                             if (iparam) {
                                 throw `Invalid setting in publish.${tableName}.${method} -> ${iparam}. \n Expecting any of: ${rm.allowed_params.join(", ")}`;
+                            }
+                            /* Add defaults */
+                            if (method === "sync") {
+                                if (typeof utils_1.get(table_rules, [method, "throttle"]) !== "number") {
+                                    table_rules[method].throttle = 100;
+                                }
+                                if (typeof utils_1.get(table_rules, [method, "batch_size"]) !== "number") {
+                                    table_rules[method].batch_size = PubSubManager_1.DEFAULT_SYNC_BATCH_SIZE;
+                                }
                             }
                         });
                     }

@@ -65,7 +65,7 @@ index_1.default({
     ],
     onReady: async (dbo, db) => {
         app.get('*', function (req, res) {
-            // console.log(req.originalUrl)
+            console.log(req.originalUrl);
             res.sendFile(path_1.default.join(__dirname + '/index.html'));
         });
         try {
@@ -163,7 +163,10 @@ index_1.default({
             if (typeof rowhash.$rowhash !== "string")
                 throw "$rowhash query failed";
             console.log("All tests successful");
-            process.exit(0);
+            if (!process.env.NOSTOP) {
+                console.log("Exiting");
+                process.exit(0);
+            }
         }
         catch (err) {
             console.error(err);

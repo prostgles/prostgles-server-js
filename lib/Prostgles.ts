@@ -12,7 +12,7 @@ const version = pkgj.version;
 
 import { get } from "./utils";
 import { DboBuilder, DbHandler, DbHandlerTX, TableHandler, ViewHandler } from "./DboBuilder";
-import { PubSubManager } from "./PubSubManager";
+import { PubSubManager, DEFAULT_SYNC_BATCH_SIZE } from "./PubSubManager";
  
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 
@@ -80,6 +80,9 @@ export type UpdateRequestData = UpdateRequestDataOne | UpdateRequestDataBatch;
 
 export type SelectRule = {
     // Fields allowed to be selected.   Tip: Use false to exclude field
+    /**
+     * Fields allowed to be selected.   Tip: Use false to exclude field
+     */
     fields: FieldFilter;
 
     maxLimit?: number;
@@ -147,15 +150,30 @@ export type DeleteRule = {
 }
 export type SyncRule = {
     
-    /* Id of the table */
+    /**
+     * Primary keys used in updating data
+     */
     id_fields: string[];
-
-    /* Numerical incrementing (last updated timestamp) fieldname used to sync items */
+    
+    /**
+     * Numerical incrementing fieldname (last updated timestamp) used to sync items
+     */
     synced_field: string;
 
+    /**
+     * EXPERIMENTAL. Disabled by default. If true then server will attempt to delete any records missing from client.
+     */
     allow_delete?: boolean;
 
-    min_throttle?: number;
+     /**
+      * Throttle replication transmission in milliseconds. Defaults to 100
+      */
+    throttle?: number;
+
+    /**
+     * Number of rows to send per trip. Defaults to 50 
+     */
+    batch_size?: number;
 }
 export type SubscribeRule = {
     throttle?: number;
@@ -741,7 +759,7 @@ const RULE_TO_METHODS = [
        rule: "sync", methods: ["sync", "unsync"], 
        no_limits: null,
        table_only: true,
-       allowed_params: <Array<keyof SyncRule>>["id_fields", "synced_field", "sync_type", "allow_delete", "min_throttle"],
+       allowed_params: <Array<keyof SyncRule>>["id_fields", "synced_field", "sync_type", "allow_delete", "throttle", "batch_size"],
        hint: ` expecting "*" | true | { id_fields: string[], synced_field: string }`
     },
     { 
@@ -985,6 +1003,7 @@ export class PublishParser {
                             
                             if(typeof table_rules[method] === "boolean" || table_rules[method] === "*"){
                                 table_rules[method] = { ...rm.no_limits };
+                                if(method === "sync") throw "Invalid sync rule. Expecting { id_fields: string[], synced_field: string } ";
                             }
                             let method_params = Object.keys(table_rules[method]);
     
@@ -992,6 +1011,16 @@ export class PublishParser {
                             let iparam = method_params.find(p => !rm.allowed_params.includes(<never>p));
                             if(iparam){
                                 throw `Invalid setting in publish.${tableName}.${method} -> ${iparam}. \n Expecting any of: ${rm.allowed_params.join(", ")}`;
+                            }
+
+                            /* Add defaults */
+                            if(method === "sync"){
+                                if(typeof get(table_rules, [method, "throttle"]) !== "number"){
+                                    table_rules[method].throttle = 100;
+                                }
+                                if(typeof get(table_rules, [method, "batch_size"]) !== "number"){
+                                    table_rules[method].batch_size = DEFAULT_SYNC_BATCH_SIZE;
+                                }
                             }
                         });                
                 }
