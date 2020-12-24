@@ -1419,7 +1419,7 @@ class TableHandler extends ViewHandler {
                     validate = tableRules.insert.validate;
                     preValidate = tableRules.insert.preValidate;
                     if (!fields)
-                        throw ` invalid insert rule for ${this.name}. fields missing `;
+                        throw ` invalid insert rule for ${this.name} -> fields missing `;
                     /* Safely test publish rules */
                     if (testRule) {
                         yield this.validateViewRules(fields, null, returningFields, null, "insert");

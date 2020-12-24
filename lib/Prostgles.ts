@@ -903,16 +903,17 @@ export class PublishParser {
 
                         if ([true, "*"].includes(table_rules[r.rule]) && r.no_limits) {
                             table_rules[r.rule] = Object.assign({}, r.no_limits);
-                        }
-                        r.methods.map(method => {
-                            if(table_rules[method] === undefined){
-                                if(method === "upsert" && !(table_rules.update && table_rules.insert)){
-                                    // return;
-                                } else {
-                                    table_rules[method] = {};
+                        } else if(table_rules[r.rule]){
+                            r.methods.map(method => {
+                                if(table_rules[method] === undefined){
+                                    if(method === "upsert" && !(table_rules.update && table_rules.insert)){
+                                        // return;
+                                    } else {
+                                        table_rules[method] = {};
+                                    }
                                 }
-                            }
-                        })
+                            });
+                        }
                     });
                 
                 /*

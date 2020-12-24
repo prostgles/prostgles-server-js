@@ -1774,7 +1774,7 @@ export class TableHandler extends ViewHandler {
                 validate = tableRules.insert.validate;
                 preValidate = tableRules.insert.preValidate;
     
-                if(!fields) throw ` invalid insert rule for ${this.name}. fields missing `;
+                if(!fields) throw ` invalid insert rule for ${this.name} -> fields missing `;
 
                 /* Safely test publish rules */
                 if(testRule){
