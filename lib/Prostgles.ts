@@ -863,7 +863,7 @@ export class PublishParser {
                                 /* Add implied methods unless specifically disabled */
                                 if(methods.includes("find") && table_rules.count !== false) methods = [ ...methods, "count"];
                                 if(methods.includes("find") && table_rules.subscribe !== false) methods = [ ...methods, "subscribe" ];
-                                if(methods.includes("getColumns") && table_rules.getColumns !== false) methods = [ ...methods, "getColumns"];
+                                if(methods.includes("find") && table_rules.getColumns !== false) methods = [ ...methods, "getColumns"];
                             }
                             
                             await Promise.all(methods.map(async method => {

@@ -28,7 +28,7 @@ prostgles({
     return Boolean(user && user.type === "admin")
   },
   publish: (socket, dbo: DBObj) => {
-		// return "*";
+		return "*";
 		return  {
 			items: {
 				select: {

@@ -524,7 +524,7 @@ class PublishParser {
                                     methods = [...methods, "count"];
                                 if (methods.includes("find") && table_rules.subscribe !== false)
                                     methods = [...methods, "subscribe"];
-                                if (methods.includes("getColumns") && table_rules.getColumns !== false)
+                                if (methods.includes("find") && table_rules.getColumns !== false)
                                     methods = [...methods, "getColumns"];
                             }
                             yield Promise.all(methods.map((method) => __awaiter(this, void 0, void 0, function* () {
