@@ -903,7 +903,8 @@ export class PublishParser {
 
                         if ([true, "*"].includes(table_rules[r.rule]) && r.no_limits) {
                             table_rules[r.rule] = Object.assign({}, r.no_limits);
-                        } else if(table_rules[r.rule]){
+                        }
+                        if(table_rules[r.rule]){
                             r.methods.map(method => {
                                 if(table_rules[method] === undefined){
                                     if(method === "upsert" && !(table_rules.update && table_rules.insert)){
@@ -1046,7 +1047,7 @@ export class PublishParser {
                                 // if(methods.includes("find") && table_rules.getColumns !== false) methods = [ ...methods, "getColumns"];
                             }
                             
-                            await Promise.all(methods.map(async method => {
+                            await Promise.all(methods.filter(m => m !== "select").map(async method => {
                                 if(method === "sync" && table_rules[method]){
 
                                     /* Pass sync info */

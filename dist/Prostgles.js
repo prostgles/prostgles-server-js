@@ -566,7 +566,7 @@ class PublishParser {
                         if ([true, "*"].includes(table_rules[r.rule]) && r.no_limits) {
                             table_rules[r.rule] = Object.assign({}, r.no_limits);
                         }
-                        else if (table_rules[r.rule]) {
+                        if (table_rules[r.rule]) {
                             r.methods.map(method => {
                                 if (table_rules[method] === undefined) {
                                     if (method === "upsert" && !(table_rules.update && table_rules.insert)) {
@@ -693,7 +693,7 @@ class PublishParser {
                                 // if(methods.includes("find") && table_rules.subscribe !== false) methods = [ ...methods, "subscribe" ];
                                 // if(methods.includes("find") && table_rules.getColumns !== false) methods = [ ...methods, "getColumns"];
                             }
-                            yield Promise.all(methods.map((method) => __awaiter(this, void 0, void 0, function* () {
+                            yield Promise.all(methods.filter(m => m !== "select").map((method) => __awaiter(this, void 0, void 0, function* () {
                                 if (method === "sync" && table_rules[method]) {
                                     /* Pass sync info */
                                     schema[tableName][method] = table_rules[method];
