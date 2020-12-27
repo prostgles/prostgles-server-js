@@ -1674,7 +1674,17 @@ class DboBuilder {
         this.schema = this.prostgles.schema || "public";
         this.dbo = {};
         // this.joins = this.prostgles.joins;
-        this.pubSubManager = new PubSubManager_1.PubSubManager(this.db, this.dbo);
+        let onSchemaChange;
+        if (this.prostgles.watchSchema) {
+            onSchemaChange = () => {
+                this.prostgles.onSchemaChange();
+            };
+        }
+        this.pubSubManager = new PubSubManager_1.PubSubManager({
+            db: this.db,
+            dbo: this.dbo,
+            onSchemaChange
+        });
     }
     getJoins() {
         return this.joins;

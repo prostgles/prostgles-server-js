@@ -169,6 +169,7 @@ export declare type ProstglesInitOptions = {
     onSocketDisconnect?(socket: Socket, dbo: any, db?: DB): any;
     auth?: Auth;
     DEBUG_MODE?: boolean;
+    watchSchema?: boolean | Function;
 };
 export declare type OnReady = {
     dbo: DbHandler;
@@ -196,10 +197,17 @@ export declare class Prostgles {
     publishParser: PublishParser;
     auth?: Auth;
     DEBUG_MODE?: boolean;
+    watchSchema?: boolean | Function;
+    private loaded;
     constructor(params: ProstglesInitOptions);
+    onSchemaChange(): void;
     checkDb(): void;
+    getTSFileName(): {
+        fileName: string;
+        fullPath: string;
+    };
     init(onReady: (dbo: DbHandler | DbHandlerTX, db: DB) => any): Promise<boolean>;
-    runSQLFile(filePath: string): Promise<void>;
+    runSQLFile(filePath: string): Promise<boolean | void>;
     getSID(socket: any): any;
     getUser(socket: any): Promise<object>;
     getUserFromCookieSession(socket: any): Promise<null | {
@@ -238,5 +246,6 @@ export declare class PublishParser {
     getTableRules({ tableName, socket }: DboTable, user: any): Promise<any>;
     getSchemaFromPublish(socket: any): Promise<{}>;
 }
+export declare function isSuperUser(db: DB): Promise<boolean>;
 export {};
 //# sourceMappingURL=Prostgles.d.ts.map

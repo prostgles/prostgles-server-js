@@ -4,14 +4,19 @@
 		<title> Prostgles </title>
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<!-- <script src="https://unpkg.com/socket.io-client@2.3.1/dist/socket.io.slim.js" type="text/javascript"></script> -->
+	
 		<script src="https://unpkg.com/socket.io-client@3.0.3/dist/socket.io.min.js" type="text/javascript"></script>
-		<script src="https://unpkg.com/prostgles-client@latest/dist/index.js" type="text/javascript"></script>
+		<script src="https://unpkg.com/prostgles-client@dev/dist/index.js" type="text/javascript"></script>
 	</head>
 	<body>
 		<script>
 
 			prostgles({
-				socket: io({ path: "/teztz" }), // or simply io()
+				socket: io({ path: "/teztz/s" }), // or simply io()
+				onReconnect: (socket) => {
+					console.log(1111)
+					// window.location.reload();
+				},
 				onReady: async (db, methods) => {
 					db.items.subscribe({}, {}, items => {
 						document.body.innerText = JSON.stringify(items);

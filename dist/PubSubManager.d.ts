@@ -55,6 +55,13 @@ declare type SubscriptionParams = {
 declare type AddSubscriptionParams = SubscriptionParams & {
     condition: string;
 };
+export declare type PubSubManagerOptions = {
+    db: DB;
+    dbo: DbHandler;
+    wsChannelNamePrefix?: string;
+    pgChannelName?: string;
+    onSchemaChange?: () => void;
+};
 export declare class PubSubManager {
     static DELIMITER: string;
     db: DB;
@@ -70,9 +77,12 @@ export declare class PubSubManager {
     };
     syncs: SyncParams[];
     socketChannelPreffix: string;
+    onSchemaChange?: () => void;
     postgresNotifListenManager: PostgresNotifListenManager;
     postgresNotifChannelName: string;
-    constructor(db: DB, dbo: DbHandler, wsChannelNamePrefix?: string, pgChannelName?: string);
+    schemaChangedNotifPayloadStr: string;
+    constructor(options: PubSubManagerOptions);
+    startWatchingSchema(): Promise<void>;
     isReady(): any;
     getSubs(table_name: string, condition: string): SubscriptionParams[];
     getSyncs(table_name: string, condition: string): SyncParams[];

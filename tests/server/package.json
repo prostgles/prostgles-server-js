@@ -1,0 +1,25 @@
+{
+  "name": "typescript",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "tsc-watch --onSuccess \"node index.js\"",
+    "dev": "NOSTOP=true npm start",
+    "build": "npm i && npm run test-server && npm run test-client",
+    "test-server": "tsc && TEST_TYPE=server node index.js",
+    "test-client": "tsc && TEST_TYPE=client node index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/node": "^14.14.16",
+    "@types/socket.io": "^2.1.11",
+    "@types/socket.io-client": "^1.4.34",
+    "express": "^4.17.1",
+    "prostgles-client": "^1.5.21",
+    "prostgles-server": "^1.0.33",
+    "socket.io": "^3.0.4",
+    "socket.io-client": "^3.0.4"
+  }
+}

@@ -6,12 +6,11 @@
 		"esModuleInterop" : true,
 		"module": "commonjs",
 		"sourceMap": true,
-		"rootDir": ".",
+		// "rootDir": ".",
 		"declaration": true,
 		"declarationMap": true,
 	},
 	"exclude": [
-		"dist",
-		"DBoGenerated.ts"
+		"dist"
 	]
 }

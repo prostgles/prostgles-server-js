@@ -2081,13 +2081,25 @@ export class DboBuilder {
     prostgles: Prostgles;
     publishParser: PublishParser;
 
+    onSchemaChange: () => void;
+
     constructor(prostgles: Prostgles){
         this.prostgles = prostgles;
         this.db = this.prostgles.db;
         this.schema = this.prostgles.schema || "public";
         this.dbo = { };
         // this.joins = this.prostgles.joins;
-        this.pubSubManager = new PubSubManager(this.db, this.dbo as unknown as DbHandler);
+        let onSchemaChange;
+        if(this.prostgles.watchSchema){
+            onSchemaChange = () => { 
+                this.prostgles.onSchemaChange()
+            }
+        }
+        this.pubSubManager = new PubSubManager({ 
+            db: this.db, 
+            dbo: this.dbo as unknown as DbHandler,
+            onSchemaChange
+        });
     }
 
     getJoins(){
