@@ -60,6 +60,14 @@ export type Items4 = {
      name?: string;
 };
 export type Items4_Filter = Items4 | object | { $and: (Items4 | object)[] } | { $or: (Items4 | object)[] } 
+export type Planes = {
+     flight_number?: string;
+     id?: number;
+     last_updated?: number;
+     x?: number;
+     y?: number;
+};
+export type Planes_Filter = Planes | object | { $and: (Planes | object)[] } | { $or: (Planes | object)[] } 
 export type Table = {
      id?: string;
 };
@@ -79,7 +87,7 @@ export type DBO_items = {
    update: (filter:  Items_Filter , newData: Items, params?: UpdateParams) => Promise<void | Items>;
    upsert: (filter:  Items_Filter , newData: Items, params?: UpdateParams) => Promise<void | Items>;
    insert: (data: (Items | Items[]), params?: InsertParams) => Promise<void | Items>;
-   delete: (filter:  Items_Filter , params?: DeleteParams) => Promise<void | Items>; 
+   delete: (filter?:  Items_Filter , params?: DeleteParams) => Promise<void | Items>; 
 };
 export type DBO_items2 = {
     getColumns: () => Promise<any[]>;
@@ -91,7 +99,7 @@ export type DBO_items2 = {
    update: (filter:  Items2_Filter , newData: Items2, params?: UpdateParams) => Promise<void | Items2>;
    upsert: (filter:  Items2_Filter , newData: Items2, params?: UpdateParams) => Promise<void | Items2>;
    insert: (data: (Items2 | Items2[]), params?: InsertParams) => Promise<void | Items2>;
-   delete: (filter:  Items2_Filter , params?: DeleteParams) => Promise<void | Items2>; 
+   delete: (filter?:  Items2_Filter , params?: DeleteParams) => Promise<void | Items2>; 
 };
 export type DBO_items3 = {
     getColumns: () => Promise<any[]>;
@@ -103,7 +111,7 @@ export type DBO_items3 = {
    update: (filter:  Items3_Filter , newData: Items3, params?: UpdateParams) => Promise<void | Items3>;
    upsert: (filter:  Items3_Filter , newData: Items3, params?: UpdateParams) => Promise<void | Items3>;
    insert: (data: (Items3 | Items3[]), params?: InsertParams) => Promise<void | Items3>;
-   delete: (filter:  Items3_Filter , params?: DeleteParams) => Promise<void | Items3>; 
+   delete: (filter?:  Items3_Filter , params?: DeleteParams) => Promise<void | Items3>; 
 };
 export type DBO_items4 = {
     getColumns: () => Promise<any[]>;
@@ -115,7 +123,19 @@ export type DBO_items4 = {
    update: (filter:  Items4_Filter , newData: Items4, params?: UpdateParams) => Promise<void | Items4>;
    upsert: (filter:  Items4_Filter , newData: Items4, params?: UpdateParams) => Promise<void | Items4>;
    insert: (data: (Items4 | Items4[]), params?: InsertParams) => Promise<void | Items4>;
-   delete: (filter:  Items4_Filter , params?: DeleteParams) => Promise<void | Items4>; 
+   delete: (filter?:  Items4_Filter , params?: DeleteParams) => Promise<void | Items4>; 
+};
+export type DBO_planes = {
+    getColumns: () => Promise<any[]>;
+   find: (filter?:  Planes_Filter , selectParams?: SelectParams) => Promise<Planes[] | any[]>;
+   findOne: (filter?:  Planes_Filter , selectParams?: SelectParams) => Promise<Planes | any>;
+   subscribe: (filter:  Planes_Filter , params: SelectParams, onData: (items: Planes[]) => any) => Promise<{ unsubscribe: () => any }>;
+   subscribeOne: (filter:  Planes_Filter , params: SelectParams, onData: (item: Planes) => any) => Promise<{ unsubscribe: () => any }>;
+   count: (filter?:  Planes_Filter ) => Promise<number>;
+   update: (filter:  Planes_Filter , newData: Planes, params?: UpdateParams) => Promise<void | Planes>;
+   upsert: (filter:  Planes_Filter , newData: Planes, params?: UpdateParams) => Promise<void | Planes>;
+   insert: (data: (Planes | Planes[]), params?: InsertParams) => Promise<void | Planes>;
+   delete: (filter?:  Planes_Filter , params?: DeleteParams) => Promise<void | Planes>; 
 };
 export type DBO_table = {
     getColumns: () => Promise<any[]>;
@@ -127,7 +147,7 @@ export type DBO_table = {
    update: (filter:  Table_Filter , newData: Table, params?: UpdateParams) => Promise<void | Table>;
    upsert: (filter:  Table_Filter , newData: Table, params?: UpdateParams) => Promise<void | Table>;
    insert: (data: (Table | Table[]), params?: InsertParams) => Promise<void | Table>;
-   delete: (filter:  Table_Filter , params?: DeleteParams) => Promise<void | Table>; 
+   delete: (filter?:  Table_Filter , params?: DeleteParams) => Promise<void | Table>; 
 };
 export type DBO_transaction = {
     getColumns: () => Promise<any[]>;
@@ -139,7 +159,7 @@ export type DBO_transaction = {
    update: (filter:  Transaction_Filter , newData: Transaction, params?: UpdateParams) => Promise<void | Transaction>;
    upsert: (filter:  Transaction_Filter , newData: Transaction, params?: UpdateParams) => Promise<void | Transaction>;
    insert: (data: (Transaction | Transaction[]), params?: InsertParams) => Promise<void | Transaction>;
-   delete: (filter:  Transaction_Filter , params?: DeleteParams) => Promise<void | Transaction>; 
+   delete: (filter?:  Transaction_Filter , params?: DeleteParams) => Promise<void | Transaction>; 
 };
 
 export type JoinMakerTables = {
@@ -153,6 +173,7 @@ export type DBObj = {
  items2: DBO_items2;
  items3: DBO_items3;
  items4: DBO_items4;
+ planes: DBO_planes;
  table: DBO_table;
  transaction: DBO_transaction;
  leftJoin: JoinMakerTables;

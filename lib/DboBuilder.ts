@@ -9,8 +9,10 @@ declare global { export interface Promise<T> extends Bluebird<T> {} }
 
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, 
-    InsertParams, UpdateParams, DeleteParams, OrderBy, DbJoinMaker 
+import { 
+    ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, 
+    InsertParams, UpdateParams, DeleteParams, OrderBy, DbJoinMaker, 
+    unpatchText
 } from "prostgles-types";
 
 export type DbHandler = {
@@ -34,7 +36,6 @@ let pgp: PGP = pgPromise({
 export const asName = (str: string): string => {
     return pgp.as.format("$1:name", [str]);
 }
-// export type FieldFilter = object | string[] | "*" | "" ;
 
 
 
@@ -809,6 +810,7 @@ export class ViewHandler {
             const delF = this.parseFieldFilter(get(tableRules, "delete.filterFields"));
             return this.columns.map(c => ({
                 ...c,
+                tsDataType: postgresToTsType(c.udt_name),
                 insert: insF.includes(c.name),
                 select: selF.includes(c.name),
                 filter: filF.includes(c.name),
@@ -818,14 +820,16 @@ export class ViewHandler {
         }
         return this.columns.map(c => ({
             ...c,
+            tsDataType: postgresToTsType(c.udt_name),
             insert: true,
             select: true,
+            filter: true,
             update: true,
             delete: true
         }));
     }
 
-    async find(filter: Filter, selectParams?: SelectParams , param3_unused = null, tableRules?: TableRule, localParams?: LocalParams): Promise<object[]>{
+    async find(filter?: Filter, selectParams?: SelectParams , param3_unused = null, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]>{
         try {
             filter = filter || {};
             const { expectOne = false } = selectParams || {};
@@ -869,7 +873,7 @@ export class ViewHandler {
         }                             
     }
 
-    findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?, table_rules?: TableRule, localParams?: LocalParams): Promise<object>{
+    findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?, table_rules?: TableRule, localParams?: LocalParams): Promise<any>{
 
         try {
             const expectOne = true;
@@ -1628,7 +1632,7 @@ export class TableHandler extends ViewHandler {
             `   update: (filter: ${this.filterDef}, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
             `   upsert: (filter: ${this.filterDef}, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
             `   insert: (data: (${this.tsDataName} | ${this.tsDataName}[]), params?: InsertParams) => Promise<void | ${this.tsDataName}>;`,
-            `   delete: (filter: ${this.filterDef}, params?: DeleteParams) => Promise<void | ${this.tsDataName}>;`,
+            `   delete: (filter?: ${this.filterDef}, params?: DeleteParams) => Promise<void | ${this.tsDataName}>;`,
         ]);
         this.makeDef();
 
@@ -1659,7 +1663,7 @@ export class TableHandler extends ViewHandler {
         }
     }
 
-    async update(filter: Filter, newData: object, params: UpdateParams, tableRules: TableRule, localParams: LocalParams = null){
+    async update(filter: Filter, newData: object, params: UpdateParams, tableRules: TableRule, localParams: LocalParams = null): Promise<any>{
         try {
 
             const { testRule = false } = localParams || {};
@@ -1712,14 +1716,48 @@ export class TableHandler extends ViewHandler {
                 let _forcedFilterKeys = Object.keys(forcedFilter);
                 _fields = _fields.filter(fkey => !_forcedFilterKeys.includes(fkey))
             }
+
+
             const { data, columnSet } = this.validateNewData({ row: newData, forcedData, allowedFields: _fields, tableRules, fixIssues });
-            
+
+            /* Patch data */
+            let patchedTextData: { 
+                fieldName: string; 
+                from: number; 
+                to: number; 
+                text: string; 
+                md5: string
+            }[] = [];
+            this.columns.map(c => {
+                const d = data[c.name];
+                if(c.data_type === "text" && d && isPlainObject(d) && !["from", "to"].find(key => typeof d[key] !== "number")){
+                    const unrecProps = Object.keys(d).filter(k => !["from", "to", "text", "md5"].includes(k));
+                    if(unrecProps.length) throw "Unrecognised params in textPatch field: " + unrecProps.join(", ");
+                    patchedTextData.push({ ...d, fieldName: c.name });
+                }
+                // console.log("update2", patchedTextData);
+            });
+
+            if(patchedTextData && patchedTextData.length){
+                if(tableRules && !tableRules.select) throw "Select needs to be permitted to patch data";
+                const rows = await this.find(filter, { select: patchedTextData.reduce((a, v) => ({ ...a, [v.fieldName]: 1 }), {}) }, null, tableRules);
+                // console.log(rows)
+                if(rows.length !== 1) {
+                    throw "Cannot patch data within a filter that affects more/less than 1 row";
+                }
+                patchedTextData.map(p => {
+                    data[p.fieldName] = unpatchText(rows[0][p.fieldName], p);
+                })
+
+                // https://w3resource.com/PostgreSQL/overlay-function.p hp
+                //  overlay(coalesce(status, '') placing 'hom' from 2 for 0)
+            }
+
             let nData = { ...data };
             if(tableRules && tableRules.update && tableRules.update.validate){
                 nData = await tableRules.update.validate(nData);
             }
             let query = pgp.helpers.update(nData, columnSet);
-
             query += await this.prepareWhere(filter, forcedFilter, filterFields, false, null, localParams, tableRules);
             if(onConflictDoNothing) query += " ON CONFLICT DO NOTHING ";
 
@@ -1740,9 +1778,12 @@ export class TableHandler extends ViewHandler {
 
     validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues = false }: ValidatedParams): ValidDataAndColumnSet {
         const synced_field = get(tableRules || {}, "sync.synced_field");
+
+        /* Update synced_field if sync is on and missing */
         if(synced_field && !row[synced_field]){
             row[synced_field] = Date.now();
         }
+
         let data = this.prepareFieldValues(row, forcedData, allowedFields, fixIssues);
         const dataKeys = Object.keys(data);
 
@@ -1754,7 +1795,7 @@ export class TableHandler extends ViewHandler {
         return { data, columnSet: cs }
     }
     
-    async insert(data: (object | object[]), param2?: InsertParams, param3_unused?, tableRules?: TableRule, localParams: LocalParams = null): Promise<object | object[] | boolean>{
+    async insert(data: (object | object[]), param2?: InsertParams, param3_unused?, tableRules?: TableRule, localParams: LocalParams = null): Promise<any | any[] | boolean>{
         try {
 
             const { returning, onConflictDoNothing, fixIssues = false } = param2 || {};
@@ -1852,7 +1893,7 @@ export class TableHandler extends ViewHandler {
         }
     };
     
-    async delete(filter: Filter, params?: DeleteParams, param3_unused?, table_rules?: TableRule, localParams: LocalParams = null){    //{ socket, func, has_rules = false, socketDb } = {}
+    async delete(filter?: Filter, params?: DeleteParams, param3_unused?, table_rules?: TableRule, localParams: LocalParams = null): Promise<any> {    //{ socket, func, has_rules = false, socketDb } = {}
         try {
             const { returning } = params || {};
             filter = filter || {};
@@ -1908,7 +1949,7 @@ export class TableHandler extends ViewHandler {
         return this.delete(filter, params, param3_unused , tableRules, localParams);
     }
 
-    async upsert(filter: Filter, newData?: object, params?: UpdateParams, table_rules?: TableRule, localParams: LocalParams = null){
+    async upsert(filter: Filter, newData?: object, params?: UpdateParams, table_rules?: TableRule, localParams: LocalParams = null): Promise<any> {
         try {
             return this.find(filter, { select: "", limit: 1 }, {}, table_rules, localParams)
                 .then(exists => {
@@ -2422,8 +2463,8 @@ function isPlainObject(o) {
     return Object(o) === o && Object.getPrototypeOf(o) === Object.prototype;
 }
 
-function postgresToTsType(data_type: string, elem_data_type?: string ): string{
-    switch (data_type) {
+function postgresToTsType(udt_data_type: string ): string{
+    switch (udt_data_type) {
         case 'bpchar':
         case 'char':
         case 'varchar':
@@ -2776,4 +2817,11 @@ async function getInferredJoins(db: DB, schema: string = "public"): Promise<Join
     });
     // console.log(joins);
     return joins;
+}
+
+
+
+export function isEmpty(obj?: object): boolean {
+    for(var v in obj) return false;
+    return true;
 }

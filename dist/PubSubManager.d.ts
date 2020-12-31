@@ -1,7 +1,7 @@
 import { PostgresNotifListenManager } from "./PostgresNotifListenManager";
 import { TableOrViewInfo, TableInfo, DbHandler } from "./DboBuilder";
 import { TableRule, DB } from "./Prostgles";
-import { SelectParams, FieldFilter } from "prostgles-types";
+import { SelectParams, FieldFilter, WAL } from "prostgles-types";
 export declare const DEFAULT_SYNC_BATCH_SIZE = 50;
 declare type SyncParams = {
     socket_id: string;
@@ -17,10 +17,12 @@ declare type SyncParams = {
         select: FieldFilter;
     };
     condition: string;
-    is_syncing: boolean;
+    isSyncingTimeout: number;
+    wal: WAL;
     throttle?: number;
     lr: object;
     last_synced: number;
+    is_syncing: boolean;
 };
 declare type AddSyncParams = {
     socket: any;
@@ -89,6 +91,7 @@ export declare class PubSubManager {
     notifListener: (data: any) => void;
     pushSubData(sub: SubscriptionParams): Promise<unknown>;
     upsertSocket(socket: any, channel_name: string): void;
+    syncTimeout: any;
     syncData(sync: SyncParams, clientData: any): Promise<void>;
     addSync(syncParams: AddSyncParams): Promise<string>;
     parseCondition: (condition: string) => string;

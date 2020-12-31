@@ -11,7 +11,13 @@ import server_only_queries from "../server_only_queries";
 
 import { DBObj } from "./DBoGenerated";
 // type DBObj = any;
-import { DB } from '../../dist/Prostgles';
+import { DB, DbHandler } from '../../dist/Prostgles';
+
+const stopTest = (err?) => {
+	console.log("Stopping server ...")
+	if(err) console.error(err);
+	process.exit(err? 1 : 0);
+}
 
 prostgles({
 	dbConnection: {
@@ -27,16 +33,12 @@ prostgles({
 	watchSchema: true,
 	transactions: true,
 	onSocketConnect: (socket) => {
-		socket.on("stop-test", (err) => {
-			if(err){				
-				console.error(err);
-				process.exit(1);
-				
-			} else {
-				console.log("Client tests successful");
-				process.exit(0);
-			}
-		})
+		if(process.env.TEST_TYPE === "client"){
+			socket.on("stop-test", (err, cb) => {
+				cb();
+				stopTest(err)
+			});
+		}
 		return true;
 	},
 	// DEBUG_MODE: true,
@@ -45,17 +47,22 @@ prostgles({
     return true;// Boolean(user && user.type === "admin")
   },
   publish: (socket, dbo: DBObj) => {
-		return "*";
-		// return  {
-		// 	items: {
-		// 		select: {
-		// 			fields: { id: 1, name: 1 }
-		// 		},
-		// 		update: "*"
-		// 	},
-		// 	items2: "*",
-		// 	items3: "*"
-		// };
+		// return "*";
+		return  {
+			items: "*",
+			items2: "*",
+			items3: "*",
+			planes: {
+				select: "*",
+				update: "*",
+				insert: "*",
+				delete: "*",
+				sync: {
+					id_fields: ["id"],
+					synced_field: "last_updated"
+				}
+			},
+		};
 		
 		// return {
 		// 	items: {
@@ -81,13 +88,13 @@ prostgles({
 			type: "many-many"
 		}
 	],
-	onReady: async (db: DBObj, _db: DB) => {
+	onReady: async (db: DbHandler, _db: DB) => {
 		
     app.get('*', function(req, res){
       console.log(req.originalUrl)
 			res.sendFile(path.join(__dirname+'/index.html'));
 		});
-
+		
 		try {
 			
 			if(process.env.TEST_TYPE === "client"){
@@ -104,14 +111,12 @@ prostgles({
 				await server_only_queries(db);
 				console.log("Server-only query tests successful");
 
-				console.log("Exiting")
-				process.exit(0);
+				stopTest()
 			}
 
 
 		} catch(err) {
-			console.error(err);
-			process.exit(1);
+			stopTest(err)
     }
     
 	},

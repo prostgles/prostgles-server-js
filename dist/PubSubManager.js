@@ -19,6 +19,7 @@ const utils_1 = require("./utils");
 const DboBuilder_1 = require("./DboBuilder");
 const Bluebird = require("bluebird");
 const pgPromise = require("pg-promise");
+const prostgles_types_1 = require("prostgles-types");
 let pgp = pgPromise({
     promiseLib: Bluebird
 });
@@ -30,8 +31,9 @@ class PubSubManager {
         this.notifListener = (data) => {
             let dataArr = data.payload.split(PubSubManager.DELIMITER);
             let table_name = dataArr[0], op_name = dataArr[1], condition_ids_str = dataArr[2];
+            // console.log(table_name, op_name, condition_ids_str, this.triggers[table_name]);
             if (table_name && table_name === this.schemaChangedNotifPayloadStr) {
-                console.log(op_name);
+                // console.log(op_name)
                 this.onSchemaChange();
             }
             else if (condition_ids_str &&
@@ -42,6 +44,7 @@ class PubSubManager {
                     const condition = this.triggers[table_name][condition_id];
                     const subs = this.getSubs(table_name, condition);
                     const syncs = this.getSyncs(table_name, condition);
+                    // console.log("SYNC DATA ", this.syncs)
                     // console.log(table_name, condition, this.syncs)
                     syncs.map((s) => {
                         this.syncData(s, null);
@@ -87,6 +90,7 @@ class PubSubManager {
                 }
             }
         };
+        this.syncTimeout = null;
         this.parseCondition = (condition) => Boolean(condition && condition.trim().length) ? condition : "TRUE";
         const { db, dbo, wsChannelNamePrefix, pgChannelName, onSchemaChange } = options;
         if (!db || !dbo) {
@@ -191,12 +195,8 @@ class PubSubManager {
     }
     syncData(sync, clientData) {
         return __awaiter(this, void 0, void 0, function* () {
-            const { socket_id, channel_name, table_name, filter, table_rules, allow_delete = false, params, synced_field, id_fields = [], batch_size } = sync, socket = this.sockets[socket_id];
-            if (sync.is_syncing) {
-                // console.log("SYNC THROTTLE")
-                return;
-            }
-            sync.is_syncing = true;
+            // console.log("S", clientData)
+            const { socket_id, channel_name, table_name, filter, table_rules, allow_delete = false, params, synced_field, id_fields = [], batch_size, isSyncingTimeout, wal, throttle } = sync, socket = this.sockets[socket_id];
             if (!socket)
                 throw "Orphaned socket";
             const sync_fields = [synced_field, ...id_fields.sort()], orderByAsc = sync_fields.reduce((a, v) => (Object.assign(Object.assign({}, a), { [v]: true })), {}), orderByDesc = sync_fields.reduce((a, v) => (Object.assign(Object.assign({}, a), { [v]: false })), {}), 
@@ -282,9 +282,11 @@ class PubSubManager {
                 return Promise.all(data.map((d, i) => __awaiter(this, void 0, void 0, function* () {
                     const id_filter = filterObj(d, id_fields);
                     /* To account for client time deviation */
+                    /* This can break sync.lr logic (correct timestamps but recursive syncing) */
                     // d[synced_field] = isExpress? (Date.now() + i) : Math.max(Date.now(), d[synced_field]);
                     /* Select only the necessary fields when preparing to update */
                     const exst = yield this.dbo[table_name].find(id_filter, { select: { [synced_field]: 1 }, orderBy: orderByAsc, limit: 1 }, null, table_rules);
+                    /* TODO: Add batch INSERT with ON CONFLICT DO UPDATE */
                     if (exst && exst.length) {
                         if (table_rules.update && exst[0][synced_field] < d[synced_field]) {
                             try {
@@ -435,15 +437,41 @@ class PubSubManager {
                 // console.log(`sync ${table_name}: inserted( ${inserted} )    updated( ${updated} )   deleted( ${deleted} )    pushed( ${pushed} )     total( ${total} )`, socket._user );
                 return true;
             });
+            if (!wal) {
+                sync.wal = new prostgles_types_1.WAL({
+                    id_fields, synced_field, throttle, batch_size,
+                    onSendStart: () => {
+                        sync.is_syncing = true;
+                    },
+                    onSend: (data) => upsertData(data, true),
+                    onSendEnd: () => {
+                        sync.is_syncing = false;
+                        this.syncData(sync, null);
+                    },
+                });
+            }
+            // if(sync.is_syncing){
+            //     console.log("SYNC THROTTLE")
+            //     return;
+            // }
+            // sync.is_syncing = true;
             /* Express data sent from client */
             if (clientData) {
                 if (clientData.data && Array.isArray(clientData.data) && clientData.data.length) {
-                    yield upsertData(clientData.data, true);
+                    sync.wal.addData(clientData.data);
+                    return;
+                    // await upsertData(clientData.data, true);
+                    /* Not expecting this anymore. use normal db.table.delete channel */
                 }
                 else if (clientData.deleted && Array.isArray(clientData.deleted) && clientData.deleted.length) {
                     yield deleteData(clientData.deleted);
                 }
             }
+            if (sync.wal.isSending() || sync.is_syncing) {
+                // console.log("SYNC WAL THROTTLE")
+                return;
+            }
+            sync.is_syncing = true;
             let from_synced = null;
             if (sync.lr) {
                 const { s_lr } = yield getServerRowInfo();
@@ -493,6 +521,8 @@ class PubSubManager {
                     lr: null,
                     table_info,
                     is_syncing: false,
+                    isSyncingTimeout: null,
+                    wal: undefined,
                     socket,
                     params
                 };
@@ -503,7 +533,9 @@ class PubSubManager {
                     this.syncs.push(newSync);
                     // console.log("Added SYNC");
                     socket.removeAllListeners(channel_name + "unsync");
-                    socket.once(channel_name + "unsync", () => this.onSocketDisconnected(socket, channel_name));
+                    socket.once(channel_name + "unsync", () => {
+                        this.onSocketDisconnected(socket, channel_name);
+                    });
                     socket.removeAllListeners(channel_name);
                     socket.on(channel_name, (data, cb) => {
                         if (!data) {
@@ -560,7 +592,7 @@ class PubSubManager {
             if (pubThrottle && Number.isInteger(pubThrottle) && pubThrottle > 0) {
                 throttle = pubThrottle;
             }
-            let channel_name = `${this.socketChannelPreffix}.${table_info.name}.${JSON.stringify(filter)}.${JSON.stringify(params)}.${subOne ? "o" : "m"}`;
+            let channel_name = `${this.socketChannelPreffix}.${table_info.name}.${JSON.stringify(filter)}.${JSON.stringify(params)}.${subOne ? "o" : "m"}.sub`;
             this.upsertSocket(socket, channel_name);
             const upsertSub = (newSubData) => {
                 const { table_name, condition: _cond, is_ready = false } = newSubData, condition = this.parseCondition(_cond), newSub = {
@@ -664,6 +696,7 @@ class PubSubManager {
         // process.on('warning', e => {
         //     console.warn(e.stack)
         // });
+        // console.log("onSocketDisconnected", channel_name, this.syncs)
         if (this.subs) {
             Object.keys(this.subs).map(table_name => {
                 Object.keys(this.subs[table_name]).map(condition => {
@@ -679,7 +712,7 @@ class PubSubManager {
         if (this.syncs) {
             this.syncs = this.syncs.filter(s => {
                 if (channel_name) {
-                    return s.socket_id !== socket.id && s.channel_name !== channel_name;
+                    return s.socket_id !== socket.id || s.channel_name !== channel_name;
                 }
                 return s.socket_id !== socket.id;
             });

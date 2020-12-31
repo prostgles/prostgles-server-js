@@ -37,6 +37,21 @@ CREATE INDEX IF NOT EXISTS idx1 ON items(name);
 CREATE INDEX IF NOT EXISTS idx2 ON items2(name);
 CREATE INDEX IF NOT EXISTS idx3 ON items3(name);
 
+
+DROP TABLE IF EXISTS planes CASCADE;
+CREATE TABLE IF NOT EXISTS planes (
+	id							SERIAL PRIMARY KEY,
+	x								INTEGER,
+	y								INTEGER,
+	flight_number		TEXT,
+	last_updated		BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS planes_idx1 ON planes(id);
+
+
+
+
+
 /*
 
 SELECT 

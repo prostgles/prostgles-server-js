@@ -11,7 +11,7 @@ import { TableRule, DB } from "./Prostgles";
 import * as Bluebird from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import { SelectParams, OrderBy, FieldFilter } from "prostgles-types";
+import { SelectParams, OrderBy, FieldFilter, WAL } from "prostgles-types";
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 let pgp: PGP = pgPromise({
     promiseLib: Bluebird
@@ -32,10 +32,12 @@ type SyncParams = {
         select: FieldFilter
     };
     condition: string;
-    is_syncing: boolean;
+    isSyncingTimeout: number;
+    wal: WAL,
     throttle?: number;
     lr: object;
     last_synced: number;
+    is_syncing: boolean;
 }
 
 type AddSyncParams = {
@@ -178,8 +180,10 @@ export class PubSubManager {
             op_name = dataArr[1],
             condition_ids_str = dataArr[2];
 
+        // console.log(table_name, op_name, condition_ids_str, this.triggers[table_name]);
+
         if(table_name && table_name === this.schemaChangedNotifPayloadStr){
-            console.log(op_name)
+            // console.log(op_name)
             this.onSchemaChange()
         } else if(
             condition_ids_str &&
@@ -191,6 +195,7 @@ export class PubSubManager {
                 const condition = this.triggers[table_name][condition_id];
                 const subs = this.getSubs(table_name, condition);
                 const syncs = this.getSyncs(table_name, condition);
+                // console.log("SYNC DATA ", this.syncs)
 
                 // console.log(table_name, condition, this.syncs)
                 syncs.map((s) => {
@@ -286,20 +291,15 @@ export class PubSubManager {
         }
     }
 
+    syncTimeout = null;
     async syncData(sync: SyncParams, clientData){
+        // console.log("S", clientData)
         const { 
                 socket_id, channel_name, table_name, filter, 
                 table_rules, allow_delete = false, params,
-                synced_field, id_fields = [], batch_size
+                synced_field, id_fields = [], batch_size, isSyncingTimeout, wal, throttle
             } = sync,
             socket = this.sockets[socket_id];
-
-        if(sync.is_syncing){
-            // console.log("SYNC THROTTLE")
-            return;
-        }
-        sync.is_syncing = true;
-
 
         if(!socket) throw "Orphaned socket";
 
@@ -416,11 +416,13 @@ export class PubSubManager {
                     const id_filter = filterObj(d, id_fields);
 
                     /* To account for client time deviation */
+                    /* This can break sync.lr logic (correct timestamps but recursive syncing) */
                     // d[synced_field] = isExpress? (Date.now() + i) : Math.max(Date.now(), d[synced_field]);
 
                     /* Select only the necessary fields when preparing to update */
                     const exst = await this.dbo[table_name].find(id_filter, { select: { [synced_field]: 1 }, orderBy: (orderByAsc as OrderBy), limit: 1 }, null, table_rules);
                 
+                    /* TODO: Add batch INSERT with ON CONFLICT DO UPDATE */
                     if(exst && exst.length){
                         if(table_rules.update && exst[0][synced_field] < d[synced_field]){
                             try {
@@ -597,14 +599,44 @@ export class PubSubManager {
                 return true;
             };
 
+        if(!wal){
+            sync.wal = new WAL({
+                id_fields, synced_field, throttle, batch_size,
+                onSendStart: () => { 
+                    sync.is_syncing = true; 
+                },
+                onSend: (data) => upsertData(data, true),
+                onSendEnd: () => { 
+                    sync.is_syncing = false;
+                    this.syncData(sync, null);
+                },
+            })
+        }
+
+        // if(sync.is_syncing){
+        //     console.log("SYNC THROTTLE")
+        //     return;
+        // }
+        // sync.is_syncing = true;
+
         /* Express data sent from client */
         if(clientData){
             if(clientData.data && Array.isArray(clientData.data) && clientData.data.length){
-                await upsertData(clientData.data, true);
+                sync.wal.addData(clientData.data);
+                return;
+                // await upsertData(clientData.data, true);
+
+            /* Not expecting this anymore. use normal db.table.delete channel */
             } else if(clientData.deleted && Array.isArray(clientData.deleted) && clientData.deleted.length){
-                await deleteData(clientData.deleted)
+                await deleteData(clientData.deleted);
             }
         }
+
+        if(sync.wal.isSending() || sync.is_syncing) {
+            // console.log("SYNC WAL THROTTLE")
+            return;
+        }
+        sync.is_syncing = true;
 
         let from_synced = null;
 
@@ -665,6 +697,8 @@ export class PubSubManager {
                     lr: null,
                     table_info,
                     is_syncing: false,
+                    isSyncingTimeout: null,
+                    wal: undefined,
                     socket,
                     params
                 };
@@ -677,7 +711,9 @@ export class PubSubManager {
                     // console.log("Added SYNC");
 
                     socket.removeAllListeners(channel_name + "unsync");
-                    socket.once(channel_name + "unsync", () => this.onSocketDisconnected(socket, channel_name));
+                    socket.once(channel_name + "unsync", () => {
+                        this.onSocketDisconnected(socket, channel_name);
+                    });
 
                     socket.removeAllListeners(channel_name);
                     socket.on(channel_name, (data, cb) => {
@@ -752,7 +788,7 @@ export class PubSubManager {
             throttle = pubThrottle;
         }
         
-        let channel_name = `${this.socketChannelPreffix}.${table_info.name}.${JSON.stringify(filter)}.${JSON.stringify(params)}.${subOne? "o" : "m"}`;
+        let channel_name = `${this.socketChannelPreffix}.${table_info.name}.${JSON.stringify(filter)}.${JSON.stringify(params)}.${subOne? "o" : "m"}.sub`;
 
         this.upsertSocket(socket, channel_name);
         
@@ -875,6 +911,7 @@ export class PubSubManager {
         // process.on('warning', e => {
         //     console.warn(e.stack)
         // });
+        // console.log("onSocketDisconnected", channel_name, this.syncs)
         if(this.subs){
             Object.keys(this.subs).map(table_name => {
                 Object.keys(this.subs[table_name]).map(condition => {
@@ -893,7 +930,7 @@ export class PubSubManager {
         if(this.syncs){
             this.syncs = this.syncs.filter(s => {
                 if(channel_name){
-                    return s.socket_id !== socket.id && s.channel_name !== channel_name
+                    return s.socket_id !== socket.id || s.channel_name !== channel_name
                 }
 
                 return s.socket_id !== socket.id;

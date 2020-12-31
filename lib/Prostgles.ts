@@ -17,6 +17,8 @@ import { PubSubManager, DEFAULT_SYNC_BATCH_SIZE } from "./PubSubManager";
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 
 
+export { DbHandler, DbHandlerTX } from "./DboBuilder";
+
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 type DbConnectionOpts = pg.IDefaults;

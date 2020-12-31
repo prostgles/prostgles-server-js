@@ -13,9 +13,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DboBuilder = exports.TableHandler = exports.ViewHandler = exports.asName = void 0;
+exports.isEmpty = exports.DboBuilder = exports.TableHandler = exports.ViewHandler = exports.asName = void 0;
 const Bluebird = require("bluebird");
 const pgPromise = require("pg-promise");
+const prostgles_types_1 = require("prostgles-types");
 ;
 const utils_1 = require("./utils");
 const Prostgles_1 = require("./Prostgles");
@@ -574,9 +575,9 @@ class ViewHandler {
                 const insF = this.parseFieldFilter(utils_1.get(tableRules, "insert.fields"));
                 const updF = this.parseFieldFilter(utils_1.get(tableRules, "update.fields"));
                 const delF = this.parseFieldFilter(utils_1.get(tableRules, "delete.filterFields"));
-                return this.columns.map(c => (Object.assign(Object.assign({}, c), { insert: insF.includes(c.name), select: selF.includes(c.name), filter: filF.includes(c.name), update: updF.includes(c.name), delete: delF.includes(c.name) })));
+                return this.columns.map(c => (Object.assign(Object.assign({}, c), { tsDataType: postgresToTsType(c.udt_name), insert: insF.includes(c.name), select: selF.includes(c.name), filter: filF.includes(c.name), update: updF.includes(c.name), delete: delF.includes(c.name) })));
             }
-            return this.columns.map(c => (Object.assign(Object.assign({}, c), { insert: true, select: true, update: true, delete: true })));
+            return this.columns.map(c => (Object.assign(Object.assign({}, c), { tsDataType: postgresToTsType(c.udt_name), insert: true, select: true, filter: true, update: true, delete: true })));
         });
     }
     find(filter, selectParams, param3_unused = null, tableRules, localParams) {
@@ -1293,7 +1294,7 @@ class TableHandler extends ViewHandler {
             `   update: (filter: ${this.filterDef}, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
             `   upsert: (filter: ${this.filterDef}, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
             `   insert: (data: (${this.tsDataName} | ${this.tsDataName}[]), params?: InsertParams) => Promise<void | ${this.tsDataName}>;`,
-            `   delete: (filter: ${this.filterDef}, params?: DeleteParams) => Promise<void | ${this.tsDataName}>;`,
+            `   delete: (filter?: ${this.filterDef}, params?: DeleteParams) => Promise<void | ${this.tsDataName}>;`,
         ]);
         this.makeDef();
         this.remove = this.delete;
@@ -1365,6 +1366,32 @@ class TableHandler extends ViewHandler {
                     _fields = _fields.filter(fkey => !_forcedFilterKeys.includes(fkey));
                 }
                 const { data, columnSet } = this.validateNewData({ row: newData, forcedData, allowedFields: _fields, tableRules, fixIssues });
+                /* Patch data */
+                let patchedTextData = [];
+                this.columns.map(c => {
+                    const d = data[c.name];
+                    if (c.data_type === "text" && d && isPlainObject(d) && !["from", "to"].find(key => typeof d[key] !== "number")) {
+                        const unrecProps = Object.keys(d).filter(k => !["from", "to", "text", "md5"].includes(k));
+                        if (unrecProps.length)
+                            throw "Unrecognised params in textPatch field: " + unrecProps.join(", ");
+                        patchedTextData.push(Object.assign(Object.assign({}, d), { fieldName: c.name }));
+                    }
+                    // console.log("update2", patchedTextData);
+                });
+                if (patchedTextData && patchedTextData.length) {
+                    if (tableRules && !tableRules.select)
+                        throw "Select needs to be permitted to patch data";
+                    const rows = yield this.find(filter, { select: patchedTextData.reduce((a, v) => (Object.assign(Object.assign({}, a), { [v.fieldName]: 1 })), {}) }, null, tableRules);
+                    // console.log(rows)
+                    if (rows.length !== 1) {
+                        throw "Cannot patch data within a filter that affects more/less than 1 row";
+                    }
+                    patchedTextData.map(p => {
+                        data[p.fieldName] = prostgles_types_1.unpatchText(rows[0][p.fieldName], p);
+                    });
+                    // https://w3resource.com/PostgreSQL/overlay-function.p hp
+                    //  overlay(coalesce(status, '') placing 'hom' from 2 for 0)
+                }
                 let nData = Object.assign({}, data);
                 if (tableRules && tableRules.update && tableRules.update.validate) {
                     nData = yield tableRules.update.validate(nData);
@@ -1393,6 +1420,7 @@ class TableHandler extends ViewHandler {
     ;
     validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues = false }) {
         const synced_field = utils_1.get(tableRules || {}, "sync.synced_field");
+        /* Update synced_field if sync is on and missing */
         if (synced_field && !row[synced_field]) {
             row[synced_field] = Date.now();
         }
@@ -1953,8 +1981,8 @@ function validateObj(obj, allowedKeys) {
 function isPlainObject(o) {
     return Object(o) === o && Object.getPrototypeOf(o) === Object.prototype;
 }
-function postgresToTsType(data_type, elem_data_type) {
-    switch (data_type) {
+function postgresToTsType(udt_data_type) {
+    switch (udt_data_type) {
         case 'bpchar':
         case 'char':
         case 'varchar':
@@ -2307,4 +2335,10 @@ function getInferredJoins(db, schema = "public") {
         return joins;
     });
 }
+function isEmpty(obj) {
+    for (var v in obj)
+        return false;
+    return true;
+}
+exports.isEmpty = isEmpty;
 //# sourceMappingURL=DboBuilder.js.map

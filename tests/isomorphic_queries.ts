@@ -1,6 +1,9 @@
 import { strict as assert } from 'assert';
 
-export default async function isomorphic(db: any){
+import { DbHandler } from "../dist/Prostgles";
+import { DBHandlerClient } from "./client/index";
+
+export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHandlerClient>){
   await db.items.delete({ });
   await db.items2.delete({ });
   await db.items3.delete({ });
