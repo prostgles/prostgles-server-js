@@ -1766,6 +1766,7 @@ export class TableHandler extends ViewHandler {
                 qType = multi? "any" : "one";
                 query += " RETURNING " + this.prepareSelect(returning, returningFields);
             }
+            // console.log(query)
             if(this.t){
                 return this.t[qType](query).catch(err => makeErr(err, localParams));
             }

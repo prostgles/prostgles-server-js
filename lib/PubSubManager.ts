@@ -199,8 +199,8 @@ export class PubSubManager {
 
                 // console.log(table_name, condition, this.syncs)
                 syncs.map((s) => {
+                    // console.log("SYNC DATA FROM TRIGGER");
                     this.syncData(s, null);
-                    // console.log("SYNC DATA FROM TRIGGER")
                 });
 
                 if(!subs){
@@ -424,10 +424,12 @@ export class PubSubManager {
                 
                     /* TODO: Add batch INSERT with ON CONFLICT DO UPDATE */
                     if(exst && exst.length){
-                        if(table_rules.update && exst[0][synced_field] < d[synced_field]){
+                        // console.log(exst[0], d)
+                        if(table_rules.update && +exst[0][synced_field] < +d[synced_field]){
                             try {
+                                const syncSafeFilter = { $and: [id_filter, { [synced_field]: { "<": d[synced_field] } } ] }
                                 updated++;
-                                await (this.dbo[table_name] as TableHandler).update(id_filter, d, { fixIssues: true }, table_rules);
+                                await (this.dbo[table_name] as TableHandler).update(syncSafeFilter, filterObj(d, [], id_fields), { fixIssues: true }, table_rules);
                             } catch(e){
                                 console.log(e);
                                 throw e;
@@ -456,12 +458,12 @@ export class PubSubManager {
                     return Promise.reject("Something went wrong with syncing to server: ")
                 });
             },
-            pushData = async (data) => {
+            pushData = async (data, isSynced = false) => {
                 return new Promise((resolve, reject) => {
-                    socket.emit(channel_name, { data }, (resp) => {
+                    socket.emit(channel_name, { data, isSynced }, (resp) => {
                             
                         if(resp && resp.ok){
-                            // console.log("PUSHED " + data.length);
+                            // console.log("PUSHED to client: fr/lr", data[0], data[data.length - 1]);
                             resolve({ pushed: data.length, resp })
                             
                         } else {
@@ -479,7 +481,8 @@ export class PubSubManager {
 
                 // console.log("getLastSynced", clientData, socket._user )
 
-                let result = null
+                let result = null;
+
                 /* Nothing to sync */
                 if( !c_fr && !s_fr || rowsFullyMatch(c_lr, s_lr)){  //  c_count === s_count && 
                     // sync.last_synced = null;
@@ -493,8 +496,9 @@ export class PubSubManager {
                     } else if(c_fr || s_fr) {
                         result = (c_fr || s_fr)[synced_field];
                     }
+
+                /* Sync from last matching synced value */
                 } else if (rowsFullyMatch(c_fr, s_fr)){
-                    /* Sync from last matching synced value */
 
                     if(s_lr && c_lr){
                         result = Math.min(c_lr[synced_field], s_lr[synced_field]);
@@ -594,7 +598,7 @@ export class PubSubManager {
                     // console.log(`sData ${sData.length}      limit ${limit}`);
                 }
 
-                // console.log(`sync ${table_name}: inserted( ${inserted} )    updated( ${updated} )   deleted( ${deleted} )    pushed( ${pushed} )     total( ${total} )`, socket._user );
+                // console.log(`syncBatch ${table_name}: inserted( ${inserted} )    updated( ${updated} )   deleted( ${deleted} )    pushed( ${pushed} )     total( ${total} )`, socket._user );
                 
                 return true;
             };
@@ -605,20 +609,22 @@ export class PubSubManager {
                 onSendStart: () => { 
                     sync.is_syncing = true; 
                 },
-                onSend: (data) => upsertData(data, true),
-                onSendEnd: () => { 
+                onSend: async (data) => {
+                    // console.log("WAL upsertData START", data)
+                    const res = await upsertData(data, true);
+                    // console.log("WAL upsertData END")
+
+                    return res;
+                },
+                onSendEnd: () => {
                     sync.is_syncing = false;
+                    // console.log("syncData from WAL.onSendEnd")
                     this.syncData(sync, null);
                 },
             })
         }
 
-        // if(sync.is_syncing){
-        //     console.log("SYNC THROTTLE")
-        //     return;
-        // }
-        // sync.is_syncing = true;
-
+        // console.log("syncData", clientData)
         /* Express data sent from client */
         if(clientData){
             if(clientData.data && Array.isArray(clientData.data) && clientData.data.length){
@@ -633,11 +639,19 @@ export class PubSubManager {
         }
 
         if(sync.wal.isSending() || sync.is_syncing) {
-            // console.log("SYNC WAL THROTTLE")
+            if(!this.syncTimeout){
+                this.syncTimeout = setTimeout(() => {
+                    this.syncTimeout = null;
+                    // console.log("SYNC FROM TIMEOUT")
+                    this.syncData(sync, null);
+                }, throttle)
+            }
+            // console.log("SYNC THROTTLE")
             return;
         }
         sync.is_syncing = true;
 
+        // from synced does not make sense. It should be sync.lr only!!!
         let from_synced = null;
 
         if(sync.lr){
@@ -646,6 +660,8 @@ export class PubSubManager {
             /* Make sure trigger is not firing on freshly synced data */
             if(!rowsFullyMatch(sync.lr, s_lr)){
                 from_synced = sync.last_synced;
+            } else {
+                // console.log("rowsFullyMatch")
             }
             // console.log(table_name, sync.lr[synced_field])
         } else {
@@ -654,8 +670,11 @@ export class PubSubManager {
         
         if(from_synced !== null){
             await syncBatch(from_synced);
+        } else {
+            // console.log("from_synced is null")
         }
 
+        await pushData([], true);
         sync.is_syncing = false;
         // console.log(`Finished sync for ${table_name}`, socket._user);
     }
@@ -744,6 +763,7 @@ export class PubSubManager {
                         //     this.upsertClientData(newSync, data.data);
                         // } else 
                         if(data.onSyncRequest){
+                            // console.log("syncData from socket")
                             this.syncData(newSync, data.onSyncRequest);
 
                             // console.log("onSyncRequest ", socket._user)
@@ -1115,7 +1135,8 @@ export class PubSubManager {
 
 
 /* Get only the specified properties of an object */
-export function filterObj(obj: object, keys: string[] = []): object{
+export function filterObj(obj: object, keys: string[] = [], exclude?: string[]): object{
+    if(exclude) keys = Object.keys(obj).filter(k => !exclude.includes(k))
     if(!keys.length) {
         // console.warn("filterObj: returning empty object");
         return {};

@@ -112,6 +112,6 @@ export declare class PubSubManager {
         info_level?: number;
     }): Promise<any[]>;
 }
-export declare function filterObj(obj: object, keys?: string[]): object;
+export declare function filterObj(obj: object, keys?: string[], exclude?: string[]): object;
 export {};
 //# sourceMappingURL=PubSubManager.d.ts.map
