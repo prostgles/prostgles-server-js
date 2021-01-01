@@ -15,4 +15,3 @@ async function f(db) {
         throw "db.tx failed";
 }
 exports.default = f;
-//# sourceMappingURL=server_only_queries.js.map

@@ -1,6 +1,7 @@
 import path from 'path';
 import express from 'express';
-import prostgles from "../../dist/index";
+// import prostgles from "../../dist/index";
+import prostgles from "prostgles-server";
 const app = express();
 const http = require('http').createServer(app);
 const io = require("socket.io")(http, { path: "/teztz/s" });
@@ -11,7 +12,7 @@ import server_only_queries from "../server_only_queries";
 
 import { DBObj } from "./DBoGenerated";
 // type DBObj = any;
-import { DB, DbHandler } from '../../dist/Prostgles';
+import { DB, DbHandler } from 'prostgles-server/dist/Prostgles';
 
 const stopTest = (err?) => {
 	console.log("Stopping server ...")
@@ -102,7 +103,7 @@ prostgles({
 				console.log("Waiting for client...")
 				io.on("connection", socket => {
 					socket.emit("start-test");
-					console.log("Client connected")
+					console.log("Client connected");
 				});
 			} else if(process.env.TEST_TYPE === "server"){
 

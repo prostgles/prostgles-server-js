@@ -7,6 +7,7 @@ const prostgles_client_1 = __importDefault(require("prostgles-client"));
 const socket_io_client_1 = __importDefault(require("socket.io-client"));
 const isomorphic_queries_1 = __importDefault(require("../isomorphic_queries"));
 const client_only_queries_1 = __importDefault(require("../client_only_queries"));
+// console.log("CLIENT STARTED")
 const url = process.env.PRGL_CLIENT_URL || "http://127.0.0.1:3001", path = process.env.PRGL_CLIENT_PATH || "/teztz/s", socket = socket_io_client_1.default(url, { path }), stopTest = (err) => {
     socket.emit("stop-test", !err ? err : { err: err.toString() }, cb => {
         console.log("Stopping client...");
@@ -41,4 +42,3 @@ try {
 catch (e) {
     stopTest(e);
 }
-//# sourceMappingURL=index.js.map

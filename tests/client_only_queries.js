@@ -3,11 +3,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 async function client_only(db) {
     return new Promise(async (resolve, reject) => {
         let start = Date.now();
+        const msLimit = 30000;
+        setTimeout(() => {
+            reject("Replication test failed due to taking longer than " + msLimit + "ms");
+        }, msLimit);
         await db.planes.delete();
         let inserts = new Array(100).fill(null).map((d, i) => ({ id: i, flight_number: `FN${i}`, x: Math.random(), y: i }));
         await db.planes.insert(inserts);
         db.planes.sync({}, { handlesOnData: true, patchText: true }, planes => {
-            // console.log(0, planes.length)
+            // console.log(0, planes[0])
             planes.map(p => {
                 // if(p.y === 1) window.up = p;
                 if (p.x < 10)
@@ -34,4 +38,3 @@ async function client_only(db) {
     });
 }
 exports.default = client_only;
-//# sourceMappingURL=client_only_queries.js.map

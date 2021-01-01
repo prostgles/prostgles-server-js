@@ -7,17 +7,18 @@ export default async function client_only(db: DBHandlerClient){
   return new Promise(async (resolve, reject) => {
 
     let start = Date.now();
-
+    const msLimit = 30000;
     setTimeout(() => {
-      reject("Replication test failed due to taking longer than 3 seconds")
-    }, 3000)
+      reject("Replication test failed due to taking longer than " + msLimit + "ms")
+    }, msLimit)
 
     await db.planes.delete();
     let inserts = new Array(100).fill(null).map((d, i) => ({ id: i, flight_number: `FN${i}`, x: Math.random(), y: i }));
     await db.planes.insert(inserts);
   
+    console.log("Started sync")
     db.planes.sync({}, { handlesOnData: true, patchText: true }, planes => {
-      // console.log(0, planes.length)
+      // console.log(0, planes[0])
       
 
       planes.map(p => {

@@ -3,12 +3,13 @@
 	"compilerOptions": {
 		"target": "es2019",
 		"lib": [ "es2019" ],
+    // "outDir": "dist",
 		"esModuleInterop" : true,
 		"module": "commonjs",
-		"sourceMap": true,
+		// "sourceMap": true,
 		// "rootDir": ".",
-		"declaration": true,
-		"declarationMap": true,
+		// "declaration": true,
+		// "declarationMap": true,
 	},
 	"exclude": [
 		"dist"

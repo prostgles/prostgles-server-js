@@ -17,6 +17,7 @@
     "@types/socket.io": "^2.1.11",
     "@types/socket.io-client": "^1.4.34",
     "express": "^4.17.1",
+    "prostgles-server": "file:../..",
     "socket.io": "^3.0.4"
   }
 }

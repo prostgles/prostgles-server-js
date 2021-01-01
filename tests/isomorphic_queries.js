@@ -74,4 +74,3 @@ async function isomorphic(db) {
         throw "$rowhash query failed";
 }
 exports.default = isomorphic;
-//# sourceMappingURL=isomorphic_queries.js.map
