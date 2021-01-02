@@ -315,12 +315,12 @@ class ViewHandler {
                     " ",
                     `-- 0. [root final]  `,
                     "SELECT    ",
-                    ...selectArrComma((depth ? q.allFields : q.select).concat((aggs || []).map(a => exports.asName(a.alias))).filter(s => s).concat(joins.map((j, i) => {
+                    ...selectArrComma((depth ? q.allFields : q.select).filter(s => s).concat(joins.map((j, i) => {
                         const jsq = `json_agg(${prefJCAN(j, `json`)}::jsonb ORDER BY ${prefJCAN(j, `rowid_sorted`)})   FILTER (WHERE ${prefJCAN(j, `limit`)} <= ${j.limit} AND ${prefJCAN(j, `dupes_rowid`)} = 1 AND ${prefJCAN(j, `json`)} IS NOT NULL)`;
                         const resAlias = exports.asName(j.joinAlias || j.table);
                         // If limit = 1 then return a single json object (first one)
                         return (j.limit === 1 ? `${jsq}->0 ` : `COALESCE(${jsq}, '[]') `) + `  AS ${resAlias}`;
-                    }))),
+                    })).concat((aggs || []).map(a => a.getQuery(a.alias)))),
                     `FROM ( `,
                     ...indjArr(depth + 1, [
                         "-- 1. [subquery limit + dupes] ",

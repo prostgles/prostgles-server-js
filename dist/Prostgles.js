@@ -356,9 +356,10 @@ class Prostgles {
                         const canRunSQL = yield this.publishRawSQL(socket, dbo, db, yield this.getUser(socket));
                         // console.log("canRunSQL", canRunSQL, socket.handshake.headers["x-real-ip"]);//, allTablesViews);
                         if (canRunSQL && typeof canRunSQL === "boolean" || canRunSQL === "*") {
-                            socket.on(WS_CHANNEL_NAME.SQL, function ({ query, params, options, justRows = false }, cb = (...callback) => { }) {
+                            socket.on(WS_CHANNEL_NAME.SQL, function ({ query, params, options }, cb = (...callback) => { }) {
+                                const { statement, justRows } = options || {};
                                 // console.log(query, options)
-                                if (options && options.statement) {
+                                if (statement) {
                                     try {
                                         cb(null, pgp.as.format(query, params));
                                     }
@@ -370,7 +371,7 @@ class Prostgles {
                                     db.result(query, params)
                                         .then((qres) => {
                                         const { duration, fields, rows, rowCount } = qres;
-                                        if (options.justRows) {
+                                        if (justRows) {
                                             cb(null, rows);
                                             return;
                                         }

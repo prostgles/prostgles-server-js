@@ -18,6 +18,7 @@ type PGP = pgPromise.IMain<{}, pg.IClient>;
 
 
 export { DbHandler, DbHandlerTX } from "./DboBuilder";
+import { SQLRequest, SQLOptions } from "prostgles-types";
 
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
@@ -645,10 +646,11 @@ export class Prostgles {
                     // console.log("canRunSQL", canRunSQL, socket.handshake.headers["x-real-ip"]);//, allTablesViews);
 
                     if(canRunSQL && typeof canRunSQL === "boolean" || canRunSQL === "*"){
-                        socket.on(WS_CHANNEL_NAME.SQL, function({ query, params, options, justRows = false }, cb = (...callback) => {}){
+                        socket.on(WS_CHANNEL_NAME.SQL, function({ query, params, options }: SQLRequest, cb = (...callback) => {}){
+                            const { statement, justRows }: SQLOptions = options || ({} as any);
 
                             // console.log(query, options)
-                            if(options && options.statement){
+                            if(statement){
                                 try {
                                     cb(null, pgp.as.format(query, params));
                                 } catch (err){
@@ -659,7 +661,7 @@ export class Prostgles {
                                 db.result(query, params)
                                     .then((qres: any) => {
                                         const { duration, fields, rows, rowCount } = qres;
-                                        if(options.justRows) {
+                                        if(justRows) {
                                             cb(null, rows);
                                             return;
                                         }

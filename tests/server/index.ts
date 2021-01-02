@@ -53,6 +53,7 @@ prostgles({
 			items: "*",
 			items2: "*",
 			items3: "*",
+			v_items: "*",
 			planes: {
 				select: "*",
 				update: "*",

@@ -1,7 +1,17 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const assert_1 = require("assert");
 async function client_only(db) {
     return new Promise(async (resolve, reject) => {
+        /* RAWSQL */
+        const sqlStatement = await db.sql("SELECT $1", [1], { statement: true });
+        assert_1.strict.equal(sqlStatement, "SELECT 1", "db.sql statement query failed");
+        const select1 = await db.sql("SELECT $1 as col1", [1], { justRows: true });
+        assert_1.strict.deepStrictEqual(select1[0], { col1: 1 }, "db.sql justRows query failed");
+        const fullResult = await db.sql("SELECT $1 as col1", [1]);
+        assert_1.strict.deepStrictEqual(fullResult.rows[0], { col1: 1 }, "db.sql query failed");
+        assert_1.strict.deepStrictEqual(fullResult.fields, [{ name: 'col1', dataType: 'int4' }], "db.sql query failed");
+        /* REPLICATION */
         let start = Date.now();
         const msLimit = 30000;
         setTimeout(() => {

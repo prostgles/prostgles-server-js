@@ -51,6 +51,7 @@ prostgles_server_1.default({
             items: "*",
             items2: "*",
             items3: "*",
+            v_items: "*",
             planes: {
                 select: "*",
                 update: "*",

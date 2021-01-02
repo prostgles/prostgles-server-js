@@ -6,6 +6,24 @@ export default async function client_only(db: DBHandlerClient){
   
   return new Promise(async (resolve, reject) => {
 
+
+
+    /* RAWSQL */
+    const sqlStatement = await db.sql("SELECT $1", [1], { statement: true });
+    assert.equal(sqlStatement, "SELECT 1", "db.sql statement query failed");
+  
+    const select1 = await db.sql("SELECT $1 as col1", [1], { justRows: true });
+    assert.deepStrictEqual(select1[0], { col1: 1 }, "db.sql justRows query failed");
+
+    const fullResult = await db.sql("SELECT $1 as col1", [1]);
+    assert.deepStrictEqual(fullResult.rows[0], { col1: 1 }, "db.sql query failed");
+    assert.deepStrictEqual(fullResult.fields, [ { name: 'col1', dataType: 'int4' } ] , "db.sql query failed");
+
+
+
+
+
+    /* REPLICATION */
     let start = Date.now();
     const msLimit = 30000;
     setTimeout(() => {
@@ -63,7 +81,9 @@ export default async function client_only(db: DBHandlerClient){
   
     // assert.deepStrictEqual(fo,    { h: null, id: 1, name: 'a' }, "findOne query failed" );
     // assert.deepStrictEqual(f[0],  { h: null, id: 1, name: 'a' }, "findOne query failed" );
-  
+
+
+    
   });
 
 }

@@ -15,7 +15,7 @@ async function isomorphic(db) {
     const fo = await db.items.findOne(), f = await db.items.find();
     assert_1.strict.deepStrictEqual(fo, { h: null, id: 1, name: 'a' }, "findOne query failed");
     assert_1.strict.deepStrictEqual(f[0], { h: null, id: 1, name: 'a' }, "findOne query failed");
-    // return;
+    /* Basic exists */
     const expect0 = await db.items.count({
         $and: [
             { $exists: { items2: { name: "a" } } },
@@ -23,7 +23,7 @@ async function isomorphic(db) {
         ]
     });
     assert_1.strict.equal(expect0, 0, "$exists query failed");
-    /* joinsTo filter example */
+    /* Exists with shortest path wildcard filter example */
     const expect2 = await db.items.find({
         $and: [
             { $existsJoined: { "**.items3": { name: "a" } } },
@@ -31,7 +31,7 @@ async function isomorphic(db) {
         ]
     });
     assert_1.strict.equal(expect2.length, 2, "$existsJoined query failed");
-    /* exists with exact path filter example */
+    /* Exists with exact path filter example */
     const _expect2 = await db.items.find({
         $and: [
             // { "items2": { name: "a" } },
@@ -44,19 +44,6 @@ async function isomorphic(db) {
     await db.items.upsert({ name: "tx" }, { name: "tx" });
     await db.items.upsert({ name: "tx" }, { name: "tx" });
     assert_1.strict.equal(await db.items.count({ name: "tx" }), 1, "upsert command failed");
-    /* Aggregate functions example */
-    const aggs = await db.items.findOne({}, {
-        select: {
-            id: "$count",
-            max_id: { $max: "id" },
-            total: { $count: ["id"] },
-            distinct_names: { $countDistinct: ["name"] },
-        },
-        orderBy: {
-            max_id: -1
-        }
-    });
-    assert_1.strict.deepStrictEqual(aggs, { id: '4', max_id: 4, total: '4', distinct_names: '3' }, "Aggregation query failed");
     /* Joins example */
     const items = await db.items.find({}, {
         select: {
@@ -69,6 +56,63 @@ async function isomorphic(db) {
         console.log(items[0].items3);
         throw "Joined select query failed";
     }
+    /* Joins duplicate table example */
+    const items2 = await db.items.find({}, {
+        select: {
+            "*": 1,
+            items2: "*"
+        }
+    });
+    const items2j = await db.items.find({}, {
+        select: {
+            "*": 1,
+            items2: "*",
+            items2j: db.leftJoin.items2({}, "*")
+        }
+    });
+    items2.forEach((d, i) => {
+        assert_1.strict.deepStrictEqual(d.items2, items2j[i].items2, "Joins duplicate aliased table query failed");
+        assert_1.strict.deepStrictEqual(d.items2, items2j[i].items2j, "Joins duplicate aliased table query failed");
+    });
+    /* Join aggregate functions example */
+    const aggsJoined = await db.items.find({}, {
+        select: {
+            id: "$count",
+            name: 1,
+            items2: {
+                id: 1
+            }
+        },
+        orderBy: {
+            id: -1
+        }
+    });
+    // console.log(JSON.stringify(aggsJoined, null, 2))
+    assert_1.strict.deepStrictEqual(aggsJoined, [
+        {
+            "name": "a",
+            "items2": [
+                {
+                    "id": 1
+                },
+                {
+                    "id": 1
+                }
+            ],
+            "id": "2"
+        },
+        {
+            "name": "b",
+            "items2": [],
+            "id": "1"
+        },
+        {
+            "name": "tx",
+            "items2": [],
+            "id": "1"
+        }
+    ], "Joined aggregation query failed");
+    /* $rowhash -> Custom column that returms md5(ctid + allowed select columns). Used in joins & CRUD to bypass PKey details */
     const rowhash = await db.items.findOne({}, { select: { $rowhash: 1 } });
     const rowhashView = await db.v_items.findOne({}, { select: { $rowhash: 1 } });
     const rh1 = await db.items.findOne({ $rowhash: rowhash.$rowhash }, { select: { $rowhash: 1 } });
