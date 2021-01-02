@@ -100,7 +100,7 @@ class ViewHandler {
             allowed_cols = this.parseFieldFilter(utils_1.get(tableRules, "select.fields"));
         return "md5(" +
             allowed_cols
-                .concat(["ctid"])
+                .concat(this.is_view ? [] : ["ctid"])
                 .sort()
                 .map(f => (tableAlias ? (exports.asName(tableAlias) + ".") : "") + exports.asName(f))
                 .map(f => `md5(coalesce(${f}::text, 'dd'))`)
@@ -996,7 +996,7 @@ class ViewHandler {
             }
             let rowHashKeys = ["$rowhash"], rowHashCondition;
             if (rowHashKeys[0] in (data || {})) {
-                rowHashCondition = this.getRowHashSelect(tableRules, tableAlias) + ` = ${pgp.as.format("$1", data.$rowhash)}`;
+                rowHashCondition = this.getRowHashSelect(tableRules, tableAlias) + ` = ${pgp.as.format("$1", [data.$rowhash])}`;
                 delete data.$rowhash;
             }
             let filterKeys = Object.keys(data).filter(k => !rowHashKeys.includes(k) && !existsKeys.find(ek => ek.key === k));

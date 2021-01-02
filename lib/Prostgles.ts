@@ -659,7 +659,7 @@ export class Prostgles {
                                 db.result(query, params)
                                     .then((qres: any) => {
                                         const { duration, fields, rows, rowCount } = qres;
-                                        if(justRows) {
+                                        if(options.justRows) {
                                             cb(null, rows);
                                             return;
                                         }

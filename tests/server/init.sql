@@ -37,6 +37,15 @@ CREATE INDEX IF NOT EXISTS idx1 ON items(name);
 CREATE INDEX IF NOT EXISTS idx2 ON items2(name);
 CREATE INDEX IF NOT EXISTS idx3 ON items3(name);
 
+DROP VIEW IF EXISTS v_items;
+CREATE VIEW v_items AS
+SELECT id, name FROM items UNION
+SELECT id, name FROM items2 UNION
+SELECT id, name FROM items2 UNION
+SELECT id, name FROM items3;
+
+
+
 
 DROP TABLE IF EXISTS planes CASCADE;
 CREATE TABLE IF NOT EXISTS planes (
@@ -47,8 +56,6 @@ CREATE TABLE IF NOT EXISTS planes (
 	last_updated		BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS planes_idx1 ON planes(id);
-
-
 
 
 

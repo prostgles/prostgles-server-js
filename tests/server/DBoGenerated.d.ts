@@ -76,6 +76,11 @@ export type Transaction = {
      id?: string;
 };
 export type Transaction_Filter = Transaction | object | { $and: (Transaction | object)[] } | { $or: (Transaction | object)[] } 
+export type V_items = {
+     id?: number;
+     name?: string;
+};
+export type V_items_Filter = V_items | object | { $and: (V_items | object)[] } | { $or: (V_items | object)[] } 
 
 export type DBO_items = {
     getColumns: () => Promise<any[]>;
@@ -161,6 +166,14 @@ export type DBO_transaction = {
    insert: (data: (Transaction | Transaction[]), params?: InsertParams) => Promise<void | Transaction>;
    delete: (filter?:  Transaction_Filter , params?: DeleteParams) => Promise<void | Transaction>; 
 };
+export type DBO_v_items = {
+    getColumns: () => Promise<any[]>;
+   find: (filter?:  V_items_Filter , selectParams?: SelectParams) => Promise<V_items[] | any[]>;
+   findOne: (filter?:  V_items_Filter , selectParams?: SelectParams) => Promise<V_items | any>;
+   subscribe: (filter:  V_items_Filter , params: SelectParams, onData: (items: V_items[]) => any) => Promise<{ unsubscribe: () => any }>;
+   subscribeOne: (filter:  V_items_Filter , params: SelectParams, onData: (item: V_items) => any) => Promise<{ unsubscribe: () => any }>;
+   count: (filter?:  V_items_Filter ) => Promise<number>; 
+};
 
 export type JoinMakerTables = {
  items: JoinMaker;
@@ -176,6 +189,7 @@ export type DBObj = {
  planes: DBO_planes;
  table: DBO_table;
  transaction: DBO_transaction;
+ v_items: DBO_v_items;
  leftJoin: JoinMakerTables;
  innerJoin: JoinMakerTables;
  leftJoinOne: JoinMakerTables;

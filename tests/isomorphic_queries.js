@@ -70,7 +70,16 @@ async function isomorphic(db) {
         throw "Joined select query failed";
     }
     const rowhash = await db.items.findOne({}, { select: { $rowhash: 1 } });
-    if (typeof rowhash.$rowhash !== "string")
+    const rowhashView = await db.v_items.findOne({}, { select: { $rowhash: 1 } });
+    const rh1 = await db.items.findOne({ $rowhash: rowhash.$rowhash }, { select: { $rowhash: 1 } });
+    const rhView = await db.v_items.findOne({ $rowhash: rowhashView.$rowhash }, { select: { $rowhash: 1 } });
+    // console.log(rowhash, rh1)
+    // console.log(rowhashView, rhView)
+    if (typeof rowhash.$rowhash !== "string" ||
+        typeof rowhashView.$rowhash !== "string" ||
+        rowhash.$rowhash !== rh1.$rowhash ||
+        rowhashView.$rowhash !== rhView.$rowhash) {
         throw "$rowhash query failed";
+    }
 }
 exports.default = isomorphic;
