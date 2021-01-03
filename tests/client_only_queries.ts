@@ -35,7 +35,7 @@ export default async function client_only(db: DBHandlerClient){
     await db.planes.insert(inserts);
   
     let updt = 0;
-    db.planes.sync({}, { handlesOnData: true, patchText: true }, planes => {
+    db.planes.sync({}, { handlesOnData: true, patchText: true }, (planes, deltas) => {
       
       const x20 = planes.filter(p => p.x == 20).length;
       console.log("sync.x10", planes.filter(p => p.x == 10).length, "x20", x20);
