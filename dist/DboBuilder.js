@@ -1291,10 +1291,10 @@ class TableHandler extends ViewHandler {
     constructor(db, tableOrViewInfo, pubSubManager, dboBuilder, t, joinPaths) {
         super(db, tableOrViewInfo, pubSubManager, dboBuilder, t, joinPaths);
         this.tsDboDefs = this.tsDboDefs.concat([
-            `   update: (filter: ${this.filterDef}, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
-            `   upsert: (filter: ${this.filterDef}, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<void | ${this.tsDataName}>;`,
-            `   insert: (data: (${this.tsDataName} | ${this.tsDataName}[]), params?: InsertParams) => Promise<void | ${this.tsDataName}>;`,
-            `   delete: (filter?: ${this.filterDef}, params?: DeleteParams) => Promise<void | ${this.tsDataName}>;`,
+            `   update: (filter: ${this.filterDef}, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<${this.tsDataName} | void>;`,
+            `   upsert: (filter: ${this.filterDef}, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<${this.tsDataName} | void>;`,
+            `   insert: (data: (${this.tsDataName} | ${this.tsDataName}[]), params?: InsertParams) => Promise<${this.tsDataName} | void>;`,
+            `   delete: (filter?: ${this.filterDef}, params?: DeleteParams) => Promise<${this.tsDataName} | void>;`,
         ]);
         this.makeDef();
         this.remove = this.delete;

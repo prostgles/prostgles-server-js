@@ -89,10 +89,10 @@ export type DBO_items = {
    subscribe: (filter:  Items_Filter , params: SelectParams, onData: (items: Items[]) => any) => Promise<{ unsubscribe: () => any }>;
    subscribeOne: (filter:  Items_Filter , params: SelectParams, onData: (item: Items) => any) => Promise<{ unsubscribe: () => any }>;
    count: (filter?:  Items_Filter ) => Promise<number>;
-   update: (filter:  Items_Filter , newData: Items, params?: UpdateParams) => Promise<void | Items>;
-   upsert: (filter:  Items_Filter , newData: Items, params?: UpdateParams) => Promise<void | Items>;
-   insert: (data: (Items | Items[]), params?: InsertParams) => Promise<void | Items>;
-   delete: (filter?:  Items_Filter , params?: DeleteParams) => Promise<void | Items>; 
+   update: (filter:  Items_Filter , newData: Items, params?: UpdateParams) => Promise<Items | void>;
+   upsert: (filter:  Items_Filter , newData: Items, params?: UpdateParams) => Promise<Items | void>;
+   insert: (data: (Items | Items[]), params?: InsertParams) => Promise<Items | void>;
+   delete: (filter?:  Items_Filter , params?: DeleteParams) => Promise<Items | void>; 
 };
 export type DBO_items2 = {
     getColumns: () => Promise<any[]>;
@@ -101,10 +101,10 @@ export type DBO_items2 = {
    subscribe: (filter:  Items2_Filter , params: SelectParams, onData: (items: Items2[]) => any) => Promise<{ unsubscribe: () => any }>;
    subscribeOne: (filter:  Items2_Filter , params: SelectParams, onData: (item: Items2) => any) => Promise<{ unsubscribe: () => any }>;
    count: (filter?:  Items2_Filter ) => Promise<number>;
-   update: (filter:  Items2_Filter , newData: Items2, params?: UpdateParams) => Promise<void | Items2>;
-   upsert: (filter:  Items2_Filter , newData: Items2, params?: UpdateParams) => Promise<void | Items2>;
-   insert: (data: (Items2 | Items2[]), params?: InsertParams) => Promise<void | Items2>;
-   delete: (filter?:  Items2_Filter , params?: DeleteParams) => Promise<void | Items2>; 
+   update: (filter:  Items2_Filter , newData: Items2, params?: UpdateParams) => Promise<Items2 | void>;
+   upsert: (filter:  Items2_Filter , newData: Items2, params?: UpdateParams) => Promise<Items2 | void>;
+   insert: (data: (Items2 | Items2[]), params?: InsertParams) => Promise<Items2 | void>;
+   delete: (filter?:  Items2_Filter , params?: DeleteParams) => Promise<Items2 | void>; 
 };
 export type DBO_items3 = {
     getColumns: () => Promise<any[]>;
@@ -113,10 +113,10 @@ export type DBO_items3 = {
    subscribe: (filter:  Items3_Filter , params: SelectParams, onData: (items: Items3[]) => any) => Promise<{ unsubscribe: () => any }>;
    subscribeOne: (filter:  Items3_Filter , params: SelectParams, onData: (item: Items3) => any) => Promise<{ unsubscribe: () => any }>;
    count: (filter?:  Items3_Filter ) => Promise<number>;
-   update: (filter:  Items3_Filter , newData: Items3, params?: UpdateParams) => Promise<void | Items3>;
-   upsert: (filter:  Items3_Filter , newData: Items3, params?: UpdateParams) => Promise<void | Items3>;
-   insert: (data: (Items3 | Items3[]), params?: InsertParams) => Promise<void | Items3>;
-   delete: (filter?:  Items3_Filter , params?: DeleteParams) => Promise<void | Items3>; 
+   update: (filter:  Items3_Filter , newData: Items3, params?: UpdateParams) => Promise<Items3 | void>;
+   upsert: (filter:  Items3_Filter , newData: Items3, params?: UpdateParams) => Promise<Items3 | void>;
+   insert: (data: (Items3 | Items3[]), params?: InsertParams) => Promise<Items3 | void>;
+   delete: (filter?:  Items3_Filter , params?: DeleteParams) => Promise<Items3 | void>; 
 };
 export type DBO_items4 = {
     getColumns: () => Promise<any[]>;
@@ -125,10 +125,10 @@ export type DBO_items4 = {
    subscribe: (filter:  Items4_Filter , params: SelectParams, onData: (items: Items4[]) => any) => Promise<{ unsubscribe: () => any }>;
    subscribeOne: (filter:  Items4_Filter , params: SelectParams, onData: (item: Items4) => any) => Promise<{ unsubscribe: () => any }>;
    count: (filter?:  Items4_Filter ) => Promise<number>;
-   update: (filter:  Items4_Filter , newData: Items4, params?: UpdateParams) => Promise<void | Items4>;
-   upsert: (filter:  Items4_Filter , newData: Items4, params?: UpdateParams) => Promise<void | Items4>;
-   insert: (data: (Items4 | Items4[]), params?: InsertParams) => Promise<void | Items4>;
-   delete: (filter?:  Items4_Filter , params?: DeleteParams) => Promise<void | Items4>; 
+   update: (filter:  Items4_Filter , newData: Items4, params?: UpdateParams) => Promise<Items4 | void>;
+   upsert: (filter:  Items4_Filter , newData: Items4, params?: UpdateParams) => Promise<Items4 | void>;
+   insert: (data: (Items4 | Items4[]), params?: InsertParams) => Promise<Items4 | void>;
+   delete: (filter?:  Items4_Filter , params?: DeleteParams) => Promise<Items4 | void>; 
 };
 export type DBO_planes = {
     getColumns: () => Promise<any[]>;
@@ -137,10 +137,10 @@ export type DBO_planes = {
    subscribe: (filter:  Planes_Filter , params: SelectParams, onData: (items: Planes[]) => any) => Promise<{ unsubscribe: () => any }>;
    subscribeOne: (filter:  Planes_Filter , params: SelectParams, onData: (item: Planes) => any) => Promise<{ unsubscribe: () => any }>;
    count: (filter?:  Planes_Filter ) => Promise<number>;
-   update: (filter:  Planes_Filter , newData: Planes, params?: UpdateParams) => Promise<void | Planes>;
-   upsert: (filter:  Planes_Filter , newData: Planes, params?: UpdateParams) => Promise<void | Planes>;
-   insert: (data: (Planes | Planes[]), params?: InsertParams) => Promise<void | Planes>;
-   delete: (filter?:  Planes_Filter , params?: DeleteParams) => Promise<void | Planes>; 
+   update: (filter:  Planes_Filter , newData: Planes, params?: UpdateParams) => Promise<Planes | void>;
+   upsert: (filter:  Planes_Filter , newData: Planes, params?: UpdateParams) => Promise<Planes | void>;
+   insert: (data: (Planes | Planes[]), params?: InsertParams) => Promise<Planes | void>;
+   delete: (filter?:  Planes_Filter , params?: DeleteParams) => Promise<Planes | void>; 
 };
 export type DBO_table = {
     getColumns: () => Promise<any[]>;
@@ -149,10 +149,10 @@ export type DBO_table = {
    subscribe: (filter:  Table_Filter , params: SelectParams, onData: (items: Table[]) => any) => Promise<{ unsubscribe: () => any }>;
    subscribeOne: (filter:  Table_Filter , params: SelectParams, onData: (item: Table) => any) => Promise<{ unsubscribe: () => any }>;
    count: (filter?:  Table_Filter ) => Promise<number>;
-   update: (filter:  Table_Filter , newData: Table, params?: UpdateParams) => Promise<void | Table>;
-   upsert: (filter:  Table_Filter , newData: Table, params?: UpdateParams) => Promise<void | Table>;
-   insert: (data: (Table | Table[]), params?: InsertParams) => Promise<void | Table>;
-   delete: (filter?:  Table_Filter , params?: DeleteParams) => Promise<void | Table>; 
+   update: (filter:  Table_Filter , newData: Table, params?: UpdateParams) => Promise<Table | void>;
+   upsert: (filter:  Table_Filter , newData: Table, params?: UpdateParams) => Promise<Table | void>;
+   insert: (data: (Table | Table[]), params?: InsertParams) => Promise<Table | void>;
+   delete: (filter?:  Table_Filter , params?: DeleteParams) => Promise<Table | void>; 
 };
 export type DBO_transaction = {
     getColumns: () => Promise<any[]>;
@@ -161,10 +161,10 @@ export type DBO_transaction = {
    subscribe: (filter:  Transaction_Filter , params: SelectParams, onData: (items: Transaction[]) => any) => Promise<{ unsubscribe: () => any }>;
    subscribeOne: (filter:  Transaction_Filter , params: SelectParams, onData: (item: Transaction) => any) => Promise<{ unsubscribe: () => any }>;
    count: (filter?:  Transaction_Filter ) => Promise<number>;
-   update: (filter:  Transaction_Filter , newData: Transaction, params?: UpdateParams) => Promise<void | Transaction>;
-   upsert: (filter:  Transaction_Filter , newData: Transaction, params?: UpdateParams) => Promise<void | Transaction>;
-   insert: (data: (Transaction | Transaction[]), params?: InsertParams) => Promise<void | Transaction>;
-   delete: (filter?:  Transaction_Filter , params?: DeleteParams) => Promise<void | Transaction>; 
+   update: (filter:  Transaction_Filter , newData: Transaction, params?: UpdateParams) => Promise<Transaction | void>;
+   upsert: (filter:  Transaction_Filter , newData: Transaction, params?: UpdateParams) => Promise<Transaction | void>;
+   insert: (data: (Transaction | Transaction[]), params?: InsertParams) => Promise<Transaction | void>;
+   delete: (filter?:  Transaction_Filter , params?: DeleteParams) => Promise<Transaction | void>; 
 };
 export type DBO_v_items = {
     getColumns: () => Promise<any[]>;
