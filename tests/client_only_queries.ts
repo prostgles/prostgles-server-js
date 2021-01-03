@@ -50,7 +50,7 @@ export default async function client_only(db: DBHandlerClient){
           p.$update({ x: 10 });
         }
       });
-      if(update) console.log("$update({ x: 10 })", updt)
+      // if(update) console.log("$update({ x: 10 })", updt)
 
       if(x20 === 100){
         // console.log(22)
@@ -65,7 +65,7 @@ export default async function client_only(db: DBHandlerClient){
     const sP = await db.planes.subscribe({ x: 10 }, { }, async planes => {
 
       const p10 = planes.filter(p => p.x == 10).length;
-      console.log("sub.x10", p10, "x20", planes.filter(p => p.x == 20).length);
+      // console.log("sub.x10", p10, "x20", planes.filter(p => p.x == 20).length);
 
       if(p10 === 100){
         // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(console.log);
