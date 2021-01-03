@@ -9,10 +9,10 @@ export default async function client_only(db: DBHandlerClient){
 
 
     /* RAWSQL */
-    const sqlStatement = await db.sql("SELECT $1", [1], { statement: true });
+    const sqlStatement = await db.sql("SELECT $1", [1], { returnType: "statement" });
     assert.equal(sqlStatement, "SELECT 1", "db.sql statement query failed");
   
-    const select1 = await db.sql("SELECT $1 as col1", [1], { justRows: true });
+    const select1 = await db.sql("SELECT $1 as col1", [1], { returnType: "rows" });
     assert.deepStrictEqual(select1[0], { col1: 1 }, "db.sql justRows query failed");
 
     const fullResult = await db.sql("SELECT $1 as col1", [1]);

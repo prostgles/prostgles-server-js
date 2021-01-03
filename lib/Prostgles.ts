@@ -647,10 +647,10 @@ export class Prostgles {
 
                     if(canRunSQL && typeof canRunSQL === "boolean" || canRunSQL === "*"){
                         socket.on(WS_CHANNEL_NAME.SQL, function({ query, params, options }: SQLRequest, cb = (...callback) => {}){
-                            const { statement, justRows }: SQLOptions = options || ({} as any);
+                            const { returnType }: SQLOptions = options || ({} as any);
 
                             // console.log(query, options)
-                            if(statement){
+                            if(returnType === "statement"){
                                 try {
                                     cb(null, pgp.as.format(query, params));
                                 } catch (err){
@@ -661,7 +661,7 @@ export class Prostgles {
                                 db.result(query, params)
                                     .then((qres: any) => {
                                         const { duration, fields, rows, rowCount } = qres;
-                                        if(justRows) {
+                                        if(returnType === "rows") {
                                             cb(null, rows);
                                             return;
                                         }

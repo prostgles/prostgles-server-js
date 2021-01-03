@@ -4,9 +4,9 @@ const assert_1 = require("assert");
 async function client_only(db) {
     return new Promise(async (resolve, reject) => {
         /* RAWSQL */
-        const sqlStatement = await db.sql("SELECT $1", [1], { statement: true });
+        const sqlStatement = await db.sql("SELECT $1", [1], { returnType: "statement" });
         assert_1.strict.equal(sqlStatement, "SELECT 1", "db.sql statement query failed");
-        const select1 = await db.sql("SELECT $1 as col1", [1], { justRows: true });
+        const select1 = await db.sql("SELECT $1 as col1", [1], { returnType: "rows" });
         assert_1.strict.deepStrictEqual(select1[0], { col1: 1 }, "db.sql justRows query failed");
         const fullResult = await db.sql("SELECT $1 as col1", [1]);
         assert_1.strict.deepStrictEqual(fullResult.rows[0], { col1: 1 }, "db.sql query failed");
@@ -35,8 +35,7 @@ async function client_only(db) {
                     p.$update({ x: 10 });
                 }
             });
-            if (update)
-                console.log("$update({ x: 10 })", updt);
+            // if(update) console.log("$update({ x: 10 })", updt)
             if (x20 === 100) {
                 // console.log(22)
                 // console.timeEnd("test")
@@ -48,7 +47,7 @@ async function client_only(db) {
         /* After all sync records are updated to x10 here we'll update them to x20 */
         const sP = await db.planes.subscribe({ x: 10 }, {}, async (planes) => {
             const p10 = planes.filter(p => p.x == 10).length;
-            console.log("sub.x10", p10, "x20", planes.filter(p => p.x == 20).length);
+            // console.log("sub.x10", p10, "x20", planes.filter(p => p.x == 20).length);
             if (p10 === 100) {
                 // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(console.log);
                 sP.unsubscribe();

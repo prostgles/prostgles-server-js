@@ -3,7 +3,8 @@ import io from "socket.io-client";
 
 import isomorphic from "../isomorphic_queries";
 import client_only from "../client_only_queries";
-export { DBHandlerClient } from "prostgles-client/dist/prostgles";
+export { DBHandlerClient, SQLResult } from "prostgles-client/dist/prostgles";
+
 
 console.log("Starting client")
 const url = process.env.PRGL_CLIENT_URL || "http://127.0.0.1:3001",
