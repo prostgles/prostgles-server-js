@@ -6,7 +6,7 @@
   "scripts": {
     "start": "tsc-watch --onSuccess \"node index.js\"",
     "dev": "NOSTOP=true npm start",
-    "build": "npm i && npm run test-server && npm run test-client",
+    "build": "rm -rf ./node_modules/* && npm i && npm run test-server && npm run test-client",
     "test-server": "tsc && TEST_TYPE=server node index.js",
     "test-client": "tsc && TEST_TYPE=client node index.js"
   },
