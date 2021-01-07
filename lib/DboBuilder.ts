@@ -76,6 +76,62 @@ export type Aggregation = {
     getQuery: (alias: string) => string;
 };
 
+export type SelectItem = {
+    type: "column" | "function" | "aggregation" | "joinedColumn";
+    getFields: () => string[];
+    getQuery: (tableAlias?: string) => string;
+    alias: string;
+};
+
+export type NewQuery = {
+    allFields: string[];
+    select: SelectItem[];
+    table: string;
+    where: string;
+    orderBy: string[];
+    limit: number;
+    offset: number;
+    isLeftJoin: boolean;
+    joins?: NewQuery[];
+    joinAlias?: string;
+    $path?: string[];
+};
+
+export type FunctionSpec = {
+    name: string;
+    type: "function" | "aggregation";
+    /**
+     * getFields used to validate user supplied field names. It will be fired before querying to validate allowed columns
+     */
+    getFields: (args: any[]) => string[];
+    /**
+     * allowedFields passed for multicol functions (e.g.: $rowhash)
+     */
+    getQuery: (params: { allowedFields: string[], args: any[], tableAlias?: string }) => string;
+};
+
+/**
+ * Each function expects a column at the very least
+ */
+const FUNCTIONS: FunctionSpec[] = [
+    {
+        name: "$ST_AsGeoJSON",
+        type: "function",
+        getFields: (args: any[]) => [args[0]],
+        getQuery: ({ allowedFields, args, tableAlias }) => {
+            return pgp.as.format("ST_AsGeoJSON($1:name)", [args[0]]);
+        }
+    },
+    {
+        name: "$left",
+        type: "function",
+        getFields: (args: any[]) => [args[0]],
+        getQuery: ({ allowedFields, args, tableAlias }) => {
+            return pgp.as.format("LEFT($1:name, $2)", [args[0], args[1]]);
+        }
+    }
+];
+
 type Filter = object | { $and: Filter[] } | { $or: Filter[] } | {};
 
 type SelectFunc = {
@@ -220,9 +276,9 @@ export class ViewHandler {
         }
     }
 
-    getRowHashSelect(tableRules: TableRule, alias?: string, tableAlias?: string): string {
+    getRowHashSelect(allowedFields: FieldFilter, alias?: string, tableAlias?: string): string {
         let allowed_cols = this.column_names;
-        if(tableRules) allowed_cols = this.parseFieldFilter(get(tableRules, "select.fields"));
+        if(allowedFields) allowed_cols = this.parseFieldFilter(allowedFields);
         return "md5(" +
             allowed_cols
                 .concat(this.is_view? [] : ["ctid"])
@@ -606,6 +662,143 @@ export class ViewHandler {
         return res;
     }
 
+    async getNewQuery(filter: Filter, selectParams?: SelectParams & { alias?: string }, param3_unused = null, tableRules?: TableRule, localParams?: LocalParams): Promise<NewQuery> {
+        let select: SelectItem[] = [], where = "", orderBy = [""], isLeftJoin = null;
+
+        const table = this.name,
+            allowedFields = this.parseFieldFilter(get(tableRules, "select.fields")) || this.column_names.slice(0),
+            checkField = (f: string) => {
+                if(!allowedFields.includes(f)) throw "Field " + f + " is invalid or dissallowed";
+                return f;
+            },
+            addColumn = (fieldName: string) => {
+                addItem({
+                    type: "column",
+                    alias: fieldName,
+                    getQuery: () => asName(fieldName),
+                    getFields: () => [fieldName]
+                });
+            },
+            addItem = (item: SelectItem) => {
+                item.getFields().map(checkField);
+                if(select.find(s => s.alias === item.alias)) throw `Cannot specify duplicate columns ( ${item.alias} ). Perhaps you're using "*" with column names?`;
+                select.push(item);
+            }
+
+        const { select: userSelect, limit, offset } = selectParams;
+        if(select && isPlainObject(userSelect) && !isEmpty(userSelect)){
+            const selectKeys = Object.keys(userSelect),
+                selectValues = Object.values(userSelect);
+
+            /* Cannot include and exclude at the same time */
+            if(
+                selectValues.find(v => [0, false].includes(v)) 
+            ){
+                if(selectValues.find(v => ![0, false].includes(v))){
+                    throw "\nCannot include and exclude fields at the same time";
+                } 
+
+                /* Exclude only */
+                allowedFields.filter(f => !selectKeys.includes(f)).map(addColumn)
+                
+            } else {
+                selectKeys.map(key => {
+                    const val = userSelect[key],
+                        throwErr = () => {
+                            throw "Unexpected select -> " + JSON.stringify({ key, val });
+                        };
+                    
+                    /* Included fields */
+                    if([1, true].includes(val)){
+                        if(key === "*"){
+                            allowedFields.map(addColumn)
+                        } else {
+                            addColumn(key);
+                        }
+
+                    /* Aggs and functions */
+                    } else if(typeof val === "string" || isPlainObject(val)) {
+
+                        /* Function 
+                            { id: "$max" } === { id: { $max: ["id"] } } === SELECT MAX(id) AS id 
+                        */  
+                        if(
+                            (typeof val === "string" && val !== "*") ||
+                            isPlainObject(val) && Object.keys(val).length === 1 && Array.isArray(Object.values(val)[0])
+                        ){
+                            let funcName, args;
+                            if(typeof val === "string") {
+                                /* Shorthand notation */
+                                funcName = val;
+                                args = [key];
+                            } else {
+                                const callKeys = Object.keys(val);
+                                if(callKeys.length !== 1 || !Array.isArray(val[callKeys[0]])) throw "\nIssue with select. \nUnexpected function definition. \nExpecting { field_name: func_name } OR { result_key: { func_name: [arg1, arg2 ...] } } \nBut got -> " + JSON.stringify({ [key]: val });
+                                funcName = callKeys[0];
+                                args = val[callKeys[0]];
+                            }
+    
+                            const funcDef = FUNCTIONS.find(f => f.name === funcName);
+                            if(!funcDef) throw `Invalid or dissallowed function name: ` + funcName;
+                            
+                            addItem({
+                                type: funcDef.type,
+                                alias: key,
+                                getFields: () => funcDef.getFields(args),
+                                getQuery: (tableAlias?: string) => funcDef.getQuery({ allowedFields, args, tableAlias })
+                            });
+
+                        /* Join */
+                        } else {
+                            let j_filter: Filter, 
+                                j_selectParams: SelectParams,
+                                j_alias: string,
+                                j_tableRules: TableRule,
+                                j_table: string,
+                                j_isLeftJoin: Boolean;
+
+                            if(val === "*"){
+                                j_selectParams = {};
+                                j_filter = {};
+                                j_alias = key;
+                                j_table = key;
+                                // j_tableRules 
+                            } else {
+                                const JOIN_KEYS = ["$innerJoin", "$leftJoin"];
+                                const joinKeys = Object.keys(val).find(k => JOIN_KEYS.includes(k));
+                                if(joinKeys.length !== 1) throw "\nIssue with select. \nCannot specify more than one join type ( $innerJoin OR $leftJoin )";
+
+                                j_isLeftJoin = joinKeys[0] === "$leftJoin";
+                                j_table = val[joinKeys[0]];
+                                if(typeof j_table !== "string") throw "\nIssue with select. \nJoin type must be a string table name but got -> " + JSON.stringify({ [key]: val });
+
+                                // Validate request ...
+                                // getNewQuery(joinParams)
+
+                            }
+                            
+                        }
+
+                    }  else throwErr();
+
+                });
+            }
+
+
+
+        }
+        return {
+            allFields: allowedFields,
+            select,
+            table,
+            where,
+            orderBy,
+            isLeftJoin,
+            limit,
+            offset
+        };
+    }
+
     async buildQueryTree(filter: Filter, selectParams?: SelectParams & { alias?: string }, param3_unused = null, tableRules?: TableRule, localParams?: LocalParams): Promise<Query> {
         this.checkFilter(filter);
         const { select, alias } = selectParams || {};
@@ -774,7 +967,7 @@ export class ViewHandler {
                 
                 selectFuncs.push({
                     alias: "$rowhash",
-                    getQuery: (alias: string, tableAlias?: string) => this.getRowHashSelect(tableRules, alias, tableAlias)
+                    getQuery: (alias: string, tableAlias?: string) => this.getRowHashSelect(get(tableRules, "select.fields"), alias, tableAlias)
                 });
             }
             
@@ -1282,7 +1475,7 @@ export class ViewHandler {
         let rowHashKeys = ["$rowhash"],
             rowHashCondition;
         if(rowHashKeys[0] in (data || {})){
-            rowHashCondition = this.getRowHashSelect(tableRules ,tableAlias) + ` = ${pgp.as.format("$1", [ (data as any).$rowhash ] )}`;
+            rowHashCondition = this.getRowHashSelect(get(tableRules, "select.fields") ,tableAlias) + ` = ${pgp.as.format("$1", [ (data as any).$rowhash ] )}`;
             delete (data as any).$rowhash;
         }
 
@@ -1681,8 +1874,9 @@ export class TableHandler extends ViewHandler {
             if(tableRules){
                 if(!tableRules.update) throw "update rules missing for " + this.name;
                 ({ forcedFilter, forcedData, returningFields, fields, filterFields } = tableRules.update);
+                if(!returningFields) returningFields = get(tableRules, "select.fields");
 
-                if(!fields)  throw ` invalid update rule for ${this.name}. fields missing `;
+                if(!fields)  throw ` Invalid update rule for ${this.name}. fields missing `;
 
                 /* Safely test publish rules */
                 if(testRule){
@@ -1816,6 +2010,9 @@ export class TableHandler extends ViewHandler {
                 validate = tableRules.insert.validate;
                 preValidate = tableRules.insert.preValidate;
     
+                /* If no returning fields specified then take select fields as returning */
+                if(!returningFields) returningFields = get(tableRules, "select.fields");
+
                 if(!fields) throw ` invalid insert rule for ${this.name} -> fields missing `;
 
                 /* Safely test publish rules */
@@ -1913,7 +2110,9 @@ export class TableHandler extends ViewHandler {
                 filterFields = table_rules.delete.filterFields;
                 returningFields = table_rules.delete.returningFields;
 
-                if(!filterFields)  throw ` invalid delete rule for ${this.name}. filterFields missing `;
+                if(!returningFields) returningFields = get(table_rules, "select.fields");
+
+                if(!filterFields)  throw ` Invalid delete rule for ${this.name}. filterFields missing `;
 
                 /* Safely test publish rules */
                 if(testRule){
@@ -2822,7 +3021,7 @@ async function getInferredJoins(db: DB, schema: string = "public"): Promise<Join
 
 
 
-export function isEmpty(obj?: object): boolean {
+export function isEmpty(obj?: any): boolean {
     for(var v in obj) return false;
     return true;
 }

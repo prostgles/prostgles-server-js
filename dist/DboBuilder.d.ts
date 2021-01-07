@@ -39,6 +39,41 @@ export declare type Aggregation = {
     alias: string;
     getQuery: (alias: string) => string;
 };
+export declare type SelectItem = {
+    type: "column" | "function" | "aggregation" | "joinedColumn";
+    getFields: () => string[];
+    getQuery: (tableAlias?: string) => string;
+    alias: string;
+};
+export declare type NewQuery = {
+    allFields: string[];
+    select: SelectItem[];
+    table: string;
+    where: string;
+    orderBy: string[];
+    limit: number;
+    offset: number;
+    isLeftJoin: boolean;
+    joins?: NewQuery[];
+    joinAlias?: string;
+    $path?: string[];
+};
+export declare type FunctionSpec = {
+    name: string;
+    type: "function" | "aggregation";
+    /**
+     * getFields used to validate user supplied field names. It will be fired before querying to validate allowed columns
+     */
+    getFields: (args: any[]) => string[];
+    /**
+     * allowedFields passed for multicol functions (e.g.: $rowhash)
+     */
+    getQuery: (params: {
+        allowedFields: string[];
+        args: any[];
+        tableAlias?: string;
+    }) => string;
+};
 declare type Filter = object | {
     $and: Filter[];
 } | {
@@ -108,7 +143,7 @@ export declare class ViewHandler {
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, joinPaths?: JoinPaths);
     makeDef(): void;
     getSelectFunctions(select: any): void;
-    getRowHashSelect(tableRules: TableRule, alias?: string, tableAlias?: string): string;
+    getRowHashSelect(allowedFields: FieldFilter, alias?: string, tableAlias?: string): string;
     getFullDef(): any[];
     validateViewRules(fields: FieldFilter, filterFields: FieldFilter, returningFields: FieldFilter, forcedFilter: object, rule: string): Promise<boolean>;
     getShortestJoin(table1: string, table2: string, startAlias: number, isInner?: boolean): {
@@ -118,6 +153,9 @@ export declare class ViewHandler {
     private getJoins;
     buildJoinQuery(q: Query): Promise<string>;
     getAggs(select: object): Aggregation[];
+    getNewQuery(filter: Filter, selectParams?: SelectParams & {
+        alias?: string;
+    }, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<NewQuery>;
     buildQueryTree(filter: Filter, selectParams?: SelectParams & {
         alias?: string;
     }, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<Query>;
@@ -231,6 +269,6 @@ export declare class DboBuilder {
     buildJoinPaths(): void;
     init(): Promise<DbHandler | DbHandlerTX>;
 }
-export declare function isEmpty(obj?: object): boolean;
+export declare function isEmpty(obj?: any): boolean;
 export {};
 //# sourceMappingURL=DboBuilder.d.ts.map

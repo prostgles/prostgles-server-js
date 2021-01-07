@@ -34,6 +34,27 @@ function replaceNonAlphaNumeric(string) {
 function capitalizeFirstLetter(string) {
     return replaceNonAlphaNumeric(string).charAt(0).toUpperCase() + string.slice(1);
 }
+/**
+ * Each function expects a column at the very least
+ */
+const FUNCTIONS = [
+    {
+        name: "$ST_AsGeoJSON",
+        type: "function",
+        getFields: (args) => [args[0]],
+        getQuery: ({ allowedFields, args, tableAlias }) => {
+            return pgp.as.format("ST_AsGeoJSON($1:name)", [args[0]]);
+        }
+    },
+    {
+        name: "$left",
+        type: "function",
+        getFields: (args) => [args[0]],
+        getQuery: ({ allowedFields, args, tableAlias }) => {
+            return pgp.as.format("LEFT($1:name, $2)", [args[0], args[1]]);
+        }
+    }
+];
 const shortestPath_1 = require("./shortestPath");
 function makeErr(err, localParams) {
     // console.error(err)
@@ -94,10 +115,10 @@ class ViewHandler {
             }
         }
     }
-    getRowHashSelect(tableRules, alias, tableAlias) {
+    getRowHashSelect(allowedFields, alias, tableAlias) {
         let allowed_cols = this.column_names;
-        if (tableRules)
-            allowed_cols = this.parseFieldFilter(utils_1.get(tableRules, "select.fields"));
+        if (allowedFields)
+            allowed_cols = this.parseFieldFilter(allowedFields);
         return "md5(" +
             allowed_cols
                 .concat(this.is_view ? [] : ["ctid"])
@@ -419,6 +440,122 @@ class ViewHandler {
         // console.log(res);
         return res;
     }
+    getNewQuery(filter, selectParams, param3_unused = null, tableRules, localParams) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let select = [], where = "", orderBy = [""], isLeftJoin = null;
+            const table = this.name, allowedFields = this.parseFieldFilter(utils_1.get(tableRules, "select.fields")) || this.column_names.slice(0), checkField = (f) => {
+                if (!allowedFields.includes(f))
+                    throw "Field " + f + " is invalid or dissallowed";
+                return f;
+            }, addColumn = (fieldName) => {
+                addItem({
+                    type: "column",
+                    alias: fieldName,
+                    getQuery: () => exports.asName(fieldName),
+                    getFields: () => [fieldName]
+                });
+            }, addItem = (item) => {
+                item.getFields().map(checkField);
+                if (select.find(s => s.alias === item.alias))
+                    throw `Cannot specify duplicate columns ( ${item.alias} ). Perhaps you're using "*" with column names?`;
+                select.push(item);
+            };
+            const { select: userSelect, limit, offset } = selectParams;
+            if (select && isPlainObject(userSelect) && !isEmpty(userSelect)) {
+                const selectKeys = Object.keys(userSelect), selectValues = Object.values(userSelect);
+                /* Cannot include and exclude at the same time */
+                if (selectValues.find(v => [0, false].includes(v))) {
+                    if (selectValues.find(v => ![0, false].includes(v))) {
+                        throw "\nCannot include and exclude fields at the same time";
+                    }
+                    /* Exclude only */
+                    allowedFields.filter(f => !selectKeys.includes(f)).map(addColumn);
+                }
+                else {
+                    selectKeys.map(key => {
+                        const val = userSelect[key], throwErr = () => {
+                            throw "Unexpected select -> " + JSON.stringify({ key, val });
+                        };
+                        /* Included fields */
+                        if ([1, true].includes(val)) {
+                            if (key === "*") {
+                                allowedFields.map(addColumn);
+                            }
+                            else {
+                                addColumn(key);
+                            }
+                            /* Aggs and functions */
+                        }
+                        else if (typeof val === "string" || isPlainObject(val)) {
+                            /* Function
+                                { id: "$max" } === { id: { $max: ["id"] } } === SELECT MAX(id) AS id
+                            */
+                            if ((typeof val === "string" && val !== "*") ||
+                                isPlainObject(val) && Object.keys(val).length === 1 && Array.isArray(Object.values(val)[0])) {
+                                let funcName, args;
+                                if (typeof val === "string") {
+                                    /* Shorthand notation */
+                                    funcName = val;
+                                    args = [key];
+                                }
+                                else {
+                                    const callKeys = Object.keys(val);
+                                    if (callKeys.length !== 1 || !Array.isArray(val[callKeys[0]]))
+                                        throw "\nIssue with select. \nUnexpected function definition. \nExpecting { field_name: func_name } OR { result_key: { func_name: [arg1, arg2 ...] } } \nBut got -> " + JSON.stringify({ [key]: val });
+                                    funcName = callKeys[0];
+                                    args = val[callKeys[0]];
+                                }
+                                const funcDef = FUNCTIONS.find(f => f.name === funcName);
+                                if (!funcDef)
+                                    throw `Invalid or dissallowed function name: ` + funcName;
+                                addItem({
+                                    type: funcDef.type,
+                                    alias: key,
+                                    getFields: () => funcDef.getFields(args),
+                                    getQuery: (tableAlias) => funcDef.getQuery({ allowedFields, args, tableAlias })
+                                });
+                                /* Join */
+                            }
+                            else {
+                                let j_filter, j_selectParams, j_alias, j_tableRules, j_table, j_isLeftJoin;
+                                if (val === "*") {
+                                    j_selectParams = {};
+                                    j_filter = {};
+                                    j_alias = key;
+                                    j_table = key;
+                                    // j_tableRules 
+                                }
+                                else {
+                                    const JOIN_KEYS = ["$innerJoin", "$leftJoin"];
+                                    const joinKeys = Object.keys(val).find(k => JOIN_KEYS.includes(k));
+                                    if (joinKeys.length !== 1)
+                                        throw "\nIssue with select. \nCannot specify more than one join type ( $innerJoin OR $leftJoin )";
+                                    j_isLeftJoin = joinKeys[0] === "$leftJoin";
+                                    j_table = val[joinKeys[0]];
+                                    if (typeof j_table !== "string")
+                                        throw "\nIssue with select. \nJoin type must be a string table name but got -> " + JSON.stringify({ [key]: val });
+                                    // Validate request ...
+                                    // getNewQuery(joinParams)
+                                }
+                            }
+                        }
+                        else
+                            throwErr();
+                    });
+                }
+            }
+            return {
+                allFields: allowedFields,
+                select,
+                table,
+                where,
+                orderBy,
+                isLeftJoin,
+                limit,
+                offset
+            };
+        });
+    }
     buildQueryTree(filter, selectParams, param3_unused = null, tableRules, localParams) {
         return __awaiter(this, void 0, void 0, function* () {
             this.checkFilter(filter);
@@ -544,7 +681,7 @@ class ViewHandler {
                     delete select.$rowhash;
                     selectFuncs.push({
                         alias: "$rowhash",
-                        getQuery: (alias, tableAlias) => this.getRowHashSelect(tableRules, alias, tableAlias)
+                        getQuery: (alias, tableAlias) => this.getRowHashSelect(utils_1.get(tableRules, "select.fields"), alias, tableAlias)
                     });
                 }
                 return {
@@ -996,7 +1133,7 @@ class ViewHandler {
             }
             let rowHashKeys = ["$rowhash"], rowHashCondition;
             if (rowHashKeys[0] in (data || {})) {
-                rowHashCondition = this.getRowHashSelect(tableRules, tableAlias) + ` = ${pgp.as.format("$1", [data.$rowhash])}`;
+                rowHashCondition = this.getRowHashSelect(utils_1.get(tableRules, "select.fields"), tableAlias) + ` = ${pgp.as.format("$1", [data.$rowhash])}`;
                 delete data.$rowhash;
             }
             let filterKeys = Object.keys(data).filter(k => !rowHashKeys.includes(k) && !existsKeys.find(ek => ek.key === k));
@@ -1334,8 +1471,10 @@ class TableHandler extends ViewHandler {
                     if (!tableRules.update)
                         throw "update rules missing for " + this.name;
                     ({ forcedFilter, forcedData, returningFields, fields, filterFields } = tableRules.update);
+                    if (!returningFields)
+                        returningFields = utils_1.get(tableRules, "select.fields");
                     if (!fields)
-                        throw ` invalid update rule for ${this.name}. fields missing `;
+                        throw ` Invalid update rule for ${this.name}. fields missing `;
                     /* Safely test publish rules */
                     if (testRule) {
                         yield this.validateViewRules(fields, filterFields, returningFields, forcedFilter, "update");
@@ -1447,6 +1586,9 @@ class TableHandler extends ViewHandler {
                     fields = tableRules.insert.fields;
                     validate = tableRules.insert.validate;
                     preValidate = tableRules.insert.preValidate;
+                    /* If no returning fields specified then take select fields as returning */
+                    if (!returningFields)
+                        returningFields = utils_1.get(tableRules, "select.fields");
                     if (!fields)
                         throw ` invalid insert rule for ${this.name} -> fields missing `;
                     /* Safely test publish rules */
@@ -1545,8 +1687,10 @@ class TableHandler extends ViewHandler {
                     forcedFilter = table_rules.delete.forcedFilter;
                     filterFields = table_rules.delete.filterFields;
                     returningFields = table_rules.delete.returningFields;
+                    if (!returningFields)
+                        returningFields = utils_1.get(table_rules, "select.fields");
                     if (!filterFields)
-                        throw ` invalid delete rule for ${this.name}. filterFields missing `;
+                        throw ` Invalid delete rule for ${this.name}. filterFields missing `;
                     /* Safely test publish rules */
                     if (testRule) {
                         yield this.validateViewRules(null, filterFields, returningFields, forcedFilter, "delete");
