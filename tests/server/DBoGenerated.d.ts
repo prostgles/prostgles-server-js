@@ -55,6 +55,7 @@ export type Items3 = {
 };
 export type Items3_Filter = Items3 | object | { $and: (Items3 | object)[] } | { $or: (Items3 | object)[] } 
 export type Items4 = {
+     added?: Date;
      id?: number;
      name?: string;
      public?: string;

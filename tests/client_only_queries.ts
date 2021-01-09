@@ -8,6 +8,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth){
   
 
   const testRealtime = () => {
+    console.log("Started testRealtime")
     return new Promise(async (resolve, reject) => {
   
   
@@ -92,7 +93,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth){
     console.log("Checking public data");
     // Public data
     await tryRun("Security rules example", async () => {
-      const vQ = await db.items4.find();
+      const vQ = await db.items4.find({}, { select: { added: 0 }});
       assert.deepStrictEqual(vQ, [{ id: 1, public: "public data" } ]);
     });
 
@@ -109,7 +110,6 @@ export default async function client_only(db: DBHandlerClient, auth: Auth){
       const vQ = await db.items4.find();
       assert.deepStrictEqual(vQ, [{ id: 1, public: "public data" } ]);
     });
-
   }
 
 }

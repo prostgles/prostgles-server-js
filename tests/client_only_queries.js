@@ -4,6 +4,7 @@ const assert_1 = require("assert");
 const isomorphic_queries_1 = require("./isomorphic_queries");
 async function client_only(db, auth) {
     const testRealtime = () => {
+        console.log("Started testRealtime");
         return new Promise(async (resolve, reject) => {
             /* RAWSQL */
             const sqlStatement = await db.sql("SELECT $1", [1], { returnType: "statement" });
@@ -61,13 +62,13 @@ async function client_only(db, auth) {
             });
         });
     };
-    /* SECURITY */
+    /* TODO: SECURITY */
     console.log("auth.user:", auth.user);
     if (!auth.user) {
         console.log("Checking public data");
         // Public data
         await isomorphic_queries_1.tryRun("Security rules example", async () => {
-            const vQ = await db.items4.find();
+            const vQ = await db.items4.find({}, { select: { added: 0 } });
             assert_1.strict.deepStrictEqual(vQ, [{ id: 1, public: "public data" }]);
         });
         await testRealtime();

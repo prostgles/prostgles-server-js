@@ -275,7 +275,10 @@ class Prostgles {
                                 try {
                                     if (!socket)
                                         throw "socket missing??!!";
-                                    yield func(params, dbo, db, socket);
+                                    const res = yield func(params, dbo, db, socket);
+                                    if (name === "login" && res && res.sid) {
+                                        /* TODO: Re-send schema to client */
+                                    }
                                     cb(null, true);
                                 }
                                 catch (err) {

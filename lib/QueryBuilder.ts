@@ -86,6 +86,84 @@ const FUNCTIONS: FunctionSpec[] = [
       return pgp.as.format("LEFT($1:name, $2)", [args[0], args[1]]);
     }
   },
+
+  {
+    name: "$to_char",
+    type: "function",
+    getFields: (args: any[]) => [args[0]],
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      if(args.length === 3){
+        return pgp.as.format("to_char($1:name, $2, $3)", [args[0], args[1], args[2]]);
+      }
+      return pgp.as.format("to_char($1:name, $2)", [args[0], args[1]]);
+    }
+  },
+
+  /* Date funcs date_part */
+  ...["date_trunc", "date_part"].map(funcName => ({
+    name: "$" + funcName,
+    type: "function",
+    getFields: (args: any[]) => [args[1]],
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      return pgp.as.format(funcName + "($1, $2:name)", [args[0], args[1]]);
+    }
+  } as FunctionSpec)),
+
+  /* Handy date funcs */
+  ...[
+    ["date", "YYYY-MM-DD"],
+    ["datetime", "YYYY-MM-DD HH24:MI"],
+    ["timedate", "HH24:MI YYYY-MM-DD"],
+
+    ["time", "HH24:MI"],
+    ["time12", "HH:MI"],
+    ["timeAM", "HH:MI AM"],
+
+    ["dy", "dy"],
+    ["Dy", "Dy"],
+    ["day", "day"],
+    ["Day", "Day"],
+
+    ["DayNo", "DD"],
+    ["DD", "DD"],
+
+    ["dowUS", "D"],
+    ["D", "D"],
+    ["dow", "ID"],
+    ["ID", "ID"],
+
+    ["MonthNo", "MM"],
+    ["MM", "MM"],
+
+    ["mon", "mon"],
+    ["Mon", "Mon"],
+    ["month", "month"],
+    ["Month", "Month"],
+
+    ["year", "yyyy"],
+    ["yyyy", "yyyy"],
+    ["yy", "yy"],
+    ["yr", "yy"],
+  ].map(([funcName, txt]) => ({
+    name: "$" + funcName,
+    type: "function",
+    getFields: (args: any[]) => [args[0]],
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      return pgp.as.format("to_char($1:name, $2)", [args[0], txt]);
+    }
+  } as FunctionSpec)),
+
+  /* Basic 1 arg col funcs */
+  ...["upper", "lower", "length", "reverse", "trim", "initcap", "round", "ceil", "floor", "sign", "age"].map(funcName => ({
+    name: "$" + funcName,
+    type: "function",
+    getFields: (args: any[]) => [args[0]],
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      return pgp.as.format(funcName + "($1:name)", [args[0]]);
+    }
+  } as FunctionSpec)),
+
+  /* Aggs */
   ...["max", "min", "count", "avg", "json_agg", "string_agg", "array_agg", "sum"].map(aggName => ({
     name: "$" + aggName,
     type: "aggregation",
@@ -260,7 +338,12 @@ export async function getNewQuery(
           ){
             let funcName, args;
             if(typeof val === "string") {
-              /* Shorthand notation */
+              /* Shorthand notation -> it is expected that the key is the column name used as the argument */
+              try {
+                checkField(key)
+              } catch (err){
+                throwErr(`Shorthand function notation error: the specifield column ( ${key} ) is invalid or dissallowed. Use correct column name or full function notation, e.g.: -> { key: { $func_name: ["column_name"] } } `)
+              }
               funcName = val;
               args = [key];
             } else {

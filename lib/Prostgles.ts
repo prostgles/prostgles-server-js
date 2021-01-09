@@ -560,7 +560,10 @@ export class Prostgles {
                             try {
                                 if(!socket) throw "socket missing??!!";
         
-                                await func(params, dbo, db, socket);
+                                const res = await func(params, dbo, db, socket);
+                                if(name === "login" && res && res.sid){
+                                    /* TODO: Re-send schema to client */
+                                }
 
                                 cb(null, true);
                                     

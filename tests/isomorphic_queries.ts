@@ -31,8 +31,8 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     await db.items2.insert([{ name: "a", items_id: 1 }]);
     await db.items3.insert([{ name: "a" }, { name: "za123" }]);
     await db.items4.insert([
-      { name: "abc", public: "public data" },
-      { name: "abcd", public: "public data d" }
+      { name: "abc", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
+      { name: "abcd", public: "public data d", added: new Date('04 Dec 1996 00:12:00 GMT') }
     ]);
   });
 
@@ -42,15 +42,14 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     assert.equal(f.p_5.length, 3);
     assert.equal(f.p_5, f.public.substr(0, 3));
 
-    /* TODO joined functions */
-    // const fJoined = await db.items2.findOne(
-    //   { $existsJoined: { items3: { name: { ">": "a"} } } }, 
-    //   { select: { 
-    //     id: 1, 
-    //     p_5: { $left: ["name", 3] },
-    //     items3: "*" 
-    //   } });
-    // console.log(fJoined)
+    // Nested function
+    const fg = await db.items2.findOne({}, { select: { id: 1, name: 1, items3: { name: "$upper" } } });// { $upper: ["public"] } } });
+    assert.deepStrictEqual(fg, { id: 1, name: 'a', items3: [ { name: 'A' } ] });
+
+    // Date utils
+    const Mon = await db.items4.findOne({ name: "abc" }, { select: { added: "$Mon" } });// { $upper: ["public"] } } });
+    assert.deepStrictEqual(Mon, { added: "Dec" });
+
   });
   
   await tryRun("Exists filter example", async () => {

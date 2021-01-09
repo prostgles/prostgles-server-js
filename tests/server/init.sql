@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS items4 (
 	id			SERIAL,
 	public	TEXT,
 	name		TEXT,
+	added		TIMESTAMP DEFAULT NOW(),
 	PRIMARY KEY(id, name)
 );
 CREATE INDEX IF NOT EXISTS idx1 ON items(name);
