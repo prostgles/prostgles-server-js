@@ -28,9 +28,9 @@ CREATE TABLE IF NOT EXISTS items3 (
 
 DROP TABLE IF EXISTS items4 CASCADE;
 CREATE TABLE IF NOT EXISTS items4 (
-	id	SERIAL,
-	h		TEXT[],
-	name	TEXT,
+	id			SERIAL,
+	public	TEXT,
+	name		TEXT,
 	PRIMARY KEY(id, name)
 );
 CREATE INDEX IF NOT EXISTS idx1 ON items(name);

@@ -19,6 +19,8 @@ const stopTest = (err) => {
         console.error(err);
     process.exit(err ? 1 : 0);
 };
+const sessions = [];
+const users = [{ id: "1a", username: "john", password: "secret" }];
 prostgles_server_1.default({
     dbConnection: {
         host: process.env.POSTGRES_HOST || "localhost",
@@ -45,7 +47,36 @@ prostgles_server_1.default({
     publishRawSQL: async (socket, dbo, db, user) => {
         return true; // Boolean(user && user.type === "admin")
     },
-    publish: (socket, dbo) => {
+    auth: {
+        getClientUser: async ({ sid }) => {
+            const s = sessions.find(s => s.id === sid);
+            if (!s)
+                throw "err";
+            const u = users.find(u => s && s.user_id === u.id);
+            if (!u)
+                throw "err";
+            return { sid: s.id, uid: u.id };
+        },
+        getUser: async ({ sid }) => {
+            const s = sessions.find(s => s.id === sid);
+            if (!s)
+                throw "err";
+            return users.find(u => s && s.user_id === u.id);
+        },
+        login: async ({ username, password } = {}) => {
+            const u = users.find(u => u.username === username && u.password === password);
+            if (!u)
+                throw "something went wrong: " + JSON.stringify({ username, password });
+            let s = sessions.find(s => s.user_id === u.id);
+            if (!s) {
+                s = { id: "SID" + Date.now(), user_id: u.id };
+                sessions.push(s);
+            }
+            console.log("Logged in!");
+            return { sid: s.id, expires: Infinity };
+        }
+    },
+    publish: (socket, dbo, db, user) => {
         // return "*";
         return {
             items: "*",
@@ -62,6 +93,14 @@ prostgles_server_1.default({
                     synced_field: "last_updated"
                 }
             },
+            items4: {
+                select: user ? "*" : {
+                    fields: { name: 0 },
+                    forcedFilter: { name: "abc" }
+                },
+                insert: "*",
+                delete: "*"
+            }
         };
         // return {
         // 	items: {
@@ -94,22 +133,32 @@ prostgles_server_1.default({
         });
         try {
             if (process.env.TEST_TYPE === "client") {
-                console.log("Waiting for client...");
+                console.log("(server): Waiting for client...");
                 io.on("connection", socket => {
+                    console.log("(server): Client connected");
                     socket.emit("start-test");
-                    console.log("Client connected");
                 });
             }
             else if (process.env.TEST_TYPE === "server") {
                 await isomorphic_queries_1.default(db);
-                console.log("Server isomorphic tests successful");
+                console.log("(server): Server isomorphic tests successful");
                 await server_only_queries_1.default(db);
-                console.log("Server-only query tests successful");
+                console.log("(server): Server-only query tests successful");
                 stopTest();
+            }
+            else {
+                const res = await db.items.find({ id: 2 }, { select: {
+                        id: 1,
+                        name: { $max: ["id"] },
+                        items2: "*"
+                    } });
+                console.log(res);
             }
         }
         catch (err) {
-            stopTest(err);
+            if (process.env.TEST_TYPE) {
+                stopTest(err);
+            }
         }
     },
 });

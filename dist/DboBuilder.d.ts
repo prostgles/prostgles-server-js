@@ -4,27 +4,31 @@ declare global {
     }
 }
 import * as pgPromise from 'pg-promise';
+import pg = require('pg-promise/typescript/pg-subset');
 import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, InsertParams, UpdateParams, DeleteParams, OrderBy, DbJoinMaker } from "prostgles-types";
 export declare type DbHandler = {
     [key: string]: Partial<TableHandler>;
 } & DbJoinMaker & {
     sql?: (query: string, params?: any, options?: any) => Promise<any>;
 };
+import { FieldSpec } from "./QueryBuilder";
 import { DB, TableRule, Join, Prostgles, PublishParser } from "./Prostgles";
 import { PubSubManager } from "./PubSubManager";
+declare type PGP = pgPromise.IMain<{}, pg.IClient>;
+export declare const pgp: PGP;
 export declare const asName: (str: string) => string;
 export declare type TableInfo = {
     schema: string;
     name: string;
     columns: ColumnInfo[];
 };
-declare type ViewInfo = TableInfo & {
+export declare type ViewInfo = TableInfo & {
     parent_tables: string[];
 };
 export declare type TableOrViewInfo = TableInfo & ViewInfo & {
     is_view: boolean;
 };
-declare type LocalParams = {
+export declare type LocalParams = {
     socket?: any;
     func?: () => any;
     has_rules?: boolean;
@@ -39,42 +43,7 @@ export declare type Aggregation = {
     alias: string;
     getQuery: (alias: string) => string;
 };
-export declare type SelectItem = {
-    type: "column" | "function" | "aggregation" | "joinedColumn";
-    getFields: () => string[];
-    getQuery: (tableAlias?: string) => string;
-    alias: string;
-};
-export declare type NewQuery = {
-    allFields: string[];
-    select: SelectItem[];
-    table: string;
-    where: string;
-    orderBy: string[];
-    limit: number;
-    offset: number;
-    isLeftJoin: boolean;
-    joins?: NewQuery[];
-    joinAlias?: string;
-    $path?: string[];
-};
-export declare type FunctionSpec = {
-    name: string;
-    type: "function" | "aggregation";
-    /**
-     * getFields used to validate user supplied field names. It will be fired before querying to validate allowed columns
-     */
-    getFields: (args: any[]) => string[];
-    /**
-     * allowedFields passed for multicol functions (e.g.: $rowhash)
-     */
-    getQuery: (params: {
-        allowedFields: string[];
-        args: any[];
-        tableAlias?: string;
-    }) => string;
-};
-declare type Filter = object | {
+export declare type Filter = object | {
     $and: Filter[];
 } | {
     $or: Filter[];
@@ -111,6 +80,32 @@ declare type JoinPaths = {
     path: string[];
 }[];
 import { Graph } from "./shortestPath";
+export declare type ValidatedTableRules = {
+    allColumns: FieldSpec[];
+    select: {
+        fields: string[];
+        filterFields: string[];
+        forcedFilter: any;
+        maxLimit: number;
+    };
+    update: {
+        fields: string[];
+        returningFields: string[];
+        filterFields: string[];
+        forcedFilter: any;
+        forcedData: any;
+    };
+    insert: {
+        fields: string[];
+        returningFields: string[];
+        forcedData: any;
+    };
+    delete: {
+        filterFields: string[];
+        forcedFilter: any;
+        returningFields: string[];
+    };
+};
 declare const EXISTS_KEYS: string[];
 export declare type ExistsFilterConfig = {
     key: string;
@@ -150,18 +145,11 @@ export declare class ViewHandler {
         query: string;
         toOne: boolean;
     };
-    private getJoins;
-    buildJoinQuery(q: Query): Promise<string>;
-    getAggs(select: object): Aggregation[];
-    getNewQuery(filter: Filter, selectParams?: SelectParams & {
-        alias?: string;
-    }, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<NewQuery>;
-    buildQueryTree(filter: Filter, selectParams?: SelectParams & {
-        alias?: string;
-    }, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<Query>;
+    getJoins(source: string, target: string, path?: string[]): JoinInfo;
     checkFilter(filter: any): void;
     prepareValidatedQuery(filter: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams, validatedAggAliases?: string[]): Promise<Query>;
     getColumns(tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]>;
+    getValidatedRules(tableRules?: TableRule, localParams?: LocalParams): ValidatedTableRules;
     find(filter?: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]>;
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: any, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
     count(filter?: Filter, param2_unused?: any, param3_unused?: any, table_rules?: TableRule, localParams?: any): Promise<number>;
@@ -201,7 +189,7 @@ export declare class ViewHandler {
     * @param {FieldFilter} fieldParams - { col1: 0, col2: 0 } | { col1: true, col2: true } | "*" | ["key1", "key2"] | []
     * @param {boolean} allow_empty - allow empty select. defaults to true
     */
-    parseFieldFilter(fieldParams?: FieldFilter, allow_empty?: boolean): string[];
+    parseFieldFilter(fieldParams?: FieldFilter, allow_empty?: boolean, allowed_cols?: string[]): string[];
 }
 declare type ValidDataAndColumnSet = {
     data: object;
@@ -269,6 +257,6 @@ export declare class DboBuilder {
     buildJoinPaths(): void;
     init(): Promise<DbHandler | DbHandlerTX>;
 }
-export declare function isEmpty(obj?: any): boolean;
+export declare function isPlainObject(o: any): boolean;
 export {};
 //# sourceMappingURL=DboBuilder.d.ts.map

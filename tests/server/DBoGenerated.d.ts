@@ -55,9 +55,9 @@ export type Items3 = {
 };
 export type Items3_Filter = Items3 | object | { $and: (Items3 | object)[] } | { $or: (Items3 | object)[] } 
 export type Items4 = {
-     h?: Array<string>;
      id?: number;
      name?: string;
+     public?: string;
 };
 export type Items4_Filter = Items4 | object | { $and: (Items4 | object)[] } | { $or: (Items4 | object)[] } 
 export type Planes = {
