@@ -69,7 +69,10 @@ async function client_only(db, auth) {
         // Public data
         await isomorphic_queries_1.tryRun("Security rules example", async () => {
             const vQ = await db.items4.find({}, { select: { added: 0 } });
-            assert_1.strict.deepStrictEqual(vQ, [{ id: 1, public: "public data" }]);
+            assert_1.strict.deepStrictEqual(vQ, [
+                { id: 1, public: 'public data' },
+                { id: 2, public: 'public data' }
+            ]);
         });
         await testRealtime();
         auth.login({ username: "john", password: "secret" });
@@ -80,7 +83,10 @@ async function client_only(db, auth) {
         // User data
         await isomorphic_queries_1.tryRun("Security rules example", async () => {
             const vQ = await db.items4.find();
-            assert_1.strict.deepStrictEqual(vQ, [{ id: 1, public: "public data" }]);
+            assert_1.strict.deepStrictEqual(vQ, [
+                { id: 1, public: 'public data' },
+                { id: 2, public: 'public data' }
+            ]);
         });
     }
 }

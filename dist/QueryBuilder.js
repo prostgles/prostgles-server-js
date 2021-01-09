@@ -28,6 +28,61 @@ exports.asNameAlias = (field, tableAlias) => {
 * Each function expects a column at the very least
 */
 const FUNCTIONS = [
+    // Hashing
+    {
+        name: "$md5_multi",
+        type: "function",
+        getFields: (args) => args,
+        getQuery: ({ allowedFields, args, tableAlias }) => {
+            const q = DboBuilder_1.pgp.as.format("md5(" + args.map(fname => "COALESCE( " + exports.asNameAlias(fname, tableAlias) + ", '' )").join(" || ") + ")");
+            return q;
+        }
+    },
+    {
+        name: "$md5_multi_agg",
+        type: "aggregation",
+        getFields: (args) => args,
+        getQuery: ({ allowedFields, args, tableAlias }) => {
+            const q = DboBuilder_1.pgp.as.format("md5(string_agg(" + args.map(fname => "COALESCE( " + exports.asNameAlias(fname, tableAlias) + ", '' )").join(" || ") + ", ','))");
+            return q;
+        }
+    },
+    {
+        name: "$sha256_multi",
+        type: "function",
+        getFields: (args) => args,
+        getQuery: ({ allowedFields, args, tableAlias }) => {
+            const q = DboBuilder_1.pgp.as.format("encode(sha256((" + args.map(fname => "COALESCE( " + exports.asNameAlias(fname, tableAlias) + ", '' )").join(" || ") + ")::text::bytea), 'hex')");
+            return q;
+        }
+    },
+    {
+        name: "$sha256_multi_agg",
+        type: "aggregation",
+        getFields: (args) => args,
+        getQuery: ({ allowedFields, args, tableAlias }) => {
+            const q = DboBuilder_1.pgp.as.format("encode(sha256(string_agg(" + args.map(fname => "COALESCE( " + exports.asNameAlias(fname, tableAlias) + ", '' )").join(" || ") + ", ',')::text::bytea), 'hex')");
+            return q;
+        }
+    },
+    {
+        name: "$sha512_multi",
+        type: "function",
+        getFields: (args) => args,
+        getQuery: ({ allowedFields, args, tableAlias }) => {
+            const q = DboBuilder_1.pgp.as.format("encode(sha512((" + args.map(fname => "COALESCE( " + exports.asNameAlias(fname, tableAlias) + ", '' )").join(" || ") + ")::text::bytea), 'hex')");
+            return q;
+        }
+    },
+    {
+        name: "$sha512_multi_agg",
+        type: "aggregation",
+        getFields: (args) => args,
+        getQuery: ({ allowedFields, args, tableAlias }) => {
+            const q = DboBuilder_1.pgp.as.format("encode(sha512(string_agg(" + args.map(fname => "COALESCE( " + exports.asNameAlias(fname, tableAlias) + ", '' )").join(" || ") + ", ',')::text::bytea), 'hex')");
+            return q;
+        }
+    },
     {
         name: "$ST_AsGeoJSON",
         type: "function",
@@ -249,7 +304,7 @@ function getNewQuery(_this, filter, selectParams, param3_unused = null, tableRul
                             DboBuilder_1.isPlainObject(val) && Object.keys(val).length === 1 && Array.isArray(Object.values(val)[0])) {
                             let funcName, args;
                             if (typeof val === "string") {
-                                /* Shorthand notation -> it is expected that the key is the column name used as the argument */
+                                /* Shorthand notation -> it is expected that the key is the column name used as the only argument */
                                 try {
                                     checkField(key);
                                 }
@@ -454,7 +509,7 @@ function makeQuery(_this, q, depth = 0, joinFields = []) {
                 select = Array.from(new Set(missingFields.concat(select)));
             }
             if (nonAggs.length) {
-                groupBy = `GROUP BY ${nonAggs.map(sf => DboBuilder_1.asName(sf.alias)).join(", ")}\n`;
+                groupBy = `GROUP BY ${nonAggs.map(sf => sf.type === "function" ? sf.getQuery() : DboBuilder_1.asName(sf.alias)).join(", ")}\n`;
             }
         }
         let fres = indJ(depth, [
@@ -492,7 +547,7 @@ function makeQuery(_this, q, depth = 0, joinFields = []) {
     let rootGroupBy;
     if ((aggs.length || q.joins && q.joins.length) && nonAggs.length) {
         // console.log({ aggs, nonAggs, joins: q.joins })
-        rootGroupBy = `GROUP BY ${(depth ? q.allFields : nonAggs.map(s => DboBuilder_1.asName(s.alias))).concat(aggs && aggs.length ? [] : [`ctid`]).filter(s => s).join(", ")} `;
+        rootGroupBy = `GROUP BY ${(depth ? q.allFields : nonAggs.map(s => s.type === "function" ? s.getQuery() : DboBuilder_1.asName(s.alias))).concat(aggs && aggs.length ? [] : [`ctid`]).filter(s => s).join(", ")} `;
     }
     /* Joined query */
     const rootSelect = [

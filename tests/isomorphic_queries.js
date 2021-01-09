@@ -27,6 +27,7 @@ async function isomorphic(db) {
         await db.items3.insert([{ name: "a" }, { name: "za123" }]);
         await db.items4.insert([
             { name: "abc", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
+            { name: "abc", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
             { name: "abcd", public: "public data d", added: new Date('04 Dec 1996 00:12:00 GMT') }
         ]);
     });
@@ -38,8 +39,11 @@ async function isomorphic(db) {
         const fg = await db.items2.findOne({}, { select: { id: 1, name: 1, items3: { name: "$upper" } } }); // { $upper: ["public"] } } });
         assert_1.strict.deepStrictEqual(fg, { id: 1, name: 'a', items3: [{ name: 'A' }] });
         // Date utils
-        const Mon = await db.items4.findOne({ name: "abc" }, { select: { added: "$Mon" } }); // { $upper: ["public"] } } });
+        const Mon = await db.items4.findOne({ name: "abc" }, { select: { added: "$Mon" } });
         assert_1.strict.deepStrictEqual(Mon, { added: "Dec" });
+        // Date + agg
+        const MonAgg = await db.items4.find({ name: "abc" }, { select: { added: "$Mon", public: "$count" } });
+        assert_1.strict.deepStrictEqual(MonAgg, [{ added: "Dec", public: '2' }]);
     });
     await tryRun("Exists filter example", async () => {
         const fo = await db.items.findOne(), f = await db.items.find();

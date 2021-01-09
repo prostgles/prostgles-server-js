@@ -175,7 +175,7 @@ export type ValidatedTableRules = {
 
 /* DEBUG CLIENT ERRORS HERE */
 function makeErr(err, localParams?: LocalParams){
-    console.trace(err)
+    // console.trace(err)
     return Promise.reject({
         ...((!localParams || !localParams.socket)? err : {}),
         ...filterObj(err, ["column", "code", "table", "constraint"]),
@@ -186,7 +186,7 @@ const EXISTS_KEYS = ["$exists", "$notExists", "$existsJoined", "$notExistsJoined
 
 function parseError(e){
     // console.error(e)
-    console.trace(e)
+    // console.trace(e)
     return Object.keys(e || {}).length? e : e.toString?  ( "INTERNAL ERROR: " + e.toString() ): e;
 }
 
@@ -717,8 +717,11 @@ export class ViewHandler {
             // }
 
             // console.log(_query);
-            if(expectOne) return (this.t || this.db).oneOrNone(_query).catch(err => makeErr(err, localParams));
-            else return (this.t || this.db).any(_query).catch(err => makeErr(err, localParams));
+            if(expectOne) {
+                return (this.t || this.db).oneOrNone(_query).catch(err => makeErr(err, localParams));
+            } else {
+                return (this.t || this.db).any(_query).catch(err => makeErr(err, localParams));
+            }
 
         } catch(e){
             if(localParams && localParams.testRule) throw e;
@@ -1007,7 +1010,7 @@ export class ViewHandler {
         try {
             finalWhere = await (this.dboBuilder.dbo[t2] as TableHandler).prepareWhere(f2, forcedFilter, filterFields, true, tableAlias, localParams, tableRules)
         } catch(err) {
-            console.trace(err)
+            // console.trace(err)
             throw "Issue with preparing $exists query for table " + t2 + "\n->" + JSON.stringify(err);
         }
         // console.log(f2, finalWhere);

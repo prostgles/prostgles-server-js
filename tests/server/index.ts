@@ -158,16 +158,25 @@ prostgles({
 
 				stopTest()
 			} else {
-				const res = await db.items.find({ id: 2 }, { select: { 
-					id: 1, 
-					name: { $max: ["id"] },
-					items2: "*"
-				} });  
-				console.log(res)
-			} 
+				
+				await db.items4.delete();
+				await db.items4.insert([
+					{ name: "abc", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
+					{ name: "abc", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
+					{ name: "abcd", public: "public data d", added: new Date('04 Dec 1996 00:12:00 GMT') }
+				]);
+
+				const MonAgg = await db.items4.find({ name: "abc" }, { select: { 
+					name: 1,
+					md5: { $md5_multi_agg: ["name", "public"] },
+					// sha256: { $sha256_multi_agg: ["name", "public"] },
+					// sha512: { $sha512_multi_agg: ["name", "public"] },
+				} });
+			}
 
 
 		} catch(err) {
+			console.trace(err)
 			if(process.env.TEST_TYPE){
 				stopTest(err)
 			}

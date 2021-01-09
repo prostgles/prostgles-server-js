@@ -147,15 +147,20 @@ prostgles_server_1.default({
                 stopTest();
             }
             else {
-                const res = await db.items.find({ id: 2 }, { select: {
-                        id: 1,
-                        name: { $max: ["id"] },
-                        items2: "*"
+                await db.items4.delete();
+                await db.items4.insert([
+                    { name: "abc", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
+                    { name: "abc", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
+                    { name: "abcd", public: "public data d", added: new Date('04 Dec 1996 00:12:00 GMT') }
+                ]);
+                const MonAgg = await db.items4.find({ name: "abc" }, { select: {
+                        name: 1,
+                        md5: { $md5_multi_agg: ["name", "public"] },
                     } });
-                console.log(res);
             }
         }
         catch (err) {
+            console.trace(err);
             if (process.env.TEST_TYPE) {
                 stopTest(err);
             }

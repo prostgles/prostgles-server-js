@@ -70,6 +70,68 @@ export type FunctionSpec = {
 * Each function expects a column at the very least
 */
 const FUNCTIONS: FunctionSpec[] = [
+
+  // Hashing
+  {
+    name: "$md5_multi",
+    type: "function",
+    getFields: (args: any[]) => args,
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      const q = pgp.as.format("md5(" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )" ).join(" || ") + ")");
+      return q
+    }
+  },
+  {
+    name: "$md5_multi_agg",
+    type: "aggregation",
+    getFields: (args: any[]) => args,
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      const q = pgp.as.format("md5(string_agg(" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )" ).join(" || ") + ", ','))");
+      return q
+    }
+  },
+
+  {
+    name: "$sha256_multi",
+    type: "function",
+    getFields: (args: any[]) => args,
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      const q = pgp.as.format("encode(sha256((" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )" ).join(" || ") + ")::text::bytea), 'hex')");
+      return q
+    }
+  },
+  {
+    name: "$sha256_multi_agg",
+    type: "aggregation",
+    getFields: (args: any[]) => args,
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      const q = pgp.as.format("encode(sha256(string_agg(" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )" ).join(" || ") + ", ',')::text::bytea), 'hex')");
+      return q
+    }
+  },
+  {
+    name: "$sha512_multi",
+    type: "function",
+    getFields: (args: any[]) => args,
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      const q = pgp.as.format("encode(sha512((" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )" ).join(" || ") + ")::text::bytea), 'hex')");
+      return q
+    }
+  },
+  {
+    name: "$sha512_multi_agg",
+    type: "aggregation",
+    getFields: (args: any[]) => args,
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      const q = pgp.as.format("encode(sha512(string_agg(" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )" ).join(" || ") + ", ',')::text::bytea), 'hex')");
+      return q
+    }
+  },
+
+
+
+
+
   {
     name: "$ST_AsGeoJSON",
     type: "function",
@@ -338,7 +400,7 @@ export async function getNewQuery(
           ){
             let funcName, args;
             if(typeof val === "string") {
-              /* Shorthand notation -> it is expected that the key is the column name used as the argument */
+              /* Shorthand notation -> it is expected that the key is the column name used as the only argument */
               try {
                 checkField(key)
               } catch (err){
@@ -583,7 +645,7 @@ export function makeQuery(
           }
 
           if(nonAggs.length){
-            groupBy = `GROUP BY ${nonAggs.map(sf => asName(sf.alias)).join(", ")}\n`;
+            groupBy = `GROUP BY ${nonAggs.map(sf => sf.type === "function"? sf.getQuery() :  asName(sf.alias)).join(", ")}\n`;
           }
       }
       
@@ -623,7 +685,7 @@ export function makeQuery(
   let rootGroupBy: string;
   if((aggs.length || q.joins && q.joins.length) && nonAggs.length){
     // console.log({ aggs, nonAggs, joins: q.joins })
-    rootGroupBy = `GROUP BY ${(depth? q.allFields : nonAggs.map(s => asName(s.alias))).concat(aggs && aggs.length? [] : [`ctid`]).filter(s => s).join(", ")} `
+    rootGroupBy = `GROUP BY ${(depth? q.allFields : nonAggs.map(s => s.type === "function"? s.getQuery() : asName(s.alias))).concat(aggs && aggs.length? [] : [`ctid`]).filter(s => s).join(", ")} `
   }
 
   /* Joined query */

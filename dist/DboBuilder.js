@@ -37,13 +37,13 @@ function capitalizeFirstLetter(string) {
 const shortestPath_1 = require("./shortestPath");
 /* DEBUG CLIENT ERRORS HERE */
 function makeErr(err, localParams) {
-    console.trace(err);
+    // console.trace(err)
     return Promise.reject(Object.assign(Object.assign(Object.assign({}, ((!localParams || !localParams.socket) ? err : {})), PubSubManager_1.filterObj(err, ["column", "code", "table", "constraint"])), { code_info: sqlErrCodeToMsg(err.code) }));
 }
 const EXISTS_KEYS = ["$exists", "$notExists", "$existsJoined", "$notExistsJoined"];
 function parseError(e) {
     // console.error(e)
-    console.trace(e);
+    // console.trace(e)
     return Object.keys(e || {}).length ? e : e.toString ? ("INTERNAL ERROR: " + e.toString()) : e;
 }
 class ViewHandler {
@@ -475,10 +475,12 @@ class ViewHandler {
                 //     await tableRules.select.validate({ filter: { ...filter, ...forcedFilter }, params: selectParams });
                 // }
                 // console.log(_query);
-                if (expectOne)
+                if (expectOne) {
                     return (this.t || this.db).oneOrNone(_query).catch(err => makeErr(err, localParams));
-                else
+                }
+                else {
                     return (this.t || this.db).any(_query).catch(err => makeErr(err, localParams));
+                }
             }
             catch (e) {
                 if (localParams && localParams.testRule)
@@ -743,7 +745,7 @@ class ViewHandler {
                 finalWhere = yield this.dboBuilder.dbo[t2].prepareWhere(f2, forcedFilter, filterFields, true, tableAlias, localParams, tableRules);
             }
             catch (err) {
-                console.trace(err);
+                // console.trace(err)
                 throw "Issue with preparing $exists query for table " + t2 + "\n->" + JSON.stringify(err);
             }
             // console.log(f2, finalWhere);
