@@ -1,10 +1,14 @@
+const clientTest = (process.env.TEST_TYPE === "client");
+
 import path from 'path';
 import express from 'express';
 // import prostgles from "../../dist/index";
 import prostgles from "prostgles-server";
 const app = express();
 const http = require('http').createServer(app);
-const io = require("socket.io")(http, { path: "/teztz/s" });
+
+const io = !clientTest? undefined : require("socket.io")(http, { path: "/teztz/s" });
+
 http.listen(3001);
 
 import isomorphic from "../isomorphic_queries";
@@ -14,8 +18,11 @@ import { DBObj } from "./DBoGenerated";
 // type DBObj = any;
 import { DB, DbHandler } from 'prostgles-server/dist/Prostgles';
 
+const log = (msg: string, extra?: any) => {
+  console.log("(server): " + msg, extra);
+}
 const stopTest = (err?) => {
-	console.log("Stopping server ...")
+	log("Stopping server ...")
 	if(err) console.error(err);
 	process.exit(err? 1 : 0);
 }
@@ -42,7 +49,10 @@ prostgles({
 	watchSchema: true,
 	transactions: true,
 	onSocketConnect: (socket) => {
-		if(process.env.TEST_TYPE === "client"){
+		log("onSocketConnect")
+		if(clientTest){
+			log("Client connected");
+			socket.emit("start-test");
 			socket.on("stop-test", (err, cb) => {
 				cb();
 				stopTest(err)
@@ -76,7 +86,7 @@ prostgles({
 				s = { id: "SID" + Date.now(), user_id: u.id }
 				sessions.push(s)
 			}
-			console.log("Logged in!")
+			log("Logged in!")
 			return { sid: s.id, expires: Infinity }
 		}
 	},
@@ -135,26 +145,21 @@ prostgles({
 	onReady: async (db: DbHandler, _db: DB) => {
 		   
     app.get('*', function(req, res){
-      console.log(req.originalUrl)
+      log(req.originalUrl)
 			res.sendFile(path.join(__dirname+'/index.html'));
 		}); 
 		
 		try { 
 			 
 			if(process.env.TEST_TYPE === "client"){
-  
-				console.log("(server): Waiting for client...");
-
-				io.on("connection", socket => {
-					console.log("(server): Client connected");
-					socket.emit("start-test");
-				});
+				log("Waiting for client...");
+				
 			} else if(process.env.TEST_TYPE === "server"){
 
 				await isomorphic(db);
-				console.log("(server): Server isomorphic tests successful");
+				log("Server isomorphic tests successful");
 				await server_only_queries(db);
-				console.log("(server): Server-only query tests successful");
+				log("Server-only query tests successful");
 
 				stopTest()
 			} else {

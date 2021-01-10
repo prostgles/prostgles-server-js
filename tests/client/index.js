@@ -7,10 +7,13 @@ const prostgles_client_1 = __importDefault(require("prostgles-client"));
 const socket_io_client_1 = __importDefault(require("socket.io-client"));
 const isomorphic_queries_1 = __importDefault(require("../isomorphic_queries"));
 const client_only_queries_1 = __importDefault(require("../client_only_queries"));
-console.log("Started client...");
+const log = (msg, extra) => {
+    console.log("(client): " + msg, extra);
+};
+log("Started client...");
 const url = process.env.PRGL_CLIENT_URL || "http://127.0.0.1:3001", path = process.env.PRGL_CLIENT_PATH || "/teztz/s", socket = socket_io_client_1.default(url, { path }), stopTest = (err) => {
     socket.emit("stop-test", !err ? err : { err: err.toString() }, cb => {
-        console.log("Stopping client...");
+        log("Stopping client...");
         if (err)
             console.error(err);
         setTimeout(() => {
@@ -21,10 +24,10 @@ const url = process.env.PRGL_CLIENT_URL || "http://127.0.0.1:3001", path = proce
 try {
     /* TODO find out why connection does not happen on rare occasions*/
     socket.on("connected", () => {
-        console.log("Client connected.");
+        log("Client connected.");
     });
     socket.on("connect", () => {
-        console.log("Client connect.");
+        log("Client connect.");
     });
     socket.on("start-test", () => {
         prostgles_client_1.default({
@@ -32,12 +35,12 @@ try {
             onReconnect: (socket) => {
             },
             onReady: async (db, methods, fullSchema, auth) => {
-                console.log("onReady.auth", auth);
+                log("onReady.auth", auth);
                 try {
                     await isomorphic_queries_1.default(db);
-                    console.log("Client isomorphic tests successful");
-                    await client_only_queries_1.default(db, auth);
-                    console.log("Client-only replication tests successful");
+                    log("Client isomorphic tests successful");
+                    await client_only_queries_1.default(db, auth, log);
+                    log("Client-only replication tests successful");
                     stopTest();
                 }
                 catch (err) {

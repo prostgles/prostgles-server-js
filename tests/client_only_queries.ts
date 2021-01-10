@@ -4,11 +4,11 @@ import { DBHandlerClient } from "./client/index";
 import { tryRun } from './isomorphic_queries';
 import { Auth } from './client/node_modules/prostgles-client/dist/prostgles';
 
-export default async function client_only(db: DBHandlerClient, auth: Auth){
+export default async function client_only(db: DBHandlerClient, auth: Auth, log: (...args: any[]) => any){
   
 
   const testRealtime = () => {
-    console.log("Started testRealtime")
+    log("Started testRealtime")
     return new Promise(async (resolve, reject) => {
   
   
@@ -27,7 +27,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth){
   
       /* REPLICATION */
       let start = Date.now();
-      const msLimit = 30000;
+      const msLimit = 10000;
       setTimeout(() => {
         reject("Replication test failed due to taking longer than " + msLimit + "ms")
       }, msLimit)
@@ -40,24 +40,24 @@ export default async function client_only(db: DBHandlerClient, auth: Auth){
       db.planes.sync({}, { handlesOnData: true, patchText: true }, (planes, deltas) => {
         
         const x20 = planes.filter(p => p.x == 20).length;
-        console.log("sync.x10", planes.filter(p => p.x == 10).length, "x20", x20);
+        log("sync.x10", planes.filter(p => p.x == 10).length, "x20", x20);
   
         let update = false;
         planes.map(p => {
           // if(p.y === 1) window.up = p;
-          if(typeof p.x !== "number") console.log(typeof p.x)
+          if(typeof p.x !== "number") log(typeof p.x)
           if(+p.x < 10){
             updt++;
             update = true;
             p.$update({ x: 10 });
           }
         });
-        // if(update) console.log("$update({ x: 10 })", updt)
+        // if(update) log("$update({ x: 10 })", updt)
   
         if(x20 === 100){
-          // console.log(22)
+          // log(22)
           // console.timeEnd("test")
-          console.log("Finished replication test. Inserting 100 rows then updating two times took: " + (Date.now() - start) + "ms")
+          log("Finished replication test. Inserting 100 rows then updating two times took: " + (Date.now() - start) + "ms")
           resolve(true)
         }
       });
@@ -67,17 +67,17 @@ export default async function client_only(db: DBHandlerClient, auth: Auth){
       const sP = await db.planes.subscribe({ x: 10 }, { }, async planes => {
   
         const p10 = planes.filter(p => p.x == 10).length;
-        // console.log("sub.x10", p10, "x20", planes.filter(p => p.x == 20).length);
+        // log("sub.x10", p10, "x20", planes.filter(p => p.x == 20).length);
   
         if(p10 === 100){
-          // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(console.log);
+          // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log);
   
           sP.unsubscribe();
-          console.log("Update to x20 start")
+          log("Update to x20 start")
           await db.planes.update({}, { x: 20, last_updated: Date.now() });
-          console.log("Updated to x20" , await db.planes.count({ x: 20 }))
+          log("Updated to x20" , await db.planes.count({ x: 20 }))
   
-          // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(console.log)
+          // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log)
         }
       }); 
       
@@ -88,9 +88,9 @@ export default async function client_only(db: DBHandlerClient, auth: Auth){
 
   
   /* TODO: SECURITY */
-  console.log("auth.user:", auth.user)
+  log("auth.user:", auth.user)
   if(!auth.user){
-    console.log("Checking public data");
+    log("Checking public data");
     // Public data
     await tryRun("Security rules example", async () => {
       const vQ = await db.items4.find({}, { select: { added: 0 }});
@@ -102,12 +102,12 @@ export default async function client_only(db: DBHandlerClient, auth: Auth){
 
     await testRealtime();
 
-    auth.login({ username: "john", password: "secret" });
+    // auth.login({ username: "john", password: "secret" });
 
-    await tout();
+    // await tout();
 
   } else {
-    console.log("Checking User data");
+    log("Checking User data");
     // User data
     await tryRun("Security rules example", async () => {
       const vQ = await db.items4.find();

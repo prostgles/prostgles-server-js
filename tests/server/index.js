@@ -3,18 +3,22 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const clientTest = (process.env.TEST_TYPE === "client");
 const path_1 = __importDefault(require("path"));
 const express_1 = __importDefault(require("express"));
 // import prostgles from "../../dist/index";
 const prostgles_server_1 = __importDefault(require("prostgles-server"));
 const app = express_1.default();
 const http = require('http').createServer(app);
-const io = require("socket.io")(http, { path: "/teztz/s" });
+const io = !clientTest ? undefined : require("socket.io")(http, { path: "/teztz/s" });
 http.listen(3001);
 const isomorphic_queries_1 = __importDefault(require("../isomorphic_queries"));
 const server_only_queries_1 = __importDefault(require("../server_only_queries"));
+const log = (msg, extra) => {
+    console.log("(server): " + msg, extra);
+};
 const stopTest = (err) => {
-    console.log("Stopping server ...");
+    log("Stopping server ...");
     if (err)
         console.error(err);
     process.exit(err ? 1 : 0);
@@ -35,7 +39,10 @@ prostgles_server_1.default({
     watchSchema: true,
     transactions: true,
     onSocketConnect: (socket) => {
-        if (process.env.TEST_TYPE === "client") {
+        log("onSocketConnect");
+        if (clientTest) {
+            log("Client connected");
+            socket.emit("start-test");
             socket.on("stop-test", (err, cb) => {
                 cb();
                 stopTest(err);
@@ -72,7 +79,7 @@ prostgles_server_1.default({
                 s = { id: "SID" + Date.now(), user_id: u.id };
                 sessions.push(s);
             }
-            console.log("Logged in!");
+            log("Logged in!");
             return { sid: s.id, expires: Infinity };
         }
     },
@@ -128,22 +135,18 @@ prostgles_server_1.default({
     ],
     onReady: async (db, _db) => {
         app.get('*', function (req, res) {
-            console.log(req.originalUrl);
+            log(req.originalUrl);
             res.sendFile(path_1.default.join(__dirname + '/index.html'));
         });
         try {
             if (process.env.TEST_TYPE === "client") {
-                console.log("(server): Waiting for client...");
-                io.on("connection", socket => {
-                    console.log("(server): Client connected");
-                    socket.emit("start-test");
-                });
+                log("Waiting for client...");
             }
             else if (process.env.TEST_TYPE === "server") {
                 await isomorphic_queries_1.default(db);
-                console.log("(server): Server isomorphic tests successful");
+                log("Server isomorphic tests successful");
                 await server_only_queries_1.default(db);
-                console.log("(server): Server-only query tests successful");
+                log("Server-only query tests successful");
                 stopTest();
             }
             else {

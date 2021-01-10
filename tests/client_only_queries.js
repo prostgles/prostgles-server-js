@@ -2,9 +2,9 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const assert_1 = require("assert");
 const isomorphic_queries_1 = require("./isomorphic_queries");
-async function client_only(db, auth) {
+async function client_only(db, auth, log) {
     const testRealtime = () => {
-        console.log("Started testRealtime");
+        log("Started testRealtime");
         return new Promise(async (resolve, reject) => {
             /* RAWSQL */
             const sqlStatement = await db.sql("SELECT $1", [1], { returnType: "statement" });
@@ -16,7 +16,7 @@ async function client_only(db, auth) {
             assert_1.strict.deepStrictEqual(fullResult.fields, [{ name: 'col1', dataType: 'int4' }], "db.sql query failed");
             /* REPLICATION */
             let start = Date.now();
-            const msLimit = 30000;
+            const msLimit = 10000;
             setTimeout(() => {
                 reject("Replication test failed due to taking longer than " + msLimit + "ms");
             }, msLimit);
@@ -26,23 +26,23 @@ async function client_only(db, auth) {
             let updt = 0;
             db.planes.sync({}, { handlesOnData: true, patchText: true }, (planes, deltas) => {
                 const x20 = planes.filter(p => p.x == 20).length;
-                console.log("sync.x10", planes.filter(p => p.x == 10).length, "x20", x20);
+                log("sync.x10", planes.filter(p => p.x == 10).length, "x20", x20);
                 let update = false;
                 planes.map(p => {
                     // if(p.y === 1) window.up = p;
                     if (typeof p.x !== "number")
-                        console.log(typeof p.x);
+                        log(typeof p.x);
                     if (+p.x < 10) {
                         updt++;
                         update = true;
                         p.$update({ x: 10 });
                     }
                 });
-                // if(update) console.log("$update({ x: 10 })", updt)
+                // if(update) log("$update({ x: 10 })", updt)
                 if (x20 === 100) {
-                    // console.log(22)
+                    // log(22)
                     // console.timeEnd("test")
-                    console.log("Finished replication test. Inserting 100 rows then updating two times took: " + (Date.now() - start) + "ms");
+                    log("Finished replication test. Inserting 100 rows then updating two times took: " + (Date.now() - start) + "ms");
                     resolve(true);
                 }
             });
@@ -50,22 +50,22 @@ async function client_only(db, auth) {
             /* After all sync records are updated to x10 here we'll update them to x20 */
             const sP = await db.planes.subscribe({ x: 10 }, {}, async (planes) => {
                 const p10 = planes.filter(p => p.x == 10).length;
-                // console.log("sub.x10", p10, "x20", planes.filter(p => p.x == 20).length);
+                // log("sub.x10", p10, "x20", planes.filter(p => p.x == 20).length);
                 if (p10 === 100) {
-                    // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(console.log);
+                    // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log);
                     sP.unsubscribe();
-                    console.log("Update to x20 start");
+                    log("Update to x20 start");
                     await db.planes.update({}, { x: 20, last_updated: Date.now() });
-                    console.log("Updated to x20", await db.planes.count({ x: 20 }));
-                    // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(console.log)
+                    log("Updated to x20", await db.planes.count({ x: 20 }));
+                    // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log)
                 }
             });
         });
     };
     /* TODO: SECURITY */
-    console.log("auth.user:", auth.user);
+    log("auth.user:", auth.user);
     if (!auth.user) {
-        console.log("Checking public data");
+        log("Checking public data");
         // Public data
         await isomorphic_queries_1.tryRun("Security rules example", async () => {
             const vQ = await db.items4.find({}, { select: { added: 0 } });
@@ -75,11 +75,11 @@ async function client_only(db, auth) {
             ]);
         });
         await testRealtime();
-        auth.login({ username: "john", password: "secret" });
-        await tout();
+        // auth.login({ username: "john", password: "secret" });
+        // await tout();
     }
     else {
-        console.log("Checking User data");
+        log("Checking User data");
         // User data
         await isomorphic_queries_1.tryRun("Security rules example", async () => {
             const vQ = await db.items4.find();

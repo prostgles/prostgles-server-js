@@ -6,7 +6,10 @@ import client_only from "../client_only_queries";
 export { DBHandlerClient, SQLResult } from "prostgles-client/dist/prostgles";
 
 
-console.log("Started client...");
+const log = (msg: string, extra?: any) => {
+  console.log("(client): " + msg, extra);
+}
+log("Started client...");
 
 const url = process.env.PRGL_CLIENT_URL || "http://127.0.0.1:3001",
   path = process.env.PRGL_CLIENT_PATH || "/teztz/s",
@@ -14,7 +17,7 @@ const url = process.env.PRGL_CLIENT_URL || "http://127.0.0.1:3001",
   stopTest = (err?) => {
     socket.emit("stop-test", !err? err : { err: err.toString() }, cb => {
 
-      console.log("Stopping client...");
+      log("Stopping client...");
       if(err) console.error(err);
   
       setTimeout(() => {
@@ -28,10 +31,10 @@ const url = process.env.PRGL_CLIENT_URL || "http://127.0.0.1:3001",
 try {
   /* TODO find out why connection does not happen on rare occasions*/
   socket.on("connected", () => {
-    console.log("Client connected.")
+    log("Client connected.")
   });
   socket.on("connect", () => {
-    console.log("Client connect.")
+    log("Client connect.")
   });
   socket.on("start-test", () => {
   
@@ -42,13 +45,13 @@ try {
         
       },
       onReady: async (db, methods, fullSchema, auth) => {
-        console.log("onReady.auth", auth)
+        log("onReady.auth", auth)
         try {
           await isomorphic(db);
-          console.log("Client isomorphic tests successful")
+          log("Client isomorphic tests successful")
   
-          await client_only(db, auth);
-          console.log("Client-only replication tests successful")
+          await client_only(db, auth, log);
+          log("Client-only replication tests successful")
   
   
           stopTest();
