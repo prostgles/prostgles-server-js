@@ -16,7 +16,7 @@ async function client_only(db, auth, log) {
             assert_1.strict.deepStrictEqual(fullResult.fields, [{ name: 'col1', dataType: 'int4' }], "db.sql query failed");
             /* REPLICATION */
             let start = Date.now();
-            const msLimit = 10000;
+            const msLimit = 15000;
             setTimeout(() => {
                 reject("Replication test failed due to taking longer than " + msLimit + "ms");
             }, msLimit);

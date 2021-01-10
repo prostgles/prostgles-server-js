@@ -27,7 +27,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
   
       /* REPLICATION */
       let start = Date.now();
-      const msLimit = 10000;
+      const msLimit = 15000;
       setTimeout(() => {
         reject("Replication test failed due to taking longer than " + msLimit + "ms")
       }, msLimit)
