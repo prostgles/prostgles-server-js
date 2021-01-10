@@ -780,6 +780,9 @@ class ViewHandler {
                 { aliases: ["&&ST_MakeEnvelope"], get: (key, val, col) => {
                         return "${key:raw} && ST_MakeEnvelope(${data:csv}) ";
                     } },
+                { aliases: ["@@ST_MakeEnvelope"], get: (key, val, col) => {
+                        return "${key:raw} @@ ST_MakeEnvelope(${data:csv}) ";
+                    } },
                 { aliases: ["$nin"], get: (key, val, col) => "${key:raw} NOT IN (${data:csv}) " },
                 { aliases: ["$in"], get: (key, val, col) => "${key:raw} IN (${data:csv}) " },
                 { aliases: ["$tsQuery"], get: (key, val, col) => {

@@ -1043,6 +1043,9 @@ export class ViewHandler {
                 // { aliases: ["$exists"],                         get: (key, val, col) =>  },                
                 { aliases: ["&&ST_MakeEnvelope"],               get: (key, val, col) => {
                     return "${key:raw} && ST_MakeEnvelope(${data:csv}) "
+                } },             
+                { aliases: ["@@ST_MakeEnvelope"],               get: (key, val, col) => {
+                    return "${key:raw} @@ ST_MakeEnvelope(${data:csv}) "
                 } },
                 { aliases: ["$nin"],                            get: (key, val, col) => "${key:raw} NOT IN (${data:csv}) " },
                 { aliases: ["$in"],                             get: (key, val, col) => "${key:raw} IN (${data:csv}) " },
@@ -1153,7 +1156,7 @@ export class ViewHandler {
                 );
                 delete (data as any)[key];
             }
-        })
+        });
         // if(rowHashKeys[0] in (data || {})){
         //     rowHashCondition = this.getRowHashSelect(get(tableRules, "select.fields") ,tableAlias) + ` = ${pgp.as.format("$1", [ (data as any).$rowhash ] )}`;
         //     delete (data as any).$rowhash;
