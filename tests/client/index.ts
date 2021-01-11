@@ -7,7 +7,7 @@ export { DBHandlerClient, SQLResult } from "prostgles-client/dist/prostgles";
 
 const start = Date.now();
 const log = (msg: string, extra?: any) => {
-  console.log("(client) t" + `${(Date.now() - start)}ms ` + msg, extra);
+  console.log(`(client) t ${(Date.now() - start)}ms ` + msg, extra);
 }
 log("Started client...");
 
@@ -41,8 +41,7 @@ try {
     prostgles({
       socket, // or simply io()
       onReconnect: (socket) => {
-        
-        
+        log("Reconnected")          
       },
       onReady: async (db, methods, fullSchema, auth) => {
         log("onReady.auth", auth)

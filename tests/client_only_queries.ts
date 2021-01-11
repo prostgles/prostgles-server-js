@@ -11,8 +11,6 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
     log("Started testRealtime")
     return new Promise(async (resolve, reject) => {
   
-  
-  
       /* RAWSQL */
       const sqlStatement = await db.sql("SELECT $1", [1], { returnType: "statement" });
       assert.equal(sqlStatement, "SELECT 1", "db.sql statement query failed");
@@ -29,8 +27,10 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       let start = Date.now();
       const msLimit = 15000;
       setTimeout(() => {
-        reject("Replication test failed due to taking longer than " + msLimit + "ms")
-      }, msLimit)
+        const msg = "Replication test failed due to taking longer than " + msLimit + "ms";
+        log(msg)
+        reject(msg)
+      }, msLimit);
   
       await db.planes.delete();
       let inserts = new Array(100).fill(null).map((d, i) => ({ id: i, flight_number: `FN${i}`, x: Math.random(), y: i }));
@@ -67,7 +67,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       const sP = await db.planes.subscribe({ x: 10 }, { }, async planes => {
   
         const p10 = planes.filter(p => p.x == 10).length;
-        // log("sub.x10", p10, "x20", planes.filter(p => p.x == 20).length);
+        log("sub.x10", p10, "x20", planes.filter(p => p.x == 20).length);
   
         if(p10 === 100){
           // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log);

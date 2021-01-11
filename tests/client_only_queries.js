@@ -18,7 +18,9 @@ async function client_only(db, auth, log) {
             let start = Date.now();
             const msLimit = 15000;
             setTimeout(() => {
-                reject("Replication test failed due to taking longer than " + msLimit + "ms");
+                const msg = "Replication test failed due to taking longer than " + msLimit + "ms";
+                log(msg);
+                reject(msg);
             }, msLimit);
             await db.planes.delete();
             let inserts = new Array(100).fill(null).map((d, i) => ({ id: i, flight_number: `FN${i}`, x: Math.random(), y: i }));
@@ -50,7 +52,7 @@ async function client_only(db, auth, log) {
             /* After all sync records are updated to x10 here we'll update them to x20 */
             const sP = await db.planes.subscribe({ x: 10 }, {}, async (planes) => {
                 const p10 = planes.filter(p => p.x == 10).length;
-                // log("sub.x10", p10, "x20", planes.filter(p => p.x == 20).length);
+                log("sub.x10", p10, "x20", planes.filter(p => p.x == 20).length);
                 if (p10 === 100) {
                     // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log);
                     sP.unsubscribe();

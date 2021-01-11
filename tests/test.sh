@@ -2,5 +2,5 @@
 cd server
 npm run build &
 cd ../client &&
-npm run build
+sleep 20s && npm run build
 
