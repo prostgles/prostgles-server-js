@@ -19,7 +19,7 @@ import { DBObj } from "./DBoGenerated";
 import { DB, DbHandler } from 'prostgles-server/dist/Prostgles';
 
 const log = (msg: string, extra?: any) => {
-  console.log("(server): " + msg, extra);
+  console.log(...["(server): " + msg, extra].filter(v => v));
 }
 const stopTest = (err?) => {
 	log("Stopping server ...")

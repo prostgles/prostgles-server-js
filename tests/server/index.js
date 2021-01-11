@@ -15,7 +15,7 @@ http.listen(3001);
 const isomorphic_queries_1 = __importDefault(require("../isomorphic_queries"));
 const server_only_queries_1 = __importDefault(require("../server_only_queries"));
 const log = (msg, extra) => {
-    console.log("(server): " + msg, extra);
+    console.log(...["(server): " + msg, extra].filter(v => v));
 };
 const stopTest = (err) => {
     log("Stopping server ...");
