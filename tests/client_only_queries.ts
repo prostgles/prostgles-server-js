@@ -1,8 +1,7 @@
-import { strict as assert, rejects } from 'assert';
+import { strict as assert } from 'assert';
 
-import { DBHandlerClient } from "./client/index";
+import { DBHandlerClient, Auth } from "./client/index";
 import { tryRun } from './isomorphic_queries';
-import { Auth } from './client/node_modules/prostgles-client/dist/prostgles';
 
 export default async function client_only(db: DBHandlerClient, auth: Auth, log: (...args: any[]) => any){
   

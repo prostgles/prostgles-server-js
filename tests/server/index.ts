@@ -16,7 +16,7 @@ import server_only_queries from "../server_only_queries";
 
 import { DBObj } from "./DBoGenerated";
 // type DBObj = any;
-import { DB, DbHandler } from 'prostgles-server/dist/Prostgles';
+import { DB, DbHandler, Auth } from 'prostgles-server/dist/Prostgles';
 
 const log = (msg: string, extra?: any) => {
   console.log(...["(server): " + msg, extra].filter(v => v));

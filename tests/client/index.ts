@@ -3,7 +3,7 @@ import io from "socket.io-client";
 
 import isomorphic from "../isomorphic_queries";
 import client_only from "../client_only_queries";
-export { DBHandlerClient, SQLResult } from "prostgles-client/dist/prostgles";
+export { DBHandlerClient, SQLResult, Auth } from "prostgles-client/dist/prostgles";
 
 const start = Date.now();
 const log = (msg: string, extra?: any) => {
