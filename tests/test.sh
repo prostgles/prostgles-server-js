@@ -1,6 +1,9 @@
 #!/bin/bash
 cd server
-npm run build &
+npm run build
+npm run test-server
+npm run test-client &
 cd ../client &&
-sleep 20s && npm run build
+npm run build
+npm test
 
