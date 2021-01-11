@@ -77,7 +77,7 @@ jobs:
 # The service containers will use host port binding instead of container networking so you access them via localhost rather than the service name
   vm-job:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 4
     strategy:
       matrix:
         node-version: [12.x, 14.x]
