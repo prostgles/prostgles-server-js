@@ -107,7 +107,8 @@ prostgles_server_1.default({
                 },
                 insert: "*",
                 delete: "*"
-            }
+            },
+            items4_pub: "*"
         };
         // return {
         // 	items: {
@@ -160,6 +161,7 @@ prostgles_server_1.default({
                         name: 1,
                         md5: { $md5_multi_agg: ["name", "public"] },
                     } });
+                // console.log(await db.items4.findOne({}, { select: { public: { "$ts_headline": ["public", "public"] } } }))
             }
         }
         catch (err) {

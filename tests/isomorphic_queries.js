@@ -16,6 +16,7 @@ async function isomorphic(db) {
     await db.items.delete({});
     await db.items2.delete({});
     await db.items3.delete({});
+    await db.items4_pub.delete({});
     /* Access controlled */
     await db.items4.delete({});
     // setTimeout(async () => {
@@ -44,6 +45,15 @@ async function isomorphic(db) {
         // Date + agg
         const MonAgg = await db.items4.find({ name: "abc" }, { select: { added: "$Mon", public: "$count" } });
         assert_1.strict.deepStrictEqual(MonAgg, [{ added: "Dec", public: '2' }]);
+        // Returning
+        const returningParam = { returning: { id: 1, name: 1, public: 1, $rowhash: 1, added_day: { "$day": ["added"] } } };
+        let i = await db.items4_pub.insert({ name: "abc123", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') }, returningParam);
+        assert_1.strict.deepStrictEqual(i, { id: 1, name: 'abc123', public: 'public data', $rowhash: 'e593cd919283f0fe7c205f09894ee53f', added_day: 'monday' });
+        let u = await db.items4_pub.update({ name: "abc123" }, { public: "public data2" }, returningParam);
+        assert_1.strict.deepStrictEqual(u, [{ id: 1, name: 'abc123', public: 'public data2', $rowhash: '31574189d0257a4e5442f8db39658cf0', added_day: 'monday' }]);
+        let d = await db.items4_pub.delete({ name: "abc123" }, returningParam);
+        assert_1.strict.deepStrictEqual(d, [{ id: 1, name: 'abc123', public: 'public data2', $rowhash: '31574189d0257a4e5442f8db39658cf0', added_day: 'monday' }]);
+        console.log("TODO: socket.io stringifies dates");
     });
     await tryRun("Exists filter example", async () => {
         const fo = await db.items.findOne(), f = await db.items.find();

@@ -61,6 +61,13 @@ export type Items4 = {
      public?: string;
 };
 export type Items4_Filter = Items4 | object | { $and: (Items4 | object)[] } | { $or: (Items4 | object)[] } 
+export type Items4_pub = {
+     added?: Date;
+     id?: number;
+     name?: string;
+     public?: string;
+};
+export type Items4_pub_Filter = Items4_pub | object | { $and: (Items4_pub | object)[] } | { $or: (Items4_pub | object)[] } 
 export type Planes = {
      flight_number?: string;
      id?: number;
@@ -131,6 +138,18 @@ export type DBO_items4 = {
    insert: (data: (Items4 | Items4[]), params?: InsertParams) => Promise<Items4 | void>;
    delete: (filter?:  Items4_Filter , params?: DeleteParams) => Promise<Items4 | void>; 
 };
+export type DBO_items4_pub = {
+    getColumns: () => Promise<any[]>;
+   find: (filter?:  Items4_pub_Filter , selectParams?: SelectParams) => Promise<Items4_pub[] | any[]>;
+   findOne: (filter?:  Items4_pub_Filter , selectParams?: SelectParams) => Promise<Items4_pub | any>;
+   subscribe: (filter:  Items4_pub_Filter , params: SelectParams, onData: (items: Items4_pub[]) => any) => Promise<{ unsubscribe: () => any }>;
+   subscribeOne: (filter:  Items4_pub_Filter , params: SelectParams, onData: (item: Items4_pub) => any) => Promise<{ unsubscribe: () => any }>;
+   count: (filter?:  Items4_pub_Filter ) => Promise<number>;
+   update: (filter:  Items4_pub_Filter , newData: Items4_pub, params?: UpdateParams) => Promise<Items4_pub | void>;
+   upsert: (filter:  Items4_pub_Filter , newData: Items4_pub, params?: UpdateParams) => Promise<Items4_pub | void>;
+   insert: (data: (Items4_pub | Items4_pub[]), params?: InsertParams) => Promise<Items4_pub | void>;
+   delete: (filter?:  Items4_pub_Filter , params?: DeleteParams) => Promise<Items4_pub | void>; 
+};
 export type DBO_planes = {
     getColumns: () => Promise<any[]>;
    find: (filter?:  Planes_Filter , selectParams?: SelectParams) => Promise<Planes[] | any[]>;
@@ -187,6 +206,7 @@ export type DBObj = {
  items2: DBO_items2;
  items3: DBO_items3;
  items4: DBO_items4;
+ items4_pub: DBO_items4_pub;
  planes: DBO_planes;
  table: DBO_table;
  transaction: DBO_transaction;

@@ -6,7 +6,7 @@
 
 import { pgp, Filter, LocalParams, asName, isPlainObject, TableHandler, ViewHandler } from "./DboBuilder";
 import { TableRule, flat } from "./Prostgles";
-import { SelectParams, isEmpty } from "prostgles-types";
+import { SelectParams, isEmpty, FieldFilter } from "prostgles-types";
 import { get } from "./utils";
 
 export type SelectItem = {
@@ -54,6 +54,11 @@ export type FieldSpec = {
 
 export type FunctionSpec = {
   name: string;
+
+  /**
+   * If true then the first argument is expected to be a column name
+   */
+  singleColArg: boolean;
   type: "function" | "aggregation" | "computed";
   /**
    * getFields: string[] -> used to validate user supplied field names. It will be fired before querying to validate allowed columns
@@ -69,12 +74,13 @@ export type FunctionSpec = {
 /**
 * Each function expects a column at the very least
 */
-const FUNCTIONS: FunctionSpec[] = [
+export const FUNCTIONS: FunctionSpec[] = [
 
   // Hashing
   {
     name: "$md5_multi",
     type: "function",
+    singleColArg: false,
     getFields: (args: any[]) => args,
     getQuery: ({ allowedFields, args, tableAlias }) => {
       const q = pgp.as.format("md5(" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )" ).join(" || ") + ")");
@@ -84,6 +90,7 @@ const FUNCTIONS: FunctionSpec[] = [
   {
     name: "$md5_multi_agg",
     type: "aggregation",
+    singleColArg: false,
     getFields: (args: any[]) => args,
     getQuery: ({ allowedFields, args, tableAlias }) => {
       const q = pgp.as.format("md5(string_agg(" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )" ).join(" || ") + ", ','))");
@@ -94,6 +101,7 @@ const FUNCTIONS: FunctionSpec[] = [
   {
     name: "$sha256_multi",
     type: "function",
+    singleColArg: false,
     getFields: (args: any[]) => args,
     getQuery: ({ allowedFields, args, tableAlias }) => {
       const q = pgp.as.format("encode(sha256((" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )" ).join(" || ") + ")::text::bytea), 'hex')");
@@ -103,6 +111,7 @@ const FUNCTIONS: FunctionSpec[] = [
   {
     name: "$sha256_multi_agg",
     type: "aggregation",
+    singleColArg: false,
     getFields: (args: any[]) => args,
     getQuery: ({ allowedFields, args, tableAlias }) => {
       const q = pgp.as.format("encode(sha256(string_agg(" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )" ).join(" || ") + ", ',')::text::bytea), 'hex')");
@@ -112,6 +121,7 @@ const FUNCTIONS: FunctionSpec[] = [
   {
     name: "$sha512_multi",
     type: "function",
+    singleColArg: false,
     getFields: (args: any[]) => args,
     getQuery: ({ allowedFields, args, tableAlias }) => {
       const q = pgp.as.format("encode(sha512((" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )" ).join(" || ") + ")::text::bytea), 'hex')");
@@ -121,6 +131,7 @@ const FUNCTIONS: FunctionSpec[] = [
   {
     name: "$sha512_multi_agg",
     type: "aggregation",
+    singleColArg: false,
     getFields: (args: any[]) => args,
     getQuery: ({ allowedFields, args, tableAlias }) => {
       const q = pgp.as.format("encode(sha512(string_agg(" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )" ).join(" || ") + ", ',')::text::bytea), 'hex')");
@@ -129,12 +140,34 @@ const FUNCTIONS: FunctionSpec[] = [
   },
 
 
+  /* Full text search */
+  {
+    name: "$ts_headline",
+    type: "function",
+    singleColArg: false,
+    getFields: (args: any[]) => [args[0]],
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      let qVal = args[1], qType = "to_tsquery";
+      const searchTypes = ["websearch_to_tsquery", "to_tsquery"];
+      if(isPlainObject(args[1])){
+        const keys = Object.keys(args[1]);
+        qType = keys[0];
+        if(keys.length !==1 || !searchTypes.includes(qType)) throw "Expecting a an object with a single key named one of: " + searchTypes.join(", ");
+        qVal = args[1][qType]
+      } else {
+        qVal = pgp.as.format(qType + "($1)", [qVal])
+      }
+      const res = pgp.as.format("ts_headline($1:name::text, $2:raw)", [args[0], qVal]);
+      return res
+    }
+  },
 
 
 
   {
     name: "$ST_AsGeoJSON",
     type: "function",
+    singleColArg: false,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
       return pgp.as.format("ST_AsGeoJSON($1:name)::json", [args[0]]);
@@ -143,6 +176,7 @@ const FUNCTIONS: FunctionSpec[] = [
   {
     name: "$left",
     type: "function",
+    singleColArg: false,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
       return pgp.as.format("LEFT($1:name, $2)", [args[0], args[1]]);
@@ -152,6 +186,7 @@ const FUNCTIONS: FunctionSpec[] = [
   {
     name: "$to_char",
     type: "function",
+    singleColArg: false,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
       if(args.length === 3){
@@ -165,6 +200,7 @@ const FUNCTIONS: FunctionSpec[] = [
   ...["date_trunc", "date_part"].map(funcName => ({
     name: "$" + funcName,
     type: "function",
+    singleColArg: false,
     getFields: (args: any[]) => [args[1]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
       return pgp.as.format(funcName + "($1, $2:name)", [args[0], args[1]]);
@@ -209,9 +245,10 @@ const FUNCTIONS: FunctionSpec[] = [
   ].map(([funcName, txt]) => ({
     name: "$" + funcName,
     type: "function",
+    singleColArg: true,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
-      return pgp.as.format("to_char($1:name, $2)", [args[0], txt]);
+      return pgp.as.format("trim(to_char($1:name, $2))", [args[0], txt]);
     }
   } as FunctionSpec)),
 
@@ -219,6 +256,7 @@ const FUNCTIONS: FunctionSpec[] = [
   ...["upper", "lower", "length", "reverse", "trim", "initcap", "round", "ceil", "floor", "sign", "age"].map(funcName => ({
     name: "$" + funcName,
     type: "function",
+    singleColArg: true,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
       return pgp.as.format(funcName + "($1:name)", [args[0]]);
@@ -229,6 +267,7 @@ const FUNCTIONS: FunctionSpec[] = [
   ...["max", "min", "count", "avg", "json_agg", "string_agg", "array_agg", "sum"].map(aggName => ({
     name: "$" + aggName,
     type: "aggregation",
+    singleColArg: true,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
       return pgp.as.format(aggName + "($1:name)", [args[0]]);
@@ -255,6 +294,186 @@ export const COMPUTED_FIELDS: FieldSpec[] = [
   }
 ];
 
+export class SelectItemBuilder {
+
+  select: SelectItem[] = [];
+  private allFields: string[];
+
+  private allowedFields: string[];
+  private computedFields: FieldSpec[];
+  private functions: FunctionSpec[];
+  private allowedFieldsIncludingComputed: string[];
+  private isView: boolean;
+
+  constructor(params: { allowedFields: string[]; computedFields: FieldSpec[]; functions: FunctionSpec[]; allFields: string[]; isView: boolean }){
+    this.allFields = params.allFields;
+    this.allowedFields = params.allowedFields;
+    this.computedFields = params.computedFields;
+    this.isView = params.isView;
+    this.functions = params.functions;
+    this.allowedFieldsIncludingComputed = this.allowedFields.concat(this.computedFields? this.computedFields.map(cf => cf.name) : []);
+    if(!this.allowedFields.length){
+      throw "allowedFields empty/missing";
+    }
+
+    /* Check for conflicting computed column names */
+    const conflictingCol = this.allFields.find(fieldName => this.computedFields.find(cf => cf.name === fieldName));
+    if(conflictingCol){
+      throw "INTERNAL ERROR: Cannot have duplicate column names ( " + conflictingCol + " ). One or more computed column names are colliding with table columns ones";
+    }
+  }
+
+  private checkField = (f: string) => {
+    if(!this.allowedFieldsIncludingComputed.includes(f)) throw "Field " + f + " is invalid or dissallowed";
+    return f;
+  }
+
+  private addItem = (item: SelectItem) => {
+    item.getFields().map(this.checkField);
+    if(this.select.find(s => s.alias === item.alias)) throw `Cannot specify duplicate columns ( ${item.alias} ). Perhaps you're using "*" with column names?`;
+    this.select.push(item);
+  }
+
+  private addFunctionByName = (funcName: string, args: any[], alias: string) => {
+    const funcDef = this.functions.find(f => f.name === funcName);
+    if(!funcDef) throw "Function " + funcName + " does not exist or is not allowed ";
+    this.addFunction(funcDef, args, alias);
+  }
+
+  private addFunction = (funcDef: FunctionSpec, args: any[], alias: string) => {
+    this.addItem({
+      type: funcDef.type,
+      alias,
+      getFields: () => funcDef.getFields(args),
+      getQuery: (tableAlias?: string) => funcDef.getQuery({ allowedFields: this.allowedFields, args, tableAlias, ctidField: this.isView? undefined : "ctid" }),
+      selected: true
+    });
+  }
+
+  addColumn = (fieldName: string, selected: boolean) => {
+  
+    /* Check if computed col */
+    if(selected){
+      const compCol = COMPUTED_FIELDS.find(cf => cf.name === fieldName);
+      if(compCol && !this.select.find(s => s.alias === fieldName)){
+        const cf: FunctionSpec = { 
+          ...compCol,
+          type: "computed",
+          singleColArg: false,
+          getFields: (args: any[]) => [] 
+        }
+        this.addFunction(cf, [], compCol.name)
+        return;
+      }
+    }
+
+    let alias = selected? fieldName : ("not_selected_" + fieldName);
+    this.addItem({
+      type: "column",
+      alias,
+      getQuery: () => asName(fieldName),
+      getFields: () => [fieldName],
+      selected
+    });
+  }
+
+  parseUserSelect = async (userSelect: FieldFilter, joinParse?: (key: string, val: any, throwErr: (msg: string) => any) => any) => {
+
+    /* Array select */
+    if(Array.isArray(userSelect)){
+      if(userSelect.find(key => typeof key !== "string")) throw "Invalid array select. Expecting an array if strings";
+  
+      userSelect.map(key => this.addColumn(key, true))
+  
+    /* Empty select */
+    } else if(userSelect === ""){
+      // select.push({
+      //   type: "function",
+      //   alias: "",
+      //   getFields: () => [],
+      //   getQuery: () => ""
+      // })
+      return [];
+    } else if(userSelect === "*"){
+      this.allowedFields.map(key => this.addColumn(key, true) );
+    } else if(isPlainObject(userSelect) && !isEmpty(userSelect as object)){
+      const selectKeys = Object.keys(userSelect),
+        selectValues = Object.values(userSelect);
+  
+      /* Cannot include and exclude at the same time */
+      if(
+        selectValues.filter(v => [0, false].includes(v)).length 
+      ){
+        if(selectValues.filter(v => ![0, false].includes(v)).length ){
+          throw "\nCannot include and exclude fields at the same time";
+        }
+  
+        /* Exclude only */
+        this.allowedFields.filter(f => !selectKeys.includes(f)).map(key => this.addColumn(key, true) )
+          
+      } else {
+        await Promise.all(selectKeys.map(async key => {
+          const val = userSelect[key],
+            throwErr = (extraErr: string = "") => {
+              console.trace(extraErr)
+              throw "Unexpected select -> " + JSON.stringify({ [key]: val }) + "\n" + extraErr;
+            };
+        
+          /* Included fields */
+          if([1, true].includes(val)){
+            if(key === "*"){
+              this.allowedFields.map(key => this.addColumn(key, true) )
+            } else {
+              this.addColumn(key, true);
+            }
+  
+          /* Aggs and functions */
+          } else if(typeof val === "string" || isPlainObject(val)) {
+  
+            /* Function 
+                { id: "$max" } === { id: { $max: ["id"] } } === SELECT MAX(id) AS id 
+            */  
+            if(
+              (typeof val === "string" && val !== "*") ||
+              isPlainObject(val) && Object.keys(val).length === 1 && Array.isArray(Object.values(val)[0])
+            ){
+              let funcName, args;
+              if(typeof val === "string") {
+                /* Shorthand notation -> it is expected that the key is the column name used as the only argument */
+                try {
+                  this.checkField(key)
+                } catch (err){
+                  throwErr(`Shorthand function notation error: the specifield column ( ${key} ) is invalid or dissallowed. Use correct column name or full function notation, e.g.: -> { key: { $func_name: ["column_name"] } } `)
+                }
+                funcName = val;
+                args = [key];
+              } else {
+                const callKeys = Object.keys(val);
+                if(callKeys.length !== 1 || !Array.isArray(val[callKeys[0]])) throw "\nIssue with select. \nUnexpected function definition. \nExpecting { field_name: func_name } OR { result_key: { func_name: [arg1, arg2 ...] } } \nBut got -> " + JSON.stringify({ [key]: val });
+                funcName = callKeys[0];
+                args = val[callKeys[0]];
+              }
+              
+              this.addFunctionByName(funcName, args, key);
+  
+            /* Join */
+            } else {
+
+              if(!joinParse) throw "Joins dissalowed";
+              await joinParse(key, val, throwErr);
+              
+            }
+  
+          } else throwErr();
+  
+        }));
+      }
+    } else throw "Unexpected select -> " + JSON.stringify(userSelect);
+  
+  }
+
+}
+
 export async function getNewQuery(
   _this: TableHandler,
   filter: Filter, 
@@ -263,6 +482,10 @@ export async function getNewQuery(
   tableRules?: TableRule, 
   localParams?: LocalParams
 ): Promise<NewQuery> {
+
+  if(get(localParams, "socket") && !get(tableRules, "select.fields")){
+    throw `INTERNAL ERROR: publish.${_this.name}.select.fields rule missing`;
+  }
 
   // const all_columns: SelectItem[] = _this.column_names.slice(0).map(fieldName => ({
   //   type: "column",
@@ -279,239 +502,256 @@ export async function getNewQuery(
   //   selected: false
   // })))
 
-  let select: SelectItem[] = [],
-    joinQueries: NewQuery[] = [];
+  // let select: SelectItem[] = [],
+  let  joinQueries: NewQuery[] = [];
 
     // const all_colnames = _this.column_names.slice(0).concat(COMPUTED_FIELDS.map(c => c.name));
 
   selectParams = selectParams || {};
   const { select: userSelect = "*" } = selectParams,
-    allCols = _this.column_names.slice(0),
-    allFieldsIncludingComputed = allCols.concat(COMPUTED_FIELDS.map(c => c.name)),
+    // allCols = _this.column_names.slice(0),
+    // allFieldsIncludingComputed = allCols.concat(COMPUTED_FIELDS.map(c => c.name)),
     allowedFields = _this.parseFieldFilter(get(tableRules, "select.fields")) || _this.column_names.slice(0),
-    allowedFieldsIncludingComputed = _this.parseFieldFilter(get(tableRules, "select.fields"), true, allFieldsIncludingComputed) || allFieldsIncludingComputed,
-    checkField = (f: string) => {
-      if(!allowedFieldsIncludingComputed.includes(f)) throw "Field " + f + " is invalid or dissallowed";
-      return f;
-    },
-    addItem = (item: SelectItem) => {
-      item.getFields().map(checkField);
-      if(select.find(s => s.alias === item.alias)) throw `Cannot specify duplicate columns ( ${item.alias} ). Perhaps you're using "*" with column names?`;
-      select.push(item);
-    },
-    addFunction = (funcDef: FunctionSpec, args: any[], alias: string) => {
-      addItem({
-        type: funcDef.type,
-        alias,
-        getFields: () => funcDef.getFields(args),
-        getQuery: (tableAlias?: string) => funcDef.getQuery({ allowedFields, args, tableAlias, ctidField: _this.is_view? undefined : "ctid" }),
-        selected: true
-      });
-    },
-    addColumn = (fieldName: string, selected: boolean) => {
+    // allowedFieldsIncludingComputed = _this.parseFieldFilter(get(tableRules, "select.fields"), true, allFieldsIncludingComputed) || allFieldsIncludingComputed,
+    sBuilder = new SelectItemBuilder({ allowedFields, computedFields: COMPUTED_FIELDS, isView: _this.is_view, functions: FUNCTIONS, allFields: _this.column_names.slice(0) });
 
-      /* Check if computed col */
-      if(selected){
-        const compCol = COMPUTED_FIELDS.find(cf => cf.name === fieldName);
-        if(compCol && !select.find(s => s.alias === fieldName)){
-          const cf: FunctionSpec = { 
-            ...compCol,
-            type: "computed",
-            getFields: (args: any[]) => [] 
-          }
-          addFunction(cf, [], compCol.name)
-          return;
-        }
-      }
 
-      let alias = selected? fieldName : ("not_selected_" + fieldName);
-      addItem({
-        type: "column",
-        alias,
-        getQuery: () => asName(fieldName),
-        getFields: () => [fieldName],
-        selected
-      });
-    };
+  //   /* Array select */
+  // if(Array.isArray(userSelect)){
+  //   if(userSelect.find(key => typeof key !== "string")) throw "Invalid array select. Expecting an array if strings";
 
-    /* Check for conflicting computed column names */
-    const conflictingCol = allFieldsIncludingComputed.find((cf, i) => allFieldsIncludingComputed.find((_cf, _i) => cf === _cf && i !== _i));
-    if(conflictingCol){
-      const isComp = COMPUTED_FIELDS.find(c => c.name === conflictingCol);
-      throw "INTERNAL ERROR: Cannot have duplicate column names ( " + conflictingCol + " ). " + (!isComp? "" : "One or more computed column names collide with the real ones");
-    }
+  //   userSelect.map(key => sBuilder.addColumn(key, true))
 
-    /* Array select */
-  if(Array.isArray(userSelect)){
-    if(userSelect.find(key => typeof key !== "string")) throw "Invalid array select. Expecting an array if strings";
+  // /* Empty select */
+  // } else if(userSelect === ""){
+  //   // select.push({
+  //   //   type: "function",
+  //   //   alias: "",
+  //   //   getFields: () => [],
+  //   //   getQuery: () => ""
+  //   // })
+  //   console.log("Finish empty select")
+  // } else if(userSelect === "*"){
+  //   allowedFields.map(key => sBuilder.addColumn(key, true) );
+  // } else if(isPlainObject(userSelect) && !isEmpty(userSelect as object)){
+  //   const selectKeys = Object.keys(userSelect),
+  //     selectValues = Object.values(userSelect);
 
-    userSelect.map(key => addColumn(key, true))
+  //   /* Cannot include and exclude at the same time */
+  //   if(
+  //     selectValues.filter(v => [0, false].includes(v)).length 
+  //   ){
+  //     if(selectValues.filter(v => ![0, false].includes(v)).length ){
+  //       throw "\nCannot include and exclude fields at the same time";
+  //     }
 
-  /* Empty select */
-  } else if(userSelect === ""){
-    // select.push({
-    //   type: "function",
-    //   alias: "",
-    //   getFields: () => [],
-    //   getQuery: () => ""
-    // })
-  } else if(userSelect === "*"){
-    allowedFields.map(key => addColumn(key, true) );
-  } else if(isPlainObject(userSelect) && !isEmpty(userSelect as object)){
-    const selectKeys = Object.keys(userSelect),
-      selectValues = Object.values(userSelect);
-
-    /* Cannot include and exclude at the same time */
-    if(
-      selectValues.filter(v => [0, false].includes(v)).length 
-    ){
-      if(selectValues.filter(v => ![0, false].includes(v)).length ){
-        throw "\nCannot include and exclude fields at the same time";
-      }
-
-      /* Exclude only */
-      allowedFields.filter(f => !selectKeys.includes(f)).map(key => addColumn(key, true) )
+  //     /* Exclude only */
+  //     allowedFields.filter(f => !selectKeys.includes(f)).map(key => sBuilder.addColumn(key, true) )
         
-    } else {
-      await Promise.all(selectKeys.map(async key => {
-        const val = userSelect[key],
-          throwErr = (extraErr: string = "") => {
-            console.trace(extraErr)
-            throw "Unexpected select -> " + JSON.stringify({ [key]: val }) + "\n" + extraErr;
-          };
+  //   } else {
+  //     await Promise.all(selectKeys.map(async key => {
+  //       const val = userSelect[key],
+  //         throwErr = (extraErr: string = "") => {
+  //           console.trace(extraErr)
+  //           throw "Unexpected select -> " + JSON.stringify({ [key]: val }) + "\n" + extraErr;
+  //         };
       
-        /* Included fields */
-        if([1, true].includes(val)){
-          if(key === "*"){
-            allowedFields.map(key => addColumn(key, true) )
-          } else {
-            addColumn(key, true);
-          }
+  //       /* Included fields */
+  //       if([1, true].includes(val)){
+  //         if(key === "*"){
+  //           allowedFields.map(key => sBuilder.addColumn(key, true) )
+  //         } else {
+  //           sBuilder.addColumn(key, true);
+  //         }
 
-        /* Aggs and functions */
-        } else if(typeof val === "string" || isPlainObject(val)) {
+  //       /* Aggs and functions */
+  //       } else if(typeof val === "string" || isPlainObject(val)) {
 
-          /* Function 
-              { id: "$max" } === { id: { $max: ["id"] } } === SELECT MAX(id) AS id 
-          */  
-          if(
-            (typeof val === "string" && val !== "*") ||
-            isPlainObject(val) && Object.keys(val).length === 1 && Array.isArray(Object.values(val)[0])
-          ){
-            let funcName, args;
-            if(typeof val === "string") {
-              /* Shorthand notation -> it is expected that the key is the column name used as the only argument */
-              try {
-                checkField(key)
-              } catch (err){
-                throwErr(`Shorthand function notation error: the specifield column ( ${key} ) is invalid or dissallowed. Use correct column name or full function notation, e.g.: -> { key: { $func_name: ["column_name"] } } `)
-              }
-              funcName = val;
-              args = [key];
-            } else {
-              const callKeys = Object.keys(val);
-              if(callKeys.length !== 1 || !Array.isArray(val[callKeys[0]])) throw "\nIssue with select. \nUnexpected function definition. \nExpecting { field_name: func_name } OR { result_key: { func_name: [arg1, arg2 ...] } } \nBut got -> " + JSON.stringify({ [key]: val });
-              funcName = callKeys[0];
-              args = val[callKeys[0]];
-            }
-
-            const funcDef = FUNCTIONS.find(f => f.name === funcName);
-            if(!funcDef) throw `Invalid or dissallowed function name: ` + funcName;
+  //         /* Function 
+  //             { id: "$max" } === { id: { $max: ["id"] } } === SELECT MAX(id) AS id 
+  //         */  
+  //         if(
+  //           (typeof val === "string" && val !== "*") ||
+  //           isPlainObject(val) && Object.keys(val).length === 1 && Array.isArray(Object.values(val)[0])
+  //         ){
+  //           let funcName, args;
+  //           if(typeof val === "string") {
+  //             /* Shorthand notation -> it is expected that the key is the column name used as the only argument */
+  //             try {
+  //               sBuilder.checkField(key)
+  //             } catch (err){
+  //               throwErr(`Shorthand function notation error: the specifield column ( ${key} ) is invalid or dissallowed. Use correct column name or full function notation, e.g.: -> { key: { $func_name: ["column_name"] } } `)
+  //             }
+  //             funcName = val;
+  //             args = [key];
+  //           } else {
+  //             const callKeys = Object.keys(val);
+  //             if(callKeys.length !== 1 || !Array.isArray(val[callKeys[0]])) throw "\nIssue with select. \nUnexpected function definition. \nExpecting { field_name: func_name } OR { result_key: { func_name: [arg1, arg2 ...] } } \nBut got -> " + JSON.stringify({ [key]: val });
+  //             funcName = callKeys[0];
+  //             args = val[callKeys[0]];
+  //           }
             
-            addFunction(funcDef, args, key);
-            // addItem({
-            //   type: funcDef.type,
-            //   alias: key,
-            //   getFields: () => funcDef.getFields(args),
-            //   getQuery: (tableAlias?: string) => funcDef.getQuery({ allowedFields, args, tableAlias, ctidField: _this.is_view? undefined : "ctid" }),
-            //   selected: true
-            // });
+  //           sBuilder.addFunctionByName(funcName, args, key);
 
-          /* Join */
-          } else {
-            // console.log({ key, val })
-            let j_filter: Filter = {},
-                j_selectParams: SelectParams = {},
-                j_path: string[],
-                j_alias: string,
-                j_tableRules: TableRule,
-                j_table: string,
-                j_isLeftJoin: boolean = true;
+  //         /* Join */
+  //         } else {
+  //           // console.log({ key, val })
+  //           let j_filter: Filter = {},
+  //               j_selectParams: SelectParams = {},
+  //               j_path: string[],
+  //               j_alias: string,
+  //               j_tableRules: TableRule,
+  //               j_table: string,
+  //               j_isLeftJoin: boolean = true;
 
-            if(val === "*"){
-              j_selectParams.select = "*";
-              j_alias = key;
-              j_table = key;
-            } else {
+  //           if(val === "*"){
+  //             j_selectParams.select = "*";
+  //             j_alias = key;
+  //             j_table = key;
+  //           } else {
 
-              /* Full option join  { field_name: db.innerJoin.table_name(filter, select)  } */
-              const JOIN_KEYS = ["$innerJoin", "$leftJoin"];
-              const JOIN_PARAMS = ["select", "filter", "$path", "offset", "limit", "orderBy"];
-              const joinKeys = Object.keys(val).filter(k => JOIN_KEYS.includes(k));
-              if(joinKeys.length > 1) {
-                throwErr("\nCannot specify more than one join type ( $innerJoin OR $leftJoin )");
-              } else if(joinKeys.length === 1) {
-                const invalidParams = Object.keys(val).filter(k => ![ ...JOIN_PARAMS, ...JOIN_KEYS ].includes(k));
-                if(invalidParams.length) throw "Invalid join params: " + invalidParams.join(", ");
+  //             /* Full option join  { field_name: db.innerJoin.table_name(filter, select)  } */
+  //             const JOIN_KEYS = ["$innerJoin", "$leftJoin"];
+  //             const JOIN_PARAMS = ["select", "filter", "$path", "offset", "limit", "orderBy"];
+  //             const joinKeys = Object.keys(val).filter(k => JOIN_KEYS.includes(k));
+  //             if(joinKeys.length > 1) {
+  //               throwErr("\nCannot specify more than one join type ( $innerJoin OR $leftJoin )");
+  //             } else if(joinKeys.length === 1) {
+  //               const invalidParams = Object.keys(val).filter(k => ![ ...JOIN_PARAMS, ...JOIN_KEYS ].includes(k));
+  //               if(invalidParams.length) throw "Invalid join params: " + invalidParams.join(", ");
   
-                j_isLeftJoin = joinKeys[0] === "$leftJoin";
-                j_table = val[joinKeys[0]];
-                j_alias = key;
-                if(typeof j_table !== "string") throw "\nIssue with select. \nJoin type must be a string table name but got -> " + JSON.stringify({ [key]: val });
+  //               j_isLeftJoin = joinKeys[0] === "$leftJoin";
+  //               j_table = val[joinKeys[0]];
+  //               j_alias = key;
+  //               if(typeof j_table !== "string") throw "\nIssue with select. \nJoin type must be a string table name but got -> " + JSON.stringify({ [key]: val });
                 
-                j_selectParams.select = val.select || "*";
-                j_filter = val.filter || {};
-                j_selectParams.limit = val.limit;
-                j_selectParams.offset = val.offset;
-                j_selectParams.orderBy = val.orderBy;
-                j_path = val.$path;
-              } else {
-                j_selectParams.select = val;
-                j_alias = key;
-                j_table = key;
-              }
-            }
+  //               j_selectParams.select = val.select || "*";
+  //               j_filter = val.filter || {};
+  //               j_selectParams.limit = val.limit;
+  //               j_selectParams.offset = val.offset;
+  //               j_selectParams.orderBy = val.orderBy;
+  //               j_path = val.$path;
+  //             } else {
+  //               j_selectParams.select = val;
+  //               j_alias = key;
+  //               j_table = key;
+  //             }
+  //           }
 
-            const _thisJoinedTable: any = _this.dboBuilder.dbo[j_table];
-            if(!_thisJoinedTable) throw `Joined table ${j_table} is disallowed or inexistent`;
+  //           const _thisJoinedTable: any = _this.dboBuilder.dbo[j_table];
+  //           if(!_thisJoinedTable) throw `Joined table ${j_table} is disallowed or inexistent`;
 
-            let isLocal = true;
-            if(localParams && localParams.socket){
-              isLocal = false;
-              j_tableRules = await _this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: j_table, command: "find", socket: localParams.socket });
-            }
+  //           let isLocal = true;
+  //           if(localParams && localParams.socket){
+  //             isLocal = false;
+  //             j_tableRules = await _this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: j_table, command: "find", socket: localParams.socket });
+  //           }
             
-            if(isLocal || j_tableRules){
+  //           if(isLocal || j_tableRules){
 
-              const joinQuery: NewQuery = await getNewQuery(
-                  _thisJoinedTable,
-                  j_filter, 
-                  { ...j_selectParams, alias: j_alias }, 
-                  param3_unused, 
-                  j_tableRules, 
-                  localParams
-                );
-              joinQuery.isLeftJoin = j_isLeftJoin;
-              joinQuery.tableAlias = j_alias;
-              joinQuery.$path = j_path;
-              joinQueries.push(joinQuery);
-              // console.log(joinQuery)
-            }
-          }
+  //             const joinQuery: NewQuery = await getNewQuery(
+  //                 _thisJoinedTable,
+  //                 j_filter, 
+  //                 { ...j_selectParams, alias: j_alias }, 
+  //                 param3_unused, 
+  //                 j_tableRules, 
+  //                 localParams
+  //               );
+  //             joinQuery.isLeftJoin = j_isLeftJoin;
+  //             joinQuery.tableAlias = j_alias;
+  //             joinQuery.$path = j_path;
+  //             joinQueries.push(joinQuery);
+  //             // console.log(joinQuery)
+  //           }
+  //         }
 
-        } else throwErr();
+  //       } else throwErr();
 
-      }));
+  //     }));
+  //   }
+  // } else throw "Unexpected select -> " + JSON.stringify(userSelect);
+
+  await sBuilder.parseUserSelect(userSelect, async (key, val, throwErr) => {
+
+    // console.log({ key, val })
+    let j_filter: Filter = {},
+        j_selectParams: SelectParams = {},
+        j_path: string[],
+        j_alias: string,
+        j_tableRules: TableRule,
+        j_table: string,
+        j_isLeftJoin: boolean = true;
+
+    if(val === "*"){
+      j_selectParams.select = "*";
+      j_alias = key;
+      j_table = key;
+    } else {
+
+      /* Full option join  { field_name: db.innerJoin.table_name(filter, select)  } */
+      const JOIN_KEYS = ["$innerJoin", "$leftJoin"];
+      const JOIN_PARAMS = ["select", "filter", "$path", "offset", "limit", "orderBy"];
+      const joinKeys = Object.keys(val).filter(k => JOIN_KEYS.includes(k));
+      if(joinKeys.length > 1) {
+        throwErr("\nCannot specify more than one join type ( $innerJoin OR $leftJoin )");
+      } else if(joinKeys.length === 1) {
+        const invalidParams = Object.keys(val).filter(k => ![ ...JOIN_PARAMS, ...JOIN_KEYS ].includes(k));
+        if(invalidParams.length) throw "Invalid join params: " + invalidParams.join(", ");
+
+        j_isLeftJoin = joinKeys[0] === "$leftJoin";
+        j_table = val[joinKeys[0]];
+        j_alias = key;
+        if(typeof j_table !== "string") throw "\nIssue with select. \nJoin type must be a string table name but got -> " + JSON.stringify({ [key]: val });
+        
+        j_selectParams.select = val.select || "*";
+        j_filter = val.filter || {};
+        j_selectParams.limit = val.limit;
+        j_selectParams.offset = val.offset;
+        j_selectParams.orderBy = val.orderBy;
+        j_path = val.$path;
+      } else {
+        j_selectParams.select = val;
+        j_alias = key;
+        j_table = key;
+      }
     }
-  } else throw "Unexpected select -> " + JSON.stringify(userSelect);
+
+    const _thisJoinedTable: any = _this.dboBuilder.dbo[j_table];
+    if(!_thisJoinedTable) throw `Joined table ${j_table} is disallowed or inexistent`;
+
+    let isLocal = true;
+    if(localParams && localParams.socket){
+      isLocal = false;
+      j_tableRules = await _this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: j_table, command: "find", socket: localParams.socket });
+    }
+    
+    if(isLocal || j_tableRules){
+
+      const joinQuery: NewQuery = await getNewQuery(
+          _thisJoinedTable,
+          j_filter, 
+          { ...j_selectParams, alias: j_alias }, 
+          param3_unused, 
+          j_tableRules, 
+          localParams
+        );
+      joinQuery.isLeftJoin = j_isLeftJoin;
+      joinQuery.tableAlias = j_alias;
+      joinQuery.$path = j_path;
+      joinQueries.push(joinQuery);
+      // console.log(joinQuery)
+    }
+  })
 
   /* Add non selected columns */
+  /* WHY???? */
   allowedFields.map(key => {
-    if(!select.find(s => s.alias === key && s.type === "column")){
-      addColumn(key, false);
+    if(!sBuilder.select.find(s => s.alias === key && s.type === "column")){
+      sBuilder.addColumn(key, false);
     }
   });
 
+  let select: SelectItem[] = sBuilder.select;
   const validatedAggAliases = select.filter(s => s.type === "aggregation").map(s => s.alias);
   let resQuery: NewQuery = {
     allFields: allowedFields,

@@ -17,6 +17,7 @@ import server_only_queries from "../server_only_queries";
 import { DBObj } from "./DBoGenerated";
 // type DBObj = any;
 import { DB, DbHandler, Auth } from 'prostgles-server/dist/Prostgles';
+import { strict as assert } from 'assert';
 
 const log = (msg: string, extra?: any) => {
   console.log(...["(server): " + msg, extra].filter(v => v));
@@ -115,7 +116,9 @@ prostgles({
 				},
 				insert: "*",
 				delete: "*"
-			}
+			},
+
+			items4_pub: "*"
 		};
 		
 		// return {
@@ -177,6 +180,7 @@ prostgles({
 					// sha256: { $sha256_multi_agg: ["name", "public"] },
 					// sha512: { $sha512_multi_agg: ["name", "public"] },
 				} });
+				// console.log(await db.items4.findOne({}, { select: { public: { "$ts_headline": ["public", "public"] } } }))
 			}
 
 

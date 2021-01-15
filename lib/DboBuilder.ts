@@ -24,7 +24,7 @@ export type DbHandler = {
   };
 
 import { get } from "./utils";
-import { getNewQuery, makeQuery, COMPUTED_FIELDS, SelectItem, FieldSpec, asNameAlias } from "./QueryBuilder";
+import { getNewQuery, makeQuery, COMPUTED_FIELDS, SelectItem, FieldSpec, asNameAlias, SelectItemBuilder, FUNCTIONS } from "./QueryBuilder";
 import { 
     DB, TableRule, SelectRule, InsertRule, UpdateRule, DeleteRule, SyncRule, Joins, Join, Prostgles, PublishParser, flat 
 } from "./Prostgles";
@@ -677,19 +677,6 @@ export class ViewHandler {
             
             const { testRule = false } = localParams || {};
 
-            // const statement = await this.prepareValidatedQuery(filter, selectParams, param3_unused, tableRules, localParams),
-            //     _query = statement.query;
-
-            // const q = await this.buildQueryTree(filter, selectParams, param3_unused, tableRules, localParams),
-            //     _query = await this.buildJoinQuery(q);
-
-            // try {
-            //     await getNewQuery(this as unknown as TableHandler, filter, selectParams, param3_unused, tableRules, localParams);
-
-            // } catch(err) {
-            //     console.log(err)
-            // }
-            // console.log(_query);
 
             if(testRule) return [];
             if(selectParams){
@@ -698,23 +685,38 @@ export class ViewHandler {
                 if(bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
             }
 
+            /* Validate publish */
+            if(tableRules){
+
+                let fields: FieldFilter,
+                    filterFields: FieldFilter,
+                    forcedFilter: object,
+                    maxLimit: number;
+
+                if(!tableRules.select) throw "select rules missing for " + this.name;
+                fields = tableRules.select.fields;
+                forcedFilter = tableRules.select.forcedFilter;
+                filterFields = tableRules.select.filterFields;
+                maxLimit = tableRules.select.maxLimit;
+
+                if(<any>tableRules.select !== "*" && typeof tableRules.select !== "boolean" && !isPlainObject(tableRules.select)) throw `\nINVALID publish.${this.name}.select\nExpecting any of: "*" | { fields: "*" } | true | false`
+                if(!fields)  throw ` invalid ${this.name}.select rule -> fields (required) setting missing.\nExpecting any of: "*" | { col_name: false } | { col1: true, col2: true }`;
+                if(maxLimit && !Number.isInteger(maxLimit)) throw ` invalid publish.${this.name}.select.maxLimit -> expecting integer but got ` + maxLimit;
+            }
+
             let q = await getNewQuery(this as unknown as TableHandler, filter, selectParams, param3_unused, tableRules, localParams),
                 _query = makeQuery(this as unknown as TableHandler, q);
             // console.log(_query)
-            /* This is used to test if publish is valid */
-            if(testRule) {
-                console.log("testing rule -> finish pls")
-                await this.prepareValidatedQuery(filter, selectParams, param3_unused, tableRules, localParams);
-                return undefined;
-            }
             
-            /* Apply publish validation */
-            // if(tableRules && tableRules.select && tableRules.select.validate){
-            //     const forcedFilter = tableRules.select.forcedFilter || {};
-                
-            //     /* Filters have been validated up to this point */
-            //     await tableRules.select.validate({ filter: { ...filter, ...forcedFilter }, params: selectParams });
-            // }
+            if(testRule){
+                try {
+                    await this.db.any("EXPLAIN " + _query);
+                    return [];
+                } catch(e) {
+                    console.error(e);
+                    throw `INTERNAL ERROR: Publish config is not valid for publish.${this.name}.select `
+                }
+            }
 
             // console.log(_query);
             if(expectOne) {
@@ -1539,7 +1541,7 @@ export class TableHandler extends ViewHandler {
         }
     }
 
-    async update(filter: Filter, newData: object, params: UpdateParams, tableRules: TableRule, localParams: LocalParams = null): Promise<any>{
+    async update(filter: Filter, newData: object, params?: UpdateParams, tableRules?: TableRule, localParams: LocalParams = null): Promise<any>{
         try {
 
             const { testRule = false } = localParams || {};
@@ -1641,8 +1643,9 @@ export class TableHandler extends ViewHandler {
             let qType = "none";
             if(returning){
                 qType = multi? "any" : "one";
-                query += " RETURNING " + this.prepareSelect(returning, returningFields);
+                query += await this.prepareReturning(returning, this.parseFieldFilter(returningFields));
             }
+
             // console.log(query)
             if(this.t){
                 return this.t[qType](query).catch(err => makeErr(err, localParams));
@@ -1695,6 +1698,7 @@ export class TableHandler extends ViewHandler {
     
                 /* If no returning fields specified then take select fields as returning */
                 if(!returningFields) returningFields = get(tableRules, "select.fields");
+                if(!returningFields) returningFields = get(tableRules, "insert.fields");
 
                 if(!fields) throw ` invalid insert rule for ${this.name} -> fields missing `;
 
@@ -1723,7 +1727,7 @@ export class TableHandler extends ViewHandler {
             }
             
             if(!data) data = {}; //throw "Provide data in param1";
-            let returningSelect = returning? (" RETURNING " + this.prepareSelect(returning, returningFields, false)) : "";
+            let returningSelect = await this.prepareReturning(returning, this.parseFieldFilter(returningFields));
             const makeQuery = async (_row, isOne = false) => {
                 let row = { ..._row };
                 if(preValidate){
@@ -1773,6 +1777,26 @@ export class TableHandler extends ViewHandler {
             throw { err: parseError(e), msg: `Issue with dbo.${this.name}.insert()` };
         }
     };
+
+    prepareReturning = async (returning: FieldFilter, allowedFields: string[], tableAlias?: string): Promise<string> => {
+        let result = "";
+        if(returning){
+            let sBuilder = new SelectItemBuilder({
+                allFields: this.column_names.slice(0),
+                allowedFields, 
+                computedFields: COMPUTED_FIELDS, 
+                functions: FUNCTIONS.filter(f => f.type === "function" && f.singleColArg),
+                isView: this.is_view
+            });
+            await sBuilder.parseUserSelect(returning);
+
+            if(sBuilder.select.length) result = "RETURNING ";
+
+            result += sBuilder.select.map(s => s.getQuery() + " AS " + asNameAlias(s.alias, tableAlias )).join(", ")
+        } 
+        
+        return result;
+    }
     
     async delete(filter?: Filter, params?: DeleteParams, param3_unused?, table_rules?: TableRule, localParams: LocalParams = null): Promise<any> {    //{ socket, func, has_rules = false, socketDb } = {}
         try {
@@ -1782,9 +1806,9 @@ export class TableHandler extends ViewHandler {
 
             // table_rules = table_rules || {};
 
-            let forcedFilter: object = null,
-                filterFields: FieldFilter = null,
-                returningFields: FieldFilter = null;
+            let forcedFilter: object = {},
+                filterFields: FieldFilter = "*",
+                returningFields: FieldFilter = "*";
 
             const { testRule = false } = localParams || {};
             if(table_rules){
@@ -1794,6 +1818,7 @@ export class TableHandler extends ViewHandler {
                 returningFields = table_rules.delete.returningFields;
 
                 if(!returningFields) returningFields = get(table_rules, "select.fields");
+                if(!returningFields) returningFields = get(table_rules, "delete.filterFields");
 
                 if(!filterFields)  throw ` Invalid delete rule for ${this.name}. filterFields missing `;
 
@@ -1818,11 +1843,15 @@ export class TableHandler extends ViewHandler {
 
             if(returning){
                 queryType = "any";
-                _query += " RETURNING " + this.prepareSelect(returning, returningFields);
+                if(!returningFields) {
+                    throw "Returning dissallowed";
+                }
+                _query += await this.prepareReturning(returning, this.parseFieldFilter(returningFields));
             }
             
             return (this.t || this.db)[queryType](_query, { _psqlWS_tableName: this.name }).catch(err => makeErr(err, localParams));
         } catch(e){
+            console.trace(e)
             if(localParams && localParams.testRule) throw e;
             throw { err: parseError(e), msg: `Issue with dbo.${this.name}.delete()` };
         }

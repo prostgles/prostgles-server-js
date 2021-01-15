@@ -1,6 +1,6 @@
 import { Filter, LocalParams, TableHandler } from "./DboBuilder";
 import { TableRule } from "./Prostgles";
-import { SelectParams } from "prostgles-types";
+import { SelectParams, FieldFilter } from "prostgles-types";
 export declare type SelectItem = {
     type: "column" | "function" | "aggregation" | "joinedColumn" | "computed";
     getFields: () => string[];
@@ -39,6 +39,10 @@ export declare type FieldSpec = {
 };
 export declare type FunctionSpec = {
     name: string;
+    /**
+     * If true then the first argument is expected to be a column name
+     */
+    singleColArg: boolean;
     type: "function" | "aggregation" | "computed";
     /**
      * getFields: string[] -> used to validate user supplied field names. It will be fired before querying to validate allowed columns
@@ -55,7 +59,33 @@ export declare type FunctionSpec = {
         ctidField?: string;
     }) => string;
 };
+/**
+* Each function expects a column at the very least
+*/
+export declare const FUNCTIONS: FunctionSpec[];
 export declare const COMPUTED_FIELDS: FieldSpec[];
+export declare class SelectItemBuilder {
+    select: SelectItem[];
+    private allFields;
+    private allowedFields;
+    private computedFields;
+    private functions;
+    private allowedFieldsIncludingComputed;
+    private isView;
+    constructor(params: {
+        allowedFields: string[];
+        computedFields: FieldSpec[];
+        functions: FunctionSpec[];
+        allFields: string[];
+        isView: boolean;
+    });
+    private checkField;
+    private addItem;
+    private addFunctionByName;
+    private addFunction;
+    addColumn: (fieldName: string, selected: boolean) => void;
+    parseUserSelect: (userSelect: FieldFilter, joinParse?: (key: string, val: any, throwErr: (msg: string) => any) => any) => Promise<any[]>;
+}
 export declare function getNewQuery(_this: TableHandler, filter: Filter, selectParams?: SelectParams & {
     alias?: string;
 }, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<NewQuery>;

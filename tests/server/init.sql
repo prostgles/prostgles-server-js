@@ -34,6 +34,14 @@ CREATE TABLE IF NOT EXISTS items4 (
 	added		TIMESTAMP DEFAULT NOW(),
 	PRIMARY KEY(id, name)
 );
+DROP TABLE IF EXISTS items4_pub CASCADE;
+CREATE TABLE IF NOT EXISTS items4_pub (
+	id			SERIAL,
+	public	TEXT,
+	name		TEXT,
+	added		TIMESTAMP DEFAULT NOW(),
+	PRIMARY KEY(id, name)
+);
 CREATE INDEX IF NOT EXISTS idx1 ON items(name);
 CREATE INDEX IF NOT EXISTS idx2 ON items2(name);
 CREATE INDEX IF NOT EXISTS idx3 ON items3(name);
