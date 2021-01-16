@@ -80,7 +80,7 @@ jobs:
     timeout-minutes: 4
     strategy:
       matrix:
-        node-version: [12.x, 14.x]
+        node-version: [10.x, 12.x, 14.x]
 
     services:
       postgres:
