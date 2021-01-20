@@ -94,7 +94,7 @@ export class PubSubManager {
 
     db: DB;
     dbo: DbHandler;
-    triggers: any;
+    triggers: { [key: string]: string[] };
     sockets: any;
     subs: { [ke: string]: { [ke: string]: { subs: SubscriptionParams[] } } };
     syncs: SyncParams[];
@@ -114,7 +114,7 @@ export class PubSubManager {
         this.dbo = dbo;
         this.onSchemaChange = onSchemaChange;
 
-        this.triggers = {};
+        this.triggers = { };
         this.sockets = {};
         this.subs = {};
         this.syncs = [];
@@ -1018,6 +1018,7 @@ export class PubSubManager {
             return Promise.resolve(true);
             
         } else {
+            log("addTrigger.. Appending to existing: ", this.triggers[table_name])
             this.triggers[table_name] = this.triggers[table_name] || [];
             _condts = [...this.triggers[table_name], condition];
         }
@@ -1102,6 +1103,7 @@ export class PubSubManager {
         }
 
         this.addingTrigger = true;
+        log("Updating triggers... ");
         this.db.result(query).then(res => {
             this.addingTrigger = false;
             
@@ -1112,7 +1114,7 @@ export class PubSubManager {
                 // console.log("processing next trigger in queue");
             }
 
-            this.triggers[table_name] = _condts;
+            this.triggers[table_name] = _condts.slice(0);
             log("Updated triggers: ", _condts);
             return true;
         }).catch(err => {
