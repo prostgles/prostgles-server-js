@@ -167,19 +167,25 @@ prostgles({
 				stopTest()
 			} else {
 				
-				await db.items4.delete();
-				await db.items4.insert([
-					{ name: "abc", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
-					{ name: "abc", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
-					{ name: "abcd", public: "public data d", added: new Date('04 Dec 1996 00:12:00 GMT') }
-				]);
+				// await db.items4.delete();
+				// await db.items4.insert([
+				// 	{ name: "abc", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
+				// 	{ name: "abc", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
+				// 	{ name: "abcd", public: "public data d", added: new Date('04 Dec 1996 00:12:00 GMT') }
+				// ]);
 
-				const MonAgg = await db.items4.find({ name: "abc" }, { select: { 
+				await db.items.insert([{ name: "a" }, { name: "z" }, { name: "b" }]);
+				await db.items2.insert([{ name: "a", items_id: 1 }]);
+				await db.items2.insert([{ name: "a", items_id: 1 }]);
+				await db.items2.insert([{ name: "b", items_id: 2 }]);
+				await db.items2.insert([{ name: "b", items_id: 2 }]);
+				await db.items2.insert([{ name: "b", items_id: 2 }]);
+				await db.items3.insert([{ name: "a" }, { name: "za123" }]);
+				const MonAgg = await db.items.find({}, { select: { 
 					name: 1,
-					md5: { $md5_multi_agg: ["name", "public"] },
-					// sha256: { $sha256_multi_agg: ["name", "public"] },
-					// sha512: { $sha512_multi_agg: ["name", "public"] },
+					items2: { count: { $count: ["id"] } } ,
 				} });
+				console.log(JSON.stringify(MonAgg, null, 2))
 				// console.log(await db.items4.findOne({}, { select: { public: { "$ts_headline": ["public", "public"] } } }))
 			}
 

@@ -35,7 +35,7 @@ exports.FUNCTIONS = [
         singleColArg: false,
         getFields: (args) => args,
         getQuery: ({ allowedFields, args, tableAlias }) => {
-            const q = DboBuilder_1.pgp.as.format("md5(" + args.map(fname => "COALESCE( " + exports.asNameAlias(fname, tableAlias) + ", '' )").join(" || ") + ")");
+            const q = DboBuilder_1.pgp.as.format("md5(" + args.map(fname => "COALESCE( " + exports.asNameAlias(fname, tableAlias) + "::text, '' )").join(" || ") + ")");
             return q;
         }
     },
@@ -45,7 +45,7 @@ exports.FUNCTIONS = [
         singleColArg: false,
         getFields: (args) => args,
         getQuery: ({ allowedFields, args, tableAlias }) => {
-            const q = DboBuilder_1.pgp.as.format("md5(string_agg(" + args.map(fname => "COALESCE( " + exports.asNameAlias(fname, tableAlias) + ", '' )").join(" || ") + ", ','))");
+            const q = DboBuilder_1.pgp.as.format("md5(string_agg(" + args.map(fname => "COALESCE( " + exports.asNameAlias(fname, tableAlias) + "::text, '' )").join(" || ") + ", ','))");
             return q;
         }
     },
@@ -697,29 +697,35 @@ function makeQuery(_this, q, depth = 0, joinFields = []) {
     const nonAggs = q.select.filter(s => depth || s.selected).filter(s => s.type !== "aggregation");
     if (!joins.length) {
         /* Nested queries contain all fields to allow joining */
-        let select = q.select.filter(s => depth || s.selected).map(s => {
-            if (s.type === "aggregation") {
-                /* Rename aggs to avoid collision with join cols */
-                return s.getQuery(!depth ? undefined : `agg_${s.alias}`) + " AS " + DboBuilder_1.asName(s.alias);
-            }
-            return s.getQuery() + " AS " + DboBuilder_1.asName(s.alias);
-        }), groupBy = "";
+        let 
+        // select = q.select.filter(s => joinFields.includes(s.alias) || s.selected).map(s => {
+        //   if(s.type === "aggregation"){
+        //     /* Rename aggs to avoid collision with join cols */
+        //     return s.getQuery(!depth? undefined : `agg_${s.alias}`) + " AS " + asName(s.alias);
+        //   }
+        //   return s.getQuery() + " AS " + asName(s.alias);
+        // }),
+        groupBy = "";
         // console.log(select, q);
         /* If aggs exist need to set groupBy add joinFields into select */
         if (aggs.length) {
-            const missingFields = joinFields.filter(jf => !q.select.find(s => s.type === "column" && s.alias === jf));
-            if (depth && missingFields.length) {
-                select = Array.from(new Set(missingFields.concat(select)));
-            }
+            // const missingFields = joinFields.filter(jf => !q.select.find(s => s.type === "column" && s.alias === jf));
+            // if(depth && missingFields.length){
+            //     // select = Array.from(new Set(missingFields.concat(select)));
+            // }
             if (nonAggs.length) {
-                groupBy = `GROUP BY ${nonAggs.map(sf => sf.type === "function" ? sf.getQuery() : DboBuilder_1.asName(sf.alias)).join(", ")}\n`;
+                let groupByFields = nonAggs.filter(sf => !depth || joinFields.includes(sf.getQuery()));
+                if (groupByFields.length) {
+                    groupBy = `GROUP BY ${groupByFields.map(sf => sf.type === "function" ? sf.getQuery() : DboBuilder_1.asName(sf.alias)).join(", ")}\n`;
+                }
             }
         }
+        // console.log(q.select, joinFields)
         let fres = indJ(depth, [
             `-- 0. or 5. [leaf query] `
-            // ,   `SELECT ` + select.concat((q.selectFuncs || []).map(sf => sf.getQuery("$rowhash"))).join(", ")
+            /* Group by selected fields + any join fields */
             ,
-            `SELECT ` + q.select.filter(s => depth || s.selected).map(s => {
+            `SELECT ` + q.select.filter(s => joinFields.includes(s.getQuery()) || s.selected).map(s => {
                 // return s.getQuery() + ((s.type !== "column")? (" AS " + s.alias) : "")
                 if (s.type === "aggregation") {
                     /* Rename aggs to avoid collision with join cols */
