@@ -97,6 +97,7 @@ class PubSubManager {
         };
         this.syncTimeout = null;
         this.parseCondition = (condition) => Boolean(condition && condition.trim().length) ? condition : "TRUE";
+        this.addTriggerPool = undefined;
         const { db, dbo, wsChannelNamePrefix, pgChannelName, onSchemaChange } = options;
         if (!db || !dbo) {
             throw 'MISSING: db_pg, db';
@@ -116,6 +117,7 @@ class PubSubManager {
         if (this.onSchemaChange) {
             this.startWatchingSchema();
         }
+        log("Created PubSubManager");
         // return this.postgresNotifListenManager.then(success => true);
     }
     startWatchingSchema() {
@@ -769,20 +771,17 @@ class PubSubManager {
     getTriggerName(table_name, suffix) {
         return pgp.as.format("$1:name", [`prostgles_triggers_${table_name}_${suffix}`]);
     }
-    /*
-        A table will only have a trigger with all conditions (for different subs)
-            conditions = ["user_id = 1"]
-            fields = ["user_id"]
-    */
     addTrigger(params) {
         return __awaiter(this, void 0, void 0, function* () {
             let { table_name, condition } = Object.assign({}, params);
             if (!table_name)
                 throw "MISSING table_name";
-            log("addTrigger.. ", { table_name, condition });
             if (!condition || !condition.trim().length)
                 condition = "TRUE";
-            let _condts = [condition];
+            log("addTrigger.. ", { table_name, condition });
+            this.triggers = this.triggers || {};
+            this.triggers[table_name] = this.triggers[table_name] || [];
+            let _condts = [];
             /* Check if need to add it to existing conditions */
             if (this.triggers[table_name] && this.triggers[table_name].includes(condition)) {
                 /* Trigger already set. Nothing to do */
@@ -790,9 +789,21 @@ class PubSubManager {
                 return Promise.resolve(true);
             }
             else {
-                this.triggers[table_name] = this.triggers[table_name] || [];
-                _condts = [...this.triggers[table_name], condition];
+                this.addTriggerPool = this.addTriggerPool || {};
+                this.addTriggerPool[table_name] = this.addTriggerPool[table_name] || [];
+                this.addTriggerPool[table_name] = Array.from(new Set([
+                    ...this.addTriggerPool[table_name],
+                    ...this.triggers[table_name],
+                    condition
+                ]));
+                log("addTrigger.. Appending to existing: ", this.triggers[table_name]);
+                _condts = this.addTriggerPool[table_name].slice(0);
             }
+            if (this.addingTrigger) {
+                log("waiting until add trigger finished... ", { table_name, condition });
+                return 1;
+            }
+            this.addingTrigger = true;
             const func_name_escaped = pgp.as.format("$1:name", [`prostgles_funcs_${table_name}`]), table_name_escaped = pgp.as.format("$1:name", [table_name]), delimiter = PubSubManager.DELIMITER, query = ` BEGIN;
                 CREATE OR REPLACE FUNCTION ${func_name_escaped}() RETURNS TRIGGER AS $$
         
@@ -806,7 +817,7 @@ class PubSubManager {
                         FROM (
                             ${_condts.map((c, cIndex) => `
                                 SELECT CASE WHEN EXISTS(SELECT 1 FROM old_table as ${DboBuilder_1.asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids
-                            `).join(" UNION ALL ")}
+                            `).join(" UNION ")}
                         ) t;
 
                     ELSIF (TG_OP = 'UPDATE') THEN
@@ -814,9 +825,9 @@ class PubSubManager {
                         INTO condition_ids
                         FROM (
                             ${_condts.map((c, cIndex) => `
-                                SELECT CASE WHEN EXISTS(SELECT 1 FROM old_table as ${DboBuilder_1.asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids UNION ALL 
+                                SELECT CASE WHEN EXISTS(SELECT 1 FROM old_table as ${DboBuilder_1.asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids UNION 
                                 SELECT CASE WHEN EXISTS(SELECT 1 FROM new_table as ${DboBuilder_1.asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids
-                            `).join(" UNION ALL ")}
+                            `).join(" UNION ")}
                         ) t;
                         
                     ELSIF (TG_OP = 'INSERT') THEN
@@ -825,7 +836,7 @@ class PubSubManager {
                         FROM (
                             ${_condts.map((c, cIndex) => `
                                 SELECT CASE WHEN EXISTS(SELECT 1 FROM new_table as ${DboBuilder_1.asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids
-                            `).join(" UNION ALL ")}
+                            `).join(" UNION ")}
                         ) t;
 
                     END IF;
@@ -860,25 +871,24 @@ class PubSubManager {
             COMMIT;
         `;
             // console.log(query)
-            this.addTriggerPool = this.addTriggerPool || [];
-            this.addTriggerPool.push({ table_name, condition });
-            if (this.addingTrigger) {
-                // console.log("waiting until add trigger finished", { table_name, condition });
-                return 1;
-            }
-            this.addingTrigger = true;
+            log("Updating triggers... ");
             this.db.result(query).then(res => {
-                this.addingTrigger = false;
-                this.addTriggerPool = this.addTriggerPool.filter(t => t.table_name !== table_name || t.condition !== condition);
-                if (this.addTriggerPool.length) {
-                    this.addTrigger(this.addTriggerPool[0]);
+                if (utils_1.get(this.addTriggerPool, [table_name, "length"])) {
+                    this.addTriggerPool[table_name] = this.addTriggerPool[table_name].filter(c => !_condts.includes(c));
+                    if (!this.addTriggerPool[table_name].length)
+                        delete this.addTriggerPool[table_name];
+                }
+                if (this.addTriggerPool[table_name]) {
+                    this.addTrigger({ table_name, condition: this.addTriggerPool[table_name][0] });
                     // console.log("processing next trigger in queue");
                 }
-                this.triggers[table_name] = _condts;
-                // console.log("added new trigger: ", { table_name, condition });
+                this.triggers[table_name] = _condts.slice(0);
+                log("Updated triggers: ", _condts);
+                this.addingTrigger = false;
                 return true;
             }).catch(err => {
                 console.error(317, err, query);
+                this.addingTrigger = false;
                 return Promise.reject(err);
             });
             return this.addingTrigger;

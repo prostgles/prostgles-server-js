@@ -68,7 +68,9 @@ export declare class PubSubManager {
     static DELIMITER: string;
     db: DB;
     dbo: DbHandler;
-    triggers: any;
+    triggers: {
+        [key: string]: string[];
+    };
     sockets: any;
     subs: {
         [ke: string]: {
@@ -100,12 +102,14 @@ export declare class PubSubManager {
     onSocketDisconnected(socket: any, channel_name: any): void;
     dropTrigger(table_name: any): void;
     getTriggerName(table_name: any, suffix: any): string;
+    addingTrigger: any;
+    addTriggerPool: {
+        [key: string]: string[];
+    };
     addTrigger(params: {
         table_name: string;
         condition: string;
     }): Promise<any>;
-    addingTrigger: any;
-    addTriggerPool: any;
     pushSyncInfo({ table_name, id_key, info_level }: {
         table_name: any;
         id_key?: string;

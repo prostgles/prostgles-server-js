@@ -130,6 +130,7 @@ export class PubSubManager {
         if(this.onSchemaChange){
             this.startWatchingSchema();
         }
+        log("Created PubSubManager")
         // return this.postgresNotifListenManager.then(success => true);
     }
 
@@ -998,17 +999,20 @@ export class PubSubManager {
             conditions = ["user_id = 1"]
             fields = ["user_id"]
     */
-    waitingTriggers: { [key: string]: string[] } = undefined;
-    addingTriggers: boolean = false;
+    // waitingTriggers: { [key: string]: string[] } = undefined;
+    addingTrigger: any;
+    addTriggerPool: { [key: string]: string[] } = undefined;
     async addTrigger(params: { table_name: string; condition: string; }){
-        this.addingTriggers = true;
         let { table_name, condition } = { ...params }
         if(!table_name) throw "MISSING table_name";
 
-        log("addTrigger.. ", { table_name, condition })
         if(!condition || !condition.trim().length) condition = "TRUE";
+        log("addTrigger.. ", { table_name, condition });
 
-        let _condts = [condition];
+        this.triggers = this.triggers || {};
+        this.triggers[table_name] = this.triggers[table_name] || [];
+
+        let _condts = [];
 
         /* Check if need to add it to existing conditions */
         if(this.triggers[table_name] && this.triggers[table_name].includes(condition)){
@@ -1018,10 +1022,24 @@ export class PubSubManager {
             return Promise.resolve(true);
             
         } else {
+            this.addTriggerPool = this.addTriggerPool || {};
+            this.addTriggerPool[table_name] = this.addTriggerPool[table_name] || [];
+            this.addTriggerPool[table_name] = Array.from(new Set([
+                ...this.addTriggerPool[table_name], 
+                ...this.triggers[table_name], 
+                condition
+            ]));
+
             log("addTrigger.. Appending to existing: ", this.triggers[table_name])
-            this.triggers[table_name] = this.triggers[table_name] || [];
-            _condts = [...this.triggers[table_name], condition];
+            _condts = this.addTriggerPool[table_name].slice(0)
         }
+
+        if(this.addingTrigger){
+            log("waiting until add trigger finished... ", { table_name, condition });
+            return 1;
+        }
+        this.addingTrigger = true;
+
 
         const func_name_escaped = pgp.as.format("$1:name", [`prostgles_funcs_${table_name}`]),
             table_name_escaped = pgp.as.format("$1:name", [table_name]),
@@ -1094,28 +1112,22 @@ export class PubSubManager {
         `;
         
 // console.log(query)
-        this.addTriggerPool = this.addTriggerPool || [];
-        this.addTriggerPool.push({ table_name, condition });
-
-        if(this.addingTrigger){
-            log("waiting until add trigger finished", { table_name, condition });
-            return 1;
-        }
-
-        this.addingTrigger = true;
         log("Updating triggers... ");
         this.db.result(query).then(res => {
-            this.addingTrigger = false;
             
-            this.addTriggerPool = this.addTriggerPool.filter(t => t.table_name !== table_name || t.condition !== condition );
+            if(get(this.addTriggerPool, [table_name, "length"])){
+                this.addTriggerPool[table_name] = this.addTriggerPool[table_name].filter(c => !_condts.includes(c));
+                if(!this.addTriggerPool[table_name].length) delete this.addTriggerPool[table_name];
+            }
             
-            if(this.addTriggerPool.length){
-                this.addTrigger(this.addTriggerPool[0]);
+            if(this.addTriggerPool[table_name]){
+                this.addTrigger({ table_name, condition: this.addTriggerPool[table_name][0] });
                 // console.log("processing next trigger in queue");
             }
 
             this.triggers[table_name] = _condts.slice(0);
             log("Updated triggers: ", _condts);
+            this.addingTrigger = false;
             return true;
         }).catch(err => {
             console.error(317, err, query);
@@ -1125,8 +1137,6 @@ export class PubSubManager {
 
         return this.addingTrigger;
     }
-    addingTrigger: any;
-    addTriggerPool: any;
 
     /* info_level:
         0   -   min_id, max_id, count
