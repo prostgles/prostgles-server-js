@@ -1007,7 +1007,7 @@ export class PubSubManager {
         if(!table_name) throw "MISSING table_name";
 
         if(!condition || !condition.trim().length) condition = "TRUE";
-        log("addTrigger.. ", { table_name, condition });
+        log("addTrigger.. ", table_name, condition);
 
         this.triggers = this.triggers || {};
         this.triggers[table_name] = this.triggers[table_name] || [];
@@ -1030,8 +1030,8 @@ export class PubSubManager {
                 condition
             ]));
 
-            log("addTrigger.. Appending to existing: ", this.triggers[table_name])
-            _condts = this.addTriggerPool[table_name].slice(0)
+            _condts = [ ...this.addTriggerPool[table_name] ]
+            log("addTrigger.. Appending to existing: ", this.triggers[table_name], _condts, this.addTriggerPool[table_name])
         }
 
         if(this.addingTrigger){
@@ -1120,14 +1120,14 @@ export class PubSubManager {
                 if(!this.addTriggerPool[table_name].length) delete this.addTriggerPool[table_name];
             }
             
-            if(this.addTriggerPool[table_name]){
-                this.addTrigger({ table_name, condition: this.addTriggerPool[table_name][0] });
-                // console.log("processing next trigger in queue");
-            }
-
-            this.triggers[table_name] = _condts.slice(0);
+            this.triggers[table_name] = [ ..._condts];
             log("Updated triggers: ", _condts);
             this.addingTrigger = false;
+            if(this.addTriggerPool[table_name]){
+                this.addTrigger({ table_name, condition: this.addTriggerPool[table_name][0] });
+                log("processing next trigger in queue", table_name, this.addTriggerPool[table_name][0]);
+            }
+
             return true;
         }).catch(err => {
             console.error(317, err, query);
