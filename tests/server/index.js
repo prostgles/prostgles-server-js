@@ -42,7 +42,7 @@ prostgles_server_1.default({
         log("onSocketConnect");
         if (clientTest) {
             log("Client connected");
-            socket.emit("start-test");
+            socket.emit("start-test", { server_id: Math.random() });
             socket.on("stop-test", (err, cb) => {
                 cb();
                 stopTest(err);

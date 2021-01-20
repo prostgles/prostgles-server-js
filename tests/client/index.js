@@ -30,7 +30,8 @@ try {
     socket.on("connect", () => {
         log("Client connect.");
     });
-    socket.on("start-test", () => {
+    socket.on("start-test", (data) => {
+        log("start-test", data);
         prostgles_client_1.default({
             socket,
             onReconnect: (socket) => {
