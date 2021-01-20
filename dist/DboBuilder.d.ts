@@ -36,6 +36,7 @@ export declare type LocalParams = {
     tableAlias?: string;
     subOne?: boolean;
     dbTX?: any;
+    returnQuery?: boolean;
 };
 export declare type Aggregation = {
     field: string;
@@ -257,6 +258,7 @@ export declare class DboBuilder {
     parseJoins(): Promise<JoinPaths>;
     buildJoinPaths(): void;
     init(): Promise<DbHandler | DbHandlerTX>;
+    getTX: (dbTX: TxCB) => Promise<any>;
 }
 export declare function isPlainObject(o: any): boolean;
 export {};

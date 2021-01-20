@@ -38,6 +38,8 @@ const shortestPath_1 = require("./shortestPath");
 /* DEBUG CLIENT ERRORS HERE */
 function makeErr(err, localParams) {
     // console.trace(err)
+    if (process.env.TEST_TYPE)
+        console.trace(err);
     return Promise.reject(Object.assign(Object.assign(Object.assign({}, ((!localParams || !localParams.socket) ? err : {})), PubSubManager_1.filterObj(err, ["column", "code", "table", "constraint"])), { code_info: sqlErrCodeToMsg(err.code) }));
 }
 const EXISTS_KEYS = ["$exists", "$notExists", "$existsJoined", "$notExistsJoined"];
@@ -441,7 +443,7 @@ class ViewHandler {
             try {
                 filter = filter || {};
                 const { expectOne = false } = selectParams || {};
-                const { testRule = false } = localParams || {};
+                const { testRule = false, returnQuery = false } = localParams || {};
                 if (testRule)
                     return [];
                 if (selectParams) {
@@ -479,6 +481,8 @@ class ViewHandler {
                     }
                 }
                 // console.log(_query);
+                if (returnQuery)
+                    return _query;
                 if (expectOne) {
                     return (this.t || this.db).oneOrNone(_query).catch(err => makeErr(err, localParams));
                 }
@@ -1229,7 +1233,7 @@ class TableHandler extends ViewHandler {
     update(filter, newData, params, tableRules, localParams = null) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                const { testRule = false } = localParams || {};
+                const { testRule = false, returnQuery = false } = localParams || {};
                 if (!testRule) {
                     if (!newData || !Object.keys(newData).length)
                         throw "no update data provided\nEXPECTING db.table.update(filter, updateData, options)";
@@ -1314,6 +1318,8 @@ class TableHandler extends ViewHandler {
                     query += yield this.prepareReturning(returning, this.parseFieldFilter(returningFields));
                 }
                 // console.log(query)
+                if (returnQuery)
+                    return query;
                 if (this.t) {
                     return this.t[qType](query).catch(err => makeErr(err, localParams));
                 }
@@ -1345,7 +1351,7 @@ class TableHandler extends ViewHandler {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const { returning, onConflictDoNothing, fixIssues = false } = param2 || {};
-                const { testRule = false } = localParams || {};
+                const { testRule = false, returnQuery = false } = localParams || {};
                 let returningFields, forcedData, validate, preValidate, fields;
                 if (tableRules) {
                     if (!tableRules.insert)
@@ -1431,6 +1437,8 @@ class TableHandler extends ViewHandler {
                         queryType = "one";
                 }
                 // console.log(query);
+                if (returnQuery)
+                    return query;
                 if (this.t)
                     return this.t[queryType](query).catch(err => makeErr(err, localParams));
                 return this.db.tx(t => t[queryType](query)).catch(err => makeErr(err, localParams));
@@ -1451,7 +1459,7 @@ class TableHandler extends ViewHandler {
                 this.checkFilter(filter);
                 // table_rules = table_rules || {};
                 let forcedFilter = {}, filterFields = "*", returningFields = "*";
-                const { testRule = false } = localParams || {};
+                const { testRule = false, returnQuery = false } = localParams || {};
                 if (table_rules) {
                     if (!table_rules.delete)
                         throw "delete rules missing";
@@ -1486,7 +1494,10 @@ class TableHandler extends ViewHandler {
                     }
                     _query += yield this.prepareReturning(returning, this.parseFieldFilter(returningFields));
                 }
-                return (this.t || this.db)[queryType](_query, { _psqlWS_tableName: this.name }).catch(err => makeErr(err, localParams));
+                _query = exports.pgp.as.format(_query, { _psqlWS_tableName: this.name });
+                if (returnQuery)
+                    return _query;
+                return (this.t || this.db)[queryType](_query).catch(err => makeErr(err, localParams));
             }
             catch (e) {
                 console.trace(e);
@@ -1503,17 +1514,28 @@ class TableHandler extends ViewHandler {
     upsert(filter, newData, params, table_rules, localParams = null) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                return this.find(filter, { select: "", limit: 1 }, {}, table_rules, localParams)
-                    .then(exists => {
-                    if (exists && exists.length) {
-                        // console.log(filter, "exists");
-                        return this.update(filter, newData, params, table_rules, localParams);
-                    }
-                    else {
-                        // console.log(filter, "existnts")
-                        return this.insert(Object.assign(Object.assign({}, newData), filter), params, null, table_rules, localParams);
-                    }
-                });
+                /* Do it within a transaction to ensure consisency */
+                if (!this.t) {
+                    return this.dboBuilder.getTX(dbTX => _upsert(dbTX[this.name]));
+                }
+                else {
+                    return _upsert(this);
+                }
+                function _upsert(tblH) {
+                    return __awaiter(this, void 0, void 0, function* () {
+                        return tblH.find(filter, { select: "", limit: 1 }, {}, table_rules, localParams)
+                            .then(exists => {
+                            if (exists && exists.length) {
+                                // console.log(filter, "exists");
+                                return tblH.update(filter, newData, params, table_rules, localParams);
+                            }
+                            else {
+                                // console.log(filter, "existnts")
+                                return tblH.insert(Object.assign(Object.assign({}, newData), filter), params, null, table_rules, localParams);
+                            }
+                        });
+                    });
+                }
                 // .catch(existnts => {
                 //     console.log(filter, "existnts")
                 //     return this.insert({ ...filter, ...newData}, params);
@@ -1619,6 +1641,20 @@ const Prostgles_2 = require("./Prostgles");
 class DboBuilder {
     constructor(prostgles) {
         this.schema = "public";
+        this.getTX = (dbTX) => {
+            return this.db.tx((t) => {
+                let txDB = {};
+                this.tablesOrViews.map(tov => {
+                    if (tov.is_view) {
+                        txDB[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
+                    }
+                    else {
+                        txDB[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
+                    }
+                });
+                return dbTX(txDB);
+            });
+        };
         this.prostgles = prostgles;
         this.db = this.prostgles.db;
         this.schema = this.prostgles.schema || "public";
@@ -1631,6 +1667,7 @@ class DboBuilder {
             };
         }
         this.pubSubManager = new PubSubManager_1.PubSubManager({
+            dboBuilder: this,
             db: this.db,
             dbo: this.dbo,
             onSchemaChange
@@ -1819,20 +1856,7 @@ export type JoinMaker = (filter?: object, select?: FieldFilter, options?: Select
                 if (typeof this.prostgles.transactions === "string")
                     txKey = this.prostgles.transactions;
                 this.dboDefinition += ` ${txKey}: (t: TxCB) => Promise<any | void> ;\n`;
-                this.dbo[txKey] = (cb) => {
-                    return this.db.tx((t) => {
-                        let txDB = {};
-                        this.tablesOrViews.map(tov => {
-                            if (tov.is_view) {
-                                txDB[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
-                            }
-                            else {
-                                txDB[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
-                            }
-                        });
-                        return cb(txDB);
-                    });
-                };
+                this.dbo[txKey] = (cb) => this.getTX(cb);
             }
             this.dboDefinition += "};\n";
             this.tsTypesDefinition = [common_types, allDataDefs, allDboDefs, joinBuilderDef, this.dboDefinition].join("\n");

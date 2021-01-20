@@ -62,6 +62,7 @@ export type LocalParams = {
     tableAlias?: string;
     subOne?: boolean;
     dbTX?: any;
+    returnQuery?: boolean;
 }
 function replaceNonAlphaNumeric(string: string): string {
     return string.replace(/[\W_]+/g,"_");
@@ -176,6 +177,7 @@ export type ValidatedTableRules = {
 /* DEBUG CLIENT ERRORS HERE */
 function makeErr(err, localParams?: LocalParams){
     // console.trace(err)
+    if(process.env.TEST_TYPE) console.trace(err)
     return Promise.reject({
         ...((!localParams || !localParams.socket)? err : {}),
         ...filterObj(err, ["column", "code", "table", "constraint"]),
@@ -675,7 +677,7 @@ export class ViewHandler {
             filter = filter || {};
             const { expectOne = false } = selectParams || {};
             
-            const { testRule = false } = localParams || {};
+            const { testRule = false, returnQuery = false } = localParams || {};
 
 
             if(testRule) return [];
@@ -719,6 +721,8 @@ export class ViewHandler {
             }
 
             // console.log(_query);
+
+            if(returnQuery) return (_query as unknown as any[]);
             if(expectOne) {
                 return (this.t || this.db).oneOrNone(_query).catch(err => makeErr(err, localParams));
             } else {
@@ -1544,7 +1548,7 @@ export class TableHandler extends ViewHandler {
     async update(filter: Filter, newData: object, params?: UpdateParams, tableRules?: TableRule, localParams: LocalParams = null): Promise<any>{
         try {
 
-            const { testRule = false } = localParams || {};
+            const { testRule = false, returnQuery = false } = localParams || {};
             if(!testRule){
                 if(!newData || !Object.keys(newData).length) throw "no update data provided\nEXPECTING db.table.update(filter, updateData, options)";
                 this.checkFilter(filter);
@@ -1647,6 +1651,7 @@ export class TableHandler extends ViewHandler {
             }
 
             // console.log(query)
+            if(returnQuery) return query;
             if(this.t){
                 return this.t[qType](query).catch(err => makeErr(err, localParams));
             }
@@ -1680,7 +1685,7 @@ export class TableHandler extends ViewHandler {
         try {
 
             const { returning, onConflictDoNothing, fixIssues = false } = param2 || {};
-            const { testRule = false } = localParams || {};
+            const { testRule = false, returnQuery = false } = localParams || {};
 
             let returningFields: FieldFilter,
                 forcedData: object,
@@ -1770,6 +1775,7 @@ export class TableHandler extends ViewHandler {
             }
             
             // console.log(query);
+            if(returnQuery)  return query;
             if(this.t) return this.t[queryType](query).catch(err => makeErr(err, localParams));
             return this.db.tx(t => t[queryType](query)).catch(err => makeErr(err, localParams));
         } catch(e){
@@ -1810,7 +1816,7 @@ export class TableHandler extends ViewHandler {
                 filterFields: FieldFilter = "*",
                 returningFields: FieldFilter = "*";
 
-            const { testRule = false } = localParams || {};
+            const { testRule = false, returnQuery = false } = localParams || {};
             if(table_rules){
                 if(!table_rules.delete) throw "delete rules missing";
                 forcedFilter = table_rules.delete.forcedFilter;
@@ -1848,8 +1854,9 @@ export class TableHandler extends ViewHandler {
                 }
                 _query += await this.prepareReturning(returning, this.parseFieldFilter(returningFields));
             }
-            
-            return (this.t || this.db)[queryType](_query, { _psqlWS_tableName: this.name }).catch(err => makeErr(err, localParams));
+            _query = pgp.as.format(_query, { _psqlWS_tableName: this.name });
+            if(returnQuery) return _query;
+            return (this.t || this.db)[queryType](_query).catch(err => makeErr(err, localParams));
         } catch(e){
             console.trace(e)
             if(localParams && localParams.testRule) throw e;
@@ -1863,16 +1870,25 @@ export class TableHandler extends ViewHandler {
 
     async upsert(filter: Filter, newData?: object, params?: UpdateParams, table_rules?: TableRule, localParams: LocalParams = null): Promise<any> {
         try {
-            return this.find(filter, { select: "", limit: 1 }, {}, table_rules, localParams)
-                .then(exists => {
-                    if(exists && exists.length){
-                        // console.log(filter, "exists");
-                        return this.update(filter, newData, params, table_rules, localParams);
-                    } else {
-                        // console.log(filter, "existnts")
-                        return this.insert({ ...newData, ...filter }, params, null, table_rules, localParams);
-                    }
-                });
+            /* Do it within a transaction to ensure consisency */
+            if(!this.t){
+                return this.dboBuilder.getTX(dbTX => _upsert(dbTX[this.name] as TableHandler))
+            } else {
+                return _upsert(this);
+            }
+
+            async function _upsert(tblH: TableHandler){
+                return tblH.find(filter, { select: "", limit: 1 }, {}, table_rules, localParams)
+                    .then(exists => {
+                        if(exists && exists.length){
+                            // console.log(filter, "exists");
+                            return tblH.update(filter, newData, params, table_rules, localParams);
+                        } else {
+                            // console.log(filter, "existnts")
+                            return tblH.insert({ ...newData, ...filter }, params, null, table_rules, localParams);
+                        }
+                    });
+            }
                 // .catch(existnts => {
                 //     console.log(filter, "existnts")
                 //     return this.insert({ ...filter, ...newData}, params);
@@ -2048,7 +2064,8 @@ export class DboBuilder {
                 this.prostgles.onSchemaChange()
             }
         }
-        this.pubSubManager = new PubSubManager({ 
+        this.pubSubManager = new PubSubManager({
+            dboBuilder: this,
             db: this.db, 
             dbo: this.dbo as unknown as DbHandler,
             onSchemaChange
@@ -2268,19 +2285,7 @@ export type JoinMaker = (filter?: object, select?: FieldFilter, options?: Select
             if(typeof this.prostgles.transactions === "string") txKey = this.prostgles.transactions;
             this.dboDefinition += ` ${txKey}: (t: TxCB) => Promise<any | void> ;\n`;
 
-            this.dbo[txKey] = (cb: TxCB) => {
-                return this.db.tx((t) => {
-                    let txDB = {};
-                    this.tablesOrViews.map(tov => {
-                        if(tov.is_view){
-                            txDB[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
-                        } else {
-                            txDB[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
-                        }
-                    });
-                    return cb(txDB);
-                });
-            }
+            this.dbo[txKey] = (cb: TxCB) => this.getTX(cb);
         }
         this.dboDefinition += "};\n";
         
@@ -2288,6 +2293,20 @@ export type JoinMaker = (filter?: object, select?: FieldFilter, options?: Select
 
         return this.dbo;
             // let dbo = makeDBO(db, allTablesViews, pubSubManager, true);
+    }
+
+    getTX = (dbTX: TxCB) => {
+        return this.db.tx((t) => {
+            let txDB = {};
+            this.tablesOrViews.map(tov => {
+                if(tov.is_view){
+                    txDB[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
+                } else {
+                    txDB[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
+                }
+            });
+            return dbTX(txDB);
+        });
     }
 }
 

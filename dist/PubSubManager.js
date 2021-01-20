@@ -98,13 +98,14 @@ class PubSubManager {
         this.syncTimeout = null;
         this.parseCondition = (condition) => Boolean(condition && condition.trim().length) ? condition : "TRUE";
         this.addTriggerPool = undefined;
-        const { db, dbo, wsChannelNamePrefix, pgChannelName, onSchemaChange } = options;
+        const { db, dbo, wsChannelNamePrefix, pgChannelName, onSchemaChange, dboBuilder } = options;
         if (!db || !dbo) {
             throw 'MISSING: db_pg, db';
         }
         this.db = db;
         this.dbo = dbo;
         this.onSchemaChange = onSchemaChange;
+        this.dboBuilder = dboBuilder;
         this.triggers = {};
         this.sockets = {};
         this.subs = {};
@@ -210,7 +211,7 @@ class PubSubManager {
             // desc_params = { orderBy: [{ [synced_field]: false }].concat(id_fields.map(f => ({ [f]: false }) )) },
             // asc_params = { orderBy: [synced_field].concat(id_fields) },
             rowsIdsMatch = (a, b) => {
-                return a && b && !id_fields.find(key => a[key].toString() !== b[key].toString());
+                return a && b && !id_fields.find(key => (a[key]).toString() !== (b[key]).toString());
             }, rowsFullyMatch = (a, b) => {
                 return rowsIdsMatch(a, b) && a[synced_field].toString() === b[synced_field].toString();
             }, getServerRowInfo = ({ from_synced = null, to_synced = null, end_offset = null } = {}) => __awaiter(this, void 0, void 0, function* () {
@@ -286,52 +287,85 @@ class PubSubManager {
             }), upsertData = (data, isExpress = false) => {
                 let inserted = 0, updated = 0, total = data.length;
                 // console.log("isExpress", isExpress, data);
-                return Promise.all(data.map((d, i) => __awaiter(this, void 0, void 0, function* () {
-                    const id_filter = filterObj(d, id_fields);
-                    /* To account for client time deviation */
-                    /* This can break sync.lr logic (correct timestamps but recursive syncing) */
-                    // d[synced_field] = isExpress? (Date.now() + i) : Math.max(Date.now(), d[synced_field]);
-                    /* Select only the necessary fields when preparing to update */
-                    const exst = yield this.dbo[table_name].find(id_filter, { select: { [synced_field]: 1 }, orderBy: orderByAsc, limit: 1 }, null, table_rules);
-                    /* TODO: Add batch INSERT with ON CONFLICT DO UPDATE */
-                    if (exst && exst.length) {
-                        // console.log(exst[0], d)
-                        if (table_rules.update && +exst[0][synced_field] < +d[synced_field]) {
-                            try {
-                                const syncSafeFilter = { $and: [id_filter, { [synced_field]: { "<": d[synced_field] } }] };
-                                updated++;
-                                yield this.dbo[table_name].update(syncSafeFilter, filterObj(d, [], id_fields), { fixIssues: true }, table_rules);
-                            }
-                            catch (e) {
-                                console.log(e);
-                                throw e;
-                            }
+                return this.dboBuilder.getTX((dbTX) => __awaiter(this, void 0, void 0, function* () {
+                    const tbl = dbTX[table_name];
+                    const existingData = yield tbl.find({ $or: data.map(d => filterObj(d, id_fields)) }, { select: [synced_field, ...id_fields], orderBy: orderByAsc,
+                    }, null, table_rules);
+                    const inserts = data.filter(d => !existingData.find(ed => rowsIdsMatch(ed, d)));
+                    const updates = data.filter(d => existingData.find(ed => rowsIdsMatch(ed, d) && +ed[synced_field] < +d[synced_field]));
+                    try {
+                        if (table_rules.update && updates.length) {
+                            yield Promise.all(updates.map(upd => {
+                                const id_filter = filterObj(upd, id_fields);
+                                const syncSafeFilter = { $and: [id_filter, { [synced_field]: { "<": upd[synced_field] } }] };
+                                return tbl.update(syncSafeFilter, filterObj(upd, [], id_fields), { fixIssues: true }, table_rules);
+                            }));
+                            updated = updates.length;
                         }
-                    }
-                    else if (table_rules.insert) {
-                        try {
-                            inserted++;
-                            yield this.dbo[table_name].insert(d, { fixIssues: true }, null, table_rules);
+                        if (table_rules.insert && inserts.length) {
+                            // const qs = await tbl.insert(inserts, { fixIssues: true }, null, table_rules, { returnQuery: true });
+                            // console.log("inserts", qs)
+                            yield tbl.insert(inserts, { fixIssues: true }, null, table_rules);
+                            inserted = inserts.length;
                         }
-                        catch (e) {
-                            console.log(e);
-                            throw e;
-                        }
+                        updated++;
+                        return true;
                     }
-                    else {
-                        console.error("SYNC onPullRequest UNEXPECTED CASE\n Data item does not exist on server and insert is not allowed !???");
-                        return false;
+                    catch (e) {
+                        console.trace(e);
+                        throw e;
                     }
-                    return true;
-                })))
-                    .then(res => {
-                    // console.log(`upsertData: inserted( ${inserted} )    updated( ${updated} )     total( ${total} )`);
+                })).then(res => {
+                    log(`upsertData: inserted( ${inserted} )    updated( ${updated} )     total( ${total} )`);
                     return { inserted, updated, total };
                 })
                     .catch(err => {
-                    console.error("Something went wrong with syncing to server: \n ->", err, data, id_fields);
+                    console.trace("Something went wrong with syncing to server: \n ->", err, data.length, id_fields);
                     return Promise.reject("Something went wrong with syncing to server: ");
                 });
+                // return Promise.all(data.map(async (d, i) => {
+                //     const id_filter = filterObj(d, id_fields);
+                //     /* To account for client time deviation */
+                //     /* This can break sync.lr logic (correct timestamps but recursive syncing) */
+                //     // d[synced_field] = isExpress? (Date.now() + i) : Math.max(Date.now(), d[synced_field]);
+                //     /* Select only the necessary fields when preparing to update */
+                //     const exst = await this.dbo[table_name].find(id_filter, { select: { [synced_field]: 1 }, orderBy: (orderByAsc as OrderBy), limit: 1 }, null, table_rules);
+                //     /* TODO: Add batch INSERT with ON CONFLICT DO UPDATE */
+                //     if(exst && exst.length){
+                //         // adwa dwa
+                //         // console.log(exst[0], d)
+                //         if(table_rules.update && +exst[0][synced_field] < +d[synced_field]){
+                //             try {
+                //                 const syncSafeFilter = { $and: [id_filter, { [synced_field]: { "<": d[synced_field] } } ] }
+                //                 updated++;
+                //                 await (this.dbo[table_name] as TableHandler).update(syncSafeFilter, filterObj(d, [], id_fields), { fixIssues: true }, table_rules);
+                //             } catch(e) {
+                //                 console.log(e);
+                //                 throw e;
+                //             }
+                //         }
+                //     } else if(table_rules.insert){
+                //         try {
+                //             inserted++;
+                //             await (this.dbo[table_name] as TableHandler).insert(d, { fixIssues: true }, null, table_rules);
+                //         } catch(e){
+                //             console.log(e);
+                //             throw e;
+                //         }
+                //     } else {
+                //         console.error("SYNC onPullRequest UNEXPECTED CASE\n Data item does not exist on server and insert is not allowed !???");
+                //         return false
+                //     }
+                //     return true;
+                // }))
+                // .then(res => {
+                //     // console.log(`upsertData: inserted( ${inserted} )    updated( ${updated} )     total( ${total} )`);
+                //     return { inserted , updated , total };
+                // })
+                // .catch(err => {
+                //     console.error("Something went wrong with syncing to server: \n ->", err, data, id_fields);
+                //     return Promise.reject("Something went wrong with syncing to server: ")
+                // });
             }, pushData = (data, isSynced = false) => __awaiter(this, void 0, void 0, function* () {
                 return new Promise((resolve, reject) => {
                     socket.emit(channel_name, { data, isSynced }, (resp) => {

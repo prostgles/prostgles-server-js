@@ -35,9 +35,26 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       let inserts = new Array(100).fill(null).map((d, i) => ({ id: i, flight_number: `FN${i}`, x: Math.random(), y: i }));
       await db.planes.insert(inserts);
     
+      /* After all sync records are updated to x10 here we'll update them to x20 */
+      const sP = await db.planes.subscribe({ x: 10 }, { }, async planes => {
+  
+        const p10 = planes.filter(p => p.x == 10).length;
+        log("sub.x10", p10, "x20", planes.filter(p => p.x == 20).length);
+  
+        if(p10 === 100){
+          // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log);
+  
+          sP.unsubscribe();
+          log("Update to x20 start")
+          await db.planes.update({}, { x: 20, last_updated: Date.now() });
+          log("Updated to x20" , await db.planes.count({ x: 20 }))
+  
+          // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log)
+        }
+      }); 
+      
       let updt = 0;
-      db.planes.sync({}, { handlesOnData: true, patchText: true }, (planes, deltas) => {
-        
+      const sync = await db.planes.sync({}, { handlesOnData: true, patchText: true }, (planes, deltas) => {
         const x20 = planes.filter(p => p.x == 20).length;
         log("sync.x10", planes.filter(p => p.x == 10).length, "x20", x20);
   
@@ -60,25 +77,9 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
           resolve(true)
         }
       });
+      // sync.upsert(inserts)
       // await db.planes.update({}, { x: 20, last_updated: Date.now() });
       
-      /* After all sync records are updated to x10 here we'll update them to x20 */
-      const sP = await db.planes.subscribe({ x: 10 }, { }, async planes => {
-  
-        const p10 = planes.filter(p => p.x == 10).length;
-        log("sub.x10", p10, "x20", planes.filter(p => p.x == 20).length);
-  
-        if(p10 === 100){
-          // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log);
-  
-          sP.unsubscribe();
-          log("Update to x20 start")
-          await db.planes.update({}, { x: 20, last_updated: Date.now() });
-          log("Updated to x20" , await db.planes.count({ x: 20 }))
-  
-          // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log)
-        }
-      }); 
       
     });
 

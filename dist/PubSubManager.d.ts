@@ -1,5 +1,5 @@
 import { PostgresNotifListenManager } from "./PostgresNotifListenManager";
-import { TableOrViewInfo, TableInfo, DbHandler } from "./DboBuilder";
+import { TableOrViewInfo, TableInfo, DbHandler, DboBuilder } from "./DboBuilder";
 import { TableRule, DB } from "./Prostgles";
 import { SelectParams, FieldFilter, WAL } from "prostgles-types";
 export declare const DEFAULT_SYNC_BATCH_SIZE = 50;
@@ -58,6 +58,7 @@ declare type AddSubscriptionParams = SubscriptionParams & {
     condition: string;
 };
 export declare type PubSubManagerOptions = {
+    dboBuilder: DboBuilder;
     db: DB;
     dbo: DbHandler;
     wsChannelNamePrefix?: string;
@@ -66,6 +67,7 @@ export declare type PubSubManagerOptions = {
 };
 export declare class PubSubManager {
     static DELIMITER: string;
+    dboBuilder: DboBuilder;
     db: DB;
     dbo: DbHandler;
     triggers: {
