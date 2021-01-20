@@ -1035,7 +1035,7 @@ export class PubSubManager {
                         FROM (
                             ${_condts.map((c, cIndex )=> `
                                 SELECT CASE WHEN EXISTS(SELECT 1 FROM old_table as ${asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids
-                            `).join(" UNION ALL ")}
+                            `).join(" UNION ")}
                         ) t;
 
                     ELSIF (TG_OP = 'UPDATE') THEN
@@ -1043,9 +1043,9 @@ export class PubSubManager {
                         INTO condition_ids
                         FROM (
                             ${_condts.map((c, cIndex )=> `
-                                SELECT CASE WHEN EXISTS(SELECT 1 FROM old_table as ${asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids UNION ALL 
+                                SELECT CASE WHEN EXISTS(SELECT 1 FROM old_table as ${asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids UNION 
                                 SELECT CASE WHEN EXISTS(SELECT 1 FROM new_table as ${asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids
-                            `).join(" UNION ALL ")}
+                            `).join(" UNION ")}
                         ) t;
                         
                     ELSIF (TG_OP = 'INSERT') THEN
@@ -1054,7 +1054,7 @@ export class PubSubManager {
                         FROM (
                             ${_condts.map((c, cIndex )=> `
                                 SELECT CASE WHEN EXISTS(SELECT 1 FROM new_table as ${asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids
-                            `).join(" UNION ALL ")}
+                            `).join(" UNION ")}
                         ) t;
 
                     END IF;
