@@ -998,7 +998,10 @@ export class PubSubManager {
             conditions = ["user_id = 1"]
             fields = ["user_id"]
     */
+    waitingTriggers: { [key: string]: string[] } = undefined;
+    addingTriggers: boolean = false;
     async addTrigger(params: { table_name: string; condition: string; }){
+        this.addingTriggers = true;
         let { table_name, condition } = { ...params }
         if(!table_name) throw "MISSING table_name";
 
@@ -1094,7 +1097,7 @@ export class PubSubManager {
         this.addTriggerPool.push({ table_name, condition });
 
         if(this.addingTrigger){
-            // console.log("waiting until add trigger finished", { table_name, condition });
+            log("waiting until add trigger finished", { table_name, condition });
             return 1;
         }
 
@@ -1110,10 +1113,11 @@ export class PubSubManager {
             }
 
             this.triggers[table_name] = _condts;
-            // console.log("added new trigger: ", { table_name, condition });
+            log("Updated triggers: ", _condts);
             return true;
         }).catch(err => {
             console.error(317, err, query);
+            this.addingTrigger = false;
             return Promise.reject(err);
         });
 
