@@ -186,7 +186,7 @@ export class PubSubManager {
             op_name = dataArr[1],
             condition_ids_str = dataArr[2];
 
-        // console.log(table_name, op_name, condition_ids_str, this.triggers[table_name]);
+        log(table_name, op_name, condition_ids_str, this.triggers[table_name]);
 
         if(table_name && table_name === this.schemaChangedNotifPayloadStr){
             // console.log(op_name)
