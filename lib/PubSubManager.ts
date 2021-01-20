@@ -18,6 +18,12 @@ let pgp: PGP = pgPromise({
 });
 export const DEFAULT_SYNC_BATCH_SIZE = 50;
 
+const log = (...args) => {
+    if(process.env.TEST_TYPE){
+        console.log(...args)
+    }
+}
+
 type SyncParams = {
     socket_id: string; 
     channel_name: string;
@@ -226,9 +232,10 @@ export class PubSubManager {
                             sub.last_throttled = Date.now();
                         } else if(!sub.is_throttling) {
                             
-                            // console.log("throttling sub")
+                            
+                            log("throttling sub")
                             sub.is_throttling = setTimeout(() => {
-                                // console.log("PUSHED throttled sub")
+                                log("throttling finished. pushSubData...")
                                 sub.is_throttling = null;
                                 this.pushSubData(sub);
                                 sub.last_throttled = Date.now();
@@ -260,7 +267,7 @@ export class PubSubManager {
                 .then(data => {
                     
                     if(socket_id && this.sockets[socket_id]){
-                        // console.log(data.length)
+                        log("Pushed " + data.length + " records to sub")
                         this.sockets[socket_id].emit(channel_name, { data }, () => {
                             resolve(data);
                         });
