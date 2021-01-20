@@ -241,7 +241,6 @@ export class PubSubManager {
                                 sub.last_throttled = Date.now();
                             }, throttle);// sub.throttle);
                         }
-
                     }
                 }
             });
