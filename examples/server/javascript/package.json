@@ -10,7 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "express": "^4.17.1",
-    "prostgles-server": "^1.0.29",
-    "socket.io": "^2.3.0"
+    "prostgles-server": "^1.5.39",
+    "socket.io": "^2.4.1"
   }
 }

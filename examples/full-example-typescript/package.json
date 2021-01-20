@@ -9,11 +9,11 @@
   "license": "MIT",
   "dependencies": {
     "express": "^4.17.1",
-    "prostgles-client": "^1.0.1",
-    "prostgles-server": "^1.0.3",
-    "socket.io": "^2.3.0"
+    "prostgles-client": "^1.5.60",
+    "prostgles-server": "^1.5.39",
+    "socket.io": "^2.4.1"
   },
   "devDependencies": {
-    "@types/socket.io": "^2.1.8"
+    "@types/socket.io": "^2.1.12"
   }
 }

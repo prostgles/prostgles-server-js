@@ -9,9 +9,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/socket.io": "^2.1.11",
+    "@types/socket.io": "^2.1.12",
     "express": "^4.17.1",
-    "prostgles-server": "^1.0.29",
-    "socket.io": "^2.3.0"
+    "prostgles-server": "^1.5.39",
+    "socket.io": "^2.4.1"
   }
 }

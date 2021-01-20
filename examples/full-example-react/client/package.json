@@ -6,11 +6,11 @@
     "@testing-library/jest-dom": "^4.2.4",
     "@testing-library/react": "^9.5.0",
     "@testing-library/user-event": "^7.2.1",
-    "prostgles-client": "^1.0.31",
-    "react": "^16.13.1",
-    "react-dom": "^16.13.1",
+    "prostgles-client": "^1.5.60",
+    "react": "^16.14.0",
+    "react-dom": "^16.14.0",
     "react-scripts": "3.4.3",
-    "socket.io-client": "^2.3.0"
+    "socket.io-client": "^2.4.0"
   },
   "scripts": {
     "start": "react-scripts start",
