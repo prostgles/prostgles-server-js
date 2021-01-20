@@ -29,7 +29,6 @@
 #     - run: npm run build --if-present
 #     - run: npm test
 
-
 name: tests
 on:
   push:
@@ -80,7 +79,7 @@ jobs:
     timeout-minutes: 4
     strategy:
       matrix:
-        node-version: [12.x, 14.x]
+        node-version: [10.x, 12.x, 14.x]
 
     services:
       postgres:
