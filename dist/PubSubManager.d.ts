@@ -100,9 +100,9 @@ export declare class PubSubManager {
     onSocketDisconnected(socket: any, channel_name: any): void;
     dropTrigger(table_name: any): void;
     getTriggerName(table_name: any, suffix: any): string;
-    addTrigger({ table_name, condition }: {
-        table_name: any;
-        condition: any;
+    addTrigger(params: {
+        table_name: string;
+        condition: string;
     }): Promise<any>;
     addingTrigger: any;
     addTriggerPool: any;

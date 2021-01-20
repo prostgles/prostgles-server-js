@@ -998,9 +998,11 @@ export class PubSubManager {
             conditions = ["user_id = 1"]
             fields = ["user_id"]
     */
-    async addTrigger({ table_name, condition }){
+    async addTrigger(params: { table_name: string; condition: string; }){
+        let { table_name, condition } = { ...params }
         if(!table_name) throw "MISSING table_name";
 
+        log("addTrigger.. ", { table_name, condition })
         if(!condition || !condition.trim().length) condition = "TRUE";
 
         let _condts = [condition];
@@ -1009,6 +1011,7 @@ export class PubSubManager {
         if(this.triggers[table_name] && this.triggers[table_name].includes(condition)){
 
             /* Trigger already set. Nothing to do */
+            log("addTrigger.. Trigger already set. Nothing to do", { table_name, condition })
             return Promise.resolve(true);
             
         } else {

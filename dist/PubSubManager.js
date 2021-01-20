@@ -774,16 +774,19 @@ class PubSubManager {
             conditions = ["user_id = 1"]
             fields = ["user_id"]
     */
-    addTrigger({ table_name, condition }) {
+    addTrigger(params) {
         return __awaiter(this, void 0, void 0, function* () {
+            let { table_name, condition } = Object.assign({}, params);
             if (!table_name)
                 throw "MISSING table_name";
+            log("addTrigger.. ", { table_name, condition });
             if (!condition || !condition.trim().length)
                 condition = "TRUE";
             let _condts = [condition];
             /* Check if need to add it to existing conditions */
             if (this.triggers[table_name] && this.triggers[table_name].includes(condition)) {
                 /* Trigger already set. Nothing to do */
+                log("addTrigger.. Trigger already set. Nothing to do", { table_name, condition });
                 return Promise.resolve(true);
             }
             else {
