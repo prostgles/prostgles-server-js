@@ -207,9 +207,8 @@ class Prostgles {
         return __awaiter(this, void 0, void 0, function* () {
             // console.log("conn", socket.handshake.query, socket._session)
             const sid = this.getSID(socket);
-            if (!sid)
-                return null;
-            const { getUser, getClientUser } = this.auth;
+            // if(!sid) return null;
+            const { getUser } = this.auth;
             return yield getUser({ sid }, this.dbo, this.db, socket);
         });
     }
@@ -217,14 +216,12 @@ class Prostgles {
         return __awaiter(this, void 0, void 0, function* () {
             // console.log("conn", socket.handshake.query, socket._session)
             const sid = this.getSID(socket);
-            if (!sid)
-                return null;
             const { getUser, getClientUser, sidCookieName } = this.auth;
             const user = yield getUser({ sid }, this.dbo, this.db, socket);
             const clientUser = yield getClientUser({ sid }, this.dbo, this.db, socket);
-            return {
-                user, clientUser
-            };
+            if (!user)
+                return undefined;
+            return { user, clientUser };
         });
     }
     setSocketEvents() {
@@ -422,7 +419,7 @@ class Prostgles {
                         version, err: publishValidationError }));
                 }
                 catch (e) {
-                    console.error("setSocketEvents: ", e);
+                    console.trace("setSocketEvents: ", e);
                 }
             }));
         });

@@ -56,19 +56,23 @@ prostgles_server_1.default({
     },
     auth: {
         getClientUser: async ({ sid }) => {
-            const s = sessions.find(s => s.id === sid);
-            if (!s)
-                throw "err";
-            const u = users.find(u => s && s.user_id === u.id);
-            if (!u)
-                throw "err";
-            return { sid: s.id, uid: u.id };
+            if (sid) {
+                const s = sessions.find(s => s.id === sid);
+                if (s) {
+                    const u = users.find(u => s && s.user_id === u.id);
+                    if (u)
+                        return { sid: s.id, uid: u.id };
+                }
+            }
+            return null;
         },
         getUser: async ({ sid }) => {
-            const s = sessions.find(s => s.id === sid);
-            if (!s)
-                throw "err";
-            return users.find(u => s && s.user_id === u.id);
+            if (sid) {
+                const s = sessions.find(s => s.id === sid);
+                if (s)
+                    return users.find(u => s && s.user_id === u.id);
+            }
+            return null;
         },
         login: async ({ username, password } = {}) => {
             const u = users.find(u => u.username === username && u.password === password);

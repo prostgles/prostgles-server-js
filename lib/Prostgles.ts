@@ -482,8 +482,8 @@ export class Prostgles {
         // console.log("conn", socket.handshake.query, socket._session)
         const sid = this.getSID(socket);
 
-        if(!sid) return null;
-        const { getUser, getClientUser } = this.auth;
+        // if(!sid) return null;
+        const { getUser } = this.auth;
 
         return await getUser({ sid }, this.dbo, this.db, socket);
     }
@@ -493,15 +493,13 @@ export class Prostgles {
         // console.log("conn", socket.handshake.query, socket._session)
         const sid = this.getSID(socket);
 
-        if(!sid) return null;
         const { getUser, getClientUser, sidCookieName } = this.auth;
 
         const user = await getUser({ sid }, this.dbo, this.db, socket);
         const clientUser = await getClientUser({ sid }, this.dbo, this.db, socket);
 
-        return {
-            user, clientUser
-        }
+        if(!user) return undefined;
+        return { user, clientUser };
     }
 
     async setSocketEvents(){
@@ -727,7 +725,7 @@ export class Prostgles {
                 });
 
             } catch(e) {
-                console.error("setSocketEvents: ", e)
+                console.trace("setSocketEvents: ", e)
             }        
         });
     }
