@@ -12,7 +12,8 @@ const log = (msg, extra) => {
     console.log(...[`(client) t+ ${(Date.now() - start)}ms ` + msg, extra].filter(v => v));
 };
 log("Started client...");
-const url = process.env.PRGL_CLIENT_URL || "http://127.0.0.1:3001", path = process.env.PRGL_CLIENT_PATH || "/teztz/s", socket = socket_io_client_1.default(url, { path }), stopTest = (err) => {
+const url = process.env.PRGL_CLIENT_URL || "http://127.0.0.1:3001", path = process.env.PRGL_CLIENT_PATH || "/teztz/s", socket = socket_io_client_1.default(url, { path, query: { token: "haha" } }), //  
+stopTest = (err) => {
     socket.emit("stop-test", !err ? err : { err: err.toString() }, cb => {
         log("Stopping client...");
         if (err)
@@ -29,6 +30,9 @@ try {
     });
     socket.on("connect", () => {
         log("Client connect.");
+    });
+    socket.on("connect_failed", (err) => {
+        log("connect_failed", err);
     });
     socket.on("start-test", (data) => {
         log("start-test", data);

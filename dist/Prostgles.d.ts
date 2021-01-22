@@ -140,17 +140,19 @@ export declare type BasicSession = {
     sid: string;
     expires: number;
 };
+export declare type SessionIDs = {
+    sidCookie?: string;
+    sidQuery?: string;
+    sid: string;
+};
 export declare type Auth = {
+    sidQueryParamName?: string;
     sidCookieName?: string;
-    getUser: ({ sid: string }: {
-        sid: any;
-    }, dbo: any, db: DB, socket: any) => Promise<object | null | undefined>;
-    getClientUser: ({ sid: string }: {
-        sid: any;
-    }, dbo: any, db: DB, socket: any) => Promise<object>;
+    getUser: (params: SessionIDs, dbo: any, db: DB, socket: any) => Promise<object | null | undefined>;
+    getClientUser: (params: SessionIDs, dbo: any, db: DB, socket: any) => Promise<object>;
     register?: (params: any, dbo: any, db: DB, socket: any) => Promise<BasicSession>;
     login?: (params: any, dbo: any, db: DB, socket: any) => Promise<BasicSession>;
-    logout?: (sid: string, dbo: any, db: DB, socket: any) => Promise<any>;
+    logout?: (params: SessionIDs, dbo: any, db: DB, socket: any) => Promise<any>;
 };
 export declare type ProstglesInitOptions = {
     dbConnection: DbConnection;
@@ -209,7 +211,7 @@ export declare class Prostgles {
     };
     init(onReady: (dbo: DbHandler | DbHandlerTX, db: DB) => any): Promise<boolean>;
     runSQLFile(filePath: string): Promise<boolean | void>;
-    getSID(socket: any): any;
+    getSID(socket: any): SessionIDs;
     getUser(socket: any): Promise<object>;
     getUserFromCookieSession(socket: any): Promise<null | {
         user: any;

@@ -227,13 +227,15 @@ export type Joins = Join[] | "inferred";
 export type publishMethods = (socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB, user?: any) => { [key:string]: Method } | Promise<{ [key:string]: Method }>;
 
 export type BasicSession = { sid: string, expires: number };
+export type SessionIDs = { sidCookie?: string; sidQuery?: string; sid: string; };
 export type Auth = {
+    sidQueryParamName?: string; /* Name of the websocket handshake query parameter that represents the session id. Takes precedence over cookie. If provided, Prostgles will attempt to get the user on socket connection */
     sidCookieName?: string; /* Name of the cookie that represents the session id. If provided, Prostgles will attempt to get the user on socket connection */
-    getUser: ({ sid: string }, dbo: any, db: DB, socket: any) => Promise<object | null | undefined>;    /* User data used on server */
-    getClientUser: ({ sid: string }, dbo: any, db: DB, socket: any) => Promise<object>;                 /* User data sent to client */
+    getUser: (params: SessionIDs, dbo: any, db: DB, socket: any) => Promise<object | null | undefined>;    /* User data used on server */
+    getClientUser: (params: SessionIDs, dbo: any, db: DB, socket: any) => Promise<object>;                 /* User data sent to client */
     register?: (params, dbo: any, db: DB, socket: any) => Promise<BasicSession>;
     login?: (params, dbo: any, db: DB, socket: any) => Promise<BasicSession>;
-    logout?: (sid: string, dbo: any, db: DB, socket: any) => Promise<any>;
+    logout?: (params: SessionIDs, dbo: any, db: DB, socket: any) => Promise<any>;
 }
 
 export type ProstglesInitOptions = {
@@ -455,18 +457,31 @@ export class Prostgles {
         }
     }
 
-    getSID(socket: any){
+    getSID(socket: any): SessionIDs {
         if(!this.auth) return null;
 
-        const { sidCookieName } = this.auth;
+        const { sidCookieName, sidQueryParamName } = this.auth;
 
-        if(!sidCookieName) return null;
+        if(!sidCookieName && !sidQueryParamName) return null;
 
-        const cookie_str = get(socket, "handshake.headers.cookie");
-        const cookie = parseCookieStr(cookie_str);
-        if(socket && cookie){
-            return cookie[sidCookieName];
+        let result = {
+            sidCookie: null, 
+            sidQuery: null,
+            sid: null
         }
+
+        if(sidQueryParamName){
+            result.sidQuery = get(socket, `handshake.query.${sidQueryParamName}`);
+        }
+
+        if(sidCookieName){
+            const cookie_str = get(socket, "handshake.headers.cookie");
+            const cookie = parseCookieStr(cookie_str);
+            if(socket && cookie){
+                result.sidCookie = cookie[sidCookieName];
+            }
+        }
+
         function parseCookieStr(cookie_str: string): any {
             if(!cookie_str || typeof cookie_str !== "string") return {}
             return cookie_str.replace(/\s/g, '').split(";").reduce((prev, current) => {
@@ -475,28 +490,29 @@ export class Prostgles {
                 return prev
             }, {});
         }
-        return null;
+
+        result.sid = result.sidQuery || result.sidCookie;
+
+        return result;
     }
 
     async getUser(socket: any){
-        // console.log("conn", socket.handshake.query, socket._session)
-        const sid = this.getSID(socket);
+        const params = this.getSID(socket);
 
-        // if(!sid) return null;
         const { getUser } = this.auth;
 
-        return await getUser({ sid }, this.dbo, this.db, socket);
+        return await getUser(params, this.dbo, this.db, socket);
     }
 
     async getUserFromCookieSession(socket: any): Promise<null | { user: any, clientUser: any }>{
        
         // console.log("conn", socket.handshake.query, socket._session)
-        const sid = this.getSID(socket);
+        const params = this.getSID(socket);
 
-        const { getUser, getClientUser, sidCookieName } = this.auth;
+        const { getUser, getClientUser } = this.auth;
 
-        const user = await getUser({ sid }, this.dbo, this.db, socket);
-        const clientUser = await getClientUser({ sid }, this.dbo, this.db, socket);
+        const user = await getUser(params, this.dbo, this.db, socket);
+        const clientUser = await getClientUser(params, this.dbo, this.db, socket);
 
         if(!user) return undefined;
         return { user, clientUser };
@@ -528,7 +544,6 @@ export class Prostgles {
         if(!this.io) return;
         
         this.io.on('connection', async (socket) => {
-            
             if(!this.db || !this.dbo) throw "db/dbo missing";
             let { dbo, db, pgp } = this;
             
@@ -538,7 +553,8 @@ export class Prostgles {
 
                 let auth: any = {};
                 if(this.auth){
-                    const { register, login, logout } = this.auth;
+                    const { register, login, logout, sidQueryParamName } = this.auth;
+                    if(sidQueryParamName === "sid") throw "sidQueryParamName cannot be 'sid' please provide another name."
                     let handlers = [
                         { func: register,   ch: WS_CHANNEL_NAME.REGISTER,   name: "register"    },
                         { func: login,      ch: WS_CHANNEL_NAME.LOGIN,      name: "login"       },
@@ -592,6 +608,7 @@ export class Prostgles {
                     } catch(err) {
                         // const _err_msg = err.toString();
                         // cb({ msg: _err_msg, err });
+                        console.trace(err)
                         cb(err)
                         // console.warn("runPublishedRequest ERROR: ", err, socket._user);
                     }

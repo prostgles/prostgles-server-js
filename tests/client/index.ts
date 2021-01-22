@@ -13,7 +13,7 @@ log("Started client...");
 
 const url = process.env.PRGL_CLIENT_URL || "http://127.0.0.1:3001",
   path = process.env.PRGL_CLIENT_PATH || "/teztz/s",
-  socket = io(url, { path }),
+  socket = io(url, { path, query: { token: "haha" }  }), //  
   stopTest = (err?) => {
     socket.emit("stop-test", !err? err : { err: err.toString() }, cb => {
 
@@ -27,7 +27,7 @@ const url = process.env.PRGL_CLIENT_URL || "http://127.0.0.1:3001",
     });
     
   };
-
+  
 try {
   /* TODO find out why connection does not happen on rare occasions*/
   socket.on("connected", () => {
@@ -36,6 +36,9 @@ try {
   socket.on("connect", () => {
     log("Client connect.")
   });
+  socket.on("connect_failed", (err) => {
+    log("connect_failed", err)
+  })
   socket.on("start-test", (data) => {
     log("start-test", data)
     prostgles({

@@ -1,12 +1,11 @@
-const clientTest = (process.env.TEST_TYPE === "client");
 
 import path from 'path';
 import express from 'express';
-// import prostgles from "../../dist/index";
 import prostgles from "prostgles-server";
 const app = express();
 const http = require('http').createServer(app);
 
+const clientTest = (process.env.TEST_TYPE === "client");
 const io = !clientTest? undefined : require("socket.io")(http, { path: "/teztz/s" });
 
 http.listen(3001);
@@ -16,8 +15,7 @@ import server_only_queries from "../server_only_queries";
 
 import { DBObj } from "./DBoGenerated";
 // type DBObj = any;
-import { DB, DbHandler, Auth } from 'prostgles-server/dist/Prostgles';
-import { strict as assert } from 'assert';
+import { DB, DbHandler } from 'prostgles-server/dist/Prostgles';
 
 const log = (msg: string, extra?: any) => {
   console.log(...["(server): " + msg, extra].filter(v => v));
@@ -67,6 +65,7 @@ prostgles({
     return true;// Boolean(user && user.type === "admin")
   },
 	auth: {
+		sidQueryParamName: "token",
 		getClientUser: async ({ sid }) => {
 			if(sid){
 				const s = sessions.find(s => s.id === sid);

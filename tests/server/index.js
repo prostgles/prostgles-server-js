@@ -3,13 +3,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const clientTest = (process.env.TEST_TYPE === "client");
 const path_1 = __importDefault(require("path"));
 const express_1 = __importDefault(require("express"));
-// import prostgles from "../../dist/index";
 const prostgles_server_1 = __importDefault(require("prostgles-server"));
 const app = express_1.default();
 const http = require('http').createServer(app);
+const clientTest = (process.env.TEST_TYPE === "client");
 const io = !clientTest ? undefined : require("socket.io")(http, { path: "/teztz/s" });
 http.listen(3001);
 const isomorphic_queries_1 = __importDefault(require("../isomorphic_queries"));
@@ -55,6 +54,7 @@ prostgles_server_1.default({
         return true; // Boolean(user && user.type === "admin")
     },
     auth: {
+        sidQueryParamName: "token",
         getClientUser: async ({ sid }) => {
             if (sid) {
                 const s = sessions.find(s => s.id === sid);

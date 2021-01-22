@@ -184,13 +184,23 @@ class Prostgles {
     getSID(socket) {
         if (!this.auth)
             return null;
-        const { sidCookieName } = this.auth;
-        if (!sidCookieName)
+        const { sidCookieName, sidQueryParamName } = this.auth;
+        if (!sidCookieName && !sidQueryParamName)
             return null;
-        const cookie_str = utils_1.get(socket, "handshake.headers.cookie");
-        const cookie = parseCookieStr(cookie_str);
-        if (socket && cookie) {
-            return cookie[sidCookieName];
+        let result = {
+            sidCookie: null,
+            sidQuery: null,
+            sid: null
+        };
+        if (sidQueryParamName) {
+            result.sidQuery = utils_1.get(socket, `handshake.query.${sidQueryParamName}`);
+        }
+        if (sidCookieName) {
+            const cookie_str = utils_1.get(socket, "handshake.headers.cookie");
+            const cookie = parseCookieStr(cookie_str);
+            if (socket && cookie) {
+                result.sidCookie = cookie[sidCookieName];
+            }
         }
         function parseCookieStr(cookie_str) {
             if (!cookie_str || typeof cookie_str !== "string")
@@ -201,24 +211,23 @@ class Prostgles {
                 return prev;
             }, {});
         }
-        return null;
+        result.sid = result.sidQuery || result.sidCookie;
+        return result;
     }
     getUser(socket) {
         return __awaiter(this, void 0, void 0, function* () {
-            // console.log("conn", socket.handshake.query, socket._session)
-            const sid = this.getSID(socket);
-            // if(!sid) return null;
+            const params = this.getSID(socket);
             const { getUser } = this.auth;
-            return yield getUser({ sid }, this.dbo, this.db, socket);
+            return yield getUser(params, this.dbo, this.db, socket);
         });
     }
     getUserFromCookieSession(socket) {
         return __awaiter(this, void 0, void 0, function* () {
             // console.log("conn", socket.handshake.query, socket._session)
-            const sid = this.getSID(socket);
-            const { getUser, getClientUser, sidCookieName } = this.auth;
-            const user = yield getUser({ sid }, this.dbo, this.db, socket);
-            const clientUser = yield getClientUser({ sid }, this.dbo, this.db, socket);
+            const params = this.getSID(socket);
+            const { getUser, getClientUser } = this.auth;
+            const user = yield getUser(params, this.dbo, this.db, socket);
+            const clientUser = yield getClientUser(params, this.dbo, this.db, socket);
             if (!user)
                 return undefined;
             return { user, clientUser };
@@ -255,7 +264,9 @@ class Prostgles {
                         yield this.onSocketConnect(socket, dbo, db);
                     let auth = {};
                     if (this.auth) {
-                        const { register, login, logout } = this.auth;
+                        const { register, login, logout, sidQueryParamName } = this.auth;
+                        if (sidQueryParamName === "sid")
+                            throw "sidQueryParamName cannot be 'sid' please provide another name.";
                         let handlers = [
                             { func: register, ch: WS_CHANNEL_NAME.REGISTER, name: "register" },
                             { func: login, ch: WS_CHANNEL_NAME.LOGIN, name: "login" },
@@ -304,6 +315,7 @@ class Prostgles {
                         catch (err) {
                             // const _err_msg = err.toString();
                             // cb({ msg: _err_msg, err });
+                            console.trace(err);
                             cb(err);
                             // console.warn("runPublishedRequest ERROR: ", err, socket._user);
                         }
