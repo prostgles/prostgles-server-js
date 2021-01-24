@@ -216,9 +216,14 @@ class Prostgles {
     }
     getUser(socket) {
         return __awaiter(this, void 0, void 0, function* () {
-            const params = this.getSID(socket);
-            const { getUser } = this.auth;
-            return yield getUser(params, this.dbo, this.db, socket);
+            if (this.auth) {
+                const { getUser } = this.auth;
+                if (getUser) {
+                    const params = this.getSID(socket);
+                    return yield getUser(params, this.dbo, this.db, socket);
+                }
+            }
+            return null;
         });
     }
     getUserFromCookieSession(socket) {
@@ -315,7 +320,7 @@ class Prostgles {
                         catch (err) {
                             // const _err_msg = err.toString();
                             // cb({ msg: _err_msg, err });
-                            console.trace(err);
+                            // console.trace(err)
                             cb(err);
                             // console.warn("runPublishedRequest ERROR: ", err, socket._user);
                         }

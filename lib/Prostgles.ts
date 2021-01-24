@@ -497,11 +497,17 @@ export class Prostgles {
     }
 
     async getUser(socket: any){
-        const params = this.getSID(socket);
 
-        const { getUser } = this.auth;
+        if(this.auth){
+            const { getUser } = this.auth;
+    
+            if(getUser){
+                const params = this.getSID(socket);
+                return await getUser(params, this.dbo, this.db, socket);
+            }
+        }
 
-        return await getUser(params, this.dbo, this.db, socket);
+        return null;
     }
 
     async getUserFromCookieSession(socket: any): Promise<null | { user: any, clientUser: any }>{
@@ -608,7 +614,7 @@ export class Prostgles {
                     } catch(err) {
                         // const _err_msg = err.toString();
                         // cb({ msg: _err_msg, err });
-                        console.trace(err)
+                        // console.trace(err)
                         cb(err)
                         // console.warn("runPublishedRequest ERROR: ", err, socket._user);
                     }
