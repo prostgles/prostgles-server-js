@@ -118,7 +118,7 @@ export declare type RequestParams = {
     socket?: any;
 };
 export declare type PublishedTablesAndViews = {
-    [key: string]: PublishTableRule | PublishViewRule | "*" | false | null;
+    [key: string]: (PublishTableRule | PublishViewRule | "*" | false | null);
 } | "*";
 export declare type Publish = PublishedTablesAndViews | ((socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB, user?: any) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>));
 export declare type Method = (...args: any) => (any | Promise<any>);

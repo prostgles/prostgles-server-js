@@ -258,10 +258,10 @@ export class ViewHandler {
         
         this.tsDboDefs = [
             `   getColumns: () => Promise<any[]>;`,
-            `   find: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<${this.tsDataName}[] | any[]>;`,
-            `   findOne: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<${this.tsDataName} | any>;`,
-            `   subscribe: (filter: ${filterDef}, params: SelectParams, onData: (items: ${this.tsDataName}[]) => any) => Promise<{ unsubscribe: () => any }>;`,
-            `   subscribeOne: (filter: ${filterDef}, params: SelectParams, onData: (item: ${this.tsDataName}) => any) => Promise<{ unsubscribe: () => any }>;`,
+            `   find: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<Partial<${this.tsDataName} & { [x: string]: any }>[]>;`,
+            `   findOne: (filter?: ${filterDef}, selectParams?: SelectParams) => Promise<Partial<${this.tsDataName} & { [x: string]: any }>>;`,
+            `   subscribe: (filter: ${filterDef}, params: SelectParams, onData: (items: Partial<${this.tsDataName} & { [x: string]: any }>[]) => any) => Promise<{ unsubscribe: () => any }>;`,
+            `   subscribeOne: (filter: ${filterDef}, params: SelectParams, onData: (item: Partial<${this.tsDataName} & { [x: string]: any }>) => any) => Promise<{ unsubscribe: () => any }>;`,
             `   count: (filter?: ${filterDef}) => Promise<number>;`
         ];
         this.makeDef();
@@ -1511,10 +1511,10 @@ export class TableHandler extends ViewHandler {
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, joinPaths?: JoinPaths){
         super(db, tableOrViewInfo, pubSubManager, dboBuilder, t, joinPaths);
         this.tsDboDefs = this.tsDboDefs.concat([
-            `   update: (filter: ${this.filterDef}, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<${this.tsDataName} | void>;`,
-            `   upsert: (filter: ${this.filterDef}, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<${this.tsDataName} | void>;`,
-            `   insert: (data: (${this.tsDataName} | ${this.tsDataName}[]), params?: InsertParams) => Promise<${this.tsDataName} | void>;`,
-            `   delete: (filter?: ${this.filterDef}, params?: DeleteParams) => Promise<${this.tsDataName} | void>;`,
+            `   update: <T = Partial<${this.tsDataName}> | void> (filter: ${this.filterDef}, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<T>;`,
+            `   upsert: <T = Partial<${this.tsDataName}> | void> (filter: ${this.filterDef}, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<T>;`,
+            `   insert: <T = Partial<${this.tsDataName}> | void> (data: (${this.tsDataName} | ${this.tsDataName}[]), params?: InsertParams) => Promise<T>;`,
+            `   delete: <T = Partial<${this.tsDataName}> | void> (filter?: ${this.filterDef}, params?: DeleteParams) => Promise<T>;`,
         ]);
         this.makeDef();
 

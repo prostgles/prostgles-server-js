@@ -95,7 +95,7 @@ prostgles({
 			return { sid: s.id, expires: Infinity }
 		}
 	},
-  publish: (socket, dbo: DBObj, db: DB, user: USER) => {
+  publish: async (socket, dbo: DBObj, db: DB, user: USER) => {
 		// return "*";
 		return  {
 			items: "*",
@@ -178,7 +178,8 @@ prostgles({
 				// 	{ name: "abcd", public: "public data d", added: new Date('04 Dec 1996 00:12:00 GMT') }
 				// ]);
 
-				await db.items.insert([{ name: "a" }, { name: "z" }, { name: "b" }]);
+				const v1 = await db.items.insert([{ name: "a" }, { name: "z" }, { name: "b" }]);
+				// v1.a;
 				await db.items2.insert([{ name: "a", items_id: 1 }]);
 				await db.items2.insert([{ name: "a", items_id: 1 }]);
 				await db.items2.insert([{ name: "b", items_id: 2 }]);
