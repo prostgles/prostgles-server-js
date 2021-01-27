@@ -96,7 +96,6 @@ prostgles({
 		}
 	},
   publish: async (socket, dbo: DBObj, db: DB, user: USER) => {
-		// return "*";
 		return  {
 			items: "*",
 			items2: "*",
@@ -179,7 +178,6 @@ prostgles({
 				// ]);
 
 				const v1 = await db.items.insert([{ name: "a" }, { name: "z" }, { name: "b" }]);
-				// v1.a;
 				await db.items2.insert([{ name: "a", items_id: 1 }]);
 				await db.items2.insert([{ name: "a", items_id: 1 }]);
 				await db.items2.insert([{ name: "b", items_id: 2 }]);

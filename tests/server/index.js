@@ -88,7 +88,6 @@ prostgles_server_1.default({
         }
     },
     publish: async (socket, dbo, db, user) => {
-        // return "*";
         return {
             items: "*",
             items2: "*",
@@ -162,7 +161,6 @@ prostgles_server_1.default({
                 // 	{ name: "abcd", public: "public data d", added: new Date('04 Dec 1996 00:12:00 GMT') }
                 // ]);
                 const v1 = await db.items.insert([{ name: "a" }, { name: "z" }, { name: "b" }]);
-                // v1.a;
                 await db.items2.insert([{ name: "a", items_id: 1 }]);
                 await db.items2.insert([{ name: "a", items_id: 1 }]);
                 await db.items2.insert([{ name: "b", items_id: 2 }]);

@@ -211,8 +211,8 @@ export type PublishViewRule = {
 //     tablesOrViews: {[key:string]: TableRule | ViewRule | "*" }
 // }
 export type RequestParams = { dbo?: DbHandler, socket?: any };
-
-export type PublishedTablesAndViews = { [key: string]: (PublishTableRule | PublishViewRule | "*" | false | null) } | "*" ;
+export type PublishAllOrNothing = string | "*" | false | null;
+export type PublishedTablesAndViews = PublishAllOrNothing | { [key: string]: (PublishTableRule | PublishViewRule | PublishAllOrNothing ) } ;
 export type Publish = PublishedTablesAndViews | ((socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB, user?: any) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>)); 
 
 export type Method = (...args: any) => ( any | Promise<any> );

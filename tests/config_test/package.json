@@ -1,0 +1,27 @@
+{
+  "name": "config_test",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "npm i && tsc",
+    "start": "npm run build && node index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/express": "^4.17.11",
+    "@types/socket.io": "^2.1.13",
+    "@types/socket.io-client": "^1.4.35",
+    "chokidar": "^3.5.1",
+    "express": "^4.17.1",
+    "prostgles-client": "^1.5.60",
+    "prostgles-server": "file:../..",
+    "socket.io": "^3.1.0",
+    "socket.io-client": "^3.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^14.14.22",
+    "typescript": "^4.1.3"
+  }
+}

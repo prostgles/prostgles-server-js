@@ -1,5 +1,5 @@
 {
-  "name": "typescript",
+  "name": "server_tests",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -19,5 +19,8 @@
     "express": "^4.17.1",
     "prostgles-server": "file:../..",
     "socket.io": "^3.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.1.3"
   }
 }

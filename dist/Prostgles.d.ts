@@ -117,9 +117,10 @@ export declare type RequestParams = {
     dbo?: DbHandler;
     socket?: any;
 };
-export declare type PublishedTablesAndViews = {
-    [key: string]: (PublishTableRule | PublishViewRule | "*" | false | null);
-} | "*";
+export declare type PublishAllOrNothing = string | "*" | false | null;
+export declare type PublishedTablesAndViews = PublishAllOrNothing | {
+    [key: string]: (PublishTableRule | PublishViewRule | PublishAllOrNothing);
+};
 export declare type Publish = PublishedTablesAndViews | ((socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB, user?: any) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>));
 export declare type Method = (...args: any) => (any | Promise<any>);
 export declare const JOIN_TYPES: readonly ["one-many", "many-one", "one-one", "many-many"];
