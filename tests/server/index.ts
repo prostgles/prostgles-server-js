@@ -45,7 +45,7 @@ prostgles({
 	sqlFilePath: path.join(__dirname+'/init.sql'),
 	io,
 	tsGeneratedTypesDir: path.join(__dirname + '/'),
-	watchSchema: true,
+	// watchSchema: true,
 	transactions: true,
 	onSocketConnect: (socket) => {
 		log("onSocketConnect")
@@ -190,8 +190,8 @@ prostgles({
 				} });
 				console.log(JSON.stringify(MonAgg, null, 2));
 
-				// await _db.any("DROP TABLE IF EXISTS tt; ")
-				// await _db.any("DROP TABLE IF EXISTS tt; CREATE TABLE tt(id serial);")
+				await _db.any("DROP TABLE IF EXISTS tt; ")
+				await _db.any("DROP TABLE IF EXISTS tt; CREATE TABLE tt(id serial);")
 				// await _db.any("DROP EXTENSION IF EXISTS pgcrypto; CREATE EXTENSION pgcrypto;")
 				// console.log(await db.items4.findOne({}, { select: { public: { "$ts_headline": ["public", "public"] } } }))
 			}

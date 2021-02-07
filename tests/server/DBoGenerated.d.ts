@@ -84,6 +84,10 @@ export type Transaction = {
      id?: string;
 };
 export type Transaction_Filter = Transaction | object | { $and: (Transaction | object)[] } | { $or: (Transaction | object)[] } 
+export type Tt = {
+     id?: number;
+};
+export type Tt_Filter = Tt | object | { $and: (Tt | object)[] } | { $or: (Tt | object)[] } 
 export type V_items = {
      id?: number;
      name?: string;
@@ -186,6 +190,18 @@ export type DBO_transaction = {
    insert: <T = Partial<Transaction> | void> (data: (Transaction | Transaction[]), params?: InsertParams) => Promise<T>;
    delete: <T = Partial<Transaction> | void> (filter?:  Transaction_Filter , params?: DeleteParams) => Promise<T>; 
 };
+export type DBO_tt = {
+    getColumns: () => Promise<any[]>;
+   find: (filter?:  Tt_Filter , selectParams?: SelectParams) => Promise<Partial<Tt & { [x: string]: any }>[]>;
+   findOne: (filter?:  Tt_Filter , selectParams?: SelectParams) => Promise<Partial<Tt & { [x: string]: any }>>;
+   subscribe: (filter:  Tt_Filter , params: SelectParams, onData: (items: Partial<Tt & { [x: string]: any }>[]) => any) => Promise<{ unsubscribe: () => any }>;
+   subscribeOne: (filter:  Tt_Filter , params: SelectParams, onData: (item: Partial<Tt & { [x: string]: any }>) => any) => Promise<{ unsubscribe: () => any }>;
+   count: (filter?:  Tt_Filter ) => Promise<number>;
+   update: <T = Partial<Tt> | void> (filter:  Tt_Filter , newData: Tt, params?: UpdateParams) => Promise<T>;
+   upsert: <T = Partial<Tt> | void> (filter:  Tt_Filter , newData: Tt, params?: UpdateParams) => Promise<T>;
+   insert: <T = Partial<Tt> | void> (data: (Tt | Tt[]), params?: InsertParams) => Promise<T>;
+   delete: <T = Partial<Tt> | void> (filter?:  Tt_Filter , params?: DeleteParams) => Promise<T>; 
+};
 export type DBO_v_items = {
     getColumns: () => Promise<any[]>;
    find: (filter?:  V_items_Filter , selectParams?: SelectParams) => Promise<Partial<V_items & { [x: string]: any }>[]>;
@@ -210,6 +226,7 @@ export type DBObj = {
  planes: DBO_planes;
  table: DBO_table;
  transaction: DBO_transaction;
+ tt: DBO_tt;
  v_items: DBO_v_items;
  leftJoin: JoinMakerTables;
  innerJoin: JoinMakerTables;

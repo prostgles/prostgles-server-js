@@ -63,7 +63,10 @@ export declare type PubSubManagerOptions = {
     dbo: DbHandler;
     wsChannelNamePrefix?: string;
     pgChannelName?: string;
-    onSchemaChange?: () => void;
+    onSchemaChange?: (event: {
+        command: string;
+        query: string;
+    }) => void;
 };
 export declare class PubSubManager {
     static DELIMITER: string;
@@ -91,7 +94,7 @@ export declare class PubSubManager {
     postgresNotifChannelName: string;
     schemaChangedNotifPayloadStr: string;
     constructor(options: PubSubManagerOptions);
-    startWatchingSchema(): Promise<void>;
+    startWatchingSchema(stop?: boolean): Promise<void>;
     isReady(): any;
     getSubs(table_name: string, condition: string): SubscriptionParams[];
     getSyncs(table_name: string, condition: string): SyncParams[];

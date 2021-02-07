@@ -2059,6 +2059,7 @@ export class DboBuilder {
         this.dbo = { };
         // this.joins = this.prostgles.joins;
         let onSchemaChange;
+        
         if(this.prostgles.watchSchema){
             onSchemaChange = (event: { command: string; query: string }) => { 
                 this.prostgles.onSchemaChange(event)

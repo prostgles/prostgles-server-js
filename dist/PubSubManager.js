@@ -31,6 +31,7 @@ const log = (...args) => {
 };
 class PubSubManager {
     constructor(options) {
+        this.onSchemaChange = null;
         this.schemaChangedNotifPayloadStr = "$prostgles_schema_has_changed$";
         /* Relay relevant data to relevant subscriptions */
         this.notifListener = (data) => {
@@ -38,7 +39,7 @@ class PubSubManager {
             let dataArr = str.split(PubSubManager.DELIMITER);
             let table_name = dataArr[0], op_name = dataArr[1], condition_ids_str = dataArr[2];
             log(table_name, op_name, condition_ids_str, this.triggers[table_name]);
-            if (str && str.startsWith(this.schemaChangedNotifPayloadStr)) {
+            if (str && str.startsWith(this.schemaChangedNotifPayloadStr) && this.onSchemaChange) {
                 const command = dataArr[1], event_type = dataArr[2], query = dataArr[3];
                 this.onSchemaChange({ command, query });
             }
@@ -116,46 +117,49 @@ class PubSubManager {
         this.postgresNotifListenManager = new PostgresNotifListenManager_1.PostgresNotifListenManager(db, this.notifListener, 'prostgles-socket-replication');
         if (!this.postgresNotifChannelName)
             throw "postgresNotifChannelName missing";
-        if (this.onSchemaChange) {
-            this.startWatchingSchema();
-        }
+        this.startWatchingSchema(!Boolean(this.onSchemaChange));
         log("Created PubSubManager");
         // return this.postgresNotifListenManager.then(success => true);
     }
-    startWatchingSchema() {
+    startWatchingSchema(stop = false) {
         return __awaiter(this, void 0, void 0, function* () {
             const pref = "prostgles_", funcName = DboBuilder_1.asName(pref + "schema_watch_func"), triggerName = DboBuilder_1.asName(pref + "schema_watch_trigger"), delimiter = PubSubManager.DELIMITER;
-            yield this.db.any(`
-
-
-        BEGIN;
-
-        DROP EVENT TRIGGER IF EXISTS ${triggerName};
-
-
-        CREATE OR REPLACE FUNCTION ${funcName}() RETURNS event_trigger AS $$
-
-        DECLARE condition_ids TEXT := ''; 
-        
-        BEGIN
-
-        SELECT current_query()
-        INTO condition_ids;
-        PERFORM pg_notify( 
-            '${this.postgresNotifChannelName}' , 
-            '${this.schemaChangedNotifPayloadStr}' || '${delimiter}' || tg_tag || '${delimiter}' || TG_event  || '${delimiter}' || condition_ids
-            ); 
-
-        END;
-        $$ LANGUAGE plpgsql;
-
-
-        CREATE EVENT TRIGGER ${triggerName} ON ddl_command_end
-        WHEN TAG IN ('CREATE TABLE', 'ALTER TABLE', 'DROP TABLE')
-        EXECUTE PROCEDURE ${funcName}();
-
-        COMMIT;
-        `);
+            if (stop) {
+                yield this.db.any(`DROP EVENT TRIGGER IF EXISTS ${triggerName};`);
+            }
+            else {
+                yield this.db.any(`
+    
+    
+            BEGIN;
+    
+            DROP EVENT TRIGGER IF EXISTS ${triggerName};
+    
+    
+            CREATE OR REPLACE FUNCTION ${funcName}() RETURNS event_trigger AS $$
+    
+            DECLARE condition_ids TEXT := ''; 
+            
+            BEGIN
+    
+            SELECT current_query()
+            INTO condition_ids;
+            PERFORM pg_notify( 
+                '${this.postgresNotifChannelName}' , 
+                '${this.schemaChangedNotifPayloadStr}' || '${delimiter}' || tg_tag || '${delimiter}' || TG_event  || '${delimiter}' || condition_ids
+                ); 
+    
+            END;
+            $$ LANGUAGE plpgsql;
+    
+    
+            CREATE EVENT TRIGGER ${triggerName} ON ddl_command_end
+            WHEN TAG IN ('CREATE TABLE', 'ALTER TABLE', 'DROP TABLE')
+            EXECUTE PROCEDURE ${funcName}();
+    
+            COMMIT;
+            `);
+            }
         });
     }
     isReady() {
