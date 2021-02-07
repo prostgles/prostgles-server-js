@@ -2050,7 +2050,7 @@ export class DboBuilder {
     prostgles: Prostgles;
     publishParser: PublishParser;
 
-    onSchemaChange: () => void;
+    onSchemaChange: (event: { command: string; query: string }) => void;
 
     constructor(prostgles: Prostgles){
         this.prostgles = prostgles;
@@ -2060,8 +2060,8 @@ export class DboBuilder {
         // this.joins = this.prostgles.joins;
         let onSchemaChange;
         if(this.prostgles.watchSchema){
-            onSchemaChange = () => { 
-                this.prostgles.onSchemaChange()
+            onSchemaChange = (event: { command: string; query: string }) => { 
+                this.prostgles.onSchemaChange(event)
             }
         }
         this.pubSubManager = new PubSubManager({

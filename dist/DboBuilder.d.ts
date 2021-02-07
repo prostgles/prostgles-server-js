@@ -251,7 +251,10 @@ export declare class DboBuilder {
     joinPaths: JoinPaths;
     prostgles: Prostgles;
     publishParser: PublishParser;
-    onSchemaChange: () => void;
+    onSchemaChange: (event: {
+        command: string;
+        query: string;
+    }) => void;
     constructor(prostgles: Prostgles);
     getJoins(): Join[];
     getJoinPaths(): JoinPaths;

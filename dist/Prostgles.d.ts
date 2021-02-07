@@ -201,15 +201,22 @@ export declare class Prostgles {
     publishParser: PublishParser;
     auth?: Auth;
     DEBUG_MODE?: boolean;
-    watchSchema?: boolean | Function;
+    watchSchema?: boolean | ((event: {
+        command: string;
+        query: string;
+    }) => void);
     private loaded;
     constructor(params: ProstglesInitOptions);
-    onSchemaChange(): void;
+    onSchemaChange(event: {
+        command: string;
+        query: string;
+    }): void;
     checkDb(): void;
     getTSFileName(): {
         fileName: string;
         fullPath: string;
     };
+    writeDBSchema(): void;
     init(onReady: (dbo: DbHandler | DbHandlerTX, db: DB) => any): Promise<boolean>;
     runSQLFile(filePath: string): Promise<boolean | void>;
     getSID(socket: any): SessionIDs;

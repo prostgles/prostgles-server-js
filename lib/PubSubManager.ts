@@ -101,7 +101,7 @@ export class PubSubManager {
     subs: { [ke: string]: { [ke: string]: { subs: SubscriptionParams[] } } };
     syncs: SyncParams[];
     socketChannelPreffix: string;
-    onSchemaChange?: () => void;
+    onSchemaChange?: (event: { command: string; query: string }) => void;
 
     postgresNotifListenManager: PostgresNotifListenManager;
     postgresNotifChannelName: string;
@@ -142,7 +142,8 @@ export class PubSubManager {
         
         const pref = "prostgles_",
             funcName = asName(pref + "schema_watch_func"),
-            triggerName = asName(pref + "schema_watch_trigger");
+            triggerName = asName(pref + "schema_watch_trigger"),
+            delimiter = PubSubManager.DELIMITER;
         await this.db.any(`
 
 
@@ -153,11 +154,16 @@ export class PubSubManager {
 
         CREATE OR REPLACE FUNCTION ${funcName}() RETURNS event_trigger AS $$
 
-        DECLARE condition_ids TEXT := '';            
+        DECLARE condition_ids TEXT := ''; 
         
         BEGIN
 
-        PERFORM pg_notify( '${this.postgresNotifChannelName}' , '${this.schemaChangedNotifPayloadStr}${PubSubManager.DELIMITER}' || tg_tag || TG_event ); 
+        SELECT current_query()
+        INTO condition_ids;
+        PERFORM pg_notify( 
+            '${this.postgresNotifChannelName}' , 
+            '${this.schemaChangedNotifPayloadStr}' || '${delimiter}' || tg_tag || '${delimiter}' || TG_event  || '${delimiter}' || condition_ids
+            ); 
 
         END;
         $$ LANGUAGE plpgsql;
@@ -185,17 +191,19 @@ export class PubSubManager {
     }
 
     /* Relay relevant data to relevant subscriptions */
-    notifListener = (data: any) => {
-        let dataArr = data.payload.split(PubSubManager.DELIMITER)
+    notifListener = (data: { payload: string }) => {
+        const str = data.payload;
+        let dataArr = str.split(PubSubManager.DELIMITER)
         let table_name = dataArr[0],
             op_name = dataArr[1],
             condition_ids_str = dataArr[2];
 
         log(table_name, op_name, condition_ids_str, this.triggers[table_name]);
-
-        if(table_name && table_name === this.schemaChangedNotifPayloadStr){
-            // console.log(op_name)
-            this.onSchemaChange()
+        if(str && str.startsWith(this.schemaChangedNotifPayloadStr)){
+            const command = dataArr[1],
+                event_type = dataArr[2],
+                query = dataArr[3];
+            this.onSchemaChange({ command, query })
         } else if(
             condition_ids_str &&
             condition_ids_str.split(",").length &&

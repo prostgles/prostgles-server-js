@@ -83,7 +83,10 @@ export declare class PubSubManager {
     };
     syncs: SyncParams[];
     socketChannelPreffix: string;
-    onSchemaChange?: () => void;
+    onSchemaChange?: (event: {
+        command: string;
+        query: string;
+    }) => void;
     postgresNotifListenManager: PostgresNotifListenManager;
     postgresNotifChannelName: string;
     schemaChangedNotifPayloadStr: string;
@@ -92,7 +95,9 @@ export declare class PubSubManager {
     isReady(): any;
     getSubs(table_name: string, condition: string): SubscriptionParams[];
     getSyncs(table_name: string, condition: string): SyncParams[];
-    notifListener: (data: any) => void;
+    notifListener: (data: {
+        payload: string;
+    }) => void;
     pushSubData(sub: SubscriptionParams): Promise<unknown>;
     upsertSocket(socket: any, channel_name: string): void;
     syncTimeout: any;

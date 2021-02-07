@@ -1662,8 +1662,8 @@ class DboBuilder {
         // this.joins = this.prostgles.joins;
         let onSchemaChange;
         if (this.prostgles.watchSchema) {
-            onSchemaChange = () => {
-                this.prostgles.onSchemaChange();
+            onSchemaChange = (event) => {
+                this.prostgles.onSchemaChange(event);
             };
         }
         this.pubSubManager = new PubSubManager_1.PubSubManager({

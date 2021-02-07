@@ -34,12 +34,13 @@ class PubSubManager {
         this.schemaChangedNotifPayloadStr = "$prostgles_schema_has_changed$";
         /* Relay relevant data to relevant subscriptions */
         this.notifListener = (data) => {
-            let dataArr = data.payload.split(PubSubManager.DELIMITER);
+            const str = data.payload;
+            let dataArr = str.split(PubSubManager.DELIMITER);
             let table_name = dataArr[0], op_name = dataArr[1], condition_ids_str = dataArr[2];
             log(table_name, op_name, condition_ids_str, this.triggers[table_name]);
-            if (table_name && table_name === this.schemaChangedNotifPayloadStr) {
-                // console.log(op_name)
-                this.onSchemaChange();
+            if (str && str.startsWith(this.schemaChangedNotifPayloadStr)) {
+                const command = dataArr[1], event_type = dataArr[2], query = dataArr[3];
+                this.onSchemaChange({ command, query });
             }
             else if (condition_ids_str &&
                 condition_ids_str.split(",").length &&
@@ -123,7 +124,7 @@ class PubSubManager {
     }
     startWatchingSchema() {
         return __awaiter(this, void 0, void 0, function* () {
-            const pref = "prostgles_", funcName = DboBuilder_1.asName(pref + "schema_watch_func"), triggerName = DboBuilder_1.asName(pref + "schema_watch_trigger");
+            const pref = "prostgles_", funcName = DboBuilder_1.asName(pref + "schema_watch_func"), triggerName = DboBuilder_1.asName(pref + "schema_watch_trigger"), delimiter = PubSubManager.DELIMITER;
             yield this.db.any(`
 
 
@@ -134,11 +135,16 @@ class PubSubManager {
 
         CREATE OR REPLACE FUNCTION ${funcName}() RETURNS event_trigger AS $$
 
-        DECLARE condition_ids TEXT := '';            
+        DECLARE condition_ids TEXT := ''; 
         
         BEGIN
 
-        PERFORM pg_notify( '${this.postgresNotifChannelName}' , '${this.schemaChangedNotifPayloadStr}${PubSubManager.DELIMITER}' || tg_tag || TG_event ); 
+        SELECT current_query()
+        INTO condition_ids;
+        PERFORM pg_notify( 
+            '${this.postgresNotifChannelName}' , 
+            '${this.schemaChangedNotifPayloadStr}' || '${delimiter}' || tg_tag || '${delimiter}' || TG_event  || '${delimiter}' || condition_ids
+            ); 
 
         END;
         $$ LANGUAGE plpgsql;
