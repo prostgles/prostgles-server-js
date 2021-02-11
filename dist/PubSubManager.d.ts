@@ -112,6 +112,7 @@ export declare class PubSubManager {
     onSocketDisconnected(socket: any, channel_name: any): void;
     dropTrigger(table_name: any): void;
     getTriggerName(table_name: any, suffix: any): string;
+    checkIfTimescaleBug: (table_name: string) => Promise<boolean>;
     addingTrigger: any;
     addTriggerPool: {
         [key: string]: string[];

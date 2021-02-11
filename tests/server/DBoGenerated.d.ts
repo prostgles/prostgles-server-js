@@ -35,6 +35,13 @@ export type TxCB = {
 export type JoinMaker = (filter?: object, select?: FieldFilter, options?: SelectParams) => any;
 
 
+export type Ex_j_ins = {
+     added?: Date;
+     id?: number;
+     name?: string;
+     public?: string;
+};
+export type Ex_j_ins_Filter = Ex_j_ins | object | { $and: (Ex_j_ins | object)[] } | { $or: (Ex_j_ins | object)[] } 
 export type Items = {
      h?: Array<string>;
      id?: number;
@@ -94,6 +101,18 @@ export type V_items = {
 };
 export type V_items_Filter = V_items | object | { $and: (V_items | object)[] } | { $or: (V_items | object)[] } 
 
+export type DBO_ex_j_ins = {
+    getColumns: () => Promise<any[]>;
+   find: (filter?:  Ex_j_ins_Filter , selectParams?: SelectParams) => Promise<Partial<Ex_j_ins & { [x: string]: any }>[]>;
+   findOne: (filter?:  Ex_j_ins_Filter , selectParams?: SelectParams) => Promise<Partial<Ex_j_ins & { [x: string]: any }>>;
+   subscribe: (filter:  Ex_j_ins_Filter , params: SelectParams, onData: (items: Partial<Ex_j_ins & { [x: string]: any }>[]) => any) => Promise<{ unsubscribe: () => any }>;
+   subscribeOne: (filter:  Ex_j_ins_Filter , params: SelectParams, onData: (item: Partial<Ex_j_ins & { [x: string]: any }>) => any) => Promise<{ unsubscribe: () => any }>;
+   count: (filter?:  Ex_j_ins_Filter ) => Promise<number>;
+   update: <T = Partial<Ex_j_ins> | void> (filter:  Ex_j_ins_Filter , newData: Ex_j_ins, params?: UpdateParams) => Promise<T>;
+   upsert: <T = Partial<Ex_j_ins> | void> (filter:  Ex_j_ins_Filter , newData: Ex_j_ins, params?: UpdateParams) => Promise<T>;
+   insert: <T = Partial<Ex_j_ins> | void> (data: (Ex_j_ins | Ex_j_ins[]), params?: InsertParams) => Promise<T>;
+   delete: <T = Partial<Ex_j_ins> | void> (filter?:  Ex_j_ins_Filter , params?: DeleteParams) => Promise<T>; 
+};
 export type DBO_items = {
     getColumns: () => Promise<any[]>;
    find: (filter?:  Items_Filter , selectParams?: SelectParams) => Promise<Partial<Items & { [x: string]: any }>[]>;
@@ -218,6 +237,7 @@ export type JoinMakerTables = {
 };
 
 export type DBObj = {
+ ex_j_ins: DBO_ex_j_ins;
  items: DBO_items;
  items2: DBO_items2;
  items3: DBO_items3;

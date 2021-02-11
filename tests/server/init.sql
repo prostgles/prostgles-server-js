@@ -68,6 +68,17 @@ CREATE INDEX IF NOT EXISTS planes_idx1 ON planes(id);
 
 
 
+DROP TABLE IF EXISTS ex_j_ins CASCADE;
+CREATE TABLE IF NOT EXISTS ex_j_ins (
+	id			SERIAL,
+	public	TEXT,
+	name		TEXT,
+	added		TIMESTAMP DEFAULT NOW(),
+	PRIMARY KEY(id, name)
+);
+
+
+
 /*
 
 SELECT 

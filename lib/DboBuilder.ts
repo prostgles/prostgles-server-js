@@ -177,10 +177,11 @@ export type ValidatedTableRules = {
 /* DEBUG CLIENT ERRORS HERE */
 function makeErr(err, localParams?: LocalParams){
     // console.trace(err)
-    if(process.env.TEST_TYPE) console.trace(err)
+    if(process.env.TEST_TYPE || process.env.PRGL_DEBUG) console.trace(err)
     return Promise.reject({
         ...((!localParams || !localParams.socket)? err : {}),
         ...filterObj(err, ["column", "code", "table", "constraint"]),
+        ...(err && err.toString? { txt: err.toString() } : {}),
         code_info: sqlErrCodeToMsg(err.code)
     });
 }

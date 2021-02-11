@@ -1056,6 +1056,30 @@ export class PubSubManager {
     getTriggerName(table_name, suffix){
         return pgp.as.format("$1:name", [`prostgles_triggers_${table_name}_${suffix}`]);
     }
+
+
+    checkIfTimescaleBug = async (table_name: string) => {
+        try {
+            const res = await this.db.oneOrNone(`SELECT EXISTS(
+                SELECT * 
+                FROM information_schema.tables 
+                WHERE 1 = 1
+                  AND table_schema = 'timescaledb_information' 
+                  AND table_name = 'hypertable'
+            );`);
+            if(res.exists){
+                let isHyperTable = await this.db.many("SELECT * FROM timescaledb_information.hypertable WHERE table_name = ${table_name:name};", { table_name });
+                if(isHyperTable && isHyperTable.length){
+                    throw "Triggers do not work on timescaledb hypertables due to bug:\nhttps://github.com/timescale/timescaledb/issues/1084"
+                }
+            }
+
+        } catch(e){
+            console.trace(e)
+        }
+        return true;
+    }
+
     /* 
         A table will only have a trigger with all conditions (for different subs) 
             conditions = ["user_id = 1"]
@@ -1102,7 +1126,7 @@ export class PubSubManager {
         }
         this.addingTrigger = true;
 
-
+        await this.checkIfTimescaleBug(table_name);
         const func_name_escaped = pgp.as.format("$1:name", [`prostgles_funcs_${table_name}`]),
             table_name_escaped = pgp.as.format("$1:name", [table_name]),
             delimiter = PubSubManager.DELIMITER,

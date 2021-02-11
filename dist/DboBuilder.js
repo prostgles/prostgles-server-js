@@ -38,9 +38,9 @@ const shortestPath_1 = require("./shortestPath");
 /* DEBUG CLIENT ERRORS HERE */
 function makeErr(err, localParams) {
     // console.trace(err)
-    if (process.env.TEST_TYPE)
+    if (process.env.TEST_TYPE || process.env.PRGL_DEBUG)
         console.trace(err);
-    return Promise.reject(Object.assign(Object.assign(Object.assign({}, ((!localParams || !localParams.socket) ? err : {})), PubSubManager_1.filterObj(err, ["column", "code", "table", "constraint"])), { code_info: sqlErrCodeToMsg(err.code) }));
+    return Promise.reject(Object.assign(Object.assign(Object.assign(Object.assign({}, ((!localParams || !localParams.socket) ? err : {})), PubSubManager_1.filterObj(err, ["column", "code", "table", "constraint"])), (err && err.toString ? { txt: err.toString() } : {})), { code_info: sqlErrCodeToMsg(err.code) }));
 }
 const EXISTS_KEYS = ["$exists", "$notExists", "$existsJoined", "$notExistsJoined"];
 function parseError(e) {

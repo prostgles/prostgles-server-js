@@ -99,6 +99,27 @@ class PubSubManager {
         };
         this.syncTimeout = null;
         this.parseCondition = (condition) => Boolean(condition && condition.trim().length) ? condition : "TRUE";
+        this.checkIfTimescaleBug = (table_name) => __awaiter(this, void 0, void 0, function* () {
+            try {
+                const res = yield this.db.oneOrNone(`SELECT EXISTS(
+                SELECT * 
+                FROM information_schema.tables 
+                WHERE 1 = 1
+                  AND table_schema = 'timescaledb_information' 
+                  AND table_name = 'hypertable'
+            );`);
+                if (res.exists) {
+                    let isHyperTable = yield this.db.many("SELECT * FROM timescaledb_information.hypertable WHERE table_name = ${table_name:name};", { table_name });
+                    if (isHyperTable && isHyperTable.length) {
+                        throw "Triggers do not work on timescaledb hypertables due to bug:\nhttps://github.com/timescale/timescaledb/issues/1084";
+                    }
+                }
+            }
+            catch (e) {
+                console.trace(e);
+            }
+            return true;
+        });
         this.addTriggerPool = undefined;
         const { db, dbo, wsChannelNamePrefix, pgChannelName, onSchemaChange, dboBuilder } = options;
         if (!db || !dbo) {
@@ -848,6 +869,7 @@ class PubSubManager {
                 return 1;
             }
             this.addingTrigger = true;
+            yield this.checkIfTimescaleBug(table_name);
             const func_name_escaped = pgp.as.format("$1:name", [`prostgles_funcs_${table_name}`]), table_name_escaped = pgp.as.format("$1:name", [table_name]), delimiter = PubSubManager.DELIMITER, query = ` BEGIN;
                 CREATE OR REPLACE FUNCTION ${func_name_escaped}() RETURNS TRIGGER AS $$
         
