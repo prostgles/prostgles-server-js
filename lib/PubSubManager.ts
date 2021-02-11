@@ -1059,24 +1059,19 @@ export class PubSubManager {
 
 
     checkIfTimescaleBug = async (table_name: string) => {
-        try {
-            const schema = "_timescaledb_catalog", 
-                res = await this.db.oneOrNone("SELECT EXISTS( \
-                SELECT * \
-                FROM information_schema.tables \
-                WHERE 1 = 1 \
-                  AND table_schema = ${schema} \
-                  AND table_name = 'hypertable' \
-            );", { schema });
-            if(res.exists){
-                let isHyperTable = await this.db.many("SELECT * FROM ${schema:name}.hypertable WHERE table_name = ${table_name};", { table_name, schema });
-                if(isHyperTable && isHyperTable.length){
-                    throw "Triggers do not work on timescaledb hypertables due to bug:\nhttps://github.com/timescale/timescaledb/issues/1084"
-                }
+        const schema = "_timescaledb_catalog", 
+            res = await this.db.oneOrNone("SELECT EXISTS( \
+            SELECT * \
+            FROM information_schema.tables \
+            WHERE 1 = 1 \
+                AND table_schema = ${schema} \
+                AND table_name = 'hypertable' \
+        );", { schema });
+        if(res.exists){
+            let isHyperTable = await this.db.many("SELECT * FROM ${schema:name}.hypertable WHERE table_name = ${table_name};", { table_name, schema });
+            if(isHyperTable && isHyperTable.length){
+                throw "Triggers do not work on timescaledb hypertables due to bug:\nhttps://github.com/timescale/timescaledb/issues/1084"
             }
-
-        } catch(e){
-            console.trace(e)
         }
         return true;
     }
