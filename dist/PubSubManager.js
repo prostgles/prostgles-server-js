@@ -105,7 +105,7 @@ class PubSubManager {
                 SELECT * \
                 FROM information_schema.tables \
                 WHERE 1 = 1 \
-                  AND table_schema = ${schema:name} \
+                  AND table_schema = ${schema} \
                   AND table_name = 'hypertable' \
             );", { schema });
                 if (res.exists) {
