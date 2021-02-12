@@ -108,7 +108,7 @@ class PubSubManager {
                 AND table_name = 'hypertable' \
         );", { schema });
             if (res.exists) {
-                let isHyperTable = yield this.db.many("SELECT * FROM ${schema:name}.hypertable WHERE table_name = ${table_name};", { table_name, schema });
+                let isHyperTable = yield this.db.any("SELECT * FROM ${schema:name}.hypertable WHERE table_name = ${table_name};", { table_name, schema });
                 if (isHyperTable && isHyperTable.length) {
                     throw "Triggers do not work on timescaledb hypertables due to bug:\nhttps://github.com/timescale/timescaledb/issues/1084";
                 }
