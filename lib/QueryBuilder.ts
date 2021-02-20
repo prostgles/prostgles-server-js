@@ -273,6 +273,17 @@ export const FUNCTIONS: FunctionSpec[] = [
       return pgp.as.format(aggName + "($1:name)", [args[0]]);
     }
   } as FunctionSpec)),
+
+  /* More aggs */
+  {
+    name: "$countAll",
+    type: "aggregation",
+    singleColArg: false,
+    getFields: (args: any[]) => [],
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      return "COUNT(*)";
+    }
+  } as FunctionSpec,
   
 ];
 

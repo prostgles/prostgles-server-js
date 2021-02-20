@@ -209,6 +209,16 @@ exports.FUNCTIONS = [
             return DboBuilder_1.pgp.as.format(aggName + "($1:name)", [args[0]]);
         }
     })),
+    /* More aggs */
+    {
+        name: "$countAll",
+        type: "aggregation",
+        singleColArg: false,
+        getFields: (args) => [],
+        getQuery: ({ allowedFields, args, tableAlias }) => {
+            return "COUNT(*)";
+        }
+    },
 ];
 /* The difference between a function and computed field is that the computed field does not require any arguments */
 exports.COMPUTED_FIELDS = [
