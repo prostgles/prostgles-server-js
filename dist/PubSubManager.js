@@ -39,9 +39,11 @@ class PubSubManager {
             let dataArr = str.split(PubSubManager.DELIMITER);
             let table_name = dataArr[0], op_name = dataArr[1], condition_ids_str = dataArr[2];
             log(table_name, op_name, condition_ids_str, this.triggers[table_name]);
-            if (str && str.startsWith(this.schemaChangedNotifPayloadStr) && this.onSchemaChange) {
-                const command = dataArr[1], event_type = dataArr[2], query = dataArr[3];
-                this.onSchemaChange({ command, query });
+            if (str && str.startsWith(this.schemaChangedNotifPayloadStr)) {
+                if (this.onSchemaChange) {
+                    const command = dataArr[1], event_type = dataArr[2], query = dataArr[3];
+                    this.onSchemaChange({ command, query });
+                }
             }
             else if (condition_ids_str &&
                 condition_ids_str.split(",").length &&
