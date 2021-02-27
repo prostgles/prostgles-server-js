@@ -14,7 +14,7 @@
   "dependencies": {
     "@types/node": "^14.14.16",
     "@types/socket.io-client": "^1.4.35",
-    "prostgles-client": "^1.5.62",
+    "prostgles-client": "^1.5.63",
     "socket.io-client": "^3.1.0"
   }
 }
