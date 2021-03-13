@@ -518,6 +518,9 @@ class PubSubManager {
                         // console.log("WAL upsertData START", data)
                         const res = yield upsertData(data, true);
                         // console.log("WAL upsertData END")
+                        /******** */
+                        /* TO DO -> Store and push patch updates instead of full data if and where possible */
+                        /******** */
                         return res;
                     }),
                     onSendEnd: () => {

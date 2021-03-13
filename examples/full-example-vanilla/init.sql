@@ -24,17 +24,22 @@
 --     rgb     TEXT
 -- );
 
+DROP TABLE IF EXISTS lines CASCADE;
+CREATE TABLE IF NOT EXISTS lines (
+    id          SERIAL,
+    color       TEXT,
+    "Synced"    BIGINT
+);
 
 DROP TABLE IF EXISTS "Points" CASCADE;
 CREATE TABLE IF NOT EXISTS "Points" (
-    id      NUMERIC,
-    color     TEXT,
-    x       NUMERIC,
-    y       NUMERIC,
-    line_id TEXT,
-    "Synced"  BIGINT
+    id          NUMERIC,
+    color       TEXT,
+    x           NUMERIC,
+    y           NUMERIC,
+    line_id     TEXT,
+    "Synced"    BIGINT
 );
-
 
 
 -- DROP TABLE IF EXISTS users CASCADE;

@@ -83,6 +83,7 @@ class Prostgles {
                 //        if(s && s.disconnect) s.disconnect(true);
                 //     });
                 // }
+                console.log("Schema chnaged. Rewriting Definitions file");
                 /* Rewrite schema if different */
                 this.writeDBSchema();
                 // const { fullPath, fileName } = this.getTSFileName();
@@ -115,6 +116,9 @@ class Prostgles {
                     console.log("Prostgles: Created typescript schema definition file -> " + fileName);
                 }
             });
+        }
+        else {
+            console.error("Schema changed. tsGeneratedTypesDir needs to be set to reload server");
         }
     }
     init(onReady) {

@@ -2,7 +2,7 @@ const express = require('express');
 const app = express();
 const path = require('path');
 var http = require('http').createServer(app);
-var io = require('socket.io')(http, { path: "/teztz" });
+var io = require('socket.io')(http, { path: "/s" });
 http.listen(3001);
 
 let prostgles = require('../../dist/index.js');
@@ -45,6 +45,7 @@ prostgles({
         }
         
         app.get('*', function(req, res){
+            console.log(req.originalUrl)
 			res.sendFile(path.join(__dirname+'/home.html'));
 		});
     },
@@ -53,6 +54,16 @@ prostgles({
         return {
             
             Points: {
+                select: "*",
+                insert: "*",
+                update: "*",
+                delete: "*",
+                sync: {
+                    synced_field: "Synced",
+                    id_fields: ["id"]
+                }
+            },
+            lines: {
                 select: "*",
                 insert: "*",
                 update: "*",

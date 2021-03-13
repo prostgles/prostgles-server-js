@@ -1546,6 +1546,26 @@ export class TableHandler extends ViewHandler {
         }
     }
 
+    async updateBatch(data: [Filter, object][], params?: UpdateParams, tableRules?: TableRule, localParams: LocalParams = null): Promise<any>{
+        try {
+            const queries = await Promise.all(
+                data.map(async ([filter, data]) => 
+                    this.update(
+                        filter, 
+                        data, 
+                        { ...(params || {}), returning: undefined }, 
+                        tableRules, 
+                        { ...(localParams || {}), returnQuery: true }
+                    )
+                )
+            );
+            return this.db.tx(t => t.batch(queries)).catch(err => makeErr(err, localParams));
+        } catch(e){
+            if(localParams && localParams.testRule) throw e;
+            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.update()` };
+        }
+    }
+
     async update(filter: Filter, newData: object, params?: UpdateParams, tableRules?: TableRule, localParams: LocalParams = null): Promise<any>{
         try {
 

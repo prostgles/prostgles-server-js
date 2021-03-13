@@ -212,6 +212,7 @@ export declare class TableHandler extends ViewHandler {
     };
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, joinPaths?: JoinPaths);
     willBatch(query: string): boolean;
+    updateBatch(data: [Filter, object][], params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
     update(filter: Filter, newData: object, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
     validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues }: ValidatedParams): ValidDataAndColumnSet;
     insert(data: (object | object[]), param2?: InsertParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<any | any[] | boolean>;

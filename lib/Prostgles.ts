@@ -349,6 +349,7 @@ export class Prostgles {
                 //     });
                 // }
 
+                console.log("Schema chnaged. Rewriting Definitions file")
                 /* Rewrite schema if different */
                 this.writeDBSchema();
 
@@ -385,6 +386,8 @@ export class Prostgles {
                     console.log("Prostgles: Created typescript schema definition file -> " + fileName)
                 }
             });                
+        } else {
+            console.error("Schema changed. tsGeneratedTypesDir needs to be set to reload server")
         }
     }
 

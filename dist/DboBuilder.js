@@ -1230,6 +1230,21 @@ class TableHandler extends ViewHandler {
             return true;
         }
     }
+    updateBatch(data, params, tableRules, localParams = null) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const queries = yield Promise.all(data.map(([filter, data]) => __awaiter(this, void 0, void 0, function* () {
+                    return this.update(filter, data, Object.assign(Object.assign({}, (params || {})), { returning: undefined }), tableRules, Object.assign(Object.assign({}, (localParams || {})), { returnQuery: true }));
+                })));
+                return this.db.tx(t => t.batch(queries)).catch(err => makeErr(err, localParams));
+            }
+            catch (e) {
+                if (localParams && localParams.testRule)
+                    throw e;
+                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.update()` };
+            }
+        });
+    }
     update(filter, newData, params, tableRules, localParams = null) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
