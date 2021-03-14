@@ -27,10 +27,17 @@ async function isomorphic(db) {
         await db.items2.insert([{ name: "a", items_id: 1 }]);
         await db.items3.insert([{ name: "a" }, { name: "za123" }]);
         await db.items4.insert([
-            { name: "abc", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
-            { name: "abc", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
+            { name: "abc1", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
+            { name: "abc2", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
             { name: "abcd", public: "public data d", added: new Date('04 Dec 1996 00:12:00 GMT') }
         ]);
+    });
+    await tryRun("Update batch example", async () => {
+        await db.items4.updateBatch([
+            [{ name: "abc1" }, { name: "abc" }],
+            [{ name: "abc2" }, { name: "abc" }]
+        ]);
+        assert_1.strict.equal(await db.items4.count({ name: "abc" }), 2);
     });
     await tryRun("Function example", async () => {
         const f = await db.items4.findOne({}, { select: { public: 1, p_5: { $left: ["public", 3] } } });

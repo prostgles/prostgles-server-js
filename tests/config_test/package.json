@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "build": "npm i && tsc",
-    "start": "npm run build && node index.js"
+    "run": "npm run build && node index.js",
+    "start": "tsc-watch --onSuccess \"node index.js\""
   },
   "author": "",
   "license": "ISC",

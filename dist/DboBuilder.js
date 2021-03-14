@@ -1202,6 +1202,7 @@ class TableHandler extends ViewHandler {
         });
         this.tsDboDefs = this.tsDboDefs.concat([
             `   update: <T = Partial<${this.tsDataName}> | void> (filter: ${this.filterDef}, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<T>;`,
+            `   updateBatch: <T = Partial<${this.tsDataName}> | void> (updateData: [${this.filterDef}, ${this.tsDataName}][], params?: UpdateParams) => Promise<T>;`,
             `   upsert: <T = Partial<${this.tsDataName}> | void> (filter: ${this.filterDef}, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<T>;`,
             `   insert: <T = Partial<${this.tsDataName}> | void> (data: (${this.tsDataName} | ${this.tsDataName}[]), params?: InsertParams) => Promise<T>;`,
             `   delete: <T = Partial<${this.tsDataName}> | void> (filter?: ${this.filterDef}, params?: DeleteParams) => Promise<T>;`,
@@ -1234,9 +1235,13 @@ class TableHandler extends ViewHandler {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const queries = yield Promise.all(data.map(([filter, data]) => __awaiter(this, void 0, void 0, function* () {
-                    return this.update(filter, data, Object.assign(Object.assign({}, (params || {})), { returning: undefined }), tableRules, Object.assign(Object.assign({}, (localParams || {})), { returnQuery: true }));
+                    return yield this.update(filter, data, Object.assign(Object.assign({}, (params || {})), { returning: undefined }), tableRules, Object.assign(Object.assign({}, (localParams || {})), { returnQuery: true }));
                 })));
-                return this.db.tx(t => t.batch(queries)).catch(err => makeErr(err, localParams));
+                // console.log(queries)
+                return this.db.tx(t => {
+                    const _queries = queries.map(q => t.none(q));
+                    return t.batch(_queries);
+                }).catch(err => makeErr(err, localParams));
             }
             catch (e) {
                 if (localParams && localParams.testRule)
@@ -1323,7 +1328,7 @@ class TableHandler extends ViewHandler {
                 if (tableRules && tableRules.update && tableRules.update.validate) {
                     nData = yield tableRules.update.validate(nData);
                 }
-                let query = exports.pgp.helpers.update(nData, columnSet);
+                let query = exports.pgp.helpers.update(nData, columnSet) + " ";
                 query += yield this.prepareWhere(filter, forcedFilter, filterFields, false, null, localParams, tableRules);
                 if (onConflictDoNothing)
                     query += " ON CONFLICT DO NOTHING ";

@@ -109,6 +109,7 @@ prostgles_server_1.default({
                     forcedFilter: { name: "abc" }
                 },
                 insert: "*",
+                update: "*",
                 delete: "*"
             },
             items4_pub: "*"

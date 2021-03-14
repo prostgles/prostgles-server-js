@@ -118,6 +118,7 @@ prostgles({
 					forcedFilter: { name: "abc" }
 				},
 				insert: "*",
+				update: "*",
 				delete: "*"
 			},
 

@@ -37,6 +37,13 @@ prostgles({
   },
   joins: "inferred",
   onReady: async (db: any, _db: any) => {
-    console.log("ok")
+    await _db.any("CREATE TABLE IF NOT EXISTS ttt(id INTEGER, t TEXT)");
+    // await db.ttt.insert([{ t: "a" }, { t: "b" }]);
+    await db.ttt.update({t: "a"}, { id: -1 })
+    await db.ttt.updateBatch([
+      [{t: "a"}, { id: -2 }],
+      [{t: "a"}, { id: -2 }]
+    ])
+    console.log("ok", await db.ttt.count({ t: "z" }), await db.ttt.count({ id: -1 }))
   },
 });

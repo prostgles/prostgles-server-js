@@ -452,11 +452,14 @@ export class PubSubManager {
                     const updates = data.filter(d =>  existingData.find(ed => rowsIdsMatch(ed, d) && +ed[synced_field] < +d[synced_field]) );
                     try {
                         if(table_rules.update && updates.length){
+                            let updateData: [any, any][] = [];
                             await Promise.all(updates.map(upd => {
                                 const id_filter = filterObj(upd, id_fields);
                                 const syncSafeFilter = { $and: [id_filter, { [synced_field]: { "<": upd[synced_field] } } ] }
-                                return tbl.update(syncSafeFilter, filterObj(upd, [], id_fields), { fixIssues: true }, table_rules)
+                                // return tbl.update(syncSafeFilter, filterObj(upd, [], id_fields), { fixIssues: true }, table_rules)
+                                updateData.push([syncSafeFilter, filterObj(upd, [], id_fields)])
                             }));
+                            await tbl.updateBatch(updateData, { fixIssues: true }, table_rules)
                             updated = updates.length;
                         }
                         if(table_rules.insert && inserts.length){
@@ -688,6 +691,9 @@ export class PubSubManager {
                     /******** */
                     /* TO DO -> Store and push patch updates instead of full data if and where possible */
                     /******** */
+                    // 1. Store successfully upserted wal items for a couple of seconds
+                    // 2. When pushing data to clients check if any matching wal items exist
+                    // 3. Replace text fields with matching patched data
 
                     return res;
                 },
@@ -703,7 +709,7 @@ export class PubSubManager {
         /* Express data sent from client */
         if(clientData){
             if(clientData.data && Array.isArray(clientData.data) && clientData.data.length){
-                sync.wal.addData(clientData.data);
+                sync.wal.addData(clientData.data.map(d => ({ current: d })));
                 return;
                 // await upsertData(clientData.data, true);
 

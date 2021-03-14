@@ -476,7 +476,7 @@ const RULE_TO_METHODS = [
     },
     {
         rule: "update",
-        methods: ["update", "upsert"],
+        methods: ["update", "upsert", "updateBatch"],
         no_limits: { fields: "*", filterFields: "*", returningFields: "*" },
         table_only: true,
         allowed_params: ["fields", "filterFields", "forcedFilter", "forcedData", "returningFields", "validate"],
@@ -638,7 +638,9 @@ class PublishParser {
                         if (table_rules[r.rule]) {
                             r.methods.map(method => {
                                 if (table_rules[method] === undefined) {
-                                    if (method === "upsert" && !(table_rules.update && table_rules.insert)) {
+                                    if (method === "updateBatch" && !table_rules.update) {
+                                    }
+                                    else if (method === "upsert" && (!table_rules.update || !table_rules.insert)) {
                                         // return;
                                     }
                                     else {
@@ -653,36 +655,6 @@ class PublishParser {
                         Check for invalid params
                     */
                     if (Object.keys(table_rules).length) {
-                        // let methods = Object.keys(table_rules);
-                        // /* Add implied secondary methods if not falsy */
-                        // RULE_TO_METHODS.map(rtms => {
-                        //     if(table_rules[rtms.rule]){
-                        //         rtms.methods.map(method => {
-                        //             if(table_rules[method] !== false){
-                        //                 table_rules[method] = {};
-                        //             }
-                        //         })
-                        //         methods = [ ...methods, ...rtms.methods ];
-                        //     }
-                        // });
-                        // /* Add complex implied methods unless specifically disabled */
-                        // if(methods.includes("insert") && methods.includes("update") && methods.includes("select") && table_rules.upsert !== false) { 
-                        //     methods = [ ...methods, "upsert" ];
-                        // } else {
-                        //     methods = methods.filter(m => m !== "upsert");
-                        // }
-                        // if(table_rules.select){
-                        //     ["count", "find", ]
-                        //     if(table_rules.count !== false) table_rules.count = {};
-                        //     if(table_rules.subscribe !== false) methods = [ ...methods, "subscribe" ];
-                        //     if(table_rules.getColumns !== false) methods = [ ...methods, "getColumns"];
-                        // }
-                        // if(table_rules.select && table_rules.subscribe !== false){
-                        //     table_rules.subscribe = { 
-                        //         ...RULE_TO_METHODS.find(r => r.rule === "subscribe").no_limits,
-                        //         ...(typeof table_rules.subscribe !== "string"? table_rules.subscribe : {})
-                        //     };
-                        // }
                         Object.keys(table_rules)
                             .filter(m => table_rules[m])
                             .find(method => {
@@ -746,21 +718,6 @@ class PublishParser {
                             let methods = [];
                             if (typeof table_rules === "object") {
                                 methods = Object.keys(table_rules);
-                                // /* Add simple implied methods methods if not falsy */
-                                // RULE_TO_METHODS.map(rtms => {
-                                //     if(table_rules[rtms.rule]) methods = [ ...methods, ...rtms.methods ];
-                                // });
-                                // /* Add complex implied methods unless specifically disabled */
-                                // if(methods.includes("insert") && methods.includes("update") && methods.includes("select") && 
-                                //     table_rules.upsert !== false
-                                // ) { 
-                                //     methods = [ ...methods, "upsert" ];
-                                // } else {
-                                //     methods = methods.filter(m => m !== "upsert");
-                                // }
-                                // if(methods.includes("find") && table_rules.count !== false) methods = [ ...methods, "count"];
-                                // if(methods.includes("find") && table_rules.subscribe !== false) methods = [ ...methods, "subscribe" ];
-                                // if(methods.includes("find") && table_rules.getColumns !== false) methods = [ ...methods, "getColumns"];
                             }
                             yield Promise.all(methods.filter(m => m !== "select").map((method) => __awaiter(this, void 0, void 0, function* () {
                                 if (method === "sync" && table_rules[method]) {
@@ -779,15 +736,6 @@ class PublishParser {
                                         catch (e) {
                                             err = "INTERNAL PUBLISH ERROR";
                                             schema[tableName][method] = { err };
-                                            /* What is going on here???? */
-                                            // if(["find", "findOne"].includes(method)){
-                                            //     if(schema[tableName].subscribe){
-                                            //         schema[tableName].subscribe = schema[tableName][method];
-                                            //     }
-                                            //     if(schema[tableName].count){
-                                            //         schema[tableName].count = schema[tableName][method];
-                                            //     }
-                                            // }
                                             throw `publish.${tableName}.${method}: \n   -> ${e}`;
                                         }
                                     }
@@ -802,6 +750,7 @@ class PublishParser {
                 console.error("Prostgles \nERRORS IN PUBLISH: ", JSON.stringify(e));
                 throw e;
             }
+            // console.log(schema)
             return schema;
         });
     }

@@ -1513,6 +1513,7 @@ export class TableHandler extends ViewHandler {
         super(db, tableOrViewInfo, pubSubManager, dboBuilder, t, joinPaths);
         this.tsDboDefs = this.tsDboDefs.concat([
             `   update: <T = Partial<${this.tsDataName}> | void> (filter: ${this.filterDef}, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<T>;`,
+            `   updateBatch: <T = Partial<${this.tsDataName}> | void> (updateData: [${this.filterDef}, ${this.tsDataName}][], params?: UpdateParams) => Promise<T>;`,
             `   upsert: <T = Partial<${this.tsDataName}> | void> (filter: ${this.filterDef}, newData: ${this.tsDataName}, params?: UpdateParams) => Promise<T>;`,
             `   insert: <T = Partial<${this.tsDataName}> | void> (data: (${this.tsDataName} | ${this.tsDataName}[]), params?: InsertParams) => Promise<T>;`,
             `   delete: <T = Partial<${this.tsDataName}> | void> (filter?: ${this.filterDef}, params?: DeleteParams) => Promise<T>;`,
@@ -1550,7 +1551,7 @@ export class TableHandler extends ViewHandler {
         try {
             const queries = await Promise.all(
                 data.map(async ([filter, data]) => 
-                    this.update(
+                    await this.update(
                         filter, 
                         data, 
                         { ...(params || {}), returning: undefined }, 
@@ -1559,7 +1560,11 @@ export class TableHandler extends ViewHandler {
                     )
                 )
             );
-            return this.db.tx(t => t.batch(queries)).catch(err => makeErr(err, localParams));
+            // console.log(queries)
+            return this.db.tx(t => {
+                const _queries = queries.map(q => t.none(q))
+                return t.batch(_queries)
+            }).catch(err => makeErr(err, localParams));
         } catch(e){
             if(localParams && localParams.testRule) throw e;
             throw { err: parseError(e), msg: `Issue with dbo.${this.name}.update()` };
@@ -1661,7 +1666,7 @@ export class TableHandler extends ViewHandler {
             if(tableRules && tableRules.update && tableRules.update.validate){
                 nData = await tableRules.update.validate(nData);
             }
-            let query = pgp.helpers.update(nData, columnSet);
+            let query = pgp.helpers.update(nData, columnSet) + " ";
             query += await this.prepareWhere(filter, forcedFilter, filterFields, false, null, localParams, tableRules);
             if(onConflictDoNothing) query += " ON CONFLICT DO NOTHING ";
 

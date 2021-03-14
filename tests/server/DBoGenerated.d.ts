@@ -95,6 +95,11 @@ export type Tt = {
      id?: number;
 };
 export type Tt_Filter = Tt | object | { $and: (Tt | object)[] } | { $or: (Tt | object)[] } 
+export type Ttt = {
+     id?: number;
+     t?: string;
+};
+export type Ttt_Filter = Ttt | object | { $and: (Ttt | object)[] } | { $or: (Ttt | object)[] } 
 export type V_items = {
      id?: number;
      name?: string;
@@ -109,6 +114,7 @@ export type DBO_ex_j_ins = {
    subscribeOne: (filter:  Ex_j_ins_Filter , params: SelectParams, onData: (item: Partial<Ex_j_ins & { [x: string]: any }>) => any) => Promise<{ unsubscribe: () => any }>;
    count: (filter?:  Ex_j_ins_Filter ) => Promise<number>;
    update: <T = Partial<Ex_j_ins> | void> (filter:  Ex_j_ins_Filter , newData: Ex_j_ins, params?: UpdateParams) => Promise<T>;
+   updateBatch: <T = Partial<Ex_j_ins> | void> (updateData: [ Ex_j_ins_Filter , Ex_j_ins][], params?: UpdateParams) => Promise<T>;
    upsert: <T = Partial<Ex_j_ins> | void> (filter:  Ex_j_ins_Filter , newData: Ex_j_ins, params?: UpdateParams) => Promise<T>;
    insert: <T = Partial<Ex_j_ins> | void> (data: (Ex_j_ins | Ex_j_ins[]), params?: InsertParams) => Promise<T>;
    delete: <T = Partial<Ex_j_ins> | void> (filter?:  Ex_j_ins_Filter , params?: DeleteParams) => Promise<T>; 
@@ -121,6 +127,7 @@ export type DBO_items = {
    subscribeOne: (filter:  Items_Filter , params: SelectParams, onData: (item: Partial<Items & { [x: string]: any }>) => any) => Promise<{ unsubscribe: () => any }>;
    count: (filter?:  Items_Filter ) => Promise<number>;
    update: <T = Partial<Items> | void> (filter:  Items_Filter , newData: Items, params?: UpdateParams) => Promise<T>;
+   updateBatch: <T = Partial<Items> | void> (updateData: [ Items_Filter , Items][], params?: UpdateParams) => Promise<T>;
    upsert: <T = Partial<Items> | void> (filter:  Items_Filter , newData: Items, params?: UpdateParams) => Promise<T>;
    insert: <T = Partial<Items> | void> (data: (Items | Items[]), params?: InsertParams) => Promise<T>;
    delete: <T = Partial<Items> | void> (filter?:  Items_Filter , params?: DeleteParams) => Promise<T>; 
@@ -133,6 +140,7 @@ export type DBO_items2 = {
    subscribeOne: (filter:  Items2_Filter , params: SelectParams, onData: (item: Partial<Items2 & { [x: string]: any }>) => any) => Promise<{ unsubscribe: () => any }>;
    count: (filter?:  Items2_Filter ) => Promise<number>;
    update: <T = Partial<Items2> | void> (filter:  Items2_Filter , newData: Items2, params?: UpdateParams) => Promise<T>;
+   updateBatch: <T = Partial<Items2> | void> (updateData: [ Items2_Filter , Items2][], params?: UpdateParams) => Promise<T>;
    upsert: <T = Partial<Items2> | void> (filter:  Items2_Filter , newData: Items2, params?: UpdateParams) => Promise<T>;
    insert: <T = Partial<Items2> | void> (data: (Items2 | Items2[]), params?: InsertParams) => Promise<T>;
    delete: <T = Partial<Items2> | void> (filter?:  Items2_Filter , params?: DeleteParams) => Promise<T>; 
@@ -145,6 +153,7 @@ export type DBO_items3 = {
    subscribeOne: (filter:  Items3_Filter , params: SelectParams, onData: (item: Partial<Items3 & { [x: string]: any }>) => any) => Promise<{ unsubscribe: () => any }>;
    count: (filter?:  Items3_Filter ) => Promise<number>;
    update: <T = Partial<Items3> | void> (filter:  Items3_Filter , newData: Items3, params?: UpdateParams) => Promise<T>;
+   updateBatch: <T = Partial<Items3> | void> (updateData: [ Items3_Filter , Items3][], params?: UpdateParams) => Promise<T>;
    upsert: <T = Partial<Items3> | void> (filter:  Items3_Filter , newData: Items3, params?: UpdateParams) => Promise<T>;
    insert: <T = Partial<Items3> | void> (data: (Items3 | Items3[]), params?: InsertParams) => Promise<T>;
    delete: <T = Partial<Items3> | void> (filter?:  Items3_Filter , params?: DeleteParams) => Promise<T>; 
@@ -157,6 +166,7 @@ export type DBO_items4 = {
    subscribeOne: (filter:  Items4_Filter , params: SelectParams, onData: (item: Partial<Items4 & { [x: string]: any }>) => any) => Promise<{ unsubscribe: () => any }>;
    count: (filter?:  Items4_Filter ) => Promise<number>;
    update: <T = Partial<Items4> | void> (filter:  Items4_Filter , newData: Items4, params?: UpdateParams) => Promise<T>;
+   updateBatch: <T = Partial<Items4> | void> (updateData: [ Items4_Filter , Items4][], params?: UpdateParams) => Promise<T>;
    upsert: <T = Partial<Items4> | void> (filter:  Items4_Filter , newData: Items4, params?: UpdateParams) => Promise<T>;
    insert: <T = Partial<Items4> | void> (data: (Items4 | Items4[]), params?: InsertParams) => Promise<T>;
    delete: <T = Partial<Items4> | void> (filter?:  Items4_Filter , params?: DeleteParams) => Promise<T>; 
@@ -169,6 +179,7 @@ export type DBO_items4_pub = {
    subscribeOne: (filter:  Items4_pub_Filter , params: SelectParams, onData: (item: Partial<Items4_pub & { [x: string]: any }>) => any) => Promise<{ unsubscribe: () => any }>;
    count: (filter?:  Items4_pub_Filter ) => Promise<number>;
    update: <T = Partial<Items4_pub> | void> (filter:  Items4_pub_Filter , newData: Items4_pub, params?: UpdateParams) => Promise<T>;
+   updateBatch: <T = Partial<Items4_pub> | void> (updateData: [ Items4_pub_Filter , Items4_pub][], params?: UpdateParams) => Promise<T>;
    upsert: <T = Partial<Items4_pub> | void> (filter:  Items4_pub_Filter , newData: Items4_pub, params?: UpdateParams) => Promise<T>;
    insert: <T = Partial<Items4_pub> | void> (data: (Items4_pub | Items4_pub[]), params?: InsertParams) => Promise<T>;
    delete: <T = Partial<Items4_pub> | void> (filter?:  Items4_pub_Filter , params?: DeleteParams) => Promise<T>; 
@@ -181,6 +192,7 @@ export type DBO_planes = {
    subscribeOne: (filter:  Planes_Filter , params: SelectParams, onData: (item: Partial<Planes & { [x: string]: any }>) => any) => Promise<{ unsubscribe: () => any }>;
    count: (filter?:  Planes_Filter ) => Promise<number>;
    update: <T = Partial<Planes> | void> (filter:  Planes_Filter , newData: Planes, params?: UpdateParams) => Promise<T>;
+   updateBatch: <T = Partial<Planes> | void> (updateData: [ Planes_Filter , Planes][], params?: UpdateParams) => Promise<T>;
    upsert: <T = Partial<Planes> | void> (filter:  Planes_Filter , newData: Planes, params?: UpdateParams) => Promise<T>;
    insert: <T = Partial<Planes> | void> (data: (Planes | Planes[]), params?: InsertParams) => Promise<T>;
    delete: <T = Partial<Planes> | void> (filter?:  Planes_Filter , params?: DeleteParams) => Promise<T>; 
@@ -193,6 +205,7 @@ export type DBO_table = {
    subscribeOne: (filter:  Table_Filter , params: SelectParams, onData: (item: Partial<Table & { [x: string]: any }>) => any) => Promise<{ unsubscribe: () => any }>;
    count: (filter?:  Table_Filter ) => Promise<number>;
    update: <T = Partial<Table> | void> (filter:  Table_Filter , newData: Table, params?: UpdateParams) => Promise<T>;
+   updateBatch: <T = Partial<Table> | void> (updateData: [ Table_Filter , Table][], params?: UpdateParams) => Promise<T>;
    upsert: <T = Partial<Table> | void> (filter:  Table_Filter , newData: Table, params?: UpdateParams) => Promise<T>;
    insert: <T = Partial<Table> | void> (data: (Table | Table[]), params?: InsertParams) => Promise<T>;
    delete: <T = Partial<Table> | void> (filter?:  Table_Filter , params?: DeleteParams) => Promise<T>; 
@@ -205,6 +218,7 @@ export type DBO_transaction = {
    subscribeOne: (filter:  Transaction_Filter , params: SelectParams, onData: (item: Partial<Transaction & { [x: string]: any }>) => any) => Promise<{ unsubscribe: () => any }>;
    count: (filter?:  Transaction_Filter ) => Promise<number>;
    update: <T = Partial<Transaction> | void> (filter:  Transaction_Filter , newData: Transaction, params?: UpdateParams) => Promise<T>;
+   updateBatch: <T = Partial<Transaction> | void> (updateData: [ Transaction_Filter , Transaction][], params?: UpdateParams) => Promise<T>;
    upsert: <T = Partial<Transaction> | void> (filter:  Transaction_Filter , newData: Transaction, params?: UpdateParams) => Promise<T>;
    insert: <T = Partial<Transaction> | void> (data: (Transaction | Transaction[]), params?: InsertParams) => Promise<T>;
    delete: <T = Partial<Transaction> | void> (filter?:  Transaction_Filter , params?: DeleteParams) => Promise<T>; 
@@ -217,9 +231,23 @@ export type DBO_tt = {
    subscribeOne: (filter:  Tt_Filter , params: SelectParams, onData: (item: Partial<Tt & { [x: string]: any }>) => any) => Promise<{ unsubscribe: () => any }>;
    count: (filter?:  Tt_Filter ) => Promise<number>;
    update: <T = Partial<Tt> | void> (filter:  Tt_Filter , newData: Tt, params?: UpdateParams) => Promise<T>;
+   updateBatch: <T = Partial<Tt> | void> (updateData: [ Tt_Filter , Tt][], params?: UpdateParams) => Promise<T>;
    upsert: <T = Partial<Tt> | void> (filter:  Tt_Filter , newData: Tt, params?: UpdateParams) => Promise<T>;
    insert: <T = Partial<Tt> | void> (data: (Tt | Tt[]), params?: InsertParams) => Promise<T>;
    delete: <T = Partial<Tt> | void> (filter?:  Tt_Filter , params?: DeleteParams) => Promise<T>; 
+};
+export type DBO_ttt = {
+    getColumns: () => Promise<any[]>;
+   find: (filter?:  Ttt_Filter , selectParams?: SelectParams) => Promise<Partial<Ttt & { [x: string]: any }>[]>;
+   findOne: (filter?:  Ttt_Filter , selectParams?: SelectParams) => Promise<Partial<Ttt & { [x: string]: any }>>;
+   subscribe: (filter:  Ttt_Filter , params: SelectParams, onData: (items: Partial<Ttt & { [x: string]: any }>[]) => any) => Promise<{ unsubscribe: () => any }>;
+   subscribeOne: (filter:  Ttt_Filter , params: SelectParams, onData: (item: Partial<Ttt & { [x: string]: any }>) => any) => Promise<{ unsubscribe: () => any }>;
+   count: (filter?:  Ttt_Filter ) => Promise<number>;
+   update: <T = Partial<Ttt> | void> (filter:  Ttt_Filter , newData: Ttt, params?: UpdateParams) => Promise<T>;
+   updateBatch: <T = Partial<Ttt> | void> (updateData: [ Ttt_Filter , Ttt][], params?: UpdateParams) => Promise<T>;
+   upsert: <T = Partial<Ttt> | void> (filter:  Ttt_Filter , newData: Ttt, params?: UpdateParams) => Promise<T>;
+   insert: <T = Partial<Ttt> | void> (data: (Ttt | Ttt[]), params?: InsertParams) => Promise<T>;
+   delete: <T = Partial<Ttt> | void> (filter?:  Ttt_Filter , params?: DeleteParams) => Promise<T>; 
 };
 export type DBO_v_items = {
     getColumns: () => Promise<any[]>;
@@ -247,6 +275,7 @@ export type DBObj = {
  table: DBO_table;
  transaction: DBO_transaction;
  tt: DBO_tt;
+ ttt: DBO_ttt;
  v_items: DBO_v_items;
  leftJoin: JoinMakerTables;
  innerJoin: JoinMakerTables;
