@@ -35,77 +35,113 @@ export type TxCB = {
 export type JoinMaker = (filter?: object, select?: FieldFilter, options?: SelectParams) => any;
 
 
+export type D_34_42_34 = {
+     "\"*\""?: string;
+     "id"?: number;
+};
+export type D_34_42_34_Filter = D_34_42_34 | object | { $and: (D_34_42_34 | object)[] } | { $or: (D_34_42_34 | object)[] } 
+export type D_42 = {
+     "*"?: string;
+     "id"?: number;
+};
+export type D_42_Filter = D_42 | object | { $and: (D_42 | object)[] } | { $or: (D_42 | object)[] } 
 export type Ex_j_ins = {
-     added?: Date;
-     id?: number;
-     name?: string;
-     public?: string;
+     "added"?: Date;
+     "id"?: number;
+     "name"?: string;
+     "public"?: string;
 };
 export type Ex_j_ins_Filter = Ex_j_ins | object | { $and: (Ex_j_ins | object)[] } | { $or: (Ex_j_ins | object)[] } 
 export type Items = {
-     h?: Array<string>;
-     id?: number;
-     name?: string;
+     "h"?: Array<string>;
+     "id"?: number;
+     "name"?: string;
 };
 export type Items_Filter = Items | object | { $and: (Items | object)[] } | { $or: (Items | object)[] } 
 export type Items2 = {
-     hh?: Array<string>;
-     id?: number;
-     items_id?: number;
-     name?: string;
+     "hh"?: Array<string>;
+     "id"?: number;
+     "items_id"?: number;
+     "name"?: string;
 };
 export type Items2_Filter = Items2 | object | { $and: (Items2 | object)[] } | { $or: (Items2 | object)[] } 
 export type Items3 = {
-     h?: Array<string>;
-     id?: number;
-     name?: string;
+     "h"?: Array<string>;
+     "id"?: number;
+     "name"?: string;
 };
 export type Items3_Filter = Items3 | object | { $and: (Items3 | object)[] } | { $or: (Items3 | object)[] } 
 export type Items4 = {
-     added?: Date;
-     id?: number;
-     name?: string;
-     public?: string;
+     "added"?: Date;
+     "id"?: number;
+     "name"?: string;
+     "public"?: string;
 };
 export type Items4_Filter = Items4 | object | { $and: (Items4 | object)[] } | { $or: (Items4 | object)[] } 
 export type Items4_pub = {
-     added?: Date;
-     id?: number;
-     name?: string;
-     public?: string;
+     "added"?: Date;
+     "id"?: number;
+     "name"?: string;
+     "public"?: string;
 };
 export type Items4_pub_Filter = Items4_pub | object | { $and: (Items4_pub | object)[] } | { $or: (Items4_pub | object)[] } 
 export type Planes = {
-     flight_number?: string;
-     id?: number;
-     last_updated?: number;
-     x?: number;
-     y?: number;
+     "flight_number"?: string;
+     "id"?: number;
+     "last_updated"?: number;
+     "x"?: number;
+     "y"?: number;
 };
 export type Planes_Filter = Planes | object | { $and: (Planes | object)[] } | { $or: (Planes | object)[] } 
 export type Table = {
-     id?: string;
+     "id"?: string;
 };
 export type Table_Filter = Table | object | { $and: (Table | object)[] } | { $or: (Table | object)[] } 
 export type Transaction = {
-     id?: string;
+     "id"?: string;
 };
 export type Transaction_Filter = Transaction | object | { $and: (Transaction | object)[] } | { $or: (Transaction | object)[] } 
 export type Tt = {
-     id?: number;
+     "id"?: number;
 };
 export type Tt_Filter = Tt | object | { $and: (Tt | object)[] } | { $or: (Tt | object)[] } 
 export type Ttt = {
-     id?: number;
-     t?: string;
+     "id"?: number;
+     "t"?: string;
 };
 export type Ttt_Filter = Ttt | object | { $and: (Ttt | object)[] } | { $or: (Ttt | object)[] } 
 export type V_items = {
-     id?: number;
-     name?: string;
+     "id"?: number;
+     "name"?: string;
 };
 export type V_items_Filter = V_items | object | { $and: (V_items | object)[] } | { $or: (V_items | object)[] } 
 
+export type DBO__34_42_34 = {
+    getColumns: () => Promise<any[]>;
+   find: (filter?:  D_34_42_34_Filter , selectParams?: SelectParams) => Promise<Partial<D_34_42_34 & { [x: string]: any }>[]>;
+   findOne: (filter?:  D_34_42_34_Filter , selectParams?: SelectParams) => Promise<Partial<D_34_42_34 & { [x: string]: any }>>;
+   subscribe: (filter:  D_34_42_34_Filter , params: SelectParams, onData: (items: Partial<D_34_42_34 & { [x: string]: any }>[]) => any) => Promise<{ unsubscribe: () => any }>;
+   subscribeOne: (filter:  D_34_42_34_Filter , params: SelectParams, onData: (item: Partial<D_34_42_34 & { [x: string]: any }>) => any) => Promise<{ unsubscribe: () => any }>;
+   count: (filter?:  D_34_42_34_Filter ) => Promise<number>;
+   update: <T = Partial<D_34_42_34> | void> (filter:  D_34_42_34_Filter , newData: D_34_42_34, params?: UpdateParams) => Promise<T>;
+   updateBatch: <T = Partial<D_34_42_34> | void> (updateData: [ D_34_42_34_Filter , D_34_42_34][], params?: UpdateParams) => Promise<T>;
+   upsert: <T = Partial<D_34_42_34> | void> (filter:  D_34_42_34_Filter , newData: D_34_42_34, params?: UpdateParams) => Promise<T>;
+   insert: <T = Partial<D_34_42_34> | void> (data: (D_34_42_34 | D_34_42_34[]), params?: InsertParams) => Promise<T>;
+   delete: <T = Partial<D_34_42_34> | void> (filter?:  D_34_42_34_Filter , params?: DeleteParams) => Promise<T>; 
+};
+export type DBO__42 = {
+    getColumns: () => Promise<any[]>;
+   find: (filter?:  D_42_Filter , selectParams?: SelectParams) => Promise<Partial<D_42 & { [x: string]: any }>[]>;
+   findOne: (filter?:  D_42_Filter , selectParams?: SelectParams) => Promise<Partial<D_42 & { [x: string]: any }>>;
+   subscribe: (filter:  D_42_Filter , params: SelectParams, onData: (items: Partial<D_42 & { [x: string]: any }>[]) => any) => Promise<{ unsubscribe: () => any }>;
+   subscribeOne: (filter:  D_42_Filter , params: SelectParams, onData: (item: Partial<D_42 & { [x: string]: any }>) => any) => Promise<{ unsubscribe: () => any }>;
+   count: (filter?:  D_42_Filter ) => Promise<number>;
+   update: <T = Partial<D_42> | void> (filter:  D_42_Filter , newData: D_42, params?: UpdateParams) => Promise<T>;
+   updateBatch: <T = Partial<D_42> | void> (updateData: [ D_42_Filter , D_42][], params?: UpdateParams) => Promise<T>;
+   upsert: <T = Partial<D_42> | void> (filter:  D_42_Filter , newData: D_42, params?: UpdateParams) => Promise<T>;
+   insert: <T = Partial<D_42> | void> (data: (D_42 | D_42[]), params?: InsertParams) => Promise<T>;
+   delete: <T = Partial<D_42> | void> (filter?:  D_42_Filter , params?: DeleteParams) => Promise<T>; 
+};
 export type DBO_ex_j_ins = {
     getColumns: () => Promise<any[]>;
    find: (filter?:  Ex_j_ins_Filter , selectParams?: SelectParams) => Promise<Partial<Ex_j_ins & { [x: string]: any }>[]>;
@@ -259,24 +295,26 @@ export type DBO_v_items = {
 };
 
 export type JoinMakerTables = {
- items: JoinMaker;
- items2: JoinMaker;
- items3: JoinMaker;
+ "items": JoinMaker;
+ "items2": JoinMaker;
+ "items3": JoinMaker;
 };
 
 export type DBObj = {
- ex_j_ins: DBO_ex_j_ins;
- items: DBO_items;
- items2: DBO_items2;
- items3: DBO_items3;
- items4: DBO_items4;
- items4_pub: DBO_items4_pub;
- planes: DBO_planes;
- table: DBO_table;
- transaction: DBO_transaction;
- tt: DBO_tt;
- ttt: DBO_ttt;
- v_items: DBO_v_items;
+ "\"*\"": DBO__34_42_34;
+ "*": DBO__42;
+ "Ex_j_ins": DBO_ex_j_ins;
+ "Items": DBO_items;
+ "Items2": DBO_items2;
+ "Items3": DBO_items3;
+ "Items4": DBO_items4;
+ "Items4_pub": DBO_items4_pub;
+ "Planes": DBO_planes;
+ "Table": DBO_table;
+ "Transaction": DBO_transaction;
+ "Tt": DBO_tt;
+ "Ttt": DBO_ttt;
+ "V_items": DBO_v_items;
  leftJoin: JoinMakerTables;
  innerJoin: JoinMakerTables;
  leftJoinOne: JoinMakerTables;

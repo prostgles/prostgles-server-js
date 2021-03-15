@@ -31,6 +31,9 @@ async function isomorphic(db) {
             { name: "abc2", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
             { name: "abcd", public: "public data d", added: new Date('04 Dec 1996 00:12:00 GMT') }
         ]);
+        await db["*"].insert([{ "*": "a" }, { "*": "a" }, { "*": "b" }]);
+        await db[`"*"`].insert([{ [`"*"`]: "a" }, { [`"*"`]: "a" }, { [`"*"`]: "b" }]);
+        console.log(await db["*"].find());
     });
     await tryRun("Update batch example", async () => {
         await db.items4.updateBatch([

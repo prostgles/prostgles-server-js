@@ -4,9 +4,9 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { pgp, Filter, LocalParams, asName, isPlainObject, TableHandler, ViewHandler } from "./DboBuilder";
+import { pgp, Filter, LocalParams, isPlainObject, TableHandler, ViewHandler } from "./DboBuilder";
 import { TableRule, flat } from "./Prostgles";
-import { SelectParams, isEmpty, FieldFilter } from "prostgles-types";
+import { SelectParams, isEmpty, FieldFilter, asName } from "prostgles-types";
 import { get } from "./utils";
 
 export type SelectItem = {
@@ -157,7 +157,7 @@ export const FUNCTIONS: FunctionSpec[] = [
       } else {
         qVal = pgp.as.format(qType + "($1)", [qVal])
       }
-      const res = pgp.as.format("ts_headline($1:name::text, $2:raw)", [args[0], qVal]);
+      const res = pgp.as.format("ts_headline(" + asName(args[0]) + "::text, $1:raw)", [qVal]);
       return res
     }
   },
@@ -170,7 +170,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: false,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
-      return pgp.as.format("ST_AsGeoJSON($1:name)::json", [args[0]]);
+      return pgp.as.format("ST_AsGeoJSON(" + asName(args[0]) + ")::json");
     }
   },
   {
@@ -179,7 +179,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: false,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
-      return pgp.as.format("LEFT($1:name, $2)", [args[0], args[1]]);
+      return pgp.as.format("LEFT(" + asName(args[0]) + ", $1)", [args[1]]);
     }
   },
 
@@ -190,9 +190,9 @@ export const FUNCTIONS: FunctionSpec[] = [
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
       if(args.length === 3){
-        return pgp.as.format("to_char($1:name, $2, $3)", [args[0], args[1], args[2]]);
+        return pgp.as.format("to_char(" + asName(args[0]) + ", $2, $3)", [args[0], args[1], args[2]]);
       }
-      return pgp.as.format("to_char($1:name, $2)", [args[0], args[1]]);
+      return pgp.as.format("to_char(" + asName(args[0]) + ", $2)", [args[0], args[1]]);
     }
   },
 
@@ -203,7 +203,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: false,
     getFields: (args: any[]) => [args[1]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
-      return pgp.as.format(funcName + "($1, $2:name)", [args[0], args[1]]);
+      return pgp.as.format(funcName + "($1, " + asName(args[1]) + ")", [args[0], args[1]]);
     }
   } as FunctionSpec)),
 
@@ -248,7 +248,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: true,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
-      return pgp.as.format("trim(to_char($1:name, $2))", [args[0], txt]);
+      return pgp.as.format("trim(to_char(" + asName(args[0]) + ", $2))", [args[0], txt]);
     }
   } as FunctionSpec)),
 
@@ -259,7 +259,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: true,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
-      return pgp.as.format(funcName + "($1:name)", [args[0]]);
+      return funcName + "(" + asName(args[0]) + ")";
     }
   } as FunctionSpec)),
 
@@ -270,7 +270,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: true,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
-      return pgp.as.format(aggName + "($1:name)", [args[0]]);
+      return aggName + "(" + asName(args[0]) + ")";
     }
   } as FunctionSpec)),
 

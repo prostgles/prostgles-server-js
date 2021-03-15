@@ -16,7 +16,6 @@ import { DB, TableRule, Join, Prostgles, PublishParser } from "./Prostgles";
 import { PubSubManager } from "./PubSubManager";
 declare type PGP = pgPromise.IMain<{}, pg.IClient>;
 export declare const pgp: PGP;
-export declare const asName: (str: string) => string;
 export declare type TableInfo = {
     schema: string;
     name: string;
@@ -108,6 +107,17 @@ export declare type ValidatedTableRules = {
     };
 };
 declare const EXISTS_KEYS: string[];
+declare class ColSet {
+    opts: {
+        columns: ColumnInfo[];
+        tableName: string;
+        colNames: string[];
+    };
+    constructor(columns: ColumnInfo[], tableName: string);
+    private getRow;
+    getInsertQuery(data: any[], allowedCols: string[]): string;
+    getUpdateQuery(data: any[], allowedCols: string[]): string;
+}
 export declare type ExistsFilterConfig = {
     key: string;
     f2: Filter;
@@ -119,10 +129,11 @@ export declare type ExistsFilterConfig = {
 export declare class ViewHandler {
     db: DB;
     name: string;
+    escapedName: string;
     columns: ColumnInfo[];
     column_names: string[];
     tableOrViewInfo: TableOrViewInfo;
-    columnSet: any;
+    colSet: ColSet;
     tsDataDef: string;
     tsDataName: string;
     tsDboDefs: string[];
@@ -192,10 +203,6 @@ export declare class ViewHandler {
     */
     parseFieldFilter(fieldParams?: FieldFilter, allow_empty?: boolean, allowed_cols?: string[]): string[];
 }
-declare type ValidDataAndColumnSet = {
-    data: object;
-    columnSet: any;
-};
 declare type ValidatedParams = {
     row: object;
     forcedData: object;
@@ -214,7 +221,10 @@ export declare class TableHandler extends ViewHandler {
     willBatch(query: string): boolean;
     updateBatch(data: [Filter, object][], params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
     update(filter: Filter, newData: object, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
-    validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues }: ValidatedParams): ValidDataAndColumnSet;
+    validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues }: ValidatedParams): {
+        data: any;
+        allowedCols: string[];
+    };
     insert(data: (object | object[]), param2?: InsertParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<any | any[] | boolean>;
     prepareReturning: (returning: FieldFilter, allowedFields: string[], tableAlias?: string) => Promise<string>;
     delete(filter?: Filter, params?: DeleteParams, param3_unused?: any, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;

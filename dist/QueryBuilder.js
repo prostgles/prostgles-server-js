@@ -19,9 +19,9 @@ const Prostgles_1 = require("./Prostgles");
 const prostgles_types_1 = require("prostgles-types");
 const utils_1 = require("./utils");
 exports.asNameAlias = (field, tableAlias) => {
-    let result = DboBuilder_1.asName(field);
+    let result = prostgles_types_1.asName(field);
     if (tableAlias)
-        return DboBuilder_1.asName(tableAlias) + "." + result;
+        return prostgles_types_1.asName(tableAlias) + "." + result;
     return result;
 };
 /**
@@ -108,7 +108,7 @@ exports.FUNCTIONS = [
             else {
                 qVal = DboBuilder_1.pgp.as.format(qType + "($1)", [qVal]);
             }
-            const res = DboBuilder_1.pgp.as.format("ts_headline($1:name::text, $2:raw)", [args[0], qVal]);
+            const res = DboBuilder_1.pgp.as.format("ts_headline(" + prostgles_types_1.asName(args[0]) + "::text, $1:raw)", [qVal]);
             return res;
         }
     },
@@ -118,7 +118,7 @@ exports.FUNCTIONS = [
         singleColArg: false,
         getFields: (args) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
-            return DboBuilder_1.pgp.as.format("ST_AsGeoJSON($1:name)::json", [args[0]]);
+            return DboBuilder_1.pgp.as.format("ST_AsGeoJSON(" + prostgles_types_1.asName(args[0]) + ")::json");
         }
     },
     {
@@ -127,7 +127,7 @@ exports.FUNCTIONS = [
         singleColArg: false,
         getFields: (args) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
-            return DboBuilder_1.pgp.as.format("LEFT($1:name, $2)", [args[0], args[1]]);
+            return DboBuilder_1.pgp.as.format("LEFT(" + prostgles_types_1.asName(args[0]) + ", $1)", [args[1]]);
         }
     },
     {
@@ -137,9 +137,9 @@ exports.FUNCTIONS = [
         getFields: (args) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
             if (args.length === 3) {
-                return DboBuilder_1.pgp.as.format("to_char($1:name, $2, $3)", [args[0], args[1], args[2]]);
+                return DboBuilder_1.pgp.as.format("to_char(" + prostgles_types_1.asName(args[0]) + ", $2, $3)", [args[0], args[1], args[2]]);
             }
-            return DboBuilder_1.pgp.as.format("to_char($1:name, $2)", [args[0], args[1]]);
+            return DboBuilder_1.pgp.as.format("to_char(" + prostgles_types_1.asName(args[0]) + ", $2)", [args[0], args[1]]);
         }
     },
     /* Date funcs date_part */
@@ -149,7 +149,7 @@ exports.FUNCTIONS = [
         singleColArg: false,
         getFields: (args) => [args[1]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
-            return DboBuilder_1.pgp.as.format(funcName + "($1, $2:name)", [args[0], args[1]]);
+            return DboBuilder_1.pgp.as.format(funcName + "($1, " + prostgles_types_1.asName(args[1]) + ")", [args[0], args[1]]);
         }
     })),
     /* Handy date funcs */
@@ -186,7 +186,7 @@ exports.FUNCTIONS = [
         singleColArg: true,
         getFields: (args) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
-            return DboBuilder_1.pgp.as.format("trim(to_char($1:name, $2))", [args[0], txt]);
+            return DboBuilder_1.pgp.as.format("trim(to_char(" + prostgles_types_1.asName(args[0]) + ", $2))", [args[0], txt]);
         }
     })),
     /* Basic 1 arg col funcs */
@@ -196,7 +196,7 @@ exports.FUNCTIONS = [
         singleColArg: true,
         getFields: (args) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
-            return DboBuilder_1.pgp.as.format(funcName + "($1:name)", [args[0]]);
+            return funcName + "(" + prostgles_types_1.asName(args[0]) + ")";
         }
     })),
     /* Aggs */
@@ -206,7 +206,7 @@ exports.FUNCTIONS = [
         singleColArg: true,
         getFields: (args) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
-            return DboBuilder_1.pgp.as.format(aggName + "($1:name)", [args[0]]);
+            return aggName + "(" + prostgles_types_1.asName(args[0]) + ")";
         }
     })),
     /* More aggs */
@@ -280,7 +280,7 @@ class SelectItemBuilder {
             this.addItem({
                 type: "column",
                 alias,
-                getQuery: () => DboBuilder_1.asName(fieldName),
+                getQuery: () => prostgles_types_1.asName(fieldName),
                 getFields: () => [fieldName],
                 selected
             });
@@ -637,29 +637,29 @@ exports.getNewQuery = getNewQuery;
 function makeQuery(_this, q, depth = 0, joinFields = []) {
     const PREF = `prostgles`, joins = q.joins || [], 
     // aggs = q.aggs || [],
-    makePref = (q) => !q.tableAlias ? q.table : `${q.tableAlias || ""}_${q.table}`, makePrefANON = (joinAlias, table) => DboBuilder_1.asName(!joinAlias ? table : `${joinAlias || ""}_${table}`), makePrefAN = (q) => DboBuilder_1.asName(makePref(q));
+    makePref = (q) => !q.tableAlias ? q.table : `${q.tableAlias || ""}_${q.table}`, makePrefANON = (joinAlias, table) => prostgles_types_1.asName(!joinAlias ? table : `${joinAlias || ""}_${table}`), makePrefAN = (q) => prostgles_types_1.asName(makePref(q));
     const indentLine = (numInd, str, indentStr = "    ") => new Array(numInd).fill(indentStr).join("") + str;
     const indStr = (numInd, str) => str.split("\n").map(s => indentLine(numInd, s)).join("\n");
     const indjArr = (numInd, strArr, indentStr = "    ") => strArr.map(str => indentLine(numInd, str));
     const indJ = (numInd, strArr, separator = " \n ", indentStr = "    ") => indjArr(numInd, strArr, indentStr).join(separator);
     const selectArrComma = (strArr) => strArr.map((s, i, arr) => s + (i < arr.length - 1 ? " , " : " "));
-    const prefJCAN = (q, str) => DboBuilder_1.asName(`${q.tableAlias || q.table}_${PREF}_${str}`);
+    const prefJCAN = (q, str) => prostgles_types_1.asName(`${q.tableAlias || q.table}_${PREF}_${str}`);
     // const indent = (a, b) => a;
     const joinTables = (q1, q2) => {
         const paths = _this.getJoins(q1.table, q2.table, q2.$path);
         return Prostgles_1.flat(paths.map(({ table, on }, i) => {
             const getPrevColName = (col) => {
-                return table === q1.table ? q1.select.find(s => s.getQuery() === DboBuilder_1.asName(col)).alias : col;
+                return table === q1.table ? q1.select.find(s => s.getQuery() === prostgles_types_1.asName(col)).alias : col;
             };
             const getThisColName = (col) => {
-                return table === q2.table ? q2.select.find(s => s.getQuery() === DboBuilder_1.asName(col)).alias : col;
+                return table === q2.table ? q2.select.find(s => s.getQuery() === prostgles_types_1.asName(col)).alias : col;
             };
             const prevTable = i === 0 ? q1.table : (paths[i - 1].table);
             const thisAlias = makePrefANON(q2.tableAlias, table);
             const prevAlias = i === 0 ? makePrefAN(q1) : thisAlias;
             // If root then prev table is aliased from root query. Alias from join otherwise
             let iQ = [
-                DboBuilder_1.asName(table) + ` ${thisAlias}`
+                prostgles_types_1.asName(table) + ` ${thisAlias}`
             ];
             /* If target table then add filters, options, etc */
             if (i === paths.length - 1) {
@@ -673,10 +673,10 @@ function makeQuery(_this, q, depth = 0, joinFields = []) {
                 const targetSelect = q2.select.filter(s => s.selected).map(s => {
                     /* Rename aggs to avoid collision with join cols */
                     if (s.type === "aggregation")
-                        return DboBuilder_1.asName(`agg_${s.alias}`) + " AS " + DboBuilder_1.asName(s.alias);
+                        return prostgles_types_1.asName(`agg_${s.alias}`) + " AS " + prostgles_types_1.asName(s.alias);
                     return s.alias;
                 }).join(", ");
-                const _iiQ = makeQuery(_this, q2, depth + 1, on.map(([c1, c2]) => DboBuilder_1.asName(c2)));
+                const _iiQ = makeQuery(_this, q2, depth + 1, on.map(([c1, c2]) => prostgles_types_1.asName(c2)));
                 // const iiQ = flat(_iiQ.split("\n")); // prettify for debugging
                 // console.log(_iiQ)
                 const iiQ = [_iiQ];
@@ -689,7 +689,7 @@ function makeQuery(_this, q, depth = 0, joinFields = []) {
                         `row_to_json((select x from (SELECT ${targetSelect}) as x)) AS ${prefJCAN(q2, `json`)}`,
                         `FROM (`,
                         ...iiQ,
-                        `) ${DboBuilder_1.asName(q2.table)}    `
+                        `) ${prostgles_types_1.asName(q2.table)}    `
                     ]),
                     `) ${thisAlias}`
                 ];
@@ -697,7 +697,7 @@ function makeQuery(_this, q, depth = 0, joinFields = []) {
             let jres = [
                 `${q2.isLeftJoin ? "LEFT" : "INNER"} JOIN `,
                 ...iQ,
-                `ON ${on.map(([c1, c2]) => `${prevAlias}.${DboBuilder_1.asName(getPrevColName(c1))} = ${thisAlias}.${DboBuilder_1.asName(getThisColName(c2))} `).join(" AND ")}`
+                `ON ${on.map(([c1, c2]) => `${prevAlias}.${prostgles_types_1.asName(getPrevColName(c1))} = ${thisAlias}.${prostgles_types_1.asName(getThisColName(c2))} `).join(" AND ")}`
             ];
             return jres;
         }));
@@ -726,7 +726,7 @@ function makeQuery(_this, q, depth = 0, joinFields = []) {
             if (nonAggs.length) {
                 let groupByFields = nonAggs.filter(sf => !depth || joinFields.includes(sf.getQuery()));
                 if (groupByFields.length) {
-                    groupBy = `GROUP BY ${groupByFields.map(sf => sf.type === "function" ? sf.getQuery() : DboBuilder_1.asName(sf.alias)).join(", ")}\n`;
+                    groupBy = `GROUP BY ${groupByFields.map(sf => sf.type === "function" ? sf.getQuery() : prostgles_types_1.asName(sf.alias)).join(", ")}\n`;
                 }
             }
         }
@@ -739,11 +739,11 @@ function makeQuery(_this, q, depth = 0, joinFields = []) {
                 // return s.getQuery() + ((s.type !== "column")? (" AS " + s.alias) : "")
                 if (s.type === "aggregation") {
                     /* Rename aggs to avoid collision with join cols */
-                    return s.getQuery() + " AS " + DboBuilder_1.asName((depth ? "agg_" : "") + s.alias);
+                    return s.getQuery() + " AS " + prostgles_types_1.asName((depth ? "agg_" : "") + s.alias);
                 }
-                return s.getQuery() + " AS " + DboBuilder_1.asName(s.alias);
+                return s.getQuery() + " AS " + prostgles_types_1.asName(s.alias);
             }).join(", "),
-            `FROM ${DboBuilder_1.asName(q.table)} `,
+            `FROM ${prostgles_types_1.asName(q.table)} `,
             q.where,
             groupBy //!aggs.length? "" : `GROUP BY ${nonAggs.map(sf => asName(sf.alias)).join(", ")}`,
             ,
@@ -766,16 +766,16 @@ function makeQuery(_this, q, depth = 0, joinFields = []) {
     let rootGroupBy;
     if ((aggs.length || q.joins && q.joins.length) && nonAggs.length) {
         // console.log({ aggs, nonAggs, joins: q.joins })
-        rootGroupBy = `GROUP BY ${(depth ? q.allFields : nonAggs.map(s => s.type === "function" ? s.getQuery() : DboBuilder_1.asName(s.alias))).concat(aggs && aggs.length ? [] : [`ctid`]).filter(s => s).join(", ")} `;
+        rootGroupBy = `GROUP BY ${(depth ? q.allFields : nonAggs.map(s => s.type === "function" ? s.getQuery() : prostgles_types_1.asName(s.alias))).concat(aggs && aggs.length ? [] : [`ctid`]).filter(s => s).join(", ")} `;
     }
     /* Joined query */
     const rootSelect = [
         " \n",
         `-- 0. [joined root]  `,
         "SELECT    ",
-        ...selectArrComma(q.select.filter(s => depth || s.selected).map(s => s.getQuery() + " AS " + DboBuilder_1.asName(s.alias)).concat(joins.map((j, i) => {
+        ...selectArrComma(q.select.filter(s => depth || s.selected).map(s => s.getQuery() + " AS " + prostgles_types_1.asName(s.alias)).concat(joins.map((j, i) => {
             const jsq = `json_agg(${prefJCAN(j, `json`)}::jsonb ORDER BY ${prefJCAN(j, `rowid_sorted`)}) FILTER (WHERE ${prefJCAN(j, `limit`)} <= ${j.limit} AND ${prefJCAN(j, `dupes_rowid`)} = 1 AND ${prefJCAN(j, `json`)} IS NOT NULL)`;
-            const resAlias = DboBuilder_1.asName(j.tableAlias || j.table);
+            const resAlias = prostgles_types_1.asName(j.tableAlias || j.table);
             // If limit = 1 then return a single json object (first one)
             return (j.limit === 1 ? `${jsq}->0 ` : `COALESCE(${jsq}, '[]') `) + `  AS ${resAlias}`;
         }))),
@@ -799,7 +799,7 @@ function makeQuery(_this, q, depth = 0, joinFields = []) {
                     "-- 3. [source table] ",
                     "SELECT ",
                     "*, row_number() over() as ctid ",
-                    `FROM ${DboBuilder_1.asName(q.table)} `,
+                    `FROM ${prostgles_types_1.asName(q.table)} `,
                     `${q.where} `
                 ]),
                 `) ${makePrefAN(q)} `,

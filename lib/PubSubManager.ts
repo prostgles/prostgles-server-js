@@ -5,13 +5,13 @@
 
 import { PostgresNotifListenManager } from "./PostgresNotifListenManager";
 import { get } from "./utils";
-import { TableOrViewInfo, TableInfo, DbHandler, TableHandler, asName, DboBuilder } from "./DboBuilder";
+import { TableOrViewInfo, TableInfo, DbHandler, TableHandler, DboBuilder } from "./DboBuilder";
 import { TableRule, DB } from "./Prostgles";
 
 import * as Bluebird from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import { SelectParams, OrderBy, FieldFilter, WAL } from "prostgles-types";
+import { SelectParams, OrderBy, FieldFilter, asName, WAL } from "prostgles-types";
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 let pgp: PGP = pgPromise({
     promiseLib: Bluebird
@@ -1066,7 +1066,7 @@ export class PubSubManager {
     }
 
     getTriggerName(table_name, suffix){
-        return pgp.as.format("$1:name", [`prostgles_triggers_${table_name}_${suffix}`]);
+        return asName(`prostgles_triggers_${table_name}_${suffix}`);
     }
 
 
@@ -1080,7 +1080,7 @@ export class PubSubManager {
                 AND table_name = 'hypertable' \
         );", { schema });
         if(res.exists){
-            let isHyperTable = await this.db.any("SELECT * FROM ${schema:name}.hypertable WHERE table_name = ${table_name};", { table_name, schema });
+            let isHyperTable = await this.db.any("SELECT * FROM " + asName(schema) + ".hypertable WHERE table_name = ${table_name};", { table_name, schema });
             if(isHyperTable && isHyperTable.length){
                 throw "Triggers do not work on timescaledb hypertables due to bug:\nhttps://github.com/timescale/timescaledb/issues/1084"
             }
@@ -1135,8 +1135,8 @@ export class PubSubManager {
         this.addingTrigger = true;
 
         await this.checkIfTimescaleBug(table_name);
-        const func_name_escaped = pgp.as.format("$1:name", [`prostgles_funcs_${table_name}`]),
-            table_name_escaped = pgp.as.format("$1:name", [table_name]),
+        const func_name_escaped = asName(`prostgles_funcs_${table_name}`),
+            table_name_escaped = asName(table_name),
             delimiter = PubSubManager.DELIMITER,
             query = ` BEGIN;
                 CREATE OR REPLACE FUNCTION ${func_name_escaped}() RETURNS TRIGGER AS $$
@@ -1255,7 +1255,7 @@ export class PubSubManager {
 
 /* Get only the specified properties of an object */
 export function filterObj(obj: object, keys: string[] = [], exclude?: string[]): object{
-    if(exclude) keys = Object.keys(obj).filter(k => !exclude.includes(k))
+    if(exclude && exclude.length) keys = Object.keys(obj).filter(k => !exclude.includes(k))
     if(!keys.length) {
         // console.warn("filterObj: returning empty object");
         return {};

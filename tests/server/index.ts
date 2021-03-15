@@ -34,6 +34,11 @@ type USER = {
 }
 const users: USER[] = [{ id: "1a", username: "john", password: "secret" }];
 
+process.on('unhandledRejection', (reason, p) => {
+  console.trace('Unhandled Rejection at:', p, 'reason:', reason)
+  process.exit(1)
+});
+
 prostgles({
 	dbConnection: {
 		host: process.env.POSTGRES_HOST || "localhost",
@@ -45,8 +50,9 @@ prostgles({
 	sqlFilePath: path.join(__dirname+'/init.sql'),
 	io,
 	tsGeneratedTypesDir: path.join(__dirname + '/'),
-	// watchSchema: true,
+	watchSchema: true,
 	transactions: true,
+	// DEBUG_MODE: true,
 	onSocketConnect: (socket) => {
 		log("onSocketConnect")
 		if(clientTest){
@@ -122,7 +128,17 @@ prostgles({
 				delete: "*"
 			},
 
-			items4_pub: "*"
+			items4_pub: "*",
+			"*": {
+				select: { fields: { "*": 0 }},
+				insert: "*",
+				update: "*",
+			},
+			[`"*"`]: {
+				select: { fields: { [`"*"`]: 0 }},
+				insert: "*",
+				update: "*",
+			}
 		};
 		
 		// return {
@@ -150,7 +166,13 @@ prostgles({
 		}
 	],
 	onReady: async (db: DbHandler, _db: DB) => {
-		   
+		  //  finish this
+		console.log("onReady ", Boolean(db.hehe))
+		// if(!db.hehe)	await _db.any("CREATE TABLE hehe(id SERIAL);");
+		// setTimeout(() => {
+		// 	_db.any("DROP TABLE IF EXISTS hehe;");
+		// }, 1000);
+		
     app.get('*', function(req, res){
       log(req.originalUrl)
 			res.sendFile(path.join(__dirname+'/index.html'));

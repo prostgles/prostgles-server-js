@@ -206,6 +206,7 @@ export declare class Prostgles {
         query: string;
     }) => void);
     private loaded;
+    onReady: (dbo: any, db: DB) => void;
     constructor(params: ProstglesInitOptions);
     onSchemaChange(event: {
         command: string;
@@ -216,6 +217,7 @@ export declare class Prostgles {
         fileName: string;
         fullPath: string;
     };
+    private getFileText;
     writeDBSchema(): void;
     init(onReady: (dbo: DbHandler | DbHandlerTX, db: DB) => any): Promise<boolean>;
     runSQLFile(filePath: string): Promise<boolean | void>;

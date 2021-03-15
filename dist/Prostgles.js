@@ -21,7 +21,8 @@ const version = pkgj.version;
 const utils_1 = require("./utils");
 const DboBuilder_1 = require("./DboBuilder");
 const PubSubManager_1 = require("./PubSubManager");
-function getDbConnection(dbConnection, options, debugQueries = false) {
+let currConnection;
+function getDbConnection(dbConnection, options, debugQueries = false, noNewConnections = true) {
     let pgp = pgPromise(Object.assign({ promiseLib: promise }, (debugQueries ? {
         query: function (e) {
             console.log({ psql: e.query, params: e.params });
@@ -33,8 +34,13 @@ function getDbConnection(dbConnection, options, debugQueries = false) {
     if (options) {
         Object.assign(pgp.pg.defaults, options);
     }
-    const db = pgp(dbConnection);
-    return { db, pgp };
+    if (!currConnection || !noNewConnections) {
+        currConnection = {
+            db: pgp(dbConnection),
+            pgp
+        };
+    }
+    return currConnection;
 }
 const QueryFile = require('pg-promise').QueryFile;
 exports.JOIN_TYPES = ["one-many", "many-one", "one-one", "many-many"];
@@ -84,8 +90,9 @@ class Prostgles {
                 //     });
                 // }
                 console.log("Schema chnaged. Rewriting Definitions file");
+                this.init(this.onReady);
                 /* Rewrite schema if different */
-                this.writeDBSchema();
+                // this.writeDBSchema();
                 // const { fullPath, fileName } = this.getTSFileName();
                 // fs.readFile(fullPath, 'utf8', function(err, data) {
                 //     console.log("Prostgles: Schema changed");
@@ -102,6 +109,16 @@ class Prostgles {
         const fileName = "DBoGenerated.d.ts"; //`dbo_${this.schema}_types.ts`;
         const fullPath = (this.tsGeneratedTypesDir || "") + fileName;
         return { fileName, fullPath };
+    }
+    getFileText(fullPath, format = "utf8") {
+        return new Promise((resolve, reject) => {
+            fs.readFile(fullPath, 'utf8', function (err, data) {
+                if (err)
+                    reject(err);
+                else
+                    resolve(data);
+            });
+        });
     }
     writeDBSchema() {
         if (this.tsGeneratedTypesDir) {
@@ -172,23 +189,28 @@ class Prostgles {
                 return true;
             }
             catch (e) {
+                console.trace(e);
                 throw "init issues: " + e.toString();
             }
         });
     }
     runSQLFile(filePath) {
-        // console.log(module.parent.path);
-        let _actualFilePath = sql(filePath); // module.parent.path + filePath;
-        return this.db.multi(_actualFilePath).then((data) => {
-            console.log("Prostgles: SQL file executed successfuly -> " + filePath);
-            return true;
-        }).catch((err) => {
-            console.log(filePath + "    file error: ", err);
+        return __awaiter(this, void 0, void 0, function* () {
+            console.log(filePath);
+            const fileContent = yield this.getFileText(filePath); //.then(console.log);
+            // console.log(module.parent.path);
+            // let _actualFilePath = sql(filePath)  // module.parent.path + filePath;
+            return this.db.multi(fileContent).then((data) => {
+                console.log("Prostgles: SQL file executed successfuly -> " + filePath);
+                return true;
+            }).catch((err) => {
+                console.log(filePath + "    file error: ", err);
+            });
+            // Helper for linking to external query files:
+            function sql(fullPath) {
+                return new QueryFile(fullPath, { minify: false });
+            }
         });
-        // Helper for linking to external query files:
-        function sql(fullPath) {
-            return new QueryFile(fullPath, { minify: false });
-        }
     }
     getSID(socket) {
         if (!this.auth)

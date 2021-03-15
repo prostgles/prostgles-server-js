@@ -24,6 +24,10 @@ const stopTest = (err) => {
 };
 const sessions = [];
 const users = [{ id: "1a", username: "john", password: "secret" }];
+process.on('unhandledRejection', (reason, p) => {
+    console.trace('Unhandled Rejection at:', p, 'reason:', reason);
+    process.exit(1);
+});
 prostgles_server_1.default({
     dbConnection: {
         host: process.env.POSTGRES_HOST || "localhost",
@@ -35,8 +39,9 @@ prostgles_server_1.default({
     sqlFilePath: path_1.default.join(__dirname + '/init.sql'),
     io,
     tsGeneratedTypesDir: path_1.default.join(__dirname + '/'),
-    // watchSchema: true,
+    watchSchema: true,
     transactions: true,
+    // DEBUG_MODE: true,
     onSocketConnect: (socket) => {
         log("onSocketConnect");
         if (clientTest) {
@@ -112,7 +117,17 @@ prostgles_server_1.default({
                 update: "*",
                 delete: "*"
             },
-            items4_pub: "*"
+            items4_pub: "*",
+            "*": {
+                select: { fields: { "*": 0 } },
+                insert: "*",
+                update: "*",
+            },
+            [`"*"`]: {
+                select: { fields: { [`"*"`]: 0 } },
+                insert: "*",
+                update: "*",
+            }
         };
         // return {
         // 	items: {
@@ -139,6 +154,11 @@ prostgles_server_1.default({
         }
     ],
     onReady: async (db, _db) => {
+        console.log("onReady ", Boolean(db.hehe));
+        // if(!db.hehe)	await _db.any("CREATE TABLE hehe(id SERIAL);");
+        // setTimeout(() => {
+        // 	_db.any("DROP TABLE IF EXISTS hehe;");
+        // }, 1000);
         app.get('*', function (req, res) {
             log(req.originalUrl);
             res.sendFile(path_1.default.join(__dirname + '/index.html'));

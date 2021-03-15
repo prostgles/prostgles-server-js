@@ -24,8 +24,8 @@ export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 type DbConnectionOpts = pg.IDefaults;
 
-
-function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts, debugQueries = false): { db: DB, pgp: PGP } {
+let currConnection: { db: DB, pgp: PGP };
+function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts, debugQueries = false, noNewConnections = true): { db: DB, pgp: PGP } {
     let pgp: PGP = pgPromise({
         promiseLib: promise,
         ...(debugQueries? {
@@ -43,9 +43,14 @@ function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts, 
         Object.assign(pgp.pg.defaults, options);
     }
     
-    const db = pgp(dbConnection);
-    
-    return { db, pgp };
+    if(!currConnection || !noNewConnections){
+        currConnection = { 
+            db: pgp(dbConnection), 
+            pgp 
+        };
+    }
+
+    return currConnection;
 }
 
 
@@ -313,6 +318,7 @@ export class Prostgles {
     DEBUG_MODE?: boolean = false;
     watchSchema?: boolean | ((event: { command: string; query: string }) => void) = false;
     private loaded = false;
+    onReady: (dbo: any, db: DB) => void;
 
     constructor(params: ProstglesInitOptions){
         if(!params) throw "ProstglesInitOptions missing";
@@ -348,10 +354,10 @@ export class Prostgles {
                 //        if(s && s.disconnect) s.disconnect(true);
                 //     });
                 // }
-
                 console.log("Schema chnaged. Rewriting Definitions file")
+                this.init(this.onReady);
                 /* Rewrite schema if different */
-                this.writeDBSchema();
+                // this.writeDBSchema();
 
                 // const { fullPath, fileName } = this.getTSFileName();
                 // fs.readFile(fullPath, 'utf8', function(err, data) {
@@ -370,6 +376,15 @@ export class Prostgles {
         const fileName = "DBoGenerated.d.ts" //`dbo_${this.schema}_types.ts`;
         const fullPath = (this.tsGeneratedTypesDir || "") + fileName;
         return { fileName, fullPath }
+    }
+
+    private getFileText(fullPath: string, format = "utf8"){
+        return new Promise((resolve, reject) => {
+            fs.readFile(fullPath, 'utf8', function(err, data) {
+                if(err) reject(err);
+                else resolve(data);
+            }); 
+        })
     }
 
     writeDBSchema(){
@@ -434,7 +449,6 @@ export class Prostgles {
             
             if(this.watchSchema){
                 if(!(await isSuperUser(db))) throw "Cannot watchSchema without a super user schema. Set watchSchema=false or provide a super user";
-                
             }
 
 
@@ -448,19 +462,24 @@ export class Prostgles {
             this.loaded = true;
             return true;
         } catch (e) {
+            console.trace(e)
             throw "init issues: " + e.toString();
         }
     }
 
-    runSQLFile(filePath: string){
+    async runSQLFile(filePath: string){
+        console.log(filePath)
+        const fileContent = await this.getFileText(filePath);//.then(console.log);
+
         // console.log(module.parent.path);
-        let _actualFilePath = sql(filePath)  // module.parent.path + filePath;
-        return this.db.multi(_actualFilePath).then((data)=>{
+        // let _actualFilePath = sql(filePath)  // module.parent.path + filePath;
+        return this.db.multi(fileContent).then((data)=>{
             console.log("Prostgles: SQL file executed successfuly -> " + filePath);
             return true
         }).catch((err)=>{
             console.log(filePath + "    file error: ", err);
         });
+
 
         // Helper for linking to external query files:
         function sql(fullPath: string) {

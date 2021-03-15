@@ -16,7 +16,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.filterObj = exports.PubSubManager = exports.DEFAULT_SYNC_BATCH_SIZE = void 0;
 const PostgresNotifListenManager_1 = require("./PostgresNotifListenManager");
 const utils_1 = require("./utils");
-const DboBuilder_1 = require("./DboBuilder");
 const Bluebird = require("bluebird");
 const pgPromise = require("pg-promise");
 const prostgles_types_1 = require("prostgles-types");
@@ -110,7 +109,7 @@ class PubSubManager {
                 AND table_name = 'hypertable' \
         );", { schema });
             if (res.exists) {
-                let isHyperTable = yield this.db.any("SELECT * FROM ${schema:name}.hypertable WHERE table_name = ${table_name};", { table_name, schema });
+                let isHyperTable = yield this.db.any("SELECT * FROM " + prostgles_types_1.asName(schema) + ".hypertable WHERE table_name = ${table_name};", { table_name, schema });
                 if (isHyperTable && isHyperTable.length) {
                     throw "Triggers do not work on timescaledb hypertables due to bug:\nhttps://github.com/timescale/timescaledb/issues/1084";
                 }
@@ -141,7 +140,7 @@ class PubSubManager {
     }
     startWatchingSchema(stop = false) {
         return __awaiter(this, void 0, void 0, function* () {
-            const pref = "prostgles_", funcName = DboBuilder_1.asName(pref + "schema_watch_func"), triggerName = DboBuilder_1.asName(pref + "schema_watch_trigger"), delimiter = PubSubManager.DELIMITER;
+            const pref = "prostgles_", funcName = prostgles_types_1.asName(pref + "schema_watch_func"), triggerName = prostgles_types_1.asName(pref + "schema_watch_trigger"), delimiter = PubSubManager.DELIMITER;
             if (stop) {
                 yield this.db.any(`DROP EVENT TRIGGER IF EXISTS ${triggerName};`);
             }
@@ -840,7 +839,7 @@ class PubSubManager {
         });
     }
     getTriggerName(table_name, suffix) {
-        return pgp.as.format("$1:name", [`prostgles_triggers_${table_name}_${suffix}`]);
+        return prostgles_types_1.asName(`prostgles_triggers_${table_name}_${suffix}`);
     }
     addTrigger(params) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -876,7 +875,7 @@ class PubSubManager {
             }
             this.addingTrigger = true;
             yield this.checkIfTimescaleBug(table_name);
-            const func_name_escaped = pgp.as.format("$1:name", [`prostgles_funcs_${table_name}`]), table_name_escaped = pgp.as.format("$1:name", [table_name]), delimiter = PubSubManager.DELIMITER, query = ` BEGIN;
+            const func_name_escaped = prostgles_types_1.asName(`prostgles_funcs_${table_name}`), table_name_escaped = prostgles_types_1.asName(table_name), delimiter = PubSubManager.DELIMITER, query = ` BEGIN;
                 CREATE OR REPLACE FUNCTION ${func_name_escaped}() RETURNS TRIGGER AS $$
         
                 DECLARE condition_ids TEXT := '';            
@@ -888,7 +887,7 @@ class PubSubManager {
                         INTO condition_ids
                         FROM (
                             ${_condts.map((c, cIndex) => `
-                                SELECT CASE WHEN EXISTS(SELECT 1 FROM old_table as ${DboBuilder_1.asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids
+                                SELECT CASE WHEN EXISTS(SELECT 1 FROM old_table as ${prostgles_types_1.asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids
                             `).join(" UNION ")}
                         ) t;
 
@@ -897,8 +896,8 @@ class PubSubManager {
                         INTO condition_ids
                         FROM (
                             ${_condts.map((c, cIndex) => `
-                                SELECT CASE WHEN EXISTS(SELECT 1 FROM old_table as ${DboBuilder_1.asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids UNION 
-                                SELECT CASE WHEN EXISTS(SELECT 1 FROM new_table as ${DboBuilder_1.asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids
+                                SELECT CASE WHEN EXISTS(SELECT 1 FROM old_table as ${prostgles_types_1.asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids UNION 
+                                SELECT CASE WHEN EXISTS(SELECT 1 FROM new_table as ${prostgles_types_1.asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids
                             `).join(" UNION ")}
                         ) t;
                         
@@ -907,7 +906,7 @@ class PubSubManager {
                         INTO condition_ids
                         FROM (
                             ${_condts.map((c, cIndex) => `
-                                SELECT CASE WHEN EXISTS(SELECT 1 FROM new_table as ${DboBuilder_1.asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids
+                                SELECT CASE WHEN EXISTS(SELECT 1 FROM new_table as ${prostgles_types_1.asName(table_name)} WHERE ${c}) THEN '${cIndex}' END AS c_ids
                             `).join(" UNION ")}
                         ) t;
 
@@ -989,7 +988,7 @@ exports.PubSubManager = PubSubManager;
 PubSubManager.DELIMITER = '|$prstgls$|';
 /* Get only the specified properties of an object */
 function filterObj(obj, keys = [], exclude) {
-    if (exclude)
+    if (exclude && exclude.length)
         keys = Object.keys(obj).filter(k => !exclude.includes(k));
     if (!keys.length) {
         // console.warn("filterObj: returning empty object");

@@ -13,7 +13,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.isPlainObject = exports.DboBuilder = exports.TableHandler = exports.ViewHandler = exports.asName = exports.pgp = void 0;
+exports.isPlainObject = exports.DboBuilder = exports.TableHandler = exports.ViewHandler = exports.pgp = void 0;
 const Bluebird = require("bluebird");
 const pgPromise = require("pg-promise");
 const prostgles_types_1 = require("prostgles-types");
@@ -25,14 +25,33 @@ exports.pgp = pgPromise({
     promiseLib: Bluebird
     // ,query: function (e) { console.log({psql: e.query, params: e.params}); }
 });
-exports.asName = (str) => {
-    return exports.pgp.as.format("$1:name", [str]);
-};
 function replaceNonAlphaNumeric(string) {
     return string.replace(/[\W_]+/g, "_");
 }
 function capitalizeFirstLetter(string) {
     return replaceNonAlphaNumeric(string).charAt(0).toUpperCase() + string.slice(1);
+}
+function snakify(str, capitalize = false) {
+    return str.split("").map((c, i) => {
+        if (!i) {
+            if (capitalize)
+                c = c.toUpperCase();
+            if (c.match(/[^a-z_A-Z]/)) {
+                return ((capitalize) ? "D_" : "_") + c.charCodeAt(0);
+            }
+        }
+        else {
+            if (c.match(/[^a-zA-Z_0-9]/)) {
+                return "_" + c.charCodeAt(0);
+            }
+        }
+        return c;
+    }).join("");
+}
+function escapeTSNames(str, capitalize = true) {
+    let res = str;
+    res = (capitalize ? str[0].toUpperCase() : str[0]) + str.slice(1);
+    return JSON.stringify(res);
 }
 const shortestPath_1 = require("./shortestPath");
 /* DEBUG CLIENT ERRORS HERE */
@@ -48,6 +67,43 @@ function parseError(e) {
     // console.trace(e)
     return Object.keys(e || {}).length ? e : e.toString ? ("INTERNAL ERROR: " + e.toString()) : e;
 }
+class ColSet {
+    constructor(columns, tableName) {
+        this.opts = { columns, tableName, colNames: columns.map(c => c.name) };
+    }
+    getRow(data, allowedCols) {
+        const badCol = allowedCols.find(c => !this.opts.colNames.includes(c));
+        if (!allowedCols || badCol) {
+            throw "Missing or unexpected columns: " + badCol;
+        }
+        if (prostgles_types_1.isEmpty(data))
+            throw "No data";
+        const row = PubSubManager_1.filterObj(data, allowedCols), rowKeys = Object.keys(row);
+        return rowKeys.map(key => {
+            const col = this.opts.columns.find(c => c.name === key);
+            if (!col)
+                throw "Unexpected missing col name";
+            const colIsJSON = ["json", "jsonb"].includes(col.data_type);
+            return {
+                escapedCol: prostgles_types_1.asName(key),
+                escapedVal: exports.pgp.as.format(colIsJSON ? "$1:json" : "$1", [row[key]])
+            };
+        });
+    }
+    getInsertQuery(data, allowedCols) {
+        return (Array.isArray(data) ? data : [data]).map(d => {
+            const rowParts = this.getRow(d, allowedCols);
+            const select = rowParts.map(r => r.escapedCol).join(", "), values = rowParts.map(r => r.escapedVal).join(", ");
+            return `INSERT INTO ${prostgles_types_1.asName(this.opts.tableName)} (${select}) VALUES (${values})`;
+        }).join(";\n") + " ";
+    }
+    getUpdateQuery(data, allowedCols) {
+        return (Array.isArray(data) ? data : [data]).map(d => {
+            const rowParts = this.getRow(d, allowedCols);
+            return `UPDATE ${prostgles_types_1.asName(this.opts.tableName)} SET ` + rowParts.map(r => `${r.escapedCol} = ${r.escapedVal} `).join(",\n");
+        }).join(";\n") + " ";
+    }
+}
 class ViewHandler {
     constructor(db, tableOrViewInfo, pubSubManager, dboBuilder, t, joinPaths) {
         this.tsDataDef = "";
@@ -62,16 +118,26 @@ class ViewHandler {
         this.joinPaths = joinPaths;
         this.tableOrViewInfo = tableOrViewInfo;
         this.name = tableOrViewInfo.name;
+        this.escapedName = prostgles_types_1.asName(this.name);
         this.columns = tableOrViewInfo.columns;
         this.column_names = tableOrViewInfo.columns.map(c => c.name);
         this.pubSubManager = pubSubManager;
         this.dboBuilder = dboBuilder;
         this.joins = this.dboBuilder.joins;
-        this.columnSet = new exports.pgp.helpers.ColumnSet(this.columns.map(({ name, data_type }) => (Object.assign({ name }, (["json", "jsonb"].includes(data_type) ? { mod: ":json" } : {})))), { table: this.name });
-        this.tsDataName = capitalizeFirstLetter(this.name);
+        // fix this
+        // and also make hot schema reload over ws 
+        this.colSet = new ColSet(this.columns, this.name);
+        // this.columnSet = new pgp.helpers.ColumnSet(
+        //     this.columns.map(({ name, data_type }) => ({
+        //         name,
+        //         ...(["json", "jsonb"].includes(data_type)? { mod: ":json" } : {})
+        //     })
+        //     ), { table: this.name }
+        // );
+        this.tsDataName = snakify(this.name, true);
         this.tsDataDef = `export type ${this.tsDataName} = {\n`;
         this.columns.map(({ name, udt_name }) => {
-            this.tsDataDef += `     ${replaceNonAlphaNumeric(name)}?: ${postgresToTsType(udt_name)};\n`;
+            this.tsDataDef += `     ${escapeTSNames(name, false)}?: ${postgresToTsType(udt_name)};\n`;
         });
         this.tsDataDef += "};";
         this.tsDataDef += "\n";
@@ -89,7 +155,7 @@ class ViewHandler {
         this.makeDef();
     }
     makeDef() {
-        this.tsDboName = `DBO_${this.name}`;
+        this.tsDboName = `DBO_${snakify(this.name)}`;
         this.tsDboDef = `export type ${this.tsDboName} = {\n ${this.tsDboDefs.join("\n")} \n};\n`;
     }
     getSelectFunctions(select) {
@@ -106,10 +172,10 @@ class ViewHandler {
             allowed_cols
                 .concat(this.is_view ? [] : ["ctid"])
                 .sort()
-                .map(f => (tableAlias ? (exports.asName(tableAlias) + ".") : "") + exports.asName(f))
+                .map(f => (tableAlias ? (prostgles_types_1.asName(tableAlias) + ".") : "") + prostgles_types_1.asName(f))
                 .map(f => `md5(coalesce(${f}::text, 'dd'))`)
                 .join(" || ") +
-            `)` + (alias ? ` as ${exports.asName(alias)}` : "");
+            `)` + (alias ? ` as ${prostgles_types_1.asName(alias)}` : "");
     }
     getFullDef() {
         return [];
@@ -216,44 +282,6 @@ class ViewHandler {
         });
         return result;
     }
-    // getAggs(select: object): Aggregation[] {
-    //     const aggParsers = [
-    //         { name: "$max", get: () => " MAX(${field:name}) as ${alias:name} "  },
-    //         { name: "$min", get: () => " MIN(${field:name}) as ${alias:name} "  },
-    //         { name: "$avg", get: () => " AVG(${field:name}) as ${alias:name} "  },
-    //         { name: "$sum", get: () => " SUM(${field:name}) as ${alias:name} "  },
-    //         { name: "$count", get: () => " COUNT(${field:name}) as ${alias:name} "  },
-    //         { name: "$countDistinct", get: () => " COUNT(DISTINCT ${field:name}) as ${alias:name} "  },
-    //     ];
-    //     let keys = Object.keys(select);
-    //     let nonAliased = keys.filter(key => typeof select[key] === "string")
-    //         .map(field => ({ field, alias: field, parser: aggParsers.find(a => a.name === (select[field])) }))
-    //         .filter((f: any) => f.parser)
-    //         // .map(({ field, parser, alias }) => ({ field, alias, query: pgp.as.format(parser.get(), { field, alias }) }));
-    //     let aliased = keys.filter(key => isPlainObject(select[key]))
-    //         .map(alias => ({ alias, parser: aggParsers.find(a => a.name === (Object.keys(select[alias])[0])) }))
-    //         .filter((f: any) => f.parser)
-    //         .map((a: any)=> {
-    //             let data = <any> select[a.alias][a.parser.name];
-    //             if(
-    //                 typeof data !== "string" && 
-    //                 (
-    //                     !data || 
-    //                     Array.isArray(data) && data.find(v => typeof v !== "string")
-    //                 )
-    //             ) throw "\nInvalid aggregate function call -> " + JSON.stringify(select[a.alias]) + "\n Expecting { $aggFuncName: \"fieldName\" | [\"fieldName\"] }";
-    //             a.field = Array.isArray(data)? data[0] : data;
-    //             return a;
-    //         });
-    //     let res = nonAliased.concat(aliased).map(({ field, parser, alias }) => ({ 
-    //         field, 
-    //         alias, 
-    //         query: pgp.as.format(parser.get(), { field, alias }),
-    //         getQuery: (alias: string) =>  pgp.as.format(parser.get(), { field, alias })
-    //     }));
-    //     // console.log(res);
-    //     return res;
-    // }
     checkFilter(filter) {
         if (filter === null || filter && !isPojoObject(filter))
             throw `invalid filter -> ${JSON.stringify(filter)} \nExpecting:    undefined | {} | { field_name: "value" } | { field: { $gt: 22 } } ... `;
@@ -283,14 +311,6 @@ class ViewHandler {
                         return undefined;
                     }
                 }
-                // console.log(this.parseFieldFilter(select));
-                // let columnSet = this.prepareSelect(select, fields, null, tableAlias);
-                // console.log(this.prepareSelect(select, fields, null , tableAlias))
-                // let _query = pgp.as.format(" SELECT ${select:raw} FROM ${_psqlWS_tableName:name} ${tableAlias:name} ", { select: columnSet, _psqlWS_tableName: this.name, tableAlias });
-                // console.log(_query)
-                /* TO FINISH */
-                // if(select_rules.validate){
-                // }
                 let selectFuncs = [];
                 if (select && select.$rowhash) {
                     delete select.$rowhash;
@@ -302,7 +322,7 @@ class ViewHandler {
                 return {
                     isLeftJoin: true,
                     table: this.name,
-                    allFields: this.column_names.map(exports.asName),
+                    allFields: this.column_names.map(prostgles_types_1.asName),
                     orderBy: [this.prepareSort(orderBy, fields, tableAlias, null, validatedAggAliases)],
                     select: this.prepareSelect(select, fields, null, tableAlias).split(","),
                     selectFuncs,
@@ -522,7 +542,7 @@ class ViewHandler {
                 return yield this.find(filter, { select: "", limit: 0 }, null, table_rules, localParams)
                     .then((allowed) => __awaiter(this, void 0, void 0, function* () {
                     const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {};
-                    let query = "SELECT COUNT(*) FROM ${_psqlWS_tableName:name} " + (yield this.prepareWhere(filter, forcedFilter, filterFields, false, null, localParams, table_rules));
+                    let query = "SELECT COUNT(*) FROM " + this.escapedName + " " + (yield this.prepareWhere(filter, forcedFilter, filterFields, false, null, localParams, table_rules));
                     return (this.t || this.db).one(query, { _psqlWS_tableName: this.name }).then(({ count }) => +count);
                 }));
             }
@@ -621,7 +641,7 @@ class ViewHandler {
     prepareSelect(selectParams = "*", allowed_cols, allow_empty = true, tableAlias) {
         if (tableAlias) {
             let cs = this.prepareColumnSet(selectParams, allowed_cols, true, false);
-            return cs.columns.map(col => exports.pgp.as.format("${tableAlias:name}.${name:name}", { tableAlias, name: col.name })).join(", ");
+            return cs.columns.map(col => `${this.escapedName}.${prostgles_types_1.asName(col.name)}`).join(", ");
         }
         else {
             return this.prepareColumnSet(selectParams, allowed_cols, true, true);
@@ -717,12 +737,12 @@ class ViewHandler {
                     const jp = paths[ji];
                     let prevTable = ji ? paths[ji - 1].table : jp.source;
                     let table = paths[ji].table;
-                    let tableAlias = exports.asName(ji < paths.length - 1 ? `jd${ji}` : table);
-                    let prevTableAlias = exports.asName(ji ? `jd${ji - 1}` : thisTable);
-                    let cond = `${jp.on.map(([c1, c2]) => `${prevTableAlias}.${exports.asName(c1)} = ${tableAlias}.${exports.asName(c2)}`).join("\n AND ")}`;
+                    let tableAlias = prostgles_types_1.asName(ji < paths.length - 1 ? `jd${ji}` : table);
+                    let prevTableAlias = prostgles_types_1.asName(ji ? `jd${ji - 1}` : thisTable);
+                    let cond = `${jp.on.map(([c1, c2]) => `${prevTableAlias}.${prostgles_types_1.asName(c1)} = ${tableAlias}.${prostgles_types_1.asName(c2)}`).join("\n AND ")}`;
                     // console.log(join, cond);
                     let j = `SELECT 1 \n` +
-                        `FROM ${exports.asName(table)} ${tableAlias} \n` +
+                        `FROM ${prostgles_types_1.asName(table)} ${tableAlias} \n` +
                         `WHERE ${cond} \n`; //
                     if (ji === paths.length - 1 &&
                         finalFilter) {
@@ -758,7 +778,7 @@ class ViewHandler {
             }
             // console.log(f2, finalWhere);
             if (!isJoined) {
-                res = ` EXISTS (SELECT 1 \nFROM ${exports.asName(t2)} \n${finalWhere ? `WHERE ${finalWhere}` : ""}) `;
+                res = ` EXISTS (SELECT 1 \nFROM ${prostgles_types_1.asName(t2)} \n${finalWhere ? `WHERE ${finalWhere}` : ""}) `;
             }
             else {
                 res = makeTableChain(finalWhere);
@@ -772,9 +792,9 @@ class ViewHandler {
             let prefix = "";
             const getRawFieldName = (field) => {
                 if (tableAlias)
-                    return exports.pgp.as.format("$1:name.$2:name", [tableAlias, field]);
+                    return `${prostgles_types_1.asName(tableAlias)}.${prostgles_types_1.asName(field)}`;
                 else
-                    return exports.pgp.as.format("$1:name", [field]);
+                    return prostgles_types_1.asName(field);
             };
             const parseDataType = (key, col = null) => {
                 const _col = col || this.columns.find(({ name }) => name === key);
@@ -1006,7 +1026,7 @@ class ViewHandler {
             (!column_names.includes(key) ||
                 (allowedFields.length && !allowedFields.includes(key))));
         if (!bad_param) {
-            return (excludeOrder ? "" : " ORDER BY ") + (_ob.map(({ key, asc }) => `${tableAlias ? exports.pgp.as.format("$1:name.", tableAlias) : ""}${exports.pgp.as.format("$1:name", key)} ${asc ? " ASC " : " DESC "}`).join(", "));
+            return (excludeOrder ? "" : " ORDER BY ") + (_ob.map(({ key, asc }) => `${[tableAlias, key].filter(v => v).map(prostgles_types_1.asName).join(".")} ${asc ? " ASC " : " DESC "}`).join(", "));
         }
         else {
             throw "Unrecognised orderBy fields or params: " + bad_param.key;
@@ -1273,8 +1293,9 @@ class TableHandler extends ViewHandler {
                         yield this.validateViewRules(fields, filterFields, returningFields, forcedFilter, "update");
                         if (forcedData) {
                             try {
-                                const { data, columnSet } = this.validateNewData({ row: forcedData, forcedData: null, allowedFields: "*", tableRules, fixIssues: false });
-                                let query = exports.pgp.helpers.update(data, columnSet) + " WHERE FALSE ";
+                                const { data, allowedCols } = this.validateNewData({ row: forcedData, forcedData: null, allowedFields: "*", tableRules, fixIssues: false });
+                                const updateQ = this.colSet.getUpdateQuery(data, allowedCols); //pgp.helpers.update(data, columnSet)
+                                let query = updateQ + " WHERE FALSE ";
                                 yield this.db.any("EXPLAIN " + query);
                             }
                             catch (e) {
@@ -1297,7 +1318,7 @@ class TableHandler extends ViewHandler {
                     let _forcedFilterKeys = Object.keys(forcedFilter);
                     _fields = _fields.filter(fkey => !_forcedFilterKeys.includes(fkey));
                 }
-                const { data, columnSet } = this.validateNewData({ row: newData, forcedData, allowedFields: _fields, tableRules, fixIssues });
+                const { data, allowedCols } = this.validateNewData({ row: newData, forcedData, allowedFields: _fields, tableRules, fixIssues });
                 /* Patch data */
                 let patchedTextData = [];
                 this.columns.map(c => {
@@ -1328,7 +1349,7 @@ class TableHandler extends ViewHandler {
                 if (tableRules && tableRules.update && tableRules.update.validate) {
                     nData = yield tableRules.update.validate(nData);
                 }
-                let query = exports.pgp.helpers.update(nData, columnSet) + " ";
+                let query = this.colSet.getUpdateQuery(nData, allowedCols); //pgp.helpers.update(nData, columnSet) + " ";
                 query += yield this.prepareWhere(filter, forcedFilter, filterFields, false, null, localParams, tableRules);
                 if (onConflictDoNothing)
                     query += " ON CONFLICT DO NOTHING ";
@@ -1364,8 +1385,8 @@ class TableHandler extends ViewHandler {
         if (!data || !dataKeys.length) {
             // throw "missing/invalid data provided";
         }
-        let cs = new exports.pgp.helpers.ColumnSet(this.columnSet.columns.filter(c => dataKeys.includes(c.name)), { table: this.name });
-        return { data, columnSet: cs };
+        // let cs = new pgp.helpers.ColumnSet(this.columnSet.columns.filter(c => dataKeys.includes(c.name)), { table: this.name });
+        return { data, allowedCols: this.columns.filter(c => dataKeys.includes(c.name)).map(c => c.name) };
     }
     insert(data, param2, param3_unused, tableRules, localParams = null) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -1396,7 +1417,7 @@ class TableHandler extends ViewHandler {
                             if (keys.length) {
                                 try {
                                     const values = exports.pgp.helpers.values(forcedData), colNames = this.prepareSelect(keys, this.column_names);
-                                    yield this.db.any("EXPLAIN INSERT INTO ${name:name} (${colNames:raw}) SELECT * FROM ( VALUES ${values:raw} ) t WHERE FALSE;", { name: this.name, colNames, values });
+                                    yield this.db.any("EXPLAIN INSERT INTO " + this.escapedName + " (${colNames:raw}) SELECT * FROM ( VALUES ${values:raw} ) t WHERE FALSE;", { colNames, values });
                                 }
                                 catch (e) {
                                     throw "\nissue with forcedData: \nVALUE: " + JSON.stringify(forcedData, null, 2) + "\nERROR: " + e;
@@ -1420,16 +1441,16 @@ class TableHandler extends ViewHandler {
                     }
                     if (!isPojoObject(row))
                         throw "\ninvalid insert data provided -> " + JSON.stringify(row);
-                    const { data, columnSet } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues });
+                    const { data, allowedCols } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues });
                     let _data = Object.assign({}, data);
                     if (validate) {
                         _data = yield validate(_data);
                     }
                     let insertQ = "";
                     if (!Object.keys(_data).length)
-                        insertQ = `INSERT INTO ${exports.asName(this.name)} DEFAULT VALUES `;
+                        insertQ = `INSERT INTO ${prostgles_types_1.asName(this.name)} DEFAULT VALUES `;
                     else
-                        insertQ = exports.pgp.helpers.insert(_data, columnSet);
+                        insertQ = this.colSet.getInsertQuery(_data, allowedCols); // pgp.helpers.insert(_data, columnSet); 
                     return insertQ + conflict_query + returningSelect;
                 });
                 if (param2) {
@@ -1505,7 +1526,7 @@ class TableHandler extends ViewHandler {
                         throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
                 }
                 let queryType = 'none';
-                let _query = exports.pgp.as.format("DELETE FROM $1:name", [this.name]);
+                let _query = "DELETE FROM " + this.escapedName;
                 _query += yield this.prepareWhere(filter, forcedFilter, filterFields, null, null, localParams, table_rules);
                 if (returning) {
                     queryType = "any";
@@ -1514,7 +1535,6 @@ class TableHandler extends ViewHandler {
                     }
                     _query += yield this.prepareReturning(returning, this.parseFieldFilter(returningFields));
                 }
-                _query = exports.pgp.as.format(_query, { _psqlWS_tableName: this.name });
                 if (returnQuery)
                     return _query;
                 return (this.t || this.db)[queryType](_query).catch(err => makeErr(err, localParams));
@@ -1834,7 +1854,7 @@ export type JoinMaker = (filter?: object, select?: FieldFilter, options?: Select
                 }
                 allDataDefs += this.dbo[tov.name].tsDataDef + "\n";
                 allDboDefs += this.dbo[tov.name].tsDboDef;
-                this.dboDefinition += ` ${tov.name}: ${this.dbo[tov.name].tsDboName};\n`;
+                this.dboDefinition += ` ${escapeTSNames(tov.name)}: ${this.dbo[tov.name].tsDboName};\n`;
                 if (this.joinPaths && this.joinPaths.find(jp => [jp.t1, jp.t2].includes(tov.name))) {
                     let table = tov.name;
                     joinTableNames.push(table);
@@ -1864,7 +1884,7 @@ export type JoinMaker = (filter?: object, select?: FieldFilter, options?: Select
             if (joinTableNames.length) {
                 joinBuilderDef += "export type JoinMakerTables = {\n";
                 joinTableNames.map(tname => {
-                    joinBuilderDef += ` ${tname}: JoinMaker;\n`;
+                    joinBuilderDef += ` ${escapeTSNames(tname, false)}: JoinMaker;\n`;
                 });
                 joinBuilderDef += "};\n";
                 ["leftJoin", "innerJoin", "leftJoinOne", "innerJoinOne"].map(joinType => {
