@@ -52,7 +52,7 @@ try {
           await isomorphic(db);
           log("Client isomorphic tests successful")
   
-          await client_only(db, auth, log);
+          await client_only(db, auth, log, methods);
           log("Client-only replication tests successful")
   
   

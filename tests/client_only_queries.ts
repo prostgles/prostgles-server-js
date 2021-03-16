@@ -3,12 +3,15 @@ import { strict as assert } from 'assert';
 import { DBHandlerClient, Auth } from "./client/index";
 import { tryRun } from './isomorphic_queries';
 
-export default async function client_only(db: DBHandlerClient, auth: Auth, log: (...args: any[]) => any){
+export default async function client_only(db: DBHandlerClient, auth: Auth, log: (...args: any[]) => any, methods){
   
 
   const testRealtime = () => {
     log("Started testRealtime")
     return new Promise(async (resolve, reject) => {
+      /* METHODS */
+      const t222 = await methods.get();
+      assert.equal(t222, 222, "methods.get() failed");
   
       /* RAWSQL */
       const sqlStatement = await db.sql("SELECT $1", [1], { returnType: "statement" });

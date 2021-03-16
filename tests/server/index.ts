@@ -101,6 +101,11 @@ prostgles({
 			return { sid: s.id, expires: Infinity }
 		}
 	},
+  publishMethods: async (socket, dbo: DBObj, db: DB, user: USER) => {
+		return {
+			get: () => 222
+		}
+	},
   publish: async (socket, dbo: DBObj, db: DB, user: USER) => {
 		return  {
 			items: "*",

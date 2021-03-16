@@ -616,7 +616,7 @@ export class Prostgles {
                 });
 
                 socket.removeAllListeners(CHANNELS.METHOD)
-                socket.on(CHANNELS.METHOD, async function({ method, params }: SocketMethodRequest, cb = (...callback) => {} ){
+                socket.on(CHANNELS.METHOD, async ({ method, params }: SocketMethodRequest, cb = (...callback) => {} ) => {
                     try {
                         const methods = await this.publishParser.getMethods(socket);
                         

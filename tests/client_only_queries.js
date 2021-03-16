@@ -2,10 +2,13 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const assert_1 = require("assert");
 const isomorphic_queries_1 = require("./isomorphic_queries");
-async function client_only(db, auth, log) {
+async function client_only(db, auth, log, methods) {
     const testRealtime = () => {
         log("Started testRealtime");
         return new Promise(async (resolve, reject) => {
+            /* METHODS */
+            const t222 = await methods.get();
+            assert_1.strict.equal(t222, 222, "methods.get() failed");
             /* RAWSQL */
             const sqlStatement = await db.sql("SELECT $1", [1], { returnType: "statement" });
             assert_1.strict.equal(sqlStatement, "SELECT 1", "db.sql statement query failed");

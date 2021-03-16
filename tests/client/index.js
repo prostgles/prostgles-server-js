@@ -46,7 +46,7 @@ try {
                 try {
                     await isomorphic_queries_1.default(db);
                     log("Client isomorphic tests successful");
-                    await client_only_queries_1.default(db, auth, log);
+                    await client_only_queries_1.default(db, auth, log, methods);
                     log("Client-only replication tests successful");
                     stopTest();
                 }

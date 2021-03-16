@@ -92,6 +92,11 @@ prostgles_server_1.default({
             return { sid: s.id, expires: Infinity };
         }
     },
+    publishMethods: async (socket, dbo, db, user) => {
+        return {
+            get: () => 222
+        };
+    },
     publish: async (socket, dbo, db, user) => {
         return {
             items: "*",

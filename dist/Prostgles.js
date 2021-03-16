@@ -444,29 +444,27 @@ class Prostgles {
                         }
                     });
                     socket.removeAllListeners(prostgles_types_1.CHANNELS.METHOD);
-                    socket.on(prostgles_types_1.CHANNELS.METHOD, function ({ method, params }, cb = (...callback) => { }) {
-                        return __awaiter(this, void 0, void 0, function* () {
-                            try {
-                                const methods = yield this.publishParser.getMethods(socket);
-                                if (!methods || !methods[method]) {
-                                    cb("Invalid method");
+                    socket.on(prostgles_types_1.CHANNELS.METHOD, ({ method, params }, cb = (...callback) => { }) => __awaiter(this, void 0, void 0, function* () {
+                        try {
+                            const methods = yield this.publishParser.getMethods(socket);
+                            if (!methods || !methods[method]) {
+                                cb("Invalid method");
+                            }
+                            else {
+                                try {
+                                    const res = yield methods[method](...params);
+                                    cb(null, res);
                                 }
-                                else {
-                                    try {
-                                        const res = yield methods[method](...params);
-                                        cb(null, res);
-                                    }
-                                    catch (err) {
-                                        makeSocketError(cb, err);
-                                    }
+                                catch (err) {
+                                    makeSocketError(cb, err);
                                 }
                             }
-                            catch (err) {
-                                makeSocketError(cb, err);
-                                console.warn("method ERROR: ", err, socket._user);
-                            }
-                        });
-                    });
+                        }
+                        catch (err) {
+                            makeSocketError(cb, err);
+                            console.warn("method ERROR: ", err, socket._user);
+                        }
+                    }));
                     this.pushSocketSchema(socket);
                 }
                 catch (e) {
