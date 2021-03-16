@@ -326,6 +326,7 @@ export class ViewHandler {
         // );
         
         this.tsDataName = snakify(this.name, true);
+        if(this.tsDataName === "T") this.tsDataName = this.tsDataName + "_";
         this.tsDataDef = `export type ${this.tsDataName} = {\n`;
         this.columns.map(({ name, udt_name }) => {
             this.tsDataDef += `     ${escapeTSNames(name, false)}?: ${postgresToTsType(udt_name)};\n`

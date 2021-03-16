@@ -166,12 +166,7 @@ prostgles({
 		}
 	],
 	onReady: async (db: DbHandler, _db: DB) => {
-		  //  finish this
-		console.log("onReady ", Boolean(db.hehe))
-		// if(!db.hehe)	await _db.any("CREATE TABLE hehe(id SERIAL);");
-		// setTimeout(() => {
-		// 	_db.any("DROP TABLE IF EXISTS hehe;");
-		// }, 1000);
+
 		
     app.get('*', function(req, res){
       log(req.originalUrl)

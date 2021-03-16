@@ -262,7 +262,6 @@ export type DBO_v_items = {
 export type JoinMakerTables = {
  "items": JoinMaker;
  "items2": JoinMaker;
- "items3": JoinMaker;
 };
 
 export type DBObj = {
@@ -282,5 +281,4 @@ export type DBObj = {
  innerJoin: JoinMakerTables;
  leftJoinOne: JoinMakerTables;
  innerJoinOne: JoinMakerTables;
- tx: (t: TxCB) => Promise<any | void> ;
 };

@@ -173,7 +173,10 @@ export declare type ProstglesInitOptions = {
     onSocketDisconnect?(socket: Socket, dbo: any, db?: DB): any;
     auth?: Auth;
     DEBUG_MODE?: boolean;
-    watchSchema?: boolean | Function;
+    watchSchema?: boolean | "rewriteGeneratedTypes" | ((event: {
+        command: string;
+        query: string;
+    }) => void);
 };
 export declare type OnReady = {
     dbo: DbHandler;
@@ -201,7 +204,7 @@ export declare class Prostgles {
     publishParser: PublishParser;
     auth?: Auth;
     DEBUG_MODE?: boolean;
-    watchSchema?: boolean | ((event: {
+    watchSchema?: boolean | "rewriteGeneratedTypes" | ((event: {
         command: string;
         query: string;
     }) => void);
@@ -218,7 +221,7 @@ export declare class Prostgles {
         fullPath: string;
     };
     private getFileText;
-    writeDBSchema(): void;
+    writeDBSchema(force?: boolean): void;
     init(onReady: (dbo: DbHandler | DbHandlerTX, db: DB) => any): Promise<boolean>;
     runSQLFile(filePath: string): Promise<boolean | void>;
     getSID(socket: any): SessionIDs;
@@ -227,6 +230,7 @@ export declare class Prostgles {
         user: any;
         clientUser: any;
     }>;
+    connectedSockets: any[];
     setSocketEvents(): Promise<void>;
 }
 declare type Request = {

@@ -18,7 +18,7 @@ type PGP = pgPromise.IMain<{}, pg.IClient>;
 
 
 export { DbHandler, DbHandlerTX } from "./DboBuilder";
-import { SQLRequest, SQLOptions } from "prostgles-types";
+import { SQLRequest, SQLOptions, CHANNELS } from "prostgles-types";
 
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
@@ -262,7 +262,7 @@ export type ProstglesInitOptions = {
     onSocketDisconnect?(socket: Socket, dbo: any, db?: DB);
     auth?: Auth;
     DEBUG_MODE?: boolean;
-    watchSchema?: boolean | Function;
+    watchSchema?: boolean | "rewriteGeneratedTypes" | ((event: { command: string; query: string }) => void);
 }
 
 // interface ISocketSetup {
@@ -290,6 +290,9 @@ export type OnReady = {
 
 const fs = require('fs');
 export class Prostgles {
+
+    // o: ProstglesInitOptions;
+
     dbConnection: DbConnection = {
         host: "localhost",
         port: 5432
@@ -316,7 +319,7 @@ export class Prostgles {
     publishParser: PublishParser;
     auth?: Auth;
     DEBUG_MODE?: boolean = false;
-    watchSchema?: boolean | ((event: { command: string; query: string }) => void) = false;
+    watchSchema?: boolean | "rewriteGeneratedTypes" | ((event: { command: string; query: string }) => void) = false;
     private loaded = false;
     onReady: (dbo: any, db: DB) => void;
 
@@ -341,29 +344,23 @@ export class Prostgles {
 
     onSchemaChange(event: { command: string; query: string }){
         if(this.watchSchema && this.loaded){
-            if(typeof this.watchSchema === "function"){
-                this.watchSchema(event);
-            } else {
-                // spawn(process.argv[1], process.argv.slice(2), {
-                //     detached: true, 
-                //     stdio: ['ignore']//, out, err]
-                //   }).unref()
-                //   process.exit()
-                // if(this.io) {
-                //     Object.values(this.io.of("/").connected).forEach(function(s: any) {
-                //        if(s && s.disconnect) s.disconnect(true);
-                //     });
-                // }
-                console.log("Schema chnaged. Rewriting Definitions file")
-                this.init(this.onReady);
-                /* Rewrite schema if different */
-                // this.writeDBSchema();
+            console.log("Schema changed");
 
-                // const { fullPath, fileName } = this.getTSFileName();
-                // fs.readFile(fullPath, 'utf8', function(err, data) {
-                //     console.log("Prostgles: Schema changed");
-                //     fs.writeFileSync(fullPath, "/* Schema changed... */\n" + data);
-                // });
+            if(typeof this.watchSchema === "function"){
+                /* Only call the provided func */
+                this.watchSchema(event);
+
+            } else if(this.watchSchema === "rewriteGeneratedTypes") {
+                /* Hot reload integration. Will only touch tsGeneratedTypesDir */
+                if(!this.tsGeneratedTypesDir) console.error(`watchSchema: "rewriteGeneratedTypes"   Requires tsGeneratedTypesDir`)
+                console.log("Re-writing schema");
+                this.writeDBSchema(true);
+
+            } else {
+                /* Full re-init. Sockets must reconnect */
+                
+                console.log("Re-initialising")
+                this.init(this.onReady);
             }
         }  
     }
@@ -387,7 +384,7 @@ export class Prostgles {
         })
     }
 
-    writeDBSchema(){
+    writeDBSchema(force = false){
 
         if(this.tsGeneratedTypesDir){
             const { fullPath, fileName } = this.getTSFileName();
@@ -396,7 +393,7 @@ export class Prostgles {
             `*/ \n\n `;
             const fileContent = header + this.dboBuilder.tsTypesDefinition;
             fs.readFile(fullPath, 'utf8', function(err, data) {
-                if (err || data !== fileContent) {
+                if (err || (force || data !== fileContent)) {
                     fs.writeFileSync(fullPath, fileContent);
                     console.log("Prostgles: Created typescript schema definition file -> " + fileName)
                 }
@@ -554,6 +551,7 @@ export class Prostgles {
         return { user, clientUser };
     }
 
+    connectedSockets: any[] = [];
     async setSocketEvents(){
         this.checkDb();
 
@@ -563,23 +561,24 @@ export class Prostgles {
         let DATA_TYPES = !needType? [] : await this.db.any("SELECT oid, typname FROM pg_type");
         let USER_TABLES = !needType? [] :  await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
 
-        const WS_CHANNEL_NAME = {
-            DEFAULT: `${this.wsChannelNamePrefix}.`,
-            SQL: `${this.wsChannelNamePrefix}.sql`,
-            METHOD: `${this.wsChannelNamePrefix}.method`,
-            SCHEMA: `${this.wsChannelNamePrefix}.schema`,
-
-            /* Auth channels */
-            REGISTER: `${this.wsChannelNamePrefix}.register`,
-            LOGIN: `${this.wsChannelNamePrefix}.login`,
-            LOGOUT: `${this.wsChannelNamePrefix}.logout`,
-        }
-
         let publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo, this.db, this);
 
         if(!this.io) return;
+
+        /* Already initialised. Only reconnect sockets */
+        if(this.connectedSockets.length){
+            this.connectedSockets.forEach(function(s: any) {
+                console.log(s.id, "disconnect")
+                // s.disconnect(true);
+                s.emit("prostgles_reconnect")
+            });
+            return;
+        }
         
+        /* Initialise */
         this.io.on('connection', async (socket) => {
+            this.connectedSockets.push(socket);
+
             if(!this.db || !this.dbo) throw "db/dbo missing";
             let { dbo, db, pgp } = this;
             
@@ -592,9 +591,9 @@ export class Prostgles {
                     const { register, login, logout, sidQueryParamName } = this.auth;
                     if(sidQueryParamName === "sid") throw "sidQueryParamName cannot be 'sid' please provide another name."
                     let handlers = [
-                        { func: register,   ch: WS_CHANNEL_NAME.REGISTER,   name: "register"    },
-                        { func: login,      ch: WS_CHANNEL_NAME.LOGIN,      name: "login"       },
-                        { func: logout,     ch: WS_CHANNEL_NAME.LOGOUT,     name: "logout"      }
+                        { func: register,   ch: CHANNELS.REGISTER,   name: "register"    },
+                        { func: login,      ch: CHANNELS.LOGIN,      name: "login"       },
+                        { func: logout,     ch: CHANNELS.LOGOUT,     name: "logout"      }
                     ].filter(h => h.func);
 
                     const usrData = await this.getUserFromCookieSession(socket);
@@ -629,7 +628,7 @@ export class Prostgles {
                 /*  RUN Client request from Publish.
                     Checks request against publish and if OK run it with relevant publish functions. Local (server) requests do not check the policy 
                 */
-                socket.on(WS_CHANNEL_NAME.DEFAULT, async ({ tableName, command, param1, param2, param3 }: SocketRequestParams, cb = (...callback) => {} ) => {
+                socket.on(CHANNELS.DEFAULT, async ({ tableName, command, param1, param2, param3 }: SocketRequestParams, cb = (...callback) => {} ) => {
                     
                     try { /* Channel name will only include client-sent params so we ignore table_rules enforced params */
                         if(!socket) throw "socket missing??!!";
@@ -652,6 +651,7 @@ export class Prostgles {
 
 
                 socket.on("disconnect", () => {
+                    this.connectedSockets = this.connectedSockets.filter(s => s.id !== socket.id)
                     // subscriptions = subscriptions.filter(sub => sub.socket.id !== socket.id);
                     if(this.onSocketDisconnect){
                         this.onSocketDisconnect(socket, dbo);
@@ -659,7 +659,7 @@ export class Prostgles {
                 });
 
                 
-                socket.on(WS_CHANNEL_NAME.METHOD, async function({ method, params }: SocketMethodRequest, cb = (...callback) => {} ){
+                socket.on(CHANNELS.METHOD, async function({ method, params }: SocketMethodRequest, cb = (...callback) => {} ){
                     try {
                         const methods = await publishParser.getMethods(socket);
                         
@@ -700,7 +700,7 @@ export class Prostgles {
                     // console.log("canRunSQL", canRunSQL, socket.handshake.headers["x-real-ip"]);//, allTablesViews);
 
                     if(canRunSQL && typeof canRunSQL === "boolean" || canRunSQL === "*"){
-                        socket.on(WS_CHANNEL_NAME.SQL, function({ query, params, options }: SQLRequest, cb = (...callback) => {}){
+                        socket.on(CHANNELS.SQL, function({ query, params, options }: SQLRequest, cb = (...callback) => {}){
                             const { returnType }: SQLOptions = options || ({} as any);
 
                             // console.log(query, options)
@@ -766,7 +766,7 @@ export class Prostgles {
                     });
                 }
                 // console.log(joinTables2)
-                socket.emit(WS_CHANNEL_NAME.SCHEMA, {
+                socket.emit(CHANNELS.SCHEMA, {
                     schema, 
                     methods: Object.keys(methods), 
                     ...(fullSchema? { fullSchema } : {}),

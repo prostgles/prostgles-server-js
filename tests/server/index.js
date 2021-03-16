@@ -154,11 +154,6 @@ prostgles_server_1.default({
         }
     ],
     onReady: async (db, _db) => {
-        console.log("onReady ", Boolean(db.hehe));
-        // if(!db.hehe)	await _db.any("CREATE TABLE hehe(id SERIAL);");
-        // setTimeout(() => {
-        // 	_db.any("DROP TABLE IF EXISTS hehe;");
-        // }, 1000);
         app.get('*', function (req, res) {
             log(req.originalUrl);
             res.sendFile(path_1.default.join(__dirname + '/index.html'));
