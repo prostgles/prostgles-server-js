@@ -89,7 +89,7 @@ prostgles({
 			res.sendFile(path.join(__dirname+'/index.html'));
 		});
 
-		console.log("onReady ", Boolean(db.hehe))
+		console.log("onReady ", Boolean(db.t))
 		// if(!db.hehe)	await _db.any("CREATE TABLE hehe(id SERIAL);");
 		// setTimeout(() => {
 		// 	_db.any("DROP TABLE IF EXISTS hehe;");

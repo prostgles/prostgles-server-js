@@ -93,6 +93,10 @@ export type Planes = {
      "y"?: number;
 };
 export type Planes_Filter = Planes | object | { $and: (Planes | object)[] } | { $or: (Planes | object)[] } 
+export type T_ = {
+     "t"?: string;
+};
+export type T__Filter = T_ | object | { $and: (T_ | object)[] } | { $or: (T_ | object)[] } 
 export type Table = {
      "id"?: string;
 };
@@ -224,6 +228,19 @@ export type DBO_planes = {
    insert: <T = Partial<Planes> | void> (data: (Planes | Planes[]), params?: InsertParams) => Promise<T>;
    delete: <T = Partial<Planes> | void> (filter?:  Planes_Filter , params?: DeleteParams) => Promise<T>; 
 };
+export type DBO_t = {
+    getColumns: () => Promise<any[]>;
+   find: (filter?:  T__Filter , selectParams?: SelectParams) => Promise<Partial<T_ & { [x: string]: any }>[]>;
+   findOne: (filter?:  T__Filter , selectParams?: SelectParams) => Promise<Partial<T_ & { [x: string]: any }>>;
+   subscribe: (filter:  T__Filter , params: SelectParams, onData: (items: Partial<T_ & { [x: string]: any }>[]) => any) => Promise<{ unsubscribe: () => any }>;
+   subscribeOne: (filter:  T__Filter , params: SelectParams, onData: (item: Partial<T_ & { [x: string]: any }>) => any) => Promise<{ unsubscribe: () => any }>;
+   count: (filter?:  T__Filter ) => Promise<number>;
+   update: <T = Partial<T_> | void> (filter:  T__Filter , newData: T_, params?: UpdateParams) => Promise<T>;
+   updateBatch: <T = Partial<T_> | void> (updateData: [ T__Filter , T_][], params?: UpdateParams) => Promise<T>;
+   upsert: <T = Partial<T_> | void> (filter:  T__Filter , newData: T_, params?: UpdateParams) => Promise<T>;
+   insert: <T = Partial<T_> | void> (data: (T_ | T_[]), params?: InsertParams) => Promise<T>;
+   delete: <T = Partial<T_> | void> (filter?:  T__Filter , params?: DeleteParams) => Promise<T>; 
+};
 export type DBO_table = {
     getColumns: () => Promise<any[]>;
    find: (filter?:  Table_Filter , selectParams?: SelectParams) => Promise<Partial<Table & { [x: string]: any }>[]>;
@@ -275,6 +292,7 @@ export type DBObj = {
  "items4": DBO_items4;
  "items4_pub": DBO_items4_pub;
  "planes": DBO_planes;
+ "t": DBO_t;
  "table": DBO_table;
  "transaction": DBO_transaction;
  "v_items": DBO_v_items;

@@ -80,7 +80,7 @@ prostgles_server_1.default({
             log(req.originalUrl);
             res.sendFile(path_1.default.join(__dirname + '/index.html'));
         });
-        console.log("onReady ", Boolean(db.hehe));
+        console.log("onReady ", Boolean(db.t));
         // if(!db.hehe)	await _db.any("CREATE TABLE hehe(id SERIAL);");
         // setTimeout(() => {
         // 	_db.any("DROP TABLE IF EXISTS hehe;");

@@ -24,10 +24,7 @@
 
 			const socket = io("wss://prostgles.com", { path: "/teztz/s", reconnect: true });
 
-			socket.on("z", console.log)
-			socket.on("prostgles_reconnect", () => {
-					window.location.reload()
-			})
+			
 			// socket.on("connected", () => {
 			// 	log("Client connected.")
 			// });

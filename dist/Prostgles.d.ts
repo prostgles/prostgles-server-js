@@ -232,6 +232,7 @@ export declare class Prostgles {
     }>;
     connectedSockets: any[];
     setSocketEvents(): Promise<void>;
+    pushSocketSchema: (socket: any) => Promise<void>;
 }
 declare type Request = {
     socket: any;
