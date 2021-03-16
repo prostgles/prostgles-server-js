@@ -268,16 +268,16 @@ export type JoinMakerTables = {
 export type DBObj = {
  "\"*\"": DBO__34_42_34;
  "*": DBO__42;
- "Ex_j_ins": DBO_ex_j_ins;
- "Items": DBO_items;
- "Items2": DBO_items2;
- "Items3": DBO_items3;
- "Items4": DBO_items4;
- "Items4_pub": DBO_items4_pub;
- "Planes": DBO_planes;
- "Table": DBO_table;
- "Transaction": DBO_transaction;
- "V_items": DBO_v_items;
+ "ex_j_ins": DBO_ex_j_ins;
+ "items": DBO_items;
+ "items2": DBO_items2;
+ "items3": DBO_items3;
+ "items4": DBO_items4;
+ "items4_pub": DBO_items4_pub;
+ "planes": DBO_planes;
+ "table": DBO_table;
+ "transaction": DBO_transaction;
+ "v_items": DBO_v_items;
  leftJoin: JoinMakerTables;
  innerJoin: JoinMakerTables;
  leftJoinOne: JoinMakerTables;

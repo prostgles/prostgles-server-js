@@ -1856,7 +1856,7 @@ export type JoinMaker = (filter?: object, select?: FieldFilter, options?: Select
                 }
                 allDataDefs += this.dbo[tov.name].tsDataDef + "\n";
                 allDboDefs += this.dbo[tov.name].tsDboDef;
-                this.dboDefinition += ` ${escapeTSNames(tov.name)}: ${this.dbo[tov.name].tsDboName};\n`;
+                this.dboDefinition += ` ${escapeTSNames(tov.name, false)}: ${this.dbo[tov.name].tsDboName};\n`;
                 if (this.joinPaths && this.joinPaths.find(jp => [jp.t1, jp.t2].includes(tov.name))) {
                     let table = tov.name;
                     joinTableNames.push(table);
