@@ -908,6 +908,7 @@ export class ViewHandler {
 
     async prepareWhere(filter: Filter, forcedFilter: object, filterFields: FieldFilter, excludeWhere = false, tableAlias: string = null, localParams: LocalParams, tableRule: TableRule){
         const parseFilter = async (f: any, parentFilter: any = null) => {
+            if(!f) throw "Invalid/missing group filter provided";
             let result = "";
             let keys = Object.keys(f);
             if(!keys.length) return result;

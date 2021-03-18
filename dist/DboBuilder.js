@@ -663,6 +663,8 @@ class ViewHandler {
     prepareWhere(filter, forcedFilter, filterFields, excludeWhere = false, tableAlias = null, localParams, tableRule) {
         return __awaiter(this, void 0, void 0, function* () {
             const parseFilter = (f, parentFilter = null) => __awaiter(this, void 0, void 0, function* () {
+                if (!f)
+                    throw "Invalid/missing group filter provided";
                 let result = "";
                 let keys = Object.keys(f);
                 if (!keys.length)
