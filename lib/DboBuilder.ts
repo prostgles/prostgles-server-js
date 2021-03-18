@@ -212,7 +212,8 @@ const EXISTS_KEYS = ["$exists", "$notExists", "$existsJoined", "$notExistsJoined
 function parseError(e){
     // console.error(e)
     // console.trace(e)
-    return Object.keys(e || {}).length? e : e.toString?  ( "INTERNAL ERROR: " + e.toString() ): e;
+    console.trace("INTERNAL ERROR: ", e);
+    return "INTERNAL ERROR: " + (!Object.keys(e || {}).length? e : (e && e.toString)? e.toString() : e);
 }
 
 class ColSet {
@@ -553,7 +554,6 @@ export class ViewHandler {
             };
 
         } catch(e){
-            // console.error(e)
             if(localParams && localParams.testRule) throw e;
             throw { err: parseError(e), msg: `Issue with dbo.${this.name}.find()` };
         }  
