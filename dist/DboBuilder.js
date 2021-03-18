@@ -931,10 +931,11 @@ class ViewHandler {
                 }
                 if (isPlainObject(d)) {
                     if (Object.keys(d).length) {
+                        const operandAliases = conditionParsers.map(o => o.aliases).flat();
                         return Object.keys(d).map(operand_key => {
                             const op = conditionParsers.find(o => operand_key && o.aliases.includes(operand_key));
                             if (!op) {
-                                throw "Unrecognised operand: " + operand_key;
+                                throw "Unrecognised operand: " + operand_key + " \nAllowed operands: " + operandAliases.join(", ");
                             }
                             let _d = d[operand_key];
                             /* Turn data into array if comparing to array type column */
