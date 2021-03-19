@@ -104,6 +104,7 @@ class Prostgles {
             const { dbo, db, pgp, publishParser } = this;
             try {
                 schema = yield publishParser.getSchemaFromPublish(socket);
+                // console.log("getSchemaFromPublish", Object.keys(schema), this.dboBuilder.tablesOrViews.map(t => `${t.name} (${t.columns.map(c => c.name).join(", ")})`))
             }
             catch (e) {
                 publishValidationError = "Server Error: PUBLISH VALIDATION ERROR";
@@ -199,23 +200,28 @@ class Prostgles {
         Object.assign(this, params);
     }
     onSchemaChange(event) {
-        if (this.watchSchema && this.loaded) {
-            console.log("Schema changed");
-            if (typeof this.watchSchema === "function") {
-                /* Only call the provided func */
-                this.watchSchema(event);
-            }
-            else {
-                if (this.tsGeneratedTypesDir) {
-                    /* Hot reload integration. Will only touch tsGeneratedTypesDir */
-                    // console.log("Re-writing TS schema");
-                    // this.writeDBSchema(true);
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.watchSchema && this.loaded) {
+                console.log("Schema changed");
+                if (typeof this.watchSchema === "function") {
+                    /* Only call the provided func */
+                    this.watchSchema(event);
                 }
-                /* Full re-init. Sockets must reconnect */
-                console.log("Re-initialising");
-                this.init(this.onReady);
+                else if (this.watchSchema === "hotReloadMode") {
+                    if (this.tsGeneratedTypesDir) {
+                        /* Hot reload integration. Will only touch tsGeneratedTypesDir */
+                        console.log("watchSchema: Re-writing TS schema");
+                        yield this.refreshDBO();
+                        this.writeDBSchema(true);
+                    }
+                }
+                else if (this.watchSchema === true) {
+                    /* Full re-init. Sockets must reconnect */
+                    console.log("watchSchema: Full re-initialisation");
+                    this.init(this.onReady);
+                }
             }
-        }
+        });
     }
     checkDb() {
         if (!this.db || !this.db.connect)
@@ -254,11 +260,17 @@ class Prostgles {
             console.error("Schema changed. tsGeneratedTypesDir needs to be set to reload server");
         }
     }
+    refreshDBO() {
+        return __awaiter(this, void 0, void 0, function* () {
+            this.dboBuilder = new DboBuilder_1.DboBuilder(this);
+            this.dbo = yield this.dboBuilder.init();
+        });
+    }
     init(onReady) {
         return __awaiter(this, void 0, void 0, function* () {
             this.loaded = false;
-            if (this.watchSchema && !this.tsGeneratedTypesDir)
-                throw "tsGeneratedTypesDir option is needed for watchSchema to work ";
+            if (this.watchSchema === "hotReloadMode" && !this.tsGeneratedTypesDir)
+                throw "tsGeneratedTypesDir option is needed for watchSchema: hotReloadMode to work ";
             /* 1. Connect to db */
             const { db, pgp } = getDbConnection(this.dbConnection, this.dbOptions, this.DEBUG_MODE);
             this.db = db;
@@ -270,8 +282,7 @@ class Prostgles {
             }
             try {
                 /* 3. Make DBO object from all tables and views */
-                this.dboBuilder = new DboBuilder_1.DboBuilder(this);
-                this.dbo = yield this.dboBuilder.init();
+                yield this.refreshDBO();
                 this.writeDBSchema();
                 if (this.publish) {
                     /* 3.9 Check auth config */
@@ -312,20 +323,13 @@ class Prostgles {
     }
     runSQLFile(filePath) {
         return __awaiter(this, void 0, void 0, function* () {
-            console.log(filePath);
             const fileContent = yield this.getFileText(filePath); //.then(console.log);
-            // console.log(module.parent.path);
-            // let _actualFilePath = sql(filePath)  // module.parent.path + filePath;
             return this.db.multi(fileContent).then((data) => {
-                console.log("Prostgles: SQL file executed successfuly -> " + filePath);
+                console.log("Prostgles: SQL file executed successfuly \n    -> " + filePath);
                 return true;
             }).catch((err) => {
                 console.log(filePath + "    file error: ", err);
             });
-            // Helper for linking to external query files:
-            function sql(fullPath) {
-                return new QueryFile(fullPath, { minify: false });
-            }
         });
     }
     getSID(socket) {
@@ -417,12 +421,14 @@ class Prostgles {
                     socket.removeAllListeners(prostgles_types_1.CHANNELS.DEFAULT);
                     socket.on(prostgles_types_1.CHANNELS.DEFAULT, ({ tableName, command, param1, param2, param3 }, cb = (...callback) => { }) => __awaiter(this, void 0, void 0, function* () {
                         try { /* Channel name will only include client-sent params so we ignore table_rules enforced params */
-                            if (!socket)
+                            if (!socket) {
+                                console.error("socket missing??!!");
                                 throw "socket missing??!!";
+                            }
                             const user = yield this.getUser(socket);
                             let valid_table_command_rules = yield this.publishParser.getValidatedRequestRule({ tableName, command, socket }, user);
                             if (valid_table_command_rules) {
-                                let res = yield dbo[tableName][command](param1, param2, param3, valid_table_command_rules, { socket, has_rules: true });
+                                let res = yield this.dbo[tableName][command](param1, param2, param3, valid_table_command_rules, { socket, has_rules: true });
                                 cb(null, res);
                             }
                             else
@@ -431,7 +437,7 @@ class Prostgles {
                         catch (err) {
                             // const _err_msg = err.toString();
                             // cb({ msg: _err_msg, err });
-                            // console.trace(err)
+                            console.trace(err);
                             cb(err);
                             // console.warn("runPublishedRequest ERROR: ", err, socket._user);
                         }

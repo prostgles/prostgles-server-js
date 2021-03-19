@@ -43,12 +43,22 @@
 					// window.location.reload();
 				},
 				onReady: async (db, methods) => {
-					window.db = db;
-					window.dbo = db;
-					window.s = socket;
-					console.log("onReady");
 
-					document.body.innerText = JSON.stringify(db, null, 2)
+					try {
+						window.db = db;
+						window.dbo = db;
+						window.s = socket;
+
+						let schema = await Promise.all(Object.keys(db).filter(t => db[t].find).map(async t => ({
+							table: t,
+							cols: await db[t].getColumns()
+						})))
+						console.log("onReady", schema);
+
+						document.body.innerText = JSON.stringify(schema, null, 2)
+					} catch(e) {
+						console.error(e)
+					}
 				}
 			});
 		</script>

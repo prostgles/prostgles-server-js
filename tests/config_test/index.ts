@@ -62,7 +62,7 @@ prostgles({
   },
   io,
   tsGeneratedTypesDir: path.join(__dirname + '/'),
-  watchSchema: true,
+  watchSchema: true,// "hotReloadMode",
   // transactions: true,	
   publishRawSQL: async (socket, db: any, _db: any, user: any) => {
     // log("set auth logic")

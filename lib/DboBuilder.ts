@@ -210,9 +210,8 @@ function makeErr(err, localParams?: LocalParams){
 const EXISTS_KEYS = ["$exists", "$notExists", "$existsJoined", "$notExistsJoined"];
 
 function parseError(e){
-    // console.error(e)
-    // console.trace(e)
-    console.trace("INTERNAL ERROR: ", e);
+    
+    // console.trace("INTERNAL ERROR: ", e);
     return "INTERNAL ERROR: " + (!Object.keys(e || {}).length? e : (e && e.toString)? e.toString() : e);
 }
 
@@ -560,17 +559,24 @@ export class ViewHandler {
     }
 
     async getColumns(tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]> {
-        const p = this.getValidatedRules(tableRules, localParams);
 
-        return this.columns.map(c => ({
-            ...c,
-            tsDataType: postgresToTsType(c.udt_name),
-            insert: Boolean(p.insert && p.insert.fields && p.insert.fields.includes(c.name)),
-            select: Boolean(p.select && p.select.fields && p.select.fields.includes(c.name)),
-            filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)),
-            update: Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)),
-            delete: Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)),
-        }));
+        try {
+            const p = this.getValidatedRules(tableRules, localParams);
+    
+            // console.log("getColumns", this.name, this.columns.map(c => c.name))
+            return this.columns.map(c => ({
+                ...c,
+                tsDataType: postgresToTsType(c.udt_name),
+                insert: Boolean(p.insert && p.insert.fields && p.insert.fields.includes(c.name)),
+                select: Boolean(p.select && p.select.fields && p.select.fields.includes(c.name)),
+                filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)),
+                update: Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)),
+                delete: Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)),
+            }));
+
+        } catch(e){
+            throw "Something went wrong in " + `db.${this.name}.getColumns()`
+        }
     }
 
     getValidatedRules(tableRules?: TableRule, localParams?: LocalParams): ValidatedTableRules {
@@ -2236,6 +2242,7 @@ export class DboBuilder {
     async init(): Promise<DbHandler | DbHandlerTX>{
         
         this.tablesOrViews = await getTablesForSchemaPostgresSQL(this.db, this.schema);
+        // console.log(this.tablesOrViews.map(t => `${t.name} (${t.columns.map(c => c.name).join(", ")})`))
 
         let allDataDefs = "";
         let allDboDefs = "";
@@ -2281,6 +2288,7 @@ export type JoinMaker = (filter?: object, select?: FieldFilter, options?: Select
         let joinTableNames = [];
 
         this.tablesOrViews.map(tov => {
+            // console.log("dboInit", tov.name, tov.columns.map(c => c.name))
             if(tov.is_view){
                 this.dbo[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, null, this.joinPaths);
             } else {

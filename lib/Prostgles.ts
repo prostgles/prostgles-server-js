@@ -262,7 +262,7 @@ export type ProstglesInitOptions = {
     onSocketDisconnect?(socket: Socket, dbo: any, db?: DB);
     auth?: Auth;
     DEBUG_MODE?: boolean;
-    watchSchema?: boolean | "rewriteGeneratedTypes" | ((event: { command: string; query: string }) => void);
+    watchSchema?: boolean | "hotReloadMode" | ((event: { command: string; query: string }) => void);
 }
 
 // interface ISocketSetup {
@@ -319,7 +319,7 @@ export class Prostgles {
     publishParser: PublishParser;
     auth?: Auth;
     DEBUG_MODE?: boolean = false;
-    watchSchema?: boolean | "rewriteGeneratedTypes" | ((event: { command: string; query: string }) => void) = false;
+    watchSchema?: boolean | "hotReloadMode" | ((event: { command: string; query: string }) => void) = false;
     private loaded = false;
     onReady: (dbo: any, db: DB) => void;
 
@@ -342,24 +342,26 @@ export class Prostgles {
         Object.assign(this, params);
     }
 
-    onSchemaChange(event: { command: string; query: string }){
+    async onSchemaChange(event: { command: string; query: string }){
         if(this.watchSchema && this.loaded){
             console.log("Schema changed");
-
+            
             if(typeof this.watchSchema === "function"){
                 /* Only call the provided func */
                 this.watchSchema(event);
 
-            } else {
+            } else if(this.watchSchema === "hotReloadMode") {
                 if(this.tsGeneratedTypesDir) {
                     /* Hot reload integration. Will only touch tsGeneratedTypesDir */
-                    // console.log("Re-writing TS schema");
-                    // this.writeDBSchema(true);
+                    console.log("watchSchema: Re-writing TS schema");
+
+                    await this.refreshDBO();
+                    this.writeDBSchema(true);
                 }
 
+            } else if(this.watchSchema === true){
                 /* Full re-init. Sockets must reconnect */
-                
-                console.log("Re-initialising")
+                console.log("watchSchema: Full re-initialisation")
                 this.init(this.onReady);
             }
         }  
@@ -403,10 +405,15 @@ export class Prostgles {
         }
     }
 
+    async refreshDBO(){
+        this.dboBuilder = new DboBuilder(this);
+        this.dbo = await this.dboBuilder.init();
+    }
+
     async init(onReady: (dbo: DbHandler | DbHandlerTX, db: DB) => any){
         this.loaded = false;
 
-        if(this.watchSchema && !this.tsGeneratedTypesDir) throw "tsGeneratedTypesDir option is needed for watchSchema to work ";
+        if(this.watchSchema === "hotReloadMode" && !this.tsGeneratedTypesDir) throw "tsGeneratedTypesDir option is needed for watchSchema: hotReloadMode to work ";
 
         /* 1. Connect to db */
         const { db, pgp } = getDbConnection(this.dbConnection, this.dbOptions, this.DEBUG_MODE);
@@ -421,9 +428,7 @@ export class Prostgles {
 
         try {
             /* 3. Make DBO object from all tables and views */
-            
-            this.dboBuilder = new DboBuilder(this);
-            this.dbo = await this.dboBuilder.init();
+            await this.refreshDBO();
 
             this.writeDBSchema();
 
@@ -465,23 +470,15 @@ export class Prostgles {
     }
 
     async runSQLFile(filePath: string){
-        console.log(filePath)
+        
         const fileContent = await this.getFileText(filePath);//.then(console.log);
 
-        // console.log(module.parent.path);
-        // let _actualFilePath = sql(filePath)  // module.parent.path + filePath;
         return this.db.multi(fileContent).then((data)=>{
-            console.log("Prostgles: SQL file executed successfuly -> " + filePath);
+            console.log("Prostgles: SQL file executed successfuly \n    -> " + filePath);
             return true
         }).catch((err)=>{
             console.log(filePath + "    file error: ", err);
         });
-
-
-        // Helper for linking to external query files:
-        function sql(fullPath: string) {
-            return new QueryFile(fullPath, { minify: false });
-        }
     }
 
     getSID(socket: any): SessionIDs {
@@ -589,19 +586,22 @@ export class Prostgles {
                 socket.on(CHANNELS.DEFAULT, async ({ tableName, command, param1, param2, param3 }: SocketRequestParams, cb = (...callback) => {} ) => {
                     
                     try { /* Channel name will only include client-sent params so we ignore table_rules enforced params */
-                        if(!socket) throw "socket missing??!!";
+                        if(!socket) {
+                            console.error("socket missing??!!")
+                            throw "socket missing??!!";
+                        }
 
                         const user = await this.getUser(socket);
                         let valid_table_command_rules = await this.publishParser.getValidatedRequestRule({ tableName, command, socket }, user);
                         if(valid_table_command_rules){
-                            let res = await dbo[tableName][command](param1, param2, param3, valid_table_command_rules, { socket, has_rules: true }); 
+                            let res = await this.dbo[tableName][command](param1, param2, param3, valid_table_command_rules, { socket, has_rules: true }); 
                             cb(null, res);
                         } else throw `Invalid OR disallowed request: ${tableName}.${command} `;
                             
                     } catch(err) {
                         // const _err_msg = err.toString();
                         // cb({ msg: _err_msg, err });
-                        // console.trace(err)
+                        console.trace(err);
                         cb(err)
                         // console.warn("runPublishedRequest ERROR: ", err, socket._user);
                     }
@@ -697,6 +697,7 @@ export class Prostgles {
         const { dbo, db, pgp, publishParser } = this;
         try {
             schema = await publishParser.getSchemaFromPublish(socket);
+            // console.log("getSchemaFromPublish", Object.keys(schema), this.dboBuilder.tablesOrViews.map(t => `${t.name} (${t.columns.map(c => c.name).join(", ")})`))
         } catch(e){
             publishValidationError = "Server Error: PUBLISH VALIDATION ERROR";
             console.error(`\nProstgles PUBLISH VALIDATION ERROR (after socket connected):\n    ->`, e);
