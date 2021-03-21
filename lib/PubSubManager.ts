@@ -141,12 +141,17 @@ export class PubSubManager {
 
         const pref = "prostgles_",
             funcName = asName(pref + "schema_watch_func"),
-            triggerName = asName(pref + "schema_watch_trigger"),
+            trigName = pref + "schema_watch_trigger",
+            triggerName = asName(trigName),
             delimiter = PubSubManager.DELIMITER;
 
         if(stop){
             await this.db.any(`DROP EVENT TRIGGER IF EXISTS ${triggerName};`);
         } else {
+
+            /* Check if trigger already exists */
+            // const trg = this.db.any(`select tgname from pg_trigger   where not tgisinternal and tgrelid = ${trigName}::regclass;`, { trigName })
+
             await this.db.any(`
     
     
@@ -157,18 +162,18 @@ export class PubSubManager {
     
             CREATE OR REPLACE FUNCTION ${funcName}() RETURNS event_trigger AS $$
     
-            DECLARE condition_ids TEXT := ''; 
-            
-            BEGIN
-    
-            SELECT current_query()
-            INTO condition_ids;
-            PERFORM pg_notify( 
-                '${this.postgresNotifChannelName}' , 
-                '${this.schemaChangedNotifPayloadStr}' || '${delimiter}' || tg_tag || '${delimiter}' || TG_event  || '${delimiter}' || condition_ids
-                ); 
-    
-            END;
+                DECLARE condition_ids TEXT := ''; 
+                
+                BEGIN
+        
+                SELECT current_query()
+                INTO condition_ids;
+                PERFORM pg_notify( 
+                    '${this.postgresNotifChannelName}' , 
+                    '${this.schemaChangedNotifPayloadStr}' || '${delimiter}' || tg_tag || '${delimiter}' || TG_event  || '${delimiter}' || condition_ids
+                    ); 
+        
+                END;
             $$ LANGUAGE plpgsql;
     
     

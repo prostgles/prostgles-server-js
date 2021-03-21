@@ -140,11 +140,13 @@ class PubSubManager {
     }
     startWatchingSchema(stop = false) {
         return __awaiter(this, void 0, void 0, function* () {
-            const pref = "prostgles_", funcName = prostgles_types_1.asName(pref + "schema_watch_func"), triggerName = prostgles_types_1.asName(pref + "schema_watch_trigger"), delimiter = PubSubManager.DELIMITER;
+            const pref = "prostgles_", funcName = prostgles_types_1.asName(pref + "schema_watch_func"), trigName = pref + "schema_watch_trigger", triggerName = prostgles_types_1.asName(trigName), delimiter = PubSubManager.DELIMITER;
             if (stop) {
                 yield this.db.any(`DROP EVENT TRIGGER IF EXISTS ${triggerName};`);
             }
             else {
+                /* Check if trigger already exists */
+                // const trg = this.db.any(`select tgname from pg_trigger   where not tgisinternal and tgrelid = ${trigName}::regclass;`, { trigName })
                 yield this.db.any(`
     
     
@@ -155,18 +157,18 @@ class PubSubManager {
     
             CREATE OR REPLACE FUNCTION ${funcName}() RETURNS event_trigger AS $$
     
-            DECLARE condition_ids TEXT := ''; 
-            
-            BEGIN
-    
-            SELECT current_query()
-            INTO condition_ids;
-            PERFORM pg_notify( 
-                '${this.postgresNotifChannelName}' , 
-                '${this.schemaChangedNotifPayloadStr}' || '${delimiter}' || tg_tag || '${delimiter}' || TG_event  || '${delimiter}' || condition_ids
-                ); 
-    
-            END;
+                DECLARE condition_ids TEXT := ''; 
+                
+                BEGIN
+        
+                SELECT current_query()
+                INTO condition_ids;
+                PERFORM pg_notify( 
+                    '${this.postgresNotifChannelName}' , 
+                    '${this.schemaChangedNotifPayloadStr}' || '${delimiter}' || tg_tag || '${delimiter}' || TG_event  || '${delimiter}' || condition_ids
+                    ); 
+        
+                END;
             $$ LANGUAGE plpgsql;
     
     

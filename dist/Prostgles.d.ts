@@ -155,6 +155,11 @@ export declare type Auth = {
     login?: (params: any, dbo: any, db: DB, socket: any) => Promise<BasicSession>;
     logout?: (params: SessionIDs, dbo: any, db: DB, socket: any) => Promise<any>;
 };
+declare type Keywords = {
+    $and: string;
+    $or: string;
+    $not: string;
+};
 export declare type ProstglesInitOptions = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
@@ -177,6 +182,7 @@ export declare type ProstglesInitOptions = {
         command: string;
         query: string;
     }) => void);
+    keywords?: Keywords;
 };
 export declare type OnReady = {
     dbo: DbHandler;
@@ -209,6 +215,12 @@ export declare class Prostgles {
         query: string;
     }) => void);
     private loaded;
+    keywords: {
+        $filter: string;
+        $and: string;
+        $or: string;
+        $not: string;
+    };
     onReady: (dbo: any, db: DB) => void;
     constructor(params: ProstglesInitOptions);
     onSchemaChange(event: {

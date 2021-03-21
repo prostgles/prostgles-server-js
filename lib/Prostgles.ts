@@ -243,6 +243,12 @@ export type Auth = {
     logout?: (params: SessionIDs, dbo: any, db: DB, socket: any) => Promise<any>;
 }
 
+type Keywords = {
+    $and: string;
+    $or: string;
+    $not: string;
+};
+
 export type ProstglesInitOptions = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
@@ -263,6 +269,7 @@ export type ProstglesInitOptions = {
     auth?: Auth;
     DEBUG_MODE?: boolean;
     watchSchema?: boolean | "hotReloadMode" | ((event: { command: string; query: string }) => void);
+    keywords?: Keywords
 }
 
 // interface ISocketSetup {
@@ -287,6 +294,13 @@ export type OnReady = {
     dbo: DbHandler;
     db: DB;
 }
+
+const DEFAULT_KEYWORDS = {
+    $filter: "$filter",
+    $and: "$and",
+    $or: "$or",
+    $not: "$not"
+};
 
 const fs = require('fs');
 export class Prostgles {
@@ -321,6 +335,7 @@ export class Prostgles {
     DEBUG_MODE?: boolean = false;
     watchSchema?: boolean | "hotReloadMode" | ((event: { command: string; query: string }) => void) = false;
     private loaded = false;
+    keywords = DEFAULT_KEYWORDS;
     onReady: (dbo: any, db: DB) => void;
 
     constructor(params: ProstglesInitOptions){
@@ -340,6 +355,10 @@ export class Prostgles {
         }
         
         Object.assign(this, params);
+        this.keywords = {
+            ...DEFAULT_KEYWORDS,
+            ...params.keywords,
+        }
     }
 
     async onSchemaChange(event: { command: string; query: string }){

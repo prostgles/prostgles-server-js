@@ -58,6 +58,7 @@ prostgles_server_1.default({
     io,
     tsGeneratedTypesDir: path_1.default.join(__dirname + '/'),
     watchSchema: true,
+    sqlFilePath: path_1.default.join(__dirname + '/init.sql'),
     // transactions: true,	
     publishRawSQL: async (socket, db, _db, user) => {
         // log("set auth logic")
@@ -69,18 +70,33 @@ prostgles_server_1.default({
     joins: "inferred",
     onReady: async (db, _db) => {
         // await _db.any("CREATE TABLE IF NOT EXISTS ttt(id INTEGER, t TEXT)");
-        // // await db.ttt.insert([{ t: "a" }, { t: "b" }]);
-        // await db.ttt.update({t: "a"}, { id: -1 })
-        // await db.ttt.updateBatch([
-        //   [{t: "a"}, { id: -2 }],
-        //   [{t: "a"}, { id: -2 }]
-        // ])
-        // console.log("ok", await db.ttt.count({ t: "z" }), await db.ttt.count({ id: -1 }));
         app.get('*', function (req, res) {
             log(req.originalUrl);
             res.sendFile(path_1.default.join(__dirname + '/index.html'));
         });
-        console.log("onReady ", Boolean(db.t));
+        // await db.items.insert([
+        //   {name: "c"},
+        //   {name: "c", tst: new Date()}
+        // ])
+        // await db.items.insert([{name: '2'}]);
+        const d = await db.items.findOne({ "id->hehe->hihi->final": ' ' });
+        // d.name;
+        // console.log("onReady ", 
+        //   await db.items.find(
+        //     {}, //{ d: new Date() },
+        //     { 
+        //       select: { 
+        //         name: 1, 
+        //         d: { $date_trunc: ["days", "tst"] }, 
+        //         count: { $countAll: [] } 
+        //       },
+        //       orderBy: { count: -1 , d: -1 }
+        //     },
+        //     // undefined,
+        //     // undefined,
+        //     // { returnQuery: false } 
+        //   ).catch(console.error)
+        // )
         // if(!db.hehe)	await _db.any("CREATE TABLE hehe(id SERIAL);");
         // setTimeout(() => {
         // 	_db.any("DROP TABLE IF EXISTS hehe;");

@@ -11,7 +11,7 @@ export declare type DbHandler = {
 } & DbJoinMaker & {
     sql?: (query: string, params?: any, options?: any) => Promise<any>;
 };
-import { FieldSpec } from "./QueryBuilder";
+import { SelectItem, FieldSpec, FinalFilter } from "./QueryBuilder";
 import { DB, TableRule, Join, Prostgles, PublishParser } from "./Prostgles";
 import { PubSubManager } from "./PubSubManager";
 declare type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -48,25 +48,6 @@ export declare type Filter = object | {
 } | {
     $or: Filter[];
 } | {};
-declare type SelectFunc = {
-    alias: string;
-    getQuery: (alias: string, tableAlias?: string) => string;
-};
-declare type Query = {
-    select: string[];
-    selectFuncs: SelectFunc[];
-    allFields: string[];
-    aggs?: Aggregation[];
-    table: string;
-    where: string;
-    orderBy: string[];
-    limit: number;
-    offset: number;
-    isLeftJoin: boolean;
-    joins?: Query[];
-    joinAlias?: string;
-    $path?: string[];
-};
 export declare type JoinInfo = {
     table: string;
     on: [[string, string]];
@@ -106,7 +87,8 @@ export declare type ValidatedTableRules = {
         returningFields: string[];
     };
 };
-declare const EXISTS_KEYS: string[];
+export declare const EXISTS_KEYS: readonly ["$exists", "$notExists", "$existsJoined", "$notExistsJoined"];
+export declare type EXISTS_KEY = typeof EXISTS_KEYS[number];
 declare class ColSet {
     opts: {
         columns: ColumnInfo[];
@@ -121,7 +103,7 @@ declare class ColSet {
 export declare type ExistsFilterConfig = {
     key: string;
     f2: Filter;
-    existType: typeof EXISTS_KEYS[number];
+    existType: EXISTS_KEY;
     tables: string[];
     isJoined: boolean;
     shortestJoin: boolean;
@@ -134,11 +116,7 @@ export declare class ViewHandler {
     column_names: string[];
     tableOrViewInfo: TableOrViewInfo;
     colSet: ColSet;
-    tsDataDef: string;
-    tsDataName: string;
-    tsDboDefs: string[];
-    tsDboDef: string;
-    tsDboName: string;
+    tsColumnDefs: string[];
     joins: Join[];
     joinGraph: Graph;
     joinPaths: JoinPaths;
@@ -148,7 +126,6 @@ export declare class ViewHandler {
     filterDef: string;
     pubSubManager: PubSubManager;
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, joinPaths?: JoinPaths);
-    makeDef(): void;
     getSelectFunctions(select: any): void;
     getRowHashSelect(allowedFields: FieldFilter, alias?: string, tableAlias?: string): string;
     getFullDef(): any[];
@@ -159,7 +136,6 @@ export declare class ViewHandler {
     };
     getJoins(source: string, target: string, path?: string[]): JoinInfo;
     checkFilter(filter: any): void;
-    prepareValidatedQuery(filter: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams, validatedAggAliases?: string[]): Promise<Query>;
     getColumns(tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]>;
     getValidatedRules(tableRules?: TableRule, localParams?: LocalParams): ValidatedTableRules;
     find(filter?: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]>;
@@ -178,11 +154,44 @@ export declare class ViewHandler {
     getAllowedSelectFields(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean): string[];
     prepareColumnSet(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, onlyNames?: boolean): string | pgPromise.ColumnSet;
     prepareSelect(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, tableAlias?: string): string;
-    private getFinalFilterObj;
-    prepareWhere(filter: Filter, forcedFilter: object, filterFields: FieldFilter, excludeWhere: boolean, tableAlias: string, localParams: LocalParams, tableRule: TableRule): Promise<string>;
+    prepareHaving(params: {
+        having: Filter;
+        select: SelectItem[];
+        forcedFilter: object;
+        filterFields: FieldFilter;
+        addKeywords?: boolean;
+        tableAlias?: string;
+        localParams: LocalParams;
+        tableRule: TableRule;
+    }): Promise<string>;
+    /**
+     * Parses group or simple filter
+     */
+    prepareWhere(params: {
+        filter: Filter;
+        select?: SelectItem[];
+        forcedFilter: object;
+        filterFields: FieldFilter;
+        addKeywords?: boolean;
+        tableAlias?: string;
+        localParams: LocalParams;
+        tableRule: TableRule;
+    }): Promise<string>;
     prepareExistCondition(eConfig: ExistsFilterConfig, localParams: LocalParams, tableRules: TableRule): Promise<string>;
-    getCondition(filter: object, allowed_colnames: string[], tableAlias?: string, localParams?: LocalParams, tableRules?: TableRule): Promise<any>;
-    prepareSort(orderBy: OrderBy, allowed_cols: any, tableAlias?: string, excludeOrder?: boolean, validatedAggAliases?: string[]): string;
+    /**
+     * parses a single filter
+     * @example: { fff: 2 } => "fff" = 2
+     *  { fff: { $ilike: 'abc' } } => "fff" ilike 'abc'
+     */
+    getCondition(params: {
+        filter: FinalFilter;
+        select?: SelectItem[];
+        allowed_colnames: string[];
+        tableAlias?: string;
+        localParams?: LocalParams;
+        tableRules?: TableRule;
+    }): Promise<any>;
+    prepareSort(orderBy: OrderBy, allowed_cols: any, tableAlias: string, excludeOrder: boolean, select: SelectItem[]): string;
     prepareLimitQuery(limit: number, maxLimit: number): number;
     prepareOffsetQuery(offset: number): number;
     intersectColumns(allowedFields: FieldFilter, dissallowedFields: FieldFilter, fixIssues?: boolean): string[];
@@ -275,5 +284,18 @@ export declare class DboBuilder {
     getTX: (dbTX: TxCB) => Promise<any>;
 }
 export declare function isPlainObject(o: any): boolean;
+export declare const TS_PG_Types: {
+    string: string[];
+    number: string[];
+    boolean: string[];
+    Object: string[];
+    Date: string[];
+    "Array<number>": string[];
+    "Array<boolean>": string[];
+    "Array<string>": string[];
+    "Array<Object>": string[];
+    "Array<Date>": string[];
+    any: any[];
+};
 export {};
 //# sourceMappingURL=DboBuilder.d.ts.map

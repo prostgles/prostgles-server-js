@@ -37,11 +37,28 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
       { name: "abcd", public: "public data d", added: new Date('04 Dec 1996 00:12:00 GMT') }
     ]);
     
+    /* Ensure */
     await db["*"].insert([{ "*": "a" }, { "*": "a" }, { "*": "b" }]);
     await db[`"*"`].insert([{ [`"*"`]: "a" }, { [`"*"`]: "a" }, { [`"*"`]: "b" }]);
 
-    console.log(await db["*"].find())
+    // console.log(await db["*"].find())
   });
+
+  await tryRun("Order by", async () => {
+    const res = await db.items.find({ }, { select: { name: 1 }, orderBy: { name: -1 }});
+    assert.deepStrictEqual(res, [{ name: 'b'}, { name: 'a'}, { name: 'a'}])
+  });
+
+  await tryRun("Order by aliased func", async () => {
+    const res = await db.items.find({ }, { select: { uname: { $upper: ["name"] }, count: { $countAll: [] } }, orderBy: { uname: -1 }});
+    assert.deepStrictEqual(res, [{ uname: 'B', count: '1'}, { uname: 'A', count: '2'} ])
+  });
+
+  await tryRun("Order by aggregation", async () => {
+    const res = await db.items.find({ }, { select: { name: 1, count: { $countAll: [] } }, orderBy: { count: -1 }});
+    assert.deepStrictEqual(res, [  { name: 'a', count: '2'} , { name: 'b', count: '1'} ])
+  });
+
   await tryRun("Update batch example", async () => {
     
     await db.items4.updateBatch([
@@ -92,7 +109,6 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     assert.deepStrictEqual(f[0],  { h: null, id: 1, name: 'a' }, "findOne query failed" );
   });
 
-
   await tryRun("Basic exists", async () => {
     const expect0 = await db.items.count({ 
       $and: [
@@ -103,7 +119,6 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     assert.equal(expect0, 0, "$exists query failed")
   });
   
-  /* Exists with shortest path wildcard filter example */
   await tryRun("Exists with shortest path wildcard filter example", async () => {
     const expect2 = await db.items.find({ 
       $and: [
@@ -115,7 +130,6 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
   });
      
 
-  /* Exists with exact path filter example */
   await tryRun("Exists with exact path filter example", async () => {
     const _expect2 = await db.items.find({ 
       $and: [

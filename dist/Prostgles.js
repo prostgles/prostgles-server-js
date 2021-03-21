@@ -45,6 +45,12 @@ function getDbConnection(dbConnection, options, debugQueries = false, noNewConne
 }
 const QueryFile = require('pg-promise').QueryFile;
 exports.JOIN_TYPES = ["one-many", "many-one", "one-one", "many-many"];
+const DEFAULT_KEYWORDS = {
+    $filter: "$filter",
+    $and: "$and",
+    $or: "$or",
+    $not: "$not"
+};
 const fs = require('fs');
 class Prostgles {
     constructor(params) {
@@ -58,6 +64,7 @@ class Prostgles {
         this.DEBUG_MODE = false;
         this.watchSchema = false;
         this.loaded = false;
+        this.keywords = DEFAULT_KEYWORDS;
         this.connectedSockets = [];
         this.pushSocketSchema = (socket) => __awaiter(this, void 0, void 0, function* () {
             let auth = {};
@@ -198,6 +205,7 @@ class Prostgles {
             console.error(`Unrecognised ProstglesInitOptions params: ${unknownParams.join()}`);
         }
         Object.assign(this, params);
+        this.keywords = Object.assign(Object.assign({}, DEFAULT_KEYWORDS), params.keywords);
     }
     onSchemaChange(event) {
         return __awaiter(this, void 0, void 0, function* () {
