@@ -5,6 +5,7 @@ export declare type SelectItem = {
     type: "column" | "function" | "aggregation" | "joinedColumn" | "computed";
     getFields: () => string[];
     getQuery: (tableAlias?: string) => string;
+    columnDataType?: string;
     alias: string;
     selected: boolean;
 };
@@ -101,18 +102,17 @@ export declare type FilterSpec = {
     tsDefinition: string;
     getQuery: (leftQuery: string, rightVal: any) => string;
 };
-export declare type NullableFilter = null;
 /**
  * Example: col_name: { $gt: 2 }
  * @alias CompareFilter
  */
-export declare type CompareFilter<T = Date | number | string | boolean> = T | {
-    "=": T;
-}
+export declare type CompareFilter<T = Date | number | string | boolean> = 
 /**
  * column value equals provided value
  */
- | {
+T | {
+    "=": T;
+} | {
     "$eq": T;
 } | {
     "<>": T;
@@ -251,6 +251,16 @@ export declare type ExistsFilter<Obj = AnyObject> = {
     $exists: TableFilter<Obj>;
 };
 export declare type FinalFilter = TableFilter | ExistsFilter;
-export declare const pParseFilter: (_f: ExistsFilter | FilterForObject, select: SelectItem[], pgp: any) => string;
+/**
+ * Parse a single filter
+ * Ensure only single key objects reach this point
+ */
+declare type ParseFilterArgs = {
+    filter: ExistsFilter | FilterForObject;
+    select?: SelectItem[];
+    tableAlias?: string;
+    pgp: any;
+};
+export declare const pParseFilter: (args: ParseFilterArgs) => string;
 export {};
 //# sourceMappingURL=QueryBuilder.d.ts.map

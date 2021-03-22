@@ -64,7 +64,10 @@ function makeErr(err, localParams) {
 exports.EXISTS_KEYS = ["$exists", "$notExists", "$existsJoined", "$notExistsJoined"];
 function parseError(e) {
     // console.trace("INTERNAL ERROR: ", e);
-    return "INTERNAL ERROR: " + (!Object.keys(e || {}).length ? e : (e && e.toString) ? e.toString() : e);
+    let res = (!Object.keys(e || {}).length ? e : (e && e.toString) ? e.toString() : e);
+    if (isPlainObject(e))
+        res = JSON.stringify(e, null, 2);
+    return "INTERNAL ERROR: " + res;
 }
 class ColSet {
     constructor(columns, tableName) {
@@ -499,7 +502,7 @@ class ViewHandler {
                         throw `INTERNAL ERROR: Publish config is not valid for publish.${this.name}.select `;
                     }
                 }
-                console.log(_query);
+                // console.log(_query);
                 if (returnQuery)
                     return _query;
                 if (expectOne) {
@@ -806,91 +809,6 @@ class ViewHandler {
     getCondition(params) {
         return __awaiter(this, void 0, void 0, function* () {
             const { filter, select, allowed_colnames, tableAlias, localParams, tableRules } = params;
-            QueryBuilder_1.pParseFilter(filter, select, exports.pgp);
-            let prefix = "";
-            const getRawFieldName = (field) => {
-                if (tableAlias)
-                    return `${prostgles_types_1.asName(tableAlias)}.${prostgles_types_1.asName(field)}`;
-                else
-                    return prostgles_types_1.asName(field);
-            };
-            const parseDataType = (key, col = null) => {
-                const _col = col || this.columns.find(({ name }) => name === key);
-                if (_col && _col.data_type === "ARRAY") {
-                    return " ARRAY[${data:csv}] ";
-                }
-                return " ${data} ";
-            }, conditionParsers = [
-                // ...FUNCTIONS.filter(f => f.singleColArg).map(func => ({
-                //     aliases: [func.name],
-                //     get: (key, val, col) => {
-                //     }
-                // })),
-                { aliases: ["&&ST_MakeEnvelope"], get: (left, val) => {
-                        return "${key:raw} && ST_MakeEnvelope(${data:csv}) ";
-                    } },
-                { aliases: ["@@ST_MakeEnvelope"], get: (key, val, col) => {
-                        return "${key:raw} @@ ST_MakeEnvelope(${data:csv}) ";
-                    } },
-                { aliases: ["$nin"], get: (key, val, col) => "${key:raw} NOT IN (${data:csv}) " },
-                { aliases: ["$in"], get: (key, val, col) => "${key:raw} IN (${data:csv}) " },
-                { aliases: ["$tsQuery"], get: (key, val, col) => {
-                        if (col.data_type === "tsvector") {
-                            return exports.pgp.as.format("${key:raw} @@ to_tsquery(${data:csv}) ", { key: getRawFieldName(key), data: val });
-                        }
-                        else {
-                            return exports.pgp.as.format(" to_tsvector(${key:raw}::text) @@ to_tsquery(${data:csv}) ", { key, data: val });
-                        }
-                    } },
-                { aliases: ["@@"], get: (key, val, col) => {
-                        if (col && val && val.to_tsquery && Array.isArray(val.to_tsquery)) {
-                            if (col.data_type === "tsvector") {
-                                return exports.pgp.as.format("${key:raw} @@ to_tsquery(${data:csv}) ", { key: getRawFieldName(key), data: val.to_tsquery });
-                            }
-                            else {
-                                return exports.pgp.as.format(" to_tsvector(${key:raw}::text) @@ to_tsquery(${data:csv}) ", { key, data: val.to_tsquery });
-                            }
-                        }
-                        else
-                            throw `expecting { field_name: { "@@": { to_tsquery: [ ...params ] } } } `;
-                    } },
-                { aliases: ["@>", "$contains"], get: (key, val, col) => "${key:raw} @> " + parseDataType(key, col) },
-                { aliases: ["<@", "$containedBy"], get: (key, val, col) => "${key:raw} <@ " + parseDataType(key, col) },
-                { aliases: ["&&", "$overlaps"], get: (key, val, col) => "${key:raw} && " + parseDataType(key, col) },
-                { aliases: ["=", "$eq", "$equal"], get: (key, val, col) => "${key:raw} =  " + parseDataType(key, col) },
-                { aliases: [">", "$gt", "$greater"], get: (key, val, col) => "${key:raw} >  " + parseDataType(key, col) },
-                { aliases: [">=", "$gte", "$greaterOrEqual"], get: (key, val, col) => "${key:raw} >= " + parseDataType(key, col) },
-                { aliases: ["<", "$lt", "$less"], get: (key, val, col) => "${key:raw} <  " + parseDataType(key, col) },
-                { aliases: ["<=", "$lte", "$lessOrEqual"], get: (key, val, col) => "${key:raw} <= " + parseDataType(key, col) },
-                { aliases: ["$ilike"], get: (key, val, col) => "${key:raw}::text ILIKE ${data}::text " },
-                { aliases: ["$like"], get: (key, val, col) => "${key:raw}::text LIKE ${data}::text " },
-                { aliases: ["$notIlike"], get: (key, val, col) => "${key:raw}::text NOT ILIKE ${data}::text " },
-                { aliases: ["$notLike"], get: (key, val, col) => "${key:raw}::text NOT LIKE ${data}::text " },
-                { aliases: ["<>", "$ne", "$not"], get: (key, val, col) => "${key:raw} " + (val === null ? " IS NOT NULL " : (" <> " + parseDataType(key, col))) },
-                { aliases: ["$isNull", "$null"], get: (key, val, col) => "${key:raw} " + `  IS ${!val ? " NOT " : ""} NULL ` }
-            ], getFilterQuery = (left, operand, rightVal) => {
-                const op = conditionParsers.find(c => c.aliases.includes(operand));
-                const colProps = this.columns.find(c => left.type === "column" && c.name === left.alias);
-                const getVal = () => {
-                    if (left.type === "column") {
-                        if (!colProps)
-                            throw "Unrecognised column in filter: " + left.alias;
-                        if (colProps.data_type === "ARRAY") {
-                            return exports.pgp.as.format(" ARRAY[$1:csv] ", [rightVal]);
-                        }
-                    }
-                    return exports.pgp.as.format("$1", [rightVal]);
-                };
-                let res = left.getQuery(tableAlias);
-                /* no operand means "=" */
-                if (!op) {
-                    res += ` = ` + getVal();
-                }
-                else {
-                    // res += op.get(left.alias, rightVal)
-                }
-                return res;
-            };
             let data = Object.assign({}, filter);
             /* Exists join filter */
             const ERR = "Invalid exists filter. \nExpecting somethibng like: { $exists: { tableName.tableName2: Filter } } | { $exists: { \"**.tableName3\": Filter } }";
@@ -956,19 +874,6 @@ class ViewHandler {
             //     rowHashCondition = this.getRowHashSelect(get(tableRules, "select.fields") ,tableAlias) + ` = ${pgp.as.format("$1", [ (data as any).$rowhash ] )}`;
             //     delete (data as any).$rowhash;
             // }
-            let filterKeys = Object.keys(data).filter(k => !computedFields.find(cf => cf.name === k) && !existsKeys.find(ek => ek.key === k));
-            if (allowed_colnames) {
-                const aliasedColumns = (select || []).filter(s => s.getFields().find(f => allowed_colnames.includes(f))).map(s => s.alias);
-                const validCols = [...allowed_colnames, ...aliasedColumns];
-                const invalidColumn = filterKeys
-                    .find(fName => !validCols.includes(fName));
-                if (invalidColumn) {
-                    throw `Table: ${this.name} -> disallowed/inexistent columns in filter: ${invalidColumn} \n  Expecting one of: ${validCols.join(", ")}`;
-                }
-            }
-            /* TODO: Allow filter funcs */
-            const selectFuncs = (select || []).filter(s => s.type === "function");
-            const singleFuncs = QueryBuilder_1.FUNCTIONS.filter(f => f.singleColArg);
             let allowedSelect = [];
             /* Select aliases take precedence */
             if (select) {
@@ -984,55 +889,38 @@ class ViewHandler {
                 selected: false,
                 getFields: () => [f.name]
             })));
-            let templates = Prostgles_1.flat(filterKeys
-                .map(fKey => {
-                let _d = data[fKey], fcol;
-                /* A valid filter will be:
-                    col_name:                       (val | { operand: val })
-                    select_func_alias: (val | { operand: val })
-                    $filter: [select_func/col_name, operand, value]
-                */
-                let leftAlias = fKey;
-                let col = this.columns.find(({ name }) => name === leftAlias);
-                // ef sef fs
-                if (!col) {
-                    const itm = allowedSelect.find(s => s.alias === leftAlias);
-                    if (itm) {
-                        return itm.getQuery(tableAlias) + ` = ` + exports.pgp.as.format("$1", [_d]);
-                    }
-                    throw "No col";
+            let filterKeys = Object.keys(data).filter(k => !computedFields.find(cf => cf.name === k) && !existsKeys.find(ek => ek.key === k));
+            if (allowed_colnames) {
+                const aliasedColumns = (select || []).filter(s => s.type === "column" && allowed_colnames.includes(s.alias) ||
+                    s.getFields().find(f => allowed_colnames.includes(f))).map(s => s.alias);
+                const validCols = [...allowed_colnames, ...aliasedColumns];
+                // const invalidColumn = filterKeys
+                //     .find(fName => !validCols.includes(fName));
+                const invalidColumn = filterKeys
+                    .find(fName => !validCols.find(c => c === fName || (fName.startsWith(c) && (fName.slice(c.length).includes("->") ||
+                    fName.slice(c.length).includes(".")))));
+                if (invalidColumn) {
+                    throw `Table: ${this.name} -> disallowed/inexistent columns in filter: ${invalidColumn} \n  Expecting one of: ${allowedSelect.map(s => s.alias).join(", ")}`;
                 }
-                let d = _d;
-                if (d === null) {
-                    return exports.pgp.as.format("${key:raw} IS NULL ", { key: getRawFieldName(fKey), prefix });
-                }
-                if (isPlainObject(d)) {
-                    if (Object.keys(d).length) {
-                        const operandAliases = conditionParsers.map(o => o.aliases).flat();
-                        return Object.keys(d).map(operand_key => {
-                            const op = conditionParsers.find(o => operand_key && o.aliases.includes(operand_key));
-                            if (!op) {
-                                throw "Unrecognised operand: " + operand_key + " \nAllowed operands: " + operandAliases.join(", ");
-                            }
-                            let _d = d[operand_key];
-                            /* Turn data into array if comparing to array type column */
-                            if (col.element_type && !Array.isArray(_d))
-                                _d = [_d];
-                            return exports.pgp.as.format(op.get(fKey, _d, col), { key: getRawFieldName(fKey), data: _d, prefix });
-                        });
-                        // if(Object.keys(d).length){
-                        // } else throw `\n Unrecognised statement for field ->   ${fKey}: ` + JSON.stringify(d);
-                    }
-                }
-                return exports.pgp.as.format("${key:raw} = " + parseDataType(fKey), { key: getRawFieldName(fKey), data: data[fKey], prefix });
-            }));
+            }
+            /* TODO: Allow filter funcs */
+            // const singleFuncs = FUNCTIONS.filter(f => f.singleColArg);
+            const f = PubSubManager_1.filterObj(data, filterKeys);
+            const q = QueryBuilder_1.pParseFilter({
+                filter: f,
+                tableAlias,
+                pgp: exports.pgp,
+                select: allowedSelect
+            });
+            // console.log({ f, q })
+            let templates = [q].filter(q => q);
             if (existsCond)
                 templates.push(existsCond);
             templates = templates.concat(computedColConditions);
-            templates = templates.sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
+            return templates.sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
                 .join(" AND \n");
             // console.log(templates)
-            return templates; //pgp.as.format(template, data);
+            // return templates; //pgp.as.format(template, data);
             /*
                 SHOULD CHECK DATA TYPES TO AVOID "No operator matches the given data type" error
                 console.log(table.columns)

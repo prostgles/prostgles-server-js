@@ -13,6 +13,7 @@ export type SelectItem = {
   type: "column" | "function" | "aggregation" | "joinedColumn" | "computed";
   getFields: () => string[];
   getQuery: (tableAlias?: string) => string;
+  columnDataType?: string;
   // columnName?: string; /* Must only exist if type "column" ... dissalow aliased columns? */
   alias: string;
   selected: boolean;
@@ -1050,43 +1051,46 @@ export type FilterSpec = {
 
 
 
-export type NullableFilter = null;
-
 /**
  * Example: col_name: { $gt: 2 }
  * @alias CompareFilter
  */
 export type CompareFilter<T = Date | number | string | boolean> =
-  | T 
-  | { "=": T } 
   /**
    * column value equals provided value
    */
-  | { "$eq": T }
+  | T 
+  | { "=": T } | { "$eq": T }
   | { "<>": T } | { "$ne": T }
   | { ">": T } | { "$gt": T }
   | { ">=": T } | { "$gte": T }
   | { "<=": T } | { "$lte": T }
+
   | { "$in": T[] }
   | { "$nin": T[] }
   | { "$between": [T, T] }
 ;
+const CompareFilterKeys = ["=", "$eq","<>",">",">=","<=","$eq","$ne","$gt","$gte","$lte"];
+const CompareInFilterKeys = ["$in", "$nin"]
 
 export type FTSFilter = 
   | { "to_tsquery": string[] }
   | { "plainto_tsquery": string[] }
   | { "phraseto_tsquery": string[] }
   | { "websearch_to_tsquery": string[] }
-;  
+;
+const TextFilter_FTSFilterKeys = ["to_tsquery","plainto_tsquery","phraseto_tsquery","websearch_to_tsquery"];
 
 export type TextFilter = 
   | CompareFilter<string>
   | { "$ilike": string }
   | { "$like": string }
+
   | { "@@": FTSFilter }
   | { "@>": FTSFilter } |  { "$contains": FTSFilter } 
   | { "<@": FTSFilter } |  { "$containedBy": FTSFilter } 
 ;
+const TextFilterFTSKeys = ["@@", "@>", "<@", "$contains", "$containedBy"];
 
 export type ArrayFilter<T = (number | boolean | string)[]> = 
   | CompareFilter<T>
@@ -1136,6 +1140,8 @@ export type GeomFilter =
   | { "~": GeoBBox }
   | { "~=": GeoBBox }
 ;
+const GeomFilterKeys = ["~","~=","@","|&>","|>>", ">>", "=", "<<|", "<<", "&>", "&<|", "&<", "&&&", "&&"]
+const GeomFilter_Funcs = ["ST_MakeEnvelope", "ST_MakeEnvelope".toLowerCase()]
 
 type AllowedTSTypes = string | number | boolean | Date | any[];
 type AnyObject = { [key: string]: AllowedTSTypes };
@@ -1185,7 +1191,16 @@ export type FinalFilter = TableFilter | ExistsFilter
 // };
 
 
-export const pParseFilter = (_f: ExistsFilter | FilterForObject, select: SelectItem[], pgp: any ): string => {
+
+
+/**
+ * Parse a single filter
+ * Ensure only single key objects reach this point
+ */
+type ParseFilterArgs = {  filter: ExistsFilter | FilterForObject, select?: SelectItem[], tableAlias?: string, pgp: any };
+export const pParseFilter = (args: ParseFilterArgs): string => {
+  const { filter: _f, select, tableAlias, pgp } = args;
+
   if(!_f || isEmpty(_f)) return "";
 
 
@@ -1195,8 +1210,17 @@ export const pParseFilter = (_f: ExistsFilter | FilterForObject, select: SelectI
     asValue = (v) => pgp.as.format("$1", [v]);
 
   const fKeys = Object.keys(_f)
-  if(fKeys.length !== 1){
-    mErr(`Bad filter. Expecting a single property but got`)
+  if(fKeys.length === 0){
+    return "";
+  } else if(fKeys.length > 1){
+    return fKeys.map(fk => pParseFilter({
+      filter: { [fk]: _f[fk] },
+      select, 
+      tableAlias,
+      pgp
+    }))
+    .sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
+    .join(" AND ")
   }
 
   const fKey = fKeys[0];
@@ -1206,72 +1230,224 @@ export const pParseFilter = (_f: ExistsFilter | FilterForObject, select: SelectI
     // parseExistsFilter()
   }
 
-  let selItem = select.find(s => fKey === s.alias);
+  let selItem;
+  if(select) selItem = select.find(s => fKey === s.alias);
   let rightF: FilterDataType = _f[fKey];
-  let leftKey: string = fKey;
+
+  const getLeftQ = (selItm: SelectItem) => {
+    if(selItm.type === "function") return selItem.getQuery();
+    return asName(selItem.alias)
+  }
+
+  /**
+   * Parsed left side of the query
+   */
+  let leftQ: string;// = asName(selItem.alias);
 
   /* Check if string notation. Build obj if necessary */
   if(!selItem){
-    selItem = select.find(s => 
-      fKey.startsWith(s.alias)     // "field_name->objName->>keyAsValue"
-    );
+    // let leftKey: string = fKey;
+    if(select){
+      selItem = select.find(s => fKey.startsWith(s.alias)  );
+    }
     if(!selItem) mErr("Bad filter. Could not match to a column or alias: ");
 
     const remainingStr = fKey.slice(selItem.alias.length);
 
     /* Is json path spec */
     if(remainingStr.startsWith("->")){
-      leftKey = asName(selItem.alias);
+      leftQ = getLeftQ(selItem);
       
       /**
        * get json path separators. Expecting -> to come first
        */
-      const getSep = (fromIdx: number = 0): { idx: number; sep: string } | void => {
-        let idx = remainingStr.slice(fromIdx).indexOf("->");
+      type GetSepRes = { idx: number; sep: string } | undefined
+      const getSep = (fromIdx = 0): GetSepRes => {
+        const strPart = remainingStr.slice(fromIdx)
+        let idx = strPart.indexOf("->");
+        let idxx = strPart.indexOf("->>");
         if(idx > -1) {
           /* if -> matches then check if it's the last separator */
-          if(remainingStr.slice(idx).startsWith("->>")) return { idx, sep: "->>" }
-          return { idx, sep: "->" }
+          if(idx === idxx) return { idx: idx + fromIdx, sep: "->>" }
+          return { idx: idx + fromIdx, sep: "->" }
         }
-        idx = remainingStr.slice(fromIdx).indexOf("->>");
+        idx = strPart.indexOf("->>");
         if(idx > -1) {
-          return { idx, sep: "->>" }
+          return { idx: idx + fromIdx, sep: "->>" }
         }
+
+        return undefined;
       }
 
 
       let currSep = getSep();
       while(currSep){
         let nextSep = getSep(currSep.idx + currSep.sep.length);
-        let nextIdx = nextSep? nextSep.idx : remainingStr.length
-        leftKey += currSep.sep + asValue(remainingStr.slice(currSep.idx + currSep.sep.length, nextIdx));
+
+        let nextIdx = nextSep? nextSep.idx : remainingStr.length;
+
+        /* If ending in set then add set as well into key */
+        if(nextSep && nextIdx + nextSep.sep.length === remainingStr.length) {
+          nextIdx = remainingStr.length;
+          nextSep =  undefined;
+        }
+
+        // console.log({ currSep, nextSep })
+        leftQ += currSep.sep + asValue(remainingStr.slice(currSep.idx + currSep.sep.length, nextIdx));
         currSep = nextSep;
       }
 
-    /* Is collapsed filter spec */
+    /* Is collapsed filter spec  e.g. { "col.$ilike": 'text' } */
     } else if(remainingStr.startsWith(".")){
+      leftQ = getLeftQ(selItem);
+
       let getSep = (fromIdx = 0) => {
-        return remainingStr.slice(fromIdx).indexOf(".")
+        const idx = remainingStr.slice(fromIdx).indexOf(".");
+        if(idx > -1) return fromIdx + idx;
+        return idx; 
       }
       let currIdx = getSep();
       let res: any = {};
       let curObj = res;
       while(currIdx > -1){
-        const nextIdx = getSep(currIdx + 1)
-        const nIdx = nextIdx > -1? nextIdx : remainingStr.length;
-        const key = remainingStr.slice(currIdx + 1, nIdx);
-        curObj[key] = {};
-        curObj = curObj[key];
-      }
+        let nextIdx = getSep(currIdx + 1);
+        let nIdx = nextIdx > -1? nextIdx : remainingStr.length;
 
-      curObj = _f[fKey]
-      rightF = curObj;
+        /* If ending in dot then add dot as well into key */
+        if(nextIdx + 1 === remainingStr.length) {
+          nIdx = remainingStr.length;
+          nextIdx = -1;
+        }
+
+        const key = remainingStr.slice(currIdx + 1, nIdx);
+        curObj[key] = nextIdx > -1? {} : _f[fKey];
+        curObj = curObj[key];
+
+        currIdx = nextIdx;
+      }
+      
+      rightF = res;
     } else {
       mErr("Bad filter. Could not find the valid col name or alias or col json path")
     }
+
+  } else {
+    leftQ = getLeftQ(selItem);
   }
 
-  console.log({ leftKey, rightF });
+  if(!leftQ) mErr("Internal error: leftQ missing?!");
+
+  /* Matching sel item */
+  if(isPlainObject(rightF)){
+    const parseRightVal = (val, expect: "csv" | "array" | null = null) => {
+      if(expect === "csv"){
+        return pgp.as.format("($1:csv)", [val]);
+
+      } else if(expect === "array" || selItem && selItem.columnDataType && selItem.columnDataType === "ARRAY"){
+        if(!Array.isArray(val)) return mErr("This type of filter/column expects an Array of items");
+        return pgp.as.format(" ARRAY[$1:csv]", [val]);
+
+      }
+
+      return asValue(val);
+    }
+
+    const filterKeys = Object.keys(rightF);
+    if(filterKeys.length !== 1) mErr("Bad filter. Expecting one key only");
+
+    const fOpType = filterKeys[0];
+    const fVal = rightF[fOpType];
+    let sOpType: string;
+    let sVal: any;
+
+    if(fVal && isPlainObject(fVal)){
+      const keys = Object.keys(fVal);
+      if(!keys.length || keys.length !== 1){
+        return mErr("Bad filter. Expecting a nested object with one key only ");
+      }
+      sOpType = keys[0];
+      sVal = fVal[sOpType];
+
+    }
+    // console.log({ fOpType, fVal, sOpType })
+
+    if(GeomFilterKeys.includes(fOpType) && sOpType && GeomFilter_Funcs.includes(sOpType)){
+      return leftQ + ` ${fOpType} ` + `${sOpType}${parseRightVal(sVal, "csv")}`;
+
+    } else if(["=", "$eq"].includes(fOpType) && !sOpType){
+      if(fVal === null) return leftQ + " IS NULL ";
+      return leftQ + " > " + parseRightVal(fVal);
+
+    } else if(["<>", "$ne"].includes(fOpType)){
+      return leftQ + " <> " + parseRightVal(fVal);
+
+    } else if([">", "$gt"].includes(fOpType)){
+      return leftQ + " > " + parseRightVal(fVal);
+
+    } else if(["<", "$lt"].includes(fOpType)){
+      return leftQ + " < " + parseRightVal(fVal);
+
+    } else if([">=", "$gte"].includes(fOpType)){
+      return leftQ + " >=  " + parseRightVal(fVal);
+
+    } else if(["<=", "$lte"].includes(fOpType)){
+      return leftQ + " <= " + parseRightVal(fVal);
+
+    } else if(["$in"].includes(fOpType)){
+      return leftQ + " IN " + parseRightVal(fVal, "csv");
+
+    } else if(["$nin"].includes(fOpType)){
+      return leftQ + " NOT IN " + parseRightVal(fVal, "csv");
+      
+    } else if(["$between"].includes(fOpType)){
+      if(!Array.isArray(fVal) || fVal.length !== 2){
+        return mErr("Between filter expects an array of two values");
+      }
+      return leftQ + " BETWEEN " + asValue(fVal[0]) + " AND " + asValue(fVal[1]);
+
+    } else if(["$ilike"].includes(fOpType)){
+      return leftQ + " ILIKE " + asValue(fVal);
+
+    } else if(["$like"].includes(fOpType)){
+      return leftQ + " LIKE " + asValue(fVal);
+
+    /* MAYBE TEXT OR MAYBE ARRAY */
+    } else if(["@>", "<@", "$contains", "$containedBy", "&&", "@@"].includes(fOpType)){
+      let operand = fOpType === "@@"? "@@": 
+          ["@>", "$contains"].includes(fOpType)? "@>" : 
+          ["&&"].includes(fOpType)? "&&" : 
+          "<@";
+
+      /* Array for sure */
+      if(Array.isArray(fVal)){
+        return leftQ + operand + parseRightVal(fVal, "array");
+          
+      /* FTSQuery */
+      } else if(["@@"].includes(fOpType) && TextFilter_FTSFilterKeys.includes(sOpType)) {
+        let lq = `to_tsvector(${leftQ}::text)`;
+        if(selItem && selItem.columnDataType === "tsvector") lq = leftQ;
+
+        let res = `${lq} ${operand} ` + `${sOpType}${parseRightVal(sVal, "csv")}`;
+
+        return res;
+      } else {
+        return mErr("Unrecognised filter operand: " + fOpType + " ");
+      }
+
+    } else {
+      return mErr("Unrecognised filter operand: " + fOpType + " ");
+    }
+
+
+  } else {
+
+    /* Is an equal filter */
+    if(rightF === null){
+      return leftQ + " IS NULL ";
+    } else {
+      return leftQ + " = " + asValue(rightF);
+    }
+  }
 }
 
 

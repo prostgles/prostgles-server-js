@@ -78,9 +78,17 @@ prostgles_server_1.default({
         //   {name: "c"},
         //   {name: "c", tst: new Date()}
         // ])
+        // console.log("WTF")
         // await db.items.insert([{name: '2'}]);
-        const d = await db.items.findOne({ "id->hehe->hihi->final": ' ' });
-        // d.name;
+        // const d = await db.items.findOne({ "id->hehe->hihi->final": ' '});  "id.$ilike": ' ', 
+        try {
+            const longGeomFilter = { id: { "=": { "ST_MakeEnvelope": [1, 2, 3, 4] } } }, shortGeomFilter = { "id.=.ST_MakeEnvelope": [1, 2, 3, '$$--4\"\'$$\``'] };
+            const d = await db.items.findOne({ ...shortGeomFilter, ...longGeomFilter });
+            // d.name;
+        }
+        catch (e) {
+            console.trace(e);
+        }
         // console.log("onReady ", 
         //   await db.items.find(
         //     {}, //{ d: new Date() },

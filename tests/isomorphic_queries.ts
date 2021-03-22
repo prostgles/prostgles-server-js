@@ -41,7 +41,42 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     await db["*"].insert([{ "*": "a" }, { "*": "a" }, { "*": "b" }]);
     await db[`"*"`].insert([{ [`"*"`]: "a" }, { [`"*"`]: "a" }, { [`"*"`]: "b" }]);
 
+    await db.various.insert([
+      { name: "abc9",  added: new Date('04 Dec 1995 00:12:00 GMT'), jsn: { "a": { "b": 2 } }  },
+      { name: "abc1",  added: new Date('04 Dec 1996 00:12:00 GMT'), jsn: { "a": { "b": 3 } }  },
+      { name: "abc81", added: new Date('04 Dec 1997 00:12:00 GMT'), jsn: { "a": { "b": 2 } }  }
+    ])
+
     // console.log(await db["*"].find())
+  });
+
+  /**
+   * TODO -> ADD ALL FILTER TYPES
+   */
+
+   
+  await tryRun("FTS filtering", async () => {
+    const res = await db.various.count({ "tsv.@@.to_tsquery": ["a"] });
+    assert.equal(res, 0)
+  });
+  await tryRun("JSON filtering", async () => {
+    const res = await db.various.count({ "jsn->a->>b": '3' });
+    assert.equal(res, 1)
+  });
+  await tryRun("Between filtering", async () => {
+    const res = await db.various.count({ 
+      added: { $between: [
+        new Date('06 Dec 1995 00:12:00 GMT'),
+        new Date('03 Dec 1997 00:12:00 GMT')
+      ] } });
+    assert.equal(res, 1)
+  });
+  await tryRun("In filtering", async () => {
+    const res = await db.various.count({ 
+      added: { $in: [
+        new Date('04 Dec 1996 00:12:00 GMT')
+      ] } });
+    assert.equal(res, 1)
   });
 
   await tryRun("Order by", async () => {
@@ -119,6 +154,17 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     assert.equal(expect0, 0, "$exists query failed")
   });
   
+  await tryRun("Basic fts with shorthand notation", async () => {
+    const res = await db.items.count({ 
+      $and: [
+        { $exists: { items2: { "name.@@.to_tsquery": ["a"] } } },
+        { $exists: { items3: { "name.@@.to_tsquery": ["b"] } } },
+      ]
+    });
+    // assert.deepStrictEqual(res, { name: 'a'})
+    assert.equal(res, 0, "FTS query failed")
+  });
+
   await tryRun("Exists with shortest path wildcard filter example", async () => {
     const expect2 = await db.items.find({ 
       $and: [

@@ -190,7 +190,7 @@ export declare class ViewHandler {
         tableAlias?: string;
         localParams?: LocalParams;
         tableRules?: TableRule;
-    }): Promise<any>;
+    }): Promise<string>;
     prepareSort(orderBy: OrderBy, allowed_cols: any, tableAlias: string, excludeOrder: boolean, select: SelectItem[]): string;
     prepareLimitQuery(limit: number, maxLimit: number): number;
     prepareOffsetQuery(offset: number): number;

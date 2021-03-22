@@ -215,7 +215,9 @@ type f = Partial<{ [key in EXISTS_KEY]: number }>
 function parseError(e){
     
     // console.trace("INTERNAL ERROR: ", e);
-    return "INTERNAL ERROR: " + (!Object.keys(e || {}).length? e : (e && e.toString)? e.toString() : e);
+    let res = (!Object.keys(e || {}).length? e : (e && e.toString)? e.toString() : e);
+    if(isPlainObject(e)) res = JSON.stringify(e, null, 2)
+    return "INTERNAL ERROR: " + res;
 }
 
 class ColSet {
@@ -1089,95 +1091,7 @@ export class ViewHandler {
      */
     async getCondition(params: { filter: FinalFilter, select?: SelectItem[], allowed_colnames: string[], tableAlias?: string, localParams?: LocalParams, tableRules?: TableRule }){
         const { filter, select, allowed_colnames, tableAlias, localParams, tableRules  } = params;
-
-        pParseFilter(filter as any, select, pgp)
-
-        let prefix = "";
-        const getRawFieldName = (field) => {
-            if(tableAlias) return `${asName(tableAlias)}.${asName(field)}`;
-            else return asName(field);
-        }
-
-        const parseDataType = (key, col = null) => {
-                const _col = col || this.columns.find(({ name }) => name === key);
-                if(_col && _col.data_type === "ARRAY"){
-                    return " ARRAY[${data:csv}] "
-                }
-                return " ${data} ";
-            },
-            conditionParsers = [
-                // ...FUNCTIONS.filter(f => f.singleColArg).map(func => ({
-                //     aliases: [func.name],
-                //     get: (key, val, col) => {
-                        
-                //     }
-                // })),
-                { aliases: ["&&ST_MakeEnvelope"],               get: (left, val) => {
-                    return "${key:raw} && ST_MakeEnvelope(${data:csv}) "
-                } },             
-                { aliases: ["@@ST_MakeEnvelope"],               get: (key, val, col) => {
-                    return "${key:raw} @@ ST_MakeEnvelope(${data:csv}) "
-                } },
-                { aliases: ["$nin"],                            get: (key, val, col) => "${key:raw} NOT IN (${data:csv}) " },
-                { aliases: ["$in"],                             get: (key, val, col) => "${key:raw} IN (${data:csv}) " },
-                { aliases: ["$tsQuery"],                        get: (key, val, col) => {
-                    if(col.data_type === "tsvector"){
-                        return pgp.as.format("${key:raw} @@ to_tsquery(${data:csv}) ", { key: getRawFieldName(key), data: val }); 
-                    } else {
-                        return pgp.as.format(" to_tsvector(${key:raw}::text) @@ to_tsquery(${data:csv}) ", { key, data: val }); 
-                    } 
-                } },
-
-                { aliases: ["@@"],                              get: (key, val, col) => {
-                    if(col && val && val.to_tsquery && Array.isArray(val.to_tsquery)){
-                        if(col.data_type === "tsvector"){
-                            return pgp.as.format("${key:raw} @@ to_tsquery(${data:csv}) ", { key: getRawFieldName(key), data: val.to_tsquery }); 
-                        } else {
-                            return pgp.as.format(" to_tsvector(${key:raw}::text) @@ to_tsquery(${data:csv}) ", { key, data: val.to_tsquery }); 
-                        } 
-
-                    } else throw `expecting { field_name: { "@@": { to_tsquery: [ ...params ] } } } `;
-                }},
-
-                { aliases: ["@>", "$contains"],                 get: (key, val, col) => "${key:raw} @> " + parseDataType(key ,col) },
-                { aliases: ["<@", "$containedBy"],              get: (key, val, col) => "${key:raw} <@ " + parseDataType(key ,col) },
-                { aliases: ["&&", "$overlaps"],                 get: (key, val, col) => "${key:raw} && " + parseDataType(key ,col) },
-
-                { aliases: ["=", "$eq", "$equal"],              get: (key, val, col) => "${key:raw} =  " + parseDataType(key ,col) },
-                { aliases: [">", "$gt", "$greater"],            get: (key, val, col) => "${key:raw} >  " + parseDataType(key ,col) },
-                { aliases: [">=", "$gte", "$greaterOrEqual"],   get: (key, val, col) => "${key:raw} >= " + parseDataType(key ,col) },
-                { aliases: ["<", "$lt", "$less"],               get: (key, val, col) => "${key:raw} <  " + parseDataType(key ,col) },
-                { aliases: ["<=", "$lte", "$lessOrEqual"],      get: (key, val, col) => "${key:raw} <= " + parseDataType(key ,col) },
-                { aliases: ["$ilike"],                          get: (key, val, col) => "${key:raw}::text ILIKE ${data}::text " },
-                { aliases: ["$like"],                           get: (key, val, col) => "${key:raw}::text LIKE ${data}::text " },
-                { aliases: ["$notIlike"],                       get: (key, val, col) => "${key:raw}::text NOT ILIKE ${data}::text " },
-                { aliases: ["$notLike"],                        get: (key, val, col) => "${key:raw}::text NOT LIKE ${data}::text " },
-                { aliases: ["<>", "$ne", "$not"],               get: (key, val, col) => "${key:raw} " + (val === null? " IS NOT NULL " : (" <> " + parseDataType(key, col))) },
-                { aliases: ["$isNull", "$null"],                get: (key, val, col) => "${key:raw} " + `  IS ${!val? " NOT " : ""} NULL ` }
-            ],
-            getFilterQuery = (left: SelectItem, operand: string, rightVal: any) => {
-                const op = conditionParsers.find(c => c.aliases.includes(operand));
-                const colProps = this.columns.find(c => left.type === "column" && c.name === left.alias);
-                const getVal = () => {
-                    if(left.type === "column"){
-                        if(!colProps) throw "Unrecognised column in filter: " + left.alias;
-                        if(colProps.data_type === "ARRAY"){
-                            return pgp.as.format(" ARRAY[$1:csv] ", [rightVal]);
-                        }
-                    }
-                    return pgp.as.format("$1", [rightVal]);
-                }
-                let res = left.getQuery(tableAlias);
-                /* no operand means "=" */
-                if(!op) {
-                    res += ` = ` + getVal();
-                } else {
-                    // res += op.get(left.alias, rightVal)
-                }
-
-                return res;
-            };
-            
+           
 
         let data = { ... (filter as any) } as FinalFilter ;
             
@@ -1257,33 +1171,6 @@ export class ViewHandler {
         //     delete (data as any).$rowhash;
         // }
 
-        let filterKeys = Object.keys(data).filter(k => !computedFields.find(cf => cf.name === k) && !existsKeys.find(ek => ek.key === k));
-        if(allowed_colnames){
-            const aliasedColumns = (select || []).filter(s => s.getFields().find(f => allowed_colnames.includes(f))).map(s => s.alias);
-            const validCols = [...allowed_colnames, ...aliasedColumns]
-            const invalidColumn = filterKeys
-                .find(fName => !validCols.includes(fName));
-
-            if(invalidColumn){
-                throw `Table: ${this.name} -> disallowed/inexistent columns in filter: ${invalidColumn} \n  Expecting one of: ${validCols.join(", ")}`;
-            }
-        }
-
-        type Condition = {
-            q: string;
-            col: ColumnInfo;
-        };
-
-        /* TODO: Allow filter funcs */
-        const selectFuncs = (select || []).filter(s => s.type === "function");
-        const singleFuncs = FUNCTIONS.filter(f => f.singleColArg);
-        
-        type FilterItem = {
-            left: SelectItem;
-            op: string;
-            rightVal: any;
-        }
-
         let allowedSelect: SelectItem[] = [];
         /* Select aliases take precedence */
         if(select){
@@ -1307,65 +1194,53 @@ export class ViewHandler {
             }))
         );
 
-        let templates = flat(filterKeys
-            .map(fKey => {
-                let _d = data[fKey],
-                    fcol: Condition;
+        let filterKeys = Object.keys(data).filter(k => !computedFields.find(cf => cf.name === k) && !existsKeys.find(ek => ek.key === k));
+        if(allowed_colnames){
+            const aliasedColumns = (select || []).filter(s => 
+                s.type === "column" && allowed_colnames.includes(s.alias) ||  
+                s.getFields().find(f => allowed_colnames.includes(f))
+            ).map(s => s.alias);
+            const validCols = [...allowed_colnames, ...aliasedColumns]
+            // const invalidColumn = filterKeys
+            //     .find(fName => !validCols.includes(fName));
 
-                /* A valid filter will be:
-                    col_name:                       (val | { operand: val })
-                    select_func_alias: (val | { operand: val })
-                    $filter: [select_func/col_name, operand, value]
-                */
-                let leftAlias = fKey;
-                let col = this.columns.find(({ name }) => name === leftAlias);
+            const invalidColumn = filterKeys
+                .find(fName => !validCols.find(c => 
+                    c === fName || (
+                        fName.startsWith(c) && (
+                            fName.slice(c.length).includes("->") ||
+                            fName.slice(c.length).includes(".")
+                        )
+                    )
+                ));
 
-                // ef sef fs
+            if(invalidColumn){
+                throw `Table: ${this.name} -> disallowed/inexistent columns in filter: ${invalidColumn} \n  Expecting one of: ${allowedSelect.map(s => s.alias).join(", ")}`;
+            }
+        }
 
-                if(!col){
-                    const itm = allowedSelect.find(s => s.alias === leftAlias);
-                    if(itm){
-                        return itm.getQuery(tableAlias) + ` = ` + pgp.as.format("$1", [_d])
-                    }
+        /* TODO: Allow filter funcs */
+        // const singleFuncs = FUNCTIONS.filter(f => f.singleColArg);
+        
 
-                    throw "No col";
-                }
+        const f = filterObj(data, filterKeys) as any
+        const q = pParseFilter({
+            filter: f,
+            tableAlias,
+            pgp,
+            select: allowedSelect
+        });
+        // console.log({ f, q })
+        let templates: string[] = [q].filter(q=>q);
 
-                let d = _d;
+        if(existsCond) templates.push(existsCond);
+        templates = templates.concat(computedColConditions);
 
-                if(d === null){
-                    return pgp.as.format("${key:raw} IS NULL ", { key: getRawFieldName(fKey), prefix });
-                }
-                if(isPlainObject(d)){
-                    if(Object.keys(d).length){
-                        const operandAliases = conditionParsers.map(o => o.aliases).flat();
-                        return Object.keys(d).map(operand_key => {
-                            const op = conditionParsers.find(o => operand_key && o.aliases.includes(operand_key));
-                            if(!op){
-                                throw "Unrecognised operand: " + operand_key + " \nAllowed operands: " + operandAliases.join(", ");
-                            }
-                            let _d = d[operand_key];
-                            /* Turn data into array if comparing to array type column */
-                            if(col.element_type && !Array.isArray(_d)) _d = [_d];
-                            return pgp.as.format(op.get(fKey, _d, col), { key: getRawFieldName(fKey), data: _d, prefix });
-                        });
-                        // if(Object.keys(d).length){
-
-                        // } else throw `\n Unrecognised statement for field ->   ${fKey}: ` + JSON.stringify(d);
-                    }                    
-                }
-
-                return pgp.as.format("${key:raw} = " + parseDataType(fKey), { key: getRawFieldName(fKey), data: data[fKey], prefix });
-            }));
-
-            if(existsCond) templates.push(existsCond);
-            templates = templates.concat(computedColConditions);
-
-        templates = templates.sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
+        return templates.sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
             .join(" AND \n");
 
         // console.log(templates)
-        return templates; //pgp.as.format(template, data);
+        // return templates; //pgp.as.format(template, data);
                             
         /* 
             SHOULD CHECK DATA TYPES TO AVOID "No operator matches the given data type" error

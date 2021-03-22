@@ -122,6 +122,14 @@ export type V_items = {
   "id"?: number;
   "name"?: string;
 }
+export type Various = { 
+  "added"?: Date;
+  "h"?: Array<string>;
+  "id"?: number;
+  "jsn"?: Object;
+  "name"?: string;
+  "tsv"?: any;
+}
 export type Z = { 
   "ccc"?: string;
   "id"?: number;
@@ -147,6 +155,7 @@ export type DBObj = {
   "planes": TableHandler<Planes> 
   "transaction": TableHandler<Transaction> 
   "v_items": ViewHandler<V_items> 
+  "various": TableHandler<Various> 
   "z": TableHandler<Z> 
   leftJoin: JoinMakerTables;
   innerJoin: JoinMakerTables;
