@@ -52,9 +52,7 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
 
   /**
    * TODO -> ADD ALL FILTER TYPES
-   */
-
-   
+   */   
   await tryRun("FTS filtering", async () => {
     const res = await db.various.count({ "tsv.@@.to_tsquery": ["a"] });
     assert.equal(res, 0)
