@@ -2,7 +2,6 @@ import { strict as assert } from 'assert';
 
 import { DbHandler} from "../dist/Prostgles";
 import { DBHandlerClient } from "./client/index";
-// import { DBHandlerClientBasic as DBHandlerClient } from "./client/node_modules/prostgles-client/dist/prostgles";
 
 
 export async function tryRun(desc: string, func: () => any){
