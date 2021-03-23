@@ -8,7 +8,7 @@ export declare type DB = pgPromise.IDatabase<{}, pg.IClient>;
 declare type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 declare type DbConnectionOpts = pg.IDefaults;
 import { Socket } from "dgram";
-import { FieldFilter, SelectParams } from "prostgles-types";
+import { FieldFilter, SelectParamsBasic as SelectParams } from "prostgles-types";
 export declare type InsertRequestData = {
     data: object | object[];
     returning: FieldFilter;

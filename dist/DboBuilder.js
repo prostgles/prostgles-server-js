@@ -21,6 +21,7 @@ const utils_1 = require("./utils");
 const QueryBuilder_1 = require("./QueryBuilder");
 const Prostgles_1 = require("./Prostgles");
 const PubSubManager_1 = require("./PubSubManager");
+const Filtering_1 = require("./Filtering");
 exports.pgp = pgPromise({
     promiseLib: Bluebird
     // ,query: function (e) { console.log({psql: e.query, params: e.params}); }
@@ -662,7 +663,7 @@ class ViewHandler {
         return __awaiter(this, void 0, void 0, function* () {
             const { filter, select, forcedFilter, filterFields, addKeywords = true, tableAlias = null, localParams, tableRule } = params;
             const { $and: $and_key, $or: $or_key } = this.dboBuilder.prostgles.keywords;
-            const parseFilter = (f, parentFilter = null) => __awaiter(this, void 0, void 0, function* () {
+            const parseFullFilter = (f, parentFilter = null) => __awaiter(this, void 0, void 0, function* () {
                 if (!f)
                     throw "Invalid/missing group filter provided";
                 let result = "";
@@ -678,7 +679,7 @@ class ViewHandler {
                 const { [$and_key]: $and, [$or_key]: $or } = f, group = $and || $or;
                 if (group && group.length) {
                     const operand = $and ? " AND " : " OR ";
-                    let conditions = (yield Promise.all(group.map((gf) => __awaiter(this, void 0, void 0, function* () { return yield parseFilter(gf, group); })))).filter(c => c);
+                    let conditions = (yield Promise.all(group.map((gf) => __awaiter(this, void 0, void 0, function* () { return yield parseFullFilter(gf, group); })))).filter(c => c);
                     if (conditions && conditions.length) {
                         if (conditions.length === 1)
                             return conditions.join(operand);
@@ -708,7 +709,7 @@ class ViewHandler {
             }
             // let keys = Object.keys(filter);
             // if(!keys.length) return result;
-            let cond = yield parseFilter(_filter, null);
+            let cond = yield parseFullFilter(_filter, null);
             if (cond && addKeywords)
                 cond = "WHERE " + cond;
             return cond || "";
@@ -906,7 +907,7 @@ class ViewHandler {
             /* TODO: Allow filter funcs */
             // const singleFuncs = FUNCTIONS.filter(f => f.singleColArg);
             const f = PubSubManager_1.filterObj(data, filterKeys);
-            const q = QueryBuilder_1.pParseFilter({
+            const q = Filtering_1.parseFilterItem({
                 filter: f,
                 tableAlias,
                 pgp: exports.pgp,
@@ -1784,6 +1785,15 @@ class DboBuilder {
             this.tablesOrViews = yield getTablesForSchemaPostgresSQL(this.db, this.schema);
             // console.log(this.tablesOrViews.map(t => `${t.name} (${t.columns.map(c => c.name).join(", ")})`))
             const common_types = `
+
+import { ViewHandler, TableHandler, JoinMaker } from "prostgles-types";
+
+export type TxCB = {
+    (t: DBObj): (any | void | Promise<(any | void)>)
+};
+
+`;
+            const dwadwa = `
 
 /* COMMON TYPES */
 

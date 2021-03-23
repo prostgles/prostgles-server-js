@@ -3,60 +3,11 @@
 
  
 
-/* COMMON TYPES */
+import { ViewHandler, TableHandler, JoinMaker } from "prostgles-types";
 
-export type Filter<T = any> = object | {} | T | undefined | any[];
-export type GroupFilter<T = any> = { "$and": Filter<T> } | { "$or": Filter<T> } | { "$not": Filter<T> };
-export type FieldFilter<T> = string[] | "*" | "" | {
-    [Key in keyof Partial<T & { [key: string]: any }>]:  any;
-};
-export type AscOrDesc = 1 | -1 | boolean;
-export type OrderBy = { key: string, asc: AscOrDesc }[] | { [key: string]: AscOrDesc }[] | { [key: string]: AscOrDesc } | string | string[];
-        
-export type SelectParams<T> = {
-    select?: FieldFilter<T>;
-    limit?: number;
-    offset?: number;
-    orderBy?: OrderBy;
-    expectOne?: boolean;
-}
-export type UpdateParams<T> = {
-    returning?: FieldFilter<T>;
-    onConflictDoNothing?: boolean;
-    fixIssues?: boolean;
-    multi?: boolean;
-}
-export type InsertParams<T> = {
-    returning?: FieldFilter<T>;
-    onConflictDoNothing?: boolean;
-    fixIssues?: boolean;
-}
-export type DeleteParams<T> = {
-    returning?: FieldFilter<T>;
-};
 export type TxCB = {
     (t: DBObj): (any | void | Promise<(any | void)>)
 };
-export type JoinMaker<T> = (filter?: Filter<T>, select?: FieldFilter<T>, options?: SelectParams<T>) => any;
-
-
-export type ViewHandler<T> = {
-    getColumns: () => Promise<any[]>;
-    find: <TD = T>(filter?: Filter<T>, selectParams?: SelectParams<T>) => Promise<Partial<TD & { [x: string]: any }>[]>;
-    findOne: <TD = T>(filter?: Filter<T>, selectParams?: SelectParams<T>) => Promise<Partial<TD & { [x: string]: any }>>;
-    subscribe: <TD = T>(filter: Filter<T>, params: SelectParams<T>, onData: (items: Partial<TD & { [x: string]: any }>[]) => any) => Promise<{ unsubscribe: () => any }>;
-    subscribeOne: <TD = T>(filter: Filter<T>, params: SelectParams<T>, onData: (item: Partial<TD & { [x: string]: any }>) => any) => Promise<{ unsubscribe: () => any }>;
-    count: (filter?: Filter<T>) => Promise<number>
-}
-
-export type TableHandler<T> = ViewHandler<T> & {
-    update: <TD = Partial<T> | void> (filter: Filter<T>, newData: T, params?: UpdateParams<T>) => Promise<TD>;
-    updateBatch: <TD = Partial<T> | void> (updateData: [Filter<T>, T][], params?: UpdateParams<T>) => Promise<TD>;
-    upsert: <TD = Partial<T> | void> (filter: Filter<T>, newData: T, params?: UpdateParams<T>) => Promise<TD>;
-    insert: <TD = Partial<T> | void> (data: (T | T[]), params?: InsertParams<T>) => Promise<TD>;
-    delete: <TD = Partial<T> | void> (filter?: T, params?: DeleteParams<T>) => Promise<TD>;
-}
-
 
 
 /* SCHEMA DEFINITON. Table names have been altered to work with Typescript */

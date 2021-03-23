@@ -3,7 +3,7 @@ import io from "socket.io-client";
 
 import isomorphic from "../isomorphic_queries";
 import client_only from "../client_only_queries";
-export { DBHandlerClient, SQLResult, Auth } from "prostgles-client/dist/prostgles";
+export { DBHandlerClientBasic as DBHandlerClient, SQLResult, Auth } from "prostgles-client/dist/prostgles";
 
 const start = Date.now();
 const log = (msg: string, extra?: any) => {
@@ -49,10 +49,10 @@ try {
       onReady: async (db, methods, fullSchema, auth) => {
         log("onReady.auth", auth)
         try {
-          await isomorphic(db);
+          await isomorphic(db as any);
           log("Client isomorphic tests successful")
   
-          await client_only(db, auth, log, methods);
+          await client_only(db as any, auth, log, methods);
           log("Client-only replication tests successful")
   
   

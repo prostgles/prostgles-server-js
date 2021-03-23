@@ -1,7 +1,7 @@
 import { PostgresNotifListenManager } from "./PostgresNotifListenManager";
 import { TableOrViewInfo, TableInfo, DbHandler, DboBuilder } from "./DboBuilder";
 import { TableRule, DB } from "./Prostgles";
-import { SelectParams, FieldFilter, WAL } from "prostgles-types";
+import { SelectParamsBasic as SelectParams, FieldFilter, WAL } from "prostgles-types";
 export declare const DEFAULT_SYNC_BATCH_SIZE = 50;
 declare type SyncParams = {
     socket_id: string;

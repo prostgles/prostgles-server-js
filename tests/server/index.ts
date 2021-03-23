@@ -220,7 +220,6 @@ prostgles({
 				// console.log(await db.items4.findOne({}, { select: { public: { "$ts_headline": ["public", "public"] } } }))
 			}
 
-
 		} catch(err) {
 			console.trace(err)
 			if(process.env.TEST_TYPE){

@@ -10,10 +10,9 @@ declare global { export interface Promise<T> extends Bluebird<T> {} }
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import { 
-    ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, 
-    InsertParams, UpdateParams, DeleteParams, OrderBy, DbJoinMaker, 
+    ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, OrderBy, InsertParams, UpdateParams, DeleteParams,   
+    DbJoinMaker, 
     unpatchText,
-    Select,
     isEmpty,
     asName
 } from "prostgles-types";
@@ -25,11 +24,13 @@ export type DbHandler = {
   };
 
 import { get } from "./utils";
-import { getNewQuery, makeQuery, COMPUTED_FIELDS, SelectItem, FieldSpec, asNameAlias, SelectItemBuilder, FUNCTIONS, FinalFilter, pParseFilter } from "./QueryBuilder";
+import { getNewQuery, makeQuery, COMPUTED_FIELDS, SelectItem, FieldSpec, asNameAlias, SelectItemBuilder, FUNCTIONS } from "./QueryBuilder";
 import { 
     DB, TableRule, SelectRule, InsertRule, UpdateRule, DeleteRule, SyncRule, Joins, Join, Prostgles, PublishParser, flat 
 } from "./Prostgles";
 import { PubSubManager, filterObj } from "./PubSubManager";
+
+import { parseFilterItem } from "./Filtering";
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 export const pgp: PGP = pgPromise({
@@ -924,7 +925,7 @@ export class ViewHandler {
         const { filter, select, forcedFilter, filterFields, addKeywords = true, tableAlias = null, localParams, tableRule } = params;
         const { $and: $and_key, $or: $or_key } = this.dboBuilder.prostgles.keywords;
 
-        const parseFilter = async (f: any, parentFilter: any = null) => {
+        const parseFullFilter = async (f: any, parentFilter: any = null) => {
             if(!f) throw "Invalid/missing group filter provided";
             let result = "";
             let keys = Object.keys(f);
@@ -939,7 +940,7 @@ export class ViewHandler {
 
             if(group && group.length){
                 const operand = $and? " AND " : " OR ";
-                let conditions = (await Promise.all(group.map(async gf => await parseFilter(gf, group)))).filter(c => c);
+                let conditions = (await Promise.all(group.map(async gf => await parseFullFilter(gf, group)))).filter(c => c);
                 if(conditions && conditions.length){
                     if(conditions.length === 1) return conditions.join(operand);
                     else return ` ( ${conditions.sort().join(operand)} ) `;
@@ -970,7 +971,7 @@ export class ViewHandler {
         // let keys = Object.keys(filter);
         // if(!keys.length) return result;
         
-        let cond = await parseFilter(_filter, null);
+        let cond = await parseFullFilter(_filter, null);
         if(cond && addKeywords)  cond = "WHERE " + cond;
         return cond || "";
     }
@@ -1089,11 +1090,11 @@ export class ViewHandler {
      * @example: { fff: 2 } => "fff" = 2
      *  { fff: { $ilike: 'abc' } } => "fff" ilike 'abc'
      */
-    async getCondition(params: { filter: FinalFilter, select?: SelectItem[], allowed_colnames: string[], tableAlias?: string, localParams?: LocalParams, tableRules?: TableRule }){
+    async getCondition(params: { filter: any, select?: SelectItem[], allowed_colnames: string[], tableAlias?: string, localParams?: LocalParams, tableRules?: TableRule }){
         const { filter, select, allowed_colnames, tableAlias, localParams, tableRules  } = params;
            
 
-        let data = { ... (filter as any) } as FinalFilter ;
+        let data = { ... (filter as any) } as any ;
             
         /* Exists join filter */
         const ERR = "Invalid exists filter. \nExpecting somethibng like: { $exists: { tableName.tableName2: Filter } } | { $exists: { \"**.tableName3\": Filter } }"
@@ -1224,7 +1225,7 @@ export class ViewHandler {
         
 
         const f = filterObj(data, filterKeys) as any
-        const q = pParseFilter({
+        const q = parseFilterItem({
             filter: f,
             tableAlias,
             pgp,
@@ -1577,7 +1578,7 @@ export class TableHandler extends ViewHandler {
             );
             // console.log(queries)
             return this.db.tx(t => {
-                const _queries = queries.map(q => t.none(q))
+                const _queries = queries.map(q => t.none(q as unknown as string))
                 return t.batch(_queries)
             }).catch(err => makeErr(err, localParams));
         } catch(e){
@@ -1586,7 +1587,7 @@ export class TableHandler extends ViewHandler {
         }
     }
 
-    async update(filter: Filter, newData: object, params?: UpdateParams, tableRules?: TableRule, localParams: LocalParams = null): Promise<any>{
+    async update(filter: Filter, newData: { [key: string]: any }, params?: UpdateParams, tableRules?: TableRule, localParams: LocalParams = null): Promise<{ [key: string]: any } | void>{
         try {
 
             const { testRule = false, returnQuery = false } = localParams || {};
@@ -1621,7 +1622,7 @@ export class TableHandler extends ViewHandler {
                             throw " issue with forcedData: \nVALUE: " + JSON.stringify(forcedData, null, 2) + "\nERROR: " + e;
                         }
                     }
-                    return true;
+                    return true as unknown as void;
                 }
             }
 
@@ -1699,7 +1700,7 @@ export class TableHandler extends ViewHandler {
             }
 
             // console.log(query)
-            if(returnQuery) return query;
+            if(returnQuery) return query as unknown as void;
             if(this.t){
                 return this.t[qType](query).catch(err => makeErr(err, localParams));
             }
@@ -2244,6 +2245,17 @@ export class DboBuilder {
         // console.log(this.tablesOrViews.map(t => `${t.name} (${t.columns.map(c => c.name).join(", ")})`))
 
         const common_types = 
+`
+
+import { ViewHandler, TableHandler, JoinMaker } from "prostgles-types";
+
+export type TxCB = {
+    (t: DBObj): (any | void | Promise<(any | void)>)
+};
+
+`
+
+const dwadwa=
 `
 
 /* COMMON TYPES */

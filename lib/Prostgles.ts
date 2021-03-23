@@ -58,9 +58,7 @@ const QueryFile = require('pg-promise').QueryFile;
 
 
 import { Socket } from "dgram";
-import { type } from "os";
-import { FieldFilter, SelectParams } from "prostgles-types";
-import { spawn } from "child_process";
+import { FieldFilter, SelectParamsBasic as SelectParams } from "prostgles-types";
 
 export type InsertRequestData = {
     data: object | object[]

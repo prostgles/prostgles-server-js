@@ -5,13 +5,13 @@ declare global {
 }
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, InsertParams, UpdateParams, DeleteParams, OrderBy, DbJoinMaker } from "prostgles-types";
+import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, OrderBy, InsertParams, UpdateParams, DeleteParams, DbJoinMaker } from "prostgles-types";
 export declare type DbHandler = {
     [key: string]: Partial<TableHandler>;
 } & DbJoinMaker & {
     sql?: (query: string, params?: any, options?: any) => Promise<any>;
 };
-import { SelectItem, FieldSpec, FinalFilter } from "./QueryBuilder";
+import { SelectItem, FieldSpec } from "./QueryBuilder";
 import { DB, TableRule, Join, Prostgles, PublishParser } from "./Prostgles";
 import { PubSubManager } from "./PubSubManager";
 declare type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -184,7 +184,7 @@ export declare class ViewHandler {
      *  { fff: { $ilike: 'abc' } } => "fff" ilike 'abc'
      */
     getCondition(params: {
-        filter: FinalFilter;
+        filter: any;
         select?: SelectItem[];
         allowed_colnames: string[];
         tableAlias?: string;
@@ -229,7 +229,11 @@ export declare class TableHandler extends ViewHandler {
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, joinPaths?: JoinPaths);
     willBatch(query: string): boolean;
     updateBatch(data: [Filter, object][], params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
-    update(filter: Filter, newData: object, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
+    update(filter: Filter, newData: {
+        [key: string]: any;
+    }, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<{
+        [key: string]: any;
+    } | void>;
     validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues }: ValidatedParams): {
         data: any;
         allowedCols: string[];

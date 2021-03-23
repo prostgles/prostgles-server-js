@@ -11,7 +11,9 @@ import { TableRule, DB } from "./Prostgles";
 import * as Bluebird from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import { SelectParams, OrderBy, FieldFilter, asName, WAL } from "prostgles-types";
+
+import { SelectParamsBasic as SelectParams, OrderBy, FieldFilter, asName, WAL } from "prostgles-types";
+
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 let pgp: PGP = pgPromise({
     promiseLib: Bluebird

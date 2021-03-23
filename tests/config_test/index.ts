@@ -92,11 +92,11 @@ prostgles({
     // const d = await db.items.findOne({ "id->hehe->hihi->final": ' '});  "id.$ilike": ' ', 
 
     try {
-      const longGeomFilter = { id: { "=": { "ST_MakeEnvelope": [1,2,3,4 ]}}},
+      const longGeomFilter = { idd: { "=": { "ST_MakeEnvelope": [1,2,3,4 ]}}},
         shortGeomFilter = { "id.=.ST_MakeEnvelope": [1,2,3,'$$--4\"\'$$\``' ] };
   
-      const d = await db.items.findOne({ ...shortGeomFilter, ...longGeomFilter });
-      // d.name;
+      const d = await db.items.findOne({ }, { select: { h: { "$ts_headline": ["name", "a"] } }});
+      console.log(d)
 
     } catch(e) {
       console.error(e)

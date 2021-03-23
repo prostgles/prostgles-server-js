@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.tryRun = void 0;
 const assert_1 = require("assert");
+// import { DBHandlerClientBasic as DBHandlerClient } from "./client/node_modules/prostgles-client/dist/prostgles";
 async function tryRun(desc, func) {
     try {
         await func();
