@@ -45,7 +45,7 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     await db.various.insert([
       { name: "abc9",  added: new Date('04 Dec 1995 00:12:00 GMT'), jsn: { "a": { "b": 2 } }  },
       { name: "abc1",  added: new Date('04 Dec 1996 00:12:00 GMT'), jsn: { "a": { "b": 3 } }  },
-      { name: "abc81", added: new Date('04 Dec 1997 00:12:00 GMT'), jsn: { "a": { "b": 2 } }  }
+      { name: "abc81 here", added: new Date('04 Dec 1997 00:12:00 GMT'), jsn: { "a": { "b": 2 } }  }
     ])
 
     // console.log(await db["*"].find())
@@ -56,8 +56,28 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
    */   
   await tryRun("FTS filtering", async () => {
     const res = await db.various.count({ "tsv.@@.to_tsquery": ["a"] });
-    assert.equal(res, 0)
+    assert.equal(res, 0);
+
+
+    const d = await db.various.findOne(
+      { "name.@@.to_tsquery": ["abc81"] }, 
+      { select: { 
+        h: { "$ts_headline_simple": ["name", { plainto_tsquery: "abc81" }] },
+        hh: { "$ts_headline": ["name", "abc81"] } ,
+        added: "$date_trunc_2hour",
+        addedY: { "$date_trunc_5minute": ["added"] }
+      }});
+    // console.log(d);
+    assert.deepStrictEqual(d, {
+      h: '<b>abc81</b> here',
+      hh: '<b>abc81</b> here',
+      added: '1997-12-04T00:00:00.000Z',
+      addedY: '1997-12-04T00:10:00.000Z'
+    });
   });
+
+
+
   await tryRun("JSON filtering", async () => {
     const res = await db.various.count({ "jsn->a->>b": '3' });
     assert.equal(res, 1)

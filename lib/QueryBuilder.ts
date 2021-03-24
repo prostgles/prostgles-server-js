@@ -6,7 +6,7 @@
 
 import { pgp, Filter, LocalParams, isPlainObject, TableHandler, ViewHandler, TS_PG_Types } from "./DboBuilder";
 import { TableRule, flat } from "./Prostgles";
-import { SelectParamsBasic as SelectParams, isEmpty, FieldFilter, asName } from "prostgles-types";
+import { SelectParamsBasic as SelectParams, isEmpty, FieldFilter, asName, TextFilter_FullTextSearchFilterKeys } from "prostgles-types";
 import { get } from "./utils";
 
 
@@ -58,10 +58,13 @@ export type FieldSpec = {
 export type FunctionSpec = {
   name: string;
 
+  description?: string;
+
   /**
    * If true then the first argument is expected to be a column name
    */
   singleColArg: boolean;
+  numArgs: number;
   type: "function" | "aggregation" | "computed";
   /**
    * getFields: string[] -> used to validate user supplied field names. It will be fired before querying to validate allowed columns
@@ -74,6 +77,8 @@ export type FunctionSpec = {
   getQuery: (params: { allowedFields: string[], args: any[], tableAlias?: string, ctidField?: string }) => string;
 };
 
+const MAX_COL_NUM = 1600;
+const asValue = (v: any, castAs: string = "") => pgp.as.format("$1" + castAs, [v])
 /**
 * Each function expects a column at the very least
 */
@@ -82,8 +87,10 @@ export const FUNCTIONS: FunctionSpec[] = [
   // Hashing
   {
     name: "$md5_multi",
+    description: ` :[...column_names] -> md5 hash of the column content`,
     type: "function",
     singleColArg: false,
+    numArgs: MAX_COL_NUM,
     getFields: (args: any[]) => args,
     getQuery: ({ allowedFields, args, tableAlias }) => {
       const q = pgp.as.format("md5(" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + "::text, '' )" ).join(" || ") + ")");
@@ -92,8 +99,10 @@ export const FUNCTIONS: FunctionSpec[] = [
   },
   {
     name: "$md5_multi_agg",
+    description: ` :[...column_names] -> md5 hash of the string aggregation of column content`,
     type: "aggregation",
     singleColArg: false,
+    numArgs: MAX_COL_NUM,
     getFields: (args: any[]) => args,
     getQuery: ({ allowedFields, args, tableAlias }) => {
       const q = pgp.as.format("md5(string_agg(" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + "::text, '' )" ).join(" || ") + ", ','))");
@@ -103,8 +112,10 @@ export const FUNCTIONS: FunctionSpec[] = [
 
   {
     name: "$sha256_multi",
+    description: ` :[...column_names] -> sha256 hash of the of column content`,
     type: "function",
     singleColArg: false,
+    numArgs: MAX_COL_NUM,
     getFields: (args: any[]) => args,
     getQuery: ({ allowedFields, args, tableAlias }) => {
       const q = pgp.as.format("encode(sha256((" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )" ).join(" || ") + ")::text::bytea), 'hex')");
@@ -113,8 +124,10 @@ export const FUNCTIONS: FunctionSpec[] = [
   },
   {
     name: "$sha256_multi_agg",
+    description: ` :[...column_names] -> sha256 hash of the string aggregation of column content`,
     type: "aggregation",
     singleColArg: false,
+    numArgs: MAX_COL_NUM,
     getFields: (args: any[]) => args,
     getQuery: ({ allowedFields, args, tableAlias }) => {
       const q = pgp.as.format("encode(sha256(string_agg(" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )" ).join(" || ") + ", ',')::text::bytea), 'hex')");
@@ -123,8 +136,10 @@ export const FUNCTIONS: FunctionSpec[] = [
   },
   {
     name: "$sha512_multi",
+    description: ` :[...column_names] -> sha512 hash of the of column content`,
     type: "function",
     singleColArg: false,
+    numArgs: MAX_COL_NUM,
     getFields: (args: any[]) => args,
     getQuery: ({ allowedFields, args, tableAlias }) => {
       const q = pgp.as.format("encode(sha512((" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )" ).join(" || ") + ")::text::bytea), 'hex')");
@@ -133,8 +148,10 @@ export const FUNCTIONS: FunctionSpec[] = [
   },
   {
     name: "$sha512_multi_agg",
+    description: ` :[...column_names] -> sha512 hash of the string aggregation of column content`,
     type: "aggregation",
     singleColArg: false,
+    numArgs: MAX_COL_NUM,
     getFields: (args: any[]) => args,
     getQuery: ({ allowedFields, args, tableAlias }) => {
       const q = pgp.as.format("encode(sha512(string_agg(" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )" ).join(" || ") + ", ',')::text::bytea), 'hex')");
@@ -143,35 +160,56 @@ export const FUNCTIONS: FunctionSpec[] = [
   },
 
 
-  /* Full text search */
-  {
-    name: "$ts_headline",
-    type: "function",
-    singleColArg: false,
+  /* Full text search 
+    https://www.postgresql.org/docs/current/textsearch-dictionaries.html#TEXTSEARCH-SIMPLE-DICTIONARY
+  */
+  ...[
+    "simple", //  • convert the input token to lower case • exclude stop words
+    // "synonym", // replace word with a synonym
+    "english",
+    // "english_stem",
+    // "english_hunspell", 
+    ""
+  ].map(type => ({
+    name: "$ts_headline" + (type? ("_" + type) : ""),
+    description: ` :[column_name <string>, search_term: <string | { to_tsquery: string } > ] -> sha512 hash of the of column content`,
+    type: "function" as "function",
+    singleColArg: true,
+    numArgs: 2,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
+      const col = asName(args[0]);
       let qVal = args[1], qType = "to_tsquery";
-      const searchTypes = ["websearch_to_tsquery", "to_tsquery"];
-      if(isPlainObject(args[1])){
-        const keys = Object.keys(args[1]);
+      let _type = type? (asValue(type) + ",") : "";
+
+      const searchTypes = TextFilter_FullTextSearchFilterKeys;
+      
+      /* { to_tsquery: 'search term' } */
+      if(isPlainObject(qVal)){
+        const keys = Object.keys(qVal);
+        if(!keys.length) throw "Bad arg";
+        if(keys.length !==1 || !searchTypes.includes(keys[0])) throw "Expecting a an object with a single key named one of: " + searchTypes.join(", ");
         qType = keys[0];
-        if(keys.length !==1 || !searchTypes.includes(qType)) throw "Expecting a an object with a single key named one of: " + searchTypes.join(", ");
-        qVal = pgp.as.format("$1", [args[1][qType]]);
-      } else {
+        qVal = asValue(qVal[qType]);
+
+      /* 'search term' */
+      } else if(typeof qVal === "string") {
         qVal = pgp.as.format(qType + "($1)", [qVal])
-      }
-      const res = pgp.as.format("ts_headline(" + asName(args[0]) + "::text, $1:raw)", [qVal]);
-      console.log(res)
+      } else throw "Bad second arg. Exepcting search string or { to_tsquery: 'search string' }";
+
+      const res =`ts_headline(${_type} ${col}::text, ${qVal}, 'ShortWord=1 ' )`
+      // console.log(res)
+      
       return res
     }
-  },
-
-
+  })),
 
   {
     name: "$ST_AsGeoJSON",
+    description: ` :[column_name] -> json GeoJSON output of a geometry column`,
     type: "function",
-    singleColArg: false,
+    singleColArg: true,
+    numArgs: 1,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
       return pgp.as.format("ST_AsGeoJSON(" + asName(args[0]) + ")::json");
@@ -179,7 +217,9 @@ export const FUNCTIONS: FunctionSpec[] = [
   },
   {
     name: "$left",
+    description: ` :[column_name, number] -> substring`,
     type: "function",
+    numArgs: 2,
     singleColArg: false,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
@@ -190,7 +230,9 @@ export const FUNCTIONS: FunctionSpec[] = [
   {
     name: "$to_char",
     type: "function",
+    description: ` :[column_name, format<string>] -> format dates and strings. Eg: [current_timestamp, 'HH12:MI:SS']`,
     singleColArg: false,
+    numArgs: 2,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
       if(args.length === 3){
@@ -200,14 +242,66 @@ export const FUNCTIONS: FunctionSpec[] = [
     }
   },
 
+  /**
+   * Date trunc utils
+   */
+  ...[
+    "microseconds",
+    "milliseconds",
+    "second",
+    "minute",
+    "hour",
+    "day",
+    "week",
+    "month",
+    "quarter",
+    "year",
+    "decade",
+    "century",
+    "millennium"
+  ].map(k => ({ val: 0, unit: k  }))
+  .concat([
+    { val: 6, unit: 'month'  },
+    { val: 4, unit: 'month'  },
+    { val: 2, unit: 'month'  },
+    { val: 8, unit: 'hour'  },
+    { val: 4, unit: 'hour'  },
+    { val: 2, unit: 'hour'  },
+    { val: 30, unit: 'minute'  },
+    { val: 15, unit: 'minute'  },
+    { val: 5, unit: 'minute'  },
+  ]).map(({ val, unit }) => ({
+    name: "$date_trunc_" + (val || "") + unit,
+    type: "function",
+    description: ` :[column_name] -> round down timestamp to closest ${val || ""} ${unit} `,
+    singleColArg: true,
+    numArgs: 1,
+    getFields: (args: any[]) => [args[0]],
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      const col = asName(args[0]);
+      if(!val) return `date_trunc(${asValue(unit)}, ${col})`;
+      const prevInt = {
+        month: "year",
+        hour: "day",
+        minute: "hour" 
+      };
+
+      let res = `(date_trunc(${asValue(prevInt[unit] || "hour")}, ${col}) + date_part(${asValue(unit, "::text")}, ${col})::int / ${val} * interval ${asValue(val + " " + unit)})`;
+      // console.log(res);
+      return res;
+    }
+  } as FunctionSpec)),
+
   /* Date funcs date_part */
   ...["date_trunc", "date_part"].map(funcName => ({
     name: "$" + funcName,
     type: "function",
+    numArgs: 2,
+    description: ` :[unit<string>, column_name] -> ` + (funcName === "date_trunc"? ` round down timestamp to closest unit value. ` : ` extract date unit as float8. ` ) + ` E.g. ['hour', col] `,
     singleColArg: false,
     getFields: (args: any[]) => [args[1]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
-      return pgp.as.format(funcName + "($1, " + asName(args[1]) + ")", [args[0], args[1]]);
+      return `${funcName}(${asValue(args[0])}, ${asName(args[1])})`;
     }
   } as FunctionSpec)),
 
@@ -249,7 +343,9 @@ export const FUNCTIONS: FunctionSpec[] = [
   ].map(([funcName, txt]) => ({
     name: "$" + funcName,
     type: "function",
+    description: ` :[column_name] -> get timestamp formated as ` + txt,
     singleColArg: true,
+    numArgs: 1,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
       return pgp.as.format("trim(to_char(" + asName(args[0]) + ", $2))", [args[0], txt]);
@@ -260,6 +356,7 @@ export const FUNCTIONS: FunctionSpec[] = [
   ...["upper", "lower", "length", "reverse", "trim", "initcap", "round", "ceil", "floor", "sign", "age"].map(funcName => ({
     name: "$" + funcName,
     type: "function",
+    numArgs: 1,
     singleColArg: true,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
@@ -271,6 +368,7 @@ export const FUNCTIONS: FunctionSpec[] = [
   ...["max", "min", "count", "avg", "json_agg", "string_agg", "array_agg", "sum"].map(aggName => ({
     name: "$" + aggName,
     type: "aggregation",
+    numArgs: 1,
     singleColArg: true,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
@@ -282,7 +380,9 @@ export const FUNCTIONS: FunctionSpec[] = [
   {
     name: "$countAll",
     type: "aggregation",
+    description: `agg :[]  COUNT of all rows `,
     singleColArg: false,
+    numArgs: 0,
     getFields: (args: any[]) => [],
     getQuery: ({ allowedFields, args, tableAlias }) => {
       return "COUNT(*)";
@@ -296,6 +396,7 @@ export const COMPUTED_FIELDS: FieldSpec[] = [
   {
     name: "$rowhash",
     type: "computed",
+    // description: ` order hash of row content  `,
     getQuery: ({ allowedFields, tableAlias, ctidField }) => {
       return "md5(" +
         allowedFields
@@ -351,11 +452,18 @@ export class SelectItemBuilder {
 
   private addFunctionByName = (funcName: string, args: any[], alias: string) => {
     const funcDef = this.functions.find(f => f.name === funcName);
-    if(!funcDef) throw "Function " + funcName + " does not exist or is not allowed ";
+    if(!funcDef) {
+      const sf = this.functions.filter(f => f.name.toLowerCase().startsWith(funcName.toLowerCase())).sort((a, b) => (a.name.length - b.name.length));
+      const hint = (sf.length? `. \n Maybe you meant: \n | ${sf.map(s => s.name + " " + (s.description || "")).join("    \n | ")}  ?` : "");
+      throw "\n Function " + funcName + " does not exist or is not allowed " + hint;
+    }
     this.addFunction(funcDef, args, alias);
   }
 
   private addFunction = (funcDef: FunctionSpec, args: any[], alias: string) => {
+    if(funcDef.numArgs && !funcDef.getFields(args).filter(f => f).length) {
+      throw `\n Function "${funcDef.name}" is missing a field name argument`;
+    }
     this.addItem({
       type: funcDef.type,
       alias,
@@ -374,6 +482,7 @@ export class SelectItemBuilder {
         const cf: FunctionSpec = { 
           ...compCol,
           type: "computed",
+          numArgs: 0,
           singleColArg: false,
           getFields: (args: any[]) => [] 
         }
@@ -462,7 +571,7 @@ export class SelectItemBuilder {
                 try {
                   this.checkField(key)
                 } catch (err){
-                  throwErr(`Shorthand function notation error: the specifield column ( ${key} ) is invalid or dissallowed. Use correct column name or full function notation, e.g.: -> { key: { $func_name: ["column_name"] } } `)
+                  throwErr(` Shorthand function notation error: the specifield column ( ${key} ) is invalid or dissallowed. \n Use correct column name or full aliased function notation, e.g.: -> { alias: { $func_name: ["column_name"] } } `)
                 }
                 funcName = val;
                 args = [key];

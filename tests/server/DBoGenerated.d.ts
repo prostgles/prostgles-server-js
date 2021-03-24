@@ -69,6 +69,9 @@ export type Planes = {
 export type Transaction = { 
   "id"?: string;
 }
+export type Tt = { 
+  "id"?: number;
+}
 export type V_items = { 
   "id"?: number;
   "name"?: string;
@@ -105,6 +108,7 @@ export type DBObj = {
   "items4_pub": TableHandler<Items4_pub> 
   "planes": TableHandler<Planes> 
   "transaction": TableHandler<Transaction> 
+  "tt": TableHandler<Tt> 
   "v_items": ViewHandler<V_items> 
   "various": TableHandler<Various> 
   "z": TableHandler<Z> 

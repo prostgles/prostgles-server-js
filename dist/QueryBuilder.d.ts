@@ -41,10 +41,12 @@ export declare type FieldSpec = {
 };
 export declare type FunctionSpec = {
     name: string;
+    description?: string;
     /**
      * If true then the first argument is expected to be a column name
      */
     singleColArg: boolean;
+    numArgs: number;
     type: "function" | "aggregation" | "computed";
     /**
      * getFields: string[] -> used to validate user supplied field names. It will be fired before querying to validate allowed columns

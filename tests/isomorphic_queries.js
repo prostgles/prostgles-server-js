@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.tryRun = void 0;
 const assert_1 = require("assert");
-// import { DBHandlerClientBasic as DBHandlerClient } from "./client/node_modules/prostgles-client/dist/prostgles";
 async function tryRun(desc, func) {
     try {
         await func();
@@ -38,7 +37,7 @@ async function isomorphic(db) {
         await db.various.insert([
             { name: "abc9", added: new Date('04 Dec 1995 00:12:00 GMT'), jsn: { "a": { "b": 2 } } },
             { name: "abc1", added: new Date('04 Dec 1996 00:12:00 GMT'), jsn: { "a": { "b": 3 } } },
-            { name: "abc81", added: new Date('04 Dec 1997 00:12:00 GMT'), jsn: { "a": { "b": 2 } } }
+            { name: "abc81 here", added: new Date('04 Dec 1997 00:12:00 GMT'), jsn: { "a": { "b": 2 } } }
         ]);
         // console.log(await db["*"].find())
     });
@@ -48,6 +47,19 @@ async function isomorphic(db) {
     await tryRun("FTS filtering", async () => {
         const res = await db.various.count({ "tsv.@@.to_tsquery": ["a"] });
         assert_1.strict.equal(res, 0);
+        const d = await db.various.findOne({ "name.@@.to_tsquery": ["abc81"] }, { select: {
+                h: { "$ts_headline_simple": ["name", { plainto_tsquery: "abc81" }] },
+                hh: { "$ts_headline": ["name", "abc81"] },
+                added: "$date_trunc_2hour",
+                addedY: { "$date_trunc_5minute": ["added"] }
+            } });
+        console.log(d);
+        assert_1.strict.deepStrictEqual(d, {
+            h: '<b>abc81</b> here',
+            hh: '<b>abc81</b> here',
+            added: '1997-12-04T00:00:00.000Z',
+            addedY: '1997-12-04T00:10:00.000Z'
+        });
     });
     await tryRun("JSON filtering", async () => {
         const res = await db.various.count({ "jsn->a->>b": '3' });

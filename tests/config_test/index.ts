@@ -83,7 +83,7 @@ prostgles({
 			res.sendFile(path.join(__dirname+'/index.html'));
 		});
 
-    // await db.items.insert([
+    // await db.items.insert([ 
     //   {name: "c"},
     //   {name: "c", tst: new Date()}
     // ])
@@ -95,7 +95,13 @@ prostgles({
       const longGeomFilter = { idd: { "=": { "ST_MakeEnvelope": [1,2,3,4 ]}}},
         shortGeomFilter = { "id.=.ST_MakeEnvelope": [1,2,3,'$$--4\"\'$$\``' ] };
   
-      const d = await db.items.findOne({ }, { select: { h: { "$ts_headline": ["name", "a"] } }});
+      const d = await db.items.findOne({ }, { select: { 
+        h: { "$ts_headline_simple": ["name", { plainto_tsquery: "a" }] },
+        hh: { "$ts_headline": ["name", "a"] },
+        tr5: "$date_trunc_5minute", 
+        tr15: { "$date_trunc_15minute": ["tst"] },
+        trh: { "$date_trunc": ["hour", "tst"] }
+      }});
       console.log(d)
 
     } catch(e) {
