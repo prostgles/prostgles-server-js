@@ -270,6 +270,9 @@ export const FUNCTIONS: FunctionSpec[] = [
     { val: 30, unit: 'minute'  },
     { val: 15, unit: 'minute'  },
     { val: 5, unit: 'minute'  },
+    { val: 30, unit: 'second'  },
+    { val: 15, unit: 'second'  },
+    { val: 5, unit: 'second'  },
   ]).map(({ val, unit }) => ({
     name: "$date_trunc_" + (val || "") + unit,
     type: "function",
@@ -283,7 +286,8 @@ export const FUNCTIONS: FunctionSpec[] = [
       const prevInt = {
         month: "year",
         hour: "day",
-        minute: "hour" 
+        minute: "hour",
+        second: "minute" 
       };
 
       let res = `(date_trunc(${asValue(prevInt[unit] || "hour")}, ${col}) + date_part(${asValue(unit, "::text")}, ${col})::int / ${val} * interval ${asValue(val + " " + unit)})`;
