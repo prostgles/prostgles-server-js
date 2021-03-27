@@ -1,2 +1,2 @@
-export declare function get(obj: any, propertyPath: string | string[]): any;
+export { get } from "prostgles-types";
 //# sourceMappingURL=utils.d.ts.map
