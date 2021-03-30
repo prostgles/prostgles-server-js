@@ -177,6 +177,8 @@ export class PubSubManager {
         
                 END;
             $$ LANGUAGE plpgsql;
+
+            COMMENT ON FUNCTION ${funcName} IS 'Prostgles internal function used to notify when schema has changed';
     
     
             CREATE EVENT TRIGGER ${triggerName} ON ddl_command_end
@@ -1191,23 +1193,30 @@ export class PubSubManager {
                 END;
             $$ LANGUAGE plpgsql;
 
+
+
             DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_insert")} ON ${table_name_escaped};
             CREATE TRIGGER ${this.getTriggerName(table_name, "_insert")}
             AFTER INSERT ON ${table_name_escaped}
             REFERENCING NEW TABLE AS new_table
             FOR EACH STATEMENT EXECUTE PROCEDURE ${func_name_escaped}();
+            COMMENT ON TRIGGER ${this.getTriggerName(table_name, "_insert")} ON ${table_name_escaped} IS 'Prostgles internal trigger used to notify when data in the table changed';
 
             DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_update")} ON ${table_name_escaped};
             CREATE TRIGGER ${this.getTriggerName(table_name, "_update")}
             AFTER UPDATE ON ${table_name_escaped}
             REFERENCING OLD TABLE AS old_table NEW TABLE AS new_table
             FOR EACH STATEMENT EXECUTE PROCEDURE ${func_name_escaped}();
+            COMMENT ON TRIGGER ${this.getTriggerName(table_name, "_update")} ON ${table_name_escaped} IS 'Prostgles internal trigger used to notify when data in the table changed';
 
             DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_delete")} ON ${table_name_escaped};
             CREATE TRIGGER ${this.getTriggerName(table_name, "_delete")}
             AFTER DELETE ON ${table_name_escaped}
             REFERENCING OLD TABLE AS old_table
             FOR EACH STATEMENT EXECUTE PROCEDURE ${func_name_escaped}();
+            COMMENT ON TRIGGER ${this.getTriggerName(table_name, "_delete")} ON ${table_name_escaped} IS 'Prostgles internal trigger used to notify when data in the table changed';
+
+            COMMENT ON FUNCTION ${func_name_escaped} IS 'Prostgles internal function used to notify when data in the table changed';
 
             COMMIT;
         `;

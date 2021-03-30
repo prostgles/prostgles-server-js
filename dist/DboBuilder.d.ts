@@ -126,7 +126,6 @@ export declare class ViewHandler {
     filterDef: string;
     pubSubManager: PubSubManager;
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, joinPaths?: JoinPaths);
-    getSelectFunctions(select: any): void;
     getRowHashSelect(allowedFields: FieldFilter, alias?: string, tableAlias?: string): string;
     getFullDef(): any[];
     validateViewRules(fields: FieldFilter, filterFields: FieldFilter, returningFields: FieldFilter, forcedFilter: object, rule: string): Promise<boolean>;

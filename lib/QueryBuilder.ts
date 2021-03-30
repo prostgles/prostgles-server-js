@@ -212,7 +212,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     numArgs: 1,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
-      return pgp.as.format("ST_AsGeoJSON(" + asName(args[0]) + ")::json");
+      return pgp.as.format("ST_AsGeoJSON(" + asNameAlias(args[0], tableAlias) + ")::json");
     }
   },
   {
@@ -223,7 +223,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: false,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
-      return pgp.as.format("LEFT(" + asName(args[0]) + ", $1)", [args[1]]);
+      return pgp.as.format("LEFT(" + asNameAlias(args[0], tableAlias) + ", $1)", [args[1]]);
     }
   },
 
@@ -236,9 +236,9 @@ export const FUNCTIONS: FunctionSpec[] = [
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
       if(args.length === 3){
-        return pgp.as.format("to_char(" + asName(args[0]) + ", $2, $3)", [args[0], args[1], args[2]]);
+        return pgp.as.format("to_char(" + asNameAlias(args[0], tableAlias) + ", $2, $3)", [args[0], args[1], args[2]]);
       }
-      return pgp.as.format("to_char(" + asName(args[0]) + ", $2)", [args[0], args[1]]);
+      return pgp.as.format("to_char(" + asNameAlias(args[0], tableAlias) + ", $2)", [args[0], args[1]]);
     }
   },
 
@@ -269,10 +269,20 @@ export const FUNCTIONS: FunctionSpec[] = [
     { val: 2, unit: 'hour'  },
     { val: 30, unit: 'minute'  },
     { val: 15, unit: 'minute'  },
+    { val: 6, unit: 'minute'  },
     { val: 5, unit: 'minute'  },
+    { val: 4, unit: 'minute'  },
+    { val: 3, unit: 'minute'  },
+    { val: 2, unit: 'minute'  },
     { val: 30, unit: 'second'  },
     { val: 15, unit: 'second'  },
+    { val: 10, unit: 'second'  },
+    { val: 8, unit: 'second'  },
+    { val: 6, unit: 'second'  },
     { val: 5, unit: 'second'  },
+    { val: 4, unit: 'second'  },
+    { val: 3, unit: 'second'  },
+    { val: 2, unit: 'second'  },
   ]).map(({ val, unit }) => ({
     name: "$date_trunc_" + (val || "") + unit,
     type: "function",
@@ -281,7 +291,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     numArgs: 1,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
-      const col = asName(args[0]);
+      const col = asNameAlias(args[0], tableAlias);
       if(!val) return `date_trunc(${asValue(unit)}, ${col})`;
       const prevInt = {
         month: "year",
@@ -305,7 +315,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: false,
     getFields: (args: any[]) => [args[1]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
-      return `${funcName}(${asValue(args[0])}, ${asName(args[1])})`;
+      return `${funcName}(${asValue(args[0])}, ${asNameAlias(args[1], tableAlias)})`;
     }
   } as FunctionSpec)),
 
@@ -352,7 +362,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     numArgs: 1,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
-      return pgp.as.format("trim(to_char(" + asName(args[0]) + ", $2))", [args[0], txt]);
+      return pgp.as.format("trim(to_char(" + asNameAlias(args[0], tableAlias) + ", $2))", [args[0], txt]);
     }
   } as FunctionSpec)),
 
@@ -364,7 +374,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: true,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
-      return funcName + "(" + asName(args[0]) + ")";
+      return funcName + "(" + asNameAlias(args[0], tableAlias) + ")";
     }
   } as FunctionSpec)),
 
@@ -376,7 +386,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: true,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
-      return aggName + "(" + asName(args[0]) + ")";
+      return aggName + "(" + asNameAlias(args[0], tableAlias) + ")";
     }
   } as FunctionSpec)),
 
@@ -392,7 +402,17 @@ export const FUNCTIONS: FunctionSpec[] = [
       return "COUNT(*)";
     }
   } as FunctionSpec,
-  
+  {
+    name: "$diff_perc",
+    type: "aggregation",
+    numArgs: 1,
+    singleColArg: true,
+    getFields: (args: any[]) => [args[0]],
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      const col = asNameAlias(args[0], tableAlias);
+      return `round( ( ( MAX(${col}) - MIN(${col}) )::float/MIN(${col}) ) * 100, 2)`
+    }
+  } as FunctionSpec
 ];
 
 /* The difference between a function and computed field is that the computed field does not require any arguments */
@@ -412,6 +432,14 @@ export const COMPUTED_FIELDS: FieldSpec[] = [
       `)`;
     }
   }
+  // ,{
+  //   name: "ctid",
+  //   type: "computed",
+  //   // description: ` order hash of row content  `,
+  //   getQuery: ({ allowedFields, tableAlias, ctidField }) => {
+  //     return asNameAlias("ctid", tableAlias);
+  //   }
+  // }
 ];
 
 export class SelectItemBuilder {

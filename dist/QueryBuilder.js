@@ -154,7 +154,7 @@ exports.FUNCTIONS = [
         numArgs: 1,
         getFields: (args) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
-            return DboBuilder_1.pgp.as.format("ST_AsGeoJSON(" + prostgles_types_1.asName(args[0]) + ")::json");
+            return DboBuilder_1.pgp.as.format("ST_AsGeoJSON(" + exports.asNameAlias(args[0], tableAlias) + ")::json");
         }
     },
     {
@@ -165,7 +165,7 @@ exports.FUNCTIONS = [
         singleColArg: false,
         getFields: (args) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
-            return DboBuilder_1.pgp.as.format("LEFT(" + prostgles_types_1.asName(args[0]) + ", $1)", [args[1]]);
+            return DboBuilder_1.pgp.as.format("LEFT(" + exports.asNameAlias(args[0], tableAlias) + ", $1)", [args[1]]);
         }
     },
     {
@@ -177,9 +177,9 @@ exports.FUNCTIONS = [
         getFields: (args) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
             if (args.length === 3) {
-                return DboBuilder_1.pgp.as.format("to_char(" + prostgles_types_1.asName(args[0]) + ", $2, $3)", [args[0], args[1], args[2]]);
+                return DboBuilder_1.pgp.as.format("to_char(" + exports.asNameAlias(args[0], tableAlias) + ", $2, $3)", [args[0], args[1], args[2]]);
             }
-            return DboBuilder_1.pgp.as.format("to_char(" + prostgles_types_1.asName(args[0]) + ", $2)", [args[0], args[1]]);
+            return DboBuilder_1.pgp.as.format("to_char(" + exports.asNameAlias(args[0], tableAlias) + ", $2)", [args[0], args[1]]);
         }
     },
     /**
@@ -209,10 +209,20 @@ exports.FUNCTIONS = [
         { val: 2, unit: 'hour' },
         { val: 30, unit: 'minute' },
         { val: 15, unit: 'minute' },
+        { val: 6, unit: 'minute' },
         { val: 5, unit: 'minute' },
+        { val: 4, unit: 'minute' },
+        { val: 3, unit: 'minute' },
+        { val: 2, unit: 'minute' },
         { val: 30, unit: 'second' },
         { val: 15, unit: 'second' },
+        { val: 10, unit: 'second' },
+        { val: 8, unit: 'second' },
+        { val: 6, unit: 'second' },
         { val: 5, unit: 'second' },
+        { val: 4, unit: 'second' },
+        { val: 3, unit: 'second' },
+        { val: 2, unit: 'second' },
     ]).map(({ val, unit }) => ({
         name: "$date_trunc_" + (val || "") + unit,
         type: "function",
@@ -221,7 +231,7 @@ exports.FUNCTIONS = [
         numArgs: 1,
         getFields: (args) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
-            const col = prostgles_types_1.asName(args[0]);
+            const col = exports.asNameAlias(args[0], tableAlias);
             if (!val)
                 return `date_trunc(${asValue(unit)}, ${col})`;
             const prevInt = {
@@ -244,7 +254,7 @@ exports.FUNCTIONS = [
         singleColArg: false,
         getFields: (args) => [args[1]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
-            return `${funcName}(${asValue(args[0])}, ${prostgles_types_1.asName(args[1])})`;
+            return `${funcName}(${asValue(args[0])}, ${exports.asNameAlias(args[1], tableAlias)})`;
         }
     })),
     /* Handy date funcs */
@@ -283,7 +293,7 @@ exports.FUNCTIONS = [
         numArgs: 1,
         getFields: (args) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
-            return DboBuilder_1.pgp.as.format("trim(to_char(" + prostgles_types_1.asName(args[0]) + ", $2))", [args[0], txt]);
+            return DboBuilder_1.pgp.as.format("trim(to_char(" + exports.asNameAlias(args[0], tableAlias) + ", $2))", [args[0], txt]);
         }
     })),
     /* Basic 1 arg col funcs */
@@ -294,7 +304,7 @@ exports.FUNCTIONS = [
         singleColArg: true,
         getFields: (args) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
-            return funcName + "(" + prostgles_types_1.asName(args[0]) + ")";
+            return funcName + "(" + exports.asNameAlias(args[0], tableAlias) + ")";
         }
     })),
     /* Aggs */
@@ -305,7 +315,7 @@ exports.FUNCTIONS = [
         singleColArg: true,
         getFields: (args) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
-            return aggName + "(" + prostgles_types_1.asName(args[0]) + ")";
+            return aggName + "(" + exports.asNameAlias(args[0], tableAlias) + ")";
         }
     })),
     /* More aggs */
@@ -320,6 +330,17 @@ exports.FUNCTIONS = [
             return "COUNT(*)";
         }
     },
+    {
+        name: "$diff_perc",
+        type: "aggregation",
+        numArgs: 1,
+        singleColArg: true,
+        getFields: (args) => [args[0]],
+        getQuery: ({ allowedFields, args, tableAlias }) => {
+            const col = exports.asNameAlias(args[0], tableAlias);
+            return `round( ( ( MAX(${col}) - MIN(${col}) )::float/MIN(${col}) ) * 100, 2)`;
+        }
+    }
 ];
 /* The difference between a function and computed field is that the computed field does not require any arguments */
 exports.COMPUTED_FIELDS = [
@@ -338,6 +359,14 @@ exports.COMPUTED_FIELDS = [
                 `)`;
         }
     }
+    // ,{
+    //   name: "ctid",
+    //   type: "computed",
+    //   // description: ` order hash of row content  `,
+    //   getQuery: ({ allowedFields, tableAlias, ctidField }) => {
+    //     return asNameAlias("ctid", tableAlias);
+    //   }
+    // }
 ];
 class SelectItemBuilder {
     constructor(params) {

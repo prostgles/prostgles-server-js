@@ -350,14 +350,6 @@ export class ViewHandler {
     //     this.tsDboDef = `export type ${this.tsDboName} = {\n ${this.tsDboDefs.join("\n")} \n};\n`;
     // }
 
-    getSelectFunctions(select: any){
-        if(select){
-            if(select.$rowhash){
-                
-            }
-        }
-    }
-
     getRowHashSelect(allowedFields: FieldFilter, alias?: string, tableAlias?: string): string {
         let allowed_cols = this.column_names;
         if(allowedFields) allowed_cols = this.parseFieldFilter(allowedFields);
@@ -488,72 +480,6 @@ export class ViewHandler {
     checkFilter(filter: any){
         if(filter === null || filter && !isPojoObject(filter)) throw `invalid filter -> ${JSON.stringify(filter)} \nExpecting:    undefined | {} | { field_name: "value" } | { field: { $gt: 22 } } ... `;
     }
-
-    // async prepareValidatedQuery(
-    //     filter: Filter, 
-    //     selectParams?: SelectParams , 
-    //     param3_unused = null, 
-    //     tableRules?: TableRule, 
-    //     localParams?: LocalParams, 
-    //     validatedAggAliases?: string[]
-    // ): Promise<Query> {
-
-    //     try {
-    //         this.checkFilter(filter);
-    //         const { select = "*", limit = null, offset = null, orderBy = null, expectOne = false } = selectParams || {};
-
-    //         let fields: FieldFilter,
-    //             filterFields: FieldFilter,
-    //             forcedFilter: object,
-    //             maxLimit: number;
-
-    //         const { testRule = false, tableAlias } = localParams || {};
-
-    //         if(tableRules){
-    //             if(!tableRules.select) throw "select rules missing for " + this.name;
-    //             fields = tableRules.select.fields;
-    //             forcedFilter = tableRules.select.forcedFilter;
-    //             filterFields = tableRules.select.filterFields;
-    //             maxLimit = tableRules.select.maxLimit;
-
-    //             if(<any>tableRules.select !== "*" && typeof tableRules.select !== "boolean" && !isPlainObject(tableRules.select)) throw `\nINVALID publish.${this.name}.select\nExpecting any of: "*" | { fields: "*" } | true | false`
-    //             if(!fields)  throw ` invalid ${this.name}.select rule -> fields (required) setting missing.\nExpecting any of: "*" | { col_name: false } | { col1: true, col2: true }`;
-
-    //             if(testRule){
-    //                 if(maxLimit && !Number.isInteger(maxLimit)) throw ` invalid publish.${this.name}.select.maxLimit -> expecting integer but got ` + maxLimit;
-
-    //                 await this.validateViewRules(fields, filterFields, null, forcedFilter, "select");
-    //                 return undefined;
-    //             }
-    //         }
-
-    //         let selectFuncs = [];
-    //         if(select && (select as any).$rowhash){
-    //             delete (select as any).$rowhash;
-                
-    //             selectFuncs.push({
-    //                 alias: "$rowhash",
-    //                 getQuery: (alias: string, tableAlias?: string) => this.getRowHashSelect(get(tableRules, "select.fields"), alias, tableAlias)
-    //             });
-    //         }
-            
-    //         return {
-    //             isLeftJoin: true,
-    //             table: this.name,
-    //             allFields: this.column_names.map(asName),
-    //             orderBy: [this.prepareSort(orderBy, fields, tableAlias, null, validatedAggAliases)],
-    //             select: this.prepareSelect(select, fields, null, tableAlias).split(","),
-    //             selectFuncs,
-    //             where: await this.prepareWhere(filter, forcedFilter, filterFields, null, tableAlias, localParams, tableRules),
-    //             limit: this.prepareLimitQuery(limit, maxLimit),
-    //             offset: this.prepareOffsetQuery(offset)
-    //         };
-
-    //     } catch(e){
-    //         if(localParams && localParams.testRule) throw e;
-    //         throw { err: parseError(e), msg: `Issue with dbo.${this.name}.find()` };
-    //     }  
-    // }
 
     async getColumns(tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]> {
 
