@@ -24,16 +24,15 @@ const PubSubManager_1 = require("./PubSubManager");
 const prostgles_types_1 = require("prostgles-types");
 let currConnection;
 function getDbConnection(dbConnection, options, debugQueries = false, noNewConnections = true) {
-    let pgp = pgPromise(Object.assign({ promiseLib: promise }, (debugQueries ? {
-        query: function (e) {
-            console.log({ psql: e.query, params: e.params });
-        },
-        connect: function (client, dc, isFresh) {
+    let pgp = pgPromise(Object.assign({ connect: function (client, dc, isFresh) {
             if (isFresh) {
                 client.on('notice', function (msg) {
                     console.log("notice: %j", msg);
                 });
             }
+        }, promiseLib: promise }, (debugQueries ? {
+        query: function (e) {
+            console.log({ psql: e.query, params: e.params });
         },
     } : {})));
     pgp.pg.defaults.max = 70;

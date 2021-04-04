@@ -1,7 +1,6 @@
 import { PostgresNotifListenManager } from "./PostgresNotifListenManager";
 import { TableOrViewInfo, TableInfo, DbHandler, DboBuilder } from "./DboBuilder";
 import { TableRule, DB } from "./Prostgles";
-import * as pgPromise from 'pg-promise';
 import { SelectParamsBasic as SelectParams, FieldFilter, WAL } from "prostgles-types";
 export declare const asValue: (v: any) => string;
 export declare const DEFAULT_SYNC_BATCH_SIZE = 50;
@@ -138,7 +137,7 @@ export declare class PubSubManager {
     addTrigger(params: {
         table_name: string;
         condition: string;
-    }): Promise<true | pgPromise.IResultExt>;
+    }): Promise<void>;
     pushSyncInfo({ table_name, id_key, info_level }: {
         table_name: any;
         id_key?: string;

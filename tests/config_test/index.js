@@ -81,7 +81,7 @@ prostgles_server_1.default({
             log(req.originalUrl);
             res.sendFile(path_1.default.join(__dirname + '/index.html'));
         });
-        db.items.subscribe({}, {}, console.log);
+        db.various.subscribe({}, {}, console.log);
         // await db.items.insert([ 
         //   {name: "c"},
         //   {name: "c", tst: new Date()}
@@ -99,9 +99,6 @@ prostgles_server_1.default({
             // }});
             // console.log(d)
             if (true || process.env.NPORT) {
-                console.log(await _db.any(`
-      select current_setting('application_name')
-      `));
             }
         }
         catch (e) {
@@ -138,10 +135,10 @@ prostgles_server_1.default({
 //     password:  process.env.POSTGRES_PASSWORD || "api",
 //     application_name: "hehe" + Date.now()
 //   },
-//   io,
+//   // io,
 //   tsGeneratedTypesDir: path.join(__dirname + '/'),
 //   watchSchema: (s) => {
-//     console.log(s)
+//     console.log(s.command)
 //   },
 // 	sqlFilePath: path.join(__dirname+'/init.sql'),
 //   // transactions: true,	
