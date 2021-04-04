@@ -27,11 +27,19 @@ type DbConnectionOpts = pg.IDefaults;
 let currConnection: { db: DB, pgp: PGP };
 function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts, debugQueries = false, noNewConnections = true): { db: DB, pgp: PGP } {
     let pgp: PGP = pgPromise({
+        
         promiseLib: promise,
         ...(debugQueries? {
             query: function (e) { 
                 console.log({psql: e.query, params: e.params}); 
-            }
+            },
+            connect: function (client, dc, isFresh) {
+                if (isFresh) {
+                    client.on('notice', function (msg) {
+                        console.log("notice: %j", msg);
+                    });
+                }
+            },
         } : {})
     });
     pgp.pg.defaults.max = 70;
@@ -307,7 +315,8 @@ export class Prostgles {
 
     dbConnection: DbConnection = {
         host: "localhost",
-        port: 5432
+        port: 5432,
+        application_name: "prostgles_app"
     };
     dbOptions: DbConnectionOpts;
     db: DB;
@@ -423,8 +432,8 @@ export class Prostgles {
     }
 
     async refreshDBO(){
-        this.dboBuilder = new DboBuilder(this);
-        this.dbo = await this.dboBuilder.init();
+        this.dboBuilder = await DboBuilder.create(this);
+        this.dbo = this.dboBuilder.dbo;
     }
 
     async init(onReady: (dbo: DbHandler | DbHandlerTX, db: DB) => any){

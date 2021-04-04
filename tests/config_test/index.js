@@ -7,6 +7,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const path_1 = __importDefault(require("path"));
 const express_1 = __importDefault(require("express"));
 const prostgles_server_1 = __importDefault(require("prostgles-server"));
+process.on('unhandledRejection', (reason, p) => {
+    console.trace('Unhandled Rejection at:', p, 'reason:', reason);
+    process.exit(1);
+});
 const app = express_1.default();
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
@@ -15,7 +19,7 @@ const http = _http.createServer(app);
 const io = require("socket.io")(http, {
     path: "/s"
 });
-http.listen(3001);
+http.listen(process.env.NPORT || 3001);
 const log = (msg, extra) => {
     console.log(...["(server): " + msg, extra].filter(v => v));
 };
@@ -53,7 +57,8 @@ prostgles_server_1.default({
         port: +process.env.POSTGRES_PORT || 5432,
         database: process.env.POSTGRES_DB || "postgres",
         user: process.env.POSTGRES_USER || "api",
-        password: process.env.POSTGRES_PASSWORD || "api"
+        password: process.env.POSTGRES_PASSWORD || "api",
+        application_name: "hehe" + Date.now()
     },
     io,
     tsGeneratedTypesDir: path_1.default.join(__dirname + '/'),
@@ -65,7 +70,9 @@ prostgles_server_1.default({
         return true;
     },
     publish: async (socket, dbo, _db, user) => {
-        return "*";
+        return {
+            various: "*",
+        };
     },
     joins: "inferred",
     onReady: async (db, _db) => {
@@ -74,6 +81,7 @@ prostgles_server_1.default({
             log(req.originalUrl);
             res.sendFile(path_1.default.join(__dirname + '/index.html'));
         });
+        db.items.subscribe({}, {}, console.log);
         // await db.items.insert([ 
         //   {name: "c"},
         //   {name: "c", tst: new Date()}
@@ -82,14 +90,19 @@ prostgles_server_1.default({
         // const d = await db.items.findOne({ "id->hehe->hihi->final": ' '});  "id.$ilike": ' ', 
         try {
             const longGeomFilter = { idd: { "=": { "ST_MakeEnvelope": [1, 2, 3, 4] } } }, shortGeomFilter = { "id.=.ST_MakeEnvelope": [1, 2, 3, '$$--4\"\'$$\``'] };
-            const d = await db.items.findOne({}, { select: {
-                    h: { "$ts_headline_simple": ["name", { plainto_tsquery: "a" }] },
-                    hh: { "$ts_headline": ["name", "a"] },
-                    tst: 1,
-                    tr15: { "$date_trunc_15minute": ["tst"] },
-                    trh: { "$date_trunc": ["hour", "tst"] }
-                } });
-            console.log(d);
+            // const d = await db.items.findOne({ }, { select: { 
+            //   h: { "$ts_headline_simple": ["name", { plainto_tsquery: "a" }] },
+            //   hh: { "$ts_headline": ["name", "a"] },
+            //   tst: 1,// "$date_trunc_5second", 
+            //   tr15: { "$date_trunc_15minute": ["tst"] },
+            //   trh: { "$date_trunc": ["hour", "tst"] }
+            // }});
+            // console.log(d)
+            if (true || process.env.NPORT) {
+                console.log(await _db.any(`
+      select current_setting('application_name')
+      `));
+            }
         }
         catch (e) {
             console.error(e);

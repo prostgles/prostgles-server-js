@@ -1,7 +1,9 @@
 import { PostgresNotifListenManager } from "./PostgresNotifListenManager";
 import { TableOrViewInfo, TableInfo, DbHandler, DboBuilder } from "./DboBuilder";
 import { TableRule, DB } from "./Prostgles";
+import * as pgPromise from 'pg-promise';
 import { SelectParamsBasic as SelectParams, FieldFilter, WAL } from "prostgles-types";
+export declare const asValue: (v: any) => string;
 export declare const DEFAULT_SYNC_BATCH_SIZE = 50;
 declare type SyncParams = {
     socket_id: string;
@@ -73,7 +75,7 @@ export declare class PubSubManager {
     dboBuilder: DboBuilder;
     db: DB;
     dbo: DbHandler;
-    triggers: {
+    _triggers: {
         [key: string]: string[];
     };
     sockets: any;
@@ -91,16 +93,33 @@ export declare class PubSubManager {
         query: string;
     }) => void;
     postgresNotifListenManager: PostgresNotifListenManager;
-    postgresNotifChannelName: string;
-    schemaChangedNotifPayloadStr: string;
-    constructor(options: PubSubManagerOptions);
-    startWatchingSchema(stop?: boolean): Promise<void>;
+    private constructor();
+    NOTIF_TYPE: {
+        data: string;
+        schema: string;
+    };
+    getNOTIFChannel: () => Promise<{
+        preffix: string;
+        full: string;
+    }>;
+    private appID;
+    appCheckFrequencyMS: number;
+    appCheck: any;
+    getAppID: () => Promise<string>;
+    static create: (options: PubSubManagerOptions) => Promise<PubSubManager>;
+    init: () => Promise<PubSubManager>;
+    DB_OBJ_NAMES: {
+        data_watch_func: string;
+        schema_watch_func: string;
+        schema_watch_trigger: string;
+    };
+    prepareTriggers: () => Promise<boolean>;
     isReady(): any;
     getSubs(table_name: string, condition: string): SubscriptionParams[];
     getSyncs(table_name: string, condition: string): SyncParams[];
     notifListener: (data: {
         payload: string;
-    }) => void;
+    }) => Promise<void>;
     pushSubData(sub: SubscriptionParams): Promise<unknown>;
     upsertSocket(socket: any, channel_name: string): void;
     syncTimeout: any;
@@ -113,6 +132,7 @@ export declare class PubSubManager {
     dropTrigger(table_name: any): void;
     getTriggerName(table_name: any, suffix: any): string;
     checkIfTimescaleBug: (table_name: string) => Promise<boolean>;
+    getMyTriggerQuery: () => Promise<string>;
     addingTrigger: any;
     addTriggerPool: {
         [key: string]: string[];
@@ -120,7 +140,7 @@ export declare class PubSubManager {
     addTrigger(params: {
         table_name: string;
         condition: string;
-    }): Promise<any>;
+    }): Promise<true | pgPromise.IResultExt>;
     pushSyncInfo({ table_name, id_key, info_level }: {
         table_name: any;
         id_key?: string;

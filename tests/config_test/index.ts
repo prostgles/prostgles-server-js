@@ -5,6 +5,11 @@ import path from 'path';
 import express from 'express';
 import prostgles from "prostgles-server";
 
+process.on('unhandledRejection', (reason, p) => {
+  console.trace('Unhandled Rejection at:', p, 'reason:', reason)
+  process.exit(1)
+});
+
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -13,7 +18,7 @@ const http = _http.createServer(app);
 const io = require("socket.io")(http, { 
   path: "/s" 
 });
-http.listen(3001);
+http.listen(process.env.NPORT || 3001);
 
 const log = (msg: string, extra?: any) => {
   console.log(...["(server): " + msg, extra].filter(v => v));
@@ -58,7 +63,8 @@ prostgles({
     port: +process.env.POSTGRES_PORT || 5432,
     database: process.env.POSTGRES_DB || "postgres",
     user: process.env.POSTGRES_USER || "api",
-    password:  process.env.POSTGRES_PASSWORD || "api"
+    password:  process.env.POSTGRES_PASSWORD || "api",
+    application_name: "hehe" + Date.now()
   },
   io,
   tsGeneratedTypesDir: path.join(__dirname + '/'),
@@ -71,7 +77,10 @@ prostgles({
   },
   publish: async (socket, dbo: any, _db: any, user: any) => {
     
-    return "*";
+    return {
+      various: "*",
+
+    };
     
   },
   joins: "inferred",
@@ -83,6 +92,7 @@ prostgles({
 			res.sendFile(path.join(__dirname+'/index.html'));
 		});
 
+    db.items.subscribe({}, {}, console.log)
     // await db.items.insert([ 
     //   {name: "c"},
     //   {name: "c", tst: new Date()}
@@ -95,14 +105,22 @@ prostgles({
       const longGeomFilter = { idd: { "=": { "ST_MakeEnvelope": [1,2,3,4 ]}}},
         shortGeomFilter = { "id.=.ST_MakeEnvelope": [1,2,3,'$$--4\"\'$$\``' ] };
   
-      const d = await db.items.findOne({ }, { select: { 
-        h: { "$ts_headline_simple": ["name", { plainto_tsquery: "a" }] },
-        hh: { "$ts_headline": ["name", "a"] },
-        tst: 1,// "$date_trunc_5second", 
-        tr15: { "$date_trunc_15minute": ["tst"] },
-        trh: { "$date_trunc": ["hour", "tst"] }
-      }});
-      console.log(d)
+      // const d = await db.items.findOne({ }, { select: { 
+      //   h: { "$ts_headline_simple": ["name", { plainto_tsquery: "a" }] },
+      //   hh: { "$ts_headline": ["name", "a"] },
+      //   tst: 1,// "$date_trunc_5second", 
+      //   tr15: { "$date_trunc_15minute": ["tst"] },
+      //   trh: { "$date_trunc": ["hour", "tst"] }
+      // }});
+      // console.log(d)
+      
+
+      if(true || process.env.NPORT){
+
+      console.log(await _db.any(`
+      select current_setting('application_name')
+      `))
+      }
 
     } catch(e) {
       console.error(e)

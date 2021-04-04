@@ -1142,7 +1142,7 @@ export class ViewHandler {
                 ));
 
             if(invalidColumn){
-                throw `Table: ${this.name} -> disallowed/inexistent columns in filter: ${invalidColumn} \n  Expecting one of: ${allowedSelect.map(s => s.alias).join(", ")}`;
+                throw `Table: ${this.name} -> disallowed/inexistent columns in filter: ${invalidColumn} \n  Expecting one of: ${allowedSelect.map(s => s.type === "column"? s.getQuery() : s.alias).join(", ")}`;
             }
         }
 
@@ -2033,12 +2033,16 @@ export class DboBuilder {
 
     onSchemaChange: (event: { command: string; query: string }) => void;
 
-    constructor(prostgles: Prostgles){
+    private constructor(prostgles: Prostgles){
         this.prostgles = prostgles;
         this.db = this.prostgles.db;
         this.schema = this.prostgles.schema || "public";
         this.dbo = { };
         // this.joins = this.prostgles.joins;
+        
+    }
+
+    private init = async () => {
         let onSchemaChange;
         
         if(this.prostgles.watchSchema){
@@ -2046,12 +2050,21 @@ export class DboBuilder {
                 this.prostgles.onSchemaChange(event)
             }
         }
-        this.pubSubManager = new PubSubManager({
+        this.pubSubManager = await PubSubManager.create({
             dboBuilder: this,
             db: this.db, 
             dbo: this.dbo as unknown as DbHandler,
             onSchemaChange
         });
+
+        await this.build();
+
+        return this;
+    }
+
+    public static create = async (prostgles: Prostgles): Promise<DboBuilder> => {
+        let res = new DboBuilder(prostgles)
+        return await res.init();
     }
 
     getJoins(){
@@ -2160,12 +2173,9 @@ export class DboBuilder {
         
     }
 
-    async init(): Promise<DbHandler | DbHandlerTX>{
+    async build(): Promise<DbHandler | DbHandlerTX>{
 
-        const { $and, $or, $not } = this.prostgles.keywords;
-        const AND = JSON.stringify($and),
-            OR = JSON.stringify($or),
-            NOT = JSON.stringify($not);
+        // await this.pubSubManager.init()
 
         this.tablesOrViews = await getTablesForSchemaPostgresSQL(this.db, this.schema);
         // console.log(this.tablesOrViews.map(t => `${t.name} (${t.columns.map(c => c.name).join(", ")})`))
@@ -2178,66 +2188,6 @@ import { ViewHandler, TableHandler, JoinMaker } from "prostgles-types";
 export type TxCB = {
     (t: DBObj): (any | void | Promise<(any | void)>)
 };
-
-`
-
-const dwadwa=
-`
-
-/* COMMON TYPES */
-
-export type Filter<T = any> = object | {} | T | undefined | any[];
-export type GroupFilter<T = any> = { ${AND}: Filter<T> } | { ${OR}: Filter<T> } | { ${NOT}: Filter<T> };
-export type FieldFilter<T> = string[] | "*" | "" | {
-    [Key in keyof Partial<T & { [key: string]: any }>]:  any;
-};
-export type AscOrDesc = 1 | -1 | boolean;
-export type OrderBy = { key: string, asc: AscOrDesc }[] | { [key: string]: AscOrDesc }[] | { [key: string]: AscOrDesc } | string | string[];
-        
-export type SelectParams<T> = {
-    select?: FieldFilter<T>;
-    limit?: number;
-    offset?: number;
-    orderBy?: OrderBy;
-    expectOne?: boolean;
-}
-export type UpdateParams<T> = {
-    returning?: FieldFilter<T>;
-    onConflictDoNothing?: boolean;
-    fixIssues?: boolean;
-    multi?: boolean;
-}
-export type InsertParams<T> = {
-    returning?: FieldFilter<T>;
-    onConflictDoNothing?: boolean;
-    fixIssues?: boolean;
-}
-export type DeleteParams<T> = {
-    returning?: FieldFilter<T>;
-};
-export type TxCB = {
-    (t: DBObj): (any | void | Promise<(any | void)>)
-};
-export type JoinMaker<T> = (filter?: Filter<T>, select?: FieldFilter<T>, options?: SelectParams<T>) => any;
-
-
-export type ViewHandler<T> = {
-    getColumns: () => Promise<any[]>;
-    find: <TD = T>(filter?: Filter<T>, selectParams?: SelectParams<T>) => Promise<Partial<TD & { [x: string]: any }>[]>;
-    findOne: <TD = T>(filter?: Filter<T>, selectParams?: SelectParams<T>) => Promise<Partial<TD & { [x: string]: any }>>;
-    subscribe: <TD = T>(filter: Filter<T>, params: SelectParams<T>, onData: (items: Partial<TD & { [x: string]: any }>[]) => any) => Promise<{ unsubscribe: () => any }>;
-    subscribeOne: <TD = T>(filter: Filter<T>, params: SelectParams<T>, onData: (item: Partial<TD & { [x: string]: any }>) => any) => Promise<{ unsubscribe: () => any }>;
-    count: (filter?: Filter<T>) => Promise<number>
-}
-
-export type TableHandler<T> = ViewHandler<T> & {
-    update: <TD = Partial<T> | void> (filter: Filter<T>, newData: T, params?: UpdateParams<T>) => Promise<TD>;
-    updateBatch: <TD = Partial<T> | void> (updateData: [Filter<T>, T][], params?: UpdateParams<T>) => Promise<TD>;
-    upsert: <TD = Partial<T> | void> (filter: Filter<T>, newData: T, params?: UpdateParams<T>) => Promise<TD>;
-    insert: <TD = Partial<T> | void> (data: (T | T[]), params?: InsertParams<T>) => Promise<TD>;
-    delete: <TD = Partial<T> | void> (filter?: T, params?: DeleteParams<T>) => Promise<TD>;
-}
-
 
 `
         this.dboDefinition = `export type DBObj = {\n`;

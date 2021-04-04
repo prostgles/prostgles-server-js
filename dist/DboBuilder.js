@@ -841,7 +841,7 @@ class ViewHandler {
                     .find(fName => !validCols.find(c => c === fName || (fName.startsWith(c) && (fName.slice(c.length).includes("->") ||
                     fName.slice(c.length).includes(".")))));
                 if (invalidColumn) {
-                    throw `Table: ${this.name} -> disallowed/inexistent columns in filter: ${invalidColumn} \n  Expecting one of: ${allowedSelect.map(s => s.alias).join(", ")}`;
+                    throw `Table: ${this.name} -> disallowed/inexistent columns in filter: ${invalidColumn} \n  Expecting one of: ${allowedSelect.map(s => s.type === "column" ? s.getQuery() : s.alias).join(", ")}`;
                 }
             }
             /* TODO: Allow filter funcs */
@@ -1596,6 +1596,22 @@ const Prostgles_2 = require("./Prostgles");
 class DboBuilder {
     constructor(prostgles) {
         this.schema = "public";
+        this.init = () => __awaiter(this, void 0, void 0, function* () {
+            let onSchemaChange;
+            if (this.prostgles.watchSchema) {
+                onSchemaChange = (event) => {
+                    this.prostgles.onSchemaChange(event);
+                };
+            }
+            this.pubSubManager = yield PubSubManager_1.PubSubManager.create({
+                dboBuilder: this,
+                db: this.db,
+                dbo: this.dbo,
+                onSchemaChange
+            });
+            yield this.build();
+            return this;
+        });
         this.getTX = (dbTX) => {
             return this.db.tx((t) => {
                 let txDB = {};
@@ -1615,18 +1631,6 @@ class DboBuilder {
         this.schema = this.prostgles.schema || "public";
         this.dbo = {};
         // this.joins = this.prostgles.joins;
-        let onSchemaChange;
-        if (this.prostgles.watchSchema) {
-            onSchemaChange = (event) => {
-                this.prostgles.onSchemaChange(event);
-            };
-        }
-        this.pubSubManager = new PubSubManager_1.PubSubManager({
-            dboBuilder: this,
-            db: this.db,
-            dbo: this.dbo,
-            onSchemaChange
-        });
     }
     getJoins() {
         return this.joins;
@@ -1718,10 +1722,9 @@ class DboBuilder {
     }
     buildJoinPaths() {
     }
-    init() {
+    build() {
         return __awaiter(this, void 0, void 0, function* () {
-            const { $and, $or, $not } = this.prostgles.keywords;
-            const AND = JSON.stringify($and), OR = JSON.stringify($or), NOT = JSON.stringify($not);
+            // await this.pubSubManager.init()
             this.tablesOrViews = yield getTablesForSchemaPostgresSQL(this.db, this.schema);
             // console.log(this.tablesOrViews.map(t => `${t.name} (${t.columns.map(c => c.name).join(", ")})`))
             const common_types = `
@@ -1731,64 +1734,6 @@ import { ViewHandler, TableHandler, JoinMaker } from "prostgles-types";
 export type TxCB = {
     (t: DBObj): (any | void | Promise<(any | void)>)
 };
-
-`;
-            const dwadwa = `
-
-/* COMMON TYPES */
-
-export type Filter<T = any> = object | {} | T | undefined | any[];
-export type GroupFilter<T = any> = { ${AND}: Filter<T> } | { ${OR}: Filter<T> } | { ${NOT}: Filter<T> };
-export type FieldFilter<T> = string[] | "*" | "" | {
-    [Key in keyof Partial<T & { [key: string]: any }>]:  any;
-};
-export type AscOrDesc = 1 | -1 | boolean;
-export type OrderBy = { key: string, asc: AscOrDesc }[] | { [key: string]: AscOrDesc }[] | { [key: string]: AscOrDesc } | string | string[];
-        
-export type SelectParams<T> = {
-    select?: FieldFilter<T>;
-    limit?: number;
-    offset?: number;
-    orderBy?: OrderBy;
-    expectOne?: boolean;
-}
-export type UpdateParams<T> = {
-    returning?: FieldFilter<T>;
-    onConflictDoNothing?: boolean;
-    fixIssues?: boolean;
-    multi?: boolean;
-}
-export type InsertParams<T> = {
-    returning?: FieldFilter<T>;
-    onConflictDoNothing?: boolean;
-    fixIssues?: boolean;
-}
-export type DeleteParams<T> = {
-    returning?: FieldFilter<T>;
-};
-export type TxCB = {
-    (t: DBObj): (any | void | Promise<(any | void)>)
-};
-export type JoinMaker<T> = (filter?: Filter<T>, select?: FieldFilter<T>, options?: SelectParams<T>) => any;
-
-
-export type ViewHandler<T> = {
-    getColumns: () => Promise<any[]>;
-    find: <TD = T>(filter?: Filter<T>, selectParams?: SelectParams<T>) => Promise<Partial<TD & { [x: string]: any }>[]>;
-    findOne: <TD = T>(filter?: Filter<T>, selectParams?: SelectParams<T>) => Promise<Partial<TD & { [x: string]: any }>>;
-    subscribe: <TD = T>(filter: Filter<T>, params: SelectParams<T>, onData: (items: Partial<TD & { [x: string]: any }>[]) => any) => Promise<{ unsubscribe: () => any }>;
-    subscribeOne: <TD = T>(filter: Filter<T>, params: SelectParams<T>, onData: (item: Partial<TD & { [x: string]: any }>) => any) => Promise<{ unsubscribe: () => any }>;
-    count: (filter?: Filter<T>) => Promise<number>
-}
-
-export type TableHandler<T> = ViewHandler<T> & {
-    update: <TD = Partial<T> | void> (filter: Filter<T>, newData: T, params?: UpdateParams<T>) => Promise<TD>;
-    updateBatch: <TD = Partial<T> | void> (updateData: [Filter<T>, T][], params?: UpdateParams<T>) => Promise<TD>;
-    upsert: <TD = Partial<T> | void> (filter: Filter<T>, newData: T, params?: UpdateParams<T>) => Promise<TD>;
-    insert: <TD = Partial<T> | void> (data: (T | T[]), params?: InsertParams<T>) => Promise<TD>;
-    delete: <TD = Partial<T> | void> (filter?: T, params?: DeleteParams<T>) => Promise<TD>;
-}
-
 
 `;
             this.dboDefinition = `export type DBObj = {\n`;
@@ -1876,6 +1821,10 @@ export type TableHandler<T> = ViewHandler<T> & {
     }
 }
 exports.DboBuilder = DboBuilder;
+DboBuilder.create = (prostgles) => __awaiter(void 0, void 0, void 0, function* () {
+    let res = new DboBuilder(prostgles);
+    return yield res.init();
+});
 // export async function makeDBO(db: DB): Promise<DbHandler> {
 //     return await DBO.build(db, "public");
 // }

@@ -278,12 +278,14 @@ export declare class DboBuilder {
         command: string;
         query: string;
     }) => void;
-    constructor(prostgles: Prostgles);
+    private constructor();
+    private init;
+    static create: (prostgles: Prostgles) => Promise<DboBuilder>;
     getJoins(): Join[];
     getJoinPaths(): JoinPaths;
     parseJoins(): Promise<JoinPaths>;
     buildJoinPaths(): void;
-    init(): Promise<DbHandler | DbHandlerTX>;
+    build(): Promise<DbHandler | DbHandlerTX>;
     getTX: (dbTX: TxCB) => Promise<any>;
 }
 export declare function isPlainObject(o: any): boolean;

@@ -27,7 +27,14 @@ function getDbConnection(dbConnection, options, debugQueries = false, noNewConne
     let pgp = pgPromise(Object.assign({ promiseLib: promise }, (debugQueries ? {
         query: function (e) {
             console.log({ psql: e.query, params: e.params });
-        }
+        },
+        connect: function (client, dc, isFresh) {
+            if (isFresh) {
+                client.on('notice', function (msg) {
+                    console.log("notice: %j", msg);
+                });
+            }
+        },
     } : {})));
     pgp.pg.defaults.max = 70;
     // /* Casts count/sum/max to bigint. Needs rework to remove casting "+count" and other issues; */
@@ -57,7 +64,8 @@ class Prostgles {
         // o: ProstglesInitOptions;
         this.dbConnection = {
             host: "localhost",
-            port: 5432
+            port: 5432,
+            application_name: "prostgles_app"
         };
         this.schema = "public";
         this.wsChannelNamePrefix = "_psqlWS_";
@@ -270,8 +278,8 @@ class Prostgles {
     }
     refreshDBO() {
         return __awaiter(this, void 0, void 0, function* () {
-            this.dboBuilder = new DboBuilder_1.DboBuilder(this);
-            this.dbo = yield this.dboBuilder.init();
+            this.dboBuilder = yield DboBuilder_1.DboBuilder.create(this);
+            this.dbo = this.dboBuilder.dbo;
         });
     }
     init(onReady) {
