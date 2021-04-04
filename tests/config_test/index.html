@@ -13,8 +13,9 @@
 		<div style="display: flex; flex-direction: row;">
 			<div class="d1"></div>
 			<div class="d2"></div>
+			<div class="d3"></div>
 		</div>
-		<script>
+		<script defer>
 
 			console.time("test")
 			// const ws = new WebSocket('wss://prostgles.com/teztz/s');
@@ -44,11 +45,13 @@
 				socket,
 				onReconnect: (socket) => {
 					console.log(1111);
-					document.body.innerText += `Reconnected ${new Date()} \n`
+					if(document.body.querySelector(".d3")){
+						document.body.querySelector(".d3").innerText += `Reconnected ${new Date()} \n`
+					}
 					// window.location.reload();
 				},
 				onReady: async (db, methods) => {
-
+					console.log("onReady")
 					try {
 						window.db = db;
 						window.dbo = db;
@@ -59,12 +62,15 @@
 						// 	cols: await db[t].getColumns()
 						// })))
 						// console.log("onReady", schema);
+						const d1 = document.body.querySelector(".d1"),
+							d2 = document.body.querySelector(".d2"),
+							d3 = document.body.querySelector(".d3");
 
 						db.various.subscribe({ $and: [] }, {}, d => {
-							document.body.querySelector(".d1").innerText = JSON.stringify(d, null, 2)
+							if(d1) d1.innerText = JSON.stringify(d, null, 2)
 						})
 						db.various.subscribe({ "id.<": 75648356348 }, {}, d => {
-							document.body.querySelector(".d2").innerText = JSON.stringify(d, null, 2)
+							if(d2) d2.innerText = JSON.stringify(d, null, 2)
 						})
 
 					} catch(e) {

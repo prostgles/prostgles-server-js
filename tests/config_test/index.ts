@@ -149,3 +149,38 @@ prostgles({
 		// }, 5000);
   },
 });
+
+
+// prostgles({
+//   dbConnection: {
+//     host: process.env.POSTGRES_HOST || "localhost",
+//     port: +process.env.POSTGRES_PORT || 5432,
+//     database: process.env.POSTGRES_DB || "postgres",
+//     user: process.env.POSTGRES_USER || "api",
+//     password:  process.env.POSTGRES_PASSWORD || "api",
+//     application_name: "hehe" + Date.now()
+//   },
+//   io,
+//   tsGeneratedTypesDir: path.join(__dirname + '/'),
+//   watchSchema: (s) => {
+//     console.log(s)
+//   },
+// 	sqlFilePath: path.join(__dirname+'/init.sql'),
+//   // transactions: true,	
+//   publishRawSQL: async (socket, db: any, _db: any, user: any) => {
+//     // log("set auth logic")
+//     return true
+//   },
+//   publish: async (socket, dbo: any, _db: any, user: any) => {
+    
+//     return {
+//       various: "*",
+
+//     };
+    
+//   },
+//   joins: "inferred",
+//   onReady: async (db: DBObj, _db: any) => {
+
+//   }
+// });

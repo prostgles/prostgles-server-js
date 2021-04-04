@@ -98,14 +98,13 @@ export declare class PubSubManager {
         data: string;
         schema: string;
     };
-    getNOTIFChannel: () => Promise<{
+    NOTIF_CHANNEL: {
         preffix: string;
-        full: string;
-    }>;
+        getFull: (appID?: string) => string;
+    };
     private appID;
     appCheckFrequencyMS: number;
     appCheck: any;
-    getAppID: () => Promise<string>;
     static create: (options: PubSubManagerOptions) => Promise<PubSubManager>;
     init: () => Promise<PubSubManager>;
     DB_OBJ_NAMES: {
@@ -129,7 +128,6 @@ export declare class PubSubManager {
     addSub(subscriptionParams: AddSubscriptionParams): Promise<string>;
     removeLocalSub(table_name: string, condition: string, func: (items: object[]) => any): void;
     onSocketDisconnected(socket: any, channel_name: any): void;
-    dropTrigger(table_name: any): void;
     getTriggerName(table_name: any, suffix: any): string;
     checkIfTimescaleBug: (table_name: string) => Promise<boolean>;
     getMyTriggerQuery: () => Promise<string>;

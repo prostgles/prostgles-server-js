@@ -72,9 +72,6 @@ export type Planes = {
 export type Transaction = { 
   "id"?: string;
 }
-export type Tt = { 
-  "id"?: number;
-}
 export type Various = { 
   "added"?: Date;
   "h"?: Array<string>;
@@ -107,7 +104,6 @@ export type DBObj = {
   "items4_pub": TableHandler<Items4_pub> 
   "planes": TableHandler<Planes> 
   "transaction": TableHandler<Transaction> 
-  "tt": TableHandler<Tt> 
   "various": TableHandler<Various> 
   "z": TableHandler<Z> 
   leftJoin: JoinMakerTables;

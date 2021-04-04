@@ -36,46 +36,23 @@ class PubSubManager {
             data: "data_has_changed",
             schema: "schema_has_changed"
         };
-        this.getNOTIFChannel = () => __awaiter(this, void 0, void 0, function* () {
-            const appID = yield this.getAppID();
-            return {
-                preffix: 'prostgles_',
-                full: 'prostgles_' + appID
-            };
-        });
-        this.appCheckFrequencyMS = 3600 * 1000;
-        this.getAppID = () => __awaiter(this, void 0, void 0, function* () {
-            /* Maybe use actual connected app names?
-    
-            ,datname
-            ,usename
-            ,client_hostname
-            ,client_port
-            ,backend_start
-            ,query_start
-            ,query
-            ,state
-    
-            console.log(await _db.any(`
-                SELECT pid, application_name, state
-                FROM pg_stat_activity
-                WHERE application_name IS NOT NULL AND application_name != '' -- state = 'active';
-            `))
-    
-            */
-            if (!this.appID) {
+        this.NOTIF_CHANNEL = {
+            preffix: 'prostgles_',
+            getFull: (appID) => {
+                if (!this.appID && !appID)
+                    throw "No appID";
+                return this.NOTIF_CHANNEL.preffix + (appID || this.appID);
             }
-            return this.appID;
-        });
+        };
+        this.appCheckFrequencyMS = 3600 * 1000;
         this.init = () => __awaiter(this, void 0, void 0, function* () {
             try {
-                const { preffix: CH_preffix, full } = yield this.getNOTIFChannel();
-                this.postgresNotifListenManager = new PostgresNotifListenManager_1.PostgresNotifListenManager(this.db, this.notifListener, full);
                 const q = `
-                BEGIN;
+                BEGIN;-- TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 
                 -- REMOVE THIIIIIS
                 DROP SCHEMA IF EXISTS prostgles CASCADE;
+
 
                 CREATE SCHEMA IF NOT EXISTS prostgles;
                 CREATE EXTENSION IF NOT EXISTS pgcrypto SCHEMA prostgles;
@@ -123,6 +100,9 @@ class PubSubManager {
                 END
                 $do$;
 
+                
+                --RAISE NOTICE '23232 %', 'dwdaw';
+
                 CREATE OR REPLACE FUNCTION ${this.DB_OBJ_NAMES.data_watch_func}() RETURNS TRIGGER 
                 AS $$
         
@@ -168,6 +148,7 @@ class PubSubManager {
                             );
                             EXECUTE query INTO c_ids;
 
+                            --RAISE  'unions: % , cids: %', unions, c_ids;
 
                             IF c_ids IS NOT NULL THEN
 
@@ -179,7 +160,7 @@ class PubSubManager {
                                 LOOP
                                     
                                     PERFORM pg_notify( 
-                                        ${exports.asValue(CH_preffix)} || nrw.app_id , 
+                                        ${exports.asValue(this.NOTIF_CHANNEL.preffix)} || nrw.app_id , 
                                         concat_ws(
                                             ${exports.asValue(PubSubManager.DELIMITER)},
                                             ${exports.asValue(this.NOTIF_TYPE.data)}, COALESCE(TG_TABLE_NAME, 'MISSING'), COALESCE(TG_OP, 'MISSING'), COALESCE(nrw.cids, '')
@@ -191,8 +172,6 @@ class PubSubManager {
                             END IF;
                         END IF;
 
-
-                        --RAISE  ' %', 'q';
  
                     --EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'issue within data func';
                         RETURN NULL; -- result is ignored since this is an AFTER trigger
@@ -217,7 +196,7 @@ class PubSubManager {
 
                         LOOP
                             PERFORM pg_notify( 
-                                ${exports.asValue(CH_preffix)} || arw.id, 
+                                ${exports.asValue(this.NOTIF_CHANNEL.preffix)} || arw.id, 
                                 concat_ws(
                                     ${exports.asValue(PubSubManager.DELIMITER)}, 
                                     ${exports.asValue(this.NOTIF_TYPE.schema)}, tg_tag , TG_event, curr_query
@@ -249,6 +228,9 @@ class PubSubManager {
                     }
                     this.appID = raw.id;
                 }
+                // const { preffix: CH_preffix, full } = await this.getNOTIFChannel();
+                // console.log(full)
+                this.postgresNotifListenManager = new PostgresNotifListenManager_1.PostgresNotifListenManager(this.db, this.notifListener, this.NOTIF_CHANNEL.getFull());
                 // await this.startWatchingSchema(!Boolean(this.onSchemaChange));
                 yield this.prepareTriggers();
                 return this;
@@ -266,92 +248,107 @@ class PubSubManager {
             // SELECT * FROM pg_catalog.pg_event_trigger WHERE evtname
             if (!this.appID)
                 throw "prepareTriggers failed: this.appID missing";
-            yield this.db.any(`
-            -- Delete stale app records
-            DELETE FROM prostgles.apps 
-            WHERE last_check < NOW() - check_frequency_ms * interval '1 millisecond';
+            try {
+                yield this.db.any(`
+                BEGIN;
 
-            -- Delete current triggers on startup
-            UPDATE prostgles.triggers SET app_ids = array_remove(app_ids, ${exports.asValue(this.appID)});
+                -- Delete stale app records
+                DELETE FROM prostgles.apps 
+                WHERE last_check < NOW() - check_frequency_ms * interval '1 millisecond';
 
-            -- Delete inactive app triggers
-            UPDATE prostgles.triggers 
-            SET app_ids = ARRAY(
-                SELECT unnest(app_ids) INTERSECT 
-                SELECT id FROM prostgles.apps
-            );
+                -- Delete current triggers on startup
+                UPDATE prostgles.triggers SET app_ids = array_remove(app_ids, ${exports.asValue(this.appID)});
+
+                -- Delete inactive app triggers
+                UPDATE prostgles.triggers 
+                SET app_ids = ARRAY(
+                    SELECT unnest(app_ids) INTERSECT 
+                    SELECT id FROM prostgles.apps
+                );
+                
+                -- RAISE NOTICE ' %', 'q';
+
+                -- Delete stale data triggers
+                DELETE FROM prostgles.triggers 
+                WHERE ${exports.asValue(this.appID)} = ANY(app_ids);
             
-            -- RAISE NOTICE ' %', 'q';
-
-            -- Delete stale data triggers
-            DELETE FROM prostgles.triggers 
-            WHERE ${exports.asValue(this.appID)} = ANY(app_ids);
-        
-
-            -- Drop the triggers
-            DO
-            $do$
-                DECLARE trg RECORD;
-                    etrg RECORD;
-                    q   TEXT;
-            BEGIN
-
-                -- DROP orphaned triggers
-                FOR trg IN
-                    SELECT * FROM information_schema.triggers 
-                    WHERE trigger_name ILIKE 'prostgles_triggers_%'
-                    AND event_object_table NOT IN (SELECT table_name FROM prostgles.triggers)
-                LOOP
-                    SELECT format(
-                        $$ DROP TRIGGER IF EXISTS %s  ON  %I ; $$
-                        , trg.trigger_name, trg.event_object_table
-                    )
-                    INTO q;
-
-                    --RAISE NOTICE ' %', q;
-
-                    EXECUTE q;
-                END LOOP;
+                
+                -- Drop the triggers
+                DO
+                $do$
+                    DECLARE trg RECORD;
+                        etrg RECORD;
+                        q   TEXT;
+                BEGIN
 
 
-                -- DROP orphaned event triggers
-                FOR etrg IN
-                    SELECT * FROM pg_catalog.pg_event_trigger
-                    WHERE evtname = ${exports.asValue(this.DB_OBJ_NAMES.schema_watch_trigger)}
-                    AND NOT EXISTS (SELECT 1 FROM prostgles.apps WHERE watching_schema IS TRUE)
-                LOOP
-                    SELECT format(
-                        $$ DROP EVENT TRIGGER IF EXISTS %I ; $$
-                        , etrg.evtname
-                    )
-                    INTO q;
+                    -- DROP orphaned triggers
+                    FOR trg IN
+                        SELECT 1 as A
+                        --SELECT * FROM information_schema.triggers 
+                        --WHERE trigger_name ILIKE 'prostgles_triggers_%'
+                        --AND event_object_table NOT IN (SELECT table_name FROM prostgles.triggers)
+                    LOOP
+                    /*
+                        SELECT format(
+                            $$ DROP TRIGGER IF EXISTS %s  ON  %I ; $$
+                            , trg.trigger_name, trg.event_object_table
+                        )
+                        INTO q;
 
-                    RAISE NOTICE ' %', q;
+                        --RAISE NOTICE ' %', q;
 
-                    EXECUTE q;
-                END LOOP;
+                        --EXECUTE q;
+                        */
+                    END LOOP;
 
 
-                IF  EXISTS (SELECT 1 FROM prostgles.apps WHERE watching_schema IS TRUE) 
-                    AND NOT EXISTS (
-                        SELECT 1 FROM pg_catalog.pg_event_trigger
+                    -- DROP orphaned event triggers
+                    FOR etrg IN
+                        SELECT * FROM pg_catalog.pg_event_trigger
                         WHERE evtname = ${exports.asValue(this.DB_OBJ_NAMES.schema_watch_trigger)}
-                    )
-                THEN
-                    CREATE EVENT TRIGGER ${this.DB_OBJ_NAMES.schema_watch_trigger} ON ddl_command_end
-                    WHEN TAG IN ('CREATE TABLE', 'ALTER TABLE', 'DROP TABLE')
-                    EXECUTE PROCEDURE ${this.DB_OBJ_NAMES.schema_watch_func}();
-                END IF;
+                        AND NOT EXISTS (SELECT 1 FROM prostgles.apps WHERE watching_schema IS TRUE)
+                    LOOP
+                        SELECT format(
+                            $$ DROP EVENT TRIGGER IF EXISTS %I ; $$
+                            , etrg.evtname
+                        )
+                        INTO q;
 
-            END
-            $do$;
-        `);
-            return true;
+                        RAISE NOTICE ' %', q;
+
+                        EXECUTE q;
+                    END LOOP;
+
+
+                    -- ADD schema_watch_trigger IF REQUIRED
+                    IF  EXISTS (SELECT 1 FROM prostgles.apps WHERE watching_schema IS TRUE) 
+                        AND NOT EXISTS (
+                            SELECT 1 FROM pg_catalog.pg_event_trigger
+                            WHERE evtname = ${exports.asValue(this.DB_OBJ_NAMES.schema_watch_trigger)}
+                        )
+                    THEN
+                        CREATE EVENT TRIGGER ${this.DB_OBJ_NAMES.schema_watch_trigger} ON ddl_command_end
+                        WHEN TAG IN ('CREATE TABLE', 'ALTER TABLE', 'DROP TABLE')
+                        EXECUTE PROCEDURE ${this.DB_OBJ_NAMES.schema_watch_func}();
+                    END IF;
+                END
+                $do$;
+
+
+                COMMIT;
+            `);
+                return true;
+            }
+            catch (e) {
+                console.error("prepareTriggers failed: ", e);
+                throw e;
+            }
         });
         /* Relay relevant data to relevant subscriptions */
         this.notifListener = (data) => __awaiter(this, void 0, void 0, function* () {
             const str = data.payload;
-            console.log(str);
+            // console.log(528,  str);
             if (!str) {
                 console.error("Empty notif?");
                 return;
@@ -417,13 +414,12 @@ class PubSubManager {
                 });
             }
             else {
-                if (!this._triggers || !this._triggers[table_name] || !this._triggers[table_name].length) {
-                    console.warn(190, "Trigger sub not found. DROPPING TRIGGER", table_name, condition_ids_str, this._triggers);
-                    this.dropTrigger(table_name);
-                }
-                else {
-                    console.warn(190, "Trigger sub issue: ", table_name, condition_ids_str, this._triggers);
-                }
+                // if(!this._triggers || !this._triggers[table_name] || !this._triggers[table_name].length){
+                //     console.warn(190, "Trigger sub not found. DROPPING TRIGGER", table_name, condition_ids_str, this._triggers);
+                //     this.dropTrigger(table_name);
+                // } else {
+                // }
+                console.warn(190, "Trigger sub issue: ", table_name, condition_ids_str, this._triggers);
             }
         });
         this.syncTimeout = null;
@@ -455,7 +451,7 @@ class PubSubManager {
             FROM prostgles.triggers
             WHERE $1 = ANY(app_ids)
             ORDER BY table_name, condition
-        `, [yield this.getAppID()]);
+        `, [this.appID]);
         });
         this.addTriggerPool = undefined;
         const { db, dbo, wsChannelNamePrefix, pgChannelName, onSchemaChange, dboBuilder } = options;
@@ -472,29 +468,6 @@ class PubSubManager {
         this.socketChannelPreffix = wsChannelNamePrefix || "_psqlWS_";
         log("Created PubSubManager");
     }
-    // async startWatchingSchema(stop = false){
-    //     try {
-    //         if(stop){
-    //             /* MUST NOT DROP THIS TRIGGER IF ANOTHER PRGL IS USING IT */
-    //             // await this.db.any(`DROP EVENT TRIGGER IF EXISTS ${triggerName};`);
-    //         } else {
-    //             /* Check if trigger already exists */
-    //             // const trg = this.db.any(`select tgname from pg_trigger   where not tgisinternal and tgrelid = ${trigName}::regclass;`, { trigName })
-    //             await this.db.any(`
-    //                 BEGIN;
-    //                     --DROP EVENT TRIGGER IF EXISTS ${this.DB_OBJ_NAMES.schema_watch_trigger};
-    //                     CREATE EVENT TRIGGER ${this.DB_OBJ_NAMES.schema_watch_trigger} ON ddl_command_end
-    //                     WHEN TAG IN ('CREATE TABLE', 'ALTER TABLE', 'DROP TABLE')
-    //                     EXECUTE PROCEDURE ${this.DB_OBJ_NAMES.schema_watch_func}();
-    //                 COMMIT;
-    //             `).catch(e => {
-    //                 console.error("Failed startWatchingSchema: ", e)
-    //             })
-    //         }
-    //     } catch (e) {
-    //         console.error("startWatchingSchema failed: ", e)
-    //     }
-    // }
     isReady() {
         return this.postgresNotifListenManager.isListening();
     }
@@ -1143,19 +1116,19 @@ class PubSubManager {
     // /* Remove Sub channels (and triggers if required) upon user request */
     // removeSub(socket, { channel_name, table_name } = {}){
     // }
-    dropTrigger(table_name) {
-        console.log("dropTrigger");
-        this.db.any(`
-            DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_insert")} ON ${table_name};
-            DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_update")} ON ${table_name};
-            DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_delete")} ON ${table_name};
-        `).then(res => {
-            // console.error("Dropped trigger result: ", res);
-        })
-            .catch(err => {
-            console.error("Error dropping trigger: ", err);
-        });
-    }
+    // dropTrigger(table_name){
+    //     console.log("dropTrigger")
+    //     this.db.any(`
+    //         DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_insert")} ON ${table_name};
+    //         DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_update")} ON ${table_name};
+    //         DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_delete")} ON ${table_name};
+    //     `).then(res => {
+    //         // console.error("Dropped trigger result: ", res);
+    //     })
+    //     .catch(err => {
+    //         console.error("Error dropping trigger: ", err);
+    //     });
+    // }
     getTriggerName(table_name, suffix) {
         return prostgles_types_1.asName(`prostgles_triggers_${table_name}_${suffix}`);
     }
@@ -1165,17 +1138,20 @@ class PubSubManager {
                 let { table_name, condition } = Object.assign({}, params);
                 if (!table_name)
                     throw "MISSING table_name";
+                if (!this.appID)
+                    throw "MISSING appID";
                 if (!condition || !condition.trim().length)
                     condition = "TRUE";
                 /* Upsert condition */
-                const app_id = yield this.getAppID();
+                const app_id = this.appID;
+                console.log({ app_id, addTrigger: { table_name, condition } });
+                yield this.checkIfTimescaleBug(table_name);
                 let createTrigger = false;
                 yield this.db.tx((t) => __awaiter(this, void 0, void 0, function* () {
                     const q = pgp.as.format(`SELECT 1 FROM prostgles.triggers WHERE table_name = $1 AND condition = $2 LIMIT 1`, [table_name, condition]);
                     const ex = yield t.oneOrNone(q);
                     if (!ex) {
                         createTrigger = true;
-                        yield this.checkIfTimescaleBug(table_name);
                         yield t.any(`INSERT INTO prostgles.triggers (table_name, condition, app_ids) VALUES ($1, $2, ARRAY[$3])`, [table_name, condition, app_id]);
                     }
                     else {
@@ -1185,7 +1161,10 @@ class PubSubManager {
                         }
                     }
                     return t;
-                }));
+                })).catch(e => {
+                    console.error(1471, e);
+                    return Promise.reject(e);
+                });
                 log("addTrigger.. ", table_name, condition);
                 const triggers = yield this.db.any(yield this.getMyTriggerQuery());
                 this._triggers = {};
@@ -1212,45 +1191,60 @@ class PubSubManager {
                 const func_name_escaped = this.DB_OBJ_NAMES.data_watch_func, // "prostgles." + asName(`prostgles_trigger_function`),
                 table_name_escaped = prostgles_types_1.asName(table_name), query = `
 
-                BEGIN;
+                BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE; 
+/*
+                DO
+                $do$
+                BEGIN 
+                    -- Force table into cache
+                    IF NOT EXISTS (
+                        select 1 from information_schema.triggers 
+                        WHERE trigger_name ilike 'prostgles_triggers_%' and event_object_table = ${exports.asValue(table_name)}
+                    ) THEN
+              */
+                        --RAISE NOTICE ' %', 'dada';
 
+                        DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_insert")} ON ${table_name_escaped};
+                        CREATE TRIGGER ${this.getTriggerName(table_name, "_insert")}
+                        AFTER INSERT ON ${table_name_escaped}
+                        REFERENCING NEW TABLE AS new_table
+                        FOR EACH STATEMENT EXECUTE PROCEDURE ${func_name_escaped}();
+                        COMMENT ON TRIGGER ${this.getTriggerName(table_name, "_insert")} ON ${table_name_escaped} IS 'Prostgles internal trigger used to notify when data in the table changed';
 
-                DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_insert")} ON ${table_name_escaped};
-                CREATE TRIGGER ${this.getTriggerName(table_name, "_insert")}
-                AFTER INSERT ON ${table_name_escaped}
-                REFERENCING NEW TABLE AS new_table
-                FOR EACH STATEMENT EXECUTE PROCEDURE ${func_name_escaped}();
-                COMMENT ON TRIGGER ${this.getTriggerName(table_name, "_insert")} ON ${table_name_escaped} IS 'Prostgles internal trigger used to notify when data in the table changed';
+                        DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_update")} ON ${table_name_escaped};
+                        CREATE TRIGGER ${this.getTriggerName(table_name, "_update")}
+                        AFTER UPDATE ON ${table_name_escaped}
+                        REFERENCING OLD TABLE AS old_table NEW TABLE AS new_table
+                        FOR EACH STATEMENT EXECUTE PROCEDURE ${func_name_escaped}();
+                        COMMENT ON TRIGGER ${this.getTriggerName(table_name, "_update")} ON ${table_name_escaped} IS 'Prostgles internal trigger used to notify when data in the table changed';
 
-                DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_update")} ON ${table_name_escaped};
-                CREATE TRIGGER ${this.getTriggerName(table_name, "_update")}
-                AFTER UPDATE ON ${table_name_escaped}
-                REFERENCING OLD TABLE AS old_table NEW TABLE AS new_table
-                FOR EACH STATEMENT EXECUTE PROCEDURE ${func_name_escaped}();
-                COMMENT ON TRIGGER ${this.getTriggerName(table_name, "_update")} ON ${table_name_escaped} IS 'Prostgles internal trigger used to notify when data in the table changed';
+                        DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_delete")} ON ${table_name_escaped};
+                        CREATE TRIGGER ${this.getTriggerName(table_name, "_delete")}
+                        AFTER DELETE ON ${table_name_escaped}
+                        REFERENCING OLD TABLE AS old_table
+                        FOR EACH STATEMENT EXECUTE PROCEDURE ${func_name_escaped}();
+                        COMMENT ON TRIGGER ${this.getTriggerName(table_name, "_delete")} ON ${table_name_escaped} IS 'Prostgles internal trigger used to notify when data in the table changed';
+/*
+                    END IF;
 
-                DROP TRIGGER IF EXISTS ${this.getTriggerName(table_name, "_delete")} ON ${table_name_escaped};
-                CREATE TRIGGER ${this.getTriggerName(table_name, "_delete")}
-                AFTER DELETE ON ${table_name_escaped}
-                REFERENCING OLD TABLE AS old_table
-                FOR EACH STATEMENT EXECUTE PROCEDURE ${func_name_escaped}();
-                COMMENT ON TRIGGER ${this.getTriggerName(table_name, "_delete")} ON ${table_name_escaped} IS 'Prostgles internal trigger used to notify when data in the table changed';
-
+                END
+                $do$;
+*/
 
                 COMMIT;
             `;
                 // console.log(query)
                 log("Created trigger for ", table_name);
-                return this.db.result(query)
+                return this.db.result(query) //.tx(t => t.result(query))
                     .catch(err => {
-                    console.error(317, err, query);
+                    console.error(1538, err, query);
                     this.addingTrigger = false;
                     return Promise.reject(err);
                 });
             }
             catch (e) {
                 console.trace("Failed adding trigger", e);
-                throw e;
+                // throw e
             }
         });
     }
@@ -1275,6 +1269,26 @@ class PubSubManager {
 }
 exports.PubSubManager = PubSubManager;
 PubSubManager.DELIMITER = '|$prstgls$|';
+// getAppID = async (): Promise<string> => {
+//     /* Maybe use actual connected app names?
+//     ,datname
+//     ,usename
+//     ,client_hostname
+//     ,client_port
+//     ,backend_start
+//     ,query_start
+//     ,query
+//     ,state
+//     console.log(await _db.any(`
+//         SELECT pid, application_name, state
+//         FROM pg_stat_activity
+//         WHERE application_name IS NOT NULL AND application_name != '' -- state = 'active';
+//     `))
+//     */
+//     if(!this.appID){
+//     }
+//     return this.appID;
+// }
 PubSubManager.create = (options) => __awaiter(void 0, void 0, void 0, function* () {
     const res = new PubSubManager(options);
     return yield res.init();
