@@ -329,7 +329,7 @@ class PubSubManager {
                                 IF to_regclass('prostgles.apps') IS NOT NULL THEN
 
                                     SELECT current_query()
-                                    INTO curr_query;
+                                    INTO LEFT(COALESCE(curr_query, ''), 5000);
 
                                     FOR arw IN 
                                         SELECT * FROM prostgles.apps WHERE watching_schema IS TRUE
