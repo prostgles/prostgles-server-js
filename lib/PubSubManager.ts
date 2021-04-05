@@ -450,9 +450,9 @@ export class PubSubManager {
                     
                                 IF to_regclass('prostgles.apps') IS NOT NULL THEN
 
-                                    SELECT current_query()
-                                    INTO LEFT(COALESCE(curr_query, ''), 5000);
-
+                                    SELECT LEFT(COALESCE(current_query(), ''), 5000)
+                                    INTO curr_query;
+                                    
                                     FOR arw IN 
                                         SELECT * FROM prostgles.apps WHERE watching_schema IS TRUE
 
@@ -560,7 +560,7 @@ export class PubSubManager {
         trigger_add_remove_func: "prostgles.trigger_add_remove_func",
         data_watch_func: "prostgles.prostgles_trigger_function",
         schema_watch_func: "prostgles.schema_watch_func",
-        schema_watch_trigger: "prostgles_schema_watch_trigger"
+        schema_watch_trigger: "prostgles_schema_watch_trigger_new"
     }
 
     prepareTriggers = async () => {
@@ -620,6 +620,14 @@ export class PubSubManager {
                             DELETE FROM prostgles.triggers
                             WHERE array_length(app_ids, 1) = 0;
                     
+                    /* DROP the old buggy schema watch trigger */
+                    IF EXISTS (
+                        SELECT 1 FROM pg_catalog.pg_event_trigger
+                        WHERE evtname = 'prostgles_schema_watch_trigger'
+                    ) THEN
+                        DROP EVENT TRIGGER IF EXISTS prostgles_schema_watch_trigger;
+                    
+                    END IF;
 
                     ev_trg_needed := EXISTS (SELECT 1 FROM prostgles.apps WHERE watching_schema IS TRUE);
                     ev_trg_exists := EXISTS (
