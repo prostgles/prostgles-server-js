@@ -675,8 +675,8 @@ export async function getNewQuery(
     // allowedFieldsIncludingComputed = _this.parseFieldFilter(get(tableRules, "select.fields"), true, allFieldsIncludingComputed) || allFieldsIncludingComputed,
     sBuilder = new SelectItemBuilder({ allowedFields, computedFields: COMPUTED_FIELDS, isView: _this.is_view, functions: FUNCTIONS, allFields: _this.column_names.slice(0) });
 
-
-
+  
+ 
   await sBuilder.parseUserSelect(userSelect, async (key, val, throwErr) => {
 
     // console.log({ key, val })

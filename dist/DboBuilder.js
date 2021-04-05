@@ -454,6 +454,7 @@ class ViewHandler {
                 }
             }
             catch (e) {
+                // console.trace(e)
                 if (localParams && localParams.testRule)
                     throw e;
                 throw { err: parseError(e), msg: `Issue with dbo.${this.name}.find()` };
@@ -601,8 +602,12 @@ class ViewHandler {
      */
     prepareWhere(params) {
         return __awaiter(this, void 0, void 0, function* () {
-            const { filter, select, forcedFilter, filterFields, addKeywords = true, tableAlias = null, localParams, tableRule } = params;
+            const { filter, select, forcedFilter, filterFields: ff, addKeywords = true, tableAlias = null, localParams, tableRule } = params;
             const { $and: $and_key, $or: $or_key } = this.dboBuilder.prostgles.keywords;
+            let filterFields = ff;
+            /* Local update allow all. TODO -> FIX THIS */
+            if (!ff && !tableRule)
+                filterFields = "*";
             const parseFullFilter = (f, parentFilter = null) => __awaiter(this, void 0, void 0, function* () {
                 if (!f)
                     throw "Invalid/missing group filter provided";
@@ -1455,7 +1460,7 @@ class TableHandler extends ViewHandler {
                 return (this.t || this.db)[queryType](_query).catch(err => makeErr(err, localParams));
             }
             catch (e) {
-                console.trace(e);
+                // console.trace(e)
                 if (localParams && localParams.testRule)
                     throw e;
                 throw { err: parseError(e), msg: `Issue with dbo.${this.name}.delete()` };

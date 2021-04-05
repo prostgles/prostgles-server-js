@@ -11,6 +11,20 @@ export type TxCB = {
 
 
 /* SCHEMA DEFINITON. Table names have been altered to work with Typescript */
+export type D_34_42_34 = { 
+  "\"*\""?: string;
+  "id"?: number;
+}
+export type D_42 = { 
+  "*"?: string;
+  "id"?: number;
+}
+export type Ex_j_ins = { 
+  "added"?: Date;
+  "id"?: number;
+  "name"?: string;
+  "public"?: string;
+}
 export type Item_children = { 
   "id"?: number;
   "item_id"?: number;
@@ -21,6 +35,36 @@ export type Items = {
   "id"?: number;
   "name"?: string;
   "tst"?: Date;
+}
+export type Items2 = { 
+  "hh"?: Array<string>;
+  "id"?: number;
+  "items_id"?: number;
+  "name"?: string;
+}
+export type Items3 = { 
+  "h"?: Array<string>;
+  "id"?: number;
+  "name"?: string;
+}
+export type Items4 = { 
+  "added"?: Date;
+  "id"?: number;
+  "name"?: string;
+  "public"?: string;
+}
+export type Items4_pub = { 
+  "added"?: Date;
+  "id"?: number;
+  "name"?: string;
+  "public"?: string;
+}
+export type Planes = { 
+  "flight_number"?: string;
+  "id"?: number;
+  "last_updated"?: number;
+  "x"?: number;
+  "y"?: number;
 }
 export type Tt = { 
   "t"?: string;
@@ -41,8 +85,16 @@ export type JoinMakerTables = {
 
 /* DBO Definition. Isomorphic */
 export type DBObj = {
+  "\"*\"": TableHandler<D_34_42_34> 
+  "*": TableHandler<D_42> 
+  "ex_j_ins": TableHandler<Ex_j_ins> 
   "item_children": TableHandler<Item_children> 
   "items": TableHandler<Items> 
+  "items2": TableHandler<Items2> 
+  "items3": TableHandler<Items3> 
+  "items4": TableHandler<Items4> 
+  "items4_pub": TableHandler<Items4_pub> 
+  "planes": TableHandler<Planes> 
   "tt": TableHandler<Tt> 
   "various": TableHandler<Various> 
   leftJoin: JoinMakerTables;

@@ -82,6 +82,10 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     });
   });
 
+  // await tryRun("Subscribe", async () => {
+  //   const res = await db.various.count({ "tsv.@@.to_tsquery": ["a"] });
+  //   assert.equal(res, 0);
+  // });
 
 
   await tryRun("JSON filtering", async () => {

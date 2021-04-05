@@ -64,6 +64,10 @@ async function isomorphic(db) {
             addedY: '1997-12-04T00:10:00.000Z',
         });
     });
+    // await tryRun("Subscribe", async () => {
+    //   const res = await db.various.count({ "tsv.@@.to_tsquery": ["a"] });
+    //   assert.equal(res, 0);
+    // });
     await tryRun("JSON filtering", async () => {
         const res = await db.various.count({ "jsn->a->>b": '3' });
         assert_1.strict.equal(res, 1);

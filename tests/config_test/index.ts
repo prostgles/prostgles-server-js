@@ -86,13 +86,15 @@ prostgles({
   joins: "inferred",
   onReady: async (db: DBObj, _db: any) => {
     // await _db.any("CREATE TABLE IF NOT EXISTS ttt(id INTEGER, t TEXT)");
+    console.log("onReady")
 
     app.get('*', function(req, res){
       log(req.originalUrl)
 			res.sendFile(path.join(__dirname+'/index.html'));
 		});
 
-    db.various.subscribe({}, {}, console.log)
+    // console.log(await db.various.find({ id: 2 }));
+    db.various.subscribe({ "id.>": 2 }, {}, console.log)
     // await db.items.insert([ 
     //   {name: "c"},
     //   {name: "c", tst: new Date()}

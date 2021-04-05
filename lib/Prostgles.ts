@@ -28,17 +28,17 @@ let currConnection: { db: DB, pgp: PGP };
 function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts, debugQueries = false, noNewConnections = true): { db: DB, pgp: PGP } {
     let pgp: PGP = pgPromise({
         
-        connect: function (client, dc, isFresh) {
-            if (isFresh) {
-                client.on('notice', function (msg) {
-                    console.log("notice: %j", msg);
-                });
-            }
-        },
         promiseLib: promise,
         ...(debugQueries? {
             query: function (e) { 
                 console.log({psql: e.query, params: e.params}); 
+            },
+            connect: function (client, dc, isFresh) {
+                if (isFresh) {
+                    client.on('notice', function (msg) {
+                        console.log("notice: %j", get(msg, "message"));
+                    });
+                }
             },
         } : {})
     });

@@ -107,6 +107,7 @@ export declare class PubSubManager {
     static create: (options: PubSubManagerOptions) => Promise<PubSubManager>;
     init: () => Promise<PubSubManager>;
     DB_OBJ_NAMES: {
+        trigger_add_remove_func: string;
         data_watch_func: string;
         schema_watch_func: string;
         schema_watch_trigger: string;
@@ -127,7 +128,6 @@ export declare class PubSubManager {
     addSub(subscriptionParams: AddSubscriptionParams): Promise<string>;
     removeLocalSub(table_name: string, condition: string, func: (items: object[]) => any): void;
     onSocketDisconnected(socket: any, channel_name: any): void;
-    getTriggerName(table_name: any, suffix: any): string;
     checkIfTimescaleBug: (table_name: string) => Promise<boolean>;
     getMyTriggerQuery: () => Promise<string>;
     addingTrigger: any;

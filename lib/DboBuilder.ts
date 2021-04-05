@@ -634,7 +634,6 @@ export class ViewHandler {
             
             const { testRule = false, returnQuery = false } = localParams || {};
 
-
             if(testRule) return [];
             if(selectParams){
                 const good_params = ["select", "orderBy", "offset", "limit", "expectOne", "having"];
@@ -685,6 +684,7 @@ export class ViewHandler {
             }
 
         } catch(e){
+            // console.trace(e)
             if(localParams && localParams.testRule) throw e;
             throw { err: parseError(e), msg: `Issue with dbo.${this.name}.find()` };
         }                             
@@ -848,8 +848,12 @@ export class ViewHandler {
         tableRule: TableRule 
     }): Promise<string> 
     {
-        const { filter, select, forcedFilter, filterFields, addKeywords = true, tableAlias = null, localParams, tableRule } = params;
+        const { filter, select, forcedFilter, filterFields: ff, addKeywords = true, tableAlias = null, localParams, tableRule } = params;
         const { $and: $and_key, $or: $or_key } = this.dboBuilder.prostgles.keywords;
+
+        let filterFields = ff;
+        /* Local update allow all. TODO -> FIX THIS */
+        if(!ff && !tableRule) filterFields = "*";
 
         const parseFullFilter = async (f: any, parentFilter: any = null) => {
             if(!f) throw "Invalid/missing group filter provided";
@@ -872,6 +876,7 @@ export class ViewHandler {
                     else return ` ( ${conditions.sort().join(operand)} ) `;
                 }       
             } else if(!group) {
+                
                 result = await this.getCondition({
                     filter: { ...f },
                     select,
@@ -1839,7 +1844,7 @@ export class TableHandler extends ViewHandler {
             if(returnQuery) return _query;
             return (this.t || this.db)[queryType](_query).catch(err => makeErr(err, localParams));
         } catch(e){
-            console.trace(e)
+            // console.trace(e)
             if(localParams && localParams.testRule) throw e;
             throw { err: parseError(e), msg: `Issue with dbo.${this.name}.delete()` };
         }

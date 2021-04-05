@@ -52,6 +52,7 @@ prostgles_server_1.default({
     joins: "inferred",
     onReady: async (db, _db) => {
         // await _db.any("CREATE TABLE IF NOT EXISTS ttt(id INTEGER, t TEXT)");
-        db.various.subscribe({}, {}, console.log);
+        // console.log(await db.various.find({ "id.<": 1423 }) )
+        db.various.subscribe({ "id.<": 1423 }, {}, console.log);
     },
 });

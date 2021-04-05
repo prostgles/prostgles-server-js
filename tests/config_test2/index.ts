@@ -48,7 +48,7 @@ prostgles({
     return true
   },
   publish: async (socket, dbo: any, _db: any, user: any) => {
-    
+     
     return {
       various: "*",
 
@@ -58,6 +58,9 @@ prostgles({
   joins: "inferred",
   onReady: async (db: DBObj, _db: any) => {
     // await _db.any("CREATE TABLE IF NOT EXISTS ttt(id INTEGER, t TEXT)");
-    db.various.subscribe({}, {}, console.log)
+
+    // console.log(await db.various.find({ "id.<": 1423 }) )
+    db.various.subscribe({ "id.<": 1423 }, {}, console.log)
   },
 });
+ 

@@ -19,9 +19,6 @@ export type D_42 = {
   "*"?: string;
   "id"?: number;
 }
-export type Aza = { 
-  "t"?: string;
-}
 export type Ex_j_ins = { 
   "added"?: Date;
   "id"?: number;
@@ -69,11 +66,8 @@ export type Planes = {
   "x"?: number;
   "y"?: number;
 }
-export type Transaction = { 
-  "id"?: string;
-}
 export type Tt = { 
-  "id"?: number;
+  "t"?: string;
 }
 export type V_items = { 
   "id"?: number;
@@ -87,10 +81,6 @@ export type Various = {
   "name"?: string;
   "tsv"?: any;
 }
-export type Z = { 
-  "ccc"?: string;
-  "id"?: number;
-}
 
 export type JoinMakerTables = {
  "items": JoinMaker<Items>;
@@ -102,7 +92,6 @@ export type JoinMakerTables = {
 export type DBObj = {
   "\"*\"": TableHandler<D_34_42_34> 
   "*": TableHandler<D_42> 
-  "aza": TableHandler<Aza> 
   "ex_j_ins": TableHandler<Ex_j_ins> 
   "item_children": TableHandler<Item_children> 
   "items": TableHandler<Items> 
@@ -111,11 +100,9 @@ export type DBObj = {
   "items4": TableHandler<Items4> 
   "items4_pub": TableHandler<Items4_pub> 
   "planes": TableHandler<Planes> 
-  "transaction": TableHandler<Transaction> 
   "tt": TableHandler<Tt> 
   "v_items": ViewHandler<V_items> 
   "various": TableHandler<Various> 
-  "z": TableHandler<Z> 
   leftJoin: JoinMakerTables;
   innerJoin: JoinMakerTables;
   leftJoinOne: JoinMakerTables;
