@@ -206,7 +206,7 @@ export class PubSubManager {
 
 
                         CREATE TABLE IF NOT EXISTS prostgles.apps (
-                            id                  TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
+                            id                  TEXT PRIMARY KEY DEFAULT prostgles.gen_random_uuid(),
                             added               TIMESTAMP DEFAULT NOW(),
                             application_name    TEXT,
                             last_check          TIMESTAMP NOT NULL DEFAULT NOW(),
