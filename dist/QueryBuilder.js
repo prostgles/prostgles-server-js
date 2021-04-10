@@ -322,10 +322,10 @@ exports.FUNCTIONS = [
         getQuery: ({ allowedFields, args, tableAlias }) => {
             const cols = DboBuilder_1.ViewHandler._parseFieldFilter(args[0], false, allowedFields);
             let term = args[1];
-            let { edgePad = -1, noFields = false, returnIndex = false } = args[2] || {};
+            let { edgePad = -1, noFields = false, returnIndex = false, matchCase = false } = args[2] || {};
             if (!prostgles_types_1.isEmpty(args[2])) {
                 const keys = Object.keys(args[2]);
-                const validKeys = ["edgePad", "noFields", "returnIndex"];
+                const validKeys = ["edgePad", "noFields", "returnIndex", "matchCase"];
                 const bad_keys = keys.filter(k => !validKeys.includes(k));
                 if (bad_keys.length)
                     throw "Invalid options provided for $term_highlight. Expecting one of: " + validKeys.join(", ");
@@ -338,8 +338,12 @@ exports.FUNCTIONS = [
                 throw "Invalid edgePad. expecting number";
             if (typeof noFields !== "boolean")
                 throw "Invalid noFields. expecting boolean";
+            let col = "( " + cols.map(c => `${noFields ? "" : (asValue(c + ": ") + " || ")} COALESCE(${exports.asNameAlias(c, tableAlias)}::TEXT, '')`).join(" || ', ' || ") + " )";
             term = asValue(term);
-            const col = "( " + cols.map(c => `${noFields ? "" : (asValue(c + ": ") + " || ")} COALESCE(${exports.asNameAlias(c, tableAlias)}::TEXT, '')`).join(" || ', ' || ") + " )";
+            if (!matchCase) {
+                col = "LOWER" + col;
+                term = `LOWER(${term})`;
+            }
             let res = `CASE WHEN position(${term} IN ${col}) > 0 THEN array_to_json(ARRAY[
         to_json(substr(${col}, 1, position(${term} IN ${col}) - 1 )::TEXT ), 
         array_to_json(

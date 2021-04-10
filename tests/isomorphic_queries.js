@@ -74,7 +74,7 @@ async function isomorphic(db) {
             },
             orderBy: { hIdx: -1 }
         });
-        console.log(res.map(r => JSON.stringify(r)).join("\n")); //, null, 2))  
+        // console.log(res.map(r => JSON.stringify(r)).join("\n"));//, null, 2))  
         assert_1.strict.deepStrictEqual(res[0], {
             "h": ["name: ", ["abc81"], " here"],
             /* Search all allowed fields using "*"  */
