@@ -412,15 +412,16 @@ export const FUNCTIONS: FunctionSpec[] = [
       if(typeof edgeTruncate !== "number") throw "Invalid edgeTruncate. expecting number";
       if(typeof noFields !== "boolean") throw "Invalid noFields. expecting boolean";
 
-      let col = "( " + cols.map(c =>`${noFields? "" : (asValue(c + ": ") + " || ")} COALESCE(${asNameAlias(c, tableAlias)}::TEXT, '')`).join(" || ', ' || ") + " )";
+      let colRaw = "( " + cols.map(c =>`${noFields? "" : (asValue(c + ": ") + " || ")} COALESCE(${asNameAlias(c, tableAlias)}::TEXT, '')`).join(" || ', ' || ") + " )";
+      let col = colRaw;
       term = asValue(term);
       if(!matchCase) {
         col = "LOWER" + col;
         term = `LOWER(${term})`
       }
 
-      let leftStr = `substr(${col}, 1, position(${term} IN ${col}) - 1 )`,
-        rightStr = `substr(${col}, position(${term} IN ${col}) + length(${term}) )`;
+      let leftStr = `substr(${colRaw}, 1, position(${term} IN ${col}) - 1 )`,
+        rightStr = `substr(${colRaw}, position(${term} IN ${col}) + length(${term}) )`;
       if(edgeTruncate > -1){
         leftStr = `RIGHT(${leftStr}, ${asValue(edgeTruncate)})`;
         rightStr = `LEFT(${rightStr}, ${asValue(edgeTruncate)})`
@@ -429,10 +430,10 @@ export const FUNCTIONS: FunctionSpec[] = [
       let res = `CASE WHEN position(${term} IN ${col}) > 0 THEN array_to_json(ARRAY[
         to_json( ${leftStr}::TEXT ), 
         array_to_json(
-          ARRAY[substr(${col}, position(${term} IN ${col}), length(${term}) )::TEXT ]
+          ARRAY[substr(${colRaw}, position(${term} IN ${col}), length(${term}) )::TEXT ]
         ), 
         to_json(${rightStr}::TEXT ) 
-      ]) ELSE array_to_json(ARRAY[(${col})::TEXT]) END`;
+      ]) ELSE array_to_json(ARRAY[(${colRaw})::TEXT]) END`;
       // console.log(col);
 
       if(returnIndex) res  = `CASE WHEN position(${term} IN ${col}) > 0 THEN position(${term} IN ${col}) - 1 ELSE -1 END`;
