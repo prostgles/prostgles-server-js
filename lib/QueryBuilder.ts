@@ -12,7 +12,7 @@ import { get } from "./utils";
 
 export type SelectItem = {
   type: "column" | "function" | "aggregation" | "joinedColumn" | "computed";
-  getFields: () => string[];
+  getFields: () => string[] | "*";
   getQuery: (tableAlias?: string) => string;
   columnPGDataType?: string;
   // columnName?: string; /* Must only exist if type "column" ... dissalow aliased columns? */
@@ -64,13 +64,19 @@ export type FunctionSpec = {
    * If true then the first argument is expected to be a column name
    */
   singleColArg: boolean;
+
+  /**
+   * If true then this func can be used within where clause
+   */
+  // returnsBoolean?: boolean;
+
   numArgs: number;
   type: "function" | "aggregation" | "computed";
   /**
    * getFields: string[] -> used to validate user supplied field names. It will be fired before querying to validate allowed columns
    *      if not field names are used from arguments then return an empty array
    */
-  getFields: (args: any[]) => string[];
+  getFields: (allowedFields: string[]) => "*" | string[];
   /**
    * allowedFields passed for multicol functions (e.g.: $rowhash)
    */
@@ -378,6 +384,51 @@ export const FUNCTIONS: FunctionSpec[] = [
     }
   } as FunctionSpec)),
 
+  /** Custom highlight -> myterm => ['some text and', ['myterm'], ' and some other text']
+   * (fields: "*" | string[], term: string, { edgePad: number = -1; noFields: boolean = false }) => string | (string | [string])[]  
+   * edgePad = maximum extra characters left and right of matches
+   * noFields = exclude field names in search
+   * */ 
+  {
+    name: "$term_highlight", /* */
+    description: ` :[column_names<string[] | "*">, search_term<string>, opts?<{ edgePad?: number; noFields?: boolean }>] -> get case-insensitive text match highlight`,
+    type: "function",
+    numArgs: 1,
+    singleColArg: true,
+    getFields: (args: any[]) => args[0],
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+
+      const cols = ViewHandler._parseFieldFilter(args[0], false, allowedFields);
+      let term = args[1];
+      let { edgePad = -1, noFields = false, returnIndex = false } = args[2] || {};
+      if(!isEmpty(args[2])){
+        const keys = Object.keys(args[2]);
+        const validKeys = ["edgePad", "noFields", "returnIndex"];
+        const bad_keys = keys.filter(k => !validKeys.includes(k));
+        if(bad_keys.length) throw "Invalid options provided for $term_highlight. Expecting one of: " + validKeys.join(", ");
+      }
+      if(!cols.length) throw "Cols are empty/invalid";
+      if(typeof term !== "string") throw "No string term provided";
+      if(typeof edgePad !== "number") throw "Invalid edgePad. expecting number";
+      if(typeof noFields !== "boolean") throw "Invalid noFields. expecting boolean";
+      term = asValue(term);
+
+      const col = "( " + cols.map(c =>`${noFields? "" : (asValue(c + ": ") + " || ")} COALESCE(${asNameAlias(c, tableAlias)}::TEXT, '')`).join(" || ', ' || ") + " )";
+      
+      let res = `CASE WHEN position(${term} IN ${col}) > 0 THEN array_to_json(ARRAY[
+        to_json(substr(${col}, 1, position(${term} IN ${col}) - 1 )::TEXT ), 
+        array_to_json(
+          ARRAY[substr(${col}, position(${term} IN ${col}), length(${term}) )::TEXT ]
+        ), 
+        to_json(substr(${col}, position(${term} IN ${col}) + length(${term}) )::TEXT ) 
+      ]) ELSE array_to_json(ARRAY[(${col})::TEXT]) END`;
+      // console.log(col);
+
+      if(returnIndex) res  = `position(${term} IN ${col})`;// `CASE WHEN position(${term} IN ${col}) > 0 THEN position(${term} IN ${col}) - 1 ELSE -1 END`;
+      return res;
+    } 
+  },
+
   /* Aggs */
   ...["max", "min", "count", "avg", "json_agg", "string_agg", "array_agg", "sum"].map(aggName => ({
     name: "$" + aggName,
@@ -472,12 +523,19 @@ export class SelectItemBuilder {
   }
 
   private checkField = (f: string) => {
-    if(!this.allowedFieldsIncludingComputed.includes(f)) throw "Field " + f + " is invalid or dissallowed";
+    if(!this.allowedFieldsIncludingComputed.includes(f)){ 
+      console.log(f, f === "name", this.allowedFieldsIncludingComputed.includes("name"), this.allowedFieldsIncludingComputed)
+      throw "Field " + f + " is invalid or dissallowed";
+    }
     return f;
   }
 
   private addItem = (item: SelectItem) => {
-    item.getFields().map(this.checkField);
+    let fields = item.getFields();
+    // console.trace(fields)
+    if(fields === "*") fields = this.allowedFields.slice(0);//.concat(fields.filter(f => f !== "*"));
+    fields.map(this.checkField);
+
     if(this.select.find(s => s.alias === item.alias)) throw `Cannot specify duplicate columns ( ${item.alias} ). Perhaps you're using "*" with column names?`;
     this.select.push(item);
   }
@@ -493,8 +551,12 @@ export class SelectItemBuilder {
   }
 
   private addFunction = (funcDef: FunctionSpec, args: any[], alias: string) => {
-    if(funcDef.numArgs && !funcDef.getFields(args).filter(f => f).length) {
-      throw `\n Function "${funcDef.name}" is missing a field name argument`;
+    if(funcDef.numArgs) {
+      const fields = funcDef.getFields(args);//  && (! || !funcDef.getFields(args) !== "*" !funcDef.getFields(args).filter(f => f).length
+      if(fields !== "*" && Array.isArray(fields) && !fields.length ){
+        console.log(fields)
+        throw `\n Function "${funcDef.name}" is missing a field name argument`;
+      }
     }
     this.addItem({
       type: funcDef.type,

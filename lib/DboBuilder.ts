@@ -1104,13 +1104,20 @@ export class ViewHandler {
         // }
 
         let allowedSelect: SelectItem[] = [];
-        /* Select aliases take precedence */
+        /* Select aliases take precedence over col names */
         if(select){
             /* Allow filtering by selected fields/funcs */
-            allowedSelect = select.filter(s => 
-                ["function", "computed", "column"].includes(s.type)
-            )
+            allowedSelect = select.filter(s => {
+                /*  */
+                if(["function", "computed", "column"].includes(s.type)){
+                    if(s.type !== "column" || allowed_colnames.includes(s.alias)){
+                        return true;
+                    }
+                }
+                return false;
+            })
         }
+        // console.log(allowedSelect);
         
         /* Add remaining allowed fields */
         allowedSelect = allowedSelect.concat(
@@ -1127,28 +1134,28 @@ export class ViewHandler {
         );
 
         let filterKeys = Object.keys(data).filter(k => !computedFields.find(cf => cf.name === k) && !existsKeys.find(ek => ek.key === k));
-        if(allowed_colnames){
-            const aliasedColumns = (select || []).filter(s => 
-                s.type === "column" && allowed_colnames.includes(s.alias) ||  
-                s.getFields().find(f => allowed_colnames.includes(f))
-            ).map(s => s.alias);
-            const validCols = [...allowed_colnames, ...aliasedColumns]
-            // const invalidColumn = filterKeys
-            //     .find(fName => !validCols.includes(fName));
+        // if(allowed_colnames){
+        //     const aliasedColumns = (select || []).filter(s => 
+        //         ["function", "computed", "column"].includes(s.type) && allowed_colnames.includes(s.alias) ||  
+        //         s.getFields().find(f => allowed_colnames.includes(f))
+        //     ).map(s => s.alias);
+        //     const validCols = [...allowed_colnames, ...aliasedColumns];
 
-            const invalidColumn = filterKeys
-                .find(fName => !validCols.find(c => 
-                    c === fName || (
-                        fName.startsWith(c) && (
-                            fName.slice(c.length).includes("->") ||
-                            fName.slice(c.length).includes(".")
-                        )
+        // }
+        const validFieldNames = allowedSelect.map(s => s.alias);
+        const invalidColumn = filterKeys
+            .find(fName => !validFieldNames.find(c => 
+                c === fName || 
+                (
+                    fName.startsWith(c) && (
+                        fName.slice(c.length).includes("->") ||
+                        fName.slice(c.length).includes(".")
                     )
-                ));
+                )
+            ));
 
-            if(invalidColumn){
-                throw `Table: ${this.name} -> disallowed/inexistent columns in filter: ${invalidColumn} \n  Expecting one of: ${allowedSelect.map(s => s.type === "column"? s.getQuery() : s.alias).join(", ")}`;
-            }
+        if(invalidColumn){
+            throw `Table: ${this.name} -> disallowed/inexistent columns in filter: ${invalidColumn} \n  Expecting one of: ${allowedSelect.map(s => s.type === "column"? s.getQuery() : s.alias).join(", ")}`;
         }
 
         /* TODO: Allow filter funcs */
@@ -1345,13 +1352,18 @@ export class ViewHandler {
     }
 
 
+    parseFieldFilter(fieldParams: FieldFilter = "*", allow_empty: boolean = true, allowed_cols?: string[]): string[] {
+        return ViewHandler._parseFieldFilter(fieldParams, allow_empty, allowed_cols || this.column_names.slice(0))
+    }
+
     /** 
     * Filter string array
     * @param {FieldFilter} fieldParams - { col1: 0, col2: 0 } | { col1: true, col2: true } | "*" | ["key1", "key2"] | []
     * @param {boolean} allow_empty - allow empty select. defaults to true
     */
-   parseFieldFilter(fieldParams: FieldFilter = "*", allow_empty: boolean = true, allowed_cols?: string[]): string[] {
-        const all_fields = allowed_cols || this.column_names.slice(0);
+    static _parseFieldFilter(fieldParams: FieldFilter = "*", allow_empty: boolean = true, allowed_cols: string[]): string[] {
+        if(!allowed_cols) throw "allowed_cols missing"
+        const all_fields = allowed_cols;// || this.column_names.slice(0);
         let colNames = null,
             initialParams = JSON.stringify(fieldParams);
 

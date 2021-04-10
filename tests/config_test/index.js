@@ -100,6 +100,14 @@ prostgles_server_1.default({
             //   trh: { "$date_trunc": ["hour", "tst"] }
             // }});
             // console.log(d)
+            const term = "cc23";
+            const res = await db.items.find({ "hIdx.>": -2 }, { select: {
+                    h: { $term_highlight: [["name"], term, { noFields: true }] },
+                    hIdx: { $term_highlight: [["name"], term, { returnIndex: true }] },
+                },
+                orderBy: { hIdx: -1 }
+            });
+            console.log(res.map(r => JSON.stringify(r)).join("\n")); //, null, 2))  
             if (true || process.env.NPORT) {
             }
         }

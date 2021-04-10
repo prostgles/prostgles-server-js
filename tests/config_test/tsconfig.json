@@ -12,6 +12,7 @@
 		// "rootDir": ".",
 		// "declaration": true,
 		// "declarationMap": true,
+		
 	},
 	"exclude": [
 		"dist",

@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS items (
 	tst TIMESTAMP DEFAULT NOW()
 );
 
-INSERT INTO items(name) VALUES ('a'), ('b'),('a'), ('b'),('a'), ('b'),('a'), ('b'), ('c');
+INSERT INTO items(name) VALUES ('a123'), ('b'),('a'), ('b'),('a'), ('b'),('a'), ('b'), ('cc233'), (null);
 
 
 

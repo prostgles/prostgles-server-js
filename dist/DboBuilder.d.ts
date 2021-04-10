@@ -204,12 +204,13 @@ export declare class ViewHandler {
     * @param {string[]} allowed_cols - allowed columns (excluding forcedData) from table rules
     */
     prepareFieldValues(obj: object, forcedData: object, allowed_cols: FieldFilter, fixIssues?: boolean): object;
+    parseFieldFilter(fieldParams?: FieldFilter, allow_empty?: boolean, allowed_cols?: string[]): string[];
     /**
     * Filter string array
     * @param {FieldFilter} fieldParams - { col1: 0, col2: 0 } | { col1: true, col2: true } | "*" | ["key1", "key2"] | []
     * @param {boolean} allow_empty - allow empty select. defaults to true
     */
-    parseFieldFilter(fieldParams?: FieldFilter, allow_empty?: boolean, allowed_cols?: string[]): string[];
+    static _parseFieldFilter(fieldParams: FieldFilter, allow_empty: boolean, allowed_cols: string[]): string[];
 }
 declare type ValidatedParams = {
     row: object;

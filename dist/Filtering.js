@@ -43,10 +43,12 @@ exports.parseFilterItem = (args) => {
       */
     let leftQ; // = asName(selItem.alias);
     /* Check if string notation. Build obj if necessary */
+    const dot_notation_delims = ["->", "."];
     if (!selItem) {
-        // let leftKey: string = fKey;
+        /* See if dot notation. Pick the best matching starting string */
         if (select) {
-            selItem = select.find(s => fKey.startsWith(s.alias));
+            selItem = select.find(s => fKey.startsWith(s.alias) &&
+                dot_notation_delims.find(dn => fKey.slice(s.alias.length).startsWith(dn)));
         }
         if (!selItem)
             mErr("Bad filter. Could not match to a column or alias: ");
@@ -112,6 +114,7 @@ exports.parseFilterItem = (args) => {
             rightF = res;
         }
         else {
+            console.trace(141, select, selItem, remainingStr);
             mErr("Bad filter. Could not find the valid col name or alias or col json path");
         }
     }

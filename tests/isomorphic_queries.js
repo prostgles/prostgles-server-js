@@ -64,6 +64,25 @@ async function isomorphic(db) {
             addedY: '1997-12-04T00:10:00.000Z',
         });
     });
+    await tryRun("$term_highlight", async () => {
+        const term = "abc81";
+        const res = await db.various.find({ "hIdx.>": -2 }, { select: {
+                h: { $term_highlight: [["name"], term, {}] },
+                hFull: { $term_highlight: ["*", "81", {}] },
+                hOrdered: { $term_highlight: [["name", "id"], "81", {}] },
+                hIdx: { $term_highlight: [["name"], term, { returnIndex: true }] },
+            },
+            orderBy: { hIdx: -1 }
+        });
+        console.log(res.map(r => JSON.stringify(r)).join("\n")); //, null, 2))  
+        assert_1.strict.deepStrictEqual(res[0], {
+            "h": ["name: ", ["abc81"], " here"],
+            /* Search all allowed fields using "*"  */
+            "hFull": ["added: 1997-12-04 00:12:00, h: , id: 3, jsn: {\"a\":{\"b\":2}}, name: abc", ["81"], " here, tsv: "],
+            /* Search specific fields in specific order */
+            "hOrdered": ["name: abc", ["81"], " here, id: 3"], "hIdx": 7
+        });
+    });
     // await tryRun("Subscribe", async () => {
     //   const res = await db.various.count({ "tsv.@@.to_tsquery": ["a"] });
     //   assert.equal(res, 0);
