@@ -106,7 +106,7 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
         "hFull":["added: 1997-12-04 00:12:00, h: , id: 3, jsn: {\"a\":{\"b\":2}}, name: abc",["81"]," here, tsv: "],
 
         /* Search specific fields in specific order */
-        "hOrdered":["name: abc",["81"]," here, id: 3"],"hIdx":7
+        "hOrdered":["name: abc",["81"]," here, id: 3"],"hIdx":6
       }
     )
   });

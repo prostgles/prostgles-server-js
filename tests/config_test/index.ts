@@ -120,7 +120,7 @@ prostgles({
       const res = await db.items.find(
         { "hIdx.>": -2 }, 
         { select: { 
-            h: { $term_highlight: [["name"], term, { noFields: true }] },
+            h: { $term_highlight: ["*", term, { noFields: true, edgeTruncate: 5 }] },
             hIdx:  { $term_highlight: [["name"], term, { returnIndex: true }] },
           },
           orderBy: { hIdx: -1 } 

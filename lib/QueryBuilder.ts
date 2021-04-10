@@ -385,13 +385,13 @@ export const FUNCTIONS: FunctionSpec[] = [
   } as FunctionSpec)),
 
   /** Custom highlight -> myterm => ['some text and', ['myterm'], ' and some other text']
-   * (fields: "*" | string[], term: string, { edgePad: number = -1; noFields: boolean = false }) => string | (string | [string])[]  
-   * edgePad = maximum extra characters left and right of matches
+   * (fields: "*" | string[], term: string, { edgeTruncate: number = -1; noFields: boolean = false }) => string | (string | [string])[]  
+   * edgeTruncate = maximum extra characters left and right of matches
    * noFields = exclude field names in search
    * */ 
   {
     name: "$term_highlight", /* */
-    description: ` :[column_names<string[] | "*">, search_term<string>, opts?<{ edgePad?: number; noFields?: boolean }>] -> get case-insensitive text match highlight`,
+    description: ` :[column_names<string[] | "*">, search_term<string>, opts?<{ edgeTruncate?: number; noFields?: boolean }>] -> get case-insensitive text match highlight`,
     type: "function",
     numArgs: 1,
     singleColArg: true,
@@ -400,16 +400,16 @@ export const FUNCTIONS: FunctionSpec[] = [
 
       const cols = ViewHandler._parseFieldFilter(args[0], false, allowedFields);
       let term = args[1];
-      let { edgePad = -1, noFields = false, returnIndex = false, matchCase = false } = args[2] || {};
+      let { edgeTruncate = -1, noFields = false, returnIndex = false, matchCase = false } = args[2] || {};
       if(!isEmpty(args[2])){
         const keys = Object.keys(args[2]);
-        const validKeys = ["edgePad", "noFields", "returnIndex", "matchCase"];
+        const validKeys = ["edgeTruncate", "noFields", "returnIndex", "matchCase"];
         const bad_keys = keys.filter(k => !validKeys.includes(k));
         if(bad_keys.length) throw "Invalid options provided for $term_highlight. Expecting one of: " + validKeys.join(", ");
       }
       if(!cols.length) throw "Cols are empty/invalid";
       if(typeof term !== "string") throw "No string term provided";
-      if(typeof edgePad !== "number") throw "Invalid edgePad. expecting number";
+      if(typeof edgeTruncate !== "number") throw "Invalid edgeTruncate. expecting number";
       if(typeof noFields !== "boolean") throw "Invalid noFields. expecting boolean";
 
       let col = "( " + cols.map(c =>`${noFields? "" : (asValue(c + ": ") + " || ")} COALESCE(${asNameAlias(c, tableAlias)}::TEXT, '')`).join(" || ', ' || ") + " )";
@@ -418,17 +418,24 @@ export const FUNCTIONS: FunctionSpec[] = [
         col = "LOWER" + col;
         term = `LOWER(${term})`
       }
+
+      let leftStr = `substr(${col}, 1, position(${term} IN ${col}) - 1 )`,
+        rightStr = `substr(${col}, position(${term} IN ${col}) + length(${term}) )`;
+      if(edgeTruncate > -1){
+        leftStr = `RIGHT(${leftStr}, ${asValue(edgeTruncate)})`;
+        rightStr = `LEFT(${rightStr}, ${asValue(edgeTruncate)})`
+      }
       
       let res = `CASE WHEN position(${term} IN ${col}) > 0 THEN array_to_json(ARRAY[
-        to_json(substr(${col}, 1, position(${term} IN ${col}) - 1 )::TEXT ), 
+        to_json( ${leftStr}::TEXT ), 
         array_to_json(
           ARRAY[substr(${col}, position(${term} IN ${col}), length(${term}) )::TEXT ]
         ), 
-        to_json(substr(${col}, position(${term} IN ${col}) + length(${term}) )::TEXT ) 
+        to_json(${rightStr}::TEXT ) 
       ]) ELSE array_to_json(ARRAY[(${col})::TEXT]) END`;
       // console.log(col);
 
-      if(returnIndex) res  = `position(${term} IN ${col})`;// `CASE WHEN position(${term} IN ${col}) > 0 THEN position(${term} IN ${col}) - 1 ELSE -1 END`;
+      if(returnIndex) res  = `CASE WHEN position(${term} IN ${col}) > 0 THEN position(${term} IN ${col}) - 1 ELSE -1 END`;
       return res;
     } 
   },
