@@ -725,6 +725,7 @@ export class ViewHandler {
 
     async subscribe(filter: Filter, params: SelectParams, localFunc: (items: object[]) => any, table_rules?: TableRule, localParams?: LocalParams){
         try {
+            if(this.is_view) throw "Cannot subscribe to a view";
             if(this.t) throw "subscribe not allowed within transactions";
             if(!localParams && !localFunc) throw " missing data. provide -> localFunc | localParams { socket } "; 
 

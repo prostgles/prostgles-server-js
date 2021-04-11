@@ -392,37 +392,39 @@ class PubSubManager {
                             try {
                                 yield this.db.any(`
                             
-                            DO $$
-                            BEGIN
+                                DO $$
+                                BEGIN
 
-                                IF to_regclass('prostgles.apps') IS NOT NULL THEN
-                                    UPDATE prostgles.apps SET last_check = NOW()
-                                    WHERE id = ${exports.asValue(this.appID)};
+                                    IF to_regclass('prostgles.apps') IS NOT NULL THEN
+                                        UPDATE prostgles.apps SET last_check = NOW()
+                                        WHERE id = ${exports.asValue(this.appID)};
 
-/*
-                                    IF EXISTS (
-                                        SELECT 1 FROM prostgles.apps
-                                        WHERE last_check < NOW() - 1.2 * check_frequency_ms * interval '1 millisecond'
-                                    ) THEN
+    /*
+                                        IF EXISTS (
+                                            SELECT 1 FROM prostgles.apps
+                                            WHERE last_check < NOW() - 1.2 * check_frequency_ms * interval '1 millisecond'
+                                        ) THEN
 
-                                        LOCK TABLE prostgles.triggers IN ACCESS EXCLUSIVE MODE;
+                                            LOCK TABLE prostgles.triggers IN ACCESS EXCLUSIVE MODE;
 
-                                        DELETE FROM prostgles.apps
-                                        WHERE last_check < NOW() - check_frequency_ms * interval '1 millisecond';
+                                            DELETE FROM prostgles.apps
+                                            WHERE last_check < NOW() - check_frequency_ms * interval '1 millisecond';
 
-                                        UPDATE prostgles.triggers 
-                                        SET app_ids = ARRAY(
-                                            SELECT DISTINCT unnest(app_ids) INTERSECT 
-                                            SELECT id FROM prostgles.apps
-                                        );
+                                            UPDATE prostgles.triggers 
+                                            SET app_ids = ARRAY(
+                                                SELECT DISTINCT unnest(app_ids) INTERSECT 
+                                                SELECT id FROM prostgles.apps
+                                            );
 
-                                        DELETE FROM prostgles.triggers 
-                                        WHERE array_length(app_ids, 1) = 0;
+                                            DELETE FROM prostgles.triggers 
+                                            WHERE array_length(app_ids, 1) = 0;
+                                        END IF;
+                                        */
                                     END IF;
-                                    */
-                                END IF;
-                            
-                            END $$;`);
+
+                                COMMIT;
+                                END $$;
+                            `);
                                 log("updated last_check");
                             }
                             catch (e) {

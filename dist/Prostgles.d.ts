@@ -183,6 +183,7 @@ export declare type ProstglesInitOptions = {
         query: string;
     }) => void);
     keywords?: Keywords;
+    onNotice?: (msg: any) => void;
 };
 export declare type OnReady = {
     dbo: DbHandler;
@@ -222,6 +223,10 @@ export declare class Prostgles {
         $not: string;
     };
     onReady: (dbo: any, db: DB) => void;
+    /**
+     * Postgres on notice callback
+     */
+    onNotice?: ProstglesInitOptions["onNotice"];
     constructor(params: ProstglesInitOptions);
     onSchemaChange(event: {
         command: string;

@@ -69,6 +69,14 @@ export type Planes = {
 export type Tt = { 
   "t"?: string;
 }
+export type V_various = { 
+  "added"?: Date;
+  "h"?: Array<string>;
+  "id"?: number;
+  "jsn"?: Object;
+  "name"?: string;
+  "tsv"?: any;
+}
 export type Various = { 
   "added"?: Date;
   "h"?: Array<string>;
@@ -96,6 +104,7 @@ export type DBObj = {
   "items4_pub": TableHandler<Items4_pub> 
   "planes": TableHandler<Planes> 
   "tt": TableHandler<Tt> 
+  "v_various": ViewHandler<V_various> 
   "various": TableHandler<Various> 
   leftJoin: JoinMakerTables;
   innerJoin: JoinMakerTables;

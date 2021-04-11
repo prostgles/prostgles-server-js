@@ -23,15 +23,21 @@ const DboBuilder_1 = require("./DboBuilder");
 const PubSubManager_1 = require("./PubSubManager");
 const prostgles_types_1 = require("prostgles-types");
 let currConnection;
-function getDbConnection(dbConnection, options, debugQueries = false, noNewConnections = true) {
-    let pgp = pgPromise(Object.assign({ promiseLib: promise }, (debugQueries ? {
+function getDbConnection(dbConnection, options, debugQueries = false, noNewConnections = true, onNotice = null) {
+    let pgp = pgPromise(Object.assign(Object.assign({ promiseLib: promise }, (debugQueries ? {
         query: function (e) {
             console.log({ psql: e.query, params: e.params });
         },
+    } : {})), ((onNotice || debugQueries) ? {
         connect: function (client, dc, isFresh) {
-            if (isFresh) {
+            if (isFresh && !client.listeners('notice').length) {
                 client.on('notice', function (msg) {
-                    console.log("notice: %j", utils_1.get(msg, "message"));
+                    if (onNotice) {
+                        onNotice(msg, utils_1.get(msg, "message"));
+                    }
+                    else {
+                        console.log("notice: %j", utils_1.get(msg, "message"));
+                    }
                 });
             }
         },
@@ -288,7 +294,7 @@ class Prostgles {
             if (this.watchSchema === "hotReloadMode" && !this.tsGeneratedTypesDir)
                 throw "tsGeneratedTypesDir option is needed for watchSchema: hotReloadMode to work ";
             /* 1. Connect to db */
-            const { db, pgp } = getDbConnection(this.dbConnection, this.dbOptions, this.DEBUG_MODE);
+            const { db, pgp } = getDbConnection(this.dbConnection, this.dbOptions, this.DEBUG_MODE, true, this.onNotice);
             this.db = db;
             this.pgp = pgp;
             this.checkDb();
@@ -503,14 +509,6 @@ function makeSocketError(cb, err) {
 }
 // const insertParams: Array<keyof InsertRule> = ["fields", "forcedData", "returningFields", "validate"];
 const RULE_TO_METHODS = [
-    // { 
-    //     rule: "getColumns",
-    //     methods: ["getColumns"], 
-    //     no_limits: {}, 
-    //     table_only: false,
-    //     allowed_params: [],
-    //     hint: `  `
-    // },
     {
         rule: "insert",
         methods: ["insert", "upsert"],
@@ -529,7 +527,7 @@ const RULE_TO_METHODS = [
     },
     {
         rule: "select",
-        methods: ["findOne", "find", "subscribe", "unsubscribe", "count", "getColumns"],
+        methods: ["findOne", "find", "count", "getColumns"],
         no_limits: { fields: "*", filterFields: "*" },
         allowed_params: ["fields", "filterFields", "forcedFilter", "validate", "maxLimit"],
         hint: ` expecting "*" | true | { fields: ( string | string[] | {} )  }`
@@ -550,7 +548,7 @@ const RULE_TO_METHODS = [
         hint: ` expecting "*" | true | { id_fields: string[], synced_field: string }`
     },
     {
-        rule: "subscribe", methods: ["subscribe", "subscribeOne"],
+        rule: "subscribe", methods: ["unsubscribe", "subscribe", "subscribeOne"],
         no_limits: { throttle: 0 },
         table_only: true,
         allowed_params: ["throttle"],
@@ -663,20 +661,20 @@ class PublishParser {
                     throw "publish OR socket OR dbo OR tableName are missing";
                 let _publish = yield this.getPublish(socket, user);
                 let table_rules = applyParamsIfFunc(_publish[tableName], socket, this.dbo, this.db, user);
+                /* Get view or table specific rules */
+                const is_view = this.dbo[tableName].is_view, MY_RULES = RULE_TO_METHODS.filter(r => !is_view || !r.table_only);
+                // if(tableName === "various") console.warn(1033, MY_RULES)
                 if (table_rules) {
                     /* All methods allowed. Add no limits for table rules */
                     if ([true, "*"].includes(table_rules)) {
                         table_rules = {};
-                        RULE_TO_METHODS
-                            .filter(r => !this.dbo[tableName].is_view || !r.table_only)
-                            .map(r => {
+                        MY_RULES.map(r => {
                             table_rules[r.rule] = Object.assign({}, r.no_limits);
                         });
+                        // if(tableName === "various") console.warn(1042, table_rules)
                     }
                     /* Add implied methods if not falsy */
-                    RULE_TO_METHODS
-                        .filter(r => !this.dbo[tableName].is_view || !r.table_only)
-                        .map(r => {
+                    MY_RULES.map(r => {
                         if ([true, "*"].includes(table_rules[r.rule]) && r.no_limits) {
                             table_rules[r.rule] = Object.assign({}, r.no_limits);
                         }
@@ -694,18 +692,19 @@ class PublishParser {
                                 }
                             });
                         }
+                        // if(tableName === "v_various") console.warn(table_rules, r)
                     });
                     /*
                         Add defaults
                         Check for invalid params
                     */
                     if (Object.keys(table_rules).length) {
-                        Object.keys(table_rules)
-                            .filter(m => table_rules[m])
+                        const ruleKeys = Object.keys(table_rules);
+                        ruleKeys.filter(m => table_rules[m])
                             .find(method => {
-                            let rm = RULE_TO_METHODS.find(r => r.rule === method || r.methods.includes(method));
+                            let rm = MY_RULES.find(r => r.rule === method || r.methods.includes(method));
                             if (!rm) {
-                                throw `Invalid rule in publish.${tableName} -> ${method} \nExpecting any of: ${flat(RULE_TO_METHODS.map(r => [r.rule, ...r.methods])).join(", ")}`;
+                                throw `Invalid rule in publish.${tableName} -> ${method} \nExpecting any of: ${flat(MY_RULES.map(r => [r.rule, ...r.methods])).join(", ")}`;
                             }
                             /* Check RULES for invalid params */
                             /* Methods do not have params -> They use them from rules */
@@ -726,6 +725,13 @@ class PublishParser {
                                 }
                                 if (typeof utils_1.get(table_rules, [method, "batch_size"]) !== "number") {
                                     table_rules[method].batch_size = PubSubManager_1.DEFAULT_SYNC_BATCH_SIZE;
+                                }
+                            }
+                            /* Enable subscribe if not explicitly disabled */
+                            if (method === "select" && !ruleKeys.includes("subscribe")) {
+                                const sr = MY_RULES.find(r => r.rule === "subscribe");
+                                if (sr) {
+                                    table_rules[sr.rule] = Object.assign({}, sr.no_limits);
                                 }
                             }
                         });

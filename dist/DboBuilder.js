@@ -501,6 +501,8 @@ class ViewHandler {
     subscribe(filter, params, localFunc, table_rules, localParams) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
+                if (this.is_view)
+                    throw "Cannot subscribe to a view";
                 if (this.t)
                     throw "subscribe not allowed within transactions";
                 if (!localParams && !localFunc)

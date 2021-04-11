@@ -72,9 +72,11 @@ prostgles_server_1.default({
     publish: async (socket, dbo, _db, user) => {
         return {
             various: "*",
+            v_various: "*",
         };
     },
     joins: "inferred",
+    onNotice: console.log,
     onReady: async (db, _db) => {
         // await _db.any("CREATE TABLE IF NOT EXISTS ttt(id INTEGER, t TEXT)");
         console.log("onReady");
@@ -83,7 +85,7 @@ prostgles_server_1.default({
             res.sendFile(path_1.default.join(__dirname + '/index.html'));
         });
         // console.log(await db.various.find({ id: 2 }));
-        db.various.subscribe({ "id.>": 2 }, {}, console.log);
+        // db.v_various.subscribe({ "id.>": 2 }, {}, console.log)
         // await db.items.insert([ 
         //   {name: "c"},
         //   {name: "c", tst: new Date()}

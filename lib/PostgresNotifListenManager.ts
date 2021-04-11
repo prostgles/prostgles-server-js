@@ -34,6 +34,9 @@ export class PostgresNotifListenManager {
 
         return this.reconnect() // = same as reconnect(0, 1)
             .then(obj => {
+
+                /* TODO: expose this within onReady */
+
                 // console.log('psqlWS - Successful Initial Connection');
                 // obj.done(); - releases the connection
                 

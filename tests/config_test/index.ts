@@ -79,11 +79,12 @@ prostgles({
     
     return {
       various: "*",
-
+      v_various: "*",
     };
     
   },
   joins: "inferred",
+	onNotice: console.log,
   onReady: async (db: DBObj, _db: any) => {
     // await _db.any("CREATE TABLE IF NOT EXISTS ttt(id INTEGER, t TEXT)");
     console.log("onReady")
@@ -94,7 +95,7 @@ prostgles({
 		});
 
     // console.log(await db.various.find({ id: 2 }));
-    db.various.subscribe({ "id.>": 2 }, {}, console.log)
+    // db.v_various.subscribe({ "id.>": 2 }, {}, console.log)
     // await db.items.insert([ 
     //   {name: "c"},
     //   {name: "c", tst: new Date()}
