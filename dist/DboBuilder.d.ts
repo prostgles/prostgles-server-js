@@ -140,16 +140,6 @@ export declare class ViewHandler {
     find(filter?: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]>;
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: any, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
     count(filter?: Filter, param2_unused?: any, param3_unused?: any, table_rules?: TableRule, localParams?: any): Promise<number>;
-    subscribe(filter: Filter, params: SelectParams, localFunc: (items: object[]) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<{
-        channelName: string;
-    } | Readonly<{
-        unsubscribe: () => void;
-    }>>;
-    subscribeOne(filter: Filter, params: SelectParams, localFunc: (items: object) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<{
-        channelName: string;
-    } | Readonly<{
-        unsubscribe: () => void;
-    }>>;
     getAllowedSelectFields(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean): string[];
     prepareColumnSet(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, onlyNames?: boolean): string | pgPromise.ColumnSet;
     prepareSelect(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, tableAlias?: string): string;
@@ -228,6 +218,16 @@ export declare class TableHandler extends ViewHandler {
     };
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, joinPaths?: JoinPaths);
     willBatch(query: string): boolean;
+    subscribe(filter: Filter, params: SelectParams, localFunc: (items: object[]) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<{
+        channelName: string;
+    } | Readonly<{
+        unsubscribe: () => void;
+    }>>;
+    subscribeOne(filter: Filter, params: SelectParams, localFunc: (items: object) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<{
+        channelName: string;
+    } | Readonly<{
+        unsubscribe: () => void;
+    }>>;
     updateBatch(data: [Filter, object][], params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
     update(filter: Filter, newData: {
         [key: string]: any;

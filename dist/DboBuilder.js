@@ -498,68 +498,6 @@ class ViewHandler {
             }
         });
     }
-    subscribe(filter, params, localFunc, table_rules, localParams) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                if (this.is_view)
-                    throw "Cannot subscribe to a view";
-                if (this.t)
-                    throw "subscribe not allowed within transactions";
-                if (!localParams && !localFunc)
-                    throw " missing data. provide -> localFunc | localParams { socket } ";
-                const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {}, condition = yield this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: null, localParams, tableRule: table_rules });
-                if (!localFunc) {
-                    return yield this.find(filter, Object.assign(Object.assign({}, params), { limit: 0 }), null, table_rules, localParams)
-                        .then(isValid => {
-                        const { socket = null, subOne = false } = localParams;
-                        return this.pubSubManager.addSub({
-                            table_info: this.tableOrViewInfo,
-                            socket,
-                            table_rules,
-                            condition: condition,
-                            func: localFunc,
-                            filter: Object.assign({}, filter),
-                            params: Object.assign({}, params),
-                            channel_name: null,
-                            socket_id: socket.id,
-                            table_name: this.name,
-                            last_throttled: 0,
-                            subOne
-                        }).then(channelName => ({ channelName }));
-                    });
-                }
-                else {
-                    const { subOne = false } = localParams || {};
-                    this.pubSubManager.addSub({
-                        table_info: this.tableOrViewInfo,
-                        socket: null,
-                        table_rules,
-                        condition,
-                        func: localFunc,
-                        filter: Object.assign({}, filter),
-                        params: Object.assign({}, params),
-                        channel_name: null,
-                        socket_id: null,
-                        table_name: this.name,
-                        last_throttled: 0,
-                        subOne
-                    }).then(channelName => ({ channelName }));
-                    const unsubscribe = () => {
-                        this.pubSubManager.removeLocalSub(this.name, condition, localFunc);
-                    };
-                    return Object.freeze({ unsubscribe });
-                }
-            }
-            catch (e) {
-                if (localParams && localParams.testRule)
-                    throw e;
-                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.subscribe()` };
-            }
-        });
-    }
-    subscribeOne(filter, params, localFunc, table_rules, localParams) {
-        return this.subscribe(filter, params, localFunc, table_rules, Object.assign(Object.assign({}, (localParams || {})), { subOne: true }));
-    }
     getAllowedSelectFields(selectParams = "*", allowed_cols, allow_empty = true) {
         let all_columns = this.column_names.slice(0), allowedFields = all_columns.slice(0), resultFields = [];
         if (selectParams) {
@@ -1176,6 +1114,68 @@ class TableHandler extends ViewHandler {
         if (this.io_stats.queries > this.io_stats.throttle_queries_per_sec) {
             return true;
         }
+    }
+    subscribe(filter, params, localFunc, table_rules, localParams) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                if (this.is_view)
+                    throw "Cannot subscribe to a view";
+                if (this.t)
+                    throw "subscribe not allowed within transactions";
+                if (!localParams && !localFunc)
+                    throw " missing data. provide -> localFunc | localParams { socket } ";
+                const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {}, condition = yield this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: null, localParams, tableRule: table_rules });
+                if (!localFunc) {
+                    return yield this.find(filter, Object.assign(Object.assign({}, params), { limit: 0 }), null, table_rules, localParams)
+                        .then(isValid => {
+                        const { socket = null, subOne = false } = localParams;
+                        return this.pubSubManager.addSub({
+                            table_info: this.tableOrViewInfo,
+                            socket,
+                            table_rules,
+                            condition: condition,
+                            func: localFunc,
+                            filter: Object.assign({}, filter),
+                            params: Object.assign({}, params),
+                            channel_name: null,
+                            socket_id: socket.id,
+                            table_name: this.name,
+                            last_throttled: 0,
+                            subOne
+                        }).then(channelName => ({ channelName }));
+                    });
+                }
+                else {
+                    const { subOne = false } = localParams || {};
+                    this.pubSubManager.addSub({
+                        table_info: this.tableOrViewInfo,
+                        socket: null,
+                        table_rules,
+                        condition,
+                        func: localFunc,
+                        filter: Object.assign({}, filter),
+                        params: Object.assign({}, params),
+                        channel_name: null,
+                        socket_id: null,
+                        table_name: this.name,
+                        last_throttled: 0,
+                        subOne
+                    }).then(channelName => ({ channelName }));
+                    const unsubscribe = () => {
+                        this.pubSubManager.removeLocalSub(this.name, condition, localFunc);
+                    };
+                    return Object.freeze({ unsubscribe });
+                }
+            }
+            catch (e) {
+                if (localParams && localParams.testRule)
+                    throw e;
+                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.subscribe()` };
+            }
+        });
+    }
+    subscribeOne(filter, params, localFunc, table_rules, localParams) {
+        return this.subscribe(filter, params, localFunc, table_rules, Object.assign(Object.assign({}, (localParams || {})), { subOne: true }));
     }
     updateBatch(data, params, tableRules, localParams = null) {
         return __awaiter(this, void 0, void 0, function* () {
