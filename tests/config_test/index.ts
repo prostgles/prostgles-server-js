@@ -76,7 +76,7 @@ prostgles({
     return true
   },
   publish: async (socket, dbo: any, _db: any, user: any) => {
-    
+    return "*";
     return {
       various: "*",
       v_various: "*",
@@ -84,7 +84,7 @@ prostgles({
     
   },
   joins: "inferred",
-	onNotice: console.log,
+	// onNotice: console.log,
   onReady: async (db: DBObj, _db: any) => {
     // await _db.any("CREATE TABLE IF NOT EXISTS ttt(id INTEGER, t TEXT)");
     console.log("onReady")
@@ -117,17 +117,22 @@ prostgles({
       // }});
       // console.log(d)
 
-      const term = "cc23";
-      const res = await db.items.find(
-        { "hIdx.>": -2 }, 
-        { select: { 
-            h: { $term_highlight: ["*", term, { noFields: true, edgeTruncate: 5 }] },
-            hIdx:  { $term_highlight: [["name"], term, { returnIndex: true }] },
-          },
-          orderBy: { hIdx: -1 } 
-        }
-      ); 
-      console.log(res.map(r => JSON.stringify(r)).join("\n"));//, null, 2))  
+      // const term = "cc23";
+      // const res = await db.items.find(
+      //   { "hIdx.>": -2 }, 
+      //   { select: { 
+      //       h: { $term_highlight: ["*", term, { noFields: true, edgeTruncate: 5 }] },
+      //       hIdx:  { $term_highlight: [["name"], term, { returnIndex: true }] },
+      //     },
+      //     orderBy: { hIdx: -1 } 
+      //   }
+      // ); 
+      // console.log(res.map(r => JSON.stringify(r)).join("\n"));//, null, 2))  
+
+      const r = await db.items.findOne({}, { select: { $rowhash: 1, "*": 1 } });
+
+      const rr = await db.items.update({ '$rowhash': r.$rowhash } as any, { name: 'a' } as any, { returning: "*"})
+      console.log(r, rr);
       if(true || process.env.NPORT){
 
       }

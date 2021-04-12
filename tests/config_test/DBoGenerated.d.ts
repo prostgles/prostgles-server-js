@@ -69,6 +69,29 @@ export type Planes = {
 export type Tt = { 
   "t"?: string;
 }
+export type Tz = { 
+  "t"?: string;
+}
+export type Tzz = { 
+  "id"?: number;
+  "name"?: string;
+  "tst"?: Date;
+}
+export type Tzz2 = { 
+  "id"?: number;
+  "name"?: string;
+  "tst"?: Date;
+}
+export type Tzz22 = { 
+  "id"?: number;
+  "name"?: string;
+  "tst"?: Date;
+}
+export type Tzz222 = { 
+  "id"?: number;
+  "name"?: string;
+  "tst"?: Date;
+}
 export type V_various = { 
   "added"?: Date;
   "h"?: Array<string>;
@@ -104,6 +127,11 @@ export type DBObj = {
   "items4_pub": TableHandler<Items4_pub> 
   "planes": TableHandler<Planes> 
   "tt": TableHandler<Tt> 
+  "tz": TableHandler<Tz> 
+  "tzz": TableHandler<Tzz> 
+  "tzz2": TableHandler<Tzz2> 
+  "tzz22": TableHandler<Tzz22> 
+  "tzz222": TableHandler<Tzz222> 
   "v_various": ViewHandler<V_various> 
   "various": TableHandler<Various> 
   leftJoin: JoinMakerTables;

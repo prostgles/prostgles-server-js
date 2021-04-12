@@ -143,11 +143,11 @@ async function isomorphic(db) {
         // Returning
         const returningParam = { returning: { id: 1, name: 1, public: 1, $rowhash: 1, added_day: { "$day": ["added"] } } }; //   ctid: 1,
         let i = await db.items4_pub.insert({ name: "abc123", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') }, returningParam);
-        assert_1.strict.deepStrictEqual(i, { id: 1, name: 'abc123', public: 'public data', $rowhash: 'e593cd919283f0fe7c205f09894ee53f', added_day: 'monday' }); //  , ctid: '(0,1)'
+        assert_1.strict.deepStrictEqual(i, { id: 1, name: 'abc123', public: 'public data', $rowhash: '347c26babad535aa697a794af89195fe', added_day: 'monday' }); //  , ctid: '(0,1)'
         let u = await db.items4_pub.update({ name: "abc123" }, { public: "public data2" }, returningParam);
-        assert_1.strict.deepStrictEqual(u, [{ id: 1, name: 'abc123', public: 'public data2', $rowhash: '31574189d0257a4e5442f8db39658cf0', added_day: 'monday' }]);
+        assert_1.strict.deepStrictEqual(u, [{ id: 1, name: 'abc123', public: 'public data2', $rowhash: '9d18ddfbff9e13411d13f82d414644de', added_day: 'monday' }]);
         let d = await db.items4_pub.delete({ name: "abc123" }, returningParam);
-        assert_1.strict.deepStrictEqual(d, [{ id: 1, name: 'abc123', public: 'public data2', $rowhash: '31574189d0257a4e5442f8db39658cf0', added_day: 'monday' }]);
+        assert_1.strict.deepStrictEqual(d, [{ id: 1, name: 'abc123', public: 'public data2', $rowhash: '9d18ddfbff9e13411d13f82d414644de', added_day: 'monday' }]);
         console.log("TODO: socket.io stringifies dates");
     });
     await tryRun("Exists filter example", async () => {
@@ -286,10 +286,13 @@ async function isomorphic(db) {
     });
     /* $rowhash -> Custom column that returms md5(ctid + allowed select columns). Used in joins & CRUD to bypass PKey details */
     await tryRun("$rowhash example", async () => {
-        const rowhash = await db.items.findOne({}, { select: { $rowhash: 1 } });
+        const rowhash = await db.items.findOne({}, { select: { $rowhash: 1, "*": 1 } });
+        const f = { $rowhash: rowhash.$rowhash };
         const rowhashView = await db.v_items.findOne({}, { select: { $rowhash: 1 } });
         const rh1 = await db.items.findOne({ $rowhash: rowhash.$rowhash }, { select: { $rowhash: 1 } });
         const rhView = await db.v_items.findOne({ $rowhash: rowhashView.$rowhash }, { select: { $rowhash: 1 } });
+        // console.log({ rowhash, f });
+        await db.items.update(f, { name: 'a' });
         // console.log(rowhash, rh1)
         // console.log(rowhashView, rhView)
         if (typeof rowhash.$rowhash !== "string" ||

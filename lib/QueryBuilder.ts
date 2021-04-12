@@ -480,6 +480,10 @@ export const FUNCTIONS: FunctionSpec[] = [
 
 /* The difference between a function and computed field is that the computed field does not require any arguments */
 export const COMPUTED_FIELDS: FieldSpec[] = [
+
+  /**
+   * Used instead of row id. Must be used as a last resort. Use all non pseudo or domain data type columns first!
+   */
   {
     name: "$rowhash",
     type: "computed",
@@ -487,7 +491,9 @@ export const COMPUTED_FIELDS: FieldSpec[] = [
     getQuery: ({ allowedFields, tableAlias, ctidField }) => {
       return "md5(" +
         allowedFields
-          .concat(ctidField? [ctidField] : [])
+
+          /* CTID not available in AFTER trigger */
+          // .concat(ctidField? [ctidField] : [])
           .sort()
           .map(f => asNameAlias(f, tableAlias))
           .map(f => `md5(coalesce(${f}::text, 'dd'))`)
@@ -574,7 +580,12 @@ export class SelectItemBuilder {
       type: funcDef.type,
       alias,
       getFields: () => funcDef.getFields(args),
-      getQuery: (tableAlias?: string) => funcDef.getQuery({ allowedFields: this.allowedFields, args, tableAlias, ctidField: this.isView? undefined : "ctid" }),
+      getQuery: (tableAlias?: string) => funcDef.getQuery({ allowedFields: this.allowedFields, args, tableAlias, 
+        ctidField: undefined,
+
+        /* CTID not available in AFTER trigger */
+        // ctidField: this.isView? undefined : "ctid" 
+      }),
       selected: true
     });
   }

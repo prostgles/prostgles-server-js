@@ -160,7 +160,8 @@ class ViewHandler {
             allowed_cols = this.parseFieldFilter(allowedFields);
         return "md5(" +
             allowed_cols
-                .concat(this.is_view ? [] : ["ctid"])
+                /* CTID not available in AFTER trigger */
+                // .concat(this.is_view? [] : ["ctid"])
                 .sort()
                 .map(f => (tableAlias ? (prostgles_types_1.asName(tableAlias) + ".") : "") + prostgles_types_1.asName(f))
                 .map(f => `md5(coalesce(${f}::text, 'dd'))`)
@@ -303,7 +304,9 @@ class ViewHandler {
             name: c.name,
             getQuery: ({ tableAlias, allowedFields }) => c.getQuery({
                 allowedFields,
-                ctidField: this.is_view ? undefined : "ctid",
+                ctidField: undefined,
+                /* CTID not available in AFTER trigger */
+                // ctidField: this.is_view? undefined : "ctid",
                 tableAlias
             }),
             selected: false
@@ -751,15 +754,13 @@ class ViewHandler {
                     computedColConditions.push(compCol.getQuery({
                         tableAlias,
                         allowedFields: p.select.fields,
-                        ctidField: this.is_view ? undefined : "ctid"
+                        /* CTID not available in AFTER trigger */
+                        // ctidField: this.is_view? undefined : "ctid"
+                        ctidField: undefined,
                     }) + ` = ${exports.pgp.as.format("$1", [data[key]])}`);
                     delete data[key];
                 }
             });
-            // if(rowHashKeys[0] in (data || {})){
-            //     rowHashCondition = this.getRowHashSelect(get(tableRules, "select.fields") ,tableAlias) + ` = ${pgp.as.format("$1", [ (data as any).$rowhash ] )}`;
-            //     delete (data as any).$rowhash;
-            // }
             let allowedSelect = [];
             /* Select aliases take precedence over col names */
             if (select) {

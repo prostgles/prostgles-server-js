@@ -48,6 +48,7 @@ class PubSubManager {
         this.appCheckFrequencyMS = 4 * 1000;
         this.init = () => __awaiter(this, void 0, void 0, function* () {
             try {
+                const schema_version = 1;
                 const q = `
                 BEGIN; --  ISOLATION LEVEL SERIALIZABLE;-- TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 
@@ -57,14 +58,30 @@ class PubSubManager {
                 $do$
                 BEGIN
 
+                    /* Drop older version */
+                    IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'prostgles') THEN
+
+                        IF to_regclass('prostgles.versions') IS NULL THEN
+                            DROP SCHEMA IF EXISTS prostgles CASCADE;
+                        ELSE 
+                            IF NOT EXISTS(SELECT 1 FROM prostgles.versions WHERE version >= ${schema_version}) THEN
+                                DROP SCHEMA IF EXISTS prostgles CASCADE;
+                            END IF;
+                        END IF;
+
+                    END IF;
+
  
-                    IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'prostgles') 
-                        THEN
-                            --RAISE NOTICE 'prostgles SCHEMA EXISTS ALREADY';
-                    ELSE 
+                    IF  NOT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'prostgles') 
+                    THEN
                         --RAISE NOTICE 'CREATE SCHEMA IF NOT EXISTS prostgles';
 
                         CREATE SCHEMA IF NOT EXISTS prostgles;
+
+                        CREATE TABLE IF NOT EXISTS prostgles.versions(
+                            version NUMERIC PRIMARY KEY
+                        );
+                        INSERT INTO prostgles.versions(version) VALUES(${schema_version}) ON CONFLICT DO NOTHING;
 
                         CREATE OR REPLACE FUNCTION prostgles.random_string(length INTEGER DEFAULT 33) RETURNS TEXT AS $$
                             DECLARE
@@ -542,7 +559,7 @@ class PubSubManager {
 
                         DROP EVENT TRIGGER IF EXISTS ${this.DB_OBJ_NAMES.schema_watch_trigger};
                         CREATE EVENT TRIGGER ${this.DB_OBJ_NAMES.schema_watch_trigger} ON ddl_command_end
-                        WHEN TAG IN ('CREATE TABLE', 'ALTER TABLE', 'DROP TABLE')
+                        WHEN TAG IN ('CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO')
                         --WHEN TAG IN ('CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE TRIGGER', 'DROP TRIGGER')
                         EXECUTE PROCEDURE ${this.DB_OBJ_NAMES.schema_watch_func}();
 
