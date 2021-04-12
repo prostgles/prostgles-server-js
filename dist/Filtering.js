@@ -158,7 +158,7 @@ exports.parseFilterItem = (args) => {
         else if (["=", "$eq"].includes(fOpType) && !sOpType) {
             if (fVal === null)
                 return leftQ + " IS NULL ";
-            return leftQ + " > " + parseRightVal(fVal);
+            return leftQ + " = " + parseRightVal(fVal);
         }
         else if (["<>", "$ne"].includes(fOpType)) {
             return leftQ + " <> " + parseRightVal(fVal);

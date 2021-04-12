@@ -129,10 +129,10 @@ prostgles({
       // ); 
       // console.log(res.map(r => JSON.stringify(r)).join("\n"));//, null, 2))  
 
-      const r = await db.items.findOne({}, { select: { $rowhash: 1, "*": 1 } });
+      const r = await db.items.findOne({ "id.=": 1 }, { select: { $rowhash: 1, "*": 1 } });
 
-      const rr = await db.items.update({ '$rowhash': r.$rowhash } as any, { name: 'a' } as any, { returning: "*"})
-      console.log(r, rr);
+      // const rr = await db.items.update({ '$rowhash': r.$rowhash } as any, { name: 'a' } as any, { returning: "*"})
+      console.log(r);
       if(true || process.env.NPORT){
 
       }
