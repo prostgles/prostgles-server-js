@@ -164,7 +164,7 @@ class Prostgles {
                                 if (fields && DATA_TYPES.length) {
                                     qres.fields = fields.map(f => {
                                         const dataType = DATA_TYPES.find(dt => +dt.oid === +f.dataTypeID), tableName = USER_TABLES.find(t => +t.relid === +f.tableID), { name } = f;
-                                        return Object.assign(Object.assign({ name }, (dataType ? { dataType: dataType.typname } : {})), (tableName ? { tableName: tableName.relname } : {}));
+                                        return Object.assign(Object.assign(Object.assign({}, f), (dataType ? { dataType: dataType.typname } : {})), (tableName ? { tableName: tableName.relname } : {}));
                                     });
                                 }
                                 cb(null, qres);
@@ -527,7 +527,7 @@ const RULE_TO_METHODS = [
     },
     {
         rule: "select",
-        methods: ["findOne", "find", "count", "getColumns"],
+        methods: ["findOne", "find", "count", "getColumns", "getInfo"],
         no_limits: { fields: "*", filterFields: "*" },
         allowed_params: ["fields", "filterFields", "forcedFilter", "validate", "maxLimit"],
         hint: ` expecting "*" | true | { fields: ( string | string[] | {} )  }`
@@ -632,6 +632,9 @@ class PublishParser {
             /* Must be local request -> allow everything */
             if (!socket)
                 return undefined;
+            /* Must be from socket. Must have a publish */
+            if (!this.publish)
+                throw "publish is missing";
             /* Get any publish errors for socket */
             const schm = utils_1.get(socket, `prostgles.schema.${tableName}.${command}`);
             // console.log(schm, get(socket, `prostgles.schema`));
@@ -645,8 +648,6 @@ class PublishParser {
                     throw `Invalid or disallowed command: upsert`;
                 }
             }
-            if (!this.publish)
-                throw "publish is missing";
             if (rtm && table_rule && table_rule[rtm.rule]) {
                 return table_rule;
             }

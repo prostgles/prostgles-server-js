@@ -96,6 +96,7 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
         orderBy: { hIdx: -1 } 
       }
     ); 
+    // console.log(res[0])
     // console.log(res.map(r => JSON.stringify(r)).join("\n"));//, null, 2))  
     assert.deepStrictEqual(
       res[0], 
@@ -103,7 +104,11 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
         "h":["name: ",["abc81"]," here"],
 
         /* Search all allowed fields using "*"  */
-        "hFull":["added: 1997-12-04 00:12:00, h: , id: 3, jsn: {\"a\":{\"b\":2}}, name: abc",["81"]," here, tsv: "],
+        hFull: [
+          'id: 3, h: , name: abc',
+          [ '81' ],
+          ' here, tsv: , jsn: {"a":{"b":2}}, added: 1997-12-04 00:12:00'
+        ],
 
         /* Search specific fields in specific order */
         "hOrdered":["name: abc",["81"]," here, id: 3"],"hIdx":6

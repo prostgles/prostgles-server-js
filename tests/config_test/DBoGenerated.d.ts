@@ -11,20 +11,6 @@ export type TxCB = {
 
 
 /* SCHEMA DEFINITON. Table names have been altered to work with Typescript */
-export type D_34_42_34 = { 
-  "\"*\""?: string;
-  "id"?: number;
-}
-export type D_42 = { 
-  "*"?: string;
-  "id"?: number;
-}
-export type Ex_j_ins = { 
-  "added"?: Date;
-  "id"?: number;
-  "name"?: string;
-  "public"?: string;
-}
 export type Item_children = { 
   "id"?: number;
   "item_id"?: number;
@@ -36,77 +22,29 @@ export type Items = {
   "name"?: string;
   "tst"?: Date;
 }
-export type Items2 = { 
-  "hh"?: Array<string>;
+export type V2 = { 
   "id"?: number;
-  "items_id"?: number;
-  "name"?: string;
-}
-export type Items3 = { 
   "h"?: Array<string>;
-  "id"?: number;
   "name"?: string;
-}
-export type Items4 = { 
+  "tsv"?: any;
+  "jsn"?: Object;
   "added"?: Date;
-  "id"?: number;
-  "name"?: string;
-  "public"?: string;
-}
-export type Items4_pub = { 
-  "added"?: Date;
-  "id"?: number;
-  "name"?: string;
-  "public"?: string;
-}
-export type Planes = { 
-  "flight_number"?: string;
-  "id"?: number;
-  "last_updated"?: number;
-  "x"?: number;
-  "y"?: number;
-}
-export type Tt = { 
-  "t"?: string;
-}
-export type Tz = { 
-  "t"?: string;
-}
-export type Tzz = { 
-  "id"?: number;
-  "name"?: string;
-  "tst"?: Date;
-}
-export type Tzz2 = { 
-  "id"?: number;
-  "name"?: string;
-  "tst"?: Date;
-}
-export type Tzz22 = { 
-  "id"?: number;
-  "name"?: string;
-  "tst"?: Date;
-}
-export type Tzz222 = { 
-  "id"?: number;
-  "name"?: string;
-  "tst"?: Date;
 }
 export type V_various = { 
-  "added"?: Date;
-  "h"?: Array<string>;
   "id"?: number;
-  "jsn"?: Object;
+  "h"?: Array<string>;
   "name"?: string;
   "tsv"?: any;
+  "jsn"?: Object;
+  "added"?: Date;
 }
 export type Various = { 
-  "added"?: Date;
-  "h"?: Array<string>;
   "id"?: number;
-  "jsn"?: Object;
+  "h"?: Array<string>;
   "name"?: string;
   "tsv"?: any;
+  "jsn"?: Object;
+  "added"?: Date;
 }
 
 export type JoinMakerTables = {
@@ -116,22 +54,9 @@ export type JoinMakerTables = {
 
 /* DBO Definition. Isomorphic */
 export type DBObj = {
-  "\"*\"": TableHandler<D_34_42_34> 
-  "*": TableHandler<D_42> 
-  "ex_j_ins": TableHandler<Ex_j_ins> 
   "item_children": TableHandler<Item_children> 
   "items": TableHandler<Items> 
-  "items2": TableHandler<Items2> 
-  "items3": TableHandler<Items3> 
-  "items4": TableHandler<Items4> 
-  "items4_pub": TableHandler<Items4_pub> 
-  "planes": TableHandler<Planes> 
-  "tt": TableHandler<Tt> 
-  "tz": TableHandler<Tz> 
-  "tzz": TableHandler<Tzz> 
-  "tzz2": TableHandler<Tzz2> 
-  "tzz22": TableHandler<Tzz22> 
-  "tzz222": TableHandler<Tzz222> 
+  "v2": TableHandler<V2> 
   "v_various": ViewHandler<V_various> 
   "various": TableHandler<Various> 
   leftJoin: JoinMakerTables;

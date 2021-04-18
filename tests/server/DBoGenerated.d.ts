@@ -12,18 +12,18 @@ export type TxCB = {
 
 /* SCHEMA DEFINITON. Table names have been altered to work with Typescript */
 export type D_34_42_34 = { 
-  "\"*\""?: string;
   "id"?: number;
+  "\"*\""?: string;
 }
 export type D_42 = { 
-  "*"?: string;
   "id"?: number;
+  "*"?: string;
 }
 export type Ex_j_ins = { 
-  "added"?: Date;
   "id"?: number;
-  "name"?: string;
   "public"?: string;
+  "name"?: string;
+  "added"?: Date;
 }
 export type Item_children = { 
   "id"?: number;
@@ -32,77 +32,59 @@ export type Item_children = {
   "tst"?: Date;
 }
 export type Items = { 
-  "h"?: Array<string>;
   "id"?: number;
+  "h"?: Array<string>;
   "name"?: string;
 }
 export type Items2 = { 
-  "hh"?: Array<string>;
   "id"?: number;
   "items_id"?: number;
+  "hh"?: Array<string>;
   "name"?: string;
 }
 export type Items3 = { 
-  "h"?: Array<string>;
   "id"?: number;
+  "h"?: Array<string>;
   "name"?: string;
 }
 export type Items4 = { 
-  "added"?: Date;
   "id"?: number;
-  "name"?: string;
   "public"?: string;
+  "name"?: string;
+  "added"?: Date;
 }
 export type Items4_pub = { 
-  "added"?: Date;
   "id"?: number;
-  "name"?: string;
   "public"?: string;
+  "name"?: string;
+  "added"?: Date;
 }
 export type Planes = { 
-  "flight_number"?: string;
   "id"?: number;
-  "last_updated"?: number;
   "x"?: number;
   "y"?: number;
+  "flight_number"?: string;
+  "last_updated"?: number;
 }
-export type Tt = { 
-  "t"?: string;
-}
-export type Tz = { 
-  "t"?: string;
-}
-export type Tzz = { 
+export type V2 = { 
   "id"?: number;
+  "h"?: Array<string>;
   "name"?: string;
-  "tst"?: Date;
-}
-export type Tzz2 = { 
-  "id"?: number;
-  "name"?: string;
-  "tst"?: Date;
-}
-export type Tzz22 = { 
-  "id"?: number;
-  "name"?: string;
-  "tst"?: Date;
-}
-export type Tzz222 = { 
-  "id"?: number;
-  "name"?: string;
-  "tst"?: Date;
+  "tsv"?: any;
+  "jsn"?: Object;
+  "added"?: Date;
 }
 export type V_items = { 
   "id"?: number;
   "name"?: string;
 }
 export type Various = { 
-  "added"?: Date;
-  "h"?: Array<string>;
   "id"?: number;
-  "jsn"?: Object;
+  "h"?: Array<string>;
   "name"?: string;
   "tsv"?: any;
+  "jsn"?: Object;
+  "added"?: Date;
 }
 
 export type JoinMakerTables = {
@@ -123,12 +105,7 @@ export type DBObj = {
   "items4": TableHandler<Items4> 
   "items4_pub": TableHandler<Items4_pub> 
   "planes": TableHandler<Planes> 
-  "tt": TableHandler<Tt> 
-  "tz": TableHandler<Tz> 
-  "tzz": TableHandler<Tzz> 
-  "tzz2": TableHandler<Tzz2> 
-  "tzz22": TableHandler<Tzz22> 
-  "tzz222": TableHandler<Tzz222> 
+  "v2": TableHandler<V2> 
   "v_items": ViewHandler<V_items> 
   "various": TableHandler<Various> 
   leftJoin: JoinMakerTables;

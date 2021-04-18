@@ -127,6 +127,10 @@ export declare class PubSubManager {
     parseCondition: (condition: string) => string;
     addSub(subscriptionParams: AddSubscriptionParams): Promise<string>;
     removeLocalSub(table_name: string, condition: string, func: (items: object[]) => any): void;
+    getActiveListeners: () => {
+        table_name: string;
+        condition: string;
+    }[];
     onSocketDisconnected(socket: any, channel_name: any): void;
     checkIfTimescaleBug: (table_name: string) => Promise<boolean>;
     getMyTriggerQuery: () => Promise<string>;

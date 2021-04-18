@@ -12,7 +12,7 @@ import * as Bluebird from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 
-import { SelectParamsBasic as SelectParams, OrderBy, FieldFilter, asName, WAL } from "prostgles-types";
+import { SelectParamsBasic as SelectParams, OrderBy, FieldFilter, asName, WAL, isEmpty } from "prostgles-types";
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 let pgp: PGP = pgPromise({
@@ -140,7 +140,7 @@ export class PubSubManager {
 
     private appID: string;
     // appCheckFrequencyMS = 3600 * 1000;
-    appCheckFrequencyMS = 4 * 1000;
+    appCheckFrequencyMS = 30 * 1000;
     appCheck;
     
     
@@ -183,7 +183,14 @@ export class PubSubManager {
                     /* Drop older version */
                     IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'prostgles') THEN
 
-                        IF to_regclass('prostgles.versions') IS NULL THEN
+                        IF
+                            NOT EXISTS (
+                                SELECT 1 
+                                FROM information_schema.tables 
+                                WHERE  table_schema = 'prostgles'
+                                AND    table_name   = 'versions'
+                            )
+                        THEN
                             DROP SCHEMA IF EXISTS prostgles CASCADE;
                         ELSE 
                             IF NOT EXISTS(SELECT 1 FROM prostgles.versions WHERE version >= ${schema_version}) THEN
@@ -227,7 +234,14 @@ export class PubSubManager {
                             BEGIN
 
                                 --PERFORM pg_notify('debug', concat_ws(' ', args));
-                                IF to_regclass('prostgles.debug') IS NULL THEN
+                                IF
+                                    NOT EXISTS (
+                                        SELECT 1 
+                                        FROM information_schema.tables 
+                                        WHERE  table_schema = 'prostgles'
+                                        AND    table_name   = 'debug'
+                                    )
+                                THEN
                                     CREATE TABLE IF NOT EXISTS prostgles.debug(m TEXT);
                                 END IF;
 
@@ -254,6 +268,7 @@ export class PubSubManager {
                             condition       TEXT NOT NULL,
                             app_ids         TEXT[] NOT NULL,
                             inserted        TIMESTAMP NOT NULL DEFAULT NOW(),
+                            last_used       TIMESTAMP NOT NULL DEFAULT NOW(),
                             PRIMARY KEY (table_name, condition)
                         );
                         COMMENT ON TABLE prostgles.triggers IS 'Tables and conditions that are currently subscribed/synced';
@@ -401,16 +416,34 @@ export class PubSubManager {
                                     --RAISE NOTICE 'INSERT trigger_add_remove_func new_table:  % ', '' || COALESCE((SELECT concat_ws(' ', string_agg(table_name, ' & '), count(*), min(inserted) ) FROM new_table), ' 0 ');
 
                                     FOR trw IN  
-                                        SELECT DISTINCT table_name FROM new_table nt
+
+                                        /* Loop through new table additions */
+                                        SELECT DISTINCT table_name 
+                                        FROM new_table nt
                                         WHERE NOT EXISTS (
+
                                             SELECT 1 FROM prostgles.triggers t 
                                             WHERE t.table_name = nt.table_name
-                                            AND t.inserted < nt.inserted 
+                                            AND   t.inserted   < nt.inserted    -- exclude current record (this is an after trigger). Turn into before trigger?
+                                        )
+
+                                        /* Ignore invalid tables */
+                                        AND  EXISTS (
+                                            SELECT 1 
+                                            FROM information_schema.tables 
+                                            WHERE  table_schema = 'public'
+                                            AND    table_name   = nt.table_name
                                         )
                                     LOOP
                                      
-
-                                        --RAISE NOTICE ' CREATE DATA TRIGGER FOR:  % ', trw.table_name;
+                                        /*
+                                            RAISE NOTICE ' CREATE DATA TRIGGER FOR:  % TABLE EXISTS?', trw.table_name, SELECT EXISTS (
+                                                SELECT 1 
+                                                FROM information_schema.tables 
+                                                WHERE  table_schema = 'public'
+                                                AND    table_name   = nt.table_name
+                                            );
+                                        */
 
                                         query := format(
                                             $q$ 
@@ -445,6 +478,30 @@ export class PubSubManager {
                                         );
 
                                         --RAISE NOTICE ' % ', query;
+
+                                        
+                                        query := format(
+                                            $q$
+                                                DO $e$ 
+                                                BEGIN
+
+                                                    IF EXISTS (
+                                                        SELECT 1 
+                                                        FROM information_schema.tables 
+                                                        WHERE  table_schema = 'public'
+                                                        AND    table_name   = %L
+                                                    ) THEN
+
+                                                        %s
+
+                                                    END IF;
+
+                                                END $e$;
+                                            $q$,
+                                            trw.table_name,
+                                            query
+                                        ) ;
+                                        
 
                                         EXECUTE query;
                                                     
@@ -481,7 +538,14 @@ export class PubSubManager {
                             
                                 --RAISE NOTICE 'SCHEMA_WATCH: %', tg_tag;
                     
-                                IF to_regclass('prostgles.apps') IS NOT NULL THEN
+                                IF
+                                    EXISTS (
+                                        SELECT 1 
+                                        FROM information_schema.tables 
+                                        WHERE  table_schema = 'prostgles'
+                                        AND    table_name   = 'apps'
+                                    )          
+                                THEN
 
                                     SELECT LEFT(COALESCE(current_query(), ''), 5000)
                                     INTO curr_query;
@@ -534,47 +598,83 @@ export class PubSubManager {
                 this.appID = raw.id;
                 console.log(this.appID)
                 if(!this.appCheck) {
+                    
                     this.appCheck = setInterval(async () => {
-                        try {
-                            await this.db.any(`
+                        let appQ = "";
+                        try {   //  drop owned by api
+
+                            let trgCond = "",
+                                listeners = this.getActiveListeners();
+
+                            if(listeners.length){
+                                trgCond = `
+                                ,
+                                last_used = CASE WHEN (table_name, condition) IN (
+                                    ${listeners.map(l => ` ( ${asValue(l.table_name)}, ${asValue(l.condition)} ) ` ).join(", ") }
+                                ) THEN NOW() ELSE last_used END
+                                `
+                            }
+
+                            appQ = `
                             
                                 DO $$
                                 BEGIN
 
-                                    IF to_regclass('prostgles.apps') IS NOT NULL THEN
+                                    IF
+                                        EXISTS (
+                                            SELECT 1 
+                                            FROM information_schema.tables 
+                                            WHERE  table_schema = 'prostgles'
+                                            AND    table_name   = 'apps'
+                                        )
+                                    THEN
+
                                         UPDATE prostgles.apps SET last_check = NOW()
                                         WHERE id = ${asValue(this.appID)};
 
-    /*
+    
                                         IF EXISTS (
                                             SELECT 1 FROM prostgles.apps
                                             WHERE last_check < NOW() - 1.2 * check_frequency_ms * interval '1 millisecond'
                                         ) THEN
 
+
+                                        END IF;
+
+                                        DELETE FROM prostgles.apps
+                                        WHERE last_check < NOW() - check_frequency_ms * interval '1 millisecond';
+
+
+                                        IF EXISTS (
+                                            SELECT 1 FROM prostgles.triggers
+                                        ) THEN
+
                                             LOCK TABLE prostgles.triggers IN ACCESS EXCLUSIVE MODE;
 
-                                            DELETE FROM prostgles.apps
-                                            WHERE last_check < NOW() - check_frequency_ms * interval '1 millisecond';
-
-                                            UPDATE prostgles.triggers 
+                                            UPDATE prostgles.triggers
                                             SET app_ids = ARRAY(
-                                                SELECT DISTINCT unnest(app_ids) INTERSECT 
-                                                SELECT id FROM prostgles.apps
-                                            );
+                                                    SELECT DISTINCT unnest(app_ids) INTERSECT 
+                                                    SELECT id FROM prostgles.apps
+                                                )
+                                                ${trgCond};
 
-                                            DELETE FROM prostgles.triggers 
-                                            WHERE array_length(app_ids, 1) = 0;
+                                            DELETE FROM prostgles.triggers
+                                            WHERE array_length(app_ids, 1) = 0
+                                            OR last_used < NOW() - 2 * ${asValue(this.appCheckFrequencyMS)} * interval '1 millisecond';
+
                                         END IF;
-                                        */
+
+    
                                     END IF;
 
                                 COMMIT;
                                 END $$;
-                            `);
+                            `
+                            await this.db.any(appQ);
                             log("updated last_check");
-
+                            // console.log("appCheck OK")
                         } catch (e) {
-                            console.error("appCheck FAILED: ", e);
+                            console.error("appCheck FAILED: \n", e, appQ);
                         } 
                     }, 0.8 * this.appCheckFrequencyMS);
                 }
@@ -1575,6 +1675,27 @@ export class PubSubManager {
         }
     }
 
+    getActiveListeners = (): { table_name: string; condition: string }[] => {
+        let result = [];
+        const add = (t, c) => {
+            if(!result.find(r => r.table_name === t && r.condition === c)){
+                result.push({ table_name: t, condition: c });
+            }
+        }
+        (this.syncs  || []).map(s => {
+            add(s.table_name, s.condition)
+        });
+        Object.keys(this.subs || {}).map(table_name => {
+            Object.keys(this.subs[table_name] || {}).map(condition => {
+                if(this.subs[table_name][condition].subs.length) {
+                    add(table_name, condition);
+                }
+            })
+        })
+
+        return result;
+    }
+
     onSocketDisconnected(socket, channel_name){
         // process.on('warning', e => {
         //     console.warn(e.stack)
@@ -1584,11 +1705,22 @@ export class PubSubManager {
             Object.keys(this.subs).map(table_name => {
                 Object.keys(this.subs[table_name]).map(condition => {
                     this.subs[table_name][condition].subs.map((sub, i) => {
+
+                        /**
+                         * If a channel name is specified then delete triggers 
+                         */
                         if(
                             sub.socket_id === socket.id &&
                             (!channel_name || sub.channel_name === channel_name)
                         ){
                             this.subs[table_name][condition].subs.splice(i, 1);
+                            if(!this.subs[table_name][condition].subs.length) {
+                                delete this.subs[table_name][condition];
+
+                                if(isEmpty(this.subs[table_name])){
+                                    delete this.subs[table_name];
+                                }
+                            }
                         }
                     });
                 })

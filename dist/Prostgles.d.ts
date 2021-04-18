@@ -39,30 +39,96 @@ export declare type SelectRule = {
      * Fields allowed to be selected.   Tip: Use false to exclude field
      */
     fields: FieldFilter;
+    /**
+     * The maximum number of rows a user can get in a select query. 1000 by default. Unless a higher limit is specified 100 rows are returned by the default
+     */
     maxLimit?: number;
+    /**
+     * Filter added to every query (e.g. user_id) to restrict access
+     */
     forcedFilter?: object;
+    /**
+     * Fields user can filter by
+     * */
     filterFields?: FieldFilter;
+    /**
+     * Validation logic to check/update data for each request
+     */
     validate?(SelectRequestData: any): SelectRequestData;
+    /**
+     * Allows clients to get column information on any columns that are allowed in any rules. True by default.
+     */
+    getColumns?: boolean;
+    /**
+     * Allows clients to get table information (oid, comment). True by default.
+     */
+    getInfo?: boolean;
 };
 export declare type InsertRule = {
+    /**
+     * Fields allowed to be inserted.   Tip: Use false to exclude field
+     */
     fields: FieldFilter;
+    /**
+     * Data to include/overwrite on each insert
+     */
     forcedData?: object;
+    /**
+     * Fields user can view after inserting
+     */
     returningFields?: FieldFilter;
+    /**
+     * Validation logic to check/update data for each request. Happens before field check
+     */
     preValidate?: (row: object) => object | Promise<object>;
+    /**
+     * Validation logic to check/update data for each request. Happens after field check
+     */
     validate?: (row: object) => object | Promise<object>;
 };
 export declare type UpdateRule = {
+    /**
+     * Fields allowed to be updated.   Tip: Use false to exclude field
+     */
     fields: FieldFilter;
+    /**
+     * Filter added to every query (e.g. user_id) to restrict access
+     * This filter cannot be updated
+     */
     forcedFilter?: object;
+    /**
+     * Data to include/overwrite on each update
+     */
     forcedData?: object;
+    /**
+     * Fields user can use to find the updates
+     */
     filterFields?: FieldFilter;
+    /**
+     * Fields user can view after updating
+     */
     returningFields?: FieldFilter;
+    /**
+     * Validation logic to check/update data for each request
+     */
     validate?: (row: object) => object | Promise<object>;
 };
 export declare type DeleteRule = {
+    /**
+     * Filter added to every query (e.g. user_id) to restrict access
+     */
     forcedFilter?: object;
+    /**
+     * Fields user can filter by
+     */
     filterFields?: FieldFilter;
+    /**
+     * Fields user can view after deleting
+     */
     returningFields?: FieldFilter;
+    /**
+     * Validation logic to check/update data for each request
+     */
     validate?(...UpdateRequestData: any[]): UpdateRequestData;
 };
 export declare type SyncRule = {
@@ -111,7 +177,6 @@ export declare type PublishTableRule = {
 };
 export declare type PublishViewRule = {
     select: SelectRule | "*" | false | null;
-    getColumns: boolean;
 };
 export declare type RequestParams = {
     dbo?: DbHandler;

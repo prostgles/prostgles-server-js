@@ -39,7 +39,7 @@ prostgles({
   io,
   tsGeneratedTypesDir: path.join(__dirname + '/'),
   watchSchema: s => {
-    console.log(s.command)
+    // console.log(s.command)
   },// "hotReloadMode",
 	sqlFilePath: path.join(__dirname+'/init.sql'),
   // transactions: true,	

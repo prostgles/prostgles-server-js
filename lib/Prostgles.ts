@@ -101,73 +101,122 @@ export type UpdateRequestDataBatch = {
 export type UpdateRequestData = UpdateRequestDataOne | UpdateRequestDataBatch;
 
 export type SelectRule = {
-    // Fields allowed to be selected.   Tip: Use false to exclude field
+
     /**
      * Fields allowed to be selected.   Tip: Use false to exclude field
      */
     fields: FieldFilter;
 
+    /**
+     * The maximum number of rows a user can get in a select query. 1000 by default. Unless a higher limit is specified 100 rows are returned by the default
+     */
     maxLimit?: number;
 
-    // Filter added to every query (e.g. user_id) to restrict access
+    /**
+     * Filter added to every query (e.g. user_id) to restrict access
+     */
     forcedFilter?: object;
 
-    // Fields user can filter by
+    /**
+     * Fields user can filter by 
+     * */
     filterFields?: FieldFilter;
 
-    // Validation logic to check/update data for each request
-    validate?(SelectRequestData): SelectRequestData
+    /**
+     * Validation logic to check/update data for each request
+     */
+    validate?(SelectRequestData): SelectRequestData;
+
+    /**
+     * Allows clients to get column information on any columns that are allowed in any rules. True by default. 
+     */
+    getColumns?: boolean;
+    
+    /**
+     * Allows clients to get table information (oid, comment). True by default. 
+     */
+    getInfo?: boolean;
 }
 export type InsertRule = {
 
-    // Fields allowed to be inserted.   Tip: Use false to exclude field
+    /**
+     * Fields allowed to be inserted.   Tip: Use false to exclude field
+     */
     fields: FieldFilter;
 
-    // Data to include/overwrite on each insert
+    /**
+     * Data to include/overwrite on each insert
+     */
     forcedData?: object;
 
-    // Fields user can view after inserting
+    /**
+     * Fields user can view after inserting
+     */
     returningFields?: FieldFilter;
 
-    // Validation logic to check/update data for each request. Happens before field check
+    /**
+     * Validation logic to check/update data for each request. Happens before field check
+     */
     preValidate?: (row: object) => object | Promise<object>
 
-    // Validation logic to check/update data for each request. Happens after field check
+    /**
+     * Validation logic to check/update data for each request. Happens after field check
+     */
     validate?: (row: object) => object | Promise<object>
 }
 export type UpdateRule = {
 
-    // Fields allowed to be updated.   Tip: Use false to exclude field
+    /**
+     * Fields allowed to be updated.   Tip: Use false to exclude field
+     */
     fields: FieldFilter;
 
-    // Filter added to every query (e.g. user_id) to restrict access
-    // This filter cannot be updated
+    /**
+     * Filter added to every query (e.g. user_id) to restrict access
+     * This filter cannot be updated
+     */
     forcedFilter?: object;
 
-    // Data to include/overwrite on each update
+    /**
+     * Data to include/overwrite on each update
+     */
     forcedData?: object;
 
-    // Fields user can use to find the updates
+    /**
+     * Fields user can use to find the updates
+     */
     filterFields?: FieldFilter;
 
-    // Fields user can view after updating
+    /**
+     * Fields user can view after updating
+     */
     returningFields?: FieldFilter;
 
-    // Validation logic to check/update data for each request
+    /**
+     * Validation logic to check/update data for each request
+     */
     validate?: (row: object) => object | Promise<object>
 }
 export type DeleteRule = {
     
-    // Filter added to every query (e.g. user_id) to restrict access
+    /**
+     * Filter added to every query (e.g. user_id) to restrict access
+     */
     forcedFilter?: object;
 
-    // Fields user can filter by
+    /**
+     * Fields user can filter by
+     */
     filterFields?: FieldFilter;
 
-    // Fields user can view after deleting
+    /**
+     * Fields user can view after deleting
+     */
     returningFields?: FieldFilter;
 
-    // Validation logic to check/update data for each request
+    /**
+     * Validation logic to check/update data for each request
+     */
     validate?(...UpdateRequestData): UpdateRequestData
 }
 export type SyncRule = {
@@ -222,7 +271,6 @@ export type PublishTableRule = {
 };
 export type PublishViewRule = {
     select: SelectRule | "*" | false | null;
-    getColumns: boolean;
 };
 // export type Publish = {
 //     tablesOrViews: {[key:string]: TableRule | ViewRule | "*" }
@@ -780,7 +828,7 @@ export class Prostgles {
                                             { name } = f;
 
                                         return {
-                                            name,
+                                            ...f,
                                             ...(dataType? { dataType: dataType.typname } : {}),
                                             ...(tableName? { tableName: tableName.relname } : {}),
                                         }
@@ -789,7 +837,7 @@ export class Prostgles {
                                 cb(null, qres)
                                 // return qres;//{ duration, fields, rows, rowCount };
                             })
-                            .catch(err =>{ 
+                            .catch(err => { 
                                 makeSocketError(cb, err);
                                 // Promise.reject(err.toString());
                             });
@@ -887,7 +935,7 @@ const RULE_TO_METHODS = [
     },
    { 
        rule: "select", 
-       methods: ["findOne", "find", "count", "getColumns"], 
+       methods: ["findOne", "find", "count", "getColumns", "getInfo"], 
        no_limits: <SelectRule>{ fields: "*", filterFields: "*" }, 
        allowed_params: <Array<keyof SelectRule>>["fields", "filterFields", "forcedFilter", "validate", "maxLimit"] ,
        hint: ` expecting "*" | true | { fields: ( string | string[] | {} )  }`
@@ -1001,8 +1049,12 @@ export class PublishParser {
         /* Must be local request -> allow everything */
         if(!socket) return undefined;
 
+        /* Must be from socket. Must have a publish */
+        if(!this.publish) throw "publish is missing";
+
         /* Get any publish errors for socket */
         const schm = get(socket, `prostgles.schema.${tableName}.${command}`);
+
         // console.log(schm, get(socket, `prostgles.schema`));
         if(schm && schm.err) throw schm.err;
 
@@ -1014,8 +1066,6 @@ export class PublishParser {
                 throw `Invalid or disallowed command: upsert`;
             }
         }
-
-        if(!this.publish) throw "publish is missing";
 
         if(rtm && table_rule && table_rule[rtm.rule]){
             return table_rule;

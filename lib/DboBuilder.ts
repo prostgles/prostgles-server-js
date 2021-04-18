@@ -28,7 +28,7 @@ import { getNewQuery, makeQuery, COMPUTED_FIELDS, SelectItem, FieldSpec, asNameA
 import { 
     DB, TableRule, SelectRule, InsertRule, UpdateRule, DeleteRule, SyncRule, Joins, Join, Prostgles, PublishParser, flat 
 } from "./Prostgles";
-import { PubSubManager, filterObj } from "./PubSubManager";
+import { PubSubManager, filterObj, asValue } from "./PubSubManager";
 
 import { parseFilterItem } from "./Filtering";
 
@@ -41,6 +41,8 @@ export const pgp: PGP = pgPromise({
 export type TableInfo = {
     schema: string;
     name: string;
+    oid: number;
+    comment: string;
     columns: ColumnInfo[];
 }
 
@@ -156,8 +158,12 @@ export type ValidatedTableRules = {
         /* Filter applied to every select */
         forcedFilter: any;
 
-        /* Max limit allowed for each select */
-        maxLimit: number;
+        /* Max limit allowed for each select. 1000 by default. If null then an unlimited select is allowed when providing { limit: null } */
+        maxLimit: number | null;
+
+        getColumns: boolean;
+
+        getInfo: boolean;
     },
     update: {
         /* Fields you can update */
@@ -482,11 +488,25 @@ export class ViewHandler {
         if(filter === null || filter && !isPojoObject(filter)) throw `invalid filter -> ${JSON.stringify(filter)} \nExpecting:    undefined | {} | { field_name: "value" } | { field: { $gt: 22 } } ... `;
     }
 
+    async getInfo(tableRules?: TableRule, localParams?: LocalParams): Promise<{ oid: number; comment: string; }>{
+        const p = this.getValidatedRules(tableRules, localParams);
+        if(!p.select.getInfo) throw "Not allowed";
+
+        return {
+            oid: this.tableOrViewInfo.oid,
+            comment: this.tableOrViewInfo.comment,
+        }
+    }
+
+    // TODO: fix renamed table trigger problem
+    
     async getColumns(tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]> {
 
         try {
             const p = this.getValidatedRules(tableRules, localParams);
     
+            if(!p.select.getColumns) throw "Not allowed";
+
             // console.log("getColumns", this.name, this.columns.map(c => c.name))
             return this.columns.map(c => ({
                 ...c,
@@ -550,7 +570,7 @@ export class ViewHandler {
                 
                 let maxLimit = 1000;
                 if(tableRules.select.maxLimit !== undefined){
-                    if(!Number.isInteger(maxLimit)) throw ` Invalid publish.${this.name}.select.maxLimit -> expecting integer but got ` + maxLimit;
+                    if(maxLimit !== null && (!Number.isInteger(maxLimit) || maxLimit < 0)) throw ` Invalid publish.${this.name}.select.maxLimit -> expecting   a positive integer OR null    but got ` + maxLimit;
                     maxLimit = tableRules.select.maxLimit;
                 }
             
@@ -558,8 +578,13 @@ export class ViewHandler {
                     fields: this.parseFieldFilter(tableRules.select.fields),
                     forcedFilter: { ...tableRules.select.forcedFilter },
                     filterFields: this.parseFieldFilter(tableRules.select.filterFields),
+                    getColumns: tableRules.select.getColumns,
+                    getInfo: tableRules.select.getInfo,
                     maxLimit
-                }
+                };
+
+                if(res.select.getColumns === undefined) res.select.getColumns = true;
+                if(res.select.getInfo === undefined) res.select.getInfo = true;
             }
 
             /* UPDATE */
@@ -606,7 +631,9 @@ export class ViewHandler {
                     fields: all_cols,
                     filterFields: all_cols,
                     forcedFilter: {},
-                    maxLimit: 10000,
+                    maxLimit: null,
+                    getColumns: true,
+                    getInfo: true
                 },
                 update: {
                     fields: all_cols,
@@ -1206,20 +1233,23 @@ export class ViewHandler {
     }
 
     /* This relates only to SELECT */
-    prepareLimitQuery(limit = 100, maxLimit: number): number{
-        const DEFAULT_LIMIT = 100,
-            MAX_LIMIT = 1000;
+    prepareLimitQuery(limit, p: ValidatedTableRules): number {
 
-        let _limit = [limit, DEFAULT_LIMIT].find(Number.isInteger);
-            
-        if(!Number.isInteger(_limit)){
-            throw "limit must be an integer"
+        if(limit !== undefined && limit !== null && !Number.isInteger(limit)){
+            throw "Unexpected LIMIT. Must be null or an integer";
         }
+        
+        let _limit = limit;
 
-        if(Number.isInteger(maxLimit)){
-            _limit = Math.min(_limit, maxLimit);
+        /* If no limit then set as the lesser of (100, maxLimit) */
+        if(_limit !== null && !Number.isInteger(_limit)){
+            _limit = [100, p.select.maxLimit].filter(Number.isInteger).sort((a, b) => a - b)[0];
         } else {
-            _limit = Math.min(_limit, MAX_LIMIT);
+
+            /* If a limit higher than maxLimit specified throw error */
+            if(Number.isInteger(p.select.maxLimit) && _limit > p.select.maxLimit){
+                throw "Unexpected LIMIT. Must be less than " + p.select.maxLimit;
+            }
         }
 
         return _limit;
@@ -2032,6 +2062,7 @@ export type DbHandlerTX = { [key: string]: TX } | DbHandler;
 
 
 import { JOIN_TYPES } from "./Prostgles";
+import { type } from "os";
 
 export class DboBuilder {
     tablesOrViews: TableOrViewInfo[];
@@ -2200,7 +2231,7 @@ export class DboBuilder {
 
         // await this.pubSubManager.init()
 
-        this.tablesOrViews = await getTablesForSchemaPostgresSQL(this.db, this.schema);
+        this.tablesOrViews = await getTablesForSchemaPostgresSQL(this.db);  //, this.schema
         // console.log(this.tablesOrViews.map(t => `${t.name} (${t.columns.map(c => c.name).join(", ")})`))
 
         const common_types = 
@@ -2342,48 +2373,59 @@ export type TxCB = {
 
 
 /* UTILS */
-function getTablesForSchemaPostgresSQL(db: DB, schema: string): Promise<{
+function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"): Promise<{
     schema: string;
     name: string;
+    oid: number;
+    comment: string;
     columns: ColumnInfo[];
     is_view: boolean;
     parent_tables: string[];
 }[]>{
-    const query = " \
-    SELECT t.table_schema as schema, t.table_name as name \
-    , json_agg((SELECT x FROM (SELECT cc.column_name as name, cc.data_type, cc.udt_name, cc.element_type, cc.is_pkey) as x) ORDER BY cc.column_name, cc.data_type ) as columns  \
-    , t.table_type = 'VIEW' as is_view \
-    , array_to_json(vr.table_names) as parent_tables \
-    FROM information_schema.tables t  \
-    INNER join (  \
-        SELECT c.table_schema, c.table_name, c.column_name, c.data_type, c.udt_name, e.data_type as element_type,  \
-        EXISTS ( \
-            SELECT 1    \
-            from information_schema.table_constraints as tc \
-            JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema  \
-            WHERE kcu.table_schema = c.table_schema AND kcu.table_name = c.table_name AND kcu.column_name = c.column_name AND tc.constraint_type IN ('PRIMARY KEY') \
-        ) as is_pkey    \
-        FROM information_schema.columns c    \
-        LEFT JOIN (SELECT * FROM information_schema.element_types )   e  \
-             ON ((c.table_catalog, c.table_schema, c.table_name, 'TABLE', c.dtd_identifier)  \
-              = (e.object_catalog, e.object_schema, e.object_name, e.object_type, e.collection_type_identifier))  \
-    ) cc  \
-    ON t.table_name = cc.table_name  \
-    AND t.table_schema = cc.table_schema  \
-    LEFT JOIN ( \
-        SELECT cl_r.relname as view_name, array_agg(DISTINCT cl_d.relname) AS table_names \
-        FROM pg_rewrite AS r \
-        JOIN pg_class AS cl_r ON r.ev_class=cl_r.oid \
-        JOIN pg_depend AS d ON r.oid=d.objid \
-        JOIN pg_class AS cl_d ON d.refobjid=cl_d.oid \
-        WHERE cl_d.relkind IN ('r','v') \
-        AND cl_d.relname <> cl_r.relname \
-        GROUP BY cl_r.relname \
-    ) vr \
-    ON t.table_name = vr.view_name \
-    where t.table_schema = ${schema} AND t.table_name <> 'spatial_ref_sys'  \
-    GROUP BY t.table_schema, t.table_name, t.table_type, vr.table_names  \
-    ORDER BY schema, name ";
+    const query = 
+    `
+    SELECT t.table_schema as schema, t.table_name as name 
+    , cc.table_oid as oid
+    , json_agg((SELECT x FROM (SELECT cc.column_name as name, cc.data_type, cc.udt_name, cc.element_type, cc.is_pkey, cc.comment, cc.ordinal_position, cc.is_nullable = 'YES' as is_nullable) as x) ORDER BY cc.ordinal_position ) as columns  
+    , t.table_type = 'VIEW' as is_view 
+    , array_to_json(vr.table_names) as parent_tables
+    , obj_description(cc.table_oid::regclass) as comment
+    FROM information_schema.tables t  
+    INNER join (
+        SELECT c.table_schema, c.table_name, c.column_name, c.data_type, c.udt_name, e.data_type as element_type
+        ,  col_description(format('%I.%I', c.table_schema, c.table_name)::regclass::oid, c.ordinal_position) as comment
+        , EXISTS ( 
+            SELECT 1    
+            from information_schema.table_constraints as tc 
+            JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema  
+            WHERE kcu.table_schema = c.table_schema AND kcu.table_name = c.table_name AND kcu.column_name = c.column_name AND tc.constraint_type IN ('PRIMARY KEY') 
+        ) as is_pkey
+        , c.ordinal_position
+        , format('%I.%I', c.table_schema, c.table_name)::regclass::oid AS table_oid
+        , c.is_nullable
+        FROM information_schema.columns c    
+        LEFT JOIN (SELECT * FROM information_schema.element_types )   e  
+            ON ((c.table_catalog, c.table_schema, c.table_name, 'TABLE', c.dtd_identifier)  
+            = (e.object_catalog, e.object_schema, e.object_name, e.object_type, e.collection_type_identifier)
+        )
+    ) cc  
+    ON t.table_name = cc.table_name  
+    AND t.table_schema = cc.table_schema  
+    LEFT JOIN ( 
+        SELECT cl_r.relname as view_name, array_agg(DISTINCT cl_d.relname) AS table_names 
+        FROM pg_rewrite AS r 
+        JOIN pg_class AS cl_r ON r.ev_class=cl_r.oid 
+        JOIN pg_depend AS d ON r.oid=d.objid 
+        JOIN pg_class AS cl_d ON d.refobjid=cl_d.oid 
+        WHERE cl_d.relkind IN ('r','v') 
+        AND cl_d.relname <> cl_r.relname 
+        GROUP BY cl_r.relname 
+    ) vr 
+    ON t.table_name = vr.view_name 
+    WHERE t.table_schema = ${asValue(schema)}
+    GROUP BY t.table_schema, t.table_name, t.table_type, vr.table_names , cc.table_oid
+    ORDER BY schema, name
+    `;
     // console.log(pgp.as.format(query, { schema }), schema);
     return db.any(query, { schema });
 }

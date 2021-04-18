@@ -19,6 +19,8 @@ export declare const pgp: PGP;
 export declare type TableInfo = {
     schema: string;
     name: string;
+    oid: number;
+    comment: string;
     columns: ColumnInfo[];
 };
 export declare type ViewInfo = TableInfo & {
@@ -67,7 +69,9 @@ export declare type ValidatedTableRules = {
         fields: string[];
         filterFields: string[];
         forcedFilter: any;
-        maxLimit: number;
+        maxLimit: number | null;
+        getColumns: boolean;
+        getInfo: boolean;
     };
     update: {
         fields: string[];
@@ -135,6 +139,10 @@ export declare class ViewHandler {
     };
     getJoins(source: string, target: string, path?: string[]): JoinInfo;
     checkFilter(filter: any): void;
+    getInfo(tableRules?: TableRule, localParams?: LocalParams): Promise<{
+        oid: number;
+        comment: string;
+    }>;
     getColumns(tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]>;
     getValidatedRules(tableRules?: TableRule, localParams?: LocalParams): ValidatedTableRules;
     find(filter?: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]>;
@@ -181,7 +189,7 @@ export declare class ViewHandler {
         tableRules?: TableRule;
     }): Promise<string>;
     prepareSort(orderBy: OrderBy, allowed_cols: any, tableAlias: string, excludeOrder: boolean, select: SelectItem[]): string;
-    prepareLimitQuery(limit: number, maxLimit: number): number;
+    prepareLimitQuery(limit: any, p: ValidatedTableRules): number;
     prepareOffsetQuery(offset: number): number;
     intersectColumns(allowedFields: FieldFilter, dissallowedFields: FieldFilter, fixIssues?: boolean): string[];
     /**

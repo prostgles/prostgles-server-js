@@ -129,14 +129,21 @@ prostgles({
       // ); 
       // console.log(res.map(r => JSON.stringify(r)).join("\n"));//, null, 2))  
 
-      const r = await db.items.findOne({ "id.=": 1 }, { select: { $rowhash: 1, "*": 1 } });
-
+      // const r = await db.items.findOne({ "id.=": 1 }, { select: { $rowhash: 1, "*": 1 } });
       // const rr = await db.items.update({ '$rowhash': r.$rowhash } as any, { name: 'a' } as any, { returning: "*"})
-      console.log(r);
+      
+      
+      // console.log(await _db.result(`SELECT *
+      // FROM (
+      //     SELECT * 
+      //     FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc 
+      //     inner join INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE cu 
+      //     on cu.CONSTRAINT_NAME = tc.CONSTRAINT_NAME 
+      // ) t`));
       if(true || process.env.NPORT){
 
       }
-
+ 
     } catch(e) {
       console.error(e)
     }

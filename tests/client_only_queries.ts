@@ -21,8 +21,9 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       assert.deepStrictEqual(select1[0], { col1: 1 }, "db.sql justRows query failed");
   
       const fullResult = await db.sql("SELECT $1 as col1", [1]);
+      // console.log(fullResult)
       assert.deepStrictEqual(fullResult.rows[0], { col1: 1 }, "db.sql query failed");
-      assert.deepStrictEqual(fullResult.fields, [ { name: 'col1', dataType: 'int4' } ] , "db.sql query failed");
+      assert.deepStrictEqual(fullResult.fields, [ { name: 'col1', tableID: 0,columnID: 0, dataTypeID: 23, dataTypeSize: 4, dataTypeModifier: -1,format: 'text', dataType: 'int4' } ] , "db.sql query failed");
   
   
       /* REPLICATION */

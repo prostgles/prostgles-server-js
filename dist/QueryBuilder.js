@@ -708,6 +708,7 @@ function getNewQuery(_this, filter, selectParams, param3_unused = null, tableRul
             localParams,
             tableRule: tableRules
         });
+        const p = _this.getValidatedRules(tableRules, localParams);
         let resQuery = {
             allFields: allowedFields,
             select,
@@ -715,7 +716,7 @@ function getNewQuery(_this, filter, selectParams, param3_unused = null, tableRul
             joins: joinQueries,
             where,
             // having: cond.having,
-            limit: _this.prepareLimitQuery(selectParams.limit, utils_1.get(tableRules, "select.maxLimit")),
+            limit: _this.prepareLimitQuery(selectParams.limit, p),
             orderBy: [_this.prepareSort(selectParams.orderBy, allowedFields, selectParams.alias, null, select)],
             offset: _this.prepareOffsetQuery(selectParams.offset)
         };
