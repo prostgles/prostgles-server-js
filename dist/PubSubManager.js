@@ -48,7 +48,7 @@ class PubSubManager {
         this.appCheckFrequencyMS = 30 * 1000;
         this.init = () => __awaiter(this, void 0, void 0, function* () {
             try {
-                const schema_version = 1;
+                const schema_version = 2;
                 const q = `
                 BEGIN; --  ISOLATION LEVEL SERIALIZABLE;-- TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 

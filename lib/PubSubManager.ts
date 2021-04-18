@@ -169,7 +169,7 @@ export class PubSubManager {
     init = async (): Promise<PubSubManager> => {
 
         try {
-            const schema_version = 1;
+            const schema_version = 2;
            
             const q = `
                 BEGIN; --  ISOLATION LEVEL SERIALIZABLE;-- TRANSACTION ISOLATION LEVEL SERIALIZABLE;
