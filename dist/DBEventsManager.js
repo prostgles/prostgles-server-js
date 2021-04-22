@@ -53,17 +53,26 @@ class DBEventsManager {
             if (typeof query !== "string" || (!socket && !func)) {
                 throw "Expecting (query: string, socket?, localFunc?) But received: " + JSON.stringify({ query, socket, func });
             }
-            let q = query.trim().toLowerCase();
-            if (!q.startsWith("listen")) {
+            /* Remove comments */
+            let q = query.trim()
+                .replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '\n')
+                .split("\n").map(v => v.trim()).filter(v => v && !v.startsWith("--"))
+                .join("\n");
+            /* Find the notify channel name */
+            if (!q.toLowerCase().startsWith("listen")) {
                 throw "Expecting a LISTEN query but got: " + query;
             }
             q = q.slice(7).trim(); // Remove listen
             if (q.endsWith(";"))
                 q = q.slice(0, -1);
-            q = q.replace(/""/g, `"`);
             if (q.startsWith('"') && q.endsWith('"')) {
                 q = q.slice(1, -1);
             }
+            else {
+                /* Replicate PG by lowercasing identifier if not quoted */
+                q = q.toLowerCase();
+            }
+            q = q.replace(/""/g, `"`);
             let channel = q;
             let notifChannel = yield this.getNotifChannelName(channel);
             notifChannel = notifChannel.replace(/""/g, `"`);
