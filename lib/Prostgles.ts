@@ -12,13 +12,15 @@ const version = pkgj.version;
 
 import { get } from "./utils";
 import { DboBuilder, DbHandler, DbHandlerTX, TableHandler, ViewHandler } from "./DboBuilder";
-import { PubSubManager, DEFAULT_SYNC_BATCH_SIZE } from "./PubSubManager";
+import { PubSubManager, DEFAULT_SYNC_BATCH_SIZE, asValue } from "./PubSubManager";
  
-type PGP = pgPromise.IMain<{}, pg.IClient>;
+export type PGP = pgPromise.IMain<{}, pg.IClient>;
 
 
 export { DbHandler, DbHandlerTX } from "./DboBuilder";
-import { SQLRequest, SQLOptions, CHANNELS } from "prostgles-types";
+import { SQLRequest, SQLOptions, CHANNELS, asName } from "prostgles-types";
+
+import { DBEventsManager } from "./DBEventsManager";
 
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
@@ -405,6 +407,8 @@ export class Prostgles {
      */
     onNotice?: ProstglesInitOptions["onNotice"];
 
+    dbEventsManager: DBEventsManager;
+
     constructor(params: ProstglesInitOptions){
         if(!params) throw "ProstglesInitOptions missing";
         if(!params.io) console.warn("io missing. WebSockets will not be set up");
@@ -499,10 +503,16 @@ export class Prostgles {
     async init(onReady: (dbo: DbHandler | DbHandlerTX, db: DB) => any){
         this.loaded = false;
 
+
         if(this.watchSchema === "hotReloadMode" && !this.tsGeneratedTypesDir) throw "tsGeneratedTypesDir option is needed for watchSchema: hotReloadMode to work ";
 
         /* 1. Connect to db */
-        const { db, pgp } = getDbConnection(this.dbConnection, this.dbOptions, this.DEBUG_MODE, true, this.onNotice);
+        const { db, pgp } = getDbConnection(this.dbConnection, this.dbOptions, this.DEBUG_MODE, true, notice => { 
+            if(this.onNotice) this.onNotice(notice);
+            if(this.dbEventsManager){
+                this.dbEventsManager.onNotice(notice)
+            }
+        });
         this.db = db;
         this.pgp = pgp;
         this.checkDb();
@@ -539,7 +549,8 @@ export class Prostgles {
                 if(!(await isSuperUser(db))) throw "Cannot watchSchema without a super user schema. Set watchSchema=false or provide a super user";
             }
 
-
+            this.dbEventsManager = new DBEventsManager(db, pgp);
+            
             /* 5. Finish init and provide DBO object */
             try {
                 onReady(this.dbo, this.db);
@@ -694,11 +705,13 @@ export class Prostgles {
                 });
 
                 socket.on("disconnect", () => {
-                    this.connectedSockets = this.connectedSockets.filter(s => s.id !== socket.id)
+                    this.dbEventsManager.removeNotice(socket);
+                    this.dbEventsManager.removeNotify(socket);
+                    this.connectedSockets = this.connectedSockets.filter(s => s.id !== socket.id);
                     // subscriptions = subscriptions.filter(sub => sub.socket.id !== socket.id);
                     if(this.onSocketDisconnect){
                         this.onSocketDisconnect(socket, dbo);
-                    }
+                    };
                 });
 
                 socket.removeAllListeners(CHANNELS.METHOD)
@@ -795,17 +808,34 @@ export class Prostgles {
         let fullSchema = [];
         let allTablesViews = this.dboBuilder.tablesOrViews;
         if(this.publishRawSQL && typeof this.publishRawSQL === "function"){
-            const canRunSQL = await this.publishRawSQL(socket, dbo, db, await this.getUser(socket));
+            const canRunSQL = async () => {
+                let res = await this.publishRawSQL(socket, dbo, db, await this.getUser(socket));
+                return Boolean(res && typeof res === "boolean" || res === "*");
+            } 
 
             // console.log("canRunSQL", canRunSQL, socket.handshake.headers["x-real-ip"]);//, allTablesViews);
 
-            if(canRunSQL && typeof canRunSQL === "boolean" || canRunSQL === "*"){
+            if(await canRunSQL()){
                 socket.removeAllListeners(CHANNELS.SQL)
-                socket.on(CHANNELS.SQL, function({ query, params, options }: SQLRequest, cb = (...callback) => {}){
-                    const { returnType }: SQLOptions = options || ({} as any);
+                socket.on(CHANNELS.SQL, async ({ query, params, options }: SQLRequest, cb = (...callback) => {}) => {
 
-                    // console.log(query, options)
-                    if(returnType === "statement"){
+                    if(!(await canRunSQL())) {
+                        cb("Dissallowed", null);
+                        return;
+                    }
+
+                    const { returnType }: SQLOptions = options || ({} as any);
+                    if(returnType === "noticeSubscription"){
+
+                        const sub = this.dbEventsManager.addNotice(socket);
+                        socket.on(sub.socketChannel + "unsubscribe", ()=>{
+                            this.dbEventsManager.removeNotice(socket);
+                        });
+                        cb(null, {
+                            socketChannel: sub.socketChannel,
+                            socketUnsubChannel: sub.socketUnsubChannel,
+                        });
+                    } else if(returnType === "statement"){
                         try {
                             cb(null, pgp.as.format(query, params));
                         } catch (err){
@@ -814,28 +844,40 @@ export class Prostgles {
                     } else if(db) {
 
                         db.result(query, params)
-                            .then((qres: any) => {
-                                const { duration, fields, rows, rowCount } = qres;
-                                if(returnType === "rows") {
-                                    cb(null, rows);
-                                    return;
-                                }
+                            .then(async (qres: any) => {
+                                const { duration, fields, rows, command } = qres;
 
-                                if(fields && DATA_TYPES.length){
-                                    qres.fields = fields.map(f => {
-                                        const dataType = DATA_TYPES.find(dt => +dt.oid === +f.dataTypeID),
-                                            tableName = USER_TABLES.find(t => +t.relid === +f.tableID),
-                                            { name } = f;
-
-                                        return {
-                                            ...f,
-                                            ...(dataType? { dataType: dataType.typname } : {}),
-                                            ...(tableName? { tableName: tableName.relname } : {}),
-                                        }
+                                if(command === "LISTEN"){
+                                    const sub = await this.dbEventsManager.addNotify(query, socket);
+                                    socket.on(sub.socketChannel + "unsubscribe", ()=>{
+                                        this.dbEventsManager.removeNotify(sub.notifChannel, socket);
                                     });
+                                    cb(null, {
+                                        socketChannel: sub.socketChannel,
+                                        socketUnsubChannel: sub.socketUnsubChannel,
+                                        notifChannel: sub.notifChannel,
+                                    });
+
+                                } else if(returnType === "rows") {
+                                    cb(null, rows);
+                                    
+                                } else {
+                                    if(fields && DATA_TYPES.length){
+                                        qres.fields = fields.map(f => {
+                                            const dataType = DATA_TYPES.find(dt => +dt.oid === +f.dataTypeID),
+                                                tableName = USER_TABLES.find(t => +t.relid === +f.tableID),
+                                                { name } = f;
+    
+                                            return {
+                                                ...f,
+                                                ...(dataType? { dataType: dataType.typname } : {}),
+                                                ...(tableName? { tableName: tableName.relname } : {}),
+                                            }
+                                        });
+                                    }
+                                    cb(null, qres)
                                 }
-                                cb(null, qres)
-                                // return qres;//{ duration, fields, rows, rowCount };
+                                
                             })
                             .catch(err => { 
                                 makeSocketError(cb, err);

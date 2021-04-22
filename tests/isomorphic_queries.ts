@@ -12,6 +12,11 @@ export async function tryRun(desc: string, func: () => any){
     throw err;
   }
 }
+export function tryRunP(desc: string, func: (resolve: any, reject: any) => any){
+  return new Promise((rv, rj) => {
+    func(rv, rj)
+  });
+}
 
 export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHandlerClient>){
   await db.items.delete({ });
@@ -50,6 +55,10 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
 
     // console.log(await db["*"].find())
   });
+
+
+  // add getInfo and getCols tests
+  // console.log(await db.items.getInfo(), await db.items.getColumns())
 
   /**
    * TODO -> ADD ALL FILTER TYPES

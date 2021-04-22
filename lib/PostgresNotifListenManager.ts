@@ -3,28 +3,26 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+export type PrglNotifListener = (args: { length: number; processId: number; channel: string; payload: string; name: string; }) => void;
 export class PostgresNotifListenManager {
     connection: any;
     db_pg: any;
-    notifListener: any;
-    db_channel_name: any;
+    notifListener: PrglNotifListener;
+    db_channel_name: string;
     isListening: any;
 
-    constructor(db_pg, notifListener, db_channel_name){
+    constructor(db_pg, notifListener: PrglNotifListener, db_channel_name: string){
         if(!db_pg || !notifListener || !db_channel_name) throw "PostgresNotifListenManager: db_pg OR notifListener OR db_channel_name MISSING";
 
         this.connection = null;
         this.db_pg = db_pg;
         this.notifListener = notifListener;
+
         this.db_channel_name = db_channel_name;
 
         this.isListening = this.startListening();
     }
-
-    // isListening(){
-
-    // }
-
+    
     isReady(){
         return this.isListening;
     }

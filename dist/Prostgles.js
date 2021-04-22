@@ -22,6 +22,7 @@ const utils_1 = require("./utils");
 const DboBuilder_1 = require("./DboBuilder");
 const PubSubManager_1 = require("./PubSubManager");
 const prostgles_types_1 = require("prostgles-types");
+const DBEventsManager_1 = require("./DBEventsManager");
 let currConnection;
 function getDbConnection(dbConnection, options, debugQueries = false, noNewConnections = true, onNotice = null) {
     let pgp = pgPromise(Object.assign(Object.assign({ promiseLib: promise }, (debugQueries ? {
@@ -138,14 +139,30 @@ class Prostgles {
             let fullSchema = [];
             let allTablesViews = this.dboBuilder.tablesOrViews;
             if (this.publishRawSQL && typeof this.publishRawSQL === "function") {
-                const canRunSQL = yield this.publishRawSQL(socket, dbo, db, yield this.getUser(socket));
+                const canRunSQL = () => __awaiter(this, void 0, void 0, function* () {
+                    let res = yield this.publishRawSQL(socket, dbo, db, yield this.getUser(socket));
+                    return Boolean(res && typeof res === "boolean" || res === "*");
+                });
                 // console.log("canRunSQL", canRunSQL, socket.handshake.headers["x-real-ip"]);//, allTablesViews);
-                if (canRunSQL && typeof canRunSQL === "boolean" || canRunSQL === "*") {
+                if (yield canRunSQL()) {
                     socket.removeAllListeners(prostgles_types_1.CHANNELS.SQL);
-                    socket.on(prostgles_types_1.CHANNELS.SQL, function ({ query, params, options }, cb = (...callback) => { }) {
+                    socket.on(prostgles_types_1.CHANNELS.SQL, ({ query, params, options }, cb = (...callback) => { }) => __awaiter(this, void 0, void 0, function* () {
+                        if (!(yield canRunSQL())) {
+                            cb("Dissallowed", null);
+                            return;
+                        }
                         const { returnType } = options || {};
-                        // console.log(query, options)
-                        if (returnType === "statement") {
+                        if (returnType === "noticeSubscription") {
+                            const sub = this.dbEventsManager.addNotice(socket);
+                            socket.on(sub.socketChannel + "unsubscribe", () => {
+                                this.dbEventsManager.removeNotice(socket);
+                            });
+                            cb(null, {
+                                socketChannel: sub.socketChannel,
+                                socketUnsubChannel: sub.socketUnsubChannel,
+                            });
+                        }
+                        else if (returnType === "statement") {
                             try {
                                 cb(null, pgp.as.format(query, params));
                             }
@@ -155,21 +172,32 @@ class Prostgles {
                         }
                         else if (db) {
                             db.result(query, params)
-                                .then((qres) => {
-                                const { duration, fields, rows, rowCount } = qres;
-                                if (returnType === "rows") {
-                                    cb(null, rows);
-                                    return;
-                                }
-                                if (fields && DATA_TYPES.length) {
-                                    qres.fields = fields.map(f => {
-                                        const dataType = DATA_TYPES.find(dt => +dt.oid === +f.dataTypeID), tableName = USER_TABLES.find(t => +t.relid === +f.tableID), { name } = f;
-                                        return Object.assign(Object.assign(Object.assign({}, f), (dataType ? { dataType: dataType.typname } : {})), (tableName ? { tableName: tableName.relname } : {}));
+                                .then((qres) => __awaiter(this, void 0, void 0, function* () {
+                                const { duration, fields, rows, command } = qres;
+                                if (command === "LISTEN") {
+                                    const sub = yield this.dbEventsManager.addNotify(query, socket);
+                                    socket.on(sub.socketChannel + "unsubscribe", () => {
+                                        this.dbEventsManager.removeNotify(sub.notifChannel, socket);
+                                    });
+                                    cb(null, {
+                                        socketChannel: sub.socketChannel,
+                                        socketUnsubChannel: sub.socketUnsubChannel,
+                                        notifChannel: sub.notifChannel,
                                     });
                                 }
-                                cb(null, qres);
-                                // return qres;//{ duration, fields, rows, rowCount };
-                            })
+                                else if (returnType === "rows") {
+                                    cb(null, rows);
+                                }
+                                else {
+                                    if (fields && DATA_TYPES.length) {
+                                        qres.fields = fields.map(f => {
+                                            const dataType = DATA_TYPES.find(dt => +dt.oid === +f.dataTypeID), tableName = USER_TABLES.find(t => +t.relid === +f.tableID), { name } = f;
+                                            return Object.assign(Object.assign(Object.assign({}, f), (dataType ? { dataType: dataType.typname } : {})), (tableName ? { tableName: tableName.relname } : {}));
+                                        });
+                                    }
+                                    cb(null, qres);
+                                }
+                            }))
                                 .catch(err => {
                                 makeSocketError(cb, err);
                                 // Promise.reject(err.toString());
@@ -177,7 +205,7 @@ class Prostgles {
                         }
                         else
                             console.error("db missing");
-                    });
+                    }));
                     if (db) {
                         // let allTablesViews = await db.any(STEP2_GET_ALL_TABLES_AND_COLUMNS);
                         fullSchema = allTablesViews;
@@ -294,7 +322,13 @@ class Prostgles {
             if (this.watchSchema === "hotReloadMode" && !this.tsGeneratedTypesDir)
                 throw "tsGeneratedTypesDir option is needed for watchSchema: hotReloadMode to work ";
             /* 1. Connect to db */
-            const { db, pgp } = getDbConnection(this.dbConnection, this.dbOptions, this.DEBUG_MODE, true, this.onNotice);
+            const { db, pgp } = getDbConnection(this.dbConnection, this.dbOptions, this.DEBUG_MODE, true, notice => {
+                if (this.onNotice)
+                    this.onNotice(notice);
+                if (this.dbEventsManager) {
+                    this.dbEventsManager.onNotice(notice);
+                }
+            });
             this.db = db;
             this.pgp = pgp;
             this.checkDb();
@@ -327,6 +361,7 @@ class Prostgles {
                     if (!(yield isSuperUser(db)))
                         throw "Cannot watchSchema without a super user schema. Set watchSchema=false or provide a super user";
                 }
+                this.dbEventsManager = new DBEventsManager_1.DBEventsManager(db, pgp);
                 /* 5. Finish init and provide DBO object */
                 try {
                     onReady(this.dbo, this.db);
@@ -465,11 +500,14 @@ class Prostgles {
                         }
                     }));
                     socket.on("disconnect", () => {
+                        this.dbEventsManager.removeNotice(socket);
+                        this.dbEventsManager.removeNotify(socket);
                         this.connectedSockets = this.connectedSockets.filter(s => s.id !== socket.id);
                         // subscriptions = subscriptions.filter(sub => sub.socket.id !== socket.id);
                         if (this.onSocketDisconnect) {
                             this.onSocketDisconnect(socket, dbo);
                         }
+                        ;
                     });
                     socket.removeAllListeners(prostgles_types_1.CHANNELS.METHOD);
                     socket.on(prostgles_types_1.CHANNELS.METHOD, ({ method, params }, cb = (...callback) => { }) => __awaiter(this, void 0, void 0, function* () {

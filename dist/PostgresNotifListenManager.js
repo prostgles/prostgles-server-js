@@ -15,8 +15,6 @@ class PostgresNotifListenManager {
         this.db_channel_name = db_channel_name;
         this.isListening = this.startListening();
     }
-    // isListening(){
-    // }
     isReady() {
         return this.isListening;
     }

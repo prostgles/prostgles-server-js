@@ -139,8 +139,8 @@ export class PubSubManager {
     }
 
     private appID: string;
-    // appCheckFrequencyMS = 3600 * 1000;
-    appCheckFrequencyMS = 30 * 1000;
+    
+    appCheckFrequencyMS = 10 * 1000;
     appCheck;
     
     
@@ -169,7 +169,7 @@ export class PubSubManager {
     init = async (): Promise<PubSubManager> => {
 
         try {
-            const schema_version = 2;
+            const schema_version = 3;
            
             const q = `
                 BEGIN; --  ISOLATION LEVEL SERIALIZABLE;-- TRANSACTION ISOLATION LEVEL SERIALIZABLE;
@@ -298,9 +298,16 @@ export class PubSubManager {
                         AS $$
                 
                             DECLARE c_ids INTEGER[];  
+                            DECLARE err_c_ids INTEGER[]; 
                             DECLARE unions TEXT := '';          
                             DECLARE query TEXT := '';            
-                            DECLARE nrw RECORD;            
+                            DECLARE nrw RECORD;               
+                            DECLARE erw RECORD;     
+                            DECLARE has_errors BOOLEAN := FALSE;
+                            
+                            DECLARE err_text    TEXT;
+                            DECLARE err_detail  TEXT;
+                            DECLARE err_hint    TEXT;
                             
                             BEGIN
 
@@ -335,16 +342,35 @@ export class PubSubManager {
                                         $s$, 
                                         unions
                                     );
-                                    EXECUTE query INTO c_ids;
+
+                                    BEGIN
+                                        EXECUTE query INTO c_ids;
+
+                                        --RAISE NOTICE 'trigger fired ok';
+
+                                    EXCEPTION WHEN OTHERS THEN
+                                        
+                                        has_errors := TRUE;
+
+                                        GET STACKED DIAGNOSTICS 
+                                            err_text = MESSAGE_TEXT,
+                                            err_detail = PG_EXCEPTION_DETAIL,
+                                            err_hint = PG_EXCEPTION_HINT;
+
+
+                                    END;
+
+                                    --RAISE NOTICE 'has_errors: % ', has_errors;
 
                                     --RAISE NOTICE 'unions: % , cids: %', unions, c_ids;
 
-                                    IF c_ids IS NOT NULL THEN
+                                    IF (c_ids IS NOT NULL OR has_errors) THEN
 
                                         FOR nrw IN
                                             SELECT app_id, string_agg(c_id::text, ',') as cids
                                             FROM prostgles.v_triggers_unnested 
-                                            WHERE id = ANY(c_ids)
+                                            WHERE id = ANY(c_ids) 
+                                            OR has_errors
                                             GROUP BY app_id
                                         LOOP
                                             
@@ -352,18 +378,42 @@ export class PubSubManager {
                                                 ${asValue(this.NOTIF_CHANNEL.preffix)} || nrw.app_id , 
                                                 concat_ws(
                                                     ${asValue(PubSubManager.DELIMITER)},
-                                                    ${asValue(this.NOTIF_TYPE.data)}, COALESCE(TG_TABLE_NAME, 'MISSING'), COALESCE(TG_OP, 'MISSING'), COALESCE(nrw.cids, '')
+                                                    ${asValue(this.NOTIF_TYPE.data)}, 
+                                                    COALESCE(TG_TABLE_NAME, 'MISSING'), 
+                                                    COALESCE(TG_OP, 'MISSING'), 
+                                                    CASE WHEN has_errors 
+                                                        THEN concat_ws('; ', 'error', err_text, err_detail, err_hint ) 
+                                                        ELSE COALESCE(nrw.cids, '') 
+                                                    END
                                                 )
                                             );
                                         END LOOP;
+
+
+                                        IF has_errors THEN
+
+                                            DELETE FROM prostgles.triggers;
+                                            RAISE NOTICE 'trigger dropped due to exception: % % %', err_text, err_detail, err_hint;
+
+                                        END IF;
 
                                         
                                     END IF;
                                 END IF;
 
         
-                            --EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'issue within data func';
-                                RETURN NULL; -- result is ignored since this is an AFTER trigger
+                                RETURN NULL;
+                                
+                        /*
+                            EXCEPTION WHEN OTHERS THEN 
+                                DELETE FROM prostgles.triggers; -- delete all or will need to loop through all conditions to find issue;
+                                RAISE NOTICE 'trigger dropped due to exception';
+                                ${"--EXCEPTION_WHEN_COLUMN_WAS_RENAMED_THEN_DROP_TRIGGER"};
+                            
+                                
+
+                                RETURN NULL; 
+                                */
                             END;
 
                         --COMMIT;
@@ -596,7 +646,7 @@ export class PubSubManager {
                     , [this.appCheckFrequencyMS, Boolean(this.onSchemaChange)]
                 );
                 this.appID = raw.id;
-                console.log(this.appID)
+                
                 if(!this.appCheck) {
                     
                     this.appCheck = setInterval(async () => {
@@ -672,7 +722,6 @@ export class PubSubManager {
                             `
                             await this.db.any(appQ);
                             log("updated last_check");
-                            // console.log("appCheck OK")
                         } catch (e) {
                             console.error("appCheck FAILED: \n", e, appQ);
                         } 
@@ -713,7 +762,6 @@ export class PubSubManager {
                 DO
                 $do$
                     DECLARE trg RECORD;
-                        etrg RECORD;
                         q   TEXT;
                         ev_trg_needed BOOLEAN := FALSE;
                         ev_trg_exists BOOLEAN := FALSE;
@@ -779,7 +827,7 @@ export class PubSubManager {
 
                         SELECT format(
                             $$ DROP EVENT TRIGGER IF EXISTS %I ; $$
-                            , etrg.evtname
+                            , ${asValue(this.DB_OBJ_NAMES.schema_watch_trigger)}
                         )
                         INTO q;
 
@@ -837,8 +885,6 @@ export class PubSubManager {
     notifListener = async (data: { payload: string }) => {
         const str = data.payload;
 
-        // console.log(528,  str);
-
         if(!str) {
             console.error("Empty notif?")
             return;
@@ -868,12 +914,22 @@ export class PubSubManager {
             op_name = dataArr[2],
             condition_ids_str = dataArr[3];
 
-  
         // const triggers = await this.db.any("SELECT * FROM prostgles.triggers WHERE table_name = $1 AND id IN ($2:csv)", [table_name, condition_ids_str.split(",").map(v => +v)]);
         // const conditions: string[] = triggers.map(t => t.condition);
 
-
         if(
+            condition_ids_str && condition_ids_str.startsWith("error") &&
+            this._triggers && this._triggers[table_name] && this._triggers[table_name].length
+        ){
+            const pref = "INTERNAL ERROR. Schema might have changed";
+            console.error(`${pref}: ${condition_ids_str}`)
+            this._triggers[table_name].map(c => {
+                const subs = this.getSubs(table_name, c);
+                subs.map(s => {
+                    this.pushSubData(s, pref + ". Check server logs");
+                })
+            });
+        } else if(
             condition_ids_str &&
             condition_ids_str.split(",").length &&
             !condition_ids_str.split(",").find((c: string )=> !Number.isInteger(+c)) &&
@@ -915,7 +971,7 @@ export class PubSubManager {
 
                             /* It is assumed the policy was checked before this point */
                             this.pushSubData(sub);
-                            sub.last_throttled = Date.now();
+                            // sub.last_throttled = Date.now();
                         } else if(!sub.is_throttling) {
                             
                             
@@ -924,7 +980,6 @@ export class PubSubManager {
                                 log("throttling finished. pushSubData...")
                                 sub.is_throttling = null;
                                 this.pushSubData(sub);
-                                sub.last_throttled = Date.now();
                             }, throttle);// sub.throttle);
                         }
                     }
@@ -943,11 +998,18 @@ export class PubSubManager {
     }
 
 
-    pushSubData(sub: SubscriptionParams){
+    pushSubData(sub: SubscriptionParams, err?: any){
         if(!sub) throw "pushSubData: invalid sub";
-
         const { table_name, filter, params, table_rules, socket_id, channel_name, func, subOne = false } = sub;
-        return new Promise((resolve, reject) => {
+
+        sub.last_throttled = Date.now();
+
+        if(err){
+            this.sockets[socket_id].emit(channel_name, { err });
+            return true;
+        }
+
+        return new Promise(async (resolve, reject) => {
             this.dbo[table_name][subOne? "findOne" : "find"](filter, params, null, table_rules)
                 .then(data => {
                     
@@ -1061,23 +1123,29 @@ export class PubSubManager {
                     });
                 }
             },
-            getServerData = (from_synced = 0, offset = 0) => {
+            getServerData = async (from_synced = 0, offset = 0) => {
                 let _filter = { 
                     ...filter,
                     [synced_field]: { $gte: from_synced || 0 }
                 };
 
-                return this.dbo[table_name].find(
-                    _filter, 
-                    { 
-                        select: params.select, 
-                        orderBy: (orderByAsc as OrderBy), 
-                        offset: offset || 0, 
-                        limit: batch_size 
-                    }, 
-                    null, 
-                    table_rules
-                );
+                try {
+                    return this.dbo[table_name].find(
+                        _filter, 
+                        { 
+                            select: params.select, 
+                            orderBy: (orderByAsc as OrderBy), 
+                            offset: offset || 0, 
+                            limit: batch_size 
+                        }, 
+                        null, 
+                        table_rules
+                    );
+
+                } catch(e){
+                    console.error("Sync getServerData failed: ", e);
+                    throw "INTERNAL ERROR"
+                }
             },
             deleteData = async (deleted) => {
                 // console.log("deleteData deleteData  deleteData " + deleted.length);
@@ -1198,7 +1266,7 @@ export class PubSubManager {
                 //     return Promise.reject("Something went wrong with syncing to server: ")
                 // });
             },
-            pushData = async (data, isSynced = false) => {
+            pushData = async (data, isSynced = false, err = null) => {
                 return new Promise((resolve, reject) => {
                     socket.emit(channel_name, { data, isSynced }, (resp) => {
                             
@@ -1301,7 +1369,14 @@ export class PubSubManager {
                         inserted += res.inserted; 
                         updated += res.updated;
                     }
-                    let sData = await getServerData(min_synced, offset);
+                    let sData;
+                    
+                    try {
+                        sData = await getServerData(min_synced, offset);
+                    } catch(e){
+                        console.trace("sync getServerData err", e);
+                        await pushData(undefined, undefined, "Internal error. Check server logs");
+                    }
 
                     // console.log("allow_delete", table_rules.delete);
                     if(allow_delete && table_rules.delete){

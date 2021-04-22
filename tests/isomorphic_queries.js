@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.tryRun = void 0;
+exports.tryRunP = exports.tryRun = void 0;
 const assert_1 = require("assert");
 async function tryRun(desc, func) {
     try {
@@ -12,6 +12,12 @@ async function tryRun(desc, func) {
     }
 }
 exports.tryRun = tryRun;
+function tryRunP(desc, func) {
+    return new Promise((rv, rj) => {
+        func(rv, rj);
+    });
+}
+exports.tryRunP = tryRunP;
 async function isomorphic(db) {
     await db.items.delete({});
     await db.items2.delete({});
@@ -41,6 +47,8 @@ async function isomorphic(db) {
         ]);
         // console.log(await db["*"].find())
     });
+    // add getInfo and getCols tests
+    // console.log(await db.items.getInfo(), await db.items.getColumns())
     /**
      * TODO -> ADD ALL FILTER TYPES
      */

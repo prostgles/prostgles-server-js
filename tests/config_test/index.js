@@ -62,7 +62,7 @@ prostgles_server_1.default({
     },
     io,
     tsGeneratedTypesDir: path_1.default.join(__dirname + '/'),
-    watchSchema: true,
+    // watchSchema: true,// "hotReloadMode",
     sqlFilePath: path_1.default.join(__dirname + '/init.sql'),
     // transactions: true,	
     publishRawSQL: async (socket, db, _db, user) => {

@@ -68,7 +68,7 @@ prostgles({
   },
   io,
   tsGeneratedTypesDir: path.join(__dirname + '/'),
-  watchSchema: true,// "hotReloadMode",
+  // watchSchema: true,// "hotReloadMode",
 	sqlFilePath: path.join(__dirname+'/init.sql'),
   // transactions: true,	
   publishRawSQL: async (socket, db: any, _db: any, user: any) => {

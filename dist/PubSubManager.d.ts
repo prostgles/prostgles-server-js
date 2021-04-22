@@ -119,7 +119,7 @@ export declare class PubSubManager {
     notifListener: (data: {
         payload: string;
     }) => Promise<void>;
-    pushSubData(sub: SubscriptionParams): Promise<unknown>;
+    pushSubData(sub: SubscriptionParams, err?: any): true | Promise<unknown>;
     upsertSocket(socket: any, channel_name: string): void;
     syncTimeout: any;
     syncData(sync: SyncParams, clientData: any): Promise<void>;

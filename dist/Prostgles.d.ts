@@ -2,8 +2,9 @@
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import { DboBuilder, DbHandler, DbHandlerTX } from "./DboBuilder";
-declare type PGP = pgPromise.IMain<{}, pg.IClient>;
+export declare type PGP = pgPromise.IMain<{}, pg.IClient>;
 export { DbHandler, DbHandlerTX } from "./DboBuilder";
+import { DBEventsManager } from "./DBEventsManager";
 export declare type DB = pgPromise.IDatabase<{}, pg.IClient>;
 declare type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 declare type DbConnectionOpts = pg.IDefaults;
@@ -292,6 +293,7 @@ export declare class Prostgles {
      * Postgres on notice callback
      */
     onNotice?: ProstglesInitOptions["onNotice"];
+    dbEventsManager: DBEventsManager;
     constructor(params: ProstglesInitOptions);
     onSchemaChange(event: {
         command: string;

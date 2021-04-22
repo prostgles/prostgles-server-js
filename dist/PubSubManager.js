@@ -44,11 +44,10 @@ class PubSubManager {
                 return this.NOTIF_CHANNEL.preffix + (appID || this.appID);
             }
         };
-        // appCheckFrequencyMS = 3600 * 1000;
-        this.appCheckFrequencyMS = 30 * 1000;
+        this.appCheckFrequencyMS = 10 * 1000;
         this.init = () => __awaiter(this, void 0, void 0, function* () {
             try {
-                const schema_version = 2;
+                const schema_version = 3;
                 const q = `
                 BEGIN; --  ISOLATION LEVEL SERIALIZABLE;-- TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 
@@ -176,9 +175,16 @@ class PubSubManager {
                         AS $$
                 
                             DECLARE c_ids INTEGER[];  
+                            DECLARE err_c_ids INTEGER[]; 
                             DECLARE unions TEXT := '';          
                             DECLARE query TEXT := '';            
-                            DECLARE nrw RECORD;            
+                            DECLARE nrw RECORD;               
+                            DECLARE erw RECORD;     
+                            DECLARE has_errors BOOLEAN := FALSE;
+                            
+                            DECLARE err_text    TEXT;
+                            DECLARE err_detail  TEXT;
+                            DECLARE err_hint    TEXT;
                             
                             BEGIN
 
@@ -213,16 +219,35 @@ class PubSubManager {
                                         $s$, 
                                         unions
                                     );
-                                    EXECUTE query INTO c_ids;
+
+                                    BEGIN
+                                        EXECUTE query INTO c_ids;
+
+                                        --RAISE NOTICE 'trigger fired ok';
+
+                                    EXCEPTION WHEN OTHERS THEN
+                                        
+                                        has_errors := TRUE;
+
+                                        GET STACKED DIAGNOSTICS 
+                                            err_text = MESSAGE_TEXT,
+                                            err_detail = PG_EXCEPTION_DETAIL,
+                                            err_hint = PG_EXCEPTION_HINT;
+
+
+                                    END;
+
+                                    --RAISE NOTICE 'has_errors: % ', has_errors;
 
                                     --RAISE NOTICE 'unions: % , cids: %', unions, c_ids;
 
-                                    IF c_ids IS NOT NULL THEN
+                                    IF (c_ids IS NOT NULL OR has_errors) THEN
 
                                         FOR nrw IN
                                             SELECT app_id, string_agg(c_id::text, ',') as cids
                                             FROM prostgles.v_triggers_unnested 
-                                            WHERE id = ANY(c_ids)
+                                            WHERE id = ANY(c_ids) 
+                                            OR has_errors
                                             GROUP BY app_id
                                         LOOP
                                             
@@ -230,18 +255,42 @@ class PubSubManager {
                                                 ${exports.asValue(this.NOTIF_CHANNEL.preffix)} || nrw.app_id , 
                                                 concat_ws(
                                                     ${exports.asValue(PubSubManager.DELIMITER)},
-                                                    ${exports.asValue(this.NOTIF_TYPE.data)}, COALESCE(TG_TABLE_NAME, 'MISSING'), COALESCE(TG_OP, 'MISSING'), COALESCE(nrw.cids, '')
+                                                    ${exports.asValue(this.NOTIF_TYPE.data)}, 
+                                                    COALESCE(TG_TABLE_NAME, 'MISSING'), 
+                                                    COALESCE(TG_OP, 'MISSING'), 
+                                                    CASE WHEN has_errors 
+                                                        THEN concat_ws('; ', 'error', err_text, err_detail, err_hint ) 
+                                                        ELSE COALESCE(nrw.cids, '') 
+                                                    END
                                                 )
                                             );
                                         END LOOP;
+
+
+                                        IF has_errors THEN
+
+                                            DELETE FROM prostgles.triggers;
+                                            RAISE NOTICE 'trigger dropped due to exception: % % %', err_text, err_detail, err_hint;
+
+                                        END IF;
 
                                         
                                     END IF;
                                 END IF;
 
         
-                            --EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'issue within data func';
-                                RETURN NULL; -- result is ignored since this is an AFTER trigger
+                                RETURN NULL;
+                                
+                        /*
+                            EXCEPTION WHEN OTHERS THEN 
+                                DELETE FROM prostgles.triggers; -- delete all or will need to loop through all conditions to find issue;
+                                RAISE NOTICE 'trigger dropped due to exception';
+                                ${"--EXCEPTION_WHEN_COLUMN_WAS_RENAMED_THEN_DROP_TRIGGER"};
+                            
+                                
+
+                                RETURN NULL; 
+                                */
                             END;
 
                         --COMMIT;
@@ -467,7 +516,6 @@ class PubSubManager {
                 if (!this.appID) {
                     const raw = yield this.db.one("INSERT INTO prostgles.apps (check_frequency_ms, watching_schema, application_name) VALUES($1, $2, current_setting('application_name')) RETURNING *; ", [this.appCheckFrequencyMS, Boolean(this.onSchemaChange)]);
                     this.appID = raw.id;
-                    console.log(this.appID);
                     if (!this.appCheck) {
                         this.appCheck = setInterval(() => __awaiter(this, void 0, void 0, function* () {
                             let appQ = "";
@@ -538,7 +586,6 @@ class PubSubManager {
                             `;
                                 yield this.db.any(appQ);
                                 log("updated last_check");
-                                // console.log("appCheck OK")
                             }
                             catch (e) {
                                 console.error("appCheck FAILED: \n", e, appQ);
@@ -574,7 +621,6 @@ class PubSubManager {
                 DO
                 $do$
                     DECLARE trg RECORD;
-                        etrg RECORD;
                         q   TEXT;
                         ev_trg_needed BOOLEAN := FALSE;
                         ev_trg_exists BOOLEAN := FALSE;
@@ -640,7 +686,7 @@ class PubSubManager {
 
                         SELECT format(
                             $$ DROP EVENT TRIGGER IF EXISTS %I ; $$
-                            , etrg.evtname
+                            , ${exports.asValue(this.DB_OBJ_NAMES.schema_watch_trigger)}
                         )
                         INTO q;
 
@@ -682,7 +728,6 @@ class PubSubManager {
         /* Relay relevant data to relevant subscriptions */
         this.notifListener = (data) => __awaiter(this, void 0, void 0, function* () {
             const str = data.payload;
-            // console.log(528,  str);
             if (!str) {
                 console.error("Empty notif?");
                 return;
@@ -703,7 +748,18 @@ class PubSubManager {
             const table_name = dataArr[1], op_name = dataArr[2], condition_ids_str = dataArr[3];
             // const triggers = await this.db.any("SELECT * FROM prostgles.triggers WHERE table_name = $1 AND id IN ($2:csv)", [table_name, condition_ids_str.split(",").map(v => +v)]);
             // const conditions: string[] = triggers.map(t => t.condition);
-            if (condition_ids_str &&
+            if (condition_ids_str && condition_ids_str.startsWith("error") &&
+                this._triggers && this._triggers[table_name] && this._triggers[table_name].length) {
+                const pref = "INTERNAL ERROR. Schema might have changed";
+                console.error(`${pref}: ${condition_ids_str}`);
+                this._triggers[table_name].map(c => {
+                    const subs = this.getSubs(table_name, c);
+                    subs.map(s => {
+                        this.pushSubData(s, pref + ". Check server logs");
+                    });
+                });
+            }
+            else if (condition_ids_str &&
                 condition_ids_str.split(",").length &&
                 !condition_ids_str.split(",").find((c) => !Number.isInteger(+c)) &&
                 this._triggers && this._triggers[table_name] && this._triggers[table_name].length) {
@@ -732,7 +788,7 @@ class PubSubManager {
                             if (sub.last_throttled <= Date.now() - throttle) {
                                 /* It is assumed the policy was checked before this point */
                                 this.pushSubData(sub);
-                                sub.last_throttled = Date.now();
+                                // sub.last_throttled = Date.now();
                             }
                             else if (!sub.is_throttling) {
                                 log("throttling sub");
@@ -740,7 +796,6 @@ class PubSubManager {
                                     log("throttling finished. pushSubData...");
                                     sub.is_throttling = null;
                                     this.pushSubData(sub);
-                                    sub.last_throttled = Date.now();
                                 }, throttle); // sub.throttle);
                             }
                         }
@@ -831,11 +886,16 @@ class PubSubManager {
         return (this.syncs || [])
             .filter((s) => !s.is_syncing && s.table_name === table_name && s.condition === condition);
     }
-    pushSubData(sub) {
+    pushSubData(sub, err) {
         if (!sub)
             throw "pushSubData: invalid sub";
         const { table_name, filter, params, table_rules, socket_id, channel_name, func, subOne = false } = sub;
-        return new Promise((resolve, reject) => {
+        sub.last_throttled = Date.now();
+        if (err) {
+            this.sockets[socket_id].emit(channel_name, { err });
+            return true;
+        }
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
             this.dbo[table_name][subOne ? "findOne" : "find"](filter, params, null, table_rules)
                 .then(data => {
                 if (socket_id && this.sockets[socket_id]) {
@@ -862,7 +922,7 @@ class PubSubManager {
                 }
                 reject(errObj);
             });
-        });
+        }));
     }
     upsertSocket(socket, channel_name) {
         if (socket && !this.sockets[socket.id]) {
@@ -926,15 +986,21 @@ class PubSubManager {
                         return (a[synced_field] - b[synced_field]) || id_fields.sort().map(idKey => a[idKey] < b[idKey] ? -1 : a[idKey] > b[idKey] ? 1 : 0).find(v => v) || 0;
                     });
                 }
-            }, getServerData = (from_synced = 0, offset = 0) => {
+            }, getServerData = (from_synced = 0, offset = 0) => __awaiter(this, void 0, void 0, function* () {
                 let _filter = Object.assign(Object.assign({}, filter), { [synced_field]: { $gte: from_synced || 0 } });
-                return this.dbo[table_name].find(_filter, {
-                    select: params.select,
-                    orderBy: orderByAsc,
-                    offset: offset || 0,
-                    limit: batch_size
-                }, null, table_rules);
-            }, deleteData = (deleted) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    return this.dbo[table_name].find(_filter, {
+                        select: params.select,
+                        orderBy: orderByAsc,
+                        offset: offset || 0,
+                        limit: batch_size
+                    }, null, table_rules);
+                }
+                catch (e) {
+                    console.error("Sync getServerData failed: ", e);
+                    throw "INTERNAL ERROR";
+                }
+            }), deleteData = (deleted) => __awaiter(this, void 0, void 0, function* () {
                 // console.log("deleteData deleteData  deleteData " + deleted.length);
                 if (allow_delete) {
                     return Promise.all(deleted.map((d) => __awaiter(this, void 0, void 0, function* () {
@@ -1038,7 +1104,7 @@ class PubSubManager {
                 //     console.error("Something went wrong with syncing to server: \n ->", err, data, id_fields);
                 //     return Promise.reject("Something went wrong with syncing to server: ")
                 // });
-            }, pushData = (data, isSynced = false) => __awaiter(this, void 0, void 0, function* () {
+            }, pushData = (data, isSynced = false, err = null) => __awaiter(this, void 0, void 0, function* () {
                 return new Promise((resolve, reject) => {
                     socket.emit(channel_name, { data, isSynced }, (resp) => {
                         if (resp && resp.ok) {
@@ -1119,7 +1185,14 @@ class PubSubManager {
                         inserted += res.inserted;
                         updated += res.updated;
                     }
-                    let sData = yield getServerData(min_synced, offset);
+                    let sData;
+                    try {
+                        sData = yield getServerData(min_synced, offset);
+                    }
+                    catch (e) {
+                        console.trace("sync getServerData err", e);
+                        yield pushData(undefined, undefined, "Internal error. Check server logs");
+                    }
                     // console.log("allow_delete", table_rules.delete);
                     if (allow_delete && table_rules.delete) {
                         const to_delete = sData.filter(d => {

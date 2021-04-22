@@ -1,7 +1,7 @@
 import { strict as assert } from 'assert';
 
 import { DBHandlerClient, Auth } from "./client/index";
-import { tryRun } from './isomorphic_queries';
+import { tryRun, tryRunP } from './isomorphic_queries';
 
 export default async function client_only(db: DBHandlerClient, auth: Auth, log: (...args: any[]) => any, methods){
   
@@ -25,6 +25,18 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       assert.deepStrictEqual(fullResult.rows[0], { col1: 1 }, "db.sql query failed");
       assert.deepStrictEqual(fullResult.fields, [ { name: 'col1', tableID: 0,columnID: 0, dataTypeID: 23, dataTypeSize: 4, dataTypeModifier: -1,format: 'text', dataType: 'int4' } ] , "db.sql query failed");
   
+      // await tryRunP("sql LISTEN NOTIFY events", async (resolve, reject) => {
+        
+      //   const sub = await db.sql("LISTEN chnl");
+      //   console.log({ sub })
+      //   sub.addListener(notif => {
+      //     console.log({ notif })
+      //     if(notif === "hello") resolve(true);
+      //     else reject("Something went bad")
+      //   });
+      //   db.sql("NOTIFY chnl, 'hello'; ");
+      // });
+
   
       /* REPLICATION */
       let start = Date.now();
