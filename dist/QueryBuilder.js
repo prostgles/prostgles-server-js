@@ -18,12 +18,13 @@ const DboBuilder_1 = require("./DboBuilder");
 const Prostgles_1 = require("./Prostgles");
 const prostgles_types_1 = require("prostgles-types");
 const utils_1 = require("./utils");
-exports.asNameAlias = (field, tableAlias) => {
+const asNameAlias = (field, tableAlias) => {
     let result = prostgles_types_1.asName(field);
     if (tableAlias)
         return prostgles_types_1.asName(tableAlias) + "." + result;
     return result;
 };
+exports.asNameAlias = asNameAlias;
 const MAX_COL_NUM = 1600;
 const asValue = (v, castAs = "") => DboBuilder_1.pgp.as.format("$1" + castAs, [v]);
 /**
@@ -471,6 +472,8 @@ class SelectItemBuilder {
                 getFields: () => funcDef.getFields(args),
                 getQuery: (tableAlias) => funcDef.getQuery({ allowedFields: this.allowedFields, args, tableAlias,
                     ctidField: undefined,
+                    /* CTID not available in AFTER trigger */
+                    // ctidField: this.isView? undefined : "ctid" 
                 }),
                 selected: true
             });

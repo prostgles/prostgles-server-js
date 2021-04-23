@@ -22,7 +22,8 @@ const prostgles_types_1 = require("prostgles-types");
 let pgp = pgPromise({
     promiseLib: Bluebird
 });
-exports.asValue = v => pgp.as.format("$1", [v]);
+const asValue = v => pgp.as.format("$1", [v]);
+exports.asValue = asValue;
 exports.DEFAULT_SYNC_BATCH_SIZE = 50;
 const log = (...args) => {
     if (process.env.TEST_TYPE) {

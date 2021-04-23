@@ -100,27 +100,37 @@ export class DBEventsManager {
     notifChannel = notifChannel.replace(/""/g, `"`);
     if(notifChannel.startsWith('"')) notifChannel = notifChannel.slice(1, -1);
 
-    let socketChannel = CHANNELS.LISTEN_EV + notifChannel;
+    const socketChannel = CHANNELS.LISTEN_EV + notifChannel,
+      socketUnsubChannel = socketChannel + "unsubscribe";
+
     if(!this.notifies[notifChannel]){
       this.notifies[notifChannel] = {
         socketChannel,
         sockets: socket? [socket] : [],
         localFuncs: func? [func] : [],
-        notifMgr: new PostgresNotifListenManager(this.db_pg, this.onNotif, channel)
+        notifMgr: await PostgresNotifListenManager.create(this.db_pg, this.onNotif, channel)
       }
 
     } else {
       if(socket && !this.notifies[notifChannel].sockets.find(s => s.id === socket.id)) {
         this.notifies[notifChannel].sockets.push(socket);
+
       } else if(func) {
         this.notifies[notifChannel].localFuncs.push(func);
       }
     }
 
+    if(socket){
+      socket.removeAllListeners(socketUnsubChannel);
+      socket.on(socketUnsubChannel, ()=>{
+        this.removeNotify(notifChannel, socket);
+      });
+    }
+
     return {
-      unsubscribe: () => this.removeNotify(notifChannel, socket, func),
+      // unsubscribe: () => this.removeNotify(notifChannel, socket, func),
       socketChannel,
-      socketUnsubChannel: socketChannel + "unsubscribe",
+      socketUnsubChannel,
       notifChannel,
     }
   }
@@ -132,6 +142,8 @@ export class DBEventsManager {
       } else if(func){
         this.notifies[channel].localFuncs = this.notifies[channel].localFuncs.filter(f => f !== func);
       }
+
+      /* UNLISTEN if no listeners ?? */
     }
   }
 
@@ -142,10 +154,14 @@ export class DBEventsManager {
       this.notice.sockets.push(socket);
     }
 
-    return {
-      socketChannel: this.notice.socketChannel,
-      socketUnsubChannel: this.notice.socketUnsubChannel,
-    }
+    const { socketChannel, socketUnsubChannel } = this.notice;
+
+    socket.removeAllListeners(socketUnsubChannel);
+    socket.on(socketUnsubChannel, () => {
+      this.removeNotice(socket);
+    });
+
+    return { socketChannel, socketUnsubChannel, }
   }
 
   removeNotice(socket){

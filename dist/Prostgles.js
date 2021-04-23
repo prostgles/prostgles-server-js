@@ -153,14 +153,8 @@ class Prostgles {
                         }
                         const { returnType } = options || {};
                         if (returnType === "noticeSubscription") {
-                            const sub = this.dbEventsManager.addNotice(socket);
-                            socket.on(sub.socketChannel + "unsubscribe", () => {
-                                this.dbEventsManager.removeNotice(socket);
-                            });
-                            cb(null, {
-                                socketChannel: sub.socketChannel,
-                                socketUnsubChannel: sub.socketUnsubChannel,
-                            });
+                            const sub = yield this.dbEventsManager.addNotice(socket);
+                            cb(null, sub);
                         }
                         else if (returnType === "statement") {
                             try {
@@ -176,14 +170,7 @@ class Prostgles {
                                 const { duration, fields, rows, command } = qres;
                                 if (command === "LISTEN") {
                                     const sub = yield this.dbEventsManager.addNotify(query, socket);
-                                    socket.on(sub.socketChannel + "unsubscribe", () => {
-                                        this.dbEventsManager.removeNotify(sub.notifChannel, socket);
-                                    });
-                                    cb(null, {
-                                        socketChannel: sub.socketChannel,
-                                        socketUnsubChannel: sub.socketUnsubChannel,
-                                        notifChannel: sub.notifChannel,
-                                    });
+                                    cb(null, sub);
                                 }
                                 else if (returnType === "rows") {
                                     cb(null, rows);

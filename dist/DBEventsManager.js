@@ -78,13 +78,13 @@ class DBEventsManager {
             notifChannel = notifChannel.replace(/""/g, `"`);
             if (notifChannel.startsWith('"'))
                 notifChannel = notifChannel.slice(1, -1);
-            let socketChannel = prostgles_types_1.CHANNELS.LISTEN_EV + notifChannel;
+            const socketChannel = prostgles_types_1.CHANNELS.LISTEN_EV + notifChannel, socketUnsubChannel = socketChannel + "unsubscribe";
             if (!this.notifies[notifChannel]) {
                 this.notifies[notifChannel] = {
                     socketChannel,
                     sockets: socket ? [socket] : [],
                     localFuncs: func ? [func] : [],
-                    notifMgr: new PostgresNotifListenManager_1.PostgresNotifListenManager(this.db_pg, this.onNotif, channel)
+                    notifMgr: yield PostgresNotifListenManager_1.PostgresNotifListenManager.create(this.db_pg, this.onNotif, channel)
                 };
             }
             else {
@@ -95,10 +95,16 @@ class DBEventsManager {
                     this.notifies[notifChannel].localFuncs.push(func);
                 }
             }
+            if (socket) {
+                socket.removeAllListeners(socketUnsubChannel);
+                socket.on(socketUnsubChannel, () => {
+                    this.removeNotify(notifChannel, socket);
+                });
+            }
             return {
-                unsubscribe: () => this.removeNotify(notifChannel, socket, func),
+                // unsubscribe: () => this.removeNotify(notifChannel, socket, func),
                 socketChannel,
-                socketUnsubChannel: socketChannel + "unsubscribe",
+                socketUnsubChannel,
                 notifChannel,
             };
         });
@@ -111,6 +117,7 @@ class DBEventsManager {
             else if (func) {
                 this.notifies[channel].localFuncs = this.notifies[channel].localFuncs.filter(f => f !== func);
             }
+            /* UNLISTEN if no listeners ?? */
         }
     }
     addNotice(socket) {
@@ -119,10 +126,12 @@ class DBEventsManager {
         if (!this.notice.sockets.find(s => s.id === socket.id)) {
             this.notice.sockets.push(socket);
         }
-        return {
-            socketChannel: this.notice.socketChannel,
-            socketUnsubChannel: this.notice.socketUnsubChannel,
-        };
+        const { socketChannel, socketUnsubChannel } = this.notice;
+        socket.removeAllListeners(socketUnsubChannel);
+        socket.on(socketUnsubChannel, () => {
+            this.removeNotice(socket);
+        });
+        return { socketChannel, socketUnsubChannel, };
     }
     removeNotice(socket) {
         if (!socket || !socket.id)

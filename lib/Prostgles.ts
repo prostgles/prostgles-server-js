@@ -827,14 +827,9 @@ export class Prostgles {
                     const { returnType }: SQLOptions = options || ({} as any);
                     if(returnType === "noticeSubscription"){
 
-                        const sub = this.dbEventsManager.addNotice(socket);
-                        socket.on(sub.socketChannel + "unsubscribe", ()=>{
-                            this.dbEventsManager.removeNotice(socket);
-                        });
-                        cb(null, {
-                            socketChannel: sub.socketChannel,
-                            socketUnsubChannel: sub.socketUnsubChannel,
-                        });
+                        const sub = await this.dbEventsManager.addNotice(socket);
+
+                        cb(null, sub);
                     } else if(returnType === "statement"){
                         try {
                             cb(null, pgp.as.format(query, params));
@@ -849,14 +844,8 @@ export class Prostgles {
 
                                 if(command === "LISTEN"){
                                     const sub = await this.dbEventsManager.addNotify(query, socket);
-                                    socket.on(sub.socketChannel + "unsubscribe", ()=>{
-                                        this.dbEventsManager.removeNotify(sub.notifChannel, socket);
-                                    });
-                                    cb(null, {
-                                        socketChannel: sub.socketChannel,
-                                        socketUnsubChannel: sub.socketUnsubChannel,
-                                        notifChannel: sub.notifChannel,
-                                    });
+                                    
+                                    cb(null, sub);
 
                                 } else if(returnType === "rows") {
                                     cb(null, rows);

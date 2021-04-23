@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.parseFilterItem = void 0;
 const prostgles_types_1 = require("prostgles-types");
 const DboBuilder_1 = require("./DboBuilder");
-exports.parseFilterItem = (args) => {
+const parseFilterItem = (args) => {
     const { filter: _f, select, tableAlias, pgp } = args;
     if (!_f || prostgles_types_1.isEmpty(_f))
         return "";
@@ -229,6 +229,7 @@ exports.parseFilterItem = (args) => {
         }
     }
 };
+exports.parseFilterItem = parseFilterItem;
 // ensure pgp is not NULL!!!
 // const asValue = v => v;// pgp.as.value;
 // const filters: FilterSpec[] = [

@@ -10,17 +10,28 @@ export class PostgresNotifListenManager {
     notifListener: PrglNotifListener;
     db_channel_name: string;
     isListening: any;
+    client: any;
 
-    constructor(db_pg, notifListener: PrglNotifListener, db_channel_name: string){
+    static create = (db_pg, notifListener: PrglNotifListener, db_channel_name: string): Promise<PostgresNotifListenManager> => {
+        let res = new PostgresNotifListenManager(db_pg, notifListener, db_channel_name, true);
+        return res.init();
+    }
+
+    constructor(db_pg, notifListener: PrglNotifListener, db_channel_name: string, noInit = false){
         if(!db_pg || !notifListener || !db_channel_name) throw "PostgresNotifListenManager: db_pg OR notifListener OR db_channel_name MISSING";
-
-        this.connection = null;
         this.db_pg = db_pg;
         this.notifListener = notifListener;
-
         this.db_channel_name = db_channel_name;
 
-        this.isListening = this.startListening();
+        if(!noInit) this.init()
+    }
+
+    async init(): Promise<PostgresNotifListenManager> {
+
+        this.connection = null;
+
+        this.isListening = await this.startListening();
+        return this;
     }
     
     isReady(){
@@ -32,7 +43,7 @@ export class PostgresNotifListenManager {
 
         return this.reconnect() // = same as reconnect(0, 1)
             .then(obj => {
-
+                return obj;
                 /* TODO: expose this within onReady */
 
                 // console.log('psqlWS - Successful Initial Connection');
@@ -58,6 +69,13 @@ export class PostgresNotifListenManager {
             });
     }
 
+    stopListening = () => {
+        if(this.db_channel_name) {
+            if(this.connection) this.connection.none('UNLISTEN $1~', this.db_channel_name)
+            if(this.client) this.client.query('UNLISTEN $1~', this.db_channel_name)
+        }
+    }
+
     reconnect(delay = null, maxAttempts = null) {
         if(!this.db_pg || !this.notifListener) throw "db_pg OR notifListener missing";
 
@@ -66,6 +84,7 @@ export class PostgresNotifListenManager {
 
         const setListeners = (client, notifListener, db_channel_name) => {
                 client.on('notification', notifListener);
+                this.client = client;
                 return this.connection.none('LISTEN $1~', db_channel_name)
                     .catch(error => {
                         console.log("PostgresNotifListenManager: unexpected error: ", error); // unlikely to ever happen
