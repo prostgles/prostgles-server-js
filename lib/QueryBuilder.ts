@@ -427,16 +427,23 @@ export const FUNCTIONS: FunctionSpec[] = [
         rightStr = `LEFT(${rightStr}, ${asValue(edgeTruncate)})`
       }
       
-      let res = `CASE WHEN position(${term} IN ${col}) > 0 THEN array_to_json(ARRAY[
-        to_json( ${leftStr}::TEXT ), 
-        array_to_json(
-          ARRAY[substr(${colRaw}, position(${term} IN ${col}), length(${term}) )::TEXT ]
-        ), 
-        to_json(${rightStr}::TEXT ) 
-      ]) ELSE array_to_json(ARRAY[(${colRaw})::TEXT]) END`;
       // console.log(col);
+      let res = ""
+      if(returnIndex){ 
+        res = `CASE WHEN position(${term} IN ${col}) > 0 THEN position(${term} IN ${col}) - 1 ELSE -1 END`;
 
-      if(returnIndex) res  = `CASE WHEN position(${term} IN ${col}) > 0 THEN position(${term} IN ${col}) - 1 ELSE -1 END`;
+      } else {
+        /* If no match or empty search THEN return full row as string within first array element  */
+        res = `CASE WHEN position(${term} IN ${col}) > 0 AND ${term} <> '' THEN array_to_json(ARRAY[
+          to_json( ${leftStr}::TEXT ), 
+          array_to_json(
+            ARRAY[substr(${colRaw}, position(${term} IN ${col}), length(${term}) )::TEXT ]
+          ),
+          to_json(${rightStr}::TEXT ) 
+        ]) ELSE array_to_json(ARRAY[(${colRaw})::TEXT]) END`;
+
+      }
+
       return res;
     } 
   },

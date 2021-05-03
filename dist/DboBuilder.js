@@ -1141,7 +1141,7 @@ class TableHandler extends ViewHandler {
             return true;
         }
     }
-    subscribe(filter, params, localFunc, table_rules, localParams) {
+    subscribe(filter, params = {}, localFunc, table_rules, localParams) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 if (this.is_view)
@@ -1150,11 +1150,16 @@ class TableHandler extends ViewHandler {
                     throw "subscribe not allowed within transactions";
                 if (!localParams && !localFunc)
                     throw " missing data. provide -> localFunc | localParams { socket } ";
-                const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {}, condition = yield this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: null, localParams, tableRule: table_rules });
+                if (localParams && localParams.socket && localFunc) {
+                    console.error({ localParams, localFunc });
+                    throw " Cannot have localFunc AND socket ";
+                }
+                const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {}, condition = yield this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: null, localParams, tableRule: table_rules }), throttle = utils_1.get(params, "throttle") || 0, selectParams = PubSubManager_1.filterObj(params || {}, [], ["throttle"]);
+                // const { subOne = false } = localParams || {};
                 if (!localFunc) {
-                    return yield this.find(filter, Object.assign(Object.assign({}, params), { limit: 0 }), null, table_rules, localParams)
+                    return yield this.find(filter, Object.assign(Object.assign({}, selectParams), { limit: 0 }), null, table_rules, localParams)
                         .then(isValid => {
-                        const { socket = null, subOne = false } = localParams;
+                        const { socket = null } = localParams;
                         return this.pubSubManager.addSub({
                             table_info: this.tableOrViewInfo,
                             socket,
@@ -1162,17 +1167,16 @@ class TableHandler extends ViewHandler {
                             condition: condition,
                             func: localFunc,
                             filter: Object.assign({}, filter),
-                            params: Object.assign({}, params),
+                            params: Object.assign({}, selectParams),
                             channel_name: null,
                             socket_id: socket.id,
                             table_name: this.name,
+                            throttle,
                             last_throttled: 0,
-                            subOne
                         }).then(channelName => ({ channelName }));
                     });
                 }
                 else {
-                    const { subOne = false } = localParams || {};
                     this.pubSubManager.addSub({
                         table_info: this.tableOrViewInfo,
                         socket: null,
@@ -1180,17 +1184,18 @@ class TableHandler extends ViewHandler {
                         condition,
                         func: localFunc,
                         filter: Object.assign({}, filter),
-                        params: Object.assign({}, params),
+                        params: Object.assign({}, selectParams),
                         channel_name: null,
                         socket_id: null,
                         table_name: this.name,
+                        throttle,
                         last_throttled: 0,
-                        subOne
                     }).then(channelName => ({ channelName }));
                     const unsubscribe = () => {
                         this.pubSubManager.removeLocalSub(this.name, condition, localFunc);
                     };
-                    return Object.freeze({ unsubscribe });
+                    let res = Object.freeze({ unsubscribe });
+                    return res;
                 }
             }
             catch (e) {
@@ -1200,8 +1205,9 @@ class TableHandler extends ViewHandler {
             }
         });
     }
-    subscribeOne(filter, params, localFunc, table_rules, localParams) {
-        return this.subscribe(filter, params, localFunc, table_rules, Object.assign(Object.assign({}, (localParams || {})), { subOne: true }));
+    subscribeOne(filter, params = {}, localFunc, table_rules, localParams) {
+        let func = localParams ? undefined : (rows) => localFunc(rows[0]);
+        return this.subscribe(filter, Object.assign(Object.assign({}, params), { limit: 2 }), func, table_rules, localParams);
     }
     updateBatch(data, params, tableRules, localParams = null) {
         return __awaiter(this, void 0, void 0, function* () {

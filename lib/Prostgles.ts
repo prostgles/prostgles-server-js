@@ -1194,6 +1194,7 @@ export class PublishParser {
                                 const sr = MY_RULES.find(r => r.rule === "subscribe");
                                 if(sr){
                                     table_rules[sr.rule] = { ...sr.no_limits };
+                                    table_rules.subscribeOne = { ...sr.no_limits };
                                 }
                             }
                         });                

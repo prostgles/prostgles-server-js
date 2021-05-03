@@ -28,7 +28,7 @@
     "i": "^0.3.6",
     "npm": "^7.10.0",
     "pg-promise": "^10.9.5",
-    "prostgles-types": "^1.5.80"
+    "prostgles-types": "^1.5.82"
   },
   "devDependencies": {
     "@types/node": "^14.14.35",

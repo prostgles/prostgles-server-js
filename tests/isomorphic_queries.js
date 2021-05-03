@@ -96,10 +96,36 @@ async function isomorphic(db) {
             "hOrdered": ["name: abc", ["81"], " here, id: 3"], "hIdx": 6
         });
     });
-    // await tryRun("Subscribe", async () => {
-    //   const res = await db.various.count({ "tsv.@@.to_tsquery": ["a"] });
-    //   assert.equal(res, 0);
-    // });
+    await tryRunP("subscribe", async (resolve, reject) => {
+        await db.various.insert({ id: 99 });
+        const sub = await db.various.subscribe({ id: 99 }, {}, async (items) => {
+            const item = items[0];
+            if (item && item.name === "zz3zz3") {
+                await db.various.delete({ name: "zz3zz3" });
+                sub.unsubscribe();
+                resolve(true);
+            }
+        });
+        await db.various.update({ id: 99 }, { name: "zz3zz1" });
+        await db.various.update({ id: 99 }, { name: "zz3zz2" });
+        await db.various.update({ id: 99 }, { name: "zz3zz3" });
+    });
+    await tryRunP("subscribeOne with throttle", async (resolve, reject) => {
+        await db.various.insert({ id: 99 });
+        const start = Date.now(); // name: "zz3zz" 
+        const sub = await db.various.subscribeOne({ id: 99 }, { throttle: 1700 }, async (item) => {
+            // const item = items[0]
+            // console.log(item)
+            const now = Date.now();
+            if (item && item.name === "zz3zz2" && now - start > 1600 && now - start < 1800) {
+                await db.various.delete({ name: "zz3zz2" });
+                sub.unsubscribe();
+                resolve(true);
+            }
+        });
+        await db.various.update({ id: 99 }, { name: "zz3zz1" });
+        await db.various.update({ id: 99 }, { name: "zz3zz2" });
+    });
     await tryRun("JSON filtering", async () => {
         const res = await db.various.count({ "jsn->a->>b": '3' });
         assert_1.strict.equal(res, 1);

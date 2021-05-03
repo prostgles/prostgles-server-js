@@ -18,13 +18,12 @@ const DboBuilder_1 = require("./DboBuilder");
 const Prostgles_1 = require("./Prostgles");
 const prostgles_types_1 = require("prostgles-types");
 const utils_1 = require("./utils");
-const asNameAlias = (field, tableAlias) => {
+exports.asNameAlias = (field, tableAlias) => {
     let result = prostgles_types_1.asName(field);
     if (tableAlias)
         return prostgles_types_1.asName(tableAlias) + "." + result;
     return result;
 };
-exports.asNameAlias = asNameAlias;
 const MAX_COL_NUM = 1600;
 const asValue = (v, castAs = "") => DboBuilder_1.pgp.as.format("$1" + castAs, [v]);
 /**
@@ -351,16 +350,21 @@ exports.FUNCTIONS = [
                 leftStr = `RIGHT(${leftStr}, ${asValue(edgeTruncate)})`;
                 rightStr = `LEFT(${rightStr}, ${asValue(edgeTruncate)})`;
             }
-            let res = `CASE WHEN position(${term} IN ${col}) > 0 THEN array_to_json(ARRAY[
-        to_json( ${leftStr}::TEXT ), 
-        array_to_json(
-          ARRAY[substr(${colRaw}, position(${term} IN ${col}), length(${term}) )::TEXT ]
-        ), 
-        to_json(${rightStr}::TEXT ) 
-      ]) ELSE array_to_json(ARRAY[(${colRaw})::TEXT]) END`;
             // console.log(col);
-            if (returnIndex)
+            let res = "";
+            if (returnIndex) {
                 res = `CASE WHEN position(${term} IN ${col}) > 0 THEN position(${term} IN ${col}) - 1 ELSE -1 END`;
+            }
+            else {
+                /* If no match or empty search THEN return full row as string within first array element  */
+                res = `CASE WHEN position(${term} IN ${col}) > 0 AND ${term} <> '' THEN array_to_json(ARRAY[
+          to_json( ${leftStr}::TEXT ), 
+          array_to_json(
+            ARRAY[substr(${colRaw}, position(${term} IN ${col}), length(${term}) )::TEXT ]
+          ),
+          to_json(${rightStr}::TEXT ) 
+        ]) ELSE array_to_json(ARRAY[(${colRaw})::TEXT]) END`;
+            }
             return res;
         }
     },
@@ -472,8 +476,6 @@ class SelectItemBuilder {
                 getFields: () => funcDef.getFields(args),
                 getQuery: (tableAlias) => funcDef.getQuery({ allowedFields: this.allowedFields, args, tableAlias,
                     ctidField: undefined,
-                    /* CTID not available in AFTER trigger */
-                    // ctidField: this.isView? undefined : "ctid" 
                 }),
                 selected: true
             });

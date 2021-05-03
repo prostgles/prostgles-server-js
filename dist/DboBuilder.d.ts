@@ -5,7 +5,7 @@ declare global {
 }
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, OrderBy, InsertParams, UpdateParams, DeleteParams, DbJoinMaker } from "prostgles-types";
+import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams, OrderBy, InsertParams, UpdateParams, DeleteParams, DbJoinMaker } from "prostgles-types";
 export declare type DbHandler = {
     [key: string]: Partial<TableHandler>;
 } & DbJoinMaker & {
@@ -35,7 +35,6 @@ export declare type LocalParams = {
     has_rules?: boolean;
     testRule?: boolean;
     tableAlias?: string;
-    subOne?: boolean;
     dbTX?: any;
     returnQuery?: boolean;
 };
@@ -226,16 +225,14 @@ export declare class TableHandler extends ViewHandler {
     };
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, joinPaths?: JoinPaths);
     willBatch(query: string): boolean;
-    subscribe(filter: Filter, params: SelectParams, localFunc: (items: object[]) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<{
-        channelName: string;
-    } | Readonly<{
-        unsubscribe: () => void;
-    }>>;
-    subscribeOne(filter: Filter, params: SelectParams, localFunc: (items: object) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<{
-        channelName: string;
-    } | Readonly<{
-        unsubscribe: () => void;
-    }>>;
+    subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: object[]) => any): Promise<{
+        unsubscribe: () => any;
+    }>;
+    subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: object[]) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>;
+    subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: object) => any): Promise<{
+        unsubscribe: () => any;
+    }>;
+    subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: object) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>;
     updateBatch(data: [Filter, object][], params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
     update(filter: Filter, newData: {
         [key: string]: any;

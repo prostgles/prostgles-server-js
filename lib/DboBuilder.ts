@@ -10,7 +10,7 @@ declare global { export interface Promise<T> extends Bluebird<T> {} }
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import { 
-    ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, OrderBy, InsertParams, UpdateParams, DeleteParams,   
+    ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams, OrderBy, InsertParams, UpdateParams, DeleteParams,   
     DbJoinMaker, 
     unpatchText,
     isEmpty,
@@ -60,7 +60,7 @@ export type LocalParams = {
     has_rules?: boolean;
     testRule?: boolean;
     tableAlias?: string;
-    subOne?: boolean;
+    // subOne?: boolean;
     dbTX?: any;
     returnQuery?: boolean;
 }
@@ -1481,37 +1481,49 @@ export class TableHandler extends ViewHandler {
         }
     }
 
-    async subscribe(filter: Filter, params: SelectParams, localFunc: (items: object[]) => any, table_rules?: TableRule, localParams?: LocalParams){
+    async subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: object[]) => any): Promise<{ unsubscribe: () => any }>
+    async subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: object[]) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>
+    async subscribe(filter: Filter, params: SubscribeParams = {}, localFunc: (items: object[]) => any, table_rules?: TableRule, localParams?: LocalParams): 
+        Promise<string | { unsubscribe: () => any }> 
+    {
         try {
             if(this.is_view) throw "Cannot subscribe to a view";
             if(this.t) throw "subscribe not allowed within transactions";
             if(!localParams && !localFunc) throw " missing data. provide -> localFunc | localParams { socket } "; 
+            if(localParams && localParams.socket && localFunc) {
+                console.error({ localParams, localFunc })
+                throw " Cannot have localFunc AND socket ";
+            }
 
             const { filterFields, forcedFilter } = get(table_rules, "select") || {},
-                condition = await this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: null, localParams, tableRule: table_rules });
+                condition = await this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: null, localParams, tableRule: table_rules }),
+                throttle = get(params, "throttle") || 0,
+                selectParams = filterObj(params || {}, [], ["throttle"]);
+
+            // const { subOne = false } = localParams || {};
             
             if(!localFunc) {
-                return await this.find(filter, { ...params, limit: 0 }, null, table_rules, localParams)
-                .then(isValid => {
-    
-                    const { socket = null, subOne = false } = localParams;
-                    return this.pubSubManager.addSub({
-                        table_info: this.tableOrViewInfo, 
-                        socket, 
-                        table_rules, 
-                        condition: condition,
-                        func: localFunc, 
-                        filter: { ...filter },
-                        params: { ...params },
-                        channel_name: null,
-                        socket_id: socket.id,
-                        table_name: this.name,
-                        last_throttled: 0,
-                        subOne
-                    }).then(channelName => ({ channelName }));
-                });
+                return await this.find(filter, { ...selectParams, limit: 0 }, null, table_rules, localParams)
+                    .then(isValid => {
+        
+                        const { socket = null } = localParams;
+                        return this.pubSubManager.addSub({
+                            table_info: this.tableOrViewInfo, 
+                            socket, 
+                            table_rules, 
+                            condition: condition,
+                            func: localFunc, 
+                            filter: { ...filter },
+                            params: { ...selectParams },
+                            channel_name: null,
+                            socket_id: socket.id,
+                            table_name: this.name,
+                            throttle,
+                            last_throttled: 0,
+                            // subOne
+                        }).then(channelName => ({ channelName }));
+                    }) as string;
             } else {
-                const { subOne = false } = localParams || {};
                 this.pubSubManager.addSub({
                     table_info: this.tableOrViewInfo, 
                     socket: null, 
@@ -1519,17 +1531,19 @@ export class TableHandler extends ViewHandler {
                     condition,
                     func: localFunc, 
                     filter: { ...filter },
-                    params: { ...params },
+                    params: { ...selectParams },
                     channel_name: null,
                     socket_id: null,
                     table_name: this.name,
+                    throttle,
                     last_throttled: 0,
-                    subOne
+                    // subOne
                 }).then(channelName => ({ channelName }));
                 const unsubscribe = () => {
                     this.pubSubManager.removeLocalSub(this.name, condition, localFunc)
                 };
-                return Object.freeze({ unsubscribe })
+                let res: { unsubscribe: () => any } = Object.freeze({ unsubscribe })
+                return  res;
             }
         } catch(e){
             if(localParams && localParams.testRule) throw e;
@@ -1537,8 +1551,14 @@ export class TableHandler extends ViewHandler {
         }        
     }
 
-    subscribeOne(filter: Filter, params: SelectParams, localFunc: (items: object) => any, table_rules?: TableRule, localParams?: LocalParams){
-        return this.subscribe(filter, params, localFunc, table_rules, { ...(localParams || {}), subOne: true });
+    /* This should only be called from server */
+    subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: object) => any): Promise<{ unsubscribe: () => any }>
+    subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: object) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>
+    subscribeOne(filter: Filter, params: SubscribeParams = {}, localFunc: (item: object) => any, table_rules?: TableRule, localParams?: LocalParams): 
+        Promise<string | { unsubscribe: () => any }> 
+    {
+        let func = localParams? undefined : (rows) => localFunc(rows[0]);
+        return this.subscribe(filter, { ...params, limit: 2 }, func, table_rules, localParams);
     }
 
 

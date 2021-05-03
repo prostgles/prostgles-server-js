@@ -78,7 +78,7 @@ type SubscriptionParams = {
     last_throttled: number;
     is_throttling?: any;
     is_ready?: boolean;
-    subOne?: boolean;
+    // subOne?: boolean;
 }
 type AddSubscriptionParams = SubscriptionParams & {
     condition: string;
@@ -682,24 +682,31 @@ export class PubSubManager {
                                         UPDATE prostgles.apps SET last_check = NOW()
                                         WHERE id = ${asValue(this.appID)};
 
-    
+    /*
                                         IF EXISTS (
                                             SELECT 1 FROM prostgles.apps
                                             WHERE last_check < NOW() - 1.2 * check_frequency_ms * interval '1 millisecond'
                                         ) THEN
 
-
                                         END IF;
+    */
 
                                         DELETE FROM prostgles.apps
                                         WHERE last_check < NOW() - check_frequency_ms * interval '1 millisecond';
 
+                                        /* Delete unused triggers. Might deadlock */
+                                        IF EXISTS ( SELECT 1 FROM prostgles.triggers)
+                                            /* If this is the latest app then proceed */
+                                            AND ( 
+                                                SELECT id = ${asValue(this.appID)} 
+                                                FROM prostgles.apps 
+                                                ORDER BY last_check DESC 
+                                                LIMIT 1  
+                                            ) = TRUE
+                                        THEN
 
-                                        IF EXISTS (
-                                            SELECT 1 FROM prostgles.triggers
-                                        ) THEN
-
-                                            LOCK TABLE prostgles.triggers IN ACCESS EXCLUSIVE MODE;
+                                            /* TODO: Fixed deadlocks */
+                                            --LOCK TABLE prostgles.triggers IN ACCESS EXCLUSIVE MODE;
 
                                             UPDATE prostgles.triggers
                                             SET app_ids = ARRAY(
@@ -1000,7 +1007,7 @@ export class PubSubManager {
 
     pushSubData(sub: SubscriptionParams, err?: any){
         if(!sub) throw "pushSubData: invalid sub";
-        const { table_name, filter, params, table_rules, socket_id, channel_name, func, subOne = false } = sub;
+        const { table_name, filter, params, table_rules, socket_id, channel_name, func } = sub;  //, subOne = false 
 
         sub.last_throttled = Date.now();
 
@@ -1010,7 +1017,9 @@ export class PubSubManager {
         }
 
         return new Promise(async (resolve, reject) => {
-            this.dbo[table_name][subOne? "findOne" : "find"](filter, params, null, table_rules)
+            /* TODO: Retire subOne -> it's redundant */
+            // this.dbo[table_name][subOne? "findOne" : "find"](filter, params, null, table_rules)
+            this.dbo[table_name].find(filter, params, null, table_rules)
                 .then(data => {
                     
                     if(socket_id && this.sockets[socket_id]){
@@ -1619,18 +1628,21 @@ export class PubSubManager {
     async addSub(subscriptionParams: AddSubscriptionParams){
         const { 
             socket = null, func = null, table_info = null, table_rules = null, filter = {}, 
-            params = {}, condition = "", subOne = false 
+            params = {}, condition = "", throttle = 0  //subOne = false, 
         } = subscriptionParams || {};
 
-        let throttle = subscriptionParams.throttle || 10;
+        let validated_throttle = subscriptionParams.throttle || 10;
         if((!socket && !func) || !table_info) throw "socket/func or table_info missing";
 
-        const pubThrottle = get(table_rules, ["subscribe","throttle"]);
+        const pubThrottle = get(table_rules, ["subscribe","throttle"]) || 0;
         if(pubThrottle && Number.isInteger(pubThrottle) && pubThrottle > 0){
-            throttle = pubThrottle;
+            validated_throttle = pubThrottle;
+        }
+        if(throttle && Number.isInteger(throttle) && throttle >= pubThrottle){
+            validated_throttle = throttle;
         }
         
-        let channel_name = `${this.socketChannelPreffix}.${table_info.name}.${JSON.stringify(filter)}.${JSON.stringify(params)}.${subOne? "o" : "m"}.sub`;
+        let channel_name = `${this.socketChannelPreffix}.${table_info.name}.${JSON.stringify(filter)}.${JSON.stringify(params)}.${"m"}.sub`;  //.${subOne? "o" : "m"}.sub`;
 
         this.upsertSocket(socket, channel_name);
         
@@ -1647,11 +1659,11 @@ export class PubSubManager {
                         channel_name, 
                         func: func? func : null,
                         socket_id: socket? socket.id : null,
-                        throttle,
+                        throttle: validated_throttle,
                         is_throttling: null,
                         last_throttled: 0,
                         is_ready,
-                        subOne
+                        // subOne
                     };
 
                 this.subs[table_name] = this.subs[table_name] || {};
@@ -1892,7 +1904,7 @@ export class PubSubManager {
                 COMMIT WORK;
             `);
 
-            log("addTrigger.. ", table_name, condition);
+            log("addTrigger.. ", {table_name, condition});
 
             const triggers: { 
                 table_name: string; 
@@ -1907,7 +1919,9 @@ export class PubSubManager {
                     this._triggers[t.table_name].push(t.condition)
                 }
             });
+            log("trigger added.. ", {table_name, condition});
 
+            return true;
             // console.log("1612", JSON.stringify(triggers, null, 2))
             // console.log("1613",JSON.stringify(this._triggers, null, 2))
             

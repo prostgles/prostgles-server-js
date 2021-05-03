@@ -53,7 +53,6 @@ declare type SubscriptionParams = {
     last_throttled: number;
     is_throttling?: any;
     is_ready?: boolean;
-    subOne?: boolean;
 };
 declare type AddSubscriptionParams = SubscriptionParams & {
     condition: string;
@@ -141,7 +140,7 @@ export declare class PubSubManager {
     addTrigger(params: {
         table_name: string;
         condition: string;
-    }): Promise<void>;
+    }): Promise<boolean>;
     pushSyncInfo({ table_name, id_key, info_level }: {
         table_name: any;
         id_key?: string;
