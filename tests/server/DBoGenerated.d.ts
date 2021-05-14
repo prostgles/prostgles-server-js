@@ -25,12 +25,6 @@ export type Ex_j_ins = {
   "name"?: string;
   "added"?: Date;
 }
-export type Item_children = { 
-  "id"?: number;
-  "item_id"?: number;
-  "name"?: string;
-  "tst"?: Date;
-}
 export type Items = { 
   "id"?: number;
   "h"?: Array<string>;
@@ -90,7 +84,6 @@ export type DBObj = {
   "\"*\"": TableHandler<D_34_42_34> 
   "*": TableHandler<D_42> 
   "ex_j_ins": TableHandler<Ex_j_ins> 
-  "item_children": TableHandler<Item_children> 
   "items": TableHandler<Items> 
   "items2": TableHandler<Items2> 
   "items3": TableHandler<Items3> 

@@ -14,7 +14,8 @@ import {
     DbJoinMaker, 
     unpatchText,
     isEmpty,
-    asName
+    asName,
+    TS_DATA_TYPE
 } from "prostgles-types";
 
 export type DbHandler = {
@@ -2476,7 +2477,7 @@ const _PG_numbers = ['int2','int4','int8','float4','float8','numeric','money','o
 const _PG_json = ['json', 'jsonb'];
 const _PG_bool = ['bool'];
 const _PG_date = ['timestamp', 'timestamptz'];
-export const TS_PG_Types = {
+export const TS_PG_Types: { [key in TS_DATA_TYPE]: string[]; } = {
     "string": _PG_strings,
     "number": _PG_numbers,
     "boolean": _PG_bool,

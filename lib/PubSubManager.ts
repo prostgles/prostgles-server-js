@@ -10,7 +10,7 @@ import { TableRule, DB } from "./Prostgles";
 
 import * as Bluebird from "bluebird";
 import * as pgPromise from 'pg-promise';
-import pg = require('pg-promise/typescript/pg-subset');
+import pg from 'pg-promise/typescript/pg-subset';
 
 import { SelectParamsBasic as SelectParams, OrderBy, FieldFilter, asName, WAL, isEmpty } from "prostgles-types";
 
@@ -169,16 +169,20 @@ export class PubSubManager {
     init = async (): Promise<PubSubManager> => {
 
         try {
-            const schema_version = 3;
+            const schema_version = 4;
            
             const q = `
                 BEGIN; --  ISOLATION LEVEL SERIALIZABLE;-- TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 
                 --SET  TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 
+
                 DO
                 $do$
                 BEGIN
+
+                    /* Reduce deadlocks */
+                    PERFORM pg_sleep(random());
 
                     /* Drop older version */
                     IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'prostgles') THEN
@@ -257,12 +261,13 @@ export class PubSubManager {
                             added               TIMESTAMP DEFAULT NOW(),
                             application_name    TEXT,
                             last_check          TIMESTAMP NOT NULL DEFAULT NOW(),
+                            last_check_ended    TIMESTAMP NOT NULL DEFAULT NOW(),
                             watching_schema     BOOLEAN DEFAULT FALSE,
                             check_frequency_ms  INTEGER NOT NULL  
                         );
                         COMMENT ON TABLE prostgles.apps IS 'Keep track of prostgles server apps connected to db to combine common triggers. Heartbeat used due to no logout triggers in postgres';
                     
-
+/*
                         CREATE TABLE IF NOT EXISTS prostgles.triggers (
                             table_name      TEXT NOT NULL,
                             condition       TEXT NOT NULL,
@@ -272,24 +277,41 @@ export class PubSubManager {
                             PRIMARY KEY (table_name, condition)
                         );
                         COMMENT ON TABLE prostgles.triggers IS 'Tables and conditions that are currently subscribed/synced';
+*/
+
+                        CREATE TABLE IF NOT EXISTS prostgles.app_triggers (
+                            app_id          TEXT NOT NULL,
+                            table_name      TEXT NOT NULL,
+                            condition       TEXT NOT NULL,
+                            inserted        TIMESTAMP NOT NULL DEFAULT NOW(),
+                            last_used       TIMESTAMP NOT NULL DEFAULT NOW(),
+                            PRIMARY KEY (app_id, table_name, condition)
+                        );
+                        COMMENT ON TABLE prostgles.app_triggers IS 'Tables and conditions that are currently subscribed/synced';
+
 
                         CREATE OR REPLACE VIEW prostgles.v_triggers AS
-                            SELECT *
-                            , ROW_NUMBER() OVER( ORDER BY table_name, condition ) AS id
-                            FROM prostgles.triggers;
+                        SELECT *
+                        , (ROW_NUMBER() OVER( ORDER BY table_name, condition ))::text AS id
+                        -- , concat_ws('-', table_name, condition) AS id
+                        , ROW_NUMBER() OVER(PARTITION BY app_id, table_name ORDER BY table_name, condition ) - 1 AS c_id
+                        FROM prostgles.app_triggers;
+                        COMMENT ON VIEW prostgles.v_triggers IS 'Augment trigger table with natural IDs and per app IDs';
 
+
+                    /*
                         CREATE OR REPLACE VIEW prostgles.v_triggers_unnested AS
-                            SELECT *, ROW_NUMBER() OVER(PARTITION BY app_id, table_name ORDER BY table_name, condition ) - 1 AS c_id
+                            SELECT *
+                            , ROW_NUMBER() OVER(PARTITION BY app_id, table_name ORDER BY table_name, condition ) - 1 AS c_id
                             FROM (
                                 SELECT *, unnest(app_ids) as app_id
                                 FROM prostgles.v_triggers
                             ) t;
 
-                    /*
                         -- Force table into cache
                         IF EXISTS (select * from pg_extension where extname = 'pg_prewarm') THEN
                             CREATE EXTENSION IF NOT EXISTS pg_prewarm;
-                            PERFORM pg_prewarm('prostgles.triggers');
+                            PERFORM pg_prewarm('prostgles.app_triggers');
                         END IF;
                     */
 
@@ -297,6 +319,7 @@ export class PubSubManager {
                         CREATE OR REPLACE FUNCTION ${this.DB_OBJ_NAMES.data_watch_func}() RETURNS TRIGGER 
                         AS $$
                 
+                            DECLARE t_ids TEXT[];
                             DECLARE c_ids INTEGER[];  
                             DECLARE err_c_ids INTEGER[]; 
                             DECLARE unions TEXT := '';          
@@ -311,7 +334,7 @@ export class PubSubManager {
                             
                             BEGIN
 
-                                PERFORM pg_notify('debug', concat_ws(' ', 'TABLE', TG_TABLE_NAME, TG_OP));
+                                -- PERFORM pg_notify('debug', concat_ws(' ', 'TABLE', TG_TABLE_NAME, TG_OP));
 
                                 SELECT string_agg(
                                     concat_ws(
@@ -326,25 +349,39 @@ export class PubSubManager {
                                     SELECT 
                                         $z$ SELECT CASE WHEN EXISTS( SELECT 1 FROM $z$     AS p1,
                                         format( 
-                                            $c$ as %I WHERE %s ) THEN %s::text END AS c_ids $c$
+                                            $c$ as %I WHERE %s ) THEN %s::text END AS t_ids $c$
                                             , table_name, condition, id 
                                         ) AS p2
                                     FROM prostgles.v_triggers
                                     WHERE table_name = TG_TABLE_NAME
                                 ) t;
                                 
+                                /*
+                                PERFORM pg_notify( 
+                                    ${asValue(this.NOTIF_CHANNEL.preffix)} || (SELECT id FROM prostgles.apps LIMIT 1) , 
+                                    concat_ws(
+                                        ${asValue(PubSubManager.DELIMITER)},
+
+                                        ${asValue(this.NOTIF_TYPE.data)}, 
+                                        COALESCE(TG_TABLE_NAME, 'MISSING'), 
+                                        COALESCE(TG_OP, 'MISSING'), 
+                                        unions
+                                    )
+                                );
+                                RAISE 'unions: % , cids: %', unions, c_ids;
+                                */
 
                                 IF unions IS NOT NULL THEN
                                     query = format(
                                         $s$
-                                            SELECT ARRAY_AGG(DISTINCT t.c_ids)
+                                            SELECT ARRAY_AGG(DISTINCT t.t_ids)
                                             FROM ( %s ) t
                                         $s$, 
                                         unions
                                     );
 
                                     BEGIN
-                                        EXECUTE query INTO c_ids;
+                                        EXECUTE query INTO t_ids;
 
                                         --RAISE NOTICE 'trigger fired ok';
 
@@ -361,15 +398,14 @@ export class PubSubManager {
                                     END;
 
                                     --RAISE NOTICE 'has_errors: % ', has_errors;
-
                                     --RAISE NOTICE 'unions: % , cids: %', unions, c_ids;
 
-                                    IF (c_ids IS NOT NULL OR has_errors) THEN
+                                    IF (t_ids IS NOT NULL OR has_errors) THEN
 
                                         FOR nrw IN
                                             SELECT app_id, string_agg(c_id::text, ',') as cids
-                                            FROM prostgles.v_triggers_unnested 
-                                            WHERE id = ANY(c_ids) 
+                                            FROM prostgles.v_triggers
+                                            WHERE id = ANY(t_ids) 
                                             OR has_errors
                                             GROUP BY app_id
                                         LOOP
@@ -378,6 +414,7 @@ export class PubSubManager {
                                                 ${asValue(this.NOTIF_CHANNEL.preffix)} || nrw.app_id , 
                                                 concat_ws(
                                                     ${asValue(PubSubManager.DELIMITER)},
+
                                                     ${asValue(this.NOTIF_TYPE.data)}, 
                                                     COALESCE(TG_TABLE_NAME, 'MISSING'), 
                                                     COALESCE(TG_OP, 'MISSING'), 
@@ -392,7 +429,7 @@ export class PubSubManager {
 
                                         IF has_errors THEN
 
-                                            DELETE FROM prostgles.triggers;
+                                            DELETE FROM prostgles.app_triggers;
                                             RAISE NOTICE 'trigger dropped due to exception: % % %', err_text, err_detail, err_hint;
 
                                         END IF;
@@ -406,14 +443,14 @@ export class PubSubManager {
                                 
                         /*
                             EXCEPTION WHEN OTHERS THEN 
-                                DELETE FROM prostgles.triggers; -- delete all or will need to loop through all conditions to find issue;
+                                DELETE FROM prostgles.app_triggers; -- delete all or will need to loop through all conditions to find issue;
                                 RAISE NOTICE 'trigger dropped due to exception';
                                 ${"--EXCEPTION_WHEN_COLUMN_WAS_RENAMED_THEN_DROP_TRIGGER"};
                             
                                 
 
                                 RETURN NULL; 
-                                */
+                        */
                             END;
 
                         --COMMIT;
@@ -433,19 +470,20 @@ export class PubSubManager {
                             BEGIN
 
 
-                                --RAISE NOTICE 'prostgles.triggers % ', TG_OP;
+                                --RAISE NOTICE 'prostgles.app_triggers % ', TG_OP;
 
                                 /* If no other listeners on table then DROP triggers */
                                 IF TG_OP = 'DELETE' THEN
 
-                                    --RAISE NOTICE 'DELETE trigger_add_remove_func table: % ', ' ' || COALESCE((SELECT concat_ws(' ', string_agg(table_name, ' & '), count(*), min(inserted) ) FROM prostgles.triggers) , ' 0 ');
+                                    --RAISE NOTICE 'DELETE trigger_add_remove_func table: % ', ' ' || COALESCE((SELECT concat_ws(' ', string_agg(table_name, ' & '), count(*), min(inserted) ) FROM prostgles.app_triggers) , ' 0 ');
                                     --RAISE NOTICE 'DELETE trigger_add_remove_func old_table:  % ', '' || COALESCE((SELECT concat_ws(' ', string_agg(table_name, ' & '), count(*), min(inserted) ) FROM old_table), ' 0 ');
 
-
+                                    
+                                    /* Drop actual triggers if needed */
                                     FOR trw IN 
                                         SELECT DISTINCT table_name FROM old_table ot
                                         WHERE NOT EXISTS (
-                                            SELECT 1 FROM prostgles.triggers t 
+                                            SELECT 1 FROM prostgles.app_triggers t 
                                             WHERE t.table_name = ot.table_name
                                         ) 
                                     LOOP
@@ -465,19 +503,21 @@ export class PubSubManager {
                                     --RAISE NOTICE 'INSERT trigger_add_remove_func table: % ', ' ' || COALESCE((SELECT concat_ws(' ', string_agg(table_name, ' & '), count(*), min(inserted) ) FROM prostgles.triggers) , ' 0 ');
                                     --RAISE NOTICE 'INSERT trigger_add_remove_func new_table:  % ', '' || COALESCE((SELECT concat_ws(' ', string_agg(table_name, ' & '), count(*), min(inserted) ) FROM new_table), ' 0 ');
 
+                                    /* Loop through newly added tables */
                                     FOR trw IN  
 
-                                        /* Loop through new table additions */
                                         SELECT DISTINCT table_name 
                                         FROM new_table nt
-                                        WHERE NOT EXISTS (
 
-                                            SELECT 1 FROM prostgles.triggers t 
+                                        /* Table did not exist prior to this insert */
+                                        WHERE NOT EXISTS (
+                                            SELECT 1 
+                                            FROM prostgles.app_triggers t 
                                             WHERE t.table_name = nt.table_name
                                             AND   t.inserted   < nt.inserted    -- exclude current record (this is an after trigger). Turn into before trigger?
                                         )
 
-                                        /* Ignore invalid tables */
+                                        /* Table is valid */
                                         AND  EXISTS (
                                             SELECT 1 
                                             FROM information_schema.tables 
@@ -566,15 +606,15 @@ export class PubSubManager {
                         $$ LANGUAGE plpgsql;
                         COMMENT ON FUNCTION ${this.DB_OBJ_NAMES.trigger_add_remove_func} IS 'Used to add/remove table watch triggers concurrently ';
 
-                        DROP TRIGGER IF EXISTS prostgles_triggers_insert ON prostgles.triggers;
+                        DROP TRIGGER IF EXISTS prostgles_triggers_insert ON prostgles.app_triggers;
                         CREATE TRIGGER prostgles_triggers_insert
-                        AFTER INSERT ON prostgles.triggers
+                        AFTER INSERT ON prostgles.app_triggers
                         REFERENCING NEW TABLE AS new_table
                         FOR EACH STATEMENT EXECUTE PROCEDURE ${this.DB_OBJ_NAMES.trigger_add_remove_func}();
                       
-                        DROP TRIGGER IF EXISTS prostgles_triggers_delete ON prostgles.triggers;
+                        DROP TRIGGER IF EXISTS prostgles_triggers_delete ON prostgles.app_triggers;
                         CREATE TRIGGER prostgles_triggers_delete
-                        AFTER DELETE ON prostgles.triggers
+                        AFTER DELETE ON prostgles.app_triggers
                         REFERENCING OLD TABLE AS old_table
                         FOR EACH STATEMENT EXECUTE PROCEDURE ${this.DB_OBJ_NAMES.trigger_add_remove_func}();
                       
@@ -653,15 +693,16 @@ export class PubSubManager {
                         let appQ = "";
                         try {   //  drop owned by api
 
-                            let trgCond = "",
+                            let trgUpdateLastUsed = "",
                                 listeners = this.getActiveListeners();
 
                             if(listeners.length){
-                                trgCond = `
-                                ,
-                                last_used = CASE WHEN (table_name, condition) IN (
+                                trgUpdateLastUsed = `
+                                UPDATE prostgles.app_triggers
+                                SET last_used = CASE WHEN (table_name, condition) IN (
                                     ${listeners.map(l => ` ( ${asValue(l.table_name)}, ${asValue(l.condition)} ) ` ).join(", ") }
                                 ) THEN NOW() ELSE last_used END
+                                WHERE app_id = ${asValue(this.appID)};
                                 `
                             }
 
@@ -670,6 +711,7 @@ export class PubSubManager {
                                 DO $$
                                 BEGIN
 
+                                    /* prostgles schema must exist */
                                     IF
                                         EXISTS (
                                             SELECT 1 
@@ -679,47 +721,56 @@ export class PubSubManager {
                                         )
                                     THEN
 
-                                        UPDATE prostgles.apps SET last_check = NOW()
-                                        WHERE id = ${asValue(this.appID)};
-
-    /*
-                                        IF EXISTS (
+    
+                                        /* Concurrency control to avoid deadlock 
+                                        IF NOT EXISTS (
                                             SELECT 1 FROM prostgles.apps
-                                            WHERE last_check < NOW() - 1.2 * check_frequency_ms * interval '1 millisecond'
+                                            WHERE last_check < last_check_ended
+                                            AND last_check_ended > NOW() - interval '5 minutes'
                                         ) THEN
+                                        */
+                                            UPDATE prostgles.apps 
+                                            SET last_check = NOW()
+                                            WHERE id = ${asValue(this.appID)};
 
-                                        END IF;
-    */
 
-                                        DELETE FROM prostgles.apps
-                                        WHERE last_check < NOW() - check_frequency_ms * interval '1 millisecond';
+    
+                                            /* Delete unused triggers. Might deadlock */
+                                            IF EXISTS ( SELECT 1 FROM prostgles.app_triggers)
 
-                                        /* Delete unused triggers. Might deadlock */
-                                        IF EXISTS ( SELECT 1 FROM prostgles.triggers)
-                                            /* If this is the latest app then proceed */
-                                            AND ( 
-                                                SELECT id = ${asValue(this.appID)} 
-                                                FROM prostgles.apps 
-                                                ORDER BY last_check DESC 
-                                                LIMIT 1  
-                                            ) = TRUE
-                                        THEN
+                                                /* If this is the latest app then proceed
+                                                    AND ( 
+                                                        SELECT id = ${asValue(this.appID)} 
+                                                        FROM prostgles.apps 
+                                                        ORDER BY last_check DESC 
+                                                        LIMIT 1  
+                                                    ) = TRUE
+                                                */
+                                                
+                                            THEN
+    
+                                                /* TODO: Fixed deadlocks */
+                                                --LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
+    
+                                                /* UPDATE currently used triggers */
+                                                ${trgUpdateLastUsed}
+    
+                                                /* DELETE stale triggers for current app. Other triggers will be deleted on app startup */
+                                                DELETE FROM prostgles.app_triggers
+                                                WHERE app_id = ${asValue(this.appID)}
+                                                AND last_used < NOW() - 4 * ${asValue(this.appCheckFrequencyMS)} * interval '1 millisecond';
+    
+                                            END IF;
 
-                                            /* TODO: Fixed deadlocks */
-                                            --LOCK TABLE prostgles.triggers IN ACCESS EXCLUSIVE MODE;
 
-                                            UPDATE prostgles.triggers
-                                            SET app_ids = ARRAY(
-                                                    SELECT DISTINCT unnest(app_ids) INTERSECT 
-                                                    SELECT id FROM prostgles.apps
-                                                )
-                                                ${trgCond};
 
-                                            DELETE FROM prostgles.triggers
-                                            WHERE array_length(app_ids, 1) = 0
-                                            OR last_used < NOW() - 2 * ${asValue(this.appCheckFrequencyMS)} * interval '1 millisecond';
+                                            UPDATE prostgles.apps 
+                                            SET last_check_ended = NOW()
+                                            WHERE id = ${asValue(this.appID)};
 
-                                        END IF;
+                                        /*
+                                        END IF;    
+                                        */
 
     
                                     END IF;
@@ -775,16 +826,16 @@ export class PubSubManager {
                 BEGIN
                     --SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
                     
-                    LOCK TABLE prostgles.triggers IN ACCESS EXCLUSIVE MODE;
+                    LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
                     EXECUTE format(
                         $q$
 
                             CREATE TEMP TABLE %1$I AS --ON COMMIT DROP AS
-                            SELECT * FROM prostgles.triggers;
+                            SELECT * FROM prostgles.app_triggers;
 
-                            DELETE FROM prostgles.triggers;
+                            DELETE FROM prostgles.app_triggers;
 
-                            INSERT INTO prostgles.triggers
+                            INSERT INTO prostgles.app_triggers
                             SELECT * FROM %1$I;
 
                             DROP TABLE IF EXISTS %1$I;
@@ -795,20 +846,12 @@ export class PubSubManager {
                     /**
                      *  Delete stale app records
                      * */
-                            DELETE FROM prostgles.apps 
-                            WHERE last_check < NOW() - check_frequency_ms * interval '1 millisecond'; 
+                    
+                            DELETE FROM prostgles.apps
+                            WHERE last_check < NOW() - 8 * check_frequency_ms * interval '1 millisecond';
 
-                            /**
-                             *  Remove inactive app ids 
-                             * */
-                            UPDATE prostgles.triggers 
-                            SET app_ids = ARRAY(
-                                SELECT DISTINCT unnest(app_ids) INTERSECT  
-                                SELECT id FROM prostgles.apps
-                            );
-
-                            DELETE FROM prostgles.triggers
-                            WHERE array_length(app_ids, 1) = 0;
+                            DELETE FROM prostgles.app_triggers
+                            WHERE app_id NOT IN (SELECT id FROM prostgles.apps);
                     
                     /* DROP the old buggy schema watch trigger */
                     IF EXISTS (
@@ -816,7 +859,6 @@ export class PubSubManager {
                         WHERE evtname = 'prostgles_schema_watch_trigger'
                     ) THEN
                         DROP EVENT TRIGGER IF EXISTS prostgles_schema_watch_trigger;
-                    
                     END IF;
 
                     ev_trg_needed := EXISTS (SELECT 1 FROM prostgles.apps WHERE watching_schema IS TRUE);
@@ -1861,7 +1903,7 @@ export class PubSubManager {
     getMyTriggerQuery = async () => {
         return pgp.as.format(` 
             SELECT * --, ROW_NUMBER() OVER(PARTITION BY table_name ORDER BY table_name, condition ) - 1 as id
-            FROM prostgles.v_triggers_unnested
+            FROM prostgles.v_triggers
             WHERE app_id = $1
             ORDER BY table_name, condition
         `, [this.appID]
@@ -1889,17 +1931,15 @@ export class PubSubManager {
             const trgVals = { 
                 tbl: asValue(table_name), 
                 cond: asValue(condition),
-                appID: asValue(app_id),
             }
 
             await this.db.any(`
                 BEGIN WORK;
-                LOCK TABLE prostgles.triggers IN ACCESS EXCLUSIVE MODE;
+                LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
 
-                INSERT INTO prostgles.triggers (table_name, condition, app_ids) 
-                    VALUES (${trgVals.tbl}, ${trgVals.cond}, ARRAY[${trgVals.appID}])
-                    ON CONFLICT (table_name, condition) DO UPDATE 
-                    SET app_ids = ARRAY(SELECT DISTINCT UNNEST(prostgles.triggers.app_ids || EXCLUDED.app_ids));
+                INSERT INTO prostgles.app_triggers (table_name, condition, app_id) 
+                    VALUES (${trgVals.tbl}, ${trgVals.cond}, ${asValue(this.appID)})
+                ON CONFLICT DO NOTHING;
                      
                 COMMIT WORK;
             `);

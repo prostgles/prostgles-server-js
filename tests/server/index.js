@@ -42,6 +42,7 @@ prostgles_server_1.default({
     watchSchema: true,
     transactions: true,
     // DEBUG_MODE: true,
+    // onNotice: console.log,
     onSocketConnect: (socket) => {
         log("onSocketConnect");
         if (clientTest) {

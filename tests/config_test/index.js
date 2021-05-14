@@ -124,6 +124,7 @@ prostgles_server_1.default({
             //     on cu.CONSTRAINT_NAME = tc.CONSTRAINT_NAME 
             // ) t`));
             if (true || process.env.NPORT) {
+                db.various.subscribe({}, {}, console.log);
             }
         }
         catch (e) {

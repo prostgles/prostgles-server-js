@@ -232,6 +232,17 @@ export const FUNCTIONS: FunctionSpec[] = [
       return pgp.as.format("LEFT(" + asNameAlias(args[0], tableAlias) + ", $1)", [args[1]]);
     }
   },
+  {
+    name: "$right",
+    description: ` :[column_name, number] -> substring`,
+    type: "function",
+    numArgs: 2,
+    singleColArg: false,
+    getFields: (args: any[]) => [args[0]],
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      return pgp.as.format("RIGHT(" + asNameAlias(args[0], tableAlias) + ", $1)", [args[1]]);
+    }
+  },
 
   {
     name: "$to_char",
