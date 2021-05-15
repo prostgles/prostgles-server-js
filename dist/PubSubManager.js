@@ -639,7 +639,8 @@ class PubSubManager {
     
                                     END IF;
 
-                                COMMIT;
+                                -- must not commit without a lock
+                                --COMMIT;
                                 END $$;
                             `;
                                 yield this.db.any(appQ);

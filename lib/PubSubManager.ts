@@ -775,7 +775,8 @@ export class PubSubManager {
     
                                     END IF;
 
-                                COMMIT;
+                                -- must not commit without a lock
+                                --COMMIT;
                                 END $$;
                             `
                             await this.db.any(appQ);
