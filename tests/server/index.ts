@@ -4,6 +4,8 @@ import express from 'express';
 import prostgles from "prostgles-server";
 const app = express();
 const http = require('http').createServer(app);
+const { exec } = require('child_process');
+
 
 const clientTest = (process.env.TEST_TYPE === "client");
 const io = !clientTest? undefined : require("socket.io")(http, { path: "/teztz/s" });
@@ -185,6 +187,9 @@ prostgles({
 		try { 
 			 
 			if(process.env.TEST_TYPE === "client"){
+				const clientPath = `cd ${__dirname}/../client && npm test`;
+				console.log(clientPath)
+				exec(clientPath, console.log);
 				log("Waiting for client...");
 				
 			} else if(process.env.TEST_TYPE === "server"){
