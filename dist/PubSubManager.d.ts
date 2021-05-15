@@ -130,7 +130,7 @@ export declare class PubSubManager {
         table_name: string;
         condition: string;
     }[];
-    onSocketDisconnected(socket: any, channel_name: any): void;
+    onSocketDisconnected(socket: any, channel_name: any): string;
     checkIfTimescaleBug: (table_name: string) => Promise<boolean>;
     getMyTriggerQuery: () => Promise<string>;
     addingTrigger: any;

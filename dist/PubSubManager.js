@@ -865,18 +865,18 @@ class PubSubManager {
         this.parseCondition = (condition) => Boolean(condition && condition.trim().length) ? condition : "TRUE";
         this.getActiveListeners = () => {
             let result = [];
-            const add = (t, c) => {
+            const upsert = (t, c) => {
                 if (!result.find(r => r.table_name === t && r.condition === c)) {
                     result.push({ table_name: t, condition: c });
                 }
             };
             (this.syncs || []).map(s => {
-                add(s.table_name, s.condition);
+                upsert(s.table_name, s.condition);
             });
             Object.keys(this.subs || {}).map(table_name => {
                 Object.keys(this.subs[table_name] || {}).map(condition => {
                     if (this.subs[table_name][condition].subs.length) {
-                        add(table_name, condition);
+                        upsert(table_name, condition);
                     }
                 });
             });
@@ -1396,8 +1396,9 @@ class PubSubManager {
                     this.syncs.push(newSync);
                     // console.log("Added SYNC");
                     socket.removeAllListeners(channel_name + "unsync");
-                    socket.once(channel_name + "unsync", () => {
+                    socket.once(channel_name + "unsync", (_data, cb) => {
                         this.onSocketDisconnected(socket, channel_name);
+                        cb(null, { res: "ok" });
                     });
                     socket.removeAllListeners(channel_name);
                     socket.on(channel_name, (data, cb) => {
@@ -1490,7 +1491,10 @@ class PubSubManager {
                     if (socket) {
                         const chnUnsub = channel_name + "unsubscribe";
                         socket.removeAllListeners(chnUnsub);
-                        socket.once(chnUnsub, () => this.onSocketDisconnected(socket, channel_name));
+                        socket.once(chnUnsub, (_data, cb) => {
+                            const res = this.onSocketDisconnected(socket, channel_name);
+                            cb(null, { res });
+                        });
                     }
                 }
                 else {
@@ -1602,6 +1606,7 @@ class PubSubManager {
             socket.removeAllListeners(channel_name + "unsync");
             socket.removeAllListeners(channel_name + "unsubscribe");
         }
+        return "ok";
     }
     addTrigger(params) {
         return __awaiter(this, void 0, void 0, function* () {

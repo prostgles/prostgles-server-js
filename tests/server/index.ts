@@ -24,7 +24,9 @@ const log = (msg: string, extra?: any) => {
 }
 const stopTest = (err?) => {
 	log("Stopping server ...")
-	if(err) console.error(err);
+	if(err) {
+		console.error(err);
+	}
 	process.exit(err? 1 : 0);
 }
 
@@ -65,7 +67,10 @@ prostgles({
 			socket.emit("start-test", { server_id: Math.random() });
 			socket.on("stop-test", (err, cb) => {
 				cb();
-				stopTest(err)
+				if(!err){
+					console.log("Client test successful!")
+				}
+				stopTest(err);
 			});
 		}
 		return true;

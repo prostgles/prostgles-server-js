@@ -169,7 +169,6 @@ prostgles_server_1.default({
         try {
             if (process.env.TEST_TYPE === "client") {
                 const clientPath = `cd ${__dirname}/../client && npm test`;
-                console.log(clientPath);
                 exec(clientPath, console.log);
                 log("Waiting for client...");
             }

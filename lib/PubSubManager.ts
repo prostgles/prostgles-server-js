@@ -1555,7 +1555,8 @@ export class PubSubManager {
 
     /* Returns a sync channel */
     async addSync(syncParams: AddSyncParams){
-        const { socket = null, table_info = null, table_rules = null, synced_field = null, 
+        const { 
+            socket = null, table_info = null, table_rules = null, synced_field = null, 
             allow_delete = null, id_fields = [], filter = {}, 
             params, condition = "", throttle = 0 
         } = syncParams || {};
@@ -1604,8 +1605,9 @@ export class PubSubManager {
                     // console.log("Added SYNC");
 
                     socket.removeAllListeners(channel_name + "unsync");
-                    socket.once(channel_name + "unsync", () => {
+                    socket.once(channel_name + "unsync", (_data, cb) => {
                         this.onSocketDisconnected(socket, channel_name);
+                        cb(null, { res: "ok" })
                     });
 
                     socket.removeAllListeners(channel_name);
@@ -1726,7 +1728,10 @@ export class PubSubManager {
                     if(socket){
                         const chnUnsub = channel_name + "unsubscribe";
                         socket.removeAllListeners(chnUnsub);
-                        socket.once(chnUnsub, () => this.onSocketDisconnected(socket, channel_name));
+                        socket.once(chnUnsub, (_data, cb) =>{
+                            const res = this.onSocketDisconnected(socket, channel_name);
+                            cb(null, { res });
+                        });
                     }
                 } else {
                     this.subs[table_name][condition].subs[sub_idx] = newSub;
@@ -1807,21 +1812,21 @@ export class PubSubManager {
 
     getActiveListeners = (): { table_name: string; condition: string }[] => {
         let result = [];
-        const add = (t, c) => {
+        const upsert = (t, c) => {
             if(!result.find(r => r.table_name === t && r.condition === c)){
                 result.push({ table_name: t, condition: c });
             }
         }
         (this.syncs  || []).map(s => {
-            add(s.table_name, s.condition)
+            upsert(s.table_name, s.condition)
         });
         Object.keys(this.subs || {}).map(table_name => {
             Object.keys(this.subs[table_name] || {}).map(condition => {
                 if(this.subs[table_name][condition].subs.length) {
-                    add(table_name, condition);
+                    upsert(table_name, condition);
                 }
-            })
-        })
+            });
+        });
 
         return result;
     }
@@ -1874,6 +1879,8 @@ export class PubSubManager {
             socket.removeAllListeners(channel_name + "unsync");
             socket.removeAllListeners(channel_name + "unsubscribe");
         }
+
+        return "ok";
     }
 
 
