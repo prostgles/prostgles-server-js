@@ -2,7 +2,7 @@
 const Prostgles_1 = require("./Prostgles");
 function prostgles(params) {
     let prgl = new Prostgles_1.Prostgles(params);
-    prgl.init(params.onReady);
+    return prgl.init(params.onReady);
 }
 module.exports = prostgles;
 // module.exports = {

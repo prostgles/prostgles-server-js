@@ -182,7 +182,8 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
 
   await tryRun("Order by", async () => {
     const res = await db.items.find({ }, { select: { name: 1 }, orderBy: { name: -1 }});
-    assert.deepStrictEqual(res, [{ name: 'b'}, { name: 'a'}, { name: 'a'}])
+    assert.deepStrictEqual(res, [{ name: 'b'}, { name: 'a'}, { name: 'a'}]);
+
   });
 
   await tryRun("Order by aliased func", async () => {
@@ -193,6 +194,11 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
   await tryRun("Order by aggregation", async () => {
     const res = await db.items.find({ }, { select: { name: 1, count: { $countAll: [] } }, orderBy: { count: -1 }});
     assert.deepStrictEqual(res, [  { name: 'a', count: '2'} , { name: 'b', count: '1'} ])
+  });
+
+  await tryRun("Order by colliding alias name", async () => {
+    const res = await db.items.find({ }, { select: { name: { $countAll: [] }, n: { $left: ["name", 1]} }, orderBy: { name: -1 }});
+    assert.deepStrictEqual(res, [  { name: '2', n: 'a' } , { name: '1', n: 'b'} ])
   });
 
   await tryRun("Update batch example", async () => {

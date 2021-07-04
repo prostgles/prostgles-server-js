@@ -1227,7 +1227,21 @@ export class ViewHandler {
             )
         );
         if(!bad_param){
-            return (excludeOrder? "" : " ORDER BY ") + (_ob.map(({ key, asc }) => `${[tableAlias, key].filter(v => v).map(asName).join(".")} ${asc? " ASC " : " DESC "}` ).join(", "))
+            
+            const selectedAliases = select.filter(s => s.selected).map(s => s.alias);
+            return (excludeOrder? "" : " ORDER BY ") + (_ob.map(({ key, asc }) => {
+
+                /* Order by column index when possible to bypass name collision when ordering by a computed column. 
+                    (Postgres will sort by existing columns whenever possible) 
+                */
+                const orderType = asc? " ASC " : " DESC ";
+                const index = selectedAliases.indexOf(key) + 1;
+                const colKey = (index > 0)? index : [tableAlias, key].filter(v => v).map(asName).join(".");
+                
+                const res = `${colKey} ${orderType}`;
+                
+                return res;
+            }).join(", "))
         } else {
             throw "Unrecognised orderBy fields or params: " + bad_param.key;
         }

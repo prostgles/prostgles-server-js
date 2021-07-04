@@ -11,14 +11,14 @@ const pkgj = require('../package.json');
 const version = pkgj.version;
 
 import { get } from "./utils";
-import { DboBuilder, DbHandler, DbHandlerTX, TableHandler, ViewHandler } from "./DboBuilder";
+import { DboBuilder, DbHandler, DbHandlerTX, TableHandler, ViewHandler, isPlainObject } from "./DboBuilder";
 import { PubSubManager, DEFAULT_SYNC_BATCH_SIZE, asValue } from "./PubSubManager";
  
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 
 
 export { DbHandler, DbHandlerTX } from "./DboBuilder";
-import { SQLRequest, SQLOptions, CHANNELS, asName } from "prostgles-types";
+import { SQLRequest, SQLOptions, CHANNELS, asName, DBHandler } from "prostgles-types";
 
 import { DBEventsManager } from "./DBEventsManager";
 
@@ -27,7 +27,7 @@ type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 type DbConnectionOpts = pg.IDefaults;
 
 let currConnection: { db: DB, pgp: PGP };
-function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts, debugQueries = false, noNewConnections = true, onNotice = null): { db: DB, pgp: PGP } {
+function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts, debugQueries = false, onNotice = null): { db: DB, pgp: PGP } {
     let pgp: PGP = pgPromise({
         
         promiseLib: promise,
@@ -59,14 +59,10 @@ function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts, 
         Object.assign(pgp.pg.defaults, options);
     }
     
-    if(!currConnection || !noNewConnections){
-        currConnection = { 
-            db: pgp(dbConnection), 
-            pgp 
-        };
-    }
-
-    return currConnection;
+    return { 
+        db: pgp(dbConnection), 
+        pgp 
+    };
 }
 
 
@@ -500,22 +496,31 @@ export class Prostgles {
         this.dbo = this.dboBuilder.dbo;
     }
 
-    async init(onReady: (dbo: DbHandler | DbHandlerTX, db: DB) => any){
+    async init(onReady: (dbo: DbHandler | DbHandlerTX, db: DB) => any): Promise<{
+        db: DbHandlerTX;
+        _db: DB;
+        pgp: PGP;
+        io?: any;
+        destroy: () => Promise<undefined>;
+    }> {
         this.loaded = false;
 
 
         if(this.watchSchema === "hotReloadMode" && !this.tsGeneratedTypesDir) throw "tsGeneratedTypesDir option is needed for watchSchema: hotReloadMode to work ";
 
         /* 1. Connect to db */
-        const { db, pgp } = getDbConnection(this.dbConnection, this.dbOptions, this.DEBUG_MODE, true, notice => { 
-            if(this.onNotice) this.onNotice(notice);
-            if(this.dbEventsManager){
-                this.dbEventsManager.onNotice(notice)
-            }
-        });
-        this.db = db;
-        this.pgp = pgp;
+        if(!this.db){
+            const { db, pgp } = getDbConnection(this.dbConnection, this.dbOptions, this.DEBUG_MODE, notice => { 
+                if(this.onNotice) this.onNotice(notice);
+                if(this.dbEventsManager){
+                    this.dbEventsManager.onNotice(notice)
+                }
+            });
+            this.db = db;
+            this.pgp = pgp;
+        }
         this.checkDb();
+        const { db, pgp } = this;
 
         /* 2. Execute any SQL file if provided */
         if(this.sqlFilePath){
@@ -559,7 +564,18 @@ export class Prostgles {
             }
 
             this.loaded = true;
-            return true;
+            return {
+                db: this.dbo,
+                _db: db,
+                pgp,
+                io: this.io,
+                destroy: () => {
+                    if(this.io && typeof this.io.close === "function"){
+                        this.io.close();
+                    }
+                    return db.$pool.end();
+                }
+            };
         } catch (e) {
             console.trace(e)
             throw "init issues: " + e.toString();
@@ -720,7 +736,7 @@ export class Prostgles {
                         const methods = await this.publishParser.getMethods(socket);
                         
                         if(!methods || !methods[method]){
-                            cb("Invalid method");
+                            cb("Disallowed/missing method " + JSON.stringify(method));
                         } else {
                             try {
                                 const res = await methods[method](...params);
@@ -882,7 +898,7 @@ export class Prostgles {
                 } else console.error("db missing");
             }
         }
-        const methods = await publishParser.getMethods(socket);
+
         // let joinTables = [];
         let joinTables2 = [];
         if(this.joins){
@@ -898,6 +914,8 @@ export class Prostgles {
             });
         }
         
+        const methods = await publishParser.getMethods(socket);
+        
         socket.emit(CHANNELS.SCHEMA, {
             schema, 
             methods: Object.keys(methods), 
@@ -911,7 +929,11 @@ export class Prostgles {
     }
 }
 function makeSocketError(cb, err){
-    const err_msg = err.toString(),
+    const err_msg = (err instanceof Error)? 
+    err.toString() : 
+        isPlainObject(err)?
+        JSON.stringify(err, null, 2) : 
+            err.toString(),
         e = { err_msg, err };
     cb(e);
 }

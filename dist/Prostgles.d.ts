@@ -307,7 +307,13 @@ export declare class Prostgles {
     private getFileText;
     writeDBSchema(force?: boolean): void;
     refreshDBO(): Promise<void>;
-    init(onReady: (dbo: DbHandler | DbHandlerTX, db: DB) => any): Promise<boolean>;
+    init(onReady: (dbo: DbHandler | DbHandlerTX, db: DB) => any): Promise<{
+        db: DbHandlerTX;
+        _db: DB;
+        pgp: PGP;
+        io?: any;
+        destroy: () => Promise<undefined>;
+    }>;
     runSQLFile(filePath: string): Promise<boolean | void>;
     getSID(socket: any): SessionIDs;
     getUser(socket: any): Promise<object>;

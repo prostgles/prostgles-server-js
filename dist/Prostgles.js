@@ -24,7 +24,7 @@ const PubSubManager_1 = require("./PubSubManager");
 const prostgles_types_1 = require("prostgles-types");
 const DBEventsManager_1 = require("./DBEventsManager");
 let currConnection;
-function getDbConnection(dbConnection, options, debugQueries = false, noNewConnections = true, onNotice = null) {
+function getDbConnection(dbConnection, options, debugQueries = false, onNotice = null) {
     let pgp = pgPromise(Object.assign(Object.assign({ promiseLib: promise }, (debugQueries ? {
         query: function (e) {
             console.log({ psql: e.query, params: e.params });
@@ -49,13 +49,10 @@ function getDbConnection(dbConnection, options, debugQueries = false, noNewConne
     if (options) {
         Object.assign(pgp.pg.defaults, options);
     }
-    if (!currConnection || !noNewConnections) {
-        currConnection = {
-            db: pgp(dbConnection),
-            pgp
-        };
-    }
-    return currConnection;
+    return {
+        db: pgp(dbConnection),
+        pgp
+    };
 }
 const QueryFile = require('pg-promise').QueryFile;
 exports.JOIN_TYPES = ["one-many", "many-one", "one-one", "many-many"];
@@ -202,7 +199,6 @@ class Prostgles {
                         console.error("db missing");
                 }
             }
-            const methods = yield publishParser.getMethods(socket);
             // let joinTables = [];
             let joinTables2 = [];
             if (this.joins) {
@@ -215,6 +211,7 @@ class Prostgles {
                     }
                 });
             }
+            const methods = yield publishParser.getMethods(socket);
             socket.emit(prostgles_types_1.CHANNELS.SCHEMA, Object.assign(Object.assign({ schema, methods: Object.keys(methods) }, (fullSchema ? { fullSchema } : {})), { rawSQL, joinTables: joinTables2, auth,
                 version, err: publishValidationError }));
         });
@@ -309,16 +306,19 @@ class Prostgles {
             if (this.watchSchema === "hotReloadMode" && !this.tsGeneratedTypesDir)
                 throw "tsGeneratedTypesDir option is needed for watchSchema: hotReloadMode to work ";
             /* 1. Connect to db */
-            const { db, pgp } = getDbConnection(this.dbConnection, this.dbOptions, this.DEBUG_MODE, true, notice => {
-                if (this.onNotice)
-                    this.onNotice(notice);
-                if (this.dbEventsManager) {
-                    this.dbEventsManager.onNotice(notice);
-                }
-            });
-            this.db = db;
-            this.pgp = pgp;
+            if (!this.db) {
+                const { db, pgp } = getDbConnection(this.dbConnection, this.dbOptions, this.DEBUG_MODE, notice => {
+                    if (this.onNotice)
+                        this.onNotice(notice);
+                    if (this.dbEventsManager) {
+                        this.dbEventsManager.onNotice(notice);
+                    }
+                });
+                this.db = db;
+                this.pgp = pgp;
+            }
             this.checkDb();
+            const { db, pgp } = this;
             /* 2. Execute any SQL file if provided */
             if (this.sqlFilePath) {
                 yield this.runSQLFile(this.sqlFilePath);
@@ -357,7 +357,18 @@ class Prostgles {
                     console.error("Prostgles: Error within onReady: \n", err);
                 }
                 this.loaded = true;
-                return true;
+                return {
+                    db: this.dbo,
+                    _db: db,
+                    pgp,
+                    io: this.io,
+                    destroy: () => {
+                        if (this.io && typeof this.io.close === "function") {
+                            this.io.close();
+                        }
+                        return db.$pool.end();
+                    }
+                };
             }
             catch (e) {
                 console.trace(e);
@@ -501,7 +512,7 @@ class Prostgles {
                         try {
                             const methods = yield this.publishParser.getMethods(socket);
                             if (!methods || !methods[method]) {
-                                cb("Invalid method");
+                                cb("Disallowed/missing method " + JSON.stringify(method));
                             }
                             else {
                                 try {
@@ -529,7 +540,11 @@ class Prostgles {
 }
 exports.Prostgles = Prostgles;
 function makeSocketError(cb, err) {
-    const err_msg = err.toString(), e = { err_msg, err };
+    const err_msg = (err instanceof Error) ?
+        err.toString() :
+        DboBuilder_1.isPlainObject(err) ?
+            JSON.stringify(err, null, 2) :
+            err.toString(), e = { err_msg, err };
     cb(e);
 }
 // const insertParams: Array<keyof InsertRule> = ["fields", "forcedData", "returningFields", "validate"];

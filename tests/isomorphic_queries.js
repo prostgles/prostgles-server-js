@@ -159,6 +159,10 @@ async function isomorphic(db) {
         const res = await db.items.find({}, { select: { name: 1, count: { $countAll: [] } }, orderBy: { count: -1 } });
         assert_1.strict.deepStrictEqual(res, [{ name: 'a', count: '2' }, { name: 'b', count: '1' }]);
     });
+    await tryRun("Order by colliding alias name", async () => {
+        const res = await db.items.find({}, { select: { name: { $countAll: [] }, n: { $left: ["name", 1] } }, orderBy: { name: -1 } });
+        assert_1.strict.deepStrictEqual(res, [{ name: '2', n: 'a' }, { name: '1', n: 'b' }]);
+    });
     await tryRun("Update batch example", async () => {
         await db.items4.updateBatch([
             [{ name: "abc1" }, { name: "abc" }],

@@ -308,7 +308,7 @@ exports.FUNCTIONS = [
         }
     })),
     /* Basic 1 arg col funcs */
-    ...["upper", "lower", "length", "reverse", "trim", "initcap", "round", "ceil", "floor", "sign", "age"].map(funcName => ({
+    ...["upper", "lower", "length", "reverse", "trim", "initcap", "round", "ceil", "floor", "sign", "age", "md5"].map(funcName => ({
         name: "$" + funcName,
         type: "function",
         numArgs: 1,
