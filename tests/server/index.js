@@ -31,6 +31,7 @@ process.on('unhandledRejection', (reason, p) => {
     process.exit(1);
 });
 (async () => {
+    let db;
     const prgl = await prostgles_server_1.default({
         dbConnection: {
             host: process.env.POSTGRES_HOST || "localhost",
@@ -57,6 +58,8 @@ process.on('unhandledRejection', (reason, p) => {
                         console.log("Client test successful!");
                     }
                     await prgl.destroy();
+                    await tout(2999);
+                    // console.warn(await db.items.count())
                     stopTest(err);
                 });
             }
@@ -221,4 +224,11 @@ process.on('unhandledRejection', (reason, p) => {
 })();
 function randElem(items) {
     return items[Math.floor(Math.random() * items.length)];
+}
+async function tout(millis) {
+    return new Promise((re, rj) => {
+        setTimeout(() => {
+            re();
+        }, millis);
+    });
 }

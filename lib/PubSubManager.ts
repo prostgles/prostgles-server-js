@@ -166,6 +166,16 @@ export class PubSubManager {
         return await res.init();
     }
 
+    destroy = () => {
+        if(this.appCheck){
+            clearInterval(this.appCheck);
+        }
+        this.onSocketDisconnected();
+        // if(this.postgresNotifListenManager){
+        //     this.postgresNotifListenManager.stopListening();
+        // }
+    }
+
     init = async (): Promise<PubSubManager> => {
 
         try {
@@ -1831,7 +1841,7 @@ export class PubSubManager {
         return result;
     }
 
-    onSocketDisconnected(socket, channel_name){
+    onSocketDisconnected(socket?, channel_name?){
         // process.on('warning', e => {
         //     console.warn(e.stack)
         // });
@@ -1845,7 +1855,7 @@ export class PubSubManager {
                          * If a channel name is specified then delete triggers 
                          */
                         if(
-                            sub.socket_id === socket.id &&
+                            (socket && sub.socket_id === socket.id) &&
                             (!channel_name || sub.channel_name === channel_name)
                         ){
                             this.subs[table_name][condition].subs.splice(i, 1);
@@ -1865,14 +1875,16 @@ export class PubSubManager {
         if(this.syncs){
             this.syncs = this.syncs.filter(s => {
                 if(channel_name){
-                    return s.socket_id !== socket.id || s.channel_name !== channel_name
+                    return (socket && s.socket_id !== socket.id) || s.channel_name !== channel_name
                 }
 
-                return s.socket_id !== socket.id;
+                return (socket && s.socket_id !== socket.id)
             });
         }
 
-        if(!channel_name){
+        if(!socket){
+
+        } else if(!channel_name){
             delete this.sockets[socket.id];
         } else {
             socket.removeAllListeners(channel_name);

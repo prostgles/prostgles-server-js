@@ -45,6 +45,15 @@ class PubSubManager {
             }
         };
         this.appCheckFrequencyMS = 10 * 1000;
+        this.destroy = () => {
+            if (this.appCheck) {
+                clearInterval(this.appCheck);
+            }
+            this.onSocketDisconnected();
+            // if(this.postgresNotifListenManager){
+            //     this.postgresNotifListenManager.stopListening();
+            // }
+        };
         this.init = () => __awaiter(this, void 0, void 0, function* () {
             try {
                 const schema_version = 4;
@@ -1576,7 +1585,7 @@ class PubSubManager {
                         /**
                          * If a channel name is specified then delete triggers
                          */
-                        if (sub.socket_id === socket.id &&
+                        if ((socket && sub.socket_id === socket.id) &&
                             (!channel_name || sub.channel_name === channel_name)) {
                             this.subs[table_name][condition].subs.splice(i, 1);
                             if (!this.subs[table_name][condition].subs.length) {
@@ -1593,12 +1602,14 @@ class PubSubManager {
         if (this.syncs) {
             this.syncs = this.syncs.filter(s => {
                 if (channel_name) {
-                    return s.socket_id !== socket.id || s.channel_name !== channel_name;
+                    return (socket && s.socket_id !== socket.id) || s.channel_name !== channel_name;
                 }
-                return s.socket_id !== socket.id;
+                return (socket && s.socket_id !== socket.id);
             });
         }
-        if (!channel_name) {
+        if (!socket) {
+        }
+        else if (!channel_name) {
             delete this.sockets[socket.id];
         }
         else {

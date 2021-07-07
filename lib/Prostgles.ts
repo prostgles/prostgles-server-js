@@ -428,6 +428,8 @@ export class Prostgles {
         }
     }
 
+    destroyed = false;
+
     async onSchemaChange(event: { command: string; query: string }){
         if(this.watchSchema && this.loaded){
             console.log("Schema changed");
@@ -573,6 +575,8 @@ export class Prostgles {
                     if(this.io && typeof this.io.close === "function"){
                         this.io.close();
                     }
+                    this.dbo = {};
+                    this.destroyed = true;
                     return db.$pool.end();
                 }
             };

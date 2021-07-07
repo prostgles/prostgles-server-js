@@ -295,6 +295,7 @@ export declare class Prostgles {
     onNotice?: ProstglesInitOptions["onNotice"];
     dbEventsManager: DBEventsManager;
     constructor(params: ProstglesInitOptions);
+    destroyed: boolean;
     onSchemaChange(event: {
         command: string;
         query: string;

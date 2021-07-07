@@ -104,6 +104,7 @@ export declare class PubSubManager {
     appCheckFrequencyMS: number;
     appCheck: any;
     static create: (options: PubSubManagerOptions) => Promise<PubSubManager>;
+    destroy: () => void;
     init: () => Promise<PubSubManager>;
     DB_OBJ_NAMES: {
         trigger_add_remove_func: string;
@@ -130,7 +131,7 @@ export declare class PubSubManager {
         table_name: string;
         condition: string;
     }[];
-    onSocketDisconnected(socket: any, channel_name: any): string;
+    onSocketDisconnected(socket?: any, channel_name?: any): string;
     checkIfTimescaleBug: (table_name: string) => Promise<boolean>;
     getMyTriggerQuery: () => Promise<string>;
     addingTrigger: any;

@@ -77,6 +77,7 @@ class Prostgles {
         this.watchSchema = false;
         this.loaded = false;
         this.keywords = DEFAULT_KEYWORDS;
+        this.destroyed = false;
         this.connectedSockets = [];
         this.pushSocketSchema = (socket) => __awaiter(this, void 0, void 0, function* () {
             let auth = {};
@@ -366,6 +367,8 @@ class Prostgles {
                         if (this.io && typeof this.io.close === "function") {
                             this.io.close();
                         }
+                        this.dbo = {};
+                        this.destroyed = true;
                         return db.$pool.end();
                     }
                 };
