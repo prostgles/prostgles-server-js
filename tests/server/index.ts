@@ -79,26 +79,27 @@ const dbConnection = {
 					if(!err){
 						console.log("Client test successful!")
 					}
-					console.log("Destroying prgl");
-					await db.items.subscribe({}, {}, () => {});
 
-					await prgl.destroy();
-					console.log("Recreating prgl")
-					prgl = await prostgles({
-						dbConnection,
-						onReady: async (dbo) => {
-							console.warn("onReady", await dbo.items.count())
-							// await tout(2)
-							await prgl.destroy();
-							console.log("Recreating prgl")
-							prgl = await prostgles({
-								dbConnection,
-								onReady: async (dbo) => {
-									console.warn("onReady", await dbo.items.count())
-								}
-							});
-						}
-					});
+					// console.log("Destroying prgl");
+					// await db.items.subscribe({}, {}, () => {});
+
+					// await prgl.destroy();
+					// console.log("Recreating prgl")
+					// prgl = await prostgles({
+					// 	dbConnection,
+					// 	onReady: async (dbo) => {
+					// 		console.warn("onReady", await dbo.items.count())
+					// 		// await tout(2)
+					// 		await prgl.destroy();
+					// 		console.log("Recreating prgl")
+					// 		prgl = await prostgles({
+					// 			dbConnection,
+					// 			onReady: async (dbo) => {
+					// 				console.warn("onReady", await dbo.items.count())
+					// 			}
+					// 		});
+					// 	}
+					// });
 
 					stopTest(err);
 				});
