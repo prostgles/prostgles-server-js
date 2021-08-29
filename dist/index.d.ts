@@ -4,7 +4,7 @@ declare function prostgles(params: ProstglesInitOptions): Promise<{
     _db: import("./Prostgles").DB;
     pgp: import("./Prostgles").PGP;
     io?: any;
-    destroy: () => Promise<undefined>;
+    destroy: () => Promise<boolean>;
 }>;
 export = prostgles;
 //# sourceMappingURL=index.d.ts.map

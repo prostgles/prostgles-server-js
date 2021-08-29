@@ -366,8 +366,8 @@ class Prostgles {
                     _db: db,
                     pgp,
                     io: this.io,
-                    destroy: () => {
-                        console.log("destroy destroy destroy destroy destroy");
+                    destroy: () => __awaiter(this, void 0, void 0, function* () {
+                        console.log("destroying prgl instance");
                         this.destroyed = true;
                         if (this.io) {
                             this.io.on("connection", (socket) => {
@@ -383,8 +383,10 @@ class Prostgles {
                         }
                         this.dbo = undefined;
                         this.db = undefined;
-                        return db.$pool.end();
-                    }
+                        yield db.$pool.end();
+                        yield sleep(1000);
+                        return true;
+                    })
                 };
             }
             catch (e) {

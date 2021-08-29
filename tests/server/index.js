@@ -44,7 +44,7 @@ const dbConnection = {
     password: process.env.POSTGRES_PASSWORD || "api"
 };
 (async () => {
-    const prgl = await prostgles_server_1.default({
+    let prgl = await prostgles_server_1.default({
         dbConnection,
         sqlFilePath: path_1.default.join(__dirname + '/init.sql'),
         io,
@@ -66,12 +66,20 @@ const dbConnection = {
                     console.log("Destroying prgl");
                     await db.items.subscribe({}, {}, () => { });
                     await prgl.destroy();
-                    await tout(2999);
                     console.log("Recreating prgl");
-                    const _prgl = await prostgles_server_1.default({
+                    prgl = await prostgles_server_1.default({
                         dbConnection,
                         onReady: async (dbo) => {
-                            console.warn(await dbo.items.count());
+                            console.warn("onReady", await dbo.items.count());
+                            // await tout(2)
+                            await prgl.destroy();
+                            console.log("Recreating prgl");
+                            prgl = await prostgles_server_1.default({
+                                dbConnection,
+                                onReady: async (dbo) => {
+                                    console.warn("onReady", await dbo.items.count());
+                                }
+                            });
                         }
                     });
                     stopTest(err);

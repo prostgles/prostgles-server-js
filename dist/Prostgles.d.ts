@@ -313,7 +313,7 @@ export declare class Prostgles {
         _db: DB;
         pgp: PGP;
         io?: any;
-        destroy: () => Promise<undefined>;
+        destroy: () => Promise<boolean>;
     }>;
     runSQLFile(filePath: string): Promise<boolean | void>;
     getSID(socket: any): SessionIDs;

@@ -58,7 +58,7 @@ const dbConnection = {
 
 (async () => {
 
-	const prgl = await prostgles({
+	let prgl = await prostgles({
 		dbConnection,
 		sqlFilePath: path.join(__dirname+'/init.sql'),
 		io,
@@ -80,17 +80,26 @@ const dbConnection = {
 						console.log("Client test successful!")
 					}
 					console.log("Destroying prgl");
-					await db.items.subscribe({}, {}, () => {})
+					await db.items.subscribe({}, {}, () => {});
+
 					await prgl.destroy();
-					await tout(2999);
 					console.log("Recreating prgl")
-					const _prgl = await prostgles({
+					prgl = await prostgles({
 						dbConnection,
 						onReady: async (dbo) => {
-							console.warn(await dbo.items.count())
+							console.warn("onReady", await dbo.items.count())
+							// await tout(2)
+							await prgl.destroy();
+							console.log("Recreating prgl")
+							prgl = await prostgles({
+								dbConnection,
+								onReady: async (dbo) => {
+									console.warn("onReady", await dbo.items.count())
+								}
+							});
 						}
 					});
-						
+
 					stopTest(err);
 				});
 			}

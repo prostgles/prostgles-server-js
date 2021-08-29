@@ -503,7 +503,7 @@ export class Prostgles {
         _db: DB;
         pgp: PGP;
         io?: any;
-        destroy: () => Promise<undefined>;
+        destroy: () => Promise<boolean>;
     }> {
         this.loaded = false;
 
@@ -574,8 +574,8 @@ export class Prostgles {
                 _db: db,
                 pgp,
                 io: this.io,
-                destroy: () => {
-                    console.log("destroy destroy destroy destroy destroy")
+                destroy: async () => {
+                    console.log("destroying prgl instance")
                     this.destroyed = true;
                     if(this.io){
                         this.io.on("connection", (socket) => {
@@ -591,7 +591,9 @@ export class Prostgles {
                     }
                     this.dbo = undefined;
                     this.db = undefined;
-                    return db.$pool.end();
+                    await db.$pool.end();
+                    await sleep(1000);
+                    return true;
                 }
             };
         } catch (e) {
