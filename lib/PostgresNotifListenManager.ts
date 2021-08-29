@@ -3,10 +3,14 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { DB } from "./Prostgles";
+import pg from "pg-promise/typescript/pg-subset";
+import pgPromise from "pg-promise";
+
 export type PrglNotifListener = (args: { length: number; processId: number; channel: string; payload: string; name: string; }) => void;
 export class PostgresNotifListenManager {
-    connection: any;
-    db_pg: any;
+    connection: pgPromise.IConnected<{}, pg.IClient>;
+    db_pg: DB;
     notifListener: PrglNotifListener;
     db_channel_name: string;
     isListening: any;
@@ -17,7 +21,7 @@ export class PostgresNotifListenManager {
         return res.init();
     }
 
-    constructor(db_pg, notifListener: PrglNotifListener, db_channel_name: string, noInit = false){
+    constructor(db_pg: DB, notifListener: PrglNotifListener, db_channel_name: string, noInit = false){
         if(!db_pg || !notifListener || !db_channel_name) throw "PostgresNotifListenManager: db_pg OR notifListener OR db_channel_name MISSING";
         this.db_pg = db_pg;
         this.notifListener = notifListener;
@@ -67,6 +71,10 @@ export class PostgresNotifListenManager {
             .catch(error => {
                 console.log('PostgresNotifListenManager: Failed Initial Connection:', error);
             });
+    }
+
+    destroy = () => {
+        if(this.connection) this.connection.done();
     }
 
     stopListening = () => {

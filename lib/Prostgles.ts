@@ -560,6 +560,9 @@ export class Prostgles {
             
             /* 5. Finish init and provide DBO object */
             try {
+                if(this.destroyed) {
+                    console.trace(1)
+                }
                 onReady(this.dbo, this.db);
             } catch(err){
                 console.error("Prostgles: Error within onReady: \n", err)
@@ -572,11 +575,22 @@ export class Prostgles {
                 pgp,
                 io: this.io,
                 destroy: () => {
-                    if(this.io && typeof this.io.close === "function"){
-                        this.io.close();
-                    }
-                    this.dbo = {};
+                    console.log("destroy destroy destroy destroy destroy")
                     this.destroyed = true;
+                    if(this.io){
+                        this.io.on("connection", (socket) => {
+                            console.log("Socket connected to destroyed instance")
+                        });
+                        if(typeof this.io.close === "function"){
+                            this.io.close();
+                            console.log("this.io.close")
+                        }
+                    }
+                    if(this.dboBuilder.pubSubManager){
+                        this.dboBuilder.pubSubManager.destroy();
+                    }
+                    this.dbo = undefined;
+                    this.db = undefined;
                     return db.$pool.end();
                 }
             };
@@ -687,6 +701,11 @@ export class Prostgles {
         
         /* Initialise */
         this.io.on('connection', async (socket) => {
+            if(this.destroyed){
+                console.log("Socket connected to destroyed instance");
+                socket.disconnect();
+                return
+            }
             this.connectedSockets.push(socket);
 
             if(!this.db || !this.dbo) throw "db/dbo missing";

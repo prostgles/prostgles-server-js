@@ -45,7 +45,9 @@ class PubSubManager {
             }
         };
         this.appCheckFrequencyMS = 10 * 1000;
+        this.destroyed = false;
         this.destroy = () => {
+            this.destroyed = true;
             if (this.appCheck) {
                 clearInterval(this.appCheck);
             }
@@ -53,8 +55,19 @@ class PubSubManager {
             // if(this.postgresNotifListenManager){
             //     this.postgresNotifListenManager.stopListening();
             // }
+            this.postgresNotifListenManager.destroy();
         };
+        this.canContinue = () => {
+            if (this.destroyed) {
+                console.trace("Could not start destroyed instance");
+                return false;
+            }
+            return true;
+        };
+        this.appChecking = false;
         this.init = () => __awaiter(this, void 0, void 0, function* () {
+            if (!this.canContinue())
+                return;
             try {
                 const schema_version = 4;
                 const q = `
@@ -561,6 +574,8 @@ class PubSubManager {
                 //     await this.db.any(q); 
                 // }
                 yield this.db.any(q);
+                if (!this.canContinue())
+                    return;
                 /* Prepare App id */
                 if (!this.appID) {
                     const raw = yield this.db.one("INSERT INTO prostgles.apps (check_frequency_ms, watching_schema, application_name) VALUES($1, $2, current_setting('application_name')) RETURNING *; ", [this.appCheckFrequencyMS, Boolean(this.onSchemaChange)]);
@@ -569,6 +584,7 @@ class PubSubManager {
                         this.appCheck = setInterval(() => __awaiter(this, void 0, void 0, function* () {
                             let appQ = "";
                             try { //  drop owned by api
+                                this.appChecking = true;
                                 let trgUpdateLastUsed = "", listeners = this.getActiveListeners();
                                 if (listeners.length) {
                                     trgUpdateLastUsed = `
@@ -658,6 +674,7 @@ class PubSubManager {
                             catch (e) {
                                 console.error("appCheck FAILED: \n", e, appQ);
                             }
+                            this.appChecking = false;
                         }), 0.8 * this.appCheckFrequencyMS);
                     }
                 }

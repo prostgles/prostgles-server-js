@@ -44,6 +44,7 @@ try {
             onReady: async (db, methods, fullSchema, auth) => {
                 log("onReady.auth", auth);
                 try {
+                    log("Starting Client isomorphic tests");
                     await isomorphic_queries_1.default(db);
                     log("Client isomorphic tests successful");
                     await client_only_queries_1.default(db, auth, log, methods);

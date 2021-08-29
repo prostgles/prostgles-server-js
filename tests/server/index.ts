@@ -19,8 +19,13 @@ import { DBObj } from "./DBoGenerated";
 // type DBObj = any;
 import { DB, DbHandler } from 'prostgles-server/dist/Prostgles';
 
-const log = (msg: string, extra?: any) => {
-  console.log(...["(server): " + msg, extra].filter(v => v));
+const log = (msg: string, extra?: any, trace?: boolean) => {
+	const msgs = ["(server): " + msg, extra].filter(v => v);
+	if(trace){
+		console.trace(...msgs);
+	} else {
+		console.log(...msgs);
+	}
 }
 const stopTest = (err?) => {
 	log("Stopping server ...")
@@ -43,17 +48,18 @@ process.on('unhandledRejection', (reason, p) => {
   process.exit(1)
 });
 
+const dbConnection = {
+	host: process.env.POSTGRES_HOST || "localhost",
+	port: +process.env.POSTGRES_PORT || 5432,
+	database: process.env.POSTGRES_DB || "postgres",
+	user: process.env.POSTGRES_USER || "api",
+	password:  process.env.POSTGRES_PASSWORD || "api"
+};
+
 (async () => {
-	let db;
 
 	const prgl = await prostgles({
-		dbConnection: {
-			host: process.env.POSTGRES_HOST || "localhost",
-			port: +process.env.POSTGRES_PORT || 5432,
-			database: process.env.POSTGRES_DB || "postgres",
-			user: process.env.POSTGRES_USER || "api",
-			password:  process.env.POSTGRES_PASSWORD || "api"
-		},
+		dbConnection,
 		sqlFilePath: path.join(__dirname+'/init.sql'),
 		io,
 		tsGeneratedTypesDir: path.join(__dirname + '/'),
@@ -63,7 +69,7 @@ process.on('unhandledRejection', (reason, p) => {
 		// DEBUG_MODE: true,
 		// onNotice: console.log,
 
-		onSocketConnect:  (socket) => {
+		onSocketConnect:  (socket, db) => {
 			log("onSocketConnect")
 			if(clientTest){
 				log("Client connected");
@@ -73,9 +79,17 @@ process.on('unhandledRejection', (reason, p) => {
 					if(!err){
 						console.log("Client test successful!")
 					}
+					console.log("Destroying prgl");
+					await db.items.subscribe({}, {}, () => {})
 					await prgl.destroy();
-					await tout(2999)
-					// console.warn(await db.items.count())
+					await tout(2999);
+					console.log("Recreating prgl")
+					const _prgl = await prostgles({
+						dbConnection,
+						onReady: async (dbo) => {
+							console.warn(await dbo.items.count())
+						}
+					});
 						
 					stopTest(err);
 				});
@@ -189,18 +203,17 @@ process.on('unhandledRejection', (reason, p) => {
 			}
 		],
 		onReady: async (db: DbHandler, _db: DB) => {
-
 			
 			app.get('*', function(req, res){
 				log(req.originalUrl)
 				res.sendFile(path.join(__dirname+'/index.html'));
 			}); 
 			
-			try { 
+			try {
 				
 				if(process.env.TEST_TYPE === "client"){
 					const clientPath = `cd ${__dirname}/../client && npm test`;
-					
+					log("EXEC CLIENT PROCESS")
 					exec(clientPath, console.log);
 					log("Waiting for client...");
 					
@@ -259,7 +272,7 @@ function randElem(items){
 async function tout(millis){
 	return new Promise((re, rj) => {
 		setTimeout(() => {
-			re();
+			re(true);
 		}, millis)
 	})
 }

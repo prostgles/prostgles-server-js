@@ -104,7 +104,10 @@ export declare class PubSubManager {
     appCheckFrequencyMS: number;
     appCheck: any;
     static create: (options: PubSubManagerOptions) => Promise<PubSubManager>;
+    destroyed: boolean;
     destroy: () => void;
+    canContinue: () => boolean;
+    appChecking: boolean;
     init: () => Promise<PubSubManager>;
     DB_OBJ_NAMES: {
         trigger_add_remove_func: string;

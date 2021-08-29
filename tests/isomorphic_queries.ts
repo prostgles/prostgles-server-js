@@ -19,6 +19,7 @@ export function tryRunP(desc: string, func: (resolve: any, reject: any) => any){
 }
 
 export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHandlerClient>){
+  console.log("Starting isomorphic queries")
   await db.items.delete({ });
   await db.items2.delete({ });
   await db.items3.delete({ });

@@ -166,7 +166,9 @@ export class PubSubManager {
         return await res.init();
     }
 
+    destroyed = false;
     destroy = () => {
+        this.destroyed = true;
         if(this.appCheck){
             clearInterval(this.appCheck);
         }
@@ -174,9 +176,20 @@ export class PubSubManager {
         // if(this.postgresNotifListenManager){
         //     this.postgresNotifListenManager.stopListening();
         // }
+        this.postgresNotifListenManager.destroy();
     }
 
+    canContinue = () => {
+        if(this.destroyed){
+            console.trace("Could not start destroyed instance");
+            return false
+        }
+        return true
+    }
+
+    appChecking = false;
     init = async (): Promise<PubSubManager> => {
+        if(!this.canContinue()) return;
 
         try {
             const schema_version = 4;
@@ -687,6 +700,7 @@ export class PubSubManager {
             //     await this.db.any(q); 
             // }
             await this.db.any(q);
+            if(!this.canContinue()) return;
  
  
             /* Prepare App id */
@@ -702,6 +716,8 @@ export class PubSubManager {
                     this.appCheck = setInterval(async () => {
                         let appQ = "";
                         try {   //  drop owned by api
+
+                            this.appChecking = true;
 
                             let trgUpdateLastUsed = "",
                                 listeners = this.getActiveListeners();
@@ -793,7 +809,9 @@ export class PubSubManager {
                             log("updated last_check");
                         } catch (e) {
                             console.error("appCheck FAILED: \n", e, appQ);
-                        } 
+                        }
+
+                        this.appChecking = false;
                     }, 0.8 * this.appCheckFrequencyMS);
                 }
             }

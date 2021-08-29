@@ -19,6 +19,7 @@ function tryRunP(desc, func) {
 }
 exports.tryRunP = tryRunP;
 async function isomorphic(db) {
+    console.log("Starting isomorphic queries");
     await db.items.delete({});
     await db.items2.delete({});
     await db.items3.delete({});

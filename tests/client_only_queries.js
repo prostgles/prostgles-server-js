@@ -51,7 +51,7 @@ async function client_only(db, auth, log, methods) {
             });
             /* REPLICATION */
             let start = Date.now();
-            const msLimit = 15000;
+            const msLimit = 20000;
             setTimeout(() => {
                 const msg = "Replication test failed due to taking longer than " + msLimit + "ms";
                 log(msg);
