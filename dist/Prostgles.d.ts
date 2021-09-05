@@ -315,7 +315,7 @@ export declare class Prostgles {
         io?: any;
         destroy: () => Promise<boolean>;
     }>;
-    runSQLFile(filePath: string): Promise<boolean | void>;
+    runSQLFile(filePath: string): Promise<boolean>;
     getSID(socket: any): SessionIDs;
     getUser(socket: any): Promise<object>;
     getUserFromCookieSession(socket: any): Promise<null | {

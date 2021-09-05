@@ -402,7 +402,16 @@ class Prostgles {
                 console.log("Prostgles: SQL file executed successfuly \n    -> " + filePath);
                 return true;
             }).catch((err) => {
-                console.log(filePath + "    file error: ", err);
+                const { position, length } = err, lines = fileContent.split("\n");
+                let errMsg = filePath + " error: ";
+                if (position && length && fileContent) {
+                    const startLine = Math.max(0, fileContent.substring(0, position).split("\n").length - 2), endLine = startLine + 3;
+                    errMsg += "\n\n";
+                    errMsg += lines.slice(startLine, endLine).map((txt, i) => `${startLine + i + 1} ${i === 1 ? "->" : "  "} ${txt}`).join("\n");
+                    errMsg += "\n\n";
+                }
+                console.error(errMsg, err);
+                throw err;
             });
         });
     }

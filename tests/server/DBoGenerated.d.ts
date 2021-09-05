@@ -60,6 +60,9 @@ export type Planes = {
   "flight_number"?: string;
   "last_updated"?: number;
 }
+export type Tt = { 
+  "id"?: number;
+}
 export type V_items = { 
   "id"?: number;
   "name"?: string;
@@ -90,6 +93,7 @@ export type DBObj = {
   "items4": TableHandler<Items4> 
   "items4_pub": TableHandler<Items4_pub> 
   "planes": TableHandler<Planes> 
+  "tt": TableHandler<Tt> 
   "v_items": ViewHandler<V_items> 
   "various": TableHandler<Various> 
   leftJoin: JoinMakerTables;
