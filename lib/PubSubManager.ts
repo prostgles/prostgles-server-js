@@ -876,6 +876,7 @@ export class PubSubManager {
                         ${asValue('triggers_' + this.appID)}
                     );
   
+                    is_super_user := EXISTS (select 1 from pg_user where usename = CURRENT_USER AND usesuper IS TRUE);
                     /**
                      *  Delete stale app records
                      * */
@@ -895,7 +896,6 @@ export class PubSubManager {
                         DROP EVENT TRIGGER IF EXISTS prostgles_schema_watch_trigger;
                     END IF;
 
-                    is_super_user := EXISTS (select 1 from pg_user where usename = CURRENT_USER AND usesuper IS TRUE);
                     ev_trg_needed := EXISTS (SELECT 1 FROM prostgles.apps WHERE watching_schema IS TRUE);
                     ev_trg_exists := EXISTS (
                         SELECT 1 FROM pg_catalog.pg_event_trigger
