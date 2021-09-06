@@ -137,6 +137,8 @@ const dbConnection = {
                 items3: "*",
                 v_items: "*",
                 various: "*",
+                tr1: "*",
+                tr2: "*",
                 planes: {
                     select: "*",
                     update: "*",

@@ -49,7 +49,7 @@ async function isomorphic(db) {
         // console.log(await db["*"].find())
     });
     await tryRun("getColumns definition", async () => {
-        const res = await db.items2.getColumns();
+        const res = await db.tr2.getColumns();
         assert_1.strict.deepStrictEqual(res, [
             {
                 comment: null,
@@ -77,37 +77,20 @@ async function isomorphic(db) {
                 insert: true,
                 is_nullable: true,
                 is_pkey: false,
-                name: 'items_id',
+                name: 'tr1_id',
                 ordinal_position: 2,
                 references: {
                     cols: [
-                        'items_id'
+                        'tr1_id'
                     ],
                     fcols: [
                         'id'
                     ],
-                    ftable: 'items'
+                    ftable: 'tr1'
                 },
                 select: true,
                 tsDataType: 'number',
                 udt_name: 'int4',
-                update: true
-            },
-            {
-                comment: null,
-                data_type: 'ARRAY',
-                delete: true,
-                element_type: 'text',
-                filter: true,
-                insert: true,
-                is_nullable: true,
-                is_pkey: false,
-                name: 'hh',
-                ordinal_position: 3,
-                references: null,
-                select: true,
-                tsDataType: 'Array<string>',
-                udt_name: '_text',
                 update: true
             },
             {
@@ -119,7 +102,24 @@ async function isomorphic(db) {
                 insert: true,
                 is_nullable: true,
                 is_pkey: false,
-                name: 'name',
+                name: 't1',
+                ordinal_position: 3,
+                references: null,
+                select: true,
+                tsDataType: 'string',
+                udt_name: 'text',
+                update: true
+            },
+            {
+                comment: null,
+                data_type: 'text',
+                delete: true,
+                element_type: null,
+                filter: true,
+                insert: true,
+                is_nullable: true,
+                is_pkey: false,
+                name: 't2',
                 ordinal_position: 4,
                 references: null,
                 select: true,

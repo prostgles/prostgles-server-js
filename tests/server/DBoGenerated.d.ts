@@ -60,6 +60,16 @@ export type Planes = {
   "flight_number"?: string;
   "last_updated"?: number;
 }
+export type Tr1 = { 
+  "id"?: number;
+  "t1"?: string;
+}
+export type Tr2 = { 
+  "id"?: number;
+  "tr1_id"?: number;
+  "t1"?: string;
+  "t2"?: string;
+}
 export type Tt = { 
   "id"?: number;
 }
@@ -93,6 +103,8 @@ export type DBObj = {
   "items4": TableHandler<Items4> 
   "items4_pub": TableHandler<Items4_pub> 
   "planes": TableHandler<Planes> 
+  "tr1": TableHandler<Tr1> 
+  "tr2": TableHandler<Tr2> 
   "tt": TableHandler<Tt> 
   "v_items": ViewHandler<V_items> 
   "various": TableHandler<Various> 
