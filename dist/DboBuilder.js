@@ -1899,14 +1899,26 @@ function getTablesForSchemaPostgresSQL(db, schema = "public") {
     const query = `
     SELECT t.table_schema as schema, t.table_name as name 
     , cc.table_oid as oid
-    , json_agg((SELECT x FROM (SELECT cc.column_name as name, cc.data_type, cc.udt_name, cc.element_type, cc.is_pkey, cc.comment, cc.ordinal_position, cc.is_nullable = 'YES' as is_nullable) as x) ORDER BY cc.ordinal_position ) as columns  
+    , json_agg((SELECT x FROM (
+        SELECT cc.column_name as name, 
+        cc.data_type, 
+        cc.udt_name, 
+        cc.element_type, 
+        cc.is_pkey, 
+        cc.comment, 
+        cc.ordinal_position, 
+        cc.is_nullable = 'YES' as is_nullable,
+        cc.references
+    ) as x) ORDER BY cc.ordinal_position ) as columns 
+
     , t.table_type = 'VIEW' as is_view 
     , array_to_json(vr.table_names) as parent_tables
     , obj_description(cc.table_oid::regclass) as comment
     FROM information_schema.tables t  
     INNER join (
-        SELECT c.table_schema, c.table_name, c.column_name, c.data_type, c.udt_name, e.data_type as element_type
+         SELECT c.table_schema, c.table_name, c.column_name, c.data_type, c.udt_name, e.data_type as element_type
         ,  col_description(format('%I.%I', c.table_schema, c.table_name)::regclass::oid, c.ordinal_position) as comment
+        , CASE WHEN fc.ftable IS NOT NULL THEN row_to_json((SELECT t FROM (SELECT fc.ftable, fc.fcols, fc.cols) t)) END as references
         , EXISTS ( 
             SELECT 1    
             from information_schema.table_constraints as tc 
@@ -1921,6 +1933,19 @@ function getTablesForSchemaPostgresSQL(db, schema = "public") {
             ON ((c.table_catalog, c.table_schema, c.table_name, 'TABLE', c.dtd_identifier)  
             = (e.object_catalog, e.object_schema, e.object_name, e.object_type, e.collection_type_identifier)
         )
+        LEFT JOIN (
+            select 
+                (select r.relname from pg_class r where r.oid = c.conrelid) as table, 
+                (select array_agg(attname::text) from pg_attribute 
+                where attrelid = c.conrelid and ARRAY[attnum] <@ c.conkey) as cols, 
+                (select array_agg(attname::text) from pg_attribute 
+                where attrelid = c.confrelid and ARRAY[attnum] <@ c.confkey) as fcols, 
+                (select r.relname from pg_class r where r.oid = c.confrelid) as ftable
+            from pg_constraint c 
+            -- where c.confrelid = 'users'::regclass::oid
+        ) fc 
+        ON fc.table = c.table_name
+        AND c.column_name::text = ANY(fc.cols)  
     ) cc  
     ON t.table_name = cc.table_name  
     AND t.table_schema = cc.table_schema  

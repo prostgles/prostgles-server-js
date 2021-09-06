@@ -48,6 +48,87 @@ async function isomorphic(db) {
         ]);
         // console.log(await db["*"].find())
     });
+    await tryRun("getColumns definition", async () => {
+        const res = await db.items2.getColumns();
+        assert_1.strict.deepStrictEqual(res, [
+            {
+                comment: null,
+                data_type: 'integer',
+                delete: true,
+                element_type: null,
+                filter: true,
+                insert: true,
+                is_nullable: false,
+                is_pkey: true,
+                name: 'id',
+                ordinal_position: 1,
+                references: null,
+                select: true,
+                tsDataType: 'number',
+                udt_name: 'int4',
+                update: true
+            },
+            {
+                comment: null,
+                data_type: 'integer',
+                delete: true,
+                element_type: null,
+                filter: true,
+                insert: true,
+                is_nullable: true,
+                is_pkey: false,
+                name: 'items_id',
+                ordinal_position: 2,
+                references: {
+                    cols: [
+                        'items_id'
+                    ],
+                    fcols: [
+                        'id'
+                    ],
+                    ftable: 'items'
+                },
+                select: true,
+                tsDataType: 'number',
+                udt_name: 'int4',
+                update: true
+            },
+            {
+                comment: null,
+                data_type: 'ARRAY',
+                delete: true,
+                element_type: 'text',
+                filter: true,
+                insert: true,
+                is_nullable: true,
+                is_pkey: false,
+                name: 'hh',
+                ordinal_position: 3,
+                references: null,
+                select: true,
+                tsDataType: 'Array<string>',
+                udt_name: '_text',
+                update: true
+            },
+            {
+                comment: null,
+                data_type: 'text',
+                delete: true,
+                element_type: null,
+                filter: true,
+                insert: true,
+                is_nullable: true,
+                is_pkey: false,
+                name: 'name',
+                ordinal_position: 4,
+                references: null,
+                select: true,
+                tsDataType: 'string',
+                udt_name: 'text',
+                update: true
+            }
+        ]);
+    });
     // add getInfo and getCols tests
     // console.log(await db.items.getInfo(), await db.items.getColumns())
     /**
