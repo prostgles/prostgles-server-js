@@ -1934,14 +1934,19 @@ function getTablesForSchemaPostgresSQL(db, schema = "public") {
             = (e.object_catalog, e.object_schema, e.object_name, e.object_type, e.collection_type_identifier)
         )
         LEFT JOIN (
-            select 
-                (select r.relname from pg_class r where r.oid = c.conrelid) as table, 
-                (select array_agg(attname::text) from pg_attribute 
-                where attrelid = c.conrelid and ARRAY[attnum] <@ c.conkey) as cols, 
-                (select array_agg(attname::text) from pg_attribute 
-                where attrelid = c.confrelid and ARRAY[attnum] <@ c.confkey) as fcols, 
-                (select r.relname from pg_class r where r.oid = c.confrelid) as ftable
-            from pg_constraint c 
+            SELECT *
+            FROM (
+                select 
+                    (select r.relname from pg_class r where r.oid = c.conrelid) as table, 
+                    (select array_agg(attname::text) from pg_attribute 
+                    where attrelid = c.conrelid and ARRAY[attnum] <@ c.conkey) as cols, 
+                    (select array_agg(attname::text) from pg_attribute 
+                    where attrelid = c.confrelid and ARRAY[attnum] <@ c.confkey) as fcols, 
+                    (select r.relname from pg_class r where r.oid = c.confrelid) as ftable
+                from pg_constraint c 
+            ) ft
+            where ft.table IS NOT NULL 
+            AND ft.ftable IS NOT NULL 
             -- where c.confrelid = 'users'::regclass::oid
         ) fc 
         ON fc.table = c.table_name
