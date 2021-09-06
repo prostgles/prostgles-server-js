@@ -16,6 +16,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.filterObj = exports.PubSubManager = exports.DEFAULT_SYNC_BATCH_SIZE = exports.asValue = void 0;
 const PostgresNotifListenManager_1 = require("./PostgresNotifListenManager");
 const utils_1 = require("./utils");
+const Prostgles_1 = require("./Prostgles");
 const Bluebird = require("bluebird");
 const pgPromise = require("pg-promise");
 const prostgles_types_1 = require("prostgles-types");
@@ -696,6 +697,9 @@ class PubSubManager {
             // SELECT * FROM pg_catalog.pg_event_trigger WHERE evtname
             if (!this.appID)
                 throw "prepareTriggers failed: this.appID missing";
+            if (this.dboBuilder.prostgles.watchSchema && !(yield Prostgles_1.isSuperUser(this.db))) {
+                console.warn("prostgles watchSchema requires superuser db user. Will not watch");
+            }
             try {
                 yield this.db.any(`
                 BEGIN;--  ISOLATION LEVEL SERIALIZABLE;
@@ -709,6 +713,7 @@ class PubSubManager {
                         q   TEXT;
                         ev_trg_needed BOOLEAN := FALSE;
                         ev_trg_exists BOOLEAN := FALSE;
+                        is_super_user BOOLEAN := FALSE;
                 BEGIN
                     --SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
                     
@@ -743,10 +748,12 @@ class PubSubManager {
                     IF EXISTS (
                         SELECT 1 FROM pg_catalog.pg_event_trigger
                         WHERE evtname = 'prostgles_schema_watch_trigger'
-                    ) THEN
+                    ) AND is_super_user IS TRUE 
+                    THEN
                         DROP EVENT TRIGGER IF EXISTS prostgles_schema_watch_trigger;
                     END IF;
 
+                    is_super_user := EXISTS (select usesuper from pg_user where usename = CURRENT_USER);
                     ev_trg_needed := EXISTS (SELECT 1 FROM prostgles.apps WHERE watching_schema IS TRUE);
                     ev_trg_exists := EXISTS (
                         SELECT 1 FROM pg_catalog.pg_event_trigger
@@ -758,7 +765,7 @@ class PubSubManager {
                     /**
                      *  DROP stale event trigger
                      * */
-                    IF ev_trg_needed IS FALSE AND ev_trg_exists IS TRUE THEN
+                    IF is_super_user IS TRUE AND ev_trg_needed IS FALSE AND ev_trg_exists IS TRUE THEN
 
                         SELECT format(
                             $$ DROP EVENT TRIGGER IF EXISTS %I ; $$
@@ -773,7 +780,7 @@ class PubSubManager {
                     /**
                      *  CREATE event trigger
                      * */
-                    ELSIF ev_trg_needed IS TRUE AND ev_trg_exists IS FALSE THEN
+                    ELSIF is_super_user IS TRUE AND ev_trg_needed IS TRUE AND ev_trg_exists IS FALSE THEN
 
                         DROP EVENT TRIGGER IF EXISTS ${this.DB_OBJ_NAMES.schema_watch_trigger};
                         CREATE EVENT TRIGGER ${this.DB_OBJ_NAMES.schema_watch_trigger} ON ddl_command_end
