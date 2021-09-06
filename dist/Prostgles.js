@@ -345,10 +345,9 @@ class Prostgles {
                 }
                 else if (this.auth)
                     throw "Auth config does not work without publish";
-                if (this.watchSchema) {
-                    if (!(yield isSuperUser(db)))
-                        throw "Cannot watchSchema without a super user schema. Set watchSchema=false or provide a super user";
-                }
+                // if(this.watchSchema){
+                //     if(!(await isSuperUser(db))) throw "Cannot watchSchema without a super user schema. Set watchSchema=false or provide a super user";
+                // }
                 this.dbEventsManager = new DBEventsManager_1.DBEventsManager(db, pgp);
                 /* 5. Finish init and provide DBO object */
                 try {
