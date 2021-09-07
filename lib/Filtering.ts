@@ -156,11 +156,15 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
   /* Matching sel item */
   if(isPlainObject(rightF)){
     const parseRightVal = (val, expect: "csv" | "array" | null = null) => {
+      const checkIfArr = () => {
+        if(!Array.isArray(val)) return mErr("This type of filter/column expects an Array of items");
+      }
       if(expect === "csv"){
+        checkIfArr();
         return pgp.as.format("($1:csv)", [val]);
 
       } else if(expect === "array" || selItem && selItem.columnPGDataType && selItem.columnPGDataType === "ARRAY"){
-        if(!Array.isArray(val)) return mErr("This type of filter/column expects an Array of items");
+        checkIfArr();        
         return pgp.as.format(" ARRAY[$1:csv]", [val]);
 
       }
@@ -195,6 +199,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       return leftQ + " = " + parseRightVal(fVal);
 
     } else if(["<>", "$ne"].includes(fOpType)){
+      if(fVal === null) return leftQ + " IS NOT NULL ";
       return leftQ + " <> " + parseRightVal(fVal);
 
     } else if([">", "$gt"].includes(fOpType)){
@@ -210,11 +215,15 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       return leftQ + " <= " + parseRightVal(fVal);
 
     } else if(["$in"].includes(fOpType)){
-      return leftQ + " IN " + parseRightVal(fVal, "csv");
+      let res = leftQ + " IN " + parseRightVal(fVal, "csv");
+      if(fVal.includes(null)) res += ` OR ${leftQ} IS NULL `
+      return res;
 
     } else if(["$nin"].includes(fOpType)){
-      return leftQ + " NOT IN " + parseRightVal(fVal, "csv");
-      
+      let res = leftQ + " NOT IN " + parseRightVal(fVal, "csv");
+      if(fVal.includes(null)) res += ` AND ${leftQ} IS NOT NULL `
+      return res;
+
     } else if(["$between"].includes(fOpType)){
       if(!Array.isArray(fVal) || fVal.length !== 2){
         return mErr("Between filter expects an array of two values");
