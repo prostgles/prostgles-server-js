@@ -460,7 +460,7 @@ export const FUNCTIONS: FunctionSpec[] = [
   },
 
   /* Aggs */
-  ...["max", "min", "count", "avg", "json_agg", "string_agg", "array_agg", "sum"].map(aggName => ({
+  ...["max", "min", "count", "avg", "json_agg", "jsonb_agg", "string_agg", "array_agg", "sum"].map(aggName => ({
     name: "$" + aggName,
     type: "aggregation",
     numArgs: 1,
@@ -902,7 +902,8 @@ export function makeQuery(
   _this: TableHandler,
   q: NewQuery, 
   depth: number = 0, 
-  joinFields: string[] = []
+  joinFields: string[] = [],
+  selectParams: SelectParams,
 ): string {
   const PREF = `prostgles`,
       joins = q.joins || [],
@@ -956,7 +957,13 @@ export function makeQuery(
               return s.alias;
             }).join(", ");
 
-          const _iiQ = makeQuery(_this, q2, depth + 1, on.map(([c1, c2]) => asName(c2)));
+          const _iiQ = makeQuery(
+            _this, 
+            q2, 
+            depth + 1, 
+            on.map(([c1, c2]) => asName(c2)),
+            selectParams,
+          );
           // const iiQ = flat(_iiQ.split("\n")); // prettify for debugging
           // console.log(_iiQ)
           const iiQ = [_iiQ];
@@ -1005,7 +1012,7 @@ export function makeQuery(
       // console.log(select, q);
 
       /* If aggs exist need to set groupBy add joinFields into select */
-      if(aggs.length){
+      if(aggs.length || selectParams?.groupBy){
           // const missingFields = joinFields.filter(jf => !q.select.find(s => s.type === "column" && s.alias === jf));
           // if(depth && missingFields.length){
           //     // select = Array.from(new Set(missingFields.concat(select)));
@@ -1050,12 +1057,12 @@ export function makeQuery(
       ) throw "Cannot join two aggregates";
   }
 
-  if(joins && joins.length && aggs.length) throw "Joins within Aggs dissallowed";
+  if(joins && joins.length && (aggs.length || selectParams.groupBy)) throw "Joins within Aggs dissallowed";
 
   // if(q.selectFuncs.length) throw "Functions within select not allowed in joins yet. -> " + q.selectFuncs.map(s => s.alias).join(", ");
   
   let rootGroupBy: string;
-  if((aggs.length || q.joins && q.joins.length) && nonAggs.length){
+  if((selectParams.groupBy || aggs.length || q.joins && q.joins.length) && nonAggs.length){
     // console.log({ aggs, nonAggs, joins: q.joins })
     rootGroupBy = `GROUP BY ${(depth? q.allFields : nonAggs.map(s => s.type === "function"? s.getQuery() : asName(s.alias))).concat(aggs && aggs.length? [] : [`ctid`]).filter(s => s).join(", ")} `
   }

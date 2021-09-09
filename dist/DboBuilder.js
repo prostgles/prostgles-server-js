@@ -430,12 +430,15 @@ class ViewHandler {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 filter = filter || {};
-                const { expectOne = false } = selectParams || {};
+                const { returnType } = selectParams || {};
+                if (returnType && !["row", "value", "values"].includes(returnType)) {
+                    throw `returnType (${returnType}) can only be ${["row", "values"].join(" OR ")}`;
+                }
                 const { testRule = false, returnQuery = false } = localParams || {};
                 if (testRule)
                     return [];
                 if (selectParams) {
-                    const good_params = ["select", "orderBy", "offset", "limit", "expectOne", "having"];
+                    const good_params = ["select", "orderBy", "offset", "limit", "returnType", "groupBy"];
                     const bad_params = Object.keys(selectParams).filter(k => !good_params.includes(k));
                     if (bad_params && bad_params.length)
                         throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
@@ -456,7 +459,7 @@ class ViewHandler {
                     if (maxLimit && !Number.isInteger(maxLimit))
                         throw ` invalid publish.${this.name}.select.maxLimit -> expecting integer but got ` + maxLimit;
                 }
-                let q = yield QueryBuilder_1.getNewQuery(this, filter, selectParams, param3_unused, tableRules, localParams), _query = QueryBuilder_1.makeQuery(this, q);
+                let q = yield QueryBuilder_1.getNewQuery(this, filter, selectParams, param3_unused, tableRules, localParams), _query = QueryBuilder_1.makeQuery(this, q, undefined, undefined, selectParams);
                 // console.log(_query)
                 if (testRule) {
                     try {
@@ -471,11 +474,18 @@ class ViewHandler {
                 // console.log(_query);
                 if (returnQuery)
                     return _query;
-                if (expectOne) {
-                    return (this.t || this.db).oneOrNone(_query).catch(err => makeErr(err, localParams));
+                if (["row", "value"].includes(returnType)) {
+                    return (this.t || this.db).oneOrNone(_query).then(data => {
+                        return (data && returnType === "value") ? Object.values(data)[0] : data;
+                    }).catch(err => makeErr(err, localParams));
                 }
                 else {
-                    return (this.t || this.db).any(_query).catch(err => makeErr(err, localParams));
+                    return (this.t || this.db).any(_query).then(data => {
+                        if (returnType === "values") {
+                            return data.map(d => Object.values(d)[0]);
+                        }
+                        return data;
+                    }).catch(err => makeErr(err, localParams));
                 }
             }
             catch (e) {
@@ -488,7 +498,6 @@ class ViewHandler {
     }
     findOne(filter, selectParams, param3_unused, table_rules, localParams) {
         try {
-            const expectOne = true;
             const { select = "*", orderBy = null, offset = 0 } = selectParams || {};
             if (selectParams) {
                 const good_params = ["select", "orderBy", "offset"];
@@ -496,7 +505,7 @@ class ViewHandler {
                 if (bad_params && bad_params.length)
                     throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
             }
-            return this.find(filter, { select, orderBy, limit: 1, offset, expectOne }, null, table_rules, localParams);
+            return this.find(filter, { select, orderBy, limit: 1, offset, returnType: "row" }, null, table_rules, localParams);
         }
         catch (e) {
             if (localParams && localParams.testRule)
@@ -859,12 +868,14 @@ class ViewHandler {
             if (expectOne && Object.keys(orderBy).length > 1)
                 throw "\nInvalid orderBy " + JSON.stringify(orderBy) +
                     "\nEach orderBy array element cannot have more than one key";
-            /* { key2: bool, key1: bool } */
+            /* { key2: true, key1: false } */
             if (!Object.values(orderBy).find(v => ![true, false].includes(v))) {
                 return Object.keys(orderBy).map(key => ({ key, asc: Boolean(orderBy[key]) }));
+                /* { key2: -1, key1: 1 } */
             }
             else if (!Object.values(orderBy).find(v => ![-1, 1].includes(v))) {
                 return Object.keys(orderBy).map(key => ({ key, asc: orderBy[key] === 1 }));
+                /* { key2: "asc", key1: "desc" } */
             }
             else if (!Object.values(orderBy).find(v => !["asc", "desc"].includes(v))) {
                 return Object.keys(orderBy).map(key => ({ key, asc: orderBy[key] === "asc" }));
@@ -895,7 +906,7 @@ class ViewHandler {
             }
             else if (_orderBy.find(v => isPlainObject(v) && Object.keys(v).length)) {
                 if (!_orderBy.find(v => typeof v.key !== "string" || typeof v.asc !== "boolean")) {
-                    /* [{ key, asc }] */
+                    /* [{ key, asc, nulls }] */
                     _ob = Object.freeze(_orderBy);
                 }
                 else {
@@ -917,14 +928,15 @@ class ViewHandler {
                 (allowedFields.length && !allowedFields.includes(key))));
         if (!bad_param) {
             const selectedAliases = select.filter(s => s.selected).map(s => s.alias);
-            return (excludeOrder ? "" : " ORDER BY ") + (_ob.map(({ key, asc }) => {
+            return (excludeOrder ? "" : " ORDER BY ") + (_ob.map(({ key, asc, nulls }) => {
                 /* Order by column index when possible to bypass name collision when ordering by a computed column.
                     (Postgres will sort by existing columns whenever possible)
                 */
                 const orderType = asc ? " ASC " : " DESC ";
                 const index = selectedAliases.indexOf(key) + 1;
                 const colKey = (index > 0) ? index : [tableAlias, key].filter(v => v).map(prostgles_types_1.asName).join(".");
-                const res = `${colKey} ${orderType}`;
+                const nullOrder = nulls ? ` NULLS ${nulls === "first" ? " FIRST " : " LAST "}` : "";
+                const res = `${colKey} ${orderType} ${nullOrder}`;
                 return res;
             }).join(", "));
         }

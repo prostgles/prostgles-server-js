@@ -129,6 +129,25 @@ async function isomorphic(db) {
             }
         ]);
     });
+    /**
+     * Group by/Distinct
+     */
+    await tryRun("Group by/Distinct", async () => {
+        const res = await db.items.find({}, { select: { name: 1 }, groupBy: true });
+        const resV = await db.items.find({}, { select: { name: 1 }, groupBy: true, returnType: "values" });
+        assert_1.strict.deepStrictEqual(res, [
+            { name: 'a' },
+            { name: 'b' },
+        ]);
+        assert_1.strict.deepStrictEqual(resV, ["a", "b"]);
+    });
+    /**
+     * returnType "value"
+     */
+    await tryRun("returnType: value", async () => {
+        const resVl = await db.items.find({}, { select: { name: { $array_agg: ["name"] } }, returnType: "value" });
+        assert_1.strict.deepStrictEqual(resVl, ["a", "a", "b"]);
+    });
     // add getInfo and getCols tests
     // console.log(await db.items.getInfo(), await db.items.getColumns())
     /**

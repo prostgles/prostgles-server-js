@@ -380,7 +380,7 @@ exports.FUNCTIONS = [
         }
     },
     /* Aggs */
-    ...["max", "min", "count", "avg", "json_agg", "string_agg", "array_agg", "sum"].map(aggName => ({
+    ...["max", "min", "count", "avg", "json_agg", "jsonb_agg", "string_agg", "array_agg", "sum"].map(aggName => ({
         name: "$" + aggName,
         type: "aggregation",
         numArgs: 1,
@@ -743,7 +743,7 @@ function getNewQuery(_this, filter, selectParams, param3_unused = null, tableRul
 }
 exports.getNewQuery = getNewQuery;
 /* No validation/authorisation at this point */
-function makeQuery(_this, q, depth = 0, joinFields = []) {
+function makeQuery(_this, q, depth = 0, joinFields = [], selectParams) {
     const PREF = `prostgles`, joins = q.joins || [], 
     // aggs = q.aggs || [],
     makePref = (q) => !q.tableAlias ? q.table : `${q.tableAlias || ""}_${q.table}`, makePrefANON = (joinAlias, table) => prostgles_types_1.asName(!joinAlias ? table : `${joinAlias || ""}_${table}`), makePrefAN = (q) => prostgles_types_1.asName(makePref(q));
@@ -785,7 +785,7 @@ function makeQuery(_this, q, depth = 0, joinFields = []) {
                         return prostgles_types_1.asName(`agg_${s.alias}`) + " AS " + prostgles_types_1.asName(s.alias);
                     return s.alias;
                 }).join(", ");
-                const _iiQ = makeQuery(_this, q2, depth + 1, on.map(([c1, c2]) => prostgles_types_1.asName(c2)));
+                const _iiQ = makeQuery(_this, q2, depth + 1, on.map(([c1, c2]) => prostgles_types_1.asName(c2)), selectParams);
                 // const iiQ = flat(_iiQ.split("\n")); // prettify for debugging
                 // console.log(_iiQ)
                 const iiQ = [_iiQ];
@@ -827,7 +827,7 @@ function makeQuery(_this, q, depth = 0, joinFields = []) {
         groupBy = "";
         // console.log(select, q);
         /* If aggs exist need to set groupBy add joinFields into select */
-        if (aggs.length) {
+        if (aggs.length || (selectParams === null || selectParams === void 0 ? void 0 : selectParams.groupBy)) {
             // const missingFields = joinFields.filter(jf => !q.select.find(s => s.type === "column" && s.alias === jf));
             // if(depth && missingFields.length){
             //     // select = Array.from(new Set(missingFields.concat(select)));
@@ -870,11 +870,11 @@ function makeQuery(_this, q, depth = 0, joinFields = []) {
             joins.find(j => j.select.find(s => s.type === "aggregation")))
             throw "Cannot join two aggregates";
     }
-    if (joins && joins.length && aggs.length)
+    if (joins && joins.length && (aggs.length || selectParams.groupBy))
         throw "Joins within Aggs dissallowed";
     // if(q.selectFuncs.length) throw "Functions within select not allowed in joins yet. -> " + q.selectFuncs.map(s => s.alias).join(", ");
     let rootGroupBy;
-    if ((aggs.length || q.joins && q.joins.length) && nonAggs.length) {
+    if ((selectParams.groupBy || aggs.length || q.joins && q.joins.length) && nonAggs.length) {
         // console.log({ aggs, nonAggs, joins: q.joins })
         rootGroupBy = `GROUP BY ${(depth ? q.allFields : nonAggs.map(s => s.type === "function" ? s.getQuery() : prostgles_types_1.asName(s.alias))).concat(aggs && aggs.length ? [] : [`ctid`]).filter(s => s).join(", ")} `;
     }

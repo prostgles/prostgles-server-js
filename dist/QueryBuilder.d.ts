@@ -96,5 +96,5 @@ export declare class SelectItemBuilder {
 export declare function getNewQuery(_this: TableHandler, filter: Filter, selectParams?: SelectParams & {
     alias?: string;
 }, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<NewQuery>;
-export declare function makeQuery(_this: TableHandler, q: NewQuery, depth?: number, joinFields?: string[]): string;
+export declare function makeQuery(_this: TableHandler, q: NewQuery, depth: number, joinFields: string[], selectParams: SelectParams): string;
 //# sourceMappingURL=QueryBuilder.d.ts.map

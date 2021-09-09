@@ -142,6 +142,39 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     );
   });
 
+  /**
+   * Group by/Distinct
+   */
+  await tryRun("Group by/Distinct", async () => {
+    const res = await db.items.find({}, { select: { name: 1 }, groupBy: true });
+    const resV = await db.items.find({}, { select: { name: 1 }, groupBy: true, returnType: "values" });
+    
+    assert.deepStrictEqual(
+      res,
+      [
+        { name: 'a' },
+        { name: 'b' },
+      ]
+    );
+    assert.deepStrictEqual(
+      resV,
+      ["a", "b"]
+    );
+  })
+
+  /**
+   * returnType "value"
+   */
+  await tryRun("returnType: value", async () => {
+    const resVl = await db.items.find({}, { select: { name: { $array_agg: ["name"] } }, returnType: "value" });
+    
+    assert.deepStrictEqual(
+      resVl,
+      ["a", "a", "b"]
+    );
+
+  })
+
   // add getInfo and getCols tests
   // console.log(await db.items.getInfo(), await db.items.getColumns())
 
