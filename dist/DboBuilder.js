@@ -861,24 +861,39 @@ class ViewHandler {
         let column_names = this.column_names.slice(0);
         const throwErr = () => {
             throw "\nInvalid orderBy option -> " + JSON.stringify(orderBy) +
-                "\nExpecting { key2: false, key1: true } | { key1: 1, key2: -1 } | [{ key1: true }, { key2: false }] | [{ key1: 1 }, { key2: -1 }]";
+                "Expecting: \
+                        { key2: false, key1: true } \
+                        { key1: 1, key2: -1 } \
+                        [{ key1: true }, { key2: false }] \
+                        [{ key: 'colName', asc: true, nulls: 'first' }]";
         }, parseOrderObj = (orderBy, expectOne = false) => {
             if (!isPlainObject(orderBy))
                 return throwErr();
-            if (expectOne && Object.keys(orderBy).length > 1)
+            const keys = Object.keys(orderBy);
+            if (keys.length && keys.find(k => ["key", "asc", "nulls"].includes(k))) {
+                const { key, asc, nulls } = orderBy;
+                if (!["string"].includes(typeof key) ||
+                    !["boolean", "undefined"].includes(typeof asc) ||
+                    !["first", "last", undefined].includes(nulls)) {
+                    throw `Invalid orderBy option (${JSON.stringify(orderBy, null, 2)}) \n Expecting { key: string, asc: boolean, nulls: 'first' | 'last'} `;
+                }
+                return [{ key, asc, nulls }];
+            }
+            if (expectOne && keys.length > 1) {
                 throw "\nInvalid orderBy " + JSON.stringify(orderBy) +
                     "\nEach orderBy array element cannot have more than one key";
+            }
             /* { key2: true, key1: false } */
             if (!Object.values(orderBy).find(v => ![true, false].includes(v))) {
-                return Object.keys(orderBy).map(key => ({ key, asc: Boolean(orderBy[key]) }));
+                return keys.map(key => ({ key, asc: Boolean(orderBy[key]) }));
                 /* { key2: -1, key1: 1 } */
             }
             else if (!Object.values(orderBy).find(v => ![-1, 1].includes(v))) {
-                return Object.keys(orderBy).map(key => ({ key, asc: orderBy[key] === 1 }));
+                return keys.map(key => ({ key, asc: orderBy[key] === 1 }));
                 /* { key2: "asc", key1: "desc" } */
             }
             else if (!Object.values(orderBy).find(v => !["asc", "desc"].includes(v))) {
-                return Object.keys(orderBy).map(key => ({ key, asc: orderBy[key] === "asc" }));
+                return keys.map(key => ({ key, asc: orderBy[key] === "asc" }));
             }
             else
                 return throwErr();
@@ -905,14 +920,14 @@ class ViewHandler {
                 _ob = _orderBy.map(key => ({ key, asc: true }));
             }
             else if (_orderBy.find(v => isPlainObject(v) && Object.keys(v).length)) {
-                if (!_orderBy.find(v => typeof v.key !== "string" || typeof v.asc !== "boolean")) {
-                    /* [{ key, asc, nulls }] */
-                    _ob = Object.freeze(_orderBy);
-                }
-                else {
-                    /* [{ [key]: asc }] | [{ [key]: -1 }] */
-                    _ob = _orderBy.map(v => parseOrderObj(v, true)[0]);
-                }
+                // if(_orderBy.find(v => typeof v.key === "string")){
+                //     /* [{ key, asc, nulls }] */
+                //     _ob = Object.freeze(_orderBy) as any;
+                // } else {
+                //     /* [{ [key]: asc }] | [{ [key]: -1 }] */
+                //     _ob = _orderBy.map(v => parseOrderObj(v, true)[0]);
+                // }
+                _ob = _orderBy.map(v => parseOrderObj(v, true)[0]);
             }
             else
                 return throwErr();

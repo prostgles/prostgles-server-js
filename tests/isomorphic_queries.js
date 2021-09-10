@@ -249,7 +249,7 @@ async function isomorphic(db) {
         assert_1.strict.equal(res, 1);
     });
     await tryRun("Order by", async () => {
-        const res = await db.items.find({}, { select: { name: 1 }, orderBy: { name: -1 } });
+        const res = await db.items.find({}, { select: { name: 1 }, orderBy: [{ key: "name", asc: false, nulls: "first" }] });
         assert_1.strict.deepStrictEqual(res, [{ name: 'b' }, { name: 'a' }, { name: 'a' }]);
     });
     await tryRun("Order by aliased func", async () => {
