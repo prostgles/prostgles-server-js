@@ -12,18 +12,18 @@ export type TxCB = {
 
 /* SCHEMA DEFINITON. Table names have been altered to work with Typescript */
 export type D_34_42_34 = { 
-  "\"*\""?: string;
   "id"?: number;
+  "\"*\""?: string;
 }
 export type D_42 = { 
-  "*"?: string;
   "id"?: number;
+  "*"?: string;
 }
 export type Ex_j_ins = { 
-  "added"?: Date;
   "id"?: number;
-  "name"?: string;
   "public"?: string;
+  "name"?: string;
+  "added"?: Date;
 }
 export type Item_children = { 
   "id"?: number;
@@ -37,50 +37,77 @@ export type Items = {
   "tst"?: Date;
 }
 export type Items2 = { 
-  "hh"?: Array<string>;
   "id"?: number;
   "items_id"?: number;
+  "hh"?: Array<string>;
   "name"?: string;
 }
 export type Items3 = { 
-  "h"?: Array<string>;
   "id"?: number;
+  "h"?: Array<string>;
   "name"?: string;
 }
 export type Items4 = { 
-  "added"?: Date;
   "id"?: number;
-  "name"?: string;
   "public"?: string;
+  "name"?: string;
+  "added"?: Date;
 }
 export type Items4_pub = { 
-  "added"?: Date;
   "id"?: number;
-  "name"?: string;
   "public"?: string;
+  "name"?: string;
+  "added"?: Date;
+}
+export type Lookup_status = { 
+  "id"?: string;
+  "en"?: string;
+  "fr"?: string;
 }
 export type Planes = { 
-  "flight_number"?: string;
   "id"?: number;
-  "last_updated"?: number;
   "x"?: number;
   "y"?: number;
+  "flight_number"?: string;
+  "last_updated"?: number;
+}
+export type Tr1 = { 
+  "id"?: number;
+  "t1"?: string;
+}
+export type Tr2 = { 
+  "id"?: number;
+  "tr1_id"?: number;
+  "t1"?: string;
+  "t2"?: string;
 }
 export type Tt = { 
-  "t"?: string;
+  "id"?: number;
+}
+export type Usr = { 
+  "id"?: number;
+  "status"?: string;
+  "msg"?: string;
+  "added"?: Date;
+  "is_active"?: boolean;
+  "age"?: number;
 }
 export type Various = { 
-  "added"?: Date;
-  "h"?: Array<string>;
   "id"?: number;
-  "jsn"?: Object;
+  "h"?: Array<string>;
   "name"?: string;
   "tsv"?: any;
+  "jsn"?: Object;
+  "added"?: Date;
 }
 
 export type JoinMakerTables = {
  "item_children": JoinMaker<Item_children>;
  "items": JoinMaker<Items>;
+ "lookup_status": JoinMaker<Lookup_status>;
+ "tr1": JoinMaker<Tr1>;
+ "tr2": JoinMaker<Tr2>;
+ "usr": JoinMaker<Usr>;
 };
 
 /* DBO Definition. Isomorphic */
@@ -94,8 +121,12 @@ export type DBObj = {
   "items3": TableHandler<Items3> 
   "items4": TableHandler<Items4> 
   "items4_pub": TableHandler<Items4_pub> 
+  "lookup_status": TableHandler<Lookup_status> 
   "planes": TableHandler<Planes> 
+  "tr1": TableHandler<Tr1> 
+  "tr2": TableHandler<Tr2> 
   "tt": TableHandler<Tt> 
+  "usr": TableHandler<Usr> 
   "various": TableHandler<Various> 
   leftJoin: JoinMakerTables;
   innerJoin: JoinMakerTables;

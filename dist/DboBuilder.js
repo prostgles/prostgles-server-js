@@ -2309,7 +2309,10 @@ function getInferredJoins(db, schema = "public") {
             JOIN information_schema.constraint_column_usage AS ccu
             ON ccu.constraint_name = tc.constraint_name
             AND ccu.table_schema = tc.table_schema
-        WHERE tc.table_schema=` + "${schema}" + ` AND tc.constraint_type = 'FOREIGN KEY' `, { schema });
+        WHERE tc.table_schema=` + "${schema}" + ` 
+        AND tc.constraint_type = 'FOREIGN KEY' 
+        AND tc.table_name <> ccu.table_name -- Exclude self-referencing tables
+    `, { schema });
         res.map((d) => {
             let eIdx = joins.findIndex(j => j.tables.includes(d.table_name) && j.tables.includes(d.foreign_table_name));
             let existing = joins[eIdx];

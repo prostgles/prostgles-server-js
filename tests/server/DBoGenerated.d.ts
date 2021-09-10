@@ -25,6 +25,12 @@ export type Ex_j_ins = {
   "name"?: string;
   "added"?: Date;
 }
+export type Item_children = { 
+  "id"?: number;
+  "item_id"?: number;
+  "name"?: string;
+  "tst"?: Date;
+}
 export type Items = { 
   "id"?: number;
   "h"?: Array<string>;
@@ -53,6 +59,11 @@ export type Items4_pub = {
   "name"?: string;
   "added"?: Date;
 }
+export type Lookup_status = { 
+  "id"?: string;
+  "en"?: string;
+  "fr"?: string;
+}
 export type Planes = { 
   "id"?: number;
   "x"?: number;
@@ -72,6 +83,14 @@ export type Tr2 = {
 }
 export type Tt = { 
   "id"?: number;
+}
+export type Usr = { 
+  "id"?: number;
+  "status"?: string;
+  "msg"?: string;
+  "added"?: Date;
+  "is_active"?: boolean;
+  "age"?: number;
 }
 export type V_items = { 
   "id"?: number;
@@ -97,15 +116,18 @@ export type DBObj = {
   "\"*\"": TableHandler<D_34_42_34> 
   "*": TableHandler<D_42> 
   "ex_j_ins": TableHandler<Ex_j_ins> 
+  "item_children": TableHandler<Item_children> 
   "items": TableHandler<Items> 
   "items2": TableHandler<Items2> 
   "items3": TableHandler<Items3> 
   "items4": TableHandler<Items4> 
   "items4_pub": TableHandler<Items4_pub> 
+  "lookup_status": TableHandler<Lookup_status> 
   "planes": TableHandler<Planes> 
   "tr1": TableHandler<Tr1> 
   "tr2": TableHandler<Tr2> 
   "tt": TableHandler<Tt> 
+  "usr": TableHandler<Usr> 
   "v_items": ViewHandler<V_items> 
   "various": TableHandler<Various> 
   leftJoin: JoinMakerTables;

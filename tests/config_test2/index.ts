@@ -43,6 +43,7 @@ prostgles({
   },// "hotReloadMode",
 	sqlFilePath: path.join(__dirname+'/init.sql'),
   // transactions: true,	
+  joins: "inferred",
   publishRawSQL: async (socket, db: any, _db: any, user: any) => {
     // log("set auth logic")
     return true
@@ -55,12 +56,12 @@ prostgles({
     };
     
   },
-  joins: "inferred",
   onReady: async (db: DBObj, _db: any) => {
     // await _db.any("CREATE TABLE IF NOT EXISTS ttt(id INTEGER, t TEXT)");
 
     // console.log(await db.various.find({ "id.<": 1423 }) )
-    db.various.subscribe({ "id.<": 1423 }, {}, console.log)
+    // db.various.subscribe({ "id.<": 1423 }, {}, console.log)
+    // console.log(await db.lookup_status.getJoinedTables())
   },
 });
  

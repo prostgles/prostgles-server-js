@@ -291,7 +291,7 @@ class Prostgles {
                 }
             });
         }
-        else {
+        else if (force) {
             console.error("Schema changed. tsGeneratedTypesDir needs to be set to reload server");
         }
     }
@@ -304,8 +304,9 @@ class Prostgles {
     init(onReady) {
         return __awaiter(this, void 0, void 0, function* () {
             this.loaded = false;
-            if (this.watchSchema === "hotReloadMode" && !this.tsGeneratedTypesDir)
+            if (this.watchSchema === "hotReloadMode" && !this.tsGeneratedTypesDir) {
                 throw "tsGeneratedTypesDir option is needed for watchSchema: hotReloadMode to work ";
+            }
             /* 1. Connect to db */
             if (!this.db) {
                 const { db, pgp } = getDbConnection(this.dbConnection, this.dbOptions, this.DEBUG_MODE, notice => {

@@ -488,7 +488,7 @@ export class Prostgles {
                     console.log("Prostgles: Created typescript schema definition file: \n " + fileName)
                 }
             });                
-        } else {
+        } else if(force) {
             console.error("Schema changed. tsGeneratedTypesDir needs to be set to reload server")
         }
     }
@@ -508,7 +508,9 @@ export class Prostgles {
         this.loaded = false;
 
 
-        if(this.watchSchema === "hotReloadMode" && !this.tsGeneratedTypesDir) throw "tsGeneratedTypesDir option is needed for watchSchema: hotReloadMode to work ";
+        if(this.watchSchema === "hotReloadMode" && !this.tsGeneratedTypesDir) {
+            throw "tsGeneratedTypesDir option is needed for watchSchema: hotReloadMode to work ";
+        }
 
         /* 1. Connect to db */
         if(!this.db){

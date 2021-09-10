@@ -36,10 +36,11 @@ prostgles_server_1.default({
     io,
     tsGeneratedTypesDir: path_1.default.join(__dirname + '/'),
     watchSchema: s => {
-        console.log(s.command);
+        // console.log(s.command)
     },
     sqlFilePath: path_1.default.join(__dirname + '/init.sql'),
     // transactions: true,	
+    joins: "inferred",
     publishRawSQL: async (socket, db, _db, user) => {
         // log("set auth logic")
         return true;
@@ -49,10 +50,10 @@ prostgles_server_1.default({
             various: "*",
         };
     },
-    joins: "inferred",
     onReady: async (db, _db) => {
         // await _db.any("CREATE TABLE IF NOT EXISTS ttt(id INTEGER, t TEXT)");
         // console.log(await db.various.find({ "id.<": 1423 }) )
-        db.various.subscribe({ "id.<": 1423 }, {}, console.log);
+        // db.various.subscribe({ "id.<": 1423 }, {}, console.log)
+        // console.log(await db.lookup_status.getJoinedTables())
     },
 });
