@@ -200,10 +200,10 @@ exports.parseFilterItem = (args) => {
             return leftQ + " BETWEEN " + asValue(fVal[0]) + " AND " + asValue(fVal[1]);
         }
         else if (["$ilike"].includes(fOpType)) {
-            return leftQ + " ILIKE " + asValue(fVal);
+            return leftQ + "::TEXT ILIKE " + asValue(fVal);
         }
         else if (["$like"].includes(fOpType)) {
-            return leftQ + " LIKE " + asValue(fVal);
+            return leftQ + "::TEXT LIKE " + asValue(fVal);
             /* MAYBE TEXT OR MAYBE ARRAY */
         }
         else if (["@>", "<@", "$contains", "$containedBy", "&&", "@@"].includes(fOpType)) {
