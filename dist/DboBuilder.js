@@ -13,7 +13,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TS_PG_Types = exports.isPlainObject = exports.DboBuilder = exports.TableHandler = exports.ViewHandler = exports.EXISTS_KEYS = exports.pgp = void 0;
+exports.isPlainObject = exports.DboBuilder = exports.TableHandler = exports.ViewHandler = exports.EXISTS_KEYS = exports.pgp = void 0;
 const Bluebird = require("bluebird");
 const pgPromise = require("pg-promise");
 const prostgles_types_1 = require("prostgles-types");
@@ -1930,12 +1930,14 @@ function getTablesForSchemaPostgresSQL(db, schema = "public") {
         SELECT cc.column_name as name, 
         cc.data_type, 
         cc.udt_name, 
-        cc.element_type, 
+        cc.element_type,
+        cc.element_udt_name,
         cc.is_pkey, 
         cc.comment, 
         cc.ordinal_position, 
         cc.is_nullable = 'YES' as is_nullable,
-        cc.references
+        cc.references,
+        cc.has_default
     ) as x) ORDER BY cc.ordinal_position ) as columns 
 
     , t.table_type = 'VIEW' as is_view 
@@ -1943,7 +1945,9 @@ function getTablesForSchemaPostgresSQL(db, schema = "public") {
     , obj_description(cc.table_oid::regclass) as comment
     FROM information_schema.tables t  
     INNER join (
-         SELECT c.table_schema, c.table_name, c.column_name, c.data_type, c.udt_name, e.data_type as element_type
+         SELECT c.table_schema, c.table_name, c.column_name, c.data_type, c.udt_name
+        , e.data_type as element_type
+        , e.udt_name as element_udt_name
         ,  col_description(format('%I.%I', c.table_schema, c.table_name)::regclass::oid, c.ordinal_position) as comment
         , CASE WHEN fc.ftable IS NOT NULL THEN row_to_json((SELECT t FROM (SELECT fc.ftable, fc.fcols, fc.cols) t)) END as references
         , EXISTS ( 
@@ -1953,6 +1957,7 @@ function getTablesForSchemaPostgresSQL(db, schema = "public") {
             WHERE kcu.table_schema = c.table_schema AND kcu.table_name = c.table_name AND kcu.column_name = c.column_name AND tc.constraint_type IN ('PRIMARY KEY') 
         ) as is_pkey
         , c.ordinal_position
+        , c.column_default IS NOT NULL as has_default
         , format('%I.%I', c.table_schema, c.table_name)::regclass::oid AS table_oid
         , c.is_nullable
         FROM information_schema.columns c    
@@ -2017,27 +2022,36 @@ function isPlainObject(o) {
     return Object(o) === o && Object.getPrototypeOf(o) === Object.prototype;
 }
 exports.isPlainObject = isPlainObject;
-const _PG_strings = ['bpchar', 'char', 'varchar', 'text', 'citext', 'uuid', 'bytea', 'inet', 'time', 'timetz', 'interval', 'name'];
-const _PG_numbers = ['int2', 'int4', 'int8', 'float4', 'float8', 'numeric', 'money', 'oid'];
-const _PG_json = ['json', 'jsonb'];
-const _PG_bool = ['bool'];
-const _PG_date = ['timestamp', 'timestamptz'];
-exports.TS_PG_Types = {
-    "string": _PG_strings,
-    "number": _PG_numbers,
-    "boolean": _PG_bool,
-    "Object": _PG_json,
-    "Date": _PG_date,
-    "Array<number>": _PG_numbers.map(s => `_${s}`),
-    "Array<boolean>": _PG_bool.map(s => `_${s}`),
-    "Array<string>": _PG_strings.map(s => `_${s}`),
-    "Array<Object>": _PG_json.map(s => `_${s}`),
-    "Array<Date>": _PG_date.map(s => `_${s}`),
-    "any": [],
-};
+// export const _PG_strings = ['bpchar','char','varchar','text','citext','uuid','bytea','inet','time','timetz','interval','name'] as const;
+// export const _PG_numbers = ['int2','int4','int8','float4','float8','numeric','money','oid'] as const;
+// export const _PG_json = ['json', 'jsonb'] as const;
+// export const _PG_bool = ['bool'] as const;
+// export const _PG_date = ['date', 'timestamp', 'timestamptz'] as const;
+// export const _PG_postgis = ['geometry'] as const;
+// export type PG_COLUMN_UDT_DATA_TYPE = 
+//     | typeof _PG_strings[number] 
+//     | typeof _PG_numbers[number] 
+//     | typeof _PG_json[number] 
+//     | typeof _PG_bool[number] 
+//     | typeof _PG_date[number] 
+//     | typeof _PG_postgis[number];
+// export const TS_PG_Types: { [key: string]: readonly string[]; } = {
+//     "string": _PG_strings,
+//     "number": _PG_numbers,
+//     "boolean": _PG_bool,
+//     "Object": _PG_json,
+//     "Date": _PG_date,
+//     "Array<number>": _PG_numbers.map(s => `_${s}`),
+//     "Array<boolean>": _PG_bool.map(s => `_${s}`),
+//     "Array<string>": _PG_strings.map(s => `_${s}`),
+//     "Array<Object>": _PG_json.map(s => `_${s}`),
+//     "Array<Date>": _PG_date.map(s => `_${s}`),
+//     "any": [],
+// } as const;
+// export type TS_COLUMN_DATA_TYPES = keyof typeof TS_PG_Types;
 function postgresToTsType(udt_data_type) {
-    return Object.keys(exports.TS_PG_Types).find(k => {
-        return exports.TS_PG_Types[k].includes(udt_data_type) || !exports.TS_PG_Types[k].length;
+    return Object.keys(prostgles_types_1.TS_PG_Types).find(k => {
+        return prostgles_types_1.TS_PG_Types[k].includes(udt_data_type) || !prostgles_types_1.TS_PG_Types[k].length;
     });
 }
 function sqlErrCodeToMsg(code) {

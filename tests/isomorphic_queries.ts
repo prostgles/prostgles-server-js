@@ -59,84 +59,93 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
 
   await tryRun("getColumns definition", async () => {
     const res = await db.tr2.getColumns();
+    // console.log(JSON.stringify(res, null, 2))
     assert.deepStrictEqual(
       res, 
       [
         {
-          comment: null,
-          data_type: 'integer',
-          delete: true,
-          element_type: null,
-          filter: true,
-          insert: true,
-          is_nullable: false,
-          is_pkey: true,
-          name: 'id',
-          ordinal_position: 1,
-          references: null,
-          select: true,
-          tsDataType: 'number',
-          udt_name: 'int4',
-          update: true
+          "name": "id",
+          "data_type": "integer",
+          "udt_name": "int4",
+          "element_type": null,
+          "element_udt_name": null,
+          "is_pkey": true,
+          "comment": null,
+          "ordinal_position": 1,
+          "is_nullable": false,
+          "references": null,
+          "has_default": true,
+          "tsDataType": "number",
+          "insert": true,
+          "select": true,
+          "filter": true,
+          "update": true,
+          "delete": true
         },
         {
-          comment: null,
-          data_type: 'integer',
-          delete: true,
-          element_type: null,
-          filter: true,
-          insert: true,
-          is_nullable: true,
-          is_pkey: false,
-          name: 'tr1_id',
-          ordinal_position: 2,
-          references: {
-            cols: [
-              'tr1_id'
+          "name": "tr1_id",
+          "data_type": "integer",
+          "udt_name": "int4",
+          "element_type": null,
+          "element_udt_name": null,
+          "is_pkey": false,
+          "comment": null,
+          "ordinal_position": 2,
+          "is_nullable": true,
+          "references": {
+            "ftable": "tr1",
+            "fcols": [
+              "id"
             ],
-            fcols: [
-              'id'
-            ],
-            ftable: 'tr1'
+            "cols": [
+              "tr1_id"
+            ]
           },
-          select: true,
-          tsDataType: 'number',
-          udt_name: 'int4',
-          update: true
+          "has_default": false,
+          "tsDataType": "number",
+          "insert": true,
+          "select": true,
+          "filter": true,
+          "update": true,
+          "delete": true
         },
         {
-          comment: null,
-          data_type: 'text',
-          delete: true,
-          element_type: null,
-          filter: true,
-          insert: true,
-          is_nullable: true,
-          is_pkey: false,
-          name: 't1',
-          ordinal_position: 3,
-          references: null,
-          select: true,
-          tsDataType: 'string',
-          udt_name: 'text',
-          update: true
+          "name": "t1",
+          "data_type": "text",
+          "udt_name": "text",
+          "element_type": null,
+          "element_udt_name": null,
+          "is_pkey": false,
+          "comment": null,
+          "ordinal_position": 3,
+          "is_nullable": true,
+          "references": null,
+          "has_default": false,
+          "tsDataType": "string",
+          "insert": true,
+          "select": true,
+          "filter": true,
+          "update": true,
+          "delete": true
         },
         {
-          comment: null,
-          data_type: 'text',
-          delete: true,
-          element_type: null,
-          filter: true,
-          insert: true,
-          is_nullable: true,
-          is_pkey: false,
-          name: 't2',
-          ordinal_position: 4,
-          references: null,
-          select: true,
-          tsDataType: 'string',
-          udt_name: 'text',
-          update: true
+          "name": "t2",
+          "data_type": "text",
+          "udt_name": "text",
+          "element_type": null,
+          "element_udt_name": null,
+          "is_pkey": false,
+          "comment": null,
+          "ordinal_position": 4,
+          "is_nullable": true,
+          "references": null,
+          "has_default": false,
+          "tsDataType": "string",
+          "insert": true,
+          "select": true,
+          "filter": true,
+          "update": true,
+          "delete": true
         }
       ]
     );

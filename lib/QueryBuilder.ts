@@ -4,9 +4,9 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { pgp, Filter, LocalParams, isPlainObject, TableHandler, ViewHandler, TS_PG_Types } from "./DboBuilder";
+import { pgp, Filter, LocalParams, isPlainObject, TableHandler, ViewHandler } from "./DboBuilder";
 import { TableRule, flat } from "./Prostgles";
-import { SelectParamsBasic as SelectParams, isEmpty, FieldFilter, asName, TextFilter_FullTextSearchFilterKeys } from "prostgles-types";
+import { SelectParamsBasic as SelectParams, isEmpty, FieldFilter, asName, TextFilter_FullTextSearchFilterKeys, TS_PG_Types } from "prostgles-types";
 import { get } from "./utils";
 
 
@@ -210,6 +210,33 @@ export const FUNCTIONS: FunctionSpec[] = [
     }
   })),
 
+  {
+    name: "$ST_Distance_Sphere",
+    description: ` :[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number }] -> Returns linear distance in meters between two lon/lat points. Uses a spherical earth and radius of 6370986 meters. Faster than ST_Distance_Spheroid, but less accurate. Only implemented for points.`,
+    type: "function",
+    singleColArg: true,
+    numArgs: 1,
+    getFields: (args: any[]) => [args[0]],
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      const arg2 = args[1],
+        mErr = () => { throw "ST_Distance_Sphere: Expecting a second argument like: { lat?: number; lng?: number; geojson?: object; srid?: number }" };
+      
+      if(!isPlainObject(arg2)) mErr();
+
+      const { lat, lng, srid = 4326, geojson } = arg2;
+      let geomQ;
+      if([lat, lng].every(v => Number.isFinite(v))){
+        geomQ = `ST_Point(${asValue(lat)}, ${asValue(lng)})`;
+      } else if(isPlainObject(geojson)){
+        geomQ = `ST_GeomFromGeoJSON(${geojson})`;
+      } else mErr();
+
+      if(Number.isFinite(srid)){
+        geomQ = `ST_SetSRID(${geomQ}, ${asValue(srid)})`;
+      }
+      return pgp.as.format(`ST_Distance_Sphere(${asNameAlias(args[0], tableAlias)},${geomQ})`);
+    }
+  },
   {
     name: "$ST_AsGeoJSON",
     description: ` :[column_name] -> json GeoJSON output of a geometry column`,

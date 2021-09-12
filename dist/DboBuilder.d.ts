@@ -5,7 +5,7 @@ declare global {
 }
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams, OrderBy, InsertParams, UpdateParams, DeleteParams, DbJoinMaker, TS_DATA_TYPE } from "prostgles-types";
+import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams, OrderBy, InsertParams, UpdateParams, DeleteParams, DbJoinMaker } from "prostgles-types";
 export declare type DbHandler = {
     [key: string]: Partial<TableHandler>;
 } & DbJoinMaker & {
@@ -295,8 +295,5 @@ export declare class DboBuilder {
     getTX: (dbTX: TxCB) => Promise<any>;
 }
 export declare function isPlainObject(o: any): boolean;
-export declare const TS_PG_Types: {
-    [key in TS_DATA_TYPE]: string[];
-};
 export {};
 //# sourceMappingURL=DboBuilder.d.ts.map
