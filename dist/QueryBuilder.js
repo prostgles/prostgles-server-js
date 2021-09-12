@@ -148,8 +148,21 @@ exports.FUNCTIONS = [
     })),
     ...[
         {
+            fname: "ST_DWithin",
+            description: `:[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean; distance: number; }] 
+          -> Returns true if the geometries are within a given distance
+          For geometry: The distance is specified in units defined by the spatial reference system of the geometries. For this function to make sense, the source geometries must be in the same coordinate system (have the same SRID).
+          For geography: units are in meters and distance measurement defaults to use_spheroid=true. For faster evaluation use use_spheroid=false to measure on the sphere.
+        `
+        },
+        {
+            fname: "<->",
+            description: `:[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean }] 
+          -> The <-> operator returns the 2D distance between two geometries. Used in the "ORDER BY" clause provides index-assisted nearest-neighbor result sets. For PostgreSQL below 9.5 only gives centroid distance of bounding boxes and for PostgreSQL 9.5+, does true KNN distance search giving true distance between geometries, and distance sphere for geographies.`
+        },
+        {
             fname: "ST_Distance",
-            description: ` :[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number }] 
+            description: ` :[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean }] 
           -> For geometry types returns the minimum 2D Cartesian (planar) distance between two geometries, in projected units (spatial ref units).
           -> For geography types defaults to return the minimum geodesic distance between two geographies in meters, compute on the spheroid determined by the SRID. If use_spheroid is false, a faster spherical calculation is used.
         `,
@@ -165,12 +178,23 @@ exports.FUNCTIONS = [
         numArgs: 1,
         getFields: (args) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
-            const arg2 = args[1], mErr = () => { throw "ST_Distance_Sphere: Expecting a second argument like: { lat?: number; lng?: number; geojson?: object; srid?: number }"; };
+            const arg2 = args[1], mErr = () => { throw `${fname}: Expecting a second argument like: { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean }`; };
             if (!DboBuilder_1.isPlainObject(arg2))
                 mErr();
-            const { lat, lng, srid = 4326, geojson } = arg2;
-            let geomQ;
-            if ([lat, lng].every(v => Number.isFinite(v))) {
+            const { lat, lng, srid = 4326, geojson, text, use_spheroid, distance } = arg2;
+            let geomQ, useSphQ, distanceQ;
+            if (fname === "ST_DWithin") {
+                if (typeof distance !== "number")
+                    throw `ST_DWithin: distance param missing or not a number`;
+                distanceQ = ", " + asValue(distance);
+            }
+            if (typeof use_spheroid === "boolean" && ["ST_DWithin", "ST_Distance"].includes(fname)) {
+                useSphQ = ", " + asValue(use_spheroid);
+            }
+            if (typeof text === "string") {
+                geomQ = `ST_GeomFromText(${asValue(text)})`;
+            }
+            else if ([lat, lng].every(v => Number.isFinite(v))) {
                 geomQ = `ST_Point(${asValue(lat)}, ${asValue(lng)})`;
             }
             else if (DboBuilder_1.isPlainObject(geojson)) {
@@ -181,7 +205,10 @@ exports.FUNCTIONS = [
             if (Number.isFinite(srid)) {
                 geomQ = `ST_SetSRID(${geomQ}, ${asValue(srid)})`;
             }
-            return DboBuilder_1.pgp.as.format(`${fname}(${exports.asNameAlias(args[0], tableAlias)},${geomQ})`);
+            if (fname === "<->") {
+                return DboBuilder_1.pgp.as.format(`${exports.asNameAlias(args[0], tableAlias)} <-> ${geomQ}`);
+            }
+            return DboBuilder_1.pgp.as.format(`${fname}(${exports.asNameAlias(args[0], tableAlias)} , ${geomQ} ${distanceQ} ${useSphQ})`);
         }
     })),
     {
@@ -595,7 +622,7 @@ class SelectItemBuilder {
                             /* Aggs and functions */
                         }
                         else if (typeof val === "string" || DboBuilder_1.isPlainObject(val)) {
-                            /* Function
+                            /* Function shorthand notation
                                 { id: "$max" } === { id: { $max: ["id"] } } === SELECT MAX(id) AS id
                             */
                             if ((typeof val === "string" && val !== "*") ||

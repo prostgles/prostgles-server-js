@@ -211,9 +211,22 @@ export const FUNCTIONS: FunctionSpec[] = [
   })),
 
   ...[
+      {
+        fname: "ST_DWithin",
+        description: `:[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean; distance: number; }] 
+          -> Returns true if the geometries are within a given distance
+          For geometry: The distance is specified in units defined by the spatial reference system of the geometries. For this function to make sense, the source geometries must be in the same coordinate system (have the same SRID).
+          For geography: units are in meters and distance measurement defaults to use_spheroid=true. For faster evaluation use use_spheroid=false to measure on the sphere.
+        `
+      },
+      {
+        fname: "<->",
+        description: `:[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean }] 
+          -> The <-> operator returns the 2D distance between two geometries. Used in the "ORDER BY" clause provides index-assisted nearest-neighbor result sets. For PostgreSQL below 9.5 only gives centroid distance of bounding boxes and for PostgreSQL 9.5+, does true KNN distance search giving true distance between geometries, and distance sphere for geographies.`
+      },
       { 
         fname: "ST_Distance",
-        description: ` :[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number }] 
+        description: ` :[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean }] 
           -> For geometry types returns the minimum 2D Cartesian (planar) distance between two geometries, in projected units (spatial ref units).
           -> For geography types defaults to return the minimum geodesic distance between two geographies in meters, compute on the spheroid determined by the SRID. If use_spheroid is false, a faster spherical calculation is used.
         `,
@@ -221,7 +234,7 @@ export const FUNCTIONS: FunctionSpec[] = [
         fname: "ST_Distance_Sphere",
         description: ` :[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number }] -> Returns linear distance in meters between two lon/lat points. Uses a spherical earth and radius of 6370986 meters. Faster than ST_Distance_Spheroid, but less accurate. Only implemented for points.`,
       }
-    ].map(({ fname, description}) => ({
+    ].map(({ fname, description }) => ({
       name: "$" + fname,
       description,
       type: "function" as "function",
@@ -230,13 +243,23 @@ export const FUNCTIONS: FunctionSpec[] = [
       getFields: (args: any[]) => [args[0]],
       getQuery: ({ allowedFields, args, tableAlias }) => {
         const arg2 = args[1],
-          mErr = () => { throw "ST_Distance_Sphere: Expecting a second argument like: { lat?: number; lng?: number; geojson?: object; srid?: number }" };
+          mErr = () => { throw `${fname}: Expecting a second argument like: { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean }` };
         
         if(!isPlainObject(arg2)) mErr();
   
-        const { lat, lng, srid = 4326, geojson } = arg2;
-        let geomQ;
-        if([lat, lng].every(v => Number.isFinite(v))){
+        const { lat, lng, srid = 4326, geojson, text, use_spheroid, distance } = arg2;
+        let geomQ, useSphQ, distanceQ;
+        if(fname === "ST_DWithin"){
+          if(typeof distance !== "number") throw `ST_DWithin: distance param missing or not a number`;
+          distanceQ = ", " + asValue(distance)
+        }
+        if(typeof use_spheroid === "boolean" && ["ST_DWithin", "ST_Distance"].includes(fname)){
+          useSphQ = ", " + asValue(use_spheroid);
+        }
+
+        if(typeof text === "string"){
+          geomQ = `ST_GeomFromText(${asValue(text)})`;
+        } else if([lat, lng].every(v => Number.isFinite(v))){
           geomQ = `ST_Point(${asValue(lat)}, ${asValue(lng)})`;
         } else if(isPlainObject(geojson)){
           geomQ = `ST_GeomFromGeoJSON(${geojson})`;
@@ -245,7 +268,11 @@ export const FUNCTIONS: FunctionSpec[] = [
         if(Number.isFinite(srid)){
           geomQ = `ST_SetSRID(${geomQ}, ${asValue(srid)})`;
         }
-        return pgp.as.format(`${fname}(${asNameAlias(args[0], tableAlias)},${geomQ})`);
+
+        if(fname === "<->"){
+          return pgp.as.format(`${asNameAlias(args[0], tableAlias)} <-> ${geomQ}`);
+        }
+        return pgp.as.format(`${fname}(${asNameAlias(args[0], tableAlias)} , ${geomQ} ${distanceQ} ${useSphQ})`);
       }
     })),
   {
@@ -727,7 +754,7 @@ export class SelectItemBuilder {
           /* Aggs and functions */
           } else if(typeof val === "string" || isPlainObject(val)) {
   
-            /* Function 
+            /* Function shorthand notation
                 { id: "$max" } === { id: { $max: ["id"] } } === SELECT MAX(id) AS id 
             */  
             if(
