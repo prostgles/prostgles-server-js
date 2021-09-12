@@ -146,9 +146,20 @@ exports.FUNCTIONS = [
             return res;
         }
     })),
-    {
-        name: "$ST_Distance_Sphere",
-        description: ` :[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number }] -> Returns linear distance in meters between two lon/lat points. Uses a spherical earth and radius of 6370986 meters. Faster than ST_Distance_Spheroid, but less accurate. Only implemented for points.`,
+    ...[
+        {
+            fname: "ST_Distance",
+            description: ` :[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number }] 
+          -> For geometry types returns the minimum 2D Cartesian (planar) distance between two geometries, in projected units (spatial ref units).
+          -> For geography types defaults to return the minimum geodesic distance between two geographies in meters, compute on the spheroid determined by the SRID. If use_spheroid is false, a faster spherical calculation is used.
+        `,
+        }, {
+            fname: "ST_Distance_Sphere",
+            description: ` :[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number }] -> Returns linear distance in meters between two lon/lat points. Uses a spherical earth and radius of 6370986 meters. Faster than ST_Distance_Spheroid, but less accurate. Only implemented for points.`,
+        }
+    ].map(({ fname, description }) => ({
+        name: "$" + fname,
+        description,
         type: "function",
         singleColArg: true,
         numArgs: 1,
@@ -170,9 +181,9 @@ exports.FUNCTIONS = [
             if (Number.isFinite(srid)) {
                 geomQ = `ST_SetSRID(${geomQ}, ${asValue(srid)})`;
             }
-            return DboBuilder_1.pgp.as.format(`ST_Distance_Sphere(${exports.asNameAlias(args[0], tableAlias)},${geomQ})`);
+            return DboBuilder_1.pgp.as.format(`${fname}(${exports.asNameAlias(args[0], tableAlias)},${geomQ})`);
         }
-    },
+    })),
     {
         name: "$ST_AsGeoJSON",
         description: ` :[column_name] -> json GeoJSON output of a geometry column`,
