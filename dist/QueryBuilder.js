@@ -389,9 +389,9 @@ exports.FUNCTIONS = [
         type: "function",
         numArgs: 1,
         singleColArg: false,
-        getFields: (args) => [args[0]],
+        getFields: (args) => [args[1]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
-            let a1 = asValue(args[1]), a2 = exports.asNameAlias(args[0], tableAlias);
+            let a1 = asValue(args[0]), a2 = exports.asNameAlias(args[1], tableAlias);
             if (funcName === "position_lower") {
                 a1 = `LOWER(${a1})`;
                 a2 = `LOWER(${a2})`;
