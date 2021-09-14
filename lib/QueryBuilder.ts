@@ -460,6 +460,25 @@ export const FUNCTIONS: FunctionSpec[] = [
     }
   } as FunctionSpec)),
 
+
+  /* Text col and value funcs */
+  ...["position", "position_lower"].map(funcName => ({
+    name: "$" + funcName,
+    type: "function",
+    numArgs: 1,
+    singleColArg: false,
+    getFields: (args: any[]) => [args[1]],
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      let a1 = asValue(args[0]),
+        a2 = asNameAlias(args[1], tableAlias);
+      if(funcName === "position_lower"){
+        a1 = `LOWER(${a1})`;
+        a2 = `LOWER(${a2})`;
+      }
+      return `position( ${a1} IN ${a2} )`;
+    }
+  } as FunctionSpec)),
+
   /** Custom highlight -> myterm => ['some text and', ['myterm'], ' and some other text']
    * (fields: "*" | string[], term: string, { edgeTruncate: number = -1; noFields: boolean = false }) => string | (string | [string])[]  
    * edgeTruncate = maximum extra characters left and right of matches
