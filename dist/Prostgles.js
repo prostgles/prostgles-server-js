@@ -225,7 +225,8 @@ class Prostgles {
             "transactions", "joins", "tsGeneratedTypesDir",
             "onReady", "dbConnection", "dbOptions", "publishMethods", "io",
             "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect",
-            "onSocketDisconnect", "sqlFilePath", "auth", "DEBUG_MODE", "watchSchema"
+            "onSocketDisconnect", "sqlFilePath", "auth", "DEBUG_MODE", "watchSchema",
+            "i18n"
         ];
         const unknownParams = Object.keys(params).filter((key) => !config.includes(key));
         if (unknownParams.length) {

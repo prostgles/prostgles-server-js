@@ -277,7 +277,7 @@ class ViewHandler {
         if (filter === null || filter && !isPojoObject(filter))
             throw `invalid filter -> ${JSON.stringify(filter)} \nExpecting:    undefined | {} | { field_name: "value" } | { field: { $gt: 22 } } ... `;
     }
-    getInfo(tableRules, localParams) {
+    getInfo(param1, param2, param3, tableRules, localParams) {
         return __awaiter(this, void 0, void 0, function* () {
             const p = this.getValidatedRules(tableRules, localParams);
             if (!p.select.getInfo)
@@ -289,16 +289,34 @@ class ViewHandler {
         });
     }
     // TODO: fix renamed table trigger problem
-    getColumns(tableRules, localParams) {
+    getColumns(lang, param2, param3, tableRules, localParams) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const p = this.getValidatedRules(tableRules, localParams);
                 if (!p.select.getColumns)
                     throw "Not allowed";
                 // console.log("getColumns", this.name, this.columns.map(c => c.name))
-                return this.columns.map(c => (Object.assign(Object.assign({}, c), { tsDataType: postgresToTsType(c.udt_name), insert: Boolean(p.insert && p.insert.fields && p.insert.fields.includes(c.name)), select: Boolean(p.select && p.select.fields && p.select.fields.includes(c.name)), filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)), update: Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)), delete: Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)) })));
+                let _lang = lang;
+                return this.columns.map(c => {
+                    var _a, _b, _c, _d, _e, _f;
+                    let label = c.comment || c.name;
+                    const iConf = (_d = (_c = (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.i18n) === null || _b === void 0 ? void 0 : _b.column_labels) === null || _c === void 0 ? void 0 : _c[this.name]) === null || _d === void 0 ? void 0 : _d[c.name];
+                    const fallbackLang = (_f = (_e = this.dboBuilder.prostgles) === null || _e === void 0 ? void 0 : _e.i18n) === null || _f === void 0 ? void 0 : _f.fallbackLang;
+                    _lang = _lang || fallbackLang;
+                    console.log({ lang, _lang, iConf });
+                    if ((lang || fallbackLang) && iConf) {
+                        let langLabel;
+                        if (lang)
+                            langLabel = iConf[lang];
+                        if (!langLabel && fallbackLang)
+                            langLabel = iConf[fallbackLang];
+                        label = langLabel || label;
+                    }
+                    return Object.assign(Object.assign({}, c), { label, tsDataType: postgresToTsType(c.udt_name), insert: Boolean(p.insert && p.insert.fields && p.insert.fields.includes(c.name)), select: Boolean(p.select && p.select.fields && p.select.fields.includes(c.name)), filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)), update: Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)), delete: Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)) });
+                });
             }
             catch (e) {
+                console.trace(e);
                 throw "Something went wrong in " + `db.${this.name}.getColumns()`;
             }
         });
@@ -1832,7 +1850,14 @@ export type TxCB = {
             yield this.parseJoins();
             let joinTableNames = [];
             let allDataDefs = "";
+            let i18nDef = "type DeepPartial<T> = { [P in keyof T]?: DeepPartial<T[P]>; }; \n";
+            i18nDef += "export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = { \n";
+            i18nDef += "  fallbackLang: keyof LANG_IDS; \n";
+            i18nDef += "  column_labels?: DeepPartial<{ \n";
             this.tablesOrViews.map(tov => {
+                i18nDef += `    ${JSON.stringify(tov.name)}: { \n`;
+                i18nDef += `      [key in ${tov.columns.map(c => JSON.stringify(c.name)).join(" | ")}]: { [lang_id in keyof LANG_IDS]: string }; \n`;
+                i18nDef += `    }; \n`;
                 // console.log("dboInit", tov.name, tov.columns.map(c => c.name))
                 const filterKeywords = Object.values(this.prostgles.keywords);
                 const $filterCol = tov.columns.find(c => filterKeywords.includes(c.name));
@@ -1880,6 +1905,8 @@ export type TxCB = {
                     }
                 }
             });
+            i18nDef += "  }> \n";
+            i18nDef += "} \n";
             let joinBuilderDef = "";
             if (joinTableNames.length) {
                 joinBuilderDef += "export type JoinMakerTables = {\n";
@@ -1905,7 +1932,8 @@ export type TxCB = {
                 allDataDefs,
                 joinBuilderDef,
                 `/* DBO Definition. Isomorphic */`,
-                this.dboDefinition
+                this.dboDefinition,
+                i18nDef,
             ].join("\n");
             return this.dbo;
             // let dbo = makeDBO(db, allTablesViews, pubSubManager, true);
@@ -2022,33 +2050,6 @@ function isPlainObject(o) {
     return Object(o) === o && Object.getPrototypeOf(o) === Object.prototype;
 }
 exports.isPlainObject = isPlainObject;
-// export const _PG_strings = ['bpchar','char','varchar','text','citext','uuid','bytea','inet','time','timetz','interval','name'] as const;
-// export const _PG_numbers = ['int2','int4','int8','float4','float8','numeric','money','oid'] as const;
-// export const _PG_json = ['json', 'jsonb'] as const;
-// export const _PG_bool = ['bool'] as const;
-// export const _PG_date = ['date', 'timestamp', 'timestamptz'] as const;
-// export const _PG_postgis = ['geometry'] as const;
-// export type PG_COLUMN_UDT_DATA_TYPE = 
-//     | typeof _PG_strings[number] 
-//     | typeof _PG_numbers[number] 
-//     | typeof _PG_json[number] 
-//     | typeof _PG_bool[number] 
-//     | typeof _PG_date[number] 
-//     | typeof _PG_postgis[number];
-// export const TS_PG_Types: { [key: string]: readonly string[]; } = {
-//     "string": _PG_strings,
-//     "number": _PG_numbers,
-//     "boolean": _PG_bool,
-//     "Object": _PG_json,
-//     "Date": _PG_date,
-//     "Array<number>": _PG_numbers.map(s => `_${s}`),
-//     "Array<boolean>": _PG_bool.map(s => `_${s}`),
-//     "Array<string>": _PG_strings.map(s => `_${s}`),
-//     "Array<Object>": _PG_json.map(s => `_${s}`),
-//     "Array<Date>": _PG_date.map(s => `_${s}`),
-//     "any": [],
-// } as const;
-// export type TS_COLUMN_DATA_TYPES = keyof typeof TS_PG_Types;
 function postgresToTsType(udt_data_type) {
     return Object.keys(prostgles_types_1.TS_PG_Types).find(k => {
         return prostgles_types_1.TS_PG_Types[k].includes(udt_data_type) || !prostgles_types_1.TS_PG_Types[k].length;

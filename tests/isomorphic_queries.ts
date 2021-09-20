@@ -58,12 +58,13 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
   });
 
   await tryRun("getColumns definition", async () => {
-    const res = await db.tr2.getColumns();
+    const res = await db.tr2.getColumns("fr");
     // console.log(JSON.stringify(res, null, 2))
     assert.deepStrictEqual(
       res, 
       [
         {
+          "label": "id",
           "name": "id",
           "data_type": "integer",
           "udt_name": "int4",
@@ -83,6 +84,7 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
           "delete": true
         },
         {
+          "label": "tr1_id",
           "name": "tr1_id",
           "data_type": "integer",
           "udt_name": "int4",
@@ -110,6 +112,7 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
           "delete": true
         },
         {
+          "label": "fr_t1",
           "name": "t1",
           "data_type": "text",
           "udt_name": "text",
@@ -129,6 +132,7 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
           "delete": true
         },
         {
+          "label": "en_t2",
           "name": "t2",
           "data_type": "text",
           "udt_name": "text",

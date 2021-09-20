@@ -44,6 +44,19 @@ const dbConnection = {
     password: process.env.POSTGRES_PASSWORD || "api",
 };
 (async () => {
+    const i18n = {
+        fallbackLang: "en",
+        column_labels: {
+            tr2: {
+                t1: {
+                    fr: "fr_t1"
+                },
+                t2: {
+                    en: "en_t2"
+                },
+            }
+        }
+    };
     let prgl = await prostgles_server_1.default({
         dbConnection,
         sqlFilePath: path_1.default.join(__dirname + '/init.sql'),
@@ -182,6 +195,7 @@ const dbConnection = {
             // };
         },
         // joins: "inferred",
+        i18n,
         joins: [
             {
                 tables: ["items", "items2"],

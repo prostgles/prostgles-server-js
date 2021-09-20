@@ -18,7 +18,7 @@ export type PGP = pgPromise.IMain<{}, pg.IClient>;
 
 
 export { DbHandler, DbHandlerTX } from "./DboBuilder";
-import { SQLRequest, SQLOptions, CHANNELS, asName, DBHandler } from "prostgles-types";
+import { SQLRequest, SQLOptions, CHANNELS, asName, DBHandler, AnyObject } from "prostgles-types";
 
 import { DBEventsManager } from "./DBEventsManager";
 
@@ -307,6 +307,20 @@ type Keywords = {
     $not: string;
 };
 
+export type DeepPartial<T> = {
+    [P in keyof T]?: DeepPartial<T[P]>;
+};
+export type I18N_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
+    fallbackLang: keyof LANG_IDS;
+    column_labels?: DeepPartial<{
+        [table_name: string]: {
+            [column_name: string]: {
+                [lang_id in keyof LANG_IDS]: string
+            }
+        }
+    }>;
+}
+
 export type ProstglesInitOptions = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
@@ -329,6 +343,7 @@ export type ProstglesInitOptions = {
     watchSchema?: boolean | "hotReloadMode" | ((event: { command: string; query: string }) => void);
     keywords?: Keywords;
     onNotice?: (msg: any) => void;
+    i18n?: I18N_CONFIG<AnyObject>;
 }
 
 // interface ISocketSetup {
@@ -405,6 +420,8 @@ export class Prostgles {
 
     dbEventsManager: DBEventsManager;
 
+    i18n?: ProstglesInitOptions["i18n"];
+
     constructor(params: ProstglesInitOptions){
         if(!params) throw "ProstglesInitOptions missing";
         if(!params.io) console.warn("io missing. WebSockets will not be set up");
@@ -414,7 +431,8 @@ export class Prostgles {
             "transactions", "joins", "tsGeneratedTypesDir",
             "onReady", "dbConnection", "dbOptions", "publishMethods", "io", 
             "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect", 
-            "onSocketDisconnect", "sqlFilePath", "auth", "DEBUG_MODE", "watchSchema"
+            "onSocketDisconnect", "sqlFilePath", "auth", "DEBUG_MODE", "watchSchema", 
+            "i18n"
         ];
         const unknownParams = Object.keys(params).filter((key: string) => !(config as string[]).includes(key))
         if(unknownParams.length){ 

@@ -4,6 +4,7 @@ import pg = require('pg-promise/typescript/pg-subset');
 import { DboBuilder, DbHandler, DbHandlerTX } from "./DboBuilder";
 export declare type PGP = pgPromise.IMain<{}, pg.IClient>;
 export { DbHandler, DbHandlerTX } from "./DboBuilder";
+import { AnyObject } from "prostgles-types";
 import { DBEventsManager } from "./DBEventsManager";
 export declare type DB = pgPromise.IDatabase<{}, pg.IClient>;
 declare type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
@@ -226,6 +227,22 @@ declare type Keywords = {
     $or: string;
     $not: string;
 };
+export declare type DeepPartial<T> = {
+    [P in keyof T]?: DeepPartial<T[P]>;
+};
+export declare type I18N_CONFIG<LANG_IDS = {
+    en: 1;
+    fr: 1;
+}> = {
+    fallbackLang: keyof LANG_IDS;
+    column_labels?: DeepPartial<{
+        [table_name: string]: {
+            [column_name: string]: {
+                [lang_id in keyof LANG_IDS]: string;
+            };
+        };
+    }>;
+};
 export declare type ProstglesInitOptions = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
@@ -250,6 +267,7 @@ export declare type ProstglesInitOptions = {
     }) => void);
     keywords?: Keywords;
     onNotice?: (msg: any) => void;
+    i18n?: I18N_CONFIG<AnyObject>;
 };
 export declare type OnReady = {
     dbo: DbHandler;
@@ -294,6 +312,7 @@ export declare class Prostgles {
      */
     onNotice?: ProstglesInitOptions["onNotice"];
     dbEventsManager: DBEventsManager;
+    i18n?: ProstglesInitOptions["i18n"];
     constructor(params: ProstglesInitOptions);
     destroyed: boolean;
     onSchemaChange(event: {

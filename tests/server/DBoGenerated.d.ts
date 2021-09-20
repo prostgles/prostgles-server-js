@@ -136,3 +136,61 @@ export type DBObj = {
   innerJoinOne: JoinMakerTables;
  tx: (t: TxCB) => Promise<any | void> ;
 };
+
+type DeepPartial<T> = { [P in keyof T]?: DeepPartial<T[P]>; }; 
+export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = { 
+  fallbackLang: keyof LANG_IDS; 
+  column_labels?: DeepPartial<{ 
+    "\"*\"": { 
+      [key in "id" | "\"*\""]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "*": { 
+      [key in "id" | "*"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "ex_j_ins": { 
+      [key in "id" | "public" | "name" | "added"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "item_children": { 
+      [key in "id" | "item_id" | "name" | "tst"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "items": { 
+      [key in "id" | "h" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "items2": { 
+      [key in "id" | "items_id" | "hh" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "items3": { 
+      [key in "id" | "h" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "items4": { 
+      [key in "id" | "public" | "name" | "added"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "items4_pub": { 
+      [key in "id" | "public" | "name" | "added"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "lookup_status": { 
+      [key in "id" | "en" | "fr"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "planes": { 
+      [key in "id" | "x" | "y" | "flight_number" | "last_updated"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "tr1": { 
+      [key in "id" | "t1"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "tr2": { 
+      [key in "id" | "tr1_id" | "t1" | "t2"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "tt": { 
+      [key in "id"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "usr": { 
+      [key in "id" | "status" | "msg" | "added" | "is_active" | "age"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "v_items": { 
+      [key in "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "various": { 
+      [key in "id" | "h" | "name" | "tsv" | "jsn" | "added"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+  }> 
+} 

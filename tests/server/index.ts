@@ -15,7 +15,7 @@ http.listen(3001);
 import isomorphic from "../isomorphic_queries";
 import server_only_queries from "../server_only_queries";
 
-import { DBObj } from "./DBoGenerated";
+import { DBObj, I18N_DBO_CONFIG } from "./DBoGenerated";
 // type DBObj = any;
 import { DB, DbHandler } from 'prostgles-server/dist/Prostgles';
 
@@ -59,6 +59,20 @@ const dbConnection = {
 };
 
 (async () => {
+
+	const i18n: I18N_DBO_CONFIG = {
+		fallbackLang: "en",
+		column_labels: {
+			tr2: {
+				t1: {
+					fr: "fr_t1"
+				},
+				t2: {
+					en: "en_t2"
+				},
+			}
+		}
+	}
 
 	let prgl = await prostgles({
 		dbConnection,
@@ -204,6 +218,7 @@ const dbConnection = {
 			// };
 		},
 		// joins: "inferred",
+		i18n,
 		joins: [
 			{ 
 				tables: ["items", "items2"],
