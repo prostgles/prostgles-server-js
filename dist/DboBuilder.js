@@ -303,7 +303,6 @@ class ViewHandler {
                     const iConf = (_d = (_c = (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.i18n) === null || _b === void 0 ? void 0 : _b.column_labels) === null || _c === void 0 ? void 0 : _c[this.name]) === null || _d === void 0 ? void 0 : _d[c.name];
                     const fallbackLang = (_f = (_e = this.dboBuilder.prostgles) === null || _e === void 0 ? void 0 : _e.i18n) === null || _f === void 0 ? void 0 : _f.fallbackLang;
                     _lang = _lang || fallbackLang;
-                    console.log({ lang, _lang, iConf });
                     if ((lang || fallbackLang) && iConf) {
                         let langLabel;
                         if (lang)
