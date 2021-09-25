@@ -6,14 +6,17 @@
 import * as promise from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
+import FileManager from "./FileManager";
 
 const pkgj = require('../package.json');
 const version = pkgj.version;
 
+console.log("Add a basic auth mode where user and sessions table are created");
+
 import { get } from "./utils";
 import { DboBuilder, DbHandler, DbHandlerTX, TableHandler, ViewHandler, isPlainObject } from "./DboBuilder";
 import { PubSubManager, DEFAULT_SYNC_BATCH_SIZE, asValue } from "./PubSubManager";
- 
+
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 
 
@@ -291,14 +294,20 @@ export type publishMethods = (socket?: any, dbo?: DbHandler | DbHandlerTX | any,
 
 export type BasicSession = { sid: string, expires: number };
 export type SessionIDs = { sidCookie?: string; sidQuery?: string; sid: string; };
+
+export type AuthClientRequest = { socket: any } | { httpReq: any }
 export type Auth = {
     sidQueryParamName?: string; /* Name of the websocket handshake query parameter that represents the session id. Takes precedence over cookie. If provided, Prostgles will attempt to get the user on socket connection */
     sidCookieName?: string; /* Name of the cookie that represents the session id. If provided, Prostgles will attempt to get the user on socket connection */
-    getUser: (params: SessionIDs, dbo: any, db: DB, socket: any) => Promise<object | null | undefined>;    /* User data used on server */
-    getClientUser: (params: SessionIDs, dbo: any, db: DB, socket: any) => Promise<object>;                 /* User data sent to client */
-    register?: (params, dbo: any, db: DB, socket: any) => Promise<BasicSession>;
-    login?: (params, dbo: any, db: DB, socket: any) => Promise<BasicSession>;
-    logout?: (params: SessionIDs, dbo: any, db: DB, socket: any) => Promise<any>;
+    expressConfig?: {
+        app: any; /* Express app instance. If provided Prostgles will attempt to set (sidQueryParamName OR sidCookieName) to user cookie  */
+        postPath: string;
+    }
+    getUser: (params: SessionIDs, dbo: any, db: DB, request: AuthClientRequest) => Promise<object | null | undefined>;    /* User data used on server */
+    getClientUser: (params: SessionIDs, dbo: any, db: DB, request: AuthClientRequest) => Promise<object>;                 /* User data sent to client */
+    register?: (params, dbo: any, db: DB, request: AuthClientRequest) => Promise<BasicSession>;
+    login?: (params, dbo: any, db: DB, request: AuthClientRequest) => Promise<BasicSession>;
+    logout?: (params: SessionIDs, dbo: any, db: DB, request: AuthClientRequest) => Promise<any>;
 }
 
 type Keywords = {
@@ -320,6 +329,55 @@ export type I18N_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
         }
     }>;
 }
+
+type ExpressApp = {
+    get: (
+        routePath: string, 
+        cb: (
+            req: { 
+                params: { id: string },
+                cookies: { sid: string }
+            },
+            res: {
+                redirect: (redirectUrl: string) => any;
+                status: (code: number) => {
+                    json: (response: AnyObject) => any;
+                }
+            }
+        ) => any
+    ) => any
+};
+
+/**
+ * Allows uploading and downloading files.
+ * Currently supports only S3.
+ * 
+ * @description
+ * Will create a media table that contains file metadata and urls
+ * Inserting a file into this table through prostgles will upload it to S3 and insert the relevant metadata into the media table
+ * Requesting a file from HTTP GET {fileUrlPath}/{fileId} will:
+ *  1. check auth (if provided) 
+ *  2. check the permissions in publish (if provided)
+ *  3. redirect the request to the signed url (if allowed)
+ * 
+ * Specifying referencedTables will:
+ *  1. create a column in that table called media
+ *  2. create a lookup table lookup_media_{referencedTable} that joins referencedTable to the media table 
+ */
+export type FileTableConfig = {
+    tableName?: string; /* defaults to 'media' */
+    fileUrlPath?: string; // defaults to tableName
+    awsS3Config: {
+        region: string; 
+        bucket: string; 
+        accessKeyId: string;
+        secretAccessKey: string;
+    },
+    expressApp: ExpressApp;
+    referencedTables?: {
+        [tableName: string]: "one" | "many"
+    }
+};
 
 export type ProstglesInitOptions = {
     dbConnection: DbConnection;
@@ -344,6 +402,7 @@ export type ProstglesInitOptions = {
     keywords?: Keywords;
     onNotice?: (msg: any) => void;
     i18n?: I18N_CONFIG<AnyObject>;
+    fileTable?: FileTableConfig;
 }
 
 // interface ISocketSetup {
@@ -421,6 +480,10 @@ export class Prostgles {
     dbEventsManager: DBEventsManager;
 
     i18n?: ProstglesInitOptions["i18n"];
+
+    fileTable?: FileTableConfig;
+
+    private fileManager?: FileManager;
 
     constructor(params: ProstglesInitOptions){
         if(!params) throw "ProstglesInitOptions missing";
@@ -577,6 +640,12 @@ export class Prostgles {
             // }
 
             this.dbEventsManager = new DBEventsManager(db, pgp);
+
+            /* 4.1 Create media table if required */
+            if(this.fileTable){
+                this.fileManager = new FileManager(this.fileTable.awsS3Config);
+                await this.fileManager.init(this);
+            }
             
             /* 5. Finish init and provide DBO object */
             try {

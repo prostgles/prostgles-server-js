@@ -24,11 +24,15 @@
   },
   "homepage": "https://github.com/prostgles/prostgles-server-js#readme",
   "dependencies": {
+    "aws-sdk": "^2.994.0",
     "bluebird": "^3.7.2",
+    "file-type": "^16.5.3",
     "pg-promise": "^10.9.5",
     "prostgles-types": "^1.5.96"
   },
   "devDependencies": {
+    "@types/aws-sdk": "^2.7.0",
+    "@types/file-type": "^10.9.1",
     "@types/node": "^14.14.35",
     "typescript": "^3.9.7"
   }
