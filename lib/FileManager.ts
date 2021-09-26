@@ -20,6 +20,7 @@ export default class FileManager {
   
   s3Client: S3;
   config: S3Config;
+  prostgles: Prostgles;
 
   constructor({ region, bucket, accessKeyId, secretAccessKey, onUploaded }: S3Config){
     this.config = { region, bucket, accessKeyId, secretAccessKey, onUploaded };
@@ -139,12 +140,19 @@ export default class FileManager {
   }
 
   init = async (prg: Prostgles) => {
-    const { fileTable, dbo, db, auth } = prg;
+    this.prostgles = prg;
+    const { dbo, db, opts } = prg;
+    const { fileTable, auth } = opts;
     const { tableName = "media", referencedTables = {} } = fileTable;
+
+    /**
+     * 1. Create media table
+     */
     if(!dbo[tableName]){
-        console.log(`Creating fileTable ${asName(tableName)}`);
+        console.log(`Creating fileTable ${asName(tableName)} ...`);
+        await db.any(`CREATE EXTENSION IF NOT EXISTS pgcrypto `);
         await db.any(`CREATE TABLE ${asName(tableName)} (
-            id                  TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
+            id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             -- user_id             TEXT REFERENCES users(id),
             title               TEXT,
             extension           TEXT NOT NULL,
@@ -159,61 +167,73 @@ export default class FileManager {
             etag                TEXT,
             is_public           BOOLEAN DEFAULT FALSE
         )`);
+        console.log(`Created fileTable ${asName(tableName)}`);
     }
 
+    /**
+     * 2. Create media lookup tables
+     */
     await Promise.all(Object.keys(referencedTables).map(async refTable => {
         if(!dbo[refTable]) throw `Referenced table (${refTable}) from fileTable.referencedTables is missing`;
-        const lookupTableName = asName(`lookup_${tableName}_${refTable}`);
-        const pKeyFields = (await (dbo[refTable] as TableHandler).getColumns()).filter(f => f.is_pkey);
+        // const lookupTableName = asName(`lookup_${tableName}_${refTable}`);
+
+        const lookupTableName = await dbo.sql<"value">("select format('%I', $1)", [`prostgles_lookup_${tableName}_${refTable}`], { returnType: "value" } )
+        const pKeyFields = (await (dbo[refTable] as unknown as TableHandler).getColumns()).filter(f => f.is_pkey);
         if(pKeyFields.length !== 1) throw `Could not make link table for ${refTable}. ${pKeyFields} must have exactly one primary key column. Current pkeys: ${pKeyFields.map(f => f.name)}`;
         const pkField = pKeyFields[0];
         const refType = referencedTables[refTable];
         if(!dbo[lookupTableName]){
-          await db.any(`
-            CREATE TABLE ${lookupTableName} (
-              foreign_id  ${pkField.udt_name} ${refType === "one"? "PRIMARY KEY" : ""} REFERENCES ${asName(refTable)}(${asName(pkField.name)})
-              media_id    TEXT REFERENCES ${asName(tableName)}(id)
-            )
-          `);
+          const action = ` (${tableName} <-> ${refTable}) join table ${lookupTableName}`
+          const query = `
+          CREATE TABLE ${lookupTableName} (
+            foreign_id  ${pkField.udt_name} ${refType === "one"? "PRIMARY KEY" : ""} REFERENCES ${asName(refTable)}(${asName(pkField.name)}),
+            media_id    UUID REFERENCES ${asName(tableName)}(id)
+          )
+        `
+          console.log(`Creating ${action} ...`, lookupTableName, Object.keys(dbo));
+          await db.any(query);
+          console.log(`Created ${action}`);
         }
     }));
 
+    /**
+     * 4. Serve media through express
+     */
     const { fileUrlPath, expressApp: app } = fileTable;
     if(app){
       app.get(fileUrlPath || `/${tableName}/:id`, async (req, res) => {
         if(!dbo[tableName]){
-          res.status(403).json({ err: "Internal error: media table not valid" });
+          res.status(500).json({ err: "Internal error: media table not valid" });
           return false;
         }
 
-        const mediaTable = dbo[tableName] as TableHandler;
+        const mediaTable = dbo[tableName] as unknown as TableHandler;
 
         try {
 
           const { id } = req.params;
           if(!id) throw "Invalid media id";
-          let filter: AnyObject = { id };
-          if(auth && auth.getUser){
-            const sid = req?.cookies?.sid;
+          // let filter: AnyObject = { id };
+          // if(auth && auth.getUser){
+          //   const sid = req?.cookies?.[auth.sidKeyName];
 
-            /** 
-             * Here we actually need to get the user published dbo and query the media table 
-             * dbo.mediaTable.findOne({ id })
-             * */
-            const user: AnyObject = await auth.getUser({ sid }, dbo, db, { httpReq: req });
-            const user_id = user?.id || "-1";
+          //   /** 
+          //    * get user DBO to validate/auth request
+          //    * */
+          //   const user: AnyObject = await auth.getUser(sid, dbo, db);
+          //   const user_id = user?.id || "-1";
   
-            filter = {
-              $and: [
-                // getMediaForcedFilter(user_id),
-                { id },
-              ]
-            };
+          //   filter = {
+          //     $and: [
+          //       // getMediaForcedFilter(user_id),
+          //       { id },
+          //     ]
+          //   };
 
-          }
+          // }
 
     
-          const media: any = await mediaTable.findOne(filter, { select: { id: 1, name: 1, signed_url: 1, signed_url_expires: 1 } });
+          const media = await mediaTable.findOne({ id }, { select: { id: 1, name: 1, signed_url: 1, signed_url_expires: 1 } }, { httpReq: req });
     
           // console.log(id, media, JSON.stringify(getMediaForcedFilter(user_id)));
           if(!media) throw "Invalid media";

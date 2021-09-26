@@ -124,12 +124,12 @@ const dbConnection = {
 		},
 		// DEBUG_MODE: true,
 		
-		publishRawSQL: async (socket, dbo: DBObj, db: DB, user: USER) => {
+		publishRawSQL: async (params) => {
 			return true;// Boolean(user && user.type === "admin")
 		},
 		auth: {
-			sidQueryParamName: "token",
-			getClientUser: async ({ sid }) => {
+			sidKeyName: "token",
+			getClientUser: async (sid) => {
 				if(sid){
 					const s = sessions.find(s => s.id === sid);
 					if(s){
@@ -139,7 +139,7 @@ const dbConnection = {
 				}
 				return null;
 			},
-			getUser: async ({ sid }) => {
+			getUser: async (sid) => {
 				if(sid){
 					const s = sessions.find(s => s.id === sid);
 					if(s) return users.find(u => s && s.user_id === u.id);
@@ -158,12 +158,12 @@ const dbConnection = {
 				return { sid: s.id, expires: Infinity }
 			}
 		},
-		publishMethods: async (socket, dbo: DBObj, db: DB, user: USER) => {
+		publishMethods: async (params) => {
 			return {
 				get: () => 222
 			}
 		},
-		publish: async (socket, dbo: DBObj, db: DB, user: USER) => {
+		publish: async ({ user }) => {
 			return  {
 				items: "*",
 				items2: "*",
@@ -231,8 +231,7 @@ const dbConnection = {
 				type: "many-many"
 			}
 		],
-		onReady: async (db: DbHandler, _db: DB) => {
-			
+		onReady: async (db, _db) => {
 			app.get('*', function(req, res){
 				log(req.originalUrl)
 				res.sendFile(path.join(__dirname+'/index.html'));

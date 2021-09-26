@@ -184,6 +184,8 @@ async function isomorphic(db) {
             hh: '<b>abc81</b> here',
             added: '1997-12-04T00:00:00.000Z',
             addedY: '1997-12-04T00:10:00.000Z',
+            // added: new Date('1997-12-04T00:00:00.000Z'),
+            // addedY: new Date('1997-12-04T00:10:00.000Z'),
         });
     });
     await tryRun("$term_highlight", async () => {

@@ -10,20 +10,48 @@ declare global { export interface Promise<T> extends Bluebird<T> {} }
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import { 
-    ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams, OrderBy, InsertParams, UpdateParams, DeleteParams,   
+    ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams, OrderBy, InsertParams, UpdateParams, DeleteParams, SQLOptions,
     DbJoinMaker, 
     unpatchText,
     isEmpty,
     asName,
     PG_COLUMN_UDT_DATA_TYPE,
     TS_PG_Types,
+    TableInfo as TInfo,
+    SQLHandler,
 } from "prostgles-types";
 
+export interface TxHandler {
+    [key: string]: TableHandler | ViewHandler;
+}
+export type TxCB = {
+    (t: TxHandler): (any | void);
+}
+export type TX = {
+    (t: TxCB): Promise<(any | void)>;
+}
 export type DbHandler = {
     [key: string]: Partial<TableHandler>;
-  } & DbJoinMaker & {
-    sql?: (query: string, params?: any, options?: any) => Promise<any>;
-  };
+  } & 
+  DbJoinMaker & 
+  {
+    sql?: SQLHandler
+  } & {
+    tx?: TX
+  }
+  
+// <TXKey extends string = "tx"> 
+//   & {
+//     [K in TXKey]: TX
+//   };
+
+// const d: DbHandler = { } as any;
+// d.
+//   export type DbHandlerTX = { [key: string]: TX } | DbHandler;
+//   export type DbHandlerTX = DbHandler
+//    & Partial<{
+//     [key: string]: TX
+//   }>
 
 import { get } from "./utils";
 import { getNewQuery, makeQuery, COMPUTED_FIELDS, SelectItem, FieldSpec, asNameAlias, SelectItemBuilder, FUNCTIONS } from "./QueryBuilder";
@@ -40,7 +68,7 @@ export const pgp: PGP = pgPromise({
     // ,query: function (e) { console.log({psql: e.query, params: e.params}); }
 });
 
-export type TableInfo = {
+export type TableInfo = TInfo & {
     schema: string;
     name: string;
     oid: number;
@@ -57,6 +85,7 @@ export type TableOrViewInfo = TableInfo & ViewInfo & {
 }
 
 export type LocalParams = {
+    httpReq?: any;
     socket?: any;
     func?: () => any;
     has_rules?: boolean;
@@ -334,7 +363,7 @@ export class ViewHandler {
         // if(this.tsDataName === "T") this.tsDataName = this.tsDataName + "_";
         // this.tsDataDef = `export type ${this.tsDataName} = {\n`;
         this.columns.map(({ name, udt_name }) => {
-            this.tsColumnDefs.push(`${escapeTSNames(name, false)}?: ${postgresToTsType(udt_name)};`);
+            this.tsColumnDefs.push(`${escapeTSNames(name, false)}?: ${postgresToTsType(udt_name) as string};`);
         });
         // this.tsDataDef += "};";
         // this.tsDataDef += "\n";
@@ -513,8 +542,8 @@ export class ViewHandler {
             let _lang = lang;
             return this.columns.map(c => {
                 let label = c.comment || c.name;
-                const iConf = this.dboBuilder.prostgles?.i18n?.column_labels?.[this.name]?.[c.name];
-                const fallbackLang = this.dboBuilder.prostgles?.i18n?.fallbackLang;
+                const iConf = this.dboBuilder.prostgles?.opts?.i18n?.column_labels?.[this.name]?.[c.name];
+                const fallbackLang = this.dboBuilder.prostgles?.opts?.i18n?.fallbackLang;
                 _lang = _lang || fallbackLang as string;
                 
                 if((lang || fallbackLang) && iConf){
@@ -680,9 +709,10 @@ export class ViewHandler {
     async find(filter?: Filter, selectParams?: SelectParams , param3_unused = null, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]>{
         try {
             filter = filter || {};
+            const allowedReturnTypes: Array<SelectParams["returnType"]> = ["row", "value", "values"]
             const { returnType } = selectParams || {};
-            if(returnType && !["row", "value", "values"].includes(returnType)){
-                throw `returnType (${returnType}) can only be ${["row", "values"].join(" OR ")}`
+            if(returnType && !allowedReturnTypes.includes(returnType)){
+                throw `returnType (${returnType}) can only be ${allowedReturnTypes.join(" OR ")}`
             }
             
             const { testRule = false, returnQuery = false } = localParams || {};
@@ -985,9 +1015,9 @@ export class ViewHandler {
             tableAlias;
 
         /* Check if allowed to view data */
-        if(localParams && localParams.socket && this.dboBuilder.publishParser){
+        if(localParams && (localParams.socket || localParams.httpReq) && this.dboBuilder.publishParser){
             /* Need to think about joining through dissallowed tables */
-            t2Rules = await this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: t2, command: "find", socket: localParams.socket });
+            t2Rules = await this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: t2, command: "find", localParams });
             if(!t2Rules || !t2Rules.select) throw "Dissallowed";
             ({ forcedFilter, filterFields } = t2Rules.select);
         }
@@ -2116,40 +2146,9 @@ export class TableHandler extends ViewHandler {
     }
 
 }
-type TransactionHandler = {
-    (): Promise<TxHandler>
-}
-export interface TxHandler {
-    [key: string]: TableHandler | ViewHandler;
-}
-export type TxCB = {
-    (t: TxHandler): (any | void);
-}
-export type TX = {
-    (t: TxCB): Promise<(any | void)>;
-}
-// export type JoinMaker = (filter?: object, select?: FieldFilter, options?: SelectParams) => any;
-
-// export type TableJoin = {
-//     [key: string]: JoinMaker;
-// }
-// export type DbJoinMaker = {
-//     innerJoin: TableJoin;
-//     leftJoin: TableJoin;
-//     innerJoinOne: TableJoin;
-//     leftJoinOne: TableJoin;
-// }
-
-// export type DbHandler = {
-//     [key: string]: TableHandler | ViewHandler;
-// } & DbJoinMaker;
-
-export type DbHandlerTX = { [key: string]: TX } | DbHandler;
 
 
 import { JOIN_TYPES } from "./Prostgles";
-import { type } from "os";
-import { join } from "path";
 
 export class DboBuilder {
     tablesOrViews: TableOrViewInfo[];
@@ -2157,7 +2156,8 @@ export class DboBuilder {
     db: DB;
     schema: string = "public";
 
-    dbo: DbHandler | DbHandlerTX;
+    // dbo: DbHandler | DbHandlerTX;
+    dbo: DbHandler;
     pubSubManager: PubSubManager;
 
     pojoDefinitions: string[];
@@ -2177,8 +2177,8 @@ export class DboBuilder {
     private constructor(prostgles: Prostgles){
         this.prostgles = prostgles;
         this.db = this.prostgles.db;
-        this.schema = this.prostgles.schema || "public";
-        this.dbo = { };
+        this.schema = this.prostgles.opts.schema || "public";
+        this.dbo = { } as unknown as DbHandler;
         // this.joins = this.prostgles.joins;
         
     }
@@ -2186,7 +2186,7 @@ export class DboBuilder {
     private init = async () => {
         let onSchemaChange;
         
-        if(this.prostgles.watchSchema){
+        if(this.prostgles.opts.watchSchema){
             onSchemaChange = (event: { command: string; query: string }) => { 
                 this.prostgles.onSchemaChange(event)
             }
@@ -2216,10 +2216,10 @@ export class DboBuilder {
     }
 
     async parseJoins(): Promise<JoinPaths> {
-        if(this.prostgles.joins){
-            let _joins = await this.prostgles.joins;
+        if(this.prostgles.opts.joins){
+            let _joins = await this.prostgles.opts.joins;
             if(typeof _joins === "string" && _joins === "inferred"){
-                _joins = await getInferredJoins(this.db, this.prostgles.schema);
+                _joins = await getInferredJoins(this.db, this.prostgles.opts.schema);
             }
             let joins = JSON.parse(JSON.stringify(_joins)) as Join[];
             this.joins = joins;
@@ -2314,7 +2314,7 @@ export class DboBuilder {
         
     }
 
-    async build(): Promise<DbHandler | DbHandlerTX>{
+    async build(): Promise<DbHandler>{
 
         // await this.pubSubManager.init()
 
@@ -2421,13 +2421,88 @@ export type TxCB = {
         }
 
 
-        if(this.prostgles.transactions){
+        if(this.prostgles.opts.transactions){
             let txKey = "tx";
-            if(typeof this.prostgles.transactions === "string") txKey = this.prostgles.transactions;
+            if(typeof this.prostgles.opts.transactions === "string") txKey = this.prostgles.opts.transactions;
             this.dboDefinition += ` ${txKey}: (t: TxCB) => Promise<any | void> ;\n`;
 
-            this.dbo[txKey] = (cb: TxCB) => this.getTX(cb);
+            (this.dbo[txKey] as TX) = (cb: TxCB) => this.getTX(cb);
         }
+
+        if(!this.dbo.sql){
+
+            let needType = true;// this.publishRawSQL && typeof this.publishRawSQL === "function";
+            let DATA_TYPES = !needType? [] : await this.db.any("SELECT oid, typname FROM pg_type");
+            let USER_TABLES = !needType? [] :  await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
+
+            this.dbo.sql = async (query: string, params: any, options: SQLOptions, localParams?: LocalParams) => {
+                const canRunSQL = async (localParams: LocalParams) => {
+                    if(!localParams) return true;
+
+                    const { socket } = localParams;
+                    const publishParams = await this.prostgles.publishParser.getPublishParams({ socket });
+                    let res = await this.prostgles.opts.publishRawSQL(publishParams);
+                    return Boolean(res && typeof res === "boolean" || res === "*");
+                }
+
+                if(!(await canRunSQL(localParams))) throw "Not allowed to run SQL";
+
+                const { returnType }: SQLOptions = options || ({} as any);
+                const { socket } = localParams || {};
+
+                if(returnType === "noticeSubscription"){
+                    if(!socket) throw "Only allowed with client socket"
+                    return await this.prostgles.dbEventsManager.addNotice(socket);
+                } else if(returnType === "statement"){
+                    try {
+                        return pgp.as.format(query, params);
+                    } catch (err){
+                        throw err.toString();
+                    }
+                } else if(this.db) {
+
+                    let qres = await this.db.result(query, params)
+                    const { duration, fields, rows, command } = qres;
+
+                    if(command === "LISTEN"){
+                        if(!socket) throw "Only allowed with client socket"
+                        return await this.prostgles.dbEventsManager.addNotify(query, socket);
+
+                    } else if(returnType === "rows") {
+                        return rows;
+                        
+                    } else if(returnType === "row") {
+                        return rows[0];
+                        
+                    } else if(returnType === "value") {
+                        return Object.values(rows?.[0] || {})?.[0];
+                        
+                    } else if(returnType === "values") {
+                        return rows.map(r => Object.values(r[0]));
+                        
+                    } else {
+                        if(fields && DATA_TYPES.length){
+                            qres.fields = fields.map(f => {
+                                const dataType = DATA_TYPES.find(dt => +dt.oid === +f.dataTypeID),
+                                    tableName = USER_TABLES.find(t => +t.relid === +f.tableID),
+                                    { name } = f;
+
+                                return {
+                                    ...f,
+                                    ...(dataType? { dataType: dataType.typname } : {}),
+                                    ...(tableName? { tableName: tableName.relname } : {}),
+                                }
+                            });
+                        }
+                        return qres;
+                    }
+
+                } else console.error("db missing");
+            }
+        } else {
+            console.warn(`Could not create dbo.sql handler because there is already a table named "sql"`)
+        }
+
         this.dboDefinition += "};\n";
         
         this.tsTypesDefinition = [

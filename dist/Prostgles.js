@@ -16,8 +16,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.isSuperUser = exports.PublishParser = exports.flat = exports.Prostgles = exports.JOIN_TYPES = void 0;
 const promise = require("bluebird");
 const pgPromise = require("pg-promise");
+const FileManager_1 = require("./FileManager");
 const pkgj = require('../package.json');
 const version = pkgj.version;
+console.log("Add a basic auth mode where user and sessions table are created");
 const utils_1 = require("./utils");
 const DboBuilder_1 = require("./DboBuilder");
 const PubSubManager_1 = require("./PubSubManager");
@@ -54,7 +56,6 @@ function getDbConnection(dbConnection, options, debugQueries = false, onNotice =
         pgp
     };
 }
-const QueryFile = require('pg-promise').QueryFile;
 exports.JOIN_TYPES = ["one-many", "many-one", "one-one", "many-many"];
 const DEFAULT_KEYWORDS = {
     $filter: "$filter",
@@ -65,32 +66,67 @@ const DEFAULT_KEYWORDS = {
 const fs = require('fs');
 class Prostgles {
     constructor(params) {
-        // o: ProstglesInitOptions;
-        this.dbConnection = {
-            host: "localhost",
-            port: 5432,
-            application_name: "prostgles_app"
+        this.opts = {
+            DEBUG_MODE: false,
+            dbConnection: {
+                host: "localhost",
+                port: 5432,
+                application_name: "prostgles_app"
+            },
+            onReady: () => { },
+            schema: "public",
+            watchSchema: false,
         };
-        this.schema = "public";
-        this.wsChannelNamePrefix = "_psqlWS_";
-        this.DEBUG_MODE = false;
-        this.watchSchema = false;
-        this.loaded = false;
+        // publishMethods?: ProstglesInitOptions<DBO>["publishMethods"];
+        // io: any;
+        // publish?: ProstglesInitOptions<DBO>["publish"];
+        // joins?: Joins;
+        // schema: string = "public";
+        // transactions?: string | boolean;
+        // publishRawSQL?: ProstglesInitOptions<DBO>["publishRawSQL"];
+        // wsChannelNamePrefix: string = "_psqlWS_";
+        // onSocketConnect?(socket: Socket | any, dbo: DBO, db?: DB);
+        // onSocketDisconnect?(socket: Socket | any, dbo: DBO, db?: DB);
+        // sqlFilePath?: string;
+        // tsGeneratedTypesDir?: string;
+        // auth?: ProstglesInitOptions["auth"];
+        // DEBUG_MODE?: boolean = false;
+        // watchSchema?: ProstglesInitOptions["watchSchema"];// boolean | "hotReloadMode" | ((event: { command: string; query: string }) => void) = false;
+        // onReady: (dbo: any, db: DB) => void;
+        // i18n?: ProstglesInitOptions["i18n"];
+        // fileTable?: FileTableConfig;
+        // /**
+        //  * Postgres on notice callback
+        //  */
+        // onNotice?: ProstglesInitOptions["onNotice"];
         this.keywords = DEFAULT_KEYWORDS;
+        this.loaded = false;
         this.destroyed = false;
+        // async getUserFromCookieSession(localParams: LocalParams): Promise<null | { user: any, clientUser: any }>{
+        //     // console.log("conn", socket.handshake.query, socket._session)
+        //     const sid = this.getSID(localParams);
+        //     const { getUser, getClientUser } = this.auth;
+        //     const user = await getUser(sid, this.dbo, this.db);
+        //     const clientUser = await getClientUser(sid, this.dbo, this.db);
+        //     if(!user) return undefined;
+        //     return { user, clientUser };
+        // }
         this.connectedSockets = [];
         this.pushSocketSchema = (socket) => __awaiter(this, void 0, void 0, function* () {
             let auth = {};
-            if (this.auth) {
-                const { register, login, logout, sidQueryParamName } = this.auth;
-                if (sidQueryParamName === "sid")
+            if (this.opts.auth) {
+                const { register, login, logout, sidKeyName } = this.opts.auth;
+                /**
+                 * Why ??? Collision with socket.io ???
+                 */
+                if (sidKeyName === "sid")
                     throw "sidQueryParamName cannot be 'sid' please provide another name.";
                 let handlers = [
                     { func: register, ch: prostgles_types_1.CHANNELS.REGISTER, name: "register" },
                     { func: login, ch: prostgles_types_1.CHANNELS.LOGIN, name: "login" },
                     { func: logout, ch: prostgles_types_1.CHANNELS.LOGOUT, name: "logout" }
                 ].filter(h => h.func);
-                const usrData = yield this.getUserFromCookieSession(socket);
+                const usrData = yield this.getClientInfo({ socket });
                 if (usrData) {
                     auth.user = usrData.clientUser;
                     handlers = handlers.filter(h => h.name === "logout");
@@ -102,7 +138,7 @@ class Prostgles {
                         try {
                             if (!socket)
                                 throw "socket missing??!!";
-                            const res = yield func(params, dbo, db, socket);
+                            const res = yield func(params, dbo, db);
                             if (name === "login" && res && res.sid) {
                                 /* TODO: Re-send schema to client */
                             }
@@ -115,9 +151,9 @@ class Prostgles {
                     }));
                 });
             }
-            let needType = this.publishRawSQL && typeof this.publishRawSQL === "function";
-            let DATA_TYPES = !needType ? [] : yield this.db.any("SELECT oid, typname FROM pg_type");
-            let USER_TABLES = !needType ? [] : yield this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
+            // let needType = this.publishRawSQL && typeof this.publishRawSQL === "function";
+            // let DATA_TYPES = !needType? [] : await this.db.any("SELECT oid, typname FROM pg_type");
+            // let USER_TABLES = !needType? [] :  await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
             let schema = {};
             let publishValidationError;
             let rawSQL = false;
@@ -136,60 +172,72 @@ class Prostgles {
             */
             let fullSchema = [];
             let allTablesViews = this.dboBuilder.tablesOrViews;
-            if (this.publishRawSQL && typeof this.publishRawSQL === "function") {
+            if (this.opts.publishRawSQL && typeof this.opts.publishRawSQL === "function") {
                 const canRunSQL = () => __awaiter(this, void 0, void 0, function* () {
-                    let res = yield this.publishRawSQL(socket, dbo, db, yield this.getUser(socket));
+                    const publishParams = yield this.publishParser.getPublishParams({ socket });
+                    let res = yield this.opts.publishRawSQL(publishParams);
                     return Boolean(res && typeof res === "boolean" || res === "*");
                 });
                 // console.log("canRunSQL", canRunSQL, socket.handshake.headers["x-real-ip"]);//, allTablesViews);
                 if (yield canRunSQL()) {
                     socket.removeAllListeners(prostgles_types_1.CHANNELS.SQL);
                     socket.on(prostgles_types_1.CHANNELS.SQL, ({ query, params, options }, cb = (...callback) => { }) => __awaiter(this, void 0, void 0, function* () {
-                        if (!(yield canRunSQL())) {
-                            cb("Dissallowed", null);
-                            return;
-                        }
-                        const { returnType } = options || {};
-                        if (returnType === "noticeSubscription") {
-                            const sub = yield this.dbEventsManager.addNotice(socket);
-                            cb(null, sub);
-                        }
-                        else if (returnType === "statement") {
-                            try {
-                                cb(null, pgp.as.format(query, params));
-                            }
-                            catch (err) {
-                                cb(err.toString());
-                            }
-                        }
-                        else if (db) {
-                            db.result(query, params)
-                                .then((qres) => __awaiter(this, void 0, void 0, function* () {
-                                const { duration, fields, rows, command } = qres;
-                                if (command === "LISTEN") {
-                                    const sub = yield this.dbEventsManager.addNotify(query, socket);
-                                    cb(null, sub);
-                                }
-                                else if (returnType === "rows") {
-                                    cb(null, rows);
-                                }
-                                else {
-                                    if (fields && DATA_TYPES.length) {
-                                        qres.fields = fields.map(f => {
-                                            const dataType = DATA_TYPES.find(dt => +dt.oid === +f.dataTypeID), tableName = USER_TABLES.find(t => +t.relid === +f.tableID), { name } = f;
-                                            return Object.assign(Object.assign(Object.assign({}, f), (dataType ? { dataType: dataType.typname } : {})), (tableName ? { tableName: tableName.relname } : {}));
-                                        });
-                                    }
-                                    cb(null, qres);
-                                }
-                            }))
-                                .catch(err => {
-                                makeSocketError(cb, err);
-                                // Promise.reject(err.toString());
-                            });
-                        }
-                        else
-                            console.error("db missing");
+                        if (!this.dbo.sql)
+                            throw "Internal error: sql handler missing";
+                        this.dbo.sql(query, params, options, { socket }).then(res => {
+                            cb(null, res);
+                        }).catch(err => {
+                            makeSocketError(cb, err);
+                        });
+                        // if(!(await canRunSQL())) {
+                        //     cb("Dissallowed", null);
+                        //     return;
+                        // }
+                        // const { returnType }: SQLOptions = options || ({} as any);
+                        // if(returnType === "noticeSubscription"){
+                        //     const sub = await this.dbEventsManager.addNotice(socket);
+                        //     cb(null, sub);
+                        // } else if(returnType === "statement"){
+                        //     try {
+                        //         cb(null, pgp.as.format(query, params));
+                        //     } catch (err){
+                        //         cb(err.toString());
+                        //     }
+                        // } else if(db) {
+                        //     db.result(query, params)
+                        //         .then(async (qres: any) => {
+                        //             const { duration, fields, rows, command } = qres;
+                        //             if(command === "LISTEN"){
+                        //                 const sub = await this.dbEventsManager.addNotify(query, socket);
+                        //                 cb(null, sub);
+                        //             } else if(returnType === "rows") {
+                        //                 cb(null, rows);
+                        //             } else if(returnType === "row") {
+                        //                 cb(null, rows[0]);
+                        //             } else if(returnType === "value") {
+                        //                 cb(null, Object.values(rows[0])[0]);
+                        //             } else if(returnType === "values") {
+                        //                 cb(null, rows.map(r => Object.values(r[0])));
+                        //             } else {
+                        //                 if(fields && DATA_TYPES.length){
+                        //                     qres.fields = fields.map(f => {
+                        //                         const dataType = DATA_TYPES.find(dt => +dt.oid === +f.dataTypeID),
+                        //                             tableName = USER_TABLES.find(t => +t.relid === +f.tableID);
+                        //                         return {
+                        //                             ...f,
+                        //                             ...(dataType? { dataType: dataType.typname } : {}),
+                        //                             ...(tableName? { tableName: tableName.relname } : {}),
+                        //                         }
+                        //                     });
+                        //                 }
+                        //                 cb(null, qres)
+                        //             }
+                        //         })
+                        //         .catch(err => { 
+                        //             makeSocketError(cb, err);
+                        //             // Promise.reject(err.toString());
+                        //         });
+                        // } else console.error("db missing");
                     }));
                     if (db) {
                         // let allTablesViews = await db.any(STEP2_GET_ALL_TABLES_AND_COLUMNS);
@@ -202,7 +250,7 @@ class Prostgles {
             }
             // let joinTables = [];
             let joinTables2 = [];
-            if (this.joins) {
+            if (this.opts.joins) {
                 // joinTables = Array.from(new Set(flat(this.dboBuilder.getJoins().map(j => j.tables)).filter(t => schema[t])));
                 let _joinTables2 = this.dboBuilder.getJoinPaths()
                     .filter(jp => ![jp.t1, jp.t2].find(t => !schema[t] || !schema[t].findOne)).map(jp => [jp.t1, jp.t2].sort());
@@ -226,35 +274,36 @@ class Prostgles {
             "onReady", "dbConnection", "dbOptions", "publishMethods", "io",
             "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect",
             "onSocketDisconnect", "sqlFilePath", "auth", "DEBUG_MODE", "watchSchema",
-            "i18n"
+            "i18n", "fileTable"
         ];
         const unknownParams = Object.keys(params).filter((key) => !config.includes(key));
         if (unknownParams.length) {
             console.error(`Unrecognised ProstglesInitOptions params: ${unknownParams.join()}`);
         }
-        Object.assign(this, params);
+        Object.assign(this.opts, params);
         this.keywords = Object.assign(Object.assign({}, DEFAULT_KEYWORDS), params.keywords);
     }
     onSchemaChange(event) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (this.watchSchema && this.loaded) {
+            const { watchSchema, onReady, tsGeneratedTypesDir } = this.opts;
+            if (watchSchema && this.loaded) {
                 console.log("Schema changed");
-                if (typeof this.watchSchema === "function") {
+                if (typeof watchSchema === "function") {
                     /* Only call the provided func */
-                    this.watchSchema(event);
+                    watchSchema(event);
                 }
-                else if (this.watchSchema === "hotReloadMode") {
-                    if (this.tsGeneratedTypesDir) {
+                else if (watchSchema === "hotReloadMode") {
+                    if (tsGeneratedTypesDir) {
                         /* Hot reload integration. Will only touch tsGeneratedTypesDir */
                         console.log("watchSchema: Re-writing TS schema");
                         yield this.refreshDBO();
                         this.writeDBSchema(true);
                     }
                 }
-                else if (this.watchSchema === true) {
+                else if (watchSchema === true) {
                     /* Full re-init. Sockets must reconnect */
                     console.log("watchSchema: Full re-initialisation");
-                    this.init(this.onReady);
+                    this.init(onReady);
                 }
             }
         });
@@ -265,7 +314,7 @@ class Prostgles {
     }
     getTSFileName() {
         const fileName = "DBoGenerated.d.ts"; //`dbo_${this.schema}_types.ts`;
-        const fullPath = (this.tsGeneratedTypesDir || "") + fileName;
+        const fullPath = (this.opts.tsGeneratedTypesDir || "") + fileName;
         return { fileName, fullPath };
     }
     getFileText(fullPath, format = "utf8") {
@@ -279,7 +328,7 @@ class Prostgles {
         });
     }
     writeDBSchema(force = false) {
-        if (this.tsGeneratedTypesDir) {
+        if (this.opts.tsGeneratedTypesDir) {
             const { fullPath, fileName } = this.getTSFileName();
             const header = `/* This file was generated by Prostgles \n` +
                 // `* ${(new Date).toUTCString()} \n` 
@@ -298,21 +347,21 @@ class Prostgles {
     }
     refreshDBO() {
         return __awaiter(this, void 0, void 0, function* () {
-            this.dboBuilder = yield DboBuilder_1.DboBuilder.create(this);
+            this.dboBuilder = (yield DboBuilder_1.DboBuilder.create(this));
             this.dbo = this.dboBuilder.dbo;
         });
     }
     init(onReady) {
         return __awaiter(this, void 0, void 0, function* () {
             this.loaded = false;
-            if (this.watchSchema === "hotReloadMode" && !this.tsGeneratedTypesDir) {
+            if (this.opts.watchSchema === "hotReloadMode" && !this.opts.tsGeneratedTypesDir) {
                 throw "tsGeneratedTypesDir option is needed for watchSchema: hotReloadMode to work ";
             }
             /* 1. Connect to db */
             if (!this.db) {
-                const { db, pgp } = getDbConnection(this.dbConnection, this.dbOptions, this.DEBUG_MODE, notice => {
-                    if (this.onNotice)
-                        this.onNotice(notice);
+                const { db, pgp } = getDbConnection(this.opts.dbConnection, this.opts.dbOptions, this.opts.DEBUG_MODE, notice => {
+                    if (this.opts.onNotice)
+                        this.opts.onNotice(notice);
                     if (this.dbEventsManager) {
                         this.dbEventsManager.onNotice(notice);
                     }
@@ -323,34 +372,40 @@ class Prostgles {
             this.checkDb();
             const { db, pgp } = this;
             /* 2. Execute any SQL file if provided */
-            if (this.sqlFilePath) {
-                yield this.runSQLFile(this.sqlFilePath);
+            if (this.opts.sqlFilePath) {
+                yield this.runSQLFile(this.opts.sqlFilePath);
             }
             try {
                 /* 3. Make DBO object from all tables and views */
                 yield this.refreshDBO();
                 this.writeDBSchema();
-                if (this.publish) {
+                if (this.opts.publish) {
                     /* 3.9 Check auth config */
-                    if (this.auth) {
-                        const { sidCookieName, login, getUser, getClientUser } = this.auth;
-                        if (typeof sidCookieName !== "string" && !login) {
-                            throw "Invalid auth: Provide { sidCookieName: string } OR  { login: Function } ";
+                    if (this.opts.auth) {
+                        this.opts.auth.sidKeyName = this.opts.auth.sidKeyName || "session_id";
+                        const { sidKeyName, login, getUser, getClientUser } = this.opts.auth;
+                        if (typeof sidKeyName !== "string" && !login) {
+                            throw "Invalid auth: Provide { sidKeyName: string } ";
                         }
                         if (!getUser || !getClientUser)
                             throw "getUser OR getClientUser missing from auth config";
                     }
-                    this.publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo, this.db, this);
+                    this.publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods, this.opts.publishRawSQL, this.dbo, this.db, this);
                     this.dboBuilder.publishParser = this.publishParser;
                     /* 4. Set publish and auth listeners */ //makeDBO(db, allTablesViews, pubSubManager, false)
                     yield this.setSocketEvents();
                 }
-                else if (this.auth)
+                else if (this.opts.auth)
                     throw "Auth config does not work without publish";
                 // if(this.watchSchema){
                 //     if(!(await isSuperUser(db))) throw "Cannot watchSchema without a super user schema. Set watchSchema=false or provide a super user";
                 // }
                 this.dbEventsManager = new DBEventsManager_1.DBEventsManager(db, pgp);
+                /* 4.1 Create media table if required */
+                if (this.opts.fileTable) {
+                    this.fileManager = new FileManager_1.default(this.opts.fileTable.awsS3Config);
+                    yield this.fileManager.init(this);
+                }
                 /* 5. Finish init and provide DBO object */
                 try {
                     if (this.destroyed) {
@@ -366,16 +421,16 @@ class Prostgles {
                     db: this.dbo,
                     _db: db,
                     pgp,
-                    io: this.io,
+                    io: this.opts.io,
                     destroy: () => __awaiter(this, void 0, void 0, function* () {
                         console.log("destroying prgl instance");
                         this.destroyed = true;
-                        if (this.io) {
-                            this.io.on("connection", (socket) => {
+                        if (this.opts.io) {
+                            this.opts.io.on("connection", (socket) => {
                                 console.log("Socket connected to destroyed instance");
                             });
-                            if (typeof this.io.close === "function") {
-                                this.io.close();
+                            if (typeof this.opts.io.close === "function") {
+                                this.opts.io.close();
                                 console.log("this.io.close");
                             }
                         }
@@ -416,27 +471,32 @@ class Prostgles {
             });
         });
     }
-    getSID(socket) {
-        if (!this.auth)
+    /**
+     * Will return first sid value found in : http cookie or query params
+     * Based on sid names in auth
+     * @param localParams
+     * @returns string
+     */
+    getSID(localParams) {
+        var _a, _b, _c, _d, _e;
+        if (!this.opts.auth)
             return null;
-        const { sidCookieName, sidQueryParamName } = this.auth;
-        if (!sidCookieName && !sidQueryParamName)
+        const { sidKeyName } = this.opts.auth;
+        if (!sidKeyName || !localParams)
             return null;
-        let result = {
-            sidCookie: null,
-            sidQuery: null,
-            sid: null
-        };
-        if (sidQueryParamName) {
-            result.sidQuery = utils_1.get(socket, `handshake.query.${sidQueryParamName}`);
-        }
-        if (sidCookieName) {
-            const cookie_str = utils_1.get(socket, "handshake.headers.cookie");
-            const cookie = parseCookieStr(cookie_str);
-            if (socket && cookie) {
-                result.sidCookie = cookie[sidCookieName];
+        if (localParams.socket) {
+            const querySid = (_c = (_b = (_a = localParams.socket) === null || _a === void 0 ? void 0 : _a.handshake) === null || _b === void 0 ? void 0 : _b.query) === null || _c === void 0 ? void 0 : _c[sidKeyName];
+            if (!querySid) {
+                const cookie_str = utils_1.get(localParams.socket, "handshake.headers.cookie");
+                const cookie = parseCookieStr(cookie_str);
+                return cookie[sidKeyName];
             }
         }
+        else if (localParams.httpReq) {
+            return (_e = (_d = localParams.httpReq) === null || _d === void 0 ? void 0 : _d.cookies) === null || _e === void 0 ? void 0 : _e[sidKeyName];
+        }
+        else
+            throw "socket OR httpReq missing from localParams";
         function parseCookieStr(cookie_str) {
             if (!cookie_str || typeof cookie_str !== "string")
                 return {};
@@ -446,31 +506,21 @@ class Prostgles {
                 return prev;
             }, {});
         }
-        result.sid = result.sidQuery || result.sidCookie;
-        return result;
     }
-    getUser(socket) {
+    getClientInfo(localParams) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (this.auth) {
-                const { getUser } = this.auth;
+            if (this.opts.auth) {
+                const { getUser, getClientUser } = this.opts.auth;
                 if (getUser) {
-                    const params = this.getSID(socket);
-                    return yield getUser(params, this.dbo, this.db, socket);
+                    const sid = this.getSID(localParams);
+                    return {
+                        sid,
+                        user: yield getUser(sid, this.dbo, this.db),
+                        clientUser: yield getClientUser(sid, this.dbo, this.db)
+                    };
                 }
             }
-            return null;
-        });
-    }
-    getUserFromCookieSession(socket) {
-        return __awaiter(this, void 0, void 0, function* () {
-            // console.log("conn", socket.handshake.query, socket._session)
-            const params = this.getSID(socket);
-            const { getUser, getClientUser } = this.auth;
-            const user = yield getUser(params, this.dbo, this.db, socket);
-            const clientUser = yield getClientUser(params, this.dbo, this.db, socket);
-            if (!user)
-                return undefined;
-            return { user, clientUser };
+            return {};
         });
     }
     setSocketEvents() {
@@ -478,9 +528,9 @@ class Prostgles {
             this.checkDb();
             if (!this.dbo)
                 throw "dbo missing";
-            let publishParser = new PublishParser(this.publish, this.publishMethods, this.publishRawSQL, this.dbo, this.db, this);
+            let publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods, this.opts.publishRawSQL, this.dbo, this.db, this);
             this.publishParser = publishParser;
-            if (!this.io)
+            if (!this.opts.io)
                 return;
             /* Already initialised. Only reconnect sockets */
             if (this.connectedSockets.length) {
@@ -491,7 +541,7 @@ class Prostgles {
                 return;
             }
             /* Initialise */
-            this.io.on('connection', (socket) => __awaiter(this, void 0, void 0, function* () {
+            this.opts.io.on('connection', (socket) => __awaiter(this, void 0, void 0, function* () {
                 if (this.destroyed) {
                     console.log("Socket connected to destroyed instance");
                     socket.disconnect();
@@ -502,8 +552,8 @@ class Prostgles {
                     throw "db/dbo missing";
                 let { dbo, db, pgp } = this;
                 try {
-                    if (this.onSocketConnect)
-                        yield this.onSocketConnect(socket, dbo, db);
+                    if (this.opts.onSocketConnect)
+                        yield this.opts.onSocketConnect(socket, dbo, db);
                     /*  RUN Client request from Publish.
                         Checks request against publish and if OK run it with relevant publish functions. Local (server) requests do not check the policy
                     */
@@ -514,8 +564,8 @@ class Prostgles {
                                 console.error("socket missing??!!");
                                 throw "socket missing??!!";
                             }
-                            const user = yield this.getUser(socket);
-                            let valid_table_command_rules = yield this.publishParser.getValidatedRequestRule({ tableName, command, socket }, user);
+                            const clientInfo = yield this.getClientInfo({ socket });
+                            let valid_table_command_rules = yield this.publishParser.getValidatedRequestRule({ tableName, command, localParams: { socket } }, clientInfo);
                             if (valid_table_command_rules) {
                                 let res = yield this.dbo[tableName][command](param1, param2, param3, valid_table_command_rules, { socket, has_rules: true });
                                 cb(null, res);
@@ -536,8 +586,8 @@ class Prostgles {
                         this.dbEventsManager.removeNotify(socket);
                         this.connectedSockets = this.connectedSockets.filter(s => s.id !== socket.id);
                         // subscriptions = subscriptions.filter(sub => sub.socket.id !== socket.id);
-                        if (this.onSocketDisconnect) {
-                            this.onSocketDisconnect(socket, dbo);
+                        if (this.opts.onSocketDisconnect) {
+                            this.opts.onSocketDisconnect(socket, dbo);
                         }
                         ;
                     });
@@ -651,11 +701,16 @@ class PublishParser {
         if (!this.dbo || !this.publish)
             throw "INTERNAL ERROR: dbo and/or publish missing";
     }
+    getPublishParams(localParams, clientInfo) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return Object.assign(Object.assign({}, (clientInfo || (yield this.prostgles.getClientInfo(localParams)))), { dbo: this.dbo, db: this.db });
+        });
+    }
     getMethods(socket) {
         return __awaiter(this, void 0, void 0, function* () {
             let methods = {};
-            const user = yield this.prostgles.getUser(socket);
-            const _methods = yield applyParamsIfFunc(this.publishMethods, socket, this.dbo, this.db, user);
+            const publishParams = yield this.getPublishParams({ socket });
+            const _methods = yield applyParamsIfFunc(this.publishMethods, publishParams);
             if (_methods && Object.keys(_methods).length) {
                 Object.keys(_methods).map(key => {
                     if (_methods[key] && (typeof _methods[key] === "function" || typeof _methods[key].then === "function")) {
@@ -674,9 +729,10 @@ class PublishParser {
      * @param socket
      * @param user
      */
-    getPublish(socket, user) {
+    getPublish(localParams, clientInfo) {
         return __awaiter(this, void 0, void 0, function* () {
-            let _publish = yield applyParamsIfFunc(this.publish, socket, this.dbo, this.db, user);
+            const publishParams = yield this.getPublishParams(localParams, clientInfo);
+            let _publish = yield applyParamsIfFunc(this.publish, publishParams);
             if (_publish === "*") {
                 let publish = {};
                 this.prostgles.dboBuilder.tablesOrViews.map(tov => {
@@ -687,13 +743,14 @@ class PublishParser {
             return _publish;
         });
     }
-    getValidatedRequestRuleWusr({ tableName, command, socket }) {
+    getValidatedRequestRuleWusr({ tableName, command, localParams }) {
         return __awaiter(this, void 0, void 0, function* () {
-            const user = yield this.prostgles.getUser(socket);
-            return yield this.getValidatedRequestRule({ tableName, command, socket }, user);
+            const clientInfo = yield this.prostgles.getClientInfo(localParams);
+            return yield this.getValidatedRequestRule({ tableName, command, localParams }, clientInfo);
         });
     }
-    getValidatedRequestRule({ tableName, command, socket }, user) {
+    getValidatedRequestRule({ tableName, command, localParams }, clientInfo) {
+        var _a, _b, _c, _d;
         return __awaiter(this, void 0, void 0, function* () {
             if (!this.dbo)
                 throw "INTERNAL ERROR: dbo is missing";
@@ -704,17 +761,17 @@ class PublishParser {
                 throw "Invalid command: " + command;
             }
             /* Must be local request -> allow everything */
-            if (!socket)
+            if (!localParams)
                 return undefined;
             /* Must be from socket. Must have a publish */
             if (!this.publish)
                 throw "publish is missing";
             /* Get any publish errors for socket */
-            const schm = utils_1.get(socket, `prostgles.schema.${tableName}.${command}`);
+            const schm = (_d = (_c = (_b = (_a = localParams === null || localParams === void 0 ? void 0 : localParams.socket) === null || _a === void 0 ? void 0 : _a.prostgles) === null || _b === void 0 ? void 0 : _b.schema) === null || _c === void 0 ? void 0 : _c[tableName]) === null || _d === void 0 ? void 0 : _d[command];
             // console.log(schm, get(socket, `prostgles.schema`));
             if (schm && schm.err)
                 throw schm.err;
-            let table_rule = yield this.getTableRules({ tableName, socket }, user);
+            let table_rule = yield this.getTableRules({ tableName, localParams }, clientInfo);
             if (!table_rule)
                 throw "Invalid or disallowed table: " + tableName;
             if (command === "upsert") {
@@ -729,13 +786,13 @@ class PublishParser {
                 throw `Invalid or disallowed command: ${command}`;
         });
     }
-    getTableRules({ tableName, socket }, user) {
+    getTableRules({ tableName, localParams }, clientInfo) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                if (!socket || !tableName)
+                if (!localParams || !tableName)
                     throw "publish OR socket OR dbo OR tableName are missing";
-                let _publish = yield this.getPublish(socket, user);
-                let table_rules = applyParamsIfFunc(_publish[tableName], socket, this.dbo, this.db, user);
+                let _publish = yield this.getPublish(localParams, clientInfo);
+                let table_rules = _publish[tableName]; // applyParamsIfFunc(_publish[tableName],  localParams, this.dbo, this.db, user);
                 /* Get view or table specific rules */
                 const is_view = this.dbo[tableName].is_view, MY_RULES = RULE_TO_METHODS.filter(r => !is_view || !r.table_only);
                 // if(tableName === "various") console.warn(1033, MY_RULES)
@@ -756,9 +813,10 @@ class PublishParser {
                         if (table_rules[r.rule]) {
                             r.methods.map(method => {
                                 if (table_rules[method] === undefined) {
-                                    if (method === "updateBatch" && !table_rules.update) {
+                                    const publishedTable = table_rules;
+                                    if (method === "updateBatch" && !publishedTable.update) {
                                     }
-                                    else if (method === "upsert" && (!table_rules.update || !table_rules.insert)) {
+                                    else if (method === "upsert" && (!publishedTable.update || !publishedTable.insert)) {
                                         // return;
                                     }
                                     else {
@@ -826,14 +884,14 @@ class PublishParser {
             let schema = {};
             try {
                 /* Publish tables and views based on socket */
-                const user = yield this.prostgles.getUser(socket);
-                let _publish = yield this.getPublish(socket, user);
+                const clientInfo = yield this.prostgles.getClientInfo({ socket });
+                let _publish = yield this.getPublish(socket, clientInfo);
                 if (_publish && Object.keys(_publish).length) {
                     let txKey = "tx";
-                    if (!this.prostgles.transactions)
+                    if (!this.prostgles.opts.transactions)
                         txKey = "";
-                    if (typeof this.prostgles.transactions === "string")
-                        txKey = this.prostgles.transactions;
+                    if (typeof this.prostgles.opts.transactions === "string")
+                        txKey = this.prostgles.opts.transactions;
                     const tableNames = Object.keys(_publish).filter(k => !txKey || txKey !== k);
                     yield Promise.all(tableNames
                         .map((tableName) => __awaiter(this, void 0, void 0, function* () {
@@ -843,7 +901,7 @@ class PublishParser {
                             DBO tables: ${Object.keys(this.dbo).filter(k => this.dbo[k].find).join(", ")}
                             `;
                         }
-                        const table_rules = yield this.getTableRules({ socket, tableName }, user);
+                        const table_rules = yield this.getTableRules({ localParams: { socket }, tableName }, clientInfo);
                         if (table_rules && Object.keys(table_rules).length) {
                             schema[tableName] = {};
                             let methods = [];
@@ -861,7 +919,7 @@ class PublishParser {
                                     if (["update", "find", "findOne", "insert", "delete", "upsert"].includes(method)) {
                                         let err = null;
                                         try {
-                                            let valid_table_command_rules = yield this.getValidatedRequestRule({ tableName, command: method, socket }, user);
+                                            let valid_table_command_rules = yield this.getValidatedRequestRule({ tableName, command: method, localParams: { socket } }, clientInfo);
                                             yield this.dbo[tableName][method]({}, {}, {}, valid_table_command_rules, { socket, has_rules: true, testRule: true });
                                         }
                                         catch (e) {

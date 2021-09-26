@@ -697,7 +697,7 @@ class PubSubManager {
             // SELECT * FROM pg_catalog.pg_event_trigger WHERE evtname
             if (!this.appID)
                 throw "prepareTriggers failed: this.appID missing";
-            if (this.dboBuilder.prostgles.watchSchema && !(yield Prostgles_1.isSuperUser(this.db))) {
+            if (this.dboBuilder.prostgles.opts.watchSchema && !(yield Prostgles_1.isSuperUser(this.db))) {
                 console.warn("prostgles watchSchema requires superuser db user. Will not watch");
             }
             try {

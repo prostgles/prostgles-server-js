@@ -12,7 +12,7 @@ const log = (msg, extra) => {
     console.log(...[`(client) t+ ${(Date.now() - start)}ms ` + msg, extra].filter(v => v));
 };
 log("Started client...");
-const url = process.env.PRGL_CLIENT_URL || "http://127.0.0.1:3001", path = process.env.PRGL_CLIENT_PATH || "/teztz/s", socket = socket_io_client_1.default(url, { path, query: { token: "haha" } }), //  
+const url = process.env.PRGL_CLIENT_URL || "http://127.0.0.1:3001", path = process.env.PRGL_CLIENT_PATH || "/teztz/s", socket = (0, socket_io_client_1.default)(url, { path, query: { token: "haha" } }), //  
 stopTest = (err) => {
     socket.emit("stop-test", !err ? err : { err: err.toString() }, cb => {
         log("Stopping client...");
@@ -36,7 +36,7 @@ try {
     });
     socket.on("start-test", (data) => {
         log("start-test", data);
-        prostgles_client_1.default({
+        (0, prostgles_client_1.default)({
             socket,
             onReconnect: (socket) => {
                 log("Reconnected");
@@ -45,9 +45,9 @@ try {
                 log("onReady.auth", auth);
                 try {
                     log("Starting Client isomorphic tests");
-                    await isomorphic_queries_1.default(db);
+                    await (0, isomorphic_queries_1.default)(db);
                     log("Client isomorphic tests successful");
-                    await client_only_queries_1.default(db, auth, log, methods);
+                    await (0, client_only_queries_1.default)(db, auth, log, methods);
                     log("Client-only replication tests successful");
                     stopTest();
                 }

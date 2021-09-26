@@ -1,5 +1,5 @@
 import { Prostgles, ProstglesInitOptions } from "./Prostgles";
-import { TableHandler, ViewHandler } from "./DboBuilder";
+import { DbHandler, TableHandler, ViewHandler } from "./DboBuilder";
 
 function prostgles(params: ProstglesInitOptions){
 

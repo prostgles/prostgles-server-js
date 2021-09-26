@@ -5,18 +5,29 @@ declare global {
 }
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams, OrderBy, InsertParams, UpdateParams, DeleteParams, DbJoinMaker } from "prostgles-types";
+import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams, OrderBy, InsertParams, UpdateParams, DeleteParams, DbJoinMaker, TableInfo as TInfo, SQLHandler } from "prostgles-types";
+export interface TxHandler {
+    [key: string]: TableHandler | ViewHandler;
+}
+export declare type TxCB = {
+    (t: TxHandler): (any | void);
+};
+export declare type TX = {
+    (t: TxCB): Promise<(any | void)>;
+};
 export declare type DbHandler = {
     [key: string]: Partial<TableHandler>;
 } & DbJoinMaker & {
-    sql?: (query: string, params?: any, options?: any) => Promise<any>;
+    sql?: SQLHandler;
+} & {
+    tx?: TX;
 };
 import { SelectItem, FieldSpec } from "./QueryBuilder";
 import { DB, TableRule, Join, Prostgles, PublishParser } from "./Prostgles";
 import { PubSubManager } from "./PubSubManager";
 declare type PGP = pgPromise.IMain<{}, pg.IClient>;
 export declare const pgp: PGP;
-export declare type TableInfo = {
+export declare type TableInfo = TInfo & {
     schema: string;
     name: string;
     oid: number;
@@ -30,6 +41,7 @@ export declare type TableOrViewInfo = TableInfo & ViewInfo & {
     is_view: boolean;
 };
 export declare type LocalParams = {
+    httpReq?: any;
     socket?: any;
     func?: () => any;
     has_rules?: boolean;
@@ -254,23 +266,11 @@ export declare class TableHandler extends ViewHandler {
         synced_field: string;
     }>;
 }
-export interface TxHandler {
-    [key: string]: TableHandler | ViewHandler;
-}
-export declare type TxCB = {
-    (t: TxHandler): (any | void);
-};
-export declare type TX = {
-    (t: TxCB): Promise<(any | void)>;
-};
-export declare type DbHandlerTX = {
-    [key: string]: TX;
-} | DbHandler;
 export declare class DboBuilder {
     tablesOrViews: TableOrViewInfo[];
     db: DB;
     schema: string;
-    dbo: DbHandler | DbHandlerTX;
+    dbo: DbHandler;
     pubSubManager: PubSubManager;
     pojoDefinitions: string[];
     dboDefinition: string;
@@ -291,7 +291,7 @@ export declare class DboBuilder {
     getJoinPaths(): JoinPaths;
     parseJoins(): Promise<JoinPaths>;
     buildJoinPaths(): void;
-    build(): Promise<DbHandler | DbHandlerTX>;
+    build(): Promise<DbHandler>;
     getTX: (dbTX: TxCB) => Promise<any>;
 }
 export declare function isPlainObject(o: any): boolean;

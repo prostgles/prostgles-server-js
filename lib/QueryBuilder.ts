@@ -830,7 +830,7 @@ export async function getNewQuery(
   localParams?: LocalParams
 ): Promise<NewQuery> {
 
-  if(get(localParams, "socket") && !get(tableRules, "select.fields")){
+  if((localParams?.socket || localParams?.httpReq) && !get(tableRules, "select.fields")){
     throw `INTERNAL ERROR: publish.${_this.name}.select.fields rule missing`;
   }
 
@@ -915,9 +915,9 @@ export async function getNewQuery(
     }
 
     let isLocal = true;
-    if(localParams && localParams.socket){
+    if(localParams && (localParams.socket || localParams.httpReq)){
       isLocal = false;
-      j_tableRules = await _this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: j_table, command: "find", socket: localParams.socket });
+      j_tableRules = await _this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: j_table, command: "find", localParams });
     }
     
     if(isLocal || j_tableRules){

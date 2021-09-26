@@ -1,6 +1,7 @@
 import { ProstglesInitOptions } from "./Prostgles";
+import { DbHandler } from "./DboBuilder";
 declare function prostgles(params: ProstglesInitOptions): Promise<{
-    db: import("./DboBuilder").DbHandlerTX;
+    db: DbHandler;
     _db: import("./Prostgles").DB;
     pgp: import("./Prostgles").PGP;
     io?: any;

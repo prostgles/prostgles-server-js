@@ -702,7 +702,7 @@ class SelectItemBuilder {
 exports.SelectItemBuilder = SelectItemBuilder;
 function getNewQuery(_this, filter, selectParams, param3_unused = null, tableRules, localParams) {
     return __awaiter(this, void 0, void 0, function* () {
-        if (utils_1.get(localParams, "socket") && !utils_1.get(tableRules, "select.fields")) {
+        if (((localParams === null || localParams === void 0 ? void 0 : localParams.socket) || (localParams === null || localParams === void 0 ? void 0 : localParams.httpReq)) && !utils_1.get(tableRules, "select.fields")) {
             throw `INTERNAL ERROR: publish.${_this.name}.select.fields rule missing`;
         }
         // const all_columns: SelectItem[] = _this.column_names.slice(0).map(fieldName => ({
@@ -772,9 +772,9 @@ function getNewQuery(_this, filter, selectParams, param3_unused = null, tableRul
                 throw `Joined table ${JSON.stringify(j_table)} is disallowed or inexistent \nOr you've forgot to put the function arguments into an array`;
             }
             let isLocal = true;
-            if (localParams && localParams.socket) {
+            if (localParams && (localParams.socket || localParams.httpReq)) {
                 isLocal = false;
-                j_tableRules = yield _this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: j_table, command: "find", socket: localParams.socket });
+                j_tableRules = yield _this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: j_table, command: "find", localParams });
             }
             if (isLocal || j_tableRules) {
                 const joinQuery = yield getNewQuery(_thisJoinedTable, j_filter, Object.assign(Object.assign({}, j_selectParams), { alias: j_alias }), param3_unused, j_tableRules, localParams);

@@ -1,9 +1,9 @@
 /// <reference types="node" />
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import { DboBuilder, DbHandler, DbHandlerTX } from "./DboBuilder";
+import { DboBuilder, DbHandler, LocalParams } from "./DboBuilder";
+export { DbHandler };
 export declare type PGP = pgPromise.IMain<{}, pg.IClient>;
-export { DbHandler, DbHandlerTX } from "./DboBuilder";
 import { AnyObject } from "prostgles-types";
 import { DBEventsManager } from "./DBEventsManager";
 export declare type DB = pgPromise.IDatabase<{}, pg.IClient>;
@@ -184,11 +184,21 @@ export declare type RequestParams = {
     dbo?: DbHandler;
     socket?: any;
 };
-export declare type PublishAllOrNothing = string | "*" | false | null;
-export declare type PublishedTablesAndViews = PublishAllOrNothing | {
-    [key: string]: (PublishTableRule | PublishViewRule | PublishAllOrNothing);
+export declare type PublishAllOrNothing = "*" | false | null;
+export declare type PublishObject = {
+    [table_name: string]: (PublishTableRule | PublishViewRule | PublishAllOrNothing);
 };
-export declare type Publish = PublishedTablesAndViews | ((socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB, user?: any) => (PublishedTablesAndViews | Promise<PublishedTablesAndViews>));
+export declare type PublishTable = {
+    [table_name: string]: (PublishTableRule | PublishViewRule);
+};
+export declare type PublishedResult = PublishAllOrNothing | PublishObject;
+export declare type PublishParams<DBO = DbHandler> = {
+    sid?: string;
+    dbo?: DBO;
+    db?: DB;
+    user?: AnyObject;
+};
+export declare type Publish<DBO> = (params: PublishParams<DBO>) => (PublishedResult | Promise<PublishedResult>);
 export declare type Method = (...args: any) => (any | Promise<any>);
 export declare const JOIN_TYPES: readonly ["one-many", "many-one", "one-one", "many-many"];
 export declare type Join = {
@@ -199,7 +209,7 @@ export declare type Join = {
     type: typeof JOIN_TYPES[number];
 };
 export declare type Joins = Join[] | "inferred";
-export declare type publishMethods = (socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB, user?: any) => {
+export declare type PublishMethods<DBO> = (params: PublishParams<DBO>) => {
     [key: string]: Method;
 } | Promise<{
     [key: string]: Method;
@@ -208,19 +218,43 @@ export declare type BasicSession = {
     sid: string;
     expires: number;
 };
-export declare type SessionIDs = {
-    sidCookie?: string;
-    sidQuery?: string;
-    sid: string;
+export declare type AuthClientRequest = {
+    socket: any;
+} | {
+    httpReq: any;
 };
-export declare type Auth = {
-    sidQueryParamName?: string;
-    sidCookieName?: string;
-    getUser: (params: SessionIDs, dbo: any, db: DB, socket: any) => Promise<object | null | undefined>;
-    getClientUser: (params: SessionIDs, dbo: any, db: DB, socket: any) => Promise<object>;
-    register?: (params: any, dbo: any, db: DB, socket: any) => Promise<BasicSession>;
-    login?: (params: any, dbo: any, db: DB, socket: any) => Promise<BasicSession>;
-    logout?: (params: SessionIDs, dbo: any, db: DB, socket: any) => Promise<any>;
+export declare type Auth<DBO = DbHandler> = {
+    /**
+     * Name of the cookie or socket hadnshake query param that represents the session id.
+     * Defaults to "session_id"
+     */
+    sidKeyName?: string;
+    expressConfig?: {
+        /**
+         * Express app instance. If provided Prostgles will attempt to set sidKeyName to user cookie
+         */
+        app: any;
+        /**
+         * Used in allowing logging in through express
+         */
+        loginPostPath: string;
+    };
+    /**
+     * User data used on server
+     */
+    getUser: (sid: string, dbo: DBO, db: DB) => Promise<AnyObject | null | undefined>;
+    /**
+     * User data sent to client
+     */
+    getClientUser: (sid: string, dbo: DBO, db: DB) => Promise<AnyObject | null | undefined>;
+    register?: (params: AnyObject, dbo: DBO, db: DB) => Promise<BasicSession>;
+    login?: (params: AnyObject, dbo: DBO, db: DB) => Promise<BasicSession>;
+    logout?: (sid: string, dbo: DBO, db: DB) => Promise<any>;
+};
+export declare type ClientInfo = {
+    user?: AnyObject;
+    clientUser?: AnyObject;
+    sid?: string;
 };
 declare type Keywords = {
     $and: string;
@@ -243,23 +277,68 @@ export declare type I18N_CONFIG<LANG_IDS = {
         };
     }>;
 };
-export declare type ProstglesInitOptions = {
+declare type ExpressApp = {
+    get: (routePath: string, cb: (req: {
+        params: {
+            id: string;
+        };
+        cookies: {
+            sid: string;
+        };
+    }, res: {
+        redirect: (redirectUrl: string) => any;
+        status: (code: number) => {
+            json: (response: AnyObject) => any;
+        };
+    }) => any) => any;
+};
+/**
+ * Allows uploading and downloading files.
+ * Currently supports only S3.
+ *
+ * @description
+ * Will create a media table that contains file metadata and urls
+ * Inserting a file into this table through prostgles will upload it to S3 and insert the relevant metadata into the media table
+ * Requesting a file from HTTP GET {fileUrlPath}/{fileId} will:
+ *  1. check auth (if provided)
+ *  2. check the permissions in publish (if provided)
+ *  3. redirect the request to the signed url (if allowed)
+ *
+ * Specifying referencedTables will:
+ *  1. create a column in that table called media
+ *  2. create a lookup table lookup_media_{referencedTable} that joins referencedTable to the media table
+ */
+export declare type FileTableConfig = {
+    tableName?: string;
+    fileUrlPath?: string;
+    awsS3Config: {
+        region: string;
+        bucket: string;
+        accessKeyId: string;
+        secretAccessKey: string;
+    };
+    expressApp: ExpressApp;
+    referencedTables?: {
+        [tableName: string]: "one" | "many";
+    };
+};
+export declare type ProstglesInitOptions<DBO = DbHandler> = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
     tsGeneratedTypesDir?: string;
     io?: any;
-    publish?: Publish;
-    publishMethods?: publishMethods;
-    publishRawSQL?(socket?: any, dbo?: DbHandler | DbHandlerTX | any, db?: DB, user?: any): ((boolean | "*") | Promise<(boolean | "*")>);
+    publish?: Publish<DBO>;
+    publishMethods?: PublishMethods<DBO>;
+    publishRawSQL?(params: PublishParams<DBO>): ((boolean | "*") | Promise<(boolean | "*")>);
     joins?: Joins;
     schema?: string;
     sqlFilePath?: string;
-    onReady(dbo: any, db: DB): void;
+    onReady(dbo: DBO, db: DB): void;
     transactions?: string | boolean;
     wsChannelNamePrefix?: string;
-    onSocketConnect?(socket: Socket, dbo: any, db?: DB): any;
-    onSocketDisconnect?(socket: Socket, dbo: any, db?: DB): any;
-    auth?: Auth;
+    onSocketConnect?(socket: Socket, dbo: DBO, db?: DB): any;
+    onSocketDisconnect?(socket: Socket, dbo: DBO, db?: DB): any;
+    auth?: Auth<DBO>;
     DEBUG_MODE?: boolean;
     watchSchema?: boolean | "hotReloadMode" | ((event: {
         command: string;
@@ -268,51 +347,28 @@ export declare type ProstglesInitOptions = {
     keywords?: Keywords;
     onNotice?: (msg: any) => void;
     i18n?: I18N_CONFIG<AnyObject>;
+    fileTable?: FileTableConfig;
 };
 export declare type OnReady = {
     dbo: DbHandler;
     db: DB;
 };
-export declare class Prostgles {
-    dbConnection: DbConnection;
-    dbOptions: DbConnectionOpts;
+export declare class Prostgles<DBO = DbHandler> {
+    opts: ProstglesInitOptions<DBO>;
     db: DB;
     pgp: PGP;
-    dbo: DbHandler | DbHandlerTX;
+    dbo: DbHandler;
     dboBuilder: DboBuilder;
-    publishMethods?: publishMethods;
-    io: any;
-    publish?: Publish;
-    joins?: Joins;
-    schema: string;
-    transactions?: string | boolean;
-    publishRawSQL?: any;
-    wsChannelNamePrefix: string;
-    onSocketConnect?(socket: Socket | any, dbo: any, db?: DB): any;
-    onSocketDisconnect?(socket: Socket | any, dbo: any, db?: DB): any;
-    sqlFilePath?: string;
-    tsGeneratedTypesDir?: string;
     publishParser: PublishParser;
-    auth?: Auth;
-    DEBUG_MODE?: boolean;
-    watchSchema?: boolean | "hotReloadMode" | ((event: {
-        command: string;
-        query: string;
-    }) => void);
-    private loaded;
     keywords: {
         $filter: string;
         $and: string;
         $or: string;
         $not: string;
     };
-    onReady: (dbo: any, db: DB) => void;
-    /**
-     * Postgres on notice callback
-     */
-    onNotice?: ProstglesInitOptions["onNotice"];
+    private loaded;
     dbEventsManager: DBEventsManager;
-    i18n?: ProstglesInitOptions["i18n"];
+    private fileManager?;
     constructor(params: ProstglesInitOptions);
     destroyed: boolean;
     onSchemaChange(event: {
@@ -327,52 +383,58 @@ export declare class Prostgles {
     private getFileText;
     writeDBSchema(force?: boolean): void;
     refreshDBO(): Promise<void>;
-    init(onReady: (dbo: DbHandler | DbHandlerTX, db: DB) => any): Promise<{
-        db: DbHandlerTX;
+    init(onReady: (dbo: DBO, db: DB) => any): Promise<{
+        db: DbHandler;
         _db: DB;
         pgp: PGP;
         io?: any;
         destroy: () => Promise<boolean>;
     }>;
     runSQLFile(filePath: string): Promise<boolean>;
-    getSID(socket: any): SessionIDs;
-    getUser(socket: any): Promise<object>;
-    getUserFromCookieSession(socket: any): Promise<null | {
-        user: any;
-        clientUser: any;
-    }>;
+    /**
+     * Will return first sid value found in : http cookie or query params
+     * Based on sid names in auth
+     * @param localParams
+     * @returns string
+     */
+    getSID(localParams: LocalParams): string;
+    getClientInfo(localParams: Pick<LocalParams, "socket" | "httpReq">): Promise<ClientInfo>;
     connectedSockets: any[];
     setSocketEvents(): Promise<void>;
     pushSocketSchema: (socket: any) => Promise<void>;
 }
 declare type Request = {
-    socket: any;
+    socket?: any;
+    httpReq?: any;
 };
 declare type DboTable = Request & {
     tableName: string;
+    localParams: LocalParams;
 };
 declare type DboTableCommand = Request & DboTable & {
     command: string;
+    localParams: LocalParams;
 };
 export declare function flat(arr: any): any;
 export declare class PublishParser {
     publish: any;
     publishMethods?: any;
     publishRawSQL?: any;
-    dbo: DbHandler | DbHandlerTX;
+    dbo: DbHandler;
     db: DB;
     prostgles: Prostgles;
-    constructor(publish: any, publishMethods: any, publishRawSQL: any, dbo: DbHandler | DbHandlerTX, db: DB, prostgles: Prostgles);
+    constructor(publish: any, publishMethods: any, publishRawSQL: any, dbo: DbHandler, db: DB, prostgles: Prostgles);
+    getPublishParams(localParams: LocalParams, clientInfo?: ClientInfo): Promise<PublishParams>;
     getMethods(socket: any): Promise<{}>;
     /**
      * Parses the first level of publish. (If false then nothing if * then all tables and views)
      * @param socket
      * @param user
      */
-    getPublish(socket: any, user: any): Promise<any>;
-    getValidatedRequestRuleWusr({ tableName, command, socket }: DboTableCommand): Promise<TableRule>;
-    getValidatedRequestRule({ tableName, command, socket }: DboTableCommand, user: any): Promise<TableRule>;
-    getTableRules({ tableName, socket }: DboTable, user: any): Promise<any>;
+    getPublish(localParams: LocalParams, clientInfo?: ClientInfo): Promise<PublishObject>;
+    getValidatedRequestRuleWusr({ tableName, command, localParams }: DboTableCommand): Promise<TableRule>;
+    getValidatedRequestRule({ tableName, command, localParams }: DboTableCommand, clientInfo: ClientInfo): Promise<TableRule>;
+    getTableRules({ tableName, localParams }: DboTable, clientInfo: ClientInfo): Promise<PublishTable>;
     getSchemaFromPublish(socket: any): Promise<{}>;
 }
 export declare function isSuperUser(db: DB): Promise<boolean>;

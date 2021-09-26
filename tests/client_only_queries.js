@@ -18,7 +18,7 @@ async function client_only(db, auth, log, methods) {
             // console.log(fullResult)
             assert_1.strict.deepStrictEqual(fullResult.rows[0], { col1: 1 }, "db.sql query failed");
             assert_1.strict.deepStrictEqual(fullResult.fields, [{ name: 'col1', tableID: 0, columnID: 0, dataTypeID: 23, dataTypeSize: 4, dataTypeModifier: -1, format: 'text', dataType: 'int4' }], "db.sql query failed");
-            await isomorphic_queries_1.tryRunP("sql LISTEN NOTIFY events", async (resolve, reject) => {
+            await (0, isomorphic_queries_1.tryRunP)("sql LISTEN NOTIFY events", async (resolve, reject) => {
                 const sub = await db.sql("LISTEN chnl ");
                 // console.log({ sub })
                 sub.addListener(notif => {
@@ -30,7 +30,7 @@ async function client_only(db, auth, log, methods) {
                 });
                 db.sql("NOTIFY chnl , 'hello'; ");
             });
-            await isomorphic_queries_1.tryRunP("sql NOTICE events", async (resolve, reject) => {
+            await (0, isomorphic_queries_1.tryRunP)("sql NOTICE events", async (resolve, reject) => {
                 const sub = await db.sql("", {}, { returnType: "noticeSubscription" });
                 // console.log({ sub })
                 sub.addListener(notice => {
@@ -105,7 +105,7 @@ async function client_only(db, auth, log, methods) {
     if (!auth.user) {
         log("Checking public data");
         // Public data
-        await isomorphic_queries_1.tryRun("Security rules example", async () => {
+        await (0, isomorphic_queries_1.tryRun)("Security rules example", async () => {
             const vQ = await db.items4.find({}, { select: { added: 0 } });
             assert_1.strict.deepStrictEqual(vQ, [
                 { id: 1, public: 'public data' },
@@ -119,7 +119,7 @@ async function client_only(db, auth, log, methods) {
     else {
         log("Checking User data");
         // User data
-        await isomorphic_queries_1.tryRun("Security rules example", async () => {
+        await (0, isomorphic_queries_1.tryRun)("Security rules example", async () => {
             const vQ = await db.items4.find();
             assert_1.strict.deepStrictEqual(vQ, [
                 { id: 1, public: 'public data' },

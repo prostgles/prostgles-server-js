@@ -17,6 +17,17 @@ exports.isPlainObject = exports.DboBuilder = exports.TableHandler = exports.View
 const Bluebird = require("bluebird");
 const pgPromise = require("pg-promise");
 const prostgles_types_1 = require("prostgles-types");
+// <TXKey extends string = "tx"> 
+//   & {
+//     [K in TXKey]: TX
+//   };
+// const d: DbHandler = { } as any;
+// d.
+//   export type DbHandlerTX = { [key: string]: TX } | DbHandler;
+//   export type DbHandlerTX = DbHandler
+//    & Partial<{
+//     [key: string]: TX
+//   }>
 const utils_1 = require("./utils");
 const QueryBuilder_1 = require("./QueryBuilder");
 const Prostgles_1 = require("./Prostgles");
@@ -298,10 +309,10 @@ class ViewHandler {
                 // console.log("getColumns", this.name, this.columns.map(c => c.name))
                 let _lang = lang;
                 return this.columns.map(c => {
-                    var _a, _b, _c, _d, _e, _f;
+                    var _a, _b, _c, _d, _e, _f, _g, _h;
                     let label = c.comment || c.name;
-                    const iConf = (_d = (_c = (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.i18n) === null || _b === void 0 ? void 0 : _b.column_labels) === null || _c === void 0 ? void 0 : _c[this.name]) === null || _d === void 0 ? void 0 : _d[c.name];
-                    const fallbackLang = (_f = (_e = this.dboBuilder.prostgles) === null || _e === void 0 ? void 0 : _e.i18n) === null || _f === void 0 ? void 0 : _f.fallbackLang;
+                    const iConf = (_e = (_d = (_c = (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.opts) === null || _b === void 0 ? void 0 : _b.i18n) === null || _c === void 0 ? void 0 : _c.column_labels) === null || _d === void 0 ? void 0 : _d[this.name]) === null || _e === void 0 ? void 0 : _e[c.name];
+                    const fallbackLang = (_h = (_g = (_f = this.dboBuilder.prostgles) === null || _f === void 0 ? void 0 : _f.opts) === null || _g === void 0 ? void 0 : _g.i18n) === null || _h === void 0 ? void 0 : _h.fallbackLang;
                     _lang = _lang || fallbackLang;
                     if ((lang || fallbackLang) && iConf) {
                         let langLabel;
@@ -447,9 +458,10 @@ class ViewHandler {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 filter = filter || {};
+                const allowedReturnTypes = ["row", "value", "values"];
                 const { returnType } = selectParams || {};
-                if (returnType && !["row", "value", "values"].includes(returnType)) {
-                    throw `returnType (${returnType}) can only be ${["row", "values"].join(" OR ")}`;
+                if (returnType && !allowedReturnTypes.includes(returnType)) {
+                    throw `returnType (${returnType}) can only be ${allowedReturnTypes.join(" OR ")}`;
                 }
                 const { testRule = false, returnQuery = false } = localParams || {};
                 if (testRule)
@@ -705,9 +717,9 @@ class ViewHandler {
             };
             let t2Rules = undefined, forcedFilter, filterFields, tableAlias;
             /* Check if allowed to view data */
-            if (localParams && localParams.socket && this.dboBuilder.publishParser) {
+            if (localParams && (localParams.socket || localParams.httpReq) && this.dboBuilder.publishParser) {
                 /* Need to think about joining through dissallowed tables */
-                t2Rules = yield this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: t2, command: "find", socket: localParams.socket });
+                t2Rules = yield this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: t2, command: "find", localParams });
                 if (!t2Rules || !t2Rules.select)
                     throw "Dissallowed";
                 ({ forcedFilter, filterFields } = t2Rules.select);
@@ -1707,7 +1719,7 @@ class DboBuilder {
         this.schema = "public";
         this.init = () => __awaiter(this, void 0, void 0, function* () {
             let onSchemaChange;
-            if (this.prostgles.watchSchema) {
+            if (this.prostgles.opts.watchSchema) {
                 onSchemaChange = (event) => {
                     this.prostgles.onSchemaChange(event);
                 };
@@ -1737,7 +1749,7 @@ class DboBuilder {
         };
         this.prostgles = prostgles;
         this.db = this.prostgles.db;
-        this.schema = this.prostgles.schema || "public";
+        this.schema = this.prostgles.opts.schema || "public";
         this.dbo = {};
         // this.joins = this.prostgles.joins;
     }
@@ -1749,10 +1761,10 @@ class DboBuilder {
     }
     parseJoins() {
         return __awaiter(this, void 0, void 0, function* () {
-            if (this.prostgles.joins) {
-                let _joins = yield this.prostgles.joins;
+            if (this.prostgles.opts.joins) {
+                let _joins = yield this.prostgles.opts.joins;
                 if (typeof _joins === "string" && _joins === "inferred") {
-                    _joins = yield getInferredJoins(this.db, this.prostgles.schema);
+                    _joins = yield getInferredJoins(this.db, this.prostgles.opts.schema);
                 }
                 let joins = JSON.parse(JSON.stringify(_joins));
                 this.joins = joins;
@@ -1917,12 +1929,80 @@ export type TxCB = {
                     this.dboDefinition += `  ${joinType}: JoinMakerTables;\n`;
                 });
             }
-            if (this.prostgles.transactions) {
+            if (this.prostgles.opts.transactions) {
                 let txKey = "tx";
-                if (typeof this.prostgles.transactions === "string")
-                    txKey = this.prostgles.transactions;
+                if (typeof this.prostgles.opts.transactions === "string")
+                    txKey = this.prostgles.opts.transactions;
                 this.dboDefinition += ` ${txKey}: (t: TxCB) => Promise<any | void> ;\n`;
                 this.dbo[txKey] = (cb) => this.getTX(cb);
+            }
+            if (!this.dbo.sql) {
+                let needType = true; // this.publishRawSQL && typeof this.publishRawSQL === "function";
+                let DATA_TYPES = !needType ? [] : yield this.db.any("SELECT oid, typname FROM pg_type");
+                let USER_TABLES = !needType ? [] : yield this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
+                this.dbo.sql = (query, params, options, localParams) => __awaiter(this, void 0, void 0, function* () {
+                    var _a;
+                    const canRunSQL = (localParams) => __awaiter(this, void 0, void 0, function* () {
+                        if (!localParams)
+                            return true;
+                        const { socket } = localParams;
+                        const publishParams = yield this.prostgles.publishParser.getPublishParams({ socket });
+                        let res = yield this.prostgles.opts.publishRawSQL(publishParams);
+                        return Boolean(res && typeof res === "boolean" || res === "*");
+                    });
+                    if (!(yield canRunSQL(localParams)))
+                        throw "Not allowed to run SQL";
+                    const { returnType } = options || {};
+                    const { socket } = localParams || {};
+                    if (returnType === "noticeSubscription") {
+                        if (!socket)
+                            throw "Only allowed with client socket";
+                        return yield this.prostgles.dbEventsManager.addNotice(socket);
+                    }
+                    else if (returnType === "statement") {
+                        try {
+                            return exports.pgp.as.format(query, params);
+                        }
+                        catch (err) {
+                            throw err.toString();
+                        }
+                    }
+                    else if (this.db) {
+                        let qres = yield this.db.result(query, params);
+                        const { duration, fields, rows, command } = qres;
+                        if (command === "LISTEN") {
+                            if (!socket)
+                                throw "Only allowed with client socket";
+                            return yield this.prostgles.dbEventsManager.addNotify(query, socket);
+                        }
+                        else if (returnType === "rows") {
+                            return rows;
+                        }
+                        else if (returnType === "row") {
+                            return rows[0];
+                        }
+                        else if (returnType === "value") {
+                            return (_a = Object.values((rows === null || rows === void 0 ? void 0 : rows[0]) || {})) === null || _a === void 0 ? void 0 : _a[0];
+                        }
+                        else if (returnType === "values") {
+                            return rows.map(r => Object.values(r[0]));
+                        }
+                        else {
+                            if (fields && DATA_TYPES.length) {
+                                qres.fields = fields.map(f => {
+                                    const dataType = DATA_TYPES.find(dt => +dt.oid === +f.dataTypeID), tableName = USER_TABLES.find(t => +t.relid === +f.tableID), { name } = f;
+                                    return Object.assign(Object.assign(Object.assign({}, f), (dataType ? { dataType: dataType.typname } : {})), (tableName ? { tableName: tableName.relname } : {}));
+                                });
+                            }
+                            return qres;
+                        }
+                    }
+                    else
+                        console.error("db missing");
+                });
+            }
+            else {
+                console.warn(`Could not create dbo.sql handler because there is already a table named "sql"`);
             }
             this.dboDefinition += "};\n";
             this.tsTypesDefinition = [

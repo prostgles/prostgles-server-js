@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const path_1 = __importDefault(require("path"));
 const express_1 = __importDefault(require("express"));
 const prostgles_server_1 = __importDefault(require("prostgles-server"));
-const app = express_1.default();
+const app = (0, express_1.default)();
 const http = require('http').createServer(app);
 const { exec } = require('child_process');
 const clientTest = (process.env.TEST_TYPE === "client");
@@ -42,6 +42,8 @@ const dbConnection = {
     database: process.env.POSTGRES_DB || "postgres",
     user: process.env.POSTGRES_USER || "api",
     password: process.env.POSTGRES_PASSWORD || "api",
+    // user: "usr",
+    // password:  "usr",
 };
 (async () => {
     const i18n = {
@@ -57,7 +59,7 @@ const dbConnection = {
             }
         }
     };
-    let prgl = await prostgles_server_1.default({
+    let prgl = await (0, prostgles_server_1.default)({
         dbConnection,
         sqlFilePath: path_1.default.join(__dirname + '/init.sql'),
         io,
@@ -101,12 +103,12 @@ const dbConnection = {
             return true;
         },
         // DEBUG_MODE: true,
-        publishRawSQL: async (socket, dbo, db, user) => {
+        publishRawSQL: async (params) => {
             return true; // Boolean(user && user.type === "admin")
         },
         auth: {
-            sidQueryParamName: "token",
-            getClientUser: async ({ sid }) => {
+            sidKeyName: "token",
+            getClientUser: async (sid) => {
                 if (sid) {
                     const s = sessions.find(s => s.id === sid);
                     if (s) {
@@ -117,7 +119,7 @@ const dbConnection = {
                 }
                 return null;
             },
-            getUser: async ({ sid }) => {
+            getUser: async (sid) => {
                 if (sid) {
                     const s = sessions.find(s => s.id === sid);
                     if (s)
@@ -138,12 +140,12 @@ const dbConnection = {
                 return { sid: s.id, expires: Infinity };
             }
         },
-        publishMethods: async (socket, dbo, db, user) => {
+        publishMethods: async (params) => {
             return {
                 get: () => 222
             };
         },
-        publish: async (socket, dbo, db, user) => {
+        publish: async ({ user }) => {
             return {
                 items: "*",
                 items2: "*",
@@ -221,9 +223,9 @@ const dbConnection = {
                     log("Waiting for client...");
                 }
                 else if (process.env.TEST_TYPE === "server") {
-                    await isomorphic_queries_1.default(db);
+                    await (0, isomorphic_queries_1.default)(db);
                     log("Server isomorphic tests successful");
-                    await server_only_queries_1.default(db);
+                    await (0, server_only_queries_1.default)(db);
                     log("Server-only query tests successful");
                     stopTest();
                 }

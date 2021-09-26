@@ -837,7 +837,7 @@ export class PubSubManager {
     prepareTriggers = async () => {
         // SELECT * FROM pg_catalog.pg_event_trigger WHERE evtname
         if(!this.appID) throw "prepareTriggers failed: this.appID missing";
-        if(this.dboBuilder.prostgles.watchSchema && !(await isSuperUser(this.db))){
+        if(this.dboBuilder.prostgles.opts.watchSchema && !(await isSuperUser(this.db))){
             console.warn("prostgles watchSchema requires superuser db user. Will not watch")
         }
 
