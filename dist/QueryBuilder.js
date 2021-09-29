@@ -836,7 +836,8 @@ function makeQuery(_this, q, depth = 0, joinFields = [], selectParams) {
     const prefJCAN = (q, str) => prostgles_types_1.asName(`${q.tableAlias || q.table}_${PREF}_${str}`);
     // const indent = (a, b) => a;
     const joinTables = (q1, q2) => {
-        const paths = _this.getJoins(q1.table, q2.table, q2.$path);
+        const joinInfo = _this.getJoins(q1.table, q2.table, q2.$path);
+        const paths = joinInfo.paths;
         return Prostgles_1.flat(paths.map(({ table, on }, i) => {
             const getPrevColName = (col) => {
                 return table === q1.table ? q1.select.find(s => s.getQuery() === prostgles_types_1.asName(col)).alias : col;
@@ -844,9 +845,11 @@ function makeQuery(_this, q, depth = 0, joinFields = [], selectParams) {
             const getThisColName = (col) => {
                 return table === q2.table ? q2.select.find(s => s.getQuery() === prostgles_types_1.asName(col)).alias : col;
             };
+            // console.log(JSON.stringify({i, table, on, q1, q2}, null, 2));
             const prevTable = i === 0 ? q1.table : (paths[i - 1].table);
             const thisAlias = makePrefANON(q2.tableAlias, table);
-            const prevAlias = i === 0 ? makePrefAN(q1) : thisAlias;
+            // const prevAlias = i === 0? makePrefAN(q1) : thisAlias;
+            const prevAlias = i === 0 ? makePrefAN(q1) : makePrefANON(q2.tableAlias, prevTable);
             // If root then prev table is aliased from root query. Alias from join otherwise
             let iQ = [
                 prostgles_types_1.asName(table) + ` ${thisAlias}`

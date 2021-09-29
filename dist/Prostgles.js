@@ -66,6 +66,7 @@ const DEFAULT_KEYWORDS = {
 const fs = require('fs');
 class Prostgles {
     constructor(params) {
+        var _a, _b, _c;
         this.opts = {
             DEBUG_MODE: false,
             dbConnection: {
@@ -281,7 +282,16 @@ class Prostgles {
             console.error(`Unrecognised ProstglesInitOptions params: ${unknownParams.join()}`);
         }
         Object.assign(this.opts, params);
+        /* set defaults */
+        if ((_a = this.opts) === null || _a === void 0 ? void 0 : _a.fileTable) {
+            this.opts.fileTable.tableName = ((_c = (_b = this.opts) === null || _b === void 0 ? void 0 : _b.fileTable) === null || _c === void 0 ? void 0 : _c.tableName) || "media";
+        }
+        this.opts.schema = this.opts.schema || "public";
         this.keywords = Object.assign(Object.assign({}, DEFAULT_KEYWORDS), params.keywords);
+    }
+    isMedia(tableName) {
+        var _a, _b;
+        return ((_b = (_a = this.opts) === null || _a === void 0 ? void 0 : _a.fileTable) === null || _b === void 0 ? void 0 : _b.tableName) === tableName;
     }
     onSchemaChange(event) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -378,8 +388,9 @@ class Prostgles {
             try {
                 /* 3. Make DBO object from all tables and views */
                 yield this.refreshDBO();
-                this.writeDBSchema();
                 if (this.opts.publish) {
+                    if (!this.opts.io)
+                        console.warn("IO missing. Publish has no effect without io");
                     /* 3.9 Check auth config */
                     if (this.opts.auth) {
                         this.opts.auth.sidKeyName = this.opts.auth.sidKeyName || "session_id";
@@ -403,9 +414,13 @@ class Prostgles {
                 this.dbEventsManager = new DBEventsManager_1.DBEventsManager(db, pgp);
                 /* 4.1 Create media table if required */
                 if (this.opts.fileTable) {
-                    this.fileManager = new FileManager_1.default(this.opts.fileTable.awsS3Config);
+                    const { awsS3Config, localConfig } = this.opts.fileTable;
+                    if (!awsS3Config && !localConfig)
+                        throw "fileTable missing param: Must provide awsS3Config OR localConfig";
+                    this.fileManager = new FileManager_1.default(awsS3Config || localConfig);
                     yield this.fileManager.init(this);
                 }
+                this.writeDBSchema();
                 /* 5. Finish init and provide DBO object */
                 try {
                     if (this.destroyed) {

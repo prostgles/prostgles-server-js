@@ -2,7 +2,7 @@ import { strict as assert } from 'assert';
 
 import { DbHandler} from "../dist/Prostgles";
 import { DBHandlerClient } from "./client/index";
-
+import * as fs from "fs";
 
 export async function tryRun(desc: string, func: () => any){
   try {
@@ -370,6 +370,15 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     assert.deepStrictEqual(d, [{ id: 1,  name: 'abc123', public: 'public data2', $rowhash: '9d18ddfbff9e13411d13f82d414644de', added_day: 'monday'  }]);
 	
     console.log("TODO: socket.io stringifies dates")
+  });
+
+  await tryRun("Local file upload", async () => {
+    let str = "This is a string",
+      data = Buffer.from(str, "utf-8");
+
+    const file = await db.media.insert({ data, name: "sample_file.txt" }, { returning: "*" });
+    const _data = fs.readFileSync(__dirname + "/server/media/"+file.name);
+    assert.equal(str, _data.toString('utf8'));
   });
   
   await tryRun("Exists filter example", async () => {

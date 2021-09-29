@@ -123,6 +123,7 @@ class ViewHandler {
         this.tsColumnDefs = [];
         this.is_view = true;
         this.filterDef = "";
+        this.is_media = false;
         if (!db || !tableOrViewInfo)
             throw "";
         this.db = db;
@@ -187,7 +188,10 @@ class ViewHandler {
             /* Safely test publish rules */
             if (fields) {
                 try {
-                    this.parseFieldFilter(fields);
+                    const _fields = this.parseFieldFilter(fields);
+                    if (this.is_media && rule === "insert" && !_fields.includes("id")) {
+                        throw "Must allow id insert for media table";
+                    }
                 }
                 catch (e) {
                     throw ` issue with publish.${this.name}.${rule}.fields: \nVALUE: ` + JSON.stringify(fields, null, 2) + "\nERROR: " + JSON.stringify(e, null, 2);
@@ -234,7 +238,7 @@ class ViewHandler {
         return { query, toOne: false };
     }
     getJoins(source, target, path) {
-        let result = [];
+        let paths = [];
         if (!this.joinPaths)
             throw "Joins dissallowed";
         if (path && !path.length)
@@ -254,7 +258,7 @@ class ViewHandler {
         if (!jp || !this.joinPaths.find(j => path ? j.path.join() === path.join() : j.t1 === source && j.t2 === target))
             throw `Joining ${source} <-...-> ${target} dissallowed or missing`;
         /* Make the join chain info excluding root table */
-        result = (path || jp.path).slice(1).map((t2, i, arr) => {
+        paths = (path || jp.path).slice(1).map((t2, i, arr) => {
             const t1 = i === 0 ? source : arr[i - 1];
             if (!this.joins)
                 this.joins = JSON.parse(JSON.stringify(this.dboBuilder.joins));
@@ -282,7 +286,21 @@ class ViewHandler {
                 on
             };
         });
-        return result;
+        let expectOne = false;
+        paths.map(({ source, target, on }, i) => {
+            // if(expectOne && on.length === 1){
+            //     const sourceCol = on[0][1];
+            //     const targetCol = on[0][0];
+            //     const sCol = this.dboBuilder.dbo[source].columns.find(c => c.name === sourceCol)
+            //     const tCol = this.dboBuilder.dbo[target].columns.find(c => c.name === targetCol)
+            //     console.log({ sourceCol, targetCol, sCol, source, tCol, target, on})
+            //     expectOne = sCol.is_pkey && tCol.is_pkey
+            // }
+        });
+        return {
+            paths,
+            expectOne
+        };
     }
     checkFilter(filter) {
         if (filter === null || filter && !isPojoObject(filter))
@@ -296,6 +314,7 @@ class ViewHandler {
             return {
                 oid: this.tableOrViewInfo.oid,
                 comment: this.tableOrViewInfo.comment,
+                is_media: this.is_media // this.name === this.dboBuilder.prostgles?.opts?.fileTable?.tableName
             };
         });
     }
@@ -679,17 +698,21 @@ class ViewHandler {
             }
             const makeTableChain = (finalFilter) => {
                 let joinPaths = [];
+                let expectOne = true;
                 tables.map((t2, depth) => {
                     let t1 = depth ? tables[depth - 1] : thisTable;
                     let exactPaths = [t1, t2];
                     if (!depth && eConfig.shortestJoin)
                         exactPaths = undefined;
-                    joinPaths = joinPaths.concat(this.getJoins(t1, t2, exactPaths));
+                    const jinf = this.getJoins(t1, t2, exactPaths);
+                    expectOne = expectOne && jinf.expectOne;
+                    joinPaths = joinPaths.concat(jinf.paths);
                 });
-                let r = makeJoin(joinPaths, 0);
+                let r = makeJoin({ paths: joinPaths, expectOne }, 0);
                 // console.log(r);
                 return r;
-                function makeJoin(paths, ji) {
+                function makeJoin(joinInfo, ji) {
+                    const { paths } = joinInfo;
                     const jp = paths[ji];
                     let prevTable = ji ? paths[ji - 1].table : jp.source;
                     let table = paths[ji].table;
@@ -706,7 +729,7 @@ class ViewHandler {
                     }
                     const indent = (a, b) => a;
                     if (ji < paths.length - 1) {
-                        j += `AND ${makeJoin(paths, ji + 1)} \n`;
+                        j += `AND ${makeJoin(joinInfo, ji + 1)} \n`;
                     }
                     j = indent(j, ji + 1);
                     let res = `EXISTS ( \n` +
@@ -1167,8 +1190,8 @@ function isPojoObject(obj) {
 class TableHandler extends ViewHandler {
     constructor(db, tableOrViewInfo, pubSubManager, dboBuilder, t, joinPaths) {
         super(db, tableOrViewInfo, pubSubManager, dboBuilder, t, joinPaths);
-        this.prepareReturning = (returning, allowedFields, tableAlias) => __awaiter(this, void 0, void 0, function* () {
-            let result = "";
+        this.prepareReturning = (returning, allowedFields) => __awaiter(this, void 0, void 0, function* () {
+            let result = [];
             if (returning) {
                 let sBuilder = new QueryBuilder_1.SelectItemBuilder({
                     allFields: this.column_names.slice(0),
@@ -1178,9 +1201,7 @@ class TableHandler extends ViewHandler {
                     isView: this.is_view
                 });
                 yield sBuilder.parseUserSelect(returning);
-                if (sBuilder.select.length)
-                    result = "RETURNING ";
-                result += sBuilder.select.map(s => s.getQuery() + " AS " + QueryBuilder_1.asNameAlias(s.alias, tableAlias)).join(", ");
+                return sBuilder.select;
             }
             return result;
         });
@@ -1192,6 +1213,7 @@ class TableHandler extends ViewHandler {
             batching: null
         };
         this.is_view = false;
+        this.is_media = dboBuilder.prostgles.isMedia(this.name);
     }
     /* TO DO: Maybe finished query batching */
     willBatch(query) {
@@ -1386,7 +1408,7 @@ class TableHandler extends ViewHandler {
                 let qType = "none";
                 if (returning) {
                     qType = multi ? "any" : "one";
-                    query += yield this.prepareReturning(returning, this.parseFieldFilter(returningFields));
+                    query += this.makeReturnQuery(yield this.prepareReturning(returning, this.parseFieldFilter(returningFields)));
                 }
                 // console.log(query)
                 if (returnQuery)
@@ -1418,11 +1440,23 @@ class TableHandler extends ViewHandler {
         // let cs = new pgp.helpers.ColumnSet(this.columnSet.columns.filter(c => dataKeys.includes(c.name)), { table: this.name });
         return { data, allowedCols: this.columns.filter(c => dataKeys.includes(c.name)).map(c => c.name) };
     }
-    insert(data, param2, param3_unused, tableRules, localParams = null) {
+    insert(data, param2, param3_unused, tableRules, _localParams = null) {
+        var _a, _b;
         return __awaiter(this, void 0, void 0, function* () {
+            const localParams = _localParams || {};
+            const { localTX } = localParams;
             try {
+                /**
+                 * Check if for nested joins and wrapp in transaction
+                 */
+                console.log("Finish this 1880");
+                // if(!localTX){//} && (Array.isArray(data)? data : [data]).find(d => Object.keys(d).find(k => !this.columns.find(c => c.name === k)))){
+                //     console.log("adding tx", this.name);
+                //     return this.dboBuilder.getTX((dbTX, localTX) => (dbTX[this.name] as TableHandler).insert(data, param2, param3_unused, tableRules, {localTX, ..._localParams}));
+                // }
                 const { returning, onConflictDoNothing, fixIssues = false } = param2 || {};
                 const { testRule = false, returnQuery = false } = localParams || {};
+                const isMultiInsert = Array.isArray(data);
                 let returningFields, forcedData, validate, preValidate, fields;
                 if (tableRules) {
                     if (!tableRules.insert)
@@ -1441,6 +1475,7 @@ class TableHandler extends ViewHandler {
                         throw ` invalid insert rule for ${this.name} -> fields missing `;
                     /* Safely test publish rules */
                     if (testRule) {
+                        // if(this.is_media && tableRules.insert.preValidate) throw "Media table cannot have a preValidate. It already is used internally by prostgles for file upload";
                         yield this.validateViewRules(fields, null, returningFields, null, "insert");
                         if (forcedData) {
                             const keys = Object.keys(forcedData);
@@ -1457,20 +1492,135 @@ class TableHandler extends ViewHandler {
                         return true;
                     }
                 }
+                const _preValidate = (row) => __awaiter(this, void 0, void 0, function* () {
+                    var _c, _d, _e;
+                    let result = row;
+                    if (preValidate) {
+                        result = yield preValidate(result);
+                    }
+                    let hasNestedData = false;
+                    /* Upload file if needed */
+                    if (this.is_media) {
+                        if (!((_c = this.dboBuilder.prostgles) === null || _c === void 0 ? void 0 : _c.fileManager))
+                            throw "fileManager not set up";
+                        const { data, name } = row;
+                        if (Object.keys(row).length !== 2)
+                            throw "Expecting only two properties: { name: string; data: File }";
+                        // if(!Buffer.isBuffer(data)) throw "data is not of type Buffer"
+                        if (!data)
+                            throw "data not provided";
+                        if (typeof name !== "string") {
+                            throw "name is not of type string";
+                        }
+                        const media_id = (yield this.db.oneOrNone("SELECT gen_random_uuid() as name")).name;
+                        const type = yield this.dboBuilder.prostgles.fileManager.getMIME(data, name);
+                        const media_name = `${media_id}.${type.ext}`;
+                        let media = {
+                            id: media_id,
+                            name: media_name,
+                            original_name: name,
+                            extension: type.ext,
+                            content_type: type.mime
+                        };
+                        if (validate) {
+                            media = yield validate(media);
+                        }
+                        const _media = yield this.dboBuilder.prostgles.fileManager.uploadAsMedia({
+                            item: {
+                                data,
+                                name: media_name,
+                                content_type: type.mime
+                            },
+                        });
+                        result = Object.assign(Object.assign({}, media), _media);
+                        // } else if(this.dboBuilder.prostgles?.fileManager) {
+                    }
+                    else {
+                        const mediaTableName = (_e = (_d = this.dboBuilder.prostgles) === null || _d === void 0 ? void 0 : _d.fileManager) === null || _e === void 0 ? void 0 : _e.tableName;
+                        // const { referencedTables } = this.dboBuilder.prostgles?.opts.fileTable;
+                        // extraKeys[0] === mediaTableName &&
+                        // referencedTables[this.name]
+                        const dataKeys = Object.keys(row);
+                        const extraKeys = dataKeys.filter(k => !this.columns.find(c => c.name === k));
+                        const nestedJoin = (localParams === null || localParams === void 0 ? void 0 : localParams.nestedJoin) || { depth: 0 };
+                        if (extraKeys.length) {
+                            if (isMultiInsert)
+                                throw "Nested inserts are not possible with batch insert. Insert only one root row";
+                            hasNestedData = true;
+                            const rootResult = yield this.insert(PubSubManager_1.filterObj(data, null, extraKeys), { returning: "*" }, null, tableRules, localParams);
+                            return Promise.all(extraKeys.map((targetTable) => __awaiter(this, void 0, void 0, function* () {
+                                const childDataItems = Array.isArray(row[targetTable]) ? row[targetTable] : [row[targetTable]];
+                                console.log({ childDataItems });
+                                /* Must be allowed to insert into media table */
+                                const t3Rules = yield this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: targetTable, command: "insert", localParams });
+                                if (!t3Rules || !t3Rules.insert)
+                                    throw "Dissallowed nested insert into table " + targetTable;
+                                const jp = this.dboBuilder.joinPaths.find(jp => jp.t1 === this.name && jp.t2 === targetTable);
+                                if (!jp)
+                                    throw `Could not find a valid table for the nested data { ${targetTable} } `;
+                                const childInsert = (data, tableName) => {
+                                    console.log("childInsert", { data, tableName });
+                                    if (!data || !this.dboBuilder.dbo[tableName])
+                                        throw "Internal error: Child table handler missing for: " + tableName;
+                                    return Promise.all((Array.isArray(data) ? data : [data])
+                                        .map(m => this.dboBuilder.dbo[tableName].insert(m, { returning: "*" }, null, tableRules, localParams)));
+                                };
+                                const { path } = jp;
+                                const [tbl1, tbl2, tbl3] = path;
+                                const cols2 = this.dboBuilder.dbo[tbl2].columns || [];
+                                const colsRefT1 = cols2 === null || cols2 === void 0 ? void 0 : cols2.filter(c => { var _a, _b; return ((_a = c.references) === null || _a === void 0 ? void 0 : _a.cols.length) === 1 && ((_b = c.references) === null || _b === void 0 ? void 0 : _b.ftable) === tbl1; }), colsRefT3 = cols2 === null || cols2 === void 0 ? void 0 : cols2.filter(c => { var _a, _b; return ((_a = c.references) === null || _a === void 0 ? void 0 : _a.cols.length) === 1 && ((_b = c.references) === null || _b === void 0 ? void 0 : _b.ftable) === tbl3; });
+                                if (!path.length) {
+                                    throw "Nested inserts join path not found for " + [this.name, targetTable];
+                                }
+                                else if (path.length === 2) {
+                                    if (!colsRefT1.length)
+                                        throw `Target table ${tbl2} does not reference any columns from the root table ${this.name}. Cannot do nested insert`;
+                                    return childInsert(childDataItems.map(d => (Object.assign(Object.assign({}, d), PubSubManager_1.filterObj(rootResult, colsRefT1.map(col => col.name))))), tbl2).then(() => { });
+                                }
+                                else if (path.length === 3) {
+                                    if (tbl3 !== this.dboBuilder.prostgles.fileManager.tableName) {
+                                        throw "Only media allowed to have nested inserts more than 2 tables apart";
+                                    }
+                                    /* We expect tbl2 to have only 2 columns (media_id and foreign_id) */
+                                    if (!cols2 || cols2.find(c => !["media_id", "foreign_id"].includes(c.name))) {
+                                        throw "Second joining table not of expected format";
+                                    }
+                                    if (!colsRefT1.length || !colsRefT3.length)
+                                        throw "Incorrectly referenced columns for nested insert";
+                                    const insertedChildren = yield childInsert(childDataItems, targetTable);
+                                    return Promise.all(insertedChildren.map(t3Child => {
+                                        let tbl2Row = {};
+                                        colsRefT3.map(col => {
+                                            tbl2Row[col.name] = t3Child[col.references.fcols[0]];
+                                        });
+                                        colsRefT1.map(col => {
+                                            tbl2Row[col.name] = rootResult[col.references.fcols[0]];
+                                        });
+                                        // console.log({ rootResult, tbl2Row, t3Child, colsRefT3, colsRefT1, t: this.t?.ctx?.start });
+                                        return childInsert(tbl2Row, tbl2).then(() => { });
+                                    }));
+                                }
+                                else
+                                    throw "Unexpected path for Nested inserts";
+                            })));
+                        }
+                    }
+                    return result;
+                });
                 let conflict_query = "";
                 if (typeof onConflictDoNothing === "boolean" && onConflictDoNothing) {
                     conflict_query = " ON CONFLICT DO NOTHING ";
                 }
                 if (!data)
                     data = {}; //throw "Provide data in param1";
-                let returningSelect = yield this.prepareReturning(returning, this.parseFieldFilter(returningFields));
+                let returningSelect = this.makeReturnQuery(yield this.prepareReturning(returning, this.parseFieldFilter(returningFields)));
                 const makeQuery = (_row, isOne = false) => __awaiter(this, void 0, void 0, function* () {
                     let row = Object.assign({}, _row);
-                    if (preValidate) {
-                        row = yield preValidate(row);
-                    }
-                    if (!isPojoObject(row))
+                    row = yield _preValidate(row);
+                    if (!isPojoObject(row)) {
+                        console.trace(row);
                         throw "\ninvalid insert data provided -> " + JSON.stringify(row);
+                    }
                     const { data, allowedCols } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues });
                     let _data = Object.assign({}, data);
                     if (validate) {
@@ -1510,9 +1660,15 @@ class TableHandler extends ViewHandler {
                 // console.log(query);
                 if (returnQuery)
                     return query;
-                if (this.t)
-                    return this.t[queryType](query).catch(err => makeErr(err, localParams));
-                return this.db.tx(t => t[queryType](query)).catch(err => makeErr(err, localParams));
+                let result;
+                console.log("insert in " + this.name, { t: (_b = (_a = this.t) === null || _a === void 0 ? void 0 : _a.ctx) === null || _b === void 0 ? void 0 : _b.start, data });
+                if (this.t || localTX) {
+                    result = (localTX || this.t)[queryType](query).catch(err => makeErr(err, localParams));
+                }
+                else {
+                    result = this.db.tx(t => t[queryType](query)).catch(err => makeErr(err, localParams));
+                }
+                return result;
             }
             catch (e) {
                 if (localParams && localParams.testRule)
@@ -1522,6 +1678,11 @@ class TableHandler extends ViewHandler {
         });
     }
     ;
+    makeReturnQuery(items) {
+        if (items === null || items === void 0 ? void 0 : items.length)
+            return " RETURNING " + items.map(s => s.getQuery() + " AS " + prostgles_types_1.asName(s.alias)).join(", ");
+        return "";
+    }
     delete(filter, params, param3_unused, table_rules, localParams = null) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
@@ -1569,7 +1730,7 @@ class TableHandler extends ViewHandler {
                     if (!returningFields) {
                         throw "Returning dissallowed";
                     }
-                    _query += yield this.prepareReturning(returning, this.parseFieldFilter(returningFields));
+                    _query += this.makeReturnQuery(yield this.prepareReturning(returning, this.parseFieldFilter(returningFields)));
                 }
                 if (returnQuery)
                     return _query;
@@ -1742,9 +1903,15 @@ class DboBuilder {
                     }
                     else {
                         txDB[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
+                        /**
+                         * Pass only the transaction object to ensure consistency
+                         */
+                        //     txDB[tov.name] = new ViewHandler(t, tov, this.pubSubManager, this, t, this.joinPaths);
+                        // } else {
+                        //     txDB[tov.name] = new TableHandler(t as any, tov, this.pubSubManager, this, t, this.joinPaths);
                     }
                 });
-                return dbTX(txDB);
+                return dbTX(txDB, t);
             });
         };
         this.prostgles = prostgles;

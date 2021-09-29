@@ -14,10 +14,10 @@ const log = (msg, extra) => {
 log("Started client...");
 const url = process.env.PRGL_CLIENT_URL || "http://127.0.0.1:3001", path = process.env.PRGL_CLIENT_PATH || "/teztz/s", socket = (0, socket_io_client_1.default)(url, { path, query: { token: "haha" } }), //  
 stopTest = (err) => {
-    socket.emit("stop-test", !err ? err : { err: err.toString() }, cb => {
+    socket.emit("stop-test", !err ? err : { err: err.toString(), error: err }, cb => {
         log("Stopping client...");
         if (err)
-            console.error(err);
+            console.trace(err);
         setTimeout(() => {
             process.exit(err ? 1 : 0);
         }, 1000);
@@ -45,19 +45,31 @@ try {
                 log("onReady.auth", auth);
                 try {
                     log("Starting Client isomorphic tests");
+                    // try {
                     await (0, isomorphic_queries_1.default)(db);
+                    // } catch(e){
+                    //   throw { isoErr: e }
+                    // }
                     log("Client isomorphic tests successful");
+                    // try {
                     await (0, client_only_queries_1.default)(db, auth, log, methods);
+                    // } catch(e){
+                    //   throw { ClientErr: e }
+                    // }
                     log("Client-only replication tests successful");
                     stopTest();
                 }
                 catch (err) {
+                    console.trace(err);
                     stopTest(err);
+                    throw err;
                 }
             }
         });
     });
 }
 catch (e) {
+    console.trace(e);
     stopTest(e);
+    throw e;
 }

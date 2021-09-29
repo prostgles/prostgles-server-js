@@ -1005,7 +1005,8 @@ export function makeQuery(
 
   // const indent = (a, b) => a;
   const joinTables = (q1: NewQuery, q2: NewQuery): string[] => {
-    const paths = _this.getJoins(q1.table, q2.table, q2.$path);
+    const joinInfo = _this.getJoins(q1.table, q2.table, q2.$path);
+    const paths = joinInfo.paths;
 
     return flat(paths.map(({ table, on }, i) => {
       const getPrevColName = (col: string) => {
@@ -1015,13 +1016,16 @@ export function makeQuery(
         return table === q2.table? q2.select.find(s => s.getQuery() === asName(col)).alias : col;
       }
 
+      // console.log(JSON.stringify({i, table, on, q1, q2}, null, 2));
+
       const prevTable = i === 0? q1.table : (paths[i - 1].table);
       const thisAlias = makePrefANON(q2.tableAlias, table);
-      const prevAlias = i === 0? makePrefAN(q1) : thisAlias;
+      // const prevAlias = i === 0? makePrefAN(q1) : thisAlias;
+      const prevAlias =  i === 0? makePrefAN(q1) : makePrefANON(q2.tableAlias, prevTable)
       // If root then prev table is aliased from root query. Alias from join otherwise
 
       let iQ = [
-          asName(table) + ` ${thisAlias}`
+        asName(table) + ` ${thisAlias}`
       ];
 
       /* If target table then add filters, options, etc */

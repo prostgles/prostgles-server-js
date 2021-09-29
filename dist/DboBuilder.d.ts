@@ -5,12 +5,26 @@ declare global {
 }
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams, OrderBy, InsertParams, UpdateParams, DeleteParams, DbJoinMaker, TableInfo as TInfo, SQLHandler } from "prostgles-types";
+import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams, OrderBy, InsertParams, UpdateParams, DeleteParams, DbJoinMaker, TableInfo as TInfo, SQLHandler, AnyObject } from "prostgles-types";
+export declare type Media = {
+    "id"?: string;
+    "title"?: string;
+    "extension"?: string;
+    "content_type"?: string;
+    "local_url"?: string;
+    "url"?: string;
+    "signed_url"?: string;
+    "signed_url_expires"?: number;
+    "name"?: string;
+    "original_name"?: string;
+    "final_name"?: string;
+    "etag"?: string;
+};
 export interface TxHandler {
     [key: string]: TableHandler | ViewHandler;
 }
 export declare type TxCB = {
-    (t: TxHandler): (any | void);
+    (t: TxHandler, _t: pgPromise.ITask<{}>): (any | void);
 };
 export declare type TX = {
     (t: TxCB): Promise<(any | void)>;
@@ -48,7 +62,12 @@ export declare type LocalParams = {
     testRule?: boolean;
     tableAlias?: string;
     dbTX?: any;
+    localTX?: pgPromise.ITask<{}>;
     returnQuery?: boolean;
+    nestedJoin?: {
+        depth: number;
+        data: AnyObject;
+    };
 };
 export declare type Aggregation = {
     field: string;
@@ -62,12 +81,14 @@ export declare type Filter = object | {
     $or: Filter[];
 } | {};
 export declare type JoinInfo = {
-    table: string;
-    on: [[string, string]];
     expectOne: boolean;
-    source: string;
-    target: string;
-}[];
+    paths: {
+        table: string;
+        on: [[string, string]];
+        source: string;
+        target: string;
+    }[];
+};
 declare type JoinPaths = {
     t1: string;
     t2: string;
@@ -140,10 +161,11 @@ export declare class ViewHandler {
     is_view: boolean;
     filterDef: string;
     pubSubManager: PubSubManager;
+    is_media: boolean;
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, joinPaths?: JoinPaths);
     getRowHashSelect(allowedFields: FieldFilter, alias?: string, tableAlias?: string): string;
     getFullDef(): any[];
-    validateViewRules(fields: FieldFilter, filterFields: FieldFilter, returningFields: FieldFilter, forcedFilter: object, rule: string): Promise<boolean>;
+    validateViewRules(fields: FieldFilter, filterFields: FieldFilter, returningFields: FieldFilter, forcedFilter: object, rule: "update" | "select" | "insert" | "delete"): Promise<boolean>;
     getShortestJoin(table1: string, table2: string, startAlias: number, isInner?: boolean): {
         query: string;
         toOne: boolean;
@@ -153,6 +175,7 @@ export declare class ViewHandler {
     getInfo(param1: any, param2: any, param3: any, tableRules?: TableRule, localParams?: LocalParams): Promise<{
         oid: number;
         comment: string;
+        is_media: boolean;
     }>;
     getColumns(lang?: string, param2?: any, param3?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]>;
     getValidatedRules(tableRules?: TableRule, localParams?: LocalParams): ValidatedTableRules;
@@ -255,8 +278,9 @@ export declare class TableHandler extends ViewHandler {
         data: any;
         allowedCols: string[];
     };
-    insert(data: (object | object[]), param2?: InsertParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<any | any[] | boolean>;
-    prepareReturning: (returning: FieldFilter, allowedFields: string[], tableAlias?: string) => Promise<string>;
+    insert(data: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: any, tableRules?: TableRule, _localParams?: LocalParams): Promise<any | any[] | boolean>;
+    prepareReturning: (returning: FieldFilter, allowedFields: string[]) => Promise<SelectItem[]>;
+    makeReturnQuery(items?: SelectItem[]): string;
     delete(filter?: Filter, params?: DeleteParams, param3_unused?: any, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
     remove(filter: Filter, params?: UpdateParams, param3_unused?: null, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
     upsert(filter: Filter, newData?: object, params?: UpdateParams, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;

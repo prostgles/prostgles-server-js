@@ -10,15 +10,16 @@ process.on('unhandledRejection', (reason, p) => {
   process.exit(1)
 });
 
-const app = express();
+const app = express(); 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 const _http = require("http");
 const http = _http.createServer(app);
 const io = require("socket.io")(http, { 
-  path: "/s" 
+  path: "/teztz/s",
+  // maxHttpBufferSize: 1e8, // 100Mb
 });
-http.listen(process.env.NPORT || 3001);
+http.listen(process.env.NPORT || 3000);
 
 const log = (msg: string, extra?: any) => {
   console.log(...["(server): " + msg, extra].filter(v => v));
@@ -57,7 +58,7 @@ import { DBObj } from "./DBoGenerated";
 //   s.on("message", console.log)
 // })
 
-prostgles({
+prostgles<DBObj>({
   dbConnection: {
     host: process.env.POSTGRES_HOST || "localhost",
     port: +process.env.POSTGRES_PORT || 5432,
@@ -86,26 +87,42 @@ prostgles({
   joins: "inferred",
 	// onNotice: console.log,
   fileTable: {
-    awsS3Config: {
-      accessKeyId: "process.env.AWS_KEY",
-      bucket: "",
-      region: "",
-      secretAccessKey: "",
+    // awsS3Config: {
+    //   accessKeyId: process.env.S3_KEY,
+    //   bucket: process.env.S3_BUCKET,
+    //   region: process.env.S3_REGION,
+    //   secretAccessKey: process.env.S3_SECRET,
+    // },
+    localConfig: {
+      localFolderPath: path.join(__dirname+'/media'),
     },
     expressApp: app,
     referencedTables: {
       various: "one"
-    }
+    } 
   },
-  onReady: async (db: DBObj, _db: any) => {
-    // await _db.any("CREATE TABLE IF NOT EXISTS ttt(id INTEGER, t TEXT)");
-    console.log("onReady", Object.keys(db))
-    // _db.any("DROP TABLE IF EXISTS I18n_column_labels")
-
+  transactions: true,
+  onReady: async (db, _db: any) => {
+    
+    // console.log("onReady", Object.keys(db))
+    
     app.get('*', function(req, res){
       log(req.originalUrl)
 			res.sendFile(path.join(__dirname+'/index.html'));
 		});
+
+    setTimeout(() => {
+      (db as any).tx(async t => {
+        await t.various.insert({})
+        await t.various.insert({})
+      })
+
+    }, 3000)
+
+    // db.media.insert({
+    //   name: "hehe.txt",
+    //   data: Buffer.from("str", "utf-8")
+    // })
 
     try {
  

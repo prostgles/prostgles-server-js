@@ -1,7 +1,27 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.tryRunP = exports.tryRun = void 0;
 const assert_1 = require("assert");
+const fs = __importStar(require("fs"));
 async function tryRun(desc, func) {
     try {
         await func();
@@ -308,6 +328,12 @@ async function isomorphic(db) {
         let d = await db.items4_pub.delete({ name: "abc123" }, returningParam);
         assert_1.strict.deepStrictEqual(d, [{ id: 1, name: 'abc123', public: 'public data2', $rowhash: '9d18ddfbff9e13411d13f82d414644de', added_day: 'monday' }]);
         console.log("TODO: socket.io stringifies dates");
+    });
+    await tryRun("Local file upload", async () => {
+        let str = "This is a string", data = Buffer.from(str, "utf-8");
+        const file = await db.media.insert({ data, name: "sample_file.txt" }, { returning: "*" });
+        const _data = fs.readFileSync(__dirname + "/server/media/" + file.name);
+        assert_1.strict.equal(str, _data.toString('utf8'));
     });
     await tryRun("Exists filter example", async () => {
         const fo = await db.items.findOne(), f = await db.items.find();

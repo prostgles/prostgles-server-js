@@ -1,6 +1,7 @@
 /// <reference types="node" />
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
+import FileManager, { LocalConfig, S3Config } from "./FileManager";
 import { DboBuilder, DbHandler, LocalParams } from "./DboBuilder";
 export { DbHandler };
 export declare type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -36,6 +37,7 @@ export declare type UpdateRequestDataBatch = {
     data: UpdateReq[];
 };
 export declare type UpdateRequestData = UpdateRequestDataOne | UpdateRequestDataBatch;
+export declare type ValidateRow = (row: AnyObject) => AnyObject | Promise<AnyObject>;
 export declare type SelectRule = {
     /**
      * Fields allowed to be selected.   Tip: Use false to exclude field
@@ -80,13 +82,13 @@ export declare type InsertRule = {
      */
     returningFields?: FieldFilter;
     /**
-     * Validation logic to check/update data for each request. Happens before field check
+     * Validation logic to check/update data for each request. Happens before field check. The returned data will be used
      */
-    preValidate?: (row: object) => object | Promise<object>;
+    preValidate?: ValidateRow;
     /**
-     * Validation logic to check/update data for each request. Happens after field check
+     * Validation logic to check/update data for each request. Happens after field check. The returned data will be used
      */
-    validate?: (row: object) => object | Promise<object>;
+    validate?: ValidateRow;
 };
 export declare type UpdateRule = {
     /**
@@ -113,7 +115,7 @@ export declare type UpdateRule = {
     /**
      * Validation logic to check/update data for each request
      */
-    validate?: (row: object) => object | Promise<object>;
+    validate?: ValidateRow;
 };
 export declare type DeleteRule = {
     /**
@@ -131,7 +133,7 @@ export declare type DeleteRule = {
     /**
      * Validation logic to check/update data for each request
      */
-    validate?(...UpdateRequestData: any[]): UpdateRequestData;
+    validate?(...args: any[]): UpdateRequestData;
 };
 export declare type SyncRule = {
     /**
@@ -280,13 +282,17 @@ export declare type I18N_CONFIG<LANG_IDS = {
 declare type ExpressApp = {
     get: (routePath: string, cb: (req: {
         params: {
-            id: string;
+            name: string;
         };
         cookies: {
             sid: string;
         };
     }, res: {
         redirect: (redirectUrl: string) => any;
+        contentType: (type: string) => void;
+        sendFile: (fileName: string, opts?: {
+            root: string;
+        }) => any;
         status: (code: number) => {
             json: (response: AnyObject) => any;
         };
@@ -311,12 +317,8 @@ declare type ExpressApp = {
 export declare type FileTableConfig = {
     tableName?: string;
     fileUrlPath?: string;
-    awsS3Config: {
-        region: string;
-        bucket: string;
-        accessKeyId: string;
-        secretAccessKey: string;
-    };
+    awsS3Config?: S3Config;
+    localConfig?: LocalConfig;
     expressApp: ExpressApp;
     referencedTables?: {
         [tableName: string]: "one" | "many";
@@ -368,7 +370,8 @@ export declare class Prostgles<DBO = DbHandler> {
     };
     private loaded;
     dbEventsManager: DBEventsManager;
-    private fileManager?;
+    fileManager?: FileManager;
+    isMedia(tableName: string): boolean;
     constructor(params: ProstglesInitOptions);
     destroyed: boolean;
     onSchemaChange(event: {

@@ -17,9 +17,10 @@ app.use(express_1.default.urlencoded({ extended: true }));
 const _http = require("http");
 const http = _http.createServer(app);
 const io = require("socket.io")(http, {
-    path: "/s"
+    path: "/teztz/s",
+    // maxHttpBufferSize: 1e8, // 100Mb
 });
-http.listen(process.env.NPORT || 3001);
+http.listen(process.env.NPORT || 3000);
 const log = (msg, extra) => {
     console.log(...["(server): " + msg, extra].filter(v => v));
 };
@@ -79,25 +80,37 @@ const log = (msg, extra) => {
     joins: "inferred",
     // onNotice: console.log,
     fileTable: {
-        awsS3Config: {
-            accessKeyId: "process.env.AWS_KEY",
-            bucket: "",
-            region: "",
-            secretAccessKey: "",
+        // awsS3Config: {
+        //   accessKeyId: process.env.S3_KEY,
+        //   bucket: process.env.S3_BUCKET,
+        //   region: process.env.S3_REGION,
+        //   secretAccessKey: process.env.S3_SECRET,
+        // },
+        localConfig: {
+            localFolderPath: path_1.default.join(__dirname + '/media'),
         },
         expressApp: app,
         referencedTables: {
             various: "one"
         }
     },
+    transactions: true,
     onReady: async (db, _db) => {
-        // await _db.any("CREATE TABLE IF NOT EXISTS ttt(id INTEGER, t TEXT)");
-        console.log("onReady", Object.keys(db));
-        // _db.any("DROP TABLE IF EXISTS I18n_column_labels")
+        // console.log("onReady", Object.keys(db))
         app.get('*', function (req, res) {
             log(req.originalUrl);
             res.sendFile(path_1.default.join(__dirname + '/index.html'));
         });
+        setTimeout(() => {
+            db.tx(async (t) => {
+                await t.various.insert({});
+                await t.various.insert({});
+            });
+        }, 3000);
+        // db.media.insert({
+        //   name: "hehe.txt",
+        //   data: Buffer.from("str", "utf-8")
+        // })
         try {
         }
         catch (e) {

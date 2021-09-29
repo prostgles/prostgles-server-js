@@ -30,7 +30,7 @@ const log = (msg: string, extra?: any, trace?: boolean) => {
 const stopTest = (err?) => {
 	log("Stopping server ...")
 	if(err) {
-		console.error(err);
+		console.trace(err);
 	}
 	process.exit(err? 1 : 0);
 }
@@ -84,6 +84,19 @@ const dbConnection = {
 
 		// DEBUG_MODE: true,
 		// onNotice: console.log,
+
+		fileTable: {
+			// awsS3Config: {
+			//   accessKeyId: process.env.S3_KEY,
+			//   bucket: process.env.S3_BUCKET,
+			//   region: process.env.S3_REGION,
+			//   secretAccessKey: process.env.S3_SECRET,
+			// },
+			localConfig: {
+			  localFolderPath: path.join(__dirname+'/media'),
+			},
+			expressApp: app,
+		},
 
 		onSocketConnect:  (socket, db) => {
 			log("onSocketConnect")
@@ -203,7 +216,8 @@ const dbConnection = {
 					select: { fields: { [`"*"`]: 0 }},
 					insert: "*",
 					update: "*",
-				}
+				},
+				media: "*"
 			};
 			
 			// return {
@@ -262,21 +276,21 @@ const dbConnection = {
 					// 	{ name: "abcd", public: "public data d", added: new Date('04 Dec 1996 00:12:00 GMT') }
 					// ]);
 
-					const v1 = await db.items.insert([{ name: "a" }, { name: "z" }, { name: "b" }]);
-					await db.items2.insert([{ name: "a", items_id: 1 }]);
-					await db.items2.insert([{ name: "a", items_id: 1 }]);
-					await db.items2.insert([{ name: "b", items_id: 2 }]);
-					await db.items2.insert([{ name: "b", items_id: 2 }]);
-					await db.items2.insert([{ name: "b", items_id: 2 }]);
-					await db.items3.insert([{ name: "a" }, { name: "za123" }]);
-					const MonAgg = await db.items.find({}, { select: { 
-						name: 1,
-						items2: { count: { $count: ["id"] } } ,
-					} });
-					console.log(JSON.stringify(MonAgg, null, 2));
+					// const v1 = await db.items.insert([{ name: "a" }, { name: "z" }, { name: "b" }]);
+					// await db.items2.insert([{ name: "a", items_id: 1 }]);
+					// await db.items2.insert([{ name: "a", items_id: 1 }]);
+					// await db.items2.insert([{ name: "b", items_id: 2 }]);
+					// await db.items2.insert([{ name: "b", items_id: 2 }]);
+					// await db.items2.insert([{ name: "b", items_id: 2 }]);
+					// await db.items3.insert([{ name: "a" }, { name: "za123" }]);
+					// const MonAgg = await db.items.find({}, { select: { 
+					// 	name: 1,
+					// 	items2: { count: { $count: ["id"] } } ,
+					// } });
+					// console.log(JSON.stringify(MonAgg, null, 2));
 
-					await _db.any("DROP TABLE IF EXISTS tt; ")
-					await _db.any("DROP TABLE IF EXISTS tt; CREATE TABLE tt(id serial);")
+					// await _db.any("DROP TABLE IF EXISTS tt; ")
+					// await _db.any("DROP TABLE IF EXISTS tt; CREATE TABLE tt(id serial);")
 					// await _db.any("DROP EXTENSION IF EXISTS pgcrypto; CREATE EXTENSION pgcrypto;")
 					// console.log(await db.items4.findOne({}, { select: { public: { "$ts_headline": ["public", "public"] } } }))
 				}

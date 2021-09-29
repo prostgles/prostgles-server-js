@@ -1,9 +1,9 @@
 import { Prostgles, ProstglesInitOptions } from "./Prostgles";
 import { DbHandler, TableHandler, ViewHandler } from "./DboBuilder";
 
-function prostgles(params: ProstglesInitOptions){
+function prostgles<DBObj = DbHandler>(params: ProstglesInitOptions<DBObj>){
 
-    let prgl = new Prostgles(params);
+    let prgl = new Prostgles<DBObj>(params as any);
     return prgl.init(params.onReady);
 }
 

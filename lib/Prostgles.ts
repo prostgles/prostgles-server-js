@@ -6,7 +6,7 @@
 import * as promise from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import FileManager from "./FileManager";
+import FileManager, { LocalConfig, S3Config } from "./FileManager";
 
 const pkgj = require('../package.json');
 const version = pkgj.version;
@@ -96,6 +96,8 @@ export type UpdateRequestDataBatch = {
 }
 export type UpdateRequestData = UpdateRequestDataOne | UpdateRequestDataBatch;
 
+export type ValidateRow = (row: AnyObject) => AnyObject | Promise<AnyObject>;
+
 export type SelectRule = {
 
     /**
@@ -151,14 +153,14 @@ export type InsertRule = {
     returningFields?: FieldFilter;
 
     /**
-     * Validation logic to check/update data for each request. Happens before field check
+     * Validation logic to check/update data for each request. Happens before field check. The returned data will be used
      */
-    preValidate?: (row: object) => object | Promise<object>
+    preValidate?: ValidateRow
 
     /**
-     * Validation logic to check/update data for each request. Happens after field check
+     * Validation logic to check/update data for each request. Happens after field check. The returned data will be used
      */
-    validate?: (row: object) => object | Promise<object>
+    validate?: ValidateRow
 }
 export type UpdateRule = {
 
@@ -191,7 +193,7 @@ export type UpdateRule = {
     /**
      * Validation logic to check/update data for each request
      */
-    validate?: (row: object) => object | Promise<object>
+    validate?: ValidateRow
 }
 export type DeleteRule = {
     
@@ -213,7 +215,7 @@ export type DeleteRule = {
     /**
      * Validation logic to check/update data for each request
      */
-    validate?(...UpdateRequestData): UpdateRequestData
+    validate?(...args): UpdateRequestData
 }
 export type SyncRule = {
     
@@ -366,11 +368,13 @@ type ExpressApp = {
         routePath: string, 
         cb: (
             req: { 
-                params: { id: string },
+                params: { name: string },
                 cookies: { sid: string }
             },
             res: {
                 redirect: (redirectUrl: string) => any;
+                contentType: (type: string) => void;
+                sendFile: (fileName: string, opts?: { root: string }) => any;
                 status: (code: number) => {
                     json: (response: AnyObject) => any;
                 }
@@ -398,12 +402,14 @@ type ExpressApp = {
 export type FileTableConfig = {
     tableName?: string; /* defaults to 'media' */
     fileUrlPath?: string; // defaults to tableName
-    awsS3Config: {
-        region: string; 
-        bucket: string; 
-        accessKeyId: string;
-        secretAccessKey: string;
-    },
+    awsS3Config?: S3Config;
+    localConfig?: LocalConfig;
+    //  {
+    //     region: string; 
+    //     bucket: string; 
+    //     accessKeyId: string;
+    //     secretAccessKey: string;
+    // },
     expressApp: ExpressApp;
     referencedTables?: {
         [tableName: string]: "one" | "many"
@@ -523,7 +529,11 @@ export class Prostgles<DBO = DbHandler> {
     dbEventsManager: DBEventsManager;
 
 
-    private fileManager?: FileManager;
+    fileManager?: FileManager;
+
+    isMedia(tableName: string){
+        return this.opts?.fileTable?.tableName === tableName;
+    }
 
     constructor(params: ProstglesInitOptions){
         if(!params) throw "ProstglesInitOptions missing";
@@ -543,6 +553,13 @@ export class Prostgles<DBO = DbHandler> {
         }
         
         Object.assign(this.opts, params);
+
+        /* set defaults */
+        if(this.opts?.fileTable){
+            this.opts.fileTable.tableName = this.opts?.fileTable?.tableName || "media";
+        }
+        this.opts.schema = this.opts.schema || "public";
+
         this.keywords = {
             ...DEFAULT_KEYWORDS,
             ...params.keywords,
@@ -657,9 +674,11 @@ export class Prostgles<DBO = DbHandler> {
             /* 3. Make DBO object from all tables and views */
             await this.refreshDBO();
 
-            this.writeDBSchema();
 
             if(this.opts.publish){
+
+                if(!this.opts.io) console.warn("IO missing. Publish has no effect without io");
+
                 /* 3.9 Check auth config */
                 if(this.opts.auth){
                     this.opts.auth.sidKeyName = this.opts.auth.sidKeyName || "session_id";
@@ -683,12 +702,16 @@ export class Prostgles<DBO = DbHandler> {
             // }
 
             this.dbEventsManager = new DBEventsManager(db, pgp);
-
+            
             /* 4.1 Create media table if required */
             if(this.opts.fileTable){
-                this.fileManager = new FileManager(this.opts.fileTable.awsS3Config);
+                const { awsS3Config, localConfig } = this.opts.fileTable;
+                if(!awsS3Config && !localConfig) throw "fileTable missing param: Must provide awsS3Config OR localConfig";
+                this.fileManager = new FileManager(awsS3Config || localConfig);
                 await this.fileManager.init(this as any);
             }
+
+            this.writeDBSchema();
             
             /* 5. Finish init and provide DBO object */
             try {
