@@ -78,6 +78,7 @@ prostgles<DBObj>({
   },
   publish: async (params) => {
     return "*";
+
     return {
       various: "*",
       v_various: "*",
@@ -110,14 +111,32 @@ prostgles<DBObj>({
       log(req.originalUrl)
 			res.sendFile(path.join(__dirname+'/index.html'));
 		});
+    
+    const media = {
+      name: "hehe.txt",
+      data: Buffer.from("str", "utf-8")
+    }
 
-    setTimeout(() => {
-      (db as any).tx(async t => {
-        await t.various.insert({})
-        await t.various.insert({})
-      })
+    // console.log(JSON.stringify({
+    //   various: await db.various?.find(),
+    //   prostgles_lookup_media_various: await db.prostgles_lookup_media_various?.find(),
+    //   media: await db.media?.find()
+    // }, null, 2))
 
-    }, 3000)
+    setTimeout(async () => {
+      // (db as any).tx(async t => {
+      //   await t.various.insert({ media })
+      // })
+
+      try {
+        // const res = await db.various.insert({ media }, {returning: "*"})
+        // console.log(res)
+        console.log(await db.various.insert({ various_nested: {} }, {returning: "*"}))
+      } catch(e){
+        console.error(e)
+      }
+
+    }, 2000)
 
     // db.media.insert({
     //   name: "hehe.txt",

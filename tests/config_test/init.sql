@@ -1,5 +1,10 @@
+DROP TABLE IF EXISTS prostgles_lookup_media_various CASCADE;
+DROP TABLE IF EXISTS media CASCADE;
 
-
+CREATE TABLE IF NOT EXISTS various_nested (
+    various_id INTEGER REFERENCES various(id),
+    name TEXT
+);
 -- DROP TABLE IF EXISTS various CASCADE;
 -- CREATE TABLE IF NOT EXISTS various (
 -- 	id	SERIAL PRIMARY KEY,
@@ -21,7 +26,6 @@
 -- );
 
 -- INSERT INTO items(name) VALUES ('a123'), ('b'),('a'), ('b'),('a'), ('b'),('a'), ('b'), ('cc233'), (null);
-
 
 
 -- DROP TABLE IF EXISTS item_children CASCADE;

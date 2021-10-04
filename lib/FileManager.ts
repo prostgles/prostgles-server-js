@@ -12,6 +12,19 @@ import { TableHandler } from './DboBuilder';
 
 const HOUR = 3600 * 1000;
 
+export type ImageOptions = {
+  keepMetadata?: boolean;
+  compression?:
+    /**
+     * Will resize image maintaing scale ratio
+     */
+    | { inside: { width: number; height: number } }
+    | { contain: 
+        | { width: number }
+        | { height: number }
+      }
+}
+
 export type S3Config = {
   region: string;
   bucket: string;
@@ -47,13 +60,16 @@ export default class FileManager {
   s3Client: S3;
 
   config: S3Config | LocalConfig;
+  imageOptions: ImageOptions;
+
   prostgles: Prostgles;
   tableName: string;
 
   private fileRoute: string;
 
-  constructor(config: FileManager["config"]){
+  constructor(config: FileManager["config"], imageOptions?: ImageOptions){
     this.config = config;
+    this.imageOptions = imageOptions;
 
     if("region" in config){
       const { region,accessKeyId, secretAccessKey } = config;
@@ -223,18 +239,7 @@ export default class FileManager {
     item: UploadItem;
     allowedExtensions?: Array<ALLOWED_EXTENSION>;
     dissallowedExtensions?: Array<ALLOWED_EXTENSION>;
-    imageOptions?: {
-      keepMetadata?: boolean;
-      compression?:
-        /**
-         * Will resize image maintaing scale ratio
-         */
-        | { inside: { width: number; height: number } }
-        | { contain: 
-            | { width: number }
-            | { height: number }
-          }
-    }
+    imageOptions?: ImageOptions;
   }): Promise<UploadedItem> => {
     const { item, imageOptions } = params;
     const { name, data, content_type } = item;
@@ -345,7 +350,7 @@ export default class FileManager {
       if(!dbo[lookupTableName] || !(await dbo[lookupTableName].count())){
         const action = ` (${tableName} <-> ${refTable}) join table ${lookupTableName}`; //  PRIMARY KEY
         const query = `
-        DROP TABLE IF EXISTS  ${lookupTableName};
+        --DROP TABLE IF EXISTS  ${lookupTableName};
         CREATE TABLE ${lookupTableName} (
           foreign_id  ${pkField.udt_name} ${refType === "one"? " PRIMARY KEY " : ""} REFERENCES ${asName(refTable)}(${asName(pkField.name)}),
           media_id    UUID NOT NULL REFERENCES ${asName(tableName)}(id)
@@ -358,9 +363,31 @@ export default class FileManager {
         const cols = await dbo[lookupTableName].getColumns();
         const badCol = cols.find(c => !c.references);
         if(badCol){
-          console.error(`Prostgles: media ${lookupTableName} joining table has lost a reference constraint for column ${badCol.name}. This may have been caused by a DROP TABLE ... CASCADE.`);
+          console.error(
+            `Prostgles: media ${lookupTableName} joining table has lost a reference constraint for column ${badCol.name}.` + 
+            ` This may have been caused by a DROP TABLE ... CASCADE.`
+          );
+          if(badCol.name === "foreign_id"){
+            console.log("Trying to add the missing constraint back");
+            try {
+              await db.any(
+              `
+                
+                ALTER TABLE ${asName(lookupTableName)} 
+                ADD CONSTRAINT ${(lookupTableName+"_foreign_id_r")} FOREIGN KEY (foreign_id)
+                REFERENCES ${asName(refTable)}(${asName(pkField.name)})
+              `)
+              console.log("Added missing constraint back");
+
+            } catch(e){
+              console.error("Failed to add missing constraint", e)
+            }
+          }
+
         }
       }
+
+      return true;
     }));
 
     /**

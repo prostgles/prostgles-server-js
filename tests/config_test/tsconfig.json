@@ -8,7 +8,7 @@
 		"allowSyntheticDefaultImports": true,
 		"allowJs": true,
 		"module": "commonjs",
-		// "sourceMap": true,
+		"sourceMap": true,
 		// "rootDir": ".",
 		// "declaration": true,
 		// "declarationMap": true,

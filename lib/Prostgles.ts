@@ -6,7 +6,7 @@
 import * as promise from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import FileManager, { LocalConfig, S3Config } from "./FileManager";
+import FileManager, { ImageOptions, LocalConfig, S3Config } from "./FileManager";
 
 const pkgj = require('../package.json');
 const version = pkgj.version;
@@ -153,12 +153,12 @@ export type InsertRule = {
     returningFields?: FieldFilter;
 
     /**
-     * Validation logic to check/update data for each request. Happens before field check. The returned data will be used
+     * Validation logic to check/update data for each request. Happens before publish rule checks (for fields, forcedData/forcedFilter)
      */
     preValidate?: ValidateRow
 
     /**
-     * Validation logic to check/update data for each request. Happens after field check. The returned data will be used
+     * Validation logic to check/update data for each request. Happens after publish rule checks (for fields, forcedData/forcedFilter)
      */
     validate?: ValidateRow
 }
@@ -413,7 +413,8 @@ export type FileTableConfig = {
     expressApp: ExpressApp;
     referencedTables?: {
         [tableName: string]: "one" | "many"
-    }
+    },
+    imageOptions?: ImageOptions
 };
 
 export type ProstglesInitOptions<DBO = DbHandler> = {
@@ -673,6 +674,15 @@ export class Prostgles<DBO = DbHandler> {
         try {
             /* 3. Make DBO object from all tables and views */
             await this.refreshDBO();
+            /* Create media table if required */
+            if(this.opts.fileTable){
+                const { awsS3Config, localConfig, imageOptions } = this.opts.fileTable;
+                if(!awsS3Config && !localConfig) throw "fileTable missing param: Must provide awsS3Config OR localConfig";
+                await this.refreshDBO();
+                this.fileManager = new FileManager(awsS3Config || localConfig, imageOptions);
+                await this.fileManager.init(this as any);
+            }
+            await this.refreshDBO();
 
 
             if(this.opts.publish){
@@ -703,13 +713,6 @@ export class Prostgles<DBO = DbHandler> {
 
             this.dbEventsManager = new DBEventsManager(db, pgp);
             
-            /* 4.1 Create media table if required */
-            if(this.opts.fileTable){
-                const { awsS3Config, localConfig } = this.opts.fileTable;
-                if(!awsS3Config && !localConfig) throw "fileTable missing param: Must provide awsS3Config OR localConfig";
-                this.fileManager = new FileManager(awsS3Config || localConfig);
-                await this.fileManager.init(this as any);
-            }
 
             this.writeDBSchema();
             
@@ -762,9 +765,9 @@ export class Prostgles<DBO = DbHandler> {
         const fileContent = await this.getFileText(filePath);//.then(console.log);
 
         return this.db.multi(fileContent).then((data)=>{
-            console.log("Prostgles: SQL file executed successfuly \n    -> " + filePath);
+            console.log("Prostgles: SQL file executed successfuly \n    -> " + filePath, data);
             return true
-        }).catch((err)=>{
+        }).catch((err) => {
             const { position, length } = err,
                 lines = fileContent.split("\n");
             let errMsg = filePath + " error: ";

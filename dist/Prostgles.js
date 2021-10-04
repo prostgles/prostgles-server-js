@@ -388,6 +388,16 @@ class Prostgles {
             try {
                 /* 3. Make DBO object from all tables and views */
                 yield this.refreshDBO();
+                /* Create media table if required */
+                if (this.opts.fileTable) {
+                    const { awsS3Config, localConfig, imageOptions } = this.opts.fileTable;
+                    if (!awsS3Config && !localConfig)
+                        throw "fileTable missing param: Must provide awsS3Config OR localConfig";
+                    yield this.refreshDBO();
+                    this.fileManager = new FileManager_1.default(awsS3Config || localConfig, imageOptions);
+                    yield this.fileManager.init(this);
+                }
+                yield this.refreshDBO();
                 if (this.opts.publish) {
                     if (!this.opts.io)
                         console.warn("IO missing. Publish has no effect without io");
@@ -412,14 +422,6 @@ class Prostgles {
                 //     if(!(await isSuperUser(db))) throw "Cannot watchSchema without a super user schema. Set watchSchema=false or provide a super user";
                 // }
                 this.dbEventsManager = new DBEventsManager_1.DBEventsManager(db, pgp);
-                /* 4.1 Create media table if required */
-                if (this.opts.fileTable) {
-                    const { awsS3Config, localConfig } = this.opts.fileTable;
-                    if (!awsS3Config && !localConfig)
-                        throw "fileTable missing param: Must provide awsS3Config OR localConfig";
-                    this.fileManager = new FileManager_1.default(awsS3Config || localConfig);
-                    yield this.fileManager.init(this);
-                }
                 this.writeDBSchema();
                 /* 5. Finish init and provide DBO object */
                 try {
@@ -470,7 +472,7 @@ class Prostgles {
         return __awaiter(this, void 0, void 0, function* () {
             const fileContent = yield this.getFileText(filePath); //.then(console.log);
             return this.db.multi(fileContent).then((data) => {
-                console.log("Prostgles: SQL file executed successfuly \n    -> " + filePath);
+                console.log("Prostgles: SQL file executed successfuly \n    -> " + filePath, data);
                 return true;
             }).catch((err) => {
                 const { position, length } = err, lines = fileContent.split("\n");

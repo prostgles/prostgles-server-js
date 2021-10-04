@@ -1,6 +1,25 @@
 /// <reference types="node" />
 import { S3 } from 'aws-sdk';
 import { Prostgles } from './Prostgles';
+export declare type ImageOptions = {
+    keepMetadata?: boolean;
+    compression?: 
+    /**
+     * Will resize image maintaing scale ratio
+     */
+    {
+        inside: {
+            width: number;
+            height: number;
+        };
+    } | {
+        contain: {
+            width: number;
+        } | {
+            height: number;
+        };
+    };
+};
 export declare type S3Config = {
     region: string;
     bucket: string;
@@ -29,10 +48,11 @@ export declare type UploadedItem = {
 export default class FileManager {
     s3Client: S3;
     config: S3Config | LocalConfig;
+    imageOptions: ImageOptions;
     prostgles: Prostgles;
     tableName: string;
     private fileRoute;
-    constructor(config: FileManager["config"]);
+    constructor(config: FileManager["config"], imageOptions?: ImageOptions);
     getMIME(file: Buffer | String, fileName: string, allowedExtensions?: Array<ALLOWED_EXTENSION>, dissallowedExtensions?: Array<ALLOWED_EXTENSION>, onlyFromName?: boolean): Promise<{
         mime: string;
         ext: string;
@@ -43,25 +63,7 @@ export default class FileManager {
         item: UploadItem;
         allowedExtensions?: Array<ALLOWED_EXTENSION>;
         dissallowedExtensions?: Array<ALLOWED_EXTENSION>;
-        imageOptions?: {
-            keepMetadata?: boolean;
-            compression?: 
-            /**
-             * Will resize image maintaing scale ratio
-             */
-            {
-                inside: {
-                    width: number;
-                    height: number;
-                };
-            } | {
-                contain: {
-                    width: number;
-                } | {
-                    height: number;
-                };
-            };
-        };
+        imageOptions?: ImageOptions;
     }) => Promise<UploadedItem>;
     private getFileURL;
     private parseSQLIdentifier;

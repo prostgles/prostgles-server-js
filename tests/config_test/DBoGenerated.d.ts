@@ -147,6 +147,9 @@ export type Various = {
   "jsn"?: Object;
   "added"?: Date;
 }
+export type Various_nested = { 
+  "various_id"?: number;
+}
 
 export type JoinMakerTables = {
  "items": JoinMaker<Items>;
@@ -160,6 +163,7 @@ export type JoinMakerTables = {
  "tt1": JoinMaker<Tt1>;
  "usr": JoinMaker<Usr>;
  "various": JoinMaker<Various>;
+ "various_nested": JoinMaker<Various_nested>;
 };
 
 /* DBO Definition. Isomorphic */
@@ -189,6 +193,7 @@ export type DBObj = {
   "usr": TableHandler<Usr> 
   "v_items": ViewHandler<V_items> 
   "various": TableHandler<Various> 
+  "various_nested": TableHandler<Various_nested> 
   leftJoin: JoinMakerTables;
   innerJoin: JoinMakerTables;
   leftJoinOne: JoinMakerTables;
@@ -274,6 +279,9 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
     }; 
     "various": { 
       [key in "id" | "h" | "name" | "tsv" | "jsn" | "added"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "various_nested": { 
+      [key in "various_id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
   }> 
 } 

@@ -16,7 +16,7 @@ const sharp = require("sharp");
 const prostgles_types_1 = require("prostgles-types");
 const HOUR = 3600 * 1000;
 class FileManager {
-    constructor(config) {
+    constructor(config, imageOptions) {
         this.uploadAsMedia = (params) => __awaiter(this, void 0, void 0, function* () {
             const { item, imageOptions } = params;
             const { name, data, content_type } = item;
@@ -105,7 +105,7 @@ class FileManager {
                 if (!dbo[lookupTableName] || !(yield dbo[lookupTableName].count())) {
                     const action = ` (${tableName} <-> ${refTable}) join table ${lookupTableName}`; //  PRIMARY KEY
                     const query = `
-        DROP TABLE IF EXISTS  ${lookupTableName};
+        --DROP TABLE IF EXISTS  ${lookupTableName};
         CREATE TABLE ${lookupTableName} (
           foreign_id  ${pkField.udt_name} ${refType === "one" ? " PRIMARY KEY " : ""} REFERENCES ${prostgles_types_1.asName(refTable)}(${prostgles_types_1.asName(pkField.name)}),
           media_id    UUID NOT NULL REFERENCES ${prostgles_types_1.asName(tableName)}(id)
@@ -119,9 +119,26 @@ class FileManager {
                     const cols = yield dbo[lookupTableName].getColumns();
                     const badCol = cols.find(c => !c.references);
                     if (badCol) {
-                        console.error(`Prostgles: media ${lookupTableName} joining table has lost a reference constraint for column ${badCol.name}. This may have been caused by a DROP TABLE ... CASCADE.`);
+                        console.error(`Prostgles: media ${lookupTableName} joining table has lost a reference constraint for column ${badCol.name}.` +
+                            ` This may have been caused by a DROP TABLE ... CASCADE.`);
+                        if (badCol.name === "foreign_id") {
+                            console.log("Trying to add the missing constraint back");
+                            try {
+                                yield db.any(`
+                
+                ALTER TABLE ${prostgles_types_1.asName(lookupTableName)} 
+                ADD CONSTRAINT ${(lookupTableName + "_foreign_id_r")} FOREIGN KEY (foreign_id)
+                REFERENCES ${prostgles_types_1.asName(refTable)}(${prostgles_types_1.asName(pkField.name)})
+              `);
+                                console.log("Added missing constraint back");
+                            }
+                            catch (e) {
+                                console.error("Failed to add missing constraint", e);
+                            }
+                        }
                     }
                 }
+                return true;
             })));
             /**
              * 4. Serve media through express
@@ -166,6 +183,7 @@ class FileManager {
             }
         });
         this.config = config;
+        this.imageOptions = imageOptions;
         if ("region" in config) {
             const { region, accessKeyId, secretAccessKey } = config;
             this.s3Client = new aws_sdk_1.S3({

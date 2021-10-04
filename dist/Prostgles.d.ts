@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import FileManager, { LocalConfig, S3Config } from "./FileManager";
+import FileManager, { ImageOptions, LocalConfig, S3Config } from "./FileManager";
 import { DboBuilder, DbHandler, LocalParams } from "./DboBuilder";
 export { DbHandler };
 export declare type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -82,11 +82,11 @@ export declare type InsertRule = {
      */
     returningFields?: FieldFilter;
     /**
-     * Validation logic to check/update data for each request. Happens before field check. The returned data will be used
+     * Validation logic to check/update data for each request. Happens before publish rule checks (for fields, forcedData/forcedFilter)
      */
     preValidate?: ValidateRow;
     /**
-     * Validation logic to check/update data for each request. Happens after field check. The returned data will be used
+     * Validation logic to check/update data for each request. Happens after publish rule checks (for fields, forcedData/forcedFilter)
      */
     validate?: ValidateRow;
 };
@@ -323,6 +323,7 @@ export declare type FileTableConfig = {
     referencedTables?: {
         [tableName: string]: "one" | "many";
     };
+    imageOptions?: ImageOptions;
 };
 export declare type ProstglesInitOptions<DBO = DbHandler> = {
     dbConnection: DbConnection;

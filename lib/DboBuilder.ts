@@ -33,7 +33,6 @@ export type Media = {
     "signed_url_expires"?: number;
     "name"?: string;
     "original_name"?: string;
-    "final_name"?: string;
     "etag"?: string;
 }
 
@@ -108,9 +107,10 @@ export type LocalParams = {
     testRule?: boolean;
     tableAlias?: string;
     // subOne?: boolean;
-    dbTX?: any;
+    dbTX?: TxHandler;
 
-    localTX?: pgPromise.ITask<{}>; 
+    // localTX?: pgPromise.ITask<{}>;
+    localDBTX?: DbHandler;
 
     returnQuery?: boolean;
 
@@ -1081,7 +1081,7 @@ export class ViewHandler {
                 addKeywords: false, 
                 tableAlias, 
                 localParams, 
-                tableRule: tableRules
+                tableRule: t2Rules //tableRules
             }))
         } catch(err) {
             // console.trace(err)
@@ -1876,30 +1876,250 @@ export class TableHandler extends ViewHandler {
         return { data, allowedCols: this.columns.filter(c => dataKeys.includes(c.name)).map(c => c.name) }
     }
     
-    async insert(data: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?, tableRules?: TableRule, _localParams: LocalParams = null): Promise<any | any[] | boolean>{
+
+    private async insertDataParse(data: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?, tableRules?: TableRule, _localParams: LocalParams = null): Promise<{
+        data?: AnyObject | AnyObject[];
+        insertResult?: AnyObject | AnyObject[];
+    }>{
         const localParams = _localParams || {};
-        const {localTX} = localParams
+        const {dbTX} = localParams;
+
+        const isMultiInsert = Array.isArray(data);
+        const getExtraKeys = d => Object.keys(d).filter(k => !this.columns.find(c => c.name === k));
+
+        /* Nested insert is not allowed for the file table */
+        const isNestedInsert = this.is_media? false : (Array.isArray(data)? data : [data]).some(d => getExtraKeys(d).length);
+
+        /**
+         * Make sure nested insert uses a transaction
+         */
+        if(isNestedInsert && (!this.t || !dbTX)){
+            return {
+                insertResult: await this.dboBuilder.getTX((dbTX) => 
+                    (dbTX[this.name] as TableHandler).insert(
+                        data, 
+                        param2, 
+                        param3_unused, 
+                        tableRules, 
+                        {dbTX, ...localParams}
+                    )
+                )
+            }
+        }
+        
+        const preValidate = tableRules?.insert?.preValidate,
+            validate = tableRules?.insert?.validate;
+
+        let _data = await Promise.all((Array.isArray(data)? data : [data]).map(async row => {
+            if(preValidate){
+                row = await preValidate(row);
+            }
+
+            const dataKeys = Object.keys(row);
+            const extraKeys = getExtraKeys(row);
+
+            /* Upload file then continue insert */
+            if(this.is_media){
+                if(!this.dboBuilder.prostgles?.fileManager) throw "fileManager not set up";
+                const { data, name } = row;
+                
+                if(dataKeys.length !== 2) throw "Expecting only two properties: { name: string; data: File }";
+
+                // if(!Buffer.isBuffer(data)) throw "data is not of type Buffer"
+                if(!data) throw "data not provided"
+                if(typeof name !== "string"){
+                    throw "name is not of type string"
+                }
+
+                const media_id = (await this.db.oneOrNone("SELECT gen_random_uuid() as name")).name;
+                const type = await this.dboBuilder.prostgles.fileManager.getMIME(data, name)
+                const media_name = `${media_id}.${type.ext}`;
+                let media: Media = {
+                    id: media_id,
+                    name: media_name,
+                    original_name: name,
+                    extension: type.ext,
+                    content_type: type.mime
+                }
+
+                if(validate){
+                    media = await validate(media);
+                }
+
+                const _media: Media = await this.dboBuilder.prostgles.fileManager.uploadAsMedia({
+                    item: {
+                        data,
+                        name: media.name,
+                        content_type: media.content_type as any
+                    },
+                    // imageCompression: {
+                    //     inside: {
+                    //         width: 1100,
+                    //         height: 630
+                    //     }
+                    // }
+                });
+
+                return {
+                    ...media,
+                    ..._media,
+                };
+
+            /* Potentially a nested join */ 
+            } else if(extraKeys.length){
+
+                /* Ensure we're using the same transaction */
+                const _this = this.t? this : dbTX[this.name] as TableHandler;
+
+                let rootData = filterObj(data, null, extraKeys);
+
+                let insertedChildren: AnyObject[];
+                let targetTableRules: TableRule;
+
+                if(validate){
+                    rootData = await validate(rootData);
+                }
+
+                const fullRootResult = await _this.insert(rootData, { returning: "*" }, null, tableRules, localParams);
+                let returnData: AnyObject;
+                const returning = param2?.returning;
+                if(returning){
+                    returnData = {}
+                    const returningItems = await this.prepareReturning(returning, this.parseFieldFilter(tableRules?.insert?.returningFields));
+                    returningItems.filter(s => s.selected).map(rs => {
+                        returnData[rs.alias] = fullRootResult[rs.alias];
+                    })
+                }
+                // console.log({ rootResult })
+                await Promise.all(extraKeys.map(async targetTable => {
+                    const childDataItems = Array.isArray(row[targetTable])? row[targetTable] : [row[targetTable]];
+                    // console.log({childDataItems})
+
+                    /* Must be allowed to insert into media table */
+                    const canInsert = async (tbl: string) => {
+                        const childRules = await this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: tbl, command: "insert", localParams });
+                        if(!childRules || !childRules.insert) throw "Dissallowed nested insert into table " + childRules;
+                        return childRules;
+                    }
+
+                    // console.log(JSON.stringify(this.dboBuilder.joinPaths, null, 2))
+                    const jp = this.dboBuilder.joinPaths.find(jp => jp.t1 === this.name && jp.t2 === targetTable);
+                    if(!jp) throw `Could not find a valid table for the nested data { ${targetTable} } `;
+
+                    const childInsert = async (cdata, tableName) => {
+                        // console.log("childInsert", {data, tableName})
+                        if(!cdata || !dbTX[tableName] || !("insert" in dbTX[tableName])) throw "childInsertErr: Child table handler missing for: " + tableName;
+
+                        const tableRules = await canInsert(tableName);
+                        return Promise.all(
+                            (Array.isArray(cdata)? cdata : [cdata])
+                                .map(m => (dbTX[tableName] as TableHandler)
+                                .insert(m, { returning: "*" }, null, tableRules, localParams)
+                                .catch(e => {
+                                    console.trace({ childInsertErr: e })
+                                    return Promise.reject({ childInsertErr: e });
+                                })
+                            )
+                        );
+                    }
+                    
+                    const { path } = jp;
+                    const [tbl1, tbl2, tbl3] = path; 
+                    targetTableRules = await canInsert(targetTable);   //  tbl3
+
+                    const cols2 = this.dboBuilder.dbo[tbl2].columns || [];
+                    if(!this.dboBuilder.dbo[tbl2]) throw "Invalid/disallowed table: " + tbl2;
+                    const colsRefT1 = cols2?.filter(c => c.references?.cols.length === 1 && c.references?.ftable === tbl1),
+                        colsRefT3 = cols2?.filter(c => c.references?.cols.length === 1 && c.references?.ftable === tbl3);
+
+
+                    if(!path.length) {
+                        throw "Nested inserts join path not found for " + [this.name, targetTable];
+                    } else if(path.length === 2){
+                        if(targetTable !== tbl2) throw "Did not expect this";
+
+                        if(!colsRefT1.length) throw `Target table ${tbl2} does not reference any columns from the root table ${this.name}. Cannot do nested insert`;
+
+                        insertedChildren = await childInsert(
+                            childDataItems.map(d => ({ ...d, ...filterObj(fullRootResult, colsRefT1.map(col => col.name)) })), 
+                            targetTable
+                        );
+
+                    } else if(path.length === 3){
+                        if(targetTable !== tbl3) throw "Did not expect this";
+                        if(!colsRefT1.length || !colsRefT3.length) throw "Incorrectly referenced or missing columns for nested insert";
+
+                        if(targetTable !== this.dboBuilder.prostgles.fileManager.tableName){
+                            throw "Only media allowed to have nested inserts more than 2 tables apart"
+                        }
+
+                        /* We expect tbl2 to have only 2 columns (media_id and foreign_id) */
+                        if(!cols2 || cols2.find(c => !["media_id", "foreign_id"].includes(c.name))){
+                            throw "Second joining table not of expected format";
+                        }
+
+                        insertedChildren = await childInsert(childDataItems, targetTable);
+                        
+                        /* Insert in key_lookup table */
+                        await Promise.all(insertedChildren.map(async t3Child => {
+                            let tbl2Row = {};
+
+                            colsRefT3.map(col => {
+                                tbl2Row[col.name] = t3Child[col.references.fcols[0]];
+                            })
+                            colsRefT1.map(col => {
+                                tbl2Row[col.name] = fullRootResult[col.references.fcols[0]];
+                            })
+                            // console.log({ rootResult, tbl2Row, t3Child, colsRefT3, colsRefT1, t: this.t?.ctx?.start });
+                            
+                            await childInsert(tbl2Row, tbl2);//.then(() => {});
+                        }));
+
+                    } else throw "Unexpected path for Nested inserts";
+
+                    /* Return also the nested inserted data */
+                    if(targetTableRules && insertedChildren?.length && returning){
+                        const targetTableHandler = dbTX[targetTable] as TableHandler;
+                        const targetReturning = await targetTableHandler.prepareReturning("*", targetTableHandler.parseFieldFilter(targetTableRules?.insert?.returningFields));
+                        let clientTargetInserts = insertedChildren.map(d => {
+                            let _d = { ...d };
+                            let res = {};
+                            targetReturning.map(r => {
+                                res[r.alias] = _d[r.alias]
+                            });
+                            return res;
+                        });
+    
+                        returnData[targetTable] = clientTargetInserts.length === 1? clientTargetInserts[0] : clientTargetInserts;
+                    }
+                }));
+
+                return returnData
+            }
+
+            return row;
+        }));
+
+        const result = isMultiInsert? _data : _data[0];
+        let res = isNestedInsert? 
+            { insertResult: result } : 
+            { data: result };
+        if(this.is_media) console.log(res, { isNestedInsert, name: this.name})
+        return res;
+    }
+
+    async insert(rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?, tableRules?: TableRule, _localParams: LocalParams = null): Promise<any | any[] | boolean>{
+        const localParams = _localParams || {};
+        const {dbTX} = localParams
         try {
-
-
-            /**
-             * Check if for nested joins and wrapp in transaction
-             */
-            console.log("Finish this 1880")
-            // if(!localTX){//} && (Array.isArray(data)? data : [data]).find(d => Object.keys(d).find(k => !this.columns.find(c => c.name === k)))){
-            //     console.log("adding tx", this.name);
-            //     return this.dboBuilder.getTX((dbTX, localTX) => (dbTX[this.name] as TableHandler).insert(data, param2, param3_unused, tableRules, {localTX, ..._localParams}));
-            // }
 
             const { returning, onConflictDoNothing, fixIssues = false } = param2 || {};
             const { testRule = false, returnQuery = false } = localParams || {};
 
-            const isMultiInsert = Array.isArray(data);
-
             let returningFields: FieldFilter,
                 forcedData: object,
-                validate: TableRule["insert"]["validate"],
-                preValidate: any,
+                // validate: TableRule["insert"]["validate"],
+                // preValidate: any,
                 fields: FieldFilter;
     
             if(tableRules){
@@ -1907,12 +2127,11 @@ export class TableHandler extends ViewHandler {
                 returningFields = tableRules.insert.returningFields;
                 forcedData = tableRules.insert.forcedData;
                 fields = tableRules.insert.fields;
-                validate = tableRules.insert.validate;
-                preValidate = tableRules.insert.preValidate;
+                // validate = tableRules.insert.validate;
+                // preValidate = tableRules.insert.preValidate;
     
                 /* If no returning fields specified then take select fields as returning */
-                if(!returningFields) returningFields = get(tableRules, "select.fields");
-                if(!returningFields) returningFields = get(tableRules, "insert.fields");
+                if(!returningFields) returningFields = get(tableRules, "select.fields") || get(tableRules, "insert.fields");
 
                 if(!fields) throw ` invalid insert rule for ${this.name} -> fields missing `;
 
@@ -1937,158 +2156,22 @@ export class TableHandler extends ViewHandler {
                 }
             }
 
-            const _preValidate = async row => {
-                let result = row;
-
-                if(preValidate){
-                    result = await preValidate(result);
-                }
-
-                let hasNestedData = false;
-                /* Upload file if needed */
-                if(this.is_media){
-                    if(!this.dboBuilder.prostgles?.fileManager) throw "fileManager not set up";
-                    const { data, name } = row;
-                    
-                    if(Object.keys(row).length !== 2) throw "Expecting only two properties: { name: string; data: File }";
-
-                    // if(!Buffer.isBuffer(data)) throw "data is not of type Buffer"
-                    if(!data) throw "data not provided"
-                    if(typeof name !== "string"){
-                        throw "name is not of type string"
-                    }
-
-                    const media_id = (await this.db.oneOrNone("SELECT gen_random_uuid() as name")).name;
-                    const type = await this.dboBuilder.prostgles.fileManager.getMIME(data, name)
-                    const media_name = `${media_id}.${type.ext}`;
-                    let media: Media = {
-                        id: media_id,
-                        name: media_name,
-                        original_name: name,
-                        extension: type.ext,
-                        content_type: type.mime
-                    }
-
-                    if(validate){
-                        media = await validate(media);
-                    }
-
-                    const _media: Media = await this.dboBuilder.prostgles.fileManager.uploadAsMedia({
-                        item: {
-                            data,
-                            name: media_name,
-                            content_type: type.mime
-                        },
-                        // imageCompression: {
-                        //     inside: {
-                        //         width: 1100,
-                        //         height: 630
-                        //     }
-                        // }
-                    });
-                    result = {
-                        ...media,
-                        ..._media,
-                    };
-
-                // } else if(this.dboBuilder.prostgles?.fileManager) {
-                } else {
-                    const mediaTableName = this.dboBuilder.prostgles?.fileManager?.tableName;
-                    // const { referencedTables } = this.dboBuilder.prostgles?.opts.fileTable;
-                        // extraKeys[0] === mediaTableName &&
-                        // referencedTables[this.name]
-                    const dataKeys = Object.keys(row);
-                    const extraKeys = dataKeys.filter(k => !this.columns.find(c => c.name === k));
-
-                    const nestedJoin = localParams?.nestedJoin || { depth: 0 };
-
-                    if(extraKeys.length){
-                        if(isMultiInsert) throw "Nested inserts are not possible with batch insert. Insert only one root row"
-
-                        hasNestedData = true;
-
-                        const rootResult = await this.insert(filterObj(data, null, extraKeys), { returning: "*" }, null, tableRules, localParams);
-
-                        return Promise.all(extraKeys.map(async targetTable => {
-                            const childDataItems = Array.isArray(row[targetTable])? row[targetTable] : [row[targetTable]];
-                            console.log({childDataItems})
-
-                            /* Must be allowed to insert into media table */
-                            const t3Rules = await this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: targetTable, command: "insert", localParams });
-                            if(!t3Rules || !t3Rules.insert) throw "Dissallowed nested insert into table " + targetTable;
-
-                            const jp = this.dboBuilder.joinPaths.find(jp => jp.t1 === this.name && jp.t2 === targetTable);
-                            if(!jp) throw `Could not find a valid table for the nested data { ${targetTable} } `;
-
-                            const childInsert = (data, tableName) => {
-                                console.log("childInsert", {data, tableName})
-                                if(!data || !this.dboBuilder.dbo[tableName]) throw "Internal error: Child table handler missing for: " + tableName;
-                                return Promise.all(
-                                    (   Array.isArray(data)? data : [data])
-                                            .map(m => this.dboBuilder.dbo[tableName].insert(m, { returning: "*" }, null, tableRules, localParams)
-                                    )
-                                );
-                            }
-                            
-                            const { path } = jp;
-                            const [tbl1, tbl2, tbl3] = path; 
-
-                            const cols2 = this.dboBuilder.dbo[tbl2].columns || [];
-                            const colsRefT1 = cols2?.filter(c => c.references?.cols.length === 1 && c.references?.ftable === tbl1),
-                                colsRefT3 = cols2?.filter(c => c.references?.cols.length === 1 && c.references?.ftable === tbl3);
-
-                            if(!path.length) {
-                                throw "Nested inserts join path not found for " + [this.name, targetTable];
-                            } else if(path.length === 2){
-                                if(!colsRefT1.length) throw `Target table ${tbl2} does not reference any columns from the root table ${this.name}. Cannot do nested insert`;
-
-                                return childInsert(childDataItems.map(d => ({ ...d, ...filterObj(rootResult, colsRefT1.map(col => col.name)) })), tbl2).then(() => {});
-
-                            } else if(path.length === 3){
-                                if(tbl3 !== this.dboBuilder.prostgles.fileManager.tableName){
-                                    throw "Only media allowed to have nested inserts more than 2 tables apart"
-                                }
-
-                                /* We expect tbl2 to have only 2 columns (media_id and foreign_id) */
-                                if(!cols2 || cols2.find(c => !["media_id", "foreign_id"].includes(c.name))){
-                                    throw "Second joining table not of expected format";
-                                }
-
-                                if(!colsRefT1.length || !colsRefT3.length) throw "Incorrectly referenced columns for nested insert";
-
-                                const insertedChildren = await childInsert(childDataItems, targetTable);
-
-                                return Promise.all(insertedChildren.map(t3Child => {
-                                    let tbl2Row = {};
-
-                                    colsRefT3.map(col => {
-                                        tbl2Row[col.name] = t3Child[col.references.fcols[0]];
-                                    })
-                                    colsRefT1.map(col => {
-                                        tbl2Row[col.name] = rootResult[col.references.fcols[0]];
-                                    })
-                                    // console.log({ rootResult, tbl2Row, t3Child, colsRefT3, colsRefT1, t: this.t?.ctx?.start });
-                                    
-                                    return childInsert(tbl2Row, tbl2).then(() => {});
-                                }));
-                            } else throw "Unexpected path for Nested inserts";
-                        }));
-                    }
-                }
-
-                return result;
-            }
-
             let conflict_query = "";
             if(typeof onConflictDoNothing === "boolean" && onConflictDoNothing){
                 conflict_query = " ON CONFLICT DO NOTHING ";
             }
+
+            if(param2){
+                const good_params = ["returning", "multi", "onConflictDoNothing", "fixIssues"];
+                const bad_params = Object.keys(param2).filter(k => !good_params.includes(k));
+                if(bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
+            }
             
-            if(!data) data = {}; //throw "Provide data in param1";
+            if(!rowOrRows) rowOrRows = {}; //throw "Provide data in param1";
             let returningSelect = this.makeReturnQuery(await this.prepareReturning(returning, this.parseFieldFilter(returningFields)));
             const makeQuery = async (_row, isOne = false) => {
                 let row = { ..._row };
-                row = await _preValidate(row);
+                
                 if(!isPojoObject(row)) {
                     console.trace(row)
                     throw "\ninvalid insert data provided -> " + JSON.stringify(row);
@@ -2096,24 +2179,24 @@ export class TableHandler extends ViewHandler {
 
                 const { data, allowedCols } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues });
                 let _data = { ...data };
-                if(validate){
-                    _data = await validate(_data);
-                }
+
                 let insertQ = "";
                 if(!Object.keys(_data).length) insertQ = `INSERT INTO ${asName(this.name)} DEFAULT VALUES `;
                 else insertQ = this.colSet.getInsertQuery(_data, allowedCols) // pgp.helpers.insert(_data, columnSet); 
                 return insertQ + conflict_query + returningSelect;
             };
-
-
-            if(param2){
-                const good_params = ["returning", "multi", "onConflictDoNothing", "fixIssues"];
-                const bad_params = Object.keys(param2).filter(k => !good_params.includes(k));
-                if(bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
-            }
     
             let query = "";
             let queryType = "none";
+            
+            /**
+             * If media it will: upload file and continue insert
+             * If nested insert it will: make separate inserts and not continue main insert
+             */
+            const { data, insertResult } = await this.insertDataParse(rowOrRows, param2, param3_unused, tableRules, localParams);
+            
+            if(insertResult) return insertResult;
+            
             if(Array.isArray(data)){
                 // if(returning) throw "Sorry but [returning] is dissalowed for multi insert";
                 let queries = await Promise.all(data.map(async p => {
@@ -2132,9 +2215,11 @@ export class TableHandler extends ViewHandler {
             if(returnQuery)  return query;
             let result;
 
-            console.log("insert in " + this.name, { t: this.t?.ctx?.start, data })
-            if(this.t || localTX) {
-                result = (localTX || this.t)[queryType](query).catch(err => makeErr(err, localParams));
+            console.log(this.t?.ctx?.start, "insert in " + this.name, data);
+
+            const tx = dbTX?.[this.name]?.t || this.t;
+            if(tx) {
+                result = tx[queryType](query).catch(err => makeErr(err, localParams));
             } else {
                 result = this.db.tx(t => t[queryType](query)).catch(err => makeErr(err, localParams));
             }
@@ -2743,7 +2828,7 @@ export type TxCB = {
 
     getTX = (dbTX: TxCB) => {
         return this.db.tx((t) => {
-            let txDB = {};
+            let txDB: TxHandler = {};
             this.tablesOrViews.map(tov => {
                 if(tov.is_view){
 

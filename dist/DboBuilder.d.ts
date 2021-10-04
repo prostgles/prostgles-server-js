@@ -17,7 +17,6 @@ export declare type Media = {
     "signed_url_expires"?: number;
     "name"?: string;
     "original_name"?: string;
-    "final_name"?: string;
     "etag"?: string;
 };
 export interface TxHandler {
@@ -61,8 +60,8 @@ export declare type LocalParams = {
     has_rules?: boolean;
     testRule?: boolean;
     tableAlias?: string;
-    dbTX?: any;
-    localTX?: pgPromise.ITask<{}>;
+    dbTX?: TxHandler;
+    localDBTX?: DbHandler;
     returnQuery?: boolean;
     nestedJoin?: {
         depth: number;
@@ -278,7 +277,8 @@ export declare class TableHandler extends ViewHandler {
         data: any;
         allowedCols: string[];
     };
-    insert(data: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: any, tableRules?: TableRule, _localParams?: LocalParams): Promise<any | any[] | boolean>;
+    private insertDataParse;
+    insert(rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: any, tableRules?: TableRule, _localParams?: LocalParams): Promise<any | any[] | boolean>;
     prepareReturning: (returning: FieldFilter, allowedFields: string[]) => Promise<SelectItem[]>;
     makeReturnQuery(items?: SelectItem[]): string;
     delete(filter?: Filter, params?: DeleteParams, param3_unused?: any, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
