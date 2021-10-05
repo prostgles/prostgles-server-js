@@ -2,6 +2,7 @@
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import FileManager, { ImageOptions, LocalConfig, S3Config } from "./FileManager";
+import AuthHandler, { ClientInfo, Auth } from "./AuthHandler";
 import { DboBuilder, DbHandler, LocalParams } from "./DboBuilder";
 export { DbHandler };
 export declare type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -101,7 +102,7 @@ export declare type UpdateRule = {
      */
     forcedFilter?: object;
     /**
-     * Data to include/overwrite on each update
+     * Data to include/overwrite on each updatDBe
      */
     forcedData?: object;
     /**
@@ -200,7 +201,7 @@ export declare type PublishParams<DBO = DbHandler> = {
     db?: DB;
     user?: AnyObject;
 };
-export declare type Publish<DBO> = (params: PublishParams<DBO>) => (PublishedResult | Promise<PublishedResult>);
+export declare type Publish<DBO> = PublishedResult | ((params: PublishParams<DBO>) => (PublishedResult | Promise<PublishedResult>));
 export declare type Method = (...args: any) => (any | Promise<any>);
 export declare const JOIN_TYPES: readonly ["one-many", "many-one", "one-one", "many-many"];
 export declare type Join = {
@@ -216,48 +217,6 @@ export declare type PublishMethods<DBO> = (params: PublishParams<DBO>) => {
 } | Promise<{
     [key: string]: Method;
 }>;
-export declare type BasicSession = {
-    sid: string;
-    expires: number;
-};
-export declare type AuthClientRequest = {
-    socket: any;
-} | {
-    httpReq: any;
-};
-export declare type Auth<DBO = DbHandler> = {
-    /**
-     * Name of the cookie or socket hadnshake query param that represents the session id.
-     * Defaults to "session_id"
-     */
-    sidKeyName?: string;
-    expressConfig?: {
-        /**
-         * Express app instance. If provided Prostgles will attempt to set sidKeyName to user cookie
-         */
-        app: any;
-        /**
-         * Used in allowing logging in through express
-         */
-        loginPostPath: string;
-    };
-    /**
-     * User data used on server
-     */
-    getUser: (sid: string, dbo: DBO, db: DB) => Promise<AnyObject | null | undefined>;
-    /**
-     * User data sent to client
-     */
-    getClientUser: (sid: string, dbo: DBO, db: DB) => Promise<AnyObject | null | undefined>;
-    register?: (params: AnyObject, dbo: DBO, db: DB) => Promise<BasicSession>;
-    login?: (params: AnyObject, dbo: DBO, db: DB) => Promise<BasicSession>;
-    logout?: (sid: string, dbo: DBO, db: DB) => Promise<any>;
-};
-export declare type ClientInfo = {
-    user?: AnyObject;
-    clientUser?: AnyObject;
-    sid?: string;
-};
 declare type Keywords = {
     $and: string;
     $or: string;
@@ -363,6 +322,7 @@ export declare class Prostgles<DBO = DbHandler> {
     dbo: DbHandler;
     dboBuilder: DboBuilder;
     publishParser: PublishParser;
+    authHandler: AuthHandler;
     keywords: {
         $filter: string;
         $and: string;
@@ -395,14 +355,6 @@ export declare class Prostgles<DBO = DbHandler> {
         destroy: () => Promise<boolean>;
     }>;
     runSQLFile(filePath: string): Promise<any[][]>;
-    /**
-     * Will return first sid value found in : http cookie or query params
-     * Based on sid names in auth
-     * @param localParams
-     * @returns string
-     */
-    getSID(localParams: LocalParams): string;
-    getClientInfo(localParams: Pick<LocalParams, "socket" | "httpReq">): Promise<ClientInfo>;
     connectedSockets: any[];
     setSocketEvents(): Promise<void>;
     pushSocketSchema: (socket: any) => Promise<void>;

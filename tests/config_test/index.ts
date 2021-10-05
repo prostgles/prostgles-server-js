@@ -76,15 +76,16 @@ prostgles<DBObj>({
     // log("set auth logic")
     return true
   },
-  publish: async (params) => {
-    return "*";
+  publish: "*",
+  // async (params) => {
+  //   return "*";
 
-    return {
-      various: "*",
-      v_various: "*",
-    };
+  //   return {
+  //     various: "*",
+  //     v_various: "*",
+  //   };
     
-  },
+  // },
   joins: "inferred",
 	// onNotice: console.log,
   fileTable: {

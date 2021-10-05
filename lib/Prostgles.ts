@@ -10,7 +10,7 @@ import FileManager, { ImageOptions, LocalConfig, S3Config } from "./FileManager"
 
 const pkgj = require('../package.json');
 const version = pkgj.version;
-
+import AuthHandler, { ClientInfo, Auth } from "./AuthHandler";
 console.log("Add a basic auth mode where user and sessions table are created");
 
 import { get } from "./utils";
@@ -176,7 +176,7 @@ export type UpdateRule = {
     forcedFilter?: object;
 
     /**
-     * Data to include/overwrite on each update
+     * Data to include/overwrite on each updatDBe
      */
     forcedData?: object;
 
@@ -288,7 +288,7 @@ export type PublishParams<DBO = DbHandler> = {
     db?: DB;
     user?: AnyObject;
 }
-export type Publish<DBO> =(params: PublishParams<DBO>) => (PublishedResult | Promise<PublishedResult>); 
+export type Publish<DBO> = PublishedResult | ((params: PublishParams<DBO>) => (PublishedResult | Promise<PublishedResult>)); 
 
 export type Method = (...args: any) => ( any | Promise<any> );
 export const JOIN_TYPES = ["one-many", "many-one", "one-one", "many-many"] as const;
@@ -301,47 +301,6 @@ export type Joins = Join[] | "inferred";
 
 export type PublishMethods<DBO> = (params: PublishParams<DBO>) => { [key:string]: Method } | Promise<{ [key:string]: Method }>;
 
-export type BasicSession = { sid: string, expires: number };
-
-export type AuthClientRequest = { socket: any } | { httpReq: any }
-export type Auth<DBO = DbHandler> = {
-    /**
-     * Name of the cookie or socket hadnshake query param that represents the session id. 
-     * Defaults to "session_id"
-     */
-    sidKeyName?: string;
-    expressConfig?: {
-        /**
-         * Express app instance. If provided Prostgles will attempt to set sidKeyName to user cookie
-         */
-        app: any;
-
-        /**
-         * Used in allowing logging in through express
-         */
-        loginPostPath: string;
-    }
-
-    /**
-     * User data used on server
-     */
-    getUser: (sid: string, dbo: DBO, db: DB) => Promise<AnyObject | null | undefined>;
-
-    /**
-     * User data sent to client
-     */
-    getClientUser: (sid: string, dbo: DBO, db: DB) => Promise<AnyObject | null | undefined>;
-
-    register?: (params: AnyObject, dbo: DBO, db: DB) => Promise<BasicSession>;
-    login?: (params: AnyObject, dbo: DBO, db: DB) => Promise<BasicSession>;
-    logout?: (sid: string, dbo: DBO, db: DB) => Promise<any>;
-}
-
-export type ClientInfo = {
-    user?: AnyObject;
-    clientUser?: AnyObject;
-    sid?: string;
-}
 
 type Keywords = {
     $and: string;
@@ -499,29 +458,7 @@ export class Prostgles<DBO = DbHandler> {
     dboBuilder: DboBuilder;
     publishParser: PublishParser;
 
-    // publishMethods?: ProstglesInitOptions<DBO>["publishMethods"];
-    // io: any;
-    // publish?: ProstglesInitOptions<DBO>["publish"];
-    // joins?: Joins;
-    // schema: string = "public";
-    // transactions?: string | boolean;
-    
-    // publishRawSQL?: ProstglesInitOptions<DBO>["publishRawSQL"];
-    // wsChannelNamePrefix: string = "_psqlWS_";
-    // onSocketConnect?(socket: Socket | any, dbo: DBO, db?: DB);
-    // onSocketDisconnect?(socket: Socket | any, dbo: DBO, db?: DB);
-    // sqlFilePath?: string;
-    // tsGeneratedTypesDir?: string;
-    // auth?: ProstglesInitOptions["auth"];
-    // DEBUG_MODE?: boolean = false;
-    // watchSchema?: ProstglesInitOptions["watchSchema"];// boolean | "hotReloadMode" | ((event: { command: string; query: string }) => void) = false;
-    // onReady: (dbo: any, db: DB) => void;
-    // i18n?: ProstglesInitOptions["i18n"];
-    // fileTable?: FileTableConfig;
-    // /**
-    //  * Postgres on notice callback
-    //  */
-    // onNotice?: ProstglesInitOptions["onNotice"];
+    authHandler: AuthHandler;
 
 
     keywords = DEFAULT_KEYWORDS;
@@ -693,13 +630,8 @@ export class Prostgles<DBO = DbHandler> {
 
                 /* 3.9 Check auth config */
                 if(this.opts.auth){
-                    this.opts.auth.sidKeyName = this.opts.auth.sidKeyName || "session_id";
-
-                    const { sidKeyName, login, getUser, getClientUser } = this.opts.auth;
-                    if(typeof sidKeyName !== "string" && !login){
-                        throw "Invalid auth: Provide { sidKeyName: string } ";
-                    }
-                    if(!getUser || !getClientUser) throw "getUser OR getClientUser missing from auth config";
+                    this.authHandler = new AuthHandler(this as any);
+                    await this.authHandler.init();
                 }
 
                 this.publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods, this.opts.publishRawSQL, this.dbo, this.db, this as any);
@@ -787,58 +719,6 @@ export class Prostgles<DBO = DbHandler> {
         });
     }
 
-    /**
-     * Will return first sid value found in : http cookie or query params
-     * Based on sid names in auth
-     * @param localParams 
-     * @returns string
-     */
-    getSID(localParams: LocalParams): string {
-        if(!this.opts.auth) return null;
-
-        const { sidKeyName } = this.opts.auth;
-
-        if(!sidKeyName || !localParams) return null;
-
-        if(localParams.socket){
-            const querySid = localParams.socket?.handshake?.query?.[sidKeyName];
-            if(!querySid){
-                const cookie_str = get(localParams.socket, "handshake.headers.cookie");
-                const cookie = parseCookieStr(cookie_str);
-                return cookie[sidKeyName];
-            }
-
-        } else if(localParams.httpReq){
-            return localParams.httpReq?.cookies?.[sidKeyName];
-
-        } else throw "socket OR httpReq missing from localParams";
-
-        function parseCookieStr(cookie_str: string): any {
-            if(!cookie_str || typeof cookie_str !== "string") return {}
-            return cookie_str.replace(/\s/g, '').split(";").reduce((prev, current) => {
-                const [name, value] = current.split('=');
-                prev[name] = value;
-                return prev
-            }, {});
-        }
-    }
-
-    async getClientInfo(localParams: Pick<LocalParams, "socket" | "httpReq">): Promise<ClientInfo>{
-        if(this.opts.auth){
-            const { getUser, getClientUser } = this.opts.auth;
-    
-            if(getUser && localParams && (localParams.httpReq || localParams.socket)){
-                const sid = this.getSID(localParams);
-                return {
-                    sid,
-                    user: await getUser(sid, this.dbo as any, this.db),
-                    clientUser: await getClientUser(sid, this.dbo as any, this.db)
-                }
-            }
-        }
-
-        return {};
-    }
 
     connectedSockets: any[] = [];
     async setSocketEvents(){
@@ -888,7 +768,7 @@ export class Prostgles<DBO = DbHandler> {
                             throw "socket missing??!!";
                         }
 
-                        const clientInfo = await this.getClientInfo({ socket });
+                        const clientInfo = await this.authHandler.getClientInfo({ socket });
                         let valid_table_command_rules = await this.publishParser.getValidatedRequestRule({ tableName, command, localParams: { socket } }, clientInfo);
                         if(valid_table_command_rules){
                             let res = await this.dbo[tableName][command](param1, param2, param3, valid_table_command_rules, { socket, has_rules: true }); 
@@ -945,13 +825,9 @@ export class Prostgles<DBO = DbHandler> {
     pushSocketSchema = async (socket: any) => {
 
         let auth: any = {};
-        if(this.opts.auth){
+        if(this.authHandler){
+            
             const { register, login, logout, sidKeyName } = this.opts.auth;
-
-            /**
-             * Why ??? Collision with socket.io ???
-             */
-            if(sidKeyName === "sid") throw "sidQueryParamName cannot be 'sid' please provide another name.";
 
             let handlers = [
                 { func: register,   ch: CHANNELS.REGISTER,   name: "register"    },
@@ -959,7 +835,7 @@ export class Prostgles<DBO = DbHandler> {
                 { func: logout,     ch: CHANNELS.LOGOUT,     name: "logout"      }
             ].filter(h => h.func);
 
-            const usrData = await this.getClientInfo({ socket });
+            const usrData = await this.authHandler.getClientInfo({ socket });
             if(usrData){
                 auth.user = usrData.clientUser;
                 handlers = handlers.filter(h => h.name === "logout");
@@ -1255,7 +1131,7 @@ export class PublishParser {
 
     async getPublishParams(localParams: LocalParams, clientInfo?: ClientInfo): Promise<PublishParams> {
         return {
-            ...(clientInfo || await this.prostgles.getClientInfo(localParams)),
+            ...(clientInfo || await this.prostgles.authHandler.getClientInfo(localParams)),
             dbo: this.dbo,
             db: this.db
         }
@@ -1300,7 +1176,7 @@ export class PublishParser {
         return _publish;
     }
     async getValidatedRequestRuleWusr({ tableName, command, localParams }: DboTableCommand): Promise<TableRule>{
-        const clientInfo = await this.prostgles.getClientInfo(localParams);
+        const clientInfo = await this.prostgles.authHandler.getClientInfo(localParams);
         return await this.getValidatedRequestRule({ tableName, command, localParams }, clientInfo);
     }
     
@@ -1315,7 +1191,12 @@ export class PublishParser {
         }
 
         /* Must be local request -> allow everything */
-        if(!localParams || (!localParams.socket && !localParams.httpReq)) return undefined;
+        if(!localParams || (!localParams.socket && !localParams.httpReq)){
+            return RULE_TO_METHODS.reduce((a, v) => ({
+                ...a,
+                [v.rule]: v.no_limits
+            }), {})
+        }
 
         /* Must be from socket. Must have a publish */
         if(!this.publish) throw "publish is missing";
@@ -1327,6 +1208,7 @@ export class PublishParser {
 
         let table_rule = await this.getTableRules({ tableName, localParams }, clientInfo);
         if(!table_rule) throw "Invalid or disallowed table: " + tableName;
+
 
         if(command === "upsert"){
             if(!table_rule.update || !table_rule.insert){
@@ -1451,7 +1333,7 @@ export class PublishParser {
         
         try {
             /* Publish tables and views based on socket */
-            const clientInfo = await this.prostgles.getClientInfo({ socket });
+            const clientInfo = await this.prostgles.authHandler.getClientInfo({ socket });
             let _publish = await this.getPublish(socket, clientInfo);
 
     

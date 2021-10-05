@@ -340,6 +340,7 @@ class ViewHandler {
                 comment: this.tableOrViewInfo.comment,
                 is_media: this.is_media,
                 has_media,
+                media_table_name: mediaTable,
             };
         });
     }
@@ -763,7 +764,7 @@ class ViewHandler {
             /* Check if allowed to view data */
             if (localParams && (localParams.socket || localParams.httpReq) && this.dboBuilder.publishParser) {
                 /* Need to think about joining through dissallowed tables */
-                t2Rules = yield this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: t2, command: "find", localParams });
+                t2Rules = (yield this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: t2, command: "find", localParams }));
                 if (!t2Rules || !t2Rules.select)
                     throw "Dissallowed";
                 ({ forcedFilter, filterFields } = t2Rules.select);

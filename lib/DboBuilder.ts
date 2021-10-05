@@ -565,13 +565,20 @@ export class ViewHandler {
         if(filter === null || filter && !isPojoObject(filter)) throw `invalid filter -> ${JSON.stringify(filter)} \nExpecting:    undefined | {} | { field_name: "value" } | { field: { $gt: 22 } } ... `;
     }
 
-    async getInfo(param1?, param2?, param3?, tableRules?: TableRule, localParams?: LocalParams): Promise<{ oid: number; comment: string; is_media: boolean; has_media?: "one" | "many" }>{
+    async getInfo(param1?, param2?, param3?, tableRules?: TableRule, localParams?: LocalParams): Promise<{ 
+        oid: number; 
+        comment: string; 
+        is_media: boolean; 
+        has_media?: "one" | "many";
+        media_table_name?: string;
+    }>{
         const p = this.getValidatedRules(tableRules, localParams);
         if(!p.select.getInfo) throw "Not allowed";
 
         let has_media = undefined;
 
         const mediaTable = this.dboBuilder.prostgles?.opts?.fileTable?.tableName;
+        
         if(!this.is_media && mediaTable){
             if(this.dboBuilder.prostgles?.opts?.fileTable?.referencedTables?.[this.name]){
                 has_media = this.dboBuilder.prostgles?.opts?.fileTable?.referencedTables?.[this.name];
@@ -597,6 +604,7 @@ export class ViewHandler {
             comment: this.tableOrViewInfo.comment,
             is_media: this.is_media,      // this.name === this.dboBuilder.prostgles?.opts?.fileTable?.tableName
             has_media,
+            media_table_name: mediaTable,
         }
     }
 
@@ -1086,7 +1094,7 @@ export class ViewHandler {
         /* Check if allowed to view data */
         if(localParams && (localParams.socket || localParams.httpReq) && this.dboBuilder.publishParser){
             /* Need to think about joining through dissallowed tables */
-            t2Rules = await this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: t2, command: "find", localParams });
+            t2Rules = await this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: t2, command: "find", localParams }) as TableRule;
             if(!t2Rules || !t2Rules.select) throw "Dissallowed";
             ({ forcedFilter, filterFields } = t2Rules.select);
         }

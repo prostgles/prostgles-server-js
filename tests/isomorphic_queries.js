@@ -335,6 +335,7 @@ async function isomorphic(db) {
         const _data = fs.readFileSync(__dirname + "/server/media/" + file.name);
         assert_1.strict.equal(str, _data.toString('utf8'));
         await tryRun("Nested insert", async () => {
+            console.log(await db.items_with_one_media.getColumns());
             const { name, media: { extension, content_type, original_name } } = await db.items_with_one_media.insert({ name: "somename.txt", media: mediaFile }, { returning: "*" });
             assert_1.strict.deepStrictEqual({ extension, content_type, original_name }, {
                 extension: 'txt',
