@@ -91,7 +91,8 @@ class Prostgles {
         this.pushSocketSchema = (socket) => __awaiter(this, void 0, void 0, function* () {
             let auth = {};
             if (this.authHandler) {
-                const { register, login, logout, sidKeyName } = this.opts.auth;
+                const { register, logout } = this.opts.auth;
+                const login = this.authHandler.loginThrottled;
                 let handlers = [
                     { func: register, ch: prostgles_types_1.CHANNELS.REGISTER, name: "register" },
                     { func: login, ch: prostgles_types_1.CHANNELS.LOGIN, name: "login" },
@@ -364,10 +365,8 @@ class Prostgles {
                     if (!this.opts.io)
                         console.warn("IO missing. Publish has no effect without io");
                     /* 3.9 Check auth config */
-                    if (this.opts.auth) {
-                        this.authHandler = new AuthHandler_1.default(this);
-                        yield this.authHandler.init();
-                    }
+                    this.authHandler = new AuthHandler_1.default(this);
+                    yield this.authHandler.init();
                     this.publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods, this.opts.publishRawSQL, this.dbo, this.db, this);
                     this.dboBuilder.publishParser = this.publishParser;
                     /* 4. Set publish and auth listeners */ //makeDBO(db, allTablesViews, pubSubManager, false)

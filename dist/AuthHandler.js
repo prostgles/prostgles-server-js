@@ -11,12 +11,46 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 class AuthHandler {
     constructor(prostgles) {
+        this.loginThrottled = (params) => __awaiter(this, void 0, void 0, function* () {
+            if (!this.opts.login)
+                throw "Auth login config missing";
+            const { responseThrottle = 500 } = this.opts;
+            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                let result, error;
+                /**
+                 * Throttle response times to prevent timing attacks
+                 */
+                let interval = setInterval(() => {
+                    if (error || result) {
+                        if (error) {
+                            reject(error);
+                        }
+                        else if (result) {
+                            resolve(result);
+                        }
+                        clearInterval(interval);
+                    }
+                }, responseThrottle);
+                try {
+                    result = yield this.opts.login(params, this.dbo, this.db);
+                    if (!result.sid) {
+                        error = { msg: "Something went wrong making a session" };
+                    }
+                }
+                catch (err) {
+                    console.log(err);
+                    error = err;
+                }
+            }));
+        });
         this.opts = prostgles.opts.auth;
         this.dbo = prostgles.dbo;
         this.db = prostgles.db;
     }
     init() {
         return __awaiter(this, void 0, void 0, function* () {
+            if (!this.opts)
+                return;
             this.opts.sidKeyName = this.opts.sidKeyName || "session_id";
             const { sidKeyName, login, getUser, getClientUser, expressConfig } = this.opts;
             this.sidKeyName = this.opts.sidKeyName;
@@ -31,7 +65,7 @@ class AuthHandler {
             if (!getUser || !getClientUser)
                 throw "getUser OR getClientUser missing from auth config";
             if (expressConfig) {
-                const { app, logoutGetPath = "/logout", loginPostPath = "/login", cookieOptions = {}, responseThrottle = 500, userRoutes } = expressConfig;
+                const { app, logoutGetPath = "/logout", loginPostPath = "/login", cookieOptions = {}, userRoutes = [], onGetRequestOK } = expressConfig;
                 if (app && loginPostPath) {
                     /**
                      * AUTH
@@ -47,23 +81,8 @@ class AuthHandler {
                         const successURL = getReturnUrl(req) || "/";
                         let cookieOpts, cookieData;
                         let isOK;
-                        /**
-                         * Throttle response times to prevent timing attacks
-                         */
-                        let interval = setInterval(() => {
-                            if (typeof isOK === "boolean") {
-                                if (isOK) {
-                                    res.cookie(sidKeyName, cookieData, cookieOpts);
-                                    res.redirect(successURL);
-                                }
-                                else {
-                                    res.status(404).json({ err: "Invalid username or password" });
-                                }
-                                clearInterval(interval);
-                            }
-                        }, responseThrottle);
                         try {
-                            const { sid, expires } = (yield this.opts.login(req.body || {}, this.dbo, this.db)) || {};
+                            const { sid, expires } = (yield this.loginThrottled(req.body || {})) || {};
                             if (sid) {
                                 let options = {
                                     maxAge: expires || 1000 * 60 * 60 * 24,
@@ -71,18 +90,19 @@ class AuthHandler {
                                 };
                                 cookieOpts = Object.assign(Object.assign(Object.assign({}, options), { secure: true, sameSite: "strict" }), cookieOptions);
                                 cookieData = sid;
+                                res.cookie(sidKeyName, cookieData, cookieOpts);
+                                res.redirect(successURL);
                                 // res.cookie('sid', sid, { ...options, sameSite:  });
                                 // res.redirect(successURL);
                                 isOK = true;
                             }
                             else {
-                                isOK = false;
-                                console.error("no user or session");
+                                throw ("no user or session");
                             }
                         }
                         catch (err) {
                             console.log(err);
-                            isOK = false;
+                            res.status(404).json({ err: "Invalid username or password" });
                         }
                     }));
                     if (app && logoutGetPath) {
@@ -134,6 +154,9 @@ class AuthHandler {
                                         return;
                                     }
                                 }
+                                if (onGetRequestOK) {
+                                    onGetRequestOK(req, res);
+                                }
                                 // res.sendFile(path.join(__dirname + '/../../client/build/index.html'));
                             }
                             catch (error) {
@@ -184,16 +207,16 @@ class AuthHandler {
     }
     getClientInfo(localParams) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (this.opts) {
-                const { getUser, getClientUser } = this.opts;
-                if (getUser && localParams && (localParams.httpReq || localParams.socket)) {
-                    const sid = this.getSID(localParams);
-                    return {
-                        sid,
-                        user: yield getUser(sid, this.dbo, this.db),
-                        clientUser: yield getClientUser(sid, this.dbo, this.db)
-                    };
-                }
+            if (!this.opts)
+                return {};
+            const { getUser, getClientUser } = this.opts;
+            if (getUser && localParams && (localParams.httpReq || localParams.socket)) {
+                const sid = this.getSID(localParams);
+                return {
+                    sid,
+                    user: yield getUser(sid, this.dbo, this.db),
+                    clientUser: yield getClientUser(sid, this.dbo, this.db)
+                };
             }
             return {};
         });

@@ -10,6 +10,12 @@ export type Auth<DBO = DbHandler> = {
      * Defaults to "session_id"
      */
     sidKeyName?: string;
+
+    /**
+     * Response time rounding in milliseconds to prevent timing attacks on login. Login response time should always be a multiple of this value. Defaults to 500 milliseconds
+     */
+    responseThrottle?: number;
+
     expressConfig?: {
         /**
          * Express app instance. If provided Prostgles will attempt to set sidKeyName to user cookie
@@ -30,11 +36,6 @@ export type Auth<DBO = DbHandler> = {
          * Options used in setting the cookie after a successful login
          */
         cookieOptions?: AnyObject;
-
-        /**
-         * Response time rounding in milliseconds to prevent timing attacks on login. Login response time should always be a multiple of this value. Defaults to 500 milliseconds
-         */
-        responseThrottle?: number;
 
         /**
          * If provided, any client requests to these routes (or their subroutes) will be redirected to loginPostPath and then redirected back to the initial route after logging in
@@ -69,7 +70,7 @@ export type ClientInfo = {
 }
 
 export default class AuthHandler {
-    opts: Auth;
+    opts?: Auth;
     dbo: DbHandler;
     db: DB;
     sidKeyName: string;
@@ -81,7 +82,7 @@ export default class AuthHandler {
     }
 
     async init(){
-
+        if(!this.opts) return;
                   
         this.opts.sidKeyName = this.opts.sidKeyName || "session_id";
         const { sidKeyName, login, getUser, getClientUser, expressConfig } = this.opts;  
@@ -98,7 +99,7 @@ export default class AuthHandler {
         if(!getUser || !getClientUser) throw "getUser OR getClientUser missing from auth config";
 
         if(expressConfig){
-            const { app, logoutGetPath = "/logout", loginPostPath = "/login", cookieOptions = {}, responseThrottle = 500, userRoutes, onGetRequestOK } = expressConfig;
+            const { app, logoutGetPath = "/logout", loginPostPath = "/login", cookieOptions = {}, userRoutes = [], onGetRequestOK } = expressConfig;
             if(app && loginPostPath){
 
                 /**
@@ -115,23 +116,8 @@ export default class AuthHandler {
                     let cookieOpts, cookieData;
                     let isOK;
 
-                    /**
-                     * Throttle response times to prevent timing attacks
-                     */
-                    let interval = setInterval(() => {
-                        if(typeof isOK === "boolean"){
-                            if(isOK){
-                                res.cookie(sidKeyName, cookieData, cookieOpts); 
-                                res.redirect(successURL);
-                            } else {
-                                res.status(404).json({ err: "Invalid username or password" });
-                            }
-                            clearInterval(interval);
-                        }
-                    }, responseThrottle);
-
                     try {
-                        const { sid, expires } = await this.opts.login(req.body || {}, this.dbo as any, this.db) || {};
+                        const { sid, expires } = await this.loginThrottled(req.body || {}) || {};
                         
                         if(sid){
             
@@ -142,17 +128,18 @@ export default class AuthHandler {
                             }
                             cookieOpts = { ...options, secure: true, sameSite: "strict", ...cookieOptions }
                             cookieData = sid;
+                            res.cookie(sidKeyName, cookieData, cookieOpts); 
+                            res.redirect(successURL);
                             // res.cookie('sid', sid, { ...options, sameSite:  });
                             
                             // res.redirect(successURL);
                             isOK = true;
                         } else {
-                            isOK = false;
-                            console.error("no user or session")
+                            throw ("no user or session")
                         }
                     } catch (err){
                         console.log(err)
-                        isOK = false;
+                        res.status(404).json({ err: "Invalid username or password" });
                     }
             
             
@@ -181,7 +168,7 @@ export default class AuthHandler {
                             if(!sid) return undefined;
                             return this.opts.getUser(sid, this.dbo, this.db);
                         }
-                                
+                        
                         try {
                     
                             /* If authorized and going to returnUrl then redirect */
@@ -222,6 +209,43 @@ export default class AuthHandler {
         }
     }
 
+    loginThrottled = async (params: AnyObject): Promise<BasicSession> => {
+        if(!this.opts.login) throw "Auth login config missing";
+        const { responseThrottle = 500 } = this.opts;
+
+        return new Promise(async (resolve, reject) => {
+
+            let result: BasicSession, error: any;
+    
+            /**
+             * Throttle response times to prevent timing attacks
+             */
+            let interval = setInterval(() => {
+                if(error || result){
+                    if(error){
+                        reject(error);
+                    } else if(result){
+                        resolve(result)
+                    }
+                    clearInterval(interval);
+                }
+            }, responseThrottle);
+    
+    
+            try {
+                result = await this.opts.login(params, this.dbo as any, this.db);
+                
+                if(!result.sid){
+                    error = { msg: "Something went wrong making a session" }
+                }
+            } catch (err){
+                console.log(err)
+                error = err;
+            }
+
+        })
+    }
+
 
     /**
      * Will return first sid value found in : http cookie or query params
@@ -260,16 +284,16 @@ export default class AuthHandler {
     }
 
     async getClientInfo(localParams: Pick<LocalParams, "socket" | "httpReq">): Promise<ClientInfo>{
-        if(this.opts){
-            const { getUser, getClientUser } = this.opts;
-    
-            if(getUser && localParams && (localParams.httpReq || localParams.socket)){
-                const sid = this.getSID(localParams);
-                return {
-                    sid,
-                    user: await getUser(sid, this.dbo as any, this.db),
-                    clientUser: await getClientUser(sid, this.dbo as any, this.db)
-                }
+        if(!this.opts) return {};
+
+        const { getUser, getClientUser } = this.opts;
+
+        if(getUser && localParams && (localParams.httpReq || localParams.socket)){
+            const sid = this.getSID(localParams);
+            return {
+                sid,
+                user: await getUser(sid, this.dbo as any, this.db),
+                clientUser: await getClientUser(sid, this.dbo as any, this.db)
             }
         }
 

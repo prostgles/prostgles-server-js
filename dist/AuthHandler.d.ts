@@ -16,6 +16,10 @@ export declare type Auth<DBO = DbHandler> = {
      * Defaults to "session_id"
      */
     sidKeyName?: string;
+    /**
+     * Response time rounding in milliseconds to prevent timing attacks on login. Login response time should always be a multiple of this value. Defaults to 500 milliseconds
+     */
+    responseThrottle?: number;
     expressConfig?: {
         /**
          * Express app instance. If provided Prostgles will attempt to set sidKeyName to user cookie
@@ -34,13 +38,13 @@ export declare type Auth<DBO = DbHandler> = {
          */
         cookieOptions?: AnyObject;
         /**
-         * Response time rounding in milliseconds to prevent timing attacks on login. Login response time should always be a multiple of this value. Defaults to 500 milliseconds
-         */
-        responseThrottle?: number;
-        /**
          * If provided, any client requests to these routes (or their subroutes) will be redirected to loginPostPath and then redirected back to the initial route after logging in
          */
         userRoutes?: string[];
+        /**
+         * Will be called after a GET request is authorised
+         */
+        onGetRequestOK?: (req: any, res: any) => any;
     };
     /**
      * User data used on server
@@ -60,12 +64,13 @@ export declare type ClientInfo = {
     sid?: string;
 };
 export default class AuthHandler {
-    opts: Auth;
+    opts?: Auth;
     dbo: DbHandler;
     db: DB;
     sidKeyName: string;
     constructor(prostgles: Prostgles);
     init(): Promise<void>;
+    loginThrottled: (params: AnyObject) => Promise<BasicSession>;
     /**
      * Will return first sid value found in : http cookie or query params
      * Based on sid names in auth

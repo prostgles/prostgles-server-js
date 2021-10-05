@@ -629,10 +629,8 @@ export class Prostgles<DBO = DbHandler> {
                 if(!this.opts.io) console.warn("IO missing. Publish has no effect without io");
 
                 /* 3.9 Check auth config */
-                if(this.opts.auth){
-                    this.authHandler = new AuthHandler(this as any);
-                    await this.authHandler.init();
-                }
+                this.authHandler = new AuthHandler(this as any);
+                await this.authHandler.init();
 
                 this.publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods, this.opts.publishRawSQL, this.dbo, this.db, this as any);
                 this.dboBuilder.publishParser = this.publishParser;
@@ -827,7 +825,11 @@ export class Prostgles<DBO = DbHandler> {
         let auth: any = {};
         if(this.authHandler){
             
-            const { register, login, logout, sidKeyName } = this.opts.auth;
+            const { 
+                register, 
+                logout
+            } = this.opts.auth;
+            const login = this.authHandler.loginThrottled
 
             let handlers = [
                 { func: register,   ch: CHANNELS.REGISTER,   name: "register"    },
