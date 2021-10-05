@@ -40,6 +40,11 @@ export type Auth<DBO = DbHandler> = {
          * If provided, any client requests to these routes (or their subroutes) will be redirected to loginPostPath and then redirected back to the initial route after logging in
          */
         userRoutes?: string[];
+
+        /**
+         * Will be called after a GET request is authorised
+         */
+        onGetRequestOK?: (req, res) => any;
     }
 
     /**
@@ -93,7 +98,7 @@ export default class AuthHandler {
         if(!getUser || !getClientUser) throw "getUser OR getClientUser missing from auth config";
 
         if(expressConfig){
-            const { app, logoutGetPath = "/logout", loginPostPath = "/login", cookieOptions = {}, responseThrottle = 500, userRoutes } = expressConfig;
+            const { app, logoutGetPath = "/logout", loginPostPath = "/login", cookieOptions = {}, responseThrottle = 500, userRoutes, onGetRequestOK } = expressConfig;
             if(app && loginPostPath){
 
                 /**
@@ -201,6 +206,9 @@ export default class AuthHandler {
                                 }
                             }
                             
+                            if(onGetRequestOK){
+                                onGetRequestOK(req, res)
+                            }
                             // res.sendFile(path.join(__dirname + '/../../client/build/index.html'));
                     
                         } catch(error) {
