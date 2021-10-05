@@ -90,7 +90,7 @@ class Prostgles {
         this.connectedSockets = [];
         this.pushSocketSchema = (socket) => __awaiter(this, void 0, void 0, function* () {
             let auth = {};
-            if (this.authHandler) {
+            if (this.authHandler && this.opts.auth) {
                 const { register, logout } = this.opts.auth;
                 const login = this.authHandler.loginThrottled;
                 let handlers = [

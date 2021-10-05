@@ -823,9 +823,9 @@ export class Prostgles<DBO = DbHandler> {
     pushSocketSchema = async (socket: any) => {
 
         let auth: any = {};
-        if(this.authHandler){
+        if(this.authHandler && this.opts.auth){
             
-            const { 
+            const {
                 register, 
                 logout
             } = this.opts.auth;
