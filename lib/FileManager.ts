@@ -88,7 +88,7 @@ export default class FileManager {
     onlyFromName = true
   ): Promise<{
     mime: string;
-    ext: string;
+    ext: string | ALLOWED_EXTENSION;
     fileName: string;
   }> {
 
@@ -315,7 +315,7 @@ export default class FileManager {
     if(!dbo[tableName]){
         console.log(`Creating fileTable ${asName(tableName)} ...`);
         await db.any(`CREATE EXTENSION IF NOT EXISTS pgcrypto `);
-        await db.any(`CREATE TABLE ${asName(tableName)} (
+        await db.any(`CREATE TABLE IF NOT EXISTS ${asName(tableName)} (
             id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             name                TEXT NOT NULL,
             extension           TEXT NOT NULL,
@@ -337,7 +337,7 @@ export default class FileManager {
      * 2. Create media lookup tables 
      */
     await Promise.all(Object.keys(referencedTables).map(async refTable => {
-      if(!dbo[refTable]) throw `Referenced table (${refTable}) from fileTable.referencedTables is missing`;
+      if(!dbo[refTable]) throw `Referenced table (${refTable}) from fileTable.referencedTables record is missing`;
       // const lookupTableName = asName(`lookup_${tableName}_${refTable}`);
 
       const lookupTableName = await this.parseSQLIdentifier(`prostgles_lookup_${tableName}_${refTable}`);
@@ -347,10 +347,11 @@ export default class FileManager {
 
       const pkField = pKeyFields[0];
       const refType = referencedTables[refTable];
-      if(!dbo[lookupTableName] || !(await dbo[lookupTableName].count())){
+
+      if(!dbo[lookupTableName]){
+        // if(!(await dbo[lookupTableName].count())) await db.any(`DROP TABLE IF EXISTS  ${lookupTableName};`);
         const action = ` (${tableName} <-> ${refTable}) join table ${lookupTableName}`; //  PRIMARY KEY
-        const query = `
-        --DROP TABLE IF EXISTS  ${lookupTableName};
+        const query = `        
         CREATE TABLE ${lookupTableName} (
           foreign_id  ${pkField.udt_name} ${refType === "one"? " PRIMARY KEY " : ""} REFERENCES ${asName(refTable)}(${asName(pkField.name)}),
           media_id    UUID NOT NULL REFERENCES ${asName(tableName)}(id)
@@ -359,24 +360,30 @@ export default class FileManager {
         // console.log(`Creating ${action} ...`, lookupTableName);
         await db.any(query);
         console.log(`Created ${action}`);
+
       } else {
         const cols = await dbo[lookupTableName].getColumns();
-        const badCol = cols.find(c => !c.references);
-        if(badCol){
+        const badCols = cols.filter(c => !c.references);
+        await Promise.all(badCols.map(async badCol => {
           console.error(
             `Prostgles: media ${lookupTableName} joining table has lost a reference constraint for column ${badCol.name}.` + 
             ` This may have been caused by a DROP TABLE ... CASCADE.`
           );
+          let q = `
+            ALTER TABLE ${asName(lookupTableName)} 
+            ADD CONSTRAINT ${(lookupTableName + "_" + badCol.name + "_r")} FOREIGN KEY (${badCol.name})
+          `;
+          console.log("Trying to add the missing constraint back");
           if(badCol.name === "foreign_id"){
-            console.log("Trying to add the missing constraint back");
+            q += `REFERENCES ${asName(refTable)}(${asName(pkField.name)}) `;
+          } else if(badCol.name === "media_id"){
+            q += `REFERENCES ${asName(tableName)}(id) `;
+          }
+
+          if(q){
+
             try {
-              await db.any(
-              `
-                
-                ALTER TABLE ${asName(lookupTableName)} 
-                ADD CONSTRAINT ${(lookupTableName+"_foreign_id_r")} FOREIGN KEY (foreign_id)
-                REFERENCES ${asName(refTable)}(${asName(pkField.name)})
-              `)
+              await db.any(q)
               console.log("Added missing constraint back");
 
             } catch(e){
@@ -384,7 +391,7 @@ export default class FileManager {
             }
           }
 
-        }
+        }));
       }
 
       return true;

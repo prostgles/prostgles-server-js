@@ -72,7 +72,7 @@ class FileManager {
             if (!dbo[tableName]) {
                 console.log(`Creating fileTable ${prostgles_types_1.asName(tableName)} ...`);
                 yield db.any(`CREATE EXTENSION IF NOT EXISTS pgcrypto `);
-                yield db.any(`CREATE TABLE ${prostgles_types_1.asName(tableName)} (
+                yield db.any(`CREATE TABLE IF NOT EXISTS ${prostgles_types_1.asName(tableName)} (
             id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             name                TEXT NOT NULL,
             extension           TEXT NOT NULL,
@@ -94,7 +94,7 @@ class FileManager {
              */
             yield Promise.all(Object.keys(referencedTables).map((refTable) => __awaiter(this, void 0, void 0, function* () {
                 if (!dbo[refTable])
-                    throw `Referenced table (${refTable}) from fileTable.referencedTables is missing`;
+                    throw `Referenced table (${refTable}) from fileTable.referencedTables record is missing`;
                 // const lookupTableName = asName(`lookup_${tableName}_${refTable}`);
                 const lookupTableName = yield this.parseSQLIdentifier(`prostgles_lookup_${tableName}_${refTable}`);
                 const pKeyFields = (yield dbo[refTable].getColumns()).filter(f => f.is_pkey);
@@ -102,10 +102,10 @@ class FileManager {
                     throw `Could not make link table for ${refTable}. ${pKeyFields} must have exactly one primary key column. Current pkeys: ${pKeyFields.map(f => f.name)}`;
                 const pkField = pKeyFields[0];
                 const refType = referencedTables[refTable];
-                if (!dbo[lookupTableName] || !(yield dbo[lookupTableName].count())) {
+                if (!dbo[lookupTableName]) {
+                    // if(!(await dbo[lookupTableName].count())) await db.any(`DROP TABLE IF EXISTS  ${lookupTableName};`);
                     const action = ` (${tableName} <-> ${refTable}) join table ${lookupTableName}`; //  PRIMARY KEY
-                    const query = `
-        --DROP TABLE IF EXISTS  ${lookupTableName};
+                    const query = `        
         CREATE TABLE ${lookupTableName} (
           foreign_id  ${pkField.udt_name} ${refType === "one" ? " PRIMARY KEY " : ""} REFERENCES ${prostgles_types_1.asName(refTable)}(${prostgles_types_1.asName(pkField.name)}),
           media_id    UUID NOT NULL REFERENCES ${prostgles_types_1.asName(tableName)}(id)
@@ -117,26 +117,31 @@ class FileManager {
                 }
                 else {
                     const cols = yield dbo[lookupTableName].getColumns();
-                    const badCol = cols.find(c => !c.references);
-                    if (badCol) {
+                    const badCols = cols.filter(c => !c.references);
+                    yield Promise.all(badCols.map((badCol) => __awaiter(this, void 0, void 0, function* () {
                         console.error(`Prostgles: media ${lookupTableName} joining table has lost a reference constraint for column ${badCol.name}.` +
                             ` This may have been caused by a DROP TABLE ... CASCADE.`);
+                        let q = `
+            ALTER TABLE ${prostgles_types_1.asName(lookupTableName)} 
+            ADD CONSTRAINT ${(lookupTableName + "_" + badCol.name + "_r")} FOREIGN KEY (${badCol.name})
+          `;
+                        console.log("Trying to add the missing constraint back");
                         if (badCol.name === "foreign_id") {
-                            console.log("Trying to add the missing constraint back");
+                            q += `REFERENCES ${prostgles_types_1.asName(refTable)}(${prostgles_types_1.asName(pkField.name)}) `;
+                        }
+                        else if (badCol.name === "media_id") {
+                            q += `REFERENCES ${prostgles_types_1.asName(tableName)}(id) `;
+                        }
+                        if (q) {
                             try {
-                                yield db.any(`
-                
-                ALTER TABLE ${prostgles_types_1.asName(lookupTableName)} 
-                ADD CONSTRAINT ${(lookupTableName + "_foreign_id_r")} FOREIGN KEY (foreign_id)
-                REFERENCES ${prostgles_types_1.asName(refTable)}(${prostgles_types_1.asName(pkField.name)})
-              `);
+                                yield db.any(q);
                                 console.log("Added missing constraint back");
                             }
                             catch (e) {
                                 console.error("Failed to add missing constraint", e);
                             }
                         }
-                    }
+                    })));
                 }
                 return true;
             })));

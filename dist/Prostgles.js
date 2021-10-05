@@ -103,15 +103,11 @@ class Prostgles {
         this.keywords = DEFAULT_KEYWORDS;
         this.loaded = false;
         this.destroyed = false;
-        // async getUserFromCookieSession(localParams: LocalParams): Promise<null | { user: any, clientUser: any }>{
-        //     // console.log("conn", socket.handshake.query, socket._session)
-        //     const sid = this.getSID(localParams);
-        //     const { getUser, getClientUser } = this.auth;
-        //     const user = await getUser(sid, this.dbo, this.db);
-        //     const clientUser = await getClientUser(sid, this.dbo, this.db);
-        //     if(!user) return undefined;
-        //     return { user, clientUser };
-        // }
+        this.refreshDBO = () => __awaiter(this, void 0, void 0, function* () {
+            this.dboBuilder = (yield DboBuilder_1.DboBuilder.create(this));
+            this.dbo = this.dboBuilder.dbo;
+            return this.dbo;
+        });
         this.connectedSockets = [];
         this.pushSocketSchema = (socket) => __awaiter(this, void 0, void 0, function* () {
             let auth = {};
@@ -161,7 +157,6 @@ class Prostgles {
             const { dbo, db, pgp, publishParser } = this;
             try {
                 schema = yield publishParser.getSchemaFromPublish(socket);
-                // console.log("getSchemaFromPublish", Object.keys(schema), this.dboBuilder.tablesOrViews.map(t => `${t.name} (${t.columns.map(c => c.name).join(", ")})`))
             }
             catch (e) {
                 publishValidationError = "Server Error: PUBLISH VALIDATION ERROR";
@@ -179,7 +174,6 @@ class Prostgles {
                     let res = yield this.opts.publishRawSQL(publishParams);
                     return Boolean(res && typeof res === "boolean" || res === "*");
                 });
-                // console.log("canRunSQL", canRunSQL, socket.handshake.headers["x-real-ip"]);//, allTablesViews);
                 if (yield canRunSQL()) {
                     socket.removeAllListeners(prostgles_types_1.CHANNELS.SQL);
                     socket.on(prostgles_types_1.CHANNELS.SQL, ({ query, params, options }, cb = (...callback) => { }) => __awaiter(this, void 0, void 0, function* () {
@@ -355,12 +349,6 @@ class Prostgles {
             console.error("Schema changed. tsGeneratedTypesDir needs to be set to reload server");
         }
     }
-    refreshDBO() {
-        return __awaiter(this, void 0, void 0, function* () {
-            this.dboBuilder = (yield DboBuilder_1.DboBuilder.create(this));
-            this.dbo = this.dboBuilder.dbo;
-        });
-    }
     init(onReady) {
         return __awaiter(this, void 0, void 0, function* () {
             this.loaded = false;
@@ -472,8 +460,8 @@ class Prostgles {
         return __awaiter(this, void 0, void 0, function* () {
             const fileContent = yield this.getFileText(filePath); //.then(console.log);
             return this.db.multi(fileContent).then((data) => {
-                console.log("Prostgles: SQL file executed successfuly \n    -> " + filePath, data);
-                return true;
+                console.log("Prostgles: SQL file executed successfuly \n    -> " + filePath);
+                return data;
             }).catch((err) => {
                 const { position, length } = err, lines = fileContent.split("\n");
                 let errMsg = filePath + " error: ";
@@ -528,7 +516,7 @@ class Prostgles {
         return __awaiter(this, void 0, void 0, function* () {
             if (this.opts.auth) {
                 const { getUser, getClientUser } = this.opts.auth;
-                if (getUser) {
+                if (getUser && localParams && (localParams.httpReq || localParams.socket)) {
                     const sid = this.getSID(localParams);
                     return {
                         sid,
@@ -703,7 +691,6 @@ function flat(arr) {
     let res = arr.reduce(function (farr, toFlatten) {
         return farr.concat(Array.isArray(toFlatten) ? flat(toFlatten) : toFlatten);
     }, []);
-    // console.log(arr, res)
     return res;
 }
 exports.flat = flat;
@@ -778,14 +765,13 @@ class PublishParser {
                 throw "Invalid command: " + command;
             }
             /* Must be local request -> allow everything */
-            if (!localParams)
+            if (!localParams || (!localParams.socket && !localParams.httpReq))
                 return undefined;
             /* Must be from socket. Must have a publish */
             if (!this.publish)
                 throw "publish is missing";
             /* Get any publish errors for socket */
             const schm = (_d = (_c = (_b = (_a = localParams === null || localParams === void 0 ? void 0 : localParams.socket) === null || _a === void 0 ? void 0 : _a.prostgles) === null || _b === void 0 ? void 0 : _b.schema) === null || _c === void 0 ? void 0 : _c[tableName]) === null || _d === void 0 ? void 0 : _d[command];
-            // console.log(schm, get(socket, `prostgles.schema`));
             if (schm && schm.err)
                 throw schm.err;
             let table_rule = yield this.getTableRules({ tableName, localParams }, clientInfo);
@@ -956,7 +942,6 @@ class PublishParser {
                 console.error("Prostgles \nERRORS IN PUBLISH: ", JSON.stringify(e));
                 throw e;
             }
-            // console.log(schema)
             return schema;
         });
     }

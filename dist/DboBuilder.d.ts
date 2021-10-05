@@ -171,10 +171,11 @@ export declare class ViewHandler {
     };
     getJoins(source: string, target: string, path?: string[]): JoinInfo;
     checkFilter(filter: any): void;
-    getInfo(param1: any, param2: any, param3: any, tableRules?: TableRule, localParams?: LocalParams): Promise<{
+    getInfo(param1?: any, param2?: any, param3?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<{
         oid: number;
         comment: string;
         is_media: boolean;
+        has_media?: "one" | "many";
     }>;
     getColumns(lang?: string, param2?: any, param3?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]>;
     getValidatedRules(tableRules?: TableRule, localParams?: LocalParams): ValidatedTableRules;

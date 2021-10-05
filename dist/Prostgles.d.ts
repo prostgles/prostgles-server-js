@@ -386,7 +386,7 @@ export declare class Prostgles<DBO = DbHandler> {
     };
     private getFileText;
     writeDBSchema(force?: boolean): void;
-    refreshDBO(): Promise<void>;
+    refreshDBO: () => Promise<DbHandler>;
     init(onReady: (dbo: DBO, db: DB) => any): Promise<{
         db: DbHandler;
         _db: DB;
@@ -394,7 +394,7 @@ export declare class Prostgles<DBO = DbHandler> {
         io?: any;
         destroy: () => Promise<boolean>;
     }>;
-    runSQLFile(filePath: string): Promise<boolean>;
+    runSQLFile(filePath: string): Promise<any[][]>;
     /**
      * Will return first sid value found in : http cookie or query params
      * Based on sid names in auth

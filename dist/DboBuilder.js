@@ -307,14 +307,39 @@ class ViewHandler {
             throw `invalid filter -> ${JSON.stringify(filter)} \nExpecting:    undefined | {} | { field_name: "value" } | { field: { $gt: 22 } } ... `;
     }
     getInfo(param1, param2, param3, tableRules, localParams) {
+        var _a, _b, _c, _e, _f, _g, _h, _j, _k, _l, _m;
         return __awaiter(this, void 0, void 0, function* () {
             const p = this.getValidatedRules(tableRules, localParams);
             if (!p.select.getInfo)
                 throw "Not allowed";
+            let has_media = undefined;
+            const mediaTable = (_c = (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.opts) === null || _b === void 0 ? void 0 : _b.fileTable) === null || _c === void 0 ? void 0 : _c.tableName;
+            if (!this.is_media && mediaTable) {
+                if ((_h = (_g = (_f = (_e = this.dboBuilder.prostgles) === null || _e === void 0 ? void 0 : _e.opts) === null || _f === void 0 ? void 0 : _f.fileTable) === null || _g === void 0 ? void 0 : _g.referencedTables) === null || _h === void 0 ? void 0 : _h[this.name]) {
+                    has_media = (_m = (_l = (_k = (_j = this.dboBuilder.prostgles) === null || _j === void 0 ? void 0 : _j.opts) === null || _k === void 0 ? void 0 : _k.fileTable) === null || _l === void 0 ? void 0 : _l.referencedTables) === null || _m === void 0 ? void 0 : _m[this.name];
+                }
+                else {
+                    const jp = this.dboBuilder.joinPaths.find(jp => jp.t1 === this.name && jp.t2 === mediaTable);
+                    if (jp && jp.path.length < 4) {
+                        yield Promise.all(jp.path.map((tableName) => __awaiter(this, void 0, void 0, function* () {
+                            const cols = (yield this.dboBuilder.dbo[tableName].getColumns()).filter(c => { var _a; return jp.path.includes((_a = c.references) === null || _a === void 0 ? void 0 : _a.ftable); });
+                            if (cols.length && has_media !== "many") {
+                                if (cols.find(c => !c.is_pkey)) {
+                                    has_media = "many";
+                                }
+                                else {
+                                    has_media = "one";
+                                }
+                            }
+                        })));
+                    }
+                }
+            }
             return {
                 oid: this.tableOrViewInfo.oid,
                 comment: this.tableOrViewInfo.comment,
-                is_media: this.is_media // this.name === this.dboBuilder.prostgles?.opts?.fileTable?.tableName
+                is_media: this.is_media,
+                has_media,
             };
         });
     }
@@ -508,7 +533,6 @@ class ViewHandler {
                         throw ` invalid publish.${this.name}.select.maxLimit -> expecting integer but got ` + maxLimit;
                 }
                 let q = yield QueryBuilder_1.getNewQuery(this, filter, selectParams, param3_unused, tableRules, localParams), _query = QueryBuilder_1.makeQuery(this, q, undefined, undefined, selectParams);
-                // console.log(_query)
                 if (testRule) {
                     try {
                         yield this.db.any("EXPLAIN " + _query);
@@ -519,7 +543,6 @@ class ViewHandler {
                         throw `INTERNAL ERROR: Publish config is not valid for publish.${this.name}.select `;
                     }
                 }
-                // console.log(_query);
                 if (returnQuery)
                     return _query;
                 if (["row", "value"].includes(returnType)) {
@@ -709,7 +732,6 @@ class ViewHandler {
                     joinPaths = joinPaths.concat(jinf.paths);
                 });
                 let r = makeJoin({ paths: joinPaths, expectOne }, 0);
-                // console.log(r);
                 return r;
                 function makeJoin(joinInfo, ji) {
                     const { paths } = joinInfo;
@@ -719,7 +741,6 @@ class ViewHandler {
                     let tableAlias = prostgles_types_1.asName(ji < paths.length - 1 ? `jd${ji}` : table);
                     let prevTableAlias = prostgles_types_1.asName(ji ? `jd${ji - 1}` : thisTable);
                     let cond = `${jp.on.map(([c1, c2]) => `${prevTableAlias}.${prostgles_types_1.asName(c1)} = ${tableAlias}.${prostgles_types_1.asName(c2)}`).join("\n AND ")}`;
-                    // console.log(join, cond);
                     let j = `SELECT 1 \n` +
                         `FROM ${prostgles_types_1.asName(table)} ${tableAlias} \n` +
                         `WHERE ${cond} \n`; //
@@ -763,7 +784,6 @@ class ViewHandler {
                 // console.trace(err)
                 throw "Issue with preparing $exists query for table " + t2 + "\n->" + JSON.stringify(err);
             }
-            // console.log(f2, finalWhere);
             if (!isJoined) {
                 res = ` EXISTS (SELECT 1 \nFROM ${prostgles_types_1.asName(t2)} \n${finalWhere ? `WHERE ${finalWhere}` : ""}) `;
             }
@@ -858,7 +878,6 @@ class ViewHandler {
                     return false;
                 });
             }
-            // console.log(allowedSelect);
             /* Add remaining allowed fields */
             allowedSelect = allowedSelect.concat(p.allColumns.filter(c => allowed_colnames.includes(c.name) &&
                 !allowedSelect.find(s => s.alias === c.name)).map(f => ({
@@ -893,14 +912,12 @@ class ViewHandler {
                 pgp: exports.pgp,
                 select: allowedSelect
             });
-            // console.log({ f, q })
             let templates = [q].filter(q => q);
             if (existsCond)
                 templates.push(existsCond);
             templates = templates.concat(computedColConditions);
             return templates.sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
                 .join(" AND \n");
-            // console.log(templates)
             // return templates; //pgp.as.format(template, data);
             /*
                 SHOULD CHECK DATA TYPES TO AVOID "No operator matches the given data type" error
@@ -989,7 +1006,6 @@ class ViewHandler {
         if (!_ob || !_ob.length)
             return "";
         const validatedAggAliases = select.filter(s => s.type !== "joinedColumn").map(s => s.alias);
-        // console.log({ validatedAggAliases })
         let bad_param = _ob.find(({ key }) => !(validatedAggAliases || []).includes(key) &&
             (!column_names.includes(key) ||
                 (allowedFields.length && !allowedFields.includes(key))));
@@ -1303,7 +1319,6 @@ class TableHandler extends ViewHandler {
                 const queries = yield Promise.all(data.map(([filter, data]) => __awaiter(this, void 0, void 0, function* () {
                     return yield this.update(filter, data, Object.assign(Object.assign({}, (params || {})), { returning: undefined }), tableRules, Object.assign(Object.assign({}, (localParams || {})), { returnQuery: true }));
                 })));
-                // console.log(queries)
                 return this.db.tx(t => {
                     const _queries = queries.map(q => t.none(q));
                     return t.batch(_queries);
@@ -1375,13 +1390,11 @@ class TableHandler extends ViewHandler {
                             throw "Unrecognised params in textPatch field: " + unrecProps.join(", ");
                         patchedTextData.push(Object.assign(Object.assign({}, d), { fieldName: c.name }));
                     }
-                    // console.log("update2", patchedTextData);
                 });
                 if (patchedTextData && patchedTextData.length) {
                     if (tableRules && !tableRules.select)
                         throw "Select needs to be permitted to patch data";
                     const rows = yield this.find(filter, { select: patchedTextData.reduce((a, v) => (Object.assign(Object.assign({}, a), { [v.fieldName]: 1 })), {}) }, null, tableRules);
-                    // console.log(rows)
                     if (rows.length !== 1) {
                         throw "Cannot patch data within a filter that affects more/less than 1 row";
                     }
@@ -1410,7 +1423,6 @@ class TableHandler extends ViewHandler {
                     qType = multi ? "any" : "one";
                     query += this.makeReturnQuery(yield this.prepareReturning(returning, this.parseFieldFilter(returningFields)));
                 }
-                // console.log(query)
                 if (returnQuery)
                     return query;
                 if (this.t) {
@@ -1520,7 +1532,6 @@ class TableHandler extends ViewHandler {
                             returnData[rs.alias] = fullRootResult[rs.alias];
                         });
                     }
-                    // console.log({ rootResult })
                     yield Promise.all(extraKeys.map((targetTable) => __awaiter(this, void 0, void 0, function* () {
                         var _f;
                         const childDataItems = Array.isArray(row[targetTable]) ? row[targetTable] : [row[targetTable]];
@@ -1555,7 +1566,7 @@ class TableHandler extends ViewHandler {
                         const cols2 = this.dboBuilder.dbo[tbl2].columns || [];
                         if (!this.dboBuilder.dbo[tbl2])
                             throw "Invalid/disallowed table: " + tbl2;
-                        const colsRefT1 = cols2 === null || cols2 === void 0 ? void 0 : cols2.filter(c => { var _a, _b; return ((_a = c.references) === null || _a === void 0 ? void 0 : _a.cols.length) === 1 && ((_b = c.references) === null || _b === void 0 ? void 0 : _b.ftable) === tbl1; }), colsRefT3 = cols2 === null || cols2 === void 0 ? void 0 : cols2.filter(c => { var _a, _b; return ((_a = c.references) === null || _a === void 0 ? void 0 : _a.cols.length) === 1 && ((_b = c.references) === null || _b === void 0 ? void 0 : _b.ftable) === tbl3; });
+                        const colsRefT1 = cols2 === null || cols2 === void 0 ? void 0 : cols2.filter(c => { var _a, _b; return ((_a = c.references) === null || _a === void 0 ? void 0 : _a.cols.length) === 1 && ((_b = c.references) === null || _b === void 0 ? void 0 : _b.ftable) === tbl1; });
                         if (!path.length) {
                             throw "Nested inserts join path not found for " + [this.name, targetTable];
                         }
@@ -1564,11 +1575,19 @@ class TableHandler extends ViewHandler {
                                 throw "Did not expect this";
                             if (!colsRefT1.length)
                                 throw `Target table ${tbl2} does not reference any columns from the root table ${this.name}. Cannot do nested insert`;
-                            insertedChildren = yield childInsert(childDataItems.map(d => (Object.assign(Object.assign({}, d), PubSubManager_1.filterObj(fullRootResult, colsRefT1.map(col => col.name))))), targetTable);
+                            // console.log(JSON.stringify(colsRefT1, null, 2))
+                            insertedChildren = yield childInsert(childDataItems.map(d => {
+                                let result = Object.assign({}, d);
+                                colsRefT1.map(col => {
+                                    result[col.references.cols[0]] = fullRootResult[col.references.fcols[0]];
+                                });
+                                return result;
+                            }), targetTable);
                         }
                         else if (path.length === 3) {
                             if (targetTable !== tbl3)
                                 throw "Did not expect this";
+                            const colsRefT3 = cols2 === null || cols2 === void 0 ? void 0 : cols2.filter(c => { var _a, _b; return ((_a = c.references) === null || _a === void 0 ? void 0 : _a.cols.length) === 1 && ((_b = c.references) === null || _b === void 0 ? void 0 : _b.ftable) === tbl3; });
                             if (!colsRefT1.length || !colsRefT3.length)
                                 throw "Incorrectly referenced or missing columns for nested insert";
                             if (targetTable !== this.dboBuilder.prostgles.fileManager.tableName) {
@@ -1617,13 +1636,11 @@ class TableHandler extends ViewHandler {
             let res = isNestedInsert ?
                 { insertResult: result } :
                 { data: result };
-            if (this.is_media)
-                console.log(res, { isNestedInsert, name: this.name });
             return res;
         });
     }
     insert(rowOrRows, param2, param3_unused, tableRules, _localParams = null) {
-        var _a, _b, _c;
+        var _a;
         return __awaiter(this, void 0, void 0, function* () {
             const localParams = _localParams || {};
             const { dbTX } = localParams;
@@ -1709,7 +1726,6 @@ class TableHandler extends ViewHandler {
                         const q = yield makeQuery(p);
                         return q;
                     })));
-                    // console.log(queries)
                     query = exports.pgp.helpers.concat(queries);
                     if (returning)
                         queryType = "many";
@@ -1719,12 +1735,11 @@ class TableHandler extends ViewHandler {
                     if (returning)
                         queryType = "one";
                 }
-                // console.log(query);
                 if (returnQuery)
                     return query;
                 let result;
-                console.log((_b = (_a = this.t) === null || _a === void 0 ? void 0 : _a.ctx) === null || _b === void 0 ? void 0 : _b.start, "insert in " + this.name, data);
-                const tx = ((_c = dbTX === null || dbTX === void 0 ? void 0 : dbTX[this.name]) === null || _c === void 0 ? void 0 : _c.t) || this.t;
+                // console.log(this.t?.ctx?.start, "insert in " + this.name, data);
+                const tx = ((_a = dbTX === null || dbTX === void 0 ? void 0 : dbTX[this.name]) === null || _a === void 0 ? void 0 : _a.t) || this.t;
                 if (tx) {
                     result = tx[queryType](query).catch(err => makeErr(err, localParams));
                 }
@@ -1826,20 +1841,14 @@ class TableHandler extends ViewHandler {
                         return tblH.find(filter, { select: "", limit: 1 }, {}, table_rules, localParams)
                             .then(exists => {
                             if (exists && exists.length) {
-                                // console.log(filter, "exists");
                                 return tblH.update(filter, newData, params, table_rules, localParams);
                             }
                             else {
-                                // console.log(filter, "existnts")
                                 return tblH.insert(Object.assign(Object.assign({}, newData), filter), params, null, table_rules, localParams);
                             }
                         });
                     });
                 }
-                // .catch(existnts => {
-                //     console.log(filter, "existnts")
-                //     return this.insert({ ...filter, ...newData}, params);
-                // });
             }
             catch (e) {
                 if (localParams && localParams.testRule)
@@ -1993,12 +2002,17 @@ class DboBuilder {
         return __awaiter(this, void 0, void 0, function* () {
             if (this.prostgles.opts.joins) {
                 let _joins = yield this.prostgles.opts.joins;
+                let inferredJoins = yield getInferredJoins(this.db, this.prostgles.opts.schema);
                 if (typeof _joins === "string" && _joins === "inferred") {
-                    _joins = yield getInferredJoins(this.db, this.prostgles.opts.schema);
+                    _joins = inferredJoins;
+                    /* If joins are specified then include inferred joins except the explicit tables */
+                }
+                else if (Array.isArray(_joins)) {
+                    const joinTables = _joins.map(j => j.tables).flat();
+                    _joins = _joins.concat(inferredJoins.filter(j => !j.tables.find(t => joinTables.includes(t))));
                 }
                 let joins = JSON.parse(JSON.stringify(_joins));
                 this.joins = joins;
-                // console.log(joins);
                 // Validate joins
                 try {
                     // 1 find duplicates
@@ -2064,9 +2078,6 @@ class DboBuilder {
                         }
                     });
                 });
-                // console.log(this.joinPaths)
-                // console.log(888, this.prostgles.joins);
-                // console.log(this.joinGraph, findShortestPath(this.joinGraph, "colors", "drawings"));
             }
             return this.joinPaths;
         });
@@ -2099,7 +2110,6 @@ export type TxCB = {
                 i18nDef += `    ${JSON.stringify(tov.name)}: { \n`;
                 i18nDef += `      [key in ${tov.columns.map(c => JSON.stringify(c.name)).join(" | ")}]: { [lang_id in keyof LANG_IDS]: string }; \n`;
                 i18nDef += `    }; \n`;
-                // console.log("dboInit", tov.name, tov.columns.map(c => c.name))
                 const filterKeywords = Object.values(this.prostgles.keywords);
                 const $filterCol = tov.columns.find(c => filterKeywords.includes(c.name));
                 if ($filterCol) {
@@ -2659,7 +2669,6 @@ function getInferredJoins(db, schema = "public") {
                 });
             }
         });
-        // console.log(joins);
         return joins;
     });
 }

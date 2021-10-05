@@ -330,10 +330,20 @@ async function isomorphic(db) {
         console.log("TODO: socket.io stringifies dates");
     });
     await tryRun("Local file upload", async () => {
-        let str = "This is a string", data = Buffer.from(str, "utf-8");
-        const file = await db.media.insert({ data, name: "sample_file.txt" }, { returning: "*" });
+        let str = "This is a string", data = Buffer.from(str, "utf-8"), mediaFile = { data, name: "sample_file.txt" };
+        const file = await db.media.insert(mediaFile, { returning: "*" });
         const _data = fs.readFileSync(__dirname + "/server/media/" + file.name);
         assert_1.strict.equal(str, _data.toString('utf8'));
+        await tryRun("Nested insert", async () => {
+            const { name, media: { extension, content_type, original_name } } = await db.items_with_one_media.insert({ name: "somename.txt", media: mediaFile }, { returning: "*" });
+            assert_1.strict.deepStrictEqual({ extension, content_type, original_name }, {
+                extension: 'txt',
+                content_type: 'text/plain',
+                original_name: 'sample_file.txt',
+            });
+            // const _data = fs.readFileSync(__dirname + "/server/media/"+file.name);
+            assert_1.strict.equal(name, "somename.txt");
+        });
     });
     await tryRun("Exists filter example", async () => {
         const fo = await db.items.findOne(), f = await db.items.find();

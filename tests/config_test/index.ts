@@ -99,8 +99,10 @@ prostgles<DBObj>({
     },
     expressApp: app,
     referencedTables: {
-      various: "one"
-    } 
+      various: "one",
+      items_with_one_media: "one",
+      items_with_media: "one",
+    }
   },
   transactions: true,
   onReady: async (db, _db: any) => {
@@ -111,11 +113,6 @@ prostgles<DBObj>({
       log(req.originalUrl)
 			res.sendFile(path.join(__dirname+'/index.html'));
 		});
-    
-    const media = {
-      name: "hehe.txt",
-      data: Buffer.from("str", "utf-8")
-    }
 
     // console.log(JSON.stringify({
     //   various: await db.various?.find(),
@@ -131,7 +128,20 @@ prostgles<DBObj>({
       try {
         // const res = await db.various.insert({ media }, {returning: "*"})
         // console.log(res)
-        console.log(await db.various.insert({ various_nested: {} }, {returning: "*"}))
+        // console.log(await db.various_nested.insert({ various: {} }, {returning: "*"}))
+        // console.log(await db.various.insert({ various_nested: {} }, {returning: "*"}))
+
+
+        let str = "This is a string",
+          data = Buffer.from(str, "utf-8"),
+          mediaFile = { data, name: "sample_file.txt" }
+
+        const file = await db.media.insert(mediaFile, { returning: "*" });
+
+        console.log(await (db as any).items_m1.getInfo())
+        // const items_with_one_media = await db.items_with_one_media.insert({ name: "sample_file.txt", media: [mediaFile, mediaFile] }, { returning: "*" });
+        // throw items_with_one_media;
+
       } catch(e){
         console.error(e)
       }

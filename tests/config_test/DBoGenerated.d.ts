@@ -64,6 +64,19 @@ export type Items4_pub = {
   "name"?: string;
   "added"?: Date;
 }
+export type Items_m1 = { 
+  "id"?: number;
+  "media_id"?: string;
+  "name"?: string;
+}
+export type Items_with_media = { 
+  "id"?: number;
+  "name"?: string;
+}
+export type Items_with_one_media = { 
+  "id"?: number;
+  "name"?: string;
+}
 export type Lookup_status = { 
   "id"?: string;
   "en"?: string;
@@ -90,6 +103,14 @@ export type Planes = {
   "last_updated"?: number;
 }
 export type Prgll = { 
+  "foreign_id"?: number;
+  "media_id"?: string;
+}
+export type Prostgles_lookup_media_items_with_media = { 
+  "foreign_id"?: number;
+  "media_id"?: string;
+}
+export type Prostgles_lookup_media_items_with_one_media = { 
   "foreign_id"?: number;
   "media_id"?: string;
 }
@@ -154,8 +175,13 @@ export type Various_nested = {
 export type JoinMakerTables = {
  "items": JoinMaker<Items>;
  "items2": JoinMaker<Items2>;
+ "items_m1": JoinMaker<Items_m1>;
+ "items_with_media": JoinMaker<Items_with_media>;
+ "items_with_one_media": JoinMaker<Items_with_one_media>;
  "lookup_status": JoinMaker<Lookup_status>;
  "media": JoinMaker<Media>;
+ "prostgles_lookup_media_items_with_media": JoinMaker<Prostgles_lookup_media_items_with_media>;
+ "prostgles_lookup_media_items_with_one_media": JoinMaker<Prostgles_lookup_media_items_with_one_media>;
  "prostgles_lookup_media_various": JoinMaker<Prostgles_lookup_media_various>;
  "tr1": JoinMaker<Tr1>;
  "tr2": JoinMaker<Tr2>;
@@ -163,7 +189,6 @@ export type JoinMakerTables = {
  "tt1": JoinMaker<Tt1>;
  "usr": JoinMaker<Usr>;
  "various": JoinMaker<Various>;
- "various_nested": JoinMaker<Various_nested>;
 };
 
 /* DBO Definition. Isomorphic */
@@ -178,10 +203,15 @@ export type DBObj = {
   "items3": TableHandler<Items3> 
   "items4": TableHandler<Items4> 
   "items4_pub": TableHandler<Items4_pub> 
+  "items_m1": TableHandler<Items_m1> 
+  "items_with_media": TableHandler<Items_with_media> 
+  "items_with_one_media": TableHandler<Items_with_one_media> 
   "lookup_status": TableHandler<Lookup_status> 
   "media": TableHandler<Media> 
   "planes": TableHandler<Planes> 
   "prgll": TableHandler<Prgll> 
+  "prostgles_lookup_media_items_with_media": TableHandler<Prostgles_lookup_media_items_with_media> 
+  "prostgles_lookup_media_items_with_one_media": TableHandler<Prostgles_lookup_media_items_with_one_media> 
   "prostgles_lookup_media_various": TableHandler<Prostgles_lookup_media_various> 
   "t": TableHandler<T> 
   "test": TableHandler<Test> 
@@ -235,6 +265,15 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
     "items4_pub": { 
       [key in "id" | "public" | "name" | "added"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
+    "items_m1": { 
+      [key in "id" | "media_id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "items_with_media": { 
+      [key in "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "items_with_one_media": { 
+      [key in "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
     "lookup_status": { 
       [key in "id" | "en" | "fr"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
@@ -245,6 +284,12 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
       [key in "id" | "x" | "y" | "flight_number" | "last_updated"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "prgll": { 
+      [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "prostgles_lookup_media_items_with_media": { 
+      [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "prostgles_lookup_media_items_with_one_media": { 
       [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "prostgles_lookup_media_various": { 

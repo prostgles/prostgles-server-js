@@ -374,12 +374,30 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
 
   await tryRun("Local file upload", async () => {
     let str = "This is a string",
-      data = Buffer.from(str, "utf-8");
+      data = Buffer.from(str, "utf-8"),
+      mediaFile = { data, name: "sample_file.txt" }
 
-    const file = await db.media.insert({ data, name: "sample_file.txt" }, { returning: "*" });
+    const file = await db.media.insert(mediaFile, { returning: "*" });
     const _data = fs.readFileSync(__dirname + "/server/media/"+file.name);
     assert.equal(str, _data.toString('utf8'));
+
+    await tryRun("Nested insert", async () => {
+  
+      const { name, media: { extension, content_type, original_name } } = await db.items_with_one_media.insert({ name: "somename.txt", media: mediaFile }, { returning: "*" });
+      
+      assert.deepStrictEqual(
+        { extension, content_type, original_name },
+        {
+          extension: 'txt',
+          content_type: 'text/plain',
+          original_name: 'sample_file.txt',
+        }
+      );
+      // const _data = fs.readFileSync(__dirname + "/server/media/"+file.name);
+      assert.equal(name, "somename.txt");
+    });
   });
+
   
   await tryRun("Exists filter example", async () => {
   

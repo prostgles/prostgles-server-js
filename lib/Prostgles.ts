@@ -633,9 +633,10 @@ export class Prostgles<DBO = DbHandler> {
         }
     }
 
-    async refreshDBO(){
+    refreshDBO = async () => {
         this.dboBuilder = await DboBuilder.create(this as any) as any;
         this.dbo = this.dboBuilder.dbo as any;
+        return this.dbo;
     }
 
     async init(onReady: (dbo: DBO, db: DB) => any): Promise<{
@@ -674,6 +675,7 @@ export class Prostgles<DBO = DbHandler> {
         try {
             /* 3. Make DBO object from all tables and views */
             await this.refreshDBO();
+            
             /* Create media table if required */
             if(this.opts.fileTable){
                 const { awsS3Config, localConfig, imageOptions } = this.opts.fileTable;
@@ -765,8 +767,8 @@ export class Prostgles<DBO = DbHandler> {
         const fileContent = await this.getFileText(filePath);//.then(console.log);
 
         return this.db.multi(fileContent).then((data)=>{
-            console.log("Prostgles: SQL file executed successfuly \n    -> " + filePath, data);
-            return true
+            console.log("Prostgles: SQL file executed successfuly \n    -> " + filePath);
+            return data
         }).catch((err) => {
             const { position, length } = err,
                 lines = fileContent.split("\n");
@@ -825,7 +827,7 @@ export class Prostgles<DBO = DbHandler> {
         if(this.opts.auth){
             const { getUser, getClientUser } = this.opts.auth;
     
-            if(getUser){
+            if(getUser && localParams && (localParams.httpReq || localParams.socket)){
                 const sid = this.getSID(localParams);
                 return {
                     sid,
@@ -837,20 +839,6 @@ export class Prostgles<DBO = DbHandler> {
 
         return {};
     }
-
-    // async getUserFromCookieSession(localParams: LocalParams): Promise<null | { user: any, clientUser: any }>{
-       
-    //     // console.log("conn", socket.handshake.query, socket._session)
-    //     const sid = this.getSID(localParams);
-
-    //     const { getUser, getClientUser } = this.auth;
-
-    //     const user = await getUser(sid, this.dbo, this.db);
-    //     const clientUser = await getClientUser(sid, this.dbo, this.db);
-
-    //     if(!user) return undefined;
-    //     return { user, clientUser };
-    // }
 
     connectedSockets: any[] = [];
     async setSocketEvents(){
@@ -1013,7 +1001,6 @@ export class Prostgles<DBO = DbHandler> {
         const { dbo, db, pgp, publishParser } = this;
         try {
             schema = await publishParser.getSchemaFromPublish(socket);
-            // console.log("getSchemaFromPublish", Object.keys(schema), this.dboBuilder.tablesOrViews.map(t => `${t.name} (${t.columns.map(c => c.name).join(", ")})`))
         } catch(e){
             publishValidationError = "Server Error: PUBLISH VALIDATION ERROR";
             console.error(`\nProstgles PUBLISH VALIDATION ERROR (after socket connected):\n    ->`, e);
@@ -1030,8 +1017,6 @@ export class Prostgles<DBO = DbHandler> {
                 let res = await this.opts.publishRawSQL(publishParams as any);
                 return Boolean(res && typeof res === "boolean" || res === "*");
             } 
-
-            // console.log("canRunSQL", canRunSQL, socket.handshake.headers["x-real-ip"]);//, allTablesViews);
 
             if(await canRunSQL()){
                 socket.removeAllListeners(CHANNELS.SQL)
@@ -1245,7 +1230,7 @@ export function flat(arr){
     let res =  arr.reduce(function (farr, toFlatten) {
         return farr.concat(Array.isArray(toFlatten) ? flat(toFlatten) : toFlatten);
       }, []);
-    // console.log(arr, res)
+      
     return res;
 }
 
@@ -1330,7 +1315,7 @@ export class PublishParser {
         }
 
         /* Must be local request -> allow everything */
-        if(!localParams) return undefined;
+        if(!localParams || (!localParams.socket && !localParams.httpReq)) return undefined;
 
         /* Must be from socket. Must have a publish */
         if(!this.publish) throw "publish is missing";
@@ -1338,7 +1323,6 @@ export class PublishParser {
         /* Get any publish errors for socket */
         const schm = localParams?.socket?.prostgles?.schema?.[tableName]?.[command];
 
-        // console.log(schm, get(socket, `prostgles.schema`));
         if(schm && schm.err) throw schm.err;
 
         let table_rule = await this.getTableRules({ tableName, localParams }, clientInfo);
@@ -1535,8 +1519,6 @@ export class PublishParser {
             console.error("Prostgles \nERRORS IN PUBLISH: ", JSON.stringify(e));
             throw e;
         }
-
-    // console.log(schema)
 
         return schema;
     }

@@ -55,7 +55,7 @@ export default class FileManager {
     constructor(config: FileManager["config"], imageOptions?: ImageOptions);
     getMIME(file: Buffer | String, fileName: string, allowedExtensions?: Array<ALLOWED_EXTENSION>, dissallowedExtensions?: Array<ALLOWED_EXTENSION>, onlyFromName?: boolean): Promise<{
         mime: string;
-        ext: string;
+        ext: string | ALLOWED_EXTENSION;
         fileName: string;
     }>;
     private upload;

@@ -92,6 +92,10 @@ const dbConnection = {
 			//   region: process.env.S3_REGION,
 			//   secretAccessKey: process.env.S3_SECRET,
 			// },
+			referencedTables: {
+				items_with_one_media: "one",
+				items_with_media: "many",
+			},
 			localConfig: {
 			  localFolderPath: path.join(__dirname+'/media'),
 			},
@@ -217,7 +221,11 @@ const dbConnection = {
 					insert: "*",
 					update: "*",
 				},
-				media: "*"
+				media: "*",
+				items_with_one_media: "*",
+				items_with_media: "*",
+				prostgles_lookup_media_items_with_one_media: "*",
+				prostgles_lookup_media_items_with_media: "*"
 			};
 			
 			// return {
@@ -231,8 +239,8 @@ const dbConnection = {
 			// 	}
 			// };
 		},
-		// joins: "inferred",
 		i18n,
+		// joins: "inferred",
 		joins: [
 			{ 
 				tables: ["items", "items2"],
@@ -249,7 +257,9 @@ const dbConnection = {
 			app.get('*', function(req, res){
 				log(req.originalUrl)
 				res.sendFile(path.join(__dirname+'/index.html'));
-			}); 
+			});
+
+			// console.log(JSON.stringify(await db.items_with_one_media.getInfo()))
 			
 			try {
 				

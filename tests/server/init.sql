@@ -1,8 +1,23 @@
 
+DROP TABLE IF EXISTS prostgles_lookup_media_items_with_one_media CASCADE;
+DROP TABLE IF EXISTS prostgles_lookup_media_items_with_media CASCADE;
+DROP TABLE IF EXISTS media CASCADE;
+
+DROP TABLE IF EXISTS items_with_one_media CASCADE;
+CREATE TABLE IF NOT EXISTS items_with_one_media (
+	id		SERIAL PRIMARY KEY,
+	name	TEXT
+);
+
+DROP TABLE IF EXISTS items_with_media CASCADE;
+CREATE TABLE IF NOT EXISTS items_with_media (
+	id		SERIAL PRIMARY KEY,
+	name	TEXT
+);
 
 DROP TABLE IF EXISTS various CASCADE;
 CREATE TABLE IF NOT EXISTS various (
-	id	SERIAL PRIMARY KEY,
+	id		SERIAL PRIMARY KEY,
 	h		TEXT[],
 	name	TEXT,
 	tsv 	TSVECTOR,
@@ -12,7 +27,7 @@ CREATE TABLE IF NOT EXISTS various (
 
 DROP TABLE IF EXISTS items CASCADE;
 CREATE TABLE IF NOT EXISTS items (
-	id	SERIAL PRIMARY KEY,
+	id		SERIAL PRIMARY KEY,
 	h		TEXT[],
 	name	TEXT
 	-- PRIMARY KEY(id, id1)
@@ -20,15 +35,15 @@ CREATE TABLE IF NOT EXISTS items (
 
 DROP TABLE IF EXISTS items2 CASCADE;
 CREATE TABLE IF NOT EXISTS items2 (
-	id	SERIAL PRIMARY KEY,
+	id			SERIAL PRIMARY KEY,
 	items_id	INTEGER REFERENCES items(id),
-	hh		TEXT[],
-	name	TEXT
+	hh			TEXT[],
+	name		TEXT
 );
 
 DROP TABLE IF EXISTS items3 CASCADE;
 CREATE TABLE IF NOT EXISTS items3 (
-	id	SERIAL PRIMARY KEY,
+	id		SERIAL PRIMARY KEY,
 	h		TEXT[],
 	name	TEXT
 );
@@ -37,7 +52,7 @@ CREATE TABLE IF NOT EXISTS items3 (
 DROP TABLE IF EXISTS items4 CASCADE;
 CREATE TABLE IF NOT EXISTS items4 (
 	id			SERIAL,
-	public	TEXT,
+	public		TEXT,
 	name		TEXT,
 	added		TIMESTAMP DEFAULT NOW(),
 	PRIMARY KEY(id, name)
