@@ -28,7 +28,7 @@ export declare type Auth<DBO = DbHandler> = {
         /**
          * Used in allowing logging in through express. Defaults to /login
          */
-        loginPostPath?: string;
+        loginRoute?: string;
         /**
          * Used in allowing logging out through express. Defaults to /logout
          */
@@ -38,7 +38,7 @@ export declare type Auth<DBO = DbHandler> = {
          */
         cookieOptions?: AnyObject;
         /**
-         * If provided, any client requests to these routes (or their subroutes) will be redirected to loginPostPath and then redirected back to the initial route after logging in
+         * If provided, any client requests to these routes (or their subroutes) will be redirected to loginRoute and then redirected back to the initial route after logging in
          */
         userRoutes?: string[];
         /**

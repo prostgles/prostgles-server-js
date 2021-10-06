@@ -65,8 +65,8 @@ class AuthHandler {
             if (!getUser || !getClientUser)
                 throw "getUser OR getClientUser missing from auth config";
             if (expressConfig) {
-                const { app, logoutGetPath = "/logout", loginPostPath = "/login", cookieOptions = {}, userRoutes = [], onGetRequestOK } = expressConfig;
-                if (app && loginPostPath) {
+                const { app, logoutGetPath = "/logout", loginRoute = "/login", cookieOptions = {}, userRoutes = [], onGetRequestOK } = expressConfig;
+                if (app && loginRoute) {
                     /**
                      * AUTH
                      */
@@ -77,7 +77,7 @@ class AuthHandler {
                         }
                         return null;
                     }
-                    app.post(loginPostPath, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                    app.post(loginRoute, (req, res) => __awaiter(this, void 0, void 0, function* () {
                         const successURL = getReturnUrl(req) || "/";
                         let cookieOpts, cookieData;
                         let isOK;
@@ -133,26 +133,21 @@ class AuthHandler {
                                 return this.opts.getUser(sid, this.dbo, this.db);
                             };
                             try {
-                                /* If authorized and going to returnUrl then redirect */
-                                if (getReturnUrl(req)) {
-                                    const u = yield getUser();
-                                    if (u) {
-                                        res.redirect(getReturnUrl(req));
-                                        return;
-                                    }
-                                    else {
-                                        throw "User not found";
-                                    }
-                                    /* Check auth. Redirect if unauthorized */
-                                }
-                                else if (userRoutes.find(userRoute => {
+                                const returnURL = getReturnUrl(req);
+                                /* Check auth. Redirect if unauthorized */
+                                if (userRoutes.find(userRoute => {
                                     return userRoute === req.path || req.path.startsWith(userRoute) && ["/", "?", "#"].includes(req.path.slice(-1));
                                 })) {
                                     const u = yield getUser();
                                     if (!u) {
-                                        res.redirect(`${loginPostPath}?returnURL=${encodeURIComponent(req.originalUrl)}`);
+                                        res.redirect(`${loginRoute}?returnURL=${encodeURIComponent(req.originalUrl)}`);
                                         return;
                                     }
+                                    /* If authorized and going to returnUrl then redirect. Otherwise serve file */
+                                }
+                                else if (returnURL && (yield getUser())) {
+                                    res.redirect(returnURL);
+                                    return;
                                 }
                                 if (onGetRequestOK) {
                                     onGetRequestOK(req, res);

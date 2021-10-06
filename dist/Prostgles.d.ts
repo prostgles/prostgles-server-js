@@ -275,7 +275,10 @@ declare type ExpressApp = {
  */
 export declare type FileTableConfig = {
     tableName?: string;
-    fileUrlPath?: string;
+    /**
+     * GET path used in serving media. defaults to /${tableName}
+     */
+    fileServeRoute?: string;
     awsS3Config?: S3Config;
     localConfig?: LocalConfig;
     expressApp: ExpressApp;

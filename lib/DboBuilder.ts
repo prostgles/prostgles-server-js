@@ -619,7 +619,7 @@ export class ViewHandler {
 
             // console.log("getColumns", this.name, this.columns.map(c => c.name))
             let _lang = lang;
-            return this.columns.map(c => {
+            let columns = this.columns.map(c => {
                 let label = c.comment || c.name;
                 const iConf = this.dboBuilder.prostgles?.opts?.i18n?.column_labels?.[this.name]?.[c.name];
                 const fallbackLang = this.dboBuilder.prostgles?.opts?.i18n?.fallbackLang;
@@ -643,6 +643,19 @@ export class ViewHandler {
                     delete: Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)),
                 }
             });
+
+            // const tblInfo = await this.getInfo();
+            
+            // if(tblInfo && tblInfo.media_table_name && tblInfo.has_media){
+            //     const mediaRules = this.dboBuilder.dbo[tblInfo.media_table_name]?.
+            //     return columns.concat({
+            //         comment: "",
+            //         data_type: "file",
+            //         delete: false,
+            //     });
+            // }
+            
+            return columns;
 
         } catch(e){
             console.trace(e);

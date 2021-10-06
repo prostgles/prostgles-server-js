@@ -27,6 +27,10 @@ export declare type S3Config = {
     secretAccessKey: string;
 };
 export declare type LocalConfig = {
+    /**
+     * example: path.join(__dirname+'/media')
+     * note that this location will be relative to the compiled file location
+     */
     localFolderPath: string;
 };
 export declare type UploadItem = {
@@ -73,16 +77,13 @@ declare const CONTENT_TYPE_TO_EXT: {
     readonly "text/html": readonly ["html", "htm", "shtml"];
     readonly "text/css": readonly ["css"];
     readonly "text/xml": readonly ["xml"];
-    readonly "image/gif": readonly ["gif"];
-    readonly "image/jpeg": readonly ["jpeg", "jpg"];
-    readonly "application/x-javascript": readonly ["js"];
-    readonly "application/atom+xml": readonly ["atom"];
-    readonly "application/rss+xml": readonly ["rss"];
     readonly "text/mathml": readonly ["mml"];
     readonly "text/plain": readonly ["txt"];
     readonly "text/vnd.sun.j2me.app-descriptor": readonly ["jad"];
     readonly "text/vnd.wap.wml": readonly ["wml"];
     readonly "text/x-component": readonly ["htc"];
+    readonly "image/gif": readonly ["gif"];
+    readonly "image/jpeg": readonly ["jpeg", "jpg"];
     readonly "image/png": readonly ["png"];
     readonly "image/tiff": readonly ["tif", "tiff"];
     readonly "image/vnd.wap.wbmp": readonly ["wbmp"];
@@ -91,6 +92,9 @@ declare const CONTENT_TYPE_TO_EXT: {
     readonly "image/x-ms-bmp": readonly ["bmp"];
     readonly "image/svg+xml": readonly ["svg"];
     readonly "image/webp": readonly ["webp"];
+    readonly "application/x-javascript": readonly ["js"];
+    readonly "application/atom+xml": readonly ["atom"];
+    readonly "application/rss+xml": readonly ["rss"];
     readonly "application/java-archive": readonly ["jar", "war", "ear"];
     readonly "application/mac-binhex40": readonly ["hqx"];
     readonly "application/msword": readonly ["doc"];
@@ -133,6 +137,7 @@ declare const CONTENT_TYPE_TO_EXT: {
     readonly "video/x-ms-wmv": readonly ["wmv"];
     readonly "video/x-msvideo": readonly ["avi"];
     readonly "video/mp4": readonly ["m4v", "mp4"];
+    readonly "video/webm": readonly ["webm"];
 };
 export declare type ALLOWED_CONTENT_TYPE = keyof typeof CONTENT_TYPE_TO_EXT;
 export declare type ALLOWED_EXTENSION = (typeof CONTENT_TYPE_TO_EXT)[ALLOWED_CONTENT_TYPE][number];

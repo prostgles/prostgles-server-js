@@ -34,6 +34,10 @@ export type S3Config = {
 }
 
 export type LocalConfig = {
+  /**
+   * example: path.join(__dirname+'/media')
+   * note that this location will be relative to the compiled file location
+   */
   localFolderPath: string;
 }
 
@@ -401,14 +405,14 @@ export default class FileManager {
      * 4. Serve media through express
      */
     const { 
-      fileUrlPath = `/${tableName}`, 
+      fileServeRoute = `/${tableName}`, 
       expressApp: app 
     } = fileTable;
 
-    this.fileRoute = fileUrlPath;
+    this.fileRoute = fileServeRoute;
 
     if(app){
-      app.get(fileUrlPath + "/:name", async (req, res) => {
+      app.get(this.fileRoute + "/:name", async (req, res) => {
         if(!dbo[tableName]){
           res.status(500).json({ err: "Internal error: media table not valid" });
           return false;
@@ -457,16 +461,13 @@ const CONTENT_TYPE_TO_EXT = {
   "text/html":                             ["html", "htm", "shtml"],
   "text/css":                              ["css"],
   "text/xml":                              ["xml"],
-  "image/gif":                             ["gif"],
-  "image/jpeg":                            ["jpeg", "jpg"], 
-  "application/x-javascript":              ["js"],
-  "application/atom+xml":                  ["atom"],
-  "application/rss+xml":                   ["rss"],
   "text/mathml":                           ["mml"],
   "text/plain":                            ["txt"],
   "text/vnd.sun.j2me.app-descriptor":      ["jad"],
   "text/vnd.wap.wml":                      ["wml"],
   "text/x-component":                      ["htc"],
+  "image/gif":                             ["gif"],
+  "image/jpeg":                            ["jpeg", "jpg"], 
   "image/png":                             ["png"],
   "image/tiff":                            ["tif", "tiff"], 
   "image/vnd.wap.wbmp":                    ["wbmp"],
@@ -475,6 +476,9 @@ const CONTENT_TYPE_TO_EXT = {
   "image/x-ms-bmp":                        ["bmp"],
   "image/svg+xml":                         ["svg"],
   "image/webp":                            ["webp"],
+  "application/x-javascript":              ["js"],
+  "application/atom+xml":                  ["atom"],
+  "application/rss+xml":                   ["rss"],
   "application/java-archive":              ["jar", "war", "ear"],
   "application/mac-binhex40":              ["hqx"],
   "application/msword":                    ["doc"],
@@ -517,6 +521,7 @@ const CONTENT_TYPE_TO_EXT = {
   "video/x-ms-wmv":                        ["wmv"],
   "video/x-msvideo":                       ["avi"],
   "video/mp4":                             ["m4v", "mp4"],
+  "video/webm":                            ["webm"],
 } as const;
 
 export type ALLOWED_CONTENT_TYPE = keyof typeof CONTENT_TYPE_TO_EXT;

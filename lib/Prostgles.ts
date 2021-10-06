@@ -360,7 +360,12 @@ type ExpressApp = {
  */
 export type FileTableConfig = {
     tableName?: string; /* defaults to 'media' */
-    fileUrlPath?: string; // defaults to tableName
+
+    /**
+     * GET path used in serving media. defaults to /${tableName}
+     */
+    fileServeRoute?: string;
+
     awsS3Config?: S3Config;
     localConfig?: LocalConfig;
     //  {

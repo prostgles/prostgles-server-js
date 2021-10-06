@@ -353,7 +353,7 @@ class ViewHandler {
                     throw "Not allowed";
                 // console.log("getColumns", this.name, this.columns.map(c => c.name))
                 let _lang = lang;
-                return this.columns.map(c => {
+                let columns = this.columns.map(c => {
                     var _a, _b, _c, _e, _f, _g, _h, _j;
                     let label = c.comment || c.name;
                     const iConf = (_f = (_e = (_c = (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.opts) === null || _b === void 0 ? void 0 : _b.i18n) === null || _c === void 0 ? void 0 : _c.column_labels) === null || _e === void 0 ? void 0 : _e[this.name]) === null || _f === void 0 ? void 0 : _f[c.name];
@@ -369,6 +369,16 @@ class ViewHandler {
                     }
                     return Object.assign(Object.assign({}, c), { label, tsDataType: postgresToTsType(c.udt_name), insert: Boolean(p.insert && p.insert.fields && p.insert.fields.includes(c.name)), select: Boolean(p.select && p.select.fields && p.select.fields.includes(c.name)), filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)), update: Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)), delete: Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)) });
                 });
+                // const tblInfo = await this.getInfo();
+                // if(tblInfo && tblInfo.media_table_name && tblInfo.has_media){
+                //     const mediaRules = this.dboBuilder.dbo[tblInfo.media_table_name]?.
+                //     return columns.concat({
+                //         comment: "",
+                //         data_type: "file",
+                //         delete: false,
+                //     });
+                // }
+                return columns;
             }
             catch (e) {
                 console.trace(e);

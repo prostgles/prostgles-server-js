@@ -25,7 +25,7 @@ export type Auth<DBO = DbHandler> = {
         /**
          * Used in allowing logging in through express. Defaults to /login
          */
-        loginPostPath?: string;
+        loginRoute?: string;
 
         /**
          * Used in allowing logging out through express. Defaults to /logout
@@ -38,7 +38,7 @@ export type Auth<DBO = DbHandler> = {
         cookieOptions?: AnyObject;
 
         /**
-         * If provided, any client requests to these routes (or their subroutes) will be redirected to loginPostPath and then redirected back to the initial route after logging in
+         * If provided, any client requests to these routes (or their subroutes) will be redirected to loginRoute and then redirected back to the initial route after logging in
          */
         userRoutes?: string[];
 
@@ -99,8 +99,8 @@ export default class AuthHandler {
         if(!getUser || !getClientUser) throw "getUser OR getClientUser missing from auth config";
 
         if(expressConfig){
-            const { app, logoutGetPath = "/logout", loginPostPath = "/login", cookieOptions = {}, userRoutes = [], onGetRequestOK } = expressConfig;
-            if(app && loginPostPath){
+            const { app, logoutGetPath = "/logout", loginRoute = "/login", cookieOptions = {}, userRoutes = [], onGetRequestOK } = expressConfig;
+            if(app && loginRoute){
 
                 /**
                  * AUTH
@@ -111,7 +111,7 @@ export default class AuthHandler {
                     }
                     return null;
                 }
-                app.post(loginPostPath, async (req, res) => {
+                app.post(loginRoute, async (req, res) => {
                     const successURL = getReturnUrl(req) || "/";
                     let cookieOpts, cookieData;
                     let isOK;
@@ -170,27 +170,25 @@ export default class AuthHandler {
                         }
                         
                         try {
+                            const returnURL = getReturnUrl(req)
                     
-                            /* If authorized and going to returnUrl then redirect */
-                            if(getReturnUrl(req)){
-                        
-                                const u = await getUser();
-                                if(u){
-                                    res.redirect(getReturnUrl(req));
-                                    return;
-                                } else {
-                                    throw "User not found"
-                                }
+                            
                             
                             /* Check auth. Redirect if unauthorized */
-                            } else if(userRoutes.find(userRoute => {
+                            if(userRoutes.find(userRoute => {
                                 return userRoute === req.path || req.path.startsWith(userRoute) && ["/", "?", "#"].includes(req.path.slice(-1));
                             })){
                                 const u = await getUser();
                                 if(!u){
-                                    res.redirect(`${loginPostPath}?returnURL=${encodeURIComponent(req.originalUrl)}`);
+                                    res.redirect(`${loginRoute}?returnURL=${encodeURIComponent(req.originalUrl)}`);
                                     return; 
                                 }
+
+                            /* If authorized and going to returnUrl then redirect. Otherwise serve file */
+                            } else if(returnURL && (await getUser())){
+                        
+                                res.redirect(returnURL);
+                                return;
                             }
                             
                             if(onGetRequestOK){

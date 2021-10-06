@@ -383,7 +383,6 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
 
     await tryRun("Nested insert", async () => {
   
-      console.log(await db.items_with_one_media.getColumns())
       const { name, media: { extension, content_type, original_name } } = await db.items_with_one_media.insert({ name: "somename.txt", media: mediaFile }, { returning: "*" });
       
       assert.deepStrictEqual(
