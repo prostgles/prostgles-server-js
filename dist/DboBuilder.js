@@ -1558,11 +1558,15 @@ class TableHandler extends ViewHandler {
                         const jp = this.dboBuilder.joinPaths.find(jp => jp.t1 === this.name && jp.t2 === targetTable);
                         if (!jp)
                             throw `Could not find a valid table for the nested data { ${targetTable} } `;
+                        const thisInfo = yield this.getInfo();
                         const childInsert = (cdata, tableName) => __awaiter(this, void 0, void 0, function* () {
                             // console.log("childInsert", {data, tableName})
                             if (!cdata || !dbTX[tableName] || !("insert" in dbTX[tableName]))
                                 throw "childInsertErr: Child table handler missing for: " + tableName;
                             const tableRules = yield canInsert(tableName);
+                            if (thisInfo.has_media === "one" && thisInfo.media_table_name === tableName && Array.isArray(cdata) && cdata.length > 1) {
+                                throw "Constraint check fail: Cannot insert more than one record into " + JSON.stringify(tableName);
+                            }
                             return Promise.all((Array.isArray(cdata) ? cdata : [cdata])
                                 .map(m => dbTX[tableName]
                                 .insert(m, { returning: "*" }, null, tableRules, localParams)

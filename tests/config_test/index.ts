@@ -139,13 +139,16 @@ prostgles<DBObj>({
 
         const file = await db.media.insert(mediaFile, { returning: "*" });
 
-        console.log(await (db as any).items_m1.getInfo())
-        // const items_with_one_media = await db.items_with_one_media.insert({ name: "sample_file.txt", media: [mediaFile, mediaFile] }, { returning: "*" });
+        await db.items_with_one_media.delete();
+        await db.media.delete();
+        const items_with_one_media = await db.items_with_one_media.insert({ name: "sample_file.txt", media: [mediaFile] }, { returning: "*" });
+        console.log(await await db.items_with_one_media.find())
+        console.log(await await db.media.find())
         // throw items_with_one_media;
 
       } catch(e){
         console.error(e)
-      }
+      } 
 
     }, 2000)
 

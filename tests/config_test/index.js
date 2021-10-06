@@ -70,13 +70,14 @@ const log = (msg, extra) => {
         // log("set auth logic")
         return true;
     },
-    publish: async (params) => {
-        return "*";
-        return {
-            various: "*",
-            v_various: "*",
-        };
-    },
+    publish: "*",
+    // async (params) => {
+    //   return "*";
+    //   return {
+    //     various: "*",
+    //     v_various: "*",
+    //   };
+    // },
     joins: "inferred",
     // onNotice: console.log,
     fileTable: {
@@ -119,8 +120,11 @@ const log = (msg, extra) => {
                 // console.log(await db.various.insert({ various_nested: {} }, {returning: "*"}))
                 let str = "This is a string", data = Buffer.from(str, "utf-8"), mediaFile = { data, name: "sample_file.txt" };
                 const file = await db.media.insert(mediaFile, { returning: "*" });
-                console.log(await db.items_m1.getInfo());
-                // const items_with_one_media = await db.items_with_one_media.insert({ name: "sample_file.txt", media: [mediaFile, mediaFile] }, { returning: "*" });
+                await db.items_with_one_media.delete();
+                await db.media.delete();
+                const items_with_one_media = await db.items_with_one_media.insert({ name: "sample_file.txt", media: [mediaFile] }, { returning: "*" });
+                console.log(await await db.items_with_one_media.find());
+                console.log(await await db.media.find());
                 // throw items_with_one_media;
             }
             catch (e) {

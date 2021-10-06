@@ -114,6 +114,10 @@ export type Prostgles_lookup_media_items_with_one_media = {
   "foreign_id"?: number;
   "media_id"?: string;
 }
+export type Prostgles_lookup_media_usr = { 
+  "foreign_id"?: number;
+  "media_id"?: string;
+}
 export type Prostgles_lookup_media_various = { 
   "foreign_id"?: number;
   "media_id"?: string;
@@ -175,13 +179,13 @@ export type Various_nested = {
 export type JoinMakerTables = {
  "items": JoinMaker<Items>;
  "items2": JoinMaker<Items2>;
- "items_m1": JoinMaker<Items_m1>;
  "items_with_media": JoinMaker<Items_with_media>;
  "items_with_one_media": JoinMaker<Items_with_one_media>;
  "lookup_status": JoinMaker<Lookup_status>;
  "media": JoinMaker<Media>;
  "prostgles_lookup_media_items_with_media": JoinMaker<Prostgles_lookup_media_items_with_media>;
  "prostgles_lookup_media_items_with_one_media": JoinMaker<Prostgles_lookup_media_items_with_one_media>;
+ "prostgles_lookup_media_usr": JoinMaker<Prostgles_lookup_media_usr>;
  "prostgles_lookup_media_various": JoinMaker<Prostgles_lookup_media_various>;
  "tr1": JoinMaker<Tr1>;
  "tr2": JoinMaker<Tr2>;
@@ -212,6 +216,7 @@ export type DBObj = {
   "prgll": TableHandler<Prgll> 
   "prostgles_lookup_media_items_with_media": TableHandler<Prostgles_lookup_media_items_with_media> 
   "prostgles_lookup_media_items_with_one_media": TableHandler<Prostgles_lookup_media_items_with_one_media> 
+  "prostgles_lookup_media_usr": TableHandler<Prostgles_lookup_media_usr> 
   "prostgles_lookup_media_various": TableHandler<Prostgles_lookup_media_various> 
   "t": TableHandler<T> 
   "test": TableHandler<Test> 
@@ -290,6 +295,9 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
       [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "prostgles_lookup_media_items_with_one_media": { 
+      [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "prostgles_lookup_media_usr": { 
       [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "prostgles_lookup_media_various": { 

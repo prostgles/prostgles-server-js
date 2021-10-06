@@ -1,6 +1,6 @@
--- DROP TABLE IF EXISTS prostgles_lookup_media_items_with_media CASCADE;
--- DROP TABLE IF EXISTS prostgles_lookup_media_items_with_one_media CASCADE;
--- DROP TABLE IF EXISTS media CASCADE;
+DROP TABLE IF EXISTS prostgles_lookup_media_items_with_media CASCADE;
+DROP TABLE IF EXISTS prostgles_lookup_media_items_with_one_media CASCADE;
+DROP TABLE IF EXISTS media CASCADE;
 
 CREATE TABLE IF NOT EXISTS various_nested (
     various_id INTEGER REFERENCES various(id),
@@ -20,12 +20,12 @@ CREATE TABLE IF NOT EXISTS items_with_media (
 );
 
 
-DROP TABLE IF EXISTS items_m1 CASCADE;
-CREATE TABLE IF NOT EXISTS items_m1 (
-	id			SERIAL ,
-	media_id 	UUID PRIMARY KEY REFERENCES media(id),
-	name		TEXT
-);
+-- DROP TABLE IF EXISTS items_m1 CASCADE;
+-- CREATE TABLE IF NOT EXISTS items_m1 (
+-- 	id			SERIAL ,
+-- 	media_id 	UUID PRIMARY KEY REFERENCES media(id),
+-- 	name		TEXT
+-- );
 
 -- DROP TABLE IF EXISTS various CASCADE;
 -- CREATE TABLE IF NOT EXISTS various (
