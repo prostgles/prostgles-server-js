@@ -1043,7 +1043,7 @@ export function makeQuery(
               /* Rename aggs to avoid collision with join cols */
               if(s.type === "aggregation") return asName(`agg_${s.alias}`) + " AS " + asName(s.alias);
               return s.alias;
-            }).join(", ");
+            }).concat(q2.joins.map(j => asName(j.table))).join(", ");
 
           const _iiQ = makeQuery(
             _this, 

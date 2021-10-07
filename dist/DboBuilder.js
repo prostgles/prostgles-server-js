@@ -544,6 +544,7 @@ class ViewHandler {
                         throw ` invalid publish.${this.name}.select.maxLimit -> expecting integer but got ` + maxLimit;
                 }
                 let q = yield QueryBuilder_1.getNewQuery(this, filter, selectParams, param3_unused, tableRules, localParams), _query = QueryBuilder_1.makeQuery(this, q, undefined, undefined, selectParams);
+                // console.log(_query, JSON.stringify(q, null, 2))
                 if (testRule) {
                     try {
                         yield this.db.any("EXPLAIN " + _query);
@@ -1546,7 +1547,6 @@ class TableHandler extends ViewHandler {
                     yield Promise.all(extraKeys.map((targetTable) => __awaiter(this, void 0, void 0, function* () {
                         var _f;
                         const childDataItems = Array.isArray(row[targetTable]) ? row[targetTable] : [row[targetTable]];
-                        // console.log({childDataItems})
                         /* Must be allowed to insert into media table */
                         const canInsert = (tbl) => __awaiter(this, void 0, void 0, function* () {
                             const childRules = yield this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: tbl, command: "insert", localParams });
@@ -1590,7 +1590,7 @@ class TableHandler extends ViewHandler {
                                 throw "Did not expect this";
                             if (!colsRefT1.length)
                                 throw `Target table ${tbl2} does not reference any columns from the root table ${this.name}. Cannot do nested insert`;
-                            // console.log(JSON.stringify(colsRefT1, null, 2))
+                            // console.log(childDataItems, JSON.stringify(colsRefT1, null, 2))
                             insertedChildren = yield childInsert(childDataItems.map(d => {
                                 let result = Object.assign({}, d);
                                 colsRefT1.map(col => {
@@ -1598,6 +1598,7 @@ class TableHandler extends ViewHandler {
                                 });
                                 return result;
                             }), targetTable);
+                            // console.log({ insertedChildren })
                         }
                         else if (path.length === 3) {
                             if (targetTable !== tbl3)
@@ -1732,9 +1733,11 @@ class TableHandler extends ViewHandler {
                  * If media it will: upload file and continue insert
                  * If nested insert it will: make separate inserts and not continue main insert
                  */
-                const { data, insertResult } = yield this.insertDataParse(rowOrRows, param2, param3_unused, tableRules, localParams);
-                if (insertResult)
+                const insRes = yield this.insertDataParse(rowOrRows, param2, param3_unused, tableRules, localParams);
+                const { data, insertResult } = insRes;
+                if ("insertResult" in insRes) {
                     return insertResult;
+                }
                 if (Array.isArray(data)) {
                     // if(returning) throw "Sorry but [returning] is dissalowed for multi insert";
                     let queries = yield Promise.all(data.map((p) => __awaiter(this, void 0, void 0, function* () {

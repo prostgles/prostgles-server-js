@@ -837,7 +837,7 @@ export class ViewHandler {
 
             let q = await getNewQuery(this as unknown as TableHandler, filter, selectParams, param3_unused, tableRules, localParams),
                 _query = makeQuery(this as unknown as TableHandler, q, undefined, undefined, selectParams);
-            
+            // console.log(_query, JSON.stringify(q, null, 2))
             if(testRule){
                 try {
                     await this.db.any("EXPLAIN " + _query);
@@ -2029,7 +2029,6 @@ export class TableHandler extends ViewHandler {
                 
                 await Promise.all(extraKeys.map(async targetTable => {
                     const childDataItems = Array.isArray(row[targetTable])? row[targetTable] : [row[targetTable]];
-                    // console.log({childDataItems})
 
                     /* Must be allowed to insert into media table */
                     const canInsert = async (tbl: string) => {
@@ -2080,7 +2079,7 @@ export class TableHandler extends ViewHandler {
 
                         if(!colsRefT1.length) throw `Target table ${tbl2} does not reference any columns from the root table ${this.name}. Cannot do nested insert`;
 
-                        // console.log(JSON.stringify(colsRefT1, null, 2))
+                        // console.log(childDataItems, JSON.stringify(colsRefT1, null, 2))
                         insertedChildren = await childInsert(
                             childDataItems.map(d => {
                                 let result = {...d};
@@ -2091,8 +2090,9 @@ export class TableHandler extends ViewHandler {
                             }), 
                             targetTable
                         );
+                        // console.log({ insertedChildren })
 
-                    } else if(path.length === 3){
+                    } else if(path.length === 3){ 
                         if(targetTable !== tbl3) throw "Did not expect this";
                         const colsRefT3 = cols2?.filter(c => c.references?.cols.length === 1 && c.references?.ftable === tbl3);
                         if(!colsRefT1.length || !colsRefT3.length) throw "Incorrectly referenced or missing columns for nested insert";
@@ -2241,9 +2241,11 @@ export class TableHandler extends ViewHandler {
              * If media it will: upload file and continue insert
              * If nested insert it will: make separate inserts and not continue main insert
              */
-            const { data, insertResult } = await this.insertDataParse(rowOrRows, param2, param3_unused, tableRules, localParams);
-            
-            if(insertResult) return insertResult;
+            const insRes = await this.insertDataParse(rowOrRows, param2, param3_unused, tableRules, localParams);
+            const { data, insertResult } = insRes;
+            if("insertResult" in insRes){
+                return insertResult;
+            }
             
             if(Array.isArray(data)){
                 // if(returning) throw "Sorry but [returning] is dissalowed for multi insert";

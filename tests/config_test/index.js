@@ -70,18 +70,19 @@ const log = (msg, extra) => {
         // log("set auth logic")
         return true;
     },
-    publish: "*",
-    // async (params) => {
-    //   return "*";
-    //   return {
-    //     various: "*",
-    //     v_various: "*",
-    //   };
-    // },
+    // publish: "*",
+    publish: async (params) => {
+        return {
+            items_with_one_media: {
+                insert: "*"
+            },
+            // v_various: "*",
+        };
+    },
     joins: "inferred",
     // onNotice: console.log,
     fileTable: {
-        // awsS3Config: {
+        // awsS3Config: {   
         //   accessKeyId: process.env.S3_KEY,
         //   bucket: process.env.S3_BUCKET,
         //   region: process.env.S3_REGION,
@@ -93,8 +94,10 @@ const log = (msg, extra) => {
         expressApp: app,
         referencedTables: {
             various: "one",
+            items_m1: "many",
             items_with_one_media: "one",
             items_with_media: "one",
+            skills: "many",
         }
     },
     transactions: true,
@@ -119,12 +122,13 @@ const log = (msg, extra) => {
                 // console.log(await db.various_nested.insert({ various: {} }, {returning: "*"}))
                 // console.log(await db.various.insert({ various_nested: {} }, {returning: "*"}))
                 let str = "This is a string", data = Buffer.from(str, "utf-8"), mediaFile = { data, name: "sample_file.txt" };
-                const file = await db.media.insert(mediaFile, { returning: "*" });
+                // const file = await db.media.insert(mediaFile, { returning: "*" });
                 await db.items_with_one_media.delete();
                 await db.media.delete();
-                const items_with_one_media = await db.items_with_one_media.insert({ name: "sample_file.txt", media: [mediaFile] }, { returning: "*" });
-                console.log(await await db.items_with_one_media.find());
-                console.log(await await db.media.find());
+                // const items_with_one_media = await db.items_m1.insert({ name: "items_m1", items_with_one_media: [{ name: "sample_file.txt", media: [mediaFile] }]}, { returning: "*" });
+                // console.log(await await db.items_m1.find())
+                // console.log(await await db.items_with_one_media.find())
+                // console.log(await await db.media.find());
                 // throw items_with_one_media;
             }
             catch (e) {
