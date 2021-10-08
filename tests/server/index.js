@@ -87,7 +87,7 @@ const dbConnection = {
         onSocketConnect: (socket, db) => {
             log("onSocketConnect");
             if (clientTest) {
-                log("Client connected");
+                log("Client connected -> CLIENT ERRORS ARE NOT LOGGED HERE!");
                 socket.emit("start-test", { server_id: Math.random() });
                 socket.on("stop-test", async (err, cb) => {
                     cb();

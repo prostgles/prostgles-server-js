@@ -119,12 +119,14 @@ export type LocalParams = {
         data: AnyObject;
     }
 }
-function replaceNonAlphaNumeric(string: string): string {
-    return string.replace(/[\W_]+/g,"_");
+function replaceNonAlphaNumeric(string: string, replacement = "_"): string {
+    return string.replace(/[\W_]+/g, replacement);
 }
-function capitalizeFirstLetter(string: string) : string {
-    return replaceNonAlphaNumeric(string).charAt(0).toUpperCase() + string.slice(1);
+function capitalizeFirstLetter(string: string, nonalpha_replacement?: string) : string {
+    const str = replaceNonAlphaNumeric(string, nonalpha_replacement);
+    return str.charAt(0).toUpperCase() + str.slice(1);
 }
+
 function snakify(str: string, capitalize = false) : string {
 
     return str.split("").map((c, i)=> {
@@ -612,9 +614,11 @@ export class ViewHandler {
             if(!p.select.getColumns) throw "Not allowed";
 
             // console.log("getColumns", this.name, this.columns.map(c => c.name))
+            
             let _lang = lang;
             let columns = this.columns.map(c => {
-                let label = c.comment || c.name;
+                let label = c.comment || capitalizeFirstLetter(c.name, " ");
+                
                 const iConf = this.dboBuilder.prostgles?.opts?.i18n?.column_labels?.[this.name]?.[c.name];
                 const fallbackLang = this.dboBuilder.prostgles?.opts?.i18n?.fallbackLang;
                 _lang = _lang || fallbackLang as string;

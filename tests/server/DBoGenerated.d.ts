@@ -72,6 +72,7 @@ export type Items4_pub = {
 export type Items_m1 = { 
   "id"?: number;
   "name"?: string;
+  "name_type"?: string;
 }
 export type Items_with_media = { 
   "id"?: number;
@@ -82,6 +83,11 @@ export type Items_with_one_media = {
   "name"?: string;
 }
 export type Lookup_experience_types = { 
+  "id"?: string;
+  "en"?: string;
+  "ro"?: string;
+}
+export type Lookup_items_m1_name_type = { 
   "id"?: string;
   "en"?: string;
   "ro"?: string;
@@ -212,6 +218,7 @@ export type JoinMakerTables = {
  "items_with_media": JoinMaker<Items_with_media>;
  "items_with_one_media": JoinMaker<Items_with_one_media>;
  "lookup_experience_types": JoinMaker<Lookup_experience_types>;
+ "lookup_items_m1_name_type": JoinMaker<Lookup_items_m1_name_type>;
  "lookup_status": JoinMaker<Lookup_status>;
  "media": JoinMaker<Media>;
  "prostgles_lookup_media_items_m1": JoinMaker<Prostgles_lookup_media_items_m1>;
@@ -244,6 +251,7 @@ export type DBObj = {
   "items_with_media": TableHandler<Items_with_media> 
   "items_with_one_media": TableHandler<Items_with_one_media> 
   "lookup_experience_types": TableHandler<Lookup_experience_types> 
+  "lookup_items_m1_name_type": TableHandler<Lookup_items_m1_name_type> 
   "lookup_settled_status": TableHandler<Lookup_settled_status> 
   "lookup_status": TableHandler<Lookup_status> 
   "media": TableHandler<Media> 
@@ -312,7 +320,7 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
       [key in "id" | "public" | "name" | "added"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "items_m1": { 
-      [key in "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "id" | "name" | "name_type"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "items_with_media": { 
       [key in "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
@@ -321,6 +329,9 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
       [key in "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "lookup_experience_types": { 
+      [key in "id" | "en" | "ro"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "lookup_items_m1_name_type": { 
       [key in "id" | "en" | "ro"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "lookup_settled_status": { 

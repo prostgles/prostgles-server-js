@@ -6,11 +6,15 @@ import * as fs from 'fs';
 import * as FileType from "file-type";
 import * as sharp from "sharp";
 
-import { Prostgles } from './Prostgles';
+import { DB, Prostgles } from './Prostgles';
 import { asName, AnyObject } from 'prostgles-types';
 import { TableHandler } from './DboBuilder';
 
 const HOUR = 3600 * 1000;
+
+export const asSQLIdentifier = async (name: string, db: DB): Promise<string> => {
+  return (await db.one("select format('%I', $1) as name", [name]))?.name
+}
 
 export type ImageOptions = {
   keepMetadata?: boolean;
@@ -300,7 +304,7 @@ export default class FileManager {
     return await this.s3Client.getSignedUrlPromise("getObject", params);
   }
 
-  private parseSQLIdentifier = async (name: string ) => this.prostgles.dbo.sql<"value">("select format('%I', $1)", [name], { returnType: "value" } )
+  private parseSQLIdentifier = async (name: string ) => asSQLIdentifier(name, this.prostgles.db);//  this.prostgles.dbo.sql<"value">("select format('%I', $1)", [name], { returnType: "value" } )
 
   init = async (prg: Prostgles) => {
     this.prostgles = prg;

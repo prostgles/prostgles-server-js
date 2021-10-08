@@ -9,12 +9,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.asSQLIdentifier = void 0;
 const aws_sdk_1 = require("aws-sdk");
 const fs = require("fs");
 const FileType = require("file-type");
 const sharp = require("sharp");
 const prostgles_types_1 = require("prostgles-types");
 const HOUR = 3600 * 1000;
+exports.asSQLIdentifier = (name, db) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    return (_a = (yield db.one("select format('%I', $1) as name", [name]))) === null || _a === void 0 ? void 0 : _a.name;
+});
 class FileManager {
     constructor(config, imageOptions) {
         this.uploadAsMedia = (params) => __awaiter(this, void 0, void 0, function* () {
@@ -55,7 +60,7 @@ class FileManager {
             const res = yield this.upload(_data, name, content_type);
             return res;
         });
-        this.parseSQLIdentifier = (name) => __awaiter(this, void 0, void 0, function* () { return this.prostgles.dbo.sql("select format('%I', $1)", [name], { returnType: "value" }); });
+        this.parseSQLIdentifier = (name) => __awaiter(this, void 0, void 0, function* () { return exports.asSQLIdentifier(name, this.prostgles.db); }); //  this.prostgles.dbo.sql<"value">("select format('%I', $1)", [name], { returnType: "value" } )
         this.init = (prg) => __awaiter(this, void 0, void 0, function* () {
             var _a, _b, _c;
             this.prostgles = prg;

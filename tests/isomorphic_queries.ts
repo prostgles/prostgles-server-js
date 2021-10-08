@@ -64,7 +64,7 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
       res, 
       [
         {
-          "label": "id",
+          "label": "Id",
           "name": "id",
           "data_type": "integer",
           "udt_name": "int4",
@@ -84,7 +84,7 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
           "delete": true
         },
         {
-          "label": "tr1_id",
+          "label": "Tr1 id",
           "name": "tr1_id",
           "data_type": "integer",
           "udt_name": "int4",

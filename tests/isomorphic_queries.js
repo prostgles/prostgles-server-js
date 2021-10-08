@@ -73,7 +73,7 @@ async function isomorphic(db) {
         // console.log(JSON.stringify(res, null, 2))
         assert_1.strict.deepStrictEqual(res, [
             {
-                "label": "id",
+                "label": "Id",
                 "name": "id",
                 "data_type": "integer",
                 "udt_name": "int4",
@@ -93,7 +93,7 @@ async function isomorphic(db) {
                 "delete": true
             },
             {
-                "label": "tr1_id",
+                "label": "Tr1 id",
                 "name": "tr1_id",
                 "data_type": "integer",
                 "udt_name": "int4",

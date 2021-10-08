@@ -21,6 +21,7 @@ const pkgj = require('../package.json');
 const version = pkgj.version;
 const AuthHandler_1 = require("./AuthHandler");
 console.log("Add a basic auth mode where user and sessions table are created");
+const TableConfig_1 = require("./TableConfig");
 const utils_1 = require("./utils");
 const DboBuilder_1 = require("./DboBuilder");
 const PubSubManager_1 = require("./PubSubManager");
@@ -244,7 +245,7 @@ class Prostgles {
             "onReady", "dbConnection", "dbOptions", "publishMethods", "io",
             "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect",
             "onSocketDisconnect", "sqlFilePath", "auth", "DEBUG_MODE", "watchSchema",
-            "i18n", "fileTable"
+            "i18n", "fileTable", "tableConfig"
         ];
         const unknownParams = Object.keys(params).filter((key) => !config.includes(key));
         if (unknownParams.length) {
@@ -349,6 +350,11 @@ class Prostgles {
                 yield this.runSQLFile(this.opts.sqlFilePath);
             }
             try {
+                yield this.refreshDBO();
+                if (this.opts.tableConfig) {
+                    this.tableConfigurator = new TableConfig_1.default(this);
+                    yield this.tableConfigurator.init();
+                }
                 /* 3. Make DBO object from all tables and views */
                 yield this.refreshDBO();
                 /* Create media table if required */

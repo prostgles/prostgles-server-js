@@ -37,11 +37,12 @@ exports.pgp = pgPromise({
     promiseLib: Bluebird
     // ,query: function (e) { console.log({psql: e.query, params: e.params}); }
 });
-function replaceNonAlphaNumeric(string) {
-    return string.replace(/[\W_]+/g, "_");
+function replaceNonAlphaNumeric(string, replacement = "_") {
+    return string.replace(/[\W_]+/g, replacement);
 }
-function capitalizeFirstLetter(string) {
-    return replaceNonAlphaNumeric(string).charAt(0).toUpperCase() + string.slice(1);
+function capitalizeFirstLetter(string, nonalpha_replacement) {
+    const str = replaceNonAlphaNumeric(string, nonalpha_replacement);
+    return str.charAt(0).toUpperCase() + str.slice(1);
 }
 function snakify(str, capitalize = false) {
     return str.split("").map((c, i) => {
@@ -355,7 +356,7 @@ class ViewHandler {
                 let _lang = lang;
                 let columns = this.columns.map(c => {
                     var _a, _b, _c, _e, _f, _g, _h, _j;
-                    let label = c.comment || c.name;
+                    let label = c.comment || capitalizeFirstLetter(c.name, " ");
                     const iConf = (_f = (_e = (_c = (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.opts) === null || _b === void 0 ? void 0 : _b.i18n) === null || _c === void 0 ? void 0 : _c.column_labels) === null || _e === void 0 ? void 0 : _e[this.name]) === null || _f === void 0 ? void 0 : _f[c.name];
                     const fallbackLang = (_j = (_h = (_g = this.dboBuilder.prostgles) === null || _g === void 0 ? void 0 : _g.opts) === null || _h === void 0 ? void 0 : _h.i18n) === null || _j === void 0 ? void 0 : _j.fallbackLang;
                     _lang = _lang || fallbackLang;

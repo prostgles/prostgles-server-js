@@ -108,6 +108,20 @@ prostgles<DBObj>({
     }
   },
   transactions: true,
+  tableConfig: {
+    items_m1: {
+      lookupColumns:{
+
+        name_type: {
+          values: [
+            { id: "type 1", i18n: { en: "hehe", ro: "hihi" } },
+            { id: "type 2" }
+          ]
+        }
+
+      }
+    }
+  },
   onReady: async (db, _db: any) => {
     
     // console.log("onReady", Object.keys(db))

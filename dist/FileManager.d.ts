@@ -1,6 +1,7 @@
 /// <reference types="node" />
 import { S3 } from 'aws-sdk';
-import { Prostgles } from './Prostgles';
+import { DB, Prostgles } from './Prostgles';
+export declare const asSQLIdentifier: (name: string, db: DB) => Promise<string>;
 export declare type ImageOptions = {
     keepMetadata?: boolean;
     compression?: 

@@ -13,6 +13,8 @@ const version = pkgj.version;
 import AuthHandler, { ClientInfo, Auth } from "./AuthHandler";
 console.log("Add a basic auth mode where user and sessions table are created");
 
+import TableConfigurator, { TableConfig } from "./TableConfig";
+
 import { get } from "./utils";
 import { DboBuilder, DbHandler, TableHandler, ViewHandler, isPlainObject, LocalParams } from "./DboBuilder";
 import { PubSubManager, DEFAULT_SYNC_BATCH_SIZE, asValue } from "./PubSubManager";
@@ -404,6 +406,7 @@ export type ProstglesInitOptions<DBO = DbHandler> = {
     onNotice?: (msg: any) => void;
     i18n?: I18N_CONFIG<AnyObject>;
     fileTable?: FileTableConfig;
+    tableConfig?: TableConfig;
 }
 
 // interface ISocketSetup {
@@ -474,6 +477,8 @@ export class Prostgles<DBO = DbHandler> {
 
     fileManager?: FileManager;
 
+    tableConfigurator?: TableConfigurator;
+
     isMedia(tableName: string){
         return this.opts?.fileTable?.tableName === tableName;
     }
@@ -488,7 +493,7 @@ export class Prostgles<DBO = DbHandler> {
             "onReady", "dbConnection", "dbOptions", "publishMethods", "io", 
             "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect", 
             "onSocketDisconnect", "sqlFilePath", "auth", "DEBUG_MODE", "watchSchema", 
-            "i18n", "fileTable"
+            "i18n", "fileTable", "tableConfig"
         ];
         const unknownParams = Object.keys(params).filter((key: string) => !(config as string[]).includes(key))
         if(unknownParams.length){ 
@@ -615,6 +620,13 @@ export class Prostgles<DBO = DbHandler> {
         }
 
         try {
+
+            await this.refreshDBO();
+            if(this.opts.tableConfig){
+                this.tableConfigurator = new TableConfigurator(this as any);
+                await this.tableConfigurator.init();
+            }
+
             /* 3. Make DBO object from all tables and views */
             await this.refreshDBO();
             

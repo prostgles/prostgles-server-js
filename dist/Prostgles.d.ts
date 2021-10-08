@@ -3,6 +3,7 @@ import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import FileManager, { ImageOptions, LocalConfig, S3Config } from "./FileManager";
 import AuthHandler, { ClientInfo, Auth } from "./AuthHandler";
+import TableConfigurator, { TableConfig } from "./TableConfig";
 import { DboBuilder, DbHandler, LocalParams } from "./DboBuilder";
 export { DbHandler };
 export declare type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -313,6 +314,7 @@ export declare type ProstglesInitOptions<DBO = DbHandler> = {
     onNotice?: (msg: any) => void;
     i18n?: I18N_CONFIG<AnyObject>;
     fileTable?: FileTableConfig;
+    tableConfig?: TableConfig;
 };
 export declare type OnReady = {
     dbo: DbHandler;
@@ -335,6 +337,7 @@ export declare class Prostgles<DBO = DbHandler> {
     private loaded;
     dbEventsManager: DBEventsManager;
     fileManager?: FileManager;
+    tableConfigurator?: TableConfigurator;
     isMedia(tableName: string): boolean;
     constructor(params: ProstglesInitOptions);
     destroyed: boolean;
