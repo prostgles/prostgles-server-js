@@ -215,6 +215,14 @@ const dbConnection = {
                             return row;
                         }
                     }
+                },
+                uuid_text: {
+                    insert: {
+                        fields: "*",
+                        forcedData: {
+                            id: 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e'
+                        }
+                    }
                 }
             };
             // return {

@@ -194,6 +194,10 @@ export type Usr = {
   "is_active"?: boolean;
   "age"?: number;
 }
+export type Uuid_text = { 
+  "id"?: string;
+  "name"?: string;
+}
 export type V_items = { 
   "id"?: number;
   "name"?: string;
@@ -272,6 +276,7 @@ export type DBObj = {
   "tt1": TableHandler<Tt1> 
   "tttt": TableHandler<Tttt> 
   "usr": TableHandler<Usr> 
+  "uuid_text": TableHandler<Uuid_text> 
   "v_items": ViewHandler<V_items> 
   "various": TableHandler<Various> 
   "various_nested": TableHandler<Various_nested> 
@@ -393,6 +398,9 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
     }; 
     "usr": { 
       [key in "id" | "status" | "msg" | "added" | "is_active" | "age"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "uuid_text": { 
+      [key in "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "v_items": { 
       [key in "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 

@@ -139,6 +139,10 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
     const expectB = await db.insert_rules.insert({ name: "a" }, { returning: "*" });
     assert.deepStrictEqual(expectB, { name: "b" }, "Validated insert failed");
 
+    /* forced UUID insert */
+    const row: any = await db.uuid_text.insert({}, {returning: "*"});
+    assert.equal(row.id, 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e')
+
     await testRealtime();
 
     // auth.login({ username: "john", password: "secret" });

@@ -99,9 +99,10 @@ class ColSet {
             if (!col)
                 throw "Unexpected missing col name";
             const colIsJSON = ["json", "jsonb"].includes(col.data_type);
+            const colIsUUID = ["uuid"].includes(col.data_type);
             return {
                 escapedCol: prostgles_types_1.asName(key),
-                escapedVal: exports.pgp.as.format(colIsJSON ? "$1:json" : "$1", [row[key]])
+                escapedVal: exports.pgp.as.format(colIsUUID ? "$1::uuid" : colIsJSON ? "$1:json" : "$1", [row[key]])
             };
         });
     }
@@ -1692,7 +1693,7 @@ class TableHandler extends ViewHandler {
                             const keys = Object.keys(forcedData);
                             if (keys.length) {
                                 try {
-                                    const values = exports.pgp.helpers.values(forcedData), colNames = this.prepareSelect(keys, this.column_names);
+                                    const colset = new exports.pgp.helpers.ColumnSet(this.columns.filter(c => keys.includes(c.name)).map(c => ({ name: c.name, cast: c.udt_name === "uuid" ? c.udt_name : undefined }))), values = exports.pgp.helpers.values(forcedData, colset), colNames = this.prepareSelect(keys, this.column_names);
                                     yield this.db.any("EXPLAIN INSERT INTO " + this.escapedName + " (${colNames:raw}) SELECT * FROM ( VALUES ${values:raw} ) t WHERE FALSE;", { colNames, values });
                                 }
                                 catch (e) {

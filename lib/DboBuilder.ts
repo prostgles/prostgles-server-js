@@ -311,10 +311,11 @@ class ColSet {
             const col = this.opts.columns.find(c => c.name === key);
             if(!col) throw "Unexpected missing col name";
             const colIsJSON = ["json", "jsonb"].includes(col.data_type);
+            const colIsUUID = ["uuid"].includes(col.data_type);
 
             return {
                 escapedCol: asName(key),
-                escapedVal: pgp.as.format(colIsJSON? "$1:json" : "$1", [row[key]])
+                escapedVal: pgp.as.format(colIsUUID? "$1::uuid" : colIsJSON? "$1:json" : "$1", [row[key]])
             }
         });
     
@@ -2192,7 +2193,8 @@ export class TableHandler extends ViewHandler {
                         const keys = Object.keys(forcedData);
                         if(keys.length){
                             try {
-                                const values = pgp.helpers.values(forcedData),
+                                const colset = new pgp.helpers.ColumnSet(this.columns.filter(c => keys.includes(c.name)).map(c => ({ name: c.name, cast: c.udt_name === "uuid"? c.udt_name : undefined }))),
+                                    values = pgp.helpers.values(forcedData, colset),
                                     colNames = this.prepareSelect(keys, this.column_names);
                                 await this.db.any("EXPLAIN INSERT INTO " + this.escapedName + " (${colNames:raw}) SELECT * FROM ( VALUES ${values:raw} ) t WHERE FALSE;", { colNames, values })
                             } catch(e){

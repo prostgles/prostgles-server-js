@@ -28,6 +28,12 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
   /* Access controlled */
   await db.items4.delete({ });
 
+
+  // await tryRun("UUID data", async () => {
+  //   const r = await db.uuid_text.insert({}, { returning: "*"});
+  //   throw r;
+  // })
+
   // setTimeout(async () => {
   // 	await db.any("DROP TABLE IF EXISTS tt; CREATE TABLE tt(id serial);");
 

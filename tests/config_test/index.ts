@@ -82,6 +82,14 @@ prostgles<DBObj>({
       items_with_one_media: {
         insert: "*"
       },
+      uuid_text: {
+        insert: {
+          fields: "*",
+          forcedData: {
+            id: 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e'
+          }
+        }
+      }
       // v_various: "*",
     };
     
@@ -149,20 +157,27 @@ prostgles<DBObj>({
         // console.log(await db.various.insert({ various_nested: {} }, {returning: "*"}))
 
 
-        let str = "This is a string",
-          data = Buffer.from(str, "utf-8"),
-          mediaFile = { data, name: "sample_file.txt" }
+        // let str = "This is a string",
+        //   data = Buffer.from(str, "utf-8"),
+        //   mediaFile = { data, name: "sample_file.txt" }
 
         // const file = await db.media.insert(mediaFile, { returning: "*" });
    
-        await db.items_with_one_media.delete();
-        await db.media.delete();
+        // await db.items_with_one_media.delete();
+        // await db.media.delete();
         // const items_with_one_media = await db.items_m1.insert({ name: "items_m1", items_with_one_media: [{ name: "sample_file.txt", media: [mediaFile] }]}, { returning: "*" });
         // console.log(await await db.items_m1.find())
         // console.log(await await db.items_with_one_media.find())
         // console.log(await await db.media.find());
  
         // throw items_with_one_media;
+
+        const r = await db.uuid_text.insert({id: 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e' }, { returning: "*"});
+        await db.uuid_text.update({ id: 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e'}, { id: 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e'});
+        console.log(
+          await db.uuid_text.find({ "id.$ilike": 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e' })
+        )
+        throw r;
 
       } catch(e){
         console.error(e)
