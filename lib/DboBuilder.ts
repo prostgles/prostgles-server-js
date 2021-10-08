@@ -2006,6 +2006,10 @@ export class TableHandler extends ViewHandler {
                 let insertedChildren: AnyObject[];
                 let targetTableRules: TableRule;
 
+                // if(validate){
+                //     rootData = await validate(rootData);
+                // }
+
                 const fullRootResult = await _this.insert(rootData, { returning: "*" }, null, tableRules, localParams);
                 let returnData: AnyObject;
                 const returning = param2?.returning;
@@ -2133,19 +2137,15 @@ export class TableHandler extends ViewHandler {
                 }));
 
                 return returnData
-            } else {
-
             }
 
             return row;
         }));
 
         let result = isMultiInsert? _data : _data[0];
-        // if(validate && !isNestedInsert){
-        //     result = isMultiInsert? await Promise.all(_data.map(async d => await validate({ ...d }))) : await validate({ ..._data[0] });
-        //     console.log(result)
-        //     throw result
-        // }
+        if(validate && !isNestedInsert){
+            result = isMultiInsert? await Promise.all(_data.map(async d => await validate({ ...d }))) : await validate({ ..._data[0] });
+        }
         let res = isNestedInsert? 
             { insertResult: result } : 
             { data: result };

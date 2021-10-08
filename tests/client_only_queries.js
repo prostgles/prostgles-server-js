@@ -9,11 +9,6 @@ async function client_only(db, auth, log, methods) {
             /* METHODS */
             const t222 = await methods.get();
             assert_1.strict.equal(t222, 222, "methods.get() failed");
-            /* Validated insert */
-            throw 2;
-            const expectB = await db.insert_rules.insert({ name: "a" }, { returning: "*" });
-            throw expectB;
-            assert_1.strict.deepStrictEqual(expectB, { name: "b" }, "Validated insert failed");
             /* RAWSQL */
             const sqlStatement = await db.sql("SELECT $1", [1], { returnType: "statement" });
             assert_1.strict.equal(sqlStatement, "SELECT 1", "db.sql statement query failed");
@@ -117,6 +112,9 @@ async function client_only(db, auth, log, methods) {
                 { id: 2, public: 'public data' }
             ]);
         });
+        /* Validated insert */
+        const expectB = await db.insert_rules.insert({ name: "a" }, { returning: "*" });
+        assert_1.strict.deepStrictEqual(expectB, { name: "b" }, "Validated insert failed");
         await testRealtime();
         // auth.login({ username: "john", password: "secret" });
         // await tout();
