@@ -30,6 +30,11 @@ export type I18n_languages = {
   "label"?: string;
   "label_en"?: string;
 }
+export type Insert_rules = { 
+  "id"?: number;
+  "name"?: string;
+  "added"?: Date;
+}
 export type Item_children = { 
   "id"?: number;
   "item_id"?: number;
@@ -228,6 +233,7 @@ export type DBObj = {
   "*": TableHandler<D_42> 
   "ex_j_ins": TableHandler<Ex_j_ins> 
   "i18n_languages": TableHandler<I18n_languages> 
+  "insert_rules": TableHandler<Insert_rules> 
   "item_children": TableHandler<Item_children> 
   "items": TableHandler<Items> 
   "items2": TableHandler<Items2> 
@@ -283,6 +289,9 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
     }; 
     "i18n_languages": { 
       [key in "id" | "label" | "label_en"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "insert_rules": { 
+      [key in "id" | "name" | "added"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "item_children": { 
       [key in "id" | "item_id" | "name" | "tst"]: { [lang_id in keyof LANG_IDS]: string }; 

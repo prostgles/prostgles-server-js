@@ -12,6 +12,12 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       /* METHODS */
       const t222 = await methods.get();
       assert.equal(t222, 222, "methods.get() failed");
+
+      /* Validated insert */
+      throw 2;
+      const expectB = await db.insert_rules.insert({ name: "a" }, { returning: "*" });
+      throw expectB;
+      assert.deepStrictEqual(expectB, { name: "b" }, "Validated insert failed");
   
       /* RAWSQL */
       const sqlStatement = await db.sql("SELECT $1", [1], { returnType: "statement" });

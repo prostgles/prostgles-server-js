@@ -29,8 +29,9 @@
     "bluebird": "^3.7.2",
     "file-type": "^16.5.3",
     "pg-promise": "^10.9.5",
-    "prostgles-types": "^1.5.101",
-    "sharp": "^0.29.1"
+    "prostgles-types": "^1.5.102",
+    "sharp": "^0.29.1",
+    "socket.io": "^4.2.0"
   },
   "devDependencies": {
     "@aws-sdk/types": "^3.34.0",

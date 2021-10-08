@@ -225,7 +225,17 @@ const dbConnection = {
 				items_with_one_media: "*",
 				items_with_media: "*",
 				prostgles_lookup_media_items_with_one_media: "*",
-				prostgles_lookup_media_items_with_media: "*"
+				prostgles_lookup_media_items_with_media: "*",
+				// insert_rules: {
+				// 	insert: {
+				// 		fields: "*",
+				// 		returningFields: { id: 0 },
+				// 		validate: async (row) => {
+				// 			if(row.name === "a") row.name = "b"
+				// 			return row
+				// 		}
+				// 	}
+				// }
 			};
 			
 			// return {

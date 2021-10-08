@@ -9,6 +9,13 @@ CREATE TABLE IF NOT EXISTS items_with_one_media (
 	name	TEXT
 );
 
+DROP TABLE IF EXISTS insert_rules CASCADE;
+CREATE TABLE IF NOT EXISTS insert_rules (
+	id		SERIAL PRIMARY KEY,
+	name	TEXT,
+	added		TIMESTAMP DEFAULT NOW()
+);
+
 DROP TABLE IF EXISTS items_with_media CASCADE;
 CREATE TABLE IF NOT EXISTS items_with_media (
 	id		SERIAL PRIMARY KEY,

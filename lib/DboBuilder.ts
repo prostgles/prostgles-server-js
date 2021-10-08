@@ -565,13 +565,7 @@ export class ViewHandler {
         if(filter === null || filter && !isPojoObject(filter)) throw `invalid filter -> ${JSON.stringify(filter)} \nExpecting:    undefined | {} | { field_name: "value" } | { field: { $gt: 22 } } ... `;
     }
 
-    async getInfo(param1?, param2?, param3?, tableRules?: TableRule, localParams?: LocalParams): Promise<{ 
-        oid: number; 
-        comment: string; 
-        is_media: boolean; 
-        has_media?: "one" | "many";
-        media_table_name?: string;
-    }>{
+    async getInfo(param1?, param2?, param3?, tableRules?: TableRule, localParams?: LocalParams): Promise<TInfo>{
         const p = this.getValidatedRules(tableRules, localParams);
         if(!p.select.getInfo) throw "Not allowed";
 
@@ -2012,10 +2006,6 @@ export class TableHandler extends ViewHandler {
                 let insertedChildren: AnyObject[];
                 let targetTableRules: TableRule;
 
-                if(validate){
-                    rootData = await validate(rootData);
-                }
-
                 const fullRootResult = await _this.insert(rootData, { returning: "*" }, null, tableRules, localParams);
                 let returnData: AnyObject;
                 const returning = param2?.returning;
@@ -2143,12 +2133,19 @@ export class TableHandler extends ViewHandler {
                 }));
 
                 return returnData
+            } else {
+
             }
 
             return row;
         }));
 
-        const result = isMultiInsert? _data : _data[0];
+        let result = isMultiInsert? _data : _data[0];
+        // if(validate && !isNestedInsert){
+        //     result = isMultiInsert? await Promise.all(_data.map(async d => await validate({ ...d }))) : await validate({ ..._data[0] });
+        //     console.log(result)
+        //     throw result
+        // }
         let res = isNestedInsert? 
             { insertResult: result } : 
             { data: result };

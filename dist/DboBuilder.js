@@ -1531,9 +1531,6 @@ class TableHandler extends ViewHandler {
                     let rootData = PubSubManager_1.filterObj(data, null, extraKeys);
                     let insertedChildren;
                     let targetTableRules;
-                    if (validate) {
-                        rootData = yield validate(rootData);
-                    }
                     const fullRootResult = yield _this.insert(rootData, { returning: "*" }, null, tableRules, localParams);
                     let returnData;
                     const returning = param2 === null || param2 === void 0 ? void 0 : param2.returning;
@@ -1646,9 +1643,16 @@ class TableHandler extends ViewHandler {
                     })));
                     return returnData;
                 }
+                else {
+                }
                 return row;
             })));
-            const result = isMultiInsert ? _data : _data[0];
+            let result = isMultiInsert ? _data : _data[0];
+            // if(validate && !isNestedInsert){
+            //     result = isMultiInsert? await Promise.all(_data.map(async d => await validate({ ...d }))) : await validate({ ..._data[0] });
+            //     console.log(result)
+            //     throw result
+            // }
             let res = isNestedInsert ?
                 { insertResult: result } :
                 { data: result };
