@@ -393,8 +393,8 @@ exports.FUNCTIONS = [
         getQuery: ({ allowedFields, args, tableAlias }) => {
             let a1 = asValue(args[0]), a2 = exports.asNameAlias(args[1], tableAlias);
             if (funcName === "position_lower") {
-                a1 = `LOWER(${a1})`;
-                a2 = `LOWER(${a2})`;
+                a1 = `LOWER(${a1}::text)`;
+                a2 = `LOWER(${a2}::text)`;
             }
             return `position( ${a1} IN ${a2} )`;
         }
