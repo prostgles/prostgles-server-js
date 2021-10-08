@@ -640,6 +640,7 @@ export class ViewHandler {
                     filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)),
                     update: Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)),
                     delete: Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)),
+                    ...(this.dboBuilder?.prostgles?.tableConfigurator?.getColInfo({ table: this.name, col: c.name}) || {})
                 }
             });
 
@@ -1903,10 +1904,9 @@ export class TableHandler extends ViewHandler {
         let data = this.prepareFieldValues(row, forcedData, allowedFields, fixIssues);
         const dataKeys = Object.keys(data);
 
-        if(!data || !dataKeys.length) {
-            // throw "missing/invalid data provided";
-        }
-        // let cs = new pgp.helpers.ColumnSet(this.columnSet.columns.filter(c => dataKeys.includes(c.name)), { table: this.name });
+        dataKeys.map(col => {
+            this.dboBuilder.prostgles?.tableConfigurator?.checkColVal({ table: this.name, col, value: data[col] });
+        })
 
         return { data, allowedCols: this.columns.filter(c => dataKeys.includes(c.name)).map(c => c.name) }
     }

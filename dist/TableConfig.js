@@ -16,6 +16,21 @@ const FileManager_1 = require("./FileManager");
  */
 class TableConfigurator {
     constructor(prostgles) {
+        this.getColInfo = (params) => {
+            var _a, _b;
+            return (_b = (_a = this.config[params.table]) === null || _a === void 0 ? void 0 : _a[params.col]) === null || _b === void 0 ? void 0 : _b.info;
+        };
+        this.checkColVal = (params) => {
+            const conf = this.getColInfo(params);
+            if (conf) {
+                const { value } = params;
+                const { min, max } = conf;
+                if (min !== undefined && value !== undefined && value < min)
+                    throw `${params.col} must be less than ${min}`;
+                if (max !== undefined && value !== undefined && value > max)
+                    throw `${params.col} must be greater than ${max}`;
+            }
+        };
         this.config = prostgles.opts.tableConfig;
         this.dbo = prostgles.dbo;
         this.db = prostgles.db;
@@ -29,11 +44,12 @@ class TableConfigurator {
                     throw "Table not found: " + tableName;
                 const tCols = (_c = (_b = this.dbo) === null || _b === void 0 ? void 0 : _b[tableName]) === null || _c === void 0 ? void 0 : _c.columns;
                 const tConf = this.config[tableName];
-                yield Promise.all(Object.keys(tConf.lookupColumns).map((colName) => __awaiter(this, void 0, void 0, function* () {
+                yield Promise.all(Object.keys(tConf).map((colName) => __awaiter(this, void 0, void 0, function* () {
                     var _d;
-                    const colConf = tConf.lookupColumns[colName];
-                    const rows = colConf.values;
-                    if (rows.length) {
+                    const colConf = tConf[colName];
+                    const lookupConf = colConf.lookupValues;
+                    const rows = lookupConf === null || lookupConf === void 0 ? void 0 : lookupConf.values;
+                    if (rows === null || rows === void 0 ? void 0 : rows.length) {
                         const keys = Object.keys(((_d = rows === null || rows === void 0 ? void 0 : rows[0]) === null || _d === void 0 ? void 0 : _d.i18n) || {});
                         const lookup_table_name = yield FileManager_1.asSQLIdentifier(`lookup_${tableName}_${colName}`, this.db);
                         // const lookup_table_name = asName(`lookup_${tableName}_${colName}`);
@@ -42,7 +58,7 @@ class TableConfigurator {
                         ${keys.length ? (", " + keys.map(k => prostgles_types_1.asName(k) + " TEXT ").join(", ")) : ""}
                     )`);
                         if (!tCols.find(c => c.name === colName)) {
-                            yield this.db.any(`ALTER TABLE ${prostgles_types_1.asName(tableName)} ADD COLUMN ${prostgles_types_1.asName(colName)} TEXT ${!colConf.nullable ? " NOT NULL " : ""} REFERENCES ${lookup_table_name} (id)`);
+                            yield this.db.any(`ALTER TABLE ${prostgles_types_1.asName(tableName)} ADD COLUMN ${prostgles_types_1.asName(colName)} TEXT ${!lookupConf.nullable ? " NOT NULL " : ""} REFERENCES ${lookup_table_name} (id)`);
                         }
                         ;
                         yield this.prostgles.refreshDBO();

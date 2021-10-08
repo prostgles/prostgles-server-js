@@ -356,7 +356,7 @@ class ViewHandler {
                 // console.log("getColumns", this.name, this.columns.map(c => c.name))
                 let _lang = lang;
                 let columns = this.columns.map(c => {
-                    var _a, _b, _c, _e, _f, _g, _h, _j;
+                    var _a, _b, _c, _e, _f, _g, _h, _j, _k, _l, _m;
                     let label = c.comment || capitalizeFirstLetter(c.name, " ");
                     const iConf = (_f = (_e = (_c = (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.opts) === null || _b === void 0 ? void 0 : _b.i18n) === null || _c === void 0 ? void 0 : _c.column_labels) === null || _e === void 0 ? void 0 : _e[this.name]) === null || _f === void 0 ? void 0 : _f[c.name];
                     const fallbackLang = (_j = (_h = (_g = this.dboBuilder.prostgles) === null || _g === void 0 ? void 0 : _g.opts) === null || _h === void 0 ? void 0 : _h.i18n) === null || _j === void 0 ? void 0 : _j.fallbackLang;
@@ -369,7 +369,7 @@ class ViewHandler {
                             langLabel = iConf[fallbackLang];
                         label = langLabel || label;
                     }
-                    return Object.assign(Object.assign({}, c), { label, tsDataType: postgresToTsType(c.udt_name), insert: Boolean(p.insert && p.insert.fields && p.insert.fields.includes(c.name)), select: Boolean(p.select && p.select.fields && p.select.fields.includes(c.name)), filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)), update: Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)), delete: Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)) });
+                    return Object.assign(Object.assign(Object.assign({}, c), { label, tsDataType: postgresToTsType(c.udt_name), insert: Boolean(p.insert && p.insert.fields && p.insert.fields.includes(c.name)), select: Boolean(p.select && p.select.fields && p.select.fields.includes(c.name)), filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)), update: Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)), delete: Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)) }), (((_m = (_l = (_k = this.dboBuilder) === null || _k === void 0 ? void 0 : _k.prostgles) === null || _l === void 0 ? void 0 : _l.tableConfigurator) === null || _m === void 0 ? void 0 : _m.getColInfo({ table: this.name, col: c.name })) || {}));
                 });
                 // const tblInfo = await this.getInfo();
                 // if(tblInfo && tblInfo.media_table_name && tblInfo.has_media){
@@ -1460,10 +1460,10 @@ class TableHandler extends ViewHandler {
         }
         let data = this.prepareFieldValues(row, forcedData, allowedFields, fixIssues);
         const dataKeys = Object.keys(data);
-        if (!data || !dataKeys.length) {
-            // throw "missing/invalid data provided";
-        }
-        // let cs = new pgp.helpers.ColumnSet(this.columnSet.columns.filter(c => dataKeys.includes(c.name)), { table: this.name });
+        dataKeys.map(col => {
+            var _a, _b;
+            (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.tableConfigurator) === null || _b === void 0 ? void 0 : _b.checkColVal({ table: this.name, col, value: data[col] });
+        });
         return { data, allowedCols: this.columns.filter(c => dataKeys.includes(c.name)).map(c => c.name) };
     }
     insertDataParse(data, param2, param3_unused, tableRules, _localParams = null) {
