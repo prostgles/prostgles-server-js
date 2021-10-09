@@ -146,7 +146,7 @@ class ViewHandler {
         // this.tsDataName = snakify(this.name, true);
         // if(this.tsDataName === "T") this.tsDataName = this.tsDataName + "_";
         // this.tsDataDef = `export type ${this.tsDataName} = {\n`;
-        this.columns.map(({ name, udt_name }) => {
+        this.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name)).map(({ name, udt_name }) => {
             this.tsColumnDefs.push(`${escapeTSNames(name, false)}?: ${postgresToTsType(udt_name)};`);
         });
         // this.tsDataDef += "};";

@@ -12,18 +12,18 @@ export type TxCB = {
 
 /* SCHEMA DEFINITON. Table names have been altered to work with Typescript */
 export type D_34_42_34 = { 
-  "id"?: number;
   "\"*\""?: string;
+  "id"?: number;
 }
 export type D_42 = { 
-  "id"?: number;
   "*"?: string;
+  "id"?: number;
 }
 export type Ex_j_ins = { 
-  "id"?: number;
-  "public"?: string;
-  "name"?: string;
   "added"?: Date;
+  "id"?: number;
+  "name"?: string;
+  "public"?: string;
 }
 export type I18n_languages = { 
   "id"?: string;
@@ -31,9 +31,9 @@ export type I18n_languages = {
   "label_en"?: string;
 }
 export type Insert_rules = { 
+  "added"?: Date;
   "id"?: number;
   "name"?: string;
-  "added"?: Date;
 }
 export type Item_children = { 
   "id"?: number;
@@ -42,32 +42,32 @@ export type Item_children = {
   "tst"?: Date;
 }
 export type Items = { 
-  "id"?: number;
   "h"?: Array<string>;
+  "id"?: number;
   "name"?: string;
 }
 export type Items2 = { 
+  "hh"?: Array<string>;
   "id"?: number;
   "items_id"?: number;
-  "hh"?: Array<string>;
   "name"?: string;
 }
 export type Items3 = { 
-  "id"?: number;
   "h"?: Array<string>;
+  "id"?: number;
   "name"?: string;
 }
 export type Items4 = { 
-  "id"?: number;
-  "public"?: string;
-  "name"?: string;
   "added"?: Date;
+  "id"?: number;
+  "name"?: string;
+  "public"?: string;
 }
 export type Items4_pub = { 
-  "id"?: number;
-  "public"?: string;
-  "name"?: string;
   "added"?: Date;
+  "id"?: number;
+  "name"?: string;
+  "public"?: string;
 }
 export type Items_m1 = { 
   "id"?: number;
@@ -82,24 +82,24 @@ export type Items_with_one_media = {
   "name"?: string;
 }
 export type Lookup_experience_types = { 
-  "id"?: string;
   "en"?: string;
+  "id"?: string;
   "ro"?: string;
 }
 export type Lookup_items_m1_name_type = { 
-  "id"?: string;
   "en"?: string;
+  "id"?: string;
   "ro"?: string;
 }
 export type Lookup_settled_status = { 
-  "id"?: string;
   "en"?: string;
+  "id"?: string;
   "ro"?: string;
 }
 export type Lookup_status = { 
-  "id"?: string;
   "en"?: string;
   "fr"?: string;
+  "id"?: string;
 }
 export type Lookup_uuid_text_col1 = { 
   "id"?: string;
@@ -108,24 +108,24 @@ export type Lookup_uuid_text_col2 = {
   "id"?: string;
 }
 export type Media = { 
+  "content_type"?: string;
+  "description"?: string;
+  "etag"?: string;
+  "extension"?: string;
   "id"?: string;
   "name"?: string;
-  "extension"?: string;
-  "content_type"?: string;
-  "url"?: string;
   "original_name"?: string;
-  "description"?: string;
   "s3_url"?: string;
   "signed_url"?: string;
   "signed_url_expires"?: number;
-  "etag"?: string;
+  "url"?: string;
 }
 export type Planes = { 
+  "flight_number"?: string;
   "id"?: number;
+  "last_updated"?: number;
   "x"?: number;
   "y"?: number;
-  "flight_number"?: string;
-  "last_updated"?: number;
 }
 export type Prgll = { 
   "foreign_id"?: number;
@@ -174,9 +174,9 @@ export type Tr1 = {
 }
 export type Tr2 = { 
   "id"?: number;
-  "tr1_id"?: number;
   "t1"?: string;
   "t2"?: string;
+  "tr1_id"?: number;
 }
 export type Tt = { 
   "id"?: number;
@@ -192,30 +192,30 @@ export type Tttt = {
   "t"?: string;
 }
 export type Usr = { 
-  "id"?: number;
-  "status"?: string;
-  "msg"?: string;
   "added"?: Date;
-  "is_active"?: boolean;
   "age"?: number;
+  "id"?: number;
+  "is_active"?: boolean;
+  "msg"?: string;
+  "status"?: string;
 }
 export type Uuid_text = { 
-  "id"?: string;
-  "name"?: string;
   "col1"?: string;
   "col2"?: string;
+  "id"?: string;
+  "name"?: string;
 }
 export type V_items = { 
   "id"?: number;
   "name"?: string;
 }
 export type Various = { 
-  "id"?: number;
+  "added"?: Date;
   "h"?: Array<string>;
+  "id"?: number;
+  "jsn"?: Object;
   "name"?: string;
   "tsv"?: any;
-  "jsn"?: Object;
-  "added"?: Date;
 }
 export type Various_nested = { 
   "various_id"?: number;
