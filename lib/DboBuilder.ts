@@ -3019,7 +3019,7 @@ async function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"):
                 col.column_default = (col.udt_name !== "uuid" && !col.is_pkey && !col.column_default.startsWith("nextval("))? col.column_default : null;
             }
             return col;
-        })
+        }).sort((a, b) => a.ordinal_position - b.ordinal_position)
         
         return tbl;
     })
