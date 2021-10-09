@@ -2371,20 +2371,25 @@ function getTablesForSchemaPostgresSQL(db, schema = "public") {
     `;
         // console.log(pgp.as.format(query, { schema }), schema);
         let res = yield db.any(query, { schema });
-        res = yield Promise.all(res.map((tbl) => __awaiter(this, void 0, void 0, function* () {
-            tbl.columns = yield Promise.all(tbl.columns.map((col) => __awaiter(this, void 0, void 0, function* () {
+        // res = await Promise.all(res.map(async tbl => {
+        //     tbl.columns = await Promise.all(tbl.columns.map(async col => {
+        //         if(col.has_default){
+        //             col.column_default = !col.column_default.startsWith("nextval(")? (await db.oneOrNone(`SELECT ${col.column_default} as val`)).val : null;
+        //         }
+        //         return col;
+        //     }))
+        //     return tbl;
+        // }))
+        res = res.map(tbl => {
+            tbl.columns = tbl.columns.map(col => {
                 if (col.has_default) {
-                    col.column_default = !col.column_default.startsWith("nextval(") ? col.column_default : null; //(await db.oneOrNone(`SELECT ${col.column_default} as val`)).val : null;
+                    col.column_default = (col.udt_name !== "uuid" && !col.is_pkey && !col.column_default.startsWith("nextval(")) ? col.column_default : null;
                 }
                 return col;
-            })));
+            });
             return tbl;
-        })));
+        });
         return res;
-    });
-}
-function refreshColDefault() {
-    return __awaiter(this, void 0, void 0, function* () {
     });
 }
 /**

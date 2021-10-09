@@ -3003,22 +3003,28 @@ async function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"):
     // console.log(pgp.as.format(query, { schema }), schema);
     let res: TableSchema[] = await db.any(query, { schema });
 
-    res = await Promise.all(res.map(async tbl => {
-        tbl.columns = await Promise.all(tbl.columns.map(async col => {
+    // res = await Promise.all(res.map(async tbl => {
+    //     tbl.columns = await Promise.all(tbl.columns.map(async col => {
+    //         if(col.has_default){
+    //             col.column_default = !col.column_default.startsWith("nextval(")? (await db.oneOrNone(`SELECT ${col.column_default} as val`)).val : null;
+    //         }
+    //         return col;
+    //     }))
+        
+    //     return tbl;
+    // }))
+    res = res.map(tbl => {
+        tbl.columns = tbl.columns.map(col => {
             if(col.has_default){
-                col.column_default = !col.column_default.startsWith("nextval(")? col.column_default : null; //(await db.oneOrNone(`SELECT ${col.column_default} as val`)).val : null;
+                col.column_default = (col.udt_name !== "uuid" && !col.is_pkey && !col.column_default.startsWith("nextval("))? col.column_default : null;
             }
             return col;
-        }))
+        })
         
         return tbl;
-    }))
+    })
 
     return res;
-}
-
-async function refreshColDefault(){
-
 }
 
 /** 
