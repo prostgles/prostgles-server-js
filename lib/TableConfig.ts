@@ -2,6 +2,7 @@ import { AnyObject, asName } from "prostgles-types";
 import { LocalParams } from "./DboBuilder";
 import { asSQLIdentifier } from "./FileManager";
 import { DB, DbHandler, Prostgles } from "./Prostgles";
+import { asValue } from "./PubSubManager";
 
 type ColExtraInfo = {
     min?: string | number;
@@ -26,6 +27,7 @@ export type TableConfig<LANG_IDS = { en: 1, ro: 1 }> = {
              */
             lookupValues?: {
                 nullable?: boolean;
+                firstValueAsDefault?: boolean;
                 values: {
                     id: string;
                     i18n?: {
@@ -78,11 +80,11 @@ export default class TableConfigurator {
             
             await Promise.all(Object.keys(tConf).map(async colName => {
                 const colConf = tConf[colName];
-                const lookupConf = colConf.lookupValues;
-                const rows = lookupConf?.values;
-                if(rows?.length){
+                const { firstValueAsDefault, values, nullable } = colConf.lookupValues
+                
+                if(values?.length){
 
-                    const keys = Object.keys(rows?.[0]?.i18n || {})
+                    const keys = Object.keys(values[0]?.i18n || {})
                     const lookup_table_name = await asSQLIdentifier(`lookup_${tableName}_${colName}`, this.db)
                     // const lookup_table_name = asName(`lookup_${tableName}_${colName}`);
                     
@@ -92,7 +94,12 @@ export default class TableConfigurator {
                     )`);
 
                     if(!tCols.find(c => c.name === colName)){
-                        await this.db.any(`ALTER TABLE ${asName(tableName)} ADD COLUMN ${asName(colName)} TEXT ${!lookupConf.nullable? " NOT NULL " : ""} REFERENCES ${lookup_table_name} (id)`)
+                        await this.db.any(`
+                            ALTER TABLE ${asName(tableName)} 
+                            ADD COLUMN ${asName(colName)} TEXT ${!nullable? " NOT NULL " : ""} 
+                            ${firstValueAsDefault? ` DEFAULT ${asValue(values[0].id)} ` : "" } 
+                            REFERENCES ${lookup_table_name} (id)
+                        `)
                     };
 
                     await this.prostgles.refreshDBO();
@@ -105,7 +112,7 @@ export default class TableConfigurator {
                     }
 
                     await this.dbo[lookup_table_name].insert(
-                        rows.map(r => ({ id: r.id, ...r.i18n })), 
+                        values.map(r => ({ id: r.id, ...r.i18n })), 
                         { onConflictDoNothing: true }
                     );
 

@@ -22,6 +22,7 @@ export declare type TableConfig<LANG_IDS = {
              */
             lookupValues?: {
                 nullable?: boolean;
+                firstValueAsDefault?: boolean;
                 values: {
                     id: string;
                     i18n?: {

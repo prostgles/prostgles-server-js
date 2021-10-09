@@ -11,6 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const prostgles_types_1 = require("prostgles-types");
 const FileManager_1 = require("./FileManager");
+const PubSubManager_1 = require("./PubSubManager");
 /**
  * Will be run between initSQL and fileTable
  */
@@ -47,10 +48,9 @@ class TableConfigurator {
                 yield Promise.all(Object.keys(tConf).map((colName) => __awaiter(this, void 0, void 0, function* () {
                     var _d;
                     const colConf = tConf[colName];
-                    const lookupConf = colConf.lookupValues;
-                    const rows = lookupConf === null || lookupConf === void 0 ? void 0 : lookupConf.values;
-                    if (rows === null || rows === void 0 ? void 0 : rows.length) {
-                        const keys = Object.keys(((_d = rows === null || rows === void 0 ? void 0 : rows[0]) === null || _d === void 0 ? void 0 : _d.i18n) || {});
+                    const { firstValueAsDefault, values, nullable } = colConf.lookupValues;
+                    if (values === null || values === void 0 ? void 0 : values.length) {
+                        const keys = Object.keys(((_d = values[0]) === null || _d === void 0 ? void 0 : _d.i18n) || {});
                         const lookup_table_name = yield FileManager_1.asSQLIdentifier(`lookup_${tableName}_${colName}`, this.db);
                         // const lookup_table_name = asName(`lookup_${tableName}_${colName}`);
                         yield this.db.any(`CREATE TABLE IF NOT EXISTS ${lookup_table_name} (
@@ -58,7 +58,12 @@ class TableConfigurator {
                         ${keys.length ? (", " + keys.map(k => prostgles_types_1.asName(k) + " TEXT ").join(", ")) : ""}
                     )`);
                         if (!tCols.find(c => c.name === colName)) {
-                            yield this.db.any(`ALTER TABLE ${prostgles_types_1.asName(tableName)} ADD COLUMN ${prostgles_types_1.asName(colName)} TEXT ${!lookupConf.nullable ? " NOT NULL " : ""} REFERENCES ${lookup_table_name} (id)`);
+                            yield this.db.any(`
+                            ALTER TABLE ${prostgles_types_1.asName(tableName)} 
+                            ADD COLUMN ${prostgles_types_1.asName(colName)} TEXT ${!nullable ? " NOT NULL " : ""} 
+                            ${firstValueAsDefault ? ` DEFAULT ${PubSubManager_1.asValue(values[0].id)} ` : ""} 
+                            REFERENCES ${lookup_table_name} (id)
+                        `);
                         }
                         ;
                         yield this.prostgles.refreshDBO();
@@ -67,7 +72,7 @@ class TableConfigurator {
                         if (missing_lcols.length) {
                             yield this.db.any(`ALTER TABLE ${lookup_table_name} ${missing_lcols.map(c => `ADD COLUMN  ${c} TEXT `).join(", ")}`);
                         }
-                        yield this.dbo[lookup_table_name].insert(rows.map(r => (Object.assign({ id: r.id }, r.i18n))), { onConflictDoNothing: true });
+                        yield this.dbo[lookup_table_name].insert(values.map(r => (Object.assign({ id: r.id }, r.i18n))), { onConflictDoNothing: true });
                         console.log(`TableConfig: Created ${lookup_table_name}(id) for ${tableName}(${prostgles_types_1.asName(colName)})`);
                     }
                 })));
