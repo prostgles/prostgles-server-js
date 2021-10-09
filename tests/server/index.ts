@@ -85,25 +85,27 @@ const dbConnection = {
 		// DEBUG_MODE: true,
 		// onNotice: console.log,
 		tableConfig: {
-			uuid_text: {
-				col1: {
-					lookupValues: {
-						values: [
-							{id: "a"},
-							{id: "b"}
-						],
-						nullable: true,
-						firstValueAsDefault: true
+			lookup_col1: {
+				isLookupTable: {
+					values: {
+						a: {},
+						b: {}
 					}
-				},
-				col2: {
-					lookupValues: {
-						values: [
-							{id: "a"},
-							{id: "b"}
-						],
-						nullable: true,
-						firstValueAsDefault: false
+				}
+			},
+			uuid_text: {
+				columns: {
+					col1: {
+						references: {
+							tableName: "lookup_col1"
+							nullable: true,
+						}
+					},
+					col2: {
+						references: {
+							tableName: "lookup_col1"
+							nullable: true,
+						}
 					}
 				}
 			}
@@ -124,7 +126,7 @@ const dbConnection = {
 			},
 			expressApp: app,
 		},
-
+		
 		onSocketConnect:  (socket, db) => {
 			log("onSocketConnect")
 			if(clientTest){

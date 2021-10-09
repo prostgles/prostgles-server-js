@@ -1,5 +1,5 @@
 import { AnyObject, asName } from "prostgles-types";
-import { LocalParams } from "./DboBuilder";
+import { DboBuilder, LocalParams } from "./DboBuilder";
 import { asSQLIdentifier } from "./FileManager";
 import { DB, DbHandler, Prostgles } from "./Prostgles";
 import { asValue } from "./PubSubManager";
@@ -10,11 +10,19 @@ type ColExtraInfo = {
     hint?: string;
 };
 
-/**
- * Helper utility to create lookup tables for TEXT columns
- */
-export type TableConfig<LANG_IDS = { en: 1, ro: 1 }> = {
-    [table_name: string]: {
+type LookupTableDefinition<LANG_IDS> = {
+    isLookupTable: {
+        dropIfExists?: boolean;
+        values: {
+            [id_value: string]: {} | {
+                [lang_id in keyof LANG_IDS]: string
+            }
+        }[]
+    }
+}
+
+type TableDefinition = {
+    columns: {
         [column_name: string]: {
             
             /**
@@ -25,18 +33,27 @@ export type TableConfig<LANG_IDS = { en: 1, ro: 1 }> = {
             /**
              * Will create a lookup table that this column will reference
              */
-            lookupValues?: {
+            references?: {
+
+
+                tableName: string;
+
+                /**
+                 * Defaults to id
+                 */
+                columnName?: string;
+                defaultValue?: string;
                 nullable?: boolean;
-                firstValueAsDefault?: boolean;
-                values: {
-                    id: string;
-                    i18n?: {
-                        [lang_id in keyof LANG_IDS]: string
-                    }
-                }[]
             }
         }
     }
+}
+
+/**
+ * Helper utility to create lookup tables for TEXT columns
+ */
+export type TableConfig<LANG_IDS = { en: 1, ro: 1 }> = {
+    [table_name: string]: TableDefinition | LookupTableDefinition<LANG_IDS>;
 }
 
 /**
@@ -72,59 +89,76 @@ export default class TableConfigurator {
     }
 
     async init(){
-        await Promise.all(Object.keys(this.config).map(async tableName => {
-            if(!this.dbo?.[tableName])throw "Table not found: " + tableName;
-
-            const tCols = this.dbo?.[tableName]?.columns;
-            const tConf = this.config[tableName];
-            
-            await Promise.all(Object.keys(tConf).map(async colName => {
-                const colConf = tConf[colName];
-                const { firstValueAsDefault, values, nullable } = colConf.lookupValues || {}
-                
-                if(values?.length){
-
-                    const keys = Object.keys(values[0]?.i18n || {})
-                    const lookup_table_name = await asSQLIdentifier(`lookup_${tableName}_${colName}`, this.db)
-                    // const lookup_table_name = asName(`lookup_${tableName}_${colName}`);
-                    
-                    if(!this.dbo[lookup_table_name]){
-                        await this.db.any(`CREATE TABLE IF NOT EXISTS ${lookup_table_name} (
-                            id  TEXT PRIMARY KEY
-                            ${keys.length? (", " + keys.map(k => asName(k) + " TEXT ").join(", ")) : ""}
-                        )`);
+        let queries: string[] = [];
+        
+        /* Create lookup tables */
+        Object.keys(this.config).map(tableName => {
+            const tableConf = this.config[tableName];
+            if("isLookupTable" in tableConf && Object.keys(tableConf.isLookupTable?.values).length){
+                const rows = Object.keys(tableConf.isLookupTable?.values).map(id => ({ id, ...(tableConf.isLookupTable?.values[id]) }))
+                if(!this.dbo?.[tableName]){
+                    if(tableConf.isLookupTable?.dropIfExists){
+                        queries.push(`DROP TABLE IF EXISTS ${tableName}`);
                     }
+                    const keys = Object.keys(rows[0]).filter(k => k !== "id");
+                    queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
+                        id  TEXT PRIMARY KEY
+                        ${keys.length? (", " + keys.map(k => asName(k) + " TEXT ").join(", ")) : ""}
+                    );`);
 
-                    if(!tCols.find(c => c.name === colName)){
-                        await this.db.any(`
-                            ALTER TABLE ${asName(tableName)} 
-                            ADD COLUMN ${asName(colName)} TEXT ${!nullable? " NOT NULL " : ""} 
-                            ${firstValueAsDefault? ` DEFAULT ${asValue(values[0].id)} ` : "" } 
-                            REFERENCES ${lookup_table_name} (id)
-                        `)
-                    };
-
-                    await this.prostgles.refreshDBO();
-
-                    if(this.dbo[lookup_table_name]){
-                        const lcols = await this.dbo[lookup_table_name].columns;
-                        const missing_lcols = keys.filter(k => !lcols.find(lc => lc.name === k));
-                        
-                        if(missing_lcols.length){
-                            await this.db.any(`ALTER TABLE ${lookup_table_name} ${missing_lcols.map(c => `ADD COLUMN  ${c} TEXT `).join(", ")}`)
-                        }
-
-                        await this.dbo[lookup_table_name].insert(
-                            values.map(r => ({ id: r.id, ...r.i18n })), 
-                            { onConflictDoNothing: true }
-                        );
-                        console.log("Added records for " + lookup_table_name)
-                    }
-
-
-                    console.log(`TableConfig: Created ${lookup_table_name}(id) for ${tableName}(${asName(colName)})`)
+                    rows.map(row => {
+                        const values = this.prostgles.pgp.helpers.values(row)
+                        queries.push(this.prostgles.pgp.as.format(`INSERT INTO ${tableName}  (${["id", ...keys].map(t => asName(t)).join(", ")})  ` + " VALUES ${values:raw} ;", { values} ))
+                    });
+                    console.log("Created lookup table " + tableName)
                 }
-            }))
-        }))
+            }
+        });
+        
+        if(queries.length){    
+            await this.db.multi(queries.join("\n"));
+        }
+        queries = [];
+
+        /* Create referenced columns */
+        await Promise.all(Object.keys(this.config).map(async tableName => {
+            const tableConf = this.config[tableName];
+            if("columns" in tableConf){
+                
+                if(!this.dbo[tableName]){
+                    console.error("TableConfigurator: Table not found in dbo: " + tableName)
+                } else {
+                    Object.keys(tableConf.columns).map(colName => {
+                        const colConf = tableConf.columns[colName];
+                        
+                        if(colConf.references && !this.dbo[tableName].columns.find(c => colName === c.name)) {
+                            const { nullable, tableName: lookupTable, columnName: lookupCol = "id", defaultValue } = colConf.references;
+                            queries.push(`
+                                ALTER TABLE ${asName(tableName)} 
+                                ADD COLUMN ${asName(colName)} TEXT ${!nullable? " NOT NULL " : ""} 
+                                ${defaultValue? ` DEFAULT ${asValue(defaultValue)} ` : "" } 
+                                REFERENCES ${lookupTable} (${lookupCol}) ;
+                            `)
+                            console.log(`${tableName}(${colName}) ` + " referenced lookup table " + tableName)
+                        }
+                    });
+                }
+            }
+        }));
+
+        if(queries.length){
+            await this.db.multi(queries.join("\n"));
+        }
     }
+}
+
+
+async function columnExists(args: {tableName: string; colName: string; db: DB }){
+    const { db, tableName, colName } = args;
+    return Boolean((await db.oneOrNone(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name=${asValue(tableName)} and column_name=${asValue(colName)}
+        LIMIT 1;
+    `))?.column_name);
 }

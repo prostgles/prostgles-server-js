@@ -81,6 +81,11 @@ export type Items_with_one_media = {
   "id"?: number;
   "name"?: string;
 }
+export type Lookup_col1 = { 
+  "col1"?: string;
+  "col2"?: string;
+  "id"?: string;
+}
 export type Lookup_experience_types = { 
   "en"?: string;
   "id"?: string;
@@ -228,10 +233,9 @@ export type JoinMakerTables = {
  "items_m1": JoinMaker<Items_m1>;
  "items_with_media": JoinMaker<Items_with_media>;
  "items_with_one_media": JoinMaker<Items_with_one_media>;
+ "lookup_col1": JoinMaker<Lookup_col1>;
  "lookup_experience_types": JoinMaker<Lookup_experience_types>;
  "lookup_status": JoinMaker<Lookup_status>;
- "lookup_uuid_text_col1": JoinMaker<Lookup_uuid_text_col1>;
- "lookup_uuid_text_col2": JoinMaker<Lookup_uuid_text_col2>;
  "media": JoinMaker<Media>;
  "prostgles_lookup_media_items_m1": JoinMaker<Prostgles_lookup_media_items_m1>;
  "prostgles_lookup_media_items_with_media": JoinMaker<Prostgles_lookup_media_items_with_media>;
@@ -263,6 +267,7 @@ export type DBObj = {
   "items_m1": TableHandler<Items_m1> 
   "items_with_media": TableHandler<Items_with_media> 
   "items_with_one_media": TableHandler<Items_with_one_media> 
+  "lookup_col1": TableHandler<Lookup_col1> 
   "lookup_experience_types": TableHandler<Lookup_experience_types> 
   "lookup_items_m1_name_type": TableHandler<Lookup_items_m1_name_type> 
   "lookup_settled_status": TableHandler<Lookup_settled_status> 
@@ -343,6 +348,9 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
     }; 
     "items_with_one_media": { 
       [key in "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "lookup_col1": { 
+      [key in "col1" | "col2" | "id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "lookup_experience_types": { 
       [key in "en" | "id" | "ro"]: { [lang_id in keyof LANG_IDS]: string }; 

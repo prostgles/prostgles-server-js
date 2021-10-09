@@ -10,7 +10,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const prostgles_types_1 = require("prostgles-types");
-const FileManager_1 = require("./FileManager");
 const PubSubManager_1 = require("./PubSubManager");
 /**
  * Will be run between initSQL and fileTable
@@ -39,51 +38,75 @@ class TableConfigurator {
     }
     init() {
         return __awaiter(this, void 0, void 0, function* () {
-            yield Promise.all(Object.keys(this.config).map((tableName) => __awaiter(this, void 0, void 0, function* () {
-                var _a, _b, _c;
-                if (!((_a = this.dbo) === null || _a === void 0 ? void 0 : _a[tableName]))
-                    throw "Table not found: " + tableName;
-                const tCols = (_c = (_b = this.dbo) === null || _b === void 0 ? void 0 : _b[tableName]) === null || _c === void 0 ? void 0 : _c.columns;
-                const tConf = this.config[tableName];
-                yield Promise.all(Object.keys(tConf).map((colName) => __awaiter(this, void 0, void 0, function* () {
-                    var _d;
-                    const colConf = tConf[colName];
-                    const { firstValueAsDefault, values, nullable } = colConf.lookupValues || {};
-                    if (values === null || values === void 0 ? void 0 : values.length) {
-                        const keys = Object.keys(((_d = values[0]) === null || _d === void 0 ? void 0 : _d.i18n) || {});
-                        const lookup_table_name = yield FileManager_1.asSQLIdentifier(`lookup_${tableName}_${colName}`, this.db);
-                        // const lookup_table_name = asName(`lookup_${tableName}_${colName}`);
-                        if (!this.dbo[lookup_table_name]) {
-                            yield this.db.any(`CREATE TABLE IF NOT EXISTS ${lookup_table_name} (
-                            id  TEXT PRIMARY KEY
-                            ${keys.length ? (", " + keys.map(k => prostgles_types_1.asName(k) + " TEXT ").join(", ")) : ""}
-                        )`);
+            let queries = [];
+            /* Create lookup tables */
+            Object.keys(this.config).map(tableName => {
+                var _a, _b, _c, _d;
+                const tableConf = this.config[tableName];
+                if ("isLookupTable" in tableConf && Object.keys((_a = tableConf.isLookupTable) === null || _a === void 0 ? void 0 : _a.values).length) {
+                    const rows = Object.keys((_b = tableConf.isLookupTable) === null || _b === void 0 ? void 0 : _b.values).map(id => { var _a; return (Object.assign({ id }, ((_a = tableConf.isLookupTable) === null || _a === void 0 ? void 0 : _a.values[id]))); });
+                    if (!((_c = this.dbo) === null || _c === void 0 ? void 0 : _c[tableName])) {
+                        if ((_d = tableConf.isLookupTable) === null || _d === void 0 ? void 0 : _d.dropIfExists) {
+                            queries.push(`DROP TABLE IF EXISTS ${tableName}`);
                         }
-                        if (!tCols.find(c => c.name === colName)) {
-                            yield this.db.any(`
-                            ALTER TABLE ${prostgles_types_1.asName(tableName)} 
-                            ADD COLUMN ${prostgles_types_1.asName(colName)} TEXT ${!nullable ? " NOT NULL " : ""} 
-                            ${firstValueAsDefault ? ` DEFAULT ${PubSubManager_1.asValue(values[0].id)} ` : ""} 
-                            REFERENCES ${lookup_table_name} (id)
-                        `);
-                        }
-                        ;
-                        yield this.prostgles.refreshDBO();
-                        if (this.dbo[lookup_table_name]) {
-                            const lcols = yield this.dbo[lookup_table_name].columns;
-                            const missing_lcols = keys.filter(k => !lcols.find(lc => lc.name === k));
-                            if (missing_lcols.length) {
-                                yield this.db.any(`ALTER TABLE ${lookup_table_name} ${missing_lcols.map(c => `ADD COLUMN  ${c} TEXT `).join(", ")}`);
-                            }
-                            yield this.dbo[lookup_table_name].insert(values.map(r => (Object.assign({ id: r.id }, r.i18n))), { onConflictDoNothing: true });
-                            console.log("Added records for " + lookup_table_name);
-                        }
-                        console.log(`TableConfig: Created ${lookup_table_name}(id) for ${tableName}(${prostgles_types_1.asName(colName)})`);
+                        const keys = Object.keys(rows[0]).filter(k => k !== "id");
+                        queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
+                        id  TEXT PRIMARY KEY
+                        ${keys.length ? (", " + keys.map(k => prostgles_types_1.asName(k) + " TEXT ").join(", ")) : ""}
+                    );`);
+                        rows.map(row => {
+                            const values = this.prostgles.pgp.helpers.values(row);
+                            queries.push(this.prostgles.pgp.as.format(`INSERT INTO ${tableName}  (${["id", ...keys].map(t => prostgles_types_1.asName(t)).join(", ")})  ` + " VALUES ${values:raw} ;", { values }));
+                        });
+                        console.log("Created lookup table " + tableName);
                     }
-                })));
+                }
+            });
+            if (queries.length) {
+                yield this.db.multi(queries.join("\n"));
+            }
+            queries = [];
+            /* Create referenced columns */
+            yield Promise.all(Object.keys(this.config).map((tableName) => __awaiter(this, void 0, void 0, function* () {
+                const tableConf = this.config[tableName];
+                if ("columns" in tableConf) {
+                    if (!this.dbo[tableName]) {
+                        console.error("TableConfigurator: Table not found in dbo: " + tableName);
+                    }
+                    else {
+                        Object.keys(tableConf.columns).map(colName => {
+                            const colConf = tableConf.columns[colName];
+                            if (colConf.references && !this.dbo[tableName].columns.find(c => colName === c.name)) {
+                                const { nullable, tableName: lookupTable, columnName: lookupCol = "id", defaultValue } = colConf.references;
+                                queries.push(`
+                                ALTER TABLE ${prostgles_types_1.asName(tableName)} 
+                                ADD COLUMN ${prostgles_types_1.asName(colName)} TEXT ${!nullable ? " NOT NULL " : ""} 
+                                ${defaultValue ? ` DEFAULT ${PubSubManager_1.asValue(defaultValue)} ` : ""} 
+                                REFERENCES ${lookupTable} (${lookupCol}) ;
+                            `);
+                                console.log(`${tableName}(${colName}) ` + " referenced lookup table " + tableName);
+                            }
+                        });
+                    }
+                }
             })));
+            if (queries.length) {
+                yield this.db.multi(queries.join("\n"));
+            }
         });
     }
 }
 exports.default = TableConfigurator;
+function columnExists(args) {
+    var _a;
+    return __awaiter(this, void 0, void 0, function* () {
+        const { db, tableName, colName } = args;
+        return Boolean((_a = (yield db.oneOrNone(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name=${PubSubManager_1.asValue(tableName)} and column_name=${PubSubManager_1.asValue(colName)}
+        LIMIT 1;
+    `))) === null || _a === void 0 ? void 0 : _a.column_name);
+    });
+}
 //# sourceMappingURL=TableConfig.js.map

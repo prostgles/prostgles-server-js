@@ -4,14 +4,18 @@ declare type ColExtraInfo = {
     max?: string | number;
     hint?: string;
 };
-/**
- * Helper utility to create lookup tables for TEXT columns
- */
-export declare type TableConfig<LANG_IDS = {
-    en: 1;
-    ro: 1;
-}> = {
-    [table_name: string]: {
+declare type LookupTableDefinition<LANG_IDS> = {
+    isLookupTable: {
+        dropIfExists?: boolean;
+        values: {
+            [id_value: string]: {} | {
+                [lang_id in keyof LANG_IDS]: string;
+            };
+        }[];
+    };
+};
+declare type TableDefinition = {
+    columns: {
         [column_name: string]: {
             /**
              * Will add these values to .getColumns() result
@@ -20,18 +24,26 @@ export declare type TableConfig<LANG_IDS = {
             /**
              * Will create a lookup table that this column will reference
              */
-            lookupValues?: {
+            references?: {
+                tableName: string;
+                /**
+                 * Defaults to id
+                 */
+                columnName?: string;
+                defaultValue?: string;
                 nullable?: boolean;
-                firstValueAsDefault?: boolean;
-                values: {
-                    id: string;
-                    i18n?: {
-                        [lang_id in keyof LANG_IDS]: string;
-                    };
-                }[];
             };
         };
     };
+};
+/**
+ * Helper utility to create lookup tables for TEXT columns
+ */
+export declare type TableConfig<LANG_IDS = {
+    en: 1;
+    ro: 1;
+}> = {
+    [table_name: string]: TableDefinition | LookupTableDefinition<LANG_IDS>;
 };
 /**
  * Will be run between initSQL and fileTable
