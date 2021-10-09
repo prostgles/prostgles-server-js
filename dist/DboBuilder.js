@@ -135,6 +135,8 @@ class ViewHandler {
         this.name = tableOrViewInfo.name;
         this.escapedName = prostgles_types_1.asName(this.name);
         this.columns = tableOrViewInfo.columns;
+        /* cols are sorted by name to reduce .d.ts schema rewrites */
+        this.columnsForTypes = tableOrViewInfo.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
         this.column_names = tableOrViewInfo.columns.map(c => c.name);
         this.pubSubManager = pubSubManager;
         this.dboBuilder = dboBuilder;
@@ -146,7 +148,7 @@ class ViewHandler {
         // this.tsDataName = snakify(this.name, true);
         // if(this.tsDataName === "T") this.tsDataName = this.tsDataName + "_";
         // this.tsDataDef = `export type ${this.tsDataName} = {\n`;
-        this.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name)).map(({ name, udt_name }) => {
+        this.columnsForTypes.map(({ name, udt_name }) => {
             this.tsColumnDefs.push(`${escapeTSNames(name, false)}?: ${postgresToTsType(udt_name)};`);
         });
         // this.tsDataDef += "};";
@@ -181,9 +183,6 @@ class ViewHandler {
                 .map(f => `md5(coalesce(${f}::text, 'dd'))`)
                 .join(" || ") +
             `)` + (alias ? ` as ${prostgles_types_1.asName(alias)}` : "");
-    }
-    getFullDef() {
-        return [];
     }
     validateViewRules(fields, filterFields, returningFields, forcedFilter, rule) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -371,6 +370,7 @@ class ViewHandler {
                     }
                     return Object.assign(Object.assign(Object.assign({}, c), { label, tsDataType: postgresToTsType(c.udt_name), insert: Boolean(p.insert && p.insert.fields && p.insert.fields.includes(c.name)), select: Boolean(p.select && p.select.fields && p.select.fields.includes(c.name)), filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)), update: Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)), delete: Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)) }), (((_m = (_l = (_k = this.dboBuilder) === null || _k === void 0 ? void 0 : _k.prostgles) === null || _l === void 0 ? void 0 : _l.tableConfigurator) === null || _m === void 0 ? void 0 : _m.getColInfo({ table: this.name, col: c.name })) || {}));
                 });
+                //.sort((a, b) => a.ordinal_position - b.ordinal_position);
                 // const tblInfo = await this.getInfo();
                 // if(tblInfo && tblInfo.media_table_name && tblInfo.has_media){
                 //     const mediaRules = this.dboBuilder.dbo[tblInfo.media_table_name]?.
@@ -2130,11 +2130,12 @@ export type TxCB = {
             i18nDef += "  fallbackLang: keyof LANG_IDS; \n";
             i18nDef += "  column_labels?: DeepPartial<{ \n";
             this.tablesOrViews.map(tov => {
+                const columnsForTypes = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
                 i18nDef += `    ${JSON.stringify(tov.name)}: { \n`;
-                i18nDef += `      [key in ${tov.columns.map(c => JSON.stringify(c.name)).join(" | ")}]: { [lang_id in keyof LANG_IDS]: string }; \n`;
+                i18nDef += `      [key in ${columnsForTypes.map(c => JSON.stringify(c.name)).join(" | ")}]: { [lang_id in keyof LANG_IDS]: string }; \n`;
                 i18nDef += `    }; \n`;
                 const filterKeywords = Object.values(this.prostgles.keywords);
-                const $filterCol = tov.columns.find(c => filterKeywords.includes(c.name));
+                const $filterCol = columnsForTypes.find(c => filterKeywords.includes(c.name));
                 if ($filterCol) {
                     throw `DboBuilder init error: \n\nTable ${JSON.stringify(tov.name)} column ${JSON.stringify($filterCol.name)} is colliding with Prostgles filtering functionality ($filter keyword)
                 Please provide a replacement keyword name using the $filter_keyName init option. 
@@ -2386,7 +2387,8 @@ function getTablesForSchemaPostgresSQL(db, schema = "public") {
                     col.column_default = (col.udt_name !== "uuid" && !col.is_pkey && !col.column_default.startsWith("nextval(")) ? col.column_default : null;
                 }
                 return col;
-            }).sort((a, b) => a.ordinal_position - b.ordinal_position);
+            }); //.slice(0).sort((a, b) => a.name.localeCompare(b.name))
+            // .sort((a, b) => a.ordinal_position - b.ordinal_position)
             return tbl;
         });
         return res;

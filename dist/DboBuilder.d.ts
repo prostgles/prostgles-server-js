@@ -148,6 +148,7 @@ export declare class ViewHandler {
     name: string;
     escapedName: string;
     columns: ColumnInfo[];
+    columnsForTypes: ColumnInfo[];
     column_names: string[];
     tableOrViewInfo: TableOrViewInfo;
     colSet: ColSet;
@@ -163,7 +164,6 @@ export declare class ViewHandler {
     is_media: boolean;
     constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, joinPaths?: JoinPaths);
     getRowHashSelect(allowedFields: FieldFilter, alias?: string, tableAlias?: string): string;
-    getFullDef(): any[];
     validateViewRules(fields: FieldFilter, filterFields: FieldFilter, returningFields: FieldFilter, forcedFilter: object, rule: "update" | "select" | "insert" | "delete"): Promise<boolean>;
     getShortestJoin(table1: string, table2: string, startAlias: number, isInner?: boolean): {
         query: string;

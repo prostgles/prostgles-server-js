@@ -352,6 +352,7 @@ export class ViewHandler {
     name: string;
     escapedName: string;
     columns: ColumnInfo[];
+    columnsForTypes: ColumnInfo[];
     column_names: string[];
     tableOrViewInfo: TableOrViewInfo;
     colSet: ColSet;
@@ -378,6 +379,10 @@ export class ViewHandler {
         this.name = tableOrViewInfo.name;
         this.escapedName = asName(this.name);
         this.columns = tableOrViewInfo.columns;
+
+        /* cols are sorted by name to reduce .d.ts schema rewrites */
+        this.columnsForTypes = tableOrViewInfo.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
+
         this.column_names = tableOrViewInfo.columns.map(c => c.name);
 
         this.pubSubManager = pubSubManager;
@@ -393,7 +398,7 @@ export class ViewHandler {
         // this.tsDataName = snakify(this.name, true);
         // if(this.tsDataName === "T") this.tsDataName = this.tsDataName + "_";
         // this.tsDataDef = `export type ${this.tsDataName} = {\n`;
-        this.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name)).map(({ name, udt_name }) => {
+        this.columnsForTypes.map(({ name, udt_name }) => {
             this.tsColumnDefs.push(`${escapeTSNames(name, false)}?: ${postgresToTsType(udt_name) as string};`);
         });
         // this.tsDataDef += "};";
@@ -430,10 +435,6 @@ export class ViewHandler {
                 .map(f => `md5(coalesce(${f}::text, 'dd'))`)
                 .join(" || ") + 
         `)` + (alias? ` as ${asName(alias)}` : "");
-    }
-
-    getFullDef(){
-        return []
     }
 
     async validateViewRules(fields: FieldFilter, filterFields: FieldFilter, returningFields: FieldFilter, forcedFilter: object, rule: "update" | "select" | "insert" | "delete"){
@@ -642,7 +643,8 @@ export class ViewHandler {
                     delete: Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)),
                     ...(this.dboBuilder?.prostgles?.tableConfigurator?.getColInfo({ table: this.name, col: c.name}) || {})
                 }
-            });
+            })
+            //.sort((a, b) => a.ordinal_position - b.ordinal_position);
 
             // const tblInfo = await this.getInfo();
             
@@ -2700,12 +2702,14 @@ export type TxCB = {
             
 
         this.tablesOrViews.map(tov => {
+            const columnsForTypes = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
+            
             i18nDef += `    ${JSON.stringify(tov.name)}: { \n`;
-            i18nDef += `      [key in ${tov.columns.map(c => JSON.stringify(c.name)).join(" | ")}]: { [lang_id in keyof LANG_IDS]: string }; \n`;
+            i18nDef += `      [key in ${columnsForTypes.map(c => JSON.stringify(c.name)).join(" | ")}]: { [lang_id in keyof LANG_IDS]: string }; \n`;
             i18nDef += `    }; \n`;
 
             const filterKeywords = Object.values(this.prostgles.keywords);
-            const $filterCol = tov.columns.find(c => filterKeywords.includes(c.name));
+            const $filterCol = columnsForTypes.find(c => filterKeywords.includes(c.name));
             if($filterCol){
                 throw `DboBuilder init error: \n\nTable ${JSON.stringify(tov.name)} column ${JSON.stringify($filterCol.name)} is colliding with Prostgles filtering functionality ($filter keyword)
                 Please provide a replacement keyword name using the $filter_keyName init option. 
@@ -3019,7 +3023,9 @@ async function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"):
                 col.column_default = (col.udt_name !== "uuid" && !col.is_pkey && !col.column_default.startsWith("nextval("))? col.column_default : null;
             }
             return col;
-        }).sort((a, b) => a.ordinal_position - b.ordinal_position)
+
+        })//.slice(0).sort((a, b) => a.name.localeCompare(b.name))
+        // .sort((a, b) => a.ordinal_position - b.ordinal_position)
         
         return tbl;
     })

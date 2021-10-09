@@ -303,37 +303,37 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
   fallbackLang: keyof LANG_IDS; 
   column_labels?: DeepPartial<{ 
     "\"*\"": { 
-      [key in "id" | "\"*\""]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "\"*\"" | "id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "*": { 
-      [key in "id" | "*"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "*" | "id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "ex_j_ins": { 
-      [key in "id" | "public" | "name" | "added"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "added" | "id" | "name" | "public"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "i18n_languages": { 
       [key in "id" | "label" | "label_en"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "insert_rules": { 
-      [key in "id" | "name" | "added"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "added" | "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "item_children": { 
       [key in "id" | "item_id" | "name" | "tst"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "items": { 
-      [key in "id" | "h" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "h" | "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "items2": { 
-      [key in "id" | "items_id" | "hh" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "hh" | "id" | "items_id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "items3": { 
-      [key in "id" | "h" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "h" | "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "items4": { 
-      [key in "id" | "public" | "name" | "added"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "added" | "id" | "name" | "public"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "items4_pub": { 
-      [key in "id" | "public" | "name" | "added"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "added" | "id" | "name" | "public"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "items_m1": { 
       [key in "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
@@ -345,16 +345,16 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
       [key in "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "lookup_experience_types": { 
-      [key in "id" | "en" | "ro"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "en" | "id" | "ro"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "lookup_items_m1_name_type": { 
-      [key in "id" | "en" | "ro"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "en" | "id" | "ro"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "lookup_settled_status": { 
-      [key in "id" | "en" | "ro"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "en" | "id" | "ro"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "lookup_status": { 
-      [key in "id" | "en" | "fr"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "en" | "fr" | "id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "lookup_uuid_text_col1": { 
       [key in "id"]: { [lang_id in keyof LANG_IDS]: string }; 
@@ -363,10 +363,10 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
       [key in "id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "media": { 
-      [key in "id" | "name" | "extension" | "content_type" | "url" | "original_name" | "description" | "s3_url" | "signed_url" | "signed_url_expires" | "etag"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "content_type" | "description" | "etag" | "extension" | "id" | "name" | "original_name" | "s3_url" | "signed_url" | "signed_url_expires" | "url"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "planes": { 
-      [key in "id" | "x" | "y" | "flight_number" | "last_updated"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "flight_number" | "id" | "last_updated" | "x" | "y"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "prgll": { 
       [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
@@ -402,7 +402,7 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
       [key in "id" | "t1"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "tr2": { 
-      [key in "id" | "tr1_id" | "t1" | "t2"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "id" | "t1" | "t2" | "tr1_id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "tt": { 
       [key in "id" | "t1" | "t2"]: { [lang_id in keyof LANG_IDS]: string }; 
@@ -414,16 +414,16 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
       [key in "t"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "usr": { 
-      [key in "id" | "status" | "msg" | "added" | "is_active" | "age"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "added" | "age" | "id" | "is_active" | "msg" | "status"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "uuid_text": { 
-      [key in "id" | "name" | "col1" | "col2"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "col1" | "col2" | "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "v_items": { 
       [key in "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "various": { 
-      [key in "id" | "h" | "name" | "tsv" | "jsn" | "added"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "added" | "h" | "id" | "jsn" | "name" | "tsv"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "various_nested": { 
       [key in "various_id"]: { [lang_id in keyof LANG_IDS]: string }; 
