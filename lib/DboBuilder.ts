@@ -2909,7 +2909,7 @@ export type TxCB = {
 
 
 /* UTILS */
-function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"): Promise<{
+export type TableSchema = {
     schema: string;
     name: string;
     oid: number;
@@ -2917,7 +2917,8 @@ function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"): Promi
     columns: ColumnInfo[];
     is_view: boolean;
     parent_tables: string[];
-}[]>{
+}
+async function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"): Promise<TableSchema[]>{
     const query = 
     `
     SELECT t.table_schema as schema, t.table_name as name 
@@ -2933,7 +2934,8 @@ function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"): Promi
         cc.ordinal_position, 
         cc.is_nullable = 'YES' as is_nullable,
         cc.references,
-        cc.has_default
+        cc.has_default,
+        cc.column_default
     ) as x) ORDER BY cc.ordinal_position ) as columns 
 
     , t.table_type = 'VIEW' as is_view 
@@ -2954,6 +2956,7 @@ function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"): Promi
         ) as is_pkey
         , c.ordinal_position
         , c.column_default IS NOT NULL as has_default
+        , c.column_default
         , format('%I.%I', c.table_schema, c.table_name)::regclass::oid AS table_oid
         , c.is_nullable
         FROM information_schema.columns c    
@@ -2998,7 +3001,24 @@ function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"): Promi
     ORDER BY schema, name
     `;
     // console.log(pgp.as.format(query, { schema }), schema);
-    return db.any(query, { schema });
+    let res: TableSchema[] = await db.any(query, { schema });
+
+    res = await Promise.all(res.map(async tbl => {
+        tbl.columns = await Promise.all(tbl.columns.map(async col => {
+            if(col.has_default){
+                col.column_default = !col.column_default.startsWith("nextval(")? col.column_default : null; //(await db.oneOrNone(`SELECT ${col.column_default} as val`)).val : null;
+            }
+            return col;
+        }))
+        
+        return tbl;
+    }))
+
+    return res;
+}
+
+async function refreshColDefault(){
+
 }
 
 /** 

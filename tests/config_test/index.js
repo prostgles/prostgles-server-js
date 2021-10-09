@@ -110,13 +110,12 @@ const log = (msg, extra) => {
     },
     transactions: true,
     tableConfig: {
-        items_m1: {
-            lookupColumns: {
-                name_type: {
-                    values: [
-                        { id: "type 1", i18n: { en: "hehe", ro: "hihi" } },
-                        { id: "type 2" }
-                    ]
+        uuid_text: {
+            name: {
+                info: {
+                    min: 1,
+                    max: 3,
+                    hint: "hiint"
                 }
             }
         }
@@ -152,10 +151,7 @@ const log = (msg, extra) => {
                 // console.log(await await db.items_with_one_media.find())
                 // console.log(await await db.media.find());
                 // throw items_with_one_media;
-                const r = await db.uuid_text.insert({ id: 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e' }, { returning: "*" });
-                await db.uuid_text.update({ id: 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e' }, { id: 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e' });
-                console.log(await db.uuid_text.find({ "id.$ilike": 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e' }));
-                throw r;
+                console.log(await db.uuid_text.getColumns());
             }
             catch (e) {
                 console.error(e);

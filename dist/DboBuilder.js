@@ -2287,13 +2287,9 @@ DboBuilder.create = (prostgles) => __awaiter(void 0, void 0, void 0, function* (
     let res = new DboBuilder(prostgles);
     return yield res.init();
 });
-// export async function makeDBO(db: DB): Promise<DbHandler> {
-//     return await DBO.build(db, "public");
-// }
-/* UTILS */
-/* UTILS */
 function getTablesForSchemaPostgresSQL(db, schema = "public") {
-    const query = `
+    return __awaiter(this, void 0, void 0, function* () {
+        const query = `
     SELECT t.table_schema as schema, t.table_name as name 
     , cc.table_oid as oid
     , json_agg((SELECT x FROM (
@@ -2307,7 +2303,8 @@ function getTablesForSchemaPostgresSQL(db, schema = "public") {
         cc.ordinal_position, 
         cc.is_nullable = 'YES' as is_nullable,
         cc.references,
-        cc.has_default
+        cc.has_default,
+        cc.column_default
     ) as x) ORDER BY cc.ordinal_position ) as columns 
 
     , t.table_type = 'VIEW' as is_view 
@@ -2328,6 +2325,7 @@ function getTablesForSchemaPostgresSQL(db, schema = "public") {
         ) as is_pkey
         , c.ordinal_position
         , c.column_default IS NOT NULL as has_default
+        , c.column_default
         , format('%I.%I', c.table_schema, c.table_name)::regclass::oid AS table_oid
         , c.is_nullable
         FROM information_schema.columns c    
@@ -2371,8 +2369,23 @@ function getTablesForSchemaPostgresSQL(db, schema = "public") {
     GROUP BY t.table_schema, t.table_name, t.table_type, vr.table_names , cc.table_oid
     ORDER BY schema, name
     `;
-    // console.log(pgp.as.format(query, { schema }), schema);
-    return db.any(query, { schema });
+        // console.log(pgp.as.format(query, { schema }), schema);
+        let res = yield db.any(query, { schema });
+        res = yield Promise.all(res.map((tbl) => __awaiter(this, void 0, void 0, function* () {
+            tbl.columns = yield Promise.all(tbl.columns.map((col) => __awaiter(this, void 0, void 0, function* () {
+                if (col.has_default) {
+                    col.column_default = !col.column_default.startsWith("nextval(") ? col.column_default : null; //(await db.oneOrNone(`SELECT ${col.column_default} as val`)).val : null;
+                }
+                return col;
+            })));
+            return tbl;
+        })));
+        return res;
+    });
+}
+function refreshColDefault() {
+    return __awaiter(this, void 0, void 0, function* () {
+    });
 }
 /**
 * Throw error if illegal keys found in object

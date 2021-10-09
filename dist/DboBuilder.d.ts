@@ -314,6 +314,15 @@ export declare class DboBuilder {
     build(): Promise<DbHandler>;
     getTX: (dbTX: TxCB) => Promise<any>;
 }
+export declare type TableSchema = {
+    schema: string;
+    name: string;
+    oid: number;
+    comment: string;
+    columns: ColumnInfo[];
+    is_view: boolean;
+    parent_tables: string[];
+};
 export declare function isPlainObject(o: any): boolean;
 export {};
 //# sourceMappingURL=DboBuilder.d.ts.map
