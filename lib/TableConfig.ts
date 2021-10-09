@@ -80,7 +80,7 @@ export default class TableConfigurator {
             
             await Promise.all(Object.keys(tConf).map(async colName => {
                 const colConf = tConf[colName];
-                const { firstValueAsDefault, values, nullable } = colConf.lookupValues
+                const { firstValueAsDefault, values, nullable } = colConf.lookupValues || {}
                 
                 if(values?.length){
 

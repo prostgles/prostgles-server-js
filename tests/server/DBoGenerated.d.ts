@@ -101,6 +101,12 @@ export type Lookup_status = {
   "en"?: string;
   "fr"?: string;
 }
+export type Lookup_uuid_text_col1 = { 
+  "id"?: string;
+}
+export type Lookup_uuid_text_col2 = { 
+  "id"?: string;
+}
 export type Media = { 
   "id"?: string;
   "name"?: string;
@@ -196,6 +202,8 @@ export type Usr = {
 export type Uuid_text = { 
   "id"?: string;
   "name"?: string;
+  "col1"?: string;
+  "col2"?: string;
 }
 export type V_items = { 
   "id"?: number;
@@ -222,6 +230,8 @@ export type JoinMakerTables = {
  "items_with_one_media": JoinMaker<Items_with_one_media>;
  "lookup_experience_types": JoinMaker<Lookup_experience_types>;
  "lookup_status": JoinMaker<Lookup_status>;
+ "lookup_uuid_text_col1": JoinMaker<Lookup_uuid_text_col1>;
+ "lookup_uuid_text_col2": JoinMaker<Lookup_uuid_text_col2>;
  "media": JoinMaker<Media>;
  "prostgles_lookup_media_items_m1": JoinMaker<Prostgles_lookup_media_items_m1>;
  "prostgles_lookup_media_items_with_media": JoinMaker<Prostgles_lookup_media_items_with_media>;
@@ -234,6 +244,7 @@ export type JoinMakerTables = {
  "tt": JoinMaker<Tt>;
  "tt1": JoinMaker<Tt1>;
  "usr": JoinMaker<Usr>;
+ "uuid_text": JoinMaker<Uuid_text>;
 };
 
 /* DBO Definition. Isomorphic */
@@ -256,6 +267,8 @@ export type DBObj = {
   "lookup_items_m1_name_type": TableHandler<Lookup_items_m1_name_type> 
   "lookup_settled_status": TableHandler<Lookup_settled_status> 
   "lookup_status": TableHandler<Lookup_status> 
+  "lookup_uuid_text_col1": TableHandler<Lookup_uuid_text_col1> 
+  "lookup_uuid_text_col2": TableHandler<Lookup_uuid_text_col2> 
   "media": TableHandler<Media> 
   "planes": TableHandler<Planes> 
   "prgll": TableHandler<Prgll> 
@@ -343,6 +356,12 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
     "lookup_status": { 
       [key in "id" | "en" | "fr"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
+    "lookup_uuid_text_col1": { 
+      [key in "id"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "lookup_uuid_text_col2": { 
+      [key in "id"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
     "media": { 
       [key in "id" | "name" | "extension" | "content_type" | "url" | "original_name" | "description" | "s3_url" | "signed_url" | "signed_url_expires" | "etag"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
@@ -398,7 +417,7 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
       [key in "id" | "status" | "msg" | "added" | "is_active" | "age"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "uuid_text": { 
-      [key in "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "id" | "name" | "col1" | "col2"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "v_items": { 
       [key in "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 

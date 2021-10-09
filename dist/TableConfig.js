@@ -48,7 +48,7 @@ class TableConfigurator {
                 yield Promise.all(Object.keys(tConf).map((colName) => __awaiter(this, void 0, void 0, function* () {
                     var _d;
                     const colConf = tConf[colName];
-                    const { firstValueAsDefault, values, nullable } = colConf.lookupValues;
+                    const { firstValueAsDefault, values, nullable } = colConf.lookupValues || {};
                     if (values === null || values === void 0 ? void 0 : values.length) {
                         const keys = Object.keys(((_d = values[0]) === null || _d === void 0 ? void 0 : _d.i18n) || {});
                         const lookup_table_name = yield FileManager_1.asSQLIdentifier(`lookup_${tableName}_${colName}`, this.db);

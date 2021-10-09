@@ -68,6 +68,30 @@ const dbConnection = {
         transactions: true,
         // DEBUG_MODE: true,
         // onNotice: console.log,
+        tableConfig: {
+            uuid_text: {
+                col1: {
+                    lookupValues: {
+                        values: [
+                            { id: "a" },
+                            { id: "b" }
+                        ],
+                        nullable: true,
+                        firstValueAsDefault: true
+                    }
+                },
+                col2: {
+                    lookupValues: {
+                        values: [
+                            { id: "a" },
+                            { id: "b" }
+                        ],
+                        nullable: true,
+                        firstValueAsDefault: false
+                    }
+                }
+            }
+        },
         fileTable: {
             // awsS3Config: {
             //   accessKeyId: process.env.S3_KEY,
