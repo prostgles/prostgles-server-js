@@ -53,10 +53,12 @@ class TableConfigurator {
                         const keys = Object.keys(((_d = values[0]) === null || _d === void 0 ? void 0 : _d.i18n) || {});
                         const lookup_table_name = yield FileManager_1.asSQLIdentifier(`lookup_${tableName}_${colName}`, this.db);
                         // const lookup_table_name = asName(`lookup_${tableName}_${colName}`);
-                        yield this.db.any(`CREATE TABLE IF NOT EXISTS ${lookup_table_name} (
-                        id  TEXT PRIMARY KEY
-                        ${keys.length ? (", " + keys.map(k => prostgles_types_1.asName(k) + " TEXT ").join(", ")) : ""}
-                    )`);
+                        if (!this.dbo[lookup_table_name]) {
+                            yield this.db.any(`CREATE TABLE IF NOT EXISTS ${lookup_table_name} (
+                            id  TEXT PRIMARY KEY
+                            ${keys.length ? (", " + keys.map(k => prostgles_types_1.asName(k) + " TEXT ").join(", ")) : ""}
+                        )`);
+                        }
                         if (!tCols.find(c => c.name === colName)) {
                             yield this.db.any(`
                             ALTER TABLE ${prostgles_types_1.asName(tableName)} 
@@ -67,12 +69,15 @@ class TableConfigurator {
                         }
                         ;
                         yield this.prostgles.refreshDBO();
-                        const lcols = yield this.dbo[lookup_table_name].columns;
-                        const missing_lcols = keys.filter(k => !lcols.find(lc => lc.name === k));
-                        if (missing_lcols.length) {
-                            yield this.db.any(`ALTER TABLE ${lookup_table_name} ${missing_lcols.map(c => `ADD COLUMN  ${c} TEXT `).join(", ")}`);
+                        if (this.dbo[lookup_table_name]) {
+                            const lcols = yield this.dbo[lookup_table_name].columns;
+                            const missing_lcols = keys.filter(k => !lcols.find(lc => lc.name === k));
+                            if (missing_lcols.length) {
+                                yield this.db.any(`ALTER TABLE ${lookup_table_name} ${missing_lcols.map(c => `ADD COLUMN  ${c} TEXT `).join(", ")}`);
+                            }
+                            yield this.dbo[lookup_table_name].insert(values.map(r => (Object.assign({ id: r.id }, r.i18n))), { onConflictDoNothing: true });
+                            console.log("Added records for " + lookup_table_name);
                         }
-                        yield this.dbo[lookup_table_name].insert(values.map(r => (Object.assign({ id: r.id }, r.i18n))), { onConflictDoNothing: true });
                         console.log(`TableConfig: Created ${lookup_table_name}(id) for ${tableName}(${prostgles_types_1.asName(colName)})`);
                     }
                 })));

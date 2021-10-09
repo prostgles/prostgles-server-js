@@ -88,10 +88,12 @@ export default class TableConfigurator {
                     const lookup_table_name = await asSQLIdentifier(`lookup_${tableName}_${colName}`, this.db)
                     // const lookup_table_name = asName(`lookup_${tableName}_${colName}`);
                     
-                    await this.db.any(`CREATE TABLE IF NOT EXISTS ${lookup_table_name} (
-                        id  TEXT PRIMARY KEY
-                        ${keys.length? (", " + keys.map(k => asName(k) + " TEXT ").join(", ")) : ""}
-                    )`);
+                    if(!this.dbo[lookup_table_name]){
+                        await this.db.any(`CREATE TABLE IF NOT EXISTS ${lookup_table_name} (
+                            id  TEXT PRIMARY KEY
+                            ${keys.length? (", " + keys.map(k => asName(k) + " TEXT ").join(", ")) : ""}
+                        )`);
+                    }
 
                     if(!tCols.find(c => c.name === colName)){
                         await this.db.any(`
@@ -104,17 +106,21 @@ export default class TableConfigurator {
 
                     await this.prostgles.refreshDBO();
 
-                    const lcols = await this.dbo[lookup_table_name].columns;
-                    const missing_lcols = keys.filter(k => !lcols.find(lc => lc.name === k));
-                    
-                    if(missing_lcols.length){
-                        await this.db.any(`ALTER TABLE ${lookup_table_name} ${missing_lcols.map(c => `ADD COLUMN  ${c} TEXT `).join(", ")}`)
+                    if(this.dbo[lookup_table_name]){
+                        const lcols = await this.dbo[lookup_table_name].columns;
+                        const missing_lcols = keys.filter(k => !lcols.find(lc => lc.name === k));
+                        
+                        if(missing_lcols.length){
+                            await this.db.any(`ALTER TABLE ${lookup_table_name} ${missing_lcols.map(c => `ADD COLUMN  ${c} TEXT `).join(", ")}`)
+                        }
+
+                        await this.dbo[lookup_table_name].insert(
+                            values.map(r => ({ id: r.id, ...r.i18n })), 
+                            { onConflictDoNothing: true }
+                        );
+                        console.log("Added records for " + lookup_table_name)
                     }
 
-                    await this.dbo[lookup_table_name].insert(
-                        values.map(r => ({ id: r.id, ...r.i18n })), 
-                        { onConflictDoNothing: true }
-                    );
 
                     console.log(`TableConfig: Created ${lookup_table_name}(id) for ${tableName}(${asName(colName)})`)
                 }
