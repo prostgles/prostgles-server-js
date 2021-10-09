@@ -69,7 +69,9 @@ export default class AuthHandler {
     db: DB;
     sidKeyName: string;
     constructor(prostgles: Prostgles);
+    validateSid: (sid: string) => string;
     init(): Promise<void>;
+    throttledFunc: <T>(func: () => Promise<T>, throttle?: number) => Promise<T>;
     loginThrottled: (params: AnyObject) => Promise<BasicSession>;
     /**
      * Will return first sid value found in : http cookie or query params

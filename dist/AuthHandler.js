@@ -11,10 +11,50 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 class AuthHandler {
     constructor(prostgles) {
+        this.validateSid = (sid) => {
+            if (!sid)
+                return undefined;
+            if (typeof sid !== "string")
+                throw "sid missing or not a string";
+            return sid;
+        };
+        this.throttledFunc = (func, throttle = 500) => {
+            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                let result, error;
+                /**
+                 * Throttle response times to prevent timing attacks
+                 */
+                let interval = setInterval(() => {
+                    if (error || result) {
+                        if (error) {
+                            reject(error);
+                        }
+                        else if (result) {
+                            resolve(result);
+                        }
+                        clearInterval(interval);
+                    }
+                }, throttle);
+                try {
+                    result = yield func();
+                }
+                catch (err) {
+                    console.log(err);
+                    error = err;
+                }
+            }));
+        };
         this.loginThrottled = (params) => __awaiter(this, void 0, void 0, function* () {
             if (!this.opts.login)
                 throw "Auth login config missing";
             const { responseThrottle = 500 } = this.opts;
+            return this.throttledFunc(() => __awaiter(this, void 0, void 0, function* () {
+                let result = yield this.opts.login(params, this.dbo, this.db);
+                if (!result.sid) {
+                    throw { msg: "Something went wrong making a session" };
+                }
+                return result;
+            }), responseThrottle);
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
                 let result, error;
                 /**
@@ -106,31 +146,32 @@ class AuthHandler {
                         }
                     }));
                     if (app && logoutGetPath) {
-                        app.get(logoutGetPath, function (req, res) {
-                            var _a, _b;
-                            return __awaiter(this, void 0, void 0, function* () {
-                                const sid = (_a = req === null || req === void 0 ? void 0 : req.cookies) === null || _a === void 0 ? void 0 : _a[sidKeyName];
-                                if (sid) {
-                                    try {
-                                        this.opts.auth.logout((_b = req === null || req === void 0 ? void 0 : req.cookies) === null || _b === void 0 ? void 0 : _b[sidKeyName], this.dbo, this.db);
-                                    }
-                                    catch (err) {
-                                        console.error(err);
-                                    }
+                        app.get(logoutGetPath, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                            var _a;
+                            const sid = this.validateSid((_a = req === null || req === void 0 ? void 0 : req.cookies) === null || _a === void 0 ? void 0 : _a[sidKeyName]);
+                            if (sid) {
+                                try {
+                                    yield this.throttledFunc(() => {
+                                        var _a;
+                                        return this.opts.logout((_a = req === null || req === void 0 ? void 0 : req.cookies) === null || _a === void 0 ? void 0 : _a[sidKeyName], this.dbo, this.db);
+                                    });
                                 }
-                                res.redirect("/");
-                            });
-                        });
+                                catch (err) {
+                                    console.error(err);
+                                }
+                            }
+                            res.redirect("/");
+                        }));
                     }
                     if (app && Array.isArray(userRoutes)) {
                         /* Redirect if not logged in and requesting user content */
                         app.get('*', (req, res) => __awaiter(this, void 0, void 0, function* () {
                             const getUser = () => {
                                 var _a;
-                                const sid = (_a = req.cookies) === null || _a === void 0 ? void 0 : _a[sidKeyName];
+                                const sid = (_a = req === null || req === void 0 ? void 0 : req.cookies) === null || _a === void 0 ? void 0 : _a[sidKeyName];
                                 if (!sid)
                                     return undefined;
-                                return this.opts.getUser(sid, this.dbo, this.db);
+                                return this.opts.getUser(this.validateSid(sid), this.dbo, this.db);
                             };
                             try {
                                 const returnURL = getReturnUrl(req);
@@ -182,11 +223,11 @@ class AuthHandler {
             if (!querySid) {
                 const cookie_str = (_f = (_e = (_d = localParams.socket) === null || _d === void 0 ? void 0 : _d.handshake) === null || _e === void 0 ? void 0 : _e.headers) === null || _f === void 0 ? void 0 : _f.cookie;
                 const cookie = parseCookieStr(cookie_str);
-                return cookie[sidKeyName];
+                return this.validateSid(cookie[sidKeyName]);
             }
         }
         else if (localParams.httpReq) {
-            return (_h = (_g = localParams.httpReq) === null || _g === void 0 ? void 0 : _g.cookies) === null || _h === void 0 ? void 0 : _h[sidKeyName];
+            return this.validateSid((_h = (_g = localParams.httpReq) === null || _g === void 0 ? void 0 : _g.cookies) === null || _h === void 0 ? void 0 : _h[sidKeyName]);
         }
         else
             throw "socket OR httpReq missing from localParams";
@@ -209,8 +250,8 @@ class AuthHandler {
                 const sid = this.getSID(localParams);
                 return {
                     sid,
-                    user: yield getUser(sid, this.dbo, this.db),
-                    clientUser: yield getClientUser(sid, this.dbo, this.db)
+                    user: !sid ? undefined : yield getUser(sid, this.dbo, this.db),
+                    clientUser: !sid ? undefined : yield getClientUser(sid, this.dbo, this.db)
                 };
             }
             return {};

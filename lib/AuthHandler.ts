@@ -81,6 +81,12 @@ export default class AuthHandler {
         this.db = prostgles.db;
     }
 
+    validateSid = (sid: string) => {
+        if(!sid) return undefined;
+        if(typeof sid !== "string") throw "sid missing or not a string";
+        return sid;
+    }
+
     async init(){
         if(!this.opts) return;
                   
@@ -146,11 +152,14 @@ export default class AuthHandler {
                 });
                 
                 if(app && logoutGetPath){
-                    app.get(logoutGetPath, async function(req, res){
-                        const sid = req?.cookies?.[sidKeyName];
+                    app.get(logoutGetPath, async (req, res) => {
+                        const sid = this.validateSid(req?.cookies?.[sidKeyName]);
                         if(sid){
                             try {
-                                this.opts.auth.logout(req?.cookies?.[sidKeyName], this.dbo as any, this.db);
+                                await this.throttledFunc(() => {
+
+                                    return this.opts.logout(req?.cookies?.[sidKeyName], this.dbo as any, this.db);
+                                })
                             } catch(err){
                                 console.error(err);
                             }
@@ -164,9 +173,10 @@ export default class AuthHandler {
                     /* Redirect if not logged in and requesting user content */
                     app.get('*', async (req, res) => {
                         const getUser = () => {
-                            const sid = req.cookies?.[sidKeyName];
+                            const sid = req?.cookies?.[sidKeyName];
                             if(!sid) return undefined;
-                            return this.opts.getUser(sid, this.dbo, this.db);
+                            
+                            return this.opts.getUser(this.validateSid(sid), this.dbo, this.db);
                         }
                         
                         try {
@@ -207,9 +217,50 @@ export default class AuthHandler {
         }
     }
 
+    throttledFunc = <T>(func: () => Promise<T>, throttle = 500): Promise<T> => {
+      
+        return new Promise(async (resolve, reject) => {
+
+            let result: any, error: any;
+    
+            /**
+             * Throttle response times to prevent timing attacks
+             */
+            let interval = setInterval(() => {
+                if(error || result){
+                    if(error){
+                        reject(error);
+                    } else if(result){
+                        resolve(result)
+                    }
+                    clearInterval(interval);
+                }
+            }, throttle);
+    
+    
+            try {
+                result = await func();
+                
+            } catch (err){
+                console.log(err)
+                error = err;
+            }
+
+        })
+    }
+
     loginThrottled = async (params: AnyObject): Promise<BasicSession> => {
         if(!this.opts.login) throw "Auth login config missing";
         const { responseThrottle = 500 } = this.opts;
+
+        return this.throttledFunc(async () => {
+            let result = await this.opts.login(params, this.dbo as any, this.db);
+            
+            if(!result.sid){
+                throw { msg: "Something went wrong making a session" }
+            }
+            return result;
+        }, responseThrottle);
 
         return new Promise(async (resolve, reject) => {
 
@@ -263,11 +314,11 @@ export default class AuthHandler {
             if(!querySid){
                 const cookie_str = localParams.socket?.handshake?.headers?.cookie;
                 const cookie = parseCookieStr(cookie_str);
-                return cookie[sidKeyName];
+                return this.validateSid(cookie[sidKeyName]);
             }
 
         } else if(localParams.httpReq){
-            return localParams.httpReq?.cookies?.[sidKeyName];
+            return this.validateSid(localParams.httpReq?.cookies?.[sidKeyName]);
 
         } else throw "socket OR httpReq missing from localParams";
 
@@ -290,8 +341,8 @@ export default class AuthHandler {
             const sid = this.getSID(localParams);
             return {
                 sid,
-                user: await getUser(sid, this.dbo as any, this.db),
-                clientUser: await getClientUser(sid, this.dbo as any, this.db)
+                user: !sid? undefined : await getUser(sid, this.dbo as any, this.db),
+                clientUser: !sid? undefined : await getClientUser(sid, this.dbo as any, this.db)
             }
         }
 
