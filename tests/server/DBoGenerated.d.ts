@@ -82,8 +82,6 @@ export type Items_with_one_media = {
   "name"?: string;
 }
 export type Lookup_col1 = { 
-  "col1"?: string;
-  "col2"?: string;
   "id"?: string;
 }
 export type Lookup_experience_types = { 
@@ -350,7 +348,7 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
       [key in "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "lookup_col1": { 
-      [key in "col1" | "col2" | "id"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in "id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "lookup_experience_types": { 
       [key in "en" | "id" | "ro"]: { [lang_id in keyof LANG_IDS]: string }; 

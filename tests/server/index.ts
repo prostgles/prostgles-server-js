@@ -87,23 +87,24 @@ const dbConnection = {
 		tableConfig: {
 			lookup_col1: {
 				isLookupTable: {
+					dropIfExists: true, 
 					values: {
 						a: {},
 						b: {}
-					}
+					},
 				}
 			},
 			uuid_text: {
 				columns: {
 					col1: {
 						references: {
-							tableName: "lookup_col1"
+							tableName: "lookup_col1",
 							nullable: true,
 						}
 					},
 					col2: {
 						references: {
-							tableName: "lookup_col1"
+							tableName: "lookup_col1",
 							nullable: true,
 						}
 					}
@@ -301,8 +302,6 @@ const dbConnection = {
 				log(req.originalUrl)
 				res.sendFile(path.join(__dirname+'/index.html'));
 			});
-
-			// console.log(JSON.stringify(await db.items_with_one_media.getInfo()))
 			
 			try {
 				

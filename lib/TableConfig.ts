@@ -17,7 +17,7 @@ type LookupTableDefinition<LANG_IDS> = {
             [id_value: string]: {} | {
                 [lang_id in keyof LANG_IDS]: string
             }
-        }[]
+        }
     }
 }
 
@@ -96,10 +96,10 @@ export default class TableConfigurator {
             const tableConf = this.config[tableName];
             if("isLookupTable" in tableConf && Object.keys(tableConf.isLookupTable?.values).length){
                 const rows = Object.keys(tableConf.isLookupTable?.values).map(id => ({ id, ...(tableConf.isLookupTable?.values[id]) }))
-                if(!this.dbo?.[tableName]){
-                    if(tableConf.isLookupTable?.dropIfExists){
-                        queries.push(`DROP TABLE IF EXISTS ${tableName}`);
-                    }
+                if(tableConf.isLookupTable?.dropIfExists){
+                    queries.push(`DROP TABLE IF EXISTS ${tableName} CASCADE;`);
+                }
+                if(tableConf.isLookupTable?.dropIfExists || !this.dbo?.[tableName]){
                     const keys = Object.keys(rows[0]).filter(k => k !== "id");
                     queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
                         id  TEXT PRIMARY KEY
@@ -139,7 +139,7 @@ export default class TableConfigurator {
                                 ${defaultValue? ` DEFAULT ${asValue(defaultValue)} ` : "" } 
                                 REFERENCES ${lookupTable} (${lookupCol}) ;
                             `)
-                            console.log(`${tableName}(${colName}) ` + " referenced lookup table " + tableName)
+                            console.log(`TableConfigurator: ${tableName}(${colName})` + " referenced lookup table " + lookupTable)
                         }
                     });
                 }

@@ -41,14 +41,14 @@ class TableConfigurator {
             let queries = [];
             /* Create lookup tables */
             Object.keys(this.config).map(tableName => {
-                var _a, _b, _c, _d;
+                var _a, _b, _c, _d, _e;
                 const tableConf = this.config[tableName];
                 if ("isLookupTable" in tableConf && Object.keys((_a = tableConf.isLookupTable) === null || _a === void 0 ? void 0 : _a.values).length) {
                     const rows = Object.keys((_b = tableConf.isLookupTable) === null || _b === void 0 ? void 0 : _b.values).map(id => { var _a; return (Object.assign({ id }, ((_a = tableConf.isLookupTable) === null || _a === void 0 ? void 0 : _a.values[id]))); });
-                    if (!((_c = this.dbo) === null || _c === void 0 ? void 0 : _c[tableName])) {
-                        if ((_d = tableConf.isLookupTable) === null || _d === void 0 ? void 0 : _d.dropIfExists) {
-                            queries.push(`DROP TABLE IF EXISTS ${tableName}`);
-                        }
+                    if ((_c = tableConf.isLookupTable) === null || _c === void 0 ? void 0 : _c.dropIfExists) {
+                        queries.push(`DROP TABLE IF EXISTS ${tableName} CASCADE;`);
+                    }
+                    if (((_d = tableConf.isLookupTable) === null || _d === void 0 ? void 0 : _d.dropIfExists) || !((_e = this.dbo) === null || _e === void 0 ? void 0 : _e[tableName])) {
                         const keys = Object.keys(rows[0]).filter(k => k !== "id");
                         queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
                         id  TEXT PRIMARY KEY
@@ -84,7 +84,7 @@ class TableConfigurator {
                                 ${defaultValue ? ` DEFAULT ${PubSubManager_1.asValue(defaultValue)} ` : ""} 
                                 REFERENCES ${lookupTable} (${lookupCol}) ;
                             `);
-                                console.log(`${tableName}(${colName}) ` + " referenced lookup table " + tableName);
+                                console.log(`TableConfigurator: ${tableName}(${colName})` + " referenced lookup table " + lookupTable);
                             }
                         });
                     }

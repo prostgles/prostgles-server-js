@@ -11,7 +11,7 @@ declare type LookupTableDefinition<LANG_IDS> = {
             [id_value: string]: {} | {
                 [lang_id in keyof LANG_IDS]: string;
             };
-        }[];
+        };
     };
 };
 declare type TableDefinition = {
