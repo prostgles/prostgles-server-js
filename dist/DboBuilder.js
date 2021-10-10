@@ -1493,7 +1493,7 @@ class TableHandler extends ViewHandler {
             /**
              * Make sure nested insert uses a transaction
              */
-            if (isNestedInsert && (!this.t && !dbTX)) {
+            if (isNestedInsert && !dbTX) {
                 return {
                     insertResult: yield this.dboBuilder.getTX((dbTX) => dbTX[this.name].insert(data, param2, param3_unused, tableRules, Object.assign({ dbTX }, localParams)))
                 };
@@ -2025,6 +2025,9 @@ class DboBuilder {
                         // } else {
                         //     dbTX[tov.name] = new TableHandler(t as any, tov, this.pubSubManager, this, t, this.joinPaths);
                     }
+                });
+                Object.keys(dbTX).map(k => {
+                    dbTX[k].dbTX = dbTX;
                 });
                 return cb(dbTX, t);
             });
