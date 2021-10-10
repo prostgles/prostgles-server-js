@@ -54,7 +54,7 @@ class TableConfigurator {
                 }
                 if ("isLookupTable" in tableConf && Object.keys((_a = tableConf.isLookupTable) === null || _a === void 0 ? void 0 : _a.values).length) {
                     const rows = Object.keys((_b = tableConf.isLookupTable) === null || _b === void 0 ? void 0 : _b.values).map(id => { var _a; return (Object.assign({ id }, ((_a = tableConf.isLookupTable) === null || _a === void 0 ? void 0 : _a.values[id]))); });
-                    if (dropIfExists || !((_c = this.dbo) === null || _c === void 0 ? void 0 : _c[tableName])) {
+                    if (dropIfExists || dropIfExistsCascade || !((_c = this.dbo) === null || _c === void 0 ? void 0 : _c[tableName])) {
                         const keys = Object.keys(rows[0]).filter(k => k !== "id");
                         queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
                         id  TEXT PRIMARY KEY
@@ -129,7 +129,7 @@ function columnExists(args) {
     return __awaiter(this, void 0, void 0, function* () {
         const { db, tableName, colName } = args;
         return Boolean((_a = (yield db.oneOrNone(`
-        SELECT column_name 
+        SELECT column_name, table_name
         FROM information_schema.columns 
         WHERE table_name=${PubSubManager_1.asValue(tableName)} and column_name=${PubSubManager_1.asValue(colName)}
         LIMIT 1;

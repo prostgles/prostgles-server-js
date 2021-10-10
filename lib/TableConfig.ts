@@ -119,7 +119,7 @@ export default class TableConfigurator {
             }
             if("isLookupTable" in tableConf && Object.keys(tableConf.isLookupTable?.values).length){
                 const rows = Object.keys(tableConf.isLookupTable?.values).map(id => ({ id, ...(tableConf.isLookupTable?.values[id]) }));
-                if(dropIfExists || !this.dbo?.[tableName]){
+                if(dropIfExists || dropIfExistsCascade || !this.dbo?.[tableName]){
                     const keys = Object.keys(rows[0]).filter(k => k !== "id");
                     queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
                         id  TEXT PRIMARY KEY
@@ -204,7 +204,7 @@ export default class TableConfigurator {
 async function columnExists(args: {tableName: string; colName: string; db: DB }){
     const { db, tableName, colName } = args;
     return Boolean((await db.oneOrNone(`
-        SELECT column_name 
+        SELECT column_name, table_name
         FROM information_schema.columns 
         WHERE table_name=${asValue(tableName)} and column_name=${asValue(colName)}
         LIMIT 1;
