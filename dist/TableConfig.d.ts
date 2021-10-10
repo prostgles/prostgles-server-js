@@ -4,9 +4,11 @@ declare type ColExtraInfo = {
     max?: string | number;
     hint?: string;
 };
+declare type BaseTableDefinition = {
+    dropIfExists?: boolean;
+};
 declare type LookupTableDefinition<LANG_IDS> = {
     isLookupTable: {
-        dropIfExists?: boolean;
         values: {
             [id_value: string]: {} | {
                 [lang_id in keyof LANG_IDS]: string;
@@ -14,26 +16,35 @@ declare type LookupTableDefinition<LANG_IDS> = {
         };
     };
 };
+declare type BaseColumn = {
+    /**
+     * Will add these values to .getColumns() result
+     */
+    info?: ColExtraInfo;
+};
+declare type SQLDefColumn = {
+    /**
+     * Raw sql statement used in creating/adding column
+     */
+    sqlDefinition?: string;
+};
+declare type ReferencedColumn = {
+    /**
+     * Will create a lookup table that this column will reference
+     */
+    references?: {
+        tableName: string;
+        /**
+         * Defaults to id
+         */
+        columnName?: string;
+        defaultValue?: string;
+        nullable?: boolean;
+    };
+};
 declare type TableDefinition = {
     columns: {
-        [column_name: string]: {
-            /**
-             * Will add these values to .getColumns() result
-             */
-            info?: ColExtraInfo;
-            /**
-             * Will create a lookup table that this column will reference
-             */
-            references?: {
-                tableName: string;
-                /**
-                 * Defaults to id
-                 */
-                columnName?: string;
-                defaultValue?: string;
-                nullable?: boolean;
-            };
-        };
+        [column_name: string]: BaseColumn & (SQLDefColumn | ReferencedColumn);
     };
 };
 /**
@@ -43,7 +54,7 @@ export declare type TableConfig<LANG_IDS = {
     en: 1;
     ro: 1;
 }> = {
-    [table_name: string]: TableDefinition | LookupTableDefinition<LANG_IDS>;
+    [table_name: string]: BaseTableDefinition & (TableDefinition | LookupTableDefinition<LANG_IDS>);
 };
 /**
  * Will be run between initSQL and fileTable

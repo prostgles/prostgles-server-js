@@ -561,6 +561,20 @@ function makeSocketError(cb, err) {
 // const insertParams: Array<keyof InsertRule> = ["fields", "forcedData", "returningFields", "validate"];
 const RULE_TO_METHODS = [
     {
+        rule: "getColumns",
+        methods: ["getColumns"],
+        no_limits: true,
+        allowed_params: [],
+        hint: ` expecting false | true | undefined`
+    },
+    {
+        rule: "getInfo",
+        methods: ["getInfo"],
+        no_limits: true,
+        allowed_params: [],
+        hint: ` expecting false | true | undefined`
+    },
+    {
         rule: "insert",
         methods: ["insert", "upsert"],
         no_limits: { fields: "*" },
@@ -578,7 +592,7 @@ const RULE_TO_METHODS = [
     },
     {
         rule: "select",
-        methods: ["findOne", "find", "count", "getColumns", "getInfo"],
+        methods: ["findOne", "find", "count"],
         no_limits: { fields: "*", filterFields: "*" },
         allowed_params: ["fields", "filterFields", "forcedFilter", "validate", "maxLimit"],
         hint: ` expecting "*" | true | { fields: ( string | string[] | {} )  }`
@@ -731,12 +745,18 @@ class PublishParser {
                         });
                         // if(tableName === "various") console.warn(1042, table_rules)
                     }
-                    /* Add implied methods if not falsy */
+                    /* Add missing implied rules */
                     MY_RULES.map(r => {
+                        if (["getInfo", "getColumns"].includes(r.rule) && ![null, false, 0].includes(table_rules[r.rule])) {
+                            table_rules[r.rule] = r.no_limits;
+                            return;
+                        }
+                        /* Add nested properties for fully allowed rules */
                         if ([true, "*"].includes(table_rules[r.rule]) && r.no_limits) {
                             table_rules[r.rule] = Object.assign({}, r.no_limits);
                         }
                         if (table_rules[r.rule]) {
+                            /* Add implied methods if not falsy */
                             r.methods.map(method => {
                                 if (table_rules[method] === undefined) {
                                     const publishedTable = table_rules;
@@ -828,6 +848,7 @@ class PublishParser {
                             `;
                         }
                         const table_rules = yield this.getTableRules({ localParams: { socket }, tableName }, clientInfo);
+                        // if(tableName === "insert_rule") throw {table_rules}
                         if (table_rules && Object.keys(table_rules).length) {
                             schema[tableName] = {};
                             let methods = [];

@@ -628,11 +628,11 @@ export class ViewHandler {
             let _lang = lang;
             let columns = this.columns
             .filter(c => {
-                const { insert, select, update } = p;
+                const { insert, select, update } = p || {};
                 return [
-                    ...insert.fields,
-                    ...select.fields,
-                    ...update.fields,
+                    ...(insert?.fields || []),
+                    ...(select?.fields || []),
+                    ...(update?.fields || []),
                 ].includes(c.name)
             })
             .map(c => {
@@ -779,8 +779,8 @@ export class ViewHandler {
             }
 
             if(!tableRules.select && !tableRules.update && !tableRules.delete && !tableRules.insert){
-                res.getInfo = false;
-                res.getColumns = false;
+                if([null, false].includes(tableRules.getInfo)) res.getInfo = false;
+                if([null, false].includes(tableRules.getColumns)) res.getColumns = false;
             }
 
             return res;

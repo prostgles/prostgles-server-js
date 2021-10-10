@@ -70,8 +70,8 @@ const dbConnection = {
         // onNotice: console.log,
         tableConfig: {
             lookup_col1: {
+                dropIfExists: true,
                 isLookupTable: {
-                    dropIfExists: true,
                     values: {
                         a: {},
                         b: {}

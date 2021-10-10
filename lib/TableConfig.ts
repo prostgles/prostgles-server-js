@@ -10,9 +10,12 @@ type ColExtraInfo = {
     hint?: string;
 };
 
+type BaseTableDefinition = {
+    dropIfExists?: boolean;
+}
+
 type LookupTableDefinition<LANG_IDS> = {
     isLookupTable: {
-        dropIfExists?: boolean;
         values: {
             [id_value: string]: {} | {
                 [lang_id in keyof LANG_IDS]: string
@@ -21,31 +24,44 @@ type LookupTableDefinition<LANG_IDS> = {
     }
 }
 
+type BaseColumn = {
+    /**
+     * Will add these values to .getColumns() result
+     */
+    info?: ColExtraInfo;
+
+}
+
+type SQLDefColumn = {
+
+    /**
+     * Raw sql statement used in creating/adding column
+     */
+    sqlDefinition?: string;
+}
+
+type ReferencedColumn = {
+
+    /**
+     * Will create a lookup table that this column will reference
+     */
+        references?: {
+
+
+        tableName: string;
+
+        /**
+         * Defaults to id
+         */
+        columnName?: string;
+        defaultValue?: string;
+        nullable?: boolean;
+    }
+}
+
 type TableDefinition = {
     columns: {
-        [column_name: string]: {
-            
-            /**
-             * Will add these values to .getColumns() result
-             */
-            info?: ColExtraInfo;
-
-            /**
-             * Will create a lookup table that this column will reference
-             */
-            references?: {
-
-
-                tableName: string;
-
-                /**
-                 * Defaults to id
-                 */
-                columnName?: string;
-                defaultValue?: string;
-                nullable?: boolean;
-            }
-        }
+        [column_name: string]: BaseColumn & (SQLDefColumn | ReferencedColumn)
     }
 }
 
@@ -53,7 +69,7 @@ type TableDefinition = {
  * Helper utility to create lookup tables for TEXT columns
  */
 export type TableConfig<LANG_IDS = { en: 1, ro: 1 }> = {
-    [table_name: string]: TableDefinition | LookupTableDefinition<LANG_IDS>;
+    [table_name: string]: BaseTableDefinition & (TableDefinition | LookupTableDefinition<LANG_IDS>);
 }
 
 /**
@@ -95,11 +111,12 @@ export default class TableConfigurator {
         Object.keys(this.config).map(tableName => {
             const tableConf = this.config[tableName];
             if("isLookupTable" in tableConf && Object.keys(tableConf.isLookupTable?.values).length){
-                const rows = Object.keys(tableConf.isLookupTable?.values).map(id => ({ id, ...(tableConf.isLookupTable?.values[id]) }))
-                if(tableConf.isLookupTable?.dropIfExists){
+                const rows = Object.keys(tableConf.isLookupTable?.values).map(id => ({ id, ...(tableConf.isLookupTable?.values[id]) }));
+                const { dropIfExists = false } = tableConf;
+                if(dropIfExists){
                     queries.push(`DROP TABLE IF EXISTS ${tableName} CASCADE;`);
                 }
-                if(tableConf.isLookupTable?.dropIfExists || !this.dbo?.[tableName]){
+                if(dropIfExists || !this.dbo?.[tableName]){
                     const keys = Object.keys(rows[0]).filter(k => k !== "id");
                     queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
                         id  TEXT PRIMARY KEY
@@ -131,15 +148,27 @@ export default class TableConfigurator {
                     Object.keys(tableConf.columns).map(colName => {
                         const colConf = tableConf.columns[colName];
                         
-                        if(colConf.references && !this.dbo[tableName].columns.find(c => colName === c.name)) {
-                            const { nullable, tableName: lookupTable, columnName: lookupCol = "id", defaultValue } = colConf.references;
-                            queries.push(`
-                                ALTER TABLE ${asName(tableName)} 
-                                ADD COLUMN ${asName(colName)} TEXT ${!nullable? " NOT NULL " : ""} 
-                                ${defaultValue? ` DEFAULT ${asValue(defaultValue)} ` : "" } 
-                                REFERENCES ${lookupTable} (${lookupCol}) ;
-                            `)
-                            console.log(`TableConfigurator: ${tableName}(${colName})` + " referenced lookup table " + lookupTable)
+                        if(!this.dbo[tableName].columns.find(c => colName === c.name)) {
+
+                            if("references" in colConf && colConf.references){
+
+                                const { nullable, tableName: lookupTable, columnName: lookupCol = "id", defaultValue } = colConf.references;
+                                queries.push(`
+                                    ALTER TABLE ${asName(tableName)} 
+                                    ADD COLUMN ${asName(colName)} TEXT ${!nullable? " NOT NULL " : ""} 
+                                    ${defaultValue? ` DEFAULT ${asValue(defaultValue)} ` : "" } 
+                                    REFERENCES ${lookupTable} (${lookupCol}) ;
+                                `)
+                                console.log(`TableConfigurator: ${tableName}(${colName})` + " referenced lookup table " + lookupTable);
+
+                            } else if("sqlDefinition" in colConf && colConf.sqlDefinition){
+                                
+                                queries.push(`
+                                    ALTER TABLE ${asName(tableName)} 
+                                    ADD COLUMN ${asName(colName)} ${colConf.sqlDefinition};
+                                `)
+                                console.log(`TableConfigurator: created/added column ${tableName}(${colName}) ` + colConf.sqlDefinition)
+                            }
                         }
                     });
                 }

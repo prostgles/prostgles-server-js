@@ -41,14 +41,15 @@ class TableConfigurator {
             let queries = [];
             /* Create lookup tables */
             Object.keys(this.config).map(tableName => {
-                var _a, _b, _c, _d, _e;
+                var _a, _b, _c;
                 const tableConf = this.config[tableName];
                 if ("isLookupTable" in tableConf && Object.keys((_a = tableConf.isLookupTable) === null || _a === void 0 ? void 0 : _a.values).length) {
                     const rows = Object.keys((_b = tableConf.isLookupTable) === null || _b === void 0 ? void 0 : _b.values).map(id => { var _a; return (Object.assign({ id }, ((_a = tableConf.isLookupTable) === null || _a === void 0 ? void 0 : _a.values[id]))); });
-                    if ((_c = tableConf.isLookupTable) === null || _c === void 0 ? void 0 : _c.dropIfExists) {
+                    const { dropIfExists = false } = tableConf;
+                    if (dropIfExists) {
                         queries.push(`DROP TABLE IF EXISTS ${tableName} CASCADE;`);
                     }
-                    if (((_d = tableConf.isLookupTable) === null || _d === void 0 ? void 0 : _d.dropIfExists) || !((_e = this.dbo) === null || _e === void 0 ? void 0 : _e[tableName])) {
+                    if (dropIfExists || !((_c = this.dbo) === null || _c === void 0 ? void 0 : _c[tableName])) {
                         const keys = Object.keys(rows[0]).filter(k => k !== "id");
                         queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
                         id  TEXT PRIMARY KEY
@@ -76,15 +77,24 @@ class TableConfigurator {
                     else {
                         Object.keys(tableConf.columns).map(colName => {
                             const colConf = tableConf.columns[colName];
-                            if (colConf.references && !this.dbo[tableName].columns.find(c => colName === c.name)) {
-                                const { nullable, tableName: lookupTable, columnName: lookupCol = "id", defaultValue } = colConf.references;
-                                queries.push(`
-                                ALTER TABLE ${prostgles_types_1.asName(tableName)} 
-                                ADD COLUMN ${prostgles_types_1.asName(colName)} TEXT ${!nullable ? " NOT NULL " : ""} 
-                                ${defaultValue ? ` DEFAULT ${PubSubManager_1.asValue(defaultValue)} ` : ""} 
-                                REFERENCES ${lookupTable} (${lookupCol}) ;
-                            `);
-                                console.log(`TableConfigurator: ${tableName}(${colName})` + " referenced lookup table " + lookupTable);
+                            if (!this.dbo[tableName].columns.find(c => colName === c.name)) {
+                                if ("references" in colConf && colConf.references) {
+                                    const { nullable, tableName: lookupTable, columnName: lookupCol = "id", defaultValue } = colConf.references;
+                                    queries.push(`
+                                    ALTER TABLE ${prostgles_types_1.asName(tableName)} 
+                                    ADD COLUMN ${prostgles_types_1.asName(colName)} TEXT ${!nullable ? " NOT NULL " : ""} 
+                                    ${defaultValue ? ` DEFAULT ${PubSubManager_1.asValue(defaultValue)} ` : ""} 
+                                    REFERENCES ${lookupTable} (${lookupCol}) ;
+                                `);
+                                    console.log(`TableConfigurator: ${tableName}(${colName})` + " referenced lookup table " + lookupTable);
+                                }
+                                else if ("sqlDefinition" in colConf && colConf.sqlDefinition) {
+                                    queries.push(`
+                                    ALTER TABLE ${prostgles_types_1.asName(tableName)} 
+                                    ADD COLUMN ${prostgles_types_1.asName(colName)} ${colConf.sqlDefinition};
+                                `);
+                                    console.log(`TableConfigurator: created/added column ${tableName}(${colName}) ` + colConf.sqlDefinition);
+                                }
                             }
                         });
                     }
