@@ -1,6 +1,14 @@
-import { AnyObject } from "prostgles-types";
+import { AnyObject, AuthGuardLocation, AuthGuardLocationResponse, CHANNELS } from "prostgles-types";
 import { LocalParams } from "./DboBuilder";
 import { DB, DbHandler, Prostgles } from "./Prostgles";
+
+type AuthSocketSchema = {
+    user?: AnyObject;
+    register?: boolean;
+    login?: boolean;
+    logout?: boolean;
+    pathGuard?: boolean;
+};
 
 export type BasicSession = { sid: string, expires: number };
 export type AuthClientRequest = { socket: any } | { httpReq: any }
@@ -41,6 +49,11 @@ export type Auth<DBO = DbHandler> = {
          * If provided, any client requests to these routes (or their subroutes) will be redirected to loginRoute and then redirected back to the initial route after logging in
          */
         userRoutes?: string[];
+
+        /**
+         * False by default. If false and userRoutes are provided then the socket will request window.location.reload if the current url is on a user route.
+         */
+        disableSocketAuthGuard?: boolean;
 
         /**
          * Will be called after a GET request is authorised
@@ -85,6 +98,12 @@ export default class AuthHandler {
         if(!sid) return undefined;
         if(typeof sid !== "string") throw "sid missing or not a string";
         return sid;
+    }
+
+    isUserRoute = (pathname: string) => {
+        return Boolean(this.opts?.expressConfig?.userRoutes?.find(userRoute => {
+            return userRoute === pathname || pathname.startsWith(userRoute) && ["/", "?", "#"].includes(pathname.slice(-1));
+        }))
     }
 
     async init(){
@@ -185,9 +204,7 @@ export default class AuthHandler {
                             
                             
                             /* Check auth. Redirect if unauthorized */
-                            if(userRoutes.find(userRoute => {
-                                return userRoute === req.path || req.path.startsWith(userRoute) && ["/", "?", "#"].includes(req.path.slice(-1));
-                            })){
+                            if(this.isUserRoute(req.path)){
                                 const u = await getUser();
                                 if(!u){
                                     res.redirect(`${loginRoute}?returnURL=${encodeURIComponent(req.originalUrl)}`);
@@ -347,5 +364,77 @@ export default class AuthHandler {
         }
 
         return {};
+    }
+
+
+    makeSocketAuth = async (socket): Promise<AuthSocketSchema> => {
+        if(!this.opts) return {};
+
+        let auth: AuthSocketSchema = {};
+
+        if(this.opts.expressConfig?.userRoutes?.length && !this.opts.expressConfig?.disableSocketAuthGuard){
+
+            auth.pathGuard = true;
+            
+            socket.removeAllListeners(CHANNELS.AUTHGUARD)
+            socket.on(CHANNELS.AUTHGUARD, async (params: AuthGuardLocation, cb = (err: any, res?: AuthGuardLocationResponse) => {} ) => {
+                
+                try {
+                    const {pathname} = params || {};
+                    if(pathname && typeof pathname === "string" && this.isUserRoute(pathname) && !(await this.getClientInfo({ socket }))?.user){
+                        cb(null, { shouldReload: true });
+                    } else {
+                        cb(null, { shouldReload: false });
+                    }
+                        
+                } catch(err) {
+                    console.error("AUTHGUARD err: ", err);
+                    cb(err)
+                }
+            });
+        }
+        
+        const {
+            register, 
+            logout
+        } = this.opts;
+        const login = this.loginThrottled
+
+        let handlers = [
+            { func: (params: any, dbo: DbHandler, db: DB) => register(params, dbo, db),                 ch: CHANNELS.REGISTER,   name: "register"    },
+            { func: (params: any, dbo: DbHandler, db: DB) => login(params),                             ch: CHANNELS.LOGIN,      name: "login"       },
+            { func: (params: any, dbo: DbHandler, db: DB) => logout(this.getSID({ socket }), dbo, db),  ch: CHANNELS.LOGOUT,     name: "logout"      }
+        ].filter(h => h.func);
+
+        const usrData = await this.getClientInfo({ socket });
+        if(usrData){
+            auth.user = usrData.clientUser;
+            handlers = handlers.filter(h => h.name === "logout");
+        }
+
+        handlers.map(({ func, ch, name }) => {
+            auth[name] = true;
+            
+            socket.removeAllListeners(ch)
+            socket.on(ch, async (params: any, cb = (...callback) => {} ) => {
+                
+                try {
+                    if(!socket) throw "socket missing??!!";
+
+                    const res = await func(params, this.dbo as any, this.db);
+                    if(name === "login" && res && res.sid){
+                        /* TODO: Re-send schema to client */
+                    }
+
+                    cb(null, true);
+                        
+                } catch(err) {
+                    console.error(name + " err", err);
+                    cb(err)
+                }
+            });
+        });
+
+        return auth;
     }
 }

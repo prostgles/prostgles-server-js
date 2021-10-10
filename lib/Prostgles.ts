@@ -841,51 +841,7 @@ export class Prostgles<DBO = DbHandler> {
 
     pushSocketSchema = async (socket: any) => {
 
-        let auth: any = {};
-        if(this.authHandler && this.opts.auth){
-            
-            const {
-                register, 
-                logout
-            } = this.opts.auth;
-            const login = this.authHandler.loginThrottled
-
-            let handlers = [
-                { func: register,   ch: CHANNELS.REGISTER,   name: "register"    },
-                { func: login,      ch: CHANNELS.LOGIN,      name: "login"       },
-                { func: logout,     ch: CHANNELS.LOGOUT,     name: "logout"      }
-            ].filter(h => h.func);
-
-            const usrData = await this.authHandler.getClientInfo({ socket });
-            if(usrData){
-                auth.user = usrData.clientUser;
-                handlers = handlers.filter(h => h.name === "logout");
-            }
-
-            handlers.map(({ func, ch, name }) => {
-                auth[name] = true;
-                
-                socket.removeAllListeners(ch)
-                socket.on(ch, async (params: any, cb = (...callback) => {} ) => {
-                    
-                    try {
-                        if(!socket) throw "socket missing??!!";
-
-                        const res = await func(params, dbo as any, db);
-                        if(name === "login" && res && res.sid){
-                            /* TODO: Re-send schema to client */
-                        }
-
-                        cb(null, true);
-                            
-                    } catch(err) {
-                        console.error(name + " err", err);
-                        cb(err)
-                    }
-                });
-            });
-
-        }
+        let auth: any = await this.authHandler?.makeSocketAuth(socket) || {};
         
         // let needType = this.publishRawSQL && typeof this.publishRawSQL === "function";
         // let DATA_TYPES = !needType? [] : await this.db.any("SELECT oid, typname FROM pg_type");

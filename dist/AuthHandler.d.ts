@@ -1,6 +1,13 @@
 import { AnyObject } from "prostgles-types";
 import { LocalParams } from "./DboBuilder";
 import { DB, DbHandler, Prostgles } from "./Prostgles";
+declare type AuthSocketSchema = {
+    user?: AnyObject;
+    register?: boolean;
+    login?: boolean;
+    logout?: boolean;
+    pathGuard?: boolean;
+};
 export declare type BasicSession = {
     sid: string;
     expires: number;
@@ -42,6 +49,10 @@ export declare type Auth<DBO = DbHandler> = {
          */
         userRoutes?: string[];
         /**
+         * False by default. If false and userRoutes are provided then the socket will request window.location.reload if the current url is on a user route.
+         */
+        disableSocketAuthGuard?: boolean;
+        /**
          * Will be called after a GET request is authorised
          */
         onGetRequestOK?: (req: any, res: any) => any;
@@ -70,6 +81,7 @@ export default class AuthHandler {
     sidKeyName: string;
     constructor(prostgles: Prostgles);
     validateSid: (sid: string) => string;
+    isUserRoute: (pathname: string) => boolean;
     init(): Promise<void>;
     throttledFunc: <T>(func: () => Promise<T>, throttle?: number) => Promise<T>;
     loginThrottled: (params: AnyObject) => Promise<BasicSession>;
@@ -81,5 +93,7 @@ export default class AuthHandler {
      */
     getSID(localParams: LocalParams): string;
     getClientInfo(localParams: Pick<LocalParams, "socket" | "httpReq">): Promise<ClientInfo>;
+    makeSocketAuth: (socket: any) => Promise<AuthSocketSchema>;
 }
+export {};
 //# sourceMappingURL=AuthHandler.d.ts.map

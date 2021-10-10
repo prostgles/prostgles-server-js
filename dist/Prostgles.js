@@ -90,40 +90,8 @@ class Prostgles {
         });
         this.connectedSockets = [];
         this.pushSocketSchema = (socket) => __awaiter(this, void 0, void 0, function* () {
-            let auth = {};
-            if (this.authHandler && this.opts.auth) {
-                const { register, logout } = this.opts.auth;
-                const login = this.authHandler.loginThrottled;
-                let handlers = [
-                    { func: register, ch: prostgles_types_1.CHANNELS.REGISTER, name: "register" },
-                    { func: login, ch: prostgles_types_1.CHANNELS.LOGIN, name: "login" },
-                    { func: logout, ch: prostgles_types_1.CHANNELS.LOGOUT, name: "logout" }
-                ].filter(h => h.func);
-                const usrData = yield this.authHandler.getClientInfo({ socket });
-                if (usrData) {
-                    auth.user = usrData.clientUser;
-                    handlers = handlers.filter(h => h.name === "logout");
-                }
-                handlers.map(({ func, ch, name }) => {
-                    auth[name] = true;
-                    socket.removeAllListeners(ch);
-                    socket.on(ch, (params, cb = (...callback) => { }) => __awaiter(this, void 0, void 0, function* () {
-                        try {
-                            if (!socket)
-                                throw "socket missing??!!";
-                            const res = yield func(params, dbo, db);
-                            if (name === "login" && res && res.sid) {
-                                /* TODO: Re-send schema to client */
-                            }
-                            cb(null, true);
-                        }
-                        catch (err) {
-                            console.error(name + " err", err);
-                            cb(err);
-                        }
-                    }));
-                });
-            }
+            var _d;
+            let auth = (yield ((_d = this.authHandler) === null || _d === void 0 ? void 0 : _d.makeSocketAuth(socket))) || {};
             // let needType = this.publishRawSQL && typeof this.publishRawSQL === "function";
             // let DATA_TYPES = !needType? [] : await this.db.any("SELECT oid, typname FROM pg_type");
             // let USER_TABLES = !needType? [] :  await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");

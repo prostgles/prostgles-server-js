@@ -9,6 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const prostgles_types_1 = require("prostgles-types");
 class AuthHandler {
     constructor(prostgles) {
         this.validateSid = (sid) => {
@@ -17,6 +18,12 @@ class AuthHandler {
             if (typeof sid !== "string")
                 throw "sid missing or not a string";
             return sid;
+        };
+        this.isUserRoute = (pathname) => {
+            var _a, _b, _c;
+            return Boolean((_c = (_b = (_a = this.opts) === null || _a === void 0 ? void 0 : _a.expressConfig) === null || _b === void 0 ? void 0 : _b.userRoutes) === null || _c === void 0 ? void 0 : _c.find(userRoute => {
+                return userRoute === pathname || pathname.startsWith(userRoute) && ["/", "?", "#"].includes(pathname.slice(-1));
+            }));
         };
         this.throttledFunc = (func, throttle = 500) => {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
@@ -82,6 +89,64 @@ class AuthHandler {
                     error = err;
                 }
             }));
+        });
+        this.makeSocketAuth = (socket) => __awaiter(this, void 0, void 0, function* () {
+            var _a, _b, _c;
+            if (!this.opts)
+                return {};
+            let auth = {};
+            if (((_b = (_a = this.opts.expressConfig) === null || _a === void 0 ? void 0 : _a.userRoutes) === null || _b === void 0 ? void 0 : _b.length) && !((_c = this.opts.expressConfig) === null || _c === void 0 ? void 0 : _c.disableSocketAuthGuard)) {
+                auth.pathGuard = true;
+                socket.removeAllListeners(prostgles_types_1.CHANNELS.AUTHGUARD);
+                socket.on(prostgles_types_1.CHANNELS.AUTHGUARD, (params, cb = (err, res) => { }) => __awaiter(this, void 0, void 0, function* () {
+                    var _d;
+                    try {
+                        const { pathname } = params || {};
+                        if (pathname && typeof pathname === "string" && this.isUserRoute(pathname) && !((_d = (yield this.getClientInfo({ socket }))) === null || _d === void 0 ? void 0 : _d.user)) {
+                            cb(null, { shouldReload: true });
+                        }
+                        else {
+                            cb(null, { shouldReload: false });
+                        }
+                    }
+                    catch (err) {
+                        console.error("AUTHGUARD err: ", err);
+                        cb(err);
+                    }
+                }));
+            }
+            const { register, logout } = this.opts;
+            const login = this.loginThrottled;
+            let handlers = [
+                { func: (params, dbo, db) => register(params, dbo, db), ch: prostgles_types_1.CHANNELS.REGISTER, name: "register" },
+                { func: (params, dbo, db) => login(params), ch: prostgles_types_1.CHANNELS.LOGIN, name: "login" },
+                { func: (params, dbo, db) => logout(this.getSID({ socket }), dbo, db), ch: prostgles_types_1.CHANNELS.LOGOUT, name: "logout" }
+            ].filter(h => h.func);
+            const usrData = yield this.getClientInfo({ socket });
+            if (usrData) {
+                auth.user = usrData.clientUser;
+                handlers = handlers.filter(h => h.name === "logout");
+            }
+            handlers.map(({ func, ch, name }) => {
+                auth[name] = true;
+                socket.removeAllListeners(ch);
+                socket.on(ch, (params, cb = (...callback) => { }) => __awaiter(this, void 0, void 0, function* () {
+                    try {
+                        if (!socket)
+                            throw "socket missing??!!";
+                        const res = yield func(params, this.dbo, this.db);
+                        if (name === "login" && res && res.sid) {
+                            /* TODO: Re-send schema to client */
+                        }
+                        cb(null, true);
+                    }
+                    catch (err) {
+                        console.error(name + " err", err);
+                        cb(err);
+                    }
+                }));
+            });
+            return auth;
         });
         this.opts = prostgles.opts.auth;
         this.dbo = prostgles.dbo;
@@ -176,9 +241,7 @@ class AuthHandler {
                             try {
                                 const returnURL = getReturnUrl(req);
                                 /* Check auth. Redirect if unauthorized */
-                                if (userRoutes.find(userRoute => {
-                                    return userRoute === req.path || req.path.startsWith(userRoute) && ["/", "?", "#"].includes(req.path.slice(-1));
-                                })) {
+                                if (this.isUserRoute(req.path)) {
                                     const u = yield getUser();
                                     if (!u) {
                                         res.redirect(`${loginRoute}?returnURL=${encodeURIComponent(req.originalUrl)}`);
