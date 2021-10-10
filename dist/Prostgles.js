@@ -353,7 +353,13 @@ class Prostgles {
                 yield this.refreshDBO();
                 if (this.opts.tableConfig) {
                     this.tableConfigurator = new TableConfig_1.default(this);
-                    yield this.tableConfigurator.init();
+                    try {
+                        yield this.tableConfigurator.init();
+                    }
+                    catch (e) {
+                        console.error("TableConfigurator: ", e);
+                        throw e;
+                    }
                 }
                 /* 3. Make DBO object from all tables and views */
                 yield this.refreshDBO();

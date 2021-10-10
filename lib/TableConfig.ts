@@ -130,13 +130,16 @@ export default class TableConfigurator {
                         const values = this.prostgles.pgp.helpers.values(row)
                         queries.push(this.prostgles.pgp.as.format(`INSERT INTO ${tableName}  (${["id", ...keys].map(t => asName(t)).join(", ")})  ` + " VALUES ${values:raw} ;", { values} ))
                     });
-                    console.log("Created lookup table " + tableName)
+                    // console.log("Created lookup table " + tableName)
                 }
             }
         });
         
-        if(queries.length){    
-            await this.db.multi(queries.join("\n"));
+        if(queries.length){ 
+            const q = queries.join("\n");
+            console.log("TableConfig: \n", q)
+            await this.db.multi(q);
+            await this.prostgles.refreshDBO()
         }
         queries = [];
 
@@ -195,7 +198,9 @@ export default class TableConfigurator {
         }));
 
         if(queries.length){
-            await this.db.multi(queries.join("\n"));
+            const q = queries.join("\n");
+            console.log("TableConfig: \n", q)
+            await this.db.multi(q);
         }
     }
 }

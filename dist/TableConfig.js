@@ -64,12 +64,15 @@ class TableConfigurator {
                             const values = this.prostgles.pgp.helpers.values(row);
                             queries.push(this.prostgles.pgp.as.format(`INSERT INTO ${tableName}  (${["id", ...keys].map(t => prostgles_types_1.asName(t)).join(", ")})  ` + " VALUES ${values:raw} ;", { values }));
                         });
-                        console.log("Created lookup table " + tableName);
+                        // console.log("Created lookup table " + tableName)
                     }
                 }
             });
             if (queries.length) {
-                yield this.db.multi(queries.join("\n"));
+                const q = queries.join("\n");
+                console.log("TableConfig: \n", q);
+                yield this.db.multi(q);
+                yield this.prostgles.refreshDBO();
             }
             queries = [];
             /* Create referenced columns */
@@ -118,7 +121,9 @@ class TableConfigurator {
                 }
             })));
             if (queries.length) {
-                yield this.db.multi(queries.join("\n"));
+                const q = queries.join("\n");
+                console.log("TableConfig: \n", q);
+                yield this.db.multi(q);
             }
         });
     }

@@ -615,7 +615,12 @@ export class Prostgles<DBO = DbHandler> {
             await this.refreshDBO();
             if(this.opts.tableConfig){
                 this.tableConfigurator = new TableConfigurator(this as any);
-                await this.tableConfigurator.init();
+                try {
+                    await this.tableConfigurator.init();
+                } catch(e){
+                    console.error("TableConfigurator: ",e);
+                    throw e;
+                }
             }
 
             /* 3. Make DBO object from all tables and views */
