@@ -311,7 +311,7 @@ class ViewHandler {
         var _a, _b, _c, _e, _f, _g, _h, _j, _k, _l, _m;
         return __awaiter(this, void 0, void 0, function* () {
             const p = this.getValidatedRules(tableRules, localParams);
-            if (!p.select.getInfo)
+            if (!p.getInfo)
                 throw "Not allowed";
             let has_media = undefined;
             const mediaTable = (_c = (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.opts) === null || _b === void 0 ? void 0 : _b.fileTable) === null || _c === void 0 ? void 0 : _c.tableName;
@@ -350,11 +350,20 @@ class ViewHandler {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const p = this.getValidatedRules(tableRules, localParams);
-                if (!p.select.getColumns)
+                if (!p.getColumns)
                     throw "Not allowed";
                 // console.log("getColumns", this.name, this.columns.map(c => c.name))
                 let _lang = lang;
-                let columns = this.columns.map(c => {
+                let columns = this.columns
+                    .filter(c => {
+                    const { insert, select, update } = p;
+                    return [
+                        ...insert.fields,
+                        ...select.fields,
+                        ...update.fields,
+                    ].includes(c.name);
+                })
+                    .map(c => {
                     var _a, _b, _c, _e, _f, _g, _h, _j, _k, _l, _m;
                     let label = c.comment || capitalizeFirstLetter(c.name, " ");
                     const iConf = (_f = (_e = (_c = (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.opts) === null || _b === void 0 ? void 0 : _b.i18n) === null || _c === void 0 ? void 0 : _c.column_labels) === null || _e === void 0 ? void 0 : _e[this.name]) === null || _f === void 0 ? void 0 : _f[c.name];
@@ -389,6 +398,7 @@ class ViewHandler {
         });
     }
     getValidatedRules(tableRules, localParams) {
+        var _a, _b;
         if (utils_1.get(localParams, "socket") && !tableRules) {
             throw "INTERNAL ERROR: Unexpected case -> localParams && !tableRules";
         }
@@ -420,7 +430,9 @@ class ViewHandler {
                 return this.parseFieldFilter(firstValid);
             };
             let res = {
-                allColumns
+                allColumns,
+                getColumns: (_a = tableRules === null || tableRules === void 0 ? void 0 : tableRules.getColumns) !== null && _a !== void 0 ? _a : true,
+                getInfo: (_b = tableRules === null || tableRules === void 0 ? void 0 : tableRules.getColumns) !== null && _b !== void 0 ? _b : true,
             };
             /* SELECT */
             if (tableRules.select) {
@@ -436,14 +448,8 @@ class ViewHandler {
                     fields: this.parseFieldFilter(tableRules.select.fields),
                     forcedFilter: Object.assign({}, tableRules.select.forcedFilter),
                     filterFields: this.parseFieldFilter(tableRules.select.filterFields),
-                    getColumns: tableRules.select.getColumns,
-                    getInfo: tableRules.select.getInfo,
                     maxLimit
                 };
-                if (res.select.getColumns === undefined)
-                    res.select.getColumns = true;
-                if (res.select.getInfo === undefined)
-                    res.select.getInfo = true;
             }
             /* UPDATE */
             if (tableRules.update) {
@@ -477,19 +483,23 @@ class ViewHandler {
                     returningFields: getFirstSpecified(tableRules.delete.returningFields, utils_1.get(tableRules, "select.fields"), tableRules.delete.filterFields)
                 };
             }
+            if (!tableRules.select && !tableRules.update && !tableRules.delete && !tableRules.insert) {
+                res.getInfo = false;
+                res.getColumns = false;
+            }
             return res;
         }
         else {
             const all_cols = this.column_names.slice(0);
             return {
                 allColumns,
+                getColumns: true,
+                getInfo: true,
                 select: {
                     fields: all_cols,
                     filterFields: all_cols,
                     forcedFilter: {},
                     maxLimit: null,
-                    getColumns: true,
-                    getInfo: true
                 },
                 update: {
                     fields: all_cols,
@@ -723,6 +733,7 @@ class ViewHandler {
         return __awaiter(this, void 0, void 0, function* () {
             let res = "";
             const thisTable = this.name;
+            const isNotExists = ["$notExists", "$notExistsJoined"].includes(eConfig.existType);
             let { f2, tables, isJoined } = eConfig;
             let t2 = tables[tables.length - 1];
             tables.forEach(t => {
@@ -767,7 +778,7 @@ class ViewHandler {
                         j += `AND ${makeJoin(joinInfo, ji + 1)} \n`;
                     }
                     j = indent(j, ji + 1);
-                    let res = `EXISTS ( \n` +
+                    let res = `${isNotExists ? " NOT " : " "} EXISTS ( \n` +
                         j +
                         `) \n`;
                     return indent(res, ji);
@@ -799,7 +810,7 @@ class ViewHandler {
                 throw "Issue with preparing $exists query for table " + t2 + "\n->" + JSON.stringify(err);
             }
             if (!isJoined) {
-                res = ` EXISTS (SELECT 1 \nFROM ${prostgles_types_1.asName(t2)} \n${finalWhere ? `WHERE ${finalWhere}` : ""}) `;
+                res = `${isNotExists ? " NOT " : " "} EXISTS (SELECT 1 \nFROM ${prostgles_types_1.asName(t2)} \n${finalWhere ? `WHERE ${finalWhere}` : ""}) `;
             }
             else {
                 res = makeTableChain(finalWhere);

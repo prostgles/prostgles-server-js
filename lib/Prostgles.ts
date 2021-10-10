@@ -16,7 +16,7 @@ console.log("Add a basic auth mode where user and sessions table are created");
 import TableConfigurator, { TableConfig } from "./TableConfig";
 
 import { get } from "./utils";
-import { DboBuilder, DbHandler, TableHandler, ViewHandler, isPlainObject, LocalParams } from "./DboBuilder";
+import { DboBuilder, DbHandler, TableHandler, ViewHandler, isPlainObject, LocalParams, CommonTableRules } from "./DboBuilder";
 import { PubSubManager, DEFAULT_SYNC_BATCH_SIZE, asValue } from "./PubSubManager";
 export { DbHandler }
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -127,15 +127,6 @@ export type SelectRule = {
      */
     validate?(SelectRequestData): SelectRequestData;
 
-    /**
-     * Allows clients to get column information on any columns that are allowed in any rules. True by default. 
-     */
-    getColumns?: boolean;
-    
-    /**
-     * Allows clients to get table information (oid, comment). True by default. 
-     */
-    getInfo?: boolean;
 }
 export type InsertRule = {
 
@@ -250,7 +241,7 @@ export type SubscribeRule = {
     throttle?: number;
 }
 
-export type TableRule = {
+export type TableRule = CommonTableRules & {
     select?: SelectRule;
     insert?: InsertRule;
     update?: UpdateRule;

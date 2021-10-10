@@ -94,15 +94,23 @@ declare type JoinPaths = {
     path: string[];
 }[];
 import { Graph } from "./shortestPath";
-export declare type ValidatedTableRules = {
+export declare type CommonTableRules = {
+    /**
+     * True by default. Allows clients to get column information on any columns that are allowed in (select, insert, update) field rules.
+     */
+    getColumns?: boolean;
+    /**
+     * True by default. Allows clients to get table information (oid, comment, label, has_media).
+     */
+    getInfo?: boolean;
+};
+export declare type ValidatedTableRules = CommonTableRules & {
     allColumns: FieldSpec[];
     select: {
         fields: string[];
         filterFields: string[];
         forcedFilter: any;
         maxLimit: number | null;
-        getColumns: boolean;
-        getInfo: boolean;
     };
     update: {
         fields: string[];

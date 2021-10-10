@@ -461,6 +461,17 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     assert.equal(_expect2.length, 2, "$existsJoined query failed");
   });
 
+  await tryRun("Not Exists with exact path filter example", async () => {
+    const _expect1 = await db.items.find({ 
+      $and: [
+        // { "items2": { name: "a" } },
+        // { "items2.items3": { name: "a" } },
+        { $notExistsJoined: { items2: { name: "a" } } }
+      ] 
+    });
+    assert.equal(_expect1.length, 1, "$notExistsJoined query failed");
+  });
+
   /* Upsert */
   await tryRun("Upsert example", async () => {
     await db.items.upsert({ name: "tx" }, { name: "tx" });

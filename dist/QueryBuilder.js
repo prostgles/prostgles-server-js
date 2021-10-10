@@ -211,17 +211,21 @@ exports.FUNCTIONS = [
             return DboBuilder_1.pgp.as.format(`${fname}(${exports.asNameAlias(args[0], tableAlias)} , ${geomQ} ${distanceQ} ${useSphQ})`);
         }
     })),
-    {
-        name: "$ST_AsGeoJSON",
-        description: ` :[column_name] -> json GeoJSON output of a geometry column`,
-        type: "function",
-        singleColArg: true,
-        numArgs: 1,
-        getFields: (args) => [args[0]],
-        getQuery: ({ allowedFields, args, tableAlias }) => {
-            return DboBuilder_1.pgp.as.format("ST_AsGeoJSON(" + exports.asNameAlias(args[0], tableAlias) + ")::json");
-        }
-    },
+    ...["ST_AsGeoJSON", "ST_AsText"]
+        .map(fname => {
+        const res = {
+            name: "$" + fname,
+            description: ` :[column_name] -> json GeoJSON output of a geometry column`,
+            type: "function",
+            singleColArg: true,
+            numArgs: 1,
+            getFields: (args) => [args[0]],
+            getQuery: ({ allowedFields, args, tableAlias }) => {
+                return DboBuilder_1.pgp.as.format(fname + "(" + exports.asNameAlias(args[0], tableAlias) + (fname === "ST_AsGeoJSON" ? ")::json" : ""));
+            }
+        };
+        return res;
+    }),
     {
         name: "$left",
         description: ` :[column_name, number] -> substring`,

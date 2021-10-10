@@ -4,7 +4,7 @@ import pg = require('pg-promise/typescript/pg-subset');
 import FileManager, { ImageOptions, LocalConfig, S3Config } from "./FileManager";
 import AuthHandler, { ClientInfo, Auth } from "./AuthHandler";
 import TableConfigurator, { TableConfig } from "./TableConfig";
-import { DboBuilder, DbHandler, LocalParams } from "./DboBuilder";
+import { DboBuilder, DbHandler, LocalParams, CommonTableRules } from "./DboBuilder";
 export { DbHandler };
 export declare type PGP = pgPromise.IMain<{}, pg.IClient>;
 import { AnyObject } from "prostgles-types";
@@ -61,14 +61,6 @@ export declare type SelectRule = {
      * Validation logic to check/update data for each request
      */
     validate?(SelectRequestData: any): SelectRequestData;
-    /**
-     * Allows clients to get column information on any columns that are allowed in any rules. True by default.
-     */
-    getColumns?: boolean;
-    /**
-     * Allows clients to get table information (oid, comment). True by default.
-     */
-    getInfo?: boolean;
 };
 export declare type InsertRule = {
     /**
@@ -162,7 +154,7 @@ export declare type SyncRule = {
 export declare type SubscribeRule = {
     throttle?: number;
 };
-export declare type TableRule = {
+export declare type TableRule = CommonTableRules & {
     select?: SelectRule;
     insert?: InsertRule;
     update?: UpdateRule;

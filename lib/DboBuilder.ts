@@ -200,8 +200,20 @@ type JoinPaths = {
 
 import { findShortestPath, Graph } from "./shortestPath";
 
+export type CommonTableRules = {
 
-export type ValidatedTableRules = {
+    /**
+     * True by default. Allows clients to get column information on any columns that are allowed in (select, insert, update) field rules. 
+     */
+     getColumns?: boolean;
+    
+    /**
+     * True by default. Allows clients to get table information (oid, comment, label, has_media). 
+     */
+     getInfo?: boolean;
+}
+
+export type ValidatedTableRules = CommonTableRules & {
 
     /* All columns of the view/table. Includes computed fields as well */
     allColumns: FieldSpec[];
@@ -218,10 +230,6 @@ export type ValidatedTableRules = {
 
         /* Max limit allowed for each select. 1000 by default. If null then an unlimited select is allowed when providing { limit: null } */
         maxLimit: number | null;
-
-        getColumns: boolean;
-
-        getInfo: boolean;
     },
     update: {
         /* Fields you can update */
@@ -571,7 +579,7 @@ export class ViewHandler {
 
     async getInfo(param1?, param2?, param3?, tableRules?: TableRule, localParams?: LocalParams): Promise<TInfo>{
         const p = this.getValidatedRules(tableRules, localParams);
-        if(!p.select.getInfo) throw "Not allowed";
+        if(!p.getInfo) throw "Not allowed";
 
         let has_media = undefined;
 
@@ -613,12 +621,21 @@ export class ViewHandler {
         try {
             const p = this.getValidatedRules(tableRules, localParams);
     
-            if(!p.select.getColumns) throw "Not allowed";
+            if(!p.getColumns) throw "Not allowed";
 
             // console.log("getColumns", this.name, this.columns.map(c => c.name))
             
             let _lang = lang;
-            let columns = this.columns.map(c => {
+            let columns = this.columns
+            .filter(c => {
+                const { insert, select, update } = p;
+                return [
+                    ...insert.fields,
+                    ...select.fields,
+                    ...update.fields,
+                ].includes(c.name)
+            })
+            .map(c => {
                 let label = c.comment || capitalizeFirstLetter(c.name, " ");
                 
                 const iConf = this.dboBuilder.prostgles?.opts?.i18n?.column_labels?.[this.name]?.[c.name];
@@ -703,7 +720,9 @@ export class ViewHandler {
                 };
 
             let res: ValidatedTableRules = {
-                allColumns
+                allColumns,
+                getColumns: tableRules?.getColumns ?? true,
+                getInfo: tableRules?.getColumns ?? true,
             } as ValidatedTableRules;
 
             /* SELECT */
@@ -720,13 +739,8 @@ export class ViewHandler {
                     fields: this.parseFieldFilter(tableRules.select.fields),
                     forcedFilter: { ...tableRules.select.forcedFilter },
                     filterFields: this.parseFieldFilter(tableRules.select.filterFields),
-                    getColumns: tableRules.select.getColumns,
-                    getInfo: tableRules.select.getInfo,
                     maxLimit
                 };
-
-                if(res.select.getColumns === undefined) res.select.getColumns = true;
-                if(res.select.getInfo === undefined) res.select.getInfo = true;
             }
 
             /* UPDATE */
@@ -764,18 +778,23 @@ export class ViewHandler {
                 }
             }
 
+            if(!tableRules.select && !tableRules.update && !tableRules.delete && !tableRules.insert){
+                res.getInfo = false;
+                res.getColumns = false;
+            }
+
             return res;
         } else {
             const all_cols = this.column_names.slice(0);
             return {
                 allColumns,
+                getColumns: true,
+                getInfo: true,
                 select: {
                     fields: all_cols,
                     filterFields: all_cols,
                     forcedFilter: {},
                     maxLimit: null,
-                    getColumns: true,
-                    getInfo: true
                 },
                 update: {
                     fields: all_cols,
@@ -1031,6 +1050,7 @@ export class ViewHandler {
     async prepareExistCondition(eConfig: ExistsFilterConfig, localParams: LocalParams, tableRules: TableRule): Promise<string> {
         let res = "";
         const thisTable = this.name;
+        const isNotExists = ["$notExists", "$notExistsJoined"].includes(eConfig.existType);
 
         let { f2, tables, isJoined } = eConfig;
         let t2 = tables[tables.length - 1];
@@ -1093,7 +1113,7 @@ export class ViewHandler {
 
                 j = indent(j, ji + 1);
     
-                let res = `EXISTS ( \n` +
+                let res = `${isNotExists? " NOT " : " "} EXISTS ( \n` +
                     j +
                 `) \n`;
                 return indent(res, ji);
@@ -1131,7 +1151,7 @@ export class ViewHandler {
         }
         
         if(!isJoined){
-            res = ` EXISTS (SELECT 1 \nFROM ${asName(t2)} \n${finalWhere? `WHERE ${finalWhere}` : ""}) `
+            res = `${isNotExists? " NOT " : " "} EXISTS (SELECT 1 \nFROM ${asName(t2)} \n${finalWhere? `WHERE ${finalWhere}` : ""}) `
         } else {
             res = makeTableChain(finalWhere);
         }
