@@ -91,7 +91,7 @@ class TableConfigurator {
                         if (!this.dbo[tableName]) {
                             colDefs.push(getColDef(colName, colConf));
                         }
-                        else if (!this.dbo[tableName].columns.find(c => colName === c.name)) {
+                        else if (!colDefs.length && !this.dbo[tableName].columns.find(c => colName === c.name)) {
                             if ("references" in colConf && colConf.references) {
                                 const { tableName: lookupTable, } = colConf.references;
                                 queries.push(`
