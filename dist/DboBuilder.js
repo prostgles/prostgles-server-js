@@ -1677,7 +1677,7 @@ class TableHandler extends ViewHandler {
         });
     }
     insert(rowOrRows, param2, param3_unused, tableRules, _localParams = null) {
-        var _a;
+        var _a, _b, _c;
         return __awaiter(this, void 0, void 0, function* () {
             const localParams = _localParams || {};
             const { dbTX } = localParams;
@@ -1777,8 +1777,10 @@ class TableHandler extends ViewHandler {
                 if (returnQuery)
                     return query;
                 let result;
-                // console.log(this.t?.ctx?.start, "insert in " + this.name, data);
-                const tx = ((_a = dbTX === null || dbTX === void 0 ? void 0 : dbTX[this.name]) === null || _a === void 0 ? void 0 : _a.t) || this.t;
+                if (this.dboBuilder.prostgles.opts.DEBUG_MODE) {
+                    console.log((_b = (_a = this.t) === null || _a === void 0 ? void 0 : _a.ctx) === null || _b === void 0 ? void 0 : _b.start, "insert in " + this.name, data);
+                }
+                const tx = ((_c = dbTX === null || dbTX === void 0 ? void 0 : dbTX[this.name]) === null || _c === void 0 ? void 0 : _c.t) || this.t;
                 if (tx) {
                     result = tx[queryType](query).catch(err => makeErr(err, localParams));
                 }

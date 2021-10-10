@@ -2292,7 +2292,9 @@ export class TableHandler extends ViewHandler {
             if(returnQuery)  return query;
             let result;
 
-            // console.log(this.t?.ctx?.start, "insert in " + this.name, data);
+            if(this.dboBuilder.prostgles.opts.DEBUG_MODE){
+                console.log(this.t?.ctx?.start, "insert in " + this.name, data);
+            }
 
             const tx = dbTX?.[this.name]?.t || this.t;
             if(tx) {
