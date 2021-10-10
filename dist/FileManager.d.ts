@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { S3 } from 'aws-sdk';
-import { DB, Prostgles } from './Prostgles';
+import { DB, DbHandler, Prostgles } from './Prostgles';
 export declare const asSQLIdentifier: (name: string, db: DB) => Promise<string>;
 export declare type ImageOptions = {
     keepMetadata?: boolean;
@@ -55,6 +55,8 @@ export default class FileManager {
     config: S3Config | LocalConfig;
     imageOptions: ImageOptions;
     prostgles: Prostgles;
+    dbo: DbHandler;
+    db: DB;
     tableName: string;
     private fileRoute;
     constructor(config: FileManager["config"], imageOptions?: ImageOptions);

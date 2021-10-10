@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import * as FileType from "file-type";
 import * as sharp from "sharp";
 
-import { DB, Prostgles } from './Prostgles';
+import { DB, DbHandler, Prostgles } from './Prostgles';
 import { asName, AnyObject } from 'prostgles-types';
 import { TableHandler } from './DboBuilder';
 
@@ -71,6 +71,8 @@ export default class FileManager {
   imageOptions: ImageOptions;
 
   prostgles: Prostgles;
+  dbo: DbHandler;
+  db: DB;
   tableName: string;
 
   private fileRoute: string;
@@ -308,8 +310,11 @@ export default class FileManager {
 
   init = async (prg: Prostgles) => {
     this.prostgles = prg;
-    const { dbo, db, opts } = prg;
-    const { fileTable } = opts;
+    this.dbo = prg.dbo;
+    this.db = prg.db;
+    // const { dbo, db, opts } = prg;
+    
+    const { fileTable } = prg.opts;
     const { tableName = "media", referencedTables = {} } = fileTable;
     this.tableName = tableName;
 
@@ -320,10 +325,10 @@ export default class FileManager {
     /**
      * 1. Create media table
      */
-    if(!dbo[tableName]){
+    if(!this.dbo[tableName]){
         console.log(`Creating fileTable ${asName(tableName)} ...`);
-        await db.any(`CREATE EXTENSION IF NOT EXISTS pgcrypto `);
-        await db.any(`CREATE TABLE IF NOT EXISTS ${asName(tableName)} (
+        await this.db.any(`CREATE EXTENSION IF NOT EXISTS pgcrypto `);
+        await this.db.any(`CREATE TABLE IF NOT EXISTS ${asName(tableName)} (
             id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             name                TEXT NOT NULL,
             extension           TEXT NOT NULL,
@@ -345,18 +350,18 @@ export default class FileManager {
      * 2. Create media lookup tables 
      */
     await Promise.all(Object.keys(referencedTables).map(async refTable => {
-      if(!dbo[refTable]) throw `Referenced table (${refTable}) from fileTable.referencedTables record is missing`;
+      if(!this.dbo[refTable]) throw `Referenced table (${refTable}) from fileTable.referencedTables record is missing`;
       // const lookupTableName = asName(`lookup_${tableName}_${refTable}`);
 
       const lookupTableName = await this.parseSQLIdentifier(`prostgles_lookup_${tableName}_${refTable}`);
-      const pKeyFields = (await (dbo[refTable] as unknown as TableHandler).getColumns()).filter(f => f.is_pkey);
+      const pKeyFields = (await (this.dbo[refTable] as unknown as TableHandler).getColumns()).filter(f => f.is_pkey);
 
       if(pKeyFields.length !== 1) throw `Could not make link table for ${refTable}. ${pKeyFields} must have exactly one primary key column. Current pkeys: ${pKeyFields.map(f => f.name)}`;
 
       const pkField = pKeyFields[0];
       const refType = referencedTables[refTable];
 
-      if(!dbo[lookupTableName]){
+      if(!this.dbo[lookupTableName]){
         // if(!(await dbo[lookupTableName].count())) await db.any(`DROP TABLE IF EXISTS  ${lookupTableName};`);
         const action = ` (${tableName} <-> ${refTable}) join table ${lookupTableName}`; //  PRIMARY KEY
         const query = `        
@@ -366,11 +371,11 @@ export default class FileManager {
         )
       `
         // console.log(`Creating ${action} ...`, lookupTableName);
-        await db.any(query);
+        await this.db.any(query);
         console.log(`Created ${action}`);
 
       } else {
-        const cols = await dbo[lookupTableName].getColumns();
+        const cols = await this.dbo[lookupTableName].getColumns();
         const badCols = cols.filter(c => !c.references);
         await Promise.all(badCols.map(async badCol => {
           console.error(
@@ -391,7 +396,7 @@ export default class FileManager {
           if(q){
 
             try {
-              await db.any(q)
+              await this.db.any(q)
               console.log("Added missing constraint back");
 
             } catch(e){
@@ -404,6 +409,7 @@ export default class FileManager {
 
       return true;
     }));
+    await prg.refreshDBO();
 
     /**
      * 4. Serve media through express
@@ -417,12 +423,12 @@ export default class FileManager {
 
     if(app){
       app.get(this.fileRoute + "/:name", async (req, res) => {
-        if(!dbo[tableName]){
+        if(!this.dbo[tableName]){
           res.status(500).json({ err: "Internal error: media table not valid" });
           return false;
         }
 
-        const mediaTable = dbo[tableName] as unknown as TableHandler;
+        const mediaTable = this.dbo[tableName] as unknown as TableHandler;
 
         try {
 

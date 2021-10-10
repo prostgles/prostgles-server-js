@@ -64,8 +64,10 @@ class FileManager {
         this.init = (prg) => __awaiter(this, void 0, void 0, function* () {
             var _a, _b, _c;
             this.prostgles = prg;
-            const { dbo, db, opts } = prg;
-            const { fileTable } = opts;
+            this.dbo = prg.dbo;
+            this.db = prg.db;
+            // const { dbo, db, opts } = prg;
+            const { fileTable } = prg.opts;
             const { tableName = "media", referencedTables = {} } = fileTable;
             this.tableName = tableName;
             const maxBfSizeMB = ((_c = (_b = (_a = prg.opts.io) === null || _a === void 0 ? void 0 : _a.engine) === null || _b === void 0 ? void 0 : _b.opts) === null || _c === void 0 ? void 0 : _c.maxHttpBufferSize) / 1e6;
@@ -74,10 +76,10 @@ class FileManager {
             /**
              * 1. Create media table
              */
-            if (!dbo[tableName]) {
+            if (!this.dbo[tableName]) {
                 console.log(`Creating fileTable ${prostgles_types_1.asName(tableName)} ...`);
-                yield db.any(`CREATE EXTENSION IF NOT EXISTS pgcrypto `);
-                yield db.any(`CREATE TABLE IF NOT EXISTS ${prostgles_types_1.asName(tableName)} (
+                yield this.db.any(`CREATE EXTENSION IF NOT EXISTS pgcrypto `);
+                yield this.db.any(`CREATE TABLE IF NOT EXISTS ${prostgles_types_1.asName(tableName)} (
             id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             name                TEXT NOT NULL,
             extension           TEXT NOT NULL,
@@ -98,16 +100,16 @@ class FileManager {
              * 2. Create media lookup tables
              */
             yield Promise.all(Object.keys(referencedTables).map((refTable) => __awaiter(this, void 0, void 0, function* () {
-                if (!dbo[refTable])
+                if (!this.dbo[refTable])
                     throw `Referenced table (${refTable}) from fileTable.referencedTables record is missing`;
                 // const lookupTableName = asName(`lookup_${tableName}_${refTable}`);
                 const lookupTableName = yield this.parseSQLIdentifier(`prostgles_lookup_${tableName}_${refTable}`);
-                const pKeyFields = (yield dbo[refTable].getColumns()).filter(f => f.is_pkey);
+                const pKeyFields = (yield this.dbo[refTable].getColumns()).filter(f => f.is_pkey);
                 if (pKeyFields.length !== 1)
                     throw `Could not make link table for ${refTable}. ${pKeyFields} must have exactly one primary key column. Current pkeys: ${pKeyFields.map(f => f.name)}`;
                 const pkField = pKeyFields[0];
                 const refType = referencedTables[refTable];
-                if (!dbo[lookupTableName]) {
+                if (!this.dbo[lookupTableName]) {
                     // if(!(await dbo[lookupTableName].count())) await db.any(`DROP TABLE IF EXISTS  ${lookupTableName};`);
                     const action = ` (${tableName} <-> ${refTable}) join table ${lookupTableName}`; //  PRIMARY KEY
                     const query = `        
@@ -117,11 +119,11 @@ class FileManager {
         )
       `;
                     // console.log(`Creating ${action} ...`, lookupTableName);
-                    yield db.any(query);
+                    yield this.db.any(query);
                     console.log(`Created ${action}`);
                 }
                 else {
-                    const cols = yield dbo[lookupTableName].getColumns();
+                    const cols = yield this.dbo[lookupTableName].getColumns();
                     const badCols = cols.filter(c => !c.references);
                     yield Promise.all(badCols.map((badCol) => __awaiter(this, void 0, void 0, function* () {
                         console.error(`Prostgles: media ${lookupTableName} joining table has lost a reference constraint for column ${badCol.name}.` +
@@ -139,7 +141,7 @@ class FileManager {
                         }
                         if (q) {
                             try {
-                                yield db.any(q);
+                                yield this.db.any(q);
                                 console.log("Added missing constraint back");
                             }
                             catch (e) {
@@ -150,6 +152,7 @@ class FileManager {
                 }
                 return true;
             })));
+            yield prg.refreshDBO();
             /**
              * 4. Serve media through express
              */
@@ -157,11 +160,11 @@ class FileManager {
             this.fileRoute = fileServeRoute;
             if (app) {
                 app.get(this.fileRoute + "/:name", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                    if (!dbo[tableName]) {
+                    if (!this.dbo[tableName]) {
                         res.status(500).json({ err: "Internal error: media table not valid" });
                         return false;
                     }
-                    const mediaTable = dbo[tableName];
+                    const mediaTable = this.dbo[tableName];
                     try {
                         const { name } = req.params;
                         if (typeof name !== "string")
