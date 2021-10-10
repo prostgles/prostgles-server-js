@@ -1642,8 +1642,10 @@ class TableHandler extends ViewHandler {
                                 yield childInsert(tbl2Row, tbl2); //.then(() => {});
                             })));
                         }
-                        else
+                        else {
+                            console.error(JSON.stringify({ path, thisTable: this.name, targetTable }, null, 2));
                             throw "Unexpected path for Nested inserts";
+                        }
                         /* Return also the nested inserted data */
                         if (targetTableRules && (insertedChildren === null || insertedChildren === void 0 ? void 0 : insertedChildren.length) && returning) {
                             const targetTableHandler = dbTX[targetTable];

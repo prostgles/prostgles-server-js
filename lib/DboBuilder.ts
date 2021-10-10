@@ -2144,7 +2144,10 @@ export class TableHandler extends ViewHandler {
                             await childInsert(tbl2Row, tbl2);//.then(() => {});
                         }));
 
-                    } else throw "Unexpected path for Nested inserts";
+                    } else {
+                        console.error(JSON.stringify({ path, thisTable: this.name, targetTable }, null, 2));
+                        throw "Unexpected path for Nested inserts";
+                    }
 
                     /* Return also the nested inserted data */
                     if(targetTableRules && insertedChildren?.length && returning){
