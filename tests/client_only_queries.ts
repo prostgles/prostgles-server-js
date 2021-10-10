@@ -134,6 +134,31 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       ]);
     });
 
+    // await tryRun("Duplicate subscription", async () => {
+
+    //   return new Promise(async (resolve, reject) => {
+    //     let data1 = [], data2 = [], cntr = 0;
+    //     function check(){
+    //       cntr++;
+    //       if(cntr === 2){
+    //         assert.equal(data1.length, data2.length);
+    //         console.error(data1, data2)
+    //         reject( data1);
+    //         resolve(data1)
+    //       }
+    //     }
+        
+    //     const sub1 = await db.planes.subscribe({}, {}, data => {
+    //       data1 = data;
+    //       check()
+    //     });
+    //     const sub2 = await db.planes.subscribe({}, {}, data => {
+    //       data2 = data;
+    //       check()
+    //     });
+    //   })
+    // })
+
     const cols = await db.insert_rules.getColumns();
     assert.equal(cols.filter(({ insert, update: u, select: s, delete: d }) => insert && !u && !s && !d).length, 3, "Validated getColumns failed")
 

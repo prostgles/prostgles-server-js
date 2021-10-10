@@ -116,7 +116,7 @@ class FileManager {
           foreign_id  ${pkField.udt_name} ${refType === "one" ? " PRIMARY KEY " : ""} REFERENCES ${prostgles_types_1.asName(refTable)}(${prostgles_types_1.asName(pkField.name)}),
           media_id    UUID NOT NULL REFERENCES ${prostgles_types_1.asName(tableName)}(id)
         )
-      `;
+        `;
                     console.log(`Creating ${action} ...`, lookupTableName);
                     yield this.db.any(query);
                     console.log(`Created ${action}`);

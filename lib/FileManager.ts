@@ -370,7 +370,7 @@ export default class FileManager {
           foreign_id  ${pkField.udt_name} ${refType === "one"? " PRIMARY KEY " : ""} REFERENCES ${asName(refTable)}(${asName(pkField.name)}),
           media_id    UUID NOT NULL REFERENCES ${asName(tableName)}(id)
         )
-      `
+        `;
         console.log(`Creating ${action} ...`, lookupTableName);
         await this.db.any(query);
         console.log(`Created ${action}`);

@@ -1,6 +1,6 @@
 import { Filter, LocalParams, TableHandler } from "./DboBuilder";
 import { TableRule } from "./Prostgles";
-import { SelectParamsBasic as SelectParams, FieldFilter } from "prostgles-types";
+import { SelectParamsBasic as SelectParams, FieldFilter, ColumnInfo } from "prostgles-types";
 export declare type SelectItem = {
     type: "column" | "function" | "aggregation" | "joinedColumn" | "computed";
     getFields: () => string[] | "*";
@@ -79,12 +79,14 @@ export declare class SelectItemBuilder {
     private functions;
     private allowedFieldsIncludingComputed;
     private isView;
+    private columns;
     constructor(params: {
         allowedFields: string[];
         computedFields: FieldSpec[];
         functions: FunctionSpec[];
         allFields: string[];
         isView: boolean;
+        columns: ColumnInfo[];
     });
     private checkField;
     private addItem;
@@ -93,8 +95,8 @@ export declare class SelectItemBuilder {
     addColumn: (fieldName: string, selected: boolean) => void;
     parseUserSelect: (userSelect: FieldFilter, joinParse?: (key: string, val: any, throwErr: (msg: string) => any) => any) => Promise<any[]>;
 }
-export declare function getNewQuery(_this: TableHandler, filter: Filter, selectParams?: SelectParams & {
+export declare function getNewQuery(_this: TableHandler, filter: Filter, selectParams: SelectParams & {
     alias?: string;
-}, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<NewQuery>;
+}, param3_unused: any, tableRules: TableRule, localParams: LocalParams, columns: ColumnInfo[]): Promise<NewQuery>;
 export declare function makeQuery(_this: TableHandler, q: NewQuery, depth: number, joinFields: string[], selectParams: SelectParams): string;
 //# sourceMappingURL=QueryBuilder.d.ts.map

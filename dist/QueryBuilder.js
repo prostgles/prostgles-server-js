@@ -586,9 +586,11 @@ class SelectItemBuilder {
                     return;
                 }
             }
+            const colDef = this.columns.find(c => c.name === fieldName);
             let alias = selected ? fieldName : ("not_selected_" + fieldName);
             this.addItem({
                 type: "column",
+                columnPGDataType: colDef === null || colDef === void 0 ? void 0 : colDef.data_type,
                 alias,
                 getQuery: () => prostgles_types_1.asName(fieldName),
                 getFields: () => [fieldName],
@@ -692,6 +694,7 @@ class SelectItemBuilder {
         this.computedFields = params.computedFields;
         this.isView = params.isView;
         this.functions = params.functions;
+        this.columns = params.columns;
         this.allowedFieldsIncludingComputed = this.allowedFields.concat(this.computedFields ? this.computedFields.map(cf => cf.name) : []);
         if (!this.allowedFields.length) {
             throw "allowedFields empty/missing";
@@ -704,7 +707,7 @@ class SelectItemBuilder {
     }
 }
 exports.SelectItemBuilder = SelectItemBuilder;
-function getNewQuery(_this, filter, selectParams, param3_unused = null, tableRules, localParams) {
+function getNewQuery(_this, filter, selectParams, param3_unused = null, tableRules, localParams, columns) {
     return __awaiter(this, void 0, void 0, function* () {
         if (((localParams === null || localParams === void 0 ? void 0 : localParams.socket) || (localParams === null || localParams === void 0 ? void 0 : localParams.httpReq)) && !utils_1.get(tableRules, "select.fields")) {
             throw `INTERNAL ERROR: publish.${_this.name}.select.fields rule missing`;
@@ -732,7 +735,7 @@ function getNewQuery(_this, filter, selectParams, param3_unused = null, tableRul
         // allFieldsIncludingComputed = allCols.concat(COMPUTED_FIELDS.map(c => c.name)),
         allowedFields = _this.parseFieldFilter(utils_1.get(tableRules, "select.fields")) || _this.column_names.slice(0), 
         // allowedFieldsIncludingComputed = _this.parseFieldFilter(get(tableRules, "select.fields"), true, allFieldsIncludingComputed) || allFieldsIncludingComputed,
-        sBuilder = new SelectItemBuilder({ allowedFields, computedFields: exports.COMPUTED_FIELDS, isView: _this.is_view, functions: exports.FUNCTIONS, allFields: _this.column_names.slice(0) });
+        sBuilder = new SelectItemBuilder({ allowedFields, computedFields: exports.COMPUTED_FIELDS, isView: _this.is_view, functions: exports.FUNCTIONS, allFields: _this.column_names.slice(0), columns });
         yield sBuilder.parseUserSelect(userSelect, (key, val, throwErr) => __awaiter(this, void 0, void 0, function* () {
             // console.log({ key, val })
             let j_filter = {}, j_selectParams = {}, j_path, j_alias, j_tableRules, j_table, j_isLeftJoin = true;
@@ -781,7 +784,7 @@ function getNewQuery(_this, filter, selectParams, param3_unused = null, tableRul
                 j_tableRules = yield _this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: j_table, command: "find", localParams });
             }
             if (isLocal || j_tableRules) {
-                const joinQuery = yield getNewQuery(_thisJoinedTable, j_filter, Object.assign(Object.assign({}, j_selectParams), { alias: j_alias }), param3_unused, j_tableRules, localParams);
+                const joinQuery = yield getNewQuery(_thisJoinedTable, j_filter, Object.assign(Object.assign({}, j_selectParams), { alias: j_alias }), param3_unused, j_tableRules, localParams, columns);
                 joinQuery.isLeftJoin = j_isLeftJoin;
                 joinQuery.tableAlias = j_alias;
                 joinQuery.$path = j_path;

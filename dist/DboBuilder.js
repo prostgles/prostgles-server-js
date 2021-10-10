@@ -557,7 +557,7 @@ class ViewHandler {
                     if (maxLimit && !Number.isInteger(maxLimit))
                         throw ` invalid publish.${this.name}.select.maxLimit -> expecting integer but got ` + maxLimit;
                 }
-                let q = yield QueryBuilder_1.getNewQuery(this, filter, selectParams, param3_unused, tableRules, localParams), _query = QueryBuilder_1.makeQuery(this, q, undefined, undefined, selectParams);
+                let q = yield QueryBuilder_1.getNewQuery(this, filter, selectParams, param3_unused, tableRules, localParams, this.columns), _query = QueryBuilder_1.makeQuery(this, q, undefined, undefined, selectParams);
                 // console.log(_query, JSON.stringify(q, null, 2))
                 if (testRule) {
                     try {
@@ -1241,7 +1241,8 @@ class TableHandler extends ViewHandler {
                     allowedFields,
                     computedFields: QueryBuilder_1.COMPUTED_FIELDS,
                     functions: QueryBuilder_1.FUNCTIONS.filter(f => f.type === "function" && f.singleColArg),
-                    isView: this.is_view
+                    isView: this.is_view,
+                    columns: this.columns,
                 });
                 yield sBuilder.parseUserSelect(returning);
                 return sBuilder.select;

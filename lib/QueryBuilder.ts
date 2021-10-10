@@ -6,7 +6,7 @@
 
 import { pgp, Filter, LocalParams, isPlainObject, TableHandler, ViewHandler } from "./DboBuilder";
 import { TableRule, flat } from "./Prostgles";
-import { SelectParamsBasic as SelectParams, isEmpty, FieldFilter, asName, TextFilter_FullTextSearchFilterKeys, TS_PG_Types } from "prostgles-types";
+import { SelectParamsBasic as SelectParams, isEmpty, FieldFilter, asName, TextFilter_FullTextSearchFilterKeys, TS_PG_Types, ColumnInfo } from "prostgles-types";
 import { get } from "./utils";
 
 
@@ -629,13 +629,15 @@ export class SelectItemBuilder {
   private functions: FunctionSpec[];
   private allowedFieldsIncludingComputed: string[];
   private isView: boolean;
+  private columns: ColumnInfo[];
 
-  constructor(params: { allowedFields: string[]; computedFields: FieldSpec[]; functions: FunctionSpec[]; allFields: string[]; isView: boolean }){
+  constructor(params: { allowedFields: string[]; computedFields: FieldSpec[]; functions: FunctionSpec[]; allFields: string[]; isView: boolean; columns: ColumnInfo[]; }){
     this.allFields = params.allFields;
     this.allowedFields = params.allowedFields;
     this.computedFields = params.computedFields;
     this.isView = params.isView;
     this.functions = params.functions;
+    this.columns = params.columns;
     this.allowedFieldsIncludingComputed = this.allowedFields.concat(this.computedFields? this.computedFields.map(cf => cf.name) : []);
     if(!this.allowedFields.length){
       throw "allowedFields empty/missing";
@@ -716,9 +718,11 @@ export class SelectItemBuilder {
       }
     }
 
+    const colDef = this.columns.find(c => c.name === fieldName);
     let alias = selected? fieldName : ("not_selected_" + fieldName);
     this.addItem({
       type: "column",
+      columnPGDataType: colDef?.data_type,
       alias,
       getQuery: () => asName(fieldName),
       getFields: () => [fieldName],
@@ -830,10 +834,11 @@ export class SelectItemBuilder {
 export async function getNewQuery(
   _this: TableHandler,
   filter: Filter, 
-  selectParams?: SelectParams & { alias?: string }, 
+  selectParams: SelectParams & { alias?: string }, 
   param3_unused = null, 
-  tableRules?: TableRule, 
-  localParams?: LocalParams
+  tableRules: TableRule, 
+  localParams: LocalParams,
+  columns: ColumnInfo[],
 ): Promise<NewQuery> {
 
   if((localParams?.socket || localParams?.httpReq) && !get(tableRules, "select.fields")){
@@ -866,7 +871,7 @@ export async function getNewQuery(
     // allFieldsIncludingComputed = allCols.concat(COMPUTED_FIELDS.map(c => c.name)),
     allowedFields = _this.parseFieldFilter(get(tableRules, "select.fields")) || _this.column_names.slice(0),
     // allowedFieldsIncludingComputed = _this.parseFieldFilter(get(tableRules, "select.fields"), true, allFieldsIncludingComputed) || allFieldsIncludingComputed,
-    sBuilder = new SelectItemBuilder({ allowedFields, computedFields: COMPUTED_FIELDS, isView: _this.is_view, functions: FUNCTIONS, allFields: _this.column_names.slice(0) });
+    sBuilder = new SelectItemBuilder({ allowedFields, computedFields: COMPUTED_FIELDS, isView: _this.is_view, functions: FUNCTIONS, allFields: _this.column_names.slice(0), columns });
 
   
  
@@ -934,7 +939,8 @@ export async function getNewQuery(
           { ...j_selectParams, alias: j_alias }, 
           param3_unused, 
           j_tableRules, 
-          localParams
+          localParams,
+          columns
         );
       joinQuery.isLeftJoin = j_isLeftJoin;
       joinQuery.tableAlias = j_alias;
