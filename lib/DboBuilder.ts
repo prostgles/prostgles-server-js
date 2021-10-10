@@ -371,17 +371,19 @@ export class ViewHandler {
     dboBuilder: DboBuilder;
 
     t: pgPromise.ITask<{}>;
+    dbTX?: TxHandler;
 
     is_view: boolean = true;
     filterDef: string = "";
 
     pubSubManager: PubSubManager;
     is_media: boolean = false;
-    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, joinPaths?: JoinPaths){
+    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths){
         if(!db || !tableOrViewInfo) throw "";
 
         this.db = db;
         this.t = t;
+        this.dbTX = dbTX;
         this.joinPaths = joinPaths;
         this.tableOrViewInfo = tableOrViewInfo;
         this.name = tableOrViewInfo.name;
@@ -1657,8 +1659,8 @@ export class TableHandler extends ViewHandler {
         batching: string[]
     }
     
-    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, joinPaths?: JoinPaths){
-        super(db, tableOrViewInfo, pubSubManager, dboBuilder, t, joinPaths);
+    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths){
+        super(db, tableOrViewInfo, pubSubManager, dboBuilder, t, dbTX, joinPaths);
 
         this.remove = this.delete;
 
@@ -1939,7 +1941,7 @@ export class TableHandler extends ViewHandler {
         insertResult?: AnyObject | AnyObject[];
     }>{
         const localParams = _localParams || {};
-        const {dbTX} = localParams;
+        let dbTX = localParams?.dbTX || this.dbTX;
 
         const isMultiInsert = Array.isArray(data);
         const getExtraKeys = d => Object.keys(d).filter(k => !this.columns.find(c => c.name === k));
@@ -1950,7 +1952,7 @@ export class TableHandler extends ViewHandler {
         /**
          * Make sure nested insert uses a transaction
          */
-        if(isNestedInsert && (!this.t || !dbTX)){
+        if(isNestedInsert && (!this.t && !dbTX)){
             return {
                 insertResult: await this.dboBuilder.getTX((dbTX) => 
                     (dbTX[this.name] as TableHandler).insert(
@@ -1963,6 +1965,7 @@ export class TableHandler extends ViewHandler {
                 )
             }
         }
+        // if(!dbTX && this.t) dbTX = this.d;
         
         const preValidate = tableRules?.insert?.preValidate,
             validate = tableRules?.insert?.validate;
@@ -2745,10 +2748,10 @@ export type TxCB = {
             const TSTableDataName = snakify(tov.name, true);
             const TSTableHandlerName = JSON.stringify(tov.name)
             if(tov.is_view){
-                this.dbo[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, null, this.joinPaths);
+                this.dbo[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, null, undefined, this.joinPaths);
                 this.dboDefinition  += `  ${TSTableHandlerName}: ViewHandler<${TSTableDataName}> \n`;
             } else {
-                this.dbo[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, null, this.joinPaths);
+                this.dbo[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, null, undefined, this.joinPaths);
                 this.dboDefinition  += `  ${TSTableHandlerName}: TableHandler<${TSTableDataName}> \n`;
             }
             allDataDefs += `export type ${TSTableDataName} = { \n` + 
@@ -2903,25 +2906,25 @@ export type TxCB = {
             // let dbo = makeDBO(db, allTablesViews, pubSubManager, true);
     }
 
-    getTX = (dbTX: TxCB) => {
+    getTX = (cb: TxCB) => {
         return this.db.tx((t) => {
-            let txDB: TxHandler = {};
+            let dbTX: TxHandler = {};
             this.tablesOrViews.map(tov => {
                 if(tov.is_view){
 
-                    txDB[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
+                    dbTX[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, t, dbTX, this.joinPaths);
                 } else {
-                    txDB[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
+                    dbTX[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t, dbTX, this.joinPaths);
                 
                     /**
                      * Pass only the transaction object to ensure consistency
                      */
-                    //     txDB[tov.name] = new ViewHandler(t, tov, this.pubSubManager, this, t, this.joinPaths);
+                    //     dbTX[tov.name] = new ViewHandler(t, tov, this.pubSubManager, this, t, this.joinPaths);
                     // } else {
-                    //     txDB[tov.name] = new TableHandler(t as any, tov, this.pubSubManager, this, t, this.joinPaths);
+                    //     dbTX[tov.name] = new TableHandler(t as any, tov, this.pubSubManager, this, t, this.joinPaths);
                 }
             });
-            return dbTX(txDB, t);
+            return cb(dbTX, t);
         });
     }
 }

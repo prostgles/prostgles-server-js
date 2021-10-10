@@ -121,7 +121,7 @@ class ColSet {
     }
 }
 class ViewHandler {
-    constructor(db, tableOrViewInfo, pubSubManager, dboBuilder, t, joinPaths) {
+    constructor(db, tableOrViewInfo, pubSubManager, dboBuilder, t, dbTX, joinPaths) {
         this.tsColumnDefs = [];
         this.is_view = true;
         this.filterDef = "";
@@ -130,6 +130,7 @@ class ViewHandler {
             throw "";
         this.db = db;
         this.t = t;
+        this.dbTX = dbTX;
         this.joinPaths = joinPaths;
         this.tableOrViewInfo = tableOrViewInfo;
         this.name = tableOrViewInfo.name;
@@ -1231,8 +1232,8 @@ function isPojoObject(obj) {
     return true;
 }
 class TableHandler extends ViewHandler {
-    constructor(db, tableOrViewInfo, pubSubManager, dboBuilder, t, joinPaths) {
-        super(db, tableOrViewInfo, pubSubManager, dboBuilder, t, joinPaths);
+    constructor(db, tableOrViewInfo, pubSubManager, dboBuilder, t, dbTX, joinPaths) {
+        super(db, tableOrViewInfo, pubSubManager, dboBuilder, t, dbTX, joinPaths);
         this.prepareReturning = (returning, allowedFields) => __awaiter(this, void 0, void 0, function* () {
             let result = [];
             if (returning) {
@@ -1484,7 +1485,7 @@ class TableHandler extends ViewHandler {
         var _a, _b;
         return __awaiter(this, void 0, void 0, function* () {
             const localParams = _localParams || {};
-            const { dbTX } = localParams;
+            let dbTX = (localParams === null || localParams === void 0 ? void 0 : localParams.dbTX) || this.dbTX;
             const isMultiInsert = Array.isArray(data);
             const getExtraKeys = d => Object.keys(d).filter(k => !this.columns.find(c => c.name === k));
             /* Nested insert is not allowed for the file table */
@@ -1492,11 +1493,12 @@ class TableHandler extends ViewHandler {
             /**
              * Make sure nested insert uses a transaction
              */
-            if (isNestedInsert && (!this.t || !dbTX)) {
+            if (isNestedInsert && (!this.t && !dbTX)) {
                 return {
                     insertResult: yield this.dboBuilder.getTX((dbTX) => dbTX[this.name].insert(data, param2, param3_unused, tableRules, Object.assign({ dbTX }, localParams)))
                 };
             }
+            // if(!dbTX && this.t) dbTX = this.d;
             const preValidate = (_a = tableRules === null || tableRules === void 0 ? void 0 : tableRules.insert) === null || _a === void 0 ? void 0 : _a.preValidate, validate = (_b = tableRules === null || tableRules === void 0 ? void 0 : tableRules.insert) === null || _b === void 0 ? void 0 : _b.validate;
             let _data = yield Promise.all((Array.isArray(data) ? data : [data]).map((row) => __awaiter(this, void 0, void 0, function* () {
                 var _c, _e;
@@ -2007,24 +2009,24 @@ class DboBuilder {
             yield this.build();
             return this;
         });
-        this.getTX = (dbTX) => {
+        this.getTX = (cb) => {
             return this.db.tx((t) => {
-                let txDB = {};
+                let dbTX = {};
                 this.tablesOrViews.map(tov => {
                     if (tov.is_view) {
-                        txDB[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
+                        dbTX[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, t, dbTX, this.joinPaths);
                     }
                     else {
-                        txDB[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t, this.joinPaths);
+                        dbTX[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t, dbTX, this.joinPaths);
                         /**
                          * Pass only the transaction object to ensure consistency
                          */
-                        //     txDB[tov.name] = new ViewHandler(t, tov, this.pubSubManager, this, t, this.joinPaths);
+                        //     dbTX[tov.name] = new ViewHandler(t, tov, this.pubSubManager, this, t, this.joinPaths);
                         // } else {
-                        //     txDB[tov.name] = new TableHandler(t as any, tov, this.pubSubManager, this, t, this.joinPaths);
+                        //     dbTX[tov.name] = new TableHandler(t as any, tov, this.pubSubManager, this, t, this.joinPaths);
                     }
                 });
-                return dbTX(txDB, t);
+                return cb(dbTX, t);
             });
         };
         this.prostgles = prostgles;
@@ -2162,11 +2164,11 @@ export type TxCB = {
                 const TSTableDataName = snakify(tov.name, true);
                 const TSTableHandlerName = JSON.stringify(tov.name);
                 if (tov.is_view) {
-                    this.dbo[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, null, this.joinPaths);
+                    this.dbo[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, null, undefined, this.joinPaths);
                     this.dboDefinition += `  ${TSTableHandlerName}: ViewHandler<${TSTableDataName}> \n`;
                 }
                 else {
-                    this.dbo[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, null, this.joinPaths);
+                    this.dbo[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, null, undefined, this.joinPaths);
                     this.dboDefinition += `  ${TSTableHandlerName}: TableHandler<${TSTableDataName}> \n`;
                 }
                 allDataDefs += `export type ${TSTableDataName} = { \n` +

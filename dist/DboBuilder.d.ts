@@ -166,11 +166,12 @@ export declare class ViewHandler {
     joinPaths: JoinPaths;
     dboBuilder: DboBuilder;
     t: pgPromise.ITask<{}>;
+    dbTX?: TxHandler;
     is_view: boolean;
     filterDef: string;
     pubSubManager: PubSubManager;
     is_media: boolean;
-    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, joinPaths?: JoinPaths);
+    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths);
     getRowHashSelect(allowedFields: FieldFilter, alias?: string, tableAlias?: string): string;
     validateViewRules(fields: FieldFilter, filterFields: FieldFilter, returningFields: FieldFilter, forcedFilter: object, rule: "update" | "select" | "insert" | "delete"): Promise<boolean>;
     getShortestJoin(table1: string, table2: string, startAlias: number, isInner?: boolean): {
@@ -261,7 +262,7 @@ export declare class TableHandler extends ViewHandler {
         queries: number;
         batching: string[];
     };
-    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, joinPaths?: JoinPaths);
+    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths);
     willBatch(query: string): boolean;
     subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: object[]) => any): Promise<{
         unsubscribe: () => any;
@@ -320,7 +321,7 @@ export declare class DboBuilder {
     parseJoins(): Promise<JoinPaths>;
     buildJoinPaths(): void;
     build(): Promise<DbHandler>;
-    getTX: (dbTX: TxCB) => Promise<any>;
+    getTX: (cb: TxCB) => Promise<any>;
 }
 export declare type TableSchema = {
     schema: string;
