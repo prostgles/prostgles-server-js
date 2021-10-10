@@ -370,7 +370,13 @@ class Prostgles {
                         throw "fileTable missing param: Must provide awsS3Config OR localConfig";
                     yield this.refreshDBO();
                     this.fileManager = new FileManager_1.default(awsS3Config || localConfig, imageOptions);
-                    yield this.fileManager.init(this);
+                    try {
+                        yield this.fileManager.init(this);
+                    }
+                    catch (e) {
+                        console.error("FileManager: ", e);
+                        throw e;
+                    }
                 }
                 yield this.refreshDBO();
                 if (this.opts.publish) {

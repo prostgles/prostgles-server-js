@@ -371,7 +371,7 @@ export default class FileManager {
           media_id    UUID NOT NULL REFERENCES ${asName(tableName)}(id)
         )
       `
-        // console.log(`Creating ${action} ...`, lookupTableName);
+        console.log(`Creating ${action} ...`, lookupTableName);
         await this.db.any(query);
         console.log(`Created ${action}`);
 

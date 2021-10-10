@@ -632,7 +632,13 @@ export class Prostgles<DBO = DbHandler> {
                 if(!awsS3Config && !localConfig) throw "fileTable missing param: Must provide awsS3Config OR localConfig";
                 await this.refreshDBO();
                 this.fileManager = new FileManager(awsS3Config || localConfig, imageOptions);
-                await this.fileManager.init(this as any);
+
+                try {
+                    await this.fileManager.init(this as any);
+                } catch(e){
+                    console.error("FileManager: ",e);
+                    throw e;
+                }
             }
             await this.refreshDBO();
 

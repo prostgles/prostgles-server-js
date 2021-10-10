@@ -117,7 +117,7 @@ class FileManager {
           media_id    UUID NOT NULL REFERENCES ${prostgles_types_1.asName(tableName)}(id)
         )
       `;
-                    // console.log(`Creating ${action} ...`, lookupTableName);
+                    console.log(`Creating ${action} ...`, lookupTableName);
                     yield this.db.any(query);
                     console.log(`Created ${action}`);
                 }
