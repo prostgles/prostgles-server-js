@@ -25,11 +25,6 @@ export type Ex_j_ins = {
   "name"?: string;
   "public"?: string;
 }
-export type I18n_languages = { 
-  "id"?: string;
-  "label"?: string;
-  "label_en"?: string;
-}
 export type Insert_rules = { 
   "added"?: Date;
   "id"?: number;
@@ -84,25 +79,10 @@ export type Items_with_one_media = {
 export type Lookup_col1 = { 
   "id"?: string;
 }
-export type Lookup_experience_types = { 
-  "en"?: string;
-  "id"?: string;
-  "ro"?: string;
-}
 export type Lookup_items_m1_name_type = { 
   "en"?: string;
   "id"?: string;
   "ro"?: string;
-}
-export type Lookup_settled_status = { 
-  "en"?: string;
-  "id"?: string;
-  "ro"?: string;
-}
-export type Lookup_status = { 
-  "en"?: string;
-  "fr"?: string;
-  "id"?: string;
 }
 export type Lookup_uuid_text_col1 = { 
   "id"?: string;
@@ -148,10 +128,6 @@ export type Prostgles_lookup_media_items_with_one_media = {
 }
 export type Prostgles_lookup_media_skills = { 
   "foreign_id"?: string;
-  "media_id"?: string;
-}
-export type Prostgles_lookup_media_usr = { 
-  "foreign_id"?: number;
   "media_id"?: string;
 }
 export type Prostgles_lookup_media_various = { 
@@ -232,20 +208,16 @@ export type JoinMakerTables = {
  "items_with_media": JoinMaker<Items_with_media>;
  "items_with_one_media": JoinMaker<Items_with_one_media>;
  "lookup_col1": JoinMaker<Lookup_col1>;
- "lookup_experience_types": JoinMaker<Lookup_experience_types>;
- "lookup_status": JoinMaker<Lookup_status>;
  "media": JoinMaker<Media>;
  "prostgles_lookup_media_items_m1": JoinMaker<Prostgles_lookup_media_items_m1>;
  "prostgles_lookup_media_items_with_media": JoinMaker<Prostgles_lookup_media_items_with_media>;
  "prostgles_lookup_media_items_with_one_media": JoinMaker<Prostgles_lookup_media_items_with_one_media>;
  "prostgles_lookup_media_skills": JoinMaker<Prostgles_lookup_media_skills>;
- "prostgles_lookup_media_usr": JoinMaker<Prostgles_lookup_media_usr>;
  "skills": JoinMaker<Skills>;
  "tr1": JoinMaker<Tr1>;
  "tr2": JoinMaker<Tr2>;
  "tt": JoinMaker<Tt>;
  "tt1": JoinMaker<Tt1>;
- "usr": JoinMaker<Usr>;
  "uuid_text": JoinMaker<Uuid_text>;
 };
 
@@ -254,7 +226,6 @@ export type DBObj = {
   "\"*\"": TableHandler<D_34_42_34> 
   "*": TableHandler<D_42> 
   "ex_j_ins": TableHandler<Ex_j_ins> 
-  "i18n_languages": TableHandler<I18n_languages> 
   "insert_rules": TableHandler<Insert_rules> 
   "item_children": TableHandler<Item_children> 
   "items": TableHandler<Items> 
@@ -266,10 +237,7 @@ export type DBObj = {
   "items_with_media": TableHandler<Items_with_media> 
   "items_with_one_media": TableHandler<Items_with_one_media> 
   "lookup_col1": TableHandler<Lookup_col1> 
-  "lookup_experience_types": TableHandler<Lookup_experience_types> 
   "lookup_items_m1_name_type": TableHandler<Lookup_items_m1_name_type> 
-  "lookup_settled_status": TableHandler<Lookup_settled_status> 
-  "lookup_status": TableHandler<Lookup_status> 
   "lookup_uuid_text_col1": TableHandler<Lookup_uuid_text_col1> 
   "lookup_uuid_text_col2": TableHandler<Lookup_uuid_text_col2> 
   "media": TableHandler<Media> 
@@ -279,7 +247,6 @@ export type DBObj = {
   "prostgles_lookup_media_items_with_media": TableHandler<Prostgles_lookup_media_items_with_media> 
   "prostgles_lookup_media_items_with_one_media": TableHandler<Prostgles_lookup_media_items_with_one_media> 
   "prostgles_lookup_media_skills": TableHandler<Prostgles_lookup_media_skills> 
-  "prostgles_lookup_media_usr": TableHandler<Prostgles_lookup_media_usr> 
   "prostgles_lookup_media_various": TableHandler<Prostgles_lookup_media_various> 
   "skills": TableHandler<Skills> 
   "t": TableHandler<T> 
@@ -314,9 +281,6 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
     "ex_j_ins": { 
       [key in "added" | "id" | "name" | "public"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "i18n_languages": { 
-      [key in "id" | "label" | "label_en"]: { [lang_id in keyof LANG_IDS]: string }; 
-    }; 
     "insert_rules": { 
       [key in "added" | "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
@@ -350,17 +314,8 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
     "lookup_col1": { 
       [key in "id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "lookup_experience_types": { 
-      [key in "en" | "id" | "ro"]: { [lang_id in keyof LANG_IDS]: string }; 
-    }; 
     "lookup_items_m1_name_type": { 
       [key in "en" | "id" | "ro"]: { [lang_id in keyof LANG_IDS]: string }; 
-    }; 
-    "lookup_settled_status": { 
-      [key in "en" | "id" | "ro"]: { [lang_id in keyof LANG_IDS]: string }; 
-    }; 
-    "lookup_status": { 
-      [key in "en" | "fr" | "id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "lookup_uuid_text_col1": { 
       [key in "id"]: { [lang_id in keyof LANG_IDS]: string }; 
@@ -387,9 +342,6 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
       [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "prostgles_lookup_media_skills": { 
-      [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
-    }; 
-    "prostgles_lookup_media_usr": { 
       [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "prostgles_lookup_media_various": { 

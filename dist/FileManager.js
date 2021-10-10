@@ -64,8 +64,6 @@ class FileManager {
         this.init = (prg) => __awaiter(this, void 0, void 0, function* () {
             var _a, _b, _c;
             this.prostgles = prg;
-            this.dbo = prg.dbo;
-            this.db = prg.db;
             // const { dbo, db, opts } = prg;
             const { fileTable } = prg.opts;
             const { tableName = "media", referencedTables = {} } = fileTable;
@@ -80,21 +78,22 @@ class FileManager {
                 console.log(`Creating fileTable ${prostgles_types_1.asName(tableName)} ...`);
                 yield this.db.any(`CREATE EXTENSION IF NOT EXISTS pgcrypto `);
                 yield this.db.any(`CREATE TABLE IF NOT EXISTS ${prostgles_types_1.asName(tableName)} (
-            id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            name                TEXT NOT NULL,
-            extension           TEXT NOT NULL,
-            content_type        TEXT NOT NULL,
-            url                 TEXT NOT NULL,
-            original_name       TEXT NOT NULL,
+          id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          name                TEXT NOT NULL,
+          extension           TEXT NOT NULL,
+          content_type        TEXT NOT NULL,
+          url                 TEXT NOT NULL,
+          original_name       TEXT NOT NULL,
 
-            description         TEXT,
-            s3_url              TEXT,
-            signed_url          TEXT,
-            signed_url_expires  BIGINT,
-            etag                TEXT,
-            UNIQUE(name)
-        )`);
+          description         TEXT,
+          s3_url              TEXT,
+          signed_url          TEXT,
+          signed_url_expires  BIGINT,
+          etag                TEXT,
+          UNIQUE(name)
+      )`);
                 console.log(`Created fileTable ${prostgles_types_1.asName(tableName)}`);
+                yield prg.refreshDBO();
             }
             /**
              * 2. Create media lookup tables
@@ -150,9 +149,9 @@ class FileManager {
                         }
                     })));
                 }
+                yield prg.refreshDBO();
                 return true;
             })));
-            yield prg.refreshDBO();
             /**
              * 4. Serve media through express
              */
@@ -161,7 +160,7 @@ class FileManager {
             if (app) {
                 app.get(this.fileRoute + "/:name", (req, res) => __awaiter(this, void 0, void 0, function* () {
                     if (!this.dbo[tableName]) {
-                        res.status(500).json({ err: "Internal error: media table not valid" });
+                        res.status(500).json({ err: `Internal error: media table (${tableName}) not valid` });
                         return false;
                     }
                     const mediaTable = this.dbo[tableName];
@@ -205,6 +204,10 @@ class FileManager {
             });
         }
     }
+    get dbo() { return this.prostgles.dbo; }
+    ;
+    get db() { return this.prostgles.db; }
+    ;
     getMIME(file, fileName, allowedExtensions, dissallowedExtensions, onlyFromName = true) {
         var _a, _b;
         return __awaiter(this, void 0, void 0, function* () {

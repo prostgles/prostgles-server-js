@@ -61,8 +61,8 @@ export declare type TableConfig<LANG_IDS = {
  */
 export default class TableConfigurator {
     config?: TableConfig;
-    dbo: DbHandler;
-    db: DB;
+    get dbo(): DbHandler;
+    get db(): DB;
     sidKeyName: string;
     prostgles: Prostgles;
     constructor(prostgles: Prostgles);

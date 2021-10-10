@@ -32,10 +32,12 @@ class TableConfigurator {
             }
         };
         this.config = prostgles.opts.tableConfig;
-        this.dbo = prostgles.dbo;
-        this.db = prostgles.db;
         this.prostgles = prostgles;
     }
+    get dbo() { return this.prostgles.dbo; }
+    ;
+    get db() { return this.prostgles.db; }
+    ;
     init() {
         return __awaiter(this, void 0, void 0, function* () {
             let queries = [];

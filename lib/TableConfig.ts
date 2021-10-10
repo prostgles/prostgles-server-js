@@ -78,15 +78,13 @@ export type TableConfig<LANG_IDS = { en: 1, ro: 1 }> = {
 export default class TableConfigurator {
 
     config?: TableConfig;
-    dbo: DbHandler;
-    db: DB;
+    get dbo(): DbHandler { return this.prostgles.dbo };
+    get db(): DB { return this.prostgles.db };
     sidKeyName: string;
     prostgles: Prostgles
 
     constructor(prostgles: Prostgles){
         this.config = prostgles.opts.tableConfig;
-        this.dbo = prostgles.dbo;
-        this.db = prostgles.db;
         this.prostgles = prostgles;
     }
 

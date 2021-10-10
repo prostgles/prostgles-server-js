@@ -82,6 +82,7 @@ prostgles<DBObj>({
       items_with_one_media: {
         insert: "*"
       },
+      media: "*",
       uuid_text: {
         insert: {
           fields: "*",
@@ -118,11 +119,13 @@ prostgles<DBObj>({
   transactions: true,
   tableConfig: {
     uuid_text: {
-      name: {
-        info: {
-          min: 1,
-          max: 3,
-          hint: "hiint"
+      columns: {
+        name: {
+          info: {
+            min: 1,
+            max: 3,
+            hint: "hiint"
+          }
         }
       }
     }

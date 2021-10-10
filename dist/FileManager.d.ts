@@ -55,8 +55,8 @@ export default class FileManager {
     config: S3Config | LocalConfig;
     imageOptions: ImageOptions;
     prostgles: Prostgles;
-    dbo: DbHandler;
-    db: DB;
+    get dbo(): DbHandler;
+    get db(): DB;
     tableName: string;
     private fileRoute;
     constructor(config: FileManager["config"], imageOptions?: ImageOptions);

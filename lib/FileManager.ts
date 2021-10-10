@@ -71,8 +71,9 @@ export default class FileManager {
   imageOptions: ImageOptions;
 
   prostgles: Prostgles;
-  dbo: DbHandler;
-  db: DB;
+  get dbo(): DbHandler { return this.prostgles.dbo };
+  get db(): DB { return this.prostgles.db };
+  
   tableName: string;
 
   private fileRoute: string;
@@ -310,8 +311,7 @@ export default class FileManager {
 
   init = async (prg: Prostgles) => {
     this.prostgles = prg;
-    this.dbo = prg.dbo;
-    this.db = prg.db;
+    
     // const { dbo, db, opts } = prg;
     
     const { fileTable } = prg.opts;
@@ -326,24 +326,25 @@ export default class FileManager {
      * 1. Create media table
      */
     if(!this.dbo[tableName]){
-        console.log(`Creating fileTable ${asName(tableName)} ...`);
-        await this.db.any(`CREATE EXTENSION IF NOT EXISTS pgcrypto `);
-        await this.db.any(`CREATE TABLE IF NOT EXISTS ${asName(tableName)} (
-            id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            name                TEXT NOT NULL,
-            extension           TEXT NOT NULL,
-            content_type        TEXT NOT NULL,
-            url                 TEXT NOT NULL,
-            original_name       TEXT NOT NULL,
+      console.log(`Creating fileTable ${asName(tableName)} ...`);
+      await this.db.any(`CREATE EXTENSION IF NOT EXISTS pgcrypto `);
+      await this.db.any(`CREATE TABLE IF NOT EXISTS ${asName(tableName)} (
+          id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          name                TEXT NOT NULL,
+          extension           TEXT NOT NULL,
+          content_type        TEXT NOT NULL,
+          url                 TEXT NOT NULL,
+          original_name       TEXT NOT NULL,
 
-            description         TEXT,
-            s3_url              TEXT,
-            signed_url          TEXT,
-            signed_url_expires  BIGINT,
-            etag                TEXT,
-            UNIQUE(name)
-        )`);
-        console.log(`Created fileTable ${asName(tableName)}`);
+          description         TEXT,
+          s3_url              TEXT,
+          signed_url          TEXT,
+          signed_url_expires  BIGINT,
+          etag                TEXT,
+          UNIQUE(name)
+      )`);
+      console.log(`Created fileTable ${asName(tableName)}`);
+      await prg.refreshDBO();
     }
 
     /**
@@ -407,9 +408,9 @@ export default class FileManager {
         }));
       }
 
+      await prg.refreshDBO();
       return true;
     }));
-    await prg.refreshDBO();
 
     /**
      * 4. Serve media through express
@@ -424,7 +425,7 @@ export default class FileManager {
     if(app){
       app.get(this.fileRoute + "/:name", async (req, res) => {
         if(!this.dbo[tableName]){
-          res.status(500).json({ err: "Internal error: media table not valid" });
+          res.status(500).json({ err: `Internal error: media table (${tableName}) not valid` });
           return false;
         }
 
