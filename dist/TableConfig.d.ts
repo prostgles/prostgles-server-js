@@ -5,6 +5,7 @@ declare type ColExtraInfo = {
     hint?: string;
 };
 declare type BaseTableDefinition = {
+    dropIfExistsCascade?: boolean;
     dropIfExists?: boolean;
 };
 declare type LookupTableDefinition<LANG_IDS> = {
@@ -42,9 +43,10 @@ declare type ReferencedColumn = {
         nullable?: boolean;
     };
 };
+declare type ColumnConfig = BaseColumn & (SQLDefColumn | ReferencedColumn);
 declare type TableDefinition = {
     columns: {
-        [column_name: string]: BaseColumn & (SQLDefColumn | ReferencedColumn);
+        [column_name: string]: ColumnConfig;
     };
 };
 /**

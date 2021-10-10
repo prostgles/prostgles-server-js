@@ -45,12 +45,15 @@ class TableConfigurator {
             Object.keys(this.config).map(tableName => {
                 var _a, _b, _c;
                 const tableConf = this.config[tableName];
+                const { dropIfExists = false, dropIfExistsCascade = false } = tableConf;
+                if (dropIfExistsCascade) {
+                    queries.push(`DROP TABLE IF EXISTS ${tableName} CASCADE;`);
+                }
+                else if (dropIfExists) {
+                    queries.push(`DROP TABLE IF EXISTS ${tableName} ;`);
+                }
                 if ("isLookupTable" in tableConf && Object.keys((_a = tableConf.isLookupTable) === null || _a === void 0 ? void 0 : _a.values).length) {
                     const rows = Object.keys((_b = tableConf.isLookupTable) === null || _b === void 0 ? void 0 : _b.values).map(id => { var _a; return (Object.assign({ id }, ((_a = tableConf.isLookupTable) === null || _a === void 0 ? void 0 : _a.values[id]))); });
-                    const { dropIfExists = false } = tableConf;
-                    if (dropIfExists) {
-                        queries.push(`DROP TABLE IF EXISTS ${tableName} CASCADE;`);
-                    }
                     if (dropIfExists || !((_c = this.dbo) === null || _c === void 0 ? void 0 : _c[tableName])) {
                         const keys = Object.keys(rows[0]).filter(k => k !== "id");
                         queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
@@ -73,32 +76,44 @@ class TableConfigurator {
             yield Promise.all(Object.keys(this.config).map((tableName) => __awaiter(this, void 0, void 0, function* () {
                 const tableConf = this.config[tableName];
                 if ("columns" in tableConf) {
-                    if (!this.dbo[tableName]) {
-                        console.error("TableConfigurator: Table not found in dbo: " + tableName);
-                    }
-                    else {
-                        Object.keys(tableConf.columns).map(colName => {
-                            const colConf = tableConf.columns[colName];
-                            if (!this.dbo[tableName].columns.find(c => colName === c.name)) {
-                                if ("references" in colConf && colConf.references) {
-                                    const { nullable, tableName: lookupTable, columnName: lookupCol = "id", defaultValue } = colConf.references;
-                                    queries.push(`
-                                    ALTER TABLE ${prostgles_types_1.asName(tableName)} 
-                                    ADD COLUMN ${prostgles_types_1.asName(colName)} TEXT ${!nullable ? " NOT NULL " : ""} 
-                                    ${defaultValue ? ` DEFAULT ${PubSubManager_1.asValue(defaultValue)} ` : ""} 
-                                    REFERENCES ${lookupTable} (${lookupCol}) ;
-                                `);
-                                    console.log(`TableConfigurator: ${tableName}(${colName})` + " referenced lookup table " + lookupTable);
-                                }
-                                else if ("sqlDefinition" in colConf && colConf.sqlDefinition) {
-                                    queries.push(`
-                                    ALTER TABLE ${prostgles_types_1.asName(tableName)} 
-                                    ADD COLUMN ${prostgles_types_1.asName(colName)} ${colConf.sqlDefinition};
-                                `);
-                                    console.log(`TableConfigurator: created/added column ${tableName}(${colName}) ` + colConf.sqlDefinition);
-                                }
+                    const getColDef = (name, colConf) => {
+                        if ("references" in colConf && colConf.references) {
+                            const { nullable, tableName: lookupTable, columnName: lookupCol = "id", defaultValue } = colConf.references;
+                            return ` ${prostgles_types_1.asName(name)} TEXT ${!nullable ? " NOT NULL " : ""} ${defaultValue ? ` DEFAULT ${PubSubManager_1.asValue(defaultValue)} ` : ""} REFERENCES ${lookupTable} (${lookupCol}) `;
+                        }
+                        else if ("sqlDefinition" in colConf && colConf.sqlDefinition) {
+                            return ` ${prostgles_types_1.asName(name)} ${colConf.sqlDefinition} `;
+                        }
+                    };
+                    const colDefs = [];
+                    Object.keys(tableConf.columns).map(colName => {
+                        const colConf = tableConf.columns[colName];
+                        if (!this.dbo[tableName]) {
+                            colDefs.push(getColDef(colName, colConf));
+                        }
+                        else if (!this.dbo[tableName].columns.find(c => colName === c.name)) {
+                            if ("references" in colConf && colConf.references) {
+                                const { tableName: lookupTable, } = colConf.references;
+                                queries.push(`
+                                ALTER TABLE ${prostgles_types_1.asName(tableName)} 
+                                ADD COLUMN ${getColDef(colName, colConf)};
+                            `);
+                                console.log(`TableConfigurator: ${tableName}(${colName})` + " referenced lookup table " + lookupTable);
                             }
-                        });
+                            else if ("sqlDefinition" in colConf && colConf.sqlDefinition) {
+                                queries.push(`
+                                ALTER TABLE ${prostgles_types_1.asName(tableName)} 
+                                ADD COLUMN ${getColDef(colName, colConf)};
+                            `);
+                                console.log(`TableConfigurator: created/added column ${tableName}(${colName}) ` + colConf.sqlDefinition);
+                            }
+                        }
+                    });
+                    if (colDefs.length) {
+                        queries.push(`CREATE TABLE ${prostgles_types_1.asName(tableName)} (
+                        ${colDefs.join(", \n")}
+                    );`);
+                        console.error("TableConfigurator: Created table: \n" + queries[0]);
                     }
                 }
             })));

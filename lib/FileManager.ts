@@ -434,11 +434,22 @@ export default class FileManager {
         try {
 
           const { name } = req.params;
-          if(typeof name !== "string") throw "Invalid media name";
+          if(typeof name !== "string" || !name) throw "Invalid media name";
     
           const media = await mediaTable.findOne({ name }, { select: { id: 1, name: 1, signed_url: 1, signed_url_expires: 1, content_type: 1 } }, { httpReq: req });
     
-          if(!media) throw "Invalid media";
+          if(!media) {
+            /**
+             * Redirect to login !??
+             */
+            // const mediaExists = await mediaTable.count({ name });
+            // if(mediaExists && this.prostgles.authHandler){
+
+            // } else {
+            //   throw "Invalid media";
+            // }
+            throw "Invalid media";
+          }
           
           if(this.s3Client){
             let url = media.signed_url;
@@ -461,7 +472,7 @@ export default class FileManager {
 
         } catch(e){
           console.log(e)
-          res.status(404).json({ err: "Invalid media" });
+          res.status(404).json({ err: "Invalid/missing media" });
         }
       });
     }

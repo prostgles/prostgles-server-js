@@ -11,6 +11,7 @@ type ColExtraInfo = {
 };
 
 type BaseTableDefinition = {
+    dropIfExistsCascade?: boolean;
     dropIfExists?: boolean;
 }
 
@@ -59,9 +60,11 @@ type ReferencedColumn = {
     }
 }
 
+type ColumnConfig = BaseColumn & (SQLDefColumn | ReferencedColumn)
+
 type TableDefinition = {
     columns: {
-        [column_name: string]: BaseColumn & (SQLDefColumn | ReferencedColumn)
+        [column_name: string]: ColumnConfig
     }
 }
 
@@ -108,12 +111,14 @@ export default class TableConfigurator {
         /* Create lookup tables */
         Object.keys(this.config).map(tableName => {
             const tableConf = this.config[tableName];
+            const { dropIfExists = false, dropIfExistsCascade = false } = tableConf;
+            if(dropIfExistsCascade){
+                queries.push(`DROP TABLE IF EXISTS ${tableName} CASCADE;`);
+            } else if(dropIfExists){
+                queries.push(`DROP TABLE IF EXISTS ${tableName} ;`);
+            }
             if("isLookupTable" in tableConf && Object.keys(tableConf.isLookupTable?.values).length){
                 const rows = Object.keys(tableConf.isLookupTable?.values).map(id => ({ id, ...(tableConf.isLookupTable?.values[id]) }));
-                const { dropIfExists = false } = tableConf;
-                if(dropIfExists){
-                    queries.push(`DROP TABLE IF EXISTS ${tableName} CASCADE;`);
-                }
                 if(dropIfExists || !this.dbo?.[tableName]){
                     const keys = Object.keys(rows[0]).filter(k => k !== "id");
                     queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
@@ -139,37 +144,53 @@ export default class TableConfigurator {
         await Promise.all(Object.keys(this.config).map(async tableName => {
             const tableConf = this.config[tableName];
             if("columns" in tableConf){
-                
-                if(!this.dbo[tableName]){
-                    console.error("TableConfigurator: Table not found in dbo: " + tableName)
-                } else {
-                    Object.keys(tableConf.columns).map(colName => {
-                        const colConf = tableConf.columns[colName];
+                const getColDef = (name: string, colConf: ColumnConfig): string => {
+
+                    if("references" in colConf && colConf.references){
+
+                        const { nullable, tableName: lookupTable, columnName: lookupCol = "id", defaultValue } = colConf.references;
+                        return ` ${asName(name)} TEXT ${!nullable? " NOT NULL " : ""} ${defaultValue? ` DEFAULT ${asValue(defaultValue)} ` : "" } REFERENCES ${lookupTable} (${lookupCol}) `;
+
+                    } else if("sqlDefinition" in colConf && colConf.sqlDefinition){
                         
-                        if(!this.dbo[tableName].columns.find(c => colName === c.name)) {
-
-                            if("references" in colConf && colConf.references){
-
-                                const { nullable, tableName: lookupTable, columnName: lookupCol = "id", defaultValue } = colConf.references;
-                                queries.push(`
-                                    ALTER TABLE ${asName(tableName)} 
-                                    ADD COLUMN ${asName(colName)} TEXT ${!nullable? " NOT NULL " : ""} 
-                                    ${defaultValue? ` DEFAULT ${asValue(defaultValue)} ` : "" } 
-                                    REFERENCES ${lookupTable} (${lookupCol}) ;
-                                `)
-                                console.log(`TableConfigurator: ${tableName}(${colName})` + " referenced lookup table " + lookupTable);
-
-                            } else if("sqlDefinition" in colConf && colConf.sqlDefinition){
-                                
-                                queries.push(`
-                                    ALTER TABLE ${asName(tableName)} 
-                                    ADD COLUMN ${asName(colName)} ${colConf.sqlDefinition};
-                                `)
-                                console.log(`TableConfigurator: created/added column ${tableName}(${colName}) ` + colConf.sqlDefinition)
-                            }
-                        }
-                    });
+                        return ` ${asName(name)} ${colConf.sqlDefinition} `;
+                    }
                 }
+                
+                const colDefs = [];
+                Object.keys(tableConf.columns).map(colName => {
+                    const colConf = tableConf.columns[colName];
+                    
+                    if(!this.dbo[tableName]){
+                        colDefs.push(getColDef(colName, colConf))
+                    } else if(!this.dbo[tableName].columns.find(c => colName === c.name)) {
+
+                        if("references" in colConf && colConf.references){
+
+                            const { tableName: lookupTable, } = colConf.references;
+                            queries.push(`
+                                ALTER TABLE ${asName(tableName)} 
+                                ADD COLUMN ${getColDef(colName, colConf)};
+                            `)
+                            console.log(`TableConfigurator: ${tableName}(${colName})` + " referenced lookup table " + lookupTable);
+
+                        } else if("sqlDefinition" in colConf && colConf.sqlDefinition){
+                            
+                            queries.push(`
+                                ALTER TABLE ${asName(tableName)} 
+                                ADD COLUMN ${getColDef(colName, colConf)};
+                            `)
+                            console.log(`TableConfigurator: created/added column ${tableName}(${colName}) ` + colConf.sqlDefinition)
+                        }
+                    }
+                });
+
+                if(colDefs.length){
+                    queries.push(`CREATE TABLE ${asName(tableName)} (
+                        ${colDefs.join(", \n")}
+                    );`)
+                    console.error("TableConfigurator: Created table: \n" + queries[0])
+                } 
             }
         }));
 
