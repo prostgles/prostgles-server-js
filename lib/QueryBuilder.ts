@@ -671,7 +671,7 @@ export class SelectItemBuilder {
   private addFunctionByName = (funcName: string, args: any[], alias: string) => {
     const funcDef = this.functions.find(f => f.name === funcName);
     if(!funcDef) {
-      const sf = this.functions.filter(f => f.name.toLowerCase().startsWith(funcName.toLowerCase())).sort((a, b) => (a.name.length - b.name.length));
+      const sf = this.functions.filter(f => f.name.toLowerCase().slice(1).startsWith(funcName.toLowerCase())).sort((a, b) => (a.name.length - b.name.length));
       const hint = (sf.length? `. \n Maybe you meant: \n | ${sf.map(s => s.name + " " + (s.description || "")).join("    \n | ")}  ?` : "");
       throw "\n Function " + funcName + " does not exist or is not allowed " + hint;
     }

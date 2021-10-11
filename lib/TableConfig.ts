@@ -65,6 +65,9 @@ type ColumnConfig = BaseColumn & (SQLDefColumn | ReferencedColumn)
 type TableDefinition = {
     columns: {
         [column_name: string]: ColumnConfig
+    },
+    constraints?: {
+        [constraint_name: string]: string
     }
 }
 
@@ -194,6 +197,11 @@ export default class TableConfigurator {
                     );`)
                     console.error("TableConfigurator: Created table: \n" + queries[0])
                 } 
+            }
+            if("constraints" in tableConf && tableConf.constraints){
+                Object.keys(tableConf.constraints).map(constraintName => {
+                    queries.push(`ALTER TABLE ${asName(tableName)} ADD CONSTRAINT ${asName(constraintName)} ${tableConf.constraints[constraintName]} ;`);
+                });
             }
         }));
 

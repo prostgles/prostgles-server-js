@@ -119,6 +119,11 @@ class TableConfigurator {
                         console.error("TableConfigurator: Created table: \n" + queries[0]);
                     }
                 }
+                if ("constraints" in tableConf && tableConf.constraints) {
+                    Object.keys(tableConf.constraints).map(constraintName => {
+                        queries.push(`ALTER TABLE ${prostgles_types_1.asName(tableName)} ADD CONSTRAINT ${prostgles_types_1.asName(constraintName)} ${tableConf.constraints[constraintName]} ;`);
+                    });
+                }
             })));
             if (queries.length) {
                 const q = queries.join("\n");

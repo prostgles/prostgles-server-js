@@ -48,6 +48,9 @@ declare type TableDefinition = {
     columns: {
         [column_name: string]: ColumnConfig;
     };
+    constraints?: {
+        [constraint_name: string]: string;
+    };
 };
 /**
  * Helper utility to create lookup tables for TEXT columns
