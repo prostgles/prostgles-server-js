@@ -189,20 +189,23 @@ export default class AuthHandler {
                     if(typeof id !== "string" || !id){
                         res.status(404).json({ msg: "Invalid magic-link id. Expecting a string" });
                     } else {
-                        const session = await this.throttledFunc(async () => {
-                            return check(id, this.dbo, this.db);
-                        });
-                        if(!session){
-                            res.status(404).json({ msg: "Invalid magic-link id" });
-                        } else if(session.expires < Date.now()){
-                            res.status(404).json({ msg: "Expired magic-link" });
-                        } else {
-                            this.setCookie({ sid: session.sid, expires: session.expires }, { req, res });
+                        try {
+                            const session = await this.throttledFunc(async () => {
+                                return check(id, this.dbo, this.db);
+                            });
+                            if(!session){
+                                res.status(404).json({ msg: "Invalid magic-link" });
+                            } else {
+                                this.setCookie(session, { req, res });
+                            }
+
+                        } catch(e){
+                            res.status(404).json({ msg: e });
                         }
                     }
                 });
             }
-            
+
             if(app && loginRoute){
 
                 app.post(loginRoute, async (req: ExpressReq, res: ExpressRes) => {

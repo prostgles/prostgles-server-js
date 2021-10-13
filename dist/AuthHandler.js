@@ -202,17 +202,19 @@ class AuthHandler {
                             res.status(404).json({ msg: "Invalid magic-link id. Expecting a string" });
                         }
                         else {
-                            const session = yield this.throttledFunc(() => __awaiter(this, void 0, void 0, function* () {
-                                return check(id, this.dbo, this.db);
-                            }));
-                            if (!session) {
-                                res.status(404).json({ msg: "Invalid magic-link id" });
+                            try {
+                                const session = yield this.throttledFunc(() => __awaiter(this, void 0, void 0, function* () {
+                                    return check(id, this.dbo, this.db);
+                                }));
+                                if (!session) {
+                                    res.status(404).json({ msg: "Invalid magic-link" });
+                                }
+                                else {
+                                    this.setCookie(session, { req, res });
+                                }
                             }
-                            else if (session.expires < Date.now()) {
-                                res.status(404).json({ msg: "Expired magic-link" });
-                            }
-                            else {
-                                this.setCookie({ sid: session.sid, expires: session.expires }, { req, res });
+                            catch (e) {
+                                res.status(404).json({ msg: e });
                             }
                         }
                     }));
