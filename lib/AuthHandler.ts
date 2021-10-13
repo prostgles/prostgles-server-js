@@ -179,6 +179,30 @@ export default class AuthHandler {
 
         if(expressConfig){
             const { app, logoutGetPath = "/logout", loginRoute = "/login", cookieOptions = {}, userRoutes = [], onGetRequestOK, magicLinks } = expressConfig;
+
+            if(app && magicLinks){
+                const { route = "/magic-link", check } = magicLinks;
+                if(!check) throw "Check must be defined for magicLinks";
+                app.get(`${route}/:id`, async (req, res) => {
+                    const { id } = req.params;
+
+                    if(typeof id !== "string" || !id){
+                        res.status(404).json({ msg: "Invalid magic-link id. Expecting a string" });
+                    } else {
+                        const session = await this.throttledFunc(async () => {
+                            return check(id, this.dbo, this.db);
+                        });
+                        if(!session){
+                            res.status(404).json({ msg: "Invalid magic-link id" });
+                        } else if(session.expires < Date.now()){
+                            res.status(404).json({ msg: "Expired magic-link" });
+                        } else {
+                            this.setCookie({ sid: session.sid, expires: session.expires }, { req, res });
+                        }
+                    }
+                });
+            }
+            
             if(app && loginRoute){
 
                 app.post(loginRoute, async (req: ExpressReq, res: ExpressRes) => {
@@ -260,28 +284,6 @@ export default class AuthHandler {
         
                     });
                 }
-            }
-            if(app && magicLinks){
-                const { route = "/magic-link", check } = magicLinks;
-                if(!check) throw "Check must be defined for magicLinks";
-                app.get(`${route}/:id`, async (req, res) => {
-                    const { id } = req.params;
-
-                    if(typeof id !== "string" || !id){
-                        res.status(404).json({ msg: "Invalid magic-link id. Expecting a string" });
-                    } else {
-                        const session = await this.throttledFunc(async () => {
-                            return check(id, this.dbo, this.db);
-                        });
-                        if(!session){
-                            res.status(404).json({ msg: "Invalid magic-link id" });
-                        } else if(session.expires < Date.now()){
-                            res.status(404).json({ msg: "Expired magic-link" });
-                        } else {
-                            this.setCookie({ sid: session.sid, expires: session.expires }, { req, res });
-                        }
-                    }
-                });
             }
         }
     }

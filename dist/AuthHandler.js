@@ -192,6 +192,31 @@ class AuthHandler {
                 throw "getUser OR getClientUser missing from auth config";
             if (expressConfig) {
                 const { app, logoutGetPath = "/logout", loginRoute = "/login", cookieOptions = {}, userRoutes = [], onGetRequestOK, magicLinks } = expressConfig;
+                if (app && magicLinks) {
+                    const { route = "/magic-link", check } = magicLinks;
+                    if (!check)
+                        throw "Check must be defined for magicLinks";
+                    app.get(`${route}/:id`, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                        const { id } = req.params;
+                        if (typeof id !== "string" || !id) {
+                            res.status(404).json({ msg: "Invalid magic-link id. Expecting a string" });
+                        }
+                        else {
+                            const session = yield this.throttledFunc(() => __awaiter(this, void 0, void 0, function* () {
+                                return check(id, this.dbo, this.db);
+                            }));
+                            if (!session) {
+                                res.status(404).json({ msg: "Invalid magic-link id" });
+                            }
+                            else if (session.expires < Date.now()) {
+                                res.status(404).json({ msg: "Expired magic-link" });
+                            }
+                            else {
+                                this.setCookie({ sid: session.sid, expires: session.expires }, { req, res });
+                            }
+                        }
+                    }));
+                }
                 if (app && loginRoute) {
                     app.post(loginRoute, (req, res) => __awaiter(this, void 0, void 0, function* () {
                         try {
@@ -262,31 +287,6 @@ class AuthHandler {
                             }
                         }));
                     }
-                }
-                if (app && magicLinks) {
-                    const { route = "/magic-link", check } = magicLinks;
-                    if (!check)
-                        throw "Check must be defined for magicLinks";
-                    app.get(`${route}/:id`, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                        const { id } = req.params;
-                        if (typeof id !== "string" || !id) {
-                            res.status(404).json({ msg: "Invalid magic-link id. Expecting a string" });
-                        }
-                        else {
-                            const session = yield this.throttledFunc(() => __awaiter(this, void 0, void 0, function* () {
-                                return check(id, this.dbo, this.db);
-                            }));
-                            if (!session) {
-                                res.status(404).json({ msg: "Invalid magic-link id" });
-                            }
-                            else if (session.expires < Date.now()) {
-                                res.status(404).json({ msg: "Expired magic-link" });
-                            }
-                            else {
-                                this.setCookie({ sid: session.sid, expires: session.expires }, { req, res });
-                            }
-                        }
-                    }));
                 }
             }
         });
