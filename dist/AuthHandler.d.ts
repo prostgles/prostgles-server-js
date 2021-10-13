@@ -12,12 +12,14 @@ declare type ExpressReq = {
     body?: AnyObject;
     cookies?: AnyObject;
     params?: AnyObject;
+    path: string;
 };
 declare type ExpressRes = {
     status: (code: number) => ({
         json: (response: AnyObject) => any;
     });
     cookie: (name: string, value: string, options: AnyObject) => any;
+    sendFile: (filepath: string) => void;
     redirect: (url: string) => void;
 };
 export declare type BasicSession = {
