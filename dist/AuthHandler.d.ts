@@ -8,6 +8,18 @@ declare type AuthSocketSchema = {
     logout?: boolean;
     pathGuard?: boolean;
 };
+declare type ExpressReq = {
+    body?: AnyObject;
+    cookies?: AnyObject;
+    params?: AnyObject;
+};
+declare type ExpressRes = {
+    status: (code: number) => ({
+        json: (response: AnyObject) => any;
+    });
+    cookie: (name: string, value: string, options: AnyObject) => any;
+    redirect: (url: string) => void;
+};
 export declare type BasicSession = {
     sid: string;
     expires: number;
@@ -55,7 +67,21 @@ export declare type Auth<DBO = DbHandler> = {
         /**
          * Will be called after a GET request is authorised
          */
-        onGetRequestOK?: (req: any, res: any) => any;
+        onGetRequestOK?: (req: ExpressReq, res: ExpressRes) => any;
+        /**
+         * Name of get url parameter used in redirecting user after successful login. Defaults to returnURL
+         */
+        returnURL?: string;
+        magicLinks?: {
+            /**
+             * Will default to /magic-link
+             */
+            route?: string;
+            /**
+             * Used in creating a session/logging in using a magic link
+             */
+            check: (magicId: string, dbo: DBO, db: DB) => Promise<BasicSession | undefined>;
+        };
     };
     /**
      * User data used on server
@@ -79,9 +105,11 @@ export default class AuthHandler {
     dbo: DbHandler;
     db: DB;
     sidKeyName: string;
+    returnURL: string;
     constructor(prostgles: Prostgles);
     validateSid: (sid: string) => string;
     isUserRoute: (pathname: string) => boolean;
+    private setCookie;
     init(): Promise<void>;
     throttledFunc: <T>(func: () => Promise<T>, throttle?: number) => Promise<T>;
     loginThrottled: (params: AnyObject) => Promise<BasicSession>;

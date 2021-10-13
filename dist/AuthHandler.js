@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const prostgles_types_1 = require("prostgles-types");
 class AuthHandler {
     constructor(prostgles) {
+        var _a, _b;
         this.validateSid = (sid) => {
             if (!sid)
                 return undefined;
@@ -24,6 +25,25 @@ class AuthHandler {
             return Boolean((_c = (_b = (_a = this.opts) === null || _a === void 0 ? void 0 : _a.expressConfig) === null || _b === void 0 ? void 0 : _b.userRoutes) === null || _c === void 0 ? void 0 : _c.find(userRoute => {
                 return userRoute === pathname || pathname.startsWith(userRoute) && ["/", "?", "#"].includes(pathname.slice(-1));
             }));
+        };
+        this.setCookie = (cookie, r) => {
+            var _a, _b;
+            const { sid, expires } = cookie;
+            const { res, req } = r;
+            if (sid) {
+                let options = {
+                    maxAge: expires || 1000 * 60 * 60 * 24,
+                    httpOnly: true,
+                };
+                const cookieOpts = Object.assign(Object.assign(Object.assign({}, options), { secure: true, sameSite: "strict" }), (((_b = (_a = this.opts) === null || _a === void 0 ? void 0 : _a.expressConfig) === null || _b === void 0 ? void 0 : _b.cookieOptions) || {}));
+                const cookieData = sid;
+                res.cookie(this.sidKeyName, cookieData, cookieOpts);
+                const successURL = getReturnUrl(req, this.returnURL) || "/";
+                res.redirect(successURL);
+            }
+            else {
+                throw ("no user or session");
+            }
         };
         this.throttledFunc = (func, throttle = 500) => {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
@@ -91,18 +111,18 @@ class AuthHandler {
             }));
         });
         this.makeSocketAuth = (socket) => __awaiter(this, void 0, void 0, function* () {
-            var _a, _b, _c;
+            var _c, _d, _e;
             if (!this.opts)
                 return {};
             let auth = {};
-            if (((_b = (_a = this.opts.expressConfig) === null || _a === void 0 ? void 0 : _a.userRoutes) === null || _b === void 0 ? void 0 : _b.length) && !((_c = this.opts.expressConfig) === null || _c === void 0 ? void 0 : _c.disableSocketAuthGuard)) {
+            if (((_d = (_c = this.opts.expressConfig) === null || _c === void 0 ? void 0 : _c.userRoutes) === null || _d === void 0 ? void 0 : _d.length) && !((_e = this.opts.expressConfig) === null || _e === void 0 ? void 0 : _e.disableSocketAuthGuard)) {
                 auth.pathGuard = true;
                 socket.removeAllListeners(prostgles_types_1.CHANNELS.AUTHGUARD);
                 socket.on(prostgles_types_1.CHANNELS.AUTHGUARD, (params, cb = (err, res) => { }) => __awaiter(this, void 0, void 0, function* () {
-                    var _d;
+                    var _f;
                     try {
                         const { pathname } = params || {};
-                        if (pathname && typeof pathname === "string" && this.isUserRoute(pathname) && !((_d = (yield this.getClientInfo({ socket }))) === null || _d === void 0 ? void 0 : _d.user)) {
+                        if (pathname && typeof pathname === "string" && this.isUserRoute(pathname) && !((_f = (yield this.getClientInfo({ socket }))) === null || _f === void 0 ? void 0 : _f.user)) {
                             cb(null, { shouldReload: true });
                         }
                         else {
@@ -149,6 +169,7 @@ class AuthHandler {
             return auth;
         });
         this.opts = prostgles.opts.auth;
+        this.returnURL = ((_b = (_a = prostgles.opts.auth) === null || _a === void 0 ? void 0 : _a.expressConfig) === null || _b === void 0 ? void 0 : _b.returnURL) || "returnURL";
         this.dbo = prostgles.dbo;
         this.db = prostgles.db;
     }
@@ -170,36 +191,13 @@ class AuthHandler {
             if (!getUser || !getClientUser)
                 throw "getUser OR getClientUser missing from auth config";
             if (expressConfig) {
-                const { app, logoutGetPath = "/logout", loginRoute = "/login", cookieOptions = {}, userRoutes = [], onGetRequestOK } = expressConfig;
+                const { app, logoutGetPath = "/logout", loginRoute = "/login", cookieOptions = {}, userRoutes = [], onGetRequestOK, magicLinks } = expressConfig;
                 if (app && loginRoute) {
-                    /**
-                     * AUTH
-                     */
-                    function getReturnUrl(req) {
-                        var _a, _b;
-                        if ((_a = req === null || req === void 0 ? void 0 : req.query) === null || _a === void 0 ? void 0 : _a.returnURL) {
-                            return decodeURIComponent((_b = req === null || req === void 0 ? void 0 : req.query) === null || _b === void 0 ? void 0 : _b.returnURL);
-                        }
-                        return null;
-                    }
                     app.post(loginRoute, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                        const successURL = getReturnUrl(req) || "/";
-                        let cookieOpts, cookieData;
-                        let isOK;
                         try {
                             const { sid, expires } = (yield this.loginThrottled(req.body || {})) || {};
                             if (sid) {
-                                let options = {
-                                    maxAge: expires || 1000 * 60 * 60 * 24,
-                                    httpOnly: true,
-                                };
-                                cookieOpts = Object.assign(Object.assign(Object.assign({}, options), { secure: true, sameSite: "strict" }), cookieOptions);
-                                cookieData = sid;
-                                res.cookie(sidKeyName, cookieData, cookieOpts);
-                                res.redirect(successURL);
-                                // res.cookie('sid', sid, { ...options, sameSite:  });
-                                // res.redirect(successURL);
-                                isOK = true;
+                                this.setCookie({ sid, expires }, { req, res });
                             }
                             else {
                                 throw ("no user or session");
@@ -239,7 +237,7 @@ class AuthHandler {
                                 return this.opts.getUser(this.validateSid(sid), this.dbo, this.db);
                             };
                             try {
-                                const returnURL = getReturnUrl(req);
+                                const returnURL = getReturnUrl(req, this.returnURL);
                                 /* Check auth. Redirect if unauthorized */
                                 if (this.isUserRoute(req.path)) {
                                     const u = yield getUser();
@@ -264,6 +262,31 @@ class AuthHandler {
                             }
                         }));
                     }
+                }
+                if (app && magicLinks) {
+                    const { route = "/magic-link", check } = magicLinks;
+                    if (!check)
+                        throw "Check must be defined for magicLinks";
+                    app.get(`${route}/:id`, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                        const { id } = req.params;
+                        if (typeof id !== "string" || !id) {
+                            res.status(404).json({ msg: "Invalid magic-link id. Expecting a string" });
+                        }
+                        else {
+                            const session = yield this.throttledFunc(() => __awaiter(this, void 0, void 0, function* () {
+                                return check(id, this.dbo, this.db);
+                            }));
+                            if (!session) {
+                                res.status(404).json({ msg: "Invalid magic-link id" });
+                            }
+                            else if (session.expires < Date.now()) {
+                                res.status(404).json({ msg: "Expired magic-link" });
+                            }
+                            else {
+                                this.setCookie({ sid: session.sid, expires: session.expires }, { req, res });
+                            }
+                        }
+                    }));
                 }
             }
         });
@@ -322,4 +345,14 @@ class AuthHandler {
     }
 }
 exports.default = AuthHandler;
+/**
+ * AUTH
+ */
+function getReturnUrl(req, name) {
+    var _a, _b;
+    if ((_a = req === null || req === void 0 ? void 0 : req.query) === null || _a === void 0 ? void 0 : _a.returnURL) {
+        return decodeURIComponent((_b = req === null || req === void 0 ? void 0 : req.query) === null || _b === void 0 ? void 0 : _b[name]);
+    }
+    return null;
+}
 //# sourceMappingURL=AuthHandler.js.map

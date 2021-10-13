@@ -10,6 +10,17 @@ type AuthSocketSchema = {
     pathGuard?: boolean;
 };
 
+type ExpressReq = {
+    body?: AnyObject;
+    cookies?: AnyObject;
+    params?: AnyObject;
+}
+type ExpressRes = {
+    status: (code: number) => ({ json: (response: AnyObject) => any; });
+    cookie: (name: string, value: string, options: AnyObject) => any;
+    redirect: (url: string) => void;
+}
+
 export type BasicSession = { sid: string, expires: number };
 export type AuthClientRequest = { socket: any } | { httpReq: any }
 export type Auth<DBO = DbHandler> = {
@@ -58,7 +69,25 @@ export type Auth<DBO = DbHandler> = {
         /**
          * Will be called after a GET request is authorised
          */
-        onGetRequestOK?: (req, res) => any;
+        onGetRequestOK?: (req: ExpressReq, res: ExpressRes) => any;
+
+        /**
+         * Name of get url parameter used in redirecting user after successful login. Defaults to returnURL
+         */
+        returnURL?: string;
+
+        magicLinks?: {
+
+            /**
+             * Will default to /magic-link
+             */
+            route?: string;
+
+            /**
+             * Used in creating a session/logging in using a magic link
+             */
+            check: (magicId: string, dbo: DBO, db: DB) => Promise<BasicSession | undefined>;
+        }
     }
 
     /**
@@ -87,9 +116,11 @@ export default class AuthHandler {
     dbo: DbHandler;
     db: DB;
     sidKeyName: string;
+    returnURL: string;
 
     constructor(prostgles: Prostgles){
         this.opts = prostgles.opts.auth;
+        this.returnURL = prostgles.opts.auth?.expressConfig?.returnURL || "returnURL";
         this.dbo = prostgles.dbo;
         this.db = prostgles.db;
     }
@@ -104,6 +135,27 @@ export default class AuthHandler {
         return Boolean(this.opts?.expressConfig?.userRoutes?.find(userRoute => {
             return userRoute === pathname || pathname.startsWith(userRoute) && ["/", "?", "#"].includes(pathname.slice(-1));
         }))
+    }
+
+    private setCookie = (cookie: { sid: string; expires: number; }, r: { req: ExpressReq; res: ExpressRes }) => {
+        const { sid, expires } = cookie;
+        const { res, req } = r;
+        if(sid){
+            
+            let options = {
+                maxAge: expires || 1000 * 60 * 60 * 24, // would expire after 24 hours
+                httpOnly: true, // The cookie only accessible by the web server
+                //signed: true // Indicates if the cookie should be signed
+            }
+            const cookieOpts = { ...options, secure: true, sameSite: "strict", ...(this.opts?.expressConfig?.cookieOptions || {}) };
+            const cookieData = sid;
+            res.cookie(this.sidKeyName, cookieData, cookieOpts); 
+            const successURL = getReturnUrl(req, this.returnURL) || "/";
+            res.redirect(successURL);
+            
+        } else {
+            throw ("no user or session")
+        }
     }
 
     async init(){
@@ -124,41 +176,17 @@ export default class AuthHandler {
         if(!getUser || !getClientUser) throw "getUser OR getClientUser missing from auth config";
 
         if(expressConfig){
-            const { app, logoutGetPath = "/logout", loginRoute = "/login", cookieOptions = {}, userRoutes = [], onGetRequestOK } = expressConfig;
+            const { app, logoutGetPath = "/logout", loginRoute = "/login", cookieOptions = {}, userRoutes = [], onGetRequestOK, magicLinks } = expressConfig;
             if(app && loginRoute){
 
-                /**
-                 * AUTH
-                 */
-                function getReturnUrl(req){
-                    if(req?.query?.returnURL){
-                        return decodeURIComponent(req?.query?.returnURL);
-                    }
-                    return null;
-                }
-                app.post(loginRoute, async (req, res) => {
-                    const successURL = getReturnUrl(req) || "/";
-                    let cookieOpts, cookieData;
-                    let isOK;
-
+                app.post(loginRoute, async (req: ExpressReq, res: ExpressRes) => {
                     try {
                         const { sid, expires } = await this.loginThrottled(req.body || {}) || {};
                         
                         if(sid){
-            
-                            let options = {
-                                maxAge: expires || 1000 * 60 * 60 * 24, // would expire after 24 hours
-                                httpOnly: true, // The cookie only accessible by the web server
-                                //signed: true // Indicates if the cookie should be signed
-                            }
-                            cookieOpts = { ...options, secure: true, sameSite: "strict", ...cookieOptions }
-                            cookieData = sid;
-                            res.cookie(sidKeyName, cookieData, cookieOpts); 
-                            res.redirect(successURL);
-                            // res.cookie('sid', sid, { ...options, sameSite:  });
                             
-                            // res.redirect(successURL);
-                            isOK = true;
+                            this.setCookie({ sid, expires }, {req, res});
+                            
                         } else {
                             throw ("no user or session")
                         }
@@ -171,7 +199,7 @@ export default class AuthHandler {
                 });
                 
                 if(app && logoutGetPath){
-                    app.get(logoutGetPath, async (req, res) => {
+                    app.get(logoutGetPath, async (req: ExpressReq, res: ExpressRes) => {
                         const sid = this.validateSid(req?.cookies?.[sidKeyName]);
                         if(sid){
                             try {
@@ -199,7 +227,7 @@ export default class AuthHandler {
                         }
                         
                         try {
-                            const returnURL = getReturnUrl(req)
+                            const returnURL = getReturnUrl(req, this.returnURL)
                     
                             
                             
@@ -230,6 +258,28 @@ export default class AuthHandler {
         
                     });
                 }
+            }
+            if(app && magicLinks){
+                const { route = "/magic-link", check } = magicLinks;
+                if(!check) throw "Check must be defined for magicLinks";
+                app.get(`${route}/:id`, async (req, res) => {
+                    const { id } = req.params;
+
+                    if(typeof id !== "string" || !id){
+                        res.status(404).json({ msg: "Invalid magic-link id. Expecting a string" });
+                    } else {
+                        const session = await this.throttledFunc(async () => {
+                            return check(id, this.dbo, this.db);
+                        });
+                        if(!session){
+                            res.status(404).json({ msg: "Invalid magic-link id" });
+                        } else if(session.expires < Date.now()){
+                            res.status(404).json({ msg: "Expired magic-link" });
+                        } else {
+                            this.setCookie({ sid: session.sid, expires: session.expires }, { req, res });
+                        }
+                    }
+                });
             }
         }
     }
@@ -437,4 +487,14 @@ export default class AuthHandler {
 
         return auth;
     }
+}
+
+/**
+ * AUTH
+ */
+function getReturnUrl(req, name: string){
+    if(req?.query?.returnURL){
+        return decodeURIComponent(req?.query?.[name]);
+    }
+    return null;
 }

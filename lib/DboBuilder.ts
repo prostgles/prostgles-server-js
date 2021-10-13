@@ -585,14 +585,20 @@ export class ViewHandler {
 
         let has_media = undefined;
 
+        /**
+         * Media is directly related to this table (does not come from a deeply joined table)
+         */ 
+        let has_direct_media = false;
+
         const mediaTable = this.dboBuilder.prostgles?.opts?.fileTable?.tableName;
         
         if(!this.is_media && mediaTable){
             if(this.dboBuilder.prostgles?.opts?.fileTable?.referencedTables?.[this.name]){
                 has_media = this.dboBuilder.prostgles?.opts?.fileTable?.referencedTables?.[this.name];
+                has_direct_media = true;
             } else {
                 const jp = this.dboBuilder.joinPaths.find(jp => jp.t1 === this.name && jp.t2 === mediaTable);
-                if(jp && jp.path.length < 4){
+                if(jp && jp.path.length <= 3){
                     await Promise.all(jp.path.map(async tableName => {
                         const cols = (await this.dboBuilder.dbo[tableName].getColumns()).filter(c => jp.path.includes(c.references?.ftable));
                         if(cols.length && has_media !== "many"){
@@ -601,6 +607,7 @@ export class ViewHandler {
                             } else {
                                 has_media = "one"
                             }
+                            has_direct_media = jp.path.length === 2;
                         }
                     }));
                 }
@@ -612,6 +619,7 @@ export class ViewHandler {
             comment: this.tableOrViewInfo.comment,
             is_media: this.is_media,      // this.name === this.dboBuilder.prostgles?.opts?.fileTable?.tableName
             has_media,
+            has_direct_media,
             media_table_name: mediaTable,
         }
     }

@@ -19,11 +19,49 @@ export type D_42 = {
   "*"?: string;
   "id"?: number;
 }
+export type CodePointOpen_London_201709 = { 
+  "borough"?: string;
+  "boroughcd"?: string;
+  "eastings"?: string;
+  "lsoa11_cd"?: string;
+  "lsoa11_nm"?: string;
+  "msoa11_cd"?: string;
+  "msoa11_nm"?: string;
+  "northings"?: string;
+  "OBJECTID"?: string;
+  "postcode"?: string;
+  "rgn11_cd"?: string;
+  "rgn11_nm"?: string;
+  "Shape"?: any;
+  "ward14_cd"?: string;
+  "ward14_nm"?: string;
+}
+export type Aaaa = { 
+  "c"?: Object;
+}
 export type Ex_j_ins = { 
   "added"?: Date;
   "id"?: number;
   "name"?: string;
   "public"?: string;
+}
+export type Geography_columns = { 
+  "coord_dimension"?: number;
+  "f_geography_column"?: string;
+  "f_table_catalog"?: string;
+  "f_table_name"?: string;
+  "f_table_schema"?: string;
+  "srid"?: number;
+  "type"?: string;
+}
+export type Geometry_columns = { 
+  "coord_dimension"?: number;
+  "f_geometry_column"?: string;
+  "f_table_catalog"?: string;
+  "f_table_name"?: string;
+  "f_table_schema"?: string;
+  "srid"?: number;
+  "type"?: string;
 }
 export type Insert_rules = { 
   "added"?: Date;
@@ -103,6 +141,32 @@ export type Media = {
   "signed_url_expires"?: number;
   "url"?: string;
 }
+export type Mmedia = { 
+  "content_type"?: string;
+  "description"?: string;
+  "etag"?: string;
+  "extension"?: string;
+  "id"?: string;
+  "name"?: string;
+  "original_name"?: string;
+  "s3_url"?: string;
+  "signed_url"?: string;
+  "signed_url_expires"?: number;
+  "url"?: string;
+}
+export type Mmmedia = { 
+  "content_type"?: string;
+  "description"?: string;
+  "etag"?: string;
+  "extension"?: string;
+  "id"?: string;
+  "name"?: string;
+  "original_name"?: string;
+  "s3_url"?: string;
+  "signed_url"?: string;
+  "signed_url_expires"?: number;
+  "url"?: string;
+}
 export type Planes = { 
   "flight_number"?: string;
   "id"?: number;
@@ -130,6 +194,10 @@ export type Prostgles_lookup_media_skills = {
   "foreign_id"?: string;
   "media_id"?: string;
 }
+export type Prostgles_lookup_media_usr = { 
+  "foreign_id"?: number;
+  "media_id"?: string;
+}
 export type Prostgles_lookup_media_various = { 
   "foreign_id"?: number;
   "media_id"?: string;
@@ -139,6 +207,13 @@ export type Skills = {
   "registration_id"?: string;
   "type"?: string;
   "years"?: number;
+}
+export type Spatial_ref_sys = { 
+  "auth_name"?: string;
+  "auth_srid"?: number;
+  "proj4text"?: string;
+  "srid"?: number;
+  "srtext"?: string;
 }
 export type T = { 
   "t"?: string;
@@ -213,11 +288,13 @@ export type JoinMakerTables = {
  "prostgles_lookup_media_items_with_media": JoinMaker<Prostgles_lookup_media_items_with_media>;
  "prostgles_lookup_media_items_with_one_media": JoinMaker<Prostgles_lookup_media_items_with_one_media>;
  "prostgles_lookup_media_skills": JoinMaker<Prostgles_lookup_media_skills>;
+ "prostgles_lookup_media_usr": JoinMaker<Prostgles_lookup_media_usr>;
  "skills": JoinMaker<Skills>;
  "tr1": JoinMaker<Tr1>;
  "tr2": JoinMaker<Tr2>;
  "tt": JoinMaker<Tt>;
  "tt1": JoinMaker<Tt1>;
+ "usr": JoinMaker<Usr>;
  "uuid_text": JoinMaker<Uuid_text>;
 };
 
@@ -225,7 +302,11 @@ export type JoinMakerTables = {
 export type DBObj = {
   "\"*\"": TableHandler<D_34_42_34> 
   "*": TableHandler<D_42> 
+  "CodePointOpen_London_201709": TableHandler<CodePointOpen_London_201709> 
+  "aaaa": TableHandler<Aaaa> 
   "ex_j_ins": TableHandler<Ex_j_ins> 
+  "geography_columns": ViewHandler<Geography_columns> 
+  "geometry_columns": ViewHandler<Geometry_columns> 
   "insert_rules": TableHandler<Insert_rules> 
   "item_children": TableHandler<Item_children> 
   "items": TableHandler<Items> 
@@ -241,14 +322,18 @@ export type DBObj = {
   "lookup_uuid_text_col1": TableHandler<Lookup_uuid_text_col1> 
   "lookup_uuid_text_col2": TableHandler<Lookup_uuid_text_col2> 
   "media": TableHandler<Media> 
+  "mmedia": TableHandler<Mmedia> 
+  "mmmedia": TableHandler<Mmmedia> 
   "planes": TableHandler<Planes> 
   "prgll": TableHandler<Prgll> 
   "prostgles_lookup_media_items_m1": TableHandler<Prostgles_lookup_media_items_m1> 
   "prostgles_lookup_media_items_with_media": TableHandler<Prostgles_lookup_media_items_with_media> 
   "prostgles_lookup_media_items_with_one_media": TableHandler<Prostgles_lookup_media_items_with_one_media> 
   "prostgles_lookup_media_skills": TableHandler<Prostgles_lookup_media_skills> 
+  "prostgles_lookup_media_usr": TableHandler<Prostgles_lookup_media_usr> 
   "prostgles_lookup_media_various": TableHandler<Prostgles_lookup_media_various> 
   "skills": TableHandler<Skills> 
+  "spatial_ref_sys": TableHandler<Spatial_ref_sys> 
   "t": TableHandler<T> 
   "test": TableHandler<Test> 
   "tr1": TableHandler<Tr1> 
@@ -278,8 +363,20 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
     "*": { 
       [key in "*" | "id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
+    "CodePointOpen_London_201709": { 
+      [key in "borough" | "boroughcd" | "eastings" | "lsoa11_cd" | "lsoa11_nm" | "msoa11_cd" | "msoa11_nm" | "northings" | "OBJECTID" | "postcode" | "rgn11_cd" | "rgn11_nm" | "Shape" | "ward14_cd" | "ward14_nm"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "aaaa": { 
+      [key in "c"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
     "ex_j_ins": { 
       [key in "added" | "id" | "name" | "public"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "geography_columns": { 
+      [key in "coord_dimension" | "f_geography_column" | "f_table_catalog" | "f_table_name" | "f_table_schema" | "srid" | "type"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "geometry_columns": { 
+      [key in "coord_dimension" | "f_geometry_column" | "f_table_catalog" | "f_table_name" | "f_table_schema" | "srid" | "type"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "insert_rules": { 
       [key in "added" | "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
@@ -326,6 +423,12 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
     "media": { 
       [key in "content_type" | "description" | "etag" | "extension" | "id" | "name" | "original_name" | "s3_url" | "signed_url" | "signed_url_expires" | "url"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
+    "mmedia": { 
+      [key in "content_type" | "description" | "etag" | "extension" | "id" | "name" | "original_name" | "s3_url" | "signed_url" | "signed_url_expires" | "url"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "mmmedia": { 
+      [key in "content_type" | "description" | "etag" | "extension" | "id" | "name" | "original_name" | "s3_url" | "signed_url" | "signed_url_expires" | "url"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
     "planes": { 
       [key in "flight_number" | "id" | "last_updated" | "x" | "y"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
@@ -344,11 +447,17 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
     "prostgles_lookup_media_skills": { 
       [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
+    "prostgles_lookup_media_usr": { 
+      [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
     "prostgles_lookup_media_various": { 
       [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "skills": { 
       [key in "id" | "registration_id" | "type" | "years"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "spatial_ref_sys": { 
+      [key in "auth_name" | "auth_srid" | "proj4text" | "srid" | "srtext"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "t": { 
       [key in "t"]: { [lang_id in keyof LANG_IDS]: string }; 

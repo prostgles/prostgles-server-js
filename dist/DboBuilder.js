@@ -315,14 +315,19 @@ class ViewHandler {
             if (!p.getInfo)
                 throw "Not allowed";
             let has_media = undefined;
+            /**
+             * Media is directly related to this table (does not come from a deeply joined table)
+             */
+            let has_direct_media = false;
             const mediaTable = (_c = (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.opts) === null || _b === void 0 ? void 0 : _b.fileTable) === null || _c === void 0 ? void 0 : _c.tableName;
             if (!this.is_media && mediaTable) {
                 if ((_h = (_g = (_f = (_e = this.dboBuilder.prostgles) === null || _e === void 0 ? void 0 : _e.opts) === null || _f === void 0 ? void 0 : _f.fileTable) === null || _g === void 0 ? void 0 : _g.referencedTables) === null || _h === void 0 ? void 0 : _h[this.name]) {
                     has_media = (_m = (_l = (_k = (_j = this.dboBuilder.prostgles) === null || _j === void 0 ? void 0 : _j.opts) === null || _k === void 0 ? void 0 : _k.fileTable) === null || _l === void 0 ? void 0 : _l.referencedTables) === null || _m === void 0 ? void 0 : _m[this.name];
+                    has_direct_media = true;
                 }
                 else {
                     const jp = this.dboBuilder.joinPaths.find(jp => jp.t1 === this.name && jp.t2 === mediaTable);
-                    if (jp && jp.path.length < 4) {
+                    if (jp && jp.path.length <= 3) {
                         yield Promise.all(jp.path.map((tableName) => __awaiter(this, void 0, void 0, function* () {
                             const cols = (yield this.dboBuilder.dbo[tableName].getColumns()).filter(c => { var _a; return jp.path.includes((_a = c.references) === null || _a === void 0 ? void 0 : _a.ftable); });
                             if (cols.length && has_media !== "many") {
@@ -332,6 +337,7 @@ class ViewHandler {
                                 else {
                                     has_media = "one";
                                 }
+                                has_direct_media = jp.path.length === 2;
                             }
                         })));
                     }
@@ -342,6 +348,7 @@ class ViewHandler {
                 comment: this.tableOrViewInfo.comment,
                 is_media: this.is_media,
                 has_media,
+                has_direct_media,
                 media_table_name: mediaTable,
             };
         });
