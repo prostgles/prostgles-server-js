@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const prostgles_types_1 = require("prostgles-types");
 class AuthHandler {
     constructor(prostgles) {
-        var _a, _b;
+        var _a, _b, _c, _d, _e, _f, _g;
         this.validateSid = (sid) => {
             if (!sid)
                 return undefined;
@@ -21,10 +21,17 @@ class AuthHandler {
             return sid;
         };
         this.isUserRoute = (pathname) => {
-            var _a, _b, _c;
-            return Boolean(!((_c = (_b = (_a = this.opts) === null || _a === void 0 ? void 0 : _a.expressConfig) === null || _b === void 0 ? void 0 : _b.publicRoutes) === null || _c === void 0 ? void 0 : _c.find(publicRoute => {
+            var _a, _b;
+            const pubRoutes = [
+                ...((_b = (_a = this.opts) === null || _a === void 0 ? void 0 : _a.expressConfig) === null || _b === void 0 ? void 0 : _b.publicRoutes) || [],
+            ];
+            if (this.loginRoute)
+                pubRoutes.push(this.loginRoute);
+            if (this.logoutGetPath)
+                pubRoutes.push(this.logoutGetPath);
+            return Boolean(!pubRoutes.find(publicRoute => {
                 return publicRoute === pathname || pathname.startsWith(publicRoute) && ["/", "?", "#"].includes(pathname.slice(-1));
-            })));
+            }));
         };
         this.setCookie = (cookie, r) => {
             var _a, _b;
@@ -111,18 +118,18 @@ class AuthHandler {
             }));
         });
         this.makeSocketAuth = (socket) => __awaiter(this, void 0, void 0, function* () {
-            var _c, _d, _e;
+            var _h, _j, _k;
             if (!this.opts)
                 return {};
             let auth = {};
-            if (((_d = (_c = this.opts.expressConfig) === null || _c === void 0 ? void 0 : _c.publicRoutes) === null || _d === void 0 ? void 0 : _d.length) && !((_e = this.opts.expressConfig) === null || _e === void 0 ? void 0 : _e.disableSocketAuthGuard)) {
+            if (((_j = (_h = this.opts.expressConfig) === null || _h === void 0 ? void 0 : _h.publicRoutes) === null || _j === void 0 ? void 0 : _j.length) && !((_k = this.opts.expressConfig) === null || _k === void 0 ? void 0 : _k.disableSocketAuthGuard)) {
                 auth.pathGuard = true;
                 socket.removeAllListeners(prostgles_types_1.CHANNELS.AUTHGUARD);
                 socket.on(prostgles_types_1.CHANNELS.AUTHGUARD, (params, cb = (err, res) => { }) => __awaiter(this, void 0, void 0, function* () {
-                    var _f;
+                    var _l;
                     try {
                         const { pathname } = params || {};
-                        if (pathname && typeof pathname === "string" && this.isUserRoute(pathname) && !((_f = (yield this.getClientInfo({ socket }))) === null || _f === void 0 ? void 0 : _f.user)) {
+                        if (pathname && typeof pathname === "string" && this.isUserRoute(pathname) && !((_l = (yield this.getClientInfo({ socket }))) === null || _l === void 0 ? void 0 : _l.user)) {
                             cb(null, { shouldReload: true });
                         }
                         else {
@@ -169,7 +176,11 @@ class AuthHandler {
             return auth;
         });
         this.opts = prostgles.opts.auth;
-        this.returnURL = ((_b = (_a = prostgles.opts.auth) === null || _a === void 0 ? void 0 : _a.expressConfig) === null || _b === void 0 ? void 0 : _b.returnURL) || "returnURL";
+        if ((_a = prostgles.opts.auth) === null || _a === void 0 ? void 0 : _a.expressConfig) {
+            this.returnURL = ((_c = (_b = prostgles.opts.auth) === null || _b === void 0 ? void 0 : _b.expressConfig) === null || _c === void 0 ? void 0 : _c.returnURL) || "returnURL";
+            this.loginRoute = ((_e = (_d = prostgles.opts.auth) === null || _d === void 0 ? void 0 : _d.expressConfig) === null || _e === void 0 ? void 0 : _e.loginRoute) || "/login";
+            this.logoutGetPath = ((_g = (_f = prostgles.opts.auth) === null || _f === void 0 ? void 0 : _f.expressConfig) === null || _g === void 0 ? void 0 : _g.logoutGetPath) || "/logout";
+        }
         this.dbo = prostgles.dbo;
         this.db = prostgles.db;
     }
@@ -192,6 +203,9 @@ class AuthHandler {
                 throw "getUser OR getClientUser missing from auth config";
             if (expressConfig) {
                 const { app, logoutGetPath = "/logout", loginRoute = "/login", cookieOptions = {}, publicRoutes = [], onGetRequestOK, magicLinks } = expressConfig;
+                if (publicRoutes.find(r => typeof r !== "string" || !r)) {
+                    throw "Invalid or empty string provided within publicRoutes ";
+                }
                 if (app && magicLinks) {
                     const { route = "/magic-link", check } = magicLinks;
                     if (!check)

@@ -114,15 +114,22 @@ export type ClientInfo = {
 }
 
 export default class AuthHandler {
-    opts?: Auth;
+    protected opts?: Auth;
     dbo: DbHandler;
     db: DB;
     sidKeyName: string;
     returnURL: string;
 
+    loginRoute?: string;
+    logoutGetPath?: string;
+
     constructor(prostgles: Prostgles){
         this.opts = prostgles.opts.auth;
-        this.returnURL = prostgles.opts.auth?.expressConfig?.returnURL || "returnURL";
+        if(prostgles.opts.auth?.expressConfig){
+            this.returnURL = prostgles.opts.auth?.expressConfig?.returnURL || "returnURL";
+            this.loginRoute = prostgles.opts.auth?.expressConfig?.loginRoute || "/login";
+            this.logoutGetPath = prostgles.opts.auth?.expressConfig?.logoutGetPath || "/logout";
+        }
         this.dbo = prostgles.dbo;
         this.db = prostgles.db;
     }
@@ -134,9 +141,15 @@ export default class AuthHandler {
     }
 
     isUserRoute = (pathname: string) => {
-        return Boolean(!this.opts?.expressConfig?.publicRoutes?.find(publicRoute => {
+        const pubRoutes = [
+            ...this.opts?.expressConfig?.publicRoutes || [],
+        ];
+        if(this.loginRoute) pubRoutes.push(this.loginRoute);
+        if(this.logoutGetPath) pubRoutes.push(this.logoutGetPath);
+
+        return Boolean(!pubRoutes.find(publicRoute => {
             return publicRoute === pathname || pathname.startsWith(publicRoute) && ["/", "?", "#"].includes(pathname.slice(-1));
-        }))
+        }));
     }
 
     private setCookie = (cookie: { sid: string; expires: number; }, r: { req: ExpressReq; res: ExpressRes }) => {
@@ -179,6 +192,9 @@ export default class AuthHandler {
 
         if(expressConfig){
             const { app, logoutGetPath = "/logout", loginRoute = "/login", cookieOptions = {}, publicRoutes = [], onGetRequestOK, magicLinks } = expressConfig;
+            if(publicRoutes.find(r => typeof r !== "string" || !r)){
+                throw "Invalid or empty string provided within publicRoutes "
+            }
 
             if(app && magicLinks){
                 const { route = "/magic-link", check } = magicLinks;

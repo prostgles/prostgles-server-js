@@ -103,11 +103,13 @@ export declare type ClientInfo = {
     sid?: string;
 };
 export default class AuthHandler {
-    opts?: Auth;
+    protected opts?: Auth;
     dbo: DbHandler;
     db: DB;
     sidKeyName: string;
     returnURL: string;
+    loginRoute?: string;
+    logoutGetPath?: string;
     constructor(prostgles: Prostgles);
     validateSid: (sid: string) => string;
     isUserRoute: (pathname: string) => boolean;
