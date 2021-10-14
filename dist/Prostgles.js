@@ -703,7 +703,7 @@ class PublishParser {
                 return table_rule;
             }
             else
-                throw `Invalid or disallowed command: ${command}`;
+                throw `Invalid or disallowed command: ${tableName}.${command}`;
         });
     }
     getTableRules({ tableName, localParams }, clientInfo) {

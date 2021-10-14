@@ -80,7 +80,7 @@ function parseError(e) {
     let res = (!Object.keys(e || {}).length ? e : (e && e.toString) ? e.toString() : e);
     if (isPlainObject(e))
         res = JSON.stringify(e, null, 2);
-    return "INTERNAL ERROR: " + res;
+    return res;
 }
 class ColSet {
     constructor(columns, tableName) {

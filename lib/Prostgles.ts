@@ -1209,7 +1209,7 @@ export class PublishParser {
 
         if(rtm && table_rule && table_rule[rtm.rule]){
             return table_rule;
-        } else throw `Invalid or disallowed command: ${command}`;
+        } else throw `Invalid or disallowed command: ${tableName}.${command}`;
     }
     
     async getTableRules({ tableName, localParams }: DboTable, clientInfo: ClientInfo): Promise<PublishTable> {
