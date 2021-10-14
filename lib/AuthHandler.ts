@@ -191,7 +191,7 @@ export default class AuthHandler {
         if(!getUser || !getClientUser) throw "getUser OR getClientUser missing from auth config";
 
         if(expressConfig){
-            const { app, logoutGetPath = "/logout", loginRoute = "/login", cookieOptions = {}, publicRoutes = [], onGetRequestOK, magicLinks } = expressConfig;
+            const { app, publicRoutes = [], onGetRequestOK, magicLinks } = expressConfig;
             if(publicRoutes.find(r => typeof r !== "string" || !r)){
                 throw "Invalid or empty string provided within publicRoutes "
             }
@@ -222,9 +222,9 @@ export default class AuthHandler {
                 });
             }
 
-            if(app && loginRoute){
+            if(app && this.loginRoute){
 
-                app.post(loginRoute, async (req: ExpressReq, res: ExpressRes) => {
+                app.post(this.loginRoute, async (req: ExpressReq, res: ExpressRes) => {
                     try {
                         const { sid, expires } = await this.loginThrottled(req.body || {}) || {};
                         
@@ -243,8 +243,8 @@ export default class AuthHandler {
             
                 });
                 
-                if(app && logoutGetPath){
-                    app.get(logoutGetPath, async (req: ExpressReq, res: ExpressRes) => {
+                if(app && this.logoutGetPath){
+                    app.get(this.logoutGetPath, async (req: ExpressReq, res: ExpressRes) => {
                         const sid = this.validateSid(req?.cookies?.[sidKeyName]);
                         if(sid){
                             try {
@@ -280,7 +280,7 @@ export default class AuthHandler {
                             if(this.isUserRoute(req.path)){
                                 const u = await getUser();
                                 if(!u){
-                                    res.redirect(`${loginRoute}?returnURL=${encodeURIComponent(req.originalUrl)}`);
+                                    res.redirect(`${this.loginRoute}?returnURL=${encodeURIComponent(req.originalUrl)}`);
                                     return; 
                                 }
 

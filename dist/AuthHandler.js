@@ -202,7 +202,7 @@ class AuthHandler {
             if (!getUser || !getClientUser)
                 throw "getUser OR getClientUser missing from auth config";
             if (expressConfig) {
-                const { app, logoutGetPath = "/logout", loginRoute = "/login", cookieOptions = {}, publicRoutes = [], onGetRequestOK, magicLinks } = expressConfig;
+                const { app, publicRoutes = [], onGetRequestOK, magicLinks } = expressConfig;
                 if (publicRoutes.find(r => typeof r !== "string" || !r)) {
                     throw "Invalid or empty string provided within publicRoutes ";
                 }
@@ -233,8 +233,8 @@ class AuthHandler {
                         }
                     }));
                 }
-                if (app && loginRoute) {
-                    app.post(loginRoute, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                if (app && this.loginRoute) {
+                    app.post(this.loginRoute, (req, res) => __awaiter(this, void 0, void 0, function* () {
                         try {
                             const { sid, expires } = (yield this.loginThrottled(req.body || {})) || {};
                             if (sid) {
@@ -249,8 +249,8 @@ class AuthHandler {
                             res.status(404).json({ err: "Invalid username or password" });
                         }
                     }));
-                    if (app && logoutGetPath) {
-                        app.get(logoutGetPath, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                    if (app && this.logoutGetPath) {
+                        app.get(this.logoutGetPath, (req, res) => __awaiter(this, void 0, void 0, function* () {
                             var _a;
                             const sid = this.validateSid((_a = req === null || req === void 0 ? void 0 : req.cookies) === null || _a === void 0 ? void 0 : _a[sidKeyName]);
                             if (sid) {
@@ -283,7 +283,7 @@ class AuthHandler {
                                 if (this.isUserRoute(req.path)) {
                                     const u = yield getUser();
                                     if (!u) {
-                                        res.redirect(`${loginRoute}?returnURL=${encodeURIComponent(req.originalUrl)}`);
+                                        res.redirect(`${this.loginRoute}?returnURL=${encodeURIComponent(req.originalUrl)}`);
                                         return;
                                     }
                                     /* If authorized and going to returnUrl then redirect. Otherwise serve file */
