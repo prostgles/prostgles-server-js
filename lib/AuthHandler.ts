@@ -59,9 +59,9 @@ export type Auth<DBO = DbHandler> = {
         cookieOptions?: AnyObject;
 
         /**
-         * If provided, any client requests to these routes (or their subroutes) will be redirected to loginRoute and then redirected back to the initial route after logging in
+         * If provided, any client requests to NOT these routes (or their subroutes) will be redirected to loginRoute and then redirected back to the initial route after logging in
          */
-        userRoutes?: string[];
+        publicRoutes?: string[];
 
         /**
          * False by default. If false and userRoutes are provided then the socket will request window.location.reload if the current url is on a user route.
@@ -134,8 +134,8 @@ export default class AuthHandler {
     }
 
     isUserRoute = (pathname: string) => {
-        return Boolean(this.opts?.expressConfig?.userRoutes?.find(userRoute => {
-            return userRoute === pathname || pathname.startsWith(userRoute) && ["/", "?", "#"].includes(pathname.slice(-1));
+        return Boolean(!this.opts?.expressConfig?.publicRoutes?.find(publicRoute => {
+            return publicRoute === pathname || pathname.startsWith(publicRoute) && ["/", "?", "#"].includes(pathname.slice(-1));
         }))
     }
 
@@ -178,7 +178,7 @@ export default class AuthHandler {
         if(!getUser || !getClientUser) throw "getUser OR getClientUser missing from auth config";
 
         if(expressConfig){
-            const { app, logoutGetPath = "/logout", loginRoute = "/login", cookieOptions = {}, userRoutes = [], onGetRequestOK, magicLinks } = expressConfig;
+            const { app, logoutGetPath = "/logout", loginRoute = "/login", cookieOptions = {}, publicRoutes = [], onGetRequestOK, magicLinks } = expressConfig;
 
             if(app && magicLinks){
                 const { route = "/magic-link", check } = magicLinks;
@@ -244,9 +244,9 @@ export default class AuthHandler {
                     });
                 }
 
-                if(app && Array.isArray(userRoutes)){
+                if(app && Array.isArray(publicRoutes)){
 
-                    /* Redirect if not logged in and requesting user content */
+                    /* Redirect if not logged in and requesting non public content */
                     app.get('*', async (req, res) => {
                         const getUser = () => {
                             const sid = req?.cookies?.[sidKeyName];
@@ -429,7 +429,7 @@ export default class AuthHandler {
 
         let auth: AuthSocketSchema = {};
 
-        if(this.opts.expressConfig?.userRoutes?.length && !this.opts.expressConfig?.disableSocketAuthGuard){
+        if(this.opts.expressConfig?.publicRoutes?.length && !this.opts.expressConfig?.disableSocketAuthGuard){
 
             auth.pathGuard = true;
             

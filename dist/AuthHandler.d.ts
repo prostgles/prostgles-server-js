@@ -59,9 +59,9 @@ export declare type Auth<DBO = DbHandler> = {
          */
         cookieOptions?: AnyObject;
         /**
-         * If provided, any client requests to these routes (or their subroutes) will be redirected to loginRoute and then redirected back to the initial route after logging in
+         * If provided, any client requests to NOT these routes (or their subroutes) will be redirected to loginRoute and then redirected back to the initial route after logging in
          */
-        userRoutes?: string[];
+        publicRoutes?: string[];
         /**
          * False by default. If false and userRoutes are provided then the socket will request window.location.reload if the current url is on a user route.
          */

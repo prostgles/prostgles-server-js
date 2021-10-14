@@ -22,9 +22,9 @@ class AuthHandler {
         };
         this.isUserRoute = (pathname) => {
             var _a, _b, _c;
-            return Boolean((_c = (_b = (_a = this.opts) === null || _a === void 0 ? void 0 : _a.expressConfig) === null || _b === void 0 ? void 0 : _b.userRoutes) === null || _c === void 0 ? void 0 : _c.find(userRoute => {
-                return userRoute === pathname || pathname.startsWith(userRoute) && ["/", "?", "#"].includes(pathname.slice(-1));
-            }));
+            return Boolean(!((_c = (_b = (_a = this.opts) === null || _a === void 0 ? void 0 : _a.expressConfig) === null || _b === void 0 ? void 0 : _b.publicRoutes) === null || _c === void 0 ? void 0 : _c.find(publicRoute => {
+                return publicRoute === pathname || pathname.startsWith(publicRoute) && ["/", "?", "#"].includes(pathname.slice(-1));
+            })));
         };
         this.setCookie = (cookie, r) => {
             var _a, _b;
@@ -115,7 +115,7 @@ class AuthHandler {
             if (!this.opts)
                 return {};
             let auth = {};
-            if (((_d = (_c = this.opts.expressConfig) === null || _c === void 0 ? void 0 : _c.userRoutes) === null || _d === void 0 ? void 0 : _d.length) && !((_e = this.opts.expressConfig) === null || _e === void 0 ? void 0 : _e.disableSocketAuthGuard)) {
+            if (((_d = (_c = this.opts.expressConfig) === null || _c === void 0 ? void 0 : _c.publicRoutes) === null || _d === void 0 ? void 0 : _d.length) && !((_e = this.opts.expressConfig) === null || _e === void 0 ? void 0 : _e.disableSocketAuthGuard)) {
                 auth.pathGuard = true;
                 socket.removeAllListeners(prostgles_types_1.CHANNELS.AUTHGUARD);
                 socket.on(prostgles_types_1.CHANNELS.AUTHGUARD, (params, cb = (err, res) => { }) => __awaiter(this, void 0, void 0, function* () {
@@ -191,7 +191,7 @@ class AuthHandler {
             if (!getUser || !getClientUser)
                 throw "getUser OR getClientUser missing from auth config";
             if (expressConfig) {
-                const { app, logoutGetPath = "/logout", loginRoute = "/login", cookieOptions = {}, userRoutes = [], onGetRequestOK, magicLinks } = expressConfig;
+                const { app, logoutGetPath = "/logout", loginRoute = "/login", cookieOptions = {}, publicRoutes = [], onGetRequestOK, magicLinks } = expressConfig;
                 if (app && magicLinks) {
                     const { route = "/magic-link", check } = magicLinks;
                     if (!check)
@@ -253,8 +253,8 @@ class AuthHandler {
                             res.redirect("/");
                         }));
                     }
-                    if (app && Array.isArray(userRoutes)) {
-                        /* Redirect if not logged in and requesting user content */
+                    if (app && Array.isArray(publicRoutes)) {
+                        /* Redirect if not logged in and requesting non public content */
                         app.get('*', (req, res) => __awaiter(this, void 0, void 0, function* () {
                             const getUser = () => {
                                 var _a;
