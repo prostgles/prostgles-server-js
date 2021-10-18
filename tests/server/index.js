@@ -297,6 +297,9 @@ const dbConnection = {
                     proc.stdout.on('data', function (data) {
                         console.log(data);
                     });
+                    proc.stderr.on('data', function (data) {
+                        console.error(data);
+                    });
                 }
                 else if (process.env.TEST_TYPE === "server") {
                     await (0, isomorphic_queries_1.default)(db);

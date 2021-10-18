@@ -20,11 +20,11 @@ const url = process.env.PRGL_CLIENT_URL || "http://127.0.0.1:3001",
       log("Stopping client...");
       if(err) console.trace(err);
   
-      setTimeout(() => {
-        process.exit(err? 1 : 0)
-      }, 1000);
 
     });
+    setTimeout(() => {
+      process.exit(err? 1 : 0)
+    }, 1000);
     
   };
   

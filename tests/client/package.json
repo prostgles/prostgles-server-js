@@ -7,7 +7,7 @@
     "start": "tsc-watch --onSuccess \"node index.js\"",
     "dev": "NOSTOP=true npm start",
     "build": "rm -rf ./node_modules/* && npm i && tsc",
-    "test": "node index.js "
+    "test": "node index.js & echo $! > ./PID.txt"
   },
   "author": "",
   "license": "ISC",

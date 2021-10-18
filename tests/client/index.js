@@ -18,10 +18,10 @@ stopTest = (err) => {
         log("Stopping client...");
         if (err)
             console.trace(err);
-        setTimeout(() => {
-            process.exit(err ? 1 : 0);
-        }, 1000);
     });
+    setTimeout(() => {
+        process.exit(err ? 1 : 0);
+    }, 1000);
 };
 try {
     /* TODO find out why connection does not happen on rare occasions*/
