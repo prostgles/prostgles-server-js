@@ -20,6 +20,10 @@ class AuthHandler {
                 throw "sid missing or not a string";
             return sid;
         };
+        this.matchesRoute = (route, clientFullRoute) => {
+            return route && clientFullRoute && (route === clientFullRoute ||
+                clientFullRoute.startsWith(route) && ["/", "?", "#"].includes(clientFullRoute.slice(-1)));
+        };
         this.isUserRoute = (pathname) => {
             var _a, _b;
             const pubRoutes = [
@@ -30,7 +34,7 @@ class AuthHandler {
             if (this.logoutGetPath)
                 pubRoutes.push(this.logoutGetPath);
             return Boolean(!pubRoutes.find(publicRoute => {
-                return publicRoute === pathname || pathname.startsWith(publicRoute) && ["/", "?", "#"].includes(pathname.slice(-1));
+                return this.matchesRoute(publicRoute, pathname); // publicRoute === pathname || pathname.startsWith(publicRoute) && ["/", "?", "#"].includes(pathname.slice(-1));
             }));
         };
         this.setCookie = (cookie, r) => {
@@ -234,6 +238,13 @@ class AuthHandler {
                     }));
                 }
                 if (app && this.loginRoute) {
+                    const getUser = (req) => {
+                        var _a;
+                        const sid = (_a = req === null || req === void 0 ? void 0 : req.cookies) === null || _a === void 0 ? void 0 : _a[sidKeyName];
+                        if (!sid)
+                            return undefined;
+                        return this.opts.getUser(this.validateSid(sid), this.dbo, this.db);
+                    };
                     app.post(this.loginRoute, (req, res) => __awaiter(this, void 0, void 0, function* () {
                         try {
                             const { sid, expires } = (yield this.loginThrottled(req.body || {})) || {};
@@ -270,32 +281,35 @@ class AuthHandler {
                     if (app && Array.isArray(publicRoutes)) {
                         /* Redirect if not logged in and requesting non public content */
                         app.get('*', (req, res) => __awaiter(this, void 0, void 0, function* () {
-                            const getUser = () => {
-                                var _a;
-                                const sid = (_a = req === null || req === void 0 ? void 0 : req.cookies) === null || _a === void 0 ? void 0 : _a[sidKeyName];
-                                if (!sid)
-                                    return undefined;
-                                return this.opts.getUser(this.validateSid(sid), this.dbo, this.db);
-                            };
                             try {
                                 const returnURL = getReturnUrl(req, this.returnURL);
-                                /* Check auth. Redirect if unauthorized */
+                                /**
+                                 * If already logged in then redirect
+                                 */ this.loginRoute;
+                                /**
+                                 * Requesting a User route
+                                 */
                                 if (this.isUserRoute(req.path)) {
-                                    const u = yield getUser();
+                                    /* Check auth. Redirect if unauthorized */
+                                    const u = yield getUser(req);
                                     if (!u) {
                                         res.redirect(`${this.loginRoute}?returnURL=${encodeURIComponent(req.originalUrl)}`);
                                         return;
                                     }
                                     /* If authorized and going to returnUrl then redirect. Otherwise serve file */
                                 }
-                                else if (returnURL && (yield getUser())) {
+                                else if (returnURL && (yield getUser(req))) {
                                     res.redirect(returnURL);
+                                    return;
+                                    /** If Logged in and requesting login then redirect */
+                                }
+                                else if (this.matchesRoute(this.loginRoute, req.path) && (yield getUser(req))) {
+                                    res.redirect("/");
                                     return;
                                 }
                                 if (onGetRequestOK) {
                                     onGetRequestOK(req, res);
                                 }
-                                // res.sendFile(path.join(__dirname + '/../../client/build/index.html'));
                             }
                             catch (error) {
                                 console.error(error);

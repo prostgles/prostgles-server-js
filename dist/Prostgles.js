@@ -84,14 +84,16 @@ class Prostgles {
         this.loaded = false;
         this.destroyed = false;
         this.refreshDBO = () => __awaiter(this, void 0, void 0, function* () {
+            var _d;
+            (_d = this.dboBuilder) === null || _d === void 0 ? void 0 : _d.destroy();
             this.dboBuilder = (yield DboBuilder_1.DboBuilder.create(this));
             this.dbo = this.dboBuilder.dbo;
             return this.dbo;
         });
         this.connectedSockets = [];
         this.pushSocketSchema = (socket) => __awaiter(this, void 0, void 0, function* () {
-            var _d;
-            let auth = (yield ((_d = this.authHandler) === null || _d === void 0 ? void 0 : _d.makeSocketAuth(socket))) || {};
+            var _e;
+            let auth = (yield ((_e = this.authHandler) === null || _e === void 0 ? void 0 : _e.makeSocketAuth(socket))) || {};
             // let needType = this.publishRawSQL && typeof this.publishRawSQL === "function";
             // let DATA_TYPES = !needType? [] : await this.db.any("SELECT oid, typname FROM pg_type");
             // let USER_TABLES = !needType? [] :  await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
@@ -355,7 +357,7 @@ class Prostgles {
                     yield this.authHandler.init();
                     this.publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods, this.opts.publishRawSQL, this.dbo, this.db, this);
                     this.dboBuilder.publishParser = this.publishParser;
-                    /* 4. Set publish and auth listeners */ //makeDBO(db, allTablesViews, pubSubManager, false)
+                    /* 4. Set publish and auth listeners */
                     yield this.setSocketEvents();
                 }
                 else if (this.opts.auth)
@@ -382,6 +384,7 @@ class Prostgles {
                     pgp,
                     io: this.opts.io,
                     destroy: () => __awaiter(this, void 0, void 0, function* () {
+                        var _a;
                         console.log("destroying prgl instance");
                         this.destroyed = true;
                         if (this.opts.io) {
@@ -393,9 +396,7 @@ class Prostgles {
                                 console.log("this.io.close");
                             }
                         }
-                        if (this.dboBuilder.pubSubManager) {
-                            this.dboBuilder.pubSubManager.destroy();
-                        }
+                        (_a = this.dboBuilder) === null || _a === void 0 ? void 0 : _a.destroy();
                         this.dbo = undefined;
                         this.db = undefined;
                         yield db.$pool.end();

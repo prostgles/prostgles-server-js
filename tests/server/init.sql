@@ -1,13 +1,17 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+
+DROP TABLE IF EXISTS prostgles_lookup_media_items_m1;
+DROP TABLE IF EXISTS prostgles_lookup_media_items_with_media;
+DROP TABLE IF EXISTS prostgles_lookup_media_items_with_one_media;
+
+
 DROP TABLE IF EXISTS uuid_text CASCADE;
 CREATE TABLE IF NOT EXISTS uuid_text (
 	id		UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 	name	TEXT
 );
 
-DROP TABLE IF EXISTS prostgles_lookup_media_items_with_one_media CASCADE;
-DROP TABLE IF EXISTS prostgles_lookup_media_items_with_media CASCADE;
 DROP TABLE IF EXISTS media CASCADE;
 
 DROP TABLE IF EXISTS items_with_one_media CASCADE;

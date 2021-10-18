@@ -572,6 +572,7 @@ export class Prostgles<DBO = DbHandler> {
     }
 
     refreshDBO = async () => {
+        this.dboBuilder?.destroy();
         this.dboBuilder = await DboBuilder.create(this as any) as any;
         this.dbo = this.dboBuilder.dbo as any;
         return this.dbo;
@@ -653,7 +654,8 @@ export class Prostgles<DBO = DbHandler> {
 
                 this.publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods, this.opts.publishRawSQL, this.dbo, this.db, this as any);
                 this.dboBuilder.publishParser = this.publishParser;
-                /* 4. Set publish and auth listeners */ //makeDBO(db, allTablesViews, pubSubManager, false)
+                
+                /* 4. Set publish and auth listeners */
                 await this.setSocketEvents();
 
             } else if(this.opts.auth) throw "Auth config does not work without publish";
@@ -695,9 +697,8 @@ export class Prostgles<DBO = DbHandler> {
                             console.log("this.io.close")
                         }
                     }
-                    if(this.dboBuilder.pubSubManager){
-                        this.dboBuilder.pubSubManager.destroy();
-                    }
+                    
+                    this.dboBuilder?.destroy();
                     this.dbo = undefined;
                     this.db = undefined;
                     await db.$pool.end();

@@ -178,23 +178,11 @@ export type Prgll = {
   "foreign_id"?: number;
   "media_id"?: string;
 }
-export type Prostgles_lookup_media_items_m1 = { 
-  "foreign_id"?: number;
-  "media_id"?: string;
-}
 export type Prostgles_lookup_media_items_with_media = { 
   "foreign_id"?: number;
   "media_id"?: string;
 }
 export type Prostgles_lookup_media_items_with_one_media = { 
-  "foreign_id"?: number;
-  "media_id"?: string;
-}
-export type Prostgles_lookup_media_skills = { 
-  "foreign_id"?: string;
-  "media_id"?: string;
-}
-export type Prostgles_lookup_media_usr = { 
   "foreign_id"?: number;
   "media_id"?: string;
 }
@@ -279,22 +267,16 @@ export type JoinMakerTables = {
  "items": JoinMaker<Items>;
  "items2": JoinMaker<Items2>;
  "items3": JoinMaker<Items3>;
- "items_m1": JoinMaker<Items_m1>;
  "items_with_media": JoinMaker<Items_with_media>;
  "items_with_one_media": JoinMaker<Items_with_one_media>;
  "lookup_col1": JoinMaker<Lookup_col1>;
  "media": JoinMaker<Media>;
- "prostgles_lookup_media_items_m1": JoinMaker<Prostgles_lookup_media_items_m1>;
  "prostgles_lookup_media_items_with_media": JoinMaker<Prostgles_lookup_media_items_with_media>;
  "prostgles_lookup_media_items_with_one_media": JoinMaker<Prostgles_lookup_media_items_with_one_media>;
- "prostgles_lookup_media_skills": JoinMaker<Prostgles_lookup_media_skills>;
- "prostgles_lookup_media_usr": JoinMaker<Prostgles_lookup_media_usr>;
- "skills": JoinMaker<Skills>;
  "tr1": JoinMaker<Tr1>;
  "tr2": JoinMaker<Tr2>;
  "tt": JoinMaker<Tt>;
  "tt1": JoinMaker<Tt1>;
- "usr": JoinMaker<Usr>;
  "uuid_text": JoinMaker<Uuid_text>;
 };
 
@@ -326,11 +308,8 @@ export type DBObj = {
   "mmmedia": TableHandler<Mmmedia> 
   "planes": TableHandler<Planes> 
   "prgll": TableHandler<Prgll> 
-  "prostgles_lookup_media_items_m1": TableHandler<Prostgles_lookup_media_items_m1> 
   "prostgles_lookup_media_items_with_media": TableHandler<Prostgles_lookup_media_items_with_media> 
   "prostgles_lookup_media_items_with_one_media": TableHandler<Prostgles_lookup_media_items_with_one_media> 
-  "prostgles_lookup_media_skills": TableHandler<Prostgles_lookup_media_skills> 
-  "prostgles_lookup_media_usr": TableHandler<Prostgles_lookup_media_usr> 
   "prostgles_lookup_media_various": TableHandler<Prostgles_lookup_media_various> 
   "skills": TableHandler<Skills> 
   "spatial_ref_sys": TableHandler<Spatial_ref_sys> 
@@ -435,19 +414,10 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
     "prgll": { 
       [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "prostgles_lookup_media_items_m1": { 
-      [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
-    }; 
     "prostgles_lookup_media_items_with_media": { 
       [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "prostgles_lookup_media_items_with_one_media": { 
-      [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
-    }; 
-    "prostgles_lookup_media_skills": { 
-      [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
-    }; 
-    "prostgles_lookup_media_usr": { 
       [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "prostgles_lookup_media_various": { 

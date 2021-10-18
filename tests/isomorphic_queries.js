@@ -40,12 +40,15 @@ function tryRunP(desc, func) {
 exports.tryRunP = tryRunP;
 async function isomorphic(db) {
     console.log("Starting isomorphic queries");
-    await db.items.delete({});
-    await db.items2.delete({});
-    await db.items3.delete({});
-    await db.items4_pub.delete({});
-    /* Access controlled */
-    await db.items4.delete({});
+    if (await db.items.count()) {
+        console.log("DELETING items");
+        await db.items.delete({});
+        await db.items2.delete({});
+        await db.items3.delete({});
+        await db.items4_pub.delete({});
+        /* Access controlled */
+        await db.items4.delete({});
+    }
     // await tryRun("UUID data", async () => {
     //   const r = await db.uuid_text.insert({}, { returning: "*"});
     //   throw r;

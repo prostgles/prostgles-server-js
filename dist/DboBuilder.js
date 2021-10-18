@@ -121,10 +121,11 @@ class ColSet {
     }
 }
 class ViewHandler {
-    constructor(db, tableOrViewInfo, pubSubManager, dboBuilder, t, dbTX, joinPaths) {
+    constructor(db, tableOrViewInfo, dboBuilder, t, dbTX, joinPaths) {
         this.tsColumnDefs = [];
         this.is_view = true;
         this.filterDef = "";
+        // pubSubManager: PubSubManager;
         this.is_media = false;
         if (!db || !tableOrViewInfo)
             throw "";
@@ -139,7 +140,7 @@ class ViewHandler {
         /* cols are sorted by name to reduce .d.ts schema rewrites */
         this.columnsForTypes = tableOrViewInfo.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
         this.column_names = tableOrViewInfo.columns.map(c => c.name);
-        this.pubSubManager = pubSubManager;
+        // this.pubSubManager = pubSubManager;
         this.dboBuilder = dboBuilder;
         this.joins = this.dboBuilder.joins;
         // fix this
@@ -1239,8 +1240,8 @@ function isPojoObject(obj) {
     return true;
 }
 class TableHandler extends ViewHandler {
-    constructor(db, tableOrViewInfo, pubSubManager, dboBuilder, t, dbTX, joinPaths) {
-        super(db, tableOrViewInfo, pubSubManager, dboBuilder, t, dbTX, joinPaths);
+    constructor(db, tableOrViewInfo, dboBuilder, t, dbTX, joinPaths) {
+        super(db, tableOrViewInfo, dboBuilder, t, dbTX, joinPaths);
         this.prepareReturning = (returning, allowedFields) => __awaiter(this, void 0, void 0, function* () {
             let result = [];
             if (returning) {
@@ -1298,9 +1299,10 @@ class TableHandler extends ViewHandler {
                 // const { subOne = false } = localParams || {};
                 if (!localFunc) {
                     return yield this.find(filter, Object.assign(Object.assign({}, selectParams), { limit: 0 }), null, table_rules, localParams)
-                        .then(isValid => {
+                        .then((isValid) => __awaiter(this, void 0, void 0, function* () {
                         const { socket = null } = localParams;
-                        return this.pubSubManager.addSub({
+                        const pubSubManager = yield this.dboBuilder.getPubSubManager();
+                        return pubSubManager.addSub({
                             table_info: this.tableOrViewInfo,
                             socket,
                             table_rules,
@@ -1314,10 +1316,11 @@ class TableHandler extends ViewHandler {
                             throttle,
                             last_throttled: 0,
                         }).then(channelName => ({ channelName }));
-                    });
+                    }));
                 }
                 else {
-                    this.pubSubManager.addSub({
+                    const pubSubManager = yield this.dboBuilder.getPubSubManager();
+                    pubSubManager.addSub({
                         table_info: this.tableOrViewInfo,
                         socket: null,
                         table_rules,
@@ -1331,9 +1334,10 @@ class TableHandler extends ViewHandler {
                         throttle,
                         last_throttled: 0,
                     }).then(channelName => ({ channelName }));
-                    const unsubscribe = () => {
-                        this.pubSubManager.removeLocalSub(this.name, condition, localFunc);
-                    };
+                    const unsubscribe = () => __awaiter(this, void 0, void 0, function* () {
+                        const pubSubManager = yield this.dboBuilder.getPubSubManager();
+                        pubSubManager.removeLocalSub(this.name, condition, localFunc);
+                    });
                     let res = Object.freeze({ unsubscribe });
                     return res;
                 }
@@ -1951,7 +1955,8 @@ class TableHandler extends ViewHandler {
                     const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {};
                     const condition = yield this.prepareWhere({ filter, forcedFilter, filterFields, addKeywords: false, localParams, tableRule: table_rules });
                     // let final_filter = getFindFilter(filter, table_rules);
-                    return this.pubSubManager.addSync({
+                    const pubSubManager = yield this.dboBuilder.getPubSubManager();
+                    return pubSubManager.addSync({
                         table_info: this.tableOrViewInfo,
                         condition,
                         id_fields, synced_field, allow_delete,
@@ -2000,19 +2005,36 @@ const Prostgles_2 = require("./Prostgles");
 class DboBuilder {
     constructor(prostgles) {
         this.schema = "public";
-        this.init = () => __awaiter(this, void 0, void 0, function* () {
-            let onSchemaChange;
-            if (this.prostgles.opts.watchSchema) {
-                onSchemaChange = (event) => {
-                    this.prostgles.onSchemaChange(event);
-                };
+        this.getPubSubManager = () => __awaiter(this, void 0, void 0, function* () {
+            if (!this._pubSubManager) {
+                let onSchemaChange;
+                if (this.prostgles.opts.watchSchema) {
+                    onSchemaChange = (event) => {
+                        this.prostgles.onSchemaChange(event);
+                    };
+                }
+                this._pubSubManager = yield PubSubManager_1.PubSubManager.create({
+                    dboBuilder: this,
+                    db: this.db,
+                    dbo: this.dbo,
+                    onSchemaChange
+                });
             }
-            this.pubSubManager = yield PubSubManager_1.PubSubManager.create({
-                dboBuilder: this,
-                db: this.db,
-                dbo: this.dbo,
-                onSchemaChange
-            });
+            return this._pubSubManager;
+        });
+        this.init = () => __awaiter(this, void 0, void 0, function* () {
+            // let onSchemaChange;
+            // if(this.prostgles.opts.watchSchema){
+            //     onSchemaChange = (event: { command: string; query: string }) => { 
+            //         this.prostgles.onSchemaChange(event)
+            //     }
+            // }
+            // this.pubSubManager = await PubSubManager.create({
+            //     dboBuilder: this,
+            //     db: this.db, 
+            //     dbo: this.dbo as unknown as DbHandler,
+            //     onSchemaChange
+            // });
             yield this.build();
             return this;
         });
@@ -2021,10 +2043,10 @@ class DboBuilder {
                 let dbTX = {};
                 this.tablesOrViews.map(tov => {
                     if (tov.is_view) {
-                        dbTX[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, t, dbTX, this.joinPaths);
+                        dbTX[tov.name] = new ViewHandler(this.db, tov, this, t, dbTX, this.joinPaths);
                     }
                     else {
-                        dbTX[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, t, dbTX, this.joinPaths);
+                        dbTX[tov.name] = new TableHandler(this.db, tov, this, t, dbTX, this.joinPaths);
                         /**
                          * Pass only the transaction object to ensure consistency
                          */
@@ -2044,6 +2066,10 @@ class DboBuilder {
         this.schema = this.prostgles.opts.schema || "public";
         this.dbo = {};
         // this.joins = this.prostgles.joins;
+    }
+    destroy() {
+        var _a;
+        (_a = this._pubSubManager) === null || _a === void 0 ? void 0 : _a.destroy();
     }
     getJoins() {
         return this.joins;
@@ -2174,11 +2200,11 @@ export type TxCB = {
                 const TSTableDataName = snakify(tov.name, true);
                 const TSTableHandlerName = JSON.stringify(tov.name);
                 if (tov.is_view) {
-                    this.dbo[tov.name] = new ViewHandler(this.db, tov, this.pubSubManager, this, null, undefined, this.joinPaths);
+                    this.dbo[tov.name] = new ViewHandler(this.db, tov, this, null, undefined, this.joinPaths);
                     this.dboDefinition += `  ${TSTableHandlerName}: ViewHandler<${TSTableDataName}> \n`;
                 }
                 else {
-                    this.dbo[tov.name] = new TableHandler(this.db, tov, this.pubSubManager, this, null, undefined, this.joinPaths);
+                    this.dbo[tov.name] = new TableHandler(this.db, tov, this, null, undefined, this.joinPaths);
                     this.dboDefinition += `  ${TSTableHandlerName}: TableHandler<${TSTableDataName}> \n`;
                 }
                 allDataDefs += `export type ${TSTableDataName} = { \n` +

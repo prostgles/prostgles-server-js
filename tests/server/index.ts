@@ -74,12 +74,13 @@ const dbConnection = {
 		}
 	}
 
+	log("created prostgles")
 	let prgl = await prostgles({
 		dbConnection,
 		sqlFilePath: path.join(__dirname+'/init.sql'),
 		io,
 		tsGeneratedTypesDir: path.join(__dirname + '/'),
-		watchSchema: true,
+		// watchSchema: true,
 		transactions: true,
 
 		// DEBUG_MODE: true,
@@ -126,6 +127,11 @@ const dbConnection = {
 			  localFolderPath: path.join(__dirname+'/media'),
 			},
 			expressApp: app,
+		},
+
+		onSocketDisconnect:  (socket, db) => {
+			log("onSocketDisconnect")
+			console.trace("onSocketDisconnect")
 		},
 		
 		onSocketConnect:  (socket, db) => {
@@ -298,6 +304,7 @@ const dbConnection = {
 			}
 		],
 		onReady: async (db, _db) => {
+			log("prostgles onReady")
 			app.get('*', function(req, res){
 				log(req.originalUrl)
 				res.sendFile(path.join(__dirname+'/index.html'));
@@ -308,8 +315,11 @@ const dbConnection = {
 				if(process.env.TEST_TYPE === "client"){
 					const clientPath = `cd ${__dirname}/../client && npm test`;
 					log("EXEC CLIENT PROCESS")
-					exec(clientPath, console.log);
+					const proc = exec(clientPath, console.log);
 					log("Waiting for client...");
+					proc.stdout.on('data', function(data) {
+						console.log(data); 
+					});
 					
 				} else if(process.env.TEST_TYPE === "server"){
 

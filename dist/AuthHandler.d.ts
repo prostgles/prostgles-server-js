@@ -112,6 +112,7 @@ export default class AuthHandler {
     logoutGetPath?: string;
     constructor(prostgles: Prostgles);
     validateSid: (sid: string) => string;
+    matchesRoute: (route: string, clientFullRoute: string) => boolean;
     isUserRoute: (pathname: string) => boolean;
     private setCookie;
     init(): Promise<void>;

@@ -140,6 +140,13 @@ export default class AuthHandler {
         return sid;
     }
 
+    matchesRoute = (route: string, clientFullRoute: string) => {
+        return route && clientFullRoute && (
+            route === clientFullRoute ||
+            clientFullRoute.startsWith(route) && ["/", "?", "#"].includes(clientFullRoute.slice(-1))
+        )
+    }
+
     isUserRoute = (pathname: string) => {
         const pubRoutes = [
             ...this.opts?.expressConfig?.publicRoutes || [],
@@ -148,7 +155,7 @@ export default class AuthHandler {
         if(this.logoutGetPath) pubRoutes.push(this.logoutGetPath);
 
         return Boolean(!pubRoutes.find(publicRoute => {
-            return publicRoute === pathname || pathname.startsWith(publicRoute) && ["/", "?", "#"].includes(pathname.slice(-1));
+            return this.matchesRoute(publicRoute, pathname); // publicRoute === pathname || pathname.startsWith(publicRoute) && ["/", "?", "#"].includes(pathname.slice(-1));
         }));
     }
 
@@ -223,6 +230,12 @@ export default class AuthHandler {
             }
 
             if(app && this.loginRoute){
+                const getUser = (req: ExpressReq): Promise<AnyObject> => {
+                    const sid = req?.cookies?.[sidKeyName];
+                    if(!sid) return undefined;
+                    
+                    return this.opts.getUser(this.validateSid(sid), this.dbo, this.db);
+                }
 
                 app.post(this.loginRoute, async (req: ExpressReq, res: ExpressRes) => {
                     try {
@@ -264,37 +277,43 @@ export default class AuthHandler {
 
                     /* Redirect if not logged in and requesting non public content */
                     app.get('*', async (req, res) => {
-                        const getUser = () => {
-                            const sid = req?.cookies?.[sidKeyName];
-                            if(!sid) return undefined;
-                            
-                            return this.opts.getUser(this.validateSid(sid), this.dbo, this.db);
-                        }
                         
                         try {
                             const returnURL = getReturnUrl(req, this.returnURL)
                     
                             
+                            /**
+                             * If already logged in then redirect
+                             */this.loginRoute
+
                             
-                            /* Check auth. Redirect if unauthorized */
+                            /**
+                             * Requesting a User route
+                             */
                             if(this.isUserRoute(req.path)){
-                                const u = await getUser();
+                                /* Check auth. Redirect if unauthorized */
+                                const u = await getUser(req);
                                 if(!u){
                                     res.redirect(`${this.loginRoute}?returnURL=${encodeURIComponent(req.originalUrl)}`);
                                     return; 
                                 }
 
                             /* If authorized and going to returnUrl then redirect. Otherwise serve file */
-                            } else if(returnURL && (await getUser())){
+                            } else if(returnURL && (await getUser(req))){
                         
                                 res.redirect(returnURL);
+                                return;
+
+                            /** If Logged in and requesting login then redirect */
+                            } else if(this.matchesRoute(this.loginRoute, req.path) && (await getUser(req))){
+                                
+                                res.redirect("/");
                                 return;
                             }
                             
                             if(onGetRequestOK){
                                 onGetRequestOK(req, res)
                             }
-                            // res.sendFile(path.join(__dirname + '/../../client/build/index.html'));
                     
                         } catch(error) {
                             console.error(error);

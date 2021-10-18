@@ -169,9 +169,8 @@ export declare class ViewHandler {
     dbTX?: TxHandler;
     is_view: boolean;
     filterDef: string;
-    pubSubManager: PubSubManager;
     is_media: boolean;
-    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths);
+    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths);
     getRowHashSelect(allowedFields: FieldFilter, alias?: string, tableAlias?: string): string;
     validateViewRules(fields: FieldFilter, filterFields: FieldFilter, returningFields: FieldFilter, forcedFilter: object, rule: "update" | "select" | "insert" | "delete"): Promise<boolean>;
     getShortestJoin(table1: string, table2: string, startAlias: number, isInner?: boolean): {
@@ -262,7 +261,7 @@ export declare class TableHandler extends ViewHandler {
         queries: number;
         batching: string[];
     };
-    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, pubSubManager: PubSubManager, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths);
+    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths);
     willBatch(query: string): boolean;
     subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: object[]) => any): Promise<{
         unsubscribe: () => any;
@@ -300,7 +299,8 @@ export declare class DboBuilder {
     db: DB;
     schema: string;
     dbo: DbHandler;
-    pubSubManager: PubSubManager;
+    _pubSubManager: PubSubManager;
+    getPubSubManager: () => Promise<PubSubManager>;
     pojoDefinitions: string[];
     dboDefinition: string;
     tsTypesDefinition: string;
@@ -316,6 +316,7 @@ export declare class DboBuilder {
     private constructor();
     private init;
     static create: (prostgles: Prostgles) => Promise<DboBuilder>;
+    destroy(): void;
     getJoins(): Join[];
     getJoinPaths(): JoinPaths;
     parseJoins(): Promise<JoinPaths>;
