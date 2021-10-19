@@ -843,14 +843,25 @@ function makeQuery(_this, q, depth = 0, joinFields = [], selectParams) {
     const prefJCAN = (q, str) => prostgles_types_1.asName(`${q.tableAlias || q.table}_${PREF}_${str}`);
     // const indent = (a, b) => a;
     const joinTables = (q1, q2) => {
-        const joinInfo = _this.getJoins(q1.table, q2.table, q2.$path);
+        const joinInfo = _this.getJoins(q1.table, q2.table, q2.$path, true);
         const paths = joinInfo.paths;
         return Prostgles_1.flat(paths.map(({ table, on }, i) => {
+            const getColName = (col, q) => {
+                if (table === q.table) {
+                    const colFromSelect = q.select.find(s => s.getQuery() === prostgles_types_1.asName(col));
+                    if (!colFromSelect) {
+                        console.error(`${col} column might be missing in user publish `);
+                        throw `Could not find join column (${col}) in allowe select. Some join tables and columns might be invalid/dissallowed`;
+                    }
+                    return colFromSelect.alias;
+                }
+                return col;
+            };
             const getPrevColName = (col) => {
-                return table === q1.table ? q1.select.find(s => s.getQuery() === prostgles_types_1.asName(col)).alias : col;
+                return getColName(col, q1);
             };
             const getThisColName = (col) => {
-                return table === q2.table ? q2.select.find(s => s.getQuery() === prostgles_types_1.asName(col)).alias : col;
+                return getColName(col, q2);
             };
             // console.log(JSON.stringify({i, table, on, q1, q2}, null, 2));
             const prevTable = i === 0 ? q1.table : (paths[i - 1].table);

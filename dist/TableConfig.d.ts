@@ -1,3 +1,4 @@
+import { JoinInfo } from "./DboBuilder";
 import { DB, DbHandler, Prostgles } from "./Prostgles";
 declare type ColExtraInfo = {
     min?: string | number;
@@ -43,7 +44,22 @@ declare type ReferencedColumn = {
         nullable?: boolean;
     };
 };
-declare type ColumnConfig = BaseColumn & (SQLDefColumn | ReferencedColumn);
+declare type JoinDef = {
+    sourceTable: string;
+    targetTable: string;
+    /**
+     * E.g.: [sourceCol: string, targetCol: string][];
+     */
+    on: [string, string][];
+};
+/**
+ * Used in specifying a join path to a table. This column name can then be used in select
+ */
+declare type NamedJoinColumn = {
+    label?: string;
+    joinDef: JoinDef[];
+};
+declare type ColumnConfig = NamedJoinColumn | (BaseColumn & (SQLDefColumn | ReferencedColumn));
 declare type TableDefinition = {
     columns: {
         [column_name: string]: ColumnConfig;
@@ -80,6 +96,7 @@ export default class TableConfigurator {
         table: string;
         value: any;
     }) => void;
+    getJoinInfo: (sourceTable: string, targetTable: string) => JoinInfo | undefined;
     init(): Promise<void>;
 }
 export {};

@@ -80,11 +80,25 @@ export declare type Filter = object | {
     $or: Filter[];
 } | {};
 export declare type JoinInfo = {
-    expectOne: boolean;
+    expectOne?: boolean;
     paths: {
+        /**
+         * The table that JOIN ON columns refer to.
+         * columns in index = 1 refer to this table. index = 0 columns refer to previous JoinInfo.table
+         */
         table: string;
-        on: [[string, string]];
+        /**
+         * Source and target JOIN ON columns
+         * e.g.:    [source_table_column: string, table_column: string][]
+         */
+        on: [string, string][];
+        /**
+         * Source table name
+         */
         source: string;
+        /**
+         * Target table name
+         */
         target: string;
     }[];
 };
@@ -177,7 +191,7 @@ export declare class ViewHandler {
         query: string;
         toOne: boolean;
     };
-    getJoins(source: string, target: string, path?: string[]): JoinInfo;
+    getJoins(source: string, target: string, path?: string[], checkTableConfig?: boolean): JoinInfo;
     checkFilter(filter: any): void;
     getInfo(param1?: any, param2?: any, param3?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<TInfo>;
     getColumns(lang?: string, param2?: any, param3?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]>;

@@ -1,5 +1,5 @@
 import { AnyObject, asName } from "prostgles-types";
-import { DboBuilder, LocalParams } from "./DboBuilder";
+import { DboBuilder, JoinInfo, LocalParams } from "./DboBuilder";
 import { asSQLIdentifier } from "./FileManager";
 import { DB, DbHandler, Prostgles } from "./Prostgles";
 import { asValue } from "./PubSubManager";
@@ -31,6 +31,7 @@ type BaseColumn = {
      */
     info?: ColExtraInfo;
 
+
 }
 
 type SQLDefColumn = {
@@ -60,7 +61,25 @@ type ReferencedColumn = {
     }
 }
 
-type ColumnConfig = BaseColumn & (SQLDefColumn | ReferencedColumn)
+type JoinDef = {
+    sourceTable: string;
+    targetTable: string;
+
+    /**
+     * E.g.: [sourceCol: string, targetCol: string][];
+     */
+    on: [string, string][];
+}
+
+/**
+ * Used in specifying a join path to a table. This column name can then be used in select
+ */
+type NamedJoinColumn = {
+    label?: string;
+    joinDef: JoinDef[];
+}
+
+type ColumnConfig = NamedJoinColumn | (BaseColumn & (SQLDefColumn | ReferencedColumn))
 
 type TableDefinition = {
     columns: {
@@ -106,6 +125,34 @@ export default class TableConfigurator {
             if(min !== undefined && value !== undefined && value < min) throw `${params.col} must be less than ${min}`
             if(max !== undefined && value !== undefined && value > max) throw `${params.col} must be greater than ${max}`
         }
+    }
+
+    getJoinInfo = (sourceTable: string, targetTable: string): JoinInfo | undefined => {
+        if(
+            sourceTable in this.config &&
+            this.config[sourceTable] &&
+            "columns" in this.config[sourceTable]
+        ){
+            const td = this.config[sourceTable];
+            if("columns" in td && td.columns[targetTable]){
+                const cd = td.columns[targetTable];
+                if("joinDef" in cd){
+                    const { joinDef } = cd;
+                    const res: JoinInfo = {
+                        expectOne: false,
+                        paths: joinDef.map(({ sourceTable, targetTable: table, on }) => ({
+                            source: sourceTable,
+                            target: targetTable,
+                            table,
+                            on
+                        })),
+                    }
+        
+                    return res;
+                }
+            }
+        }
+        return undefined;
     }
 
     async init(){

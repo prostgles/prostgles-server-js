@@ -240,13 +240,18 @@ class ViewHandler {
         }).join("\n");
         return { query, toOne: false };
     }
-    getJoins(source, target, path) {
+    getJoins(source, target, path, checkTableConfig) {
         let paths = [];
         if (!this.joinPaths)
-            throw "Joins dissallowed";
+            throw `${source} - ${target} Join info missing or dissallowed`;
         if (path && !path.length)
             throw `Empty join path ( $path ) specified for ${source} <-> ${target}`;
         /* Find the join path between tables */
+        if (checkTableConfig) {
+            const tableConfigJoinInfo = this.dboBuilder.prostgles.tableConfigurator.getJoinInfo(source, target);
+            if (tableConfigJoinInfo)
+                return tableConfigJoinInfo;
+        }
         let jp;
         if (!path) {
             jp = this.joinPaths.find(j => path ? j.path.join() === path.join() : j.t1 === source && j.t2 === target);
@@ -2148,10 +2153,30 @@ class DboBuilder {
                     tables.map(t2 => {
                         const spath = shortestPath_1.findShortestPath(this.joinGraph, t1, t2);
                         if (spath && spath.distance < Infinity) {
-                            if (!this.joinPaths.find(j => j.t1 === t1 && j.t2 === t2)) {
+                            const existing1 = this.joinPaths.find(j => j.t1 === t1 && j.t2 === t2);
+                            if (!existing1) {
                                 this.joinPaths.push({ t1, t2, path: spath.path });
                             }
-                            if (!this.joinPaths.find(j => j.t2 === t1 && j.t1 === t2)) {
+                            else {
+                                /* Same length paths prioritised by the number of unique referenced tables */
+                                // const pkeys = existing1.path.filter((table, i, arr) => {
+                                //     if(i){
+                                //         const thisTable = table;
+                                //         const prevTable = arr[i - 1]
+                                //         const prevTableDef = this.tablesOrViews.find(t => t.name === prevTable);
+                                //         const thisTableDef = this.tablesOrViews.find(t => t.name === thisTable);
+                                //         if(prevTableDef && thisTableDef){
+                                //             const prevPkeys = prevTableDef.columns.find(c => c.is_pkey && c.references?.ftable === thisTable);
+                                //             const thisPkeys = thisTableDef.columns.find(c => c.is_pkey && c.references?.ftable === prevTable);
+                                //             return prevPkeys;
+                                //         }
+                                //     }
+                                //     return false;
+                                // });
+                            }
+                            console.error("NEED TO PRIORITISE JOINS through pkeys");
+                            const existing2 = this.joinPaths.find(j => j.t2 === t1 && j.t1 === t2);
+                            if (!existing2) {
                                 this.joinPaths.push({ t1: t2, t2: t1, path: spath.path.slice().reverse() });
                             }
                         }

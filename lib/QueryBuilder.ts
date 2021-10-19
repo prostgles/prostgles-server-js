@@ -1017,15 +1017,27 @@ export function makeQuery(
 
   // const indent = (a, b) => a;
   const joinTables = (q1: NewQuery, q2: NewQuery): string[] => {
-    const joinInfo = _this.getJoins(q1.table, q2.table, q2.$path);
+    const joinInfo = _this.getJoins(q1.table, q2.table, q2.$path, true);
     const paths = joinInfo.paths;
 
     return flat(paths.map(({ table, on }, i) => {
+      const getColName = (col: string, q: NewQuery) => {
+        if(table === q.table){
+          const colFromSelect = q.select.find(s => s.getQuery() === asName(col));
+          if(!colFromSelect){
+            console.error(`${col} column might be missing in user publish `);
+            throw `Could not find join column (${col}) in allowe select. Some join tables and columns might be invalid/dissallowed`
+          }
+          return colFromSelect.alias;
+        }
+
+        return col;
+      }
       const getPrevColName = (col: string) => {
-        return table === q1.table? q1.select.find(s => s.getQuery() === asName(col)).alias : col;
+        return getColName(col, q1);
       }
       const getThisColName = (col: string) => {
-        return table === q2.table? q2.select.find(s => s.getQuery() === asName(col)).alias : col;
+        return getColName(col, q2);
       }
 
       // console.log(JSON.stringify({i, table, on, q1, q2}, null, 2));

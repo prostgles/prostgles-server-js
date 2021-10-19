@@ -31,6 +31,30 @@ class TableConfigurator {
                     throw `${params.col} must be greater than ${max}`;
             }
         };
+        this.getJoinInfo = (sourceTable, targetTable) => {
+            if (sourceTable in this.config &&
+                this.config[sourceTable] &&
+                "columns" in this.config[sourceTable]) {
+                const td = this.config[sourceTable];
+                if ("columns" in td && td.columns[targetTable]) {
+                    const cd = td.columns[targetTable];
+                    if ("joinDef" in cd) {
+                        const { joinDef } = cd;
+                        const res = {
+                            expectOne: false,
+                            paths: joinDef.map(({ sourceTable, targetTable: table, on }) => ({
+                                source: sourceTable,
+                                target: targetTable,
+                                table,
+                                on
+                            })),
+                        };
+                        return res;
+                    }
+                }
+            }
+            return undefined;
+        };
         this.config = prostgles.opts.tableConfig;
         this.prostgles = prostgles;
     }

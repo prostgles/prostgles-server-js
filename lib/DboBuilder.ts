@@ -184,11 +184,29 @@ type Query = {
 }
 
 export type JoinInfo = { 
-    expectOne: boolean, 
-    paths: { 
-        table: string, 
-        on: [[string, string]],
+    expectOne?: boolean, 
+    paths: {
+
+        /**
+         * The table that JOIN ON columns refer to.
+         * columns in index = 1 refer to this table. index = 0 columns refer to previous JoinInfo.table
+         */
+        table: string,
+
+        /**
+         * Source and target JOIN ON columns
+         * e.g.:    [source_table_column: string, table_column: string][]
+         */
+        on: [string, string][],
+
+        /**
+         * Source table name
+         */
         source: string, 
+        
+        /**
+         * Target table name
+         */
         target: string 
     }[]
 }
@@ -503,14 +521,19 @@ export class ViewHandler {
         return { query, toOne: false }
     }
 
-    getJoins(source: string, target: string, path?: string[]): JoinInfo {
+    getJoins(source: string, target: string, path?: string[], checkTableConfig?: boolean): JoinInfo {
         let paths: JoinInfo["paths"] = [];
 
-        if(!this.joinPaths) throw "Joins dissallowed";
+        if(!this.joinPaths) throw `${source} - ${target} Join info missing or dissallowed`;
 
         if(path && !path.length) throw `Empty join path ( $path ) specified for ${source} <-> ${target}`
 
         /* Find the join path between tables */
+        if(checkTableConfig){
+            const tableConfigJoinInfo = this.dboBuilder.prostgles.tableConfigurator.getJoinInfo(source, target);
+            if(tableConfigJoinInfo) return tableConfigJoinInfo;
+        }
+
         let jp;
         if(!path){ 
             jp = this.joinPaths.find(j => path? j.path.join() === path.join() : j.t1 === source && j.t2 === target);
@@ -2718,10 +2741,30 @@ export class DboBuilder {
                 tables.map(t2 => {
                     const spath = findShortestPath(this.joinGraph, t1, t2);
                     if(spath && spath.distance < Infinity){
-                        if(!this.joinPaths.find(j => j.t1 === t1 && j.t2 === t2)){
+
+                        const existing1 = this.joinPaths.find(j => j.t1 === t1 && j.t2 === t2)
+                        if(!existing1){
                             this.joinPaths.push({ t1, t2, path: spath.path });
+                        } else {
+                            /* Same length paths prioritised by the number of unique referenced tables */
+                            // const pkeys = existing1.path.filter((table, i, arr) => {
+                            //     if(i){
+                            //         const thisTable = table;
+                            //         const prevTable = arr[i - 1]
+                            //         const prevTableDef = this.tablesOrViews.find(t => t.name === prevTable);
+                            //         const thisTableDef = this.tablesOrViews.find(t => t.name === thisTable);
+                            //         if(prevTableDef && thisTableDef){
+                            //             const prevPkeys = prevTableDef.columns.find(c => c.is_pkey && c.references?.ftable === thisTable);
+                            //             const thisPkeys = thisTableDef.columns.find(c => c.is_pkey && c.references?.ftable === prevTable);
+                            //             return prevPkeys;
+                            //         }
+                            //     }
+                            //     return false;
+                            // });
                         }
-                        if(!this.joinPaths.find(j => j.t2 === t1 && j.t1 === t2)){
+                        console.error("NEED TO PRIORITISE JOINS through pkeys")
+                        const existing2 = this.joinPaths.find(j => j.t2 === t1 && j.t1 === t2);
+                        if(!existing2){
                             this.joinPaths.push({ t1: t2, t2: t1, path: spath.path.slice().reverse() });
                         }
                     }
