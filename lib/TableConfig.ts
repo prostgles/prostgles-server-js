@@ -211,7 +211,7 @@ export default class TableConfigurator {
                 }
                 
                 const colDefs = [];
-                Object.keys(tableConf.columns).map(colName => {
+                Object.keys(tableConf.columns).filter(c => !("joinDef" in tableConf.columns[c])).map(colName => {
                     const colConf = tableConf.columns[colName];
                     
                     if(!this.dbo[tableName]){
