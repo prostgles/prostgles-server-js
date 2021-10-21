@@ -978,7 +978,11 @@ function makeQuery(_this, q, depth = 0, joinFields = [], selectParams) {
     let rootGroupBy;
     if ((selectParams.groupBy || aggs.length || q.joins && q.joins.length) && nonAggs.length) {
         // console.log({ aggs, nonAggs, joins: q.joins })
-        rootGroupBy = `GROUP BY ${(depth ? q.allFields : nonAggs.map(s => s.type === "function" ? s.getQuery() : prostgles_types_1.asName(s.alias))).concat(aggs && aggs.length ? [] : [`ctid`]).filter(s => s).join(", ")} `;
+        rootGroupBy = `GROUP BY ${(depth ?
+            q.allFields.map(f => prostgles_types_1.asName(f)) :
+            nonAggs.map(s => s.type === "function" ? s.getQuery() : prostgles_types_1.asName(s.alias))).concat((aggs && aggs.length) ?
+            [] :
+            [`ctid`]).filter(s => s).join(", ")} `;
     }
     /* Joined query */
     const rootSelect = [
@@ -1004,7 +1008,7 @@ function makeQuery(_this, q, depth = 0, joinFields = [], selectParams) {
                 "-- 2. [source full select + ctid to group by] ",
                 "SELECT ",
                 ...selectArrComma(q.allFields.concat(["ctid"])
-                    .map(field => `${makePrefAN(q)}.${field}  `)
+                    .map(field => `${makePrefAN(q)}.${prostgles_types_1.asName(field)}  `)
                     .concat(joins.map((j, i) => makePrefAN(j) + "." + prefJCAN(j, `json`) + ", " + makePrefAN(j) + "." + prefJCAN(j, `rowid_sorted`)).concat(joins.map(j => `row_number() over(partition by ${makePrefAN(j)}.${prefJCAN(j, `rowid_sorted`)}, ${makePrefAN(q)}.ctid ) AS ${prefJCAN(j, `dupes_rowid`)}`)))),
                 `FROM ( `,
                 ...indjArr(depth + 1, [

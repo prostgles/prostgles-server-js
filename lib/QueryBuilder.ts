@@ -1176,7 +1176,15 @@ export function makeQuery(
   let rootGroupBy: string;
   if((selectParams.groupBy || aggs.length || q.joins && q.joins.length) && nonAggs.length){
     // console.log({ aggs, nonAggs, joins: q.joins })
-    rootGroupBy = `GROUP BY ${(depth? q.allFields : nonAggs.map(s => s.type === "function"? s.getQuery() : asName(s.alias))).concat(aggs && aggs.length? [] : [`ctid`]).filter(s => s).join(", ")} `
+    rootGroupBy = `GROUP BY ${
+      (depth? 
+        q.allFields.map(f => asName(f)) : 
+        nonAggs.map(s => s.type === "function"? s.getQuery() : asName(s.alias))
+      ).concat(
+        (aggs && aggs.length)? 
+          [] : 
+          [`ctid`]
+        ).filter(s => s).join(", ")} `
   }
 
   /* Joined query */
@@ -1209,7 +1217,7 @@ export function makeQuery(
           ,   "SELECT "
           ,   ...selectArrComma(
                   q.allFields.concat(["ctid"])
-                  .map(field => `${makePrefAN(q)}.${field}  `)
+                  .map(field => `${makePrefAN(q)}.${asName(field)}  `)
                   .concat(
                       joins.map((j, i)=> 
                       makePrefAN(j) + "." + prefJCAN(j, `json`) + ", " + makePrefAN(j) + "." + prefJCAN(j, `rowid_sorted`)
