@@ -378,20 +378,21 @@ class ViewHandler {
                     ].includes(c.name);
                 })
                     .map(c => {
-                    var _a, _b, _c, _e, _f, _g, _h, _j, _k, _l, _m;
+                    var _a, _b, _c, _e, _f, _g, _h;
                     let label = c.comment || capitalizeFirstLetter(c.name, " ");
-                    const iConf = (_f = (_e = (_c = (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.opts) === null || _b === void 0 ? void 0 : _b.i18n) === null || _c === void 0 ? void 0 : _c.column_labels) === null || _e === void 0 ? void 0 : _e[this.name]) === null || _f === void 0 ? void 0 : _f[c.name];
-                    const fallbackLang = (_j = (_h = (_g = this.dboBuilder.prostgles) === null || _g === void 0 ? void 0 : _g.opts) === null || _h === void 0 ? void 0 : _h.i18n) === null || _j === void 0 ? void 0 : _j.fallbackLang;
-                    _lang = _lang || fallbackLang;
-                    if ((lang || fallbackLang) && iConf) {
-                        let langLabel;
-                        if (lang)
-                            langLabel = iConf[lang];
-                        if (!langLabel && fallbackLang)
-                            langLabel = iConf[fallbackLang];
-                        label = langLabel || label;
+                    const tblConfig = (_c = (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.opts) === null || _b === void 0 ? void 0 : _b.tableConfig) === null || _c === void 0 ? void 0 : _c[this.name];
+                    if (tblConfig && "columns" in tblConfig) {
+                        const lbl = (_e = tblConfig === null || tblConfig === void 0 ? void 0 : tblConfig.columns[c.name]) === null || _e === void 0 ? void 0 : _e.label;
+                        if (["string", "object"].includes(typeof lbl)) {
+                            if (typeof lbl === "string") {
+                                label = lbl;
+                            }
+                            else {
+                                label = lbl[lang] || (lbl === null || lbl === void 0 ? void 0 : lbl.en) || label;
+                            }
+                        }
                     }
-                    return Object.assign(Object.assign(Object.assign({}, c), { label, tsDataType: postgresToTsType(c.udt_name), insert: Boolean(p.insert && p.insert.fields && p.insert.fields.includes(c.name)), select: Boolean(p.select && p.select.fields && p.select.fields.includes(c.name)), filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)), update: Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)), delete: Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)) }), (((_m = (_l = (_k = this.dboBuilder) === null || _k === void 0 ? void 0 : _k.prostgles) === null || _l === void 0 ? void 0 : _l.tableConfigurator) === null || _m === void 0 ? void 0 : _m.getColInfo({ table: this.name, col: c.name })) || {}));
+                    return Object.assign(Object.assign(Object.assign({}, c), { label, tsDataType: postgresToTsType(c.udt_name), insert: Boolean(p.insert && p.insert.fields && p.insert.fields.includes(c.name)), select: Boolean(p.select && p.select.fields && p.select.fields.includes(c.name)), filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)), update: Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)), delete: Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)) }), (((_h = (_g = (_f = this.dboBuilder) === null || _f === void 0 ? void 0 : _f.prostgles) === null || _g === void 0 ? void 0 : _g.tableConfigurator) === null || _h === void 0 ? void 0 : _h.getColInfo({ table: this.name, col: c.name })) || {}));
                 });
                 //.sort((a, b) => a.ordinal_position - b.ordinal_position);
                 // const tblInfo = await this.getInfo();

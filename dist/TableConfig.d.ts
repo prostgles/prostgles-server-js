@@ -18,11 +18,14 @@ declare type LookupTableDefinition<LANG_IDS> = {
         };
     };
 };
-declare type BaseColumn = {
+declare type BaseColumn<LANG_IDS> = {
     /**
      * Will add these values to .getColumns() result
      */
     info?: ColExtraInfo;
+    label?: string | Partial<{
+        [lang_id in keyof LANG_IDS]: string;
+    }>;
 };
 declare type SQLDefColumn = {
     /**
@@ -59,10 +62,12 @@ declare type NamedJoinColumn = {
     label?: string;
     joinDef: JoinDef[];
 };
-declare type ColumnConfig = NamedJoinColumn | (BaseColumn & (SQLDefColumn | ReferencedColumn));
-declare type TableDefinition = {
+declare type ColumnConfig<LANG_IDS = {
+    en: 1;
+}> = NamedJoinColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn));
+declare type TableDefinition<LANG_IDS> = {
     columns: {
-        [column_name: string]: ColumnConfig;
+        [column_name: string]: ColumnConfig<LANG_IDS>;
     };
     constraints?: {
         [constraint_name: string]: string;
@@ -73,9 +78,8 @@ declare type TableDefinition = {
  */
 export declare type TableConfig<LANG_IDS = {
     en: 1;
-    ro: 1;
 }> = {
-    [table_name: string]: BaseTableDefinition & (TableDefinition | LookupTableDefinition<LANG_IDS>);
+    [table_name: string]: BaseTableDefinition & (TableDefinition<LANG_IDS> | LookupTableDefinition<LANG_IDS>);
 };
 /**
  * Will be run between initSQL and fileTable

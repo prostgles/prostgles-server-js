@@ -60,6 +60,39 @@ const dbConnection = {
         }
     };
     log("created prostgles");
+    const tableConfig = {
+        tr2: {
+            columns: {
+                t1: { label: { fr: "fr_t1" } },
+                t2: { label: { en: "en_t2" } },
+            }
+        },
+        lookup_col1: {
+            dropIfExists: true,
+            isLookupTable: {
+                values: {
+                    a: {},
+                    b: {}
+                },
+            }
+        },
+        uuid_text: {
+            columns: {
+                col1: {
+                    references: {
+                        tableName: "lookup_col1",
+                        nullable: true,
+                    }
+                },
+                col2: {
+                    references: {
+                        tableName: "lookup_col1",
+                        nullable: true,
+                    }
+                }
+            }
+        }
+    };
     let prgl = await (0, prostgles_server_1.default)({
         dbConnection,
         sqlFilePath: path_1.default.join(__dirname + '/init.sql'),
@@ -69,33 +102,7 @@ const dbConnection = {
         transactions: true,
         // DEBUG_MODE: true,
         // onNotice: console.log,
-        tableConfig: {
-            lookup_col1: {
-                dropIfExists: true,
-                isLookupTable: {
-                    values: {
-                        a: {},
-                        b: {}
-                    },
-                }
-            },
-            uuid_text: {
-                columns: {
-                    col1: {
-                        references: {
-                            tableName: "lookup_col1",
-                            nullable: true,
-                        }
-                    },
-                    col2: {
-                        references: {
-                            tableName: "lookup_col1",
-                            nullable: true,
-                        }
-                    }
-                }
-            }
-        },
+        tableConfig,
         fileTable: {
             // awsS3Config: {
             //   accessKeyId: process.env.S3_KEY,
@@ -268,7 +275,6 @@ const dbConnection = {
             // 	}
             // };
         },
-        i18n,
         // joins: "inferred",
         joins: [
             {

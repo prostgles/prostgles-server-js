@@ -18,6 +18,7 @@ import server_only_queries from "../server_only_queries";
 import { DBObj, I18N_DBO_CONFIG } from "./DBoGenerated";
 // type DBObj = any;
 import { DB, DbHandler } from 'prostgles-server/dist/Prostgles';
+import { TableConfig } from '../../dist/TableConfig';
 
 const log = (msg: string, extra?: any, trace?: boolean) => {
 	const msgs = ["(server): " + msg, extra].filter(v => v);
@@ -75,6 +76,40 @@ const dbConnection = {
 	}
 
 	log("created prostgles")
+	const tableConfig: TableConfig<{ en: 1, fr: 1 }> = {
+
+		tr2: {
+			columns: {
+				t1: { label: { fr: "fr_t1" } },
+				t2: { label: { en: "en_t2" } },
+			}
+		},
+		lookup_col1: {
+			dropIfExists: true, 
+			isLookupTable: {
+				values: {
+					a: {},
+					b: {}
+				},
+			}
+		},
+		uuid_text: {
+			columns: {
+				col1: {
+					references: {
+						tableName: "lookup_col1",
+						nullable: true,
+					}
+				},
+				col2: {
+					references: {
+						tableName: "lookup_col1",
+						nullable: true,
+					}
+				}
+			}
+		}
+	}
 	let prgl = await prostgles({
 		dbConnection,
 		sqlFilePath: path.join(__dirname+'/init.sql'),
@@ -85,33 +120,7 @@ const dbConnection = {
 
 		// DEBUG_MODE: true,
 		// onNotice: console.log,
-		tableConfig: {
-			lookup_col1: {
-				dropIfExists: true, 
-				isLookupTable: {
-					values: {
-						a: {},
-						b: {}
-					},
-				}
-			},
-			uuid_text: {
-				columns: {
-					col1: {
-						references: {
-							tableName: "lookup_col1",
-							nullable: true,
-						}
-					},
-					col2: {
-						references: {
-							tableName: "lookup_col1",
-							nullable: true,
-						}
-					}
-				}
-			}
-		},
+		tableConfig,
 		fileTable: {
 			// awsS3Config: {
 			//   accessKeyId: process.env.S3_KEY,
@@ -289,7 +298,6 @@ const dbConnection = {
 			// 	}
 			// };
 		},
-		i18n,
 		// joins: "inferred",
 		joins: [
 			{ 

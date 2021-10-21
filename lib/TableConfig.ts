@@ -25,13 +25,13 @@ type LookupTableDefinition<LANG_IDS> = {
     }
 }
 
-type BaseColumn = {
+type BaseColumn<LANG_IDS> = {
     /**
      * Will add these values to .getColumns() result
      */
     info?: ColExtraInfo;
 
-
+    label?: string | Partial<{ [lang_id in keyof LANG_IDS]: string; }>
 }
 
 type SQLDefColumn = {
@@ -79,11 +79,11 @@ type NamedJoinColumn = {
     joinDef: JoinDef[];
 }
 
-type ColumnConfig = NamedJoinColumn | (BaseColumn & (SQLDefColumn | ReferencedColumn))
+type ColumnConfig<LANG_IDS= { en: 1 }> = NamedJoinColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn))
 
-type TableDefinition = {
+type TableDefinition<LANG_IDS> = {
     columns: {
-        [column_name: string]: ColumnConfig
+        [column_name: string]: ColumnConfig<LANG_IDS>
     },
     constraints?: {
         [constraint_name: string]: string
@@ -93,8 +93,8 @@ type TableDefinition = {
 /**
  * Helper utility to create lookup tables for TEXT columns
  */
-export type TableConfig<LANG_IDS = { en: 1, ro: 1 }> = {
-    [table_name: string]: BaseTableDefinition & (TableDefinition | LookupTableDefinition<LANG_IDS>);
+export type TableConfig<LANG_IDS = { en: 1 }> = {
+    [table_name: string]: BaseTableDefinition & (TableDefinition<LANG_IDS> | LookupTableDefinition<LANG_IDS>);
 }
 
 /**

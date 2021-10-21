@@ -218,19 +218,6 @@ declare type Keywords = {
 export declare type DeepPartial<T> = {
     [P in keyof T]?: DeepPartial<T[P]>;
 };
-export declare type I18N_CONFIG<LANG_IDS = {
-    en: 1;
-    fr: 1;
-}> = {
-    fallbackLang: keyof LANG_IDS;
-    column_labels?: DeepPartial<{
-        [table_name: string]: {
-            [column_name: string]: {
-                [lang_id in keyof LANG_IDS]: string;
-            };
-        };
-    }>;
-};
 declare type ExpressApp = {
     get: (routePath: string, cb: (req: {
         params: {
@@ -304,7 +291,6 @@ export declare type ProstglesInitOptions<DBO = DbHandler> = {
     }) => void);
     keywords?: Keywords;
     onNotice?: (msg: any) => void;
-    i18n?: I18N_CONFIG<AnyObject>;
     fileTable?: FileTableConfig;
     tableConfig?: TableConfig;
 };

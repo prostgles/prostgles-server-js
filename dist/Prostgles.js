@@ -215,7 +215,7 @@ class Prostgles {
             "onReady", "dbConnection", "dbOptions", "publishMethods", "io",
             "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect",
             "onSocketDisconnect", "sqlFilePath", "auth", "DEBUG_MODE", "watchSchema",
-            "i18n", "fileTable", "tableConfig"
+            "fileTable", "tableConfig"
         ];
         const unknownParams = Object.keys(params).filter((key) => !config.includes(key));
         if (unknownParams.length) {

@@ -670,18 +670,19 @@ export class ViewHandler {
             })
             .map(c => {
                 let label = c.comment || capitalizeFirstLetter(c.name, " ");
-                
-                const iConf = this.dboBuilder.prostgles?.opts?.i18n?.column_labels?.[this.name]?.[c.name];
-                const fallbackLang = this.dboBuilder.prostgles?.opts?.i18n?.fallbackLang;
-                _lang = _lang || fallbackLang as string;
-                
-                if((lang || fallbackLang) && iConf){
-                    let langLabel;
-                    if(lang) langLabel = iConf[lang];
-                    if(!langLabel && fallbackLang) langLabel = iConf[fallbackLang];
-                    label = langLabel || label;
-                }
 
+                const tblConfig = this.dboBuilder.prostgles?.opts?.tableConfig?.[this.name];
+                if(tblConfig && "columns" in tblConfig){
+                    const lbl = tblConfig?.columns[c.name]?.label;
+                    if(["string", "object"].includes(typeof lbl)){
+                        if(typeof lbl === "string") {
+                            label = lbl
+                        } else {
+                            label = lbl[lang] || lbl?.en || label;
+                        }
+                    }
+                }
+                
                 return {
                     ...c,
                     label,
