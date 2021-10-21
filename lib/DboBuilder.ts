@@ -1107,7 +1107,7 @@ export class ViewHandler {
                 let exactPaths = [t1, t2];
 
                 if(!depth && eConfig.shortestJoin) exactPaths = undefined;
-                const jinf= this.getJoins(t1, t2, exactPaths);
+                const jinf= this.getJoins(t1, t2, exactPaths, true);
                 expectOne = expectOne && jinf.expectOne
                 joinPaths = joinPaths.concat(jinf.paths);
             });
@@ -1218,7 +1218,7 @@ export class ViewHandler {
                 if(!isJoined){
                     if(tables.length !== 1) throw "Expecting single table in exists filter. Example: { $exists: { tableName: Filter } }"
                 } else {
-                    /* First part can be the ** param meaning shortest join */
+                    /* First part can be the ** param meaning shortest join. Will be overriden by anything in tableConfig */
                     
                     if(!tables.length) throw ERR + "\nBut got: " + data[key];
 
