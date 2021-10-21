@@ -31,7 +31,7 @@ type BaseColumn<LANG_IDS> = {
      */
     info?: ColExtraInfo;
 
-    label?: string | Partial<{ [lang_id in keyof LANG_IDS]: string; }>
+    label?: string | Partial<{ [lang_id in keyof LANG_IDS]: string; }>;
 }
 
 type SQLDefColumn = {

@@ -1066,7 +1066,7 @@ export function makeQuery(
           const targetSelect = q2.select.filter(s => s.selected).map(s => {
               /* Rename aggs to avoid collision with join cols */
               if(s.type === "aggregation") return asName(`agg_${s.alias}`) + " AS " + asName(s.alias);
-              return s.alias;
+              return asName(s.alias);
             }).concat(q2.joins.map(j => asName(j.table))).join(", ");
 
           const _iiQ = makeQuery(

@@ -885,7 +885,7 @@ function makeQuery(_this, q, depth = 0, joinFields = [], selectParams) {
                     /* Rename aggs to avoid collision with join cols */
                     if (s.type === "aggregation")
                         return prostgles_types_1.asName(`agg_${s.alias}`) + " AS " + prostgles_types_1.asName(s.alias);
-                    return s.alias;
+                    return prostgles_types_1.asName(s.alias);
                 }).concat(q2.joins.map(j => prostgles_types_1.asName(j.table))).join(", ");
                 const _iiQ = makeQuery(_this, q2, depth + 1, on.map(([c1, c2]) => prostgles_types_1.asName(c2)), selectParams);
                 // const iiQ = flat(_iiQ.split("\n")); // prettify for debugging
