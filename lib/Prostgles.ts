@@ -1327,7 +1327,7 @@ export class PublishParser {
 
     
     /* Prepares schema for client. Only allowed views and commands will be present */
-    async getSchemaFromPublish(socket: any){
+    async getSchemaFromPublish(socket: any): Promise<AnyObject> {
         let schema = {};
         
         try {
@@ -1368,7 +1368,7 @@ export class PublishParser {
 
                                     /* Pass sync info */
                                     schema[tableName][method] = table_rules[method];
-                                } else {
+                                } else if(table_rules[method]) {
 
                                     schema[tableName][method] = {};
 

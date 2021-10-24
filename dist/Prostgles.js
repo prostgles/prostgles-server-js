@@ -841,7 +841,7 @@ class PublishParser {
                                     /* Pass sync info */
                                     schema[tableName][method] = table_rules[method];
                                 }
-                                else {
+                                else if (table_rules[method]) {
                                     schema[tableName][method] = {};
                                     /* Test for issues with the publish rules */
                                     if (["update", "find", "findOne", "insert", "delete", "upsert"].includes(method)) {

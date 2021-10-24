@@ -375,7 +375,7 @@ export declare class PublishParser {
     getValidatedRequestRuleWusr({ tableName, command, localParams }: DboTableCommand): Promise<TableRule>;
     getValidatedRequestRule({ tableName, command, localParams }: DboTableCommand, clientInfo: ClientInfo): Promise<TableRule>;
     getTableRules({ tableName, localParams }: DboTable, clientInfo: ClientInfo): Promise<PublishTable>;
-    getSchemaFromPublish(socket: any): Promise<{}>;
+    getSchemaFromPublish(socket: any): Promise<AnyObject>;
 }
 export declare function isSuperUser(db: DB): Promise<boolean>;
 //# sourceMappingURL=Prostgles.d.ts.map
