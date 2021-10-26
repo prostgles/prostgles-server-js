@@ -259,7 +259,7 @@ export default class TableConfigurator {
 
                     } else if("isText" in colConf && colConf.isText){
                         
-                        return ` ${asName(name)} TEXT ${getTextDef(colConf)}`;
+                        return ` ${asName(name)} ${getTextDef(colConf)} `;
                     } else {
                         throw "Unknown column config: " + JSON.stringify(colConf);
                     }

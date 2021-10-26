@@ -124,7 +124,7 @@ class TableConfigurator {
                             return ` ${prostgles_types_1.asName(name)} ${colConf.sqlDefinition} `;
                         }
                         else if ("isText" in colConf && colConf.isText) {
-                            return ` ${prostgles_types_1.asName(name)} TEXT ${getTextDef(colConf)}`;
+                            return ` ${prostgles_types_1.asName(name)} ${getTextDef(colConf)} `;
                         }
                         else {
                             throw "Unknown column config: " + JSON.stringify(colConf);
