@@ -68,11 +68,26 @@ function escapeTSNames(str, capitalize = true) {
 }
 const shortestPath_1 = require("./shortestPath");
 /* DEBUG CLIENT ERRORS HERE */
-function makeErr(err, localParams) {
+function makeErr(err, localParams, view, allowedKeys) {
+    var _a;
     // console.trace(err)
-    if (process.env.TEST_TYPE || process.env.PRGL_DEBUG)
+    if (process.env.TEST_TYPE || process.env.PRGL_DEBUG) {
         console.trace(err);
-    return Promise.reject(Object.assign(Object.assign(Object.assign(Object.assign({}, ((!localParams || !localParams.socket) ? err : {})), PubSubManager_1.filterObj(err, ["column", "code", "table", "constraint"])), (err && err.toString ? { txt: err.toString() } : {})), { code_info: sqlErrCodeToMsg(err.code) }));
+    }
+    const errObject = Object.assign(Object.assign(Object.assign(Object.assign({}, ((!localParams || !localParams.socket) ? err : {})), PubSubManager_1.filterObj(err, ["column", "code", "table", "constraint"])), (err && err.toString ? { txt: err.toString() } : {})), { code_info: sqlErrCodeToMsg(err.code) });
+    if (((_a = view === null || view === void 0 ? void 0 : view.dboBuilder) === null || _a === void 0 ? void 0 : _a.constraints) && errObject.constraint && !errObject.column) {
+        const constraint = view.dboBuilder.constraints
+            .find(c => c.conname === errObject.constraint && c.relname === view.name);
+        if (constraint) {
+            const cols = view.columns.filter(c => (!allowedKeys || allowedKeys.includes(c.name)) &&
+                constraint.conkey.includes(c.ordinal_position));
+            if (cols.length) {
+                errObject.column = cols[0].name;
+                errObject.columns = cols.map(c => c.name);
+            }
+        }
+    }
+    return Promise.reject(errObject);
 }
 exports.EXISTS_KEYS = ["$exists", "$notExists", "$existsJoined", "$notExistsJoined"];
 function parseError(e) {
@@ -589,7 +604,7 @@ class ViewHandler {
                 if (["row", "value"].includes(returnType)) {
                     return (this.t || this.db).oneOrNone(_query).then(data => {
                         return (data && returnType === "value") ? Object.values(data)[0] : data;
-                    }).catch(err => makeErr(err, localParams));
+                    }).catch(err => makeErr(err, localParams, this));
                 }
                 else {
                     return (this.t || this.db).any(_query).then(data => {
@@ -597,14 +612,14 @@ class ViewHandler {
                             return data.map(d => Object.values(d)[0]);
                         }
                         return data;
-                    }).catch(err => makeErr(err, localParams));
+                    }).catch(err => makeErr(err, localParams, this));
                 }
             }
             catch (e) {
                 // console.trace(e)
                 if (localParams && localParams.testRule)
                     throw e;
-                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.find()` };
+                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.find(${JSON.stringify(filter || {}, null, 2)}, ${JSON.stringify(selectParams || {}, null, 2)})` };
             }
         });
     }
@@ -1365,10 +1380,11 @@ class TableHandler extends ViewHandler {
                 const queries = yield Promise.all(data.map(([filter, data]) => __awaiter(this, void 0, void 0, function* () {
                     return yield this.update(filter, data, Object.assign(Object.assign({}, (params || {})), { returning: undefined }), tableRules, Object.assign(Object.assign({}, (localParams || {})), { returnQuery: true }));
                 })));
+                const keys = (data && data.length) ? Object.keys(data[0]) : [];
                 return this.db.tx(t => {
                     const _queries = queries.map(q => t.none(q));
                     return t.batch(_queries);
-                }).catch(err => makeErr(err, localParams));
+                }).catch(err => makeErr(err, localParams, this, keys));
             }
             catch (e) {
                 if (localParams && localParams.testRule)
@@ -1472,14 +1488,14 @@ class TableHandler extends ViewHandler {
                 if (returnQuery)
                     return query;
                 if (this.t) {
-                    return this.t[qType](query).catch(err => makeErr(err, localParams));
+                    return this.t[qType](query).catch(err => makeErr(err, localParams, this, _fields));
                 }
-                return this.db.tx(t => t[qType](query)).catch(err => makeErr(err, localParams));
+                return this.db.tx(t => t[qType](query)).catch(err => makeErr(err, localParams, this, _fields));
             }
             catch (e) {
                 if (localParams && localParams.testRule)
                     throw e;
-                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.update()` };
+                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.update(${JSON.stringify(filter || {}, null, 2)}, ${JSON.stringify(newData || {}, null, 2)}, ${JSON.stringify(params || {}, null, 2)})` };
             }
         });
     }
@@ -1800,18 +1816,19 @@ class TableHandler extends ViewHandler {
                     console.log((_b = (_a = this.t) === null || _a === void 0 ? void 0 : _a.ctx) === null || _b === void 0 ? void 0 : _b.start, "insert in " + this.name, data);
                 }
                 const tx = ((_c = dbTX === null || dbTX === void 0 ? void 0 : dbTX[this.name]) === null || _c === void 0 ? void 0 : _c.t) || this.t;
+                const allowedFieldKeys = this.parseFieldFilter(fields);
                 if (tx) {
-                    result = tx[queryType](query).catch(err => makeErr(err, localParams));
+                    result = tx[queryType](query).catch(err => makeErr(err, localParams, this, allowedFieldKeys));
                 }
                 else {
-                    result = this.db.tx(t => t[queryType](query)).catch(err => makeErr(err, localParams));
+                    result = this.db.tx(t => t[queryType](query)).catch(err => makeErr(err, localParams, this, allowedFieldKeys));
                 }
                 return result;
             }
             catch (e) {
                 if (localParams && localParams.testRule)
                     throw e;
-                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.insert()` };
+                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.insert(${JSON.stringify(rowOrRows || {}, null, 2)}, ${JSON.stringify(param2 || {}, null, 2)})` };
             }
         });
     }
@@ -1878,7 +1895,7 @@ class TableHandler extends ViewHandler {
                 // console.trace(e)
                 if (localParams && localParams.testRule)
                     throw e;
-                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.delete()` };
+                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.delete(${JSON.stringify(filter || {}, null, 2)}, ${JSON.stringify(params || {}, null, 2)})` };
             }
         });
     }
@@ -2176,6 +2193,7 @@ class DboBuilder {
             // await this.pubSubManager.init()
             this.tablesOrViews = yield getTablesForSchemaPostgresSQL(this.db); //, this.schema
             // console.log(this.tablesOrViews.map(t => `${t.name} (${t.columns.map(c => c.name).join(", ")})`))
+            this.constraints = yield getConstraints(this.db);
             const common_types = `
 
 import { ViewHandler, TableHandler, JoinMaker } from "prostgles-types";
@@ -2352,6 +2370,19 @@ DboBuilder.create = (prostgles) => __awaiter(void 0, void 0, void 0, function* (
     let res = new DboBuilder(prostgles);
     return yield res.init();
 });
+function getConstraints(db, schema = "public") {
+    return __awaiter(this, void 0, void 0, function* () {
+        return db.any(`
+        SELECT rel.relname, con.conkey, con.conname
+        FROM pg_catalog.pg_constraint con
+            INNER JOIN pg_catalog.pg_class rel
+                ON rel.oid = con.conrelid
+            INNER JOIN pg_catalog.pg_namespace nsp
+                ON nsp.oid = connamespace
+        WHERE nsp.nspname = ${PubSubManager_1.asValue(schema)}
+    `);
+    });
+}
 function getTablesForSchemaPostgresSQL(db, schema = "public") {
     return __awaiter(this, void 0, void 0, function* () {
         const query = `

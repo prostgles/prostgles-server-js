@@ -100,12 +100,12 @@ declare const CONTENT_TYPE_TO_EXT: {
     readonly "application/rss+xml": readonly ["rss"];
     readonly "application/java-archive": readonly ["jar", "war", "ear"];
     readonly "application/mac-binhex40": readonly ["hqx"];
-    readonly "application/msword": readonly ["doc"];
+    readonly "application/msword": readonly ["doc", "docx"];
     readonly "application/pdf": readonly ["pdf"];
     readonly "application/postscript": readonly ["ps", "eps", "ai"];
     readonly "application/rtf": readonly ["rtf"];
-    readonly "application/vnd.ms-excel": readonly ["xls"];
-    readonly "application/vnd.ms-powerpoint": readonly ["ppt"];
+    readonly "application/vnd.ms-excel": readonly ["xls", "xlsx"];
+    readonly "application/vnd.ms-powerpoint": readonly ["ppt", "pptx"];
     readonly "application/vnd.wap.wmlc": readonly ["wmlc"];
     readonly "application/vnd.google-earth.kml+xml": readonly ["kml"];
     readonly "application/vnd.google-earth.kmz": readonly ["kmz"];

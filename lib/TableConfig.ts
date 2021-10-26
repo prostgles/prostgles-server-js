@@ -1,6 +1,6 @@
 import { AnyObject, asName } from "prostgles-types";
 import { DboBuilder, JoinInfo, LocalParams } from "./DboBuilder";
-import { asSQLIdentifier } from "./FileManager";
+import { asSQLIdentifier, ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE } from "./FileManager";
 import { DB, DbHandler, Prostgles } from "./Prostgles";
 import { asValue } from "./PubSubManager";
 
@@ -42,6 +42,29 @@ type SQLDefColumn = {
     sqlDefinition?: string;
 }
 
+/**
+ * Allows referencing media to this table.
+ * Requires this table to have a primary key AND a valid fileTable config
+ */
+type MediaColumn = ({
+    
+    name: string;
+    label?: string;
+    files: "one" | "many";
+} & (
+    {
+
+        /**
+         * https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/accept
+         */
+        allowedContentType?: Record<Partial<("audio/*" | "video/*" | "image/*" | "text/*" | ALLOWED_CONTENT_TYPE)>, 1>
+    } |
+    { 
+        allowedExtensions?:  Record<Partial<ALLOWED_EXTENSION>, 1> 
+    }
+));
+
+
 type ReferencedColumn = {
 
     /**
@@ -79,7 +102,7 @@ type NamedJoinColumn = {
     joinDef: JoinDef[];
 }
 
-type ColumnConfig<LANG_IDS= { en: 1 }> = NamedJoinColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn))
+type ColumnConfig<LANG_IDS= { en: 1 }> = NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn))
 
 type TableDefinition<LANG_IDS> = {
     columns: {

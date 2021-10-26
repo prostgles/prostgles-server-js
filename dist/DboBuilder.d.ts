@@ -310,6 +310,10 @@ export declare class TableHandler extends ViewHandler {
 }
 export declare class DboBuilder {
     tablesOrViews: TableOrViewInfo[];
+    /**
+     * Used in obtaining column names for error messages
+     */
+    constraints: PGConstraint[];
     db: DB;
     schema: string;
     dbo: DbHandler;
@@ -346,6 +350,20 @@ export declare type TableSchema = {
     columns: ColumnInfo[];
     is_view: boolean;
     parent_tables: string[];
+};
+declare type PGConstraint = {
+    /**
+     * Column ordinal positions
+     */
+    conkey: number[];
+    /**
+     * Constraint name
+     */
+    conname: string;
+    /**
+     * Table name
+     */
+    relname: string;
 };
 export declare function isPlainObject(o: any): boolean;
 export {};

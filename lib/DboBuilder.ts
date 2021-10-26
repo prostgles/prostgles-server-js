@@ -288,15 +288,32 @@ export type ValidatedTableRules = CommonTableRules & {
 }
 
 /* DEBUG CLIENT ERRORS HERE */
-function makeErr(err, localParams?: LocalParams){
+function makeErr(err, localParams?: LocalParams, view?: ViewHandler, allowedKeys?: string[]){
     // console.trace(err)
-    if(process.env.TEST_TYPE || process.env.PRGL_DEBUG) console.trace(err)
-    return Promise.reject({
+    if(process.env.TEST_TYPE || process.env.PRGL_DEBUG) {
+        console.trace(err)
+    }
+    const errObject = {
         ...((!localParams || !localParams.socket)? err : {}),
         ...filterObj(err, ["column", "code", "table", "constraint"]),
         ...(err && err.toString? { txt: err.toString() } : {}),
         code_info: sqlErrCodeToMsg(err.code)
-    });
+    };
+    if(view?.dboBuilder?.constraints && errObject.constraint && !errObject.column){
+        const constraint = view.dboBuilder.constraints
+            .find(c => c.conname === errObject.constraint && c.relname === view.name);
+        if(constraint){
+            const cols = view.columns.filter(c => 
+                (!allowedKeys || allowedKeys.includes(c.name)) && 
+                constraint.conkey.includes(c.ordinal_position)
+            );
+            if(cols.length){
+                errObject.column = cols[0].name;
+                errObject.columns = cols.map(c => c.name);
+            }
+        }
+    }
+    return Promise.reject(errObject);
 }
 export const EXISTS_KEYS = ["$exists", "$notExists", "$existsJoined", "$notExistsJoined"] as const;
 export type EXISTS_KEY = typeof EXISTS_KEYS[number];
@@ -907,20 +924,20 @@ export class ViewHandler {
             if(["row", "value"].includes(returnType)) {
                 return (this.t || this.db).oneOrNone(_query).then(data => {
                     return (data && returnType === "value")? Object.values(data)[0] : data;
-                }).catch(err => makeErr(err, localParams));
+                }).catch(err => makeErr(err, localParams, this));
             } else {
                 return (this.t || this.db).any(_query).then(data => {
                     if(returnType === "values"){
                         return data.map(d => Object.values(d)[0]);
                     }
                     return data;
-                }).catch(err => makeErr(err, localParams));
+                }).catch(err => makeErr(err, localParams, this));
             }
 
         } catch(e){
             // console.trace(e)
             if(localParams && localParams.testRule) throw e;
-            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.find()` };
+            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.find(${JSON.stringify(filter || {}, null, 2)}, ${JSON.stringify(selectParams || {}, null, 2)})` };
         }                             
     }
 
@@ -1819,11 +1836,11 @@ export class TableHandler extends ViewHandler {
                     )
                 )
             );
-            
+            const keys = (data && data.length)? Object.keys(data[0]) : [];
             return this.db.tx(t => {
                 const _queries = queries.map(q => t.none(q as unknown as string))
                 return t.batch(_queries)
-            }).catch(err => makeErr(err, localParams));
+            }).catch(err => makeErr(err, localParams, this, keys));
         } catch(e){
             if(localParams && localParams.testRule) throw e;
             throw { err: parseError(e), msg: `Issue with dbo.${this.name}.update()` };
@@ -1942,13 +1959,14 @@ export class TableHandler extends ViewHandler {
             }
 
             if(returnQuery) return query as unknown as void;
+            
             if(this.t){
-                return this.t[qType](query).catch(err => makeErr(err, localParams));
+                return this.t[qType](query).catch(err => makeErr(err, localParams, this, _fields));
             }
-            return this.db.tx(t => t[qType](query)).catch(err => makeErr(err, localParams));
+            return this.db.tx(t => t[qType](query)).catch(err => makeErr(err, localParams, this, _fields));
         } catch(e){
             if(localParams && localParams.testRule) throw e;
-            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.update()` };
+            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.update(${JSON.stringify(filter || {}, null, 2)}, ${JSON.stringify(newData || {}, null, 2)}, ${JSON.stringify(params || {}, null, 2)})` };
         }
     };
 
@@ -2335,16 +2353,18 @@ export class TableHandler extends ViewHandler {
             }
 
             const tx = dbTX?.[this.name]?.t || this.t;
+
+            const allowedFieldKeys = this.parseFieldFilter(fields);
             if(tx) {
-                result = tx[queryType](query).catch(err => makeErr(err, localParams));
+                result = tx[queryType](query).catch(err => makeErr(err, localParams, this, allowedFieldKeys));
             } else {
-                result = this.db.tx(t => t[queryType](query)).catch(err => makeErr(err, localParams));
+                result = this.db.tx(t => t[queryType](query)).catch(err => makeErr(err, localParams, this, allowedFieldKeys));
             }
             
             return result;
         } catch(e){
             if(localParams && localParams.testRule) throw e;
-            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.insert()` };
+            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.insert(${JSON.stringify(rowOrRows || {}, null, 2)}, ${JSON.stringify(param2 || {}, null, 2)})` };
         } 
     };
 
@@ -2434,7 +2454,7 @@ export class TableHandler extends ViewHandler {
         } catch(e){
             // console.trace(e)
             if(localParams && localParams.testRule) throw e;
-            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.delete()` };
+            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.delete(${JSON.stringify(filter || {}, null, 2)}, ${JSON.stringify(params || {}, null, 2)})` };
         }
     };
    
@@ -2571,6 +2591,10 @@ import { JOIN_TYPES } from "./Prostgles";
 
 export class DboBuilder {
     tablesOrViews: TableOrViewInfo[];
+    /**
+     * Used in obtaining column names for error messages
+     */
+    constraints: PGConstraint[];
     
     db: DB;
     schema: string = "public";
@@ -2770,6 +2794,8 @@ export class DboBuilder {
 
         this.tablesOrViews = await getTablesForSchemaPostgresSQL(this.db);  //, this.schema
         // console.log(this.tablesOrViews.map(t => `${t.name} (${t.columns.map(c => c.name).join(", ")})`))
+
+        this.constraints = await getConstraints(this.db);
 
         const common_types = 
 `
@@ -3019,6 +3045,36 @@ export type TableSchema = {
     is_view: boolean;
     parent_tables: string[];
 }
+
+type PGConstraint = {
+    /**
+     * Column ordinal positions
+     */
+    conkey: number[];
+
+    /**
+     * Constraint name
+     */
+    conname: string;
+
+    /**
+     * Table name
+     */
+    relname: string;
+};
+
+async function getConstraints(db: DB, schema: string = "public"): Promise<PGConstraint[]> {
+    return db.any(`
+        SELECT rel.relname, con.conkey, con.conname
+        FROM pg_catalog.pg_constraint con
+            INNER JOIN pg_catalog.pg_class rel
+                ON rel.oid = con.conrelid
+            INNER JOIN pg_catalog.pg_namespace nsp
+                ON nsp.oid = connamespace
+        WHERE nsp.nspname = ${asValue(schema)}
+    `);
+}
+
 async function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"): Promise<TableSchema[]>{
     const query = 
     `

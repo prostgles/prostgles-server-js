@@ -1,4 +1,5 @@
 import { JoinInfo } from "./DboBuilder";
+import { ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE } from "./FileManager";
 import { DB, DbHandler, Prostgles } from "./Prostgles";
 declare type ColExtraInfo = {
     min?: string | number;
@@ -33,6 +34,22 @@ declare type SQLDefColumn = {
      */
     sqlDefinition?: string;
 };
+/**
+ * Allows referencing media to this table.
+ * Requires this table to have a primary key AND a valid fileTable config
+ */
+declare type MediaColumn = ({
+    name: string;
+    label?: string;
+    files: "one" | "many";
+} & ({
+    /**
+     * https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/accept
+     */
+    allowedContentType?: Record<Partial<("audio/*" | "video/*" | "image/*" | "text/*" | ALLOWED_CONTENT_TYPE)>, 1>;
+} | {
+    allowedExtensions?: Record<Partial<ALLOWED_EXTENSION>, 1>;
+}));
 declare type ReferencedColumn = {
     /**
      * Will create a lookup table that this column will reference
@@ -64,7 +81,7 @@ declare type NamedJoinColumn = {
 };
 declare type ColumnConfig<LANG_IDS = {
     en: 1;
-}> = NamedJoinColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn));
+}> = NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn));
 declare type TableDefinition<LANG_IDS> = {
     columns: {
         [column_name: string]: ColumnConfig<LANG_IDS>;
