@@ -34,6 +34,21 @@ declare type SQLDefColumn = {
      */
     sqlDefinition?: string;
 };
+declare type TextColDef = {
+    defaultValue?: string;
+    nullable?: boolean;
+};
+declare type TextColumn = TextColDef & {
+    isText: true;
+    /**
+     * Value will be trimmed before update/insert
+     */
+    trimmed?: boolean;
+    /**
+     * Value will be lower cased before update/insert
+     */
+    lowerCased?: boolean;
+};
 /**
  * Allows referencing media to this table.
  * Requires this table to have a primary key AND a valid fileTable config
@@ -54,14 +69,12 @@ declare type ReferencedColumn = {
     /**
      * Will create a lookup table that this column will reference
      */
-    references?: {
+    references?: TextColDef & {
         tableName: string;
         /**
          * Defaults to id
          */
         columnName?: string;
-        defaultValue?: string;
-        nullable?: boolean;
     };
 };
 declare type JoinDef = {
@@ -81,7 +94,7 @@ declare type NamedJoinColumn = {
 };
 declare type ColumnConfig<LANG_IDS = {
     en: 1;
-}> = NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn));
+}> = NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn));
 declare type TableDefinition<LANG_IDS> = {
     columns: {
         [column_name: string]: ColumnConfig<LANG_IDS>;
@@ -108,6 +121,7 @@ export default class TableConfigurator {
     sidKeyName: string;
     prostgles: Prostgles;
     constructor(prostgles: Prostgles);
+    getColumnConfig: (tableName: string, colName: string) => ColumnConfig | undefined;
     getColInfo: (params: {
         col: string;
         table: string;

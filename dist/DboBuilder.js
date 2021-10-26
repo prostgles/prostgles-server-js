@@ -1509,8 +1509,17 @@ class TableHandler extends ViewHandler {
         let data = this.prepareFieldValues(row, forcedData, allowedFields, fixIssues);
         const dataKeys = Object.keys(data);
         dataKeys.map(col => {
-            var _a, _b;
+            var _a, _b, _c;
             (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.tableConfigurator) === null || _b === void 0 ? void 0 : _b.checkColVal({ table: this.name, col, value: data[col] });
+            const colConfig = (_c = this.dboBuilder.prostgles) === null || _c === void 0 ? void 0 : _c.tableConfigurator.getColumnConfig(this.name, col);
+            if (colConfig && "isText" in colConfig && data[col]) {
+                if (colConfig.lowerCased) {
+                    data[col] = data[col].toString().toLowerCase();
+                }
+                if (colConfig.trimmed) {
+                    data[col] = data[col].toString().trim();
+                }
+            }
         });
         return { data, allowedCols: this.columns.filter(c => dataKeys.includes(c.name)).map(c => c.name) };
     }

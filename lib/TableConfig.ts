@@ -42,6 +42,24 @@ type SQLDefColumn = {
     sqlDefinition?: string;
 }
 
+type TextColDef = {
+    defaultValue?: string;
+    nullable?: boolean;
+}
+
+type TextColumn = TextColDef & {
+    isText: true;
+    /**
+     * Value will be trimmed before update/insert
+     */
+    trimmed?: boolean;
+
+    /**
+     * Value will be lower cased before update/insert
+     */
+    lowerCased?: boolean;
+}
+
 /**
  * Allows referencing media to this table.
  * Requires this table to have a primary key AND a valid fileTable config
@@ -64,13 +82,12 @@ type MediaColumn = ({
     }
 ));
 
-
 type ReferencedColumn = {
 
     /**
      * Will create a lookup table that this column will reference
      */
-        references?: {
+    references?: TextColDef & {
 
 
         tableName: string;
@@ -79,8 +96,6 @@ type ReferencedColumn = {
          * Defaults to id
          */
         columnName?: string;
-        defaultValue?: string;
-        nullable?: boolean;
     }
 }
 
@@ -102,7 +117,7 @@ type NamedJoinColumn = {
     joinDef: JoinDef[];
 }
 
-type ColumnConfig<LANG_IDS= { en: 1 }> = NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn))
+type ColumnConfig<LANG_IDS= { en: 1 }> = NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn))
 
 type TableDefinition<LANG_IDS> = {
     columns: {
@@ -134,6 +149,14 @@ export default class TableConfigurator {
     constructor(prostgles: Prostgles){
         this.config = prostgles.opts.tableConfig;
         this.prostgles = prostgles;
+    }
+
+    getColumnConfig = (tableName: string, colName: string): ColumnConfig | undefined => {
+        const tconf = this.config?.[tableName];
+        if(tconf && "columns" in tconf){
+            return tconf.columns[colName];
+        }
+        return undefined;
     }
 
     getColInfo = (params: {col: string, table: string}): ColExtraInfo | undefined => {
@@ -221,15 +244,24 @@ export default class TableConfigurator {
             const tableConf = this.config[tableName];
             if("columns" in tableConf){
                 const getColDef = (name: string, colConf: ColumnConfig): string => {
-
+                    const getTextDef = (colConf: TextColDef) => {
+                        const { nullable, defaultValue } = colConf;
+                        return ` TEXT ${!nullable? " NOT NULL " : ""} ${defaultValue? ` DEFAULT ${asValue(defaultValue)} ` : "" }`
+                    }
                     if("references" in colConf && colConf.references){
 
-                        const { nullable, tableName: lookupTable, columnName: lookupCol = "id", defaultValue } = colConf.references;
-                        return ` ${asName(name)} TEXT ${!nullable? " NOT NULL " : ""} ${defaultValue? ` DEFAULT ${asValue(defaultValue)} ` : "" } REFERENCES ${lookupTable} (${lookupCol}) `;
+                        const { tableName: lookupTable, columnName: lookupCol = "id" } = colConf.references;
+                        return ` ${asName(name)} ${getTextDef(colConf.references)} REFERENCES ${lookupTable} (${lookupCol}) `;
 
                     } else if("sqlDefinition" in colConf && colConf.sqlDefinition){
                         
                         return ` ${asName(name)} ${colConf.sqlDefinition} `;
+
+                    } else if("isText" in colConf && colConf.isText){
+                        
+                        return ` ${asName(name)} TEXT ${getTextDef(colConf)}`;
+                    } else {
+                        throw "Unknown column config: " + JSON.stringify(colConf);
                     }
                 }
                 

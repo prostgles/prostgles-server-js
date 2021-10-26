@@ -16,6 +16,14 @@ const PubSubManager_1 = require("./PubSubManager");
  */
 class TableConfigurator {
     constructor(prostgles) {
+        this.getColumnConfig = (tableName, colName) => {
+            var _a;
+            const tconf = (_a = this.config) === null || _a === void 0 ? void 0 : _a[tableName];
+            if (tconf && "columns" in tconf) {
+                return tconf.columns[colName];
+            }
+            return undefined;
+        };
         this.getColInfo = (params) => {
             var _a, _b;
             return (_b = (_a = this.config[params.table]) === null || _a === void 0 ? void 0 : _a[params.col]) === null || _b === void 0 ? void 0 : _b.info;
@@ -104,12 +112,22 @@ class TableConfigurator {
                 const tableConf = this.config[tableName];
                 if ("columns" in tableConf) {
                     const getColDef = (name, colConf) => {
+                        const getTextDef = (colConf) => {
+                            const { nullable, defaultValue } = colConf;
+                            return ` TEXT ${!nullable ? " NOT NULL " : ""} ${defaultValue ? ` DEFAULT ${PubSubManager_1.asValue(defaultValue)} ` : ""}`;
+                        };
                         if ("references" in colConf && colConf.references) {
-                            const { nullable, tableName: lookupTable, columnName: lookupCol = "id", defaultValue } = colConf.references;
-                            return ` ${prostgles_types_1.asName(name)} TEXT ${!nullable ? " NOT NULL " : ""} ${defaultValue ? ` DEFAULT ${PubSubManager_1.asValue(defaultValue)} ` : ""} REFERENCES ${lookupTable} (${lookupCol}) `;
+                            const { tableName: lookupTable, columnName: lookupCol = "id" } = colConf.references;
+                            return ` ${prostgles_types_1.asName(name)} ${getTextDef(colConf.references)} REFERENCES ${lookupTable} (${lookupCol}) `;
                         }
                         else if ("sqlDefinition" in colConf && colConf.sqlDefinition) {
                             return ` ${prostgles_types_1.asName(name)} ${colConf.sqlDefinition} `;
+                        }
+                        else if ("isText" in colConf && colConf.isText) {
+                            return ` ${prostgles_types_1.asName(name)} TEXT ${getTextDef(colConf)}`;
+                        }
+                        else {
+                            throw "Unknown column config: " + JSON.stringify(colConf);
                         }
                     };
                     const colDefs = [];
