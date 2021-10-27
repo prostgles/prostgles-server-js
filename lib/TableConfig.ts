@@ -287,6 +287,7 @@ export default class TableConfigurator {
             const tableConf = this.config[tableName];
             if("columns" in tableConf){
                 const getColDef = (name: string, colConf: ColumnConfig): string => {
+                    const colNameEsc = asName(name);
                     const getTextDef = (colConf: TextColDef) => {
                         const { nullable, defaultValue } = colConf;
                         return ` TEXT ${!nullable? " NOT NULL " : ""} ${defaultValue? ` DEFAULT ${asValue(defaultValue)} ` : "" }`
@@ -294,15 +295,24 @@ export default class TableConfigurator {
                     if("references" in colConf && colConf.references){
 
                         const { tableName: lookupTable, columnName: lookupCol = "id" } = colConf.references;
-                        return ` ${asName(name)} ${getTextDef(colConf.references)} REFERENCES ${lookupTable} (${lookupCol}) `;
+                        return ` ${colNameEsc} ${getTextDef(colConf.references)} REFERENCES ${lookupTable} (${lookupCol}) `;
 
                     } else if("sqlDefinition" in colConf && colConf.sqlDefinition){
                         
-                        return ` ${asName(name)} ${colConf.sqlDefinition} `;
+                        return ` ${colNameEsc} ${colConf.sqlDefinition} `;
 
                     } else if("isText" in colConf && colConf.isText){
-                        
-                        return ` ${asName(name)} ${getTextDef(colConf)} `;
+                        let checks = "", cArr = [];
+                        if(colConf.lowerCased){
+                            cArr.push(`${colNameEsc} = LOWER(${colNameEsc})`)
+                        }
+                        if(colConf.trimmed){
+                            cArr.push(`${colNameEsc} = BTRIM(${colNameEsc})`)
+                        }
+                        if(cArr.length){
+                            checks = `(${cArr.join(" AND ")})`
+                        }
+                        return ` ${colNameEsc} ${getTextDef(colConf)} ${checks}`;
                     } else {
                         throw "Unknown column config: " + JSON.stringify(colConf);
                     }

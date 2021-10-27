@@ -112,19 +112,30 @@ class TableConfigurator {
                 const tableConf = this.config[tableName];
                 if ("columns" in tableConf) {
                     const getColDef = (name, colConf) => {
+                        const colNameEsc = prostgles_types_1.asName(name);
                         const getTextDef = (colConf) => {
                             const { nullable, defaultValue } = colConf;
                             return ` TEXT ${!nullable ? " NOT NULL " : ""} ${defaultValue ? ` DEFAULT ${PubSubManager_1.asValue(defaultValue)} ` : ""}`;
                         };
                         if ("references" in colConf && colConf.references) {
                             const { tableName: lookupTable, columnName: lookupCol = "id" } = colConf.references;
-                            return ` ${prostgles_types_1.asName(name)} ${getTextDef(colConf.references)} REFERENCES ${lookupTable} (${lookupCol}) `;
+                            return ` ${colNameEsc} ${getTextDef(colConf.references)} REFERENCES ${lookupTable} (${lookupCol}) `;
                         }
                         else if ("sqlDefinition" in colConf && colConf.sqlDefinition) {
-                            return ` ${prostgles_types_1.asName(name)} ${colConf.sqlDefinition} `;
+                            return ` ${colNameEsc} ${colConf.sqlDefinition} `;
                         }
                         else if ("isText" in colConf && colConf.isText) {
-                            return ` ${prostgles_types_1.asName(name)} ${getTextDef(colConf)} `;
+                            let checks = "", cArr = [];
+                            if (colConf.lowerCased) {
+                                cArr.push(`${colNameEsc} = LOWER(${colNameEsc})`);
+                            }
+                            if (colConf.trimmed) {
+                                cArr.push(`${colNameEsc} = BTRIM(${colNameEsc})`);
+                            }
+                            if (cArr.length) {
+                                checks = `(${cArr.join(" AND ")})`;
+                            }
+                            return ` ${colNameEsc} ${getTextDef(colConf)} ${checks}`;
                         }
                         else {
                             throw "Unknown column config: " + JSON.stringify(colConf);
