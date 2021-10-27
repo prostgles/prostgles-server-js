@@ -375,7 +375,6 @@ class ColSet {
         
             return `INSERT INTO ${asName(this.opts.tableName)} (${select}) VALUES (${values})`;
         }))).join(";\n") + " ";
-        console.log(res);
         return res;
     }
     async getUpdateQuery(data: any[], allowedCols: string[], validate: ValidateRow): Promise<string> {
@@ -383,7 +382,6 @@ class ColSet {
             const rowParts = await this.getRow(d, allowedCols, validate);
             return `UPDATE ${asName(this.opts.tableName)} SET ` +  rowParts.map(r => `${r.escapedCol} = ${r.escapedVal} `).join(",\n")
         }))).join(";\n") + " ";
-        console.log(res);
         return res;
     }
 }

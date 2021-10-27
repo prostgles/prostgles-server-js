@@ -134,7 +134,6 @@ class ColSet {
                 const select = rowParts.map(r => r.escapedCol).join(", "), values = rowParts.map(r => r.escapedVal).join(", ");
                 return `INSERT INTO ${prostgles_types_1.asName(this.opts.tableName)} (${select}) VALUES (${values})`;
             })))).join(";\n") + " ";
-            console.log(res);
             return res;
         });
     }
@@ -144,7 +143,6 @@ class ColSet {
                 const rowParts = yield this.getRow(d, allowedCols, validate);
                 return `UPDATE ${prostgles_types_1.asName(this.opts.tableName)} SET ` + rowParts.map(r => `${r.escapedCol} = ${r.escapedVal} `).join(",\n");
             })))).join(";\n") + " ";
-            console.log(res);
             return res;
         });
     }
