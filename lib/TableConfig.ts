@@ -130,8 +130,44 @@ type TableDefinition<LANG_IDS> = {
     /**
      * Similar to unique constraints but expressions are allowed inside definition
      */
-    uniqueIndexes?: {
-        [index_name: string]: string
+    replaceUniqueIndexes?: boolean;
+    indexes?: {
+        [index_name: string]: {
+
+            /**
+             * Overrides replaceUniqueIndexes
+             */
+            replace?: boolean;
+
+            /**
+             * Causes the system to check for duplicate values in the table when the index is created (if data already exist) and each time data is added. 
+             * Attempts to insert or update data which would result in duplicate entries will generate an error.
+             */
+            unique?: boolean;
+
+            /**
+             * When this option is used, PostgreSQL will build the index without taking any locks that prevent 
+             * concurrent inserts, updates, or deletes on the table; whereas a standard index build locks out writes (but not reads) on the table until it's done. 
+             * There are several caveats to be aware of when using this option — see Building Indexes Concurrently.
+             */
+            concurrently?: boolean;
+
+            /**
+             * Table name
+             */
+            // on?: string;
+
+            /**
+             * Raw sql statement used excluding parentheses. e.g.: column_name
+             */
+            definition: string;
+
+            /**
+             * The name of the index method to be used. 
+             * Choices are btree, hash, gist, and gin. The default method is btree.
+             */
+            using?: "btree" | "hash" | "gist" | "gin"
+        }
     }
 }
 
@@ -312,9 +348,13 @@ export default class TableConfigurator {
                     queries.push(`ALTER TABLE ${asName(tableName)} ADD CONSTRAINT ${asName(constraintName)} ${tableConf.constraints[constraintName]} ;`);
                 });
             }
-            if("uniqueIndexes" in tableConf && tableConf.uniqueIndexes){
-                Object.keys(tableConf.uniqueIndexes).map(indexName => {
-                    queries.push(`CREATE UNIQUE INDEX ${asName(indexName)} ON ${asName(tableName)} ${tableConf.uniqueIndexes[indexName]} ;`);
+            if("indexes" in tableConf && tableConf.indexes){
+                Object.keys(tableConf.indexes).map(indexName => {
+                    const { concurrently, unique, using, definition, replace } = tableConf.indexes[indexName];
+                    if(replace || typeof replace !== "boolean" && tableConf.replaceUniqueIndexes){
+                        queries.push(`DROP INDEX IF EXISTS ${asName(indexName)}  ;`);
+                    }
+                    queries.push(`CREATE ${unique? "UNIQUE" : ""} ${!concurrently? "" : "CONCURRENTLY"} INDEX ${asName(indexName)} ON ${asName(tableName)} ${!using? "" : ("USING " + using)} (${definition}) ;`);
                 });
             }
         }));

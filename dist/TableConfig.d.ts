@@ -105,8 +105,37 @@ declare type TableDefinition<LANG_IDS> = {
     /**
      * Similar to unique constraints but expressions are allowed inside definition
      */
-    uniqueIndexes?: {
-        [index_name: string]: string;
+    replaceUniqueIndexes?: boolean;
+    indexes?: {
+        [index_name: string]: {
+            /**
+             * Overrides replaceUniqueIndexes
+             */
+            replace?: boolean;
+            /**
+             * Causes the system to check for duplicate values in the table when the index is created (if data already exist) and each time data is added.
+             * Attempts to insert or update data which would result in duplicate entries will generate an error.
+             */
+            unique?: boolean;
+            /**
+             * When this option is used, PostgreSQL will build the index without taking any locks that prevent
+             * concurrent inserts, updates, or deletes on the table; whereas a standard index build locks out writes (but not reads) on the table until it's done.
+             * There are several caveats to be aware of when using this option — see Building Indexes Concurrently.
+             */
+            concurrently?: boolean;
+            /**
+             * Table name
+             */
+            /**
+             * Raw sql statement used excluding parentheses. e.g.: column_name
+             */
+            definition: string;
+            /**
+             * The name of the index method to be used.
+             * Choices are btree, hash, gist, and gin. The default method is btree.
+             */
+            using?: "btree" | "hash" | "gist" | "gin";
+        };
     };
 };
 /**

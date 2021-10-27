@@ -166,9 +166,13 @@ class TableConfigurator {
                         queries.push(`ALTER TABLE ${prostgles_types_1.asName(tableName)} ADD CONSTRAINT ${prostgles_types_1.asName(constraintName)} ${tableConf.constraints[constraintName]} ;`);
                     });
                 }
-                if ("uniqueIndexes" in tableConf && tableConf.uniqueIndexes) {
-                    Object.keys(tableConf.uniqueIndexes).map(indexName => {
-                        queries.push(`CREATE UNIQUE INDEX ${prostgles_types_1.asName(indexName)} ON ${prostgles_types_1.asName(tableName)} ${tableConf.uniqueIndexes[indexName]} ;`);
+                if ("indexes" in tableConf && tableConf.indexes) {
+                    Object.keys(tableConf.indexes).map(indexName => {
+                        const { concurrently, unique, using, definition, replace } = tableConf.indexes[indexName];
+                        if (replace || typeof replace !== "boolean" && tableConf.replaceUniqueIndexes) {
+                            queries.push(`DROP INDEX IF EXISTS ${prostgles_types_1.asName(indexName)}  ;`);
+                        }
+                        queries.push(`CREATE ${unique ? "UNIQUE" : ""} ${!concurrently ? "" : "CONCURRENTLY"} INDEX ${prostgles_types_1.asName(indexName)} ON ${prostgles_types_1.asName(tableName)} ${!using ? "" : ("USING " + using)} (${definition}) ;`);
                     });
                 }
             })));
