@@ -133,7 +133,7 @@ class TableConfigurator {
                                 cArr.push(`${colNameEsc} = BTRIM(${colNameEsc})`);
                             }
                             if (cArr.length) {
-                                checks = `(${cArr.join(" AND ")})`;
+                                checks = `CHECK (${cArr.join(" AND ")})`;
                             }
                             return ` ${colNameEsc} ${getTextDef(colConf)} ${checks}`;
                         }
