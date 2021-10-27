@@ -101,38 +101,52 @@ class ColSet {
     constructor(columns, tableName) {
         this.opts = { columns, tableName, colNames: columns.map(c => c.name) };
     }
-    getRow(data, allowedCols) {
-        const badCol = allowedCols.find(c => !this.opts.colNames.includes(c));
-        if (!allowedCols || badCol) {
-            throw "Missing or unexpected columns: " + badCol;
-        }
-        if (prostgles_types_1.isEmpty(data))
-            throw "No data";
-        const row = PubSubManager_1.filterObj(data, allowedCols), rowKeys = Object.keys(row);
-        return rowKeys.map(key => {
-            const col = this.opts.columns.find(c => c.name === key);
-            if (!col)
-                throw "Unexpected missing col name";
-            const colIsJSON = ["json", "jsonb"].includes(col.data_type);
-            const colIsUUID = ["uuid"].includes(col.data_type);
-            return {
-                escapedCol: prostgles_types_1.asName(key),
-                escapedVal: exports.pgp.as.format(colIsUUID ? "$1::uuid" : colIsJSON ? "$1:json" : "$1", [row[key]])
-            };
+    getRow(data, allowedCols, validate) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const badCol = allowedCols.find(c => !this.opts.colNames.includes(c));
+            if (!allowedCols || badCol) {
+                throw "Missing or unexpected columns: " + badCol;
+            }
+            if (prostgles_types_1.isEmpty(data))
+                throw "No data";
+            let row = PubSubManager_1.filterObj(data, allowedCols);
+            if (validate) {
+                row = yield validate(row);
+            }
+            const rowKeys = Object.keys(row);
+            return rowKeys.map(key => {
+                const col = this.opts.columns.find(c => c.name === key);
+                if (!col)
+                    throw "Unexpected missing col name";
+                const colIsJSON = ["json", "jsonb"].includes(col.data_type);
+                const colIsUUID = ["uuid"].includes(col.data_type);
+                return {
+                    escapedCol: prostgles_types_1.asName(key),
+                    escapedVal: exports.pgp.as.format(colIsUUID ? "$1::uuid" : colIsJSON ? "$1:json" : "$1", [row[key]])
+                };
+            });
         });
     }
-    getInsertQuery(data, allowedCols) {
-        return (Array.isArray(data) ? data : [data]).map(d => {
-            const rowParts = this.getRow(d, allowedCols);
-            const select = rowParts.map(r => r.escapedCol).join(", "), values = rowParts.map(r => r.escapedVal).join(", ");
-            return `INSERT INTO ${prostgles_types_1.asName(this.opts.tableName)} (${select}) VALUES (${values})`;
-        }).join(";\n") + " ";
+    getInsertQuery(data, allowedCols, validate) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const res = (yield Promise.all((Array.isArray(data) ? data : [data]).map((d) => __awaiter(this, void 0, void 0, function* () {
+                const rowParts = yield this.getRow(d, allowedCols, validate);
+                const select = rowParts.map(r => r.escapedCol).join(", "), values = rowParts.map(r => r.escapedVal).join(", ");
+                return `INSERT INTO ${prostgles_types_1.asName(this.opts.tableName)} (${select}) VALUES (${values})`;
+            })))).join(";\n") + " ";
+            console.log(res);
+            return res;
+        });
     }
-    getUpdateQuery(data, allowedCols) {
-        return (Array.isArray(data) ? data : [data]).map(d => {
-            const rowParts = this.getRow(d, allowedCols);
-            return `UPDATE ${prostgles_types_1.asName(this.opts.tableName)} SET ` + rowParts.map(r => `${r.escapedCol} = ${r.escapedVal} `).join(",\n");
-        }).join(";\n") + " ";
+    getUpdateQuery(data, allowedCols, validate) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const res = (yield Promise.all((Array.isArray(data) ? data : [data]).map((d) => __awaiter(this, void 0, void 0, function* () {
+                const rowParts = yield this.getRow(d, allowedCols, validate);
+                return `UPDATE ${prostgles_types_1.asName(this.opts.tableName)} SET ` + rowParts.map(r => `${r.escapedCol} = ${r.escapedVal} `).join(",\n");
+            })))).join(";\n") + " ";
+            console.log(res);
+            return res;
+        });
     }
 }
 class ViewHandler {
@@ -1394,6 +1408,7 @@ class TableHandler extends ViewHandler {
         });
     }
     update(filter, newData, params, tableRules, localParams = null) {
+        var _a;
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const { testRule = false, returnQuery = false } = localParams || {};
@@ -1402,11 +1417,11 @@ class TableHandler extends ViewHandler {
                         throw "no update data provided\nEXPECTING db.table.update(filter, updateData, options)";
                     this.checkFilter(filter);
                 }
-                let forcedFilter = {}, forcedData = {}, returningFields = "*", filterFields = "*", fields = "*";
+                let forcedFilter = {}, forcedData = {}, validate, returningFields = "*", filterFields = "*", fields = "*";
                 if (tableRules) {
                     if (!tableRules.update)
                         throw "update rules missing for " + this.name;
-                    ({ forcedFilter, forcedData, returningFields, fields, filterFields } = tableRules.update);
+                    ({ forcedFilter, forcedData, returningFields, fields, filterFields, validate } = tableRules.update);
                     if (!returningFields)
                         returningFields = utils_1.get(tableRules, "select.fields");
                     if (!fields)
@@ -1417,7 +1432,7 @@ class TableHandler extends ViewHandler {
                         if (forcedData) {
                             try {
                                 const { data, allowedCols } = this.validateNewData({ row: forcedData, forcedData: null, allowedFields: "*", tableRules, fixIssues: false });
-                                const updateQ = this.colSet.getUpdateQuery(data, allowedCols); //pgp.helpers.update(data, columnSet)
+                                const updateQ = yield this.colSet.getUpdateQuery(data, allowedCols, validate); //pgp.helpers.update(data, columnSet)
                                 let query = updateQ + " WHERE FALSE ";
                                 yield this.db.any("EXPLAIN " + query);
                             }
@@ -1467,10 +1482,10 @@ class TableHandler extends ViewHandler {
                     //  overlay(coalesce(status, '') placing 'hom' from 2 for 0)
                 }
                 let nData = Object.assign({}, data);
-                if (tableRules && tableRules.update && tableRules.update.validate) {
-                    nData = yield tableRules.update.validate(nData);
-                }
-                let query = this.colSet.getUpdateQuery(nData, allowedCols); //pgp.helpers.update(nData, columnSet) + " ";
+                // if(tableRules && tableRules.update && tableRules?.update?.validate){
+                //     nData = await tableRules.update.validate(nData);
+                // }
+                let query = yield this.colSet.getUpdateQuery(nData, allowedCols, (_a = tableRules === null || tableRules === void 0 ? void 0 : tableRules.update) === null || _a === void 0 ? void 0 : _a.validate); //pgp.helpers.update(nData, columnSet) + " ";
                 query += (yield this.prepareWhere({
                     filter,
                     forcedFilter,
@@ -1591,9 +1606,6 @@ class TableHandler extends ViewHandler {
                     let rootData = PubSubManager_1.filterObj(data, null, extraKeys);
                     let insertedChildren;
                     let targetTableRules;
-                    // if(validate){
-                    //     rootData = await validate(rootData);
-                    // }
                     const fullRootResult = yield _this.insert(rootData, { returning: "*" }, null, tableRules, localParams);
                     let returnData;
                     const returning = param2 === null || param2 === void 0 ? void 0 : param2.returning;
@@ -1711,9 +1723,9 @@ class TableHandler extends ViewHandler {
                 return row;
             })));
             let result = isMultiInsert ? _data : _data[0];
-            if (validate && !isNestedInsert) {
-                result = isMultiInsert ? yield Promise.all(_data.map((d) => __awaiter(this, void 0, void 0, function* () { return yield validate(Object.assign({}, d)); }))) : yield validate(Object.assign({}, _data[0]));
-            }
+            // if(validate && !isNestedInsert){
+            //     result = isMultiInsert? await Promise.all(_data.map(async d => await validate({ ...d }))) : await validate({ ..._data[0] });
+            // }
             let res = isNestedInsert ?
                 { insertResult: result } :
                 { data: result };
@@ -1728,18 +1740,13 @@ class TableHandler extends ViewHandler {
             try {
                 const { returning, onConflictDoNothing, fixIssues = false } = param2 || {};
                 const { testRule = false, returnQuery = false } = localParams || {};
-                let returningFields, forcedData, 
-                // validate: TableRule["insert"]["validate"],
-                // preValidate: any,
-                fields;
+                let returningFields, forcedData, fields;
                 if (tableRules) {
                     if (!tableRules.insert)
                         throw "insert rules missing for " + this.name;
                     returningFields = tableRules.insert.returningFields;
                     forcedData = tableRules.insert.forcedData;
                     fields = tableRules.insert.fields;
-                    // validate = tableRules.insert.validate;
-                    // preValidate = tableRules.insert.preValidate;
                     /* If no returning fields specified then take select fields as returning */
                     if (!returningFields)
                         returningFields = utils_1.get(tableRules, "select.fields") || utils_1.get(tableRules, "insert.fields");
@@ -1778,6 +1785,7 @@ class TableHandler extends ViewHandler {
                     rowOrRows = {}; //throw "Provide data in param1";
                 let returningSelect = this.makeReturnQuery(yield this.prepareReturning(returning, this.parseFieldFilter(returningFields)));
                 const makeQuery = (_row, isOne = false) => __awaiter(this, void 0, void 0, function* () {
+                    var _e;
                     let row = Object.assign({}, _row);
                     if (!isPojoObject(row)) {
                         console.trace(row);
@@ -1789,7 +1797,7 @@ class TableHandler extends ViewHandler {
                     if (!Object.keys(_data).length)
                         insertQ = `INSERT INTO ${prostgles_types_1.asName(this.name)} DEFAULT VALUES `;
                     else
-                        insertQ = this.colSet.getInsertQuery(_data, allowedCols); // pgp.helpers.insert(_data, columnSet); 
+                        insertQ = yield this.colSet.getInsertQuery(_data, allowedCols, (_e = tableRules === null || tableRules === void 0 ? void 0 : tableRules.insert) === null || _e === void 0 ? void 0 : _e.validate); // pgp.helpers.insert(_data, columnSet); 
                     return insertQ + conflict_query + returningSelect;
                 });
                 let query = "";
@@ -1837,7 +1845,10 @@ class TableHandler extends ViewHandler {
             catch (e) {
                 if (localParams && localParams.testRule)
                     throw e;
-                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.insert(${JSON.stringify(rowOrRows || {}, null, 2)}, ${JSON.stringify(param2 || {}, null, 2)})` };
+                throw { err: parseError(e), msg: `Issue with dbo.${this.name}.insert(
+                ${JSON.stringify(rowOrRows || {}, null, 2)}, 
+                ${JSON.stringify(param2 || {}, null, 2)}
+            )` };
             }
         });
     }

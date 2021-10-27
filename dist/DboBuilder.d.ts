@@ -36,7 +36,7 @@ export declare type DbHandler = {
     tx?: TX;
 };
 import { SelectItem, FieldSpec } from "./QueryBuilder";
-import { DB, TableRule, Join, Prostgles, PublishParser } from "./Prostgles";
+import { DB, TableRule, Join, Prostgles, PublishParser, ValidateRow } from "./Prostgles";
 import { PubSubManager } from "./PubSubManager";
 declare type PGP = pgPromise.IMain<{}, pg.IClient>;
 export declare const pgp: PGP;
@@ -154,8 +154,8 @@ declare class ColSet {
     };
     constructor(columns: ColumnInfo[], tableName: string);
     private getRow;
-    getInsertQuery(data: any[], allowedCols: string[]): string;
-    getUpdateQuery(data: any[], allowedCols: string[]): string;
+    getInsertQuery(data: any[], allowedCols: string[], validate: ValidateRow): Promise<string>;
+    getUpdateQuery(data: any[], allowedCols: string[], validate: ValidateRow): Promise<string>;
 }
 export declare type ExistsFilterConfig = {
     key: string;
