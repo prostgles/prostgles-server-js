@@ -102,6 +102,12 @@ declare type TableDefinition<LANG_IDS> = {
     constraints?: {
         [constraint_name: string]: string;
     };
+    /**
+     * Similar to unique constraints but expressions are allowed inside definition
+     */
+    uniqueIndexes?: {
+        [index_name: string]: string;
+    };
 };
 /**
  * Helper utility to create lookup tables for TEXT columns

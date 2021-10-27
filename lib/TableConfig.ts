@@ -125,6 +125,13 @@ type TableDefinition<LANG_IDS> = {
     },
     constraints?: {
         [constraint_name: string]: string
+    },
+
+    /**
+     * Similar to unique constraints but expressions are allowed inside definition
+     */
+    uniqueIndexes?: {
+        [index_name: string]: string
     }
 }
 
@@ -303,6 +310,11 @@ export default class TableConfigurator {
             if("constraints" in tableConf && tableConf.constraints){
                 Object.keys(tableConf.constraints).map(constraintName => {
                     queries.push(`ALTER TABLE ${asName(tableName)} ADD CONSTRAINT ${asName(constraintName)} ${tableConf.constraints[constraintName]} ;`);
+                });
+            }
+            if("uniqueIndexes" in tableConf && tableConf.uniqueIndexes){
+                Object.keys(tableConf.uniqueIndexes).map(indexName => {
+                    queries.push(`CREATE UNIQUE INDEX ${asName(indexName)} ON ${asName(tableName)} ${tableConf.uniqueIndexes[indexName]} ;`);
                 });
             }
         }));
