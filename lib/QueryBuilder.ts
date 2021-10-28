@@ -192,7 +192,7 @@ let PostGIS_Funcs: FunctionSpec[] = [
       if(typeof text === "string"){
         geomQ = `ST_GeomFromText(${asValue(text)})`;
       } else if([lat, lng].every(v => Number.isFinite(v))){
-        geomQ = `ST_Point(${asValue(lat)}, ${asValue(lng)})`;
+        geomQ = `ST_Point(${asValue(lng)}, ${asValue(lat)})`;
       } else if(isPlainObject(geojson)){
         geomQ = `ST_GeomFromGeoJSON(${geojson})`;
       } else mErr();
