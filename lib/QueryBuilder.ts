@@ -161,7 +161,7 @@ let PostGIS_Funcs: FunctionSpec[] = [
       `,
     },{ 
       fname: "ST_DistanceSpheroid",
-      description: ` :[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number }] -> Returns minimum distance in meters between two lon/lat geometries given a particular spheroid. See the explanation of spheroids given for ST_LengthSpheroid.
+      description: ` :[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number; spheroid?: string; }] -> Returns minimum distance in meters between two lon/lat geometries given a particular spheroid. See the explanation of spheroids given for ST_LengthSpheroid.
 
       `,
     },{ 
@@ -181,18 +181,14 @@ let PostGIS_Funcs: FunctionSpec[] = [
       
       if(!isPlainObject(arg2)) mErr();
       const col = allColumns.find(c => c.name === args[0]);
-      const geomQCast = col.udt_name === "geography"? "::geography" : "::geometry";
 
-      const { lat, lng, srid = 4326, geojson, text, use_spheroid, distance } = arg2;
-      let geomQ = "", useSphQ = "", distanceQ = "";
-      if(fname === "ST_DWithin"){
-        if(typeof distance !== "number") throw `ST_DWithin: distance param missing or not a number`;
-        distanceQ = ", " + asValue(distance)
-      }
-      if(typeof use_spheroid === "boolean" && ["ST_DWithin", "ST_Distance"].includes(fname)){
-        useSphQ = ", " + asValue(use_spheroid);
-      }
-
+      const { lat, lng, srid = 4326, 
+        geojson, text, use_spheroid, 
+        distance, spheroid = 'SPHEROID["WGS 84",6378137,298.257223563]',
+        debug
+      } = arg2;
+      let geomQ = "", extraParams = "";
+      
       if(typeof text === "string"){
         geomQ = `ST_GeomFromText(${asValue(text)})`;
       } else if([lat, lng].every(v => Number.isFinite(v))){
@@ -205,12 +201,68 @@ let PostGIS_Funcs: FunctionSpec[] = [
         geomQ = `ST_SetSRID(${geomQ}, ${asValue(srid)})`;
       }
 
-      geomQ += geomQCast;
+      let colCast = "";
+      const colIsGeog = col.udt_name === "geography";
+      let geomQCast = colIsGeog? "::geography" : "::geometry";
 
-      if(fname === "<->"){
-        return pgp.as.format(`${asNameAlias(args[0], tableAlias)} <-> ${geomQ}`);
+      /**
+       * float ST_Distance(geometry g1, geometry g2);
+       * float ST_Distance(geography geog1, geography geog2, boolean use_spheroid=true);
+       */
+      if(fname === "ST_Distance"){
+
+        if(typeof use_spheroid === "boolean"){
+          extraParams = ", " + asValue(use_spheroid);
+        }
+
+        colCast = (colIsGeog || use_spheroid)? "::geography" : "::geometry";
+        geomQCast = (colIsGeog || use_spheroid)? "::geography" : "::geometry";
+
+      /**
+       * boolean ST_DWithin(geometry g1, geometry g2, double precision distance_of_srid);
+       * boolean ST_DWithin(geography gg1, geography gg2, double precision distance_meters, boolean use_spheroid = true);
+       */
+      } else if(fname === "ST_DWithin"){
+        colCast = colIsGeog? "::geography" : "::geometry";
+        geomQCast = colIsGeog? "::geography" : "::geometry";
+        
+        if(typeof distance !== "number") throw `ST_DWithin: distance param missing or not a number`;
+        extraParams = ", " + asValue(distance);
+
+
+      /**
+       * float ST_DistanceSpheroid(geometry geomlonlatA, geometry geomlonlatB, spheroid measurement_spheroid);
+       */
+      } else if(fname === "ST_DistanceSpheroid"){
+        colCast = "::geometry";
+        geomQCast = "::geometry";
+        if(typeof spheroid !== "string") throw `ST_DistanceSpheroid: spheroid param must be string`;
+        extraParams = `, ${asValue(spheroid)}`
+
+
+
+      /**
+       * float ST_DistanceSphere(geometry geomlonlatA, geometry geomlonlatB);
+       */
+      } else if(fname === "ST_DistanceSphere"){
+        colCast = "::geometry";
+        geomQCast = "::geometry";
+        extraParams = "";
+
+      /**
+       * double precision <->( geometry A , geometry B );
+       * double precision <->( geography A , geography B );
+       */
+      } else if(fname === "<->"){
+        colCast = colIsGeog? "::geography" : "::geometry";
+        geomQCast = colIsGeog? "::geography" : "::geometry";
+        const q = pgp.as.format(`${asNameAlias(args[0], tableAlias)}${colCast} <-> ${geomQ}${geomQCast}`);
+        if(debug) throw q;
+        return q;
       }
-      return pgp.as.format(`${fname}(${asNameAlias(args[0], tableAlias)} , ${geomQ} ${distanceQ} ${useSphQ})`);
+      const q = pgp.as.format(`${fname}(${asNameAlias(args[0], tableAlias)}${colCast} , ${geomQ}${geomQCast} ${extraParams})`);
+      if(debug) throw q;
+      return q;
     }
   }))
 
