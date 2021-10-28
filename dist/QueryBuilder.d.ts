@@ -27,17 +27,20 @@ export declare type NewQuery = {
     $path?: string[];
 };
 export declare const asNameAlias: (field: string, tableAlias?: string) => string;
+declare type GetQueryArgs = {
+    allColumns: ColumnInfo[];
+    allowedFields: string[];
+    args: any[];
+    tableAlias?: string;
+    ctidField?: string;
+};
 export declare type FieldSpec = {
     name: string;
     type: "column" | "computed";
     /**
      * allowedFields passed for multicol functions (e.g.: $rowhash)
      */
-    getQuery: (params: {
-        allowedFields: string[];
-        tableAlias?: string;
-        ctidField?: string;
-    }) => string;
+    getQuery: (params: Omit<GetQueryArgs, "args">) => string;
 };
 export declare type FunctionSpec = {
     name: string;
@@ -59,12 +62,7 @@ export declare type FunctionSpec = {
     /**
      * allowedFields passed for multicol functions (e.g.: $rowhash)
      */
-    getQuery: (params: {
-        allowedFields: string[];
-        args: any[];
-        tableAlias?: string;
-        ctidField?: string;
-    }) => string;
+    getQuery: (params: GetQueryArgs) => string;
 };
 /**
 * Each function expects a column at the very least
@@ -99,4 +97,5 @@ export declare function getNewQuery(_this: TableHandler, filter: Filter, selectP
     alias?: string;
 }, param3_unused: any, tableRules: TableRule, localParams: LocalParams, columns: ColumnInfo[]): Promise<NewQuery>;
 export declare function makeQuery(_this: TableHandler, q: NewQuery, depth: number, joinFields: string[], selectParams: SelectParams): string;
+export {};
 //# sourceMappingURL=QueryBuilder.d.ts.map

@@ -46,13 +46,21 @@ export const asNameAlias = (field: string, tableAlias?: string) => {
   return result;
 }
 
+type GetQueryArgs = { 
+  allColumns: ColumnInfo[];
+  allowedFields: string[];
+  args: any[];
+  tableAlias?: string;
+  ctidField?: string;
+};
+
 export type FieldSpec = {
   name: string;
   type: "column" | "computed";
   /**
    * allowedFields passed for multicol functions (e.g.: $rowhash)
    */
-  getQuery: (params: { allowedFields: string[], tableAlias?: string, ctidField?: string }) => string;
+  getQuery: (params: Omit<GetQueryArgs, "args">) => string;
 };
 
 export type FunctionSpec = {
@@ -80,11 +88,151 @@ export type FunctionSpec = {
   /**
    * allowedFields passed for multicol functions (e.g.: $rowhash)
    */
-  getQuery: (params: { allowedFields: string[], args: any[], tableAlias?: string, ctidField?: string }) => string;
+  getQuery: (params: GetQueryArgs) => string;
 };
 
 const MAX_COL_NUM = 1600;
-const asValue = (v: any, castAs: string = "") => pgp.as.format("$1" + castAs, [v])
+const asValue = (v: any, castAs: string = "") => pgp.as.format("$1" + castAs, [v]);
+
+const FTS_Funcs: FunctionSpec[] = 
+  /* Full text search 
+    https://www.postgresql.org/docs/current/textsearch-dictionaries.html#TEXTSEARCH-SIMPLE-DICTIONARY
+  */
+  [
+    "simple", //  • convert the input token to lower case • exclude stop words
+    // "synonym", // replace word with a synonym
+    "english",
+    // "english_stem",
+    // "english_hunspell", 
+    ""
+  ].map(type => ({
+    name: "$ts_headline" + (type? ("_" + type) : ""),
+    description: ` :[column_name <string>, search_term: <string | { to_tsquery: string } > ] -> sha512 hash of the of column content`,
+    type: "function" as "function",
+    singleColArg: true,
+    numArgs: 2,
+    getFields: (args: any[]) => [args[0]],
+    getQuery: ({ allColumns, args, tableAlias }) => {
+      const col = asName(args[0]);
+      let qVal = args[1], qType = "to_tsquery";
+      let _type = type? (asValue(type) + ",") : "";
+
+      const searchTypes = TextFilter_FullTextSearchFilterKeys;
+      
+      /* { to_tsquery: 'search term' } */
+      if(isPlainObject(qVal)){
+        const keys = Object.keys(qVal);
+        if(!keys.length) throw "Bad arg";
+        if(keys.length !==1 || !searchTypes.includes(keys[0])) throw "Expecting a an object with a single key named one of: " + searchTypes.join(", ");
+        qType = keys[0];
+        qVal = asValue(qVal[qType]);
+
+      /* 'search term' */
+      } else if(typeof qVal === "string") {
+        qVal = pgp.as.format(qType + "($1)", [qVal])
+      } else throw "Bad second arg. Exepcting search string or { to_tsquery: 'search string' }";
+
+      const res =`ts_headline(${_type} ${col}::text, ${qVal}, 'ShortWord=1 ' )`
+      // console.log(res)
+      
+      return res
+    }
+  }));
+
+let PostGIS_Funcs: FunctionSpec[] = [
+    {
+      fname: "ST_DWithin",
+      description: `:[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean; distance: number; }] 
+        -> Returns true if the geometries are within a given distance
+        For geometry: The distance is specified in units defined by the spatial reference system of the geometries. For this function to make sense, the source geometries must be in the same coordinate system (have the same SRID).
+        For geography: units are in meters and distance measurement defaults to use_spheroid=true. For faster evaluation use use_spheroid=false to measure on the sphere.
+      `
+    },
+    {
+      fname: "<->",
+      description: `:[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean }] 
+        -> The <-> operator returns the 2D distance between two geometries. Used in the "ORDER BY" clause provides index-assisted nearest-neighbor result sets. For PostgreSQL below 9.5 only gives centroid distance of bounding boxes and for PostgreSQL 9.5+, does true KNN distance search giving true distance between geometries, and distance sphere for geographies.`
+    },
+    { 
+      fname: "ST_Distance",
+      description: ` :[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean }] 
+        -> For geometry types returns the minimum 2D Cartesian (planar) distance between two geometries, in projected units (spatial ref units).
+        -> For geography types defaults to return the minimum geodesic distance between two geographies in meters, compute on the spheroid determined by the SRID. If use_spheroid is false, a faster spherical calculation is used.
+      `,
+    },{ 
+      fname: "ST_DistanceSpheroid",
+      description: ` :[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number }] -> Returns minimum distance in meters between two lon/lat geometries given a particular spheroid. See the explanation of spheroids given for ST_LengthSpheroid.
+
+      `,
+    },{ 
+      fname: "ST_DistanceSphere",
+      description: ` :[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number }] -> Returns linear distance in meters between two lon/lat points. Uses a spherical earth and radius of 6370986 meters. Faster than ST_DistanceSpheroid, but less accurate. Only implemented for points.`,
+    }
+  ].map(({ fname, description }) => ({
+    name: "$" + fname,
+    description,
+    type: "function" as "function",
+    singleColArg: true,
+    numArgs: 1,
+    getFields: (args: any[]) => [args[0]],
+    getQuery: ({ allColumns, args, tableAlias }) => {
+      const arg2 = args[1],
+        mErr = () => { throw `${fname}: Expecting a second argument like: { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean }` };
+      
+      if(!isPlainObject(arg2)) mErr();
+      const col = allColumns.find(c => c.name === args[0]);
+      const geomQCast = col.udt_name === "geography"? "::geography" : "::geometry";
+
+      const { lat, lng, srid = 4326, geojson, text, use_spheroid, distance } = arg2;
+      let geomQ = "", useSphQ = "", distanceQ = "";
+      if(fname === "ST_DWithin"){
+        if(typeof distance !== "number") throw `ST_DWithin: distance param missing or not a number`;
+        distanceQ = ", " + asValue(distance)
+      }
+      if(typeof use_spheroid === "boolean" && ["ST_DWithin", "ST_Distance"].includes(fname)){
+        useSphQ = ", " + asValue(use_spheroid);
+      }
+
+      if(typeof text === "string"){
+        geomQ = `ST_GeomFromText(${asValue(text)})`;
+      } else if([lat, lng].every(v => Number.isFinite(v))){
+        geomQ = `ST_Point(${asValue(lat)}, ${asValue(lng)})`;
+      } else if(isPlainObject(geojson)){
+        geomQ = `ST_GeomFromGeoJSON(${geojson})`;
+      } else mErr();
+
+      if(Number.isFinite(srid)){
+        geomQ = `ST_SetSRID(${geomQ}, ${asValue(srid)})`;
+      }
+
+      geomQ += geomQCast;
+
+      if(fname === "<->"){
+        return pgp.as.format(`${asNameAlias(args[0], tableAlias)} <-> ${geomQ}`);
+      }
+      return pgp.as.format(`${fname}(${asNameAlias(args[0], tableAlias)} , ${geomQ} ${distanceQ} ${useSphQ})`);
+    }
+  }))
+
+  PostGIS_Funcs = PostGIS_Funcs.concat(
+    ["ST_AsGeoJSON", "ST_AsText"]
+    .map(fname => {
+      const res: FunctionSpec = {
+        name: "$" + fname,
+        description: ` :[column_name] -> json GeoJSON output of a geometry column`,
+        type: "function",
+        singleColArg: true,
+        numArgs: 1,
+        getFields: (args: any[]) => [args[0]],
+        getQuery: ({ allowedFields, args, tableAlias }) => {
+          return pgp.as.format(fname + "(" + asNameAlias(args[0], tableAlias) + ( fname === "ST_AsGeoJSON"? ")::json" : ""));
+        }
+      }
+      return res;
+    }),
+  );
+
+
 /**
 * Each function expects a column at the very least
 */
@@ -165,132 +313,9 @@ export const FUNCTIONS: FunctionSpec[] = [
     }
   },
 
+  ...FTS_Funcs,
 
-  /* Full text search 
-    https://www.postgresql.org/docs/current/textsearch-dictionaries.html#TEXTSEARCH-SIMPLE-DICTIONARY
-  */
-  ...[
-    "simple", //  • convert the input token to lower case • exclude stop words
-    // "synonym", // replace word with a synonym
-    "english",
-    // "english_stem",
-    // "english_hunspell", 
-    ""
-  ].map(type => ({
-    name: "$ts_headline" + (type? ("_" + type) : ""),
-    description: ` :[column_name <string>, search_term: <string | { to_tsquery: string } > ] -> sha512 hash of the of column content`,
-    type: "function" as "function",
-    singleColArg: true,
-    numArgs: 2,
-    getFields: (args: any[]) => [args[0]],
-    getQuery: ({ allowedFields, args, tableAlias }) => {
-      const col = asName(args[0]);
-      let qVal = args[1], qType = "to_tsquery";
-      let _type = type? (asValue(type) + ",") : "";
-
-      const searchTypes = TextFilter_FullTextSearchFilterKeys;
-      
-      /* { to_tsquery: 'search term' } */
-      if(isPlainObject(qVal)){
-        const keys = Object.keys(qVal);
-        if(!keys.length) throw "Bad arg";
-        if(keys.length !==1 || !searchTypes.includes(keys[0])) throw "Expecting a an object with a single key named one of: " + searchTypes.join(", ");
-        qType = keys[0];
-        qVal = asValue(qVal[qType]);
-
-      /* 'search term' */
-      } else if(typeof qVal === "string") {
-        qVal = pgp.as.format(qType + "($1)", [qVal])
-      } else throw "Bad second arg. Exepcting search string or { to_tsquery: 'search string' }";
-
-      const res =`ts_headline(${_type} ${col}::text, ${qVal}, 'ShortWord=1 ' )`
-      // console.log(res)
-      
-      return res
-    }
-  })),
-
-  ...[
-      {
-        fname: "ST_DWithin",
-        description: `:[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean; distance: number; }] 
-          -> Returns true if the geometries are within a given distance
-          For geometry: The distance is specified in units defined by the spatial reference system of the geometries. For this function to make sense, the source geometries must be in the same coordinate system (have the same SRID).
-          For geography: units are in meters and distance measurement defaults to use_spheroid=true. For faster evaluation use use_spheroid=false to measure on the sphere.
-        `
-      },
-      {
-        fname: "<->",
-        description: `:[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean }] 
-          -> The <-> operator returns the 2D distance between two geometries. Used in the "ORDER BY" clause provides index-assisted nearest-neighbor result sets. For PostgreSQL below 9.5 only gives centroid distance of bounding boxes and for PostgreSQL 9.5+, does true KNN distance search giving true distance between geometries, and distance sphere for geographies.`
-      },
-      { 
-        fname: "ST_Distance",
-        description: ` :[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean }] 
-          -> For geometry types returns the minimum 2D Cartesian (planar) distance between two geometries, in projected units (spatial ref units).
-          -> For geography types defaults to return the minimum geodesic distance between two geographies in meters, compute on the spheroid determined by the SRID. If use_spheroid is false, a faster spherical calculation is used.
-        `,
-      },{ 
-        fname: "ST_Distance_Sphere",
-        description: ` :[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number }] -> Returns linear distance in meters between two lon/lat points. Uses a spherical earth and radius of 6370986 meters. Faster than ST_Distance_Spheroid, but less accurate. Only implemented for points.`,
-      }
-    ].map(({ fname, description }) => ({
-      name: "$" + fname,
-      description,
-      type: "function" as "function",
-      singleColArg: true,
-      numArgs: 1,
-      getFields: (args: any[]) => [args[0]],
-      getQuery: ({ allowedFields, args, tableAlias }) => {
-        const arg2 = args[1],
-          mErr = () => { throw `${fname}: Expecting a second argument like: { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean }` };
-        
-        if(!isPlainObject(arg2)) mErr();
-  
-        const { lat, lng, srid = 4326, geojson, text, use_spheroid, distance } = arg2;
-        let geomQ = "", useSphQ = "", distanceQ = "";
-        if(fname === "ST_DWithin"){
-          if(typeof distance !== "number") throw `ST_DWithin: distance param missing or not a number`;
-          distanceQ = ", " + asValue(distance)
-        }
-        if(typeof use_spheroid === "boolean" && ["ST_DWithin", "ST_Distance"].includes(fname)){
-          useSphQ = ", " + asValue(use_spheroid);
-        }
-
-        if(typeof text === "string"){
-          geomQ = `ST_GeomFromText(${asValue(text)})`;
-        } else if([lat, lng].every(v => Number.isFinite(v))){
-          geomQ = `ST_Point(${asValue(lat)}, ${asValue(lng)})`;
-        } else if(isPlainObject(geojson)){
-          geomQ = `ST_GeomFromGeoJSON(${geojson})`;
-        } else mErr();
-  
-        if(Number.isFinite(srid)){
-          geomQ = `ST_SetSRID(${geomQ}, ${asValue(srid)})`;
-        }
-
-        if(fname === "<->"){
-          return pgp.as.format(`${asNameAlias(args[0], tableAlias)} <-> ${geomQ}`);
-        }
-        return pgp.as.format(`${fname}(${asNameAlias(args[0], tableAlias)} , ${geomQ} ${distanceQ} ${useSphQ})`);
-      }
-    })),
-
-    ...["ST_AsGeoJSON", "ST_AsText"]
-    .map(fname => {
-      const res: FunctionSpec = {
-        name: "$" + fname,
-        description: ` :[column_name] -> json GeoJSON output of a geometry column`,
-        type: "function",
-        singleColArg: true,
-        numArgs: 1,
-        getFields: (args: any[]) => [args[0]],
-        getQuery: ({ allowedFields, args, tableAlias }) => {
-          return pgp.as.format(fname + "(" + asNameAlias(args[0], tableAlias) + ( fname === "ST_AsGeoJSON"? ")::json" : ""));
-        }
-      }
-      return res;
-    }),
+  ...PostGIS_Funcs,
 
   {
     name: "$left",
@@ -690,7 +715,7 @@ export class SelectItemBuilder {
       type: funcDef.type,
       alias,
       getFields: () => funcDef.getFields(args),
-      getQuery: (tableAlias?: string) => funcDef.getQuery({ allowedFields: this.allowedFields, args, tableAlias, 
+      getQuery: (tableAlias?: string) => funcDef.getQuery({ allColumns: this.columns, allowedFields: this.allowedFields, args, tableAlias, 
         ctidField: undefined,
 
         /* CTID not available in AFTER trigger */

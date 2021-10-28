@@ -456,6 +456,7 @@ class ViewHandler {
             getQuery: ({ tableAlias, allowedFields }) => c.getQuery({
                 allowedFields,
                 ctidField: undefined,
+                allColumns: this.columns,
                 /* CTID not available in AFTER trigger */
                 // ctidField: this.is_view? undefined : "ctid",
                 tableAlias
@@ -926,6 +927,7 @@ class ViewHandler {
                     computedColConditions.push(compCol.getQuery({
                         tableAlias,
                         allowedFields: p.select.fields,
+                        allColumns: this.columns,
                         /* CTID not available in AFTER trigger */
                         // ctidField: this.is_view? undefined : "ctid"
                         ctidField: undefined,
@@ -952,7 +954,11 @@ class ViewHandler {
                 !allowedSelect.find(s => s.alias === c.name)).map(f => ({
                 type: f.type,
                 alias: f.name,
-                getQuery: (tableAlias) => f.getQuery({ tableAlias, allowedFields: allowed_colnames }),
+                getQuery: (tableAlias) => f.getQuery({
+                    tableAlias,
+                    allColumns: this.columns,
+                    allowedFields: allowed_colnames
+                }),
                 selected: false,
                 getFields: () => [f.name]
             })));
