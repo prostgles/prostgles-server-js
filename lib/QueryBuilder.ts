@@ -248,7 +248,7 @@ export const FUNCTIONS: FunctionSpec[] = [
         if(!isPlainObject(arg2)) mErr();
   
         const { lat, lng, srid = 4326, geojson, text, use_spheroid, distance } = arg2;
-        let geomQ, useSphQ, distanceQ;
+        let geomQ = "", useSphQ = "", distanceQ = "";
         if(fname === "ST_DWithin"){
           if(typeof distance !== "number") throw `ST_DWithin: distance param missing or not a number`;
           distanceQ = ", " + asValue(distance)
