@@ -1995,7 +1995,7 @@ export class TableHandler extends ViewHandler {
 
         dataKeys.map(col => {
             this.dboBuilder.prostgles?.tableConfigurator?.checkColVal({ table: this.name, col, value: data[col] });
-            const colConfig = this.dboBuilder.prostgles?.tableConfigurator.getColumnConfig(this.name, col);
+            const colConfig = this.dboBuilder.prostgles?.tableConfigurator?.getColumnConfig(this.name, col);
             if(colConfig && "isText" in colConfig && data[col]){
                 if(colConfig.lowerCased){
                     data[col] = data[col].toString().toLowerCase()
