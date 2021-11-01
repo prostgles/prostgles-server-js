@@ -399,7 +399,7 @@ export class ViewHandler {
     db: DB;
     name: string;
     escapedName: string;
-    columns: ColumnInfo[];
+    columns: TableSchema["columns"];
     columnsForTypes: ColumnInfo[];
     column_names: string[];
     tableOrViewInfo: TableOrViewInfo;
@@ -418,7 +418,7 @@ export class ViewHandler {
 
     // pubSubManager: PubSubManager;
     is_media: boolean = false;
-    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths){
+    constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths){
         if(!db || !tableOrViewInfo) throw "";
 
         this.db = db;
@@ -684,13 +684,16 @@ export class ViewHandler {
             let columns = this.columns
             .filter(c => {
                 const { insert, select, update } = p || {};
+                
                 return [
                     ...(insert?.fields || []),
                     ...(select?.fields || []),
                     ...(update?.fields || []),
                 ].includes(c.name)
             })
-            .map(c => {
+            .map(_c => {
+                let c = { ..._c };
+                
                 let label = c.comment || capitalizeFirstLetter(c.name, " ");
 
                 const tblConfig = this.dboBuilder.prostgles?.opts?.tableConfig?.[this.name];
@@ -704,19 +707,24 @@ export class ViewHandler {
                         }
                     }
                 }
-                
+
+                const select = c.privileges.some(p => p.is_grantable === "YES" && p.privilege_type === "SELECT"),
+                    insert = c.privileges.some(p => p.is_grantable === "YES" && p.privilege_type === "INSERT"),
+                    update = c.privileges.some(p => p.is_grantable === "YES" && p.privilege_type === "UPDATE");
+                    
+                delete c.privileges;
                 return {
                     ...c,
                     label,
                     tsDataType: postgresToTsType(c.udt_name),
-                    insert: Boolean(p.insert && p.insert.fields && p.insert.fields.includes(c.name)),
-                    select: Boolean(p.select && p.select.fields && p.select.fields.includes(c.name)),
+                    insert: insert && Boolean(p.insert && p.insert.fields && p.insert.fields.includes(c.name)),
+                    select: select && Boolean(p.select && p.select.fields && p.select.fields.includes(c.name)),
                     filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)),
-                    update: Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)),
+                    update: update && Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)),
                     delete: Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)),
                     ...(this.dboBuilder?.prostgles?.tableConfigurator?.getColInfo({ table: this.name, col: c.name}) || {})
                 }
-            })
+            }).filter(c => c.select || c.update || c.delete || c.insert)
             //.sort((a, b) => a.ordinal_position - b.ordinal_position);
 
             // const tblInfo = await this.getInfo();
@@ -1719,7 +1727,7 @@ export class TableHandler extends ViewHandler {
         batching: string[]
     }
     
-    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths){
+    constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths){
         super(db, tableOrViewInfo, dboBuilder, t, dbTX, joinPaths);
 
         this.remove = this.delete;
@@ -2606,7 +2614,7 @@ export class TableHandler extends ViewHandler {
 import { JOIN_TYPES } from "./Prostgles";
 
 export class DboBuilder {
-    tablesOrViews: TableOrViewInfo[];
+    tablesOrViews: TableSchema[];   //TableSchema           TableOrViewInfo
     /**
      * Used in obtaining column names for error messages
      */
@@ -3057,7 +3065,12 @@ export type TableSchema = {
     name: string;
     oid: number;
     comment: string;
-    columns: ColumnInfo[];
+    columns: (ColumnInfo & {
+        privileges: {
+            privilege_type: "INSERT" | "REFERENCES" | "SELECT" | "UPDATE";
+            is_grantable: "YES" | "NO"
+        }[];
+    })[];
     is_view: boolean;
     parent_tables: string[];
 }
@@ -3108,7 +3121,8 @@ async function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"):
         cc.is_nullable = 'YES' as is_nullable,
         cc.references,
         cc.has_default,
-        cc.column_default
+        cc.column_default,
+        cc.privileges
     ) as x) ORDER BY cc.ordinal_position ) as columns 
 
     , t.table_type = 'VIEW' as is_view 
@@ -3132,11 +3146,18 @@ async function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"):
         , c.column_default
         , format('%I.%I', c.table_schema, c.table_name)::regclass::oid AS table_oid
         , c.is_nullable
+        , cp.privileges
         FROM information_schema.columns c    
         LEFT JOIN (SELECT * FROM information_schema.element_types )   e  
             ON ((c.table_catalog, c.table_schema, c.table_name, 'TABLE', c.dtd_identifier)  
             = (e.object_catalog, e.object_schema, e.object_name, e.object_type, e.collection_type_identifier)
         )
+        LEFT JOIN (
+            SELECT table_schema, table_name, column_name, json_agg(row_to_json((SELECT t FROM (SELECT cpp.privilege_type, cpp.is_grantable ) t))) as privileges
+            FROM information_schema.column_privileges cpp
+            GROUP BY table_schema, table_name, column_name
+        ) cp
+            ON c.table_name = cp.table_name AND c.column_name = cp.column_name
         LEFT JOIN (
             SELECT *
             FROM (

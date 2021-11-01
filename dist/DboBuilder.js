@@ -342,7 +342,7 @@ class ViewHandler {
             throw `invalid filter -> ${JSON.stringify(filter)} \nExpecting:    undefined | {} | { field_name: "value" } | { field: { $gt: 22 } } ... `;
     }
     getInfo(param1, param2, param3, tableRules, localParams) {
-        var _a, _b, _c, _e, _f, _g, _h, _j, _k, _l, _m;
+        var _a, _b, _e, _f, _g, _h, _j, _k, _l, _m, _o;
         return __awaiter(this, void 0, void 0, function* () {
             const p = this.getValidatedRules(tableRules, localParams);
             if (!p.getInfo)
@@ -352,10 +352,10 @@ class ViewHandler {
              * Media is directly related to this table (does not come from a deeply joined table)
              */
             let has_direct_media = false;
-            const mediaTable = (_c = (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.opts) === null || _b === void 0 ? void 0 : _b.fileTable) === null || _c === void 0 ? void 0 : _c.tableName;
+            const mediaTable = (_e = (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.opts) === null || _b === void 0 ? void 0 : _b.fileTable) === null || _e === void 0 ? void 0 : _e.tableName;
             if (!this.is_media && mediaTable) {
-                if ((_h = (_g = (_f = (_e = this.dboBuilder.prostgles) === null || _e === void 0 ? void 0 : _e.opts) === null || _f === void 0 ? void 0 : _f.fileTable) === null || _g === void 0 ? void 0 : _g.referencedTables) === null || _h === void 0 ? void 0 : _h[this.name]) {
-                    has_media = (_m = (_l = (_k = (_j = this.dboBuilder.prostgles) === null || _j === void 0 ? void 0 : _j.opts) === null || _k === void 0 ? void 0 : _k.fileTable) === null || _l === void 0 ? void 0 : _l.referencedTables) === null || _m === void 0 ? void 0 : _m[this.name];
+                if ((_j = (_h = (_g = (_f = this.dboBuilder.prostgles) === null || _f === void 0 ? void 0 : _f.opts) === null || _g === void 0 ? void 0 : _g.fileTable) === null || _h === void 0 ? void 0 : _h.referencedTables) === null || _j === void 0 ? void 0 : _j[this.name]) {
+                    has_media = (_o = (_m = (_l = (_k = this.dboBuilder.prostgles) === null || _k === void 0 ? void 0 : _k.opts) === null || _l === void 0 ? void 0 : _l.fileTable) === null || _m === void 0 ? void 0 : _m.referencedTables) === null || _o === void 0 ? void 0 : _o[this.name];
                     has_direct_media = true;
                 }
                 else {
@@ -404,12 +404,13 @@ class ViewHandler {
                         ...((update === null || update === void 0 ? void 0 : update.fields) || []),
                     ].includes(c.name);
                 })
-                    .map(c => {
-                    var _a, _b, _c, _e, _f, _g, _h;
+                    .map(_c => {
+                    var _a, _b, _e, _f, _g, _h, _j;
+                    let c = Object.assign({}, _c);
                     let label = c.comment || capitalizeFirstLetter(c.name, " ");
-                    const tblConfig = (_c = (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.opts) === null || _b === void 0 ? void 0 : _b.tableConfig) === null || _c === void 0 ? void 0 : _c[this.name];
+                    const tblConfig = (_e = (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.opts) === null || _b === void 0 ? void 0 : _b.tableConfig) === null || _e === void 0 ? void 0 : _e[this.name];
                     if (tblConfig && "columns" in tblConfig) {
-                        const lbl = (_e = tblConfig === null || tblConfig === void 0 ? void 0 : tblConfig.columns[c.name]) === null || _e === void 0 ? void 0 : _e.label;
+                        const lbl = (_f = tblConfig === null || tblConfig === void 0 ? void 0 : tblConfig.columns[c.name]) === null || _f === void 0 ? void 0 : _f.label;
                         if (["string", "object"].includes(typeof lbl)) {
                             if (typeof lbl === "string") {
                                 label = lbl;
@@ -419,8 +420,10 @@ class ViewHandler {
                             }
                         }
                     }
-                    return Object.assign(Object.assign(Object.assign({}, c), { label, tsDataType: postgresToTsType(c.udt_name), insert: Boolean(p.insert && p.insert.fields && p.insert.fields.includes(c.name)), select: Boolean(p.select && p.select.fields && p.select.fields.includes(c.name)), filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)), update: Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)), delete: Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)) }), (((_h = (_g = (_f = this.dboBuilder) === null || _f === void 0 ? void 0 : _f.prostgles) === null || _g === void 0 ? void 0 : _g.tableConfigurator) === null || _h === void 0 ? void 0 : _h.getColInfo({ table: this.name, col: c.name })) || {}));
-                });
+                    const select = c.privileges.some(p => p.is_grantable === "YES" && p.privilege_type === "SELECT"), insert = c.privileges.some(p => p.is_grantable === "YES" && p.privilege_type === "INSERT"), update = c.privileges.some(p => p.is_grantable === "YES" && p.privilege_type === "UPDATE");
+                    delete c.privileges;
+                    return Object.assign(Object.assign(Object.assign({}, c), { label, tsDataType: postgresToTsType(c.udt_name), insert: insert && Boolean(p.insert && p.insert.fields && p.insert.fields.includes(c.name)), select: select && Boolean(p.select && p.select.fields && p.select.fields.includes(c.name)), filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)), update: update && Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)), delete: Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)) }), (((_j = (_h = (_g = this.dboBuilder) === null || _g === void 0 ? void 0 : _g.prostgles) === null || _h === void 0 ? void 0 : _h.tableConfigurator) === null || _j === void 0 ? void 0 : _j.getColInfo({ table: this.name, col: c.name })) || {}));
+                }).filter(c => c.select || c.update || c.delete || c.insert);
                 //.sort((a, b) => a.ordinal_position - b.ordinal_position);
                 // const tblInfo = await this.getInfo();
                 // if(tblInfo && tblInfo.media_table_name && tblInfo.has_media){
@@ -1528,9 +1531,9 @@ class TableHandler extends ViewHandler {
         let data = this.prepareFieldValues(row, forcedData, allowedFields, fixIssues);
         const dataKeys = Object.keys(data);
         dataKeys.map(col => {
-            var _a, _b, _c, _e;
+            var _a, _b, _e, _f;
             (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.tableConfigurator) === null || _b === void 0 ? void 0 : _b.checkColVal({ table: this.name, col, value: data[col] });
-            const colConfig = (_e = (_c = this.dboBuilder.prostgles) === null || _c === void 0 ? void 0 : _c.tableConfigurator) === null || _e === void 0 ? void 0 : _e.getColumnConfig(this.name, col);
+            const colConfig = (_f = (_e = this.dboBuilder.prostgles) === null || _e === void 0 ? void 0 : _e.tableConfigurator) === null || _f === void 0 ? void 0 : _f.getColumnConfig(this.name, col);
             if (colConfig && "isText" in colConfig && data[col]) {
                 if (colConfig.lowerCased) {
                     data[col] = data[col].toString().toLowerCase();
@@ -1562,7 +1565,7 @@ class TableHandler extends ViewHandler {
             // if(!dbTX && this.t) dbTX = this.d;
             const preValidate = (_a = tableRules === null || tableRules === void 0 ? void 0 : tableRules.insert) === null || _a === void 0 ? void 0 : _a.preValidate, validate = (_b = tableRules === null || tableRules === void 0 ? void 0 : tableRules.insert) === null || _b === void 0 ? void 0 : _b.validate;
             let _data = yield Promise.all((Array.isArray(data) ? data : [data]).map((row) => __awaiter(this, void 0, void 0, function* () {
-                var _c, _e;
+                var _e, _f;
                 if (preValidate) {
                     row = yield preValidate(row);
                 }
@@ -1570,7 +1573,7 @@ class TableHandler extends ViewHandler {
                 const extraKeys = getExtraKeys(row);
                 /* Upload file then continue insert */
                 if (this.is_media) {
-                    if (!((_c = this.dboBuilder.prostgles) === null || _c === void 0 ? void 0 : _c.fileManager))
+                    if (!((_e = this.dboBuilder.prostgles) === null || _e === void 0 ? void 0 : _e.fileManager))
                         throw "fileManager not set up";
                     const { data, name } = row;
                     if (dataKeys.length !== 2)
@@ -1615,13 +1618,13 @@ class TableHandler extends ViewHandler {
                     const returning = param2 === null || param2 === void 0 ? void 0 : param2.returning;
                     if (returning) {
                         returnData = {};
-                        const returningItems = yield this.prepareReturning(returning, this.parseFieldFilter((_e = tableRules === null || tableRules === void 0 ? void 0 : tableRules.insert) === null || _e === void 0 ? void 0 : _e.returningFields));
+                        const returningItems = yield this.prepareReturning(returning, this.parseFieldFilter((_f = tableRules === null || tableRules === void 0 ? void 0 : tableRules.insert) === null || _f === void 0 ? void 0 : _f.returningFields));
                         returningItems.filter(s => s.selected).map(rs => {
                             returnData[rs.alias] = fullRootResult[rs.alias];
                         });
                     }
                     yield Promise.all(extraKeys.map((targetTable) => __awaiter(this, void 0, void 0, function* () {
-                        var _f;
+                        var _g;
                         const childDataItems = Array.isArray(row[targetTable]) ? row[targetTable] : [row[targetTable]];
                         /* Must be allowed to insert into media table */
                         const canInsert = (tbl) => __awaiter(this, void 0, void 0, function* () {
@@ -1710,7 +1713,7 @@ class TableHandler extends ViewHandler {
                         /* Return also the nested inserted data */
                         if (targetTableRules && (insertedChildren === null || insertedChildren === void 0 ? void 0 : insertedChildren.length) && returning) {
                             const targetTableHandler = dbTX[targetTable];
-                            const targetReturning = yield targetTableHandler.prepareReturning("*", targetTableHandler.parseFieldFilter((_f = targetTableRules === null || targetTableRules === void 0 ? void 0 : targetTableRules.insert) === null || _f === void 0 ? void 0 : _f.returningFields));
+                            const targetReturning = yield targetTableHandler.prepareReturning("*", targetTableHandler.parseFieldFilter((_g = targetTableRules === null || targetTableRules === void 0 ? void 0 : targetTableRules.insert) === null || _g === void 0 ? void 0 : _g.returningFields));
                             let clientTargetInserts = insertedChildren.map(d => {
                                 let _d = Object.assign({}, d);
                                 let res = {};
@@ -1737,7 +1740,7 @@ class TableHandler extends ViewHandler {
         });
     }
     insert(rowOrRows, param2, param3_unused, tableRules, _localParams = null) {
-        var _a, _b, _c;
+        var _a, _b, _e;
         return __awaiter(this, void 0, void 0, function* () {
             const localParams = _localParams || {};
             const { dbTX } = localParams;
@@ -1789,7 +1792,7 @@ class TableHandler extends ViewHandler {
                     rowOrRows = {}; //throw "Provide data in param1";
                 let returningSelect = this.makeReturnQuery(yield this.prepareReturning(returning, this.parseFieldFilter(returningFields)));
                 const makeQuery = (_row, isOne = false) => __awaiter(this, void 0, void 0, function* () {
-                    var _e;
+                    var _f;
                     let row = Object.assign({}, _row);
                     if (!isPojoObject(row)) {
                         console.trace(row);
@@ -1801,7 +1804,7 @@ class TableHandler extends ViewHandler {
                     if (!Object.keys(_data).length)
                         insertQ = `INSERT INTO ${prostgles_types_1.asName(this.name)} DEFAULT VALUES `;
                     else
-                        insertQ = yield this.colSet.getInsertQuery(_data, allowedCols, (_e = tableRules === null || tableRules === void 0 ? void 0 : tableRules.insert) === null || _e === void 0 ? void 0 : _e.validate); // pgp.helpers.insert(_data, columnSet); 
+                        insertQ = yield this.colSet.getInsertQuery(_data, allowedCols, (_f = tableRules === null || tableRules === void 0 ? void 0 : tableRules.insert) === null || _f === void 0 ? void 0 : _f.validate); // pgp.helpers.insert(_data, columnSet); 
                     return insertQ + conflict_query + returningSelect;
                 });
                 let query = "";
@@ -1836,7 +1839,7 @@ class TableHandler extends ViewHandler {
                 if (this.dboBuilder.prostgles.opts.DEBUG_MODE) {
                     console.log((_b = (_a = this.t) === null || _a === void 0 ? void 0 : _a.ctx) === null || _b === void 0 ? void 0 : _b.start, "insert in " + this.name, data);
                 }
-                const tx = ((_c = dbTX === null || dbTX === void 0 ? void 0 : dbTX[this.name]) === null || _c === void 0 ? void 0 : _c.t) || this.t;
+                const tx = ((_e = dbTX === null || dbTX === void 0 ? void 0 : dbTX[this.name]) === null || _e === void 0 ? void 0 : _e.t) || this.t;
                 const allowedFieldKeys = this.parseFieldFilter(fields);
                 if (tx) {
                     result = tx[queryType](query).catch(err => makeErr(err, localParams, this, allowedFieldKeys));
@@ -2424,7 +2427,8 @@ function getTablesForSchemaPostgresSQL(db, schema = "public") {
         cc.is_nullable = 'YES' as is_nullable,
         cc.references,
         cc.has_default,
-        cc.column_default
+        cc.column_default,
+        cc.privileges
     ) as x) ORDER BY cc.ordinal_position ) as columns 
 
     , t.table_type = 'VIEW' as is_view 
@@ -2448,11 +2452,18 @@ function getTablesForSchemaPostgresSQL(db, schema = "public") {
         , c.column_default
         , format('%I.%I', c.table_schema, c.table_name)::regclass::oid AS table_oid
         , c.is_nullable
+        , cp.privileges
         FROM information_schema.columns c    
         LEFT JOIN (SELECT * FROM information_schema.element_types )   e  
             ON ((c.table_catalog, c.table_schema, c.table_name, 'TABLE', c.dtd_identifier)  
             = (e.object_catalog, e.object_schema, e.object_name, e.object_type, e.collection_type_identifier)
         )
+        LEFT JOIN (
+            SELECT table_schema, table_name, column_name, json_agg(row_to_json((SELECT t FROM (SELECT cpp.privilege_type, cpp.is_grantable ) t))) as privileges
+            FROM information_schema.column_privileges cpp
+            GROUP BY table_schema, table_name, column_name
+        ) cp
+            ON c.table_name = cp.table_name AND c.column_name = cp.column_name
         LEFT JOIN (
             SELECT *
             FROM (

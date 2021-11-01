@@ -169,7 +169,7 @@ export declare class ViewHandler {
     db: DB;
     name: string;
     escapedName: string;
-    columns: ColumnInfo[];
+    columns: TableSchema["columns"];
     columnsForTypes: ColumnInfo[];
     column_names: string[];
     tableOrViewInfo: TableOrViewInfo;
@@ -184,7 +184,7 @@ export declare class ViewHandler {
     is_view: boolean;
     filterDef: string;
     is_media: boolean;
-    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths);
+    constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths);
     getRowHashSelect(allowedFields: FieldFilter, alias?: string, tableAlias?: string): string;
     validateViewRules(fields: FieldFilter, filterFields: FieldFilter, returningFields: FieldFilter, forcedFilter: object, rule: "update" | "select" | "insert" | "delete"): Promise<boolean>;
     getShortestJoin(table1: string, table2: string, startAlias: number, isInner?: boolean): {
@@ -275,7 +275,7 @@ export declare class TableHandler extends ViewHandler {
         queries: number;
         batching: string[];
     };
-    constructor(db: DB, tableOrViewInfo: TableOrViewInfo, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths);
+    constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths);
     willBatch(query: string): boolean;
     subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: object[]) => any): Promise<{
         unsubscribe: () => any;
@@ -309,7 +309,7 @@ export declare class TableHandler extends ViewHandler {
     }>;
 }
 export declare class DboBuilder {
-    tablesOrViews: TableOrViewInfo[];
+    tablesOrViews: TableSchema[];
     /**
      * Used in obtaining column names for error messages
      */
@@ -347,7 +347,12 @@ export declare type TableSchema = {
     name: string;
     oid: number;
     comment: string;
-    columns: ColumnInfo[];
+    columns: (ColumnInfo & {
+        privileges: {
+            privilege_type: "INSERT" | "REFERENCES" | "SELECT" | "UPDATE";
+            is_grantable: "YES" | "NO";
+        }[];
+    })[];
     is_view: boolean;
     parent_tables: string[];
 };
