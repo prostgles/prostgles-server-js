@@ -349,7 +349,7 @@ export declare type TableSchema = {
     comment: string;
     columns: (ColumnInfo & {
         privileges: {
-            privilege_type: "INSERT" | "REFERENCES" | "SELECT" | "UPDATE";
+            privilege_type: "INSERT" | "REFERENCES" | "SELECT" | "UPDATE" | "DELETE";
             is_grantable: "YES" | "NO";
         }[];
     })[];

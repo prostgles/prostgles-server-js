@@ -708,10 +708,12 @@ export class ViewHandler {
                     }
                 }
 
-                const select = c.privileges.some(p => p.is_grantable === "YES" && p.privilege_type === "SELECT"),
-                    insert = c.privileges.some(p => p.is_grantable === "YES" && p.privilege_type === "INSERT"),
-                    update = c.privileges.some(p => p.is_grantable === "YES" && p.privilege_type === "UPDATE");
+                const select = !c.privileges.some(p => p.is_grantable === "NO" && p.privilege_type === "SELECT"),
+                    insert = !c.privileges.some(p => p.is_grantable === "NO" && p.privilege_type === "INSERT"),
+                    update = !c.privileges.some(p => p.is_grantable === "NO" && p.privilege_type === "UPDATE"),
+                    _delete = !c.privileges.some(p => p.is_grantable === "NO" && p.privilege_type === "DELETE");
                     
+
                 delete c.privileges;
                 return {
                     ...c,
@@ -721,7 +723,7 @@ export class ViewHandler {
                     select: select && Boolean(p.select && p.select.fields && p.select.fields.includes(c.name)),
                     filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)),
                     update: update && Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)),
-                    delete: Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)),
+                    delete: _delete && Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)),
                     ...(this.dboBuilder?.prostgles?.tableConfigurator?.getColInfo({ table: this.name, col: c.name}) || {})
                 }
             }).filter(c => c.select || c.update || c.delete || c.insert)
@@ -3067,7 +3069,7 @@ export type TableSchema = {
     comment: string;
     columns: (ColumnInfo & {
         privileges: {
-            privilege_type: "INSERT" | "REFERENCES" | "SELECT" | "UPDATE";
+            privilege_type: "INSERT" | "REFERENCES" | "SELECT" | "UPDATE" | "DELETE";
             is_grantable: "YES" | "NO"
         }[];
     })[];
