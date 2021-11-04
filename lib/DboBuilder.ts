@@ -2673,21 +2673,12 @@ export class DboBuilder {
     }
 
     private init = async () => {
-        // let onSchemaChange;
         
-        // if(this.prostgles.opts.watchSchema){
-        //     onSchemaChange = (event: { command: string; query: string }) => { 
-        //         this.prostgles.onSchemaChange(event)
-        //     }
-        // }
-        // this.pubSubManager = await PubSubManager.create({
-        //     dboBuilder: this,
-        //     db: this.db, 
-        //     dbo: this.dbo as unknown as DbHandler,
-        //     onSchemaChange
-        // });
-
+        /* If watchSchema then PubSubManager must be created */
         await this.build();
+        if(this.prostgles.opts.watchSchema){
+            await this.getPubSubManager()
+        }
 
         return this;
     }

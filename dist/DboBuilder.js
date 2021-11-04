@@ -2073,19 +2073,11 @@ class DboBuilder {
             return this._pubSubManager;
         });
         this.init = () => __awaiter(this, void 0, void 0, function* () {
-            // let onSchemaChange;
-            // if(this.prostgles.opts.watchSchema){
-            //     onSchemaChange = (event: { command: string; query: string }) => { 
-            //         this.prostgles.onSchemaChange(event)
-            //     }
-            // }
-            // this.pubSubManager = await PubSubManager.create({
-            //     dboBuilder: this,
-            //     db: this.db, 
-            //     dbo: this.dbo as unknown as DbHandler,
-            //     onSchemaChange
-            // });
+            /* If watchSchema then PubSubManager must be created */
             yield this.build();
+            if (this.prostgles.opts.watchSchema) {
+                yield this.getPubSubManager();
+            }
             return this;
         });
         this.getTX = (cb) => {
