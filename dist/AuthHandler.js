@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const prostgles_types_1 = require("prostgles-types");
 class AuthHandler {
@@ -57,7 +48,7 @@ class AuthHandler {
             }
         };
         this.throttledFunc = (func, throttle = 500) => {
-            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            return new Promise(async (resolve, reject) => {
                 let result, error;
                 /**
                  * Throttle response times to prevent timing attacks
@@ -74,26 +65,26 @@ class AuthHandler {
                     }
                 }, throttle);
                 try {
-                    result = yield func();
+                    result = await func();
                 }
                 catch (err) {
                     console.log(err);
                     error = err;
                 }
-            }));
+            });
         };
-        this.loginThrottled = (params) => __awaiter(this, void 0, void 0, function* () {
+        this.loginThrottled = async (params) => {
             if (!this.opts.login)
                 throw "Auth login config missing";
             const { responseThrottle = 500 } = this.opts;
-            return this.throttledFunc(() => __awaiter(this, void 0, void 0, function* () {
-                let result = yield this.opts.login(params, this.dbo, this.db);
+            return this.throttledFunc(async () => {
+                let result = await this.opts.login(params, this.dbo, this.db);
                 if (!result.sid) {
                     throw { msg: "Something went wrong making a session" };
                 }
                 return result;
-            }), responseThrottle);
-            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            }, responseThrottle);
+            return new Promise(async (resolve, reject) => {
                 let result, error;
                 /**
                  * Throttle response times to prevent timing attacks
@@ -110,7 +101,7 @@ class AuthHandler {
                     }
                 }, responseThrottle);
                 try {
-                    result = yield this.opts.login(params, this.dbo, this.db);
+                    result = await this.opts.login(params, this.dbo, this.db);
                     if (!result.sid) {
                         error = { msg: "Something went wrong making a session" };
                     }
@@ -119,21 +110,21 @@ class AuthHandler {
                     console.log(err);
                     error = err;
                 }
-            }));
-        });
-        this.makeSocketAuth = (socket) => __awaiter(this, void 0, void 0, function* () {
-            var _h, _j, _k;
+            });
+        };
+        this.makeSocketAuth = async (socket) => {
+            var _a, _b, _c;
             if (!this.opts)
                 return {};
             let auth = {};
-            if (((_j = (_h = this.opts.expressConfig) === null || _h === void 0 ? void 0 : _h.publicRoutes) === null || _j === void 0 ? void 0 : _j.length) && !((_k = this.opts.expressConfig) === null || _k === void 0 ? void 0 : _k.disableSocketAuthGuard)) {
+            if (((_b = (_a = this.opts.expressConfig) === null || _a === void 0 ? void 0 : _a.publicRoutes) === null || _b === void 0 ? void 0 : _b.length) && !((_c = this.opts.expressConfig) === null || _c === void 0 ? void 0 : _c.disableSocketAuthGuard)) {
                 auth.pathGuard = true;
                 socket.removeAllListeners(prostgles_types_1.CHANNELS.AUTHGUARD);
-                socket.on(prostgles_types_1.CHANNELS.AUTHGUARD, (params, cb = (err, res) => { }) => __awaiter(this, void 0, void 0, function* () {
-                    var _l;
+                socket.on(prostgles_types_1.CHANNELS.AUTHGUARD, async (params, cb = (err, res) => { }) => {
+                    var _a;
                     try {
                         const { pathname } = params || {};
-                        if (pathname && typeof pathname === "string" && this.isUserRoute(pathname) && !((_l = (yield this.getClientInfo({ socket }))) === null || _l === void 0 ? void 0 : _l.user)) {
+                        if (pathname && typeof pathname === "string" && this.isUserRoute(pathname) && !((_a = (await this.getClientInfo({ socket }))) === null || _a === void 0 ? void 0 : _a.user)) {
                             cb(null, { shouldReload: true });
                         }
                         else {
@@ -144,7 +135,7 @@ class AuthHandler {
                         console.error("AUTHGUARD err: ", err);
                         cb(err);
                     }
-                }));
+                });
             }
             const { register, logout } = this.opts;
             const login = this.loginThrottled;
@@ -153,7 +144,7 @@ class AuthHandler {
                 { func: (params, dbo, db) => login(params), ch: prostgles_types_1.CHANNELS.LOGIN, name: "login" },
                 { func: (params, dbo, db) => logout(this.getSID({ socket }), dbo, db), ch: prostgles_types_1.CHANNELS.LOGOUT, name: "logout" }
             ].filter(h => h.func);
-            const usrData = yield this.getClientInfo({ socket });
+            const usrData = await this.getClientInfo({ socket });
             if (usrData) {
                 auth.user = usrData.clientUser;
                 handlers = handlers.filter(h => h.name === "logout");
@@ -161,11 +152,11 @@ class AuthHandler {
             handlers.map(({ func, ch, name }) => {
                 auth[name] = true;
                 socket.removeAllListeners(ch);
-                socket.on(ch, (params, cb = (...callback) => { }) => __awaiter(this, void 0, void 0, function* () {
+                socket.on(ch, async (params, cb = (...callback) => { }) => {
                     try {
                         if (!socket)
                             throw "socket missing??!!";
-                        const res = yield func(params, this.dbo, this.db);
+                        const res = await func(params, this.dbo, this.db);
                         if (name === "login" && res && res.sid) {
                             /* TODO: Re-send schema to client */
                         }
@@ -175,10 +166,10 @@ class AuthHandler {
                         console.error(name + " err", err);
                         cb(err);
                     }
-                }));
+                });
             });
             return auth;
-        });
+        };
         this.opts = prostgles.opts.auth;
         if ((_a = prostgles.opts.auth) === null || _a === void 0 ? void 0 : _a.expressConfig) {
             this.returnURL = ((_c = (_b = prostgles.opts.auth) === null || _b === void 0 ? void 0 : _b.expressConfig) === null || _c === void 0 ? void 0 : _c.returnURL) || "returnURL";
@@ -188,138 +179,136 @@ class AuthHandler {
         this.dbo = prostgles.dbo;
         this.db = prostgles.db;
     }
-    init() {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (!this.opts)
-                return;
-            this.opts.sidKeyName = this.opts.sidKeyName || "session_id";
-            const { sidKeyName, login, getUser, getClientUser, expressConfig } = this.opts;
-            this.sidKeyName = this.opts.sidKeyName;
-            if (typeof sidKeyName !== "string" && !login) {
-                throw "Invalid auth: Provide { sidKeyName: string } ";
+    async init() {
+        if (!this.opts)
+            return;
+        this.opts.sidKeyName = this.opts.sidKeyName || "session_id";
+        const { sidKeyName, login, getUser, getClientUser, expressConfig } = this.opts;
+        this.sidKeyName = this.opts.sidKeyName;
+        if (typeof sidKeyName !== "string" && !login) {
+            throw "Invalid auth: Provide { sidKeyName: string } ";
+        }
+        /**
+         * Why ??? Collision with socket.io ???
+         */
+        if (this.sidKeyName === "sid")
+            throw "sidKeyName cannot be 'sid' please provide another name.";
+        if (!getUser || !getClientUser)
+            throw "getUser OR getClientUser missing from auth config";
+        if (expressConfig) {
+            const { app, publicRoutes = [], onGetRequestOK, magicLinks } = expressConfig;
+            if (publicRoutes.find(r => typeof r !== "string" || !r)) {
+                throw "Invalid or empty string provided within publicRoutes ";
             }
-            /**
-             * Why ??? Collision with socket.io ???
-             */
-            if (this.sidKeyName === "sid")
-                throw "sidKeyName cannot be 'sid' please provide another name.";
-            if (!getUser || !getClientUser)
-                throw "getUser OR getClientUser missing from auth config";
-            if (expressConfig) {
-                const { app, publicRoutes = [], onGetRequestOK, magicLinks } = expressConfig;
-                if (publicRoutes.find(r => typeof r !== "string" || !r)) {
-                    throw "Invalid or empty string provided within publicRoutes ";
-                }
-                if (app && magicLinks) {
-                    const { route = "/magic-link", check } = magicLinks;
-                    if (!check)
-                        throw "Check must be defined for magicLinks";
-                    app.get(`${route}/:id`, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                        const { id } = req.params;
-                        if (typeof id !== "string" || !id) {
-                            res.status(404).json({ msg: "Invalid magic-link id. Expecting a string" });
-                        }
-                        else {
-                            try {
-                                const session = yield this.throttledFunc(() => __awaiter(this, void 0, void 0, function* () {
-                                    return check(id, this.dbo, this.db);
-                                }));
-                                if (!session) {
-                                    res.status(404).json({ msg: "Invalid magic-link" });
-                                }
-                                else {
-                                    this.setCookie(session, { req, res });
-                                }
-                            }
-                            catch (e) {
-                                res.status(404).json({ msg: e });
-                            }
-                        }
-                    }));
-                }
-                if (app && this.loginRoute) {
-                    const getUser = (req) => {
-                        var _a;
-                        const sid = (_a = req === null || req === void 0 ? void 0 : req.cookies) === null || _a === void 0 ? void 0 : _a[sidKeyName];
-                        if (!sid)
-                            return undefined;
-                        return this.opts.getUser(this.validateSid(sid), this.dbo, this.db);
-                    };
-                    app.post(this.loginRoute, (req, res) => __awaiter(this, void 0, void 0, function* () {
+            if (app && magicLinks) {
+                const { route = "/magic-link", check } = magicLinks;
+                if (!check)
+                    throw "Check must be defined for magicLinks";
+                app.get(`${route}/:id`, async (req, res) => {
+                    const { id } = req.params;
+                    if (typeof id !== "string" || !id) {
+                        res.status(404).json({ msg: "Invalid magic-link id. Expecting a string" });
+                    }
+                    else {
                         try {
-                            const { sid, expires } = (yield this.loginThrottled(req.body || {})) || {};
-                            if (sid) {
-                                this.setCookie({ sid, expires }, { req, res });
+                            const session = await this.throttledFunc(async () => {
+                                return check(id, this.dbo, this.db);
+                            });
+                            if (!session) {
+                                res.status(404).json({ msg: "Invalid magic-link" });
                             }
                             else {
-                                throw ("no user or session");
+                                this.setCookie(session, { req, res });
                             }
                         }
-                        catch (err) {
-                            console.log(err);
-                            res.status(404).json({ err: "Invalid username or password" });
+                        catch (e) {
+                            res.status(404).json({ msg: e });
                         }
-                    }));
-                    if (app && this.logoutGetPath) {
-                        app.get(this.logoutGetPath, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                            var _a;
-                            const sid = this.validateSid((_a = req === null || req === void 0 ? void 0 : req.cookies) === null || _a === void 0 ? void 0 : _a[sidKeyName]);
-                            if (sid) {
-                                try {
-                                    yield this.throttledFunc(() => {
-                                        var _a;
-                                        return this.opts.logout((_a = req === null || req === void 0 ? void 0 : req.cookies) === null || _a === void 0 ? void 0 : _a[sidKeyName], this.dbo, this.db);
-                                    });
-                                }
-                                catch (err) {
-                                    console.error(err);
-                                }
-                            }
-                            res.redirect("/");
-                        }));
                     }
-                    if (app && Array.isArray(publicRoutes)) {
-                        /* Redirect if not logged in and requesting non public content */
-                        app.get('*', (req, res) => __awaiter(this, void 0, void 0, function* () {
+                });
+            }
+            if (app && this.loginRoute) {
+                const getUser = (req) => {
+                    var _a;
+                    const sid = (_a = req === null || req === void 0 ? void 0 : req.cookies) === null || _a === void 0 ? void 0 : _a[sidKeyName];
+                    if (!sid)
+                        return undefined;
+                    return this.opts.getUser(this.validateSid(sid), this.dbo, this.db);
+                };
+                app.post(this.loginRoute, async (req, res) => {
+                    try {
+                        const { sid, expires } = await this.loginThrottled(req.body || {}) || {};
+                        if (sid) {
+                            this.setCookie({ sid, expires }, { req, res });
+                        }
+                        else {
+                            throw ("no user or session");
+                        }
+                    }
+                    catch (err) {
+                        console.log(err);
+                        res.status(404).json({ err: "Invalid username or password" });
+                    }
+                });
+                if (app && this.logoutGetPath) {
+                    app.get(this.logoutGetPath, async (req, res) => {
+                        var _a;
+                        const sid = this.validateSid((_a = req === null || req === void 0 ? void 0 : req.cookies) === null || _a === void 0 ? void 0 : _a[sidKeyName]);
+                        if (sid) {
                             try {
-                                const returnURL = getReturnUrl(req, this.returnURL);
-                                /**
-                                 * If already logged in then redirect
-                                 */ this.loginRoute;
-                                /**
-                                 * Requesting a User route
-                                 */
-                                if (this.isUserRoute(req.path)) {
-                                    /* Check auth. Redirect if unauthorized */
-                                    const u = yield getUser(req);
-                                    if (!u) {
-                                        res.redirect(`${this.loginRoute}?returnURL=${encodeURIComponent(req.originalUrl)}`);
-                                        return;
-                                    }
-                                    /* If authorized and going to returnUrl then redirect. Otherwise serve file */
-                                }
-                                else if (returnURL && (yield getUser(req))) {
-                                    res.redirect(returnURL);
-                                    return;
-                                    /** If Logged in and requesting login then redirect */
-                                }
-                                else if (this.matchesRoute(this.loginRoute, req.path) && (yield getUser(req))) {
-                                    res.redirect("/");
-                                    return;
-                                }
-                                if (onGetRequestOK) {
-                                    onGetRequestOK(req, res);
-                                }
+                                await this.throttledFunc(() => {
+                                    var _a;
+                                    return this.opts.logout((_a = req === null || req === void 0 ? void 0 : req.cookies) === null || _a === void 0 ? void 0 : _a[sidKeyName], this.dbo, this.db);
+                                });
                             }
-                            catch (error) {
-                                console.error(error);
-                                res.status(404).json({ msg: "Something went wrong", error });
+                            catch (err) {
+                                console.error(err);
                             }
-                        }));
-                    }
+                        }
+                        res.redirect("/");
+                    });
+                }
+                if (app && Array.isArray(publicRoutes)) {
+                    /* Redirect if not logged in and requesting non public content */
+                    app.get('*', async (req, res) => {
+                        try {
+                            const returnURL = getReturnUrl(req, this.returnURL);
+                            /**
+                             * If already logged in then redirect
+                             */ this.loginRoute;
+                            /**
+                             * Requesting a User route
+                             */
+                            if (this.isUserRoute(req.path)) {
+                                /* Check auth. Redirect if unauthorized */
+                                const u = await getUser(req);
+                                if (!u) {
+                                    res.redirect(`${this.loginRoute}?returnURL=${encodeURIComponent(req.originalUrl)}`);
+                                    return;
+                                }
+                                /* If authorized and going to returnUrl then redirect. Otherwise serve file */
+                            }
+                            else if (returnURL && (await getUser(req))) {
+                                res.redirect(returnURL);
+                                return;
+                                /** If Logged in and requesting login then redirect */
+                            }
+                            else if (this.matchesRoute(this.loginRoute, req.path) && (await getUser(req))) {
+                                res.redirect("/");
+                                return;
+                            }
+                            if (onGetRequestOK) {
+                                onGetRequestOK(req, res);
+                            }
+                        }
+                        catch (error) {
+                            console.error(error);
+                            res.status(404).json({ msg: "Something went wrong", error });
+                        }
+                    });
                 }
             }
-        });
+        }
     }
     /**
      * Will return first sid value found in : http cookie or query params
@@ -357,21 +346,19 @@ class AuthHandler {
             }, {});
         }
     }
-    getClientInfo(localParams) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (!this.opts)
-                return {};
-            const { getUser, getClientUser } = this.opts;
-            if (getUser && localParams && (localParams.httpReq || localParams.socket)) {
-                const sid = this.getSID(localParams);
-                return {
-                    sid,
-                    user: !sid ? undefined : yield getUser(sid, this.dbo, this.db),
-                    clientUser: !sid ? undefined : yield getClientUser(sid, this.dbo, this.db)
-                };
-            }
+    async getClientInfo(localParams) {
+        if (!this.opts)
             return {};
-        });
+        const { getUser, getClientUser } = this.opts;
+        if (getUser && localParams && (localParams.httpReq || localParams.socket)) {
+            const sid = this.getSID(localParams);
+            return {
+                sid,
+                user: !sid ? undefined : await getUser(sid, this.dbo, this.db),
+                clientUser: !sid ? undefined : await getClientUser(sid, this.dbo, this.db)
+            };
+        }
+        return {};
     }
 }
 exports.default = AuthHandler;

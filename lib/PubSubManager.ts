@@ -12,26 +12,30 @@ import * as Bluebird from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg from 'pg-promise/typescript/pg-subset';
 
-import { SelectParamsBasic as SelectParams, OrderBy, FieldFilter, asName, WAL, isEmpty } from "prostgles-types";
+import { SelectParamsBasic as SelectParams, OrderBy, FieldFilter, asName, WAL, isEmpty, AnyObject } from "prostgles-types";
+
+import { ClientExpressData, syncData } from "./SyncReplication";
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 let pgp: PGP = pgPromise({
     promiseLib: Bluebird
 });
-export const asValue = v => pgp.as.format("$1", [v]);
+export const asValue = (v: any) => pgp.as.format("$1", [v]);
 export const DEFAULT_SYNC_BATCH_SIZE = 50;
 
-const log = (...args) => {
+export const log = (...args: any[]) => {
     if(process.env.TEST_TYPE){
         console.log(...args)
     }
 }
 
-type SyncParams = {
+export type BasicCallback = (err?: any, res?: any) => void
+
+export type SyncParams = {
     socket_id: string; 
     channel_name: string;
     table_name: string;
-    table_rules: TableRule;
+    table_rules?: TableRule;
     synced_field: string;
     allow_delete: boolean;
     id_fields: string[];
@@ -41,10 +45,9 @@ type SyncParams = {
         select: FieldFilter
     };
     condition: string;
-    isSyncingTimeout: number;
-    wal: WAL,
+    wal?: WAL,
     throttle?: number;
-    lr: object;
+    lr?: AnyObject;
     last_synced: number;
     is_syncing: boolean;
 }
@@ -73,7 +76,7 @@ type SubscriptionParams = {
     table_rules: TableRule;
     filter: object;
     params: SelectParams;
-    func: (data: any) => any;
+    func?: (data: any) => any;
     throttle?: number;
     last_throttled: number;
     is_throttling?: any;
@@ -99,14 +102,14 @@ export class PubSubManager {
     dboBuilder: DboBuilder;
     db: DB;
     dbo: DbHandler;
-    _triggers: { [key: string]: string[] };
+    _triggers?: Record<string, string[]>;
     sockets: any;
     subs: { [ke: string]: { [ke: string]: { subs: SubscriptionParams[] } } };
     syncs: SyncParams[];
     socketChannelPreffix: string;
-    onSchemaChange?: (event: { command: string; query: string }) => void = null;
+    onSchemaChange?: ((event: { command: string; query: string }) => void) = undefined;
 
-    postgresNotifListenManager: PostgresNotifListenManager;
+    postgresNotifListenManager?: PostgresNotifListenManager;
 
     private constructor (options: PubSubManagerOptions) {
         const { db, dbo, wsChannelNamePrefix, pgChannelName, onSchemaChange, dboBuilder } = options;
@@ -138,10 +141,10 @@ export class PubSubManager {
         }
     }
 
-    private appID: string;
+    private appID?: string;
     
     appCheckFrequencyMS = 10 * 1000;
-    appCheck;
+    appCheck?: ReturnType<typeof setInterval>;
     
     
 
@@ -176,6 +179,7 @@ export class PubSubManager {
         // if(this.postgresNotifListenManager){
         //     this.postgresNotifListenManager.stopListening();
         // }
+        if(!this.postgresNotifListenManager) throw "this.postgresNotifListenManager missing"
         this.postgresNotifListenManager.destroy();
     }
 
@@ -188,8 +192,8 @@ export class PubSubManager {
     }
 
     appChecking = false;
-    init = async (): Promise<PubSubManager> => {
-        if(!this.canContinue()) return;
+    init = async (): Promise<PubSubManager | undefined> => {
+        if(!this.canContinue()) return undefined;
 
         try {
             const schema_version = 4;
@@ -957,6 +961,7 @@ export class PubSubManager {
     }
 
     isReady(){
+        if(!this.postgresNotifListenManager) throw "this.postgresNotifListenManager missing";
         return this.postgresNotifListenManager.isListening();
     }
 
@@ -1036,7 +1041,7 @@ export class PubSubManager {
 
                 syncs.map((s) => {
                     // console.log("SYNC DATA FROM TRIGGER");
-                    this.syncData(s, null);
+                    this.syncData(s);
                 });
 
                 if(!subs){
@@ -1054,7 +1059,7 @@ export class PubSubManager {
                         sub.is_ready &&
                         (sub.socket_id && this.sockets[sub.socket_id]) || sub.func
                     ){
-                        const throttle = sub.throttle;
+                        const throttle = sub.throttle || 0;
                         if(sub.last_throttled <= Date.now() - throttle){
 
                             /* It is assumed the policy was checked before this point */
@@ -1100,7 +1105,9 @@ export class PubSubManager {
         return new Promise(async (resolve, reject) => {
             /* TODO: Retire subOne -> it's redundant */
             // this.dbo[table_name][subOne? "findOne" : "find"](filter, params, null, table_rules)
-            this.dbo[table_name].find(filter, params, null, table_rules)
+            if(!this.dbo?.[table_name]?.find) throw "1107 this.dbo[table_name].find";
+
+            this.dbo?.[table_name]?.find?.(filter, params, null, table_rules)
                 .then(data => {
                     
                     if(socket_id && this.sockets[socket_id]){
@@ -1131,471 +1138,23 @@ export class PubSubManager {
     upsertSocket(socket: any, channel_name: string){
         if(socket && !this.sockets[socket.id]){
             this.sockets[socket.id] = socket;
-            socket.on("disconnect", () => this.onSocketDisconnected(socket, null));
+            socket.on("disconnect", () => this.onSocketDisconnected(socket));
         }
     }
 
-    syncTimeout = null;
-    async syncData(sync: SyncParams, clientData){
-        // console.log("S", clientData)
-        const { 
-                socket_id, channel_name, table_name, filter, 
-                table_rules, allow_delete = false, params,
-                synced_field, id_fields = [], batch_size, isSyncingTimeout, wal, throttle
-            } = sync,
-            socket = this.sockets[socket_id];
-
-        if(!socket) throw "Orphaned socket";
-
-        const sync_fields = [synced_field, ...id_fields.sort()],
-            orderByAsc = sync_fields.reduce((a, v) => ({ ...a, [v]: true }), {}),
-            orderByDesc = sync_fields.reduce((a, v) => ({ ...a, [v]: false }), {}),
-            // desc_params = { orderBy: [{ [synced_field]: false }].concat(id_fields.map(f => ({ [f]: false }) )) },
-            // asc_params = { orderBy: [synced_field].concat(id_fields) },
-            rowsIdsMatch = (a, b) => {
-                return a && b && !id_fields.find(key => (a[key]).toString() !== (b[key]).toString())
-            },
-            rowsFullyMatch = (a, b) => {
-                return rowsIdsMatch(a, b) && a[synced_field].toString() === b[synced_field].toString();
-            },
-            getServerRowInfo = async ({ from_synced = null, to_synced = null, end_offset = null } = {}) => {
-                let _filter = { ...filter };
-
-                if(from_synced || to_synced){
-                    _filter[synced_field] = {
-                        ...(from_synced? {  $gte: from_synced } : {}),
-                        ...(to_synced?  { $lte: to_synced } : {})
-                    }
-                }
-
-                const first_rows = await this.dbo[table_name].find(_filter, { orderBy: (orderByAsc as OrderBy), select: sync_fields, limit: 1 }, null, table_rules);
-                const last_rows = await this.dbo[table_name].find(_filter, { orderBy: (orderByDesc as OrderBy), select: sync_fields, limit: 1, offset: end_offset || 0 }, null, table_rules);
-                const count = await this.dbo[table_name].count(_filter, null, null, table_rules);
-
-                return { s_fr: first_rows[0] || null, s_lr: last_rows[0] || null, s_count: count }
-            },
-            getClientRowInfo = ({ from_synced = null, to_synced = null, end_offset = null } = {}) => {
-                let res = new Promise<any>((resolve, reject) => {
-                    let onSyncRequest = { from_synced, to_synced, end_offset };//, forReal: true };
-                    socket.emit(channel_name, { onSyncRequest }, (resp) => {
-                        if(resp.onSyncRequest){
-                            let c_fr = resp.onSyncRequest.c_fr,
-                                c_lr = resp.onSyncRequest.c_lr,
-                                c_count = resp.onSyncRequest.c_count;
-
-                            // console.log(onSyncRequest, { c_fr, c_lr, c_count }, socket._user);
-                            return resolve({ c_fr, c_lr, c_count });
-                        } else if(resp.err){
-                            reject(resp.err);
-                        }
-                    });
-                });
-
-                return res;
-            },
-            getClientData = (from_synced = 0, offset = 0) => {
-                return new Promise((resolve, reject) => {
-                    const onPullRequest = { from_synced: from_synced || 0, offset: offset || 0, limit: batch_size };
-                    socket.emit(channel_name, { onPullRequest } , async (resp) => {
-                        if(resp && resp.data && Array.isArray(resp.data)){
-                            // console.log({ onPullRequest, resp }, socket._user)
-                            resolve(sortClientData(resp.data));
-                        } else {
-                            reject("unexpected onPullRequest response: " + JSON.stringify(resp));
-                        }
-                    });
-                });
-
-                function sortClientData(data){
-                    return data.sort((a, b) => {
-                        /* Order by increasing synced and ids (sorted alphabetically) */
-                        return (a[synced_field] - b[synced_field]) || id_fields.sort().map(idKey => a[idKey] < b[idKey]? -1 : a[idKey] > b[idKey]? 1 : 0).find(v => v) || 0;
-                    });
-                }
-            },
-            getServerData = async (from_synced = 0, offset = 0) => {
-                let _filter = { 
-                    ...filter,
-                    [synced_field]: { $gte: from_synced || 0 }
-                };
-
-                try {
-                    return this.dbo[table_name].find(
-                        _filter, 
-                        { 
-                            select: params.select, 
-                            orderBy: (orderByAsc as OrderBy), 
-                            offset: offset || 0, 
-                            limit: batch_size 
-                        }, 
-                        null, 
-                        table_rules
-                    );
-
-                } catch(e){
-                    console.error("Sync getServerData failed: ", e);
-                    throw "INTERNAL ERROR"
-                }
-            },
-            deleteData = async (deleted) => {
-                // console.log("deleteData deleteData  deleteData " + deleted.length);
-                if(allow_delete){
-                    return Promise.all(deleted.map(async d => {
-                        const id_filter = filterObj(d, id_fields);
-                        try {
-                            await (this.dbo[table_name] as TableHandler).delete(id_filter, null, null, table_rules);
-                            return 1;
-                        } catch (e){
-                            console.error(e)
-                        }
-                        return 0;
-                    }))
-                } else {
-                    console.warn("client tried to delete data without permission (allow_delete is false)")
-                }
-                return false;
-            },
-            upsertData = (data, isExpress = false) => {
-                let inserted = 0,
-                    updated = 0,
-                    total = data.length;
-
-                // console.log("isExpress", isExpress, data);
-
-                return this.dboBuilder.getTX(async dbTX => {
-                    const tbl = dbTX[table_name] as TableHandler;
-                    const existingData = await tbl.find(
-                        { $or: data.map(d => filterObj(d, id_fields)) }, 
-                        { select: [synced_field, ...id_fields] , 
-                        orderBy: (orderByAsc as OrderBy), 
-                        }, 
-                        null, 
-                        table_rules
-                    );
-                    const inserts = data.filter(d => !existingData.find(ed => rowsIdsMatch(ed, d)));
-                    const updates = data.filter(d =>  existingData.find(ed => rowsIdsMatch(ed, d) && +ed[synced_field] < +d[synced_field]) );
-                    try {
-                        if(table_rules.update && updates.length){
-                            let updateData: [any, any][] = [];
-                            await Promise.all(updates.map(upd => {
-                                const id_filter = filterObj(upd, id_fields);
-                                const syncSafeFilter = { $and: [id_filter, { [synced_field]: { "<": upd[synced_field] } } ] }
-                                // return tbl.update(syncSafeFilter, filterObj(upd, [], id_fields), { fixIssues: true }, table_rules)
-                                updateData.push([syncSafeFilter, filterObj(upd, [], id_fields)])
-                            }));
-                            await tbl.updateBatch(updateData, { fixIssues: true }, table_rules)
-                            updated = updates.length;
-                        }
-                        if(table_rules.insert && inserts.length){
-                            // const qs = await tbl.insert(inserts, { fixIssues: true }, null, table_rules, { returnQuery: true });
-                            // console.log("inserts", qs)
-                            await tbl.insert(inserts, { fixIssues: true }, null, table_rules);
-                            inserted = inserts.length;                       
-                        }
-                        updated++;
-                        
-                        return true;
-                    } catch(e) {
-                        console.trace(e);
-                        throw e;
-                    }
-
-                }).then(res => {
-                    log(`upsertData: inserted( ${inserted} )    updated( ${updated} )     total( ${total} )`);
-                    return { inserted , updated , total };
-                })
-                .catch(err => {
-                    console.trace("Something went wrong with syncing to server: \n ->", err, data.length, id_fields);
-                    return Promise.reject("Something went wrong with syncing to server: ")
-                });
-                
-                // return Promise.all(data.map(async (d, i) => {
-                //     const id_filter = filterObj(d, id_fields);
-
-                //     /* To account for client time deviation */
-                //     /* This can break sync.lr logic (correct timestamps but recursive syncing) */
-                //     // d[synced_field] = isExpress? (Date.now() + i) : Math.max(Date.now(), d[synced_field]);
-
-                //     /* Select only the necessary fields when preparing to update */
-                //     const exst = await this.dbo[table_name].find(id_filter, { select: { [synced_field]: 1 }, orderBy: (orderByAsc as OrderBy), limit: 1 }, null, table_rules);
-                
-                //     /* TODO: Add batch INSERT with ON CONFLICT DO UPDATE */
-                //     if(exst && exst.length){
-                //         // adwa dwa
-                //         // console.log(exst[0], d)
-                //         if(table_rules.update && +exst[0][synced_field] < +d[synced_field]){
-                //             try {
-                //                 const syncSafeFilter = { $and: [id_filter, { [synced_field]: { "<": d[synced_field] } } ] }
-                //                 updated++;
-                //                 await (this.dbo[table_name] as TableHandler).update(syncSafeFilter, filterObj(d, [], id_fields), { fixIssues: true }, table_rules);
-                //             } catch(e) {
-                //                 console.log(e);
-                //                 throw e;
-                //             }
-                //         }
-                //     } else if(table_rules.insert){
-                //         try {
-                //             inserted++;
-                //             await (this.dbo[table_name] as TableHandler).insert(d, { fixIssues: true }, null, table_rules);
-                //         } catch(e){
-                //             console.log(e);
-                //             throw e;
-                //         }
-                //     } else {
-                //         console.error("SYNC onPullRequest UNEXPECTED CASE\n Data item does not exist on server and insert is not allowed !???");
-                //         return false
-                //     }
-                //     return true;
-                // }))
-                // .then(res => {
-                //     // console.log(`upsertData: inserted( ${inserted} )    updated( ${updated} )     total( ${total} )`);
-                //     return { inserted , updated , total };
-                // })
-                // .catch(err => {
-                //     console.error("Something went wrong with syncing to server: \n ->", err, data, id_fields);
-                //     return Promise.reject("Something went wrong with syncing to server: ")
-                // });
-            },
-            pushData = async (data, isSynced = false, err = null) => {
-                return new Promise((resolve, reject) => {
-                    socket.emit(channel_name, { data, isSynced }, (resp) => {
-                            
-                        if(resp && resp.ok){
-                            // console.log("PUSHED to client: fr/lr", data[0], data[data.length - 1]);
-                            resolve({ pushed: data.length, resp })
-                            
-                        } else {
-                            reject(resp);
-                            console.error("Unexpected response");
-                        }
-                    });
-                });
-            },
-            getLastSynced = async (clientData) => {
-
-                // Get latest row info
-                const { c_fr, c_lr, c_count } = clientData || await getClientRowInfo();
-                const { s_fr, s_lr, s_count } = await getServerRowInfo();
-
-                // console.log("getLastSynced", clientData, socket._user )
-
-                let result = null;
-
-                /* Nothing to sync */
-                if( !c_fr && !s_fr || rowsFullyMatch(c_lr, s_lr)){  //  c_count === s_count && 
-                    // sync.last_synced = null;
-                    result = null;
-
-                /* Sync Everything */
-                } else if(!rowsFullyMatch(c_fr, s_fr)) {
-                    if(c_fr && s_fr){
-                        result = Math.min(c_fr[synced_field], s_fr[synced_field]);
-
-                    } else if(c_fr || s_fr) {
-                        result = (c_fr || s_fr)[synced_field];
-                    }
-
-                /* Sync from last matching synced value */
-                } else if (rowsFullyMatch(c_fr, s_fr)){
-
-                    if(s_lr && c_lr){
-                        result = Math.min(c_lr[synced_field], s_lr[synced_field]);
-                    } else {
-                        result = Math.min(c_fr[synced_field], s_fr[synced_field]);
-                    }
-
-                    let min_count = Math.min(c_count, s_count);
-                    let end_offset = 1;// Math.min(s_count, c_count) - 1;
-                    let step = 0;
-
-                    while(min_count > 5 && end_offset < min_count){
-                        const { c_lr = null } = await getClientRowInfo({ from_synced: 0, to_synced: result, end_offset });
-                        // console.log("getLastSynced... end_offset > " + end_offset);
-                        let server_row;
-
-                        if(c_lr){
-                            let _filter = {};
-                            sync_fields.map(key => {
-                                _filter[key] = c_lr[key];
-                            });
-                            server_row = await this.dbo[table_name].find(_filter, { select: sync_fields, limit: 1 }, null, table_rules);
-                        }
-
-                        // if(rowsFullyMatch(c_lr, s_lr)){ //c_count === s_count && 
-                        if(server_row && server_row.length){
-                            server_row = server_row[0];
-
-                            result = server_row[synced_field];
-                            end_offset = min_count;
-                            // console.log(`getLastSynced found for ${table_name} -> ${result}`);
-                        } else {
-                            end_offset += 1 + step * (step > 4? 2 : 1);
-                            // console.log(`getLastSynced NOT found for ${table_name} -> ${result}`);
-                        }
-                        
-                        step++;
-                    }
-                }
-
-                return result;
-            },
-            syncBatch = async (from_synced) => {
-                let offset = 0,
-                    limit = batch_size,
-                    canContinue = true,
-                    min_synced = from_synced || 0,
-                    max_synced = from_synced;
-
-                let inserted = 0, updated = 0, pushed = 0, deleted = 0, total = 0;
-
-                // console.log("syncBatch", from_synced)
-
-                while (canContinue){
-                    let cData: any = await getClientData(min_synced, offset);
-
-
-                    if(cData.length){
-                        let res = await upsertData(cData);
-                        inserted += res.inserted; 
-                        updated += res.updated;
-                    }
-                    let sData;
-                    
-                    try {
-                        sData = await getServerData(min_synced, offset);
-                    } catch(e){
-                        console.trace("sync getServerData err", e);
-                        await pushData(undefined, undefined, "Internal error. Check server logs");
-                    }
-
-                    // console.log("allow_delete", table_rules.delete);
-                    if(allow_delete && table_rules.delete){
-                        const to_delete = sData.filter(d => {
-                            !cData.find(c => rowsIdsMatch(c, d) )
-                        });
-                        await Promise.all(to_delete.map(d => {
-                            deleted++;
-                            return (this.dbo[table_name] as TableHandler).delete(filterObj(d, id_fields), { }, null, table_rules);
-                        }));
-                        sData = await getServerData(min_synced, offset);
-                    }
-
-                    let forClient = sData.filter(s => {
-                        return !cData.find(c => 
-                            rowsIdsMatch(c, s) &&
-                            c[synced_field] >= s[synced_field]
-                        );
-                    });
-                    if(forClient.length){
-                        let res: any = await pushData(forClient);
-                        pushed += res.pushed;
-                    }
-
-                    if(sData.length){
-                        sync.lr = sData[sData.length - 1];
-                        sync.last_synced = sync.lr[synced_field];
-                        total += sData.length;
-                    }
-                    offset += sData.length;
-
-                    // canContinue = offset >= limit;
-                    canContinue = sData.length >= limit;
-                    // console.log(`sData ${sData.length}      limit ${limit}`);
-                }
-
-                // console.log(`syncBatch ${table_name}: inserted( ${inserted} )    updated( ${updated} )   deleted( ${deleted} )    pushed( ${pushed} )     total( ${total} )`, socket._user );
-                
-                return true;
-            };
-
-        if(!wal){
-            sync.wal = new WAL({
-                id_fields, synced_field, throttle, batch_size,
-                onSendStart: () => { 
-                    sync.is_syncing = true; 
-                },
-                onSend: async (data) => {
-                    // console.log("WAL upsertData START", data)
-                    const res = await upsertData(data, true);
-                    // console.log("WAL upsertData END")
-
-                    /******** */
-                    /* TO DO -> Store and push patch updates instead of full data if and where possible */
-                    /******** */
-                    // 1. Store successfully upserted wal items for a couple of seconds
-                    // 2. When pushing data to clients check if any matching wal items exist
-                    // 3. Replace text fields with matching patched data
-
-                    return res;
-                },
-                onSendEnd: () => {
-                    sync.is_syncing = false;
-                    // console.log("syncData from WAL.onSendEnd")
-                    this.syncData(sync, null);
-                },
-            })
-        }
-
-        // console.log("syncData", clientData)
-        /* Express data sent from client */
-        if(clientData){
-            if(clientData.data && Array.isArray(clientData.data) && clientData.data.length){
-                sync.wal.addData(clientData.data.map(d => ({ current: d })));
-                return;
-                // await upsertData(clientData.data, true);
-
-            /* Not expecting this anymore. use normal db.table.delete channel */
-            } else if(clientData.deleted && Array.isArray(clientData.deleted) && clientData.deleted.length){
-                await deleteData(clientData.deleted);
-            }
-        }
-
-        if(sync.wal.isSending() || sync.is_syncing) {
-            if(!this.syncTimeout){
-                this.syncTimeout = setTimeout(() => {
-                    this.syncTimeout = null;
-                    // console.log("SYNC FROM TIMEOUT")
-                    this.syncData(sync, null);
-                }, throttle)
-            }
-            // console.log("SYNC THROTTLE")
-            return;
-        }
-        sync.is_syncing = true;
-
-        // from synced does not make sense. It should be sync.lr only!!!
-        let from_synced = null;
-
-        if(sync.lr){
-            const { s_lr } = await getServerRowInfo();
-
-            /* Make sure trigger is not firing on freshly synced data */
-            if(!rowsFullyMatch(sync.lr, s_lr)){
-                from_synced = sync.last_synced;
-            } else {
-                // console.log("rowsFullyMatch")
-            }
-            // console.log(table_name, sync.lr[synced_field])
-        } else {
-            from_synced = await getLastSynced(clientData);
-        }
-        
-        if(from_synced !== null){
-            await syncBatch(from_synced);
-        } else {
-            // console.log("from_synced is null")
-        }
-
-        await pushData([], true);
-        sync.is_syncing = false;
-        // console.log(`Finished sync for ${table_name}`, socket._user);
+    syncTimeout?: ReturnType<typeof setTimeout>;
+    async syncData(sync: SyncParams, clientData?: ClientExpressData){
+        return await syncData(this, sync, clientData);
     }
 
-    /* Returns a sync channel */
+    /**
+     * Returns a sync channel
+     * A sync channel is unique per socket for each filter
+     */
     async addSync(syncParams: AddSyncParams){
         const { 
-            socket = null, table_info = null, table_rules = null, synced_field = null, 
-            allow_delete = null, id_fields = [], filter = {}, 
+            socket = null, table_info = null, table_rules, synced_field = null, 
+            allow_delete = false, id_fields = [], filter = {}, 
             params, condition = "", throttle = 0 
         } = syncParams || {};
 
@@ -1620,16 +1179,15 @@ export class PubSubManager {
                     id_fields,
                     allow_delete,
                     table_rules,
-                    throttle: Math.max(throttle || 0, table_rules.sync.throttle || 0),
+                    throttle: Math.max(throttle || 0, table_rules?.sync?.throttle || 0),
                     batch_size: get(table_rules, "sync.batch_size") || DEFAULT_SYNC_BATCH_SIZE,
                     last_throttled: 0,
                     socket_id: socket.id,
                     is_sync: true,
                     last_synced: 0,
-                    lr: null,
+                    lr: undefined,
                     table_info,
                     is_syncing: false,
-                    isSyncingTimeout: null,
                     wal: undefined,
                     socket,
                     params
@@ -1643,13 +1201,13 @@ export class PubSubManager {
                     // console.log("Added SYNC");
 
                     socket.removeAllListeners(channel_name + "unsync");
-                    socket.once(channel_name + "unsync", (_data, cb) => {
+                    socket.once(channel_name + "unsync", (_data: any, cb: BasicCallback) => {
                         this.onSocketDisconnected(socket, channel_name);
                         cb(null, { res: "ok" })
                     });
 
                     socket.removeAllListeners(channel_name);
-                    socket.on(channel_name, (data, cb) => {
+                    socket.on(channel_name, (data: any, cb: BasicCallback) => {
 
                         if(!data){
                             cb({ err: "Unexpected request. Need data or onSyncRequest"});
@@ -1681,6 +1239,8 @@ export class PubSubManager {
                             this.syncData(newSync, data.onSyncRequest);
 
                             // console.log("onSyncRequest ", socket._user)
+                        } else {
+                            console.error("Unexpected sync request data from client: ", data)
                         }
                     });
 
@@ -1710,7 +1270,7 @@ export class PubSubManager {
     /* The distinct list of channel names must have a corresponding trigger in the database */
     async addSub(subscriptionParams: AddSubscriptionParams){
         const { 
-            socket = null, func = null, table_info = null, table_rules = null, filter = {}, 
+            socket = null, func = null, table_info = null, table_rules, filter = {}, 
             params = {}, condition = "", throttle = 0  //subOne = false, 
         } = subscriptionParams || {};
 
@@ -1740,7 +1300,7 @@ export class PubSubManager {
                         params, 
                         table_rules,
                         channel_name, 
-                        func: func? func : null,
+                        func: func? func : undefined,
                         socket_id: socket? socket.id : null,
                         throttle: validated_throttle,
                         is_throttling: null,
@@ -1766,7 +1326,7 @@ export class PubSubManager {
                     if(socket){
                         const chnUnsub = channel_name + "unsubscribe";
                         socket.removeAllListeners(chnUnsub);
-                        socket.once(chnUnsub, (_data, cb) =>{
+                        socket.once(chnUnsub, (_data: any, cb: BasicCallback) =>{
                             const res = this.onSocketDisconnected(socket, channel_name);
                             cb(null, { res });
                         });
@@ -1849,8 +1409,8 @@ export class PubSubManager {
     }
 
     getActiveListeners = (): { table_name: string; condition: string }[] => {
-        let result = [];
-        const upsert = (t, c) => {
+        let result: { table_name: string; condition: string }[] = [];
+        const upsert = (t: string, c: string) => {
             if(!result.find(r => r.table_name === t && r.condition === c)){
                 result.push({ table_name: t, condition: c });
             }
@@ -1869,7 +1429,7 @@ export class PubSubManager {
         return result;
     }
 
-    onSocketDisconnected(socket?, channel_name?){
+    onSocketDisconnected(socket?: any, channel_name?: string){
         // process.on('warning', e => {
         //     console.warn(e.stack)
         // });
@@ -1960,7 +1520,7 @@ export class PubSubManager {
 
     // waitingTriggers: { [key: string]: string[] } = undefined;
     addingTrigger: any;
-    addTriggerPool: { [key: string]: string[] } = undefined;
+    addTriggerPool?: Record<string, string[]> = undefined;
     async addTrigger(params: { table_name: string; condition: string; }){
         try{
 
@@ -2002,6 +1562,7 @@ export class PubSubManager {
 
             this._triggers = {};
             triggers.map(t => {
+                this._triggers = this._triggers || {};
                 this._triggers[t.table_name] = this._triggers[t.table_name] || [];
                 if(!this._triggers[t.table_name].includes(t.condition)){
                     this._triggers[t.table_name].push(t.condition)
@@ -2020,37 +1581,18 @@ export class PubSubManager {
         }
 
     }
-
-    /* info_level:
-        0   -   min_id, max_id, count
-        1   -   missing_ids
-        */
-    pushSyncInfo({ table_name, id_key = "id", info_level = 0 }){
-        return this.db.any(`            
-            SELECT ${id_key}
-            FROM generate_series(
-                (SELECT MIN(msg_id) FROM ${table_name}) ,
-                (SELECT MAX(msg_id) FROM ${table_name})
-            ) ${id_key}
-            WHERE NOT EXISTS (
-                SELECT 1 
-                FROM ${table_name} n
-                WHERE n.msg_id = ${id_key}.${id_key}
-            )
-        `)
-    }
 }
 
 
 /* Get only the specified properties of an object */
-export function filterObj(obj: object, keys: string[] = [], exclude?: string[]): object{
+export function filterObj(obj: AnyObject, keys: string[] = [], exclude?: string[]): AnyObject{
     if(exclude && exclude.length) keys = Object.keys(obj).filter(k => !exclude.includes(k))
     if(!keys.length) {
         // console.warn("filterObj: returning empty object");
         return {};
     }
     if(obj && keys.length){
-        let res = {};
+        let res: AnyObject = {};
         keys.map(k => {
             res[k] = obj[k];
         });

@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.asSQLIdentifier = void 0;
 const aws_sdk_1 = require("aws-sdk");
@@ -16,13 +7,13 @@ const FileType = require("file-type");
 const sharp = require("sharp");
 const prostgles_types_1 = require("prostgles-types");
 const HOUR = 3600 * 1000;
-exports.asSQLIdentifier = (name, db) => __awaiter(void 0, void 0, void 0, function* () {
+exports.asSQLIdentifier = async (name, db) => {
     var _a;
-    return (_a = (yield db.one("select format('%I', $1) as name", [name]))) === null || _a === void 0 ? void 0 : _a.name;
-});
+    return (_a = (await db.one("select format('%I', $1) as name", [name]))) === null || _a === void 0 ? void 0 : _a.name;
+};
 class FileManager {
     constructor(config, imageOptions) {
-        this.uploadAsMedia = (params) => __awaiter(this, void 0, void 0, function* () {
+        this.uploadAsMedia = async (params) => {
             const { item, imageOptions } = params;
             const { name, data, content_type } = item;
             if (!data)
@@ -42,7 +33,7 @@ class FileManager {
                     else if ("inside" in compression) {
                         opts = Object.assign({ fit: sharp.fit.inside }, compression.inside);
                     }
-                    _data = yield sharp(data)
+                    _data = await sharp(data)
                         .resize(opts)
                         .withMetadata(Boolean(imageOptions.keepMetadata))
                         // .jpeg({ quality: 80 })
@@ -52,16 +43,16 @@ class FileManager {
                     /**
                      * Remove exif
                      */
-                    _data = yield sharp(data)
+                    _data = await sharp(data)
                         .clone()
                         .toBuffer();
                 }
             }
-            const res = yield this.upload(_data, name, content_type);
+            const res = await this.upload(_data, name, content_type);
             return res;
-        });
-        this.parseSQLIdentifier = (name) => __awaiter(this, void 0, void 0, function* () { return exports.asSQLIdentifier(name, this.prostgles.db); }); //  this.prostgles.dbo.sql<"value">("select format('%I', $1)", [name], { returnType: "value" } )
-        this.init = (prg) => __awaiter(this, void 0, void 0, function* () {
+        };
+        this.parseSQLIdentifier = async (name) => exports.asSQLIdentifier(name, this.prostgles.db); //  this.prostgles.dbo.sql<"value">("select format('%I', $1)", [name], { returnType: "value" } )
+        this.init = async (prg) => {
             var _a, _b, _c;
             this.prostgles = prg;
             // const { dbo, db, opts } = prg;
@@ -76,8 +67,8 @@ class FileManager {
              */
             if (!this.dbo[tableName]) {
                 console.log(`Creating fileTable ${prostgles_types_1.asName(tableName)} ...`);
-                yield this.db.any(`CREATE EXTENSION IF NOT EXISTS pgcrypto `);
-                yield this.db.any(`CREATE TABLE IF NOT EXISTS ${prostgles_types_1.asName(tableName)} (
+                await this.db.any(`CREATE EXTENSION IF NOT EXISTS pgcrypto `);
+                await this.db.any(`CREATE TABLE IF NOT EXISTS ${prostgles_types_1.asName(tableName)} (
           id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           name                TEXT NOT NULL,
           extension           TEXT NOT NULL,
@@ -93,17 +84,17 @@ class FileManager {
           UNIQUE(name)
       )`);
                 console.log(`Created fileTable ${prostgles_types_1.asName(tableName)}`);
-                yield prg.refreshDBO();
+                await prg.refreshDBO();
             }
             /**
              * 2. Create media lookup tables
              */
-            yield Promise.all(Object.keys(referencedTables).map((refTable) => __awaiter(this, void 0, void 0, function* () {
+            await Promise.all(Object.keys(referencedTables).map(async (refTable) => {
                 if (!this.dbo[refTable])
                     throw `Referenced table (${refTable}) from fileTable.referencedTables record is missing`;
                 // const lookupTableName = asName(`lookup_${tableName}_${refTable}`);
-                const lookupTableName = yield this.parseSQLIdentifier(`prostgles_lookup_${tableName}_${refTable}`);
-                const pKeyFields = (yield this.dbo[refTable].getColumns()).filter(f => f.is_pkey);
+                const lookupTableName = await this.parseSQLIdentifier(`prostgles_lookup_${tableName}_${refTable}`);
+                const pKeyFields = (await this.dbo[refTable].getColumns()).filter(f => f.is_pkey);
                 if (pKeyFields.length !== 1)
                     throw `Could not make link table for ${refTable}. ${pKeyFields} must have exactly one primary key column. Current pkeys: ${pKeyFields.map(f => f.name)}`;
                 const pkField = pKeyFields[0];
@@ -118,13 +109,13 @@ class FileManager {
         )
         `;
                     console.log(`Creating ${action} ...`, lookupTableName);
-                    yield this.db.any(query);
+                    await this.db.any(query);
                     console.log(`Created ${action}`);
                 }
                 else {
-                    const cols = yield this.dbo[lookupTableName].getColumns();
+                    const cols = await this.dbo[lookupTableName].getColumns();
                     const badCols = cols.filter(c => !c.references);
-                    yield Promise.all(badCols.map((badCol) => __awaiter(this, void 0, void 0, function* () {
+                    await Promise.all(badCols.map(async (badCol) => {
                         console.error(`Prostgles: media ${lookupTableName} joining table has lost a reference constraint for column ${badCol.name}.` +
                             ` This may have been caused by a DROP TABLE ... CASCADE.`);
                         let q = `
@@ -140,25 +131,25 @@ class FileManager {
                         }
                         if (q) {
                             try {
-                                yield this.db.any(q);
+                                await this.db.any(q);
                                 console.log("Added missing constraint back");
                             }
                             catch (e) {
                                 console.error("Failed to add missing constraint", e);
                             }
                         }
-                    })));
+                    }));
                 }
-                yield prg.refreshDBO();
+                await prg.refreshDBO();
                 return true;
-            })));
+            }));
             /**
              * 4. Serve media through express
              */
             const { fileServeRoute = `/${tableName}`, expressApp: app } = fileTable;
             this.fileRoute = fileServeRoute;
             if (app) {
-                app.get(this.fileRoute + "/:name", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                app.get(this.fileRoute + "/:name", async (req, res) => {
                     if (!this.dbo[tableName]) {
                         res.status(500).json({ err: `Internal error: media table (${tableName}) not valid` });
                         return false;
@@ -168,7 +159,7 @@ class FileManager {
                         const { name } = req.params;
                         if (typeof name !== "string" || !name)
                             throw "Invalid media name";
-                        const media = yield mediaTable.findOne({ name }, { select: { id: 1, name: 1, signed_url: 1, signed_url_expires: 1, content_type: 1 } }, { httpReq: req });
+                        const media = await mediaTable.findOne({ name }, { select: { id: 1, name: 1, signed_url: 1, signed_url_expires: 1, content_type: 1 } }, { httpReq: req });
                         if (!media) {
                             /**
                              * Redirect to login !??
@@ -185,8 +176,8 @@ class FileManager {
                             const expires = +(media.signed_url_expires || 0);
                             const EXPIRES = Date.now() + HOUR;
                             if (!url || expires < EXPIRES) {
-                                url = yield this.getFileURL(media.name, 60 * 60);
-                                yield mediaTable.update({ name }, { signed_url: url, signed_url_expires: EXPIRES });
+                                url = await this.getFileURL(media.name, 60 * 60);
+                                await mediaTable.update({ name }, { signed_url: url, signed_url_expires: EXPIRES });
                             }
                             res.redirect(url);
                         }
@@ -200,9 +191,9 @@ class FileManager {
                         console.log(e);
                         res.status(404).json({ err: "Invalid/missing media" });
                     }
-                }));
+                });
             }
-        });
+        };
         this.config = config;
         this.imageOptions = imageOptions;
         if ("region" in config) {
@@ -217,52 +208,50 @@ class FileManager {
     ;
     get db() { return this.prostgles.db; }
     ;
-    getMIME(file, fileName, allowedExtensions, dissallowedExtensions, onlyFromName = true) {
+    async getMIME(file, fileName, allowedExtensions, dissallowedExtensions, onlyFromName = true) {
         var _a, _b;
-        return __awaiter(this, void 0, void 0, function* () {
-            const nameParts = fileName.split(".");
-            const nameExt = nameParts[nameParts.length - 1].toLowerCase(), mime = Object.keys(CONTENT_TYPE_TO_EXT).find(k => CONTENT_TYPE_TO_EXT[k].includes(nameExt));
-            let type = {
-                fileName,
-                mime,
-                ext: nameExt,
-            };
-            if (onlyFromName && !mime)
-                throw `Invalid file extension: content_type could not be found for extension(${nameExt})`;
-            if (!mime) {
-                /* Set correct/missing extension */
-                if (["xml", "txt", "csv", "tsv", "doc"].includes(nameExt)) {
-                    type = Object.assign(Object.assign({}, type), { mime: "text/" + nameExt, ext: nameExt });
-                }
-                else if (["svg"].includes(nameExt)) {
-                    type = Object.assign(Object.assign({}, type), { mime: "image/svg+xml", ext: nameExt });
-                }
-                else if (Buffer.isBuffer(file)) {
-                    const res = yield FileType.fromBuffer(file);
-                    type = Object.assign(Object.assign({}, res), { fileName });
-                }
-                else if (typeof file === "string") {
-                    const res = yield FileType.fromFile(file);
-                    type = Object.assign(Object.assign({}, res), { fileName });
-                }
-                else {
-                    throw "Unexpected file. Expecting: Buffer | String";
-                }
+        const nameParts = fileName.split(".");
+        const nameExt = nameParts[nameParts.length - 1].toLowerCase(), mime = Object.keys(CONTENT_TYPE_TO_EXT).find(k => CONTENT_TYPE_TO_EXT[k].includes(nameExt));
+        let type = {
+            fileName,
+            mime,
+            ext: nameExt,
+        };
+        if (onlyFromName && !mime)
+            throw `Invalid file extension: content_type could not be found for extension(${nameExt})`;
+        if (!mime) {
+            /* Set correct/missing extension */
+            if (["xml", "txt", "csv", "tsv", "doc"].includes(nameExt)) {
+                type = Object.assign(Object.assign({}, type), { mime: "text/" + nameExt, ext: nameExt });
             }
-            if (allowedExtensions &&
-                !((_a = allowedExtensions.map(v => v.toLowerCase())) === null || _a === void 0 ? void 0 : _a.includes(type.ext))) {
-                throw fileName + " -> File type ( " + type.ext + " ) not allowed. Expecting one of: " + allowedExtensions.map(v => v.toLowerCase()).join(", ");
+            else if (["svg"].includes(nameExt)) {
+                type = Object.assign(Object.assign({}, type), { mime: "image/svg+xml", ext: nameExt });
             }
-            else if (dissallowedExtensions && ((_b = dissallowedExtensions.map(v => v.toLowerCase())) === null || _b === void 0 ? void 0 : _b.includes(type.ext))) {
-                throw fileName + " -> File type ( " + type.ext + " ) not allowed";
+            else if (Buffer.isBuffer(file)) {
+                const res = await FileType.fromBuffer(file);
+                type = Object.assign(Object.assign({}, res), { fileName });
             }
-            if (!onlyFromName) {
-                let { ext } = type;
-                if (nameExt !== ext)
-                    fileName = nameParts.slice(0, -1).join('') + "." + ext;
+            else if (typeof file === "string") {
+                const res = await FileType.fromFile(file);
+                type = Object.assign(Object.assign({}, res), { fileName });
             }
-            return Object.assign(Object.assign({}, type), { fileName });
-        });
+            else {
+                throw "Unexpected file. Expecting: Buffer | String";
+            }
+        }
+        if (allowedExtensions &&
+            !((_a = allowedExtensions.map(v => v.toLowerCase())) === null || _a === void 0 ? void 0 : _a.includes(type.ext))) {
+            throw fileName + " -> File type ( " + type.ext + " ) not allowed. Expecting one of: " + allowedExtensions.map(v => v.toLowerCase()).join(", ");
+        }
+        else if (dissallowedExtensions && ((_b = dissallowedExtensions.map(v => v.toLowerCase())) === null || _b === void 0 ? void 0 : _b.includes(type.ext))) {
+            throw fileName + " -> File type ( " + type.ext + " ) not allowed";
+        }
+        if (!onlyFromName) {
+            let { ext } = type;
+            if (nameExt !== ext)
+                fileName = nameParts.slice(0, -1).join('') + "." + ext;
+        }
+        return Object.assign(Object.assign({}, type), { fileName });
     }
     // async getUploadURL(fileName: string): Promise<string> {
     //   const thisHour = new Date();
@@ -280,74 +269,70 @@ class FileManager {
     //   };
     //   return await this.s3Client.getSignedUrlPromise("putObject", params)
     // }
-    upload(file, name, mime) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
-                if (!file) {
-                    throw "No file. Expecting: Buffer | String";
-                }
-                if (!name) {
-                    throw "No name. Expecting: String";
-                }
-                // let type = await this.getMIME(file, name, allowedExtensions);
-                const url = `${this.fileRoute}/${name}`;
-                if (!this.s3Client) {
-                    const config = this.config;
-                    try {
-                        yield fs.promises.mkdir(config.localFolderPath, { recursive: true });
-                        fs.writeFileSync(`${config.localFolderPath}/${name}`, file);
-                        resolve({
-                            url,
-                            etag: `none`,
-                        });
-                    }
-                    catch (err) {
-                        console.error("Error saving file locally", err);
-                        reject("Internal error");
-                    }
-                }
-                else {
-                    /* S3 Upload */
-                    // ACL: "public-read", 
-                    /* ACL needs this permission:
-                        "s3:PutObject",
-                        "s3:PutObjectAcl",
-                        "s3:GetObject",
-                        "s3:GetObjectAcl",
-                      */
-                    const params = {
-                        Bucket: this.config.bucket,
-                        Key: name,
-                        ContentType: mime,
-                        Body: file
-                    };
-                    this.s3Client.upload(params, (err, res) => {
-                        if (err) {
-                            reject("Something went wrong");
-                            console.error(err);
-                        }
-                        else {
-                            // console.log("Uploaded file:", res)
-                            resolve({
-                                url,
-                                etag: res.ETag,
-                                s3_url: res.Location,
-                            });
-                        }
+    async upload(file, name, mime) {
+        return new Promise(async (resolve, reject) => {
+            if (!file) {
+                throw "No file. Expecting: Buffer | String";
+            }
+            if (!name) {
+                throw "No name. Expecting: String";
+            }
+            // let type = await this.getMIME(file, name, allowedExtensions);
+            const url = `${this.fileRoute}/${name}`;
+            if (!this.s3Client) {
+                const config = this.config;
+                try {
+                    await fs.promises.mkdir(config.localFolderPath, { recursive: true });
+                    fs.writeFileSync(`${config.localFolderPath}/${name}`, file);
+                    resolve({
+                        url,
+                        etag: `none`,
                     });
                 }
-            }));
+                catch (err) {
+                    console.error("Error saving file locally", err);
+                    reject("Internal error");
+                }
+            }
+            else {
+                /* S3 Upload */
+                // ACL: "public-read", 
+                /* ACL needs this permission:
+                    "s3:PutObject",
+                    "s3:PutObjectAcl",
+                    "s3:GetObject",
+                    "s3:GetObjectAcl",
+                  */
+                const params = {
+                    Bucket: this.config.bucket,
+                    Key: name,
+                    ContentType: mime,
+                    Body: file
+                };
+                this.s3Client.upload(params, (err, res) => {
+                    if (err) {
+                        reject("Something went wrong");
+                        console.error(err);
+                    }
+                    else {
+                        // console.log("Uploaded file:", res)
+                        resolve({
+                            url,
+                            etag: res.ETag,
+                            s3_url: res.Location,
+                        });
+                    }
+                });
+            }
         });
     }
-    getFileURL(fileName, expiresInSeconds = 30 * 60) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const params = {
-                Bucket: this.config.bucket,
-                Key: fileName,
-                Expires: expiresInSeconds || 30 * 60
-            };
-            return yield this.s3Client.getSignedUrlPromise("getObject", params);
-        });
+    async getFileURL(fileName, expiresInSeconds = 30 * 60) {
+        const params = {
+            Bucket: this.config.bucket,
+            Key: fileName,
+            Expires: expiresInSeconds || 30 * 60
+        };
+        return await this.s3Client.getSignedUrlPromise("getObject", params);
     }
 }
 exports.default = FileManager;

@@ -52,7 +52,7 @@ export declare type SelectRule = {
     /**
      * Filter added to every query (e.g. user_id) to restrict access
      */
-    forcedFilter?: object;
+    forcedFilter?: AnyObject;
     /**
      * Fields user can filter by
      * */
@@ -60,7 +60,7 @@ export declare type SelectRule = {
     /**
      * Validation logic to check/update data for each request
      */
-    validate?(SelectRequestData: any): SelectRequestData;
+    validate?(args: SelectRequestData): SelectRequestData | Promise<SelectRequestData>;
 };
 export declare type InsertRule = {
     /**
@@ -70,7 +70,7 @@ export declare type InsertRule = {
     /**
      * Data to include/overwrite on each insert
      */
-    forcedData?: object;
+    forcedData?: AnyObject;
     /**
      * Fields user can view after inserting
      */
@@ -93,11 +93,11 @@ export declare type UpdateRule = {
      * Filter added to every query (e.g. user_id) to restrict access
      * This filter cannot be updated
      */
-    forcedFilter?: object;
+    forcedFilter?: AnyObject;
     /**
      * Data to include/overwrite on each updatDBe
      */
-    forcedData?: object;
+    forcedData?: AnyObject;
     /**
      * Fields user can use to find the updates
      */
@@ -115,7 +115,7 @@ export declare type DeleteRule = {
     /**
      * Filter added to every query (e.g. user_id) to restrict access
      */
-    forcedFilter?: object;
+    forcedFilter?: AnyObject;
     /**
      * Fields user can filter by
      */
@@ -290,7 +290,7 @@ export declare type ProstglesInitOptions<DBO = DbHandler> = {
         query: string;
     }) => void);
     keywords?: Keywords;
-    onNotice?: (msg: any) => void;
+    onNotice?: (notice: AnyObject, message?: string) => void;
     fileTable?: FileTableConfig;
     tableConfig?: TableConfig;
 };
@@ -300,12 +300,14 @@ export declare type OnReady = {
 };
 export declare class Prostgles<DBO = DbHandler> {
     opts: ProstglesInitOptions<DBO>;
-    db: DB;
-    pgp: PGP;
-    dbo: DbHandler;
-    dboBuilder: DboBuilder;
-    publishParser: PublishParser;
-    authHandler: AuthHandler;
+    db?: DB;
+    pgp?: PGP;
+    dbo?: DbHandler;
+    _dboBuilder?: DboBuilder;
+    get dboBuilder(): DboBuilder;
+    set dboBuilder(d: DboBuilder);
+    publishParser?: PublishParser;
+    authHandler?: AuthHandler;
     keywords: {
         $filter: string;
         $and: string;
@@ -313,7 +315,7 @@ export declare class Prostgles<DBO = DbHandler> {
         $not: string;
     };
     private loaded;
-    dbEventsManager: DBEventsManager;
+    dbEventsManager?: DBEventsManager;
     fileManager?: FileManager;
     tableConfigurator?: TableConfigurator;
     isMedia(tableName: string): boolean;

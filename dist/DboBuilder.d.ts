@@ -1,8 +1,3 @@
-import * as Bluebird from "bluebird";
-declare global {
-    export interface Promise<T> extends Bluebird<T> {
-    }
-}
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams, OrderBy, InsertParams, UpdateParams, DeleteParams, DbJoinMaker, TableInfo as TInfo, SQLHandler, AnyObject } from "prostgles-types";
@@ -116,7 +111,7 @@ export declare type CommonTableRules = {
     /**
      * True by default. Allows clients to get table information (oid, comment, label, has_media).
      */
-    getInfo?: boolean;
+    getInfo?: boolean | null;
 };
 export declare type ValidatedTableRules = CommonTableRules & {
     allColumns: FieldSpec[];
@@ -176,10 +171,10 @@ export declare class ViewHandler {
     colSet: ColSet;
     tsColumnDefs: string[];
     joins: Join[];
-    joinGraph: Graph;
-    joinPaths: JoinPaths;
+    joinGraph?: Graph;
+    joinPaths?: JoinPaths;
     dboBuilder: DboBuilder;
-    t: pgPromise.ITask<{}>;
+    t?: pgPromise.ITask<{}>;
     dbTX?: TxHandler;
     is_view: boolean;
     filterDef: string;
@@ -194,7 +189,7 @@ export declare class ViewHandler {
     getJoins(source: string, target: string, path?: string[], checkTableConfig?: boolean): JoinInfo;
     checkFilter(filter: any): void;
     getInfo(param1?: any, param2?: any, param3?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<TInfo>;
-    getColumns(lang?: string, param2?: any, param3?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]>;
+    getColumns(lang?: string, param2?: never, param3?: never, tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]>;
     getValidatedRules(tableRules?: TableRule, localParams?: LocalParams): ValidatedTableRules;
     find(filter?: Filter, selectParams?: SelectParams, param3_unused?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]>;
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: any, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
@@ -277,20 +272,18 @@ export declare class TableHandler extends ViewHandler {
     };
     constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths);
     willBatch(query: string): boolean;
-    subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: object[]) => any): Promise<{
+    subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: AnyObject[]) => any): Promise<{
         unsubscribe: () => any;
     }>;
-    subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: object[]) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>;
-    subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: object) => any): Promise<{
+    subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: AnyObject[]) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>;
+    subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: AnyObject) => any): Promise<{
         unsubscribe: () => any;
     }>;
-    subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: object) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>;
-    updateBatch(data: [Filter, object][], params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
+    subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: AnyObject) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>;
+    updateBatch(data: [Filter, AnyObject][], params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
     update(filter: Filter, newData: {
         [key: string]: any;
-    }, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<{
-        [key: string]: any;
-    } | void>;
+    }, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<AnyObject | void>;
     validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues }: ValidatedParams): {
         data: any;
         allowedCols: string[];

@@ -16,7 +16,7 @@ console.log("Add a basic auth mode where user and sessions table are created");
 import TableConfigurator, { TableConfig } from "./TableConfig";
 
 import { get } from "./utils";
-import { DboBuilder, DbHandler, TableHandler, ViewHandler, isPlainObject, LocalParams, CommonTableRules } from "./DboBuilder";
+import { DboBuilder, DbHandler, TableHandler, ViewHandler, isPlainObject, LocalParams, CommonTableRules, TableSchema } from "./DboBuilder";
 import { PubSubManager, DEFAULT_SYNC_BATCH_SIZE, asValue } from "./PubSubManager";
 export { DbHandler }
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -30,7 +30,7 @@ type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 type DbConnectionOpts = pg.IDefaults;
 
 let currConnection: { db: DB, pgp: PGP };
-function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts, debugQueries = false, onNotice = null): { db: DB, pgp: PGP } {
+function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts | undefined, debugQueries = false, onNotice: ProstglesInitOptions["onNotice"]): { db: DB, pgp: PGP } {
     let pgp: PGP = pgPromise({
         
         promiseLib: promise,
@@ -115,7 +115,7 @@ export type SelectRule = {
     /**
      * Filter added to every query (e.g. user_id) to restrict access
      */
-    forcedFilter?: object;
+    forcedFilter?: AnyObject;
 
     /**
      * Fields user can filter by 
@@ -125,7 +125,7 @@ export type SelectRule = {
     /**
      * Validation logic to check/update data for each request
      */
-    validate?(SelectRequestData): SelectRequestData;
+    validate?(args: SelectRequestData): SelectRequestData | Promise<SelectRequestData>;
 
 }
 export type InsertRule = {
@@ -138,7 +138,7 @@ export type InsertRule = {
     /**
      * Data to include/overwrite on each insert
      */
-    forcedData?: object;
+    forcedData?: AnyObject;
 
     /**
      * Fields user can view after inserting
@@ -166,12 +166,12 @@ export type UpdateRule = {
      * Filter added to every query (e.g. user_id) to restrict access
      * This filter cannot be updated
      */
-    forcedFilter?: object;
+    forcedFilter?: AnyObject;
 
     /**
      * Data to include/overwrite on each updatDBe
      */
-    forcedData?: object;
+    forcedData?: AnyObject;
 
     /**
      * Fields user can use to find the updates
@@ -193,7 +193,7 @@ export type DeleteRule = {
     /**
      * Filter added to every query (e.g. user_id) to restrict access
      */
-    forcedFilter?: object;
+    forcedFilter?: AnyObject;
 
     /**
      * Fields user can filter by
@@ -208,7 +208,7 @@ export type DeleteRule = {
     /**
      * Validation logic to check/update data for each request
      */
-    validate?(...args): UpdateRequestData
+    validate?(...args: any[]): UpdateRequestData
 }
 export type SyncRule = {
     
@@ -388,13 +388,13 @@ export type ProstglesInitOptions<DBO = DbHandler> = {
     onReady(dbo: DBO, db: DB): void;
     transactions?: string | boolean;
     wsChannelNamePrefix?: string;
-    onSocketConnect?(socket: Socket, dbo: DBO, db?: DB);
-    onSocketDisconnect?(socket: Socket, dbo: DBO, db?: DB);
+    onSocketConnect?(socket: Socket, dbo: DBO, db?: DB): any;
+    onSocketDisconnect?(socket: Socket, dbo: DBO, db?: DB): any;
     auth?: Auth<DBO>;
     DEBUG_MODE?: boolean;
     watchSchema?: boolean | "hotReloadMode" | ((event: { command: string; query: string }) => void);
     keywords?: Keywords;
-    onNotice?: (msg: any) => void;
+    onNotice?: (notice: AnyObject, message?: string) => void;
     fileTable?: FileTableConfig;
     tableConfig?: TableConfig;
 }
@@ -429,7 +429,7 @@ const DEFAULT_KEYWORDS = {
     $not: "$not"
 };
 
-const fs = require('fs');
+import * as fs from 'fs';
 export class Prostgles<DBO = DbHandler> {
 
     opts: ProstglesInitOptions<DBO> = {
@@ -450,19 +450,26 @@ export class Prostgles<DBO = DbHandler> {
     //     application_name: "prostgles_app"
     // };
     // dbOptions: DbConnectionOpts;
-    db: DB;
-    pgp: PGP;
-    dbo: DbHandler;
-    dboBuilder: DboBuilder;
-    publishParser: PublishParser;
+    db?: DB;
+    pgp?: PGP;
+    dbo?: DbHandler;
+    _dboBuilder?: DboBuilder;
+    get dboBuilder(): DboBuilder {
+        if(!this._dboBuilder) throw "get dboBuilder: it's undefined"
+        return this._dboBuilder;
+    }
+    set dboBuilder(d: DboBuilder) {
+        this._dboBuilder = d;
+    }
+    publishParser?: PublishParser;
 
-    authHandler: AuthHandler;
+    authHandler?: AuthHandler;
 
 
     keywords = DEFAULT_KEYWORDS;
     private loaded = false;
 
-    dbEventsManager: DBEventsManager;
+    dbEventsManager?: DBEventsManager;
 
 
     fileManager?: FileManager;
@@ -571,8 +578,9 @@ export class Prostgles<DBO = DbHandler> {
     }
 
     refreshDBO = async () => {
-        this.dboBuilder?.destroy();
+        if(this._dboBuilder) this._dboBuilder.destroy();
         this.dboBuilder = await DboBuilder.create(this as any) as any;
+        if(!this.dboBuilder) throw "this.dboBuilder"
         this.dbo = this.dboBuilder.dbo as any;
         return this.dbo;
     }
@@ -629,8 +637,9 @@ export class Prostgles<DBO = DbHandler> {
             /* Create media table if required */
             if(this.opts.fileTable){
                 const { awsS3Config, localConfig, imageOptions } = this.opts.fileTable;
-                if(!awsS3Config && !localConfig) throw "fileTable missing param: Must provide awsS3Config OR localConfig";
                 await this.refreshDBO();
+                if(!awsS3Config && !localConfig) throw "fileTable missing param: Must provide awsS3Config OR localConfig";
+                //@ts-ignore
                 this.fileManager = new FileManager(awsS3Config || localConfig, imageOptions);
 
                 try {
@@ -688,7 +697,7 @@ export class Prostgles<DBO = DbHandler> {
                     console.log("destroying prgl instance")
                     this.destroyed = true;
                     if(this.opts.io){
-                        this.opts.io.on("connection", (socket) => {
+                        this.opts.io.on("connection", () => {
                             console.log("Socket connected to destroyed instance")
                         });
                         if(typeof this.opts.io.close === "function"){
@@ -862,7 +871,7 @@ export class Prostgles<DBO = DbHandler> {
         socket.prostgles.schema = schema;
         /*  RUN Raw sql from client IF PUBLISHED
         */
-        let fullSchema = [];
+        let fullSchema: TableSchema[] = [];
         let allTablesViews = this.dboBuilder.tablesOrViews;
         if(this.opts.publishRawSQL && typeof this.opts.publishRawSQL === "function"){
             const canRunSQL = async () => {

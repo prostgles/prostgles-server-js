@@ -5,7 +5,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as Bluebird from "bluebird";
-declare global { export interface Promise<T> extends Bluebird<T> {} }
+// declare global { export interface Promise<T> extends Bluebird<T> {} }
 
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
@@ -228,7 +228,7 @@ export type CommonTableRules = {
     /**
      * True by default. Allows clients to get table information (oid, comment, label, has_media). 
      */
-     getInfo?: boolean;
+    getInfo?: boolean | null;
 }
 
 export type ValidatedTableRules = CommonTableRules & {
@@ -288,7 +288,7 @@ export type ValidatedTableRules = CommonTableRules & {
 }
 
 /* DEBUG CLIENT ERRORS HERE */
-function makeErr(err, localParams?: LocalParams, view?: ViewHandler, allowedKeys?: string[]){
+function makeErr(err: any, localParams?: LocalParams, view?: ViewHandler, allowedKeys?: string[]){
     // console.trace(err)
     if(process.env.TEST_TYPE || process.env.PRGL_DEBUG) {
         console.trace(err)
@@ -320,7 +320,7 @@ export type EXISTS_KEY = typeof EXISTS_KEYS[number];
 type f = Partial<{ [key in EXISTS_KEY]: number }>
 
 
-function parseError(e){
+function parseError(e: any){
     
     // console.trace("INTERNAL ERROR: ", e);
     let res = (!Object.keys(e || {}).length? e : (e && e.toString)? e.toString() : e);
@@ -406,11 +406,11 @@ export class ViewHandler {
     colSet: ColSet;
     tsColumnDefs: string[] = [];
     joins: Join[];
-    joinGraph: Graph;
-    joinPaths: JoinPaths;
+    joinGraph?: Graph;
+    joinPaths?: JoinPaths;
     dboBuilder: DboBuilder;
 
-    t: pgPromise.ITask<{}>;
+    t?: pgPromise.ITask<{}>;
     dbTX?: TxHandler;
 
     is_view: boolean = true;
@@ -552,13 +552,13 @@ export class ViewHandler {
 
         /* Find the join path between tables */
         if(checkTableConfig){
-            const tableConfigJoinInfo = this.dboBuilder.prostgles.tableConfigurator.getJoinInfo(source, target);
+            const tableConfigJoinInfo = this.dboBuilder?.prostgles?.tableConfigurator?.getJoinInfo(source, target);
             if(tableConfigJoinInfo) return tableConfigJoinInfo;
         }
 
         let jp;
         if(!path){ 
-            jp = this.joinPaths.find(j => path? j.path.join() === path.join() : j.t1 === source && j.t2 === target);
+            jp = this.joinPaths.find(j => j.t1 === source && j.t2 === target);
         } else {
             jp = {
                 t1: source,
@@ -578,7 +578,7 @@ export class ViewHandler {
             const jo = this.joins.find(j => j.tables.includes(t1) && j.tables.includes(t2));
             if(!jo) throw `Joining ${t1} <-> ${t2} dissallowed or missing`;;
 
-            let on = [];
+            let on: [string, string][] = [];
 
             Object.keys(jo.on).map(leftKey => {
                 const rightKey = jo.on[leftKey];
@@ -624,11 +624,11 @@ export class ViewHandler {
         if(filter === null || filter && !isPojoObject(filter)) throw `invalid filter -> ${JSON.stringify(filter)} \nExpecting:    undefined | {} | { field_name: "value" } | { field: { $gt: 22 } } ... `;
     }
 
-    async getInfo(param1?, param2?, param3?, tableRules?: TableRule, localParams?: LocalParams): Promise<TInfo>{
+    async getInfo(param1?: any, param2?: any, param3?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<TInfo>{
         const p = this.getValidatedRules(tableRules, localParams);
         if(!p.getInfo) throw "Not allowed";
 
-        let has_media = undefined;
+        let has_media: "one" | "many" | undefined = undefined;
 
         /**
          * Media is directly related to this table (does not come from a deeply joined table)
@@ -645,8 +645,8 @@ export class ViewHandler {
                 const jp = this.dboBuilder.joinPaths.find(jp => jp.t1 === this.name && jp.t2 === mediaTable);
                 if(jp && jp.path.length <= 3){
                     await Promise.all(jp.path.map(async tableName => {
-                        const cols = (await this.dboBuilder.dbo[tableName].getColumns()).filter(c => jp.path.includes(c.references?.ftable));
-                        if(cols.length && has_media !== "many"){
+                        const cols = (await this?.dboBuilder?.dbo?.[tableName]?.getColumns?.())?.filter(c => jp.path.includes(c?.references?.ftable as any));
+                        if(cols && cols.length && has_media !== "many"){
                             if(cols.find(c => !c.is_pkey)){
                                 has_media = "many"
                             } else {
@@ -671,7 +671,7 @@ export class ViewHandler {
 
     // TODO: fix renamed table trigger problem
     
-    async getColumns(lang?: string, param2?, param3?, tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]> {
+    async getColumns(lang?: string, param2?: never, param3?: never, tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]> {
 
         try {
             const p = this.getValidatedRules(tableRules, localParams);
@@ -702,8 +702,8 @@ export class ViewHandler {
                     if(["string", "object"].includes(typeof lbl)){
                         if(typeof lbl === "string") {
                             label = lbl
-                        } else {
-                            label = lbl[lang] || lbl?.en || label;
+                        } else if(lang) {
+                            label = (lbl?.[lang as "en"]) || lbl?.en || label;
                         }
                     }
                 }
@@ -714,7 +714,7 @@ export class ViewHandler {
                     _delete = !c.privileges.some(p => p.is_grantable === "NO" && p.privilege_type === "DELETE");
                     
 
-                delete c.privileges;
+                delete (c as any).privileges;
                 return {
                     ...c,
                     label,
@@ -781,7 +781,7 @@ export class ViewHandler {
             const throwFieldsErr = (command: "select" | "update" | "delete" | "insert", fieldType: string = "fields") => {
                     throw `Invalid publish.${this.name}.${command} rule -> ${fieldType} setting is missing.\nPlease specify allowed ${fieldType} in this format: "*" | { col_name: false } | { col1: true, col2: true }`;
                 },
-                getFirstSpecified = (...fieldParams: FieldFilter[]): string[] => {
+                getFirstSpecified = (...fieldParams: (FieldFilter | undefined)[]): string[] => {
                     const firstValid = fieldParams.find(fp => fp !== undefined);
                     return this.parseFieldFilter(firstValid)
                 };
@@ -818,7 +818,7 @@ export class ViewHandler {
                     fields: this.parseFieldFilter(tableRules.update.fields),
                     forcedData: { ...tableRules.update.forcedData },
                     forcedFilter: { ...tableRules.update.forcedFilter },
-                    returningFields: getFirstSpecified(tableRules.update.returningFields, get(tableRules, "select.fields"), tableRules.update.fields),
+                    returningFields: getFirstSpecified(tableRules.update?.returningFields, tableRules?.select?.fields, tableRules.update.fields),
                     filterFields: this.parseFieldFilter(tableRules.update.filterFields)
                 }
             }
@@ -830,7 +830,7 @@ export class ViewHandler {
                 res.insert = {
                     fields: this.parseFieldFilter(tableRules.insert.fields),
                     forcedData: { ...tableRules.insert.forcedData },
-                    returningFields: getFirstSpecified(tableRules.insert.returningFields, get(tableRules, "select.fields"), tableRules.insert.fields)
+                    returningFields: getFirstSpecified(tableRules.insert.returningFields, tableRules?.select?.fields, tableRules.insert.fields)
                 }
             }
 
@@ -841,13 +841,13 @@ export class ViewHandler {
                 res.delete = {
                     forcedFilter: { ...tableRules.delete.forcedFilter },
                     filterFields: this.parseFieldFilter(tableRules.delete.filterFields),
-                    returningFields: getFirstSpecified(tableRules.delete.returningFields, get(tableRules, "select.fields"), tableRules.delete.filterFields)
+                    returningFields: getFirstSpecified(tableRules.delete.returningFields, tableRules?.select?.fields, tableRules.delete.filterFields)
                 }
             }
 
             if(!tableRules.select && !tableRules.update && !tableRules.delete && !tableRules.insert){
-                if([null, false].includes(tableRules.getInfo)) res.getInfo = false;
-                if([null, false].includes(tableRules.getColumns)) res.getColumns = false;
+                if([null, false].includes(tableRules.getInfo as any)) res.getInfo = false;
+                if([null, false].includes(tableRules.getColumns as any)) res.getColumns = false;
             }
 
             return res;
@@ -898,7 +898,7 @@ export class ViewHandler {
             const { testRule = false, returnQuery = false } = localParams || {};
 
             if(testRule) return [];
-        if(selectParams){
+            if(selectParams){
                 const good_params: Array<keyof SelectParams> = ["select", "orderBy", "offset", "limit", "returnType",  "groupBy"];
                 const bad_params = Object.keys(selectParams).filter(k => !good_params.includes(k as any));
                 if(bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
@@ -1760,9 +1760,9 @@ export class TableHandler extends ViewHandler {
         }
     }
 
-    async subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: object[]) => any): Promise<{ unsubscribe: () => any }>
-    async subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: object[]) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>
-    async subscribe(filter: Filter, params: SubscribeParams = {}, localFunc: (items: object[]) => any, table_rules?: TableRule, localParams?: LocalParams): 
+    async subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: AnyObject[]) => any): Promise<{ unsubscribe: () => any }>
+    async subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: AnyObject[]) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>
+    async subscribe(filter: Filter, params: SubscribeParams = {}, localFunc: (items: AnyObject[]) => any, table_rules?: TableRule, localParams?: LocalParams): 
         Promise<string | { unsubscribe: () => any }> 
     {
         try {
@@ -1834,9 +1834,9 @@ export class TableHandler extends ViewHandler {
     }
 
     /* This should only be called from server */
-    subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: object) => any): Promise<{ unsubscribe: () => any }>
-    subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: object) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>
-    subscribeOne(filter: Filter, params: SubscribeParams = {}, localFunc: (item: object) => any, table_rules?: TableRule, localParams?: LocalParams): 
+    subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: AnyObject) => any): Promise<{ unsubscribe: () => any }>
+    subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: AnyObject) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>
+    subscribeOne(filter: Filter, params: SubscribeParams = {}, localFunc: (item: AnyObject) => any, table_rules?: TableRule, localParams?: LocalParams): 
         Promise<string | { unsubscribe: () => any }> 
     {
         let func = localParams? undefined : (rows) => localFunc(rows[0]);
@@ -1844,7 +1844,7 @@ export class TableHandler extends ViewHandler {
     }
 
 
-    async updateBatch(data: [Filter, object][], params?: UpdateParams, tableRules?: TableRule, localParams: LocalParams = null): Promise<any>{
+    async updateBatch(data: [Filter, AnyObject][], params?: UpdateParams, tableRules?: TableRule, localParams: LocalParams = null): Promise<any>{
         try {
             const queries = await Promise.all(
                 data.map(async ([filter, data]) => 
@@ -1868,7 +1868,7 @@ export class TableHandler extends ViewHandler {
         }
     }
 
-    async update(filter: Filter, newData: { [key: string]: any }, params?: UpdateParams, tableRules?: TableRule, localParams: LocalParams = null): Promise<{ [key: string]: any } | void>{
+    async update(filter: Filter, newData: { [key: string]: any }, params?: UpdateParams, tableRules?: TableRule, localParams: LocalParams = null): Promise<AnyObject | void>{
         try {
 
             const { testRule = false, returnQuery = false } = localParams || {};

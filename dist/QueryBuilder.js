@@ -3,15 +3,6 @@
  *  Copyright (c) Stefan L. All rights reserved.
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.makeQuery = exports.getNewQuery = exports.SelectItemBuilder = exports.COMPUTED_FIELDS = exports.FUNCTIONS = exports.asNameAlias = void 0;
 const DboBuilder_1 = require("./DboBuilder");
@@ -653,7 +644,7 @@ class SelectItemBuilder {
                 selected
             });
         };
-        this.parseUserSelect = (userSelect, joinParse) => __awaiter(this, void 0, void 0, function* () {
+        this.parseUserSelect = async (userSelect, joinParse) => {
             /* Array select */
             if (Array.isArray(userSelect)) {
                 if (userSelect.find(key => typeof key !== "string"))
@@ -684,7 +675,7 @@ class SelectItemBuilder {
                     this.allowedFields.filter(f => !selectKeys.includes(f)).map(key => this.addColumn(key, true));
                 }
                 else {
-                    yield Promise.all(selectKeys.map((key) => __awaiter(this, void 0, void 0, function* () {
+                    await Promise.all(selectKeys.map(async (key) => {
                         const val = userSelect[key], throwErr = (extraErr = "") => {
                             console.trace(extraErr);
                             throw "Unexpected select -> " + JSON.stringify({ [key]: val }) + "\n" + extraErr;
@@ -734,17 +725,17 @@ class SelectItemBuilder {
                             else {
                                 if (!joinParse)
                                     throw "Joins dissalowed";
-                                yield joinParse(key, val, throwErr);
+                                await joinParse(key, val, throwErr);
                             }
                         }
                         else
                             throwErr();
-                    })));
+                    }));
                 }
             }
             else
                 throw "Unexpected select -> " + JSON.stringify(userSelect);
-        });
+        };
         this.allFields = params.allFields;
         this.allowedFields = params.allowedFields;
         this.computedFields = params.computedFields;
@@ -763,127 +754,125 @@ class SelectItemBuilder {
     }
 }
 exports.SelectItemBuilder = SelectItemBuilder;
-function getNewQuery(_this, filter, selectParams, param3_unused = null, tableRules, localParams, columns) {
-    return __awaiter(this, void 0, void 0, function* () {
-        if (((localParams === null || localParams === void 0 ? void 0 : localParams.socket) || (localParams === null || localParams === void 0 ? void 0 : localParams.httpReq)) && !utils_1.get(tableRules, "select.fields")) {
-            throw `INTERNAL ERROR: publish.${_this.name}.select.fields rule missing`;
+async function getNewQuery(_this, filter, selectParams, param3_unused = null, tableRules, localParams, columns) {
+    if (((localParams === null || localParams === void 0 ? void 0 : localParams.socket) || (localParams === null || localParams === void 0 ? void 0 : localParams.httpReq)) && !utils_1.get(tableRules, "select.fields")) {
+        throw `INTERNAL ERROR: publish.${_this.name}.select.fields rule missing`;
+    }
+    // const all_columns: SelectItem[] = _this.column_names.slice(0).map(fieldName => ({
+    //   type: "column",
+    //   alias: fieldName,
+    //   getQuery: () => asName(fieldName),
+    //   getFields: () => [fieldName],
+    //   selected: false
+    // } as SelectItem))
+    // .concat(COMPUTED_FIELDS.map(c => ({
+    //   type: c.type,
+    //   alias: c.name,
+    //   getQuery: () => c.getQuery(),
+    //   getFields: c.getFields,
+    //   selected: false
+    // })))
+    // let select: SelectItem[] = [],
+    let joinQueries = [];
+    // const all_colnames = _this.column_names.slice(0).concat(COMPUTED_FIELDS.map(c => c.name));
+    selectParams = selectParams || {};
+    const { select: userSelect = "*" } = selectParams, 
+    // allCols = _this.column_names.slice(0),
+    // allFieldsIncludingComputed = allCols.concat(COMPUTED_FIELDS.map(c => c.name)),
+    allowedFields = _this.parseFieldFilter(utils_1.get(tableRules, "select.fields")) || _this.column_names.slice(0), 
+    // allowedFieldsIncludingComputed = _this.parseFieldFilter(get(tableRules, "select.fields"), true, allFieldsIncludingComputed) || allFieldsIncludingComputed,
+    sBuilder = new SelectItemBuilder({ allowedFields, computedFields: exports.COMPUTED_FIELDS, isView: _this.is_view, functions: exports.FUNCTIONS, allFields: _this.column_names.slice(0), columns });
+    await sBuilder.parseUserSelect(userSelect, async (key, val, throwErr) => {
+        // console.log({ key, val })
+        let j_filter = {}, j_selectParams = {}, j_path, j_alias, j_tableRules, j_table, j_isLeftJoin = true;
+        if (val === "*") {
+            j_selectParams.select = "*";
+            j_alias = key;
+            j_table = key;
         }
-        // const all_columns: SelectItem[] = _this.column_names.slice(0).map(fieldName => ({
-        //   type: "column",
-        //   alias: fieldName,
-        //   getQuery: () => asName(fieldName),
-        //   getFields: () => [fieldName],
-        //   selected: false
-        // } as SelectItem))
-        // .concat(COMPUTED_FIELDS.map(c => ({
-        //   type: c.type,
-        //   alias: c.name,
-        //   getQuery: () => c.getQuery(),
-        //   getFields: c.getFields,
-        //   selected: false
-        // })))
-        // let select: SelectItem[] = [],
-        let joinQueries = [];
-        // const all_colnames = _this.column_names.slice(0).concat(COMPUTED_FIELDS.map(c => c.name));
-        selectParams = selectParams || {};
-        const { select: userSelect = "*" } = selectParams, 
-        // allCols = _this.column_names.slice(0),
-        // allFieldsIncludingComputed = allCols.concat(COMPUTED_FIELDS.map(c => c.name)),
-        allowedFields = _this.parseFieldFilter(utils_1.get(tableRules, "select.fields")) || _this.column_names.slice(0), 
-        // allowedFieldsIncludingComputed = _this.parseFieldFilter(get(tableRules, "select.fields"), true, allFieldsIncludingComputed) || allFieldsIncludingComputed,
-        sBuilder = new SelectItemBuilder({ allowedFields, computedFields: exports.COMPUTED_FIELDS, isView: _this.is_view, functions: exports.FUNCTIONS, allFields: _this.column_names.slice(0), columns });
-        yield sBuilder.parseUserSelect(userSelect, (key, val, throwErr) => __awaiter(this, void 0, void 0, function* () {
-            // console.log({ key, val })
-            let j_filter = {}, j_selectParams = {}, j_path, j_alias, j_tableRules, j_table, j_isLeftJoin = true;
-            if (val === "*") {
-                j_selectParams.select = "*";
+        else {
+            /* Full option join  { field_name: db.innerJoin.table_name(filter, select)  } */
+            const JOIN_KEYS = ["$innerJoin", "$leftJoin"];
+            const JOIN_PARAMS = ["select", "filter", "$path", "offset", "limit", "orderBy"];
+            const joinKeys = Object.keys(val).filter(k => JOIN_KEYS.includes(k));
+            if (joinKeys.length > 1) {
+                throwErr("\nCannot specify more than one join type ( $innerJoin OR $leftJoin )");
+            }
+            else if (joinKeys.length === 1) {
+                const invalidParams = Object.keys(val).filter(k => ![...JOIN_PARAMS, ...JOIN_KEYS].includes(k));
+                if (invalidParams.length)
+                    throw "Invalid join params: " + invalidParams.join(", ");
+                j_isLeftJoin = joinKeys[0] === "$leftJoin";
+                j_table = val[joinKeys[0]];
+                j_alias = key;
+                if (typeof j_table !== "string")
+                    throw "\nIssue with select. \nJoin type must be a string table name but got -> " + JSON.stringify({ [key]: val });
+                j_selectParams.select = val.select || "*";
+                j_filter = val.filter || {};
+                j_selectParams.limit = val.limit;
+                j_selectParams.offset = val.offset;
+                j_selectParams.orderBy = val.orderBy;
+                j_path = val.$path;
+            }
+            else {
+                j_selectParams.select = val;
                 j_alias = key;
                 j_table = key;
             }
-            else {
-                /* Full option join  { field_name: db.innerJoin.table_name(filter, select)  } */
-                const JOIN_KEYS = ["$innerJoin", "$leftJoin"];
-                const JOIN_PARAMS = ["select", "filter", "$path", "offset", "limit", "orderBy"];
-                const joinKeys = Object.keys(val).filter(k => JOIN_KEYS.includes(k));
-                if (joinKeys.length > 1) {
-                    throwErr("\nCannot specify more than one join type ( $innerJoin OR $leftJoin )");
-                }
-                else if (joinKeys.length === 1) {
-                    const invalidParams = Object.keys(val).filter(k => ![...JOIN_PARAMS, ...JOIN_KEYS].includes(k));
-                    if (invalidParams.length)
-                        throw "Invalid join params: " + invalidParams.join(", ");
-                    j_isLeftJoin = joinKeys[0] === "$leftJoin";
-                    j_table = val[joinKeys[0]];
-                    j_alias = key;
-                    if (typeof j_table !== "string")
-                        throw "\nIssue with select. \nJoin type must be a string table name but got -> " + JSON.stringify({ [key]: val });
-                    j_selectParams.select = val.select || "*";
-                    j_filter = val.filter || {};
-                    j_selectParams.limit = val.limit;
-                    j_selectParams.offset = val.offset;
-                    j_selectParams.orderBy = val.orderBy;
-                    j_path = val.$path;
-                }
-                else {
-                    j_selectParams.select = val;
-                    j_alias = key;
-                    j_table = key;
-                }
-            }
-            const _thisJoinedTable = _this.dboBuilder.dbo[j_table];
-            if (!_thisJoinedTable) {
-                throw `Joined table ${JSON.stringify(j_table)} is disallowed or inexistent \nOr you've forgot to put the function arguments into an array`;
-            }
-            let isLocal = true;
-            if (localParams && (localParams.socket || localParams.httpReq)) {
-                isLocal = false;
-                j_tableRules = yield _this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: j_table, command: "find", localParams });
-            }
-            if (isLocal || j_tableRules) {
-                const joinQuery = yield getNewQuery(_thisJoinedTable, j_filter, Object.assign(Object.assign({}, j_selectParams), { alias: j_alias }), param3_unused, j_tableRules, localParams, columns);
-                joinQuery.isLeftJoin = j_isLeftJoin;
-                joinQuery.tableAlias = j_alias;
-                joinQuery.$path = j_path;
-                joinQueries.push(joinQuery);
-                // console.log(joinQuery)
-            }
-        }));
-        /* Add non selected columns */
-        /* WHY???? */
-        allowedFields.map(key => {
-            if (!sBuilder.select.find(s => s.alias === key && s.type === "column")) {
-                sBuilder.addColumn(key, false);
-            }
-        });
-        let select = sBuilder.select;
-        // const validatedAggAliases = select
-        //   .filter(s => s.type !== "joinedColumn")
-        //   .map(s => s.alias);
-        const where = yield _this.prepareWhere({
-            filter,
-            select,
-            forcedFilter: utils_1.get(tableRules, "select.forcedFilter"),
-            filterFields: utils_1.get(tableRules, "select.filterFields"),
-            tableAlias: selectParams.alias,
-            localParams,
-            tableRule: tableRules
-        });
-        const p = _this.getValidatedRules(tableRules, localParams);
-        let resQuery = {
-            allFields: allowedFields,
-            select,
-            table: _this.name,
-            joins: joinQueries,
-            where,
-            // having: cond.having,
-            limit: _this.prepareLimitQuery(selectParams.limit, p),
-            orderBy: [_this.prepareSort(selectParams.orderBy, allowedFields, selectParams.alias, null, select)],
-            offset: _this.prepareOffsetQuery(selectParams.offset)
-        };
-        // console.log(resQuery);
-        // console.log(buildJoinQuery(_this, resQuery));
-        return resQuery;
+        }
+        const _thisJoinedTable = _this.dboBuilder.dbo[j_table];
+        if (!_thisJoinedTable) {
+            throw `Joined table ${JSON.stringify(j_table)} is disallowed or inexistent \nOr you've forgot to put the function arguments into an array`;
+        }
+        let isLocal = true;
+        if (localParams && (localParams.socket || localParams.httpReq)) {
+            isLocal = false;
+            j_tableRules = await _this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: j_table, command: "find", localParams });
+        }
+        if (isLocal || j_tableRules) {
+            const joinQuery = await getNewQuery(_thisJoinedTable, j_filter, Object.assign(Object.assign({}, j_selectParams), { alias: j_alias }), param3_unused, j_tableRules, localParams, columns);
+            joinQuery.isLeftJoin = j_isLeftJoin;
+            joinQuery.tableAlias = j_alias;
+            joinQuery.$path = j_path;
+            joinQueries.push(joinQuery);
+            // console.log(joinQuery)
+        }
     });
+    /* Add non selected columns */
+    /* WHY???? */
+    allowedFields.map(key => {
+        if (!sBuilder.select.find(s => s.alias === key && s.type === "column")) {
+            sBuilder.addColumn(key, false);
+        }
+    });
+    let select = sBuilder.select;
+    // const validatedAggAliases = select
+    //   .filter(s => s.type !== "joinedColumn")
+    //   .map(s => s.alias);
+    const where = await _this.prepareWhere({
+        filter,
+        select,
+        forcedFilter: utils_1.get(tableRules, "select.forcedFilter"),
+        filterFields: utils_1.get(tableRules, "select.filterFields"),
+        tableAlias: selectParams.alias,
+        localParams,
+        tableRule: tableRules
+    });
+    const p = _this.getValidatedRules(tableRules, localParams);
+    let resQuery = {
+        allFields: allowedFields,
+        select,
+        table: _this.name,
+        joins: joinQueries,
+        where,
+        // having: cond.having,
+        limit: _this.prepareLimitQuery(selectParams.limit, p),
+        orderBy: [_this.prepareSort(selectParams.orderBy, allowedFields, selectParams.alias, null, select)],
+        offset: _this.prepareOffsetQuery(selectParams.offset)
+    };
+    // console.log(resQuery);
+    // console.log(buildJoinQuery(_this, resQuery));
+    return resQuery;
 }
 exports.getNewQuery = getNewQuery;
 /* No validation/authorisation at this point */

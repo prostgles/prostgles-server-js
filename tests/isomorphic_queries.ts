@@ -275,7 +275,7 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     await db.various.insert({ id: 99 });
     const sub = await db.various.subscribe({ id: 99  }, {  }, async items => {
       const item = items[0];
-
+      
       if(item && item.name === "zz3zz3"){
         await db.various.delete({ name: "zz3zz3" });
         sub.unsubscribe();

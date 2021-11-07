@@ -1,14 +1,18 @@
+/// <reference types="node" />
 import { PostgresNotifListenManager } from "./PostgresNotifListenManager";
 import { TableOrViewInfo, TableInfo, DbHandler, DboBuilder } from "./DboBuilder";
 import { TableRule, DB } from "./Prostgles";
-import { SelectParamsBasic as SelectParams, FieldFilter, WAL } from "prostgles-types";
+import { SelectParamsBasic as SelectParams, FieldFilter, WAL, AnyObject } from "prostgles-types";
+import { ClientExpressData } from "./SyncReplication";
 export declare const asValue: (v: any) => string;
 export declare const DEFAULT_SYNC_BATCH_SIZE = 50;
-declare type SyncParams = {
+export declare const log: (...args: any[]) => void;
+export declare type BasicCallback = (err?: any, res?: any) => void;
+export declare type SyncParams = {
     socket_id: string;
     channel_name: string;
     table_name: string;
-    table_rules: TableRule;
+    table_rules?: TableRule;
     synced_field: string;
     allow_delete: boolean;
     id_fields: string[];
@@ -18,10 +22,9 @@ declare type SyncParams = {
         select: FieldFilter;
     };
     condition: string;
-    isSyncingTimeout: number;
-    wal: WAL;
+    wal?: WAL;
     throttle?: number;
-    lr: object;
+    lr?: AnyObject;
     last_synced: number;
     is_syncing: boolean;
 };
@@ -48,7 +51,7 @@ declare type SubscriptionParams = {
     table_rules: TableRule;
     filter: object;
     params: SelectParams;
-    func: (data: any) => any;
+    func?: (data: any) => any;
     throttle?: number;
     last_throttled: number;
     is_throttling?: any;
@@ -73,9 +76,7 @@ export declare class PubSubManager {
     dboBuilder: DboBuilder;
     db: DB;
     dbo: DbHandler;
-    _triggers: {
-        [key: string]: string[];
-    };
+    _triggers?: Record<string, string[]>;
     sockets: any;
     subs: {
         [ke: string]: {
@@ -86,11 +87,11 @@ export declare class PubSubManager {
     };
     syncs: SyncParams[];
     socketChannelPreffix: string;
-    onSchemaChange?: (event: {
+    onSchemaChange?: ((event: {
         command: string;
         query: string;
-    }) => void;
-    postgresNotifListenManager: PostgresNotifListenManager;
+    }) => void);
+    postgresNotifListenManager?: PostgresNotifListenManager;
     private constructor();
     NOTIF_TYPE: {
         data: string;
@@ -100,15 +101,15 @@ export declare class PubSubManager {
         preffix: string;
         getFull: (appID?: string) => string;
     };
-    private appID;
+    private appID?;
     appCheckFrequencyMS: number;
-    appCheck: any;
+    appCheck?: ReturnType<typeof setInterval>;
     static create: (options: PubSubManagerOptions) => Promise<PubSubManager>;
     destroyed: boolean;
     destroy: () => void;
     canContinue: () => boolean;
     appChecking: boolean;
-    init: () => Promise<PubSubManager>;
+    init: () => Promise<PubSubManager | undefined>;
     DB_OBJ_NAMES: {
         trigger_add_remove_func: string;
         data_watch_func: string;
@@ -124,8 +125,12 @@ export declare class PubSubManager {
     }) => Promise<void>;
     pushSubData(sub: SubscriptionParams, err?: any): true | Promise<unknown>;
     upsertSocket(socket: any, channel_name: string): void;
-    syncTimeout: any;
-    syncData(sync: SyncParams, clientData: any): Promise<void>;
+    syncTimeout?: ReturnType<typeof setTimeout>;
+    syncData(sync: SyncParams, clientData?: ClientExpressData): Promise<void>;
+    /**
+     * Returns a sync channel
+     * A sync channel is unique per socket for each filter
+     */
     addSync(syncParams: AddSyncParams): Promise<string>;
     parseCondition: (condition: string) => string;
     addSub(subscriptionParams: AddSubscriptionParams): Promise<string>;
@@ -134,23 +139,16 @@ export declare class PubSubManager {
         table_name: string;
         condition: string;
     }[];
-    onSocketDisconnected(socket?: any, channel_name?: any): string;
+    onSocketDisconnected(socket?: any, channel_name?: string): string;
     checkIfTimescaleBug: (table_name: string) => Promise<boolean>;
     getMyTriggerQuery: () => Promise<string>;
     addingTrigger: any;
-    addTriggerPool: {
-        [key: string]: string[];
-    };
+    addTriggerPool?: Record<string, string[]>;
     addTrigger(params: {
         table_name: string;
         condition: string;
     }): Promise<boolean>;
-    pushSyncInfo({ table_name, id_key, info_level }: {
-        table_name: any;
-        id_key?: string;
-        info_level?: number;
-    }): Promise<any[]>;
 }
-export declare function filterObj(obj: object, keys?: string[], exclude?: string[]): object;
+export declare function filterObj(obj: AnyObject, keys?: string[], exclude?: string[]): AnyObject;
 export {};
 //# sourceMappingURL=PubSubManager.d.ts.map

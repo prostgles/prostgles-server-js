@@ -2,7 +2,7 @@
   // "files": ["lib/rootExport.ts"],
   "files": ["lib/index.ts"],
   "compilerOptions": {
-    "target": "es6",
+    "target": "ES2017",
     "lib": [
       "es2019"
     ],

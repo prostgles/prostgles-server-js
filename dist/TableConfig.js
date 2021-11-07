@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const prostgles_types_1 = require("prostgles-types");
 const PubSubManager_1 = require("./PubSubManager");
@@ -70,142 +61,138 @@ class TableConfigurator {
     ;
     get db() { return this.prostgles.db; }
     ;
-    init() {
-        return __awaiter(this, void 0, void 0, function* () {
-            let queries = [];
-            /* Create lookup tables */
-            Object.keys(this.config).map(tableName => {
-                var _a, _b, _c;
-                const tableConf = this.config[tableName];
-                const { dropIfExists = false, dropIfExistsCascade = false } = tableConf;
-                if (dropIfExistsCascade) {
-                    queries.push(`DROP TABLE IF EXISTS ${tableName} CASCADE;`);
-                }
-                else if (dropIfExists) {
-                    queries.push(`DROP TABLE IF EXISTS ${tableName} ;`);
-                }
-                if ("isLookupTable" in tableConf && Object.keys((_a = tableConf.isLookupTable) === null || _a === void 0 ? void 0 : _a.values).length) {
-                    const rows = Object.keys((_b = tableConf.isLookupTable) === null || _b === void 0 ? void 0 : _b.values).map(id => { var _a; return (Object.assign({ id }, ((_a = tableConf.isLookupTable) === null || _a === void 0 ? void 0 : _a.values[id]))); });
-                    if (dropIfExists || dropIfExistsCascade || !((_c = this.dbo) === null || _c === void 0 ? void 0 : _c[tableName])) {
-                        const keys = Object.keys(rows[0]).filter(k => k !== "id");
-                        queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
+    async init() {
+        let queries = [];
+        /* Create lookup tables */
+        Object.keys(this.config).map(tableName => {
+            var _a, _b, _c;
+            const tableConf = this.config[tableName];
+            const { dropIfExists = false, dropIfExistsCascade = false } = tableConf;
+            if (dropIfExistsCascade) {
+                queries.push(`DROP TABLE IF EXISTS ${tableName} CASCADE;`);
+            }
+            else if (dropIfExists) {
+                queries.push(`DROP TABLE IF EXISTS ${tableName} ;`);
+            }
+            if ("isLookupTable" in tableConf && Object.keys((_a = tableConf.isLookupTable) === null || _a === void 0 ? void 0 : _a.values).length) {
+                const rows = Object.keys((_b = tableConf.isLookupTable) === null || _b === void 0 ? void 0 : _b.values).map(id => { var _a; return (Object.assign({ id }, ((_a = tableConf.isLookupTable) === null || _a === void 0 ? void 0 : _a.values[id]))); });
+                if (dropIfExists || dropIfExistsCascade || !((_c = this.dbo) === null || _c === void 0 ? void 0 : _c[tableName])) {
+                    const keys = Object.keys(rows[0]).filter(k => k !== "id");
+                    queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
                         id  TEXT PRIMARY KEY
                         ${keys.length ? (", " + keys.map(k => prostgles_types_1.asName(k) + " TEXT ").join(", ")) : ""}
                     );`);
-                        rows.map(row => {
-                            const values = this.prostgles.pgp.helpers.values(row);
-                            queries.push(this.prostgles.pgp.as.format(`INSERT INTO ${tableName}  (${["id", ...keys].map(t => prostgles_types_1.asName(t)).join(", ")})  ` + " VALUES ${values:raw} ;", { values }));
-                        });
-                        // console.log("Created lookup table " + tableName)
-                    }
-                }
-            });
-            if (queries.length) {
-                const q = queries.join("\n");
-                console.log("TableConfig: \n", q);
-                yield this.db.multi(q);
-                yield this.prostgles.refreshDBO();
-            }
-            queries = [];
-            /* Create referenced columns */
-            yield Promise.all(Object.keys(this.config).map((tableName) => __awaiter(this, void 0, void 0, function* () {
-                const tableConf = this.config[tableName];
-                if ("columns" in tableConf) {
-                    const getColDef = (name, colConf) => {
-                        const colNameEsc = prostgles_types_1.asName(name);
-                        const getTextDef = (colConf) => {
-                            const { nullable, defaultValue } = colConf;
-                            return ` TEXT ${!nullable ? " NOT NULL " : ""} ${defaultValue ? ` DEFAULT ${PubSubManager_1.asValue(defaultValue)} ` : ""}`;
-                        };
-                        if ("references" in colConf && colConf.references) {
-                            const { tableName: lookupTable, columnName: lookupCol = "id" } = colConf.references;
-                            return ` ${colNameEsc} ${getTextDef(colConf.references)} REFERENCES ${lookupTable} (${lookupCol}) `;
-                        }
-                        else if ("sqlDefinition" in colConf && colConf.sqlDefinition) {
-                            return ` ${colNameEsc} ${colConf.sqlDefinition} `;
-                        }
-                        else if ("isText" in colConf && colConf.isText) {
-                            let checks = "", cArr = [];
-                            if (colConf.lowerCased) {
-                                cArr.push(`${colNameEsc} = LOWER(${colNameEsc})`);
-                            }
-                            if (colConf.trimmed) {
-                                cArr.push(`${colNameEsc} = BTRIM(${colNameEsc})`);
-                            }
-                            if (cArr.length) {
-                                checks = `CHECK (${cArr.join(" AND ")})`;
-                            }
-                            return ` ${colNameEsc} ${getTextDef(colConf)} ${checks}`;
-                        }
-                        else {
-                            throw "Unknown column config: " + JSON.stringify(colConf);
-                        }
-                    };
-                    const colDefs = [];
-                    Object.keys(tableConf.columns).filter(c => !("joinDef" in tableConf.columns[c])).map(colName => {
-                        const colConf = tableConf.columns[colName];
-                        if (!this.dbo[tableName]) {
-                            colDefs.push(getColDef(colName, colConf));
-                        }
-                        else if (!colDefs.length && !this.dbo[tableName].columns.find(c => colName === c.name)) {
-                            if ("references" in colConf && colConf.references) {
-                                const { tableName: lookupTable, } = colConf.references;
-                                queries.push(`
-                                ALTER TABLE ${prostgles_types_1.asName(tableName)} 
-                                ADD COLUMN ${getColDef(colName, colConf)};
-                            `);
-                                console.log(`TableConfigurator: ${tableName}(${colName})` + " referenced lookup table " + lookupTable);
-                            }
-                            else if ("sqlDefinition" in colConf && colConf.sqlDefinition) {
-                                queries.push(`
-                                ALTER TABLE ${prostgles_types_1.asName(tableName)} 
-                                ADD COLUMN ${getColDef(colName, colConf)};
-                            `);
-                                console.log(`TableConfigurator: created/added column ${tableName}(${colName}) ` + colConf.sqlDefinition);
-                            }
-                        }
+                    rows.map(row => {
+                        const values = this.prostgles.pgp.helpers.values(row);
+                        queries.push(this.prostgles.pgp.as.format(`INSERT INTO ${tableName}  (${["id", ...keys].map(t => prostgles_types_1.asName(t)).join(", ")})  ` + " VALUES ${values:raw} ;", { values }));
                     });
-                    if (colDefs.length) {
-                        queries.push(`CREATE TABLE ${prostgles_types_1.asName(tableName)} (
-                        ${colDefs.join(", \n")}
-                    );`);
-                        console.error("TableConfigurator: Created table: \n" + queries[0]);
-                    }
+                    // console.log("Created lookup table " + tableName)
                 }
-                if ("constraints" in tableConf && tableConf.constraints) {
-                    Object.keys(tableConf.constraints).map(constraintName => {
-                        queries.push(`ALTER TABLE ${prostgles_types_1.asName(tableName)} ADD CONSTRAINT ${prostgles_types_1.asName(constraintName)} ${tableConf.constraints[constraintName]} ;`);
-                    });
-                }
-                if ("indexes" in tableConf && tableConf.indexes) {
-                    Object.keys(tableConf.indexes).map(indexName => {
-                        const { concurrently, unique, using, definition, replace } = tableConf.indexes[indexName];
-                        if (replace || typeof replace !== "boolean" && tableConf.replaceUniqueIndexes) {
-                            queries.push(`DROP INDEX IF EXISTS ${prostgles_types_1.asName(indexName)}  ;`);
-                        }
-                        queries.push(`CREATE ${unique ? "UNIQUE" : ""} ${!concurrently ? "" : "CONCURRENTLY"} INDEX ${prostgles_types_1.asName(indexName)} ON ${prostgles_types_1.asName(tableName)} ${!using ? "" : ("USING " + using)} (${definition}) ;`);
-                    });
-                }
-            })));
-            if (queries.length) {
-                const q = queries.join("\n");
-                console.log("TableConfig: \n", q);
-                yield this.db.multi(q);
             }
         });
+        if (queries.length) {
+            const q = queries.join("\n");
+            console.log("TableConfig: \n", q);
+            await this.db.multi(q);
+            await this.prostgles.refreshDBO();
+        }
+        queries = [];
+        /* Create referenced columns */
+        await Promise.all(Object.keys(this.config).map(async (tableName) => {
+            const tableConf = this.config[tableName];
+            if ("columns" in tableConf) {
+                const getColDef = (name, colConf) => {
+                    const colNameEsc = prostgles_types_1.asName(name);
+                    const getTextDef = (colConf) => {
+                        const { nullable, defaultValue } = colConf;
+                        return ` TEXT ${!nullable ? " NOT NULL " : ""} ${defaultValue ? ` DEFAULT ${PubSubManager_1.asValue(defaultValue)} ` : ""}`;
+                    };
+                    if ("references" in colConf && colConf.references) {
+                        const { tableName: lookupTable, columnName: lookupCol = "id" } = colConf.references;
+                        return ` ${colNameEsc} ${getTextDef(colConf.references)} REFERENCES ${lookupTable} (${lookupCol}) `;
+                    }
+                    else if ("sqlDefinition" in colConf && colConf.sqlDefinition) {
+                        return ` ${colNameEsc} ${colConf.sqlDefinition} `;
+                    }
+                    else if ("isText" in colConf && colConf.isText) {
+                        let checks = "", cArr = [];
+                        if (colConf.lowerCased) {
+                            cArr.push(`${colNameEsc} = LOWER(${colNameEsc})`);
+                        }
+                        if (colConf.trimmed) {
+                            cArr.push(`${colNameEsc} = BTRIM(${colNameEsc})`);
+                        }
+                        if (cArr.length) {
+                            checks = `CHECK (${cArr.join(" AND ")})`;
+                        }
+                        return ` ${colNameEsc} ${getTextDef(colConf)} ${checks}`;
+                    }
+                    else {
+                        throw "Unknown column config: " + JSON.stringify(colConf);
+                    }
+                };
+                const colDefs = [];
+                Object.keys(tableConf.columns).filter(c => !("joinDef" in tableConf.columns[c])).map(colName => {
+                    const colConf = tableConf.columns[colName];
+                    if (!this.dbo[tableName]) {
+                        colDefs.push(getColDef(colName, colConf));
+                    }
+                    else if (!colDefs.length && !this.dbo[tableName].columns.find(c => colName === c.name)) {
+                        if ("references" in colConf && colConf.references) {
+                            const { tableName: lookupTable, } = colConf.references;
+                            queries.push(`
+                                ALTER TABLE ${prostgles_types_1.asName(tableName)} 
+                                ADD COLUMN ${getColDef(colName, colConf)};
+                            `);
+                            console.log(`TableConfigurator: ${tableName}(${colName})` + " referenced lookup table " + lookupTable);
+                        }
+                        else if ("sqlDefinition" in colConf && colConf.sqlDefinition) {
+                            queries.push(`
+                                ALTER TABLE ${prostgles_types_1.asName(tableName)} 
+                                ADD COLUMN ${getColDef(colName, colConf)};
+                            `);
+                            console.log(`TableConfigurator: created/added column ${tableName}(${colName}) ` + colConf.sqlDefinition);
+                        }
+                    }
+                });
+                if (colDefs.length) {
+                    queries.push(`CREATE TABLE ${prostgles_types_1.asName(tableName)} (
+                        ${colDefs.join(", \n")}
+                    );`);
+                    console.error("TableConfigurator: Created table: \n" + queries[0]);
+                }
+            }
+            if ("constraints" in tableConf && tableConf.constraints) {
+                Object.keys(tableConf.constraints).map(constraintName => {
+                    queries.push(`ALTER TABLE ${prostgles_types_1.asName(tableName)} ADD CONSTRAINT ${prostgles_types_1.asName(constraintName)} ${tableConf.constraints[constraintName]} ;`);
+                });
+            }
+            if ("indexes" in tableConf && tableConf.indexes) {
+                Object.keys(tableConf.indexes).map(indexName => {
+                    const { concurrently, unique, using, definition, replace } = tableConf.indexes[indexName];
+                    if (replace || typeof replace !== "boolean" && tableConf.replaceUniqueIndexes) {
+                        queries.push(`DROP INDEX IF EXISTS ${prostgles_types_1.asName(indexName)}  ;`);
+                    }
+                    queries.push(`CREATE ${unique ? "UNIQUE" : ""} ${!concurrently ? "" : "CONCURRENTLY"} INDEX ${prostgles_types_1.asName(indexName)} ON ${prostgles_types_1.asName(tableName)} ${!using ? "" : ("USING " + using)} (${definition}) ;`);
+                });
+            }
+        }));
+        if (queries.length) {
+            const q = queries.join("\n");
+            console.log("TableConfig: \n", q);
+            await this.db.multi(q);
+        }
     }
 }
 exports.default = TableConfigurator;
-function columnExists(args) {
+async function columnExists(args) {
     var _a;
-    return __awaiter(this, void 0, void 0, function* () {
-        const { db, tableName, colName } = args;
-        return Boolean((_a = (yield db.oneOrNone(`
+    const { db, tableName, colName } = args;
+    return Boolean((_a = (await db.oneOrNone(`
         SELECT column_name, table_name
         FROM information_schema.columns 
         WHERE table_name=${PubSubManager_1.asValue(tableName)} and column_name=${PubSubManager_1.asValue(colName)}
         LIMIT 1;
     `))) === null || _a === void 0 ? void 0 : _a.column_name);
-    });
 }
 //# sourceMappingURL=TableConfig.js.map
