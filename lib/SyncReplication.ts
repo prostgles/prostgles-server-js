@@ -242,7 +242,7 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
                 socket.emit(channel_name, { data, isSynced }, (resp?: { ok: boolean }) => {
                         
                     if(resp && resp.ok){
-                        console.log("PUSHED to client: fr/lr", data[0], data[data.length - 1]);
+                        // console.log("PUSHED to client: fr/lr", data[0], data[data.length - 1]);
                         resolve({ pushed: data?.length, resp })
                         
                     } else {
@@ -414,6 +414,7 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
         /* Used to throttle and merge incomming updates */
         sync.wal = new WAL({
             id_fields, synced_field, throttle, batch_size,
+            DEBUG_MODE: _this.dboBuilder.prostgles.opts.DEBUG_MODE,
             onSendStart: () => { 
                 sync.is_syncing = true; 
             },

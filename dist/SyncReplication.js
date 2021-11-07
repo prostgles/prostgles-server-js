@@ -165,7 +165,7 @@ exports.syncData = async (_this, sync, clientData) => {
         return new Promise((resolve, reject) => {
             socket.emit(channel_name, { data, isSynced }, (resp) => {
                 if (resp && resp.ok) {
-                    console.log("PUSHED to client: fr/lr", data[0], data[data.length - 1]);
+                    // console.log("PUSHED to client: fr/lr", data[0], data[data.length - 1]);
                     resolve({ pushed: data === null || data === void 0 ? void 0 : data.length, resp });
                 }
                 else {
@@ -307,6 +307,7 @@ exports.syncData = async (_this, sync, clientData) => {
         /* Used to throttle and merge incomming updates */
         sync.wal = new prostgles_types_1.WAL({
             id_fields, synced_field, throttle, batch_size,
+            DEBUG_MODE: _this.dboBuilder.prostgles.opts.DEBUG_MODE,
             onSendStart: () => {
                 sync.is_syncing = true;
             },
