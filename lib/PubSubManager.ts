@@ -971,7 +971,7 @@ export class PubSubManager {
 
     getSyncs(table_name: string, condition: string){
         return (this.syncs || [])
-            .filter((s: SyncParams) => !s.is_syncing && s.table_name === table_name && s.condition === condition);
+            .filter((s: SyncParams) => s.table_name === table_name && s.condition === condition);
     }
 
     /* Relay relevant data to relevant subscriptions */
@@ -1010,6 +1010,7 @@ export class PubSubManager {
         // const triggers = await this.db.any("SELECT * FROM prostgles.triggers WHERE table_name = $1 AND id IN ($2:csv)", [table_name, condition_ids_str.split(",").map(v => +v)]);
         // const conditions: string[] = triggers.map(t => t.condition);
 
+        log("PG Trigger ->", dataArr.join("__"))
         if(
             condition_ids_str && condition_ids_str.startsWith("error") &&
             this._triggers && this._triggers[table_name] && this._triggers[table_name].length
@@ -1031,7 +1032,7 @@ export class PubSubManager {
             const idxs = condition_ids_str.split(",").map(v => +v);
             const conditions = this._triggers[table_name].filter((c, i) => idxs.includes(i))
 
-            // console.log({ table_name, op_name, condition_ids_str, conditions }, this._triggers[table_name]);
+            log("PG Trigger -> ",{ table_name, op_name, condition_ids_str, conditions }, this._triggers[table_name]);
 
             conditions.map(condition => {
                 
@@ -1040,7 +1041,7 @@ export class PubSubManager {
                 
 
                 syncs.map((s) => {
-                    // console.log("SYNC DATA FROM TRIGGER");
+                    log("PG Trigger -> syncData. LR: ", s.lr);
                     this.syncData(s);
                 });
 

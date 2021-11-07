@@ -60,15 +60,30 @@ async function client_only(db, auth, log, methods) {
             await db.planes.delete();
             let inserts = new Array(100).fill(null).map((d, i) => ({ id: i, flight_number: `FN${i}`, x: Math.random(), y: i }));
             await db.planes.insert(inserts);
+            if ((await db.planes.count()) !== 100)
+                throw "Not 100 planes";
+            /**
+             * Two listeners are added at the same time to dbo.planes (which has 100 records):
+             *  subscribe({ x: 10 }
+             *  sync({}
+             *
+             * sync starts updating x to 10
+             * subscribe waits for 100 records of x=10 and then updates everything to x=20
+             * sync waits for 100 records of x=20 and finishes the test
+             */
             /* After all sync records are updated to x10 here we'll update them to x20 */
             const sP = await db.planes.subscribe({ x: 10 }, {}, async (planes) => {
-                const p10 = planes.filter(p => p.x == 10).length;
-                log("sub.x10", p10, "x20", planes.filter(p => p.x == 20).length);
-                if (p10 === 100) {
+                const p10 = planes.filter(p => p.x == 10);
+                log("sub: x10 -> ", p10.length, "    x20 ->", planes.filter(p => p.x == 20).length);
+                if (p10.length === 100) {
                     // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log);
                     sP.unsubscribe();
                     log("Update to x20 start");
-                    await db.planes.update({}, { x: 20, last_updated: Date.now() });
+                    const dLastUpdated = Math.max(...p10.map(v => +v.last_updated));
+                    const last_updated = Date.now();
+                    if (dLastUpdated >= last_updated)
+                        throw "dLastUpdated >= last_updated should not happen";
+                    await db.planes.update({}, { x: 20, last_updated });
                     log("Updated to x20", await db.planes.count({ x: 20 }));
                     // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log)
                 }
@@ -76,7 +91,8 @@ async function client_only(db, auth, log, methods) {
             let updt = 0;
             const sync = await db.planes.sync({}, { handlesOnData: true, patchText: true }, (planes, deltas) => {
                 const x20 = planes.filter(p => p.x == 20).length;
-                log("sync.x10", planes.filter(p => p.x == 10).length, "x20", x20);
+                const x10 = planes.filter(p => p.x == 10);
+                log(`sync: \nx10 -> ${x10.length} \nx20 -> ${x20}`);
                 let update = false;
                 planes.map(p => {
                     // if(p.y === 1) window.up = p;

@@ -388,11 +388,31 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
   });
 
   await tryRun("Postgis examples", async () => {
+    await db.shapes.delete();
+    await db.shapes.insert([
+      { geom: { ST_GeomFromText: ["POINT(-1 1)", 4326] } },
+      { geom: { ST_GeomFromText: ["POINT(-2 2)", 4326] } },
+    ])
   
-    const f = await db.shapes.findOne({}, { select: {
-      geom: "$ST_AsText"
-    }});
-    assert.deepStrictEqual(f, {});
+    const f = await db.shapes.findOne({
+      "geom.&&.st_makeenvelope": [
+        -3, 2,
+        -2, 2
+      ] 
+    }, { 
+      select: {
+        geomTxt: {"$ST_AsText": ["geom"]},
+        geomGeo: {"$ST_AsGeoJSON": ["geom"]},
+      },
+      orderBy: "geom"
+    });
+    assert.deepStrictEqual(f, {
+      geomGeo: {
+        coordinates: [-2,2],
+        type: 'Point'
+      },
+      geomTxt: 'POINT(-2 2)'
+    });
   });
 
   await tryRun("Local file upload", async () => {

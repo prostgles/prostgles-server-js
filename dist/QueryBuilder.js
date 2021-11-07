@@ -179,7 +179,7 @@ let PostGIS_Funcs = [
         return q;
     }
 }));
-PostGIS_Funcs = PostGIS_Funcs.concat(["ST_AsGeoJSON", "ST_AsText"]
+PostGIS_Funcs = PostGIS_Funcs.concat(["ST_AsGeoJSON", "ST_AsText", "ST_AsEWKT", "ST_AsEWKB", "ST_AsBinary", "ST_AsMVT", "ST_AsMVTGeom", "ST_SnapToGrid"]
     .map(fname => {
     const res = {
         name: "$" + fname,
@@ -189,7 +189,15 @@ PostGIS_Funcs = PostGIS_Funcs.concat(["ST_AsGeoJSON", "ST_AsText"]
         numArgs: 1,
         getFields: (args) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
-            return DboBuilder_1.pgp.as.format(fname + "(" + exports.asNameAlias(args[0], tableAlias) + (fname === "ST_AsGeoJSON" ? ")::json" : ""));
+            let secondArg = "";
+            const otherArgs = args.slice(1);
+            if (otherArgs.length)
+                secondArg = otherArgs.map(arg => asValue(arg)).join(", ");
+            let result = DboBuilder_1.pgp.as.format(fname + "(" + exports.asNameAlias(args[0], tableAlias) + secondArg + (fname === "ST_AsGeoJSON" ? ")::jsonb" : ")"));
+            if (fname === "ST_SnapToGrid") {
+                return `ST_AsGeoJSON(${result})::jsonb`;
+            }
+            return result;
         }
     };
     return res;

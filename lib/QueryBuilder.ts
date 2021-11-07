@@ -267,7 +267,7 @@ let PostGIS_Funcs: FunctionSpec[] = [
   }))
 
   PostGIS_Funcs = PostGIS_Funcs.concat(
-    ["ST_AsGeoJSON", "ST_AsText"]
+    ["ST_AsGeoJSON", "ST_AsText", "ST_AsEWKT", "ST_AsEWKB", "ST_AsBinary", "ST_AsMVT", "ST_AsMVTGeom", "ST_SnapToGrid"]
     .map(fname => {
       const res: FunctionSpec = {
         name: "$" + fname,
@@ -277,7 +277,14 @@ let PostGIS_Funcs: FunctionSpec[] = [
         numArgs: 1,
         getFields: (args: any[]) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
-          return pgp.as.format(fname + "(" + asNameAlias(args[0], tableAlias) + ( fname === "ST_AsGeoJSON"? ")::jsonb" : ""));
+          let secondArg = "";
+          const otherArgs = args.slice(1);
+          if(otherArgs.length) secondArg = otherArgs.map(arg => asValue(arg)).join(", ");
+          let result = pgp.as.format(fname + "(" + asNameAlias(args[0], tableAlias) + secondArg + ( fname === "ST_AsGeoJSON"? ")::jsonb" : ")" ));
+          if(fname === "ST_SnapToGrid"){
+            return `ST_AsGeoJSON(${result})::jsonb`
+          }
+          return result;
         }
       }
       return res;

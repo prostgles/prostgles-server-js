@@ -202,6 +202,7 @@ const dbConnection = {
         },
         publish: async ({ user }) => {
             return {
+                shapes: "*",
                 items: "*",
                 items2: "*",
                 items3: "*",

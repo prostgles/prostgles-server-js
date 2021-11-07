@@ -340,6 +340,32 @@ async function isomorphic(db) {
         assert_1.strict.deepStrictEqual(d, [{ id: 1, name: 'abc123', public: 'public data2', $rowhash: '9d18ddfbff9e13411d13f82d414644de', added_day: 'monday' }]);
         console.log("TODO: socket.io stringifies dates");
     });
+    await tryRun("Postgis examples", async () => {
+        await db.shapes.delete();
+        await db.shapes.insert([
+            { geom: { ST_GeomFromText: ["POINT(-1 1)", 4326] } },
+            { geom: { ST_GeomFromText: ["POINT(-2 2)", 4326] } },
+        ]);
+        const f = await db.shapes.findOne({
+            "geom.&&.st_makeenvelope": [
+                -3, 2,
+                -2, 2
+            ]
+        }, {
+            select: {
+                geomTxt: { "$ST_AsText": ["geom"] },
+                geomGeo: { "$ST_AsGeoJSON": ["geom"] },
+            },
+            orderBy: "geom"
+        });
+        assert_1.strict.deepStrictEqual(f, {
+            geomGeo: {
+                coordinates: [-2, 2],
+                type: 'Point'
+            },
+            geomTxt: 'POINT(-2 2)'
+        });
+    });
     await tryRun("Local file upload", async () => {
         let str = "This is a string", data = Buffer.from(str, "utf-8"), mediaFile = { data, name: "sample_file.txt" };
         const file = await db.media.insert(mediaFile, { returning: "*" });

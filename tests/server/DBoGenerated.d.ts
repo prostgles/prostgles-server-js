@@ -190,6 +190,11 @@ export type Prostgles_lookup_media_various = {
   "foreign_id"?: number;
   "media_id"?: string;
 }
+export type Shapes = { 
+  "geog"?: any;
+  "geom"?: any;
+  "id"?: string;
+}
 export type Skills = { 
   "id"?: string;
   "registration_id"?: string;
@@ -311,6 +316,7 @@ export type DBObj = {
   "prostgles_lookup_media_items_with_media": TableHandler<Prostgles_lookup_media_items_with_media> 
   "prostgles_lookup_media_items_with_one_media": TableHandler<Prostgles_lookup_media_items_with_one_media> 
   "prostgles_lookup_media_various": TableHandler<Prostgles_lookup_media_various> 
+  "shapes": TableHandler<Shapes> 
   "skills": TableHandler<Skills> 
   "spatial_ref_sys": TableHandler<Spatial_ref_sys> 
   "t": TableHandler<T> 
@@ -422,6 +428,9 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
     }; 
     "prostgles_lookup_media_various": { 
       [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "shapes": { 
+      [key in "geog" | "geom" | "id"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "skills": { 
       [key in "id" | "registration_id" | "type" | "years"]: { [lang_id in keyof LANG_IDS]: string }; 

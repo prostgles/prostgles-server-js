@@ -106,14 +106,36 @@ class ColSet {
         }
         const rowKeys = Object.keys(row);
         return rowKeys.map(key => {
+            var _a;
             const col = this.opts.columns.find(c => c.name === key);
             if (!col)
                 throw "Unexpected missing col name";
             const colIsJSON = ["json", "jsonb"].includes(col.data_type);
             const colIsUUID = ["uuid"].includes(col.data_type);
+            /**
+             * Add utility functions for PostGIS data
+             */
+            let escapedVal;
+            if (["geometry", "geography"].includes(col.udt_name) && row[key] && isPlainObject(row[key])) {
+                const basicFunc = (args) => {
+                    return args.map(arg => PubSubManager_1.asValue(arg)).join(", ");
+                };
+                const basicFuncNames = ["ST_GeomFromText", "ST_Point", "ST_MakePoint", "ST_MakePointM", "ST_PointFromText", "ST_GeomFromEWKT", "ST_GeomFromGeoJSON"];
+                const dataKeys = Object.keys(row[key]);
+                const funcName = dataKeys[0];
+                const funcExists = basicFuncNames.includes(funcName);
+                const funcArgs = (_a = row[key]) === null || _a === void 0 ? void 0 : _a[funcName];
+                if (dataKeys.length !== 1 || !funcExists || !Array.isArray(funcArgs)) {
+                    throw `Expecting only one function key (${basicFuncNames.join(", ")}) \nwith an array of arguments \n within column (${key}) data but got: ${JSON.stringify(row[key])} \nExample: { geo_col: { ST_GeomFromText: ["POINT(-71.064544 42.28787)", 4326] } }`;
+                }
+                escapedVal = `${funcName}(${basicFunc(funcArgs)})`;
+            }
+            else {
+                escapedVal = exports.pgp.as.format(colIsUUID ? "$1::uuid" : colIsJSON ? "$1:json" : "$1", [row[key]]);
+            }
             return {
                 escapedCol: prostgles_types_1.asName(key),
-                escapedVal: exports.pgp.as.format(colIsUUID ? "$1::uuid" : colIsJSON ? "$1:json" : "$1", [row[key]])
+                escapedVal
             };
         });
     }

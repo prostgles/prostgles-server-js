@@ -829,6 +829,7 @@ class PubSubManager {
             const table_name = dataArr[1], op_name = dataArr[2], condition_ids_str = dataArr[3];
             // const triggers = await this.db.any("SELECT * FROM prostgles.triggers WHERE table_name = $1 AND id IN ($2:csv)", [table_name, condition_ids_str.split(",").map(v => +v)]);
             // const conditions: string[] = triggers.map(t => t.condition);
+            exports.log("PG Trigger ->", dataArr.join("__"));
             if (condition_ids_str && condition_ids_str.startsWith("error") &&
                 this._triggers && this._triggers[table_name] && this._triggers[table_name].length) {
                 const pref = "INTERNAL ERROR. Schema might have changed";
@@ -846,12 +847,12 @@ class PubSubManager {
                 this._triggers && this._triggers[table_name] && this._triggers[table_name].length) {
                 const idxs = condition_ids_str.split(",").map(v => +v);
                 const conditions = this._triggers[table_name].filter((c, i) => idxs.includes(i));
-                // console.log({ table_name, op_name, condition_ids_str, conditions }, this._triggers[table_name]);
+                exports.log("PG Trigger -> ", { table_name, op_name, condition_ids_str, conditions }, this._triggers[table_name]);
                 conditions.map(condition => {
                     const subs = this.getSubs(table_name, condition);
                     const syncs = this.getSyncs(table_name, condition);
                     syncs.map((s) => {
-                        // console.log("SYNC DATA FROM TRIGGER");
+                        exports.log("PG Trigger -> syncData. LR: ", s.lr);
                         this.syncData(s);
                     });
                     if (!subs) {
@@ -966,7 +967,7 @@ class PubSubManager {
     }
     getSyncs(table_name, condition) {
         return (this.syncs || [])
-            .filter((s) => !s.is_syncing && s.table_name === table_name && s.condition === condition);
+            .filter((s) => s.table_name === table_name && s.condition === condition);
     }
     pushSubData(sub, err) {
         if (!sub)
