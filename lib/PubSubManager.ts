@@ -203,6 +203,9 @@ export class PubSubManager {
 
                 --SET  TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 
+                /* 
+                * ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
+                */
 
                 DO
                 $do$
@@ -838,6 +841,7 @@ export class PubSubManager {
         schema_watch_trigger: "prostgles_schema_watch_trigger_new"
     }
 
+    static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from "
     prepareTriggers = async () => {
         // SELECT * FROM pg_catalog.pg_event_trigger WHERE evtname
         if(!this.appID) throw "prepareTriggers failed: this.appID missing";
@@ -850,7 +854,7 @@ export class PubSubManager {
             await this.db.any(`
                 BEGIN;--  ISOLATION LEVEL SERIALIZABLE;
                 
-                /**
+                /**                                 ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
                  *  Drop stale triggers
                  * */
                 DO
@@ -992,7 +996,10 @@ export class PubSubManager {
                 const command = dataArr[1],
                     event_type = dataArr[2],
                     query = dataArr[3];
-                this.onSchemaChange({ command, query })
+
+                if(query && !query.includes(PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)){
+                    this.onSchemaChange({ command, query })
+                }
             }
 
             return;

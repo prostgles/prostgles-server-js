@@ -116,6 +116,7 @@ export declare class PubSubManager {
         schema_watch_func: string;
         schema_watch_trigger: string;
     };
+    static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID: string;
     prepareTriggers: () => Promise<boolean>;
     isReady(): any;
     getSubs(table_name: string, condition: string): SubscriptionParams[];

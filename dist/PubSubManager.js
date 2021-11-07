@@ -70,6 +70,9 @@ class PubSubManager {
 
                 --SET  TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 
+                /* 
+                * ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
+                */
 
                 DO
                 $do$
@@ -698,7 +701,7 @@ class PubSubManager {
                 await this.db.any(`
                 BEGIN;--  ISOLATION LEVEL SERIALIZABLE;
                 
-                /**
+                /**                                 ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
                  *  Drop stale triggers
                  * */
                 DO
@@ -818,7 +821,9 @@ class PubSubManager {
             if (notifType === this.NOTIF_TYPE.schema) {
                 if (this.onSchemaChange) {
                     const command = dataArr[1], event_type = dataArr[2], query = dataArr[3];
-                    this.onSchemaChange({ command, query });
+                    if (query && !query.includes(PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)) {
+                        this.onSchemaChange({ command, query });
+                    }
                 }
                 return;
             }
@@ -1344,6 +1349,7 @@ PubSubManager.create = async (options) => {
     const res = new PubSubManager(options);
     return await res.init();
 };
+PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from ";
 /* Get only the specified properties of an object */
 function filterObj(obj, keys = [], exclude) {
     if (exclude && exclude.length)
