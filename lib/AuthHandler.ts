@@ -464,7 +464,7 @@ export default class AuthHandler {
 
         let auth: AuthSocketSchema = {};
 
-        if(this.opts.expressConfig?.publicRoutes?.length && !this.opts.expressConfig?.disableSocketAuthGuard){
+        if(this.opts.expressConfig?.publicRoutes && !this.opts.expressConfig?.disableSocketAuthGuard){
 
             auth.pathGuard = true;
             

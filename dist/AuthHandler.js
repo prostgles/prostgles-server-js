@@ -113,11 +113,11 @@ class AuthHandler {
             });
         };
         this.makeSocketAuth = async (socket) => {
-            var _a, _b, _c;
+            var _a, _b;
             if (!this.opts)
                 return {};
             let auth = {};
-            if (((_b = (_a = this.opts.expressConfig) === null || _a === void 0 ? void 0 : _a.publicRoutes) === null || _b === void 0 ? void 0 : _b.length) && !((_c = this.opts.expressConfig) === null || _c === void 0 ? void 0 : _c.disableSocketAuthGuard)) {
+            if (((_a = this.opts.expressConfig) === null || _a === void 0 ? void 0 : _a.publicRoutes) && !((_b = this.opts.expressConfig) === null || _b === void 0 ? void 0 : _b.disableSocketAuthGuard)) {
                 auth.pathGuard = true;
                 socket.removeAllListeners(prostgles_types_1.CHANNELS.AUTHGUARD);
                 socket.on(prostgles_types_1.CHANNELS.AUTHGUARD, async (params, cb = (err, res) => { }) => {
