@@ -123,7 +123,9 @@ class AuthHandler {
                 socket.on(prostgles_types_1.CHANNELS.AUTHGUARD, async (params, cb = (err, res) => { }) => {
                     var _a;
                     try {
-                        const { pathname } = params || {};
+                        const { pathname } = typeof params === "string" ? JSON.parse(params) : (params || {});
+                        if (pathname && typeof pathname !== "string")
+                            console.warn("Invalid pathname provided for AuthGuardLocation: ", pathname);
                         if (pathname && typeof pathname === "string" && this.isUserRoute(pathname) && !((_a = (await this.getClientInfo({ socket }))) === null || _a === void 0 ? void 0 : _a.user)) {
                             cb(null, { shouldReload: true });
                         }

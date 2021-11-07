@@ -472,7 +472,8 @@ export default class AuthHandler {
             socket.on(CHANNELS.AUTHGUARD, async (params: AuthGuardLocation, cb = (err: any, res?: AuthGuardLocationResponse) => {} ) => {
                 
                 try {
-                    const {pathname} = params || {};
+                    const {pathname} = typeof params === "string"? JSON.parse(params) : (params || {});
+                    if(pathname && typeof pathname !== "string") console.warn("Invalid pathname provided for AuthGuardLocation: ", pathname)
                     if(pathname && typeof pathname === "string" && this.isUserRoute(pathname) && !(await this.getClientInfo({ socket }))?.user){
                         cb(null, { shouldReload: true });
                     } else {
