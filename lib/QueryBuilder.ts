@@ -279,7 +279,7 @@ let PostGIS_Funcs: FunctionSpec[] = [
         getQuery: ({ allowedFields, args, tableAlias }) => {
           let secondArg = "";
           const otherArgs = args.slice(1);
-          if(otherArgs.length) secondArg = otherArgs.map(arg => asValue(arg)).join(", ");
+          if(otherArgs.length) secondArg = ", " + otherArgs.map(arg => asValue(arg)).join(", ");
           let result = pgp.as.format(fname + "(" + asNameAlias(args[0], tableAlias) + secondArg + ( fname === "ST_AsGeoJSON"? ")::jsonb" : ")" ));
           if(fname === "ST_SnapToGrid"){
             return `ST_AsGeoJSON(${result})::jsonb`

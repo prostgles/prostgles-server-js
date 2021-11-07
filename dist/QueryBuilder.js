@@ -192,7 +192,7 @@ PostGIS_Funcs = PostGIS_Funcs.concat(["ST_AsGeoJSON", "ST_AsText", "ST_AsEWKT", 
             let secondArg = "";
             const otherArgs = args.slice(1);
             if (otherArgs.length)
-                secondArg = otherArgs.map(arg => asValue(arg)).join(", ");
+                secondArg = ", " + otherArgs.map(arg => asValue(arg)).join(", ");
             let result = DboBuilder_1.pgp.as.format(fname + "(" + exports.asNameAlias(args[0], tableAlias) + secondArg + (fname === "ST_AsGeoJSON" ? ")::jsonb" : ")"));
             if (fname === "ST_SnapToGrid") {
                 return `ST_AsGeoJSON(${result})::jsonb`;
