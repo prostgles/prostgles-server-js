@@ -387,6 +387,14 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     console.log("TODO: socket.io stringifies dates")
   });
 
+  await tryRun("Postgis examples", async () => {
+  
+    const f = await db.shapes.findOne({}, { select: {
+      geom: "$ST_AsText"
+    }});
+    assert.deepStrictEqual(f, {});
+  });
+
   await tryRun("Local file upload", async () => {
     let str = "This is a string",
       data = Buffer.from(str, "utf-8"),

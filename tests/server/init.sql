@@ -1,5 +1,12 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS postgis;
 
+DROP TABLE IF EXISTS shapes CASCADE;
+CREATE TABLE IF NOT EXISTS shapes (
+	id		UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	geog	GEOGRAPHY,
+	geom 	GEOMETRY
+);
 
 DROP TABLE IF EXISTS prostgles_lookup_media_items_m1;
 DROP TABLE IF EXISTS prostgles_lookup_media_items_with_media;

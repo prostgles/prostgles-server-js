@@ -277,7 +277,7 @@ let PostGIS_Funcs: FunctionSpec[] = [
         numArgs: 1,
         getFields: (args: any[]) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
-          return pgp.as.format(fname + "(" + asNameAlias(args[0], tableAlias) + ( fname === "ST_AsGeoJSON"? ")::json" : ""));
+          return pgp.as.format(fname + "(" + asNameAlias(args[0], tableAlias) + ( fname === "ST_AsGeoJSON"? ")::jsonb" : ""));
         }
       }
       return res;
