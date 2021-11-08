@@ -202,6 +202,26 @@ PostGIS_Funcs = PostGIS_Funcs.concat(["ST_AsGeoJSON", "ST_AsText", "ST_AsEWKT", 
     };
     return res;
 }));
+PostGIS_Funcs = PostGIS_Funcs.concat(["ST_Extent", "ST_3DExtent", "ST_XMin_Agg", "ST_XMax_Agg", "ST_YMin_Agg", "ST_YMax_Agg", "ST_ZMin_Agg", "ST_ZMax_Agg"]
+    .map(fname => {
+    const res = {
+        name: "$" + fname,
+        description: ` :[column_name] -> ST_Extent returns a bounding box that encloses a set of geometries. 
+          The ST_Extent function is an "aggregate" function in the terminology of SQL. 
+          That means that it operates on lists of data, in the same way the SUM() and AVG() functions do.`,
+        type: "aggregation",
+        singleColArg: true,
+        numArgs: 1,
+        getFields: (args) => [args[0]],
+        getQuery: ({ allowedFields, args, tableAlias }) => {
+            if (fname.includes("Extent")) {
+                return `${fname}(${exports.asNameAlias(args[0], tableAlias)})`;
+            }
+            return `${fname.endsWith("_Agg") ? fname.slice(0, -4) : fname}(ST_Collect(${exports.asNameAlias(args[0], tableAlias)}))`;
+        }
+    };
+    return res;
+}));
 /**
 * Each function expects a column at the very least
 */
@@ -535,7 +555,7 @@ exports.FUNCTIONS = [
         name: "$countAll",
         type: "aggregation",
         description: `agg :[]  COUNT of all rows `,
-        singleColArg: false,
+        singleColArg: true,
         numArgs: 0,
         getFields: (args) => [],
         getQuery: ({ allowedFields, args, tableAlias }) => {

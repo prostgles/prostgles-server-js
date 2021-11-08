@@ -394,6 +394,7 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
       { geom: { ST_GeomFromText: ["POINT(-2 2)", 4326] } },
     ])
   
+    /** Basic functions and extent filters */
     const f = await db.shapes.findOne({
       "geom.&&.st_makeenvelope": [
         -3, 2,
@@ -413,6 +414,31 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
       },
       geomTxt: 'POINT(-2 2)'
     });
+
+    /**Aggregate functions */
+    const aggs = await db.shapes.findOne({ }, { 
+      select: {
+        xMin: { "$ST_XMin_Agg": ["geom"] },
+        xMax: { "$ST_XMax_Agg": ["geom"] },
+        yMin: { "$ST_YMin_Agg": ["geom"] },
+        yMax: { "$ST_YMax_Agg": ["geom"] },
+        zMin: { "$ST_ZMin_Agg": ["geom"] },
+        zMax: { "$ST_ZMax_Agg": ["geom"] },
+        extent: { "$ST_Extent": ["geom"] },
+        //  extent3D: { "$ST_3DExtent": ["geom"] },
+      },
+    });
+    assert.deepStrictEqual(aggs, {
+      xMax: -1,
+      xMin: -2,
+      yMax: 2,
+      yMin: 1,
+      zMax: 0,
+      zMin: 0,
+      extent: 'BOX(-2 1,-1 2)',
+      //  extent3D: 'BOX3D(-2 1 0,-1 2 6.952908662134e-310)' <-- looks like a value that will fail tests at some point
+    });
+
   });
 
   await tryRun("Local file upload", async () => {
