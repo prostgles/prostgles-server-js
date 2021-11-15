@@ -280,7 +280,8 @@ let PostGIS_Funcs: FunctionSpec[] = [
           let secondArg = "";
           const otherArgs = args.slice(1);
           if(otherArgs.length) secondArg = ", " + otherArgs.map(arg => asValue(arg)).join(", ");
-          let result = pgp.as.format(fname + "(" + asNameAlias(args[0], tableAlias) + secondArg + ( fname === "ST_AsGeoJSON"? ")::jsonb" : ")" ));
+          const escTabelName = asNameAlias(args[0], tableAlias) + "::geometry";
+          let result = pgp.as.format(fname + "(" + escTabelName + secondArg + ( fname === "ST_AsGeoJSON"? ")::jsonb" : ")" ));
           if(fname === "ST_SnapToGrid"){
             return `ST_AsGeoJSON(${result})::jsonb`
           }
@@ -305,10 +306,11 @@ let PostGIS_Funcs: FunctionSpec[] = [
         numArgs: 1,
         getFields: (args: any[]) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
+          const escTabelName = asNameAlias(args[0], tableAlias) + "::geometry";
           if(fname.includes("Extent")){
-            return `${fname}(${asNameAlias(args[0], tableAlias)})`;
+            return `${fname}(${escTabelName})`;
           }
-          return `${fname.endsWith("_Agg")? fname.slice(0, -4) : fname}(ST_Collect(${asNameAlias(args[0], tableAlias)}))`;
+          return `${fname.endsWith("_Agg")? fname.slice(0, -4) : fname}(ST_Collect(${escTabelName}))`;
         }
       }
       return res;

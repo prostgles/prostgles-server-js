@@ -193,7 +193,8 @@ PostGIS_Funcs = PostGIS_Funcs.concat(["ST_AsGeoJSON", "ST_AsText", "ST_AsEWKT", 
             const otherArgs = args.slice(1);
             if (otherArgs.length)
                 secondArg = ", " + otherArgs.map(arg => asValue(arg)).join(", ");
-            let result = DboBuilder_1.pgp.as.format(fname + "(" + exports.asNameAlias(args[0], tableAlias) + secondArg + (fname === "ST_AsGeoJSON" ? ")::jsonb" : ")"));
+            const escTabelName = exports.asNameAlias(args[0], tableAlias) + "::geometry";
+            let result = DboBuilder_1.pgp.as.format(fname + "(" + escTabelName + secondArg + (fname === "ST_AsGeoJSON" ? ")::jsonb" : ")"));
             if (fname === "ST_SnapToGrid") {
                 return `ST_AsGeoJSON(${result})::jsonb`;
             }
@@ -214,10 +215,11 @@ PostGIS_Funcs = PostGIS_Funcs.concat(["ST_Extent", "ST_3DExtent", "ST_XMin_Agg",
         numArgs: 1,
         getFields: (args) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
+            const escTabelName = exports.asNameAlias(args[0], tableAlias) + "::geometry";
             if (fname.includes("Extent")) {
-                return `${fname}(${exports.asNameAlias(args[0], tableAlias)})`;
+                return `${fname}(${escTabelName})`;
             }
-            return `${fname.endsWith("_Agg") ? fname.slice(0, -4) : fname}(ST_Collect(${exports.asNameAlias(args[0], tableAlias)}))`;
+            return `${fname.endsWith("_Agg") ? fname.slice(0, -4) : fname}(ST_Collect(${escTabelName}))`;
         }
     };
     return res;
