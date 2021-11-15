@@ -191,7 +191,10 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
     }
     // console.log({ fOpType, fVal, sOpType })
 
+    /** st_makeenvelope */
     if(GeomFilterKeys.includes(fOpType) && sOpType && GeomFilter_Funcs.includes(sOpType)){
+      /** If leftQ is geography then this err can happen: 'Antipodal (180 degrees long) edge detected!' */
+      if(sOpType.toLowerCase() === "st_makeenvelope") leftQ += "::geometry"
       return leftQ + ` ${fOpType} ` + `${sOpType}${parseRightVal(sVal, "csv")}`;
 
     } else if(["=", "$eq"].includes(fOpType) && !sOpType){

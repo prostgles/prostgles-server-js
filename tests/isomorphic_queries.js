@@ -342,15 +342,21 @@ async function isomorphic(db) {
     });
     await tryRun("Postgis examples", async () => {
         await db.shapes.delete();
+        const p1 = { ST_GeomFromText: ["POINT(-1 1)", 4326] }, p2 = { ST_GeomFromText: ["POINT(-2 2)", 4326] };
         await db.shapes.insert([
-            { geom: { ST_GeomFromText: ["POINT(-1 1)", 4326] } },
-            { geom: { ST_GeomFromText: ["POINT(-2 2)", 4326] } },
+            { geom: p1, geog: p1 },
+            { geom: p2, geog: p2 },
         ]);
         /** Basic functions and extent filters */
-        const f = await db.shapes.findOne({
-            "geom.&&.st_makeenvelope": [
-                -3, 2,
-                -2, 2
+        const f = await db.shapes.findOne({ $and: [
+                { "geom.&&.st_makeenvelope": [
+                        -3, 2,
+                        -2, 2
+                    ] },
+                { "geog.&&.st_makeenvelope": [
+                        -3, 2,
+                        -2, 2
+                    ] }
             ]
         }, {
             select: {
@@ -387,7 +393,7 @@ async function isomorphic(db) {
             zMax: 0,
             zMin: 0,
             extent: 'BOX(-2 1,-1 2)',
-            //  extent3D: 'BOX3D(-2 1 0,-1 2 6.952908662134e-310)'
+            //  extent3D: 'BOX3D(-2 1 0,-1 2 6.952908662134e-310)' <-- looks like a value that will fail tests at some point
         });
     });
     await tryRun("Local file upload", async () => {
