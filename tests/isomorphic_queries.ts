@@ -223,7 +223,15 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
         addedY: { "$date_trunc_5minute": ["added"] }
       }});
     // console.log(d);
-
+    await db.various.findOne(
+      { }, 
+      { select: { 
+        h: { "$ts_headline_simple": ["name", { plainto_tsquery: "abc81" }] },
+        hh: { "$ts_headline": ["name", "abc81"] } ,
+        added: "$date_trunc_2hour",
+        addedY: { "$date_trunc_5millisecond": ["added"] }
+      }});
+      
     /* Dates become strings after reaching client.
     * Serialize col dataTypes and then recast ??
     */
