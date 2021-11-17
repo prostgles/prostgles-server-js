@@ -343,8 +343,8 @@ exports.FUNCTIONS = [
      * Date trunc utils
      */
     ...[
-        "microseconds",
-        "milliseconds",
+        "microsecond",
+        "millisecond",
         "second",
         "minute",
         "hour",
