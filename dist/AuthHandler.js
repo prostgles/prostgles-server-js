@@ -47,6 +47,21 @@ class AuthHandler {
                 throw ("no user or session");
             }
         };
+        this.getUser = async (clientReq) => {
+            var _a, _b;
+            const sid = "httpReq" in clientReq ? (_b = (_a = clientReq.httpReq) === null || _a === void 0 ? void 0 : _a.cookies) === null || _b === void 0 ? void 0 : _b[this.sidKeyName] : clientReq.socket;
+            if (!sid)
+                return undefined;
+            try {
+                return this.throttledFunc(() => {
+                    return this.opts.getUser(this.validateSid(sid), this.dbo, this.db, clientReq);
+                }, 50);
+            }
+            catch (err) {
+                console.error(err);
+            }
+            return undefined;
+        };
         this.throttledFunc = (func, throttle = 500) => {
             return new Promise(async (resolve, reject) => {
                 let result, error;
@@ -84,33 +99,17 @@ class AuthHandler {
                 }
                 return result;
             }, responseThrottle);
-            return new Promise(async (resolve, reject) => {
-                let result, error;
-                /**
-                 * Throttle response times to prevent timing attacks
-                 */
-                let interval = setInterval(() => {
-                    if (error || result) {
-                        if (error) {
-                            reject(error);
-                        }
-                        else if (result) {
-                            resolve(result);
-                        }
-                        clearInterval(interval);
-                    }
-                }, responseThrottle);
-                try {
-                    result = await this.opts.login(params, this.dbo, this.db);
-                    if (!result.sid) {
-                        error = { msg: "Something went wrong making a session" };
-                    }
+        };
+        this.isValidSocketSession = (socket, session) => {
+            var _a, _b;
+            const hasExpired = Boolean(session && session.expires <= Date.now());
+            if (((_a = this.opts.expressConfig) === null || _a === void 0 ? void 0 : _a.publicRoutes) && !((_b = this.opts.expressConfig) === null || _b === void 0 ? void 0 : _b.disableSocketAuthGuard)) {
+                if (hasExpired) {
+                    socket.emit(prostgles_types_1.CHANNELS.AUTHGUARD, { shouldReload: true });
+                    throw "";
                 }
-                catch (err) {
-                    console.log(err);
-                    error = err;
-                }
-            });
+            }
+            return Boolean(session && !hasExpired);
         };
         this.makeSocketAuth = async (socket) => {
             var _a, _b;
@@ -230,13 +229,6 @@ class AuthHandler {
                 });
             }
             if (app && this.loginRoute) {
-                const getUser = (req) => {
-                    var _a;
-                    const sid = (_a = req === null || req === void 0 ? void 0 : req.cookies) === null || _a === void 0 ? void 0 : _a[sidKeyName];
-                    if (!sid)
-                        return undefined;
-                    return this.opts.getUser(this.validateSid(sid), this.dbo, this.db);
-                };
                 app.post(this.loginRoute, async (req, res) => {
                     try {
                         const { sid, expires } = await this.loginThrottled(req.body || {}) || {};
@@ -273,29 +265,28 @@ class AuthHandler {
                 if (app && Array.isArray(publicRoutes)) {
                     /* Redirect if not logged in and requesting non public content */
                     app.get('*', async (req, res) => {
+                        const clientReq = { httpReq: req };
+                        const getUser = this.getUser;
                         try {
                             const returnURL = getReturnUrl(req, this.returnURL);
-                            /**
-                             * If already logged in then redirect
-                             */ this.loginRoute;
                             /**
                              * Requesting a User route
                              */
                             if (this.isUserRoute(req.path)) {
                                 /* Check auth. Redirect if unauthorized */
-                                const u = await getUser(req);
+                                const u = await getUser(clientReq);
                                 if (!u) {
                                     res.redirect(`${this.loginRoute}?returnURL=${encodeURIComponent(req.originalUrl)}`);
                                     return;
                                 }
                                 /* If authorized and going to returnUrl then redirect. Otherwise serve file */
                             }
-                            else if (returnURL && (await getUser(req))) {
+                            else if (returnURL && (await getUser(clientReq))) {
                                 res.redirect(returnURL);
                                 return;
                                 /** If Logged in and requesting login then redirect */
                             }
-                            else if (this.matchesRoute(this.loginRoute, req.path) && (await getUser(req))) {
+                            else if (this.matchesRoute(this.loginRoute, req.path) && (await getUser(clientReq))) {
                                 res.redirect("/");
                                 return;
                             }
@@ -327,11 +318,13 @@ class AuthHandler {
             return null;
         if (localParams.socket) {
             const querySid = (_c = (_b = (_a = localParams.socket) === null || _a === void 0 ? void 0 : _a.handshake) === null || _b === void 0 ? void 0 : _b.query) === null || _c === void 0 ? void 0 : _c[sidKeyName];
-            if (!querySid) {
+            let rawSid = querySid;
+            if (!rawSid) {
                 const cookie_str = (_f = (_e = (_d = localParams.socket) === null || _d === void 0 ? void 0 : _d.handshake) === null || _e === void 0 ? void 0 : _e.headers) === null || _f === void 0 ? void 0 : _f.cookie;
                 const cookie = parseCookieStr(cookie_str);
-                return this.validateSid(cookie[sidKeyName]);
+                rawSid = cookie[sidKeyName];
             }
+            return this.validateSid(rawSid);
         }
         else if (localParams.httpReq) {
             return this.validateSid((_h = (_g = localParams.httpReq) === null || _g === void 0 ? void 0 : _g.cookies) === null || _h === void 0 ? void 0 : _h[sidKeyName]);
@@ -349,18 +342,45 @@ class AuthHandler {
         }
     }
     async getClientInfo(localParams) {
+        var _a;
         if (!this.opts)
             return {};
-        const { getUser, getClientUser } = this.opts;
-        if (getUser && localParams && (localParams.httpReq || localParams.socket)) {
-            const sid = this.getSID(localParams);
-            return {
-                sid,
-                user: !sid ? undefined : await getUser(sid, this.dbo, this.db),
-                clientUser: !sid ? undefined : await getClientUser(sid, this.dbo, this.db)
-            };
+        const getSession = (_a = this.opts.cacheSession) === null || _a === void 0 ? void 0 : _a.getSession;
+        const isSocket = "socket" in localParams;
+        if (getSession && isSocket && localParams.socket.__prglCache) {
+            const { session, user, clientUser } = localParams.socket.__prglCache;
+            const isValid = this.isValidSocketSession(localParams.socket, session);
+            if (isValid) {
+                return {
+                    sid: session.sid,
+                    user,
+                    clientUser,
+                };
+            }
+            else
+                return {};
         }
-        return {};
+        return this.throttledFunc(async () => {
+            const { getUser, getClientUser } = this.opts;
+            if (getUser && localParams && (localParams.httpReq || localParams.socket)) {
+                const sid = this.getSID(localParams);
+                const clientReq = localParams.httpReq ? { httpReq: localParams.httpReq } : { socket: localParams.socket };
+                let user, clientUser;
+                if (sid) {
+                    user = await getUser(sid, this.dbo, this.db, clientReq),
+                        clientUser = await getClientUser(sid, this.dbo, this.db);
+                }
+                if (getSession && isSocket) {
+                    localParams.socket.__prglCache = {
+                        session: await getSession(sid),
+                        user,
+                        clientUser,
+                    };
+                }
+                return { sid, user, clientUser };
+            }
+            return {};
+        }, 5);
     }
 }
 exports.default = AuthHandler;

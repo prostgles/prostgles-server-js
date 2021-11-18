@@ -245,7 +245,6 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     });
   });
 
-
   await tryRun("$term_highlight", async () => {
     const term = "abc81";
     const res = await db.various.find(
@@ -312,7 +311,6 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     await db.various.update({ id: 99 }, { name: "zz3zz1" });
     await db.various.update({ id: 99 }, { name: "zz3zz2" });
   });
-
 
   await tryRun("JSON filtering", async () => {
     const res = await db.various.count({ "jsn->a->>b": '3' });

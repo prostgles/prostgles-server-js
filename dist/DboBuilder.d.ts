@@ -32,7 +32,7 @@ export declare type DbHandler = {
 };
 import { SelectItem, FieldSpec } from "./QueryBuilder";
 import { DB, TableRule, Join, Prostgles, PublishParser, ValidateRow } from "./Prostgles";
-import { PubSubManager } from "./PubSubManager";
+import { PubSubManager, BasicCallback } from "./PubSubManager";
 declare type PGP = pgPromise.IMain<{}, pg.IClient>;
 export declare const pgp: PGP;
 export declare type TableInfo = TInfo & {
@@ -48,9 +48,27 @@ export declare type ViewInfo = TableInfo & {
 export declare type TableOrViewInfo = TableInfo & ViewInfo & {
     is_view: boolean;
 };
+export declare type PRGLIOSocket = {
+    readonly id: string;
+    readonly handshake?: {
+        query?: Record<string, string>;
+        headers?: {
+            cookie?: string;
+        };
+    };
+    readonly emit: (channel: string, message: any, cb?: BasicCallback) => any;
+    /** Used for session caching */
+    __prglCache?: {
+        session: BasicSession;
+        user: AnyObject;
+        clientUser: AnyObject;
+    };
+    /** Used for publish error caching */
+    prostgles?: AnyObject;
+};
 export declare type LocalParams = {
     httpReq?: any;
-    socket?: any;
+    socket?: PRGLIOSocket;
     func?: () => any;
     has_rules?: boolean;
     testRule?: boolean;
@@ -301,6 +319,7 @@ export declare class TableHandler extends ViewHandler {
         synced_field: string;
     }>;
 }
+import { BasicSession } from "./AuthHandler";
 export declare class DboBuilder {
     tablesOrViews: TableSchema[];
     /**

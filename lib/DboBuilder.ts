@@ -73,7 +73,7 @@ import { getNewQuery, makeQuery, COMPUTED_FIELDS, SelectItem, FieldSpec, asNameA
 import { 
     DB, TableRule, SelectRule, InsertRule, UpdateRule, DeleteRule, SyncRule, Joins, Join, Prostgles, PublishParser, flat, ValidateRow 
 } from "./Prostgles";
-import { PubSubManager, filterObj, asValue } from "./PubSubManager";
+import { PubSubManager, filterObj, asValue, BasicCallback } from "./PubSubManager";
 
 import { parseFilterItem } from "./Filtering";
 
@@ -99,9 +99,30 @@ export type TableOrViewInfo = TableInfo & ViewInfo & {
     is_view: boolean;
 }
 
+export type PRGLIOSocket = {
+    readonly id: string;
+
+    readonly handshake?: { 
+        query?: Record<string, string>;
+        headers?: { cookie?: string; }  //  e.g.: "some_arg=dwdaw; otherarg=23232"
+    }
+
+    readonly emit: (channel: string, message: any, cb?: BasicCallback) => any;
+
+    /** Used for session caching */
+    __prglCache?: {
+        session: BasicSession;
+        user: AnyObject;
+        clientUser: AnyObject;
+    }
+
+    /** Used for publish error caching */
+    prostgles?: AnyObject;
+};
+
 export type LocalParams = {
     httpReq?: any;
-    socket?: any;
+    socket?: PRGLIOSocket;
     func?: () => any;
     has_rules?: boolean;
     testRule?: boolean;
@@ -2638,6 +2659,7 @@ export class TableHandler extends ViewHandler {
 
 
 import { JOIN_TYPES } from "./Prostgles";
+import { BasicSession } from "./AuthHandler";
 
 export class DboBuilder {
     tablesOrViews: TableSchema[];   //TableSchema           TableOrViewInfo

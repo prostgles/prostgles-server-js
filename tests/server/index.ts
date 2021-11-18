@@ -214,7 +214,8 @@ const dbConnection = {
 				}
 				log("Logged in!")
 				return { sid: s.id, expires: Infinity }
-			}
+			},
+			
 		},
 		publishMethods: async (params) => {
 			return {
