@@ -42,12 +42,12 @@ async function isomorphic(db) {
     console.log("Starting isomorphic queries");
     if (await db.items.count()) {
         console.log("DELETING items");
-        await db.items.delete({});
-        await db.items2.delete({});
-        await db.items3.delete({});
-        await db.items4_pub.delete({});
         /* Access controlled */
         await db.items4.delete({});
+        await db.items4_pub.delete({});
+        await db.items3.delete({});
+        await db.items2.delete({});
+        await db.items.delete({});
     }
     // await tryRun("UUID data", async () => {
     //   const r = await db.uuid_text.insert({}, { returning: "*"});
@@ -58,6 +58,7 @@ async function isomorphic(db) {
     // }, 500)
     await tryRun("Prepare data", async () => {
         await db.items.insert([{ name: "a" }, { name: "a" }, { name: "b" }]);
+        console.log(await db.items.find());
         await db.items2.insert([{ name: "a", items_id: 1 }]);
         await db.items3.insert([{ name: "a" }, { name: "za123" }]);
         await db.items4.insert([

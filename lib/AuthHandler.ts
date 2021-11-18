@@ -175,7 +175,7 @@ export default class AuthHandler {
     }));
   }
 
-  private setCookie = (cookie: { sid: string; expires: number; }, r: { req: ExpressReq; res: ExpressRes }) => {
+  private setCookieAndGoToReturnURLIFSet = (cookie: { sid: string; expires: number; }, r: { req: ExpressReq; res: ExpressRes }) => {
     const { sid, expires } = cookie;
     const { res, req } = r;
     if (sid) {
@@ -250,7 +250,7 @@ export default class AuthHandler {
               if (!session) {
                 res.status(404).json({ msg: "Invalid magic-link" });
               } else {
-                this.setCookie(session, { req, res });
+                this.setCookieAndGoToReturnURLIFSet(session, { req, res });
               }
 
             } catch (e) {
@@ -269,7 +269,7 @@ export default class AuthHandler {
 
             if (sid) {
 
-              this.setCookie({ sid, expires }, { req, res });
+              this.setCookieAndGoToReturnURLIFSet({ sid, expires }, { req, res });
 
             } else {
               throw ("no user or session")
@@ -352,31 +352,31 @@ export default class AuthHandler {
 
     return new Promise(async (resolve, reject) => {
 
-      let result: any, error: any;
+      let interval, result: any, error: any, finished = false;
 
       /**
        * Throttle response times to prevent timing attacks
        */
-      let interval = setInterval(() => {
-        if (error || result) {
+      interval = setInterval(() => {
+        clearInterval(interval);
+        if (finished) {
           if (error) {
             reject(error);
-          } else if (result) {
+          } else {
             resolve(result)
           }
-          clearInterval(interval);
         }
       }, throttle);
 
 
       try {
         result = await func();
-
       } catch (err) {
         console.log(err)
         error = err;
       }
 
+      finished = true;
     })
   }
 
@@ -465,10 +465,13 @@ export default class AuthHandler {
           clientUser = await getClientUser(sid, this.dbo as any, this.db)
         }
         if(getSession && isSocket){
-          localParams.socket.__prglCache = { 
-            session: await getSession(sid),
-            user, 
-            clientUser,
+          const session = await getSession(sid)
+          if(session?.expires && user && clientUser){
+            localParams.socket.__prglCache = { 
+              session,
+              user, 
+              clientUser,
+            }
           }
         }
         return { sid, user, clientUser }

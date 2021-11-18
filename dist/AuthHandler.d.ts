@@ -122,7 +122,7 @@ export default class AuthHandler {
     validateSid: (sid: string) => string;
     matchesRoute: (route: string, clientFullRoute: string) => boolean;
     isUserRoute: (pathname: string) => boolean;
-    private setCookie;
+    private setCookieAndGoToReturnURLIFSet;
     getUser: (clientReq: AuthClientRequest) => Promise<AnyObject>;
     init(): Promise<void>;
     throttledFunc: <T>(func: () => Promise<T>, throttle?: number) => Promise<T>;

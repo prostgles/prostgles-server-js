@@ -215,7 +215,12 @@ const dbConnection = {
 				log("Logged in!")
 				return { sid: s.id, expires: Infinity }
 			},
-			
+			cacheSession: {
+				getSession: async (sid) => { 
+					const s = sessions.find(s => s.id === sid); 
+					return s? { sid: s.id, expires: Infinity }  : undefined
+				}
+			}
 		},
 		publishMethods: async (params) => {
 			return {

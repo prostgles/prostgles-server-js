@@ -28,7 +28,7 @@ class AuthHandler {
                 return this.matchesRoute(publicRoute, pathname); // publicRoute === pathname || pathname.startsWith(publicRoute) && ["/", "?", "#"].includes(pathname.slice(-1));
             }));
         };
-        this.setCookie = (cookie, r) => {
+        this.setCookieAndGoToReturnURLIFSet = (cookie, r) => {
             var _a, _b;
             const { sid, expires } = cookie;
             const { res, req } = r;
@@ -64,19 +64,19 @@ class AuthHandler {
         };
         this.throttledFunc = (func, throttle = 500) => {
             return new Promise(async (resolve, reject) => {
-                let result, error;
+                let interval, result, error, finished = false;
                 /**
                  * Throttle response times to prevent timing attacks
                  */
-                let interval = setInterval(() => {
-                    if (error || result) {
+                interval = setInterval(() => {
+                    clearInterval(interval);
+                    if (finished) {
                         if (error) {
                             reject(error);
                         }
-                        else if (result) {
+                        else {
                             resolve(result);
                         }
-                        clearInterval(interval);
                     }
                 }, throttle);
                 try {
@@ -86,6 +86,7 @@ class AuthHandler {
                     console.log(err);
                     error = err;
                 }
+                finished = true;
             });
         };
         this.loginThrottled = async (params) => {
@@ -219,7 +220,7 @@ class AuthHandler {
                                 res.status(404).json({ msg: "Invalid magic-link" });
                             }
                             else {
-                                this.setCookie(session, { req, res });
+                                this.setCookieAndGoToReturnURLIFSet(session, { req, res });
                             }
                         }
                         catch (e) {
@@ -233,7 +234,7 @@ class AuthHandler {
                     try {
                         const { sid, expires } = await this.loginThrottled(req.body || {}) || {};
                         if (sid) {
-                            this.setCookie({ sid, expires }, { req, res });
+                            this.setCookieAndGoToReturnURLIFSet({ sid, expires }, { req, res });
                         }
                         else {
                             throw ("no user or session");
@@ -371,11 +372,14 @@ class AuthHandler {
                         clientUser = await getClientUser(sid, this.dbo, this.db);
                 }
                 if (getSession && isSocket) {
-                    localParams.socket.__prglCache = {
-                        session: await getSession(sid),
-                        user,
-                        clientUser,
-                    };
+                    const session = await getSession(sid);
+                    if ((session === null || session === void 0 ? void 0 : session.expires) && user && clientUser) {
+                        localParams.socket.__prglCache = {
+                            session,
+                            user,
+                            clientUser,
+                        };
+                    }
                 }
                 return { sid, user, clientUser };
             }

@@ -100,7 +100,7 @@ const dbConnection = {
         tsGeneratedTypesDir: path_1.default.join(__dirname + '/'),
         // watchSchema: true,
         transactions: true,
-        // DEBUG_MODE: true,
+        DEBUG_MODE: true,
         // onNotice: console.log,
         tableConfig,
         fileTable: {
@@ -194,6 +194,12 @@ const dbConnection = {
                 log("Logged in!");
                 return { sid: s.id, expires: Infinity };
             },
+            cacheSession: {
+                getSession: async (sid) => {
+                    const s = sessions.find(s => s.id === sid);
+                    return s ? { sid: s.id, expires: Infinity } : undefined;
+                }
+            }
         },
         publishMethods: async (params) => {
             return {
