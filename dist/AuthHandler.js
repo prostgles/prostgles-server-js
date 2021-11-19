@@ -69,8 +69,8 @@ class AuthHandler {
                  * Throttle response times to prevent timing attacks
                  */
                 interval = setInterval(() => {
-                    clearInterval(interval);
                     if (finished) {
+                        clearInterval(interval);
                         if (error) {
                             reject(error);
                         }
