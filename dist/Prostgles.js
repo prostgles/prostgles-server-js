@@ -617,7 +617,7 @@ class PublishParser {
             throw "INTERNAL ERROR: dbo and/or publish missing";
     }
     async getPublishParams(localParams, clientInfo) {
-        return Object.assign(Object.assign({}, (clientInfo || await this.prostgles.authHandler.getClientInfo(localParams))), { dbo: this.dbo, db: this.db });
+        return Object.assign(Object.assign({}, (clientInfo || await this.prostgles.authHandler.getClientInfo(localParams))), { dbo: this.dbo, db: this.db, socket: localParams.socket });
     }
     async getMethods(socket) {
         let methods = {};

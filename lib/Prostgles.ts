@@ -16,7 +16,7 @@ console.log("Add a basic auth mode where user and sessions table are created");
 import TableConfigurator, { TableConfig } from "./TableConfig";
 
 import { get } from "./utils";
-import { DboBuilder, DbHandler, TableHandler, ViewHandler, isPlainObject, LocalParams, CommonTableRules, TableSchema } from "./DboBuilder";
+import { DboBuilder, DbHandler, TableHandler, ViewHandler, isPlainObject, LocalParams, CommonTableRules, TableSchema, PRGLIOSocket } from "./DboBuilder";
 import { PubSubManager, DEFAULT_SYNC_BATCH_SIZE, asValue } from "./PubSubManager";
 export { DbHandler }
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -280,6 +280,7 @@ export type PublishParams<DBO = DbHandler> = {
     dbo?: DBO;
     db?: DB;
     user?: AnyObject;
+    socket: PRGLIOSocket
 }
 export type Publish<DBO> = PublishedResult | ((params: PublishParams<DBO>) => (PublishedResult | Promise<PublishedResult>)); 
 
@@ -1133,7 +1134,8 @@ export class PublishParser {
         return {
             ...(clientInfo || await this.prostgles.authHandler.getClientInfo(localParams)),
             dbo: this.dbo,
-            db: this.db
+            db: this.db,
+            socket: localParams.socket
         }
     }
 

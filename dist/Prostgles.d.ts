@@ -4,7 +4,7 @@ import pg = require('pg-promise/typescript/pg-subset');
 import FileManager, { ImageOptions, LocalConfig, S3Config } from "./FileManager";
 import AuthHandler, { ClientInfo, Auth } from "./AuthHandler";
 import TableConfigurator, { TableConfig } from "./TableConfig";
-import { DboBuilder, DbHandler, LocalParams, CommonTableRules } from "./DboBuilder";
+import { DboBuilder, DbHandler, LocalParams, CommonTableRules, PRGLIOSocket } from "./DboBuilder";
 export { DbHandler };
 export declare type PGP = pgPromise.IMain<{}, pg.IClient>;
 import { AnyObject } from "prostgles-types";
@@ -193,6 +193,7 @@ export declare type PublishParams<DBO = DbHandler> = {
     dbo?: DBO;
     db?: DB;
     user?: AnyObject;
+    socket: PRGLIOSocket;
 };
 export declare type Publish<DBO> = PublishedResult | ((params: PublishParams<DBO>) => (PublishedResult | Promise<PublishedResult>));
 export declare type Method = (...args: any) => (any | Promise<any>);
