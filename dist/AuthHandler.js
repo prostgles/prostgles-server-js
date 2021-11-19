@@ -98,7 +98,7 @@ class AuthHandler {
                 const err = {
                     msg: "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number } but got: " + JSON.stringify(result)
                 };
-                if (result && (typeof result.sid !== "string" || typeof result.expires !== "number") || ![undefined, null].includes(result)) {
+                if (result && (typeof result.sid !== "string" || typeof result.expires !== "number") || !result && ![undefined, null].includes(result)) {
                     throw err;
                 }
                 return result;
