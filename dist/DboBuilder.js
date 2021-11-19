@@ -975,7 +975,7 @@ class ViewHandler {
             selected: false,
             getFields: () => [f.name]
         })));
-        let filterKeys = Object.keys(data).filter(k => !computedFields.find(cf => cf.name === k) && !existsKeys.find(ek => ek.key === k));
+        let filterKeys = Object.keys(data).filter(k => !funcFilterkeys.find(ek => ek.name === k) && !computedFields.find(cf => cf.name === k) && !existsKeys.find(ek => ek.key === k));
         // if(allowed_colnames){
         //     const aliasedColumns = (select || []).filter(s => 
         //         ["function", "computed", "column"].includes(s.type) && allowed_colnames.includes(s.alias) ||  

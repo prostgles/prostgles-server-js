@@ -386,10 +386,13 @@ export default class AuthHandler {
 
     return this.throttledFunc(async () => {
       let result = await this.opts.login(params, this.dbo as any, this.db);
-
-      if (!result.sid) {
-        throw { msg: "Something went wrong making a session" }
+      const err = {
+        msg: "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number } but got: " + JSON.stringify(result) 
       }
+      if(result && (typeof result.sid !== "string" || typeof result.expires !== "number") || ![undefined, null].includes(result)) {
+        throw err
+      }
+
       return result;
     }, responseThrottle);
 

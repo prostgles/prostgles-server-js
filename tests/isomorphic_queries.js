@@ -259,6 +259,11 @@ async function isomorphic(db) {
             },
         });
     });
+    await tryRun("funcFilters: $term_highlight", async () => {
+        const term = "abc81";
+        const res = await db.various.count({ $term_highlight: [["*"], term, { returnType: "boolean" }] });
+        assert_1.strict.equal(+res, 1);
+    });
     await tryRunP("subscribe", async (resolve, reject) => {
         await db.various.insert({ id: 99 });
         const sub = await db.various.subscribe({ id: 99 }, {}, async (items) => {
