@@ -625,6 +625,7 @@ export const FUNCTIONS: FunctionSpec[] = [
 
       const cols = ViewHandler._parseFieldFilter(args[0], false, allowedFields);
       let term = args[1];
+      const rawTerm = args[1];
       let { edgeTruncate, noFields = false, returnType, matchCase = false } = args[2] || {};
       if(!isEmpty(args[2])){
         const keys = Object.keys(args[2]);
@@ -641,7 +642,12 @@ export const FUNCTIONS: FunctionSpec[] = [
         throw `returnType can only be one of: ${RETURN_TYPES}`
       }
 
-      const makeTextMatcherArray = (rawText: string, matchText: string, term: string) => {
+      const makeTextMatcherArray = (rawText: string, _term: string) => {
+        let matchText = rawText, term = _term;
+        if(!matchCase) {
+          matchText = `LOWER(${rawText})`
+          term = `LOWER(${term})`
+        }
         let leftStr = `substr(${rawText}, 1, position(${term} IN ${matchText}) - 1 )`,
           rightStr = `substr(${rawText}, position(${term} IN ${matchText}) + length(${term}) )`;
         if(edgeTruncate){
@@ -688,14 +694,22 @@ export const FUNCTIONS: FunctionSpec[] = [
 
       } else if(returnType === "object"){
         res = `CASE 
-          ${cols.map(c => ` 
-          WHEN COALESCE(${asNameAlias(c, tableAlias)}::TEXT, '') ${matchCase? "LIKE" : "ILIKE"} ${term}
-            THEN 
-          `).join(" OR ")}
+          ${cols.map(c => {
+            let colTxt = `COALESCE(${asNameAlias(c, tableAlias)}::TEXT, '')`; //  position(${term} IN ${colTxt}) > 0
+            return ` 
+              WHEN  ${colTxt} ${matchCase? "LIKE" : "ILIKE"} ${asValue('%' + rawTerm + '%')}
+                THEN json_build_object(${asValue(c)}, ${
+                  makeTextMatcherArray(
+                    colTxt, 
+                    term
+                  )})::jsonb
+              `
+          }).join(" OR ")}
           ELSE NULL
 
         END`;
 
+        // console.log(res)
       } else {
         /* If no match or empty search THEN return full row as string within first array element  */
         res = `CASE WHEN position(${term} IN ${col}) > 0 AND ${term} <> '' THEN array_to_json(ARRAY[

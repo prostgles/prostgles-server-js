@@ -233,13 +233,15 @@ async function isomorphic(db) {
                 hFull: { $term_highlight: ["*", "81", {}] },
                 hOrdered: { $term_highlight: [["name", "id"], "81", {}] },
                 hIdx: { $term_highlight: [["name"], term, { returnType: "index" }] },
+                hBool: { $term_highlight: [["name"], term, { returnType: "boolean" }] },
+                hObj: { $term_highlight: [["name"], term, { returnType: "object" }] },
             },
             orderBy: { hIdx: -1 }
         });
         // console.log(res[0])
         // console.log(res.map(r => JSON.stringify(r)).join("\n"));//, null, 2))  
         assert_1.strict.deepStrictEqual(res[0], {
-            "h": ["name: ", ["abc81"], " here"],
+            h: ["name: ", ["abc81"], " here"],
             /* Search all allowed fields using "*"  */
             hFull: [
                 'id: 3, h: , name: abc',
@@ -247,7 +249,14 @@ async function isomorphic(db) {
                 ' here, tsv: , jsn: {"a":{"b":2}}, added: 1997-12-04 00:12:00'
             ],
             /* Search specific fields in specific order */
-            "hOrdered": ["name: abc", ["81"], " here, id: 3"], "hIdx": 6
+            hOrdered: ["name: abc", ["81"], " here, id: 3"],
+            hIdx: 6,
+            hBool: true,
+            hObj: {
+                name: [
+                    '', ['abc81'], ' here'
+                ]
+            },
         });
     });
     await tryRunP("subscribe", async (resolve, reject) => {

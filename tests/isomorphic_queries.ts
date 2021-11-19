@@ -256,6 +256,8 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
           hFull: { $term_highlight: ["*", "81", { }] },
           hOrdered: { $term_highlight: [["name", "id"], "81", { }] },
           hIdx:  { $term_highlight: [["name"], term, { returnType: "index" }] },
+          hBool:  { $term_highlight: [["name"], term, { returnType: "boolean" }] },
+          hObj:  { $term_highlight: [["name"], term, { returnType: "object" }] },
         },
         orderBy: { hIdx: -1 } 
       }
@@ -265,7 +267,7 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     assert.deepStrictEqual(
       res[0], 
       {
-        "h":["name: ",["abc81"]," here"],
+        h:["name: ",["abc81"]," here"],
 
         /* Search all allowed fields using "*"  */
         hFull: [
@@ -275,7 +277,14 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
         ],
 
         /* Search specific fields in specific order */
-        "hOrdered":["name: abc",["81"]," here, id: 3"],"hIdx":6
+        hOrdered:["name: abc",["81"]," here, id: 3"],
+        hIdx: 6, 
+        hBool: true,
+        hObj: {
+          name: [
+            '', ['abc81'],' here'
+          ]
+        },
       }
     )
   });
