@@ -381,7 +381,9 @@ class AuthHandler {
                         };
                     }
                 }
-                return { sid, user, clientUser };
+                if (sid) {
+                    return { sid, user, clientUser };
+                }
             }
             return {};
         }, 5);
