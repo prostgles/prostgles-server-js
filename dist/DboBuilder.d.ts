@@ -241,7 +241,8 @@ export declare class ViewHandler {
     prepareExistCondition(eConfig: ExistsFilterConfig, localParams: LocalParams, tableRules: TableRule): Promise<string>;
     /**
      * parses a single filter
-     * @example: { fff: 2 } => "fff" = 2
+     * @example
+     *  { fff: 2 } => "fff" = 2
      *  { fff: { $ilike: 'abc' } } => "fff" ilike 'abc'
      */
     getCondition(params: {
@@ -272,7 +273,7 @@ export declare class ViewHandler {
     * @param {FieldFilter} fieldParams - { col1: 0, col2: 0 } | { col1: true, col2: true } | "*" | ["key1", "key2"] | []
     * @param {boolean} allow_empty - allow empty select. defaults to true
     */
-    static _parseFieldFilter(fieldParams: FieldFilter, allow_empty: boolean, allowed_cols: string[]): string[];
+    static _parseFieldFilter(fieldParams: FieldFilter, allow_empty: boolean, all_cols: string[]): string[];
 }
 declare type ValidatedParams = {
     row: object;

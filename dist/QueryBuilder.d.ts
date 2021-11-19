@@ -3,7 +3,7 @@ import { TableRule } from "./Prostgles";
 import { SelectParamsBasic as SelectParams, FieldFilter, ColumnInfo } from "prostgles-types";
 export declare type SelectItem = {
     type: "column" | "function" | "aggregation" | "joinedColumn" | "computed";
-    getFields: () => string[] | "*";
+    getFields: (args?: any[]) => string[] | "*";
     getQuery: (tableAlias?: string) => string;
     columnPGDataType?: string;
     alias: string;
@@ -46,6 +46,10 @@ export declare type FunctionSpec = {
     name: string;
     description?: string;
     /**
+     * If true then it can be used in filters and is expected to return boolean
+     */
+    canBeUsedForFilter?: boolean;
+    /**
      * If true then the first argument is expected to be a column name
      */
     singleColArg: boolean;
@@ -55,10 +59,10 @@ export declare type FunctionSpec = {
     numArgs: number;
     type: "function" | "aggregation" | "computed";
     /**
-     * getFields: string[] -> used to validate user supplied field names. It will be fired before querying to validate allowed columns
+     * getFields: string[] -> used to validate user supplied field names. It will be fired before querying to validate against allowed columns
      *      if not field names are used from arguments then return an empty array
      */
-    getFields: (allowedFields: string[]) => "*" | string[];
+    getFields: (args: any[]) => "*" | string[];
     /**
      * allowedFields passed for multicol functions (e.g.: $rowhash)
      */

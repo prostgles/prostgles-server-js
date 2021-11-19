@@ -119,7 +119,7 @@ export type Auth<DBO = DbHandler> = {
    * If provided then then session info will be saved on socket.__prglCache and reused from there
    */
   cacheSession?: {
-    getSession: (sid: string) => Promise<BasicSession>
+    getSession: (sid: string, dbo: DBO, db: DB) => Promise<BasicSession>
   }
 }
 
@@ -452,7 +452,7 @@ export default class AuthHandler {
       } else return {};
     }
 
-    return this.throttledFunc(async () => {
+    const res = await this.throttledFunc(async () => {
 
       const { getUser, getClientUser } = this.opts;
 
@@ -465,7 +465,7 @@ export default class AuthHandler {
           clientUser = await getClientUser(sid, this.dbo as any, this.db)
         }
         if(getSession && isSocket){
-          const session = await getSession(sid)
+          const session = await getSession(sid, this.dbo as any, this.db)
           if(session?.expires && user && clientUser){
             localParams.socket.__prglCache = { 
               session,
@@ -479,6 +479,8 @@ export default class AuthHandler {
   
       return {};
     }, 5);
+
+    return res;
   }
 
   isValidSocketSession = (socket: PRGLIOSocket, session: BasicSession): boolean => {

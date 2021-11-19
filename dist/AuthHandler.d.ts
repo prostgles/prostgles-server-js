@@ -102,7 +102,7 @@ export declare type Auth<DBO = DbHandler> = {
      * If provided then then session info will be saved on socket.__prglCache and reused from there
      */
     cacheSession?: {
-        getSession: (sid: string) => Promise<BasicSession>;
+        getSession: (sid: string, dbo: DBO, db: DB) => Promise<BasicSession>;
     };
 };
 export declare type ClientInfo = {

@@ -232,7 +232,7 @@ async function isomorphic(db) {
                 h: { $term_highlight: [["name"], term, {}] },
                 hFull: { $term_highlight: ["*", "81", {}] },
                 hOrdered: { $term_highlight: [["name", "id"], "81", {}] },
-                hIdx: { $term_highlight: [["name"], term, { returnIndex: true }] },
+                hIdx: { $term_highlight: [["name"], term, { returnType: "index" }] },
             },
             orderBy: { hIdx: -1 }
         });

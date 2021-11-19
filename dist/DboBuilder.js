@@ -82,6 +82,7 @@ function makeErr(err, localParams, view, allowedKeys) {
     return Promise.reject(errObject);
 }
 exports.EXISTS_KEYS = ["$exists", "$notExists", "$existsJoined", "$notExistsJoined"];
+const FILTER_FUNCS = QueryBuilder_1.FUNCTIONS.filter(f => f.canBeUsedForFilter);
 function parseError(e) {
     // console.trace("INTERNAL ERROR: ", e);
     let res = (!Object.keys(e || {}).length ? e : (e && e.toString) ? e.toString() : e);
@@ -862,7 +863,8 @@ class ViewHandler {
     }
     /**
      * parses a single filter
-     * @example: { fff: 2 } => "fff" = 2
+     * @example
+     *  { fff: 2 } => "fff" = 2
      *  { fff: { $ilike: 'abc' } } => "fff" ilike 'abc'
      */
     async getCondition(params) {
@@ -909,6 +911,21 @@ class ViewHandler {
         //         });
         //     }
         // });
+        let funcConds = [];
+        const funcFilterkeys = FILTER_FUNCS.filter(f => {
+            return f.name in data;
+        });
+        funcFilterkeys.map(f => {
+            const funcArgs = data[f.name];
+            if (!Array.isArray(funcArgs))
+                throw `A function filter must contain an array. E.g: { $funcFilterName: ["col1"] } \n but got: ${JSON.stringify(PubSubManager_1.filterObj(data, [f.name]))} `;
+            const fields = this.parseFieldFilter(f.getFields(funcArgs), true, allowed_colnames);
+            const dissallowedCols = fields.filter(fname => !allowed_colnames.includes(fname));
+            if (dissallowedCols.length) {
+                throw `Invalid/disallowed columns found in function filter: ${dissallowedCols}`;
+            }
+            funcConds.push(f.getQuery({ args: funcArgs, allColumns: this.columns, allowedFields: allowed_colnames, tableAlias }));
+        });
         let existsCond = "";
         if (existsKeys.length) {
             existsCond = (await Promise.all(existsKeys.map(async (k) => await this.prepareExistCondition(k, localParams, tableRules)))).join(" AND ");
@@ -932,7 +949,7 @@ class ViewHandler {
             }
         });
         let allowedSelect = [];
-        /* Select aliases take precedence over col names */
+        /* Select aliases take precedence over col names. This is to ensure filters work correctly and even on computed cols*/
         if (select) {
             /* Allow filtering by selected fields/funcs */
             allowedSelect = select.filter(s => {
@@ -986,6 +1003,7 @@ class ViewHandler {
         let templates = [q].filter(q => q);
         if (existsCond)
             templates.push(existsCond);
+        templates = templates.concat(funcConds);
         templates = templates.concat(computedColConditions);
         return templates.sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
             .join(" AND \n");
@@ -1181,10 +1199,10 @@ class ViewHandler {
     * @param {FieldFilter} fieldParams - { col1: 0, col2: 0 } | { col1: true, col2: true } | "*" | ["key1", "key2"] | []
     * @param {boolean} allow_empty - allow empty select. defaults to true
     */
-    static _parseFieldFilter(fieldParams = "*", allow_empty = true, allowed_cols) {
-        if (!allowed_cols)
-            throw "allowed_cols missing";
-        const all_fields = allowed_cols; // || this.column_names.slice(0);
+    static _parseFieldFilter(fieldParams = "*", allow_empty = true, all_cols) {
+        if (!all_cols)
+            throw "all_cols missing";
+        const all_fields = all_cols; // || this.column_names.slice(0);
         let colNames = null, initialParams = JSON.stringify(fieldParams);
         if (fieldParams) {
             /*

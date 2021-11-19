@@ -100,7 +100,7 @@ const dbConnection = {
         tsGeneratedTypesDir: path_1.default.join(__dirname + '/'),
         // watchSchema: true,
         transactions: true,
-        DEBUG_MODE: true,
+        // DEBUG_MODE: true,
         // onNotice: console.log,
         tableConfig,
         fileTable: {

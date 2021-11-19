@@ -12,7 +12,7 @@ import { get } from "./utils";
 
 export type SelectItem = {
   type: "column" | "function" | "aggregation" | "joinedColumn" | "computed";
-  getFields: () => string[] | "*";
+  getFields: (args?: any[]) => string[] | "*";
   getQuery: (tableAlias?: string) => string;
   columnPGDataType?: string;
   // columnName?: string; /* Must only exist if type "column" ... dissalow aliased columns? */
@@ -69,6 +69,11 @@ export type FunctionSpec = {
   description?: string;
 
   /**
+   * If true then it can be used in filters and is expected to return boolean
+   */
+  canBeUsedForFilter?: boolean;
+
+  /**
    * If true then the first argument is expected to be a column name
    */
   singleColArg: boolean;
@@ -81,10 +86,10 @@ export type FunctionSpec = {
   numArgs: number;
   type: "function" | "aggregation" | "computed";
   /**
-   * getFields: string[] -> used to validate user supplied field names. It will be fired before querying to validate allowed columns
+   * getFields: string[] -> used to validate user supplied field names. It will be fired before querying to validate against allowed columns
    *      if not field names are used from arguments then return an empty array
    */
-  getFields: (allowedFields: string[]) => "*" | string[];
+  getFields: (args: any[]) => "*" | string[];
   /**
    * allowedFields passed for multicol functions (e.g.: $rowhash)
    */
@@ -610,26 +615,53 @@ export const FUNCTIONS: FunctionSpec[] = [
    * */ 
   {
     name: "$term_highlight", /* */
-    description: ` :[column_names<string[] | "*">, search_term<string>, opts?<{ edgeTruncate?: number; noFields?: boolean }>] -> get case-insensitive text match highlight`,
+    description: ` :[column_names<string[] | "*">, search_term<string>, opts?<{ returnIndex?: number; edgeTruncate?: number; noFields?: boolean }>] -> get case-insensitive text match highlight`,
     type: "function",
     numArgs: 1,
     singleColArg: true,
+    canBeUsedForFilter: true,
     getFields: (args: any[]) => args[0],
     getQuery: ({ allowedFields, args, tableAlias }) => {
 
       const cols = ViewHandler._parseFieldFilter(args[0], false, allowedFields);
       let term = args[1];
-      let { edgeTruncate = -1, noFields = false, returnIndex = false, matchCase = false } = args[2] || {};
+      let { edgeTruncate, noFields = false, returnType, matchCase = false } = args[2] || {};
       if(!isEmpty(args[2])){
         const keys = Object.keys(args[2]);
-        const validKeys = ["edgeTruncate", "noFields", "returnIndex", "matchCase"];
+        const validKeys = ["edgeTruncate", "noFields", "returnType", "matchCase"];
         const bad_keys = keys.filter(k => !validKeys.includes(k));
         if(bad_keys.length) throw "Invalid options provided for $term_highlight. Expecting one of: " + validKeys.join(", ");
       }
       if(!cols.length) throw "Cols are empty/invalid";
       if(typeof term !== "string") throw "No string term provided";
-      if(typeof edgeTruncate !== "number") throw "Invalid edgeTruncate. expecting number";
+      if(edgeTruncate !== undefined && (!Number.isInteger(edgeTruncate) || edgeTruncate < -1)) throw "Invalid edgeTruncate. expecting a positive integer";
       if(typeof noFields !== "boolean") throw "Invalid noFields. expecting boolean";
+      const RETURN_TYPES = ["index", "boolean", "object"];
+      if(returnType && !RETURN_TYPES.includes(returnType)){
+        throw `returnType can only be one of: ${RETURN_TYPES}`
+      }
+
+      const makeTextMatcherArray = (rawText: string, matchText: string, term: string) => {
+        let leftStr = `substr(${rawText}, 1, position(${term} IN ${matchText}) - 1 )`,
+          rightStr = `substr(${rawText}, position(${term} IN ${matchText}) + length(${term}) )`;
+        if(edgeTruncate){
+          leftStr = `RIGHT(${leftStr}, ${asValue(edgeTruncate)})`;
+          rightStr = `LEFT(${rightStr}, ${asValue(edgeTruncate)})`
+        }
+        return `
+          CASE WHEN position(${term} IN ${matchText}) > 0 AND ${term} <> '' 
+            THEN array_to_json(ARRAY[
+                to_json( ${leftStr}::TEXT ), 
+                array_to_json(
+                  ARRAY[substr(${rawText}, position(${term} IN ${matchText}), length(${term}) )::TEXT ]
+                ),
+                to_json(${rightStr}::TEXT ) 
+              ]) 
+            ELSE 
+              array_to_json(ARRAY[(${rawText})::TEXT]) 
+          END
+        `;
+      }
 
       let colRaw = "( " + cols.map(c =>`${noFields? "" : (asValue(c + ": ") + " || ")} COALESCE(${asNameAlias(c, tableAlias)}::TEXT, '')`).join(" || ', ' || ") + " )";
       let col = colRaw;
@@ -641,15 +673,28 @@ export const FUNCTIONS: FunctionSpec[] = [
 
       let leftStr = `substr(${colRaw}, 1, position(${term} IN ${col}) - 1 )`,
         rightStr = `substr(${colRaw}, position(${term} IN ${col}) + length(${term}) )`;
-      if(edgeTruncate > -1){
+      if(edgeTruncate){
         leftStr = `RIGHT(${leftStr}, ${asValue(edgeTruncate)})`;
         rightStr = `LEFT(${rightStr}, ${asValue(edgeTruncate)})`
       }
       
       // console.log(col);
       let res = ""
-      if(returnIndex){ 
+      if(returnType === "index"){ 
         res = `CASE WHEN position(${term} IN ${col}) > 0 THEN position(${term} IN ${col}) - 1 ELSE -1 END`;
+
+      } else if(returnType === "boolean"){
+        res = `CASE WHEN position(${term} IN ${col}) > 0 THEN TRUE ELSE FALSE END`;
+
+      } else if(returnType === "object"){
+        res = `CASE 
+          ${cols.map(c => ` 
+          WHEN COALESCE(${asNameAlias(c, tableAlias)}::TEXT, '') ${matchCase? "LIKE" : "ILIKE"} ${term}
+            THEN 
+          `).join(" OR ")}
+          ELSE NULL
+
+        END`;
 
       } else {
         /* If no match or empty search THEN return full row as string within first array element  */
@@ -926,7 +971,7 @@ export class SelectItemBuilder {
                 const callKeys = Object.keys(val);
                 if(callKeys.length !== 1 || !Array.isArray(val[callKeys[0]])) throw "\nIssue with select. \nUnexpected function definition. \nExpecting { field_name: func_name } OR { result_key: { func_name: [arg1, arg2 ...] } } \nBut got -> " + JSON.stringify({ [key]: val });
                 funcName = callKeys[0];
-                args = val[callKeys[0]];
+                args = val[funcName];
               }
               
               this.addFunctionByName(funcName, args, key);

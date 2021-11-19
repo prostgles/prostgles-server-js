@@ -361,7 +361,7 @@ class AuthHandler {
             else
                 return {};
         }
-        return this.throttledFunc(async () => {
+        const res = await this.throttledFunc(async () => {
             const { getUser, getClientUser } = this.opts;
             if (getUser && localParams && (localParams.httpReq || localParams.socket)) {
                 const sid = this.getSID(localParams);
@@ -372,7 +372,7 @@ class AuthHandler {
                         clientUser = await getClientUser(sid, this.dbo, this.db);
                 }
                 if (getSession && isSocket) {
-                    const session = await getSession(sid);
+                    const session = await getSession(sid, this.dbo, this.db);
                     if ((session === null || session === void 0 ? void 0 : session.expires) && user && clientUser) {
                         localParams.socket.__prglCache = {
                             session,
@@ -385,6 +385,7 @@ class AuthHandler {
             }
             return {};
         }, 5);
+        return res;
     }
 }
 exports.default = AuthHandler;
