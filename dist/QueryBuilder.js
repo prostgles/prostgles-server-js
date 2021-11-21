@@ -179,11 +179,15 @@ let PostGIS_Funcs = [
         return q;
     }
 }));
-PostGIS_Funcs = PostGIS_Funcs.concat(["ST_AsGeoJSON", "ST_AsText", "ST_AsEWKT", "ST_AsEWKB", "ST_AsBinary", "ST_AsMVT", "ST_AsMVTGeom", "ST_SnapToGrid"]
+PostGIS_Funcs = PostGIS_Funcs.concat([
+    "ST_AsText", "ST_AsEWKT", "ST_AsEWKB", "ST_AsBinary", "ST_AsMVT", "ST_AsMVTGeom",
+    "ST_AsGeoJSON", "ST_Simplify",
+    "ST_SnapToGrid",
+]
     .map(fname => {
     const res = {
         name: "$" + fname,
-        description: ` :[column_name] -> json GeoJSON output of a geometry column`,
+        description: ` :[column_name, precision?] -> json GeoJSON output of a geometry column`,
         type: "function",
         singleColArg: true,
         numArgs: 1,
@@ -195,8 +199,9 @@ PostGIS_Funcs = PostGIS_Funcs.concat(["ST_AsGeoJSON", "ST_AsText", "ST_AsEWKT", 
                 secondArg = ", " + otherArgs.map(arg => asValue(arg)).join(", ");
             const escTabelName = exports.asNameAlias(args[0], tableAlias) + "::geometry";
             let result = DboBuilder_1.pgp.as.format(fname + "(" + escTabelName + secondArg + (fname === "ST_AsGeoJSON" ? ")::jsonb" : ")"));
-            if (fname === "ST_SnapToGrid") {
-                return `ST_AsGeoJSON(${result})::jsonb`;
+            if (fname.startsWith("ST_SnapToGrid") || fname.startsWith("ST_Simplify")) {
+                let r = `ST_AsGeoJSON(${result})::jsonb`;
+                return r;
             }
             return result;
         }
