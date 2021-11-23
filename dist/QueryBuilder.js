@@ -506,7 +506,7 @@ exports.FUNCTIONS = [
         singleColArg: true,
         canBeUsedForFilter: true,
         getFields: (args) => args[0],
-        getQuery: ({ allowedFields, args, tableAlias }) => {
+        getQuery: ({ allowedFields, args, tableAlias, allColumns }) => {
             const cols = DboBuilder_1.ViewHandler._parseFieldFilter(args[0], false, allowedFields);
             let term = args[1];
             const rawTerm = args[1];
@@ -581,9 +581,12 @@ exports.FUNCTIONS = [
                     let colTxt = `COALESCE(${exports.asNameAlias(c, tableAlias)}::TEXT, '')`; //  position(${term} IN ${colTxt}) > 0
                     return ` 
               WHEN  ${colTxt} ${matchCase ? "LIKE" : "ILIKE"} ${asValue('%' + rawTerm + '%')}
-                THEN json_build_object(${asValue(c)}, ${makeTextMatcherArray(colTxt, term)})::jsonb
+                THEN json_build_object(
+                  ${asValue(c)}, 
+                  ${makeTextMatcherArray(colTxt, term)}
+                )::jsonb
               `;
-                }).join(" OR ")}
+                }).join(" ")}
           ELSE NULL
 
         END`;

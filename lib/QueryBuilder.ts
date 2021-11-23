@@ -626,7 +626,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: true,
     canBeUsedForFilter: true,
     getFields: (args: any[]) => args[0],
-    getQuery: ({ allowedFields, args, tableAlias }) => {
+    getQuery: ({ allowedFields, args, tableAlias, allColumns }) => {
 
       const cols = ViewHandler._parseFieldFilter(args[0], false, allowedFields);
       let term = args[1];
@@ -703,13 +703,15 @@ export const FUNCTIONS: FunctionSpec[] = [
             let colTxt = `COALESCE(${asNameAlias(c, tableAlias)}::TEXT, '')`; //  position(${term} IN ${colTxt}) > 0
             return ` 
               WHEN  ${colTxt} ${matchCase? "LIKE" : "ILIKE"} ${asValue('%' + rawTerm + '%')}
-                THEN json_build_object(${asValue(c)}, ${
-                  makeTextMatcherArray(
+                THEN json_build_object(
+                  ${asValue(c)}, 
+                  ${makeTextMatcherArray(
                     colTxt, 
                     term
-                  )})::jsonb
+                  )}
+                )::jsonb
               `
-          }).join(" OR ")}
+          }).join(" ")}
           ELSE NULL
 
         END`;

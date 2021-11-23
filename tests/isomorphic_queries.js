@@ -235,6 +235,7 @@ async function isomorphic(db) {
                 hIdx: { $term_highlight: [["name"], term, { returnType: "index" }] },
                 hBool: { $term_highlight: [["name"], term, { returnType: "boolean" }] },
                 hObj: { $term_highlight: [["name"], term, { returnType: "object" }] },
+                hObjAll: { $term_highlight: ["*", term, { returnType: "object" }] },
             },
             orderBy: { hIdx: -1 }
         });
@@ -253,6 +254,11 @@ async function isomorphic(db) {
             hIdx: 6,
             hBool: true,
             hObj: {
+                name: [
+                    '', ['abc81'], ' here'
+                ]
+            },
+            hObjAll: {
                 name: [
                     '', ['abc81'], ' here'
                 ]
