@@ -28,8 +28,10 @@
     "aws-sdk": "^2.1002.0",
     "bluebird": "^3.7.2",
     "file-type": "^16.5.3",
+    "i": "^0.3.7",
+    "npm": "^8.1.4",
     "pg-promise": "^10.9.5",
-    "prostgles-types": "^1.5.119",
+    "prostgles-types": "^1.5.120",
     "sharp": "^0.29.2"
   },
   "devDependencies": {
