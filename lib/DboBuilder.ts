@@ -1481,10 +1481,10 @@ export class ViewHandler {
                     const { key, asc, nulls } = orderBy;
                     if(
                         !["string"].includes(typeof key) ||
-                        !["boolean", "undefined"].includes(typeof asc) ||
-                        !["first", "last", undefined].includes(nulls)
+                        !["boolean"].includes(typeof asc) ||
+                        !["first", "last", undefined, null].includes(nulls)
                     ){
-                        throw `Invalid orderBy option (${JSON.stringify(orderBy, null, 2)}) \n Expecting { key: string, asc: boolean, nulls: 'first' | 'last'} `
+                        throw `Invalid orderBy option (${JSON.stringify(orderBy, null, 2)}) \n Expecting { key: string, asc: boolean, nulls: 'first' | 'last' | null | undefined } `
                     }
                     return [{ key, asc, nulls }];
                 }

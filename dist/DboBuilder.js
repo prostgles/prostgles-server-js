@@ -1030,9 +1030,9 @@ class ViewHandler {
             if (keys.length && keys.find(k => ["key", "asc", "nulls"].includes(k))) {
                 const { key, asc, nulls } = orderBy;
                 if (!["string"].includes(typeof key) ||
-                    !["boolean", "undefined"].includes(typeof asc) ||
-                    !["first", "last", undefined].includes(nulls)) {
-                    throw `Invalid orderBy option (${JSON.stringify(orderBy, null, 2)}) \n Expecting { key: string, asc: boolean, nulls: 'first' | 'last'} `;
+                    !["boolean"].includes(typeof asc) ||
+                    !["first", "last", undefined, null].includes(nulls)) {
+                    throw `Invalid orderBy option (${JSON.stringify(orderBy, null, 2)}) \n Expecting { key: string, asc: boolean, nulls: 'first' | 'last' | null | undefined } `;
                 }
                 return [{ key, asc, nulls }];
             }
