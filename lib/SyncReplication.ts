@@ -52,7 +52,10 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
         } = sync,
         socket = _this.sockets[socket_id];
 
-    if(!socket) throw "Orphaned socket";
+    if(!socket) {
+        console.error("Orphaned socket", { sync, clientData });
+        return;
+    }
 
     const sync_fields = [synced_field, ...id_fields.sort()],
         orderByAsc = sync_fields.reduce((a, v) => ({ ...a, [v]: true }), {}),

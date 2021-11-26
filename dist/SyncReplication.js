@@ -9,8 +9,10 @@ function getNumbers(numberArr) {
 exports.syncData = async (_this, sync, clientData) => {
     // console.log("S", clientData)
     const { socket_id, channel_name, table_name, filter, table_rules, allow_delete = false, params, synced_field, id_fields = [], batch_size, wal, throttle = 0 } = sync, socket = _this.sockets[socket_id];
-    if (!socket)
-        throw "Orphaned socket";
+    if (!socket) {
+        console.error("Orphaned socket", { sync, clientData });
+        return;
+    }
     const sync_fields = [synced_field, ...id_fields.sort()], orderByAsc = sync_fields.reduce((a, v) => (Object.assign(Object.assign({}, a), { [v]: true })), {}), orderByDesc = sync_fields.reduce((a, v) => (Object.assign(Object.assign({}, a), { [v]: false })), {}), 
     // desc_params = { orderBy: [{ [synced_field]: false }].concat(id_fields.map(f => ({ [f]: false }) )) },
     // asc_params = { orderBy: [synced_field].concat(id_fields) },
