@@ -358,7 +358,7 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
   });
 
   await tryRun("Order by", async () => {
-    const res = await db.items.find({}, { select: { name: 1 }, orderBy: [{ key: "name", asc: false, nulls: "first" }] });
+    const res = await db.items.find({}, { select: { name: 1 }, orderBy: [{ key: "name", asc: false, nulls: "first", nullEmpty: true }] });
     assert.deepStrictEqual(res, [{ name: 'b'}, { name: 'a'}, { name: 'a'}]);
   });
 

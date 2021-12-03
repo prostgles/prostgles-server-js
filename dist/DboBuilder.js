@@ -1022,19 +1022,21 @@ class ViewHandler {
                         { key2: false, key1: true } \
                         { key1: 1, key2: -1 } \
                         [{ key1: true }, { key2: false }] \
-                        [{ key: 'colName', asc: true, nulls: 'first' }]";
+                        [{ key: 'colName', asc: true, nulls: 'first', nullEmpty: true }]";
         }, parseOrderObj = (orderBy, expectOne = false) => {
             if (!isPlainObject(orderBy))
                 return throwErr();
             const keys = Object.keys(orderBy);
-            if (keys.length && keys.find(k => ["key", "asc", "nulls"].includes(k))) {
-                const { key, asc, nulls } = orderBy;
+            if (keys.length && keys.find(k => ["key", "asc", "nulls", "nullEmpty"].includes(k))) {
+                const { key, asc, nulls, nullEmpty = false } = orderBy;
                 if (!["string"].includes(typeof key) ||
                     !["boolean"].includes(typeof asc) ||
-                    !["first", "last", undefined, null].includes(nulls)) {
-                    throw `Invalid orderBy option (${JSON.stringify(orderBy, null, 2)}) \n Expecting { key: string, asc: boolean, nulls: 'first' | 'last' | null | undefined } `;
+                    !["first", "last", undefined, null].includes(nulls) ||
+                    !["boolean"].includes(typeof nullEmpty)) {
+                    throw `Invalid orderBy option (${JSON.stringify(orderBy, null, 2)}) \n 
+                            Expecting { key: string, asc?: boolean, nulls?: 'first' | 'last' | null | undefined, nullEmpty?: boolean } `;
                 }
-                return [{ key, asc, nulls }];
+                return [{ key, asc, nulls, nullEmpty }];
             }
             if (expectOne && keys.length > 1) {
                 throw "\nInvalid orderBy " + JSON.stringify(orderBy) +
@@ -1099,14 +1101,17 @@ class ViewHandler {
                 (allowedFields.length && !allowedFields.includes(key))));
         if (!bad_param) {
             const selectedAliases = select.filter(s => s.selected).map(s => s.alias);
-            return (excludeOrder ? "" : " ORDER BY ") + (_ob.map(({ key, asc, nulls }) => {
+            return (excludeOrder ? "" : " ORDER BY ") + (_ob.map(({ key, asc, nulls, nullEmpty = false }) => {
                 /* Order by column index when possible to bypass name collision when ordering by a computed column.
                     (Postgres will sort by existing columns whenever possible)
                 */
                 const orderType = asc ? " ASC " : " DESC ";
                 const index = selectedAliases.indexOf(key) + 1;
-                const colKey = (index > 0) ? index : [tableAlias, key].filter(v => v).map(prostgles_types_1.asName).join(".");
                 const nullOrder = nulls ? ` NULLS ${nulls === "first" ? " FIRST " : " LAST "}` : "";
+                let colKey = (index > 0 && !nullEmpty) ? index : [tableAlias, key].filter(v => v).map(prostgles_types_1.asName).join(".");
+                if (nullEmpty) {
+                    colKey = `nullif(trim(${colKey}), '')`;
+                }
                 const res = `${colKey} ${orderType} ${nullOrder}`;
                 return res;
             }).join(", "));
