@@ -289,7 +289,9 @@ export declare type ProstglesInitOptions<DBO = DbHandler> = {
     watchSchema?: boolean | "hotReloadMode" | ((event: {
         command: string;
         query: string;
-    }) => void);
+    }) => void) | {
+        checkIntervalMillis: number;
+    };
     keywords?: Keywords;
     onNotice?: (notice: AnyObject, message?: string) => void;
     fileTable?: FileTableConfig;
@@ -334,6 +336,7 @@ export declare class Prostgles<DBO = DbHandler> {
     private getFileText;
     writeDBSchema(force?: boolean): void;
     refreshDBO: () => Promise<DbHandler>;
+    schema_checkIntervalMillis: any;
     init(onReady: (dbo: DBO, db: DB) => any): Promise<{
         db: DbHandler;
         _db: DB;

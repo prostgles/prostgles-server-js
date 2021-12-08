@@ -393,7 +393,7 @@ export type ProstglesInitOptions<DBO = DbHandler> = {
     onSocketDisconnect?(socket: Socket, dbo: DBO, db?: DB): any;
     auth?: Auth<DBO>;
     DEBUG_MODE?: boolean;
-    watchSchema?: boolean | "hotReloadMode" | ((event: { command: string; query: string }) => void);
+    watchSchema?: boolean | "hotReloadMode" | ((event: { command: string; query: string }) => void) | { checkIntervalMillis: number };
     keywords?: Keywords;
     onNotice?: (notice: AnyObject, message?: string) => void;
     fileTable?: FileTableConfig;
@@ -586,6 +586,7 @@ export class Prostgles<DBO = DbHandler> {
         return this.dbo;
     }
 
+    schema_checkIntervalMillis: any;
     async init(onReady: (dbo: DBO, db: DB) => any): Promise<{
         db: DbHandler;
         _db: DB;
@@ -598,6 +599,22 @@ export class Prostgles<DBO = DbHandler> {
 
         if(this.opts.watchSchema === "hotReloadMode" && !this.opts.tsGeneratedTypesDir) {
             throw "tsGeneratedTypesDir option is needed for watchSchema: hotReloadMode to work ";
+        } else if(
+            this.opts.watchSchema && 
+            typeof this.opts.watchSchema === "object" && 
+            "checkIntervalMillis" in this.opts.watchSchema && 
+            typeof this.opts.watchSchema.checkIntervalMillis === "number"
+        ){
+
+            if(this.schema_checkIntervalMillis){
+                clearInterval(this.schema_checkIntervalMillis);
+                this.schema_checkIntervalMillis = setInterval(async () => {
+                    const dbuilder = await DboBuilder.create(this as any);
+                    if(dbuilder.tsTypesDefinition !== this.dboBuilder.tsTypesDefinition){
+                        this.refreshDBO();
+                    }
+                }, 2000)
+            }
         }
 
         /* 1. Connect to db */

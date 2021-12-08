@@ -299,6 +299,20 @@ class Prostgles {
         if (this.opts.watchSchema === "hotReloadMode" && !this.opts.tsGeneratedTypesDir) {
             throw "tsGeneratedTypesDir option is needed for watchSchema: hotReloadMode to work ";
         }
+        else if (this.opts.watchSchema &&
+            typeof this.opts.watchSchema === "object" &&
+            "checkIntervalMillis" in this.opts.watchSchema &&
+            typeof this.opts.watchSchema.checkIntervalMillis === "number") {
+            if (this.schema_checkIntervalMillis) {
+                clearInterval(this.schema_checkIntervalMillis);
+                this.schema_checkIntervalMillis = setInterval(async () => {
+                    const dbuilder = await DboBuilder_1.DboBuilder.create(this);
+                    if (dbuilder.tsTypesDefinition !== this.dboBuilder.tsTypesDefinition) {
+                        this.refreshDBO();
+                    }
+                }, 2000);
+            }
+        }
         /* 1. Connect to db */
         if (!this.db) {
             const { db, pgp } = getDbConnection(this.opts.dbConnection, this.opts.dbOptions, this.opts.DEBUG_MODE, notice => {
