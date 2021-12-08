@@ -310,7 +310,7 @@ class Prostgles {
                     if (dbuilder.tsTypesDefinition !== this.dboBuilder.tsTypesDefinition) {
                         this.refreshDBO();
                     }
-                }, 2000);
+                }, this.opts.watchSchema.checkIntervalMillis);
             }
         }
         /* 1. Connect to db */

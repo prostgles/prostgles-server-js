@@ -613,7 +613,7 @@ export class Prostgles<DBO = DbHandler> {
                     if(dbuilder.tsTypesDefinition !== this.dboBuilder.tsTypesDefinition){
                         this.refreshDBO();
                     }
-                }, 2000)
+                }, this.opts.watchSchema.checkIntervalMillis)
             }
         }
 
