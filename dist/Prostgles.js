@@ -309,6 +309,7 @@ class Prostgles {
                     const dbuilder = await DboBuilder_1.DboBuilder.create(this);
                     if (dbuilder.tsTypesDefinition !== this.dboBuilder.tsTypesDefinition) {
                         this.refreshDBO();
+                        this.init(onReady);
                     }
                 }, this.opts.watchSchema.checkIntervalMillis);
             }

@@ -612,6 +612,7 @@ export class Prostgles<DBO = DbHandler> {
                     const dbuilder = await DboBuilder.create(this as any);
                     if(dbuilder.tsTypesDefinition !== this.dboBuilder.tsTypesDefinition){
                         this.refreshDBO();
+                        this.init(onReady);
                     }
                 }, this.opts.watchSchema.checkIntervalMillis)
             }
