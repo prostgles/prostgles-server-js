@@ -70,6 +70,7 @@ class Prostgles {
             onReady: () => { },
             schema: "public",
             watchSchema: false,
+            watchSchemaType: "queries",
         };
         this.keywords = DEFAULT_KEYWORDS;
         this.loaded = false;
@@ -83,6 +84,7 @@ class Prostgles {
             this.dbo = this.dboBuilder.dbo;
             return this.dbo;
         };
+        this.isSuperUser = false;
         this.connectedSockets = [];
         this.pushSocketSchema = async (socket) => {
             var _a;
@@ -207,7 +209,7 @@ class Prostgles {
             "transactions", "joins", "tsGeneratedTypesDir",
             "onReady", "dbConnection", "dbOptions", "publishMethods", "io",
             "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect",
-            "onSocketDisconnect", "sqlFilePath", "auth", "DEBUG_MODE", "watchSchema",
+            "onSocketDisconnect", "sqlFilePath", "auth", "DEBUG_MODE", "watchSchema", "watchSchemaType",
             "fileTable", "tableConfig"
         ];
         const unknownParams = Object.keys(params).filter((key) => !config.includes(key));
@@ -238,6 +240,11 @@ class Prostgles {
         const { watchSchema, onReady, tsGeneratedTypesDir } = this.opts;
         if (watchSchema && this.loaded) {
             console.log("Schema changed");
+            const { query } = event;
+            if (query && query.includes(PubSubManager_1.PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)) {
+                console.log("Schema change event excluded from triggers due to EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID");
+                return;
+            }
             if (typeof watchSchema === "function") {
                 /* Only call the provided func */
                 watchSchema(event);
@@ -250,7 +257,7 @@ class Prostgles {
                     this.writeDBSchema(true);
                 }
             }
-            else if (watchSchema === true) {
+            else if (watchSchema === true || "checkIntervalMillis" in watchSchema) {
                 /* Full re-init. Sockets must reconnect */
                 console.log("watchSchema: Full re-initialisation");
                 this.init(onReady);
@@ -325,6 +332,7 @@ class Prostgles {
             });
             this.db = db;
             this.pgp = pgp;
+            this.isSuperUser = await isSuperUser(db);
         }
         this.checkDb();
         const { db, pgp } = this;

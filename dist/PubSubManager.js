@@ -821,7 +821,7 @@ class PubSubManager {
             if (notifType === this.NOTIF_TYPE.schema) {
                 if (this.onSchemaChange) {
                     const command = dataArr[1], event_type = dataArr[2], query = dataArr[3];
-                    if (query && !query.includes(PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)) {
+                    if (query) {
                         this.onSchemaChange({ command, query });
                     }
                 }

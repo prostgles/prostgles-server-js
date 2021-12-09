@@ -393,23 +393,47 @@ export type ProstglesInitOptions<DBO = DbHandler> = {
     onSocketDisconnect?(socket: Socket, dbo: DBO, db?: DB): any;
     auth?: Auth<DBO>;
     DEBUG_MODE?: boolean;
-    watchSchema?: boolean | "hotReloadMode" | ((event: { command: string; query: string }) => void) | { checkIntervalMillis: number };
+    watchSchemaType?: 
+
+    /**
+     * Will check client queries for schema changes
+     * Default
+     */
+    | "events" 
+
+    /**
+     * Will set database event trigger for schema changes. Requires superuser
+     */
+    | "queries";
+    
+    watchSchema?: 
+
+        /**
+         * If true then DBoGenerated.d.ts will be updated and "onReady" will be called with new schema on both client and server
+         */
+        | boolean 
+
+        /**
+         * "hotReloadMode" will only rewrite the DBoGenerated.d.ts found in tsGeneratedTypesDir
+         * This is meant to be used in development when server restarts on file change
+         */
+        | "hotReloadMode" 
+
+        /**
+         * Function called when schema changes. Nothing else triggered
+         */
+        | ((event: { command: string; query: string }) => void) 
+
+        /**
+         * Schema checked for changes every 'checkIntervalMillis" milliseconds
+         */
+        | { checkIntervalMillis: number };
     keywords?: Keywords;
     onNotice?: (notice: AnyObject, message?: string) => void;
     fileTable?: FileTableConfig;
     tableConfig?: TableConfig;
 }
 
-// interface ISocketSetup {
-//     db: DB;
-//     dbo: DbHandler;
-//     io: any;
-//     onSocketConnect?(socket: Socket, dbo: any);
-//     onSocketDisconnect?(socket: Socket, dbo: any);
-//     publish: Publish,
-//     publishMethods: any;
-//     publishRawSQL?: any,
-// }
 /*
     1. Connect to db
     2. Execute any SQL file if provided
@@ -443,6 +467,7 @@ export class Prostgles<DBO = DbHandler> {
         onReady: () => {},
         schema: "public",
         watchSchema: false,
+        watchSchemaType: "queries",
     };
 
     // dbConnection: DbConnection = {
@@ -490,7 +515,7 @@ export class Prostgles<DBO = DbHandler> {
             "transactions", "joins", "tsGeneratedTypesDir",
             "onReady", "dbConnection", "dbOptions", "publishMethods", "io", 
             "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect", 
-            "onSocketDisconnect", "sqlFilePath", "auth", "DEBUG_MODE", "watchSchema", 
+            "onSocketDisconnect", "sqlFilePath", "auth", "DEBUG_MODE", "watchSchema", "watchSchemaType",
             "fileTable", "tableConfig"
         ];
         const unknownParams = Object.keys(params).filter((key: string) => !(config as string[]).includes(key))
@@ -518,6 +543,11 @@ export class Prostgles<DBO = DbHandler> {
         const { watchSchema, onReady, tsGeneratedTypesDir } = this.opts;
         if(watchSchema && this.loaded){
             console.log("Schema changed");
+            const { query } = event;
+            if(query && query.includes(PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)){
+                console.log("Schema change event excluded from triggers due to EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID");
+                return;
+            }
             
             if(typeof watchSchema === "function"){
                 /* Only call the provided func */
@@ -532,7 +562,7 @@ export class Prostgles<DBO = DbHandler> {
                     this.writeDBSchema(true);
                 }
 
-            } else if(watchSchema === true){
+            } else if(watchSchema === true || "checkIntervalMillis" in watchSchema){
                 /* Full re-init. Sockets must reconnect */
                 console.log("watchSchema: Full re-initialisation")
                 this.init(onReady);
@@ -586,6 +616,7 @@ export class Prostgles<DBO = DbHandler> {
         return this.dbo;
     }
 
+    isSuperUser = false;
     schema_checkIntervalMillis: any;
     async init(onReady: (dbo: DBO, db: DB) => any): Promise<{
         db: DbHandler;
@@ -620,14 +651,17 @@ export class Prostgles<DBO = DbHandler> {
 
         /* 1. Connect to db */
         if(!this.db){
-            const { db, pgp } = getDbConnection(this.opts.dbConnection, this.opts.dbOptions, this.opts.DEBUG_MODE, notice => { 
-                if(this.opts.onNotice) this.opts.onNotice(notice);
-                if(this.dbEventsManager){
-                    this.dbEventsManager.onNotice(notice)
+            const { db, pgp } = getDbConnection(this.opts.dbConnection, this.opts.dbOptions, this.opts.DEBUG_MODE, 
+                notice => { 
+                    if(this.opts.onNotice) this.opts.onNotice(notice);
+                    if(this.dbEventsManager){
+                        this.dbEventsManager.onNotice(notice)
+                    }
                 }
-            });
+            );
             this.db = db;
             this.pgp = pgp;
+            this.isSuperUser = await isSuperUser(db);
         }
         this.checkDb();
         const { db, pgp } = this;

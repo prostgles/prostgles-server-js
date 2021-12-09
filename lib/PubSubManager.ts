@@ -997,7 +997,7 @@ export class PubSubManager {
                     event_type = dataArr[2],
                     query = dataArr[3];
 
-                if(query && !query.includes(PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)){
+                if(query){
                     this.onSchemaChange({ command, query })
                 }
             }

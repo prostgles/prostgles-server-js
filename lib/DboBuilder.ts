@@ -2701,9 +2701,13 @@ export class DboBuilder {
         if(!this._pubSubManager){
             let onSchemaChange;
             
-            if(this.prostgles.opts.watchSchema){
-                onSchemaChange = (event: { command: string; query: string }) => { 
-                    this.prostgles.onSchemaChange(event)
+            if(this.prostgles.opts.watchSchema && this.prostgles.opts.watchSchemaType === "events"){
+                if(!this.prostgles.isSuperUser){
+                    console.warn(`watchSchemaType "events" cannot be used due because db user is not a superuser. Will fallback to watchSchemaType "queries" `)
+                } else {
+                    onSchemaChange = (event: { command: string; query: string }) => { 
+                        this.prostgles.onSchemaChange(event)
+                    }
                 }
             }
             this._pubSubManager = await PubSubManager.create({
@@ -3025,6 +3029,19 @@ export type TxCB = {
 
                     let qres = await this.db.result(query, params)
                     const { duration, fields, rows, command } = qres;
+
+                    /**
+                     * Fallback for watchSchema in case not superuser and cannot add db event listener
+                     */
+                    const { watchSchema, watchSchemaType } = this.prostgles?.opts || {};
+
+                    if(
+                        watchSchema &&
+                        (!this.prostgles.isSuperUser || watchSchemaType === "queries") && 
+                        ["CREATE", "ALTER", "DROP"].includes(command)
+                    ){
+                        this.prostgles.onSchemaChange({ command, query })
+                    }
 
                     if(command === "LISTEN"){
                         if(!socket) throw "Only allowed with client socket"

@@ -2053,10 +2053,15 @@ class DboBuilder {
         this.getPubSubManager = async () => {
             if (!this._pubSubManager) {
                 let onSchemaChange;
-                if (this.prostgles.opts.watchSchema) {
-                    onSchemaChange = (event) => {
-                        this.prostgles.onSchemaChange(event);
-                    };
+                if (this.prostgles.opts.watchSchema && this.prostgles.opts.watchSchemaType === "events") {
+                    if (!this.prostgles.isSuperUser) {
+                        console.warn(`watchSchemaType "events" cannot be used due because db user is not a superuser. Will fallback to watchSchemaType "queries" `);
+                    }
+                    else {
+                        onSchemaChange = (event) => {
+                            this.prostgles.onSchemaChange(event);
+                        };
+                    }
                 }
                 this._pubSubManager = await PubSubManager_1.PubSubManager.create({
                     dboBuilder: this,
@@ -2298,7 +2303,7 @@ export type TxCB = {
             let DATA_TYPES = !needType ? [] : await this.db.any("SELECT oid, typname FROM pg_type");
             let USER_TABLES = !needType ? [] : await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
             this.dbo.sql = async (query, params, options, localParams) => {
-                var _a;
+                var _a, _b;
                 const canRunSQL = async (localParams) => {
                     if (!localParams)
                         return true;
@@ -2327,6 +2332,15 @@ export type TxCB = {
                 else if (this.db) {
                     let qres = await this.db.result(query, params);
                     const { duration, fields, rows, command } = qres;
+                    /**
+                     * Fallback for watchSchema in case not superuser and cannot add db event listener
+                     */
+                    const { watchSchema, watchSchemaType } = ((_a = this.prostgles) === null || _a === void 0 ? void 0 : _a.opts) || {};
+                    if (watchSchema &&
+                        (!this.prostgles.isSuperUser || watchSchemaType === "queries") &&
+                        ["CREATE", "ALTER", "DROP"].includes(command)) {
+                        this.prostgles.onSchemaChange({ command, query });
+                    }
                     if (command === "LISTEN") {
                         if (!socket)
                             throw "Only allowed with client socket";
@@ -2339,7 +2353,7 @@ export type TxCB = {
                         return rows[0];
                     }
                     else if (returnType === "value") {
-                        return (_a = Object.values((rows === null || rows === void 0 ? void 0 : rows[0]) || {})) === null || _a === void 0 ? void 0 : _a[0];
+                        return (_b = Object.values((rows === null || rows === void 0 ? void 0 : rows[0]) || {})) === null || _b === void 0 ? void 0 : _b[0];
                     }
                     else if (returnType === "values") {
                         return rows.map(r => Object.values(r[0]));

@@ -286,10 +286,37 @@ export declare type ProstglesInitOptions<DBO = DbHandler> = {
     onSocketDisconnect?(socket: Socket, dbo: DBO, db?: DB): any;
     auth?: Auth<DBO>;
     DEBUG_MODE?: boolean;
-    watchSchema?: boolean | "hotReloadMode" | ((event: {
+    watchSchemaType?: 
+    /**
+     * Will check client queries for schema changes
+     * Default
+     */
+    "events"
+    /**
+     * Will set database event trigger for schema changes. Requires superuser
+     */
+     | "queries";
+    watchSchema?: 
+    /**
+     * If true then DBoGenerated.d.ts will be updated and "onReady" will be called with new schema on both client and server
+     */
+    boolean
+    /**
+     * "hotReloadMode" will only rewrite the DBoGenerated.d.ts found in tsGeneratedTypesDir
+     * This is meant to be used in development when server restarts on file change
+     */
+     | "hotReloadMode"
+    /**
+     * Function called when schema changes. Nothing else triggered
+     */
+     | ((event: {
         command: string;
         query: string;
-    }) => void) | {
+    }) => void)
+    /**
+     * Schema checked for changes every 'checkIntervalMillis" milliseconds
+     */
+     | {
         checkIntervalMillis: number;
     };
     keywords?: Keywords;
@@ -336,6 +363,7 @@ export declare class Prostgles<DBO = DbHandler> {
     private getFileText;
     writeDBSchema(force?: boolean): void;
     refreshDBO: () => Promise<DbHandler>;
+    isSuperUser: boolean;
     schema_checkIntervalMillis: any;
     init(onReady: (dbo: DBO, db: DB) => any): Promise<{
         db: DbHandler;
