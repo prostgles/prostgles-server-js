@@ -694,24 +694,32 @@ export const FUNCTIONS: FunctionSpec[] = [
       if(returnType === "index"){ 
         res = `CASE WHEN position(${term} IN ${col}) > 0 THEN position(${term} IN ${col}) - 1 ELSE -1 END`;
 
-      } else if(returnType === "boolean"){
-        res = `CASE WHEN position(${term} IN ${col}) > 0 THEN TRUE ELSE FALSE END`;
+      // } else if(returnType === "boolean"){
+      //   res = `CASE WHEN position(${term} IN ${col}) > 0 THEN TRUE ELSE FALSE END`;
 
-      } else if(returnType === "object"){
+      } else if(returnType === "object" || returnType === "boolean"){
         res = `CASE 
           ${cols.map(c => {
             const colInfo = allColumns.find(ac => ac.name === c);
             const colNameEscaped = asNameAlias(c, tableAlias)
             let colSelect = `${colNameEscaped}::TEXT`;
-            if(colInfo?.udt_name.startsWith("timestamp") || colInfo?.udt_name === "date"){
+            const isTstamp = colInfo?.udt_name.startsWith("timestamp");
+            if(isTstamp || colInfo?.udt_name === "date"){
               colSelect = `( CASE WHEN ${colNameEscaped} IS NULL THEN '' ELSE concat_ws(' ', 
               ${colNameEscaped}::TEXT, 
-                to_char(${colNameEscaped}, 'Day Month '), 
+              ${isTstamp? `'TZ' || to_char(${colNameEscaped}, 'OF'), `: ''}
+                to_char(${colNameEscaped}, ' Day Month '), 
                 'Q' || to_char(${colNameEscaped}, 'Q'),
                 'WK' || to_char(${colNameEscaped}, 'WW')
               ) END)`
             }
             let colTxt = `COALESCE(${colSelect}, '')`; //  position(${term} IN ${colTxt}) > 0
+            if(returnType === "boolean"){
+              return ` 
+                WHEN  ${colTxt} ${matchCase? "LIKE" : "ILIKE"} ${asValue('%' + rawTerm + '%')}
+                  THEN TRUE
+                `
+            }
             return ` 
               WHEN  ${colTxt} ${matchCase? "LIKE" : "ILIKE"} ${asValue('%' + rawTerm + '%')}
                 THEN json_build_object(
@@ -723,7 +731,7 @@ export const FUNCTIONS: FunctionSpec[] = [
                 )::jsonb
               `
           }).join(" ")}
-          ELSE NULL
+          ELSE ${(returnType === "boolean")? "FALSE" : "NULL"}
 
         END`;
 
