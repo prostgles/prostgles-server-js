@@ -578,7 +578,18 @@ exports.FUNCTIONS = [
             else if (returnType === "object") {
                 res = `CASE 
           ${cols.map(c => {
-                    let colTxt = `COALESCE(${exports.asNameAlias(c, tableAlias)}::TEXT, '')`; //  position(${term} IN ${colTxt}) > 0
+                    const colInfo = allColumns.find(ac => ac.name === c);
+                    const colNameEscaped = exports.asNameAlias(c, tableAlias);
+                    let colSelect = `${colNameEscaped}::TEXT`;
+                    if (colInfo === null || colInfo === void 0 ? void 0 : colInfo.udt_name.startsWith("timestamp")) {
+                        colSelect = `( CASE WHEN ${colNameEscaped} IS NULL THEN '' ELSE concat_ws(' ', 
+              ${colNameEscaped}::TEXT, 
+                to_char(${colNameEscaped}, 'Day Month '), 
+                'Q' || to_char(${colNameEscaped}, 'Q'),
+                'WK' || to_char(${colNameEscaped}, 'WW')
+              ) END)`;
+                    }
+                    let colTxt = `COALESCE(${colSelect}, '')`; //  position(${term} IN ${colTxt}) > 0
                     return ` 
               WHEN  ${colTxt} ${matchCase ? "LIKE" : "ILIKE"} ${asValue('%' + rawTerm + '%')}
                 THEN json_build_object(
