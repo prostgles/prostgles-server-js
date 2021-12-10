@@ -447,7 +447,7 @@ export class ViewHandler {
     columns: TableSchema["columns"];
     columnsForTypes: ColumnInfo[];
     column_names: string[];
-    tableOrViewInfo: TableOrViewInfo;
+    tableOrViewInfo: TableSchema;// TableOrViewInfo;
     colSet: ColSet;
     tsColumnDefs: string[] = [];
     joins: Join[];
@@ -3151,6 +3151,12 @@ export type TableSchema = {
     })[];
     is_view: boolean;
     parent_tables: string[];
+    privileges: {
+        insert: boolean;
+        select: boolean;
+        update: boolean;
+        delete: boolean;
+    }
 }
 
 type PGConstraint = {
@@ -3185,7 +3191,37 @@ async function getConstraints(db: DB, schema: string = "public"): Promise<PGCons
 async function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"): Promise<TableSchema[]>{
     const query = 
     `
-    SELECT t.table_schema as schema, t.table_name as name 
+    SELECT jsonb_build_object(
+        'insert', EXISTS (
+            SELECT 1 
+            FROM information_schema.role_table_grants rg
+            WHERE rg.table_name = t.table_name
+            AND rg.privilege_type = 'INSERT'
+            AND rg.is_grantable = 'YES'
+        ),
+        'select', EXISTS (
+            SELECT 1 
+            FROM information_schema.role_table_grants rg
+            WHERE rg.table_name = t.table_name
+            AND rg.privilege_type = 'SELECT'
+            AND rg.is_grantable = 'YES'
+        ),
+        'update', EXISTS (
+            SELECT 1 
+            FROM information_schema.role_table_grants rg
+            WHERE rg.table_name = t.table_name
+            AND rg.privilege_type = 'UPDATE'
+            AND rg.is_grantable = 'YES'
+        ),
+        'delete', EXISTS (
+            SELECT 1 
+            FROM information_schema.role_table_grants rg
+            WHERE rg.table_name = t.table_name
+            AND rg.privilege_type = 'DELETE'
+            AND rg.is_grantable = 'YES'
+        )
+    ) as privileges
+    , t.table_schema as schema, t.table_name as name 
     , cc.table_oid as oid
     , json_agg((SELECT x FROM (
         SELECT cc.column_name as name, 

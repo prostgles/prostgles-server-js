@@ -1093,20 +1093,25 @@ type DboTableCommand = Request & DboTable & {
 const RULE_TO_METHODS = [
     { 
         rule: "getColumns",
+        sqlRule: "select",
         methods: ["getColumns"], 
         no_limits: true, 
         allowed_params: [],
+        table_only: false,
         hint: ` expecting false | true | undefined`
     },
     { 
         rule: "getInfo",
+        sqlRule: "select",
         methods: ["getInfo"], 
         no_limits: true, 
         allowed_params: [],
+        table_only: false,
         hint: ` expecting false | true | undefined`
     },
    { 
        rule: "insert",
+       sqlRule: "insert",
        methods: ["insert", "upsert"], 
        no_limits: <SelectRule>{ fields: "*" }, 
        table_only: true,
@@ -1115,6 +1120,7 @@ const RULE_TO_METHODS = [
     },
    { 
        rule: "update", 
+       sqlRule: "update",
        methods: ["update", "upsert", "updateBatch"], 
        no_limits: <UpdateRule>{ fields: "*", filterFields: "*", returningFields: "*"  },
        table_only: true, 
@@ -1123,13 +1129,16 @@ const RULE_TO_METHODS = [
     },
    { 
        rule: "select", 
+       sqlRule: "select",
        methods: ["findOne", "find", "count"], 
        no_limits: <SelectRule>{ fields: "*", filterFields: "*" }, 
+       table_only: false,
        allowed_params: <Array<keyof SelectRule>>["fields", "filterFields", "forcedFilter", "validate", "maxLimit"] ,
        hint: ` expecting "*" | true | { fields: ( string | string[] | {} )  }`
     },
    { 
        rule: "delete", 
+       sqlRule: "delete",
        methods: ["delete", "remove"], 
        no_limits: <DeleteRule>{ filterFields: "*" } , 
        table_only: true,
@@ -1137,20 +1146,24 @@ const RULE_TO_METHODS = [
        hint: ` expecting "*" | true | { filterFields: ( string | string[] | {} ) } \n Will use "select", "update", "delete" and "insert" rules`
     },
     { 
-       rule: "sync", methods: ["sync", "unsync"], 
+       rule: "sync", 
+       sqlRule: "select",
+       methods: ["sync", "unsync"], 
        no_limits: null,
        table_only: true,
        allowed_params: <Array<keyof SyncRule>>["id_fields", "synced_field", "sync_type", "allow_delete", "throttle", "batch_size"],
        hint: ` expecting "*" | true | { id_fields: string[], synced_field: string }`
     },
     { 
-        rule: "subscribe", methods: ["unsubscribe", "subscribe", "subscribeOne"], 
+        rule: "subscribe", 
+        sqlRule: "select",
+        methods: ["unsubscribe", "subscribe", "subscribeOne"], 
         no_limits: <SubscribeRule>{  throttle: 0  },
         table_only: true,
         allowed_params: <Array<keyof SubscribeRule>>["throttle"],
         hint: ` expecting "*" | true | { throttle: number } \n Will use "select" rules`
     }
-];
+] as const;
 // const ALL_PUBLISH_METHODS = ["update", "upsert", "delete", "insert", "find", "findOne", "subscribe", "unsubscribe", "sync", "unsync", "remove"];
 // const ALL_PUBLISH_METHODS = RULE_TO_METHODS.map(r => r.methods).flat();
 
@@ -1239,7 +1252,7 @@ export class PublishParser {
 
         if(!command || !tableName) throw "command OR tableName are missing";
 
-        let rtm = RULE_TO_METHODS.find(rtms => rtms.methods.includes(command));
+        let rtm = RULE_TO_METHODS.find(rtms => (rtms.methods as any).includes(command));
         if(!rtm){
             throw "Invalid command: " + command;
         }
@@ -1285,7 +1298,9 @@ export class PublishParser {
             let table_rules = _publish[tableName];// applyParamsIfFunc(_publish[tableName],  localParams, this.dbo, this.db, user);
 
             /* Get view or table specific rules */
-            const is_view = (this.dbo[tableName] as TableHandler | ViewHandler).is_view,
+            const tHandler = (this.dbo[tableName] as TableHandler | ViewHandler);
+            
+            const is_view = tHandler.is_view,
                 MY_RULES = RULE_TO_METHODS.filter(r => !is_view || !r.table_only);
 
             // if(tableName === "various") console.warn(1033, MY_RULES)
@@ -1295,7 +1310,14 @@ export class PublishParser {
                 if([true, "*"].includes(table_rules as any)){
                     table_rules = {};
                     MY_RULES.map(r => {
-                        table_rules[r.rule] = { ...r.no_limits };
+                        /** Check PG User privileges */
+                        if(
+                            tHandler.tableOrViewInfo.privileges[r.sqlRule]
+                        ){
+                            table_rules[r.rule] = { ...r.no_limits };
+                        }
+                        
+
                     });
                     // if(tableName === "various") console.warn(1042, table_rules)
                 }
@@ -1315,7 +1337,7 @@ export class PublishParser {
 
                     if(table_rules[r.rule]){
                         /* Add implied methods if not falsy */
-                        r.methods.map(method => {
+                        (r.methods as any).map(method => {
                             if(table_rules[method] === undefined){
                                 const publishedTable = (table_rules as PublishTable);
                                 if(method === "updateBatch" && !publishedTable.update){
@@ -1340,9 +1362,15 @@ export class PublishParser {
                     
                     ruleKeys.filter(m => table_rules[m])
                         .find(method => {
-                            let rm = MY_RULES.find(r => r.rule === method || r.methods.includes(method));
+                            let rm = MY_RULES.find(r => r.rule === method || (r.methods as any).includes(method));
                             if(!rm){
                                 throw `Invalid rule in publish.${tableName} -> ${method} \nExpecting any of: ${flat(MY_RULES.map(r => [r.rule, ...r.methods])).join(", ")}`;
+                            }
+
+                            /** Check user privileges */
+                            if(!tHandler.tableOrViewInfo.privileges[rm.sqlRule]){
+                                delete table_rules[method];
+                                return;
                             }
 
                             /* Check RULES for invalid params */

@@ -2407,7 +2407,37 @@ async function getConstraints(db, schema = "public") {
 }
 async function getTablesForSchemaPostgresSQL(db, schema = "public") {
     const query = `
-    SELECT t.table_schema as schema, t.table_name as name 
+    SELECT jsonb_build_object(
+        'insert', EXISTS (
+            SELECT 1 
+            FROM information_schema.role_table_grants rg
+            WHERE rg.table_name = t.table_name
+            AND rg.privilege_type = 'INSERT'
+            AND rg.is_grantable = 'YES'
+        ),
+        'select', EXISTS (
+            SELECT 1 
+            FROM information_schema.role_table_grants rg
+            WHERE rg.table_name = t.table_name
+            AND rg.privilege_type = 'SELECT'
+            AND rg.is_grantable = 'YES'
+        ),
+        'update', EXISTS (
+            SELECT 1 
+            FROM information_schema.role_table_grants rg
+            WHERE rg.table_name = t.table_name
+            AND rg.privilege_type = 'UPDATE'
+            AND rg.is_grantable = 'YES'
+        ),
+        'delete', EXISTS (
+            SELECT 1 
+            FROM information_schema.role_table_grants rg
+            WHERE rg.table_name = t.table_name
+            AND rg.privilege_type = 'DELETE'
+            AND rg.is_grantable = 'YES'
+        )
+    ) as privileges
+    , t.table_schema as schema, t.table_name as name 
     , cc.table_oid as oid
     , json_agg((SELECT x FROM (
         SELECT cc.column_name as name, 

@@ -185,7 +185,7 @@ export declare class ViewHandler {
     columns: TableSchema["columns"];
     columnsForTypes: ColumnInfo[];
     column_names: string[];
-    tableOrViewInfo: TableOrViewInfo;
+    tableOrViewInfo: TableSchema;
     colSet: ColSet;
     tsColumnDefs: string[];
     joins: Join[];
@@ -368,6 +368,12 @@ export declare type TableSchema = {
     })[];
     is_view: boolean;
     parent_tables: string[];
+    privileges: {
+        insert: boolean;
+        select: boolean;
+        update: boolean;
+        delete: boolean;
+    };
 };
 declare type PGConstraint = {
     /**

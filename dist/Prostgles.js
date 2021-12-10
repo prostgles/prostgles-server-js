@@ -560,20 +560,25 @@ function makeSocketError(cb, err) {
 const RULE_TO_METHODS = [
     {
         rule: "getColumns",
+        sqlRule: "select",
         methods: ["getColumns"],
         no_limits: true,
         allowed_params: [],
+        table_only: false,
         hint: ` expecting false | true | undefined`
     },
     {
         rule: "getInfo",
+        sqlRule: "select",
         methods: ["getInfo"],
         no_limits: true,
         allowed_params: [],
+        table_only: false,
         hint: ` expecting false | true | undefined`
     },
     {
         rule: "insert",
+        sqlRule: "insert",
         methods: ["insert", "upsert"],
         no_limits: { fields: "*" },
         table_only: true,
@@ -582,6 +587,7 @@ const RULE_TO_METHODS = [
     },
     {
         rule: "update",
+        sqlRule: "update",
         methods: ["update", "upsert", "updateBatch"],
         no_limits: { fields: "*", filterFields: "*", returningFields: "*" },
         table_only: true,
@@ -590,13 +596,16 @@ const RULE_TO_METHODS = [
     },
     {
         rule: "select",
+        sqlRule: "select",
         methods: ["findOne", "find", "count"],
         no_limits: { fields: "*", filterFields: "*" },
+        table_only: false,
         allowed_params: ["fields", "filterFields", "forcedFilter", "validate", "maxLimit"],
         hint: ` expecting "*" | true | { fields: ( string | string[] | {} )  }`
     },
     {
         rule: "delete",
+        sqlRule: "delete",
         methods: ["delete", "remove"],
         no_limits: { filterFields: "*" },
         table_only: true,
@@ -604,14 +613,18 @@ const RULE_TO_METHODS = [
         hint: ` expecting "*" | true | { filterFields: ( string | string[] | {} ) } \n Will use "select", "update", "delete" and "insert" rules`
     },
     {
-        rule: "sync", methods: ["sync", "unsync"],
+        rule: "sync",
+        sqlRule: "select",
+        methods: ["sync", "unsync"],
         no_limits: null,
         table_only: true,
         allowed_params: ["id_fields", "synced_field", "sync_type", "allow_delete", "throttle", "batch_size"],
         hint: ` expecting "*" | true | { id_fields: string[], synced_field: string }`
     },
     {
-        rule: "subscribe", methods: ["unsubscribe", "subscribe", "subscribeOne"],
+        rule: "subscribe",
+        sqlRule: "select",
+        methods: ["unsubscribe", "subscribe", "subscribeOne"],
         no_limits: { throttle: 0 },
         table_only: true,
         allowed_params: ["throttle"],
@@ -721,14 +734,18 @@ class PublishParser {
             let _publish = await this.getPublish(localParams, clientInfo);
             let table_rules = _publish[tableName]; // applyParamsIfFunc(_publish[tableName],  localParams, this.dbo, this.db, user);
             /* Get view or table specific rules */
-            const is_view = this.dbo[tableName].is_view, MY_RULES = RULE_TO_METHODS.filter(r => !is_view || !r.table_only);
+            const tHandler = this.dbo[tableName];
+            const is_view = tHandler.is_view, MY_RULES = RULE_TO_METHODS.filter(r => !is_view || !r.table_only);
             // if(tableName === "various") console.warn(1033, MY_RULES)
             if (table_rules) {
                 /* All methods allowed. Add no limits for table rules */
                 if ([true, "*"].includes(table_rules)) {
                     table_rules = {};
                     MY_RULES.map(r => {
-                        table_rules[r.rule] = Object.assign({}, r.no_limits);
+                        /** Check PG User privileges */
+                        if (tHandler.tableOrViewInfo.privileges[r.sqlRule]) {
+                            table_rules[r.rule] = Object.assign({}, r.no_limits);
+                        }
                     });
                     // if(tableName === "various") console.warn(1042, table_rules)
                 }
@@ -771,6 +788,11 @@ class PublishParser {
                         let rm = MY_RULES.find(r => r.rule === method || r.methods.includes(method));
                         if (!rm) {
                             throw `Invalid rule in publish.${tableName} -> ${method} \nExpecting any of: ${flat(MY_RULES.map(r => [r.rule, ...r.methods])).join(", ")}`;
+                        }
+                        /** Check user privileges */
+                        if (!tHandler.tableOrViewInfo.privileges[rm.sqlRule]) {
+                            delete table_rules[method];
+                            return;
                         }
                         /* Check RULES for invalid params */
                         /* Methods do not have params -> They use them from rules */
