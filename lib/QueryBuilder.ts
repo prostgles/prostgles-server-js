@@ -703,7 +703,7 @@ export const FUNCTIONS: FunctionSpec[] = [
             const colInfo = allColumns.find(ac => ac.name === c);
             const colNameEscaped = asNameAlias(c, tableAlias)
             let colSelect = `${colNameEscaped}::TEXT`;
-            if(colInfo?.udt_name.startsWith("timestamp")){
+            if(colInfo?.udt_name.startsWith("timestamp") || colInfo?.udt_name === "date"){
               colSelect = `( CASE WHEN ${colNameEscaped} IS NULL THEN '' ELSE concat_ws(' ', 
               ${colNameEscaped}::TEXT, 
                 to_char(${colNameEscaped}, 'Day Month '), 
