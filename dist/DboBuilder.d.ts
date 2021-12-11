@@ -1,6 +1,6 @@
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams, OrderBy, InsertParams, UpdateParams, DeleteParams, DbJoinMaker, TableInfo as TInfo, SQLHandler, AnyObject } from "prostgles-types";
+import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams, OrderBy, InsertParams, UpdateParams, DeleteParams, DbJoinMaker, PG_COLUMN_UDT_DATA_TYPE, TS_PG_Types, TableInfo as TInfo, SQLHandler, AnyObject } from "prostgles-types";
 export declare type Media = {
     "id"?: string;
     "title"?: string;
@@ -390,5 +390,6 @@ declare type PGConstraint = {
     relname: string;
 };
 export declare function isPlainObject(o: any): boolean;
+export declare function postgresToTsType(udt_data_type: PG_COLUMN_UDT_DATA_TYPE): keyof typeof TS_PG_Types;
 export {};
 //# sourceMappingURL=DboBuilder.d.ts.map

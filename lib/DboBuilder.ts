@@ -3358,7 +3358,7 @@ export function isPlainObject(o) {
     return Object(o) === o && Object.getPrototypeOf(o) === Object.prototype;
 }
 
-function postgresToTsType(udt_data_type: PG_COLUMN_UDT_DATA_TYPE): keyof typeof TS_PG_Types {
+export function postgresToTsType(udt_data_type: PG_COLUMN_UDT_DATA_TYPE): keyof typeof TS_PG_Types {
     return Object.keys(TS_PG_Types).find(k => {
         return TS_PG_Types[k].includes(udt_data_type) || !TS_PG_Types[k].length;
     }) as keyof typeof TS_PG_Types;

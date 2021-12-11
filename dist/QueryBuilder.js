@@ -575,19 +575,34 @@ exports.FUNCTIONS = [
                 //   res = `CASE WHEN position(${term} IN ${col}) > 0 THEN TRUE ELSE FALSE END`;
             }
             else if (returnType === "object" || returnType === "boolean") {
+                const hasChars = Boolean(term && /[a-z]/i.test(term));
                 res = `CASE 
           ${cols.map(c => {
                     const colInfo = allColumns.find(ac => ac.name === c);
-                    const colNameEscaped = exports.asNameAlias(c, tableAlias);
+                    return {
+                        key: c,
+                        colInfo
+                    };
+                }).filter(c => {
+                    var _a;
+                    /** Exclude numeric columns when the search tern contains a character */
+                    return !hasChars ||
+                        ((_a = c.colInfo) === null || _a === void 0 ? void 0 : _a.udt_name) &&
+                            DboBuilder_1.postgresToTsType(c.colInfo.udt_name) !== "number";
+                })
+                    .map(c => {
+                    var _a, _b;
+                    const colNameEscaped = exports.asNameAlias(c.key, tableAlias);
                     let colSelect = `${colNameEscaped}::TEXT`;
-                    const isTstamp = colInfo === null || colInfo === void 0 ? void 0 : colInfo.udt_name.startsWith("timestamp");
-                    if (isTstamp || (colInfo === null || colInfo === void 0 ? void 0 : colInfo.udt_name) === "date") {
-                        colSelect = `( CASE WHEN ${colNameEscaped} IS NULL THEN '' ELSE concat_ws(' ', 
+                    const isTstamp = (_a = c.colInfo) === null || _a === void 0 ? void 0 : _a.udt_name.startsWith("timestamp");
+                    if (isTstamp || ((_b = c.colInfo) === null || _b === void 0 ? void 0 : _b.udt_name) === "date") {
+                        colSelect = `( CASE WHEN ${colNameEscaped} IS NULL THEN '' 
+              ELSE concat_ws(' ', 
               ${colNameEscaped}::TEXT, 
-              ${isTstamp ? `'TZ' || to_char(${colNameEscaped}, 'OF'), ` : ''}
-                to_char(${colNameEscaped}, ' Day Month '), 
-                'Q' || to_char(${colNameEscaped}, 'Q'),
-                'WK' || to_char(${colNameEscaped}, 'WW')
+              ${isTstamp ? `'TZ' || trim(to_char(${colNameEscaped}, 'OF')), ` : ''}
+                trim(to_char(${colNameEscaped}, 'Day Month')), 
+                'Q' || trim(to_char(${colNameEscaped}, 'Q')),
+                'WK' || trim(to_char(${colNameEscaped}, 'WW'))
               ) END)`;
                     }
                     let colTxt = `COALESCE(${colSelect}, '')`; //  position(${term} IN ${colTxt}) > 0
@@ -600,7 +615,7 @@ exports.FUNCTIONS = [
                     return ` 
               WHEN  ${colTxt} ${matchCase ? "LIKE" : "ILIKE"} ${asValue('%' + rawTerm + '%')}
                 THEN json_build_object(
-                  ${asValue(c)}, 
+                  ${asValue(c.key)}, 
                   ${makeTextMatcherArray(colTxt, term)}
                 )::jsonb
               `;

@@ -4,7 +4,7 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { pgp, Filter, LocalParams, isPlainObject, TableHandler, ViewHandler } from "./DboBuilder";
+import { pgp, Filter, LocalParams, isPlainObject, TableHandler, ViewHandler, postgresToTsType } from "./DboBuilder";
 import { TableRule, flat } from "./Prostgles";
 import { SelectParamsBasic as SelectParams, isEmpty, FieldFilter, asName, TextFilter_FullTextSearchFilterKeys, TS_PG_Types, ColumnInfo } from "prostgles-types";
 import { get } from "./utils";
@@ -698,19 +698,32 @@ export const FUNCTIONS: FunctionSpec[] = [
       //   res = `CASE WHEN position(${term} IN ${col}) > 0 THEN TRUE ELSE FALSE END`;
 
       } else if(returnType === "object" || returnType === "boolean"){
+        const hasChars = Boolean(term &&  /[a-z]/i.test(term));
         res = `CASE 
           ${cols.map(c => {
             const colInfo = allColumns.find(ac => ac.name === c);
-            const colNameEscaped = asNameAlias(c, tableAlias)
+            return {
+              key: c,
+              colInfo
+            }
+          }).filter(c => 
+            /** Exclude numeric columns when the search tern contains a character */
+            !hasChars ||  
+            c.colInfo?.udt_name && 
+            postgresToTsType(c.colInfo.udt_name) !== "number"
+          )
+          .map(c => {
+            const colNameEscaped = asNameAlias(c.key, tableAlias)
             let colSelect = `${colNameEscaped}::TEXT`;
-            const isTstamp = colInfo?.udt_name.startsWith("timestamp");
-            if(isTstamp || colInfo?.udt_name === "date"){
-              colSelect = `( CASE WHEN ${colNameEscaped} IS NULL THEN '' ELSE concat_ws(' ', 
+            const isTstamp = c.colInfo?.udt_name.startsWith("timestamp");
+            if(isTstamp || c.colInfo?.udt_name === "date"){
+              colSelect = `( CASE WHEN ${colNameEscaped} IS NULL THEN '' 
+              ELSE concat_ws(' ', 
               ${colNameEscaped}::TEXT, 
-              ${isTstamp? `'TZ' || to_char(${colNameEscaped}, 'OF'), `: ''}
-                to_char(${colNameEscaped}, ' Day Month '), 
-                'Q' || to_char(${colNameEscaped}, 'Q'),
-                'WK' || to_char(${colNameEscaped}, 'WW')
+              ${isTstamp? `'TZ' || trim(to_char(${colNameEscaped}, 'OF')), `: ''}
+                trim(to_char(${colNameEscaped}, 'Day Month')), 
+                'Q' || trim(to_char(${colNameEscaped}, 'Q')),
+                'WK' || trim(to_char(${colNameEscaped}, 'WW'))
               ) END)`
             }
             let colTxt = `COALESCE(${colSelect}, '')`; //  position(${term} IN ${colTxt}) > 0
@@ -723,7 +736,7 @@ export const FUNCTIONS: FunctionSpec[] = [
             return ` 
               WHEN  ${colTxt} ${matchCase? "LIKE" : "ILIKE"} ${asValue('%' + rawTerm + '%')}
                 THEN json_build_object(
-                  ${asValue(c)}, 
+                  ${asValue(c.key)}, 
                   ${makeTextMatcherArray(
                     colTxt, 
                     term

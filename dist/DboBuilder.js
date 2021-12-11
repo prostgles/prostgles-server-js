@@ -4,7 +4,7 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.isPlainObject = exports.DboBuilder = exports.TableHandler = exports.ViewHandler = exports.EXISTS_KEYS = exports.pgp = void 0;
+exports.postgresToTsType = exports.isPlainObject = exports.DboBuilder = exports.TableHandler = exports.ViewHandler = exports.EXISTS_KEYS = exports.pgp = void 0;
 const Bluebird = require("bluebird");
 // declare global { export interface Promise<T> extends Bluebird<T> {} }
 const pgPromise = require("pg-promise");
@@ -2570,6 +2570,7 @@ function postgresToTsType(udt_data_type) {
         return prostgles_types_1.TS_PG_Types[k].includes(udt_data_type) || !prostgles_types_1.TS_PG_Types[k].length;
     });
 }
+exports.postgresToTsType = postgresToTsType;
 function sqlErrCodeToMsg(code) {
     const errs = {
         "00000": "successful_completion",
