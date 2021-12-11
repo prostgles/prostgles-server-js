@@ -576,8 +576,7 @@ exports.FUNCTIONS = [
             }
             else if (returnType === "object" || returnType === "boolean") {
                 const hasChars = Boolean(term && /[a-z]/i.test(term));
-                res = `CASE 
-          ${cols.map(c => {
+                const _cols = cols.map(c => {
                     const colInfo = allColumns.find(ac => ac.name === c);
                     return {
                         key: c,
@@ -589,7 +588,12 @@ exports.FUNCTIONS = [
                     return !hasChars ||
                         ((_a = c.colInfo) === null || _a === void 0 ? void 0 : _a.udt_name) &&
                             DboBuilder_1.postgresToTsType(c.colInfo.udt_name) !== "number";
-                })
+                });
+                if (!_cols.length) {
+                    return (returnType === "boolean") ? "FALSE" : "NULL";
+                }
+                res = `CASE 
+          ${_cols
                     .map(c => {
                     var _a, _b;
                     const colNameEscaped = exports.asNameAlias(c.key, tableAlias);

@@ -699,20 +699,24 @@ export const FUNCTIONS: FunctionSpec[] = [
 
       } else if(returnType === "object" || returnType === "boolean"){
         const hasChars = Boolean(term &&  /[a-z]/i.test(term));
+        const _cols = cols.map(c => {
+          const colInfo = allColumns.find(ac => ac.name === c);
+          return {
+            key: c,
+            colInfo
+          }
+        }).filter(c => 
+          /** Exclude numeric columns when the search tern contains a character */
+          !hasChars ||  
+          c.colInfo?.udt_name && 
+          postgresToTsType(c.colInfo.udt_name) !== "number"
+        );
+        if(!_cols.length){
+          return (returnType === "boolean")? "FALSE" : "NULL"
+        }
         res = `CASE 
-          ${cols.map(c => {
-            const colInfo = allColumns.find(ac => ac.name === c);
-            return {
-              key: c,
-              colInfo
-            }
-          }).filter(c => 
-            /** Exclude numeric columns when the search tern contains a character */
-            !hasChars ||  
-            c.colInfo?.udt_name && 
-            postgresToTsType(c.colInfo.udt_name) !== "number"
-          )
-          .map(c => {
+          ${_cols
+           .map(c => {
             const colNameEscaped = asNameAlias(c.key, tableAlias)
             let colSelect = `${colNameEscaped}::TEXT`;
             const isTstamp = c.colInfo?.udt_name.startsWith("timestamp");
