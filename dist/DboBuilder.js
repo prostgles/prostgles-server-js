@@ -1111,7 +1111,7 @@ class ViewHandler {
                 const nullOrder = nulls ? ` NULLS ${nulls === "first" ? " FIRST " : " LAST "}` : "";
                 let colKey = (index > 0 && !nullEmpty) ? index : [tableAlias, key].filter(v => v).map(prostgles_types_1.asName).join(".");
                 if (nullEmpty) {
-                    colKey = `nullif(trim(${colKey}), '')`;
+                    colKey = `nullif(trim(${colKey}::text), '')`;
                 }
                 const res = `${colKey} ${orderType} ${nullOrder}`;
                 return res;
