@@ -582,7 +582,9 @@ exports.FUNCTIONS = [
                         key: c,
                         colInfo
                     };
-                }).filter(c => {
+                })
+                    .filter(c => !c.colInfo || c.colInfo.udt_name !== "bytea")
+                    .filter(c => {
                     var _a;
                     /** Exclude numeric columns when the search tern contains a character */
                     return !hasChars ||

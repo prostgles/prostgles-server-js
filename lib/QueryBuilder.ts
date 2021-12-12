@@ -705,7 +705,9 @@ export const FUNCTIONS: FunctionSpec[] = [
             key: c,
             colInfo
           }
-        }).filter(c => 
+        })
+        .filter(c => !c.colInfo || c.colInfo.udt_name !== "bytea")
+        .filter(c => 
           /** Exclude numeric columns when the search tern contains a character */
           !hasChars ||  
           c.colInfo?.udt_name && 
