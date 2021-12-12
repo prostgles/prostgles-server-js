@@ -31,7 +31,7 @@
     "i": "^0.3.7",
     "npm": "^8.1.4",
     "pg-promise": "^10.9.5",
-    "prostgles-types": "^1.5.121",
+    "prostgles-types": "^1.5.122",
     "sharp": "^0.29.3"
   },
   "devDependencies": {

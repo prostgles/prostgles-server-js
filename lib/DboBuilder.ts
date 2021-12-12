@@ -8,6 +8,7 @@ import * as Bluebird from "bluebird";
 // declare global { export interface Promise<T> extends Bluebird<T> {} }
 
 import * as pgPromise from 'pg-promise';
+const {ParameterizedQuery: PQ} = require('pg-promise');
 import pg = require('pg-promise/typescript/pg-subset');
 import { 
     ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams, OrderBy, InsertParams, UpdateParams, DeleteParams, SQLOptions,
@@ -3001,7 +3002,8 @@ export type TxCB = {
             let DATA_TYPES = !needType? [] : await this.db.any("SELECT oid, typname FROM pg_type");
             let USER_TABLES = !needType? [] :  await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
 
-            this.dbo.sql = async (query: string, params: any, options: SQLOptions, localParams?: LocalParams) => {
+            this.dbo.sql = async (q: string, params: any, options: SQLOptions, localParams?: LocalParams) => {
+                let query = q;
                 const canRunSQL = async (localParams: LocalParams) => {
                     if(!localParams) return true;
 
@@ -3026,6 +3028,10 @@ export type TxCB = {
                         throw err.toString();
                     }
                 } else if(this.db) {
+
+                    if(returnType === "arrayMode"){
+                        query = new PQ({ text: pgp.as.format(query, params), rowMode: "array" });
+                    }
 
                     let qres = await this.db.result(query, params)
                     const { duration, fields, rows, command } = qres;

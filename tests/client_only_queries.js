@@ -6,12 +6,16 @@ async function client_only(db, auth, log, methods) {
     const testRealtime = () => {
         log("Started testRealtime");
         return new Promise(async (resolve, reject) => {
+            var _a, _b;
             /* METHODS */
             const t222 = await methods.get();
             assert_1.strict.equal(t222, 222, "methods.get() failed");
             /* RAWSQL */
             const sqlStatement = await db.sql("SELECT $1", [1], { returnType: "statement" });
             assert_1.strict.equal(sqlStatement, "SELECT 1", "db.sql statement query failed");
+            const arrayMode = await db.sql("SELECT 1 as a, 2 as a", undefined, { returnType: "arrayMode" });
+            assert_1.strict.equal((_a = arrayMode.rows) === null || _a === void 0 ? void 0 : _a[0].join("."), "1.2", "db.sql statement arrayMode failed");
+            assert_1.strict.equal((_b = arrayMode.fields) === null || _b === void 0 ? void 0 : _b.map(f => f.name).join("."), "a.a", "db.sql statement arrayMode failed");
             const select1 = await db.sql("SELECT $1 as col1", [1], { returnType: "rows" });
             assert_1.strict.deepStrictEqual(select1[0], { col1: 1 }, "db.sql justRows query failed");
             const fullResult = await db.sql("SELECT $1 as col1", [1]);

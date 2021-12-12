@@ -17,6 +17,10 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       const sqlStatement = await db.sql("SELECT $1", [1], { returnType: "statement" });
       assert.equal(sqlStatement, "SELECT 1", "db.sql statement query failed");
     
+      const arrayMode = await db.sql("SELECT 1 as a, 2 as a", undefined, { returnType: "arrayMode" });
+      assert.equal(arrayMode.rows?.[0].join("."), "1.2", "db.sql statement arrayMode failed");
+      assert.equal(arrayMode.fields?.map(f => f.name).join("."), "a.a", "db.sql statement arrayMode failed");
+
       const select1 = await db.sql("SELECT $1 as col1", [1], { returnType: "rows" });
       assert.deepStrictEqual(select1[0], { col1: 1 }, "db.sql justRows query failed");
   

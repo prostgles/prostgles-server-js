@@ -8,6 +8,7 @@ exports.postgresToTsType = exports.isPlainObject = exports.DboBuilder = exports.
 const Bluebird = require("bluebird");
 // declare global { export interface Promise<T> extends Bluebird<T> {} }
 const pgPromise = require("pg-promise");
+const { ParameterizedQuery: PQ } = require('pg-promise');
 const prostgles_types_1 = require("prostgles-types");
 // <TXKey extends string = "tx"> 
 //   & {
@@ -2302,8 +2303,9 @@ export type TxCB = {
             let needType = true; // this.publishRawSQL && typeof this.publishRawSQL === "function";
             let DATA_TYPES = !needType ? [] : await this.db.any("SELECT oid, typname FROM pg_type");
             let USER_TABLES = !needType ? [] : await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
-            this.dbo.sql = async (query, params, options, localParams) => {
+            this.dbo.sql = async (q, params, options, localParams) => {
                 var _a, _b;
+                let query = q;
                 const canRunSQL = async (localParams) => {
                     if (!localParams)
                         return true;
@@ -2330,6 +2332,9 @@ export type TxCB = {
                     }
                 }
                 else if (this.db) {
+                    if (returnType === "arrayMode") {
+                        query = new PQ({ text: exports.pgp.as.format(query, params), rowMode: "array" });
+                    }
                     let qres = await this.db.result(query, params);
                     const { duration, fields, rows, command } = qres;
                     /**
