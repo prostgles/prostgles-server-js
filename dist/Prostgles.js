@@ -192,7 +192,7 @@ class Prostgles {
         if (watchSchema && this.loaded) {
             console.log("Schema changed");
             const { query } = event;
-            if (query && query.includes(PubSubManager_1.PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)) {
+            if (typeof query === "string" && query.includes(PubSubManager_1.PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)) {
                 console.log("Schema change event excluded from triggers due to EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID");
                 return;
             }
