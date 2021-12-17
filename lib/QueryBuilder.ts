@@ -6,7 +6,7 @@
 
 import { pgp, Filter, LocalParams, isPlainObject, TableHandler, ViewHandler, postgresToTsType } from "./DboBuilder";
 import { TableRule, flat } from "./Prostgles";
-import { SelectParamsBasic as SelectParams, isEmpty, FieldFilter, asName, TextFilter_FullTextSearchFilterKeys, TS_PG_Types, ColumnInfo } from "prostgles-types";
+import { SelectParamsBasic as SelectParams, isEmpty, FieldFilter, asName, TextFilter_FullTextSearchFilterKeys, TS_PG_Types, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE } from "prostgles-types";
 import { get } from "./utils";
 
 
@@ -15,6 +15,7 @@ export type SelectItem = {
   getFields: (args?: any[]) => string[] | "*";
   getQuery: (tableAlias?: string) => string;
   columnPGDataType?: string;
+  column_udt_type?: PG_COLUMN_UDT_DATA_TYPE;
   // columnName?: string; /* Must only exist if type "column" ... dissalow aliased columns? */
   alias: string;
   selected: boolean;
@@ -420,6 +421,17 @@ export const FUNCTIONS: FunctionSpec[] = [
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
       return pgp.as.format("LEFT(" + asNameAlias(args[0], tableAlias) + ", $1)", [args[1]]);
+    }
+  },
+  {
+    name: "$unnest_words",
+    description: ` :[column_name, number] -> substring`,
+    type: "function",
+    numArgs: 1,
+    singleColArg: true,
+    getFields: (args: any[]) => [args[0]],
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      return pgp.as.format("unnest(string_to_array(" + asNameAlias(args[0], tableAlias) + "::TEXT , ' '))");//, [args[1]]
     }
   },
   {
@@ -945,6 +957,7 @@ export class SelectItemBuilder {
     this.addItem({
       type: "column",
       columnPGDataType: colDef?.data_type,
+      column_udt_type: colDef?.udt_name,
       alias,
       getQuery: () => asName(fieldName),
       getFields: () => [fieldName],

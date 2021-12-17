@@ -174,6 +174,16 @@ async function isomorphic(db) {
             }
         ]);
     });
+    await tryRun("$unnest_words", async () => {
+        const res = await db.various.find({}, { returnType: "values", select: { name: "$unnest_words" } });
+        console.trace(res);
+        assert_1.strict.deepStrictEqual(res, [
+            'abc9',
+            'abc1',
+            'abc81',
+            'here'
+        ]);
+    });
     /**
      * Group by/Distinct
      */

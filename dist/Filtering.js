@@ -156,6 +156,10 @@ exports.parseFilterItem = (args) => {
             sVal = fVal[sOpType];
         }
         // console.log({ fOpType, fVal, sOpType })
+        /** JSON cannot be compared so we'll cast it to TEXT */
+        if ((selItem === null || selItem === void 0 ? void 0 : selItem.column_udt_type) === "json" || ["$ilike", "$like"].includes(fOpType)) {
+            leftQ += "::TEXT ";
+        }
         /** st_makeenvelope */
         if (prostgles_types_1.GeomFilterKeys.includes(fOpType) && sOpType && prostgles_types_1.GeomFilter_Funcs.includes(sOpType)) {
             /** If leftQ is geography then this err can happen: 'Antipodal (180 degrees long) edge detected!' */
@@ -186,12 +190,16 @@ exports.parseFilterItem = (args) => {
             return leftQ + " <= " + parseRightVal(fVal);
         }
         else if (["$in"].includes(fOpType)) {
+            if (!(fVal === null || fVal === void 0 ? void 0 : fVal.length))
+                throw "$in filter array is empty";
             let res = leftQ + " IN " + parseRightVal(fVal, "csv");
             if (fVal.includes(null))
                 res += ` OR ${leftQ} IS NULL `;
             return res;
         }
         else if (["$nin"].includes(fOpType)) {
+            if (!(fVal === null || fVal === void 0 ? void 0 : fVal.length))
+                throw "$nin filter array is empty";
             let res = leftQ + " NOT IN " + parseRightVal(fVal, "csv");
             if (fVal.includes(null))
                 res += ` AND ${leftQ} IS NOT NULL `;
@@ -204,10 +212,10 @@ exports.parseFilterItem = (args) => {
             return leftQ + " BETWEEN " + asValue(fVal[0]) + " AND " + asValue(fVal[1]);
         }
         else if (["$ilike"].includes(fOpType)) {
-            return leftQ + "::TEXT ILIKE " + asValue(fVal);
+            return leftQ + " ILIKE " + asValue(fVal);
         }
         else if (["$like"].includes(fOpType)) {
-            return leftQ + "::TEXT LIKE " + asValue(fVal);
+            return leftQ + " LIKE " + asValue(fVal);
             /* MAYBE TEXT OR MAYBE ARRAY */
         }
         else if (["@>", "<@", "$contains", "$containedBy", "&&", "@@"].includes(fOpType)) {
@@ -222,7 +230,7 @@ exports.parseFilterItem = (args) => {
             }
             else if (["@@"].includes(fOpType) && prostgles_types_1.TextFilter_FullTextSearchFilterKeys.includes(sOpType)) {
                 let lq = `to_tsvector(${leftQ}::text)`;
-                if (selItem && selItem.columnDataType === "tsvector")
+                if (selItem && selItem.columnPGDataType === "tsvector")
                     lq = leftQ;
                 let res = `${lq} ${operand} ` + `${sOpType}${parseRightVal(sVal, "csv")}`;
                 return res;

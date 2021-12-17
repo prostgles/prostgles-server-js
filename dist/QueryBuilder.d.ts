@@ -1,11 +1,12 @@
 import { Filter, LocalParams, TableHandler } from "./DboBuilder";
 import { TableRule } from "./Prostgles";
-import { SelectParamsBasic as SelectParams, FieldFilter, ColumnInfo } from "prostgles-types";
+import { SelectParamsBasic as SelectParams, FieldFilter, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE } from "prostgles-types";
 export declare type SelectItem = {
     type: "column" | "function" | "aggregation" | "joinedColumn" | "computed";
     getFields: (args?: any[]) => string[] | "*";
     getQuery: (tableAlias?: string) => string;
     columnPGDataType?: string;
+    column_udt_type?: PG_COLUMN_UDT_DATA_TYPE;
     alias: string;
     selected: boolean;
 };

@@ -1850,6 +1850,7 @@ export class TableHandler extends ViewHandler {
             // const { subOne = false } = localParams || {};
             
             if(!localFunc) {
+                if(!this.dboBuilder.prostgles.isSuperUser) throw "Subscribe no possible. 1853";
                 return await this.find(filter, { ...selectParams, limit: 0 }, null, table_rules, localParams)
                     .then(async isValid => {
         
@@ -2704,19 +2705,23 @@ export class DboBuilder {
             
             if(this.prostgles.opts.watchSchema && this.prostgles.opts.watchSchemaType === "events"){
                 if(!this.prostgles.isSuperUser){
-                    console.warn(`watchSchemaType "events" cannot be used due because db user is not a superuser. Will fallback to watchSchemaType "queries" `)
+                    console.warn(`watchSchemaType "events" cannot be used because db user is not a superuser. Will fallback to watchSchemaType "queries" `)
                 } else {
                     onSchemaChange = (event: { command: string; query: string }) => { 
                         this.prostgles.onSchemaChange(event)
                     }
                 }
             }
-            this._pubSubManager = await PubSubManager.create({
-                dboBuilder: this,
-                db: this.db, 
-                dbo: this.dbo as unknown as DbHandler,
-                onSchemaChange
-            });
+
+            if(this.prostgles.isSuperUser){
+                console.warn(`subscribe and sync cannot be used because db user is not a superuser `)
+                this._pubSubManager = await PubSubManager.create({
+                    dboBuilder: this,
+                    db: this.db, 
+                    dbo: this.dbo as unknown as DbHandler,
+                    onSchemaChange
+                });
+            }
         }
 
         return this._pubSubManager;

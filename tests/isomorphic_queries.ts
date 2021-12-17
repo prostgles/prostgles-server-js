@@ -172,6 +172,17 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     );
   });
 
+  await tryRun("$unnest_words", async () => {
+    const res = await db.various.find({}, { returnType: "values", select: { name: "$unnest_words" } });
+    console.trace(res)
+    assert.deepStrictEqual( res,  [
+      'abc9',
+      'abc1',
+      'abc81',
+      'here'
+    ]);
+  })
+
   /**
    * Group by/Distinct
    */

@@ -1355,6 +1355,8 @@ class TableHandler extends ViewHandler {
             const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {}, condition = await this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: null, localParams, tableRule: table_rules }), throttle = utils_1.get(params, "throttle") || 0, selectParams = PubSubManager_1.filterObj(params || {}, [], ["throttle"]);
             // const { subOne = false } = localParams || {};
             if (!localFunc) {
+                if (!this.dboBuilder.prostgles.isSuperUser)
+                    throw "Subscribe no possible. 1853";
                 return await this.find(filter, Object.assign(Object.assign({}, selectParams), { limit: 0 }), null, table_rules, localParams)
                     .then(async (isValid) => {
                     const { socket = null } = localParams;
@@ -2056,7 +2058,7 @@ class DboBuilder {
                 let onSchemaChange;
                 if (this.prostgles.opts.watchSchema && this.prostgles.opts.watchSchemaType === "events") {
                     if (!this.prostgles.isSuperUser) {
-                        console.warn(`watchSchemaType "events" cannot be used due because db user is not a superuser. Will fallback to watchSchemaType "queries" `);
+                        console.warn(`watchSchemaType "events" cannot be used because db user is not a superuser. Will fallback to watchSchemaType "queries" `);
                     }
                     else {
                         onSchemaChange = (event) => {
@@ -2064,12 +2066,15 @@ class DboBuilder {
                         };
                     }
                 }
-                this._pubSubManager = await PubSubManager_1.PubSubManager.create({
-                    dboBuilder: this,
-                    db: this.db,
-                    dbo: this.dbo,
-                    onSchemaChange
-                });
+                if (this.prostgles.isSuperUser) {
+                    console.warn(`subscribe and sync cannot be used because db user is not a superuser `);
+                    this._pubSubManager = await PubSubManager_1.PubSubManager.create({
+                        dboBuilder: this,
+                        db: this.db,
+                        dbo: this.dbo,
+                        onSchemaChange
+                    });
+                }
             }
             return this._pubSubManager;
         };

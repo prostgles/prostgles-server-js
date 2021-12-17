@@ -320,6 +320,17 @@ exports.FUNCTIONS = [
         }
     },
     {
+        name: "$unnest_words",
+        description: ` :[column_name, number] -> substring`,
+        type: "function",
+        numArgs: 1,
+        singleColArg: true,
+        getFields: (args) => [args[0]],
+        getQuery: ({ allowedFields, args, tableAlias }) => {
+            return DboBuilder_1.pgp.as.format("unnest(string_to_array(" + exports.asNameAlias(args[0], tableAlias) + "::TEXT , ' '))"); //, [args[1]]
+        }
+    },
+    {
         name: "$right",
         description: ` :[column_name, number] -> substring`,
         type: "function",
@@ -771,6 +782,7 @@ class SelectItemBuilder {
             this.addItem({
                 type: "column",
                 columnPGDataType: colDef === null || colDef === void 0 ? void 0 : colDef.data_type,
+                column_udt_type: colDef === null || colDef === void 0 ? void 0 : colDef.udt_name,
                 alias,
                 getQuery: () => prostgles_types_1.asName(fieldName),
                 getFields: () => [fieldName],
