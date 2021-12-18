@@ -2423,28 +2423,24 @@ async function getTablesForSchemaPostgresSQL(db, schema = "public") {
             FROM information_schema.role_table_grants rg
             WHERE rg.table_name = t.table_name
             AND rg.privilege_type = 'INSERT'
-            AND rg.is_grantable = 'YES'
         ),
         'select', EXISTS (
             SELECT 1 
             FROM information_schema.role_table_grants rg
             WHERE rg.table_name = t.table_name
             AND rg.privilege_type = 'SELECT'
-            AND rg.is_grantable = 'YES'
         ),
         'update', EXISTS (
             SELECT 1 
             FROM information_schema.role_table_grants rg
             WHERE rg.table_name = t.table_name
             AND rg.privilege_type = 'UPDATE'
-            AND rg.is_grantable = 'YES'
         ),
         'delete', EXISTS (
             SELECT 1 
             FROM information_schema.role_table_grants rg
             WHERE rg.table_name = t.table_name
             AND rg.privilege_type = 'DELETE'
-            AND rg.is_grantable = 'YES'
         )
     ) as privileges
     , t.table_schema as schema, t.table_name as name 
