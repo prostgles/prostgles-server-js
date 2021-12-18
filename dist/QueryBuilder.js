@@ -586,7 +586,7 @@ exports.FUNCTIONS = [
                 //   res = `CASE WHEN position(${term} IN ${col}) > 0 THEN TRUE ELSE FALSE END`;
             }
             else if (returnType === "object" || returnType === "boolean") {
-                const hasChars = Boolean(term && /[a-z]/i.test(term));
+                const hasChars = Boolean(rawTerm && /[a-z]/i.test(rawTerm));
                 const _cols = cols.map(c => {
                     const colInfo = allColumns.find(ac => ac.name === c);
                     return {
