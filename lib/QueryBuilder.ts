@@ -425,7 +425,7 @@ export const FUNCTIONS: FunctionSpec[] = [
   },
   {
     name: "$unnest_words",
-    description: ` :[column_name, number] -> substring`,
+    description: ` :[column_name] -> Splits string at spaces`,
     type: "function",
     numArgs: 1,
     singleColArg: true,
@@ -791,7 +791,11 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: true,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
-      return aggName + "(" + asNameAlias(args[0], tableAlias) + ")";
+      let extraArgs = "";
+      if(args.length > 1){
+        extraArgs  = pgp.as.format(", $1:csv", args.slice(1))
+      }
+      return aggName + "(" + asNameAlias(args[0], tableAlias) + `${extraArgs})`;
     }
   } as FunctionSpec)),
 

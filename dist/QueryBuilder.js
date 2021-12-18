@@ -321,7 +321,7 @@ exports.FUNCTIONS = [
     },
     {
         name: "$unnest_words",
-        description: ` :[column_name, number] -> substring`,
+        description: ` :[column_name] -> Splits string at spaces`,
         type: "function",
         numArgs: 1,
         singleColArg: true,
@@ -663,7 +663,11 @@ exports.FUNCTIONS = [
         singleColArg: true,
         getFields: (args) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
-            return aggName + "(" + exports.asNameAlias(args[0], tableAlias) + ")";
+            let extraArgs = "";
+            if (args.length > 1) {
+                extraArgs = DboBuilder_1.pgp.as.format(", $1:csv", args.slice(1));
+            }
+            return aggName + "(" + exports.asNameAlias(args[0], tableAlias) + `${extraArgs})`;
         }
     })),
     /* More aggs */
