@@ -754,12 +754,11 @@ export class ViewHandler {
                     }
                 }
 
-                const select = !c.privileges.some(p => p.is_grantable === "NO" && p.privilege_type === "SELECT"),
-                    insert = !c.privileges.some(p => p.is_grantable === "NO" && p.privilege_type === "INSERT"),
-                    update = !c.privileges.some(p => p.is_grantable === "NO" && p.privilege_type === "UPDATE"),
-                    _delete = !c.privileges.some(p => p.is_grantable === "NO" && p.privilege_type === "DELETE");
-                    
-
+                const select = c.privileges.some(p => p.privilege_type === "SELECT"),
+                    insert = c.privileges.some(p => p.privilege_type === "INSERT"),
+                    update = c.privileges.some(p => p.privilege_type === "UPDATE"),
+                    _delete = this.tableOrViewInfo.privileges.delete;// c.privileges.some(p => p.privilege_type === "DELETE");
+                
                 delete (c as any).privileges;
                 return {
                     ...c,
@@ -3156,7 +3155,7 @@ export type TableSchema = {
     comment: string;
     columns: (ColumnInfo & {
         privileges: {
-            privilege_type: "INSERT" | "REFERENCES" | "SELECT" | "UPDATE" | "DELETE";
+            privilege_type: "INSERT" | "REFERENCES" | "SELECT" | "UPDATE";// | "DELETE";
             is_grantable: "YES" | "NO"
         }[];
     })[];

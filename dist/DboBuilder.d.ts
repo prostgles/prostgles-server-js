@@ -362,7 +362,7 @@ export declare type TableSchema = {
     comment: string;
     columns: (ColumnInfo & {
         privileges: {
-            privilege_type: "INSERT" | "REFERENCES" | "SELECT" | "UPDATE" | "DELETE";
+            privilege_type: "INSERT" | "REFERENCES" | "SELECT" | "UPDATE";
             is_grantable: "YES" | "NO";
         }[];
     })[];
