@@ -2348,7 +2348,9 @@ export type TxCB = {
                     const { watchSchema, watchSchemaType } = ((_a = this.prostgles) === null || _a === void 0 ? void 0 : _a.opts) || {};
                     if (watchSchema &&
                         (!this.prostgles.isSuperUser || watchSchemaType === "queries") &&
-                        ["CREATE", "ALTER", "DROP"].includes(command)) {
+                        (["CREATE", "ALTER", "DROP"].includes(command) ||
+                            //  Cover this case `CREATE TABLE mytable AS SELECT` 
+                            query && query.toLowerCase().replace(/\s\s+/g, ' ').includes("create table"))) {
                         this.prostgles.onSchemaChange({ command, query });
                     }
                     if (command === "LISTEN") {
