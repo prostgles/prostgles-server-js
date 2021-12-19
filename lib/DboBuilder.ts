@@ -3006,8 +3006,8 @@ export type TxCB = {
             let DATA_TYPES = !needType? [] : await this.db.any("SELECT oid, typname FROM pg_type");
             let USER_TABLES = !needType? [] :  await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
 
-            this.dbo.sql = async (q: string, params: any, options: SQLOptions, localParams?: LocalParams) => {
-                let query = q;
+            this.dbo.sql = async (query: string, params: any, options: SQLOptions, localParams?: LocalParams) => {
+                
                 const canRunSQL = async (localParams: LocalParams) => {
                     if(!localParams) return true;
 
@@ -3033,11 +3033,12 @@ export type TxCB = {
                     }
                 } else if(this.db) {
 
+                    let finalQuery = query + "";
                     if(returnType === "arrayMode"){
-                        query = new PQ({ text: pgp.as.format(query, params), rowMode: "array" });
+                        finalQuery = new PQ({ text: pgp.as.format(query, params), rowMode: "array" });
                     }
 
-                    let qres = await this.db.result(query, params)
+                    let qres = await this.db.result(finalQuery, params)
                     const { duration, fields, rows, command } = qres;
 
                     /**

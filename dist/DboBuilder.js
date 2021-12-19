@@ -2308,9 +2308,8 @@ export type TxCB = {
             let needType = true; // this.publishRawSQL && typeof this.publishRawSQL === "function";
             let DATA_TYPES = !needType ? [] : await this.db.any("SELECT oid, typname FROM pg_type");
             let USER_TABLES = !needType ? [] : await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
-            this.dbo.sql = async (q, params, options, localParams) => {
+            this.dbo.sql = async (query, params, options, localParams) => {
                 var _a, _b;
-                let query = q;
                 const canRunSQL = async (localParams) => {
                     if (!localParams)
                         return true;
@@ -2337,10 +2336,11 @@ export type TxCB = {
                     }
                 }
                 else if (this.db) {
+                    let finalQuery = query + "";
                     if (returnType === "arrayMode") {
-                        query = new PQ({ text: exports.pgp.as.format(query, params), rowMode: "array" });
+                        finalQuery = new PQ({ text: exports.pgp.as.format(query, params), rowMode: "array" });
                     }
-                    let qres = await this.db.result(query, params);
+                    let qres = await this.db.result(finalQuery, params);
                     const { duration, fields, rows, command } = qres;
                     /**
                      * Fallback for watchSchema in case not superuser and cannot add db event listener
