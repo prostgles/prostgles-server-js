@@ -36,6 +36,16 @@ function getDbConnection(dbConnection, options, debugQueries = false, onNotice) 
                     }
                 });
             }
+            if (isFresh && !client.listeners('error').length) {
+                client.on('error', function (msg) {
+                    if (onNotice) {
+                        onNotice(msg, utils_1.get(msg, "message"));
+                    }
+                    else {
+                        console.log("error: %j", utils_1.get(msg, "message"));
+                    }
+                });
+            }
         },
     } : {})));
     pgp.pg.defaults.max = 70;

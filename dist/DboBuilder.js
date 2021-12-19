@@ -2349,7 +2349,7 @@ export type TxCB = {
                     if (watchSchema &&
                         (!this.prostgles.isSuperUser || watchSchemaType === "queries") &&
                         (["CREATE", "ALTER", "DROP"].includes(command) ||
-                            //  Cover this case `CREATE TABLE mytable AS SELECT` 
+                            //  Cover this case: `CREATE TABLE mytable AS SELECT` 
                             query && query.toLowerCase().replace(/\s\s+/g, ' ').includes("create table"))) {
                         this.prostgles.onSchemaChange({ command, query });
                     }

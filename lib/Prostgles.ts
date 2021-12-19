@@ -50,6 +50,15 @@ function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts |
                         }
                     });
                 }
+                if (isFresh && !client.listeners('error').length) {
+                    client.on('error', function (msg) {
+                        if(onNotice){
+                            onNotice(msg, get(msg, "message"));
+                        } else {
+                            console.log("error: %j", get(msg, "message"));
+                        }
+                    });
+                }
             },
         } : {})
     });
