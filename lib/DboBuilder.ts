@@ -1847,9 +1847,13 @@ export class TableHandler extends ViewHandler {
                 selectParams = filterObj(params || {}, [], ["throttle"]);
 
             // const { subOne = false } = localParams || {};
+            const filterSize = JSON.stringify(filter || {}).length;
+            if(filterSize * 4 > 2704){
+                throw "filter too big. Might exceed the btree version 4 maximum 2704"
+            }
             
             if(!localFunc) {
-                if(!this.dboBuilder.prostgles.isSuperUser) throw "Subscribe no possible. 1853";
+                if(!this.dboBuilder.prostgles.isSuperUser) throw "Subscribe not possible. Must be superuser to add triggers 1856";
                 return await this.find(filter, { ...selectParams, limit: 0 }, null, table_rules, localParams)
                     .then(async isValid => {
         

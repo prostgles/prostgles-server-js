@@ -1354,9 +1354,13 @@ class TableHandler extends ViewHandler {
             }
             const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {}, condition = await this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: null, localParams, tableRule: table_rules }), throttle = utils_1.get(params, "throttle") || 0, selectParams = PubSubManager_1.filterObj(params || {}, [], ["throttle"]);
             // const { subOne = false } = localParams || {};
+            const filterSize = JSON.stringify(filter || {}).length;
+            if (filterSize * 4 > 2704) {
+                throw "filter too big. Might exceed the btree version 4 maximum 2704";
+            }
             if (!localFunc) {
                 if (!this.dboBuilder.prostgles.isSuperUser)
-                    throw "Subscribe no possible. 1853";
+                    throw "Subscribe not possible. Must be superuser to add triggers 1856";
                 return await this.find(filter, Object.assign(Object.assign({}, selectParams), { limit: 0 }), null, table_rules, localParams)
                     .then(async (isValid) => {
                     const { socket = null } = localParams;
