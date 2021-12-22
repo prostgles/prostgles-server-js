@@ -1039,7 +1039,16 @@ export class ViewHandler {
         try {
             return await this.find(filter, { ...selectParams, limit: 2 }, null, table_rules, localParams)
                 .then(async _allowed => {
-                    const q: string = await this.find(filter, { ...selectParams }, null, table_rules, { ...localParams, returnQuery: true }) as any;
+                    let rules: TableRule = table_rules || {};
+                    rules.select.maxLimit = Number.MAX_SAFE_INTEGER;
+                    rules.select.fields = rules.select.fields || "*";
+
+                    const q: string = await this.find(
+                        filter, { ...selectParams, limit: selectParams?.limit ?? Number.MAX_SAFE_INTEGER }, 
+                        null, 
+                        rules, 
+                        { ...localParams, returnQuery: true }
+                    ) as any;
                     const query = `
                         SELECT sum(pg_column_size((prgl_size_query.*))) as size 
                         FROM (

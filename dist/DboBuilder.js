@@ -682,7 +682,11 @@ class ViewHandler {
         try {
             return await this.find(filter, Object.assign(Object.assign({}, selectParams), { limit: 2 }), null, table_rules, localParams)
                 .then(async (_allowed) => {
-                const q = await this.find(filter, Object.assign({}, selectParams), null, table_rules, Object.assign(Object.assign({}, localParams), { returnQuery: true }));
+                var _a;
+                let rules = table_rules || {};
+                rules.select.maxLimit = Number.MAX_SAFE_INTEGER;
+                rules.select.fields = rules.select.fields || "*";
+                const q = await this.find(filter, Object.assign(Object.assign({}, selectParams), { limit: (_a = selectParams === null || selectParams === void 0 ? void 0 : selectParams.limit) !== null && _a !== void 0 ? _a : Number.MAX_SAFE_INTEGER }), null, rules, Object.assign(Object.assign({}, localParams), { returnQuery: true }));
                 const query = `
                         SELECT sum(pg_column_size((prgl_size_query.*))) as size 
                         FROM (
