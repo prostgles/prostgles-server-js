@@ -192,18 +192,24 @@ exports.parseFilterItem = (args) => {
         else if (["$in"].includes(fOpType)) {
             if (!(fVal === null || fVal === void 0 ? void 0 : fVal.length))
                 throw "$in filter array is empty";
-            let res = leftQ + " IN " + parseRightVal(fVal, "csv");
+            let _fVal = fVal.filter(v => v !== null);
+            let c1 = "", c2 = "";
+            if (_fVal.length)
+                c1 = leftQ + " IN " + parseRightVal(_fVal, "csv");
             if (fVal.includes(null))
-                res += ` OR ${leftQ} IS NULL `;
-            return res;
+                c2 = ` ${leftQ} IS NULL `;
+            return [c1, c2].filter(c => c).join(" OR ");
         }
         else if (["$nin"].includes(fOpType)) {
             if (!(fVal === null || fVal === void 0 ? void 0 : fVal.length))
                 throw "$nin filter array is empty";
-            let res = leftQ + " NOT IN " + parseRightVal(fVal, "csv");
+            let _fVal = fVal.filter(v => v !== null);
+            let c1 = "", c2 = "";
+            if (_fVal.length)
+                c1 = leftQ + " NOT IN " + parseRightVal(_fVal, "csv");
             if (fVal.includes(null))
-                res += ` AND ${leftQ} IS NOT NULL `;
-            return res;
+                c2 = ` ${leftQ} IS NOT NULL `;
+            return [c1, c2].filter(c => c).join(" AND ");
         }
         else if (["$between"].includes(fOpType)) {
             if (!Array.isArray(fVal) || fVal.length !== 2) {
