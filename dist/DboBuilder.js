@@ -677,6 +677,27 @@ class ViewHandler {
             throw { err: parseError(e), msg: `Issue with dbo.${this.name}.count()` };
         }
     }
+    async size(filter, selectParams, param3_unused, table_rules, localParams = {}) {
+        filter = filter || {};
+        try {
+            return await this.find(filter, Object.assign(Object.assign({}, selectParams), { limit: 2 }), null, table_rules, localParams)
+                .then(async (_allowed) => {
+                const q = await this.find(filter, Object.assign({}, selectParams), null, table_rules, Object.assign(Object.assign({}, localParams), { returnQuery: true }));
+                const query = `
+                        SELECT sum(pg_column_size((prgl_size_query.*))) as size 
+                        FROM (
+                            ${q}
+                        ) prgl_size_query
+                    `;
+                return (this.t || this.db).one(query, { _psqlWS_tableName: this.name }).then(({ size }) => size || '0');
+            });
+        }
+        catch (e) {
+            if (localParams && localParams.testRule)
+                throw e;
+            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.size()` };
+        }
+    }
     getAllowedSelectFields(selectParams = "*", allowed_cols, allow_empty = true) {
         let all_columns = this.column_names.slice(0), allowedFields = all_columns.slice(0), resultFields = [];
         if (selectParams) {
@@ -2071,13 +2092,15 @@ class DboBuilder {
                     }
                 }
                 if (this.prostgles.isSuperUser) {
-                    console.warn(`subscribe and sync cannot be used because db user is not a superuser `);
                     this._pubSubManager = await PubSubManager_1.PubSubManager.create({
                         dboBuilder: this,
                         db: this.db,
                         dbo: this.dbo,
                         onSchemaChange
                     });
+                }
+                else {
+                    console.warn(`subscribe and sync cannot be used because db user is not a superuser `);
                 }
             }
             return this._pubSubManager;

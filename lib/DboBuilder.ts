@@ -1034,6 +1034,27 @@ export class ViewHandler {
         } 
     }
 
+    async size(filter?: Filter, selectParams?: SelectParams, param3_unused?, table_rules?: TableRule, localParams: any = {}): Promise<string>{
+        filter = filter || {};
+        try {
+            return await this.find(filter, { ...selectParams, limit: 2 }, null, table_rules, localParams)
+                .then(async _allowed => {
+                    const q: string = await this.find(filter, { ...selectParams }, null, table_rules, { ...localParams, returnQuery: true }) as any;
+                    const query = `
+                        SELECT sum(pg_column_size((prgl_size_query.*))) as size 
+                        FROM (
+                            ${q}
+                        ) prgl_size_query
+                    `;
+                    
+                    return (this.t || this.db).one(query, { _psqlWS_tableName: this.name }).then(({ size }) => size || '0');
+                });
+        } catch(e){
+            if(localParams && localParams.testRule) throw e;
+            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.size()` };
+        } 
+    }
+
     getAllowedSelectFields(selectParams: FieldFilter = "*", allowed_cols: FieldFilter, allow_empty: boolean = true): string[] {
         let all_columns = this.column_names.slice(0),
             allowedFields = all_columns.slice(0),
@@ -2717,13 +2738,14 @@ export class DboBuilder {
             }
 
             if(this.prostgles.isSuperUser){
-                console.warn(`subscribe and sync cannot be used because db user is not a superuser `)
                 this._pubSubManager = await PubSubManager.create({
                     dboBuilder: this,
                     db: this.db, 
                     dbo: this.dbo as unknown as DbHandler,
                     onSchemaChange
                 });
+            } else {
+                console.warn(`subscribe and sync cannot be used because db user is not a superuser `)
             }
         }
 

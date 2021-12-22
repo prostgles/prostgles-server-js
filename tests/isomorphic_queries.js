@@ -176,7 +176,6 @@ async function isomorphic(db) {
     });
     await tryRun("$unnest_words", async () => {
         const res = await db.various.find({}, { returnType: "values", select: { name: "$unnest_words" } });
-        console.trace(res);
         assert_1.strict.deepStrictEqual(res, [
             'abc9',
             'abc1',
@@ -378,238 +377,244 @@ async function isomorphic(db) {
         console.log("TODO: socket.io stringifies dates");
     });
     await tryRun("Postgis examples", async () => {
-        await db.shapes.delete();
-        const p1 = { ST_GeomFromText: ["POINT(-1 1)", 4326] }, p2 = { ST_GeomFromText: ["POINT(-2 2)", 4326] };
-        await db.shapes.insert([
-            { geom: p1, geog: p1 },
-            { geom: p2, geog: p2 },
-        ]);
-        /** Basic functions and extent filters */
-        const f = await db.shapes.findOne({ $and: [
-                { "geom.&&.st_makeenvelope": [
-                        -3, 2,
-                        -2, 2
-                    ] },
-                { "geog.&&.st_makeenvelope": [
-                        -3, 2,
-                        -2, 2
-                    ] }
-            ]
-        }, {
-            select: {
-                geomTxt: { "$ST_AsText": ["geom"] },
-                geomGeo: { "$ST_AsGeoJSON": ["geom"] },
-            },
-            orderBy: "geom"
-        });
-        assert_1.strict.deepStrictEqual(f, {
-            geomGeo: {
-                coordinates: [-2, 2],
-                type: 'Point'
-            },
-            geomTxt: 'POINT(-2 2)'
-        });
-        /**Aggregate functions */
-        const aggs = await db.shapes.findOne({}, {
-            select: {
-                xMin: { "$ST_XMin_Agg": ["geom"] },
-                xMax: { "$ST_XMax_Agg": ["geom"] },
-                yMin: { "$ST_YMin_Agg": ["geom"] },
-                yMax: { "$ST_YMax_Agg": ["geom"] },
-                zMin: { "$ST_ZMin_Agg": ["geom"] },
-                zMax: { "$ST_ZMax_Agg": ["geom"] },
-                extent: { "$ST_Extent": ["geom"] },
-                //  extent3D: { "$ST_3DExtent": ["geom"] },
-            },
-        });
-        assert_1.strict.deepStrictEqual(aggs, {
-            xMax: -1,
-            xMin: -2,
-            yMax: 2,
-            yMin: 1,
-            zMax: 0,
-            zMin: 0,
-            extent: 'BOX(-2 1,-1 2)',
-            //  extent3D: 'BOX3D(-2 1 0,-1 2 6.952908662134e-310)' <-- looks like a value that will fail tests at some point
-        });
-    });
-    await tryRun("Local file upload", async () => {
-        let str = "This is a string", data = Buffer.from(str, "utf-8"), mediaFile = { data, name: "sample_file.txt" };
-        const file = await db.media.insert(mediaFile, { returning: "*" });
-        const _data = fs.readFileSync(__dirname + "/server/media/" + file.name);
-        assert_1.strict.equal(str, _data.toString('utf8'));
-        await tryRun("Nested insert", async () => {
-            const { name, media: { extension, content_type, original_name } } = await db.items_with_one_media.insert({ name: "somename.txt", media: mediaFile }, { returning: "*" });
-            assert_1.strict.deepStrictEqual({ extension, content_type, original_name }, {
-                extension: 'txt',
-                content_type: 'text/plain',
-                original_name: 'sample_file.txt',
+        await tryRun("Postgis examples", async () => {
+            await db.shapes.delete();
+            const p1 = { ST_GeomFromText: ["POINT(-1 1)", 4326] }, p2 = { ST_GeomFromText: ["POINT(-2 2)", 4326] };
+            await db.shapes.insert([
+                { geom: p1, geog: p1 },
+                { geom: p2, geog: p2 },
+            ]);
+            /** Basic functions and extent filters */
+            const f = await db.shapes.findOne({ $and: [
+                    { "geom.&&.st_makeenvelope": [
+                            -3, 2,
+                            -2, 2
+                        ] },
+                    { "geog.&&.st_makeenvelope": [
+                            -3, 2,
+                            -2, 2
+                        ] }
+                ]
+            }, {
+                select: {
+                    geomTxt: { "$ST_AsText": ["geom"] },
+                    geomGeo: { "$ST_AsGeoJSON": ["geom"] },
+                },
+                orderBy: "geom"
             });
-            // const _data = fs.readFileSync(__dirname + "/server/media/"+file.name);
-            assert_1.strict.equal(name, "somename.txt");
+            assert_1.strict.deepStrictEqual(f, {
+                geomGeo: {
+                    coordinates: [-2, 2],
+                    type: 'Point'
+                },
+                geomTxt: 'POINT(-2 2)'
+            });
+            /**Aggregate functions */
+            const aggs = await db.shapes.findOne({}, {
+                select: {
+                    xMin: { "$ST_XMin_Agg": ["geom"] },
+                    xMax: { "$ST_XMax_Agg": ["geom"] },
+                    yMin: { "$ST_YMin_Agg": ["geom"] },
+                    yMax: { "$ST_YMax_Agg": ["geom"] },
+                    zMin: { "$ST_ZMin_Agg": ["geom"] },
+                    zMax: { "$ST_ZMax_Agg": ["geom"] },
+                    extent: { "$ST_Extent": ["geom"] },
+                    //  extent3D: { "$ST_3DExtent": ["geom"] },
+                },
+            });
+            assert_1.strict.deepStrictEqual(aggs, {
+                xMax: -1,
+                xMin: -2,
+                yMax: 2,
+                yMin: 1,
+                zMax: 0,
+                zMin: 0,
+                extent: 'BOX(-2 1,-1 2)',
+                //  extent3D: 'BOX3D(-2 1 0,-1 2 6.952908662134e-310)' <-- looks like a value that will fail tests at some point
+            });
         });
-    });
-    await tryRun("Exists filter example", async () => {
-        const fo = await db.items.findOne(), f = await db.items.find();
-        assert_1.strict.deepStrictEqual(fo, { h: null, id: 1, name: 'a' }, "findOne query failed");
-        assert_1.strict.deepStrictEqual(f[0], { h: null, id: 1, name: 'a' }, "findOne query failed");
-    });
-    await tryRun("Basic exists", async () => {
-        const expect0 = await db.items.count({
-            $and: [
-                { $exists: { items2: { name: "a" } } },
-                { $exists: { items3: { name: "b" } } },
-            ]
+        await tryRun("Local file upload", async () => {
+            let str = "This is a string", data = Buffer.from(str, "utf-8"), mediaFile = { data, name: "sample_file.txt" };
+            const file = await db.media.insert(mediaFile, { returning: "*" });
+            const _data = fs.readFileSync(__dirname + "/server/media/" + file.name);
+            assert_1.strict.equal(str, _data.toString('utf8'));
+            await tryRun("Nested insert", async () => {
+                const { name, media: { extension, content_type, original_name } } = await db.items_with_one_media.insert({ name: "somename.txt", media: mediaFile }, { returning: "*" });
+                assert_1.strict.deepStrictEqual({ extension, content_type, original_name }, {
+                    extension: 'txt',
+                    content_type: 'text/plain',
+                    original_name: 'sample_file.txt',
+                });
+                // const _data = fs.readFileSync(__dirname + "/server/media/"+file.name);
+                assert_1.strict.equal(name, "somename.txt");
+            });
         });
-        assert_1.strict.equal(expect0, 0, "$exists query failed");
-    });
-    await tryRun("Basic fts with shorthand notation", async () => {
-        const res = await db.items.count({
-            $and: [
-                { $exists: { items2: { "name.@@.to_tsquery": ["a"] } } },
-                { $exists: { items3: { "name.@@.to_tsquery": ["b"] } } },
-            ]
+        await tryRun("Exists filter example", async () => {
+            const fo = await db.items.findOne(), f = await db.items.find();
+            assert_1.strict.deepStrictEqual(fo, { h: null, id: 1, name: 'a' }, "findOne query failed");
+            assert_1.strict.deepStrictEqual(f[0], { h: null, id: 1, name: 'a' }, "findOne query failed");
         });
-        // assert.deepStrictEqual(res, { name: 'a'})
-        assert_1.strict.equal(res, 0, "FTS query failed");
-    });
-    await tryRun("Exists with shortest path wildcard filter example", async () => {
-        const expect2 = await db.items.find({
-            $and: [
-                { $existsJoined: { "**.items3": { name: "a" } } },
-                { $existsJoined: { items2: { name: "a" } } }
-            ]
+        await tryRun("Result size", async () => {
+            const is75bits = await db.items.size({}, { select: { name: 1 } });
+            assert_1.strict.equal(is75bits, '75', "Result size query failed");
         });
-        assert_1.strict.equal(expect2.length, 2, "$existsJoined query failed");
-    });
-    await tryRun("Exists with exact path filter example", async () => {
-        const _expect2 = await db.items.find({
-            $and: [
-                // { "items2": { name: "a" } },
-                // { "items2.items3": { name: "a" } },
-                { $existsJoined: { items2: { name: "a" } } }
-            ]
+        await tryRun("Basic exists", async () => {
+            const expect0 = await db.items.count({
+                $and: [
+                    { $exists: { items2: { name: "a" } } },
+                    { $exists: { items3: { name: "b" } } },
+                ]
+            });
+            assert_1.strict.equal(expect0, 0, "$exists query failed");
         });
-        assert_1.strict.equal(_expect2.length, 2, "$existsJoined query failed");
-    });
-    await tryRun("Not Exists with exact path filter example", async () => {
-        const _expect1 = await db.items.find({
-            $and: [
-                // { "items2": { name: "a" } },
-                // { "items2.items3": { name: "a" } },
-                { $notExistsJoined: { items2: { name: "a" } } }
-            ]
+        await tryRun("Basic fts with shorthand notation", async () => {
+            const res = await db.items.count({
+                $and: [
+                    { $exists: { items2: { "name.@@.to_tsquery": ["a"] } } },
+                    { $exists: { items3: { "name.@@.to_tsquery": ["b"] } } },
+                ]
+            });
+            // assert.deepStrictEqual(res, { name: 'a'})
+            assert_1.strict.equal(res, 0, "FTS query failed");
         });
-        assert_1.strict.equal(_expect1.length, 1, "$notExistsJoined query failed");
-    });
-    /* Upsert */
-    await tryRun("Upsert example", async () => {
-        await db.items.upsert({ name: "tx" }, { name: "tx" });
-        await db.items.upsert({ name: "tx" }, { name: "tx" });
-        assert_1.strict.equal(await db.items.count({ name: "tx" }), 1, "upsert command failed");
-    });
-    /* Joins example */
-    await tryRun("Joins example", async () => {
-        const items = await db.items.find({}, {
-            select: {
-                "*": 1,
-                items3: "*",
-                items22: db.leftJoin.items2({}, "*")
+        await tryRun("Exists with shortest path wildcard filter example", async () => {
+            const expect2 = await db.items.find({
+                $and: [
+                    { $existsJoined: { "**.items3": { name: "a" } } },
+                    { $existsJoined: { items2: { name: "a" } } }
+                ]
+            });
+            assert_1.strict.equal(expect2.length, 2, "$existsJoined query failed");
+        });
+        await tryRun("Exists with exact path filter example", async () => {
+            const _expect2 = await db.items.find({
+                $and: [
+                    // { "items2": { name: "a" } },
+                    // { "items2.items3": { name: "a" } },
+                    { $existsJoined: { items2: { name: "a" } } }
+                ]
+            });
+            assert_1.strict.equal(_expect2.length, 2, "$existsJoined query failed");
+        });
+        await tryRun("Not Exists with exact path filter example", async () => {
+            const _expect1 = await db.items.find({
+                $and: [
+                    // { "items2": { name: "a" } },
+                    // { "items2.items3": { name: "a" } },
+                    { $notExistsJoined: { items2: { name: "a" } } }
+                ]
+            });
+            assert_1.strict.equal(_expect1.length, 1, "$notExistsJoined query failed");
+        });
+        /* Upsert */
+        await tryRun("Upsert example", async () => {
+            await db.items.upsert({ name: "tx" }, { name: "tx" });
+            await db.items.upsert({ name: "tx" }, { name: "tx" });
+            assert_1.strict.equal(await db.items.count({ name: "tx" }), 1, "upsert command failed");
+        });
+        /* Joins example */
+        await tryRun("Joins example", async () => {
+            const items = await db.items.find({}, {
+                select: {
+                    "*": 1,
+                    items3: "*",
+                    items22: db.leftJoin.items2({}, "*")
+                }
+            });
+            if (!items.length || !items.every(it => Array.isArray(it.items3) && Array.isArray(it.items22))) {
+                console.log(items[0].items3);
+                throw "Joined select query failed";
             }
         });
-        if (!items.length || !items.every(it => Array.isArray(it.items3) && Array.isArray(it.items22))) {
-            console.log(items[0].items3);
-            throw "Joined select query failed";
-        }
-    });
-    /* Joins duplicate table example */
-    await tryRun("Joins repeating table example", async () => {
-        const items2 = await db.items.find({}, {
-            select: {
-                "*": 1,
-                items2: "*"
+        /* Joins duplicate table example */
+        await tryRun("Joins repeating table example", async () => {
+            const items2 = await db.items.find({}, {
+                select: {
+                    "*": 1,
+                    items2: "*"
+                }
+            });
+            const items2j = await db.items.find({}, {
+                select: {
+                    "*": 1,
+                    items2: "*",
+                    items2j: db.leftJoin.items2({}, "*")
+                }
+            });
+            items2.forEach((d, i) => {
+                assert_1.strict.deepStrictEqual(d.items2, items2j[i].items2, "Joins duplicate aliased table query failed");
+                assert_1.strict.deepStrictEqual(d.items2, items2j[i].items2j, "Joins duplicate aliased table query failed");
+            });
+        });
+        await tryRun("Join aggregate functions example", async () => {
+            const singleShortHandAgg = await db.items.findOne({}, { select: { id: "$max" } });
+            const singleAgg = await db.items.findOne({}, { select: { id: { "$max": ["id"] } } });
+            assert_1.strict.deepStrictEqual(singleShortHandAgg, { id: 4 });
+            assert_1.strict.deepStrictEqual(singleAgg, { id: 4 });
+            const shortHandAggJoined = await db.items.findOne({ id: 4 }, { select: { id: 1, items2: { name: "$max" } } });
+            assert_1.strict.deepStrictEqual(shortHandAggJoined, { id: 4, items2: [] });
+            // console.log(JSON.stringify(shortHandAggJoined, null, 2));
+            // throw 1;
+            /* TODO joins & aggs */
+            // const aggsJoined = await db.items.find(
+            //   {}, 
+            //   { 
+            //     select: {
+            //       id: "$count", 
+            //       name: 1,
+            //       items2: {
+            //         id: 1
+            //       }
+            //     },
+            //     orderBy: {
+            //       id: -1
+            //     }
+            //   }
+            // );
+            // console.log(JSON.stringify(aggsJoined, null, 2))
+            // assert.deepStrictEqual(aggsJoined, [
+            //   {
+            //     "name": "a",
+            //     "items2": [
+            //       {
+            //         "id": 1
+            //       },
+            //       {
+            //         "id": 1
+            //       }
+            //     ],
+            //     "id": "2"
+            //   },
+            //   {
+            //     "name": "b",
+            //     "items2": [],
+            //     "id": "1"
+            //   },
+            //   {
+            //     "name": "tx",
+            //     "items2": [],
+            //     "id": "1"
+            //   }
+            // ], "Joined aggregation query failed");
+        });
+        /* $rowhash -> Custom column that returms md5(ctid + allowed select columns). Used in joins & CRUD to bypass PKey details */
+        await tryRun("$rowhash example", async () => {
+            const rowhash = await db.items.findOne({}, { select: { $rowhash: 1, "*": 1 } });
+            const f = { $rowhash: rowhash.$rowhash };
+            const rowhashView = await db.v_items.findOne({}, { select: { $rowhash: 1 } });
+            const rh1 = await db.items.findOne({ $rowhash: rowhash.$rowhash }, { select: { $rowhash: 1 } });
+            const rhView = await db.v_items.findOne({ $rowhash: rowhashView.$rowhash }, { select: { $rowhash: 1 } });
+            // console.log({ rowhash, f });
+            await db.items.update(f, { name: 'a' });
+            // console.log(rowhash, rh1)
+            // console.log(rowhashView, rhView)
+            if (typeof rowhash.$rowhash !== "string" ||
+                typeof rowhashView.$rowhash !== "string" ||
+                rowhash.$rowhash !== rh1.$rowhash ||
+                rowhashView.$rowhash !== rhView.$rowhash) {
+                throw "$rowhash query failed";
             }
         });
-        const items2j = await db.items.find({}, {
-            select: {
-                "*": 1,
-                items2: "*",
-                items2j: db.leftJoin.items2({}, "*")
-            }
-        });
-        items2.forEach((d, i) => {
-            assert_1.strict.deepStrictEqual(d.items2, items2j[i].items2, "Joins duplicate aliased table query failed");
-            assert_1.strict.deepStrictEqual(d.items2, items2j[i].items2j, "Joins duplicate aliased table query failed");
-        });
-    });
-    await tryRun("Join aggregate functions example", async () => {
-        const singleShortHandAgg = await db.items.findOne({}, { select: { id: "$max" } });
-        const singleAgg = await db.items.findOne({}, { select: { id: { "$max": ["id"] } } });
-        assert_1.strict.deepStrictEqual(singleShortHandAgg, { id: 4 });
-        assert_1.strict.deepStrictEqual(singleAgg, { id: 4 });
-        const shortHandAggJoined = await db.items.findOne({ id: 4 }, { select: { id: 1, items2: { name: "$max" } } });
-        assert_1.strict.deepStrictEqual(shortHandAggJoined, { id: 4, items2: [] });
-        // console.log(JSON.stringify(shortHandAggJoined, null, 2));
-        // throw 1;
-        /* TODO joins & aggs */
-        // const aggsJoined = await db.items.find(
-        //   {}, 
-        //   { 
-        //     select: {
-        //       id: "$count", 
-        //       name: 1,
-        //       items2: {
-        //         id: 1
-        //       }
-        //     },
-        //     orderBy: {
-        //       id: -1
-        //     }
-        //   }
-        // );
-        // console.log(JSON.stringify(aggsJoined, null, 2))
-        // assert.deepStrictEqual(aggsJoined, [
-        //   {
-        //     "name": "a",
-        //     "items2": [
-        //       {
-        //         "id": 1
-        //       },
-        //       {
-        //         "id": 1
-        //       }
-        //     ],
-        //     "id": "2"
-        //   },
-        //   {
-        //     "name": "b",
-        //     "items2": [],
-        //     "id": "1"
-        //   },
-        //   {
-        //     "name": "tx",
-        //     "items2": [],
-        //     "id": "1"
-        //   }
-        // ], "Joined aggregation query failed");
-    });
-    /* $rowhash -> Custom column that returms md5(ctid + allowed select columns). Used in joins & CRUD to bypass PKey details */
-    await tryRun("$rowhash example", async () => {
-        const rowhash = await db.items.findOne({}, { select: { $rowhash: 1, "*": 1 } });
-        const f = { $rowhash: rowhash.$rowhash };
-        const rowhashView = await db.v_items.findOne({}, { select: { $rowhash: 1 } });
-        const rh1 = await db.items.findOne({ $rowhash: rowhash.$rowhash }, { select: { $rowhash: 1 } });
-        const rhView = await db.v_items.findOne({ $rowhash: rowhashView.$rowhash }, { select: { $rowhash: 1 } });
-        // console.log({ rowhash, f });
-        await db.items.update(f, { name: 'a' });
-        // console.log(rowhash, rh1)
-        // console.log(rowhashView, rhView)
-        if (typeof rowhash.$rowhash !== "string" ||
-            typeof rowhashView.$rowhash !== "string" ||
-            rowhash.$rowhash !== rh1.$rowhash ||
-            rowhashView.$rowhash !== rhView.$rowhash) {
-            throw "$rowhash query failed";
-        }
     });
 }
 exports.default = isomorphic;

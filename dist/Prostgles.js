@@ -558,7 +558,7 @@ const RULE_TO_METHODS = [
     {
         rule: "select",
         sqlRule: "select",
-        methods: ["findOne", "find", "count"],
+        methods: ["findOne", "find", "count", "size"],
         no_limits: { fields: "*", filterFields: "*" },
         table_only: false,
         allowed_params: ["fields", "filterFields", "forcedFilter", "validate", "maxLimit"],

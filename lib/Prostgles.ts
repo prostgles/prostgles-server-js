@@ -1075,7 +1075,7 @@ const RULE_TO_METHODS = [
    { 
        rule: "select", 
        sqlRule: "select",
-       methods: ["findOne", "find", "count"], 
+       methods: ["findOne", "find", "count", "size"], 
        no_limits: <SelectRule>{ fields: "*", filterFields: "*" }, 
        table_only: false,
        allowed_params: <Array<keyof SelectRule>>["fields", "filterFields", "forcedFilter", "validate", "maxLimit"] ,

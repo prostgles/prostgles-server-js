@@ -174,7 +174,7 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
 
   await tryRun("$unnest_words", async () => {
     const res = await db.various.find({}, { returnType: "values", select: { name: "$unnest_words" } });
-    console.trace(res)
+
     assert.deepStrictEqual( res,  [
       'abc9',
       'abc1',
@@ -430,6 +430,8 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
   });
 
   await tryRun("Postgis examples", async () => {
+
+  await tryRun("Postgis examples", async () => {
     await db.shapes.delete();
     const p1 = { ST_GeomFromText: ["POINT(-1 1)", 4326] },
       p2 = { ST_GeomFromText: ["POINT(-2 2)", 4326] };
@@ -523,6 +525,12 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
       
     assert.deepStrictEqual(fo,    { h: null, id: 1, name: 'a' }, "findOne query failed" );
     assert.deepStrictEqual(f[0],  { h: null, id: 1, name: 'a' }, "findOne query failed" );
+  });
+
+  await tryRun("Result size", async () => {
+    const is75bits = await db.items.size({ 
+    }, { select: { name: 1 } });
+    assert.equal(is75bits, '75', "Result size query failed")
   });
 
   await tryRun("Basic exists", async () => {
