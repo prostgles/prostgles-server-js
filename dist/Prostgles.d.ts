@@ -46,9 +46,9 @@ export declare type SelectRule = {
      */
     fields: FieldFilter;
     /**
-     * The maximum number of rows a user can get in a select query. 1000 by default. Unless a higher limit is specified 100 rows are returned by the default
+     * The maximum number of rows a user can get in a select query. null by default. Unless a null or higher limit is specified 100 rows will be returned by the default
      */
-    maxLimit?: number;
+    maxLimit?: number | null;
     /**
      * Filter added to every query (e.g. user_id) to restrict access
      */

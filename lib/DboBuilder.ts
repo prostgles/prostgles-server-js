@@ -841,10 +841,11 @@ export class ViewHandler {
             if(tableRules.select){
                 if(!tableRules.select.fields) return throwFieldsErr("select");
                 
-                let maxLimit = 1000;
-                if(tableRules.select.maxLimit !== undefined){
-                    if(maxLimit !== null && (!Number.isInteger(maxLimit) || maxLimit < 0)) throw ` Invalid publish.${this.name}.select.maxLimit -> expecting   a positive integer OR null    but got ` + maxLimit;
-                    maxLimit = tableRules.select.maxLimit;
+                let maxLimit = null;
+                if(tableRules.select.maxLimit !== undefined && tableRules.select.maxLimit !== maxLimit){
+                    const ml = tableRules.select.maxLimit;
+                    if(ml !== null && (!Number.isInteger(ml) || ml < 0)) throw ` Invalid publish.${this.name}.select.maxLimit -> expecting   a positive integer OR null    but got ` + ml;
+                    maxLimit = ml;
                 }
             
                 res.select = {
@@ -1039,14 +1040,14 @@ export class ViewHandler {
         try {
             return await this.find(filter, { ...selectParams, limit: 2 }, null, table_rules, localParams)
                 .then(async _allowed => {
-                    let rules: TableRule = table_rules || {};
-                    rules.select.maxLimit = Number.MAX_SAFE_INTEGER;
-                    rules.select.fields = rules.select.fields || "*";
+                    // let rules: TableRule = table_rules || {};
+                    // rules.select.maxLimit = Number.MAX_SAFE_INTEGER;
+                    // rules.select.fields = rules.select.fields || "*";
 
                     const q: string = await this.find(
                         filter, { ...selectParams, limit: selectParams?.limit ?? Number.MAX_SAFE_INTEGER }, 
                         null, 
-                        rules, 
+                        table_rules, 
                         { ...localParams, returnQuery: true }
                     ) as any;
                     const query = `
@@ -1608,7 +1609,7 @@ export class ViewHandler {
     }
 
     /* This relates only to SELECT */
-    prepareLimitQuery(limit, p: ValidatedTableRules): number {
+    prepareLimitQuery(limit = 1000, p: ValidatedTableRules): number {
 
         if(limit !== undefined && limit !== null && !Number.isInteger(limit)){
             throw "Unexpected LIMIT. Must be null or an integer";
@@ -1616,16 +1617,21 @@ export class ViewHandler {
         
         let _limit = limit;
 
+        // if(_limit === undefined && p.select.maxLimit === null){
+        //     _limit = 1000;
+
         /* If no limit then set as the lesser of (100, maxLimit) */
-        if(_limit !== null && !Number.isInteger(_limit)){
+        // } else 
+        if(_limit !== null && !Number.isInteger(_limit) && p.select.maxLimit !== null){
             _limit = [100, p.select.maxLimit].filter(Number.isInteger).sort((a, b) => a - b)[0];
         } else {
 
             /* If a limit higher than maxLimit specified throw error */
             if(Number.isInteger(p.select.maxLimit) && _limit > p.select.maxLimit){
-                throw "Unexpected LIMIT. Must be less than " + p.select.maxLimit;
+                throw `Unexpected LIMIT ${_limit}. Must be less than the published maxLimit: ` + p.select.maxLimit;
             }
         }
+
 
         return _limit;
     }

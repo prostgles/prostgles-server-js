@@ -255,7 +255,7 @@ export declare class ViewHandler {
         tableRules?: TableRule;
     }): Promise<string>;
     prepareSort(orderBy: OrderBy, allowed_cols: any, tableAlias: string, excludeOrder: boolean, select: SelectItem[]): string;
-    prepareLimitQuery(limit: any, p: ValidatedTableRules): number;
+    prepareLimitQuery(limit: number, p: ValidatedTableRules): number;
     prepareOffsetQuery(offset: number): number;
     intersectColumns(allowedFields: FieldFilter, dissallowedFields: FieldFilter, fixIssues?: boolean): string[];
     /**
