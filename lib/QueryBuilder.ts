@@ -651,7 +651,7 @@ export const FUNCTIONS: FunctionSpec[] = [
         if(bad_keys.length) throw "Invalid options provided for $term_highlight. Expecting one of: " + validKeys.join(", ");
       }
       if(!cols.length) throw "Cols are empty/invalid";
-      if(typeof term !== "string") throw "No string term provided";
+      if(typeof term !== "string") throw "Non string term provided: " + term;
       if(edgeTruncate !== undefined && (!Number.isInteger(edgeTruncate) || edgeTruncate < -1)) throw "Invalid edgeTruncate. expecting a positive integer";
       if(typeof noFields !== "boolean") throw "Invalid noFields. expecting boolean";
       const RETURN_TYPES = ["index", "boolean", "object"];
@@ -711,21 +711,24 @@ export const FUNCTIONS: FunctionSpec[] = [
 
       } else if(returnType === "object" || returnType === "boolean"){
         const hasChars = Boolean(rawTerm &&  /[a-z]/i.test(rawTerm));
-        const _cols = cols.map(c => {
-          const colInfo = allColumns.find(ac => ac.name === c);
-          return {
-            key: c,
-            colInfo
-          }
-        })
-        .filter(c => !c.colInfo || c.colInfo.udt_name !== "bytea")
-        .filter(c => 
+        let validCols = cols.map(c => {
+            const colInfo = allColumns.find(ac => ac.name === c);
+            return {
+              key: c,
+              colInfo
+            }
+          })
+          .filter(c => c.colInfo && c.colInfo.udt_name !== "bytea")
+        
+        let _cols = validCols.filter(c => 
           /** Exclude numeric columns when the search tern contains a character */
           !hasChars ||  
-          c.colInfo?.udt_name && 
           postgresToTsType(c.colInfo.udt_name) !== "number"
         );
+
+        /** This will break GROUP BY (non-integer constant in GROUP BY) */
         if(!_cols.length){
+          if(validCols.length && hasChars) throw `You're searching the impossible: characters in numeric fields. Use this to prevent making such a request in future: /[a-z]/i.test(your_term) `
           return (returnType === "boolean")? "FALSE" : "NULL"
         }
         res = `CASE 
@@ -1345,76 +1348,88 @@ export function makeQuery(
       return jres;
     }))
   }
+
+  const getGroupBy = (rootSelectItems: SelectItem[], groupByItems: SelectItem[]): string => {
+    if(groupByItems.length){
+      /** Root Select column index number is used where possible to prevent "non-integer constant in GROUP BY" error */
+
+      return `GROUP BY ` + groupByItems.map(gi => {
+        const idx = rootSelectItems.findIndex(si => si.alias === gi.alias);
+        if(idx < 0) throw `Could not find GROUP BY column ${gi.alias} in ROOT SELECT ${rootSelectItems.map(s => s.alias)}`;
+        return idx + 1;
+      }).join(", ")
+    }
+
+    return ""
+  }
       
   /* Leaf query -> no joins -> return simple query */
   const aggs = q.select.filter(s => s.type === "aggregation");
   const nonAggs = q.select.filter(s => depth || s.selected).filter(s => s.type !== "aggregation");
   if(!joins.length){
-      /* Nested queries contain all fields to allow joining */
-      let 
-        // select = q.select.filter(s => joinFields.includes(s.alias) || s.selected).map(s => {
-        //   if(s.type === "aggregation"){
-        //     /* Rename aggs to avoid collision with join cols */
-        //     return s.getQuery(!depth? undefined : `agg_${s.alias}`) + " AS " + asName(s.alias);
-        //   }
-        //   return s.getQuery() + " AS " + asName(s.alias);
-        // }),
-        groupBy = "";
-      // console.log(select, q);
+    /* Nested queries contain all fields to allow joining */
+    let groupBy = "";
 
-      /* If aggs exist need to set groupBy add joinFields into select */
-      if(aggs.length || selectParams?.groupBy){
-          // const missingFields = joinFields.filter(jf => !q.select.find(s => s.type === "column" && s.alias === jf));
-          // if(depth && missingFields.length){
-          //     // select = Array.from(new Set(missingFields.concat(select)));
+    const rootSelectItems = q.select.filter(s => joinFields.includes(s.getQuery()) || s.selected)
+
+    /* If aggs exist need to set groupBy add joinFields into select */
+    if(aggs.length || selectParams?.groupBy){
+        // const missingFields = joinFields.filter(jf => !q.select.find(s => s.type === "column" && s.alias === jf));
+        // if(depth && missingFields.length){
+        //     // select = Array.from(new Set(missingFields.concat(select)));
+        // }
+
+        if(nonAggs.length){
+          let groupByFields = nonAggs.filter(sf => !depth || joinFields.includes(sf.getQuery()));
+          groupBy = getGroupBy(rootSelectItems, groupByFields);
+          // if(groupByFields.length){
+          //   groupBy = `GROUP BY ${groupByFields.map(sf => sf.type === "function"? sf.getQuery() :  asName(sf.alias)).join(", ")}\n`;
           // }
+        }
+    }
 
-          if(nonAggs.length){
-            let groupByFields = nonAggs.filter(sf => !depth || joinFields.includes(sf.getQuery()));
-            if(groupByFields.length){
-              groupBy = `GROUP BY ${groupByFields.map(sf => sf.type === "function"? sf.getQuery() :  asName(sf.alias)).join(", ")}\n`;
+    // console.log(q.select, joinFields)
+    let simpleQuery = indJ(depth, [
+        `-- 0. or 5. [leaf query] `
+        
+        /* Group by selected fields + any join fields */
+    ,   `SELECT ` + rootSelectItems.map(s => {
+            // return s.getQuery() + ((s.type !== "column")? (" AS " + s.alias) : "")
+            
+            if(s.type === "aggregation"){
+              /* Rename aggs to avoid collision with join cols */
+              return s.getQuery() + " AS " + asName((depth? "agg_" : "") + s.alias);
             }
-          }
-      }
-      // console.log(q.select, joinFields)
-      let fres = indJ(depth, [
-          `-- 0. or 5. [leaf query] `
-          
-          /* Group by selected fields + any join fields */
-      ,   `SELECT ` + q.select.filter(s => joinFields.includes(s.getQuery()) || s.selected).map(s => {
-              // return s.getQuery() + ((s.type !== "column")? (" AS " + s.alias) : "")
-              
-              if(s.type === "aggregation"){
-                /* Rename aggs to avoid collision with join cols */
-                return s.getQuery() + " AS " + asName((depth? "agg_" : "") + s.alias);
-              }
-              return s.getQuery() + " AS " + asName(s.alias)
-        }).join(", ")
-      ,   `FROM ${asName(q.table)} `
-      ,   q.where
-      ,   groupBy //!aggs.length? "" : `GROUP BY ${nonAggs.map(sf => asName(sf.alias)).join(", ")}`,
-      ,   q.having? `HAVING ${q.having}` : ""
-      ,   q.orderBy.join(", ")
-      ,   !depth? `LIMIT ${q.limit} ` : null
-      ,   !depth? `OFFSET ${q.offset || 0} ` : null
-      ].filter(v => v && (v + "").trim().length) as unknown as string[]);
-      // console.log(fres);
-      return fres;
+            return s.getQuery() + " AS " + asName(s.alias)
+      }).join(", ")
+    ,   `FROM ${asName(q.table)} `
+    ,   q.where
+    ,   groupBy //!aggs.length? "" : `GROUP BY ${nonAggs.map(sf => asName(sf.alias)).join(", ")}`,
+    ,   q.having? `HAVING ${q.having}` : ""
+    ,   q.orderBy.join(", ")
+    ,   !depth? `LIMIT ${q.limit} ` : null
+    ,   !depth? `OFFSET ${q.offset || 0} ` : null
+    ].filter(v => v && (v + "").trim().length) as unknown as string[]);
+    // console.log(fres);
+    return simpleQuery;
   } else {
-      // if(q.aggs && q.aggs && q.aggs.length) throw "Cannot join an aggregate";
-      if(
-        q.select.find(s => s.type === "aggregation") && 
-        joins.find(j => j.select.find(s => s.type === "aggregation"))
-      ) throw "Cannot join two aggregates";
+    // if(q.aggs && q.aggs && q.aggs.length) throw "Cannot join an aggregate";
+    if(
+      q.select.find(s => s.type === "aggregation") && 
+      joins.find(j => j.select.find(s => s.type === "aggregation"))
+    ) throw "Cannot join two aggregates";
   }
 
   if(joins && joins.length && (aggs.length || selectParams.groupBy)) throw "Joins within Aggs dissallowed";
 
   // if(q.selectFuncs.length) throw "Functions within select not allowed in joins yet. -> " + q.selectFuncs.map(s => s.alias).join(", ");
   
+  const rootSelectItems = q.select.filter(s => depth || s.selected)
+
   let rootGroupBy: string;
   if((selectParams.groupBy || aggs.length || q.joins && q.joins.length) && nonAggs.length){
     // console.log({ aggs, nonAggs, joins: q.joins })
+    // rootGroupBy = getGroupBy(rootSelectItems, depth? rootSelectItems : nonAggs) + (aggs?.length? "" : ", ctid")
     rootGroupBy = `GROUP BY ${
       (depth? 
         q.allFields.map(f => asName(f)) : 
@@ -1427,17 +1442,19 @@ export function makeQuery(
   }
 
   /* Joined query */
-  const rootSelect = [
+  const joinedQuery = [
       " \n"
   ,   `-- 0. [joined root]  `
   ,   "SELECT    "
-  ,...selectArrComma(q.select.filter(s => depth || s.selected).map(s => s.getQuery() + " AS " + asName(s.alias)).concat(
+  ,...selectArrComma(rootSelectItems.map(s => s.getQuery() + " AS " + asName(s.alias)).concat(
       joins.map((j, i)=> {
-          const jsq = `json_agg(${prefJCAN(j, `json`)}::jsonb ORDER BY ${prefJCAN(j, `rowid_sorted`)}) FILTER (WHERE ${prefJCAN(j, `limit`)} <= ${j.limit} AND ${prefJCAN(j, `dupes_rowid`)} = 1 AND ${prefJCAN(j, `json`)} IS NOT NULL)`;
-          const resAlias = asName(j.tableAlias || j.table)
 
-          // If limit = 1 then return a single json object (first one)
-          return (j.limit === 1? `${jsq}->0 ` : `COALESCE(${jsq}, '[]') `) +  `  AS ${resAlias}`;
+        /** Apply LIMIT to joined items */
+        const jsq = `json_agg(${prefJCAN(j, `json`)}::jsonb ORDER BY ${prefJCAN(j, `rowid_sorted`)}) FILTER (WHERE ${prefJCAN(j, `limit`)} <= ${j.limit} AND ${prefJCAN(j, `dupes_rowid`)} = 1 AND ${prefJCAN(j, `json`)} IS NOT NULL)`;
+        const resAlias = asName(j.tableAlias || j.table)
+
+        // If limit = 1 then return a single json object (first one)
+        return (j.limit === 1? `${jsq}->0 ` : `COALESCE(${jsq}, '[]') `) +  `  AS ${resAlias}`;
       })
     ))
   ,   `FROM ( `
@@ -1486,7 +1503,7 @@ export function makeQuery(
   ,   " \n"
   ].filter(v => v)
 
-  let res = indJ(depth, rootSelect as unknown as string[]);
+  let res = indJ(depth, joinedQuery as unknown as string[]);
   // res = indent(res, depth);
   // console.log(res);
   return res;
