@@ -3217,6 +3217,15 @@ export type TableSchema = {
 }
 
 type PGConstraint = {
+
+    /**
+     * Constraint type
+     */
+    contype: 
+    | "u" // Unique
+    | "p" // Primary key 
+    | "c" // Check
+
     /**
      * Column ordinal positions
      */
@@ -3235,7 +3244,7 @@ type PGConstraint = {
 
 async function getConstraints(db: DB, schema: string = "public"): Promise<PGConstraint[]> {
     return db.any(`
-        SELECT rel.relname, con.conkey, con.conname
+        SELECT rel.relname, con.conkey, con.conname, con.contype
         FROM pg_catalog.pg_constraint con
             INNER JOIN pg_catalog.pg_class rel
                 ON rel.oid = con.conrelid

@@ -378,6 +378,10 @@ export declare type TableSchema = {
 };
 declare type PGConstraint = {
     /**
+     * Constraint type
+     */
+    contype: "u" | "p" | "c";
+    /**
      * Column ordinal positions
      */
     conkey: number[];

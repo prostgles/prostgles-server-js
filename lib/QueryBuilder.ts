@@ -607,6 +607,21 @@ export const FUNCTIONS: FunctionSpec[] = [
   } as FunctionSpec)),
 
 
+  /* pgcrypto funcs */
+  ...["crypt"].map(funcName => ({
+    name: "$" + funcName,
+    type: "function",
+    numArgs: 1,
+    singleColArg: false,
+    getFields: (args: any[]) => [args[1]],
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      const value = asValue(args[0]) + "",
+        seedColumnName = asNameAlias(args[1], tableAlias);
+        
+      return `crypt(${value}, ${seedColumnName}::text)`;
+    }
+  } as FunctionSpec)),
+
   /* Text col and value funcs */
   ...["position", "position_lower"].map(funcName => ({
     name: "$" + funcName,

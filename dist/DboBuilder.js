@@ -2443,7 +2443,7 @@ DboBuilder.create = async (prostgles) => {
 };
 async function getConstraints(db, schema = "public") {
     return db.any(`
-        SELECT rel.relname, con.conkey, con.conname
+        SELECT rel.relname, con.conkey, con.conname, con.contype
         FROM pg_catalog.pg_constraint con
             INNER JOIN pg_catalog.pg_class rel
                 ON rel.oid = con.conrelid
