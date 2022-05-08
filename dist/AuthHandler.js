@@ -33,8 +33,12 @@ class AuthHandler {
             const { sid, expires } = cookie;
             const { res, req } = r;
             if (sid) {
+                let maxAge = 1000 * 60 * 60 * 24; // 24 hours
+                if (expires && Number.isFinite(expires) && !isNaN(+new Date(expires))) {
+                    maxAge = (+new Date(expires) - Date.now());
+                }
                 let options = {
-                    maxAge: expires || 1000 * 60 * 60 * 24,
+                    maxAge,
                     httpOnly: true,
                 };
                 const cookieOpts = Object.assign(Object.assign(Object.assign({}, options), { secure: true, sameSite: "strict" }), (((_b = (_a = this.opts) === null || _a === void 0 ? void 0 : _a.expressConfig) === null || _b === void 0 ? void 0 : _b.cookieOptions) || {}));
