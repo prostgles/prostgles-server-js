@@ -223,7 +223,9 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       return leftQ + " <= " + parseRightVal(fVal);
 
     } else if(["$in"].includes(fOpType)){
-      if(!fVal?.length) throw "$in filter array is empty";
+      if(!fVal?.length) {
+        return " FALSE ";
+      }
 
       let _fVal: any[] = fVal.filter(v => v !== null);
       let c1 = "", c2 = "";
@@ -232,7 +234,9 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       return [c1, c2].filter(c => c).join(" OR ");
 
     } else if(["$nin"].includes(fOpType)){
-      if(!fVal?.length) throw "$nin filter array is empty";
+      if(!fVal?.length) {
+        return " TRUE ";
+      }
 
       let _fVal: any[] = fVal.filter(v => v !== null);
       let c1 = "", c2 = "";

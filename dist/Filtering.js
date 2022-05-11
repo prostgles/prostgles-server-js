@@ -190,8 +190,9 @@ exports.parseFilterItem = (args) => {
             return leftQ + " <= " + parseRightVal(fVal);
         }
         else if (["$in"].includes(fOpType)) {
-            if (!(fVal === null || fVal === void 0 ? void 0 : fVal.length))
-                throw "$in filter array is empty";
+            if (!(fVal === null || fVal === void 0 ? void 0 : fVal.length)) {
+                return " FALSE ";
+            }
             let _fVal = fVal.filter(v => v !== null);
             let c1 = "", c2 = "";
             if (_fVal.length)
@@ -201,8 +202,9 @@ exports.parseFilterItem = (args) => {
             return [c1, c2].filter(c => c).join(" OR ");
         }
         else if (["$nin"].includes(fOpType)) {
-            if (!(fVal === null || fVal === void 0 ? void 0 : fVal.length))
-                throw "$nin filter array is empty";
+            if (!(fVal === null || fVal === void 0 ? void 0 : fVal.length)) {
+                return " TRUE ";
+            }
             let _fVal = fVal.filter(v => v !== null);
             let c1 = "", c2 = "";
             if (_fVal.length)
