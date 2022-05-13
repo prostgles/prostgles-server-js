@@ -192,7 +192,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
     // console.log({ fOpType, fVal, sOpType })
 
     /** JSON cannot be compared so we'll cast it to TEXT */
-    if(selItem?.column_udt_type === "json" || ["$ilike", "$like"].includes(fOpType)){
+    if(selItem?.column_udt_type === "json" || ["$ilike", "$like", "$nilike", "$nlike"].includes(fOpType)){
       leftQ += "::TEXT "
     }
 

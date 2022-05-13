@@ -157,7 +157,7 @@ exports.parseFilterItem = (args) => {
         }
         // console.log({ fOpType, fVal, sOpType })
         /** JSON cannot be compared so we'll cast it to TEXT */
-        if ((selItem === null || selItem === void 0 ? void 0 : selItem.column_udt_type) === "json" || ["$ilike", "$like"].includes(fOpType)) {
+        if ((selItem === null || selItem === void 0 ? void 0 : selItem.column_udt_type) === "json" || ["$ilike", "$like", "$nilike", "$nlike"].includes(fOpType)) {
             leftQ += "::TEXT ";
         }
         /** st_makeenvelope */
