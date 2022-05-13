@@ -224,6 +224,12 @@ exports.parseFilterItem = (args) => {
         }
         else if (["$like"].includes(fOpType)) {
             return leftQ + " LIKE " + asValue(fVal);
+        }
+        else if (["$nilike"].includes(fOpType)) {
+            return leftQ + " NOT ILIKE " + asValue(fVal);
+        }
+        else if (["$nlike"].includes(fOpType)) {
+            return leftQ + " NOT LIKE " + asValue(fVal);
             /* MAYBE TEXT OR MAYBE ARRAY */
         }
         else if (["@>", "<@", "$contains", "$containedBy", "&&", "@@"].includes(fOpType)) {
