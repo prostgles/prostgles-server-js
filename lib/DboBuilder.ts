@@ -1366,7 +1366,7 @@ export class ViewHandler {
         funcFilterkeys.map(f => {
             const funcArgs = data[f.name];
             if(!Array.isArray(funcArgs)) throw `A function filter must contain an array. E.g: { $funcFilterName: ["col1"] } \n but got: ${JSON.stringify(filterObj(data, [f.name]))} `;
-            const fields = this.parseFieldFilter(f.getFields(funcArgs), true, allowed_colnames);
+            const fields = this.parseFieldFilter(f.getFields(funcArgs, allowed_colnames), true, allowed_colnames);
 
             const dissallowedCols = fields.filter(fname => !allowed_colnames.includes(fname))
             if(dissallowedCols.length){

@@ -352,6 +352,12 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     const res = await db.various.count({ "jsn->a->>b": '3' });
     assert.equal(res, 1)
   });
+
+  await tryRun("template_string function", async () => {
+    const res = await db.various.findOne({ name: 'abc9' }, { select: { tstr: { $template_string: ["{name} is hehe"] } } });
+    assert.equal(res.tstr, "'abc9 is hehe'")
+  });
+
   await tryRun("Between filtering", async () => {
     const res = await db.various.count({ 
       added: { $between: [

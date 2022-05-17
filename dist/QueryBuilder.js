@@ -516,6 +516,27 @@ exports.FUNCTIONS = [
             return `position( ${a1} IN ${a2} )`;
         }
     })),
+    ...["template_string"].map(funcName => ({
+        name: "$" + funcName,
+        type: "function",
+        numArgs: 1,
+        singleColArg: false,
+        getFields: (args, allowedFields) => allowedFields.filter(fName => { var _a; return (_a = args === null || args === void 0 ? void 0 : args[0]) === null || _a === void 0 ? void 0 : _a.includes(`{${fName}}`); }),
+        getQuery: ({ allowedFields, args, tableAlias }) => {
+            let value = asValue(args[0]);
+            if (typeof value !== "string")
+                throw "expecting string argument";
+            const usedColumns = allowedFields.filter(fName => value.includes(`{${fName}}`));
+            usedColumns.forEach((colName, idx) => {
+                value = value.split(`{${colName}}`).join(`%${idx + 1}$s`);
+            });
+            value = asValue(value);
+            if (usedColumns.length) {
+                return `format(${value}, ${usedColumns.map(c => `${c}::TEXT`).join(", ")})`;
+            }
+            return `format(${value})`;
+        }
+    })),
     /** Custom highlight -> myterm => ['some text and', ['myterm'], ' and some other text']
      * (fields: "*" | string[], term: string, { edgeTruncate: number = -1; noFields: boolean = false }) => string | (string | [string])[]
      * edgeTruncate = maximum extra characters left and right of matches
@@ -767,7 +788,7 @@ class SelectItemBuilder {
         };
         this.addFunction = (funcDef, args, alias) => {
             if (funcDef.numArgs) {
-                const fields = funcDef.getFields(args); //  && (! || !funcDef.getFields(args) !== "*" !funcDef.getFields(args).filter(f => f).length
+                const fields = funcDef.getFields(args, this.allowedFields); //  && (! || !funcDef.getFields(args) !== "*" !funcDef.getFields(args).filter(f => f).length
                 if (fields !== "*" && Array.isArray(fields) && !fields.length) {
                     console.log(fields);
                     throw `\n Function "${funcDef.name}" is missing a field name argument`;
@@ -776,7 +797,7 @@ class SelectItemBuilder {
             this.addItem({
                 type: funcDef.type,
                 alias,
-                getFields: () => funcDef.getFields(args),
+                getFields: () => funcDef.getFields(args, this.allowedFields),
                 getQuery: (tableAlias) => funcDef.getQuery({ allColumns: this.columns, allowedFields: this.allowedFields, args, tableAlias,
                     ctidField: undefined,
                 }),

@@ -313,6 +313,10 @@ async function isomorphic(db) {
         const res = await db.various.count({ "jsn->a->>b": '3' });
         assert_1.strict.equal(res, 1);
     });
+    await tryRun("template_string function", async () => {
+        const res = await db.various.findOne({ name: 'abc9' }, { select: { tstr: { $template_string: ["{name} is hehe"] } } });
+        assert_1.strict.equal(res.tstr, "'abc9 is hehe'");
+    });
     await tryRun("Between filtering", async () => {
         const res = await db.various.count({
             added: { $between: [

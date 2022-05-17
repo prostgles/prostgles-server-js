@@ -90,7 +90,7 @@ export type FunctionSpec = {
    * getFields: string[] -> used to validate user supplied field names. It will be fired before querying to validate against allowed columns
    *      if not field names are used from arguments then return an empty array
    */
-  getFields: (args: any[]) => "*" | string[];
+  getFields: (args: any[], allowedFields: string[]) => "*" | string[];
   /**
    * allowedFields passed for multicol functions (e.g.: $rowhash)
    */
@@ -639,6 +639,29 @@ export const FUNCTIONS: FunctionSpec[] = [
       return `position( ${a1} IN ${a2} )`;
     }
   } as FunctionSpec)),
+  ...["template_string"].map(funcName => ({
+    name: "$" + funcName,
+    type: "function",
+    numArgs: 1,
+    singleColArg: false,
+    getFields: (args: any[], allowedFields) => allowedFields.filter(fName => args?.[0]?.includes(`{${fName}}`)),
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      let value = asValue(args[0]);
+      if(typeof value !== "string") throw "expecting string argument";
+      
+      const usedColumns = allowedFields.filter(fName => value.includes(`{${fName}}`));
+      usedColumns.forEach((colName, idx) => {
+        value = value.split(`{${colName}}`).join(`%${idx + 1}$s`)
+      });
+      value = asValue(value);
+      
+      if(usedColumns.length){
+        return `format(${value}, ${usedColumns.map(c => `${c}::TEXT`).join(", ")})`;
+      }
+      
+      return `format(${value})`;
+    }
+  } as FunctionSpec)),
 
   /** Custom highlight -> myterm => ['some text and', ['myterm'], ' and some other text']
    * (fields: "*" | string[], term: string, { edgeTruncate: number = -1; noFields: boolean = false }) => string | (string | [string])[]  
@@ -936,7 +959,7 @@ export class SelectItemBuilder {
 
   private addFunction = (funcDef: FunctionSpec, args: any[], alias: string) => {
     if(funcDef.numArgs) {
-      const fields = funcDef.getFields(args);//  && (! || !funcDef.getFields(args) !== "*" !funcDef.getFields(args).filter(f => f).length
+      const fields = funcDef.getFields(args, this.allowedFields);//  && (! || !funcDef.getFields(args) !== "*" !funcDef.getFields(args).filter(f => f).length
       if(fields !== "*" && Array.isArray(fields) && !fields.length ){
         console.log(fields)
         throw `\n Function "${funcDef.name}" is missing a field name argument`;
@@ -945,7 +968,7 @@ export class SelectItemBuilder {
     this.addItem({
       type: funcDef.type,
       alias,
-      getFields: () => funcDef.getFields(args),
+      getFields: () => funcDef.getFields(args, this.allowedFields),
       getQuery: (tableAlias?: string) => funcDef.getQuery({ allColumns: this.columns, allowedFields: this.allowedFields, args, tableAlias, 
         ctidField: undefined,
 

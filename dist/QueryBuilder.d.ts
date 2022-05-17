@@ -63,7 +63,7 @@ export declare type FunctionSpec = {
      * getFields: string[] -> used to validate user supplied field names. It will be fired before querying to validate against allowed columns
      *      if not field names are used from arguments then return an empty array
      */
-    getFields: (args: any[]) => "*" | string[];
+    getFields: (args: any[], allowedFields: string[]) => "*" | string[];
     /**
      * allowedFields passed for multicol functions (e.g.: $rowhash)
      */
