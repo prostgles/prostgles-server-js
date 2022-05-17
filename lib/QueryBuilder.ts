@@ -656,7 +656,7 @@ export const FUNCTIONS: FunctionSpec[] = [
       value = asValue(value);
       
       if(usedColumns.length){
-        return `format(${value}, ${usedColumns.map(c => `${c}::TEXT`).join(", ")})`;
+        return `format(${value}, ${usedColumns.map(c => `${asNameAlias(c, tableAlias)}::TEXT`).join(", ")})`;
       }
       
       return `format(${value})`;

@@ -532,7 +532,7 @@ exports.FUNCTIONS = [
             });
             value = asValue(value);
             if (usedColumns.length) {
-                return `format(${value}, ${usedColumns.map(c => `${c}::TEXT`).join(", ")})`;
+                return `format(${value}, ${usedColumns.map(c => `${exports.asNameAlias(c, tableAlias)}::TEXT`).join(", ")})`;
             }
             return `format(${value})`;
         }
