@@ -520,6 +520,7 @@ exports.FUNCTIONS = [
         name: "$" + funcName,
         type: "function",
         numArgs: 1,
+        minCols: 0,
         singleColArg: false,
         getFields: (args, allowedFields) => allowedFields.filter(fName => { var _a; return (_a = args === null || args === void 0 ? void 0 : args[0]) === null || _a === void 0 ? void 0 : _a.includes(`{${fName}}`); }),
         getQuery: ({ allowedFields, args, tableAlias }) => {
@@ -788,10 +789,10 @@ class SelectItemBuilder {
         };
         this.addFunction = (funcDef, args, alias) => {
             if (funcDef.numArgs) {
-                const fields = funcDef.getFields(args, this.allowedFields); //  && (! || !funcDef.getFields(args) !== "*" !funcDef.getFields(args).filter(f => f).length
-                if (fields !== "*" && Array.isArray(fields) && !fields.length) {
+                const fields = funcDef.getFields(args, this.allowedFields);
+                if (funcDef.minCols !== 0 && fields !== "*" && Array.isArray(fields) && !fields.length) {
                     console.log(fields);
-                    throw `\n Function "${funcDef.name}" is missing a field name argument`;
+                    throw `\n Function "${funcDef.name}" expects at least a field name but has not been provided with one`;
                 }
             }
             this.addItem({

@@ -85,6 +85,13 @@ export type FunctionSpec = {
   // returnsBoolean?: boolean;
 
   numArgs: number;
+
+  /**
+   * If provided then the number of column names provided to the function must not be less than this
+   * By default every function is checked against numArgs
+   */
+  minCols?: number;
+
   type: "function" | "aggregation" | "computed";
   /**
    * getFields: string[] -> used to validate user supplied field names. It will be fired before querying to validate against allowed columns
@@ -643,6 +650,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     name: "$" + funcName,
     type: "function",
     numArgs: 1,
+    minCols: 0,
     singleColArg: false,
     getFields: (args: any[], allowedFields) => allowedFields.filter(fName => args?.[0]?.includes(`{${fName}}`)),
     getQuery: ({ allowedFields, args, tableAlias }) => {
@@ -959,10 +967,10 @@ export class SelectItemBuilder {
 
   private addFunction = (funcDef: FunctionSpec, args: any[], alias: string) => {
     if(funcDef.numArgs) {
-      const fields = funcDef.getFields(args, this.allowedFields);//  && (! || !funcDef.getFields(args) !== "*" !funcDef.getFields(args).filter(f => f).length
-      if(fields !== "*" && Array.isArray(fields) && !fields.length ){
+      const fields = funcDef.getFields(args, this.allowedFields);
+      if(funcDef.minCols !== 0 && fields !== "*" && Array.isArray(fields) && !fields.length ){
         console.log(fields)
-        throw `\n Function "${funcDef.name}" is missing a field name argument`;
+        throw `\n Function "${funcDef.name}" expects at least a field name but has not been provided with one`;
       }
     }
     this.addItem({

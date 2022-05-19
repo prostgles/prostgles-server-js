@@ -58,6 +58,11 @@ export declare type FunctionSpec = {
      * If true then this func can be used within where clause
      */
     numArgs: number;
+    /**
+     * If provided then the number of column names provided to the function must not be less than this
+     * By default every function is checked against numArgs
+     */
+    minCols?: number;
     type: "function" | "aggregation" | "computed";
     /**
      * getFields: string[] -> used to validate user supplied field names. It will be fired before querying to validate against allowed columns

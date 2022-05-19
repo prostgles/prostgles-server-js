@@ -315,6 +315,7 @@ async function isomorphic(db) {
     });
     await tryRun("template_string function", async () => {
         const res = await db.various.findOne({ name: 'abc9' }, { select: { tstr: { $template_string: ["{name} is hehe"] } } });
+        const res2 = await db.various.findOne({ name: 'abc9' }, { select: { tstr: { $template_string: ["is hehe"] } } });
         assert_1.strict.equal(res.tstr, "'abc9 is hehe'");
     });
     await tryRun("Between filtering", async () => {
