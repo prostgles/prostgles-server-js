@@ -28,6 +28,16 @@ export declare type NewQuery = {
     $path?: string[];
 };
 export declare const asNameAlias: (field: string, tableAlias?: string) => string;
+export declare const parseFunctionObject: (funcData: any) => {
+    funcName: string;
+    args: any[];
+};
+export declare const parseFunction: (funcData: {
+    func: string | FunctionSpec;
+    args: any[];
+    functions: FunctionSpec[];
+    allowedFields: string[];
+}) => FunctionSpec;
 declare type GetQueryArgs = {
     allColumns: ColumnInfo[];
     allowedFields: string[];
@@ -57,9 +67,12 @@ export declare type FunctionSpec = {
     /**
      * If true then this func can be used within where clause
      */
+    /**
+     * Number of arguments expected
+     */
     numArgs: number;
     /**
-     * If provided then the number of column names provided to the function must not be less than this
+     * If provided then the number of column names provided to the function (from getFields()) must not be less than this
      * By default every function is checked against numArgs
      */
     minCols?: number;
@@ -68,7 +81,7 @@ export declare type FunctionSpec = {
      * getFields: string[] -> used to validate user supplied field names. It will be fired before querying to validate against allowed columns
      *      if not field names are used from arguments then return an empty array
      */
-    getFields: (args: any[], allowedFields: string[]) => "*" | string[];
+    getFields: (args: any[]) => "*" | string[];
     /**
      * allowedFields passed for multicol functions (e.g.: $rowhash)
      */
@@ -98,7 +111,6 @@ export declare class SelectItemBuilder {
     });
     private checkField;
     private addItem;
-    private addFunctionByName;
     private addFunction;
     addColumn: (fieldName: string, selected: boolean) => void;
     parseUserSelect: (userSelect: FieldFilter, joinParse?: (key: string, val: any, throwErr: (msg: string) => any) => any) => Promise<any[]>;

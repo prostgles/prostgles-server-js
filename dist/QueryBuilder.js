@@ -4,7 +4,7 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.makeQuery = exports.getNewQuery = exports.SelectItemBuilder = exports.COMPUTED_FIELDS = exports.FUNCTIONS = exports.asNameAlias = void 0;
+exports.makeQuery = exports.getNewQuery = exports.SelectItemBuilder = exports.COMPUTED_FIELDS = exports.FUNCTIONS = exports.parseFunction = exports.parseFunctionObject = exports.asNameAlias = void 0;
 const DboBuilder_1 = require("./DboBuilder");
 const Prostgles_1 = require("./Prostgles");
 const prostgles_types_1 = require("prostgles-types");
@@ -14,6 +14,58 @@ exports.asNameAlias = (field, tableAlias) => {
     if (tableAlias)
         return prostgles_types_1.asName(tableAlias) + "." + result;
     return result;
+};
+exports.parseFunctionObject = (funcData) => {
+    const makeErr = (msg) => `Function not specified correctly. Expecting { $funcName: ["columnName",...] } object but got: ${JSON.stringify(funcData)} \n ${msg}`;
+    if (!utils_1.isObject(funcData))
+        throw makeErr("");
+    const keys = Object.keys(funcData);
+    if (keys.length !== 1)
+        throw makeErr("");
+    const funcName = keys[0];
+    const args = funcData[funcName];
+    if (!args || !Array.isArray(args)) {
+        throw makeErr("Arguments missing or invalid");
+    }
+    return { funcName, args };
+};
+exports.parseFunction = (funcData) => {
+    var _a;
+    const { func, args, functions, allowedFields } = funcData;
+    /* Function is computed column. No checks needed */
+    if (typeof func !== "string") {
+        const computedCol = exports.COMPUTED_FIELDS.find(c => c.name === func.name);
+        if (!computedCol)
+            throw `Unexpected function: computed column spec not found for ${JSON.stringify(func.name)}`;
+        return func;
+    }
+    const funcName = func;
+    const makeErr = (msg) => {
+        return `Issue with function ${JSON.stringify({ [funcName]: args })}: \n${msg}`;
+    };
+    /* Find function */
+    const funcDef = functions.find(f => f.name === funcName);
+    if (!funcDef) {
+        const sf = functions.filter(f => f.name.toLowerCase().slice(1).startsWith(funcName.toLowerCase())).sort((a, b) => (a.name.length - b.name.length));
+        const hint = (sf.length ? `. \n Maybe you meant: \n | ${sf.map(s => s.name + " " + (s.description || "")).join("    \n | ")}  ?` : "");
+        throw "\n Function " + funcName + " does not exist or is not allowed " + hint;
+    }
+    /* Validate fields */
+    const fields = funcDef.getFields(args);
+    if (fields !== "*") {
+        fields.forEach(fieldKey => {
+            if (typeof fieldKey !== "string" || !allowedFields.includes(fieldKey)) {
+                throw makeErr(`getFields() => field name ${JSON.stringify(fieldKey)} is invalid or disallowed`);
+            }
+        });
+        if (((_a = funcDef.minCols) !== null && _a !== void 0 ? _a : 0) > fields.length) {
+            throw makeErr(`Less columns provided than necessary (minCols=${funcDef.minCols})`);
+        }
+    }
+    if (funcDef.numArgs && funcDef.minCols !== 0 && fields !== "*" && Array.isArray(fields) && !fields.length) {
+        throw `\n Function "${funcDef.name}" expects at least a field name but has not been provided with one`;
+    }
+    return funcDef;
 };
 const MAX_COL_NUM = 1600;
 const asValue = (v, castAs = "") => DboBuilder_1.pgp.as.format("$1" + castAs, [v]);
@@ -522,7 +574,7 @@ exports.FUNCTIONS = [
         numArgs: 1,
         minCols: 0,
         singleColArg: false,
-        getFields: (args, allowedFields) => allowedFields.filter(fName => { var _a; return (_a = args === null || args === void 0 ? void 0 : args[0]) === null || _a === void 0 ? void 0 : _a.includes(`{${fName}}`); }),
+        getFields: (args, allowedFields) => [],
         getQuery: ({ allowedFields, args, tableAlias }) => {
             let value = asValue(args[0]);
             if (typeof value !== "string")
@@ -778,27 +830,15 @@ class SelectItemBuilder {
                 throw `Cannot specify duplicate columns ( ${item.alias} ). Perhaps you're using "*" with column names?`;
             this.select.push(item);
         };
-        this.addFunctionByName = (funcName, args, alias) => {
-            const funcDef = this.functions.find(f => f.name === funcName);
-            if (!funcDef) {
-                const sf = this.functions.filter(f => f.name.toLowerCase().slice(1).startsWith(funcName.toLowerCase())).sort((a, b) => (a.name.length - b.name.length));
-                const hint = (sf.length ? `. \n Maybe you meant: \n | ${sf.map(s => s.name + " " + (s.description || "")).join("    \n | ")}  ?` : "");
-                throw "\n Function " + funcName + " does not exist or is not allowed " + hint;
-            }
-            this.addFunction(funcDef, args, alias);
-        };
-        this.addFunction = (funcDef, args, alias) => {
-            if (funcDef.numArgs) {
-                const fields = funcDef.getFields(args, this.allowedFields);
-                if (funcDef.minCols !== 0 && fields !== "*" && Array.isArray(fields) && !fields.length) {
-                    console.log(fields);
-                    throw `\n Function "${funcDef.name}" expects at least a field name but has not been provided with one`;
-                }
-            }
+        this.addFunction = (func, args, alias) => {
+            const funcDef = exports.parseFunction({
+                func, args, functions: this.functions,
+                allowedFields: this.allowedFieldsIncludingComputed,
+            });
             this.addItem({
                 type: funcDef.type,
                 alias,
-                getFields: () => funcDef.getFields(args, this.allowedFields),
+                getFields: () => funcDef.getFields(args),
                 getQuery: (tableAlias) => funcDef.getQuery({ allColumns: this.columns, allowedFields: this.allowedFields, args, tableAlias,
                     ctidField: undefined,
                 }),
@@ -894,15 +934,12 @@ class SelectItemBuilder {
                                     }
                                     funcName = val;
                                     args = [key];
+                                    /** Function full notation { $funcName: ["colName", ...args] } */
                                 }
                                 else {
-                                    const callKeys = Object.keys(val);
-                                    if (callKeys.length !== 1 || !Array.isArray(val[callKeys[0]]))
-                                        throw "\nIssue with select. \nUnexpected function definition. \nExpecting { field_name: func_name } OR { result_key: { func_name: [arg1, arg2 ...] } } \nBut got -> " + JSON.stringify({ [key]: val });
-                                    funcName = callKeys[0];
-                                    args = val[funcName];
+                                    ({ funcName, args } = exports.parseFunctionObject(val));
                                 }
-                                this.addFunctionByName(funcName, args, key);
+                                this.addFunction(funcName, args, key);
                                 /* Join */
                             }
                             else {

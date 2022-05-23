@@ -24,15 +24,13 @@
   },
   "homepage": "https://github.com/prostgles/prostgles-server-js#readme",
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.86.0",
-    "aws-sdk": "^2.1134.0",
+    "@aws-sdk/client-s3": "^3.95.0",
+    "aws-sdk": "^2.1141.0",
     "bluebird": "^3.7.2",
     "file-type": "^16.5.3",
-    "i": "^0.3.7",
-    "npm": "^8.1.4",
-    "pg-promise": "^10.9.5",
+    "pg-promise": "^10.11.1",
     "prostgles-types": "^1.5.123",
-    "sharp": "^0.30.4"
+    "sharp": "^0.30.5"
   },
   "devDependencies": {
     "@aws-sdk/types": "^3.34.0",

@@ -898,7 +898,7 @@ class ViewHandler {
         const { filter, select, allowed_colnames, tableAlias, localParams, tableRules } = params;
         let data = Object.assign({}, filter);
         /* Exists join filter */
-        const ERR = "Invalid exists filter. \nExpecting somethibng like: { $exists: { tableName.tableName2: Filter } } | { $exists: { \"**.tableName3\": Filter } }";
+        const ERR = "Invalid exists filter. \nExpecting somethibng like: { $exists: { tableName.tableName2: Filter } } | { $exists: { \"**.tableName3\": Filter } }\n";
         const SP_WILDCARD = "**";
         let existsKeys = Object.keys(data)
             .filter(k => exports.EXISTS_KEYS.includes(k) && Object.keys(data[k] || {}).length)
@@ -946,7 +946,7 @@ class ViewHandler {
             const funcArgs = data[f.name];
             if (!Array.isArray(funcArgs))
                 throw `A function filter must contain an array. E.g: { $funcFilterName: ["col1"] } \n but got: ${JSON.stringify(PubSubManager_1.filterObj(data, [f.name]))} `;
-            const fields = this.parseFieldFilter(f.getFields(funcArgs, allowed_colnames), true, allowed_colnames);
+            const fields = this.parseFieldFilter(f.getFields(funcArgs), true, allowed_colnames);
             const dissallowedCols = fields.filter(fname => !allowed_colnames.includes(fname));
             if (dissallowedCols.length) {
                 throw `Invalid/disallowed columns found in function filter: ${dissallowedCols}`;
@@ -1002,7 +1002,39 @@ class ViewHandler {
             selected: false,
             getFields: () => [f.name]
         })));
-        let filterKeys = Object.keys(data).filter(k => !funcFilterkeys.find(ek => ek.name === k) && !computedFields.find(cf => cf.name === k) && !existsKeys.find(ek => ek.key === k));
+        /* Parse complex filters
+            { $filter: [{ $func: [...] }, "=", value | { $func: [..] }] }
+        */
+        const complexFilters = [];
+        const complexFilterKey = "$filter";
+        const allowedComparators = [">", "<", "=", "<=", ">=", "<>", "!="];
+        if (complexFilterKey in data) {
+            const getFuncQuery = (funcData) => {
+                const { funcName, args } = QueryBuilder_1.parseFunctionObject(funcData);
+                const funcDef = QueryBuilder_1.parseFunction({ func: funcName, args, functions: QueryBuilder_1.FUNCTIONS, allowedFields: allowed_colnames });
+                return funcDef.getQuery({ args, tableAlias, allColumns: this.columns, allowedFields: allowed_colnames });
+            };
+            const complexFilter = data[complexFilterKey];
+            if (!Array.isArray(complexFilter))
+                throw `Invalid $filter. Must contain an array of at least element but got: ${JSON.stringify(complexFilter)} `;
+            const leftFilter = complexFilter[0];
+            const comparator = complexFilter[1];
+            const rightFilterOrValue = complexFilter[2];
+            const leftVal = getFuncQuery(leftFilter);
+            let result = leftVal;
+            if (comparator) {
+                if (!allowedComparators.includes(comparator))
+                    throw `Invalid $filter. comparator ${JSON.stringify(comparator)} is not valid. Expecting one of: ${allowedComparators}`;
+                if (!rightFilterOrValue)
+                    throw "Invalid $filter. Expecting a value or function after the comparator";
+                const rightVal = utils_1.isObject(rightFilterOrValue) ? getFuncQuery(rightFilterOrValue) : PubSubManager_1.asValue(rightFilterOrValue);
+                if (leftVal === rightVal)
+                    throw "Invalid $filter. Cannot compare two identical function signatures: " + JSON.stringify(leftFilter);
+                result += ` ${comparator} ${rightVal}`;
+            }
+            complexFilters.push(result);
+        }
+        let filterKeys = Object.keys(data).filter(k => k !== complexFilterKey && !funcFilterkeys.find(ek => ek.name === k) && !computedFields.find(cf => cf.name === k) && !existsKeys.find(ek => ek.key === k));
         // if(allowed_colnames){
         //     const aliasedColumns = (select || []).filter(s => 
         //         ["function", "computed", "column"].includes(s.type) && allowed_colnames.includes(s.alias) ||  
@@ -1032,6 +1064,7 @@ class ViewHandler {
             templates.push(existsCond);
         templates = templates.concat(funcConds);
         templates = templates.concat(computedColConditions);
+        templates = templates.concat(complexFilters);
         return templates.sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
             .join(" AND \n");
         // return templates; //pgp.as.format(template, data);

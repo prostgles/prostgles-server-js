@@ -313,6 +313,27 @@ async function isomorphic(db) {
         const res = await db.various.count({ "jsn->a->>b": '3' });
         assert_1.strict.equal(res, 1);
     });
+    await tryRun("Complex filtering", async () => {
+        const res = await db.various.count({
+            $and: [
+                {
+                    $filter: [
+                        { $year: ["added"] },
+                        "=",
+                        '1996'
+                    ]
+                },
+                {
+                    $filter: [
+                        { $Mon: ["added"] },
+                        "=",
+                        'Dec'
+                    ]
+                }
+            ]
+        });
+        assert_1.strict.equal(res, 1);
+    });
     await tryRun("template_string function", async () => {
         const res = await db.various.findOne({ name: 'abc9' }, { select: { tstr: { $template_string: ["{name} is hehe"] } } });
         const res2 = await db.various.findOne({ name: 'abc9' }, { select: { tstr: { $template_string: ["is hehe"] } } });

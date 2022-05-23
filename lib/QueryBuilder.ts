@@ -7,7 +7,7 @@
 import { pgp, Filter, LocalParams, isPlainObject, TableHandler, ViewHandler, postgresToTsType } from "./DboBuilder";
 import { TableRule, flat } from "./Prostgles";
 import { SelectParamsBasic as SelectParams, isEmpty, FieldFilter, asName, TextFilter_FullTextSearchFilterKeys, TS_PG_Types, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE } from "prostgles-types";
-import { get } from "./utils";
+import { get, isObject } from "./utils";
 
 
 export type SelectItem = {
@@ -47,6 +47,65 @@ export const asNameAlias = (field: string, tableAlias?: string) => {
   return result;
 }
 
+export const parseFunctionObject = (funcData: any): { funcName: string; args: any[] } => {
+  const makeErr = (msg: string) => `Function not specified correctly. Expecting { $funcName: ["columnName",...] } object but got: ${JSON.stringify(funcData)} \n ${msg}`
+  if(!isObject(funcData)) throw makeErr("");
+  const keys = Object.keys(funcData);
+  if(keys.length !== 1) throw makeErr("");
+  const funcName = keys[0];
+  const args = funcData[funcName];
+  if(!args || !Array.isArray(args)){
+    throw makeErr("Arguments missing or invalid");
+  }
+
+  return { funcName, args };
+}
+
+export const parseFunction = (funcData: { func: string | FunctionSpec, args: any[],  functions: FunctionSpec[]; allowedFields: string[]; }): FunctionSpec => {
+  const { func, args, functions, allowedFields } = funcData;
+
+  /* Function is computed column. No checks needed */
+  if(typeof func !== "string"){
+    const computedCol = COMPUTED_FIELDS.find(c => c.name === func.name);
+    if(!computedCol) throw `Unexpected function: computed column spec not found for ${JSON.stringify(func.name)}`;
+    return func;
+  }
+
+  const funcName = func;
+  const makeErr = (msg: string): string => {
+    return `Issue with function ${JSON.stringify({ [funcName]: args })}: \n${msg}`
+  }
+
+  /* Find function */
+  const funcDef = functions.find(f => f.name === funcName);
+
+  if(!funcDef) {
+    const sf = functions.filter(f => f.name.toLowerCase().slice(1).startsWith(funcName.toLowerCase())).sort((a, b) => (a.name.length - b.name.length));
+    const hint = (sf.length? `. \n Maybe you meant: \n | ${sf.map(s => s.name + " " + (s.description || "")).join("    \n | ")}  ?` : "");
+    throw "\n Function " + funcName + " does not exist or is not allowed " + hint;
+  }
+  
+  /* Validate fields */
+  const fields = funcDef.getFields(args);
+  if(fields !== "*"){
+    fields.forEach(fieldKey => {
+      if(typeof fieldKey !== "string" || !allowedFields.includes(fieldKey)) {
+        throw makeErr(`getFields() => field name ${JSON.stringify(fieldKey)} is invalid or disallowed`)
+      }
+    });
+    if((funcDef.minCols ?? 0) > fields.length){
+      throw makeErr(`Less columns provided than necessary (minCols=${funcDef.minCols})`)
+    }
+  }
+
+  if(funcDef.numArgs && funcDef.minCols !== 0 && fields !== "*" && Array.isArray(fields) && !fields.length) {
+    throw `\n Function "${funcDef.name}" expects at least a field name but has not been provided with one`;
+  }
+
+  return funcDef;
+}
+
+
 type GetQueryArgs = { 
   allColumns: ColumnInfo[];
   allowedFields: string[];
@@ -84,10 +143,13 @@ export type FunctionSpec = {
    */
   // returnsBoolean?: boolean;
 
+  /**
+   * Number of arguments expected
+   */
   numArgs: number;
 
   /**
-   * If provided then the number of column names provided to the function must not be less than this
+   * If provided then the number of column names provided to the function (from getFields()) must not be less than this
    * By default every function is checked against numArgs
    */
   minCols?: number;
@@ -97,7 +159,7 @@ export type FunctionSpec = {
    * getFields: string[] -> used to validate user supplied field names. It will be fired before querying to validate against allowed columns
    *      if not field names are used from arguments then return an empty array
    */
-  getFields: (args: any[], allowedFields: string[]) => "*" | string[];
+  getFields: (args: any[]) => "*" | string[];
   /**
    * allowedFields passed for multicol functions (e.g.: $rowhash)
    */
@@ -652,7 +714,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     numArgs: 1,
     minCols: 0,
     singleColArg: false,
-    getFields: (args: any[], allowedFields) => allowedFields.filter(fName => args?.[0]?.includes(`{${fName}}`)),
+    getFields: (args: any[], allowedFields) => [], // Fields not validated because we'll use the allowed ones anyway
     getQuery: ({ allowedFields, args, tableAlias }) => {
       let value = asValue(args[0]);
       if(typeof value !== "string") throw "expecting string argument";
@@ -955,28 +1017,16 @@ export class SelectItemBuilder {
     this.select.push(item);
   }
 
-  private addFunctionByName = (funcName: string, args: any[], alias: string) => {
-    const funcDef = this.functions.find(f => f.name === funcName);
-    if(!funcDef) {
-      const sf = this.functions.filter(f => f.name.toLowerCase().slice(1).startsWith(funcName.toLowerCase())).sort((a, b) => (a.name.length - b.name.length));
-      const hint = (sf.length? `. \n Maybe you meant: \n | ${sf.map(s => s.name + " " + (s.description || "")).join("    \n | ")}  ?` : "");
-      throw "\n Function " + funcName + " does not exist or is not allowed " + hint;
-    }
-    this.addFunction(funcDef, args, alias);
-  }
+  private addFunction = (func: FunctionSpec | string, args: any[], alias: string) => {
+    const funcDef = parseFunction({
+      func, args, functions: this.functions,
+      allowedFields: this.allowedFieldsIncludingComputed,
+    });
 
-  private addFunction = (funcDef: FunctionSpec, args: any[], alias: string) => {
-    if(funcDef.numArgs) {
-      const fields = funcDef.getFields(args, this.allowedFields);
-      if(funcDef.minCols !== 0 && fields !== "*" && Array.isArray(fields) && !fields.length ){
-        console.log(fields)
-        throw `\n Function "${funcDef.name}" expects at least a field name but has not been provided with one`;
-      }
-    }
     this.addItem({
       type: funcDef.type,
       alias,
-      getFields: () => funcDef.getFields(args, this.allowedFields),
+      getFields: () => funcDef.getFields(args),
       getQuery: (tableAlias?: string) => funcDef.getQuery({ allColumns: this.columns, allowedFields: this.allowedFields, args, tableAlias, 
         ctidField: undefined,
 
@@ -1092,14 +1142,13 @@ export class SelectItemBuilder {
                 }
                 funcName = val;
                 args = [key];
+
+              /** Function full notation { $funcName: ["colName", ...args] } */
               } else {
-                const callKeys = Object.keys(val);
-                if(callKeys.length !== 1 || !Array.isArray(val[callKeys[0]])) throw "\nIssue with select. \nUnexpected function definition. \nExpecting { field_name: func_name } OR { result_key: { func_name: [arg1, arg2 ...] } } \nBut got -> " + JSON.stringify({ [key]: val });
-                funcName = callKeys[0];
-                args = val[funcName];
+                ({ funcName, args } = parseFunctionObject(val));
               }
               
-              this.addFunctionByName(funcName, args, key);
+              this.addFunction(funcName, args, key);
   
             /* Join */
             } else {

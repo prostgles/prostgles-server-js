@@ -353,6 +353,29 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     assert.equal(res, 1)
   });
 
+  await tryRun("Complex filtering", async () => {
+    const res = await db.various.count({ 
+      $and: [
+        { 
+          $filter: [
+            { $year: ["added"] },
+            "=",
+            '1996'
+          ] 
+        },
+        { 
+          $filter: [
+            { $Mon: ["added"] },
+            "=",
+            'Dec'
+          ] 
+        }
+
+      ]
+    });
+    assert.equal(res, 1)
+  });
+
   await tryRun("template_string function", async () => {
     const res = await db.various.findOne({ name: 'abc9' }, { select: { tstr: { $template_string: ["{name} is hehe"] } } });
     const res2 = await db.various.findOne({ name: 'abc9' }, { select: { tstr: { $template_string: ["is hehe"] } } });
