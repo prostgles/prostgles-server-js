@@ -218,15 +218,9 @@ export declare class ViewHandler {
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: never, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
     count(filter?: Filter, param2_unused?: never, param3_unused?: never, table_rules?: TableRule, localParams?: any): Promise<number>;
     size(filter?: Filter, selectParams?: SelectParams, param3_unused?: never, table_rules?: TableRule, localParams?: any): Promise<string>;
-    getAllowedSelectFields(selectParams: {} | "" | string[] | {
-        [key: string]: boolean | 0 | 1;
-    } | "*" | undefined, allowed_cols: FieldFilter, allow_empty?: boolean): string[];
-    prepareColumnSet(selectParams: {} | "" | string[] | {
-        [key: string]: boolean | 0 | 1;
-    } | "*" | undefined, allowed_cols: FieldFilter, allow_empty?: boolean, onlyNames?: boolean): string | pgPromise.ColumnSet;
-    prepareSelect(selectParams: {} | "" | string[] | {
-        [key: string]: boolean | 0 | 1;
-    } | "*" | undefined, allowed_cols: FieldFilter, allow_empty?: boolean, tableAlias?: string): string;
+    getAllowedSelectFields(selectParams: FieldFilter | undefined, allowed_cols: FieldFilter, allow_empty?: boolean): string[];
+    prepareColumnSet(selectParams: FieldFilter | undefined, allowed_cols: FieldFilter, allow_empty?: boolean, onlyNames?: boolean): string | pgPromise.ColumnSet;
+    prepareSelect(selectParams: FieldFilter | undefined, allowed_cols: FieldFilter, allow_empty?: boolean, tableAlias?: string): string;
     prepareHaving(params: {
         having: Filter;
         select: SelectItem[];
@@ -285,9 +279,7 @@ export declare class ViewHandler {
     * @param {FieldFilter} fieldParams - { col1: 0, col2: 0 } | { col1: true, col2: true } | "*" | ["key1", "key2"] | []
     * @param {boolean} allow_empty - allow empty select. defaults to true
     */
-    static _parseFieldFilter(fieldParams: {} | "" | string[] | {
-        [key: string]: boolean | 0 | 1;
-    } | "*" | undefined, allow_empty: boolean | undefined, all_cols: string[]): string[];
+    static _parseFieldFilter(fieldParams: FieldFilter | undefined, allow_empty: boolean | undefined, all_cols: string[]): string[];
 }
 declare type ValidatedParams = {
     row: AnyObject;
@@ -405,7 +397,7 @@ declare type PGConstraint = {
      */
     relname: string;
 };
-export declare function isPlainObject<T>(o: T): o is T | Record<string, any>;
+export declare function isPlainObject(o: any): o is Record<string, any>;
 export declare function getKeys<T>(o: T): Array<keyof T>;
 export declare function postgresToTsType(udt_data_type: PG_COLUMN_UDT_DATA_TYPE): keyof typeof TS_PG_Types;
 export {};

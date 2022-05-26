@@ -3,6 +3,7 @@
  *  Copyright (c) Stefan L. All rights reserved.
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.filterObj = exports.PubSubManager = exports.log = exports.DEFAULT_SYNC_BATCH_SIZE = exports.asValue = void 0;
 const PostgresNotifListenManager_1 = require("./PostgresNotifListenManager");
@@ -15,13 +16,15 @@ const SyncReplication_1 = require("./SyncReplication");
 let pgp = pgPromise({
     promiseLib: Bluebird
 });
-exports.asValue = (v) => pgp.as.format("$1", [v]);
+const asValue = (v) => pgp.as.format("$1", [v]);
+exports.asValue = asValue;
 exports.DEFAULT_SYNC_BATCH_SIZE = 50;
-exports.log = (...args) => {
+const log = (...args) => {
     if (process.env.TEST_TYPE) {
         console.log(...args);
     }
 };
+exports.log = log;
 class PubSubManager {
     constructor(options) {
         this.onSchemaChange = undefined;
@@ -255,11 +258,11 @@ class PubSubManager {
                                 
                                 /*
                                 PERFORM pg_notify( 
-                                    ${exports.asValue(this.NOTIF_CHANNEL.preffix)} || (SELECT id FROM prostgles.apps LIMIT 1) , 
+                                    ${(0, exports.asValue)(this.NOTIF_CHANNEL.preffix)} || (SELECT id FROM prostgles.apps LIMIT 1) , 
                                     concat_ws(
-                                        ${exports.asValue(PubSubManager.DELIMITER)},
+                                        ${(0, exports.asValue)(PubSubManager.DELIMITER)},
 
-                                        ${exports.asValue(this.NOTIF_TYPE.data)}, 
+                                        ${(0, exports.asValue)(this.NOTIF_TYPE.data)}, 
                                         COALESCE(TG_TABLE_NAME, 'MISSING'), 
                                         COALESCE(TG_OP, 'MISSING'), 
                                         unions
@@ -308,11 +311,11 @@ class PubSubManager {
                                         LOOP
                                             
                                             PERFORM pg_notify( 
-                                                ${exports.asValue(this.NOTIF_CHANNEL.preffix)} || nrw.app_id , 
+                                                ${(0, exports.asValue)(this.NOTIF_CHANNEL.preffix)} || nrw.app_id , 
                                                 concat_ws(
-                                                    ${exports.asValue(PubSubManager.DELIMITER)},
+                                                    ${(0, exports.asValue)(PubSubManager.DELIMITER)},
 
-                                                    ${exports.asValue(this.NOTIF_TYPE.data)}, 
+                                                    ${(0, exports.asValue)(this.NOTIF_TYPE.data)}, 
                                                     COALESCE(TG_TABLE_NAME, 'MISSING'), 
                                                     COALESCE(TG_OP, 'MISSING'), 
                                                     CASE WHEN has_errors 
@@ -542,10 +545,10 @@ class PubSubManager {
 
                                     LOOP
                                         PERFORM pg_notify( 
-                                            ${exports.asValue(this.NOTIF_CHANNEL.preffix)} || arw.id, 
+                                            ${(0, exports.asValue)(this.NOTIF_CHANNEL.preffix)} || arw.id, 
                                             concat_ws(
-                                                ${exports.asValue(PubSubManager.DELIMITER)}, 
-                                                ${exports.asValue(this.NOTIF_TYPE.schema)}, tg_tag , TG_event, curr_query
+                                                ${(0, exports.asValue)(PubSubManager.DELIMITER)}, 
+                                                ${(0, exports.asValue)(this.NOTIF_TYPE.schema)}, tg_tag , TG_event, curr_query
                                             )
                                         );
                                     END LOOP;
@@ -588,9 +591,9 @@ class PubSubManager {
                                     trgUpdateLastUsed = `
                                 UPDATE prostgles.app_triggers
                                 SET last_used = CASE WHEN (table_name, condition) IN (
-                                    ${listeners.map(l => ` ( ${exports.asValue(l.table_name)}, ${exports.asValue(l.condition)} ) `).join(", ")}
+                                    ${listeners.map(l => ` ( ${(0, exports.asValue)(l.table_name)}, ${(0, exports.asValue)(l.condition)} ) `).join(", ")}
                                 ) THEN NOW() ELSE last_used END
-                                WHERE app_id = ${exports.asValue(this.appID)};
+                                WHERE app_id = ${(0, exports.asValue)(this.appID)};
                                 `;
                                 }
                                 appQ = `
@@ -618,7 +621,7 @@ class PubSubManager {
                                         */
                                             UPDATE prostgles.apps 
                                             SET last_check = NOW()
-                                            WHERE id = ${exports.asValue(this.appID)};
+                                            WHERE id = ${(0, exports.asValue)(this.appID)};
 
 
     
@@ -627,7 +630,7 @@ class PubSubManager {
 
                                                 /* If this is the latest app then proceed
                                                     AND ( 
-                                                        SELECT id = ${exports.asValue(this.appID)} 
+                                                        SELECT id = ${(0, exports.asValue)(this.appID)} 
                                                         FROM prostgles.apps 
                                                         ORDER BY last_check DESC 
                                                         LIMIT 1  
@@ -644,8 +647,8 @@ class PubSubManager {
     
                                                 /* DELETE stale triggers for current app. Other triggers will be deleted on app startup */
                                                 DELETE FROM prostgles.app_triggers
-                                                WHERE app_id = ${exports.asValue(this.appID)}
-                                                AND last_used < NOW() - 4 * ${exports.asValue(this.appCheckFrequencyMS)} * interval '1 millisecond';
+                                                WHERE app_id = ${(0, exports.asValue)(this.appID)}
+                                                AND last_used < NOW() - 4 * ${(0, exports.asValue)(this.appCheckFrequencyMS)} * interval '1 millisecond';
     
                                             END IF;
 
@@ -653,7 +656,7 @@ class PubSubManager {
 
                                             UPDATE prostgles.apps 
                                             SET last_check_ended = NOW()
-                                            WHERE id = ${exports.asValue(this.appID)};
+                                            WHERE id = ${(0, exports.asValue)(this.appID)};
 
                                         /*
                                         END IF;    
@@ -667,7 +670,7 @@ class PubSubManager {
                                 END $$;
                             `;
                                 await this.db.any(appQ);
-                                exports.log("updated last_check");
+                                (0, exports.log)("updated last_check");
                             }
                             catch (e) {
                                 console.error("appCheck FAILED: \n", e, appQ);
@@ -694,7 +697,7 @@ class PubSubManager {
             // SELECT * FROM pg_catalog.pg_event_trigger WHERE evtname
             if (!this.appID)
                 throw "prepareTriggers failed: this.appID missing";
-            if (this.dboBuilder.prostgles.opts.watchSchema && !(await Prostgles_1.isSuperUser(this.db))) {
+            if (this.dboBuilder.prostgles.opts.watchSchema && !(await (0, Prostgles_1.isSuperUser)(this.db))) {
                 console.warn("prostgles watchSchema requires superuser db user. Will not watch");
             }
             try {
@@ -728,7 +731,7 @@ class PubSubManager {
 
                             DROP TABLE IF EXISTS %1$I;
                         $q$, 
-                        ${exports.asValue('triggers_' + this.appID)}
+                        ${(0, exports.asValue)('triggers_' + this.appID)}
                     );
   
                     is_super_user := EXISTS (select 1 from pg_user where usename = CURRENT_USER AND usesuper IS TRUE);
@@ -754,7 +757,7 @@ class PubSubManager {
                     ev_trg_needed := EXISTS (SELECT 1 FROM prostgles.apps WHERE watching_schema IS TRUE);
                     ev_trg_exists := EXISTS (
                         SELECT 1 FROM pg_catalog.pg_event_trigger
-                        WHERE evtname = ${exports.asValue(this.DB_OBJ_NAMES.schema_watch_trigger)}
+                        WHERE evtname = ${(0, exports.asValue)(this.DB_OBJ_NAMES.schema_watch_trigger)}
                     );
 
                      -- RAISE NOTICE ' ev_trg_needed %, ev_trg_exists %', ev_trg_needed, ev_trg_exists;
@@ -766,7 +769,7 @@ class PubSubManager {
 
                         SELECT format(
                             $$ DROP EVENT TRIGGER IF EXISTS %I ; $$
-                            , ${exports.asValue(this.DB_OBJ_NAMES.schema_watch_trigger)}
+                            , ${(0, exports.asValue)(this.DB_OBJ_NAMES.schema_watch_trigger)}
                         )
                         INTO q;
 
@@ -817,7 +820,7 @@ class PubSubManager {
                 return;
             }
             const dataArr = str.split(PubSubManager.DELIMITER), notifType = dataArr[0];
-            exports.log(str);
+            (0, exports.log)(str);
             if (notifType === this.NOTIF_TYPE.schema) {
                 if (this.onSchemaChange) {
                     const command = dataArr[1], event_type = dataArr[2], query = dataArr[3];
@@ -834,7 +837,7 @@ class PubSubManager {
             const table_name = dataArr[1], op_name = dataArr[2], condition_ids_str = dataArr[3];
             // const triggers = await this.db.any("SELECT * FROM prostgles.triggers WHERE table_name = $1 AND id IN ($2:csv)", [table_name, condition_ids_str.split(",").map(v => +v)]);
             // const conditions: string[] = triggers.map(t => t.condition);
-            exports.log("PG Trigger ->", dataArr.join("__"));
+            (0, exports.log)("PG Trigger ->", dataArr.join("__"));
             if (condition_ids_str && condition_ids_str.startsWith("error") &&
                 this._triggers && this._triggers[table_name] && this._triggers[table_name].length) {
                 const pref = "INTERNAL ERROR. Schema might have changed";
@@ -852,12 +855,12 @@ class PubSubManager {
                 this._triggers && this._triggers[table_name] && this._triggers[table_name].length) {
                 const idxs = condition_ids_str.split(",").map(v => +v);
                 const conditions = this._triggers[table_name].filter((c, i) => idxs.includes(i));
-                exports.log("PG Trigger -> ", { table_name, op_name, condition_ids_str, conditions }, this._triggers[table_name]);
+                (0, exports.log)("PG Trigger -> ", { table_name, op_name, condition_ids_str, conditions }, this._triggers[table_name]);
                 conditions.map(condition => {
                     const subs = this.getSubs(table_name, condition);
                     const syncs = this.getSyncs(table_name, condition);
                     syncs.map((s) => {
-                        exports.log("PG Trigger -> syncData. LR: ", s.lr);
+                        (0, exports.log)("PG Trigger -> syncData. LR: ", s.lr);
                         this.syncData(s);
                     });
                     if (!subs) {
@@ -878,9 +881,9 @@ class PubSubManager {
                                 // sub.last_throttled = Date.now();
                             }
                             else if (!sub.is_throttling) {
-                                exports.log("throttling sub");
+                                (0, exports.log)("throttling sub");
                                 sub.is_throttling = setTimeout(() => {
-                                    exports.log("throttling finished. pushSubData...");
+                                    (0, exports.log)("throttling finished. pushSubData...");
                                     sub.is_throttling = null;
                                     this.pushSubData(sub);
                                 }, throttle); // sub.throttle);
@@ -927,7 +930,7 @@ class PubSubManager {
                 AND table_name = 'hypertable' \
         );", { schema });
             if (res.exists) {
-                let isHyperTable = await this.db.any("SELECT * FROM " + prostgles_types_1.asName(schema) + ".hypertable WHERE table_name = ${table_name};", { table_name, schema });
+                let isHyperTable = await this.db.any("SELECT * FROM " + (0, prostgles_types_1.asName)(schema) + ".hypertable WHERE table_name = ${table_name};", { table_name, schema });
                 if (isHyperTable && isHyperTable.length) {
                     throw "Triggers do not work on timescaledb hypertables due to bug:\nhttps://github.com/timescale/timescaledb/issues/1084";
                 }
@@ -960,7 +963,7 @@ class PubSubManager {
         this.subs = {};
         this.syncs = [];
         this.socketChannelPreffix = wsChannelNamePrefix || "_psqlWS_";
-        exports.log("Created PubSubManager");
+        (0, exports.log)("Created PubSubManager");
     }
     isReady() {
         if (!this.postgresNotifListenManager)
@@ -968,7 +971,7 @@ class PubSubManager {
         return this.postgresNotifListenManager.isListening();
     }
     getSubs(table_name, condition) {
-        return utils_1.get(this.subs, [table_name, condition, "subs"]);
+        return (0, utils_1.get)(this.subs, [table_name, condition, "subs"]);
     }
     getSyncs(table_name, condition) {
         return (this.syncs || [])
@@ -993,7 +996,7 @@ class PubSubManager {
             this.dbo?.[table_name]?.find?.(filter, params, undefined, table_rules)
                 .then(data => {
                 if (socket_id && this.sockets[socket_id]) {
-                    exports.log("Pushed " + data.length + " records to sub");
+                    (0, exports.log)("Pushed " + data.length + " records to sub");
                     this.sockets[socket_id].emit(channel_name, { data }, () => {
                         resolve(data);
                     });
@@ -1025,7 +1028,7 @@ class PubSubManager {
         }
     }
     async syncData(sync, clientData) {
-        return await SyncReplication_1.syncData(this, sync, clientData);
+        return await (0, SyncReplication_1.syncData)(this, sync, clientData);
     }
     /**
      * Returns a sync channel
@@ -1051,7 +1054,7 @@ class PubSubManager {
                 allow_delete,
                 table_rules,
                 throttle: Math.max(throttle || 0, table_rules?.sync?.throttle || 0),
-                batch_size: utils_1.get(table_rules, "sync.batch_size") || exports.DEFAULT_SYNC_BATCH_SIZE,
+                batch_size: (0, utils_1.get)(table_rules, "sync.batch_size") || exports.DEFAULT_SYNC_BATCH_SIZE,
                 last_throttled: 0,
                 socket_id: socket.id,
                 is_sync: true,
@@ -1129,7 +1132,7 @@ class PubSubManager {
         let validated_throttle = subscriptionParams.throttle || 10;
         if ((!socket && !func) || !table_info)
             throw "socket/func or table_info missing";
-        const pubThrottle = utils_1.get(table_rules, ["subscribe", "throttle"]) || 0;
+        const pubThrottle = (0, utils_1.get)(table_rules, ["subscribe", "throttle"]) || 0;
         if (pubThrottle && Number.isInteger(pubThrottle) && pubThrottle > 0) {
             validated_throttle = pubThrottle;
         }
@@ -1153,6 +1156,7 @@ class PubSubManager {
                 is_throttling: null,
                 last_throttled: 0,
                 is_ready,
+                // subOne
             };
             this.subs[table_name] = this.subs[table_name] || {};
             this.subs[table_name][condition] = this.subs[table_name][condition] || { subs: [] };
@@ -1227,7 +1231,7 @@ class PubSubManager {
     }
     removeLocalSub(table_name, condition, func) {
         let cond = this.parseCondition(condition);
-        if (utils_1.get(this.subs, [table_name, cond, "subs"])) {
+        if ((0, utils_1.get)(this.subs, [table_name, cond, "subs"])) {
             this.subs[table_name][cond].subs.map((sub, i) => {
                 if (sub.func && sub.func === func) {
                     this.subs[table_name][cond].subs.splice(i, 1);
@@ -1255,7 +1259,7 @@ class PubSubManager {
                             this.subs[table_name][condition].subs.splice(i, 1);
                             if (!this.subs[table_name][condition].subs.length) {
                                 delete this.subs[table_name][condition];
-                                if (prostgles_types_1.isEmpty(this.subs[table_name])) {
+                                if ((0, prostgles_types_1.isEmpty)(this.subs[table_name])) {
                                     delete this.subs[table_name];
                                 }
                             }
@@ -1297,20 +1301,20 @@ class PubSubManager {
             // console.log(1623, { app_id, addTrigger: { table_name, condition } });
             await this.checkIfTimescaleBug(table_name);
             const trgVals = {
-                tbl: exports.asValue(table_name),
-                cond: exports.asValue(condition),
+                tbl: (0, exports.asValue)(table_name),
+                cond: (0, exports.asValue)(condition),
             };
             await this.db.any(`
                 BEGIN WORK;
                 LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
 
                 INSERT INTO prostgles.app_triggers (table_name, condition, app_id) 
-                    VALUES (${trgVals.tbl}, ${trgVals.cond}, ${exports.asValue(this.appID)})
+                    VALUES (${trgVals.tbl}, ${trgVals.cond}, ${(0, exports.asValue)(this.appID)})
                 ON CONFLICT DO NOTHING;
                      
                 COMMIT WORK;
             `);
-            exports.log("addTrigger.. ", { table_name, condition });
+            (0, exports.log)("addTrigger.. ", { table_name, condition });
             const triggers = await this.db.any(await this.getMyTriggerQuery());
             this._triggers = {};
             triggers.map(t => {
@@ -1320,7 +1324,7 @@ class PubSubManager {
                     this._triggers[t.table_name].push(t.condition);
                 }
             });
-            exports.log("trigger added.. ", { table_name, condition });
+            (0, exports.log)("trigger added.. ", { table_name, condition });
             return true;
             // console.log("1612", JSON.stringify(triggers, null, 2))
             // console.log("1613",JSON.stringify(this._triggers, null, 2))
@@ -1332,6 +1336,7 @@ class PubSubManager {
     }
 }
 exports.PubSubManager = PubSubManager;
+_a = PubSubManager;
 PubSubManager.DELIMITER = '|$prstgls$|';
 //     ,datname
 //     ,usename

@@ -110,7 +110,7 @@ class DBEventsManager {
             /* UNLISTEN if no listeners ?? */
         }
         if (socket) {
-            DboBuilder_1.getKeys(this.notifies).forEach(channel => {
+            (0, DboBuilder_1.getKeys)(this.notifies).forEach(channel => {
                 this.notifies[channel].sockets = this.notifies[channel].sockets.filter(s => s.id !== socket.id);
             });
         }

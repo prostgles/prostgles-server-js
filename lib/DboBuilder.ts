@@ -3478,7 +3478,7 @@ function validateObj(obj: object, allowedKeys: string[]): object{
 }
 
 
-export function isPlainObject<T>(o: T): o is T | Record<string, any> {
+export function isPlainObject(o: any): o is Record<string, any> {
     return Object(o) === o && Object.getPrototypeOf(o) === Object.prototype;
 }
 export function getKeys<T>(o: T): Array<keyof T>{

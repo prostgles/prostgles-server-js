@@ -30,5 +30,5 @@ export declare type ClientExpressData = ClientSyncInfo & {
     data?: AnyObject[];
     deleted?: AnyObject[];
 };
-export declare const syncData: (_this: PubSubManager, sync: SyncParams, clientData?: ClientExpressData | undefined) => Promise<void>;
+export declare const syncData: (_this: PubSubManager, sync: SyncParams, clientData?: ClientExpressData) => Promise<void>;
 //# sourceMappingURL=SyncReplication.d.ts.map

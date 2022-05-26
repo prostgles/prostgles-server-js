@@ -36,7 +36,8 @@ class AuthHandler {
                 }
                 let options = {
                     maxAge,
-                    httpOnly: true,
+                    httpOnly: true, // The cookie only accessible by the web server
+                    //signed: true // Indicates if the cookie should be signed
                 };
                 const cookieOpts = { ...options, secure: true, sameSite: "strict", ...(this.opts?.expressConfig?.cookieOptions || {}) };
                 const cookieData = sid;

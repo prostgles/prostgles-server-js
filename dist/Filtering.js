@@ -3,19 +3,19 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.parseFilterItem = void 0;
 const prostgles_types_1 = require("prostgles-types");
 const DboBuilder_1 = require("./DboBuilder");
-exports.parseFilterItem = (args) => {
+const parseFilterItem = (args) => {
     const { filter: _f, select, tableAlias, pgp } = args;
-    if (!_f || prostgles_types_1.isEmpty(_f))
+    if (!_f || (0, prostgles_types_1.isEmpty)(_f))
         return "";
     const mErr = (msg) => {
         throw `${msg}: ${JSON.stringify(_f, null, 2)}`;
     }, asValue = (v) => pgp.as.format("$1", [v]);
-    const fKeys = DboBuilder_1.getKeys(_f);
+    const fKeys = (0, DboBuilder_1.getKeys)(_f);
     if (fKeys.length === 0) {
         return "";
     }
     else if (fKeys.length > 1) {
-        return fKeys.map(fk => exports.parseFilterItem({
+        return fKeys.map(fk => (0, exports.parseFilterItem)({
             filter: { [fk]: _f[fk] },
             select,
             tableAlias,
@@ -126,7 +126,7 @@ exports.parseFilterItem = (args) => {
     if (!leftQ)
         mErr("Internal error: leftQ missing?!");
     /* Matching sel item */
-    if (DboBuilder_1.isPlainObject(rightF)) {
+    if ((0, DboBuilder_1.isPlainObject)(rightF)) {
         const parseRightVal = (val, expect = null) => {
             const checkIfArr = () => {
                 if (!Array.isArray(val))
@@ -149,7 +149,7 @@ exports.parseFilterItem = (args) => {
         const fVal = rightF[fOpType];
         let sOpType;
         let sVal;
-        if (fVal && DboBuilder_1.isPlainObject(fVal)) {
+        if (fVal && (0, DboBuilder_1.isPlainObject)(fVal)) {
             const keys = Object.keys(fVal);
             if (!keys.length || keys.length !== 1) {
                 return mErr("Bad filter. Expecting a nested object with one key only ");
@@ -269,6 +269,7 @@ exports.parseFilterItem = (args) => {
         }
     }
 };
+exports.parseFilterItem = parseFilterItem;
 // ensure pgp is not NULL!!!
 // const asValue = v => v;// pgp.as.value;
 // const filters: FilterSpec[] = [

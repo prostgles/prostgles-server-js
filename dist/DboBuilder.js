@@ -3,6 +3,7 @@
  *  Copyright (c) Stefan L. All rights reserved.
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.postgresToTsType = exports.getKeys = exports.isPlainObject = exports.DboBuilder = exports.TableHandler = exports.ViewHandler = exports.EXISTS_KEYS = exports.pgp = void 0;
 const Bluebird = require("bluebird");
@@ -67,7 +68,7 @@ function makeErr(err, localParams, view, allowedKeys) {
     }
     const errObject = {
         ...((!localParams || !localParams.socket) ? err : {}),
-        ...PubSubManager_1.filterObj(err, ["column", "code", "table", "constraint"]),
+        ...(0, PubSubManager_1.filterObj)(err, ["column", "code", "table", "constraint"]),
         ...(err && err.toString ? { txt: err.toString() } : {}),
         code_info: sqlErrCodeToMsg(err.code)
     };
@@ -103,9 +104,9 @@ class ColSet {
         if (!allowedCols || badCol) {
             throw "Missing or unexpected columns: " + badCol;
         }
-        if (prostgles_types_1.isEmpty(data))
+        if ((0, prostgles_types_1.isEmpty)(data))
             throw "No data";
-        let row = PubSubManager_1.filterObj(data, allowedCols);
+        let row = (0, PubSubManager_1.filterObj)(data, allowedCols);
         if (validate) {
             row = await validate(row);
         }
@@ -122,7 +123,7 @@ class ColSet {
             let escapedVal;
             if (["geometry", "geography"].includes(col.udt_name) && row[key] && isPlainObject(row[key])) {
                 const basicFunc = (args) => {
-                    return args.map(arg => PubSubManager_1.asValue(arg)).join(", ");
+                    return args.map(arg => (0, PubSubManager_1.asValue)(arg)).join(", ");
                 };
                 const basicFuncNames = ["ST_GeomFromText", "ST_Point", "ST_MakePoint", "ST_MakePointM", "ST_PointFromText", "ST_GeomFromEWKT", "ST_GeomFromGeoJSON"];
                 const dataKeys = Object.keys(row[key]);
@@ -138,7 +139,7 @@ class ColSet {
                 escapedVal = exports.pgp.as.format(colIsUUID ? "$1::uuid" : colIsJSON ? "$1:json" : "$1", [row[key]]);
             }
             return {
-                escapedCol: prostgles_types_1.asName(key),
+                escapedCol: (0, prostgles_types_1.asName)(key),
                 escapedVal
             };
         });
@@ -147,14 +148,14 @@ class ColSet {
         const res = (await Promise.all((Array.isArray(data) ? data : [data]).map(async (d) => {
             const rowParts = await this.getRow(d, allowedCols, validate);
             const select = rowParts.map(r => r.escapedCol).join(", "), values = rowParts.map(r => r.escapedVal).join(", ");
-            return `INSERT INTO ${prostgles_types_1.asName(this.opts.tableName)} (${select}) VALUES (${values})`;
+            return `INSERT INTO ${(0, prostgles_types_1.asName)(this.opts.tableName)} (${select}) VALUES (${values})`;
         }))).join(";\n") + " ";
         return res;
     }
     async getUpdateQuery(data, allowedCols, validate) {
         const res = (await Promise.all((Array.isArray(data) ? data : [data]).map(async (d) => {
             const rowParts = await this.getRow(d, allowedCols, validate);
-            return `UPDATE ${prostgles_types_1.asName(this.opts.tableName)} SET ` + rowParts.map(r => `${r.escapedCol} = ${r.escapedVal} `).join(",\n");
+            return `UPDATE ${(0, prostgles_types_1.asName)(this.opts.tableName)} SET ` + rowParts.map(r => `${r.escapedCol} = ${r.escapedVal} `).join(",\n");
         }))).join(";\n") + " ";
         return res;
     }
@@ -174,7 +175,7 @@ class ViewHandler {
         this.joinPaths = joinPaths;
         this.tableOrViewInfo = tableOrViewInfo;
         this.name = tableOrViewInfo.name;
-        this.escapedName = prostgles_types_1.asName(this.name);
+        this.escapedName = (0, prostgles_types_1.asName)(this.name);
         this.columns = tableOrViewInfo.columns;
         /* cols are sorted by name to reduce .d.ts schema rewrites */
         this.columnsForTypes = tableOrViewInfo.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
@@ -220,10 +221,10 @@ class ViewHandler {
                 /* CTID not available in AFTER trigger */
                 // .concat(this.is_view? [] : ["ctid"])
                 .sort()
-                .map(f => (tableAlias ? (prostgles_types_1.asName(tableAlias) + ".") : "") + prostgles_types_1.asName(f))
+                .map(f => (tableAlias ? ((0, prostgles_types_1.asName)(tableAlias) + ".") : "") + (0, prostgles_types_1.asName)(f))
                 .map(f => `md5(coalesce(${f}::text, 'dd'))`)
                 .join(" || ") +
-            `)` + (alias ? ` as ${prostgles_types_1.asName(alias)}` : "");
+            `)` + (alias ? ` as ${(0, prostgles_types_1.asName)(alias)}` : "");
     }
     async validateViewRules(fields, filterFields, returningFields, forcedFilter, rule) {
         /* Safely test publish rules */
@@ -457,14 +458,14 @@ class ViewHandler {
         }
     }
     getValidatedRules(tableRules, localParams) {
-        if (utils_1.get(localParams, "socket") && !tableRules) {
+        if ((0, utils_1.get)(localParams, "socket") && !tableRules) {
             throw "INTERNAL ERROR: Unexpected case -> localParams && !tableRules";
         }
         /* Computed fields are allowed only if select is allowed */
         const allColumns = this.column_names.slice(0).map(fieldName => ({
             type: "column",
             name: fieldName,
-            getQuery: ({ tableAlias }) => QueryBuilder_1.asNameAlias(fieldName, tableAlias),
+            getQuery: ({ tableAlias }) => (0, QueryBuilder_1.asNameAlias)(fieldName, tableAlias),
             selected: false
         })).concat(QueryBuilder_1.COMPUTED_FIELDS.map(c => ({
             type: c.type,
@@ -480,7 +481,7 @@ class ViewHandler {
             selected: false
         })));
         if (tableRules) {
-            if (prostgles_types_1.isEmpty(tableRules))
+            if ((0, prostgles_types_1.isEmpty)(tableRules))
                 throw "INTERNAL ERROR: Unexpected case -> Empty table rules for " + this.name;
             const throwFieldsErr = (command, fieldType = "fields") => {
                 throw `Invalid publish.${this.name}.${command} rule -> ${fieldType} setting is missing.\nPlease specify allowed ${fieldType} in this format: "*" | { col_name: false } | { col1: true, col2: true }`;
@@ -616,7 +617,7 @@ class ViewHandler {
                 if (maxLimit && !Number.isInteger(maxLimit))
                     throw ` invalid publish.${this.name}.select.maxLimit -> expecting integer but got ` + maxLimit;
             }
-            let q = await QueryBuilder_1.getNewQuery(this, filter, selectParams, param3_unused, tableRules, localParams, this.columns), _query = QueryBuilder_1.makeQuery(this, q, undefined, undefined, selectParams);
+            let q = await (0, QueryBuilder_1.getNewQuery)(this, filter, selectParams, param3_unused, tableRules, localParams, this.columns), _query = (0, QueryBuilder_1.makeQuery)(this, q, undefined, undefined, selectParams);
             // console.log(_query, JSON.stringify(q, null, 2))
             if (testRule) {
                 try {
@@ -673,7 +674,7 @@ class ViewHandler {
         try {
             return await this.find(filter, { select: "", limit: 0 }, undefined, table_rules, localParams)
                 .then(async (allowed) => {
-                const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {};
+                const { filterFields, forcedFilter } = (0, utils_1.get)(table_rules, "select") || {};
                 const where = (await this.prepareWhere({ filter, forcedFilter, filterFields, addKeywords: true, localParams, tableRule: table_rules }));
                 let query = "SELECT COUNT(*) FROM " + this.escapedName + " " + where;
                 return (this.t || this.db).one(query, { _psqlWS_tableName: this.name }).then(({ count }) => +count);
@@ -737,7 +738,7 @@ class ViewHandler {
     prepareSelect(selectParams = "*", allowed_cols, allow_empty = true, tableAlias) {
         if (tableAlias) {
             let cs = this.prepareColumnSet(selectParams, allowed_cols, true, false);
-            return cs.columns.map(col => `${this.escapedName}.${prostgles_types_1.asName(col.name)}`).join(", ");
+            return cs.columns.map(col => `${this.escapedName}.${(0, prostgles_types_1.asName)(col.name)}`).join(", ");
         }
         else {
             return this.prepareColumnSet(selectParams, allowed_cols, true, true);
@@ -840,11 +841,11 @@ class ViewHandler {
                 const jp = paths[ji];
                 // let prevTable = ji? paths[ji - 1].table : jp.source;
                 let table = paths[ji].table;
-                let tableAlias = prostgles_types_1.asName(ji < paths.length - 1 ? `jd${ji}` : table);
-                let prevTableAlias = prostgles_types_1.asName(ji ? `jd${ji - 1}` : thisTable);
-                let cond = `${jp.on.map(([c1, c2]) => `${prevTableAlias}.${prostgles_types_1.asName(c1)} = ${tableAlias}.${prostgles_types_1.asName(c2)}`).join("\n AND ")}`;
+                let tableAlias = (0, prostgles_types_1.asName)(ji < paths.length - 1 ? `jd${ji}` : table);
+                let prevTableAlias = (0, prostgles_types_1.asName)(ji ? `jd${ji - 1}` : thisTable);
+                let cond = `${jp.on.map(([c1, c2]) => `${prevTableAlias}.${(0, prostgles_types_1.asName)(c1)} = ${tableAlias}.${(0, prostgles_types_1.asName)(c2)}`).join("\n AND ")}`;
                 let j = `SELECT 1 \n` +
-                    `FROM ${prostgles_types_1.asName(table)} ${tableAlias} \n` +
+                    `FROM ${(0, prostgles_types_1.asName)(table)} ${tableAlias} \n` +
                     `WHERE ${cond} \n`; //
                 if (ji === paths.length - 1 &&
                     finalFilter) {
@@ -887,7 +888,7 @@ class ViewHandler {
             throw "Issue with preparing $exists query for table " + t2 + "\n->" + JSON.stringify(err);
         }
         if (!isJoined) {
-            res = `${isNotExists ? " NOT " : " "} EXISTS (SELECT 1 \nFROM ${prostgles_types_1.asName(t2)} \n${finalWhere ? `WHERE ${finalWhere}` : ""}) `;
+            res = `${isNotExists ? " NOT " : " "} EXISTS (SELECT 1 \nFROM ${(0, prostgles_types_1.asName)(t2)} \n${finalWhere ? `WHERE ${finalWhere}` : ""}) `;
         }
         else {
             res = makeTableChain(finalWhere);
@@ -951,7 +952,7 @@ class ViewHandler {
         funcFilterkeys.map(f => {
             const funcArgs = data[f.name];
             if (!Array.isArray(funcArgs))
-                throw `A function filter must contain an array. E.g: { $funcFilterName: ["col1"] } \n but got: ${JSON.stringify(PubSubManager_1.filterObj(data, [f.name]))} `;
+                throw `A function filter must contain an array. E.g: { $funcFilterName: ["col1"] } \n but got: ${JSON.stringify((0, PubSubManager_1.filterObj)(data, [f.name]))} `;
             const fields = this.parseFieldFilter(f.getFields(funcArgs), true, allowed_colnames);
             const dissallowedCols = fields.filter(fname => !allowed_colnames.includes(fname));
             if (dissallowedCols.length) {
@@ -1016,8 +1017,8 @@ class ViewHandler {
         const allowedComparators = [">", "<", "=", "<=", ">=", "<>", "!="];
         if (complexFilterKey in data) {
             const getFuncQuery = (funcData) => {
-                const { funcName, args } = QueryBuilder_1.parseFunctionObject(funcData);
-                const funcDef = QueryBuilder_1.parseFunction({ func: funcName, args, functions: QueryBuilder_1.FUNCTIONS, allowedFields: allowed_colnames });
+                const { funcName, args } = (0, QueryBuilder_1.parseFunctionObject)(funcData);
+                const funcDef = (0, QueryBuilder_1.parseFunction)({ func: funcName, args, functions: QueryBuilder_1.FUNCTIONS, allowedFields: allowed_colnames });
                 return funcDef.getQuery({ args, tableAlias, allColumns: this.columns, allowedFields: allowed_colnames });
             };
             const complexFilter = data[complexFilterKey];
@@ -1033,7 +1034,7 @@ class ViewHandler {
                     throw `Invalid $filter. comparator ${JSON.stringify(comparator)} is not valid. Expecting one of: ${allowedComparators}`;
                 if (!rightFilterOrValue)
                     throw "Invalid $filter. Expecting a value or function after the comparator";
-                const rightVal = utils_1.isObject(rightFilterOrValue) ? getFuncQuery(rightFilterOrValue) : PubSubManager_1.asValue(rightFilterOrValue);
+                const rightVal = (0, utils_1.isObject)(rightFilterOrValue) ? getFuncQuery(rightFilterOrValue) : (0, PubSubManager_1.asValue)(rightFilterOrValue);
                 if (leftVal === rightVal)
                     throw "Invalid $filter. Cannot compare two identical function signatures: " + JSON.stringify(leftFilter);
                 result += ` ${comparator} ${rightVal}`;
@@ -1062,8 +1063,8 @@ class ViewHandler {
         }
         /* TODO: Allow filter funcs */
         // const singleFuncs = FUNCTIONS.filter(f => f.singleColArg);
-        const f = PubSubManager_1.filterObj(data, filterKeys);
-        const q = Filtering_1.parseFilterItem({
+        const f = (0, PubSubManager_1.filterObj)(data, filterKeys);
+        const q = (0, Filtering_1.parseFilterItem)({
             filter: f,
             tableAlias,
             pgp: exports.pgp,
@@ -1424,7 +1425,7 @@ class TableHandler extends ViewHandler {
                 console.error({ localParams, localFunc });
                 throw " Cannot have localFunc AND socket ";
             }
-            const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {}, condition = await this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: undefined, localParams, tableRule: table_rules }), throttle = utils_1.get(params, "throttle") || 0, selectParams = PubSubManager_1.filterObj(params || {}, [], ["throttle"]);
+            const { filterFields, forcedFilter } = (0, utils_1.get)(table_rules, "select") || {}, condition = await this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: undefined, localParams, tableRule: table_rules }), throttle = (0, utils_1.get)(params, "throttle") || 0, selectParams = (0, PubSubManager_1.filterObj)(params || {}, [], ["throttle"]);
             // const { subOne = false } = localParams || {};
             const filterSize = JSON.stringify(filter || {}).length;
             if (filterSize * 4 > 2704) {
@@ -1449,6 +1450,7 @@ class TableHandler extends ViewHandler {
                         table_name: this.name,
                         throttle,
                         last_throttled: 0,
+                        // subOne
                     }).then(channelName => ({ channelName }));
                 });
             }
@@ -1466,6 +1468,7 @@ class TableHandler extends ViewHandler {
                     table_name: this.name,
                     throttle,
                     last_throttled: 0,
+                    // subOne
                 }).then(channelName => ({ channelName }));
                 const unsubscribe = async () => {
                     const pubSubManager = await this.dboBuilder.getPubSubManager();
@@ -1514,7 +1517,7 @@ class TableHandler extends ViewHandler {
                     throw "update rules missing for " + this.name;
                 ({ forcedFilter, forcedData, returningFields, fields, filterFields, validate } = tableRules.update);
                 if (!returningFields)
-                    returningFields = utils_1.get(tableRules, "select.fields");
+                    returningFields = (0, utils_1.get)(tableRules, "select.fields");
                 if (!fields)
                     throw ` Invalid update rule for ${this.name}. fields missing `;
                 /* Safely test publish rules */
@@ -1567,7 +1570,7 @@ class TableHandler extends ViewHandler {
                     throw "Cannot patch data within a filter that affects more/less than 1 row";
                 }
                 patchedTextData.map(p => {
-                    data[p.fieldName] = prostgles_types_1.unpatchText(rows[0][p.fieldName], p);
+                    data[p.fieldName] = (0, prostgles_types_1.unpatchText)(rows[0][p.fieldName], p);
                 });
                 // https://w3resource.com/PostgreSQL/overlay-function.p hp
                 //  overlay(coalesce(status, '') placing 'hom' from 2 for 0)
@@ -1606,7 +1609,7 @@ class TableHandler extends ViewHandler {
     }
     ;
     validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues = false }) {
-        const synced_field = utils_1.get(tableRules ?? {}, "sync.synced_field");
+        const synced_field = (0, utils_1.get)(tableRules ?? {}, "sync.synced_field");
         /* Update synced_field if sync is on and missing */
         if (synced_field && !row[synced_field]) {
             row[synced_field] = Date.now();
@@ -1682,6 +1685,12 @@ class TableHandler extends ViewHandler {
                         name: media.name ?? "????",
                         content_type: media.content_type
                     },
+                    // imageCompression: {
+                    //     inside: {
+                    //         width: 1100,
+                    //         height: 630
+                    //     }
+                    // }
                 });
                 return {
                     ...media,
@@ -1692,7 +1701,7 @@ class TableHandler extends ViewHandler {
             else if (extraKeys.length) {
                 /* Ensure we're using the same transaction */
                 const _this = this.t ? this : dbTX[this.name];
-                let rootData = PubSubManager_1.filterObj(data, undefined, extraKeys);
+                let rootData = (0, PubSubManager_1.filterObj)(data, undefined, extraKeys);
                 let insertedChildren;
                 let targetTableRules;
                 const fullRootResult = await _this.insert(rootData, { returning: "*" }, undefined, tableRules, localParams);
@@ -1834,7 +1843,7 @@ class TableHandler extends ViewHandler {
                 fields = tableRules.insert.fields;
                 /* If no returning fields specified then take select fields as returning */
                 if (!returningFields)
-                    returningFields = utils_1.get(tableRules, "select.fields") || utils_1.get(tableRules, "insert.fields");
+                    returningFields = (0, utils_1.get)(tableRules, "select.fields") || (0, utils_1.get)(tableRules, "insert.fields");
                 if (!fields)
                     throw ` invalid insert rule for ${this.name} -> fields missing `;
                 /* Safely test publish rules */
@@ -1879,7 +1888,7 @@ class TableHandler extends ViewHandler {
                 let _data = { ...data };
                 let insertQ = "";
                 if (!Object.keys(_data).length)
-                    insertQ = `INSERT INTO ${prostgles_types_1.asName(this.name)} DEFAULT VALUES `;
+                    insertQ = `INSERT INTO ${(0, prostgles_types_1.asName)(this.name)} DEFAULT VALUES `;
                 else
                     insertQ = await this.colSet.getInsertQuery(_data, allowedCols, tableRules?.insert?.validate); // pgp.helpers.insert(_data, columnSet); 
                 return insertQ + conflict_query + returningSelect;
@@ -1938,7 +1947,7 @@ class TableHandler extends ViewHandler {
     ;
     makeReturnQuery(items) {
         if (items?.length)
-            return " RETURNING " + items.map(s => s.getQuery() + " AS " + prostgles_types_1.asName(s.alias)).join(", ");
+            return " RETURNING " + items.map(s => s.getQuery() + " AS " + (0, prostgles_types_1.asName)(s.alias)).join(", ");
         return "";
     }
     async delete(filter, params, param3_unused, table_rules, localParams) {
@@ -1956,9 +1965,9 @@ class TableHandler extends ViewHandler {
                 filterFields = table_rules.delete.filterFields;
                 returningFields = table_rules.delete.returningFields;
                 if (!returningFields)
-                    returningFields = utils_1.get(table_rules, "select.fields");
+                    returningFields = (0, utils_1.get)(table_rules, "select.fields");
                 if (!returningFields)
-                    returningFields = utils_1.get(table_rules, "delete.filterFields");
+                    returningFields = (0, utils_1.get)(table_rules, "delete.filterFields");
                 if (!filterFields)
                     throw ` Invalid delete rule for ${this.name}. filterFields missing `;
                 /* Safely test publish rules */
@@ -2056,11 +2065,11 @@ class TableHandler extends ViewHandler {
                 throw err;
             }
             id_fields = this.parseFieldFilter(id_fields, false);
-            let allowedSelect = this.parseFieldFilter(utils_1.get(table_rules, "select.fields"), false);
+            let allowedSelect = this.parseFieldFilter((0, utils_1.get)(table_rules, "select.fields"), false);
             if (syncFields.find(f => !allowedSelect.includes(f))) {
                 throw `INTERNAL ERROR: sync field missing from publish.${this.name}.select.fields`;
             }
-            let select = this.getAllowedSelectFields(utils_1.get(params || {}, "select") || "*", allowedSelect, false);
+            let select = this.getAllowedSelectFields((0, utils_1.get)(params || {}, "select") || "*", allowedSelect, false);
             if (!select.length)
                 throw "Empty select not allowed";
             /* Add sync fields if missing */
@@ -2071,7 +2080,7 @@ class TableHandler extends ViewHandler {
             /* Step 1: parse command and params */
             return this.find(filter, { select, limit: 0 }, undefined, table_rules, localParams)
                 .then(async (isValid) => {
-                const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {};
+                const { filterFields, forcedFilter } = (0, utils_1.get)(table_rules, "select") || {};
                 const condition = await this.prepareWhere({ filter, forcedFilter, filterFields, addKeywords: false, localParams, tableRule: table_rules });
                 // let final_filter = getFindFilter(filter, table_rules);
                 const pubSubManager = await this.dboBuilder.getPubSubManager();
@@ -2270,7 +2279,7 @@ class DboBuilder {
             this.joinPaths = [];
             tables.map(t1 => {
                 tables.map(t2 => {
-                    const spath = shortestPath_1.findShortestPath(this.joinGraph, t1, t2);
+                    const spath = (0, shortestPath_1.findShortestPath)(this.joinGraph, t1, t2);
                     if (spath && spath.distance < Infinity) {
                         const existing1 = this.joinPaths.find(j => j.t1 === t1 && j.t2 === t2);
                         if (!existing1) {
@@ -2490,6 +2499,7 @@ export type TxCB = {
     }
 }
 exports.DboBuilder = DboBuilder;
+_a = DboBuilder;
 DboBuilder.create = async (prostgles) => {
     let res = new DboBuilder(prostgles);
     return await res.init();
@@ -2502,7 +2512,7 @@ async function getConstraints(db, schema = "public") {
                 ON rel.oid = con.conrelid
             INNER JOIN pg_catalog.pg_namespace nsp
                 ON nsp.oid = connamespace
-        WHERE nsp.nspname = ${PubSubManager_1.asValue(schema)}
+        WHERE nsp.nspname = ${(0, PubSubManager_1.asValue)(schema)}
     `);
 }
 async function getTablesForSchemaPostgresSQL(db, schema = "public") {
@@ -2616,7 +2626,7 @@ async function getTablesForSchemaPostgresSQL(db, schema = "public") {
         GROUP BY cl_r.relname 
     ) vr 
     ON t.table_name = vr.view_name 
-    WHERE t.table_schema = ${PubSubManager_1.asValue(schema)}
+    WHERE t.table_schema = ${(0, PubSubManager_1.asValue)(schema)}
     GROUP BY t.table_schema, t.table_name, t.table_type, vr.table_names , cc.table_oid
     ORDER BY schema, name
     `;

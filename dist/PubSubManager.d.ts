@@ -99,7 +99,7 @@ export declare class PubSubManager {
     };
     NOTIF_CHANNEL: {
         preffix: string;
-        getFull: (appID?: string | undefined) => string;
+        getFull: (appID?: string) => string;
     };
     private appID?;
     appCheckFrequencyMS: number;

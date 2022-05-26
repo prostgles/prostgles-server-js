@@ -27,7 +27,7 @@ export declare type NewQuery = {
     tableAlias?: string;
     $path?: string[];
 };
-export declare const asNameAlias: (field: string, tableAlias?: string | undefined) => string;
+export declare const asNameAlias: (field: string, tableAlias?: string) => string;
 export declare const parseFunctionObject: (funcData: any) => {
     funcName: string;
     args: any[];

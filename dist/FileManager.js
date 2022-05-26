@@ -8,9 +8,10 @@ const sharp = require("sharp");
 const prostgles_types_1 = require("prostgles-types");
 const DboBuilder_1 = require("./DboBuilder");
 const HOUR = 3600 * 1000;
-exports.asSQLIdentifier = async (name, db) => {
+const asSQLIdentifier = async (name, db) => {
     return (await db.one("select format('%I', $1) as name", [name]))?.name;
 };
+exports.asSQLIdentifier = asSQLIdentifier;
 class FileManager {
     constructor(config, imageOptions) {
         this.uploadAsMedia = async (params) => {
@@ -57,7 +58,7 @@ class FileManager {
             const res = await this.upload(_data, name, content_type);
             return res;
         };
-        this.parseSQLIdentifier = async (name) => exports.asSQLIdentifier(name, this.prostgles.db); //  this.prostgles.dbo.sql<"value">("select format('%I', $1)", [name], { returnType: "value" } )
+        this.parseSQLIdentifier = async (name) => (0, exports.asSQLIdentifier)(name, this.prostgles.db); //  this.prostgles.dbo.sql<"value">("select format('%I', $1)", [name], { returnType: "value" } )
         this.init = async (prg) => {
             this.prostgles = prg;
             // const { dbo, db, opts } = prg;
@@ -73,9 +74,9 @@ class FileManager {
              * 1. Create media table
              */
             if (!this.dbo[tableName]) {
-                console.log(`Creating fileTable ${prostgles_types_1.asName(tableName)} ...`);
+                console.log(`Creating fileTable ${(0, prostgles_types_1.asName)(tableName)} ...`);
                 await this.db.any(`CREATE EXTENSION IF NOT EXISTS pgcrypto `);
-                await this.db.any(`CREATE TABLE IF NOT EXISTS ${prostgles_types_1.asName(tableName)} (
+                await this.db.any(`CREATE TABLE IF NOT EXISTS ${(0, prostgles_types_1.asName)(tableName)} (
           id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           name                TEXT NOT NULL,
           extension           TEXT NOT NULL,
@@ -90,7 +91,7 @@ class FileManager {
           etag                TEXT,
           UNIQUE(name)
       )`);
-                console.log(`Created fileTable ${prostgles_types_1.asName(tableName)}`);
+                console.log(`Created fileTable ${(0, prostgles_types_1.asName)(tableName)}`);
                 await prg.refreshDBO();
             }
             /**
@@ -111,8 +112,8 @@ class FileManager {
                     const action = ` (${tableName} <-> ${refTable}) join table ${lookupTableName}`; //  PRIMARY KEY
                     const query = `        
         CREATE TABLE ${lookupTableName} (
-          foreign_id  ${pkField.udt_name} ${refType === "one" ? " PRIMARY KEY " : ""} REFERENCES ${prostgles_types_1.asName(refTable)}(${prostgles_types_1.asName(pkField.name)}),
-          media_id    UUID NOT NULL REFERENCES ${prostgles_types_1.asName(tableName)}(id)
+          foreign_id  ${pkField.udt_name} ${refType === "one" ? " PRIMARY KEY " : ""} REFERENCES ${(0, prostgles_types_1.asName)(refTable)}(${(0, prostgles_types_1.asName)(pkField.name)}),
+          media_id    UUID NOT NULL REFERENCES ${(0, prostgles_types_1.asName)(tableName)}(id)
         )
         `;
                     console.log(`Creating ${action} ...`, lookupTableName);
@@ -126,15 +127,15 @@ class FileManager {
                         console.error(`Prostgles: media ${lookupTableName} joining table has lost a reference constraint for column ${badCol.name}.` +
                             ` This may have been caused by a DROP TABLE ... CASCADE.`);
                         let q = `
-            ALTER TABLE ${prostgles_types_1.asName(lookupTableName)} 
+            ALTER TABLE ${(0, prostgles_types_1.asName)(lookupTableName)} 
             ADD CONSTRAINT ${(lookupTableName + "_" + badCol.name + "_r")} FOREIGN KEY (${badCol.name})
           `;
                         console.log("Trying to add the missing constraint back");
                         if (badCol.name === "foreign_id") {
-                            q += `REFERENCES ${prostgles_types_1.asName(refTable)}(${prostgles_types_1.asName(pkField.name)}) `;
+                            q += `REFERENCES ${(0, prostgles_types_1.asName)(refTable)}(${(0, prostgles_types_1.asName)(pkField.name)}) `;
                         }
                         else if (badCol.name === "media_id") {
-                            q += `REFERENCES ${prostgles_types_1.asName(tableName)}(id) `;
+                            q += `REFERENCES ${(0, prostgles_types_1.asName)(tableName)}(id) `;
                         }
                         if (q) {
                             try {
@@ -225,7 +226,7 @@ class FileManager {
     ;
     async getMIME(file, fileName, allowedExtensions, dissallowedExtensions, onlyFromName = true) {
         const nameParts = fileName.split(".");
-        const nameExt = nameParts[nameParts.length - 1].toLowerCase(), mime = DboBuilder_1.getKeys(CONTENT_TYPE_TO_EXT).find(k => CONTENT_TYPE_TO_EXT[k].includes(nameExt));
+        const nameExt = nameParts[nameParts.length - 1].toLowerCase(), mime = (0, DboBuilder_1.getKeys)(CONTENT_TYPE_TO_EXT).find(k => CONTENT_TYPE_TO_EXT[k].includes(nameExt));
         let type = {
             fileName,
             mime,

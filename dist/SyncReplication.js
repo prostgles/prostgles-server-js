@@ -6,7 +6,7 @@ const prostgles_types_1 = require("prostgles-types");
 function getNumbers(numberArr) {
     return numberArr.filter(v => v !== null && v !== undefined && Number.isFinite(+v));
 }
-exports.syncData = async (_this, sync, clientData) => {
+const syncData = async (_this, sync, clientData) => {
     // console.log("S", clientData)
     const { socket_id, channel_name, table_name, filter, table_rules, allow_delete = false, params, synced_field, id_fields = [], batch_size, wal, throttle = 0 } = sync, socket = _this.sockets[socket_id];
     if (!socket) {
@@ -98,7 +98,7 @@ exports.syncData = async (_this, sync, clientData) => {
         // console.log("deleteData deleteData  deleteData " + deleted.length);
         if (allow_delete) {
             return Promise.all(deleted.map(async (d) => {
-                const id_filter = PubSubManager_1.filterObj(d, id_fields);
+                const id_filter = (0, PubSubManager_1.filterObj)(d, id_fields);
                 try {
                     await _this.dbo[table_name].delete(id_filter, undefined, undefined, table_rules);
                     return 1;
@@ -122,7 +122,7 @@ exports.syncData = async (_this, sync, clientData) => {
         // console.log("isExpress", isExpress, data);
         return _this.dboBuilder.getTX(async (dbTX) => {
             const tbl = dbTX[table_name];
-            const existingData = await tbl.find({ $or: data.map(d => PubSubManager_1.filterObj(d, id_fields)) }, {
+            const existingData = await tbl.find({ $or: data.map(d => (0, PubSubManager_1.filterObj)(d, id_fields)) }, {
                 select: [synced_field, ...id_fields],
                 orderBy: orderByAsc,
             }, undefined, table_rules);
@@ -134,10 +134,10 @@ exports.syncData = async (_this, sync, clientData) => {
                 if (table_rules.update && updates.length) {
                     let updateData = [];
                     await Promise.all(updates.map(upd => {
-                        const id_filter = PubSubManager_1.filterObj(upd, id_fields);
+                        const id_filter = (0, PubSubManager_1.filterObj)(upd, id_fields);
                         const syncSafeFilter = { $and: [id_filter, { [synced_field]: { "<": upd[synced_field] } }] };
                         // return tbl.update(syncSafeFilter, filterObj(upd, [], id_fields), { fixIssues: true }, table_rules)
-                        updateData.push([syncSafeFilter, PubSubManager_1.filterObj(upd, [], id_fields)]);
+                        updateData.push([syncSafeFilter, (0, PubSubManager_1.filterObj)(upd, [], id_fields)]);
                     }));
                     await tbl.updateBatch(updateData, { fixIssues: true }, table_rules);
                     updated = updates.length;
@@ -155,7 +155,7 @@ exports.syncData = async (_this, sync, clientData) => {
                 throw e;
             }
         }).then(res => {
-            PubSubManager_1.log(`upsertData: inserted( ${inserted} )    updated( ${updated} )     total( ${total} )`);
+            (0, PubSubManager_1.log)(`upsertData: inserted( ${inserted} )    updated( ${updated} )     total( ${total} )`);
             return { inserted, updated, total };
         })
             .catch(err => {
@@ -283,7 +283,7 @@ exports.syncData = async (_this, sync, clientData) => {
                 });
                 await Promise.all(to_delete.map(d => {
                     deleted++;
-                    return _this.dbo[table_name].delete(PubSubManager_1.filterObj(d, id_fields), {}, undefined, table_rules);
+                    return _this.dbo[table_name].delete((0, PubSubManager_1.filterObj)(d, id_fields), {}, undefined, table_rules);
                 }));
                 sData = await getServerData(min_synced, offset);
             }
@@ -406,4 +406,5 @@ exports.syncData = async (_this, sync, clientData) => {
     sync.is_syncing = false;
     // console.log(`Finished sync for ${table_name}`, socket._user);
 };
+exports.syncData = syncData;
 //# sourceMappingURL=SyncReplication.js.map

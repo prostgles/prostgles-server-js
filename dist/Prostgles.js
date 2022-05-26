@@ -32,20 +32,20 @@ function getDbConnection(dbConnection, options, debugQueries = false, onNotice) 
                 if (isFresh && !client.listeners('notice').length) {
                     client.on('notice', function (msg) {
                         if (onNotice) {
-                            onNotice(msg, utils_1.get(msg, "message"));
+                            onNotice(msg, (0, utils_1.get)(msg, "message"));
                         }
                         else {
-                            console.log("notice: %j", utils_1.get(msg, "message"));
+                            console.log("notice: %j", (0, utils_1.get)(msg, "message"));
                         }
                     });
                 }
                 if (isFresh && !client.listeners('error').length) {
                     client.on('error', function (msg) {
                         if (onNotice) {
-                            onNotice(msg, utils_1.get(msg, "message"));
+                            onNotice(msg, (0, utils_1.get)(msg, "message"));
                         }
                         else {
-                            console.log("error: %j", utils_1.get(msg, "message"));
+                            console.log("error: %j", (0, utils_1.get)(msg, "message"));
                         }
                     });
                 }
@@ -162,7 +162,7 @@ class Prostgles {
             const methods = await publishParser?.getMethods(socket);
             socket.emit(prostgles_types_1.CHANNELS.SCHEMA, {
                 schema,
-                methods: DboBuilder_1.getKeys(methods),
+                methods: (0, DboBuilder_1.getKeys)(methods),
                 ...(fullSchema ? { fullSchema } : {}),
                 rawSQL,
                 joinTables: joinTables2,
@@ -526,7 +526,7 @@ exports.Prostgles = Prostgles;
 function makeSocketError(cb, err) {
     const err_msg = (err instanceof Error) ?
         err.toString() :
-        DboBuilder_1.isPlainObject(err) ?
+        (0, DboBuilder_1.isPlainObject)(err) ?
             JSON.stringify(err, null, 2) :
             err.toString(), e = { err_msg, err };
     cb(e);
@@ -639,7 +639,7 @@ class PublishParser {
         const publishParams = await this.getPublishParams({ socket });
         const _methods = await applyParamsIfFunc(this.publishMethods, publishParams);
         if (_methods && Object.keys(_methods).length) {
-            DboBuilder_1.getKeys(_methods).map(key => {
+            (0, DboBuilder_1.getKeys)(_methods).map(key => {
                 if (_methods[key] && (typeof _methods[key] === "function" || typeof _methods[key].then === "function")) {
                     //@ts-ignore
                     methods[key] = _methods[key];
@@ -771,8 +771,8 @@ class PublishParser {
                     Add defaults
                     Check for invalid params
                 */
-                if (table_rules && DboBuilder_1.getKeys(table_rules).length && table_rules !== "*") {
-                    const ruleKeys = DboBuilder_1.getKeys(table_rules);
+                if (table_rules && (0, DboBuilder_1.getKeys)(table_rules).length && table_rules !== "*") {
+                    const ruleKeys = (0, DboBuilder_1.getKeys)(table_rules);
                     // @ts-ignore
                     ruleKeys.filter(m => table_rules[m])
                         .find(method => {
@@ -790,7 +790,7 @@ class PublishParser {
                         /* Methods do not have params -> They use them from rules */
                         if (method === rm.rule) {
                             // @ts-ignore
-                            let method_params = DboBuilder_1.getKeys(table_rules[method]);
+                            let method_params = (0, DboBuilder_1.getKeys)(table_rules[method]);
                             let iparam = method_params.find(p => !rm?.allowed_params.includes(p));
                             if (iparam) {
                                 throw `Invalid setting in publish.${tableName}.${method} -> ${iparam}. \n Expecting any of: ${rm.allowed_params.join(", ")}`;
@@ -803,11 +803,11 @@ class PublishParser {
                             if ([true, "*"].includes(table_rules[method])) {
                                 throw "Invalid sync rule. Expecting { id_fields: string[], synced_field: string } ";
                             }
-                            if (typeof utils_1.get(table_rules, [method, "throttle"]) !== "number") {
+                            if (typeof (0, utils_1.get)(table_rules, [method, "throttle"]) !== "number") {
                                 // @ts-ignore
                                 table_rules[method].throttle = 100;
                             }
-                            if (typeof utils_1.get(table_rules, [method, "batch_size"]) !== "number") {
+                            if (typeof (0, utils_1.get)(table_rules, [method, "batch_size"]) !== "number") {
                                 // @ts-ignore
                                 table_rules[method].batch_size = PubSubManager_1.DEFAULT_SYNC_BATCH_SIZE;
                             }
@@ -860,7 +860,7 @@ class PublishParser {
                         schema[tableName] = {};
                         let methods = [];
                         if (typeof table_rules === "object") {
-                            methods = DboBuilder_1.getKeys(table_rules);
+                            methods = (0, DboBuilder_1.getKeys)(table_rules);
                         }
                         await Promise.all(methods.filter(m => m !== "select").map(async (method) => {
                             if (method === "sync" && table_rules[method]) {

@@ -89,11 +89,11 @@ class TableConfigurator {
                     const keys = Object.keys(rows[0]).filter(k => k !== "id");
                     queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
                         id  TEXT PRIMARY KEY
-                        ${keys.length ? (", " + keys.map(k => prostgles_types_1.asName(k) + " TEXT ").join(", ")) : ""}
+                        ${keys.length ? (", " + keys.map(k => (0, prostgles_types_1.asName)(k) + " TEXT ").join(", ")) : ""}
                     );`);
                     rows.map(row => {
                         const values = this.prostgles.pgp.helpers.values(row);
-                        queries.push(this.prostgles.pgp.as.format(`INSERT INTO ${tableName}  (${["id", ...keys].map(t => prostgles_types_1.asName(t)).join(", ")})  ` + " VALUES ${values:raw} ;", { values }));
+                        queries.push(this.prostgles.pgp.as.format(`INSERT INTO ${tableName}  (${["id", ...keys].map(t => (0, prostgles_types_1.asName)(t)).join(", ")})  ` + " VALUES ${values:raw} ;", { values }));
                     });
                     // console.log("Created lookup table " + tableName)
                 }
@@ -111,10 +111,10 @@ class TableConfigurator {
             const tableConf = this.config[tableName];
             if ("columns" in tableConf) {
                 const getColDef = (name, colConf) => {
-                    const colNameEsc = prostgles_types_1.asName(name);
+                    const colNameEsc = (0, prostgles_types_1.asName)(name);
                     const getTextDef = (colConf) => {
                         const { nullable, defaultValue } = colConf;
-                        return ` TEXT ${!nullable ? " NOT NULL " : ""} ${defaultValue ? ` DEFAULT ${PubSubManager_1.asValue(defaultValue)} ` : ""}`;
+                        return ` TEXT ${!nullable ? " NOT NULL " : ""} ${defaultValue ? ` DEFAULT ${(0, PubSubManager_1.asValue)(defaultValue)} ` : ""}`;
                     };
                     if ("references" in colConf && colConf.references) {
                         const { tableName: lookupTable, columnName: lookupCol = "id" } = colConf.references;
@@ -150,14 +150,14 @@ class TableConfigurator {
                         if ("references" in colConf && colConf.references) {
                             const { tableName: lookupTable, } = colConf.references;
                             queries.push(`
-                                ALTER TABLE ${prostgles_types_1.asName(tableName)} 
+                                ALTER TABLE ${(0, prostgles_types_1.asName)(tableName)} 
                                 ADD COLUMN ${getColDef(colName, colConf)};
                             `);
                             console.log(`TableConfigurator: ${tableName}(${colName})` + " referenced lookup table " + lookupTable);
                         }
                         else if ("sqlDefinition" in colConf && colConf.sqlDefinition) {
                             queries.push(`
-                                ALTER TABLE ${prostgles_types_1.asName(tableName)} 
+                                ALTER TABLE ${(0, prostgles_types_1.asName)(tableName)} 
                                 ADD COLUMN ${getColDef(colName, colConf)};
                             `);
                             console.log(`TableConfigurator: created/added column ${tableName}(${colName}) ` + colConf.sqlDefinition);
@@ -165,24 +165,24 @@ class TableConfigurator {
                     }
                 });
                 if (colDefs.length) {
-                    queries.push(`CREATE TABLE ${prostgles_types_1.asName(tableName)} (
+                    queries.push(`CREATE TABLE ${(0, prostgles_types_1.asName)(tableName)} (
                         ${colDefs.join(", \n")}
                     );`);
                     console.error("TableConfigurator: Created table: \n" + queries[0]);
                 }
             }
             if ("constraints" in tableConf && tableConf.constraints) {
-                DboBuilder_1.getKeys(tableConf.constraints).map(constraintName => {
-                    queries.push(`ALTER TABLE ${prostgles_types_1.asName(tableName)} ADD CONSTRAINT ${prostgles_types_1.asName(constraintName)} ${tableConf.constraints[constraintName]} ;`);
+                (0, DboBuilder_1.getKeys)(tableConf.constraints).map(constraintName => {
+                    queries.push(`ALTER TABLE ${(0, prostgles_types_1.asName)(tableName)} ADD CONSTRAINT ${(0, prostgles_types_1.asName)(constraintName)} ${tableConf.constraints[constraintName]} ;`);
                 });
             }
             if ("indexes" in tableConf && tableConf.indexes) {
-                DboBuilder_1.getKeys(tableConf.indexes).map(indexName => {
+                (0, DboBuilder_1.getKeys)(tableConf.indexes).map(indexName => {
                     const { concurrently, unique, using, definition, replace } = tableConf.indexes[indexName];
                     if (replace || typeof replace !== "boolean" && tableConf.replaceUniqueIndexes) {
-                        queries.push(`DROP INDEX IF EXISTS ${prostgles_types_1.asName(indexName)}  ;`);
+                        queries.push(`DROP INDEX IF EXISTS ${(0, prostgles_types_1.asName)(indexName)}  ;`);
                     }
-                    queries.push(`CREATE ${unique ? "UNIQUE" : ""} ${!concurrently ? "" : "CONCURRENTLY"} INDEX ${prostgles_types_1.asName(indexName)} ON ${prostgles_types_1.asName(tableName)} ${!using ? "" : ("USING " + using)} (${definition}) ;`);
+                    queries.push(`CREATE ${unique ? "UNIQUE" : ""} ${!concurrently ? "" : "CONCURRENTLY"} INDEX ${(0, prostgles_types_1.asName)(indexName)} ON ${(0, prostgles_types_1.asName)(tableName)} ${!using ? "" : ("USING " + using)} (${definition}) ;`);
                 });
             }
         }));
@@ -199,7 +199,7 @@ async function columnExists(args) {
     return Boolean((await db.oneOrNone(`
         SELECT column_name, table_name
         FROM information_schema.columns 
-        WHERE table_name=${PubSubManager_1.asValue(tableName)} and column_name=${PubSubManager_1.asValue(colName)}
+        WHERE table_name=${(0, PubSubManager_1.asValue)(tableName)} and column_name=${(0, PubSubManager_1.asValue)(colName)}
         LIMIT 1;
     `))?.column_name);
 }
