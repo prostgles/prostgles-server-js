@@ -425,7 +425,6 @@ export default class AuthHandler {
       let rawSid = querySid;
       if (!rawSid) {
         const cookie_str = localParams.socket?.handshake?.headers?.cookie;
-        if(!cookie_str) throw "cookie_str missing";
         const cookie = parseCookieStr(cookie_str);
         rawSid = cookie[sidKeyName];
       }
@@ -436,7 +435,7 @@ export default class AuthHandler {
 
     } else throw "socket OR httpReq missing from localParams";
 
-    function parseCookieStr(cookie_str: string): any {
+    function parseCookieStr(cookie_str: string | undefined): any {
       if (!cookie_str || typeof cookie_str !== "string") return {}
       return cookie_str.replace(/\s/g, '').split(";").reduce<AnyObject>((prev, current) => {
         const [name, value] = current.split('=');
