@@ -5,7 +5,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { pgp, Filter, LocalParams, isPlainObject, TableHandler, ViewHandler, postgresToTsType } from "./DboBuilder";
-import { TableRule, flat } from "./Prostgles";
+import { TableRule } from "./Prostgles";
 import { SelectParamsBasic as SelectParams, isEmpty, FieldFilter, asName, TextFilter_FullTextSearchFilterKeys, TS_PG_Types, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE } from "prostgles-types";
 import { get, isObject } from "./utils";
 
@@ -164,6 +164,8 @@ export type FunctionSpec = {
    * allowedFields passed for multicol functions (e.g.: $rowhash)
    */
   getQuery: (params: GetQueryArgs) => string;
+
+  returnType?: PG_COLUMN_UDT_DATA_TYPE;
 };
 
 const MAX_COL_NUM = 1600;
@@ -256,8 +258,10 @@ let PostGIS_Funcs: FunctionSpec[] = [
       
       if(!isPlainObject(arg2)) mErr();
       const col = allColumns.find(c => c.name === args[0]);
+      if(!col) throw new Error("Col not found: " + args[0])
 
-      const { lat, lng, srid = 4326, 
+      const { 
+        lat, lng, srid = 4326, 
         geojson, text, use_spheroid, 
         distance, spheroid = 'SPHEROID["WGS 84",6378137,298.257223563]',
         debug
@@ -597,7 +601,7 @@ export const FUNCTIONS: FunctionSpec[] = [
         second: "minute" 
       };
 
-      let res = `(date_trunc(${asValue(prevInt[unit] || "hour")}, ${col}) + date_part(${asValue(unit, "::text")}, ${col})::int / ${val} * interval ${asValue(val + " " + unit)})`;
+      let res = `(date_trunc(${asValue(prevInt[unit as "month"] || "hour")}, ${col}) + date_part(${asValue(unit, "::text")}, ${col})::int / ${val} * interval ${asValue(val + " " + unit)})`;
       // console.log(res);
       return res;
     }
@@ -664,7 +668,7 @@ export const FUNCTIONS: FunctionSpec[] = [
   } as FunctionSpec)),
 
   /* Basic 1 arg col funcs */
-  ...["upper", "lower", "length", "reverse", "trim", "initcap", "round", "ceil", "floor", "sign", "age", "md5"].map(funcName => ({
+  ...["upper", "lower", "length", "reverse", "trim", "initcap", "round", "ceil", "floor", "sign", "md5"].map(funcName => ({
     name: "$" + funcName,
     type: "function",
     numArgs: 1,
@@ -675,6 +679,27 @@ export const FUNCTIONS: FunctionSpec[] = [
     }
   } as FunctionSpec)),
 
+  /* Interval funcs */
+  ...["age", "difference"].map(funcName => ({
+    name: "$" + funcName,
+    type: "function",
+    numArgs: 1,
+    singleColArg: true,
+    getFields: (args: any[]) => args,
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      const validCols = args.filter(a => typeof a === "string").length
+      if(funcName === "difference" && validCols !== 2) throw new Error("Must have two column names")
+      if(![1,2].includes(validCols)) throw new Error("Must have one or two column names")
+      const [leftField, rightField] = args;
+      const leftQ = asNameAlias(leftField, tableAlias);
+      const rightQ = rightField? ("," + asNameAlias(rightField, tableAlias)) : "";
+      if(funcName === "age"){
+        return `${funcName}(${leftQ}, ${rightQ})`;
+      } else {
+        return `${leftQ} - ${rightQ}`;
+      }
+    }
+  } as FunctionSpec)),
 
   /* pgcrypto funcs */
   ...["crypt"].map(funcName => ({
@@ -714,7 +739,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     numArgs: 1,
     minCols: 0,
     singleColArg: false,
-    getFields: (args: any[], allowedFields) => [], // Fields not validated because we'll use the allowed ones anyway
+    getFields: (args: any[]) => [] as string[], // Fields not validated because we'll use the allowed ones anyway
     getQuery: ({ allowedFields, args, tableAlias }) => {
       let value = asValue(args[0]);
       if(typeof value !== "string") throw "expecting string argument";
@@ -831,7 +856,7 @@ export const FUNCTIONS: FunctionSpec[] = [
         let _cols = validCols.filter(c => 
           /** Exclude numeric columns when the search tern contains a character */
           !hasChars ||  
-          postgresToTsType(c.colInfo.udt_name) !== "number"
+          postgresToTsType(c.colInfo!.udt_name) !== "number"
         );
 
         /** This will break GROUP BY (non-integer constant in GROUP BY) */
@@ -1104,7 +1129,7 @@ export class SelectItemBuilder {
           
       } else {
         await Promise.all(selectKeys.map(async key => {
-          const val = userSelect[key],
+          const val: any = userSelect[key as keyof typeof userSelect],
             throwErr = (extraErr: string = "") => {
               console.trace(extraErr)
               throw "Unexpected select -> " + JSON.stringify({ [key]: val }) + "\n" + extraErr;
@@ -1171,10 +1196,10 @@ export class SelectItemBuilder {
 export async function getNewQuery(
   _this: TableHandler,
   filter: Filter, 
-  selectParams: SelectParams & { alias?: string }, 
+  selectParams: (SelectParams & { alias?: string })  = {}, 
   param3_unused = null, 
-  tableRules: TableRule, 
-  localParams: LocalParams,
+  tableRules: TableRule | undefined, 
+  localParams: LocalParams | undefined,
   columns: ColumnInfo[],
 ): Promise<NewQuery> {
 
@@ -1202,7 +1227,6 @@ export async function getNewQuery(
 
     // const all_colnames = _this.column_names.slice(0).concat(COMPUTED_FIELDS.map(c => c.name));
 
-  selectParams = selectParams || {};
   const { select: userSelect = "*" } = selectParams,
     // allCols = _this.column_names.slice(0),
     // allFieldsIncludingComputed = allCols.concat(COMPUTED_FIELDS.map(c => c.name)),
@@ -1217,10 +1241,10 @@ export async function getNewQuery(
     // console.log({ key, val })
     let j_filter: Filter = {},
         j_selectParams: SelectParams = {},
-        j_path: string[],
-        j_alias: string,
-        j_tableRules: TableRule,
-        j_table: string,
+        j_path: string[] | undefined,
+        j_alias: string | undefined,
+        j_tableRules: TableRule | undefined,
+        j_table: string | undefined,
         j_isLeftJoin: boolean = true;
 
     if(val === "*"){
@@ -1256,7 +1280,7 @@ export async function getNewQuery(
         j_table = key;
       }
     }
-
+    if(!j_table) throw "j_table missing"
     const _thisJoinedTable: any = _this.dboBuilder.dbo[j_table];
     if(!_thisJoinedTable) {
       throw `Joined table ${JSON.stringify(j_table)} is disallowed or inexistent \nOr you've forgot to put the function arguments into an array`;
@@ -1265,7 +1289,7 @@ export async function getNewQuery(
     let isLocal = true;
     if(localParams && (localParams.socket || localParams.httpReq)){
       isLocal = false;
-      j_tableRules = await _this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: j_table, command: "find", localParams });
+      j_tableRules = await _this.dboBuilder.publishParser?.getValidatedRequestRuleWusr({ tableName: j_table, command: "find", localParams });
     }
     
     if(isLocal || j_tableRules){
@@ -1319,7 +1343,7 @@ export async function getNewQuery(
     where,
     // having: cond.having,
     limit: _this.prepareLimitQuery(selectParams.limit, p),
-    orderBy: [_this.prepareSort(selectParams.orderBy, allowedFields, selectParams.alias, null, select)],
+    orderBy: [_this.prepareSort(selectParams.orderBy, allowedFields, selectParams.alias, undefined, select)],
     offset: _this.prepareOffsetQuery(selectParams.offset)
   } as NewQuery;
 
@@ -1336,19 +1360,19 @@ export function makeQuery(
   q: NewQuery, 
   depth: number = 0, 
   joinFields: string[] = [],
-  selectParams: SelectParams,
+  selectParams: SelectParams = {},
 ): string {
   const PREF = `prostgles`,
       joins = q.joins || [],
       // aggs = q.aggs || [],
       makePref = (q: NewQuery) => !q.tableAlias? q.table : `${q.tableAlias || ""}_${q.table}`,
-      makePrefANON = (joinAlias, table) => asName(!joinAlias? table : `${joinAlias || ""}_${table}`),
+      makePrefANON = (joinAlias: string | undefined, table: string) => asName(!joinAlias? table : `${joinAlias || ""}_${table}`),
       makePrefAN = (q: NewQuery) => asName(makePref(q));
 
-  const indentLine = (numInd, str, indentStr = "    ") => new Array(numInd).fill(indentStr).join("") + str;
-  const indStr = (numInd, str: string) => str.split("\n").map(s => indentLine(numInd, s)).join("\n");
-  const indjArr = (numInd, strArr: string[], indentStr = "    "): string[] => strArr.map(str => indentLine(numInd, str) );
-  const indJ = (numInd, strArr: string[], separator = " \n ", indentStr = "    ") => indjArr(numInd, strArr, indentStr).join(separator);
+  const indentLine = (numInd: number, str: string, indentStr = "    ") => new Array(numInd).fill(indentStr).join("") + str;
+  const indStr = (numInd: number, str: string) => str.split("\n").map(s => indentLine(numInd, s)).join("\n");
+  const indjArr = (numInd: number, strArr: string[], indentStr = "    "): string[] => strArr.map(str => indentLine(numInd, str) );
+  const indJ = (numInd: number, strArr: string[], separator = " \n ", indentStr = "    ") => indjArr(numInd, strArr, indentStr).join(separator);
   const selectArrComma = (strArr: string[]): string[] => strArr.map((s, i, arr)=> s + (i < arr.length - 1? " , " : " "));
   const prefJCAN = (q: NewQuery, str: string) => asName(`${q.tableAlias || q.table}_${PREF}_${str}`);
 
@@ -1357,7 +1381,7 @@ export function makeQuery(
     const joinInfo = _this.getJoins(q1.table, q2.table, q2.$path, true);
     const paths = joinInfo.paths;
 
-    return flat(paths.map(({ table, on }, i) => {
+    return paths.flatMap(({ table, on }, i) => {
       const getColName = (col: string, q: NewQuery) => {
         if(table === q.table){
           const colFromSelect = q.select.find(s => s.getQuery() === asName(col));
@@ -1404,7 +1428,7 @@ export function makeQuery(
               /* Rename aggs to avoid collision with join cols */
               if(s.type === "aggregation") return asName(`agg_${s.alias}`) + " AS " + asName(s.alias);
               return asName(s.alias);
-            }).concat(q2.joins.map(j => asName(j.table))).join(", ");
+            }).concat(q2.joins?.map(j => asName(j.table)) ?? []).join(", ");
 
           const _iiQ = makeQuery(
             _this, 
@@ -1441,7 +1465,7 @@ export function makeQuery(
           }`
       ];
       return jres;
-    }))
+    });
   }
 
   const getGroupBy = (rootSelectItems: SelectItem[], groupByItems: SelectItem[]): string => {
@@ -1521,7 +1545,7 @@ export function makeQuery(
   
   const rootSelectItems = q.select.filter(s => depth || s.selected)
 
-  let rootGroupBy: string;
+  let rootGroupBy: string | undefined;
   if((selectParams.groupBy || aggs.length || q.joins && q.joins.length) && nonAggs.length){
     // console.log({ aggs, nonAggs, joins: q.joins })
     // rootGroupBy = getGroupBy(rootSelectItems, depth? rootSelectItems : nonAggs) + (aggs?.length? "" : ", ctid")
@@ -1585,7 +1609,7 @@ export function makeQuery(
               ,   `${q.where} `
               ])
           ,   `) ${makePrefAN(q)} `
-          ,   ...flat(joins.map((j, i)=> joinTables(q, j)))
+          ,   ...joins.flatMap((j, i)=> joinTables(q, j))
           ])
       ,   ") t1"
       ])

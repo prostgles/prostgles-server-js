@@ -15,15 +15,19 @@ const url = process.env.PRGL_CLIENT_URL || "http://127.0.0.1:3001",
   path = process.env.PRGL_CLIENT_PATH || "/teztz/s",
   socket = io(url, { path, query: { token: "haha" }  }), //  
   stopTest = (err?) => {
-    socket.emit("stop-test", !err? err : { err: err.toString(), error: err }, cb => {
+    log("Stopping client due to error: " + JSON.stringify(err));
 
-      log("Stopping client...");
-      if(err) console.trace(err);
-  
-
-    });
     setTimeout(() => {
-      process.exit(err? 1 : 0)
+      socket.emit("stop-test", !err? err : { err: err.toString(), error: err }, cb => {
+  
+        log("Stopping client...");
+        if(err) console.trace(err);
+    
+  
+      });
+      setTimeout(() => {
+        process.exit(err? 1 : 0)
+      }, 1000);
     }, 1000);
     
   };
@@ -70,7 +74,7 @@ try {
         } catch (err){
           console.trace(err)
           stopTest(err);
-          throw err;
+          // throw err;
         }
       }
     }); 

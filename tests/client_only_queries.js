@@ -6,45 +6,62 @@ async function client_only(db, auth, log, methods) {
     const testRealtime = () => {
         log("Started testRealtime");
         return new Promise(async (resolve, reject) => {
-            var _a, _b;
-            /* METHODS */
-            const t222 = await methods.get();
-            assert_1.strict.equal(t222, 222, "methods.get() failed");
-            /* RAWSQL */
-            const sqlStatement = await db.sql("SELECT $1", [1], { returnType: "statement" });
-            assert_1.strict.equal(sqlStatement, "SELECT 1", "db.sql statement query failed");
-            const arrayMode = await db.sql("SELECT 1 as a, 2 as a", undefined, { returnType: "arrayMode" });
-            assert_1.strict.equal((_a = arrayMode.rows) === null || _a === void 0 ? void 0 : _a[0].join("."), "1.2", "db.sql statement arrayMode failed");
-            assert_1.strict.equal((_b = arrayMode.fields) === null || _b === void 0 ? void 0 : _b.map(f => f.name).join("."), "a.a", "db.sql statement arrayMode failed");
-            const select1 = await db.sql("SELECT $1 as col1", [1], { returnType: "rows" });
-            assert_1.strict.deepStrictEqual(select1[0], { col1: 1 }, "db.sql justRows query failed");
-            const fullResult = await db.sql("SELECT $1 as col1", [1]);
-            // console.log(fullResult)
-            assert_1.strict.deepStrictEqual(fullResult.rows[0], { col1: 1 }, "db.sql query failed");
-            assert_1.strict.deepStrictEqual(fullResult.fields, [{ name: 'col1', tableID: 0, columnID: 0, dataTypeID: 23, dataTypeSize: 4, dataTypeModifier: -1, format: 'text', dataType: 'int4' }], "db.sql query failed");
-            await (0, isomorphic_queries_1.tryRunP)("sql LISTEN NOTIFY events", async (resolve, reject) => {
-                const sub = await db.sql("LISTEN chnl ");
-                // console.log({ sub })
-                sub.addListener(notif => {
-                    // console.log({ notif })
-                    if (notif === "hello")
-                        resolve(true);
-                    else
-                        reject("Something went bad");
-                });
-                db.sql("NOTIFY chnl , 'hello'; ");
-            });
-            await (0, isomorphic_queries_1.tryRunP)("sql NOTICE events", async (resolve, reject) => {
-                const sub = await db.sql("", {}, { returnType: "noticeSubscription" });
-                // console.log({ sub })
-                sub.addListener(notice => {
-                    // console.log({ notif })
-                    if (notice.message === "hello2")
-                        resolve(true);
-                    else
-                        reject("Something went bad");
-                });
-                db.sql(`
+            try {
+                /* METHODS */
+                const t222 = await methods.get();
+                assert_1.strict.equal(t222, 222, "methods.get() failed");
+                log("SQL Full result");
+                /* RAWSQL */
+                await (0, isomorphic_queries_1.tryRunP)("SQL Full result", async (resolve, reject) => {
+                    const sqlStatement = await db.sql("SELECT $1", [1], { returnType: "statement" });
+                    assert_1.strict.equal(sqlStatement, "SELECT 1", "db.sql statement query failed");
+                    const arrayMode = await db.sql("SELECT 1 as a, 2 as a", undefined, { returnType: "arrayMode" });
+                    assert_1.strict.equal(arrayMode.rows?.[0].join("."), "1.2", "db.sql statement arrayMode failed");
+                    assert_1.strict.equal(arrayMode.fields?.map(f => f.name).join("."), "a.a", "db.sql statement arrayMode failed");
+                    const select1 = await db.sql("SELECT $1 as col1", [1], { returnType: "rows" });
+                    assert_1.strict.deepStrictEqual(select1[0], { col1: 1 }, "db.sql justRows query failed");
+                    const fullResult = await db.sql("SELECT $1 as col1", [1]);
+                    // console.log(fullResult)
+                    assert_1.strict.deepStrictEqual(fullResult.rows[0], { col1: 1 }, "db.sql query failed");
+                    assert_1.strict.deepStrictEqual(fullResult.fields, [{
+                            name: 'col1',
+                            tableID: 0,
+                            columnID: 0,
+                            dataTypeID: 23,
+                            dataTypeSize: 4,
+                            dataTypeModifier: -1,
+                            format: 'text',
+                            dataType: 'int4',
+                            udt_name: 'int4',
+                            tsDataType: "number"
+                        }], "db.sql query failed");
+                    resolve(true);
+                }, log);
+                log("sql LISTEN NOTIFY events");
+                await (0, isomorphic_queries_1.tryRunP)("sql LISTEN NOTIFY events", async (resolve, reject) => {
+                    const sub = await db.sql("LISTEN chnl ");
+                    // console.log({ sub })
+                    sub.addListener(notif => {
+                        // console.log({ notif })
+                        if (notif === "hello")
+                            resolve(true);
+                        else
+                            reject("Something went bad");
+                    });
+                    db.sql("NOTIFY chnl , 'hello'; ");
+                }, log);
+                log("sql NOTICE events");
+                await (0, isomorphic_queries_1.tryRunP)("sql NOTICE events", async (resolve, reject) => {
+                    const sub = await db.sql("", {}, { returnType: "noticeSubscription" });
+                    // console.log({ sub })
+                    sub.addListener(notice => {
+                        // console.log({ notif })
+                        if (notice.message === "hello2")
+                            resolve(true);
+                        else
+                            reject("Something went bad");
+                    });
+                    db.sql(`
           DO $$ 
           BEGIN
 
@@ -52,72 +69,78 @@ async function client_only(db, auth, log, methods) {
 
           END $$;
         `);
-            });
-            /* REPLICATION */
-            let start = Date.now();
-            const msLimit = 20000;
-            setTimeout(() => {
-                const msg = "Replication test failed due to taking longer than " + msLimit + "ms";
-                log(msg);
-                reject(msg);
-            }, msLimit);
-            await db.planes.delete();
-            let inserts = new Array(100).fill(null).map((d, i) => ({ id: i, flight_number: `FN${i}`, x: Math.random(), y: i }));
-            await db.planes.insert(inserts);
-            if ((await db.planes.count()) !== 100)
-                throw "Not 100 planes";
-            /**
-             * Two listeners are added at the same time to dbo.planes (which has 100 records):
-             *  subscribe({ x: 10 }
-             *  sync({}
-             *
-             * sync starts updating x to 10
-             * subscribe waits for 100 records of x=10 and then updates everything to x=20
-             * sync waits for 100 records of x=20 and finishes the test
-             */
-            /* After all sync records are updated to x10 here we'll update them to x20 */
-            const sP = await db.planes.subscribe({ x: 10 }, {}, async (planes) => {
-                const p10 = planes.filter(p => p.x == 10);
-                log("sub: x10 -> ", p10.length, "    x20 ->", planes.filter(p => p.x == 20).length);
-                if (p10.length === 100) {
-                    // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log);
-                    sP.unsubscribe();
-                    log("Update to x20 start");
-                    const dLastUpdated = Math.max(...p10.map(v => +v.last_updated));
-                    const last_updated = Date.now();
-                    if (dLastUpdated >= last_updated)
-                        throw "dLastUpdated >= last_updated should not happen";
-                    await db.planes.update({}, { x: 20, last_updated });
-                    log("Updated to x20", await db.planes.count({ x: 20 }));
-                    // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log)
-                }
-            });
-            let updt = 0;
-            const sync = await db.planes.sync({}, { handlesOnData: true, patchText: true }, (planes, deltas) => {
-                const x20 = planes.filter(p => p.x == 20).length;
-                const x10 = planes.filter(p => p.x == 10);
-                log(`sync: \nx10 -> ${x10.length} \nx20 -> ${x20}`);
-                let update = false;
-                planes.map(p => {
-                    // if(p.y === 1) window.up = p;
-                    if (typeof p.x !== "number")
-                        log(typeof p.x);
-                    if (+p.x < 10) {
-                        updt++;
-                        update = true;
-                        p.$update({ x: 10 });
+                }, log);
+                /* REPLICATION */
+                let start = Date.now();
+                const msLimit = 20000;
+                setTimeout(() => {
+                    const msg = "Replication test failed due to taking longer than " + msLimit + "ms";
+                    log(msg);
+                    reject(msg);
+                }, msLimit);
+                await db.planes.delete();
+                let inserts = new Array(100).fill(null).map((d, i) => ({ id: i, flight_number: `FN${i}`, x: Math.random(), y: i }));
+                await db.planes.insert(inserts);
+                if ((await db.planes.count()) !== 100)
+                    throw "Not 100 planes";
+                /**
+                 * Two listeners are added at the same time to dbo.planes (which has 100 records):
+                 *  subscribe({ x: 10 }
+                 *  sync({}
+                 *
+                 * sync starts updating x to 10
+                 * subscribe waits for 100 records of x=10 and then updates everything to x=20
+                 * sync waits for 100 records of x=20 and finishes the test
+                 */
+                /* After all sync records are updated to x10 here we'll update them to x20 */
+                const sP = await db.planes.subscribe({ x: 10 }, {}, async (planes) => {
+                    const p10 = planes.filter(p => p.x == 10);
+                    log("sub: x10 -> ", p10.length, "    x20 ->", planes.filter(p => p.x == 20).length);
+                    if (p10.length === 100) {
+                        // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log);
+                        sP.unsubscribe();
+                        log("Update to x20 start");
+                        const dLastUpdated = Math.max(...p10.map(v => +v.last_updated));
+                        const last_updated = Date.now();
+                        if (dLastUpdated >= last_updated)
+                            throw "dLastUpdated >= last_updated should not happen";
+                        await db.planes.update({}, { x: 20, last_updated });
+                        log("Updated to x20", await db.planes.count({ x: 20 }));
+                        // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log)
                     }
                 });
-                // if(update) log("$update({ x: 10 })", updt)
-                if (x20 === 100) {
-                    // log(22)
-                    // console.timeEnd("test")
-                    log("Finished replication test. Inserting 100 rows then updating two times took: " + (Date.now() - start) + "ms");
-                    resolve(true);
-                }
-            });
-            // sync.upsert(inserts)
-            // await db.planes.update({}, { x: 20, last_updated: Date.now() });
+                let updt = 0;
+                const sync = await db.planes.sync({}, { handlesOnData: true, patchText: true }, (planes, deltas) => {
+                    const x20 = planes.filter(p => p.x == 20).length;
+                    const x10 = planes.filter(p => p.x == 10);
+                    log(`sync: \nx10 -> ${x10.length} \nx20 -> ${x20}`);
+                    let update = false;
+                    planes.map(p => {
+                        // if(p.y === 1) window.up = p;
+                        if (typeof p.x !== "number")
+                            log(typeof p.x);
+                        if (+p.x < 10) {
+                            updt++;
+                            update = true;
+                            p.$update({ x: 10 });
+                        }
+                    });
+                    // if(update) log("$update({ x: 10 })", updt)
+                    if (x20 === 100) {
+                        // log(22)
+                        // console.timeEnd("test")
+                        log("Finished replication test. Inserting 100 rows then updating two times took: " + (Date.now() - start) + "ms");
+                        resolve(true);
+                    }
+                });
+                // sync.upsert(inserts)
+                // await db.planes.update({}, { x: 20, last_updated: Date.now() });
+            }
+            catch (err) {
+                log(JSON.stringify(err));
+                await tout(1000);
+                throw err;
+            }
         });
     };
     /* TODO: SECURITY */
@@ -175,7 +198,7 @@ async function client_only(db, auth, log, methods) {
                 { id: 1, public: 'public data' },
                 { id: 2, public: 'public data' }
             ]);
-        });
+        }, log);
     }
 }
 exports.default = client_only;

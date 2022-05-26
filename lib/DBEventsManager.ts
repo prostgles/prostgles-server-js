@@ -1,6 +1,7 @@
 import { PostgresNotifListenManager, PrglNotifListener } from "./PostgresNotifListenManager";
 import { DB, PGP } from "./Prostgles";
 import { SQLRequest, SQLOptions, CHANNELS, asName } from "prostgles-types";
+import { getKeys, PRGLIOSocket } from "./DboBuilder";
 
 export class DBEventsManager {
 
@@ -23,7 +24,7 @@ export class DBEventsManager {
     sockets: []
   };
 
-  notifManager: PostgresNotifListenManager;
+  notifManager?: PostgresNotifListenManager;
 
   db_pg: DB;
   pgp: PGP
@@ -50,7 +51,7 @@ export class DBEventsManager {
       });
   }
 
-  onNotice = notice => {
+  onNotice = (notice: any) => {
     if(this.notice && this.notice.sockets.length){
       this.notice.sockets.map(s => {
         s.emit(this.notice.socketChannel, notice);
@@ -63,7 +64,7 @@ export class DBEventsManager {
     return c.c;
   }
 
-  async addNotify(query: string, socket?, func?): Promise<{
+  async addNotify(query: string, socket?: PRGLIOSocket, func?: any): Promise<{
     socketChannel: string;
     socketUnsubChannel: string;
     notifChannel: string;
@@ -135,8 +136,8 @@ export class DBEventsManager {
     }
   }
 
-  removeNotify(channel: string, socket?, func?){
-    if(this.notifies[channel]){
+  removeNotify(channel?: string, socket?: PRGLIOSocket, func?: any){
+    if(channel && this.notifies[channel]){
       if(socket){
         this.notifies[channel].sockets = this.notifies[channel].sockets.filter(s => s.id !== socket.id);
       } else if(func){
@@ -145,9 +146,15 @@ export class DBEventsManager {
 
       /* UNLISTEN if no listeners ?? */
     }
+
+    if(socket){
+      getKeys(this.notifies).forEach(channel => {
+        this.notifies[channel].sockets = this.notifies[channel].sockets.filter(s => s.id !== socket.id);
+      })
+    }
   }
 
-  addNotice(socket){
+  addNotice(socket: PRGLIOSocket){
     if(!socket || !socket.id) throw "Expecting a socket obj with id";
 
     if(!this.notice.sockets.find(s => s.id === socket.id)){
@@ -164,7 +171,7 @@ export class DBEventsManager {
     return { socketChannel, socketUnsubChannel, }
   }
 
-  removeNotice(socket){
+  removeNotice(socket: PRGLIOSocket){
     if(!socket || !socket.id) throw "Expecting a socket obj with id";
     this.notice.sockets = this.notice.sockets.filter(s => s.id !== socket.id)
   }

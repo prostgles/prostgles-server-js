@@ -28,7 +28,7 @@ class PostgresNotifListenManager {
             this.init();
     }
     async init() {
-        this.connection = null;
+        this.connection = undefined;
         this.isListening = await this.startListening();
         return this;
     }
@@ -62,14 +62,16 @@ class PostgresNotifListenManager {
             console.log('PostgresNotifListenManager: Failed Initial Connection:', error);
         });
     }
-    reconnect(delay = null, maxAttempts = null) {
+    reconnect(delay = 0, maxAttempts = 0) {
         if (!this.db_pg || !this.notifListener)
             throw "db_pg OR notifListener missing";
-        delay = delay > 0 ? parseInt(delay) : 0;
-        maxAttempts = maxAttempts > 0 ? parseInt(maxAttempts) : 1;
+        delay = delay > 0 ? parseInt(delay + "") : 0;
+        maxAttempts = maxAttempts > 0 ? parseInt(maxAttempts + "") : 1;
         const setListeners = (client, notifListener, db_channel_name) => {
             client.on('notification', notifListener);
             this.client = client;
+            if (!this.connection)
+                throw "Connection missing";
             return this.connection.none('LISTEN $1~', db_channel_name)
                 .catch(error => {
                 console.log("PostgresNotifListenManager: unexpected error: ", error); // unlikely to ever happen
@@ -78,7 +80,7 @@ class PostgresNotifListenManager {
             client.removeListener('notification', this.notifListener);
         }, onConnectionLost = (err, e) => {
             console.log('PostgresNotifListenManager: Connectivity Problem:', err);
-            this.connection = null; // prevent use of the broken connection
+            this.connection = undefined; // prevent use of the broken connection
             removeListeners(e.client);
             this.reconnect(5000, 10) // retry 10 times, with 5-second intervals
                 .then(() => {

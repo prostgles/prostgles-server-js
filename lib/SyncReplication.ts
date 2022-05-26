@@ -82,10 +82,10 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
                 throw `dbo.${table_name}.find or .count are missing or not allowed`;
             }
 
-            const first_rows = await _this.dbo?.[table_name]?.find?.(_filter, { orderBy: (orderByAsc as OrderBy), select: sync_fields, limit, offset }, null, table_rules);
-            const last_rows = first_rows.slice(-1);
+            const first_rows = await _this.dbo?.[table_name]?.find?.(_filter, { orderBy: (orderByAsc as OrderBy), select: sync_fields, limit, offset }, undefined, table_rules);
+            const last_rows = first_rows?.slice(-1);
             // const last_rows = await _this?.dbo[table_name]?.find?.(_filter, { orderBy: (orderByDesc as OrderBy), select: sync_fields, limit: 1, offset: -offset || 0 }, null, table_rules);
-            const count = await _this.dbo?.[table_name]?.count?.(_filter, null, null, table_rules);
+            const count = await _this.dbo?.[table_name]?.count?.(_filter, undefined, undefined, table_rules);
 
             return { s_fr: first_rows?.[0] || null, s_lr: last_rows?.[0] || null, s_count: count }
         },
@@ -146,7 +146,7 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
                         offset: offset || 0, 
                         limit: batch_size 
                     }, 
-                    null, 
+                    undefined, 
                     table_rules
                 );
 
@@ -164,7 +164,7 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
                 return Promise.all(deleted.map(async d => {
                     const id_filter = filterObj(d, id_fields);
                     try {
-                        await (_this.dbo[table_name] as TableHandler).delete(id_filter, undefined, null, table_rules);
+                        await (_this.dbo[table_name] as TableHandler).delete(id_filter, undefined, undefined, table_rules);
                         return 1;
                     } catch (e){
                         console.error(e)
@@ -195,7 +195,7 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
                         select: [synced_field, ...id_fields] , 
                         orderBy: (orderByAsc as OrderBy), 
                     }, 
-                    null, 
+                    undefined, 
                     table_rules
                 );
                 const inserts = data.filter(d => !existingData.find(ed => rowsIdsMatch(ed, d)));
@@ -216,7 +216,7 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
                     if(table_rules.insert && inserts.length){
                         // const qs = await tbl.insert(inserts, { fixIssues: true }, null, table_rules, { returnQuery: true });
                         // console.log("inserts", qs)
-                        await tbl.insert(inserts, { fixIssues: true }, null, table_rules);
+                        await tbl.insert(inserts, { fixIssues: true }, undefined, table_rules);
                         inserted = inserts.length;                       
                     }
                     
@@ -308,7 +308,7 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
                         sync_fields.map(key => {
                             _filter[key] = c_lr[key];
                         });
-                        server_row = await _this?.dbo?.[table_name]?.find?.(_filter, { select: sync_fields, limit: 1 }, null, table_rules);
+                        server_row = await _this?.dbo?.[table_name]?.find?.(_filter, { select: sync_fields, limit: 1 }, undefined, table_rules);
                     }
 
                     // if(rowsFullyMatch(c_lr, s_lr)){ //c_count === s_count && 
@@ -337,7 +337,7 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
                     console.error({ syncIssue: "sync.lr[synced_field] is greater than lastRow[synced_field]"})
                 }
                 sync.lr = lastRow;
-                sync.last_synced = +sync.lr[synced_field];
+                sync.last_synced = +sync.lr?.[synced_field];
             }
         },
 
@@ -381,7 +381,7 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
                     });
                     await Promise.all(to_delete.map(d => {
                         deleted++;
-                        return (_this.dbo[table_name] as TableHandler).delete(filterObj(d, id_fields), { }, null, table_rules);
+                        return (_this.dbo[table_name] as TableHandler).delete(filterObj(d, id_fields), { }, undefined, table_rules);
                     }));
                     sData = await getServerData(min_synced, offset);
                 }

@@ -10,7 +10,7 @@ exports.parseFilterItem = (args) => {
     const mErr = (msg) => {
         throw `${msg}: ${JSON.stringify(_f, null, 2)}`;
     }, asValue = (v) => pgp.as.format("$1", [v]);
-    const fKeys = Object.keys(_f);
+    const fKeys = DboBuilder_1.getKeys(_f);
     if (fKeys.length === 0) {
         return "";
     }
@@ -35,8 +35,8 @@ exports.parseFilterItem = (args) => {
     let rightF = _f[fKey];
     const getLeftQ = (selItm) => {
         if (selItm.type === "function")
-            return selItem.getQuery();
-        return selItem.getQuery(tableAlias);
+            return selItm.getQuery();
+        return selItm.getQuery(tableAlias);
     };
     /**
       * Parsed left side of the query
@@ -50,8 +50,10 @@ exports.parseFilterItem = (args) => {
             selItem = select.find(s => fKey.startsWith(s.alias) &&
                 dot_notation_delims.find(dn => fKey.slice(s.alias.length).startsWith(dn)));
         }
-        if (!selItem)
+        if (!selItem) {
             mErr("Bad filter. Could not match to a column or alias: ");
+            throw " ";
+        }
         const remainingStr = fKey.slice(selItem.alias.length);
         /* Is json path spec */
         if (remainingStr.startsWith("->")) {
@@ -157,7 +159,7 @@ exports.parseFilterItem = (args) => {
         }
         // console.log({ fOpType, fVal, sOpType })
         /** JSON cannot be compared so we'll cast it to TEXT */
-        if ((selItem === null || selItem === void 0 ? void 0 : selItem.column_udt_type) === "json" || ["$ilike", "$like", "$nilike", "$nlike"].includes(fOpType)) {
+        if (selItem?.column_udt_type === "json" || ["$ilike", "$like", "$nilike", "$nlike"].includes(fOpType)) {
             leftQ += "::TEXT ";
         }
         /** st_makeenvelope */
@@ -190,10 +192,10 @@ exports.parseFilterItem = (args) => {
             return leftQ + " <= " + parseRightVal(fVal);
         }
         else if (["$in"].includes(fOpType)) {
-            if (!(fVal === null || fVal === void 0 ? void 0 : fVal.length)) {
+            if (!fVal?.length) {
                 return " FALSE ";
             }
-            let _fVal = fVal.filter(v => v !== null);
+            let _fVal = fVal.filter((v) => v !== null);
             let c1 = "", c2 = "";
             if (_fVal.length)
                 c1 = leftQ + " IN " + parseRightVal(_fVal, "csv");
@@ -202,10 +204,10 @@ exports.parseFilterItem = (args) => {
             return [c1, c2].filter(c => c).join(" OR ");
         }
         else if (["$nin"].includes(fOpType)) {
-            if (!(fVal === null || fVal === void 0 ? void 0 : fVal.length)) {
+            if (!fVal?.length) {
                 return " TRUE ";
             }
-            let _fVal = fVal.filter(v => v !== null);
+            let _fVal = fVal.filter((v) => v !== null);
             let c1 = "", c2 = "";
             if (_fVal.length)
                 c1 = leftQ + " NOT IN " + parseRightVal(_fVal, "csv");

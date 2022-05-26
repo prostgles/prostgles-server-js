@@ -1,7 +1,11 @@
 "use strict";
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
 }) : (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     o[k2] = m[k];
@@ -22,19 +26,31 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.tryRunP = exports.tryRun = void 0;
 const assert_1 = require("assert");
 const fs = __importStar(require("fs"));
-async function tryRun(desc, func) {
+async function tryRun(desc, func, log) {
     try {
         await func();
     }
     catch (err) {
         console.error(desc + " FAILED:");
-        throw err;
+        log?.("FAIL: ", err);
+        setTimeout(() => {
+            throw err;
+        }, 2000);
     }
 }
 exports.tryRun = tryRun;
-function tryRunP(desc, func) {
-    return new Promise((rv, rj) => {
-        func(rv, rj);
+function tryRunP(desc, func, log) {
+    return new Promise(async (rv, rj) => {
+        try {
+            await func(rv, rj);
+        }
+        catch (err) {
+            log?.(JSON.stringify(err));
+            setTimeout(() => {
+                log?.("Throw err");
+                throw err;
+            }, 1000);
+        }
     });
 }
 exports.tryRunP = tryRunP;

@@ -4,7 +4,7 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.postgresToTsType = exports.isPlainObject = exports.DboBuilder = exports.TableHandler = exports.ViewHandler = exports.EXISTS_KEYS = exports.pgp = void 0;
+exports.postgresToTsType = exports.getKeys = exports.isPlainObject = exports.DboBuilder = exports.TableHandler = exports.ViewHandler = exports.EXISTS_KEYS = exports.pgp = void 0;
 const Bluebird = require("bluebird");
 // declare global { export interface Promise<T> extends Bluebird<T> {} }
 const pgPromise = require("pg-promise");
@@ -23,7 +23,6 @@ const prostgles_types_1 = require("prostgles-types");
 //   }>
 const utils_1 = require("./utils");
 const QueryBuilder_1 = require("./QueryBuilder");
-const Prostgles_1 = require("./Prostgles");
 const PubSubManager_1 = require("./PubSubManager");
 const Filtering_1 = require("./Filtering");
 exports.pgp = pgPromise({
@@ -62,13 +61,17 @@ function escapeTSNames(str, capitalize = true) {
 const shortestPath_1 = require("./shortestPath");
 /* DEBUG CLIENT ERRORS HERE */
 function makeErr(err, localParams, view, allowedKeys) {
-    var _a;
     // console.trace(err)
     if (process.env.TEST_TYPE || process.env.PRGL_DEBUG) {
         console.trace(err);
     }
-    const errObject = Object.assign(Object.assign(Object.assign(Object.assign({}, ((!localParams || !localParams.socket) ? err : {})), PubSubManager_1.filterObj(err, ["column", "code", "table", "constraint"])), (err && err.toString ? { txt: err.toString() } : {})), { code_info: sqlErrCodeToMsg(err.code) });
-    if (((_a = view === null || view === void 0 ? void 0 : view.dboBuilder) === null || _a === void 0 ? void 0 : _a.constraints) && errObject.constraint && !errObject.column) {
+    const errObject = {
+        ...((!localParams || !localParams.socket) ? err : {}),
+        ...PubSubManager_1.filterObj(err, ["column", "code", "table", "constraint"]),
+        ...(err && err.toString ? { txt: err.toString() } : {}),
+        code_info: sqlErrCodeToMsg(err.code)
+    };
+    if (view?.dboBuilder?.constraints && errObject.constraint && !errObject.column) {
         const constraint = view.dboBuilder.constraints
             .find(c => c.conname === errObject.constraint && c.relname === view.name);
         if (constraint) {
@@ -108,7 +111,6 @@ class ColSet {
         }
         const rowKeys = Object.keys(row);
         return rowKeys.map(key => {
-            var _a;
             const col = this.opts.columns.find(c => c.name === key);
             if (!col)
                 throw "Unexpected missing col name";
@@ -126,7 +128,7 @@ class ColSet {
                 const dataKeys = Object.keys(row[key]);
                 const funcName = dataKeys[0];
                 const funcExists = basicFuncNames.includes(funcName);
-                const funcArgs = (_a = row[key]) === null || _a === void 0 ? void 0 : _a[funcName];
+                const funcArgs = row[key]?.[funcName];
                 if (dataKeys.length !== 1 || !funcExists || !Array.isArray(funcArgs)) {
                     throw `Expecting only one function key (${basicFuncNames.join(", ")}) \nwith an array of arguments \n within column (${key}) data but got: ${JSON.stringify(row[key])} \nExample: { geo_col: { ST_GeomFromText: ["POINT(-71.064544 42.28787)", 4326] } }`;
                 }
@@ -179,7 +181,7 @@ class ViewHandler {
         this.column_names = tableOrViewInfo.columns.map(c => c.name);
         // this.pubSubManager = pubSubManager;
         this.dboBuilder = dboBuilder;
-        this.joins = this.dboBuilder.joins;
+        this.joins = this.dboBuilder.joins ?? [];
         // fix this
         // and also make hot schema reload over ws 
         this.colSet = new ColSet(this.columns, this.name);
@@ -276,7 +278,6 @@ class ViewHandler {
         return { query, toOne: false };
     }
     getJoins(source, target, path, checkTableConfig) {
-        var _a, _b, _e;
         let paths = [];
         if (!this.joinPaths)
             throw `${source} - ${target} Join info missing or dissallowed`;
@@ -284,7 +285,7 @@ class ViewHandler {
             throw `Empty join path ( $path ) specified for ${source} <-> ${target}`;
         /* Find the join path between tables */
         if (checkTableConfig) {
-            const tableConfigJoinInfo = (_e = (_b = (_a = this.dboBuilder) === null || _a === void 0 ? void 0 : _a.prostgles) === null || _b === void 0 ? void 0 : _b.tableConfigurator) === null || _e === void 0 ? void 0 : _e.getJoinInfo(source, target);
+            const tableConfigJoinInfo = this.dboBuilder?.prostgles?.tableConfigurator?.getJoinInfo(source, target);
             if (tableConfigJoinInfo)
                 return tableConfigJoinInfo;
         }
@@ -351,7 +352,6 @@ class ViewHandler {
             throw `invalid filter -> ${JSON.stringify(filter)} \nExpecting:    undefined | {} | { field_name: "value" } | { field: { $gt: 22 } } ... `;
     }
     async getInfo(param1, param2, param3, tableRules, localParams) {
-        var _a, _b, _e, _f, _g, _h, _j, _k, _l, _m, _o;
         const p = this.getValidatedRules(tableRules, localParams);
         if (!p.getInfo)
             throw "Not allowed";
@@ -360,18 +360,17 @@ class ViewHandler {
          * Media is directly related to this table (does not come from a deeply joined table)
          */
         let has_direct_media = false;
-        const mediaTable = (_e = (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.opts) === null || _b === void 0 ? void 0 : _b.fileTable) === null || _e === void 0 ? void 0 : _e.tableName;
+        const mediaTable = this.dboBuilder.prostgles?.opts?.fileTable?.tableName;
         if (!this.is_media && mediaTable) {
-            if ((_j = (_h = (_g = (_f = this.dboBuilder.prostgles) === null || _f === void 0 ? void 0 : _f.opts) === null || _g === void 0 ? void 0 : _g.fileTable) === null || _h === void 0 ? void 0 : _h.referencedTables) === null || _j === void 0 ? void 0 : _j[this.name]) {
-                has_media = (_o = (_m = (_l = (_k = this.dboBuilder.prostgles) === null || _k === void 0 ? void 0 : _k.opts) === null || _l === void 0 ? void 0 : _l.fileTable) === null || _m === void 0 ? void 0 : _m.referencedTables) === null || _o === void 0 ? void 0 : _o[this.name];
+            if (this.dboBuilder.prostgles?.opts?.fileTable?.referencedTables?.[this.name]) {
+                has_media = this.dboBuilder.prostgles?.opts?.fileTable?.referencedTables?.[this.name];
                 has_direct_media = true;
             }
             else {
                 const jp = this.dboBuilder.joinPaths.find(jp => jp.t1 === this.name && jp.t2 === mediaTable);
                 if (jp && jp.path.length <= 3) {
                     await Promise.all(jp.path.map(async (tableName) => {
-                        var _a, _b, _e, _f, _g;
-                        const cols = (_g = (await ((_f = (_e = (_b = (_a = this === null || this === void 0 ? void 0 : this.dboBuilder) === null || _a === void 0 ? void 0 : _a.dbo) === null || _b === void 0 ? void 0 : _b[tableName]) === null || _e === void 0 ? void 0 : _e.getColumns) === null || _f === void 0 ? void 0 : _f.call(_e)))) === null || _g === void 0 ? void 0 : _g.filter(c => { var _a; return jp.path.includes((_a = c === null || c === void 0 ? void 0 : c.references) === null || _a === void 0 ? void 0 : _a.ftable); });
+                        const cols = (await this?.dboBuilder?.dbo?.[tableName]?.getColumns?.())?.filter(c => jp.path.includes(c?.references?.ftable));
                         if (cols && cols.length && has_media !== "many") {
                             if (cols.find(c => !c.is_pkey)) {
                                 has_media = "many";
@@ -406,30 +405,39 @@ class ViewHandler {
                 .filter(c => {
                 const { insert, select, update } = p || {};
                 return [
-                    ...((insert === null || insert === void 0 ? void 0 : insert.fields) || []),
-                    ...((select === null || select === void 0 ? void 0 : select.fields) || []),
-                    ...((update === null || update === void 0 ? void 0 : update.fields) || []),
+                    ...(insert?.fields || []),
+                    ...(select?.fields || []),
+                    ...(update?.fields || []),
                 ].includes(c.name);
             })
                 .map(_c => {
-                var _a, _b, _e, _f, _g, _h, _j;
-                let c = Object.assign({}, _c);
+                let c = { ..._c };
                 let label = c.comment || capitalizeFirstLetter(c.name, " ");
-                const tblConfig = (_e = (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.opts) === null || _b === void 0 ? void 0 : _b.tableConfig) === null || _e === void 0 ? void 0 : _e[this.name];
+                const tblConfig = this.dboBuilder.prostgles?.opts?.tableConfig?.[this.name];
                 if (tblConfig && "columns" in tblConfig) {
-                    const lbl = (_f = tblConfig === null || tblConfig === void 0 ? void 0 : tblConfig.columns[c.name]) === null || _f === void 0 ? void 0 : _f.label;
+                    const lbl = tblConfig?.columns[c.name]?.label;
                     if (["string", "object"].includes(typeof lbl)) {
                         if (typeof lbl === "string") {
                             label = lbl;
                         }
                         else if (lang) {
-                            label = (lbl === null || lbl === void 0 ? void 0 : lbl[lang]) || (lbl === null || lbl === void 0 ? void 0 : lbl.en) || label;
+                            label = (lbl?.[lang]) || lbl?.en || label;
                         }
                     }
                 }
                 const select = c.privileges.some(p => p.privilege_type === "SELECT"), insert = c.privileges.some(p => p.privilege_type === "INSERT"), update = c.privileges.some(p => p.privilege_type === "UPDATE"), _delete = this.tableOrViewInfo.privileges.delete; // c.privileges.some(p => p.privilege_type === "DELETE");
                 delete c.privileges;
-                return Object.assign(Object.assign(Object.assign({}, c), { label, tsDataType: postgresToTsType(c.udt_name), insert: insert && Boolean(p.insert && p.insert.fields && p.insert.fields.includes(c.name)), select: select && Boolean(p.select && p.select.fields && p.select.fields.includes(c.name)), filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)), update: update && Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)), delete: _delete && Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)) }), (((_j = (_h = (_g = this.dboBuilder) === null || _g === void 0 ? void 0 : _g.prostgles) === null || _h === void 0 ? void 0 : _h.tableConfigurator) === null || _j === void 0 ? void 0 : _j.getColInfo({ table: this.name, col: c.name })) || {}));
+                return {
+                    ...c,
+                    label,
+                    tsDataType: postgresToTsType(c.udt_name),
+                    insert: insert && Boolean(p.insert && p.insert.fields && p.insert.fields.includes(c.name)),
+                    select: select && Boolean(p.select && p.select.fields && p.select.fields.includes(c.name)),
+                    filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)),
+                    update: update && Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)),
+                    delete: _delete && Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)),
+                    ...(this.dboBuilder?.prostgles?.tableConfigurator?.getColInfo({ table: this.name, col: c.name }) || {})
+                };
             }).filter(c => c.select || c.update || c.delete || c.insert);
             //.sort((a, b) => a.ordinal_position - b.ordinal_position);
             // const tblInfo = await this.getInfo();
@@ -449,7 +457,6 @@ class ViewHandler {
         }
     }
     getValidatedRules(tableRules, localParams) {
-        var _a, _b, _e, _f, _g, _h;
         if (utils_1.get(localParams, "socket") && !tableRules) {
             throw "INTERNAL ERROR: Unexpected case -> localParams && !tableRules";
         }
@@ -483,8 +490,8 @@ class ViewHandler {
             };
             let res = {
                 allColumns,
-                getColumns: (_a = tableRules === null || tableRules === void 0 ? void 0 : tableRules.getColumns) !== null && _a !== void 0 ? _a : true,
-                getInfo: (_b = tableRules === null || tableRules === void 0 ? void 0 : tableRules.getColumns) !== null && _b !== void 0 ? _b : true,
+                getColumns: tableRules?.getColumns ?? true,
+                getInfo: tableRules?.getColumns ?? true,
             };
             /* SELECT */
             if (tableRules.select) {
@@ -499,7 +506,7 @@ class ViewHandler {
                 }
                 res.select = {
                     fields: this.parseFieldFilter(tableRules.select.fields),
-                    forcedFilter: Object.assign({}, tableRules.select.forcedFilter),
+                    forcedFilter: { ...tableRules.select.forcedFilter },
                     filterFields: this.parseFieldFilter(tableRules.select.filterFields),
                     maxLimit
                 };
@@ -510,9 +517,9 @@ class ViewHandler {
                     return throwFieldsErr("update");
                 res.update = {
                     fields: this.parseFieldFilter(tableRules.update.fields),
-                    forcedData: Object.assign({}, tableRules.update.forcedData),
-                    forcedFilter: Object.assign({}, tableRules.update.forcedFilter),
-                    returningFields: getFirstSpecified((_e = tableRules.update) === null || _e === void 0 ? void 0 : _e.returningFields, (_f = tableRules === null || tableRules === void 0 ? void 0 : tableRules.select) === null || _f === void 0 ? void 0 : _f.fields, tableRules.update.fields),
+                    forcedData: { ...tableRules.update.forcedData },
+                    forcedFilter: { ...tableRules.update.forcedFilter },
+                    returningFields: getFirstSpecified(tableRules.update?.returningFields, tableRules?.select?.fields, tableRules.update.fields),
                     filterFields: this.parseFieldFilter(tableRules.update.filterFields)
                 };
             }
@@ -522,8 +529,8 @@ class ViewHandler {
                     return throwFieldsErr("insert");
                 res.insert = {
                     fields: this.parseFieldFilter(tableRules.insert.fields),
-                    forcedData: Object.assign({}, tableRules.insert.forcedData),
-                    returningFields: getFirstSpecified(tableRules.insert.returningFields, (_g = tableRules === null || tableRules === void 0 ? void 0 : tableRules.select) === null || _g === void 0 ? void 0 : _g.fields, tableRules.insert.fields)
+                    forcedData: { ...tableRules.insert.forcedData },
+                    returningFields: getFirstSpecified(tableRules.insert.returningFields, tableRules?.select?.fields, tableRules.insert.fields)
                 };
             }
             /* DELETE */
@@ -531,9 +538,9 @@ class ViewHandler {
                 if (!tableRules.delete.filterFields)
                     return throwFieldsErr("delete", "filterFields");
                 res.delete = {
-                    forcedFilter: Object.assign({}, tableRules.delete.forcedFilter),
+                    forcedFilter: { ...tableRules.delete.forcedFilter },
                     filterFields: this.parseFieldFilter(tableRules.delete.filterFields),
-                    returningFields: getFirstSpecified(tableRules.delete.returningFields, (_h = tableRules === null || tableRules === void 0 ? void 0 : tableRules.select) === null || _h === void 0 ? void 0 : _h.fields, tableRules.delete.filterFields)
+                    returningFields: getFirstSpecified(tableRules.delete.returningFields, tableRules?.select?.fields, tableRules.delete.filterFields)
                 };
             }
             if (!tableRules.select && !tableRules.update && !tableRules.delete && !tableRules.insert) {
@@ -576,7 +583,7 @@ class ViewHandler {
             };
         }
     }
-    async find(filter, selectParams, param3_unused = null, tableRules, localParams) {
+    async find(filter, selectParams, param3_unused, tableRules, localParams) {
         try {
             filter = filter || {};
             const allowedReturnTypes = ["row", "value", "values"];
@@ -646,14 +653,14 @@ class ViewHandler {
     }
     findOne(filter, selectParams, param3_unused, table_rules, localParams) {
         try {
-            const { select = "*", orderBy = null, offset = 0 } = selectParams || {};
+            const { select = "*", orderBy, offset = 0 } = selectParams || {};
             if (selectParams) {
                 const good_params = ["select", "orderBy", "offset"];
                 const bad_params = Object.keys(selectParams).filter(k => !good_params.includes(k));
                 if (bad_params && bad_params.length)
                     throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
             }
-            return this.find(filter, { select, orderBy, limit: 1, offset, returnType: "row" }, null, table_rules, localParams);
+            return this.find(filter, { select, orderBy, limit: 1, offset, returnType: "row" }, undefined, table_rules, localParams);
         }
         catch (e) {
             if (localParams && localParams.testRule)
@@ -664,7 +671,7 @@ class ViewHandler {
     async count(filter, param2_unused, param3_unused, table_rules, localParams = {}) {
         filter = filter || {};
         try {
-            return await this.find(filter, { select: "", limit: 0 }, null, table_rules, localParams)
+            return await this.find(filter, { select: "", limit: 0 }, undefined, table_rules, localParams)
                 .then(async (allowed) => {
                 const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {};
                 const where = (await this.prepareWhere({ filter, forcedFilter, filterFields, addKeywords: true, localParams, tableRule: table_rules }));
@@ -681,13 +688,12 @@ class ViewHandler {
     async size(filter, selectParams, param3_unused, table_rules, localParams = {}) {
         filter = filter || {};
         try {
-            return await this.find(filter, Object.assign(Object.assign({}, selectParams), { limit: 2 }), null, table_rules, localParams)
+            return await this.find(filter, { ...selectParams, limit: 2 }, undefined, table_rules, localParams)
                 .then(async (_allowed) => {
                 // let rules: TableRule = table_rules || {};
                 // rules.select.maxLimit = Number.MAX_SAFE_INTEGER;
                 // rules.select.fields = rules.select.fields || "*";
-                var _a;
-                const q = await this.find(filter, Object.assign(Object.assign({}, selectParams), { limit: (_a = selectParams === null || selectParams === void 0 ? void 0 : selectParams.limit) !== null && _a !== void 0 ? _a : Number.MAX_SAFE_INTEGER }), null, table_rules, Object.assign(Object.assign({}, localParams), { returnQuery: true }));
+                const q = await this.find(filter, { ...selectParams, limit: selectParams?.limit ?? Number.MAX_SAFE_INTEGER }, undefined, table_rules, { ...localParams, returnQuery: true });
                 const query = `
                         SELECT sum(pg_column_size((prgl_size_query.*))) as size 
                         FROM (
@@ -744,7 +750,7 @@ class ViewHandler {
      * Parses group or simple filter
      */
     async prepareWhere(params) {
-        const { filter, select, forcedFilter, filterFields: ff, addKeywords = true, tableAlias = null, localParams, tableRule } = params;
+        const { filter, select, forcedFilter, filterFields: ff, addKeywords = true, tableAlias, localParams, tableRule } = params;
         const { $and: $and_key, $or: $or_key } = this.dboBuilder.prostgles.keywords;
         let filterFields = ff;
         /* Local update allow all. TODO -> FIX THIS */
@@ -754,7 +760,7 @@ class ViewHandler {
             if (!f)
                 throw "Invalid/missing group filter provided";
             let result = "";
-            let keys = Object.keys(f);
+            let keys = getKeys(f);
             if (!keys.length)
                 return result;
             if ((keys.includes($and_key) || keys.includes($or_key))) {
@@ -776,7 +782,7 @@ class ViewHandler {
             }
             else if (!group) {
                 result = await this.getCondition({
-                    filter: Object.assign({}, f),
+                    filter: { ...f },
                     select,
                     allowed_colnames: this.parseFieldFilter(filterFields),
                     tableAlias,
@@ -788,7 +794,7 @@ class ViewHandler {
         };
         if (!isPlainObject(filter))
             throw "\nInvalid filter\nExpecting an object but got -> " + JSON.stringify(filter);
-        let _filter = Object.assign({}, filter);
+        let _filter = { ...filter };
         if (forcedFilter) {
             _filter = {
                 [$and_key]: [forcedFilter, _filter].filter(f => f)
@@ -801,7 +807,7 @@ class ViewHandler {
             cond = "WHERE " + cond;
         return cond || "";
     }
-    async prepareExistCondition(eConfig, localParams, tableRules) {
+    async prepareExistCondition(eConfig, localParams) {
         let res = "";
         const thisTable = this.name;
         const isNotExists = ["$notExists", "$notExistsJoined"].includes(eConfig.existType);
@@ -824,7 +830,7 @@ class ViewHandler {
                 if (!depth && eConfig.shortestJoin)
                     exactPaths = undefined;
                 const jinf = this.getJoins(t1, t2, exactPaths, true);
-                expectOne = expectOne && jinf.expectOne;
+                expectOne = Boolean(expectOne && jinf.expectOne);
                 joinPaths = joinPaths.concat(jinf.paths);
             });
             let r = makeJoin({ paths: joinPaths, expectOne }, 0);
@@ -832,7 +838,7 @@ class ViewHandler {
             function makeJoin(joinInfo, ji) {
                 const { paths } = joinInfo;
                 const jp = paths[ji];
-                let prevTable = ji ? paths[ji - 1].table : jp.source;
+                // let prevTable = ji? paths[ji - 1].table : jp.source;
                 let table = paths[ji].table;
                 let tableAlias = prostgles_types_1.asName(ji < paths.length - 1 ? `jd${ji}` : table);
                 let prevTableAlias = prostgles_types_1.asName(ji ? `jd${ji - 1}` : thisTable);
@@ -896,7 +902,7 @@ class ViewHandler {
      */
     async getCondition(params) {
         const { filter, select, allowed_colnames, tableAlias, localParams, tableRules } = params;
-        let data = Object.assign({}, filter);
+        let data = { ...filter };
         /* Exists join filter */
         const ERR = "Invalid exists filter. \nExpecting somethibng like: { $exists: { tableName.tableName2: Filter } } | { $exists: { \"**.tableName3\": Filter } }\n";
         const SP_WILDCARD = "**";
@@ -955,7 +961,7 @@ class ViewHandler {
         });
         let existsCond = "";
         if (existsKeys.length) {
-            existsCond = (await Promise.all(existsKeys.map(async (k) => await this.prepareExistCondition(k, localParams, tableRules)))).join(" AND ");
+            existsCond = (await Promise.all(existsKeys.map(async (k) => await this.prepareExistCondition(k, localParams)))).join(" AND ");
         }
         /* Computed field queries */
         const p = this.getValidatedRules(tableRules, localParams);
@@ -1034,6 +1040,10 @@ class ViewHandler {
             }
             complexFilters.push(result);
         }
+        /* Parse join filters
+            { $joinFilter: { $ST_DWithin: [table.col, foreignTable.col, distance] }
+            will make an exists filter
+        */
         let filterKeys = Object.keys(data).filter(k => k !== complexFilterKey && !funcFilterkeys.find(ek => ek.name === k) && !computedFields.find(cf => cf.name === k) && !existsKeys.find(ek => ek.key === k));
         // if(allowed_colnames){
         //     const aliasedColumns = (select || []).filter(s => 
@@ -1168,7 +1178,7 @@ class ViewHandler {
                 const orderType = asc ? " ASC " : " DESC ";
                 const index = selectedAliases.indexOf(key) + 1;
                 const nullOrder = nulls ? ` NULLS ${nulls === "first" ? " FIRST " : " LAST "}` : "";
-                let colKey = (index > 0 && !nullEmpty) ? index : [tableAlias, key].filter(v => v).map(prostgles_types_1.asName).join(".");
+                let colKey = (index > 0 && !nullEmpty) ? index : [tableAlias, key].filter(utils_1.isDefined).map(prostgles_types_1.asName).join(".");
                 if (nullEmpty) {
                     colKey = `nullif(trim(${colKey}::text), '')`;
                 }
@@ -1236,11 +1246,11 @@ class ViewHandler {
         if (!column_names || !column_names.length)
             throw "table column_names mising";
         let _allowed_cols = column_names.slice(0);
-        let _obj = Object.assign({}, obj);
+        let _obj = { ...obj };
         if (allowed_cols) {
             _allowed_cols = this.parseFieldFilter(allowed_cols, false);
         }
-        let final_filter = Object.assign({}, _obj), filter_keys = Object.keys(final_filter);
+        let final_filter = { ..._obj }, filter_keys = Object.keys(final_filter);
         if (fixIssues && filter_keys.length) {
             final_filter = {};
             filter_keys
@@ -1254,7 +1264,7 @@ class ViewHandler {
             validateObj(final_filter, _allowed_cols);
         }
         if (forcedData && Object.keys(forcedData).length) {
-            final_filter = Object.assign(Object.assign({}, final_filter), forcedData);
+            final_filter = { ...final_filter, ...forcedData };
         }
         validateObj(final_filter, column_names.slice(0));
         return final_filter;
@@ -1271,7 +1281,7 @@ class ViewHandler {
         if (!all_cols)
             throw "all_cols missing";
         const all_fields = all_cols; // || this.column_names.slice(0);
-        let colNames = null, initialParams = JSON.stringify(fieldParams);
+        let colNames = [], initialParams = JSON.stringify(fieldParams);
         if (fieldParams) {
             /*
                 "field1, field2, field4" | "*"
@@ -1414,7 +1424,7 @@ class TableHandler extends ViewHandler {
                 console.error({ localParams, localFunc });
                 throw " Cannot have localFunc AND socket ";
             }
-            const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {}, condition = await this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: null, localParams, tableRule: table_rules }), throttle = utils_1.get(params, "throttle") || 0, selectParams = PubSubManager_1.filterObj(params || {}, [], ["throttle"]);
+            const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {}, condition = await this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: undefined, localParams, tableRule: table_rules }), throttle = utils_1.get(params, "throttle") || 0, selectParams = PubSubManager_1.filterObj(params || {}, [], ["throttle"]);
             // const { subOne = false } = localParams || {};
             const filterSize = JSON.stringify(filter || {}).length;
             if (filterSize * 4 > 2704) {
@@ -1423,20 +1433,19 @@ class TableHandler extends ViewHandler {
             if (!localFunc) {
                 if (!this.dboBuilder.prostgles.isSuperUser)
                     throw "Subscribe not possible. Must be superuser to add triggers 1856";
-                return await this.find(filter, Object.assign(Object.assign({}, selectParams), { limit: 0 }), null, table_rules, localParams)
+                return await this.find(filter, { ...selectParams, limit: 0 }, undefined, table_rules, localParams)
                     .then(async (isValid) => {
-                    const { socket = null } = localParams;
+                    const { socket } = localParams ?? {};
                     const pubSubManager = await this.dboBuilder.getPubSubManager();
                     return pubSubManager.addSub({
                         table_info: this.tableOrViewInfo,
                         socket,
                         table_rules,
                         condition: condition,
-                        func: localFunc,
-                        filter: Object.assign({}, filter),
-                        params: Object.assign({}, selectParams),
-                        channel_name: null,
-                        socket_id: socket.id,
+                        func: undefined,
+                        filter: { ...filter },
+                        params: { ...selectParams },
+                        socket_id: socket?.id,
                         table_name: this.name,
                         throttle,
                         last_throttled: 0,
@@ -1447,14 +1456,13 @@ class TableHandler extends ViewHandler {
                 const pubSubManager = await this.dboBuilder.getPubSubManager();
                 pubSubManager.addSub({
                     table_info: this.tableOrViewInfo,
-                    socket: null,
+                    socket: undefined,
                     table_rules,
                     condition,
                     func: localFunc,
-                    filter: Object.assign({}, filter),
-                    params: Object.assign({}, selectParams),
-                    channel_name: null,
-                    socket_id: null,
+                    filter: { ...filter },
+                    params: { ...selectParams },
+                    socket_id: undefined,
                     table_name: this.name,
                     throttle,
                     last_throttled: 0,
@@ -1475,11 +1483,11 @@ class TableHandler extends ViewHandler {
     }
     subscribeOne(filter, params = {}, localFunc, table_rules, localParams) {
         let func = localParams ? undefined : (rows) => localFunc(rows[0]);
-        return this.subscribe(filter, Object.assign(Object.assign({}, params), { limit: 2 }), func, table_rules, localParams);
+        return this.subscribe(filter, { ...params, limit: 2 }, func, table_rules, localParams);
     }
-    async updateBatch(data, params, tableRules, localParams = null) {
+    async updateBatch(data, params, tableRules, localParams) {
         try {
-            const queries = await Promise.all(data.map(async ([filter, data]) => await this.update(filter, data, Object.assign(Object.assign({}, (params || {})), { returning: undefined }), tableRules, Object.assign(Object.assign({}, (localParams || {})), { returnQuery: true }))));
+            const queries = await Promise.all(data.map(async ([filter, data]) => await this.update(filter, data, { ...(params || {}), returning: undefined }, tableRules, { ...(localParams || {}), returnQuery: true })));
             const keys = (data && data.length) ? Object.keys(data[0]) : [];
             return this.db.tx(t => {
                 const _queries = queries.map(q => t.none(q));
@@ -1492,10 +1500,9 @@ class TableHandler extends ViewHandler {
             throw { err: parseError(e), msg: `Issue with dbo.${this.name}.update()` };
         }
     }
-    async update(filter, newData, params, tableRules, localParams = null) {
-        var _a;
+    async update(filter, newData, params, tableRules, localParams) {
         try {
-            const { testRule = false, returnQuery = false } = localParams || {};
+            const { testRule = false, returnQuery = false } = localParams ?? {};
             if (!testRule) {
                 if (!newData || !Object.keys(newData).length)
                     throw "no update data provided\nEXPECTING db.table.update(filter, updateData, options)";
@@ -1515,7 +1522,7 @@ class TableHandler extends ViewHandler {
                     await this.validateViewRules(fields, filterFields, returningFields, forcedFilter, "update");
                     if (forcedData) {
                         try {
-                            const { data, allowedCols } = this.validateNewData({ row: forcedData, forcedData: null, allowedFields: "*", tableRules, fixIssues: false });
+                            const { data, allowedCols } = this.validateNewData({ row: forcedData, forcedData: undefined, allowedFields: "*", tableRules, fixIssues: false });
                             const updateQ = await this.colSet.getUpdateQuery(data, allowedCols, validate); //pgp.helpers.update(data, columnSet)
                             let query = updateQ + " WHERE FALSE ";
                             await this.db.any("EXPLAIN " + query);
@@ -1549,13 +1556,13 @@ class TableHandler extends ViewHandler {
                     const unrecProps = Object.keys(d).filter(k => !["from", "to", "text", "md5"].includes(k));
                     if (unrecProps.length)
                         throw "Unrecognised params in textPatch field: " + unrecProps.join(", ");
-                    patchedTextData.push(Object.assign(Object.assign({}, d), { fieldName: c.name }));
+                    patchedTextData.push({ ...d, fieldName: c.name });
                 }
             });
             if (patchedTextData && patchedTextData.length) {
                 if (tableRules && !tableRules.select)
                     throw "Select needs to be permitted to patch data";
-                const rows = await this.find(filter, { select: patchedTextData.reduce((a, v) => (Object.assign(Object.assign({}, a), { [v.fieldName]: 1 })), {}) }, null, tableRules);
+                const rows = await this.find(filter, { select: patchedTextData.reduce((a, v) => ({ ...a, [v.fieldName]: 1 }), {}) }, undefined, tableRules);
                 if (rows.length !== 1) {
                     throw "Cannot patch data within a filter that affects more/less than 1 row";
                 }
@@ -1565,11 +1572,11 @@ class TableHandler extends ViewHandler {
                 // https://w3resource.com/PostgreSQL/overlay-function.p hp
                 //  overlay(coalesce(status, '') placing 'hom' from 2 for 0)
             }
-            let nData = Object.assign({}, data);
+            let nData = { ...data };
             // if(tableRules && tableRules.update && tableRules?.update?.validate){
             //     nData = await tableRules.update.validate(nData);
             // }
-            let query = await this.colSet.getUpdateQuery(nData, allowedCols, (_a = tableRules === null || tableRules === void 0 ? void 0 : tableRules.update) === null || _a === void 0 ? void 0 : _a.validate); //pgp.helpers.update(nData, columnSet) + " ";
+            let query = await this.colSet.getUpdateQuery(nData, allowedCols, tableRules?.update?.validate); //pgp.helpers.update(nData, columnSet) + " ";
             query += (await this.prepareWhere({
                 filter,
                 forcedFilter,
@@ -1587,7 +1594,7 @@ class TableHandler extends ViewHandler {
             if (returnQuery)
                 return query;
             if (this.t) {
-                return this.t[qType](query).catch(err => makeErr(err, localParams, this, _fields));
+                return this.t[qType](query).catch((err) => makeErr(err, localParams, this, _fields));
             }
             return this.db.tx(t => t[qType](query)).catch(err => makeErr(err, localParams, this, _fields));
         }
@@ -1599,17 +1606,16 @@ class TableHandler extends ViewHandler {
     }
     ;
     validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues = false }) {
-        const synced_field = utils_1.get(tableRules || {}, "sync.synced_field");
+        const synced_field = utils_1.get(tableRules ?? {}, "sync.synced_field");
         /* Update synced_field if sync is on and missing */
         if (synced_field && !row[synced_field]) {
             row[synced_field] = Date.now();
         }
         let data = this.prepareFieldValues(row, forcedData, allowedFields, fixIssues);
-        const dataKeys = Object.keys(data);
+        const dataKeys = getKeys(data);
         dataKeys.map(col => {
-            var _a, _b, _e, _f;
-            (_b = (_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.tableConfigurator) === null || _b === void 0 ? void 0 : _b.checkColVal({ table: this.name, col, value: data[col] });
-            const colConfig = (_f = (_e = this.dboBuilder.prostgles) === null || _e === void 0 ? void 0 : _e.tableConfigurator) === null || _f === void 0 ? void 0 : _f.getColumnConfig(this.name, col);
+            this.dboBuilder.prostgles?.tableConfigurator?.checkColVal({ table: this.name, col, value: data[col] });
+            const colConfig = this.dboBuilder.prostgles?.tableConfigurator?.getColumnConfig(this.name, col);
             if (colConfig && "isText" in colConfig && data[col]) {
                 if (colConfig.lowerCased) {
                     data[col] = data[col].toString().toLowerCase();
@@ -1621,12 +1627,11 @@ class TableHandler extends ViewHandler {
         });
         return { data, allowedCols: this.columns.filter(c => dataKeys.includes(c.name)).map(c => c.name) };
     }
-    async insertDataParse(data, param2, param3_unused, tableRules, _localParams = null) {
-        var _a, _b;
+    async insertDataParse(data, param2, param3_unused, tableRules, _localParams) {
         const localParams = _localParams || {};
-        let dbTX = (localParams === null || localParams === void 0 ? void 0 : localParams.dbTX) || this.dbTX;
+        let dbTX = localParams?.dbTX || this.dbTX;
         const isMultiInsert = Array.isArray(data);
-        const getExtraKeys = d => Object.keys(d).filter(k => !this.columns.find(c => c.name === k));
+        const getExtraKeys = (d) => Object.keys(d).filter(k => !this.columns.find(c => c.name === k));
         /* Nested insert is not allowed for the file table */
         const isNestedInsert = this.is_media ? false : (Array.isArray(data) ? data : [data]).some(d => getExtraKeys(d).length);
         /**
@@ -1634,13 +1639,12 @@ class TableHandler extends ViewHandler {
          */
         if (isNestedInsert && !dbTX) {
             return {
-                insertResult: await this.dboBuilder.getTX((dbTX) => dbTX[this.name].insert(data, param2, param3_unused, tableRules, Object.assign({ dbTX }, localParams)))
+                insertResult: await this.dboBuilder.getTX((dbTX) => dbTX[this.name].insert(data, param2, param3_unused, tableRules, { dbTX, ...localParams }))
             };
         }
         // if(!dbTX && this.t) dbTX = this.d;
-        const preValidate = (_a = tableRules === null || tableRules === void 0 ? void 0 : tableRules.insert) === null || _a === void 0 ? void 0 : _a.preValidate, validate = (_b = tableRules === null || tableRules === void 0 ? void 0 : tableRules.insert) === null || _b === void 0 ? void 0 : _b.validate;
+        const preValidate = tableRules?.insert?.preValidate, validate = tableRules?.insert?.validate;
         let _data = await Promise.all((Array.isArray(data) ? data : [data]).map(async (row) => {
-            var _a, _b;
             if (preValidate) {
                 row = await preValidate(row);
             }
@@ -1648,7 +1652,7 @@ class TableHandler extends ViewHandler {
             const extraKeys = getExtraKeys(row);
             /* Upload file then continue insert */
             if (this.is_media) {
-                if (!((_a = this.dboBuilder.prostgles) === null || _a === void 0 ? void 0 : _a.fileManager))
+                if (!this.dboBuilder.prostgles?.fileManager)
                     throw "fileManager not set up";
                 const { data, name } = row;
                 if (dataKeys.length !== 2)
@@ -1675,35 +1679,37 @@ class TableHandler extends ViewHandler {
                 const _media = await this.dboBuilder.prostgles.fileManager.uploadAsMedia({
                     item: {
                         data,
-                        name: media.name,
+                        name: media.name ?? "????",
                         content_type: media.content_type
                     },
                 });
-                return Object.assign(Object.assign({}, media), _media);
+                return {
+                    ...media,
+                    ..._media,
+                };
                 /* Potentially a nested join */
             }
             else if (extraKeys.length) {
                 /* Ensure we're using the same transaction */
                 const _this = this.t ? this : dbTX[this.name];
-                let rootData = PubSubManager_1.filterObj(data, null, extraKeys);
+                let rootData = PubSubManager_1.filterObj(data, undefined, extraKeys);
                 let insertedChildren;
                 let targetTableRules;
-                const fullRootResult = await _this.insert(rootData, { returning: "*" }, null, tableRules, localParams);
+                const fullRootResult = await _this.insert(rootData, { returning: "*" }, undefined, tableRules, localParams);
                 let returnData;
-                const returning = param2 === null || param2 === void 0 ? void 0 : param2.returning;
+                const returning = param2?.returning;
                 if (returning) {
                     returnData = {};
-                    const returningItems = await this.prepareReturning(returning, this.parseFieldFilter((_b = tableRules === null || tableRules === void 0 ? void 0 : tableRules.insert) === null || _b === void 0 ? void 0 : _b.returningFields));
+                    const returningItems = await this.prepareReturning(returning, this.parseFieldFilter(tableRules?.insert?.returningFields));
                     returningItems.filter(s => s.selected).map(rs => {
                         returnData[rs.alias] = fullRootResult[rs.alias];
                     });
                 }
                 await Promise.all(extraKeys.map(async (targetTable) => {
-                    var _a;
                     const childDataItems = Array.isArray(row[targetTable]) ? row[targetTable] : [row[targetTable]];
                     /* Must be allowed to insert into media table */
                     const canInsert = async (tbl) => {
-                        const childRules = await this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: tbl, command: "insert", localParams });
+                        const childRules = await this.dboBuilder.publishParser?.getValidatedRequestRuleWusr({ tableName: tbl, command: "insert", localParams });
                         if (!childRules || !childRules.insert)
                             throw "Dissallowed nested insert into table " + childRules;
                         return childRules;
@@ -1715,7 +1721,7 @@ class TableHandler extends ViewHandler {
                     const thisInfo = await this.getInfo();
                     const childInsert = async (cdata, tableName) => {
                         // console.log("childInsert", {data, tableName})
-                        if (!cdata || !dbTX[tableName] || !("insert" in dbTX[tableName]))
+                        if (!cdata || !dbTX?.[tableName] || !("insert" in dbTX[tableName]))
                             throw "childInsertErr: Child table handler missing for: " + tableName;
                         const tableRules = await canInsert(tableName);
                         if (thisInfo.has_media === "one" && thisInfo.media_table_name === tableName && Array.isArray(cdata) && cdata.length > 1) {
@@ -1723,7 +1729,7 @@ class TableHandler extends ViewHandler {
                         }
                         return Promise.all((Array.isArray(cdata) ? cdata : [cdata])
                             .map(m => dbTX[tableName]
-                            .insert(m, { returning: "*" }, null, tableRules, localParams)
+                            .insert(m, { returning: "*" }, undefined, tableRules, localParams)
                             .catch(e => {
                             console.trace({ childInsertErr: e });
                             return Promise.reject({ childInsertErr: e });
@@ -1735,7 +1741,7 @@ class TableHandler extends ViewHandler {
                     const cols2 = this.dboBuilder.dbo[tbl2].columns || [];
                     if (!this.dboBuilder.dbo[tbl2])
                         throw "Invalid/disallowed table: " + tbl2;
-                    const colsRefT1 = cols2 === null || cols2 === void 0 ? void 0 : cols2.filter(c => { var _a, _b; return ((_a = c.references) === null || _a === void 0 ? void 0 : _a.cols.length) === 1 && ((_b = c.references) === null || _b === void 0 ? void 0 : _b.ftable) === tbl1; });
+                    const colsRefT1 = cols2?.filter(c => c.references?.cols.length === 1 && c.references?.ftable === tbl1);
                     if (!path.length) {
                         throw "Nested inserts join path not found for " + [this.name, targetTable];
                     }
@@ -1745,8 +1751,8 @@ class TableHandler extends ViewHandler {
                         if (!colsRefT1.length)
                             throw `Target table ${tbl2} does not reference any columns from the root table ${this.name}. Cannot do nested insert`;
                         // console.log(childDataItems, JSON.stringify(colsRefT1, null, 2))
-                        insertedChildren = await childInsert(childDataItems.map(d => {
-                            let result = Object.assign({}, d);
+                        insertedChildren = await childInsert(childDataItems.map((d) => {
+                            let result = { ...d };
                             colsRefT1.map(col => {
                                 result[col.references.cols[0]] = fullRootResult[col.references.fcols[0]];
                             });
@@ -1757,10 +1763,10 @@ class TableHandler extends ViewHandler {
                     else if (path.length === 3) {
                         if (targetTable !== tbl3)
                             throw "Did not expect this";
-                        const colsRefT3 = cols2 === null || cols2 === void 0 ? void 0 : cols2.filter(c => { var _a, _b; return ((_a = c.references) === null || _a === void 0 ? void 0 : _a.cols.length) === 1 && ((_b = c.references) === null || _b === void 0 ? void 0 : _b.ftable) === tbl3; });
+                        const colsRefT3 = cols2?.filter(c => c.references?.cols.length === 1 && c.references?.ftable === tbl3);
                         if (!colsRefT1.length || !colsRefT3.length)
                             throw "Incorrectly referenced or missing columns for nested insert";
-                        if (targetTable !== this.dboBuilder.prostgles.fileManager.tableName) {
+                        if (targetTable !== this.dboBuilder.prostgles.fileManager?.tableName) {
                             throw "Only media allowed to have nested inserts more than 2 tables apart";
                         }
                         /* We expect tbl2 to have only 2 columns (media_id and foreign_id) */
@@ -1786,11 +1792,11 @@ class TableHandler extends ViewHandler {
                         throw "Unexpected path for Nested inserts";
                     }
                     /* Return also the nested inserted data */
-                    if (targetTableRules && (insertedChildren === null || insertedChildren === void 0 ? void 0 : insertedChildren.length) && returning) {
+                    if (targetTableRules && insertedChildren?.length && returning) {
                         const targetTableHandler = dbTX[targetTable];
-                        const targetReturning = await targetTableHandler.prepareReturning("*", targetTableHandler.parseFieldFilter((_a = targetTableRules === null || targetTableRules === void 0 ? void 0 : targetTableRules.insert) === null || _a === void 0 ? void 0 : _a.returningFields));
+                        const targetReturning = await targetTableHandler.prepareReturning("*", targetTableHandler.parseFieldFilter(targetTableRules?.insert?.returningFields));
                         let clientTargetInserts = insertedChildren.map(d => {
-                            let _d = Object.assign({}, d);
+                            let _d = { ...d };
                             let res = {};
                             targetReturning.map(r => {
                                 res[r.alias] = _d[r.alias];
@@ -1813,8 +1819,7 @@ class TableHandler extends ViewHandler {
             { data: result };
         return res;
     }
-    async insert(rowOrRows, param2, param3_unused, tableRules, _localParams = null) {
-        var _a, _b, _e;
+    async insert(rowOrRows, param2, param3_unused, tableRules, _localParams) {
         const localParams = _localParams || {};
         const { dbTX } = localParams;
         try {
@@ -1835,7 +1840,7 @@ class TableHandler extends ViewHandler {
                 /* Safely test publish rules */
                 if (testRule) {
                     // if(this.is_media && tableRules.insert.preValidate) throw "Media table cannot have a preValidate. It already is used internally by prostgles for file upload";
-                    await this.validateViewRules(fields, null, returningFields, null, "insert");
+                    await this.validateViewRules(fields, undefined, returningFields, undefined, "insert");
                     if (forcedData) {
                         const keys = Object.keys(forcedData);
                         if (keys.length) {
@@ -1865,19 +1870,18 @@ class TableHandler extends ViewHandler {
                 rowOrRows = {}; //throw "Provide data in param1";
             let returningSelect = this.makeReturnQuery(await this.prepareReturning(returning, this.parseFieldFilter(returningFields)));
             const makeQuery = async (_row, isOne = false) => {
-                var _a;
-                let row = Object.assign({}, _row);
+                let row = { ..._row };
                 if (!isPojoObject(row)) {
                     console.trace(row);
                     throw "\ninvalid insert data provided -> " + JSON.stringify(row);
                 }
                 const { data, allowedCols } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues });
-                let _data = Object.assign({}, data);
+                let _data = { ...data };
                 let insertQ = "";
                 if (!Object.keys(_data).length)
                     insertQ = `INSERT INTO ${prostgles_types_1.asName(this.name)} DEFAULT VALUES `;
                 else
-                    insertQ = await this.colSet.getInsertQuery(_data, allowedCols, (_a = tableRules === null || tableRules === void 0 ? void 0 : tableRules.insert) === null || _a === void 0 ? void 0 : _a.validate); // pgp.helpers.insert(_data, columnSet); 
+                    insertQ = await this.colSet.getInsertQuery(_data, allowedCols, tableRules?.insert?.validate); // pgp.helpers.insert(_data, columnSet); 
                 return insertQ + conflict_query + returningSelect;
             };
             let query = "";
@@ -1910,12 +1914,12 @@ class TableHandler extends ViewHandler {
                 return query;
             let result;
             if (this.dboBuilder.prostgles.opts.DEBUG_MODE) {
-                console.log((_b = (_a = this.t) === null || _a === void 0 ? void 0 : _a.ctx) === null || _b === void 0 ? void 0 : _b.start, "insert in " + this.name, data);
+                console.log(this.t?.ctx?.start, "insert in " + this.name, data);
             }
-            const tx = ((_e = dbTX === null || dbTX === void 0 ? void 0 : dbTX[this.name]) === null || _e === void 0 ? void 0 : _e.t) || this.t;
+            const tx = dbTX?.[this.name]?.t || this.t;
             const allowedFieldKeys = this.parseFieldFilter(fields);
             if (tx) {
-                result = tx[queryType](query).catch(err => makeErr(err, localParams, this, allowedFieldKeys));
+                result = tx[queryType](query).catch((err) => makeErr(err, localParams, this, allowedFieldKeys));
             }
             else {
                 result = this.db.tx(t => t[queryType](query)).catch(err => makeErr(err, localParams, this, allowedFieldKeys));
@@ -1933,11 +1937,11 @@ class TableHandler extends ViewHandler {
     }
     ;
     makeReturnQuery(items) {
-        if (items === null || items === void 0 ? void 0 : items.length)
+        if (items?.length)
             return " RETURNING " + items.map(s => s.getQuery() + " AS " + prostgles_types_1.asName(s.alias)).join(", ");
         return "";
     }
-    async delete(filter, params, param3_unused, table_rules, localParams = null) {
+    async delete(filter, params, param3_unused, table_rules, localParams) {
         try {
             const { returning } = params || {};
             filter = filter || {};
@@ -1959,7 +1963,7 @@ class TableHandler extends ViewHandler {
                     throw ` Invalid delete rule for ${this.name}. filterFields missing `;
                 /* Safely test publish rules */
                 if (testRule) {
-                    await this.validateViewRules(null, filterFields, returningFields, forcedFilter, "delete");
+                    await this.validateViewRules(undefined, filterFields, returningFields, forcedFilter, "delete");
                     return true;
                 }
             }
@@ -1987,7 +1991,7 @@ class TableHandler extends ViewHandler {
             }
             if (returnQuery)
                 return _query;
-            return (this.t || this.db)[queryType](_query).catch(err => makeErr(err, localParams));
+            return (this.t || this.db)[queryType](_query).catch((err) => makeErr(err, localParams));
         }
         catch (e) {
             // console.trace(e)
@@ -1997,10 +2001,10 @@ class TableHandler extends ViewHandler {
         }
     }
     ;
-    remove(filter, params, param3_unused, tableRules, localParams = null) {
+    remove(filter, params, param3_unused, tableRules, localParams) {
         return this.delete(filter, params, param3_unused, tableRules, localParams);
     }
-    async upsert(filter, newData, params, table_rules, localParams = null) {
+    async upsert(filter, newData, params, table_rules, localParams) {
         try {
             /* Do it within a transaction to ensure consisency */
             if (!this.t) {
@@ -2010,13 +2014,13 @@ class TableHandler extends ViewHandler {
                 return _upsert(this);
             }
             async function _upsert(tblH) {
-                return tblH.find(filter, { select: "", limit: 1 }, {}, table_rules, localParams)
+                return tblH.find(filter, { select: "", limit: 1 }, undefined, table_rules, localParams)
                     .then(exists => {
                     if (exists && exists.length) {
                         return tblH.update(filter, newData, params, table_rules, localParams);
                     }
                     else {
-                        return tblH.insert(Object.assign(Object.assign({}, newData), filter), params, null, table_rules, localParams);
+                        return tblH.insert({ ...newData, ...filter }, params, undefined, table_rules, localParams);
                     }
                 });
             }
@@ -2065,7 +2069,7 @@ class TableHandler extends ViewHandler {
                     select.push(sf);
             });
             /* Step 1: parse command and params */
-            return this.find(filter, { select, limit: 0 }, null, table_rules, localParams)
+            return this.find(filter, { select, limit: 0 }, undefined, table_rules, localParams)
                 .then(async (isValid) => {
                 const { filterFields, forcedFilter } = utils_1.get(table_rules, "select") || {};
                 const condition = await this.prepareWhere({ filter, forcedFilter, filterFields, addKeywords: false, localParams, tableRule: table_rules });
@@ -2074,10 +2078,11 @@ class TableHandler extends ViewHandler {
                 return pubSubManager.addSync({
                     table_info: this.tableOrViewInfo,
                     condition,
-                    id_fields, synced_field, allow_delete,
+                    id_fields, synced_field,
+                    allow_delete,
                     socket,
                     table_rules,
-                    filter: Object.assign({}, filter),
+                    filter: { ...filter },
                     params: { select }
                 }).then(channelName => ({ channelName, id_fields, synced_field }));
             });
@@ -2115,7 +2120,7 @@ class TableHandler extends ViewHandler {
     }
 }
 exports.TableHandler = TableHandler;
-const Prostgles_2 = require("./Prostgles");
+const Prostgles_1 = require("./Prostgles");
 class DboBuilder {
     constructor(prostgles) {
         this.schema = "public";
@@ -2144,8 +2149,11 @@ class DboBuilder {
                     console.warn(`subscribe and sync cannot be used because db user is not a superuser `);
                 }
             }
+            if (!this._pubSubManager)
+                throw "Could not create this._pubSubManager";
             return this._pubSubManager;
         };
+        this.joinPaths = [];
         this.init = async () => {
             /* If watchSchema then PubSubManager must be created */
             await this.build();
@@ -2157,7 +2165,7 @@ class DboBuilder {
         this.getTX = (cb) => {
             return this.db.tx((t) => {
                 let dbTX = {};
-                this.tablesOrViews.map(tov => {
+                this.tablesOrViews?.map(tov => {
                     if (tov.is_view) {
                         dbTX[tov.name] = new ViewHandler(this.db, tov, this, t, dbTX, this.joinPaths);
                     }
@@ -2178,14 +2186,15 @@ class DboBuilder {
             });
         };
         this.prostgles = prostgles;
+        if (!this.prostgles.db)
+            throw "db missing";
         this.db = this.prostgles.db;
         this.schema = this.prostgles.opts.schema || "public";
         this.dbo = {};
         // this.joins = this.prostgles.joins;
     }
     destroy() {
-        var _a;
-        (_a = this._pubSubManager) === null || _a === void 0 ? void 0 : _a.destroy();
+        this._pubSubManager?.destroy();
     }
     getJoins() {
         return this.joins;
@@ -2218,7 +2227,7 @@ class DboBuilder {
                 }
                 const tovNames = this.tablesOrViews.map(t => t.name);
                 // 2 find incorrect tables
-                const missing = Prostgles_1.flat(joins.map(j => j.tables)).find(t => !tovNames.includes(t));
+                const missing = joins.flatMap(j => j.tables).find(t => !tovNames.includes(t));
                 if (missing) {
                     throw "Table not found: " + missing;
                 }
@@ -2237,11 +2246,11 @@ class DboBuilder {
                     });
                 });
                 // 4 find incorrect/missing join types
-                const expected_types = " \n\n-> Expecting: " + Prostgles_2.JOIN_TYPES.map(t => JSON.stringify(t)).join(` | `);
+                const expected_types = " \n\n-> Expecting: " + Prostgles_1.JOIN_TYPES.map(t => JSON.stringify(t)).join(` | `);
                 const mt = joins.find(j => !j.type);
                 if (mt)
                     throw "Join type missing for: " + JSON.stringify(mt, null, 2) + expected_types;
-                const it = joins.find(j => !Prostgles_2.JOIN_TYPES.includes(j.type));
+                const it = joins.find(j => !Prostgles_1.JOIN_TYPES.includes(j.type));
                 if (it)
                     throw "Incorrect join type for: " + JSON.stringify(it, null, 2) + expected_types;
             }
@@ -2257,7 +2266,7 @@ class DboBuilder {
                 this.joinGraph[t2] = this.joinGraph[t2] || {};
                 this.joinGraph[t2][t1] = 1;
             });
-            const tables = Prostgles_1.flat(this.joins.map(t => t.tables));
+            const tables = this.joins.flatMap(t => t.tables);
             this.joinPaths = [];
             tables.map(t1 => {
                 tables.map(t2 => {
@@ -2316,11 +2325,11 @@ export type TxCB = {
             const TSTableDataName = snakify(tov.name, true);
             const TSTableHandlerName = JSON.stringify(tov.name);
             if (tov.is_view) {
-                this.dbo[tov.name] = new ViewHandler(this.db, tov, this, null, undefined, this.joinPaths);
+                this.dbo[tov.name] = new ViewHandler(this.db, tov, this, undefined, undefined, this.joinPaths);
                 this.dboDefinition += `  ${TSTableHandlerName}: ViewHandler<${TSTableDataName}> \n`;
             }
             else {
-                this.dbo[tov.name] = new TableHandler(this.db, tov, this, null, undefined, this.joinPaths);
+                this.dbo[tov.name] = new TableHandler(this.db, tov, this, undefined, undefined, this.joinPaths);
                 this.dboDefinition += `  ${TSTableHandlerName}: TableHandler<${TSTableDataName}> \n`;
             }
             allDataDefs += `export type ${TSTableDataName} = { \n` +
@@ -2330,6 +2339,14 @@ export type TxCB = {
             if (this.joinPaths && this.joinPaths.find(jp => [jp.t1, jp.t2].includes(tov.name))) {
                 let table = tov.name;
                 joinTableNames.push(table);
+                const makeJoin = (isLeft = true, filter, select, options) => {
+                    return {
+                        [isLeft ? "$leftJoin" : "$innerJoin"]: table,
+                        filter,
+                        select,
+                        ...options
+                    };
+                };
                 this.dbo.innerJoin = this.dbo.innerJoin || {};
                 this.dbo.leftJoin = this.dbo.leftJoin || {};
                 this.dbo.innerJoinOne = this.dbo.innerJoinOne || {};
@@ -2341,15 +2358,11 @@ export type TxCB = {
                     return makeJoin(false, filter, select, options);
                 };
                 this.dbo.leftJoinOne[table] = (filter, select, options = {}) => {
-                    return makeJoin(true, filter, select, Object.assign(Object.assign({}, options), { limit: 1 }));
+                    return makeJoin(true, filter, select, { ...options, limit: 1 });
                 };
                 this.dbo.innerJoinOne[table] = (filter, select, options = {}) => {
-                    return makeJoin(false, filter, select, Object.assign(Object.assign({}, options), { limit: 1 }));
+                    return makeJoin(false, filter, select, { ...options, limit: 1 });
                 };
-                function makeJoin(isLeft = true, filter, select, options) {
-                    return Object.assign({ [isLeft ? "$leftJoin" : "$innerJoin"]: table, filter,
-                        select }, options);
-                }
             }
         });
         i18nDef += "  }> \n";
@@ -2377,13 +2390,12 @@ export type TxCB = {
             let DATA_TYPES = !needType ? [] : await this.db.any("SELECT oid, typname FROM pg_type");
             let USER_TABLES = !needType ? [] : await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
             this.dbo.sql = async (query, params, options, localParams) => {
-                var _a, _b;
                 const canRunSQL = async (localParams) => {
                     if (!localParams)
                         return true;
                     const { socket } = localParams;
                     const publishParams = await this.prostgles.publishParser.getPublishParams({ socket });
-                    let res = await this.prostgles.opts.publishRawSQL(publishParams);
+                    let res = await this.prostgles.opts.publishRawSQL?.(publishParams);
                     return Boolean(res && typeof res === "boolean" || res === "*");
                 };
                 if (!(await canRunSQL(localParams)))
@@ -2393,7 +2405,7 @@ export type TxCB = {
                 if (returnType === "noticeSubscription") {
                     if (!socket)
                         throw "Only allowed with client socket";
-                    return await this.prostgles.dbEventsManager.addNotice(socket);
+                    return await this.prostgles.dbEventsManager?.addNotice(socket);
                 }
                 else if (returnType === "statement") {
                     try {
@@ -2408,12 +2420,12 @@ export type TxCB = {
                     if (returnType === "arrayMode") {
                         finalQuery = new PQ({ text: exports.pgp.as.format(query, params), rowMode: "array" });
                     }
-                    let qres = await this.db.result(finalQuery, params);
-                    const { duration, fields, rows, command } = qres;
+                    let _qres = await this.db.result(finalQuery, params);
+                    const { fields, rows, command } = _qres;
                     /**
                      * Fallback for watchSchema in case not superuser and cannot add db event listener
                      */
-                    const { watchSchema, watchSchemaType } = ((_a = this.prostgles) === null || _a === void 0 ? void 0 : _a.opts) || {};
+                    const { watchSchema, watchSchemaType } = this.prostgles?.opts || {};
                     if (watchSchema &&
                         (!this.prostgles.isSuperUser || watchSchemaType === "queries") &&
                         (["CREATE", "ALTER", "DROP"].includes(command) ||
@@ -2424,7 +2436,7 @@ export type TxCB = {
                     if (command === "LISTEN") {
                         if (!socket)
                             throw "Only allowed with client socket";
-                        return await this.prostgles.dbEventsManager.addNotify(query, socket);
+                        return await this.prostgles.dbEventsManager?.addNotify(query, socket);
                     }
                     else if (returnType === "rows") {
                         return rows;
@@ -2433,18 +2445,26 @@ export type TxCB = {
                         return rows[0];
                     }
                     else if (returnType === "value") {
-                        return (_b = Object.values((rows === null || rows === void 0 ? void 0 : rows[0]) || {})) === null || _b === void 0 ? void 0 : _b[0];
+                        return Object.values(rows?.[0] || {})?.[0];
                     }
                     else if (returnType === "values") {
                         return rows.map(r => Object.values(r[0]));
                     }
                     else {
-                        if (fields && DATA_TYPES.length) {
-                            qres.fields = fields.map(f => {
-                                const dataType = DATA_TYPES.find(dt => +dt.oid === +f.dataTypeID), tableName = USER_TABLES.find(t => +t.relid === +f.tableID), { name } = f;
-                                return Object.assign(Object.assign(Object.assign({}, f), (dataType ? { dataType: dataType.typname } : {})), (tableName ? { tableName: tableName.relname } : {}));
-                            });
-                        }
+                        let qres = {
+                            duration: 0,
+                            ..._qres,
+                            fields: fields?.map(f => {
+                                const dataType = DATA_TYPES.find(dt => +dt.oid === +f.dataTypeID)?.typname ?? "text", tableName = USER_TABLES.find(t => +t.relid === +f.tableID), tsDataType = postgresToTsType(dataType);
+                                return {
+                                    ...f,
+                                    tsDataType,
+                                    dataType,
+                                    udt_name: dataType,
+                                    tableName: tableName?.relname
+                                };
+                            }) ?? []
+                        };
                         return qres;
                     }
                 }
@@ -2641,8 +2661,13 @@ function isPlainObject(o) {
     return Object(o) === o && Object.getPrototypeOf(o) === Object.prototype;
 }
 exports.isPlainObject = isPlainObject;
+function getKeys(o) {
+    return Object.keys(o);
+}
+exports.getKeys = getKeys;
 function postgresToTsType(udt_data_type) {
-    return Object.keys(prostgles_types_1.TS_PG_Types).find(k => {
+    return getKeys(prostgles_types_1.TS_PG_Types).find(k => {
+        // @ts-ignore
         return prostgles_types_1.TS_PG_Types[k].includes(udt_data_type) || !prostgles_types_1.TS_PG_Types[k].length;
     });
 }
@@ -2890,6 +2915,7 @@ function sqlErrCodeToMsg(code) {
         "XX001": "data_corrupted",
         "XX002": "index_corrupted"
     }, c2 = { "20000": "case_not_found", "21000": "cardinality_violation", "22000": "data_exception", "22001": "string_data_right_truncation", "22002": "null_value_no_indicator_parameter", "22003": "numeric_value_out_of_range", "22004": "null_value_not_allowed", "22005": "error_in_assignment", "22007": "invalid_datetime_format", "22008": "datetime_field_overflow", "22009": "invalid_time_zone_displacement_value", "22010": "invalid_indicator_parameter_value", "22011": "substring_error", "22012": "division_by_zero", "22013": "invalid_preceding_or_following_size", "22014": "invalid_argument_for_ntile_function", "22015": "interval_field_overflow", "22016": "invalid_argument_for_nth_value_function", "22018": "invalid_character_value_for_cast", "22019": "invalid_escape_character", "22021": "character_not_in_repertoire", "22022": "indicator_overflow", "22023": "invalid_parameter_value", "22024": "unterminated_c_string", "22025": "invalid_escape_sequence", "22026": "string_data_length_mismatch", "22027": "trim_error", "22030": "duplicate_json_object_key_value", "22031": "invalid_argument_for_sql_json_datetime_function", "22032": "invalid_json_text", "22033": "invalid_sql_json_subscript", "22034": "more_than_one_sql_json_item", "22035": "no_sql_json_item", "22036": "non_numeric_sql_json_item", "22037": "non_unique_keys_in_a_json_object", "22038": "singleton_sql_json_item_required", "22039": "sql_json_array_not_found", "23000": "integrity_constraint_violation", "23001": "restrict_violation", "23502": "not_null_violation", "23503": "foreign_key_violation", "23505": "unique_violation", "23514": "check_violation", "24000": "invalid_cursor_state", "25000": "invalid_transaction_state", "25001": "active_sql_transaction", "25002": "branch_transaction_already_active", "25003": "inappropriate_access_mode_for_branch_transaction", "25004": "inappropriate_isolation_level_for_branch_transaction", "25005": "no_active_sql_transaction_for_branch_transaction", "25006": "read_only_sql_transaction", "25007": "schema_and_data_statement_mixing_not_supported", "25008": "held_cursor_requires_same_isolation_level", "26000": "invalid_sql_statement_name", "27000": "triggered_data_change_violation", "28000": "invalid_authorization_specification", "34000": "invalid_cursor_name", "38000": "external_routine_exception", "38001": "containing_sql_not_permitted", "38002": "modifying_sql_data_not_permitted", "38003": "prohibited_sql_statement_attempted", "38004": "reading_sql_data_not_permitted", "39000": "external_routine_invocation_exception", "39001": "invalid_sqlstate_returned", "39004": "null_value_not_allowed", "40000": "transaction_rollback", "40001": "serialization_failure", "40002": "transaction_integrity_constraint_violation", "40003": "statement_completion_unknown", "42000": "syntax_error_or_access_rule_violation", "42501": "insufficient_privilege", "42601": "syntax_error", "42602": "invalid_name", "42611": "invalid_column_definition", "42622": "name_too_long", "42701": "duplicate_column", "42702": "ambiguous_column", "42703": "undefined_column", "42704": "undefined_object", "42710": "duplicate_object", "42712": "duplicate_alias", "42723": "duplicate_function", "42725": "ambiguous_function", "42803": "grouping_error", "42804": "datatype_mismatch", "42809": "wrong_object_type", "42830": "invalid_foreign_key", "42846": "cannot_coerce", "42883": "undefined_function", "42939": "reserved_name", "44000": "with_check_option_violation", "53000": "insufficient_resources", "53100": "disk_full", "53200": "out_of_memory", "53300": "too_many_connections", "53400": "configuration_limit_exceeded", "54000": "program_limit_exceeded", "54001": "statement_too_complex", "54011": "too_many_columns", "54023": "too_many_arguments", "55000": "object_not_in_prerequisite_state", "55006": "object_in_use", "57000": "operator_intervention", "57014": "query_canceled", "58000": "system_error", "58030": "io_error", "72000": "snapshot_too_old", "00000": "successful_completion", "01000": "warning", "0100C": "dynamic_result_sets_returned", "01008": "implicit_zero_bit_padding", "01003": "null_value_eliminated_in_set_function", "01007": "privilege_not_granted", "01006": "privilege_not_revoked", "01004": "string_data_right_truncation", "01P01": "deprecated_feature", "02000": "no_data", "02001": "no_additional_dynamic_result_sets_returned", "03000": "sql_statement_not_yet_complete", "08000": "connection_exception", "08003": "connection_does_not_exist", "08006": "connection_failure", "08001": "sqlclient_unable_to_establish_sqlconnection", "08004": "sqlserver_rejected_establishment_of_sqlconnection", "08007": "transaction_resolution_unknown", "08P01": "protocol_violation", "09000": "triggered_action_exception", "0A000": "feature_not_supported", "0B000": "invalid_transaction_initiation", "0F000": "locator_exception", "0F001": "invalid_locator_specification", "0L000": "invalid_grantor", "0LP01": "invalid_grant_operation", "0P000": "invalid_role_specification", "0Z000": "diagnostics_exception", "0Z002": "stacked_diagnostics_accessed_without_active_handler", "2202E": "array_subscript_error", "2200B": "escape_character_conflict", "2201E": "invalid_argument_for_logarithm", "2201F": "invalid_argument_for_power_function", "2201G": "invalid_argument_for_width_bucket_function", "2200D": "invalid_escape_octet", "22P06": "nonstandard_use_of_escape_character", "2201B": "invalid_regular_expression", "2201W": "invalid_row_count_in_limit_clause", "2201X": "invalid_row_count_in_result_offset_clause", "2202H": "invalid_tablesample_argument", "2202G": "invalid_tablesample_repeat", "2200C": "invalid_use_of_escape_character", "2200G": "most_specific_type_mismatch", "2200H": "sequence_generator_limit_exceeded", "2200F": "zero_length_character_string", "22P01": "floating_point_exception", "22P02": "invalid_text_representation", "22P03": "invalid_binary_representation", "22P04": "bad_copy_file_format", "22P05": "untranslatable_character", "2200L": "not_an_xml_document", "2200M": "invalid_xml_document", "2200N": "invalid_xml_content", "2200S": "invalid_xml_comment", "2200T": "invalid_xml_processing_instruction", "2203A": "sql_json_member_not_found", "2203B": "sql_json_number_not_found", "2203C": "sql_json_object_not_found", "2203D": "too_many_json_array_elements", "2203E": "too_many_json_object_members", "2203F": "sql_json_scalar_required", "23P01": "exclusion_violation", "25P01": "no_active_sql_transaction", "25P02": "in_failed_sql_transaction", "25P03": "idle_in_transaction_session_timeout", "28P01": "invalid_password", "2B000": "dependent_privilege_descriptors_still_exist", "2BP01": "dependent_objects_still_exist", "2D000": "invalid_transaction_termination", "2F000": "sql_routine_exception", "2F005": "function_executed_no_return_statement", "2F002": "modifying_sql_data_not_permitted", "2F003": "prohibited_sql_statement_attempted", "2F004": "reading_sql_data_not_permitted", "39P01": "trigger_protocol_violated", "39P02": "srf_protocol_violated", "39P03": "event_trigger_protocol_violated", "3B000": "savepoint_exception", "3B001": "invalid_savepoint_specification", "3D000": "invalid_catalog_name", "3F000": "invalid_schema_name", "40P01": "deadlock_detected", "42P20": "windowing_error", "42P19": "invalid_recursion", "42P18": "indeterminate_datatype", "42P21": "collation_mismatch", "42P22": "indeterminate_collation", "428C9": "generated_always", "42P01": "undefined_table", "42P02": "undefined_parameter", "42P03": "duplicate_cursor", "42P04": "duplicate_database", "42P05": "duplicate_prepared_statement", "42P06": "duplicate_schema", "42P07": "duplicate_table", "42P08": "ambiguous_parameter", "42P09": "ambiguous_alias", "42P10": "invalid_column_reference", "42P11": "invalid_cursor_definition", "42P12": "invalid_database_definition", "42P13": "invalid_function_definition", "42P14": "invalid_prepared_statement_definition", "42P15": "invalid_schema_definition", "42P16": "invalid_table_definition", "42P17": "invalid_object_definition", "55P02": "cant_change_runtime_param", "55P03": "lock_not_available", "55P04": "unsafe_new_enum_value_usage", "57P01": "admin_shutdown", "57P02": "crash_shutdown", "57P03": "cannot_connect_now", "57P04": "database_dropped", "58P01": "undefined_file", "58P02": "duplicate_file", "F0000": "config_file_error", "F0001": "lock_file_exists", "HV000": "fdw_error", "HV005": "fdw_column_name_not_found", "HV002": "fdw_dynamic_parameter_value_needed", "HV010": "fdw_function_sequence_error", "HV021": "fdw_inconsistent_descriptor_information", "HV024": "fdw_invalid_attribute_value", "HV007": "fdw_invalid_column_name", "HV008": "fdw_invalid_column_number", "HV004": "fdw_invalid_data_type", "HV006": "fdw_invalid_data_type_descriptors", "HV091": "fdw_invalid_descriptor_field_identifier", "HV00B": "fdw_invalid_handle", "HV00C": "fdw_invalid_option_index", "HV00D": "fdw_invalid_option_name", "HV090": "fdw_invalid_string_length_or_buffer_length", "HV00A": "fdw_invalid_string_format", "HV009": "fdw_invalid_use_of_null_pointer", "HV014": "fdw_too_many_handles", "HV001": "fdw_out_of_memory", "HV00P": "fdw_no_schemas", "HV00J": "fdw_option_name_not_found", "HV00K": "fdw_reply_handle", "HV00Q": "fdw_schema_not_found", "HV00R": "fdw_table_not_found", "HV00L": "fdw_unable_to_create_execution", "HV00M": "fdw_unable_to_create_reply", "HV00N": "fdw_unable_to_establish_connection", "P0000": "plpgsql_error", "P0001": "raise_exception", "P0002": "no_data_found", "P0003": "too_many_rows", "P0004": "assert_failure", "XX000": "internal_error", "XX001": "data_corrupted", "XX002": "index_corrupted" };
+    //@ts-ignore
     return c2[code] || errs[code] || code;
     /*
       https://www.postgresql.org/docs/13/errcodes-appendix.html
@@ -2924,10 +2950,10 @@ async function getInferredJoins(db, schema = "public") {
         let existing = joins[eIdx];
         if (existing) {
             if (existing.tables[0] === d.table_name) {
-                existing.on = Object.assign(Object.assign({}, existing.on), { [d.column_name]: d.foreign_column_name });
+                existing.on = { ...existing.on, [d.column_name]: d.foreign_column_name };
             }
             else {
-                existing.on = Object.assign(Object.assign({}, existing.on), { [d.foreign_column_name]: d.column_name });
+                existing.on = { ...existing.on, [d.foreign_column_name]: d.column_name };
             }
             joins[eIdx] = existing;
         }

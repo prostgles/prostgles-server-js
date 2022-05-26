@@ -9,19 +9,19 @@ export declare type PrglNotifListener = (args: {
     name: string;
 }) => void;
 export declare class PostgresNotifListenManager {
-    connection: pgPromise.IConnected<{}, pg.IClient>;
+    connection?: pgPromise.IConnected<{}, pg.IClient>;
     db_pg: DB;
     notifListener: PrglNotifListener;
     db_channel_name: string;
     isListening: any;
     client: any;
-    static create: (db_pg: any, notifListener: PrglNotifListener, db_channel_name: string) => Promise<PostgresNotifListenManager>;
+    static create: (db_pg: DB, notifListener: PrglNotifListener, db_channel_name: string) => Promise<PostgresNotifListenManager>;
     constructor(db_pg: DB, notifListener: PrglNotifListener, db_channel_name: string, noInit?: boolean);
     init(): Promise<PostgresNotifListenManager>;
     isReady(): any;
     startListening(): Promise<unknown>;
     destroy: () => void;
     stopListening: () => void;
-    reconnect(delay?: any, maxAttempts?: any): Promise<unknown>;
+    reconnect(delay?: number | undefined, maxAttempts?: number | undefined): Promise<unknown>;
 }
 //# sourceMappingURL=PostgresNotifListenManager.d.ts.map

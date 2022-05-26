@@ -1,4 +1,6 @@
-const shortestDistanceNode = (distances, visited) => {
+import { AnyObject } from "prostgles-types";
+
+const shortestDistanceNode = (distances: AnyObject, visited: AnyObject) => {
 	let shortest = null;
 
 	for (let node in distances) {
@@ -16,18 +18,18 @@ export type Graph = {
 
 export const findShortestPath = (graph: Graph, startNode: string, endNode: string): { distance: number, path: string[] } => {
 	// establish object for recording distances from the start node
-	let distances = {};
+	let distances: AnyObject = {};
 	distances[endNode] = "Infinity";
 	distances = Object.assign(distances, graph[startNode]);
 
 	// track paths
-	let parents = { endNode: null };
+	let parents: AnyObject = { endNode: null };
 	for (let child in graph[startNode]) {
 		parents[child] = startNode;
 	}
 
 	// track nodes that have already been visited
-	let visited = [];
+	let visited: AnyObject = [];
 
 	// find the nearest node
 	let node = shortestDistanceNode(distances, visited);

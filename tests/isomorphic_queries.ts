@@ -4,21 +4,33 @@ import { DbHandler} from "../dist/Prostgles";
 import { DBHandlerClient } from "./client/index";
 import * as fs from "fs";
 
-export async function tryRun(desc: string, func: () => any){
+export async function tryRun(desc: string, func: () => any, log?: Function){
   try {
     await func();
   } catch(err) {
     console.error(desc + " FAILED:");
-    throw err;
+    log?.("FAIL: ", err);
+    setTimeout(() => {
+      throw err;
+
+    }, 2000)
   }
 }
-export function tryRunP(desc: string, func: (resolve: any, reject: any) => any){
-  return new Promise((rv, rj) => {
-    func(rv, rj)
+export function tryRunP(desc: string, func: (resolve: any, reject: any) => any, log?: Function){
+  return new Promise(async (rv, rj) => {
+    try {
+      await func(rv, rj)
+    } catch(err: any){
+      log?.(JSON.stringify(err));
+      setTimeout(() => {
+        log?.("Throw err");
+        throw err;
+      }, 1000)
+    }
   });
 }
 
-export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHandlerClient>){
+export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHandlerClient>) {
   console.log("Starting isomorphic queries");
 
   if(await db.items.count()){

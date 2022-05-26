@@ -2,11 +2,11 @@
   // "files": ["lib/rootExport.ts"],
   "files": ["lib/index.ts"],
   "compilerOptions": {
-    "target": "ES2017",
+    "target": "ES2020",
     "lib": [
       "es2019"
     ],
-    // "strict": true,
+    "strict": true,
     "module": "commonjs",
     // "removeComments": true,
     "sourceMap": true,
@@ -17,6 +17,7 @@
     "resolveJsonModule": true,
     // "outFile": "bundle.js",
     // "moduleResolution": "node"
+    "keyofStringsOnly": true,
     "declaration": true,
     "declarationMap": true
   },

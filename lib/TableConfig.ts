@@ -1,5 +1,5 @@
 import { AnyObject, asName } from "prostgles-types";
-import { DboBuilder, JoinInfo, LocalParams } from "./DboBuilder";
+import { DboBuilder, getKeys, JoinInfo, LocalParams } from "./DboBuilder";
 import { asSQLIdentifier, ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE } from "./FileManager";
 import { DB, DbHandler, Prostgles } from "./Prostgles";
 import { asValue } from "./PubSubManager";
@@ -184,9 +184,15 @@ export type TableConfig<LANG_IDS = { en: 1 }> = {
 export default class TableConfigurator {
 
     config?: TableConfig;
-    get dbo(): DbHandler { return this.prostgles.dbo };
-    get db(): DB { return this.prostgles.db };
-    sidKeyName: string;
+    get dbo(): DbHandler {
+        if(!this.prostgles.dbo) throw "this.prostgles.dbo missing"
+        return this.prostgles.dbo 
+    };
+    get db(): DB { 
+        if(!this.prostgles.db) throw "this.prostgles.db missing"
+        return this.prostgles.db 
+    };
+    // sidKeyName: string;
     prostgles: Prostgles
 
     constructor(prostgles: Prostgles){
@@ -203,7 +209,7 @@ export default class TableConfigurator {
     }
 
     getColInfo = (params: {col: string, table: string}): ColExtraInfo | undefined => {
-        return this.config[params.table]?.[params.col]?.info;
+        return (this.config as any)[params.table]?.[params.col]?.info;
     }
 
     checkColVal = (params: {col: string, table: string, value: any }): void => {
@@ -218,6 +224,7 @@ export default class TableConfigurator {
 
     getJoinInfo = (sourceTable: string, targetTable: string): JoinInfo | undefined => {
         if(
+            this.config &&
             sourceTable in this.config &&
             this.config[sourceTable] &&
             "columns" in this.config[sourceTable]
@@ -247,9 +254,10 @@ export default class TableConfigurator {
     async init(){
         let queries: string[] = [];
         
+        if(!this.config || !this.prostgles.pgp) throw "config or pgp missing"
         /* Create lookup tables */
         Object.keys(this.config).map(tableName => {
-            const tableConf = this.config[tableName];
+            const tableConf = this.config![tableName];
             const { dropIfExists = false, dropIfExistsCascade = false } = tableConf;
             if(dropIfExistsCascade){
                 queries.push(`DROP TABLE IF EXISTS ${tableName} CASCADE;`);
@@ -266,8 +274,8 @@ export default class TableConfigurator {
                     );`);
 
                     rows.map(row => {
-                        const values = this.prostgles.pgp.helpers.values(row)
-                        queries.push(this.prostgles.pgp.as.format(`INSERT INTO ${tableName}  (${["id", ...keys].map(t => asName(t)).join(", ")})  ` + " VALUES ${values:raw} ;", { values} ))
+                        const values = this.prostgles.pgp!.helpers.values(row)
+                        queries.push(this.prostgles.pgp!.as.format(`INSERT INTO ${tableName}  (${["id", ...keys].map(t => asName(t)).join(", ")})  ` + " VALUES ${values:raw} ;", { values} ))
                     });
                     // console.log("Created lookup table " + tableName)
                 }
@@ -284,7 +292,7 @@ export default class TableConfigurator {
 
         /* Create referenced columns */
         await Promise.all(Object.keys(this.config).map(async tableName => {
-            const tableConf = this.config[tableName];
+            const tableConf = this.config![tableName];
             if("columns" in tableConf){
                 const getColDef = (name: string, colConf: ColumnConfig): string => {
                     const colNameEsc = asName(name);
@@ -318,13 +326,13 @@ export default class TableConfigurator {
                     }
                 }
                 
-                const colDefs = [];
+                const colDefs: string[] = [];
                 Object.keys(tableConf.columns).filter(c => !("joinDef" in tableConf.columns[c])).map(colName => {
                     const colConf = tableConf.columns[colName];
                     
                     if(!this.dbo[tableName]){
                         colDefs.push(getColDef(colName, colConf))
-                    } else if(!colDefs.length && !this.dbo[tableName].columns.find(c => colName === c.name)) {
+                    } else if(!colDefs.length && !this.dbo[tableName].columns?.find(c => colName === c.name)) {
 
                         if("references" in colConf && colConf.references){
 
@@ -354,13 +362,13 @@ export default class TableConfigurator {
                 } 
             }
             if("constraints" in tableConf && tableConf.constraints){
-                Object.keys(tableConf.constraints).map(constraintName => {
-                    queries.push(`ALTER TABLE ${asName(tableName)} ADD CONSTRAINT ${asName(constraintName)} ${tableConf.constraints[constraintName]} ;`);
+                getKeys(tableConf.constraints).map(constraintName => {
+                    queries.push(`ALTER TABLE ${asName(tableName)} ADD CONSTRAINT ${asName(constraintName)} ${tableConf.constraints![constraintName]} ;`);
                 });
             }
             if("indexes" in tableConf && tableConf.indexes){
-                Object.keys(tableConf.indexes).map(indexName => {
-                    const { concurrently, unique, using, definition, replace } = tableConf.indexes[indexName];
+                getKeys(tableConf.indexes).map(indexName => {
+                    const { concurrently, unique, using, definition, replace } = tableConf.indexes![indexName];
                     if(replace || typeof replace !== "boolean" && tableConf.replaceUniqueIndexes){
                         queries.push(`DROP INDEX IF EXISTS ${asName(indexName)}  ;`);
                     }

@@ -980,16 +980,18 @@ class PubSubManager {
         const { table_name, filter, params, table_rules, socket_id, channel_name, func } = sub; //, subOne = false 
         sub.last_throttled = Date.now();
         if (err) {
-            this.sockets[socket_id].emit(channel_name, { err });
+            if (socket_id) {
+                this.sockets[socket_id].emit(channel_name, { err });
+            }
             return true;
         }
         return new Promise(async (resolve, reject) => {
-            var _a, _b, _c, _d, _e;
             /* TODO: Retire subOne -> it's redundant */
             // this.dbo[table_name][subOne? "findOne" : "find"](filter, params, null, table_rules)
-            if (!((_b = (_a = this.dbo) === null || _a === void 0 ? void 0 : _a[table_name]) === null || _b === void 0 ? void 0 : _b.find))
+            if (!this.dbo?.[table_name]?.find)
                 throw "1107 this.dbo[table_name].find";
-            (_e = (_d = (_c = this.dbo) === null || _c === void 0 ? void 0 : _c[table_name]) === null || _d === void 0 ? void 0 : _d.find) === null || _e === void 0 ? void 0 : _e.call(_d, filter, params, null, table_rules).then(data => {
+            this.dbo?.[table_name]?.find?.(filter, params, undefined, table_rules)
+                .then(data => {
                 if (socket_id && this.sockets[socket_id]) {
                     exports.log("Pushed " + data.length + " records to sub");
                     this.sockets[socket_id].emit(channel_name, { data }, () => {
@@ -1039,7 +1041,6 @@ class PubSubManager {
             throw "synced_field missing from table_rules";
         this.upsertSocket(socket, channel_name);
         const upsertSync = () => {
-            var _a;
             let newSync = {
                 channel_name,
                 table_name,
@@ -1049,7 +1050,7 @@ class PubSubManager {
                 id_fields,
                 allow_delete,
                 table_rules,
-                throttle: Math.max(throttle || 0, ((_a = table_rules === null || table_rules === void 0 ? void 0 : table_rules.sync) === null || _a === void 0 ? void 0 : _a.throttle) || 0),
+                throttle: Math.max(throttle || 0, table_rules?.sync?.throttle || 0),
                 batch_size: utils_1.get(table_rules, "sync.batch_size") || exports.DEFAULT_SYNC_BATCH_SIZE,
                 last_throttled: 0,
                 socket_id: socket.id,
@@ -1123,7 +1124,7 @@ class PubSubManager {
     /* Must return a channel for socket */
     /* The distinct list of channel names must have a corresponding trigger in the database */
     async addSub(subscriptionParams) {
-        const { socket = null, func = null, table_info = null, table_rules, filter = {}, params = {}, condition = "", throttle = 0 //subOne = false, 
+        const { socket, func = null, table_info = null, table_rules, filter = {}, params = {}, condition = "", throttle = 0 //subOne = false, 
          } = subscriptionParams || {};
         let validated_throttle = subscriptionParams.throttle || 10;
         if ((!socket && !func) || !table_info)
@@ -1147,7 +1148,7 @@ class PubSubManager {
                 table_rules,
                 channel_name,
                 func: func ? func : undefined,
-                socket_id: socket ? socket.id : null,
+                socket_id: socket?.id,
                 throttle: validated_throttle,
                 is_throttling: null,
                 last_throttled: 0,
@@ -1285,7 +1286,7 @@ class PubSubManager {
     }
     async addTrigger(params) {
         try {
-            let { table_name, condition } = Object.assign({}, params);
+            let { table_name, condition } = { ...params };
             if (!table_name)
                 throw "MISSING table_name";
             if (!this.appID)

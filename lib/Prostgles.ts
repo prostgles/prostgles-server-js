@@ -16,7 +16,7 @@ console.log("Add a basic auth mode where user and sessions table are created");
 import TableConfigurator, { TableConfig } from "./TableConfig";
 
 import { get } from "./utils";
-import { DboBuilder, DbHandler, TableHandler, ViewHandler, isPlainObject, LocalParams, CommonTableRules, TableSchema, PRGLIOSocket } from "./DboBuilder";
+import { DboBuilder, DbHandler, TableHandler, ViewHandler, isPlainObject, LocalParams, CommonTableRules, TableSchema, PRGLIOSocket, getKeys } from "./DboBuilder";
 import { PubSubManager, DEFAULT_SYNC_BATCH_SIZE, asValue } from "./PubSubManager";
 export { DbHandler }
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -28,8 +28,7 @@ import { DBEventsManager } from "./DBEventsManager";
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 type DbConnectionOpts = pg.IDefaults;
-
-let currConnection: { db: DB, pgp: PGP };
+const TABLE_METHODS = ["update", "find", "findOne", "insert", "delete", "upsert"];
 function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts | undefined, debugQueries = false, onNotice: ProstglesInitOptions["onNotice"]): { db: DB, pgp: PGP } {
     let pgp: PGP = pgPromise({
         
@@ -398,8 +397,8 @@ export type ProstglesInitOptions<DBO = DbHandler> = {
     onReady(dbo: DBO, db: DB): void;
     transactions?: string | boolean;
     wsChannelNamePrefix?: string;
-    onSocketConnect?(socket: Socket, dbo: DBO, db?: DB): any;
-    onSocketDisconnect?(socket: Socket, dbo: DBO, db?: DB): any;
+    onSocketConnect?(socket: PRGLIOSocket, dbo: DBO, db?: DB): any;
+    onSocketDisconnect?(socket: PRGLIOSocket, dbo: DBO, db?: DB): any;
     auth?: Auth<DBO>;
     DEBUG_MODE?: boolean;
     watchSchemaType?: 
@@ -673,7 +672,8 @@ export class Prostgles<DBO = DbHandler> {
             this.isSuperUser = await isSuperUser(db);
         }
         this.checkDb();
-        const { db, pgp } = this;
+        const db = this.db!;
+        const pgp = this.pgp!;
 
         /* 2. Execute any SQL file if provided */
         if(this.opts.sqlFilePath){
@@ -722,7 +722,7 @@ export class Prostgles<DBO = DbHandler> {
                 this.authHandler = new AuthHandler(this as any);
                 await this.authHandler.init();
 
-                this.publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods, this.opts.publishRawSQL, this.dbo, this.db, this as any);
+                this.publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods, this.opts.publishRawSQL, this.dbo!, this.db, this as any);
                 this.dboBuilder.publishParser = this.publishParser;
                 
                 /* 4. Set publish and auth listeners */
@@ -751,7 +751,7 @@ export class Prostgles<DBO = DbHandler> {
 
             this.loaded = true;
             return {
-                db: this.dbo,
+                db: this.dbo!,
                 _db: db,
                 pgp,
                 io: this.opts.io,
@@ -778,6 +778,7 @@ export class Prostgles<DBO = DbHandler> {
             };
         } catch (e) {
             console.trace(e)
+            // @ts-ignore
             throw "init issues: " + e.toString();
         }
     }
@@ -786,7 +787,7 @@ export class Prostgles<DBO = DbHandler> {
         
         const fileContent = await this.getFileText(filePath);//.then(console.log);
 
-        return this.db.multi(fileContent).then((data)=>{
+        return this.db?.multi(fileContent).then((data)=>{
             console.log("Prostgles: SQL file executed successfuly \n    -> " + filePath);
             return data
         }).catch((err) => {
@@ -814,7 +815,7 @@ export class Prostgles<DBO = DbHandler> {
 
         if(!this.dbo) throw "dbo missing";
 
-        let publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods, this.opts.publishRawSQL, this.dbo, this.db, this as any);
+        let publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods, this.opts.publishRawSQL, this.dbo, this.db!, this as any);
         this.publishParser = publishParser;
 
         if(!this.opts.io) return;
@@ -829,7 +830,7 @@ export class Prostgles<DBO = DbHandler> {
         }
         
         /* Initialise */
-        this.opts.io.on('connection', async (socket) => {
+        this.opts.io.on('connection', async (socket: PRGLIOSocket) => {
             if(this.destroyed){
                 console.log("Socket connected to destroyed instance");
                 socket.disconnect();
@@ -848,18 +849,19 @@ export class Prostgles<DBO = DbHandler> {
                     Checks request against publish and if OK run it with relevant publish functions. Local (server) requests do not check the policy 
                 */
                 socket.removeAllListeners(CHANNELS.DEFAULT)
-                socket.on(CHANNELS.DEFAULT, async ({ tableName, command, param1, param2, param3 }: SocketRequestParams, cb = (...callback) => {} ) => {
+                socket.on(CHANNELS.DEFAULT, async ({ tableName, command, param1, param2, param3 }: SocketRequestParams, cb = (...callback: any[]) => {} ) => {
                     
                     try { /* Channel name will only include client-sent params so we ignore table_rules enforced params */
-                        if(!socket) {
-                            console.error("socket missing??!!")
-                            throw "socket missing??!!";
+                        if(!socket || !this.authHandler || !this.publishParser || !this.dbo) {
+                            console.error("socket or authhandler missing??!!")
+                            throw "socket or authhandler missing??!!";
                         }
 
                         const clientInfo = await this.authHandler.getClientInfo({ socket });
                         let valid_table_command_rules = await this.publishParser.getValidatedRequestRule({ tableName, command, localParams: { socket } }, clientInfo);
                         if(valid_table_command_rules){
-                            let res = await this.dbo[tableName][command](param1, param2, param3, valid_table_command_rules, { socket, has_rules: true }); 
+                            //@ts-ignore
+                            let res = await this.dbo[tableName][command]!(param1, param2, param3, valid_table_command_rules, { socket, has_rules: true }); 
                             cb(null, res);
                         } else throw `Invalid OR disallowed request: ${tableName}.${command} `;
                             
@@ -873,8 +875,8 @@ export class Prostgles<DBO = DbHandler> {
                 });
 
                 socket.on("disconnect", () => {
-                    this.dbEventsManager.removeNotice(socket);
-                    this.dbEventsManager.removeNotify(socket);
+                    this.dbEventsManager?.removeNotice(socket);
+                    this.dbEventsManager?.removeNotify(undefined, socket);
                     this.connectedSockets = this.connectedSockets.filter(s => s.id !== socket.id);
                     // subscriptions = subscriptions.filter(sub => sub.socket.id !== socket.id);
                     if(this.opts.onSocketDisconnect){
@@ -883,9 +885,9 @@ export class Prostgles<DBO = DbHandler> {
                 });
 
                 socket.removeAllListeners(CHANNELS.METHOD)
-                socket.on(CHANNELS.METHOD, async ({ method, params }: SocketMethodRequest, cb = (...callback) => {} ) => {
+                socket.on(CHANNELS.METHOD, async ({ method, params }: SocketMethodRequest, cb = (...callback: any) => {} ) => {
                     try {
-                        const methods = await this.publishParser.getMethods(socket);
+                        const methods = await this.publishParser?.getMethods(socket) as any;
                         
                         if(!methods || !methods[method]){
                             cb("Disallowed/missing method " + JSON.stringify(method));
@@ -924,7 +926,7 @@ export class Prostgles<DBO = DbHandler> {
         
         const { dbo, db, pgp, publishParser } = this;
         try {
-            schema = await publishParser.getSchemaFromPublish(socket);
+            schema = await publishParser?.getSchemaFromPublish(socket);
         } catch(e){
             publishValidationError = "Server Error: PUBLISH VALIDATION ERROR";
             console.error(`\nProstgles PUBLISH VALIDATION ERROR (after socket connected):\n    ->`, e);
@@ -934,19 +936,19 @@ export class Prostgles<DBO = DbHandler> {
         /*  RUN Raw sql from client IF PUBLISHED
         */
         let fullSchema: TableSchema[] = [];
-        let allTablesViews = this.dboBuilder.tablesOrViews;
+        let allTablesViews = this.dboBuilder.tablesOrViews ?? [];
         if(this.opts.publishRawSQL && typeof this.opts.publishRawSQL === "function"){
             const canRunSQL = async () => {
-                const publishParams = await this.publishParser.getPublishParams({ socket })
-                let res = await this.opts.publishRawSQL(publishParams as any);
+                const publishParams = await this.publishParser?.getPublishParams({ socket })
+                let res = await this.opts.publishRawSQL?.(publishParams as any);
                 return Boolean(res && typeof res === "boolean" || res === "*");
             } 
 
             if(await canRunSQL()){
                 socket.removeAllListeners(CHANNELS.SQL)
-                socket.on(CHANNELS.SQL, async ({ query, params, options }: SQLRequest, cb = (...callback) => {}) => {
+                socket.on(CHANNELS.SQL, async ({ query, params, options }: SQLRequest, cb = (...callback: any) => {}) => {
 
-                    if(!this.dbo.sql) throw "Internal error: sql handler missing";
+                    if(!this.dbo?.sql) throw "Internal error: sql handler missing";
 
                     this.dbo.sql(query, params, options, { socket }).then(res => {
                         cb(null, res)
@@ -963,7 +965,7 @@ export class Prostgles<DBO = DbHandler> {
         }
 
         // let joinTables = [];
-        let joinTables2 = [];
+        let joinTables2: string[][] = [];
         if(this.opts.joins){
             // joinTables = Array.from(new Set(flat(this.dboBuilder.getJoins().map(j => j.tables)).filter(t => schema[t])));
             let _joinTables2 = this.dboBuilder.getJoinPaths()
@@ -977,11 +979,11 @@ export class Prostgles<DBO = DbHandler> {
             });
         }
         
-        const methods = await publishParser.getMethods(socket);
+        const methods = await publishParser?.getMethods(socket);
         
         socket.emit(CHANNELS.SCHEMA, {
             schema, 
-            methods: Object.keys(methods), 
+            methods: getKeys(methods), 
             ...(fullSchema? { fullSchema } : {}),
             rawSQL,
             joinTables: joinTables2,
@@ -991,19 +993,19 @@ export class Prostgles<DBO = DbHandler> {
         });
     }
 }
-function makeSocketError(cb, err){
+function makeSocketError(cb: Function, err: any){
     const err_msg = (err instanceof Error)? 
     err.toString() : 
         isPlainObject(err)?
         JSON.stringify(err, null, 2) : 
-            err.toString(),
+            (err as any).toString(),
         e = { err_msg, err };
     cb(e);
 }
 
 type SocketRequestParams = {
     tableName: string;
-    command: string;
+    command: typeof TABLE_METHODS[number];
     param1: any;
     param2: any;
     param3: any;
@@ -1011,11 +1013,6 @@ type SocketRequestParams = {
 type SocketMethodRequest = {
     method: string;
     params: any;
-}
-
-
-type callback = {
-    (err: { err: any, err_msg: string }, res: any)
 }
 
 
@@ -1112,14 +1109,14 @@ const RULE_TO_METHODS = [
 // const ALL_PUBLISH_METHODS = ["update", "upsert", "delete", "insert", "find", "findOne", "subscribe", "unsubscribe", "sync", "unsync", "remove"];
 // const ALL_PUBLISH_METHODS = RULE_TO_METHODS.map(r => r.methods).flat();
 
-export function flat(arr){
-    // let res = arr.reduce((acc, val) => [ ...acc, ...val ], []);
-    let res =  arr.reduce(function (farr, toFlatten) {
-        return farr.concat(Array.isArray(toFlatten) ? flat(toFlatten) : toFlatten);
-      }, []);
+// export function flat(arr){
+//     // let res = arr.reduce((acc, val) => [ ...acc, ...val ], []);
+//     let res =  arr.reduce(function (farr, toFlatten) {
+//         return farr.concat(Array.isArray(toFlatten) ? flat(toFlatten) : toFlatten);
+//       }, []);
       
-    return res;
-}
+//     return res;
+// }
 
 export class PublishParser {
     publish: any;
@@ -1142,10 +1139,10 @@ export class PublishParser {
 
     async getPublishParams(localParams: LocalParams, clientInfo?: ClientInfo): Promise<PublishParams> {
         return {
-            ...(clientInfo || await this.prostgles.authHandler.getClientInfo(localParams)),
+            ...(clientInfo || await this.prostgles.authHandler?.getClientInfo(localParams)),
             dbo: this.dbo,
             db: this.db,
-            socket: localParams.socket
+            socket: localParams.socket!
         }
     }
 
@@ -1156,8 +1153,9 @@ export class PublishParser {
         const _methods = await applyParamsIfFunc(this.publishMethods, publishParams);
     
         if(_methods && Object.keys(_methods).length){
-            Object.keys(_methods).map(key => {
+            getKeys(_methods).map(key => {
                 if(_methods[key] && (typeof _methods[key] === "function" || typeof _methods[key].then === "function")){
+                    //@ts-ignore
                     methods[key] = _methods[key];
                 } else {
                     throw `invalid publishMethods item -> ${key} \n Expecting a function or promise`
@@ -1178,8 +1176,8 @@ export class PublishParser {
         let _publish = await applyParamsIfFunc(this.publish, publishParams );
 
         if(_publish === "*"){
-            let publish = {}
-            this.prostgles.dboBuilder.tablesOrViews.map(tov => {
+            let publish = {} as any;
+            this.prostgles.dboBuilder.tablesOrViews?.map(tov => {
                 publish[tov.name] = "*";
             });
             return publish;
@@ -1188,11 +1186,11 @@ export class PublishParser {
         return _publish;
     }
     async getValidatedRequestRuleWusr({ tableName, command, localParams }: DboTableCommand): Promise<TableRule>{
-        const clientInfo = await this.prostgles.authHandler.getClientInfo(localParams);
+        const clientInfo = await this.prostgles.authHandler!.getClientInfo(localParams);
         return await this.getValidatedRequestRule({ tableName, command, localParams }, clientInfo);
     }
     
-    async getValidatedRequestRule({ tableName, command, localParams }: DboTableCommand, clientInfo: ClientInfo): Promise<TableRule>{
+    async getValidatedRequestRule({ tableName, command, localParams }: DboTableCommand, clientInfo?: ClientInfo): Promise<TableRule>{
         if(!this.dbo) throw "INTERNAL ERROR: dbo is missing";
 
         if(!command || !tableName) throw "command OR tableName are missing";
@@ -1233,7 +1231,7 @@ export class PublishParser {
         } else throw `Invalid or disallowed command: ${tableName}.${command}`;
     }
     
-    async getTableRules({ tableName, localParams }: DboTable, clientInfo: ClientInfo): Promise<PublishTable> {
+    async getTableRules({ tableName, localParams }: DboTable, clientInfo?: ClientInfo): Promise<PublishTable> {
         
         try {
             if(!localParams || !tableName) throw "publish OR socket OR dbo OR tableName are missing";
@@ -1259,7 +1257,8 @@ export class PublishParser {
                         if(
                             tHandler.tableOrViewInfo.privileges[r.sqlRule]
                         ){
-                            table_rules[r.rule] = { ...r.no_limits };
+                            // @ts-ignore
+                            table_rules[r.rule] = { ...(r as any).no_limits } as any;
                         }
                         
 
@@ -1270,19 +1269,25 @@ export class PublishParser {
                 /* Add missing implied rules */
                 MY_RULES.map(r => {
 
-                    if(["getInfo", "getColumns"].includes(r.rule) && ![null, false, 0].includes(table_rules[r.rule])){
+                    if(["getInfo", "getColumns"].includes(r.rule) && ![null, false, 0].includes((table_rules as any)[r.rule])){
+                        // @ts-ignore
                         table_rules[r.rule] = r.no_limits;
                         return ;
                     } 
 
                     /* Add nested properties for fully allowed rules */
+                        // @ts-ignore
                     if ([true, "*"].includes(table_rules[r.rule]) && r.no_limits) {
+                        // @ts-ignore
                         table_rules[r.rule] = Object.assign({}, r.no_limits);
                     }
 
+                            // @ts-ignore
                     if(table_rules[r.rule]){
                         /* Add implied methods if not falsy */
-                        (r.methods as any).map(method => {
+                        // @ts-ignore
+                        r.methods.forEach(method => {
+                            // @ts-ignore
                             if(table_rules[method] === undefined){
                                 const publishedTable = (table_rules as PublishTable);
                                 if(method === "updateBatch" && !publishedTable.update){
@@ -1290,6 +1295,7 @@ export class PublishParser {
                                 } else if(method === "upsert" && (!publishedTable.update || !publishedTable.insert)){
                                     // return;
                                 } else {
+                                    // @ts-ignore
                                     table_rules[method] = {};
                                 }
                             }
@@ -1302,51 +1308,61 @@ export class PublishParser {
                     Add defaults
                     Check for invalid params 
                 */
-                if(Object.keys(table_rules).length){
-                    const ruleKeys = Object.keys(table_rules)
+                if(table_rules && getKeys(table_rules).length && table_rules !== "*"){
+                    const ruleKeys = getKeys(table_rules as PublishTableRule | PublishViewRule)
                     
+                            // @ts-ignore
                     ruleKeys.filter(m => table_rules[m])
                         .find(method => {
                             let rm = MY_RULES.find(r => r.rule === method || (r.methods as any).includes(method));
                             if(!rm){
-                                throw `Invalid rule in publish.${tableName} -> ${method} \nExpecting any of: ${flat(MY_RULES.map(r => [r.rule, ...r.methods])).join(", ")}`;
+                                throw `Invalid rule in publish.${tableName} -> ${method} \nExpecting any of: ${MY_RULES.flatMap(r => [r.rule, ...r.methods]).join(", ")}`;
                             }
 
                             /** Check user privileges */
                             if(!tHandler.tableOrViewInfo.privileges[rm.sqlRule]){
-                                delete table_rules[method];
+                                // @ts-ignore
+                                delete table_rules![method];
                                 return;
                             }
 
                             /* Check RULES for invalid params */
                             /* Methods do not have params -> They use them from rules */
                             if(method === rm.rule){
-                                let method_params = Object.keys(table_rules[method]);
-                                let iparam = method_params.find(p => !rm.allowed_params.includes(<never>p));
+                                // @ts-ignore
+                                let method_params = getKeys(table_rules![method]);
+                                let iparam = method_params.find(p => !rm?.allowed_params.includes(<never>p));
                                 if(iparam){
                                     throw `Invalid setting in publish.${tableName}.${method} -> ${iparam}. \n Expecting any of: ${rm.allowed_params.join(", ")}`;
                                 }
                             }
 
                             /* Add default params (if missing) */
+                            // @ts-ignore
                             if(method === "sync"){
                             
-                                if([true, "*"].includes(table_rules[method])){
+                                // @ts-ignore
+                                if([true, "*"].includes(table_rules![method])){
                                     throw "Invalid sync rule. Expecting { id_fields: string[], synced_field: string } ";
                                 }
                                 if(typeof get(table_rules, [method, "throttle"]) !== "number"){
-                                    table_rules[method].throttle = 100;
+                                    // @ts-ignore
+                                    table_rules![method].throttle = 100;
                                 }
                                 if(typeof get(table_rules, [method, "batch_size"]) !== "number"){
-                                    table_rules[method].batch_size = DEFAULT_SYNC_BATCH_SIZE;
+                                    // @ts-ignore
+                                    table_rules![method].batch_size = DEFAULT_SYNC_BATCH_SIZE;
                                 }
                             }
 
                             /* Enable subscribe if not explicitly disabled */
+                            // @ts-ignore
                             if(method === "select" && !ruleKeys.includes("subscribe")){
                                 const sr = MY_RULES.find(r => r.rule === "subscribe");
                                 if(sr){
+                                    // @ts-ignore
                                     table_rules[sr.rule] = { ...sr.no_limits };
+                                    // @ts-ignore
                                     (table_rules as PublishTable).subscribeOne = { ...sr.no_limits };
                                 }
                             }
@@ -1364,11 +1380,11 @@ export class PublishParser {
     
     /* Prepares schema for client. Only allowed views and commands will be present */
     async getSchemaFromPublish(socket: any): Promise<AnyObject> {
-        let schema = {};
+        let schema: AnyObject = {};
         
         try {
             /* Publish tables and views based on socket */
-            const clientInfo = await this.prostgles.authHandler.getClientInfo({ socket });
+            const clientInfo = await this.prostgles.authHandler?.getClientInfo({ socket });
             let _publish = await this.getPublish(socket, clientInfo);
 
     
@@ -1383,7 +1399,7 @@ export class PublishParser {
                     .map(async tableName => {
                         if(!this.dbo[tableName]) {
                             throw `Table ${tableName} does not exist
-                            Expecting one of: ${this.prostgles.dboBuilder.tablesOrViews.map(tov => tov.name).join(", ")}
+                            Expecting one of: ${this.prostgles.dboBuilder.tablesOrViews?.map(tov => tov.name).join(", ")}
                             DBO tables: ${Object.keys(this.dbo).filter(k => (this.dbo[k] as any).find).join(", ")}
                             `;
                         }
@@ -1393,13 +1409,13 @@ export class PublishParser {
                         // if(tableName === "insert_rule") throw {table_rules}
                         if(table_rules && Object.keys(table_rules).length){
                             schema[tableName] = {};
-                            let methods = [];
+                            let methods: Array<typeof TABLE_METHODS[number]> = [];
         
                             if(typeof table_rules === "object"){
-                                methods = Object.keys(table_rules);
+                                methods = getKeys(table_rules) as any;
                             }
                             
-                            await Promise.all(methods.filter(m => m !== "select").map(async method => {
+                            await Promise.all(methods.filter(m => m !== "select" as any).map(async method => {
                                 if(method === "sync" && table_rules[method]){
 
                                     /* Pass sync info */
@@ -1409,12 +1425,12 @@ export class PublishParser {
                                     schema[tableName][method] = {};
 
                                     /* Test for issues with the publish rules */
-                                    if(["update", "find", "findOne", "insert", "delete", "upsert"].includes(method)){
+                                    if(TABLE_METHODS.includes(method)){
 
                                         let err = null;
                                         try {
                                             let valid_table_command_rules = await this.getValidatedRequestRule({ tableName, command: method, localParams: {socket} }, clientInfo);
-                                            await this.dbo[tableName][method]({}, {}, {}, valid_table_command_rules, { socket, has_rules: true, testRule: true }); 
+                                            await (this.dbo[tableName] as any)[method]({}, {}, {}, valid_table_command_rules, { socket, has_rules: true, testRule: true }); 
                                                 
                                         } catch(e) {
                                             err = "INTERNAL PUBLISH ERROR";
@@ -1461,7 +1477,7 @@ export async function isSuperUser(db: DB): Promise<boolean>{
 }
 
 
-function sleep(ms) {
+function sleep(ms: number) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });

@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.DBEventsManager = void 0;
 const PostgresNotifListenManager_1 = require("./PostgresNotifListenManager");
 const prostgles_types_1 = require("prostgles-types");
+const DboBuilder_1 = require("./DboBuilder");
 class DBEventsManager {
     constructor(db_pg, pgp) {
         this.notifies = {};
@@ -25,7 +26,7 @@ class DBEventsManager {
                 });
             });
         };
-        this.onNotice = notice => {
+        this.onNotice = (notice) => {
             if (this.notice && this.notice.sockets.length) {
                 this.notice.sockets.map(s => {
                     s.emit(this.notice.socketChannel, notice);
@@ -99,7 +100,7 @@ class DBEventsManager {
         };
     }
     removeNotify(channel, socket, func) {
-        if (this.notifies[channel]) {
+        if (channel && this.notifies[channel]) {
             if (socket) {
                 this.notifies[channel].sockets = this.notifies[channel].sockets.filter(s => s.id !== socket.id);
             }
@@ -107,6 +108,11 @@ class DBEventsManager {
                 this.notifies[channel].localFuncs = this.notifies[channel].localFuncs.filter(f => f !== func);
             }
             /* UNLISTEN if no listeners ?? */
+        }
+        if (socket) {
+            DboBuilder_1.getKeys(this.notifies).forEach(channel => {
+                this.notifies[channel].sockets = this.notifies[channel].sockets.filter(s => s.id !== socket.id);
+            });
         }
     }
     addNotice(socket) {

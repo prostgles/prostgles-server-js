@@ -5,7 +5,7 @@
 
 import { PostgresNotifListenManager } from "./PostgresNotifListenManager";
 import { get } from "./utils";
-import { TableOrViewInfo, TableInfo, DbHandler, TableHandler, DboBuilder } from "./DboBuilder";
+import { TableOrViewInfo, TableInfo, DbHandler, TableHandler, DboBuilder, PRGLIOSocket } from "./DboBuilder";
 import { TableRule, DB, isSuperUser } from "./Prostgles";
 
 import * as Bluebird from "bluebird";
@@ -57,7 +57,7 @@ type AddSyncParams = {
     table_info: TableInfo;
     table_rules: TableRule;
     synced_field: string;
-    allow_delete: boolean;
+    allow_delete?: boolean;
     id_fields: string[];
     filter: object;
     params: {
@@ -68,12 +68,12 @@ type AddSyncParams = {
 }
 
 type SubscriptionParams = {
-    socket_id: string;
+    socket_id?: string;
     channel_name: string;
     table_name: string;
-    socket: any;
+    socket: PRGLIOSocket | undefined;
     table_info: TableOrViewInfo;
-    table_rules: TableRule;
+    table_rules?: TableRule;
     filter: object;
     params: SelectParams;
     func?: (data: any) => any;
@@ -1106,7 +1106,9 @@ export class PubSubManager {
         sub.last_throttled = Date.now();
 
         if(err){
-            this.sockets[socket_id].emit(channel_name, { err });
+            if(socket_id){
+                this.sockets[socket_id].emit(channel_name, { err });
+            }
             return true;
         }
 
@@ -1115,7 +1117,7 @@ export class PubSubManager {
             // this.dbo[table_name][subOne? "findOne" : "find"](filter, params, null, table_rules)
             if(!this.dbo?.[table_name]?.find) throw "1107 this.dbo[table_name].find";
 
-            this.dbo?.[table_name]?.find?.(filter, params, null, table_rules)
+            this.dbo?.[table_name]?.find?.(filter, params, undefined, table_rules)
                 .then(data => {
                     
                     if(socket_id && this.sockets[socket_id]){
@@ -1276,9 +1278,9 @@ export class PubSubManager {
 
     /* Must return a channel for socket */
     /* The distinct list of channel names must have a corresponding trigger in the database */
-    async addSub(subscriptionParams: AddSubscriptionParams){
+    async addSub(subscriptionParams: Omit<AddSubscriptionParams, "channel_name">){
         const { 
-            socket = null, func = null, table_info = null, table_rules, filter = {}, 
+            socket, func = null, table_info = null, table_rules, filter = {}, 
             params = {}, condition = "", throttle = 0  //subOne = false, 
         } = subscriptionParams || {};
 
@@ -1300,7 +1302,7 @@ export class PubSubManager {
         const upsertSub = (newSubData: { table_name: string, condition: string, is_ready: boolean }) => {
                 const { table_name, condition: _cond, is_ready = false } = newSubData,
                     condition = this.parseCondition(_cond),
-                    newSub = {
+                    newSub: SubscriptionParams = {
                         socket,
                         table_name: table_info.name,
                         table_info,
@@ -1309,7 +1311,7 @@ export class PubSubManager {
                         table_rules,
                         channel_name, 
                         func: func? func : undefined,
-                        socket_id: socket? socket.id : null,
+                        socket_id: socket?.id,
                         throttle: validated_throttle,
                         is_throttling: null,
                         last_throttled: 0,

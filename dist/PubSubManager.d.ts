@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { PostgresNotifListenManager } from "./PostgresNotifListenManager";
-import { TableOrViewInfo, TableInfo, DbHandler, DboBuilder } from "./DboBuilder";
+import { TableOrViewInfo, TableInfo, DbHandler, DboBuilder, PRGLIOSocket } from "./DboBuilder";
 import { TableRule, DB } from "./Prostgles";
 import { SelectParamsBasic as SelectParams, FieldFilter, WAL, AnyObject } from "prostgles-types";
 import { ClientExpressData } from "./SyncReplication";
@@ -33,7 +33,7 @@ declare type AddSyncParams = {
     table_info: TableInfo;
     table_rules: TableRule;
     synced_field: string;
-    allow_delete: boolean;
+    allow_delete?: boolean;
     id_fields: string[];
     filter: object;
     params: {
@@ -43,12 +43,12 @@ declare type AddSyncParams = {
     throttle?: number;
 };
 declare type SubscriptionParams = {
-    socket_id: string;
+    socket_id?: string;
     channel_name: string;
     table_name: string;
-    socket: any;
+    socket: PRGLIOSocket | undefined;
     table_info: TableOrViewInfo;
-    table_rules: TableRule;
+    table_rules?: TableRule;
     filter: object;
     params: SelectParams;
     func?: (data: any) => any;
@@ -99,12 +99,12 @@ export declare class PubSubManager {
     };
     NOTIF_CHANNEL: {
         preffix: string;
-        getFull: (appID?: string) => string;
+        getFull: (appID?: string | undefined) => string;
     };
     private appID?;
     appCheckFrequencyMS: number;
     appCheck?: ReturnType<typeof setInterval>;
-    static create: (options: PubSubManagerOptions) => Promise<PubSubManager>;
+    static create: (options: PubSubManagerOptions) => Promise<PubSubManager | undefined>;
     destroyed: boolean;
     destroy: () => void;
     canContinue: () => boolean;
@@ -134,7 +134,7 @@ export declare class PubSubManager {
      */
     addSync(syncParams: AddSyncParams): Promise<string>;
     parseCondition: (condition: string) => string;
-    addSub(subscriptionParams: AddSubscriptionParams): Promise<string>;
+    addSub(subscriptionParams: Omit<AddSubscriptionParams, "channel_name">): Promise<string>;
     removeLocalSub(table_name: string, condition: string, func: (items: object[]) => any): void;
     getActiveListeners: () => {
         table_name: string;
@@ -148,7 +148,7 @@ export declare class PubSubManager {
     addTrigger(params: {
         table_name: string;
         condition: string;
-    }): Promise<boolean>;
+    }): Promise<true | undefined>;
 }
 export declare function filterObj(obj: AnyObject, keys?: string[], exclude?: string[]): AnyObject;
 export {};

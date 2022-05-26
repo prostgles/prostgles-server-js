@@ -2,7 +2,7 @@
 
 import { SelectItem } from "./QueryBuilder";
 import { isEmpty, FullFilter, EXISTS_KEYS, FilterDataType, GeomFilterKeys, GeomFilter_Funcs, TextFilter_FullTextSearchFilterKeys } from "prostgles-types";
-import { isPlainObject } from "./DboBuilder";
+import { getKeys, isPlainObject } from "./DboBuilder";
 
 /**
 * Parse a single filter
@@ -17,9 +17,9 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
   const mErr = (msg: string) => {
       throw `${msg}: ${JSON.stringify(_f, null, 2)}`
     }, 
-    asValue = (v) => pgp.as.format("$1", [v]);
+    asValue = (v: any) => pgp.as.format("$1", [v]);
 
-  const fKeys = Object.keys(_f)
+  const fKeys = getKeys(_f)
   if(fKeys.length === 0){
       return "";
   } else if(fKeys.length > 1){
@@ -33,7 +33,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
     .join(" AND ")
   }
 
-  const fKey = fKeys[0];
+  const fKey: string = fKeys[0];
 
   /* Exists filter */
   if(EXISTS_KEYS.find(k => k in _f)){
@@ -42,17 +42,17 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
 
   let selItem: SelectItem | undefined;
   if(select) selItem = select.find(s => fKey === s.alias);
-  let rightF: FilterDataType = _f[fKey];
+  let rightF: FilterDataType = (_f as any)[fKey];
 
   const getLeftQ = (selItm: SelectItem) => {
-    if(selItm.type === "function") return selItem.getQuery();
-    return selItem.getQuery(tableAlias);
+    if(selItm.type === "function") return selItm.getQuery();
+    return selItm.getQuery(tableAlias);
   }
 
   /**
     * Parsed left side of the query
     */
-  let leftQ: string;// = asName(selItem.alias);
+  let leftQ: string | undefined;// = asName(selItem.alias);
 
   /* Check if string notation. Build obj if necessary */
   const dot_notation_delims = ["->", "."];
@@ -65,7 +65,10 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
         dot_notation_delims.find(dn => fKey.slice(s.alias.length).startsWith(dn)) 
       );
     }
-    if(!selItem) mErr("Bad filter. Could not match to a column or alias: ");
+    if(!selItem) {
+      mErr("Bad filter. Could not match to a column or alias: ");
+      throw " "
+    }
     const remainingStr = fKey.slice(selItem.alias.length);
 
     /* Is json path spec */
@@ -135,7 +138,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
         }
 
         const key = remainingStr.slice(currIdx + 1, nIdx);
-        curObj[key] = nextIdx > -1? {} : _f[fKey];
+        curObj[key] = nextIdx > -1? {} : (_f as any)[fKey];
         curObj = curObj[key];
 
         currIdx = nextIdx;
@@ -155,7 +158,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
 
   /* Matching sel item */
   if(isPlainObject(rightF)){
-    const parseRightVal = (val, expect: "csv" | "array" | null = null) => {
+    const parseRightVal = (val: any, expect: "csv" | "array" | null = null) => {
       const checkIfArr = () => {
         if(!Array.isArray(val)) return mErr("This type of filter/column expects an Array of items");
       }
@@ -177,7 +180,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
 
     const fOpType = filterKeys[0];
     const fVal = rightF[fOpType];
-    let sOpType: string;
+    let sOpType: string | undefined;
     let sVal: any;
 
     if(fVal && isPlainObject(fVal)){
@@ -227,7 +230,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
         return " FALSE ";
       }
 
-      let _fVal: any[] = fVal.filter(v => v !== null);
+      let _fVal: any[] = fVal.filter((v: any) => v !== null);
       let c1 = "", c2 = "";
       if(_fVal.length) c1 = leftQ + " IN " + parseRightVal(_fVal, "csv");
       if(fVal.includes(null)) c2 = ` ${leftQ} IS NULL `;
@@ -238,7 +241,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
         return " TRUE ";
       }
 
-      let _fVal: any[] = fVal.filter(v => v !== null);
+      let _fVal: any[] = fVal.filter((v: any) => v !== null);
       let c1 = "", c2 = "";
       if(_fVal.length) c1 = leftQ + " NOT IN " + parseRightVal(_fVal, "csv");
       if(fVal.includes(null)) c2 = ` ${leftQ} IS NOT NULL `;
@@ -274,9 +277,9 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
         return leftQ + operand + parseRightVal(fVal, "array");
           
       /* FTSQuery */
-      } else if(["@@"].includes(fOpType) && TextFilter_FullTextSearchFilterKeys.includes(sOpType)) {
+      } else if(["@@"].includes(fOpType) && TextFilter_FullTextSearchFilterKeys.includes(sOpType!)) {
         let lq = `to_tsvector(${leftQ}::text)`;
-        if(selItem && selItem.columnPGDataType === "tsvector") lq = leftQ;
+        if(selItem && selItem.columnPGDataType === "tsvector") lq = leftQ!;
 
         let res = `${lq} ${operand} ` + `${sOpType}${parseRightVal(sVal, "csv")}`;
 

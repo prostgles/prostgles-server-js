@@ -153,7 +153,6 @@ export default class TableConfigurator {
     config?: TableConfig;
     get dbo(): DbHandler;
     get db(): DB;
-    sidKeyName: string;
     prostgles: Prostgles;
     constructor(prostgles: Prostgles);
     getColumnConfig: (tableName: string, colName: string) => ColumnConfig | undefined;

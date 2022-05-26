@@ -12,9 +12,11 @@ type AuthSocketSchema = {
 
 type ExpressReq = {
   body?: AnyObject;
+  query?: AnyObject;
   cookies?: AnyObject;
   params?: AnyObject;
   path: string;
+  originalUrl: string;
 }
 type ExpressRes = {
   status: (code: number) => ({ json: (response: AnyObject) => any; });
@@ -104,22 +106,22 @@ export type Auth<DBO = DbHandler> = {
   /**
    * User data used on server. Mainly used in http request auth
    */
-  getUser: (sid: string, dbo: DBO, db: DB, client: AuthClientRequest) => Promise<AnyObject | null | undefined>;
+  getUser: (sid: string | undefined, dbo: DBO, db: DB, client: AuthClientRequest) => Promise<AnyObject | undefined> | AnyObject | undefined;
 
   /**
    * User data sent to client. Mainly used in socket request auth
    */
-  getClientUser: (sid: string, dbo: DBO, db: DB) => Promise<AnyObject | null | undefined>;
+  getClientUser: (sid: string, dbo: DBO, db: DB) => Promise<AnyObject | undefined> | AnyObject | undefined;
 
-  register?: (params: AnyObject, dbo: DBO, db: DB) => Promise<BasicSession>;
-  login?: (params: AnyObject, dbo: DBO, db: DB) => Promise<BasicSession>;
-  logout?: (sid: string, dbo: DBO, db: DB) => Promise<any>;
+  register?: (params: AnyObject, dbo: DBO, db: DB) => Promise<BasicSession> | BasicSession;
+  login?: (params: AnyObject, dbo: DBO, db: DB) => Promise<BasicSession> | BasicSession;
+  logout?: (sid: string | undefined, dbo: DBO, db: DB) => Promise<any>;
 
   /**
    * If provided then then session info will be saved on socket.__prglCache and reused from there
    */
   cacheSession?: {
-    getSession: (sid: string, dbo: DBO, db: DB) => Promise<BasicSession>
+    getSession: (sid: string | undefined, dbo: DBO, db: DB) => Promise<BasicSession>
   }
 }
 
@@ -133,8 +135,8 @@ export default class AuthHandler {
   protected opts?: Auth;
   dbo: DbHandler;
   db: DB;
-  sidKeyName: string;
-  returnURL: string;
+  sidKeyName?: string;
+  returnURL?: string;
 
   loginRoute?: string;
   logoutGetPath?: string;
@@ -146,17 +148,18 @@ export default class AuthHandler {
       this.loginRoute = prostgles.opts.auth?.expressConfig?.loginRoute || "/login";
       this.logoutGetPath = prostgles.opts.auth?.expressConfig?.logoutGetPath || "/logout";
     }
+    if(!prostgles.dbo || !prostgles.db) throw "dbo or db missing";
     this.dbo = prostgles.dbo;
     this.db = prostgles.db;
   }
 
-  validateSid = (sid: string) => {
+  validateSid = (sid: string | undefined) => {
     if (!sid) return undefined;
     if (typeof sid !== "string") throw "sid missing or not a string";
     return sid;
   }
 
-  matchesRoute = (route: string, clientFullRoute: string) => {
+  matchesRoute = (route: string | undefined, clientFullRoute: string) => {
     return route && clientFullRoute && (
       route === clientFullRoute ||
       clientFullRoute.startsWith(route) && ["/", "?", "#"].includes(clientFullRoute.slice(-1))
@@ -190,6 +193,7 @@ export default class AuthHandler {
       }
       const cookieOpts = { ...options, secure: true, sameSite: "strict", ...(this.opts?.expressConfig?.cookieOptions || {}) };
       const cookieData = sid;
+      if(!this.sidKeyName || !this.returnURL) throw "sidKeyName or returnURL missing"
       res.cookie(this.sidKeyName, cookieData, cookieOpts);
       const successURL = getReturnUrl(req, this.returnURL) || "/";
       res.redirect(successURL);
@@ -199,14 +203,15 @@ export default class AuthHandler {
     }
   }
 
-  getUser = async (clientReq: AuthClientRequest): Promise<AnyObject> => {
+  getUser = async (clientReq: AuthClientRequest): Promise<AnyObject | undefined> => {
+    if(!this.sidKeyName || !this.opts?.getUser) throw "sidKeyName or this.opts.getUser missing"
     const sid = "httpReq" in clientReq? clientReq.httpReq?.cookies?.[this.sidKeyName] : clientReq.socket
     if (!sid) return undefined;
 
     try {
-      return this.throttledFunc(() => {
+      return this.throttledFunc(async () => {
 
-        return this.opts.getUser(this.validateSid(sid), this.dbo, this.db, clientReq);
+        return this.opts!.getUser(this.validateSid(sid), this.dbo, this.db, clientReq);
       }, 50)
     } catch (err) {
       console.error(err);
@@ -240,8 +245,8 @@ export default class AuthHandler {
       if (app && magicLinks) {
         const { route = "/magic-link", check } = magicLinks;
         if (!check) throw "Check must be defined for magicLinks";
-        app.get(`${route}/:id`, async (req, res) => {
-          const { id } = req.params;
+        app.get(`${route}/:id`, async (req: ExpressReq, res: ExpressRes) => {
+          const { id } = req.params ?? {};
 
           if (typeof id !== "string" || !id) {
             res.status(404).json({ msg: "Invalid magic-link id. Expecting a string" });
@@ -285,14 +290,14 @@ export default class AuthHandler {
 
         });
 
-        if (app && this.logoutGetPath) {
+        if (app && this.logoutGetPath && this.opts.logout) {
           app.get(this.logoutGetPath, async (req: ExpressReq, res: ExpressRes) => {
             const sid = this.validateSid(req?.cookies?.[sidKeyName]);
             if (sid) {
               try {
                 await this.throttledFunc(() => {
 
-                  return this.opts.logout(req?.cookies?.[sidKeyName], this.dbo as any, this.db);
+                  return this.opts!.logout!(req?.cookies?.[sidKeyName], this.dbo as any, this.db);
                 })
               } catch (err) {
                 console.error(err);
@@ -305,7 +310,7 @@ export default class AuthHandler {
         if (app && Array.isArray(publicRoutes)) {
 
           /* Redirect if not logged in and requesting non public content */
-          app.get('*', async (req, res) => {
+          app.get('*', async (req: ExpressReq, res: ExpressRes) => {
             const clientReq: AuthClientRequest = { httpReq: req }
             const getUser = this.getUser;
             try {
@@ -355,7 +360,7 @@ export default class AuthHandler {
 
     return new Promise(async (resolve, reject) => {
 
-      let interval, result: any, error: any, finished = false;
+      let interval: NodeJS.Timeout, result: any, error: any, finished = false;
 
       /**
        * Throttle response times to prevent timing attacks
@@ -384,18 +389,18 @@ export default class AuthHandler {
   }
 
   loginThrottled = async (params: AnyObject): Promise<BasicSession> => {
-    if (!this.opts.login) throw "Auth login config missing";
+    if (!this.opts?.login) throw "Auth login config missing";
     const { responseThrottle = 500 } = this.opts;
 
     return this.throttledFunc(async () => {
-      let result = await this.opts.login(params, this.dbo as any, this.db);
+      let result = await this.opts?.login?.(params, this.dbo as any, this.db);
       const err = {
         msg: "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number } but got: " + JSON.stringify(result) 
       }
       if(result && (typeof result.sid !== "string" || typeof result.expires !== "number") || !result && ![undefined, null].includes(result)) {
         throw err
       }
-
+      if(!result) throw "Could not login"
       return result;
     }, responseThrottle);
 
@@ -408,18 +413,19 @@ export default class AuthHandler {
    * @param localParams 
    * @returns string
    */
-  getSID(localParams: LocalParams): string {
-    if (!this.opts) return null;
+  getSID(localParams: LocalParams): string | undefined {
+    if (!this.opts) return undefined;
 
     const { sidKeyName } = this.opts;
 
-    if (!sidKeyName || !localParams) return null;
+    if (!sidKeyName || !localParams) return undefined;
 
     if (localParams.socket) {
       const querySid = localParams.socket?.handshake?.query?.[sidKeyName];
       let rawSid = querySid;
       if (!rawSid) {
         const cookie_str = localParams.socket?.handshake?.headers?.cookie;
+        if(!cookie_str) throw "cookie_str missing";
         const cookie = parseCookieStr(cookie_str);
         rawSid = cookie[sidKeyName];
       }
@@ -432,7 +438,7 @@ export default class AuthHandler {
 
     function parseCookieStr(cookie_str: string): any {
       if (!cookie_str || typeof cookie_str !== "string") return {}
-      return cookie_str.replace(/\s/g, '').split(";").reduce((prev, current) => {
+      return cookie_str.replace(/\s/g, '').split(";").reduce<AnyObject>((prev, current) => {
         const [name, value] = current.split('=');
         prev[name] = value;
         return prev
@@ -445,7 +451,7 @@ export default class AuthHandler {
 
     const getSession = this.opts.cacheSession?.getSession;
     const isSocket = "socket" in localParams
-    if(getSession && isSocket && localParams.socket.__prglCache){
+    if(getSession && isSocket && localParams.socket?.__prglCache){
       const { session, user, clientUser } = localParams.socket.__prglCache;
       const isValid = this.isValidSocketSession(localParams.socket, session)
       if(isValid){
@@ -460,9 +466,9 @@ export default class AuthHandler {
 
     const res = await this.throttledFunc(async () => {
 
-      const { getUser, getClientUser } = this.opts;
+      const { getUser, getClientUser } = this.opts ?? {};
 
-      if (getUser && localParams && (localParams.httpReq || localParams.socket)) {
+      if (getUser && getClientUser && localParams && (localParams.httpReq || localParams.socket)) {
         const sid = this.getSID(localParams);
         const clientReq = localParams.httpReq? { httpReq: localParams.httpReq } : { socket: localParams.socket };
         let user, clientUser;
@@ -472,7 +478,7 @@ export default class AuthHandler {
         }
         if(getSession && isSocket){
           const session = await getSession(sid, this.dbo as any, this.db)
-          if(session?.expires && user && clientUser){
+          if(session?.expires && user && clientUser && localParams.socket){
             localParams.socket.__prglCache = { 
               session,
               user, 
@@ -493,7 +499,7 @@ export default class AuthHandler {
 
   isValidSocketSession = (socket: PRGLIOSocket, session: BasicSession): boolean => {
     const hasExpired = Boolean(session && session.expires <= Date.now())
-    if(this.opts.expressConfig?.publicRoutes && !this.opts.expressConfig?.disableSocketAuthGuard){
+    if(this.opts?.expressConfig?.publicRoutes && !this.opts.expressConfig?.disableSocketAuthGuard){
       if(hasExpired){
         socket.emit(CHANNELS.AUTHGUARD, { shouldReload: true });
         throw ""
@@ -502,10 +508,10 @@ export default class AuthHandler {
     return Boolean(session && !hasExpired);
   }
 
-  makeSocketAuth = async (socket): Promise<AuthSocketSchema> => {
+  makeSocketAuth = async (socket: PRGLIOSocket): Promise<AuthSocketSchema> => {
     if (!this.opts) return {};
 
-    let auth: AuthSocketSchema = {};
+    let auth: Partial<Record<keyof Omit<AuthSocketSchema, "user">, boolean | undefined>> & { user?: AnyObject | undefined } = {};
 
     if (this.opts.expressConfig?.publicRoutes && !this.opts.expressConfig?.disableSocketAuthGuard) {
 
@@ -536,10 +542,14 @@ export default class AuthHandler {
     } = this.opts;
     const login = this.loginThrottled
 
-    let handlers = [
-      { func: (params: any, dbo: DbHandler, db: DB) => register(params, dbo, db), ch: CHANNELS.REGISTER, name: "register" },
-      { func: (params: any, dbo: DbHandler, db: DB) => login(params), ch: CHANNELS.LOGIN, name: "login" },
-      { func: (params: any, dbo: DbHandler, db: DB) => logout(this.getSID({ socket }), dbo, db), ch: CHANNELS.LOGOUT, name: "logout" }
+    let handlers: { 
+      name: keyof Omit<AuthSocketSchema, "user">;
+      ch: string;
+      func: Function;
+    }[] = [
+      { func: (params: any, dbo: DbHandler, db: DB) => register?.(params, dbo, db), ch: CHANNELS.REGISTER, name: "register" as keyof Omit<AuthSocketSchema, "user"> },
+      { func: (params: any, dbo: DbHandler, db: DB) => login(params), ch: CHANNELS.LOGIN, name: "login" as keyof Omit<AuthSocketSchema, "user"> },
+      { func: (params: any, dbo: DbHandler, db: DB) => logout?.(this.getSID({ socket }), dbo, db), ch: CHANNELS.LOGOUT, name: "logout"  as keyof Omit<AuthSocketSchema, "user">}
     ].filter(h => h.func);
 
     const usrData = await this.getClientInfo({ socket });
@@ -552,7 +562,7 @@ export default class AuthHandler {
       auth[name] = true;
 
       socket.removeAllListeners(ch)
-      socket.on(ch, async (params: any, cb = (...callback) => { }) => {
+      socket.on(ch, async (params: any, cb = (...callback: any) => { }) => {
 
         try {
           if (!socket) throw "socket missing??!!";
@@ -578,8 +588,8 @@ export default class AuthHandler {
 /**
  * AUTH
  */
-function getReturnUrl(req, name: string) {
-  if (req?.query?.returnURL) {
+function getReturnUrl(req: ExpressReq, name?: string) {
+  if (req?.query?.returnURL && name) {
     return decodeURIComponent(req?.query?.[name]);
   }
   return null;

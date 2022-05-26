@@ -8,7 +8,7 @@ import * as sharp from "sharp";
 
 import { DB, DbHandler, Prostgles } from './Prostgles';
 import { asName, AnyObject } from 'prostgles-types';
-import { TableHandler } from './DboBuilder';
+import { getKeys, TableHandler } from './DboBuilder';
 
 const HOUR = 3600 * 1000;
 
@@ -65,18 +65,24 @@ export type UploadedItem = {
 
 export default class FileManager {
   
-  s3Client: S3;
+  s3Client?: S3;
 
   config: S3Config | LocalConfig;
-  imageOptions: ImageOptions;
+  imageOptions?: ImageOptions;
 
-  prostgles: Prostgles;
-  get dbo(): DbHandler { return this.prostgles.dbo };
-  get db(): DB { return this.prostgles.db };
+  prostgles?: Prostgles;
+  get dbo(): DbHandler { 
+    if(!this.prostgles?.dbo) throw "this.prostgles.dbo missing"
+    return this.prostgles.dbo 
+  };
+  get db(): DB { 
+    if(!this.prostgles?.db) throw "this.prostgles.db missing"
+    return this.prostgles.db 
+  };
   
-  tableName: string;
+  tableName?: string;
 
-  private fileRoute: string;
+  private fileRoute?: string;
 
   constructor(config: FileManager["config"], imageOptions?: ImageOptions){
     this.config = config;
@@ -106,7 +112,7 @@ export default class FileManager {
     const nameParts = fileName.split(".");
     
     const nameExt = nameParts[nameParts.length - 1].toLowerCase(),
-      mime = Object.keys(CONTENT_TYPE_TO_EXT).find(k => CONTENT_TYPE_TO_EXT[k].includes(nameExt));
+      mime = getKeys(CONTENT_TYPE_TO_EXT).find(k => (CONTENT_TYPE_TO_EXT[k] as readonly string[]).includes(nameExt));
 
     let type = {
       fileName,
@@ -119,17 +125,17 @@ export default class FileManager {
     if(!mime){
       /* Set correct/missing extension */
       if(["xml", "txt", "csv", "tsv", "doc"].includes(nameExt)){
-        type = { ...type, mime: "text/" + nameExt, ext: nameExt };
+        type = { ...type, mime: ("text/" + nameExt) as any, ext: nameExt };
       } else if(["svg"].includes(nameExt)){
         type = { ...type, mime: "image/svg+xml", ext: nameExt };
       } else if(Buffer.isBuffer(file)){
-        const res = await FileType.fromBuffer(file);
+        const res: any = await FileType.fromBuffer(file);
         type = {
           ...res,
           fileName,
         }
       } else if(typeof file === "string"){
-        const res = await FileType.fromFile(file);
+        const res: any = await FileType.fromFile(file);
         type = {
           ...res,
           fileName,
@@ -158,10 +164,12 @@ export default class FileManager {
       if(nameExt !== ext) fileName = nameParts.slice(0, -1).join('') + "." + ext;
     }
 
-    return {
+    const res = {
       ...type,
       fileName
     }
+    if(!res.mime) throw "Could not find mime"
+    return res as any;
   }
 
   // async getUploadURL(fileName: string): Promise<string> {
@@ -227,7 +235,7 @@ export default class FileManager {
               ContentType: mime,
               Body: file
             };
-            this.s3Client.upload(params, (err, res: ManagedUpload.SendData) => {
+            this.s3Client.upload(params, (err: any, res: ManagedUpload.SendData) => {
               
               if(err){
                 reject("Something went wrong");
@@ -279,8 +287,8 @@ export default class FileManager {
           }
         }
         _data = await sharp(data)
-          .resize(opts)
-          .withMetadata(Boolean(imageOptions.keepMetadata))
+          .resize(opts as any)
+          .withMetadata(Boolean(imageOptions?.keepMetadata) as any)
           // .jpeg({ quality: 80 })
           .toBuffer()
       } else if(!imageOptions?.keepMetadata) {
@@ -304,10 +312,10 @@ export default class FileManager {
       Key: fileName,
       Expires: expiresInSeconds || 30 * 60
     };
-    return await this.s3Client.getSignedUrlPromise("getObject", params);
+    return await this.s3Client?.getSignedUrlPromise("getObject", params);
   }
 
-  private parseSQLIdentifier = async (name: string ) => asSQLIdentifier(name, this.prostgles.db);//  this.prostgles.dbo.sql<"value">("select format('%I', $1)", [name], { returnType: "value" } )
+  private parseSQLIdentifier = async (name: string ) => asSQLIdentifier(name, this.prostgles!.db!);//  this.prostgles.dbo.sql<"value">("select format('%I', $1)", [name], { returnType: "value" } )
 
   init = async (prg: Prostgles) => {
     this.prostgles = prg;
@@ -315,6 +323,7 @@ export default class FileManager {
     // const { dbo, db, opts } = prg;
     
     const { fileTable } = prg.opts;
+    if(!fileTable) throw "fileTable missing";
     const { tableName = "media", referencedTables = {} } = fileTable;
     this.tableName = tableName;
 
@@ -376,7 +385,7 @@ export default class FileManager {
         console.log(`Created ${action}`);
 
       } else {
-        const cols = await this.dbo[lookupTableName].getColumns();
+        const cols = await this.dbo[lookupTableName].getColumns!();
         const badCols = cols.filter(c => !c.references);
         await Promise.all(badCols.map(async badCol => {
           console.error(
@@ -436,7 +445,7 @@ export default class FileManager {
           const { name } = req.params;
           if(typeof name !== "string" || !name) throw "Invalid media name";
     
-          const media = await mediaTable.findOne({ name }, { select: { id: 1, name: 1, signed_url: 1, signed_url_expires: 1, content_type: 1 } }, { httpReq: req });
+          const media = await mediaTable.findOne({ name }, { select: { id: 1, name: 1, signed_url: 1, signed_url_expires: 1, content_type: 1 } }, { httpReq: req } as any);
     
           if(!media) {
             /**

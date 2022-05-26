@@ -9,14 +9,14 @@ import pgPromise from "pg-promise";
 
 export type PrglNotifListener = (args: { length: number; processId: number; channel: string; payload: string; name: string; }) => void;
 export class PostgresNotifListenManager {
-    connection: pgPromise.IConnected<{}, pg.IClient>;
+    connection?: pgPromise.IConnected<{}, pg.IClient>;
     db_pg: DB;
     notifListener: PrglNotifListener;
     db_channel_name: string;
     isListening: any;
     client: any;
 
-    static create = (db_pg, notifListener: PrglNotifListener, db_channel_name: string): Promise<PostgresNotifListenManager> => {
+    static create = (db_pg: DB, notifListener: PrglNotifListener, db_channel_name: string): Promise<PostgresNotifListenManager> => {
         let res = new PostgresNotifListenManager(db_pg, notifListener, db_channel_name, true);
         return res.init();
     }
@@ -32,7 +32,7 @@ export class PostgresNotifListenManager {
 
     async init(): Promise<PostgresNotifListenManager> {
 
-        this.connection = null;
+        this.connection = undefined;
 
         this.isListening = await this.startListening();
         return this;
@@ -84,26 +84,27 @@ export class PostgresNotifListenManager {
         }
     }
 
-    reconnect(delay = null, maxAttempts = null) {
+    reconnect(delay: number | undefined = 0, maxAttempts: number | undefined = 0) {
         if(!this.db_pg || !this.notifListener) throw "db_pg OR notifListener missing";
 
-        delay = delay > 0 ? parseInt(delay) : 0;
-        maxAttempts = maxAttempts > 0 ? parseInt(maxAttempts) : 1;
+        delay = delay > 0 ? parseInt(delay + "") : 0;
+        maxAttempts = maxAttempts > 0 ? parseInt(maxAttempts + "") : 1;
 
-        const setListeners = (client, notifListener, db_channel_name) => {
+        const setListeners = (client: pg.IClient, notifListener: PrglNotifListener, db_channel_name: string) => {
                 client.on('notification', notifListener);
                 this.client = client;
+                if(!this.connection) throw "Connection missing";
                 return this.connection.none('LISTEN $1~', db_channel_name)
                     .catch(error => {
                         console.log("PostgresNotifListenManager: unexpected error: ", error); // unlikely to ever happen
                     });
             },    
-            removeListeners = (client) => {
+            removeListeners = (client: pg.IClient) => {
                 client.removeListener('notification', this.notifListener);
             },
-            onConnectionLost = (err, e) => {
+            onConnectionLost = (err: any, e: pgPromise.ILostContext<pg.IClient>) => {
                 console.log('PostgresNotifListenManager: Connectivity Problem:', err);
-                this.connection = null; // prevent use of the broken connection
+                this.connection = undefined; // prevent use of the broken connection
                 removeListeners(e.client);
                 this.reconnect(5000, 10) // retry 10 times, with 5-second intervals
                     .then(() => {

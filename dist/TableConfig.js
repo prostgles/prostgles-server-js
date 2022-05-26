@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const prostgles_types_1 = require("prostgles-types");
+const DboBuilder_1 = require("./DboBuilder");
 const PubSubManager_1 = require("./PubSubManager");
 /**
  * Will be run between initSQL and fileTable
@@ -8,16 +9,14 @@ const PubSubManager_1 = require("./PubSubManager");
 class TableConfigurator {
     constructor(prostgles) {
         this.getColumnConfig = (tableName, colName) => {
-            var _a;
-            const tconf = (_a = this.config) === null || _a === void 0 ? void 0 : _a[tableName];
+            const tconf = this.config?.[tableName];
             if (tconf && "columns" in tconf) {
                 return tconf.columns[colName];
             }
             return undefined;
         };
         this.getColInfo = (params) => {
-            var _a, _b;
-            return (_b = (_a = this.config[params.table]) === null || _a === void 0 ? void 0 : _a[params.col]) === null || _b === void 0 ? void 0 : _b.info;
+            return this.config[params.table]?.[params.col]?.info;
         };
         this.checkColVal = (params) => {
             const conf = this.getColInfo(params);
@@ -31,7 +30,8 @@ class TableConfigurator {
             }
         };
         this.getJoinInfo = (sourceTable, targetTable) => {
-            if (sourceTable in this.config &&
+            if (this.config &&
+                sourceTable in this.config &&
                 this.config[sourceTable] &&
                 "columns" in this.config[sourceTable]) {
                 const td = this.config[sourceTable];
@@ -57,15 +57,24 @@ class TableConfigurator {
         this.config = prostgles.opts.tableConfig;
         this.prostgles = prostgles;
     }
-    get dbo() { return this.prostgles.dbo; }
+    get dbo() {
+        if (!this.prostgles.dbo)
+            throw "this.prostgles.dbo missing";
+        return this.prostgles.dbo;
+    }
     ;
-    get db() { return this.prostgles.db; }
+    get db() {
+        if (!this.prostgles.db)
+            throw "this.prostgles.db missing";
+        return this.prostgles.db;
+    }
     ;
     async init() {
         let queries = [];
+        if (!this.config || !this.prostgles.pgp)
+            throw "config or pgp missing";
         /* Create lookup tables */
         Object.keys(this.config).map(tableName => {
-            var _a, _b, _c;
             const tableConf = this.config[tableName];
             const { dropIfExists = false, dropIfExistsCascade = false } = tableConf;
             if (dropIfExistsCascade) {
@@ -74,9 +83,9 @@ class TableConfigurator {
             else if (dropIfExists) {
                 queries.push(`DROP TABLE IF EXISTS ${tableName} ;`);
             }
-            if ("isLookupTable" in tableConf && Object.keys((_a = tableConf.isLookupTable) === null || _a === void 0 ? void 0 : _a.values).length) {
-                const rows = Object.keys((_b = tableConf.isLookupTable) === null || _b === void 0 ? void 0 : _b.values).map(id => { var _a; return (Object.assign({ id }, ((_a = tableConf.isLookupTable) === null || _a === void 0 ? void 0 : _a.values[id]))); });
-                if (dropIfExists || dropIfExistsCascade || !((_c = this.dbo) === null || _c === void 0 ? void 0 : _c[tableName])) {
+            if ("isLookupTable" in tableConf && Object.keys(tableConf.isLookupTable?.values).length) {
+                const rows = Object.keys(tableConf.isLookupTable?.values).map(id => ({ id, ...(tableConf.isLookupTable?.values[id]) }));
+                if (dropIfExists || dropIfExistsCascade || !this.dbo?.[tableName]) {
                     const keys = Object.keys(rows[0]).filter(k => k !== "id");
                     queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
                         id  TEXT PRIMARY KEY
@@ -137,7 +146,7 @@ class TableConfigurator {
                     if (!this.dbo[tableName]) {
                         colDefs.push(getColDef(colName, colConf));
                     }
-                    else if (!colDefs.length && !this.dbo[tableName].columns.find(c => colName === c.name)) {
+                    else if (!colDefs.length && !this.dbo[tableName].columns?.find(c => colName === c.name)) {
                         if ("references" in colConf && colConf.references) {
                             const { tableName: lookupTable, } = colConf.references;
                             queries.push(`
@@ -163,12 +172,12 @@ class TableConfigurator {
                 }
             }
             if ("constraints" in tableConf && tableConf.constraints) {
-                Object.keys(tableConf.constraints).map(constraintName => {
+                DboBuilder_1.getKeys(tableConf.constraints).map(constraintName => {
                     queries.push(`ALTER TABLE ${prostgles_types_1.asName(tableName)} ADD CONSTRAINT ${prostgles_types_1.asName(constraintName)} ${tableConf.constraints[constraintName]} ;`);
                 });
             }
             if ("indexes" in tableConf && tableConf.indexes) {
-                Object.keys(tableConf.indexes).map(indexName => {
+                DboBuilder_1.getKeys(tableConf.indexes).map(indexName => {
                     const { concurrently, unique, using, definition, replace } = tableConf.indexes[indexName];
                     if (replace || typeof replace !== "boolean" && tableConf.replaceUniqueIndexes) {
                         queries.push(`DROP INDEX IF EXISTS ${prostgles_types_1.asName(indexName)}  ;`);
@@ -186,13 +195,12 @@ class TableConfigurator {
 }
 exports.default = TableConfigurator;
 async function columnExists(args) {
-    var _a;
     const { db, tableName, colName } = args;
-    return Boolean((_a = (await db.oneOrNone(`
+    return Boolean((await db.oneOrNone(`
         SELECT column_name, table_name
         FROM information_schema.columns 
         WHERE table_name=${PubSubManager_1.asValue(tableName)} and column_name=${PubSubManager_1.asValue(colName)}
         LIMIT 1;
-    `))) === null || _a === void 0 ? void 0 : _a.column_name);
+    `))?.column_name);
 }
 //# sourceMappingURL=TableConfig.js.map

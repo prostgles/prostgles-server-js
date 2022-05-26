@@ -6,10 +6,10 @@ const fs = require("fs");
 const FileType = require("file-type");
 const sharp = require("sharp");
 const prostgles_types_1 = require("prostgles-types");
+const DboBuilder_1 = require("./DboBuilder");
 const HOUR = 3600 * 1000;
 exports.asSQLIdentifier = async (name, db) => {
-    var _a;
-    return (_a = (await db.one("select format('%I', $1) as name", [name]))) === null || _a === void 0 ? void 0 : _a.name;
+    return (await db.one("select format('%I', $1) as name", [name]))?.name;
 };
 class FileManager {
     constructor(config, imageOptions) {
@@ -23,23 +23,29 @@ class FileManager {
             // const type = await this.getMIME(data, name, allowedExtensions, dissallowedExtensions);
             let _data = data;
             if (content_type.startsWith("image")) {
-                const compression = imageOptions === null || imageOptions === void 0 ? void 0 : imageOptions.compression;
+                const compression = imageOptions?.compression;
                 if (compression) {
                     console.log("Resizing image");
                     let opts;
                     if ("contain" in compression) {
-                        opts = Object.assign({ fit: sharp.fit.contain }, compression.contain);
+                        opts = {
+                            fit: sharp.fit.contain,
+                            ...compression.contain
+                        };
                     }
                     else if ("inside" in compression) {
-                        opts = Object.assign({ fit: sharp.fit.inside }, compression.inside);
+                        opts = {
+                            fit: sharp.fit.inside,
+                            ...compression.inside
+                        };
                     }
                     _data = await sharp(data)
                         .resize(opts)
-                        .withMetadata(Boolean(imageOptions.keepMetadata))
+                        .withMetadata(Boolean(imageOptions?.keepMetadata))
                         // .jpeg({ quality: 80 })
                         .toBuffer();
                 }
-                else if (!(imageOptions === null || imageOptions === void 0 ? void 0 : imageOptions.keepMetadata)) {
+                else if (!imageOptions?.keepMetadata) {
                     /**
                      * Remove exif
                      */
@@ -53,13 +59,14 @@ class FileManager {
         };
         this.parseSQLIdentifier = async (name) => exports.asSQLIdentifier(name, this.prostgles.db); //  this.prostgles.dbo.sql<"value">("select format('%I', $1)", [name], { returnType: "value" } )
         this.init = async (prg) => {
-            var _a, _b, _c;
             this.prostgles = prg;
             // const { dbo, db, opts } = prg;
             const { fileTable } = prg.opts;
+            if (!fileTable)
+                throw "fileTable missing";
             const { tableName = "media", referencedTables = {} } = fileTable;
             this.tableName = tableName;
-            const maxBfSizeMB = ((_c = (_b = (_a = prg.opts.io) === null || _a === void 0 ? void 0 : _a.engine) === null || _b === void 0 ? void 0 : _b.opts) === null || _c === void 0 ? void 0 : _c.maxHttpBufferSize) / 1e6;
+            const maxBfSizeMB = prg.opts.io?.engine?.opts?.maxHttpBufferSize / 1e6;
             console.log(`Prostgles: Initiated file manager. Max allowed file size: ${maxBfSizeMB}MB (maxHttpBufferSize = 1e6). To increase this set maxHttpBufferSize in socket.io server init options`);
             // throw "Why are constraints dissapearing?"
             /**
@@ -204,14 +211,21 @@ class FileManager {
             });
         }
     }
-    get dbo() { return this.prostgles.dbo; }
+    get dbo() {
+        if (!this.prostgles?.dbo)
+            throw "this.prostgles.dbo missing";
+        return this.prostgles.dbo;
+    }
     ;
-    get db() { return this.prostgles.db; }
+    get db() {
+        if (!this.prostgles?.db)
+            throw "this.prostgles.db missing";
+        return this.prostgles.db;
+    }
     ;
     async getMIME(file, fileName, allowedExtensions, dissallowedExtensions, onlyFromName = true) {
-        var _a, _b;
         const nameParts = fileName.split(".");
-        const nameExt = nameParts[nameParts.length - 1].toLowerCase(), mime = Object.keys(CONTENT_TYPE_TO_EXT).find(k => CONTENT_TYPE_TO_EXT[k].includes(nameExt));
+        const nameExt = nameParts[nameParts.length - 1].toLowerCase(), mime = DboBuilder_1.getKeys(CONTENT_TYPE_TO_EXT).find(k => CONTENT_TYPE_TO_EXT[k].includes(nameExt));
         let type = {
             fileName,
             mime,
@@ -222,28 +236,35 @@ class FileManager {
         if (!mime) {
             /* Set correct/missing extension */
             if (["xml", "txt", "csv", "tsv", "doc"].includes(nameExt)) {
-                type = Object.assign(Object.assign({}, type), { mime: "text/" + nameExt, ext: nameExt });
+                type = { ...type, mime: ("text/" + nameExt), ext: nameExt };
             }
             else if (["svg"].includes(nameExt)) {
-                type = Object.assign(Object.assign({}, type), { mime: "image/svg+xml", ext: nameExt });
+                type = { ...type, mime: "image/svg+xml", ext: nameExt };
             }
             else if (Buffer.isBuffer(file)) {
                 const res = await FileType.fromBuffer(file);
-                type = Object.assign(Object.assign({}, res), { fileName });
+                type = {
+                    ...res,
+                    fileName,
+                };
             }
             else if (typeof file === "string") {
                 const res = await FileType.fromFile(file);
-                type = Object.assign(Object.assign({}, res), { fileName });
+                type = {
+                    ...res,
+                    fileName,
+                };
             }
             else {
                 throw "Unexpected file. Expecting: Buffer | String";
             }
         }
         if (allowedExtensions &&
-            !((_a = allowedExtensions.map(v => v.toLowerCase())) === null || _a === void 0 ? void 0 : _a.includes(type.ext))) {
+            !allowedExtensions.map(v => v.toLowerCase())?.includes(type.ext)) {
             throw fileName + " -> File type ( " + type.ext + " ) not allowed. Expecting one of: " + allowedExtensions.map(v => v.toLowerCase()).join(", ");
         }
-        else if (dissallowedExtensions && ((_b = dissallowedExtensions.map(v => v.toLowerCase())) === null || _b === void 0 ? void 0 : _b.includes(type.ext))) {
+        else if (dissallowedExtensions &&
+            dissallowedExtensions.map(v => v.toLowerCase())?.includes(type.ext)) {
             throw fileName + " -> File type ( " + type.ext + " ) not allowed";
         }
         if (!onlyFromName) {
@@ -251,7 +272,13 @@ class FileManager {
             if (nameExt !== ext)
                 fileName = nameParts.slice(0, -1).join('') + "." + ext;
         }
-        return Object.assign(Object.assign({}, type), { fileName });
+        const res = {
+            ...type,
+            fileName
+        };
+        if (!res.mime)
+            throw "Could not find mime";
+        return res;
     }
     // async getUploadURL(fileName: string): Promise<string> {
     //   const thisHour = new Date();
@@ -332,7 +359,7 @@ class FileManager {
             Key: fileName,
             Expires: expiresInSeconds || 30 * 60
         };
-        return await this.s3Client.getSignedUrlPromise("getObject", params);
+        return await this.s3Client?.getSignedUrlPromise("getObject", params);
     }
 }
 exports.default = FileManager;

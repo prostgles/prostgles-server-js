@@ -13,39 +13,41 @@ exports.syncData = async (_this, sync, clientData) => {
         console.error("Orphaned socket", { sync, clientData });
         return;
     }
-    const sync_fields = [synced_field, ...id_fields.sort()], orderByAsc = sync_fields.reduce((a, v) => (Object.assign(Object.assign({}, a), { [v]: true })), {}), orderByDesc = sync_fields.reduce((a, v) => (Object.assign(Object.assign({}, a), { [v]: false })), {}), 
+    const sync_fields = [synced_field, ...id_fields.sort()], orderByAsc = sync_fields.reduce((a, v) => ({ ...a, [v]: true }), {}), orderByDesc = sync_fields.reduce((a, v) => ({ ...a, [v]: false }), {}), 
     // desc_params = { orderBy: [{ [synced_field]: false }].concat(id_fields.map(f => ({ [f]: false }) )) },
     // asc_params = { orderBy: [synced_field].concat(id_fields) },
     rowsIdsMatch = (a, b) => {
         return a && b && !id_fields.find(key => (a[key]).toString() !== (b[key]).toString());
     }, rowsFullyMatch = (a, b) => {
-        return rowsIdsMatch(a, b) && (a === null || a === void 0 ? void 0 : a[synced_field].toString()) === (b === null || b === void 0 ? void 0 : b[synced_field].toString());
+        return rowsIdsMatch(a, b) && a?.[synced_field].toString() === b?.[synced_field].toString();
     }, getServerRowInfo = async (args = {}) => {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
         const { from_synced = null, to_synced = null, offset = 0, limit } = args;
-        let _filter = Object.assign({}, filter);
+        let _filter = { ...filter };
         if (from_synced || to_synced) {
-            _filter[synced_field] = Object.assign(Object.assign({}, (from_synced ? { $gte: from_synced } : {})), (to_synced ? { $lte: to_synced } : {}));
+            _filter[synced_field] = {
+                ...(from_synced ? { $gte: from_synced } : {}),
+                ...(to_synced ? { $lte: to_synced } : {})
+            };
         }
-        if (((_b = (_a = _this.dbo) === null || _a === void 0 ? void 0 : _a[table_name]) === null || _b === void 0 ? void 0 : _b.find) === undefined || ((_d = (_c = _this === null || _this === void 0 ? void 0 : _this.dbo) === null || _c === void 0 ? void 0 : _c[table_name]) === null || _d === void 0 ? void 0 : _d.count) === undefined) {
+        if (_this.dbo?.[table_name]?.find === undefined || _this?.dbo?.[table_name]?.count === undefined) {
             throw `dbo.${table_name}.find or .count are missing or not allowed`;
         }
-        const first_rows = await ((_g = (_f = (_e = _this.dbo) === null || _e === void 0 ? void 0 : _e[table_name]) === null || _f === void 0 ? void 0 : _f.find) === null || _g === void 0 ? void 0 : _g.call(_f, _filter, { orderBy: orderByAsc, select: sync_fields, limit, offset }, null, table_rules));
-        const last_rows = first_rows.slice(-1);
+        const first_rows = await _this.dbo?.[table_name]?.find?.(_filter, { orderBy: orderByAsc, select: sync_fields, limit, offset }, undefined, table_rules);
+        const last_rows = first_rows?.slice(-1);
         // const last_rows = await _this?.dbo[table_name]?.find?.(_filter, { orderBy: (orderByDesc as OrderBy), select: sync_fields, limit: 1, offset: -offset || 0 }, null, table_rules);
-        const count = await ((_k = (_j = (_h = _this.dbo) === null || _h === void 0 ? void 0 : _h[table_name]) === null || _j === void 0 ? void 0 : _j.count) === null || _k === void 0 ? void 0 : _k.call(_j, _filter, null, null, table_rules));
-        return { s_fr: (first_rows === null || first_rows === void 0 ? void 0 : first_rows[0]) || null, s_lr: (last_rows === null || last_rows === void 0 ? void 0 : last_rows[0]) || null, s_count: count };
+        const count = await _this.dbo?.[table_name]?.count?.(_filter, undefined, undefined, table_rules);
+        return { s_fr: first_rows?.[0] || null, s_lr: last_rows?.[0] || null, s_count: count };
     }, getClientRowInfo = (args = {}) => {
         const { from_synced = null, to_synced = null, end_offset = null } = args;
         let res = new Promise((resolve, reject) => {
             let onSyncRequest = { from_synced, to_synced, end_offset }; //, forReal: true };
             socket.emit(channel_name, { onSyncRequest }, (resp) => {
-                if (resp && "onSyncRequest" in resp && (resp === null || resp === void 0 ? void 0 : resp.onSyncRequest)) {
+                if (resp && "onSyncRequest" in resp && resp?.onSyncRequest) {
                     let c_fr = resp.onSyncRequest.c_fr, c_lr = resp.onSyncRequest.c_lr, c_count = resp.onSyncRequest.c_count;
                     // console.log(onSyncRequest, { c_fr, c_lr, c_count }, socket._user);
                     return resolve({ c_fr, c_lr, c_count });
                 }
-                else if (resp && "err" in resp && (resp === null || resp === void 0 ? void 0 : resp.err)) {
+                else if (resp && "err" in resp && resp?.err) {
                     reject(resp.err);
                 }
             });
@@ -71,17 +73,19 @@ exports.syncData = async (_this, sync, clientData) => {
             });
         }
     }, getServerData = async (from_synced = 0, offset = 0) => {
-        var _a, _b, _c, _d, _e;
-        let _filter = Object.assign(Object.assign({}, filter), { [synced_field]: { $gte: from_synced || 0 } });
-        if (!((_b = (_a = _this === null || _this === void 0 ? void 0 : _this.dbo) === null || _a === void 0 ? void 0 : _a[table_name]) === null || _b === void 0 ? void 0 : _b.find))
+        let _filter = {
+            ...filter,
+            [synced_field]: { $gte: from_synced || 0 }
+        };
+        if (!_this?.dbo?.[table_name]?.find)
             throw "_this?.dbo?.[table_name]?.find is missing";
         try {
-            let res = (_e = (_d = (_c = _this === null || _this === void 0 ? void 0 : _this.dbo) === null || _c === void 0 ? void 0 : _c[table_name]) === null || _d === void 0 ? void 0 : _d.find) === null || _e === void 0 ? void 0 : _e.call(_d, _filter, {
+            let res = _this?.dbo?.[table_name]?.find?.(_filter, {
                 select: params.select,
                 orderBy: orderByAsc,
                 offset: offset || 0,
                 limit: batch_size
-            }, null, table_rules);
+            }, undefined, table_rules);
             if (!res)
                 throw "_this?.dbo?.[table_name]?.find is missing";
             return res;
@@ -96,7 +100,7 @@ exports.syncData = async (_this, sync, clientData) => {
             return Promise.all(deleted.map(async (d) => {
                 const id_filter = PubSubManager_1.filterObj(d, id_fields);
                 try {
-                    await _this.dbo[table_name].delete(id_filter, undefined, null, table_rules);
+                    await _this.dbo[table_name].delete(id_filter, undefined, undefined, table_rules);
                     return 1;
                 }
                 catch (e) {
@@ -121,7 +125,7 @@ exports.syncData = async (_this, sync, clientData) => {
             const existingData = await tbl.find({ $or: data.map(d => PubSubManager_1.filterObj(d, id_fields)) }, {
                 select: [synced_field, ...id_fields],
                 orderBy: orderByAsc,
-            }, null, table_rules);
+            }, undefined, table_rules);
             const inserts = data.filter(d => !existingData.find(ed => rowsIdsMatch(ed, d)));
             const updates = data.filter(d => existingData.find(ed => rowsIdsMatch(ed, d) && +ed[synced_field] < +d[synced_field]));
             try {
@@ -141,7 +145,7 @@ exports.syncData = async (_this, sync, clientData) => {
                 if (table_rules.insert && inserts.length) {
                     // const qs = await tbl.insert(inserts, { fixIssues: true }, null, table_rules, { returnQuery: true });
                     // console.log("inserts", qs)
-                    await tbl.insert(inserts, { fixIssues: true }, null, table_rules);
+                    await tbl.insert(inserts, { fixIssues: true }, undefined, table_rules);
                     inserted = inserts.length;
                 }
                 return true;
@@ -168,7 +172,7 @@ exports.syncData = async (_this, sync, clientData) => {
             socket.emit(channel_name, { data, isSynced }, (resp) => {
                 if (resp && resp.ok) {
                     // console.log("PUSHED to client: fr/lr", data[0], data[data.length - 1]);
-                    resolve({ pushed: data === null || data === void 0 ? void 0 : data.length, resp });
+                    resolve({ pushed: data?.length, resp });
                 }
                 else {
                     reject(resp);
@@ -183,7 +187,6 @@ exports.syncData = async (_this, sync, clientData) => {
      * If no rows or fully synced (c_lr and s_lr match) then returns null
      */
     getLastSynced = async (clientSyncInfo) => {
-        var _a, _b, _c;
         // Get latest row info
         const { c_fr, c_lr, c_count } = clientSyncInfo || await getClientRowInfo();
         const { s_fr, s_lr, s_count } = await getServerRowInfo();
@@ -209,7 +212,7 @@ exports.syncData = async (_this, sync, clientData) => {
                 result = Math.min(...getNumbers([c_lr[synced_field], s_lr[synced_field]]));
             }
             else {
-                result = Math.min(...getNumbers([c_fr[synced_field], s_fr === null || s_fr === void 0 ? void 0 : s_fr[synced_field]]));
+                result = Math.min(...getNumbers([c_fr[synced_field], s_fr?.[synced_field]]));
             }
             let min_count = Math.min(...getNumbers([c_count, s_count]));
             let end_offset = 1; // Math.min(s_count, c_count) - 1;
@@ -223,7 +226,7 @@ exports.syncData = async (_this, sync, clientData) => {
                     sync_fields.map(key => {
                         _filter[key] = c_lr[key];
                     });
-                    server_row = await ((_c = (_b = (_a = _this === null || _this === void 0 ? void 0 : _this.dbo) === null || _a === void 0 ? void 0 : _a[table_name]) === null || _b === void 0 ? void 0 : _b.find) === null || _c === void 0 ? void 0 : _c.call(_b, _filter, { select: sync_fields, limit: 1 }, null, table_rules));
+                    server_row = await _this?.dbo?.[table_name]?.find?.(_filter, { select: sync_fields, limit: 1 }, undefined, table_rules);
                 }
                 // if(rowsFullyMatch(c_lr, s_lr)){ //c_count === s_count && 
                 if (server_row && server_row.length) {
@@ -241,14 +244,13 @@ exports.syncData = async (_this, sync, clientData) => {
         }
         return result;
     }, updateSyncLR = (data) => {
-        var _a, _b;
         if (data.length) {
             const lastRow = data[data.length - 1];
-            if (((_a = sync.lr) === null || _a === void 0 ? void 0 : _a[synced_field]) && +((_b = sync.lr) === null || _b === void 0 ? void 0 : _b[synced_field]) > +lastRow[synced_field]) {
+            if (sync.lr?.[synced_field] && +sync.lr?.[synced_field] > +lastRow[synced_field]) {
                 console.error({ syncIssue: "sync.lr[synced_field] is greater than lastRow[synced_field]" });
             }
             sync.lr = lastRow;
-            sync.last_synced = +sync.lr[synced_field];
+            sync.last_synced = +sync.lr?.[synced_field];
         }
     }, 
     /**
@@ -275,13 +277,13 @@ exports.syncData = async (_this, sync, clientData) => {
                 throw " d";
             }
             // console.log("allow_delete", table_rules.delete);
-            if (allow_delete && (table_rules === null || table_rules === void 0 ? void 0 : table_rules.delete)) {
+            if (allow_delete && table_rules?.delete) {
                 const to_delete = sData.filter(d => {
                     !cData.find(c => rowsIdsMatch(c, d));
                 });
                 await Promise.all(to_delete.map(d => {
                     deleted++;
-                    return _this.dbo[table_name].delete(PubSubManager_1.filterObj(d, id_fields), {}, null, table_rules);
+                    return _this.dbo[table_name].delete(PubSubManager_1.filterObj(d, id_fields), {}, undefined, table_rules);
                 }));
                 sData = await getServerData(min_synced, offset);
             }

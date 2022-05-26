@@ -10,9 +10,11 @@ declare type AuthSocketSchema = {
 };
 declare type ExpressReq = {
     body?: AnyObject;
+    query?: AnyObject;
     cookies?: AnyObject;
     params?: AnyObject;
     path: string;
+    originalUrl: string;
 };
 declare type ExpressRes = {
     status: (code: number) => ({
@@ -90,19 +92,19 @@ export declare type Auth<DBO = DbHandler> = {
     /**
      * User data used on server. Mainly used in http request auth
      */
-    getUser: (sid: string, dbo: DBO, db: DB, client: AuthClientRequest) => Promise<AnyObject | null | undefined>;
+    getUser: (sid: string | undefined, dbo: DBO, db: DB, client: AuthClientRequest) => Promise<AnyObject | undefined> | AnyObject | undefined;
     /**
      * User data sent to client. Mainly used in socket request auth
      */
-    getClientUser: (sid: string, dbo: DBO, db: DB) => Promise<AnyObject | null | undefined>;
-    register?: (params: AnyObject, dbo: DBO, db: DB) => Promise<BasicSession>;
-    login?: (params: AnyObject, dbo: DBO, db: DB) => Promise<BasicSession>;
-    logout?: (sid: string, dbo: DBO, db: DB) => Promise<any>;
+    getClientUser: (sid: string, dbo: DBO, db: DB) => Promise<AnyObject | undefined> | AnyObject | undefined;
+    register?: (params: AnyObject, dbo: DBO, db: DB) => Promise<BasicSession> | BasicSession;
+    login?: (params: AnyObject, dbo: DBO, db: DB) => Promise<BasicSession> | BasicSession;
+    logout?: (sid: string | undefined, dbo: DBO, db: DB) => Promise<any>;
     /**
      * If provided then then session info will be saved on socket.__prglCache and reused from there
      */
     cacheSession?: {
-        getSession: (sid: string, dbo: DBO, db: DB) => Promise<BasicSession>;
+        getSession: (sid: string | undefined, dbo: DBO, db: DB) => Promise<BasicSession>;
     };
 };
 export declare type ClientInfo = {
@@ -114,16 +116,16 @@ export default class AuthHandler {
     protected opts?: Auth;
     dbo: DbHandler;
     db: DB;
-    sidKeyName: string;
-    returnURL: string;
+    sidKeyName?: string;
+    returnURL?: string;
     loginRoute?: string;
     logoutGetPath?: string;
     constructor(prostgles: Prostgles);
-    validateSid: (sid: string) => string;
-    matchesRoute: (route: string, clientFullRoute: string) => boolean;
+    validateSid: (sid: string | undefined) => string | undefined;
+    matchesRoute: (route: string | undefined, clientFullRoute: string) => boolean | "" | undefined;
     isUserRoute: (pathname: string) => boolean;
     private setCookieAndGoToReturnURLIFSet;
-    getUser: (clientReq: AuthClientRequest) => Promise<AnyObject>;
+    getUser: (clientReq: AuthClientRequest) => Promise<AnyObject | undefined>;
     init(): Promise<void>;
     throttledFunc: <T>(func: () => Promise<T>, throttle?: number) => Promise<T>;
     loginThrottled: (params: AnyObject) => Promise<BasicSession>;
@@ -133,10 +135,10 @@ export default class AuthHandler {
      * @param localParams
      * @returns string
      */
-    getSID(localParams: LocalParams): string;
+    getSID(localParams: LocalParams): string | undefined;
     getClientInfo(localParams: Pick<LocalParams, "socket" | "httpReq">): Promise<ClientInfo | undefined>;
     isValidSocketSession: (socket: PRGLIOSocket, session: BasicSession) => boolean;
-    makeSocketAuth: (socket: any) => Promise<AuthSocketSchema>;
+    makeSocketAuth: (socket: PRGLIOSocket) => Promise<AuthSocketSchema>;
 }
 export {};
 //# sourceMappingURL=AuthHandler.d.ts.map

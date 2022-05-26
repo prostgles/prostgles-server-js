@@ -27,7 +27,7 @@ export declare type NewQuery = {
     tableAlias?: string;
     $path?: string[];
 };
-export declare const asNameAlias: (field: string, tableAlias?: string) => string;
+export declare const asNameAlias: (field: string, tableAlias?: string | undefined) => string;
 export declare const parseFunctionObject: (funcData: any) => {
     funcName: string;
     args: any[];
@@ -86,6 +86,7 @@ export declare type FunctionSpec = {
      * allowedFields passed for multicol functions (e.g.: $rowhash)
      */
     getQuery: (params: GetQueryArgs) => string;
+    returnType?: PG_COLUMN_UDT_DATA_TYPE;
 };
 /**
 * Each function expects a column at the very least
@@ -113,11 +114,11 @@ export declare class SelectItemBuilder {
     private addItem;
     private addFunction;
     addColumn: (fieldName: string, selected: boolean) => void;
-    parseUserSelect: (userSelect: FieldFilter, joinParse?: (key: string, val: any, throwErr: (msg: string) => any) => any) => Promise<any[]>;
+    parseUserSelect: (userSelect: FieldFilter, joinParse?: ((key: string, val: any, throwErr: (msg: string) => any) => any) | undefined) => Promise<never[] | undefined>;
 }
-export declare function getNewQuery(_this: TableHandler, filter: Filter, selectParams: SelectParams & {
-    alias?: string;
-}, param3_unused: any, tableRules: TableRule, localParams: LocalParams, columns: ColumnInfo[]): Promise<NewQuery>;
-export declare function makeQuery(_this: TableHandler, q: NewQuery, depth: number, joinFields: string[], selectParams: SelectParams): string;
+export declare function getNewQuery(_this: TableHandler, filter: Filter, selectParams: (SelectParams & {
+    alias?: string | undefined;
+}) | undefined, param3_unused: null | undefined, tableRules: TableRule | undefined, localParams: LocalParams | undefined, columns: ColumnInfo[]): Promise<NewQuery>;
+export declare function makeQuery(_this: TableHandler, q: NewQuery, depth?: number, joinFields?: string[], selectParams?: SelectParams): string;
 export {};
 //# sourceMappingURL=QueryBuilder.d.ts.map

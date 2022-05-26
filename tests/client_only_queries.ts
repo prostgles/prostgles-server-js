@@ -9,26 +9,45 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
   const testRealtime = () => {
     log("Started testRealtime")
     return new Promise(async (resolve, reject) => {
+      try {
+
       /* METHODS */
       const t222 = await methods.get();
       assert.equal(t222, 222, "methods.get() failed");
   
+      log("SQL Full result")
       /* RAWSQL */
-      const sqlStatement = await db.sql("SELECT $1", [1], { returnType: "statement" });
-      assert.equal(sqlStatement, "SELECT 1", "db.sql statement query failed");
-    
-      const arrayMode = await db.sql("SELECT 1 as a, 2 as a", undefined, { returnType: "arrayMode" });
-      assert.equal(arrayMode.rows?.[0].join("."), "1.2", "db.sql statement arrayMode failed");
-      assert.equal(arrayMode.fields?.map(f => f.name).join("."), "a.a", "db.sql statement arrayMode failed");
+      await tryRunP("SQL Full result", async (resolve, reject) => {
+        const sqlStatement = await db.sql("SELECT $1", [1], { returnType: "statement" });
+        assert.equal(sqlStatement, "SELECT 1", "db.sql statement query failed");
+      
+        const arrayMode = await db.sql("SELECT 1 as a, 2 as a", undefined, { returnType: "arrayMode" });
+        assert.equal(arrayMode.rows?.[0].join("."), "1.2", "db.sql statement arrayMode failed");
+        assert.equal(arrayMode.fields?.map(f => f.name).join("."), "a.a", "db.sql statement arrayMode failed");
+  
+        const select1 = await db.sql("SELECT $1 as col1", [1], { returnType: "rows" });
+        assert.deepStrictEqual(select1[0], { col1: 1 }, "db.sql justRows query failed");
 
-      const select1 = await db.sql("SELECT $1 as col1", [1], { returnType: "rows" });
-      assert.deepStrictEqual(select1[0], { col1: 1 }, "db.sql justRows query failed");
-  
-      const fullResult = await db.sql("SELECT $1 as col1", [1]);
-      // console.log(fullResult)
-      assert.deepStrictEqual(fullResult.rows[0], { col1: 1 }, "db.sql query failed");
-      assert.deepStrictEqual(fullResult.fields, [ { name: 'col1', tableID: 0,columnID: 0, dataTypeID: 23, dataTypeSize: 4, dataTypeModifier: -1,format: 'text', dataType: 'int4' } ] , "db.sql query failed");
-  
+        const fullResult = await db.sql("SELECT $1 as col1", [1]);
+        // console.log(fullResult)
+        assert.deepStrictEqual(fullResult.rows[0], { col1: 1 }, "db.sql query failed");
+        assert.deepStrictEqual(fullResult.fields, [ { 
+          name: 'col1', 
+          tableID: 0,
+          columnID: 0, 
+          dataTypeID: 23, 
+          dataTypeSize: 4, 
+          dataTypeModifier: -1,
+          format: 'text', 
+          dataType: 'int4', 
+          udt_name: 'int4', 
+          tsDataType: "number" 
+        }] , "db.sql query failed");
+        resolve(true);
+      }, log);
+
+      log("sql LISTEN NOTIFY events")
+
       await tryRunP("sql LISTEN NOTIFY events", async (resolve, reject) => {
         
         const sub = await db.sql("LISTEN chnl ");
@@ -39,7 +58,9 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
           else reject("Something went bad")
         });
         db.sql("NOTIFY chnl , 'hello'; ");
-      });
+      }, log);
+
+    log("sql NOTICE events")
       await tryRunP("sql NOTICE events", async (resolve, reject) => {
         
         const sub = await db.sql("", {}, { returnType: "noticeSubscription" });
@@ -57,7 +78,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
 
           END $$;
         `);
-      });
+      }, log);
 
   
       /* REPLICATION */
@@ -135,6 +156,11 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       // await db.planes.update({}, { x: 20, last_updated: Date.now() });
       
       
+      } catch(err){
+        log(JSON.stringify(err));
+        await tout(1000);
+        throw err;
+      }
     });
 
   }
@@ -205,7 +231,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
         { id: 1, public: 'public data' },
         { id: 2, public: 'public data' }
       ]);
-    });
+    }, log);
   }
 
 }

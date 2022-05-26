@@ -51,14 +51,14 @@ export declare type UploadedItem = {
     s3_url?: string;
 };
 export default class FileManager {
-    s3Client: S3;
+    s3Client?: S3;
     config: S3Config | LocalConfig;
-    imageOptions: ImageOptions;
-    prostgles: Prostgles;
+    imageOptions?: ImageOptions;
+    prostgles?: Prostgles;
     get dbo(): DbHandler;
     get db(): DB;
-    tableName: string;
-    private fileRoute;
+    tableName?: string;
+    private fileRoute?;
     constructor(config: FileManager["config"], imageOptions?: ImageOptions);
     getMIME(file: Buffer | String, fileName: string, allowedExtensions?: Array<ALLOWED_EXTENSION>, dissallowedExtensions?: Array<ALLOWED_EXTENSION>, onlyFromName?: boolean): Promise<{
         mime: string;

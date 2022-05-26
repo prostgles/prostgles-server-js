@@ -6,7 +6,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.makeQuery = exports.getNewQuery = exports.SelectItemBuilder = exports.COMPUTED_FIELDS = exports.FUNCTIONS = exports.parseFunction = exports.parseFunctionObject = exports.asNameAlias = void 0;
 const DboBuilder_1 = require("./DboBuilder");
-const Prostgles_1 = require("./Prostgles");
 const prostgles_types_1 = require("prostgles-types");
 const utils_1 = require("./utils");
 exports.asNameAlias = (field, tableAlias) => {
@@ -30,7 +29,6 @@ exports.parseFunctionObject = (funcData) => {
     return { funcName, args };
 };
 exports.parseFunction = (funcData) => {
-    var _a;
     const { func, args, functions, allowedFields } = funcData;
     /* Function is computed column. No checks needed */
     if (typeof func !== "string") {
@@ -58,7 +56,7 @@ exports.parseFunction = (funcData) => {
                 throw makeErr(`getFields() => field name ${JSON.stringify(fieldKey)} is invalid or disallowed`);
             }
         });
-        if (((_a = funcDef.minCols) !== null && _a !== void 0 ? _a : 0) > fields.length) {
+        if ((funcDef.minCols ?? 0) > fields.length) {
             throw makeErr(`Less columns provided than necessary (minCols=${funcDef.minCols})`);
         }
     }
@@ -154,6 +152,8 @@ let PostGIS_Funcs = [
         if (!DboBuilder_1.isPlainObject(arg2))
             mErr();
         const col = allColumns.find(c => c.name === args[0]);
+        if (!col)
+            throw new Error("Col not found: " + args[0]);
         const { lat, lng, srid = 4326, geojson, text, use_spheroid, distance, spheroid = 'SPHEROID["WGS 84",6378137,298.257223563]', debug } = arg2;
         let geomQ = "", extraParams = "";
         if (typeof text === "string") {
@@ -530,7 +530,7 @@ exports.FUNCTIONS = [
         }
     })),
     /* Basic 1 arg col funcs */
-    ...["upper", "lower", "length", "reverse", "trim", "initcap", "round", "ceil", "floor", "sign", "age", "md5"].map(funcName => ({
+    ...["upper", "lower", "length", "reverse", "trim", "initcap", "round", "ceil", "floor", "sign", "md5"].map(funcName => ({
         name: "$" + funcName,
         type: "function",
         numArgs: 1,
@@ -538,6 +538,30 @@ exports.FUNCTIONS = [
         getFields: (args) => [args[0]],
         getQuery: ({ allowedFields, args, tableAlias }) => {
             return funcName + "(" + exports.asNameAlias(args[0], tableAlias) + ")";
+        }
+    })),
+    /* Interval funcs */
+    ...["age", "difference"].map(funcName => ({
+        name: "$" + funcName,
+        type: "function",
+        numArgs: 1,
+        singleColArg: true,
+        getFields: (args) => args,
+        getQuery: ({ allowedFields, args, tableAlias }) => {
+            const validCols = args.filter(a => typeof a === "string").length;
+            if (funcName === "difference" && validCols !== 2)
+                throw new Error("Must have two column names");
+            if (![1, 2].includes(validCols))
+                throw new Error("Must have one or two column names");
+            const [leftField, rightField] = args;
+            const leftQ = exports.asNameAlias(leftField, tableAlias);
+            const rightQ = rightField ? ("," + exports.asNameAlias(rightField, tableAlias)) : "";
+            if (funcName === "age") {
+                return `${funcName}(${leftQ}, ${rightQ})`;
+            }
+            else {
+                return `${leftQ} - ${rightQ}`;
+            }
         }
     })),
     /* pgcrypto funcs */
@@ -574,7 +598,7 @@ exports.FUNCTIONS = [
         numArgs: 1,
         minCols: 0,
         singleColArg: false,
-        getFields: (args, allowedFields) => [],
+        getFields: (args) => [],
         getQuery: ({ allowedFields, args, tableAlias }) => {
             let value = asValue(args[0]);
             if (typeof value !== "string")
@@ -694,11 +718,10 @@ exports.FUNCTIONS = [
                 res = `CASE 
           ${_cols
                     .map(c => {
-                    var _a, _b;
                     const colNameEscaped = exports.asNameAlias(c.key, tableAlias);
                     let colSelect = `${colNameEscaped}::TEXT`;
-                    const isTstamp = (_a = c.colInfo) === null || _a === void 0 ? void 0 : _a.udt_name.startsWith("timestamp");
-                    if (isTstamp || ((_b = c.colInfo) === null || _b === void 0 ? void 0 : _b.udt_name) === "date") {
+                    const isTstamp = c.colInfo?.udt_name.startsWith("timestamp");
+                    if (isTstamp || c.colInfo?.udt_name === "date") {
                         colSelect = `( CASE WHEN ${colNameEscaped} IS NULL THEN '' 
               ELSE concat_ws(' ', 
               ${colNameEscaped}::TEXT, 
@@ -850,7 +873,13 @@ class SelectItemBuilder {
             if (selected) {
                 const compCol = exports.COMPUTED_FIELDS.find(cf => cf.name === fieldName);
                 if (compCol && !this.select.find(s => s.alias === fieldName)) {
-                    const cf = Object.assign(Object.assign({}, compCol), { type: "computed", numArgs: 0, singleColArg: false, getFields: (args) => [] });
+                    const cf = {
+                        ...compCol,
+                        type: "computed",
+                        numArgs: 0,
+                        singleColArg: false,
+                        getFields: (args) => []
+                    };
                     this.addFunction(cf, [], compCol.name);
                     return;
                 }
@@ -859,8 +888,8 @@ class SelectItemBuilder {
             let alias = selected ? fieldName : ("not_selected_" + fieldName);
             this.addItem({
                 type: "column",
-                columnPGDataType: colDef === null || colDef === void 0 ? void 0 : colDef.data_type,
-                column_udt_type: colDef === null || colDef === void 0 ? void 0 : colDef.udt_name,
+                columnPGDataType: colDef?.data_type,
+                column_udt_type: colDef?.udt_name,
                 alias,
                 getQuery: () => prostgles_types_1.asName(fieldName),
                 getFields: () => [fieldName],
@@ -974,8 +1003,8 @@ class SelectItemBuilder {
     }
 }
 exports.SelectItemBuilder = SelectItemBuilder;
-async function getNewQuery(_this, filter, selectParams, param3_unused = null, tableRules, localParams, columns) {
-    if (((localParams === null || localParams === void 0 ? void 0 : localParams.socket) || (localParams === null || localParams === void 0 ? void 0 : localParams.httpReq)) && !utils_1.get(tableRules, "select.fields")) {
+async function getNewQuery(_this, filter, selectParams = {}, param3_unused = null, tableRules, localParams, columns) {
+    if ((localParams?.socket || localParams?.httpReq) && !utils_1.get(tableRules, "select.fields")) {
         throw `INTERNAL ERROR: publish.${_this.name}.select.fields rule missing`;
     }
     // const all_columns: SelectItem[] = _this.column_names.slice(0).map(fieldName => ({
@@ -995,7 +1024,6 @@ async function getNewQuery(_this, filter, selectParams, param3_unused = null, ta
     // let select: SelectItem[] = [],
     let joinQueries = [];
     // const all_colnames = _this.column_names.slice(0).concat(COMPUTED_FIELDS.map(c => c.name));
-    selectParams = selectParams || {};
     const { select: userSelect = "*" } = selectParams, 
     // allCols = _this.column_names.slice(0),
     // allFieldsIncludingComputed = allCols.concat(COMPUTED_FIELDS.map(c => c.name)),
@@ -1040,6 +1068,8 @@ async function getNewQuery(_this, filter, selectParams, param3_unused = null, ta
                 j_table = key;
             }
         }
+        if (!j_table)
+            throw "j_table missing";
         const _thisJoinedTable = _this.dboBuilder.dbo[j_table];
         if (!_thisJoinedTable) {
             throw `Joined table ${JSON.stringify(j_table)} is disallowed or inexistent \nOr you've forgot to put the function arguments into an array`;
@@ -1047,10 +1077,10 @@ async function getNewQuery(_this, filter, selectParams, param3_unused = null, ta
         let isLocal = true;
         if (localParams && (localParams.socket || localParams.httpReq)) {
             isLocal = false;
-            j_tableRules = await _this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: j_table, command: "find", localParams });
+            j_tableRules = await _this.dboBuilder.publishParser?.getValidatedRequestRuleWusr({ tableName: j_table, command: "find", localParams });
         }
         if (isLocal || j_tableRules) {
-            const joinQuery = await getNewQuery(_thisJoinedTable, j_filter, Object.assign(Object.assign({}, j_selectParams), { alias: j_alias }), param3_unused, j_tableRules, localParams, columns);
+            const joinQuery = await getNewQuery(_thisJoinedTable, j_filter, { ...j_selectParams, alias: j_alias }, param3_unused, j_tableRules, localParams, columns);
             joinQuery.isLeftJoin = j_isLeftJoin;
             joinQuery.tableAlias = j_alias;
             joinQuery.$path = j_path;
@@ -1087,7 +1117,7 @@ async function getNewQuery(_this, filter, selectParams, param3_unused = null, ta
         where,
         // having: cond.having,
         limit: _this.prepareLimitQuery(selectParams.limit, p),
-        orderBy: [_this.prepareSort(selectParams.orderBy, allowedFields, selectParams.alias, null, select)],
+        orderBy: [_this.prepareSort(selectParams.orderBy, allowedFields, selectParams.alias, undefined, select)],
         offset: _this.prepareOffsetQuery(selectParams.offset)
     };
     // console.log(resQuery);
@@ -1096,7 +1126,7 @@ async function getNewQuery(_this, filter, selectParams, param3_unused = null, ta
 }
 exports.getNewQuery = getNewQuery;
 /* No validation/authorisation at this point */
-function makeQuery(_this, q, depth = 0, joinFields = [], selectParams) {
+function makeQuery(_this, q, depth = 0, joinFields = [], selectParams = {}) {
     const PREF = `prostgles`, joins = q.joins || [], 
     // aggs = q.aggs || [],
     makePref = (q) => !q.tableAlias ? q.table : `${q.tableAlias || ""}_${q.table}`, makePrefANON = (joinAlias, table) => prostgles_types_1.asName(!joinAlias ? table : `${joinAlias || ""}_${table}`), makePrefAN = (q) => prostgles_types_1.asName(makePref(q));
@@ -1110,7 +1140,7 @@ function makeQuery(_this, q, depth = 0, joinFields = [], selectParams) {
     const joinTables = (q1, q2) => {
         const joinInfo = _this.getJoins(q1.table, q2.table, q2.$path, true);
         const paths = joinInfo.paths;
-        return Prostgles_1.flat(paths.map(({ table, on }, i) => {
+        return paths.flatMap(({ table, on }, i) => {
             const getColName = (col, q) => {
                 if (table === q.table) {
                     const colFromSelect = q.select.find(s => s.getQuery() === prostgles_types_1.asName(col));
@@ -1151,7 +1181,7 @@ function makeQuery(_this, q, depth = 0, joinFields = [], selectParams) {
                     if (s.type === "aggregation")
                         return prostgles_types_1.asName(`agg_${s.alias}`) + " AS " + prostgles_types_1.asName(s.alias);
                     return prostgles_types_1.asName(s.alias);
-                }).concat(q2.joins.map(j => prostgles_types_1.asName(j.table))).join(", ");
+                }).concat(q2.joins?.map(j => prostgles_types_1.asName(j.table)) ?? []).join(", ");
                 const _iiQ = makeQuery(_this, q2, depth + 1, on.map(([c1, c2]) => prostgles_types_1.asName(c2)), selectParams);
                 // const iiQ = flat(_iiQ.split("\n")); // prettify for debugging
                 // console.log(_iiQ)
@@ -1176,7 +1206,7 @@ function makeQuery(_this, q, depth = 0, joinFields = [], selectParams) {
                 `ON ${on.map(([c1, c2]) => `${prevAlias}.${prostgles_types_1.asName(getPrevColName(c1))} = ${thisAlias}.${prostgles_types_1.asName(getThisColName(c2))} `).join(" AND ")}`
             ];
             return jres;
-        }));
+        });
     };
     const getGroupBy = (rootSelectItems, groupByItems) => {
         if (groupByItems.length) {
@@ -1198,7 +1228,7 @@ function makeQuery(_this, q, depth = 0, joinFields = [], selectParams) {
         let groupBy = "";
         const rootSelectItems = q.select.filter(s => joinFields.includes(s.getQuery()) || s.selected);
         /* If aggs exist need to set groupBy add joinFields into select */
-        if (aggs.length || (selectParams === null || selectParams === void 0 ? void 0 : selectParams.groupBy)) {
+        if (aggs.length || selectParams?.groupBy) {
             // const missingFields = joinFields.filter(jf => !q.select.find(s => s.type === "column" && s.alias === jf));
             // if(depth && missingFields.length){
             //     // select = Array.from(new Set(missingFields.concat(select)));
@@ -1292,7 +1322,7 @@ function makeQuery(_this, q, depth = 0, joinFields = [], selectParams) {
                     `${q.where} `
                 ]),
                 `) ${makePrefAN(q)} `,
-                ...Prostgles_1.flat(joins.map((j, i) => joinTables(q, j)))
+                ...joins.flatMap((j, i) => joinTables(q, j))
             ]),
             ") t1"
         ]),

@@ -1,4 +1,3 @@
-/// <reference types="node" />
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import FileManager, { ImageOptions, LocalConfig, S3Config } from "./FileManager";
@@ -12,7 +11,6 @@ import { DBEventsManager } from "./DBEventsManager";
 export declare type DB = pgPromise.IDatabase<{}, pg.IClient>;
 declare type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 declare type DbConnectionOpts = pg.IDefaults;
-import { Socket } from "dgram";
 import { FieldFilter, SelectParamsBasic as SelectParams } from "prostgles-types";
 export declare type InsertRequestData = {
     data: object | object[];
@@ -282,8 +280,8 @@ export declare type ProstglesInitOptions<DBO = DbHandler> = {
     onReady(dbo: DBO, db: DB): void;
     transactions?: string | boolean;
     wsChannelNamePrefix?: string;
-    onSocketConnect?(socket: Socket, dbo: DBO, db?: DB): any;
-    onSocketDisconnect?(socket: Socket, dbo: DBO, db?: DB): any;
+    onSocketConnect?(socket: PRGLIOSocket, dbo: DBO, db?: DB): any;
+    onSocketDisconnect?(socket: PRGLIOSocket, dbo: DBO, db?: DB): any;
     auth?: Auth<DBO>;
     DEBUG_MODE?: boolean;
     watchSchemaType?: 
@@ -362,7 +360,7 @@ export declare class Prostgles<DBO = DbHandler> {
     };
     private getFileText;
     writeDBSchema(force?: boolean): void;
-    refreshDBO: () => Promise<DbHandler>;
+    refreshDBO: () => Promise<DbHandler | undefined>;
     isSuperUser: boolean;
     schema_checkIntervalMillis: any;
     init(onReady: (dbo: DBO, db: DB) => any): Promise<{
@@ -372,7 +370,7 @@ export declare class Prostgles<DBO = DbHandler> {
         io?: any;
         destroy: () => Promise<boolean>;
     }>;
-    runSQLFile(filePath: string): Promise<any[][]>;
+    runSQLFile(filePath: string): Promise<any[][] | undefined>;
     connectedSockets: any[];
     setSocketEvents(): Promise<void>;
     pushSocketSchema: (socket: any) => Promise<void>;
@@ -389,7 +387,6 @@ declare type DboTableCommand = Request & DboTable & {
     command: string;
     localParams: LocalParams;
 };
-export declare function flat(arr: any): any;
 export declare class PublishParser {
     publish: any;
     publishMethods?: any;
@@ -407,8 +404,8 @@ export declare class PublishParser {
      */
     getPublish(localParams: LocalParams, clientInfo?: ClientInfo): Promise<PublishObject>;
     getValidatedRequestRuleWusr({ tableName, command, localParams }: DboTableCommand): Promise<TableRule>;
-    getValidatedRequestRule({ tableName, command, localParams }: DboTableCommand, clientInfo: ClientInfo): Promise<TableRule>;
-    getTableRules({ tableName, localParams }: DboTable, clientInfo: ClientInfo): Promise<PublishTable>;
+    getValidatedRequestRule({ tableName, command, localParams }: DboTableCommand, clientInfo?: ClientInfo): Promise<TableRule>;
+    getTableRules({ tableName, localParams }: DboTable, clientInfo?: ClientInfo): Promise<PublishTable>;
     getSchemaFromPublish(socket: any): Promise<AnyObject>;
 }
 export declare function isSuperUser(db: DB): Promise<boolean>;

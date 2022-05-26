@@ -18,10 +18,10 @@
     "@types/socket.io-client": "^1.4.34",
     "express": "^4.17.1",
     "prostgles-server": "file:../..",
-    "socket.io": "^4.5.0"
+    "socket.io": "^4.5.1"
   },
   "devDependencies": {
     "tsc-watch": "^4.5.0",
-    "typescript": "^4.1.3"
+    "typescript": "^4.7.2"
   }
 }
