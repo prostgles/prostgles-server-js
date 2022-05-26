@@ -328,8 +328,6 @@ class AuthHandler {
             let rawSid = querySid;
             if (!rawSid) {
                 const cookie_str = localParams.socket?.handshake?.headers?.cookie;
-                if (!cookie_str)
-                    throw "cookie_str missing";
                 const cookie = parseCookieStr(cookie_str);
                 rawSid = cookie[sidKeyName];
             }
