@@ -109,7 +109,9 @@ class Prostgles {
             let rawSQL = false;
             const { dbo, db, pgp, publishParser } = this;
             try {
-                schema = await publishParser?.getSchemaFromPublish(socket);
+                if (!publishParser)
+                    throw "publishParser undefined";
+                schema = await publishParser.getSchemaFromPublish(socket);
             }
             catch (e) {
                 publishValidationError = "Server Error: PUBLISH VALIDATION ERROR";
@@ -160,7 +162,7 @@ class Prostgles {
                 });
             }
             const methods = await publishParser?.getMethods(socket);
-            socket.emit(prostgles_types_1.CHANNELS.SCHEMA, {
+            const clientSchema = {
                 schema,
                 methods: (0, DboBuilder_1.getKeys)(methods),
                 ...(fullSchema ? { fullSchema } : {}),
@@ -169,7 +171,8 @@ class Prostgles {
                 auth,
                 version,
                 err: publishValidationError
-            });
+            };
+            socket.emit(prostgles_types_1.CHANNELS.SCHEMA, clientSchema);
         };
         if (!params)
             throw "ProstglesInitOptions missing";
@@ -531,12 +534,11 @@ function makeSocketError(cb, err) {
             err.toString(), e = { err_msg, err };
     cb(e);
 }
-// const insertParams: Array<keyof InsertRule> = ["fields", "forcedData", "returningFields", "validate"];
 const RULE_TO_METHODS = [
     {
         rule: "getColumns",
         sqlRule: "select",
-        methods: ["getColumns"],
+        methods: prostgles_types_1.RULE_METHODS.getColumns,
         no_limits: true,
         allowed_params: [],
         table_only: false,
@@ -545,7 +547,7 @@ const RULE_TO_METHODS = [
     {
         rule: "getInfo",
         sqlRule: "select",
-        methods: ["getInfo"],
+        methods: prostgles_types_1.RULE_METHODS.getInfo,
         no_limits: true,
         allowed_params: [],
         table_only: false,
@@ -554,7 +556,7 @@ const RULE_TO_METHODS = [
     {
         rule: "insert",
         sqlRule: "insert",
-        methods: ["insert", "upsert"],
+        methods: prostgles_types_1.RULE_METHODS.insert,
         no_limits: { fields: "*" },
         table_only: true,
         allowed_params: ["fields", "forcedData", "returningFields", "validate", "preValidate"],
@@ -563,7 +565,7 @@ const RULE_TO_METHODS = [
     {
         rule: "update",
         sqlRule: "update",
-        methods: ["update", "upsert", "updateBatch"],
+        methods: prostgles_types_1.RULE_METHODS.update,
         no_limits: { fields: "*", filterFields: "*", returningFields: "*" },
         table_only: true,
         allowed_params: ["fields", "filterFields", "forcedFilter", "forcedData", "returningFields", "validate"],
@@ -572,7 +574,7 @@ const RULE_TO_METHODS = [
     {
         rule: "select",
         sqlRule: "select",
-        methods: ["findOne", "find", "count", "size"],
+        methods: prostgles_types_1.RULE_METHODS.select,
         no_limits: { fields: "*", filterFields: "*" },
         table_only: false,
         allowed_params: ["fields", "filterFields", "forcedFilter", "validate", "maxLimit"],
@@ -581,7 +583,7 @@ const RULE_TO_METHODS = [
     {
         rule: "delete",
         sqlRule: "delete",
-        methods: ["delete", "remove"],
+        methods: prostgles_types_1.RULE_METHODS.delete,
         no_limits: { filterFields: "*" },
         table_only: true,
         allowed_params: ["filterFields", "forcedFilter", "returningFields", "validate"],
@@ -590,7 +592,7 @@ const RULE_TO_METHODS = [
     {
         rule: "sync",
         sqlRule: "select",
-        methods: ["sync", "unsync"],
+        methods: prostgles_types_1.RULE_METHODS.sync,
         no_limits: null,
         table_only: true,
         allowed_params: ["id_fields", "synced_field", "sync_type", "allow_delete", "throttle", "batch_size"],
@@ -599,7 +601,7 @@ const RULE_TO_METHODS = [
     {
         rule: "subscribe",
         sqlRule: "select",
-        methods: ["unsubscribe", "subscribe", "subscribeOne"],
+        methods: prostgles_types_1.RULE_METHODS.subscribe,
         no_limits: { throttle: 0 },
         table_only: true,
         allowed_params: ["throttle"],

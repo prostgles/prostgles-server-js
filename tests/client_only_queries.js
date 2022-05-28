@@ -10,7 +10,6 @@ async function client_only(db, auth, log, methods) {
                 /* METHODS */
                 const t222 = await methods.get();
                 assert_1.strict.equal(t222, 222, "methods.get() failed");
-                log("SQL Full result");
                 /* RAWSQL */
                 await (0, isomorphic_queries_1.tryRunP)("SQL Full result", async (resolve, reject) => {
                     const sqlStatement = await db.sql("SELECT $1", [1], { returnType: "statement" });
@@ -37,7 +36,6 @@ async function client_only(db, auth, log, methods) {
                         }], "db.sql query failed");
                     resolve(true);
                 }, log);
-                log("sql LISTEN NOTIFY events");
                 await (0, isomorphic_queries_1.tryRunP)("sql LISTEN NOTIFY events", async (resolve, reject) => {
                     const sub = await db.sql("LISTEN chnl ");
                     // console.log({ sub })
@@ -50,7 +48,6 @@ async function client_only(db, auth, log, methods) {
                     });
                     db.sql("NOTIFY chnl , 'hello'; ");
                 }, log);
-                log("sql NOTICE events");
                 await (0, isomorphic_queries_1.tryRunP)("sql NOTICE events", async (resolve, reject) => {
                     const sub = await db.sql("", {}, { returnType: "noticeSubscription" });
                     // console.log({ sub })
@@ -88,32 +85,32 @@ async function client_only(db, auth, log, methods) {
                  *  subscribe({ x: 10 }
                  *  sync({}
                  *
-                 * sync starts updating x to 10
+                 * Then sync starts updating x to 10 for each record
                  * subscribe waits for 100 records of x=10 and then updates everything to x=20
                  * sync waits for 100 records of x=20 and finishes the test
                  */
                 /* After all sync records are updated to x10 here we'll update them to x20 */
                 const sP = await db.planes.subscribe({ x: 10 }, {}, async (planes) => {
                     const p10 = planes.filter(p => p.x == 10);
-                    log("sub: x10 -> ", p10.length, "    x20 ->", planes.filter(p => p.x == 20).length);
+                    log(Date.now() + ": sub stats: x10 -> " + p10.length + "    x20 ->" + planes.filter(p => p.x == 20).length);
                     if (p10.length === 100) {
                         // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log);
                         sP.unsubscribe();
-                        log("Update to x20 start");
+                        log(Date.now() + ": sub: db.planes.update({}, { x: 20, last_updated });");
                         const dLastUpdated = Math.max(...p10.map(v => +v.last_updated));
                         const last_updated = Date.now();
                         if (dLastUpdated >= last_updated)
                             throw "dLastUpdated >= last_updated should not happen";
                         await db.planes.update({}, { x: 20, last_updated });
-                        log("Updated to x20", await db.planes.count({ x: 20 }));
+                        log(Date.now() + ": sub: Updated to x20", await db.planes.count({ x: 20 }));
                         // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log)
                     }
                 });
                 let updt = 0;
-                const sync = await db.planes.sync({}, { handlesOnData: true, patchText: true }, (planes, deltas) => {
+                const sync = await db.planes.sync({}, { handlesOnData: true, patchText: true, }, (planes, deltas) => {
                     const x20 = planes.filter(p => p.x == 20).length;
                     const x10 = planes.filter(p => p.x == 10);
-                    log(`sync: \nx10 -> ${x10.length} \nx20 -> ${x20}`);
+                    log(Date.now() + `: sync stats: x10 -> ${x10.length}  x20 -> ${x20}`);
                     let update = false;
                     planes.map(p => {
                         // if(p.y === 1) window.up = p;
@@ -123,13 +120,14 @@ async function client_only(db, auth, log, methods) {
                             updt++;
                             update = true;
                             p.$update({ x: 10 });
+                            log(Date.now() + `: sync: p.$update({ x: 10 }); (id: ${p.id})`);
                         }
                     });
                     // if(update) log("$update({ x: 10 })", updt)
                     if (x20 === 100) {
                         // log(22)
                         // console.timeEnd("test")
-                        log("Finished replication test. Inserting 100 rows then updating two times took: " + (Date.now() - start) + "ms");
+                        log(Date.now() + ": sync end: Finished replication test. Inserting 100 rows then updating two times took: " + (Date.now() - start) + "ms");
                         resolve(true);
                     }
                 });

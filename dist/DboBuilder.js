@@ -1034,7 +1034,7 @@ class ViewHandler {
                     throw `Invalid $filter. comparator ${JSON.stringify(comparator)} is not valid. Expecting one of: ${allowedComparators}`;
                 if (!rightFilterOrValue)
                     throw "Invalid $filter. Expecting a value or function after the comparator";
-                const rightVal = (0, utils_1.isObject)(rightFilterOrValue) ? getFuncQuery(rightFilterOrValue) : (0, PubSubManager_1.asValue)(rightFilterOrValue);
+                const rightVal = (0, prostgles_types_1.isObject)(rightFilterOrValue) ? getFuncQuery(rightFilterOrValue) : (0, PubSubManager_1.asValue)(rightFilterOrValue);
                 if (leftVal === rightVal)
                     throw "Invalid $filter. Cannot compare two identical function signatures: " + JSON.stringify(leftFilter);
                 result += ` ${comparator} ${rightVal}`;
@@ -1179,7 +1179,7 @@ class ViewHandler {
                 const orderType = asc ? " ASC " : " DESC ";
                 const index = selectedAliases.indexOf(key) + 1;
                 const nullOrder = nulls ? ` NULLS ${nulls === "first" ? " FIRST " : " LAST "}` : "";
-                let colKey = (index > 0 && !nullEmpty) ? index : [tableAlias, key].filter(utils_1.isDefined).map(prostgles_types_1.asName).join(".");
+                let colKey = (index > 0 && !nullEmpty) ? index : [tableAlias, key].filter(prostgles_types_1.isDefined).map(prostgles_types_1.asName).join(".");
                 if (nullEmpty) {
                     colKey = `nullif(trim(${colKey}::text), '')`;
                 }

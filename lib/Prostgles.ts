@@ -21,7 +21,7 @@ import { PubSubManager, DEFAULT_SYNC_BATCH_SIZE, asValue } from "./PubSubManager
 export { DbHandler }
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 
-import { SQLRequest, SQLOptions, CHANNELS, AnyObject } from "prostgles-types";
+import { SQLRequest, TableSchemaForClient, MethodKey, CHANNELS, AnyObject, RULE_METHODS, ClientSchema } from "prostgles-types";
 
 import { DBEventsManager } from "./DBEventsManager";
 
@@ -920,13 +920,14 @@ export class Prostgles<DBO = DbHandler> {
         // let DATA_TYPES = !needType? [] : await this.db.any("SELECT oid, typname FROM pg_type");
         // let USER_TABLES = !needType? [] :  await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
 
-        let schema: any = {};
+        let schema: TableSchemaForClient = {};
         let publishValidationError;
         let rawSQL = false;
         
         const { dbo, db, pgp, publishParser } = this;
         try {
-            schema = await publishParser?.getSchemaFromPublish(socket);
+            if(!publishParser) throw "publishParser undefined";
+            schema = await publishParser.getSchemaFromPublish(socket);
         } catch(e){
             publishValidationError = "Server Error: PUBLISH VALIDATION ERROR";
             console.error(`\nProstgles PUBLISH VALIDATION ERROR (after socket connected):\n    ->`, e);
@@ -980,8 +981,7 @@ export class Prostgles<DBO = DbHandler> {
         }
         
         const methods = await publishParser?.getMethods(socket);
-        
-        socket.emit(CHANNELS.SCHEMA, {
+        const clientSchema: ClientSchema = {
             schema, 
             methods: getKeys(methods), 
             ...(fullSchema? { fullSchema } : {}),
@@ -990,7 +990,8 @@ export class Prostgles<DBO = DbHandler> {
             auth,
             version,
             err: publishValidationError
-        });
+        }
+        socket.emit(CHANNELS.SCHEMA, clientSchema);
     }
 }
 function makeSocketError(cb: Function, err: any){
@@ -1030,13 +1031,11 @@ type DboTableCommand = Request & DboTable & {
     localParams: LocalParams;
 }
 
-// const insertParams: Array<keyof InsertRule> = ["fields", "forcedData", "returningFields", "validate"];
-
 const RULE_TO_METHODS = [
     { 
         rule: "getColumns",
         sqlRule: "select",
-        methods: ["getColumns"], 
+        methods: RULE_METHODS.getColumns, 
         no_limits: true, 
         allowed_params: [],
         table_only: false,
@@ -1045,7 +1044,7 @@ const RULE_TO_METHODS = [
     { 
         rule: "getInfo",
         sqlRule: "select",
-        methods: ["getInfo"], 
+        methods: RULE_METHODS.getInfo, 
         no_limits: true, 
         allowed_params: [],
         table_only: false,
@@ -1054,7 +1053,7 @@ const RULE_TO_METHODS = [
    { 
        rule: "insert",
        sqlRule: "insert",
-       methods: ["insert", "upsert"], 
+       methods: RULE_METHODS.insert, 
        no_limits: <SelectRule>{ fields: "*" }, 
        table_only: true,
        allowed_params: <Array<keyof InsertRule>>["fields", "forcedData", "returningFields", "validate", "preValidate"] ,
@@ -1063,7 +1062,7 @@ const RULE_TO_METHODS = [
    { 
        rule: "update", 
        sqlRule: "update",
-       methods: ["update", "upsert", "updateBatch"], 
+       methods: RULE_METHODS.update, 
        no_limits: <UpdateRule>{ fields: "*", filterFields: "*", returningFields: "*"  },
        table_only: true, 
        allowed_params: <Array<keyof UpdateRule>>["fields", "filterFields", "forcedFilter", "forcedData", "returningFields", "validate"] ,
@@ -1072,7 +1071,7 @@ const RULE_TO_METHODS = [
    { 
        rule: "select", 
        sqlRule: "select",
-       methods: ["findOne", "find", "count", "size"], 
+       methods: RULE_METHODS.select, 
        no_limits: <SelectRule>{ fields: "*", filterFields: "*" }, 
        table_only: false,
        allowed_params: <Array<keyof SelectRule>>["fields", "filterFields", "forcedFilter", "validate", "maxLimit"] ,
@@ -1081,7 +1080,7 @@ const RULE_TO_METHODS = [
    { 
        rule: "delete", 
        sqlRule: "delete",
-       methods: ["delete", "remove"], 
+       methods: RULE_METHODS.delete, 
        no_limits: <DeleteRule>{ filterFields: "*" } , 
        table_only: true,
        allowed_params: <Array<keyof DeleteRule>>["filterFields", "forcedFilter", "returningFields", "validate"] ,
@@ -1090,7 +1089,7 @@ const RULE_TO_METHODS = [
     { 
        rule: "sync", 
        sqlRule: "select",
-       methods: ["sync", "unsync"], 
+       methods: RULE_METHODS.sync, 
        no_limits: null,
        table_only: true,
        allowed_params: <Array<keyof SyncRule>>["id_fields", "synced_field", "sync_type", "allow_delete", "throttle", "batch_size"],
@@ -1099,7 +1098,7 @@ const RULE_TO_METHODS = [
     { 
         rule: "subscribe", 
         sqlRule: "select",
-        methods: ["unsubscribe", "subscribe", "subscribeOne"], 
+        methods: RULE_METHODS.subscribe, 
         no_limits: <SubscribeRule>{  throttle: 0  },
         table_only: true,
         allowed_params: <Array<keyof SubscribeRule>>["throttle"],
@@ -1379,8 +1378,8 @@ export class PublishParser {
 
     
     /* Prepares schema for client. Only allowed views and commands will be present */
-    async getSchemaFromPublish(socket: any): Promise<AnyObject> {
-        let schema: AnyObject = {};
+    async getSchemaFromPublish(socket: any): Promise<TableSchemaForClient> {
+        let schema: TableSchemaForClient = {};
         
         try {
             /* Publish tables and views based on socket */
@@ -1409,7 +1408,7 @@ export class PublishParser {
                         // if(tableName === "insert_rule") throw {table_rules}
                         if(table_rules && Object.keys(table_rules).length){
                             schema[tableName] = {};
-                            let methods: Array<typeof TABLE_METHODS[number]> = [];
+                            let methods: Array<MethodKey> = [];
         
                             if(typeof table_rules === "object"){
                                 methods = getKeys(table_rules) as any;

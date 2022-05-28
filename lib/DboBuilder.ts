@@ -25,6 +25,7 @@ import {
     SQLResult,
     Select,
     JoinMaker,
+    isObject, isDefined
 } from "prostgles-types";
 
 export type Media = {
@@ -73,7 +74,7 @@ export type DbHandler = {
 //     [key: string]: TX
 //   }>
 
-import { get, isDefined, isObject } from "./utils";
+import { get } from "./utils";
 import { getNewQuery, makeQuery, COMPUTED_FIELDS, SelectItem, FieldSpec, asNameAlias, SelectItemBuilder, FUNCTIONS, parseFunction, parseFunctionObject } from "./QueryBuilder";
 import { 
     DB, TableRule, SelectRule, InsertRule, UpdateRule, DeleteRule, SyncRule, Joins, Join, Prostgles, PublishParser, ValidateRow 

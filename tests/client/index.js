@@ -14,7 +14,8 @@ const log = (msg, extra) => {
 log("Started client...");
 const url = process.env.PRGL_CLIENT_URL || "http://127.0.0.1:3001", path = process.env.PRGL_CLIENT_PATH || "/teztz/s", socket = (0, socket_io_client_1.default)(url, { path, query: { token: "haha" } }), //  
 stopTest = (err) => {
-    log("Stopping client due to error: " + JSON.stringify(err));
+    if (err)
+        log("Stopping client due to error: " + JSON.stringify(err));
     setTimeout(() => {
         socket.emit("stop-test", !err ? err : { err: err.toString(), error: err }, cb => {
             log("Stopping client...");

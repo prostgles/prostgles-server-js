@@ -17,7 +17,7 @@ const asNameAlias = (field, tableAlias) => {
 exports.asNameAlias = asNameAlias;
 const parseFunctionObject = (funcData) => {
     const makeErr = (msg) => `Function not specified correctly. Expecting { $funcName: ["columnName",...] } object but got: ${JSON.stringify(funcData)} \n ${msg}`;
-    if (!(0, utils_1.isObject)(funcData))
+    if (!(0, prostgles_types_1.isObject)(funcData))
         throw makeErr("");
     const keys = Object.keys(funcData);
     if (keys.length !== 1)
