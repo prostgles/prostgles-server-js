@@ -25,7 +25,7 @@ import {
     SQLResult,
     Select,
     JoinMaker,
-    isObject, isDefined
+    isObject, isDefined, getKeys
 } from "prostgles-types";
 
 export type Media = {
@@ -3482,9 +3482,7 @@ function validateObj(obj: object, allowedKeys: string[]): object{
 export function isPlainObject(o: any): o is Record<string, any> {
     return Object(o) === o && Object.getPrototypeOf(o) === Object.prototype;
 }
-export function getKeys<T>(o: T): Array<keyof T>{
-    return Object.keys(o) as any
-}
+
 export function postgresToTsType(udt_data_type: PG_COLUMN_UDT_DATA_TYPE): keyof typeof TS_PG_Types {
     return getKeys(TS_PG_Types).find(k => {
         // @ts-ignore

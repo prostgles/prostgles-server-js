@@ -1,7 +1,7 @@
 import { PostgresNotifListenManager, PrglNotifListener } from "./PostgresNotifListenManager";
 import { DB, PGP } from "./Prostgles";
-import { SQLRequest, SQLOptions, CHANNELS, asName } from "prostgles-types";
-import { getKeys, PRGLIOSocket } from "./DboBuilder";
+import { getKeys, CHANNELS } from "prostgles-types";
+import { PRGLIOSocket } from "./DboBuilder";
 
 export class DBEventsManager {
 

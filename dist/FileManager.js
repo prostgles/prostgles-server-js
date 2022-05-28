@@ -6,7 +6,6 @@ const fs = require("fs");
 const FileType = require("file-type");
 const sharp = require("sharp");
 const prostgles_types_1 = require("prostgles-types");
-const DboBuilder_1 = require("./DboBuilder");
 const HOUR = 3600 * 1000;
 const asSQLIdentifier = async (name, db) => {
     return (await db.one("select format('%I', $1) as name", [name]))?.name;
@@ -226,7 +225,7 @@ class FileManager {
     ;
     async getMIME(file, fileName, allowedExtensions, dissallowedExtensions, onlyFromName = true) {
         const nameParts = fileName.split(".");
-        const nameExt = nameParts[nameParts.length - 1].toLowerCase(), mime = (0, DboBuilder_1.getKeys)(CONTENT_TYPE_TO_EXT).find(k => CONTENT_TYPE_TO_EXT[k].includes(nameExt));
+        const nameExt = nameParts[nameParts.length - 1].toLowerCase(), mime = (0, prostgles_types_1.getKeys)(CONTENT_TYPE_TO_EXT).find(k => CONTENT_TYPE_TO_EXT[k].includes(nameExt));
         let type = {
             fileName,
             mime,

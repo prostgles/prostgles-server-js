@@ -5,7 +5,7 @@
  *--------------------------------------------------------------------------------------------*/
 var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.postgresToTsType = exports.getKeys = exports.isPlainObject = exports.DboBuilder = exports.TableHandler = exports.ViewHandler = exports.EXISTS_KEYS = exports.pgp = void 0;
+exports.postgresToTsType = exports.isPlainObject = exports.DboBuilder = exports.TableHandler = exports.ViewHandler = exports.EXISTS_KEYS = exports.pgp = void 0;
 const Bluebird = require("bluebird");
 // declare global { export interface Promise<T> extends Bluebird<T> {} }
 const pgPromise = require("pg-promise");
@@ -761,7 +761,7 @@ class ViewHandler {
             if (!f)
                 throw "Invalid/missing group filter provided";
             let result = "";
-            let keys = getKeys(f);
+            let keys = (0, prostgles_types_1.getKeys)(f);
             if (!keys.length)
                 return result;
             if ((keys.includes($and_key) || keys.includes($or_key))) {
@@ -1615,7 +1615,7 @@ class TableHandler extends ViewHandler {
             row[synced_field] = Date.now();
         }
         let data = this.prepareFieldValues(row, forcedData, allowedFields, fixIssues);
-        const dataKeys = getKeys(data);
+        const dataKeys = (0, prostgles_types_1.getKeys)(data);
         dataKeys.map(col => {
             this.dboBuilder.prostgles?.tableConfigurator?.checkColVal({ table: this.name, col, value: data[col] });
             const colConfig = this.dboBuilder.prostgles?.tableConfigurator?.getColumnConfig(this.name, col);
@@ -2671,12 +2671,8 @@ function isPlainObject(o) {
     return Object(o) === o && Object.getPrototypeOf(o) === Object.prototype;
 }
 exports.isPlainObject = isPlainObject;
-function getKeys(o) {
-    return Object.keys(o);
-}
-exports.getKeys = getKeys;
 function postgresToTsType(udt_data_type) {
-    return getKeys(prostgles_types_1.TS_PG_Types).find(k => {
+    return (0, prostgles_types_1.getKeys)(prostgles_types_1.TS_PG_Types).find(k => {
         // @ts-ignore
         return prostgles_types_1.TS_PG_Types[k].includes(udt_data_type) || !prostgles_types_1.TS_PG_Types[k].length;
     });

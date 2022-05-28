@@ -164,7 +164,7 @@ class Prostgles {
             const methods = await publishParser?.getMethods(socket);
             const clientSchema = {
                 schema,
-                methods: (0, DboBuilder_1.getKeys)(methods),
+                methods: (0, prostgles_types_1.getKeys)(methods),
                 ...(fullSchema ? { fullSchema } : {}),
                 rawSQL,
                 joinTables: joinTables2,
@@ -641,7 +641,7 @@ class PublishParser {
         const publishParams = await this.getPublishParams({ socket });
         const _methods = await applyParamsIfFunc(this.publishMethods, publishParams);
         if (_methods && Object.keys(_methods).length) {
-            (0, DboBuilder_1.getKeys)(_methods).map(key => {
+            (0, prostgles_types_1.getKeys)(_methods).map(key => {
                 if (_methods[key] && (typeof _methods[key] === "function" || typeof _methods[key].then === "function")) {
                     //@ts-ignore
                     methods[key] = _methods[key];
@@ -773,8 +773,8 @@ class PublishParser {
                     Add defaults
                     Check for invalid params
                 */
-                if (table_rules && (0, DboBuilder_1.getKeys)(table_rules).length && table_rules !== "*") {
-                    const ruleKeys = (0, DboBuilder_1.getKeys)(table_rules);
+                if (table_rules && (0, prostgles_types_1.getKeys)(table_rules).length && table_rules !== "*") {
+                    const ruleKeys = (0, prostgles_types_1.getKeys)(table_rules);
                     // @ts-ignore
                     ruleKeys.filter(m => table_rules[m])
                         .find(method => {
@@ -792,7 +792,7 @@ class PublishParser {
                         /* Methods do not have params -> They use them from rules */
                         if (method === rm.rule) {
                             // @ts-ignore
-                            let method_params = (0, DboBuilder_1.getKeys)(table_rules[method]);
+                            let method_params = (0, prostgles_types_1.getKeys)(table_rules[method]);
                             let iparam = method_params.find(p => !rm?.allowed_params.includes(p));
                             if (iparam) {
                                 throw `Invalid setting in publish.${tableName}.${method} -> ${iparam}. \n Expecting any of: ${rm.allowed_params.join(", ")}`;
@@ -862,7 +862,7 @@ class PublishParser {
                         schema[tableName] = {};
                         let methods = [];
                         if (typeof table_rules === "object") {
-                            methods = (0, DboBuilder_1.getKeys)(table_rules);
+                            methods = (0, prostgles_types_1.getKeys)(table_rules);
                         }
                         await Promise.all(methods.filter(m => m !== "select").map(async (method) => {
                             if (method === "sync" && table_rules[method]) {

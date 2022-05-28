@@ -398,7 +398,6 @@ declare type PGConstraint = {
     relname: string;
 };
 export declare function isPlainObject(o: any): o is Record<string, any>;
-export declare function getKeys<T>(o: T): Array<keyof T>;
 export declare function postgresToTsType(udt_data_type: PG_COLUMN_UDT_DATA_TYPE): keyof typeof TS_PG_Types;
 export {};
 //# sourceMappingURL=DboBuilder.d.ts.map

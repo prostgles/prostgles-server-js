@@ -10,7 +10,7 @@ const parseFilterItem = (args) => {
     const mErr = (msg) => {
         throw `${msg}: ${JSON.stringify(_f, null, 2)}`;
     }, asValue = (v) => pgp.as.format("$1", [v]);
-    const fKeys = (0, DboBuilder_1.getKeys)(_f);
+    const fKeys = (0, prostgles_types_1.getKeys)(_f);
     if (fKeys.length === 0) {
         return "";
     }

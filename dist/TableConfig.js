@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const prostgles_types_1 = require("prostgles-types");
-const DboBuilder_1 = require("./DboBuilder");
 const PubSubManager_1 = require("./PubSubManager");
 /**
  * Will be run between initSQL and fileTable
@@ -172,12 +171,12 @@ class TableConfigurator {
                 }
             }
             if ("constraints" in tableConf && tableConf.constraints) {
-                (0, DboBuilder_1.getKeys)(tableConf.constraints).map(constraintName => {
+                (0, prostgles_types_1.getKeys)(tableConf.constraints).map(constraintName => {
                     queries.push(`ALTER TABLE ${(0, prostgles_types_1.asName)(tableName)} ADD CONSTRAINT ${(0, prostgles_types_1.asName)(constraintName)} ${tableConf.constraints[constraintName]} ;`);
                 });
             }
             if ("indexes" in tableConf && tableConf.indexes) {
-                (0, DboBuilder_1.getKeys)(tableConf.indexes).map(indexName => {
+                (0, prostgles_types_1.getKeys)(tableConf.indexes).map(indexName => {
                     const { concurrently, unique, using, definition, replace } = tableConf.indexes[indexName];
                     if (replace || typeof replace !== "boolean" && tableConf.replaceUniqueIndexes) {
                         queries.push(`DROP INDEX IF EXISTS ${(0, prostgles_types_1.asName)(indexName)}  ;`);

@@ -3,7 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.DBEventsManager = void 0;
 const PostgresNotifListenManager_1 = require("./PostgresNotifListenManager");
 const prostgles_types_1 = require("prostgles-types");
-const DboBuilder_1 = require("./DboBuilder");
 class DBEventsManager {
     constructor(db_pg, pgp) {
         this.notifies = {};
@@ -110,7 +109,7 @@ class DBEventsManager {
             /* UNLISTEN if no listeners ?? */
         }
         if (socket) {
-            (0, DboBuilder_1.getKeys)(this.notifies).forEach(channel => {
+            (0, prostgles_types_1.getKeys)(this.notifies).forEach(channel => {
                 this.notifies[channel].sockets = this.notifies[channel].sockets.filter(s => s.id !== socket.id);
             });
         }

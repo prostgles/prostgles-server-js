@@ -1090,7 +1090,7 @@ class PubSubManager {
                         2. Ask for data >= server_synced    emit(onPullRequest)
                             -> Upsert that data
                         2. Push data >= last_synced     emit(data.data)
-
+          
                        Client will:
                         1. Send last_synced     on(onSyncRequest)
                         2. Send data >= server_synced   on(onPullRequest)
@@ -1270,10 +1270,11 @@ class PubSubManager {
         }
         if (this.syncs) {
             this.syncs = this.syncs.filter(s => {
+                const matchesSocket = Boolean(socket && s.socket_id !== socket.id);
                 if (channel_name) {
-                    return (socket && s.socket_id !== socket.id) || s.channel_name !== channel_name;
+                    return matchesSocket || s.channel_name !== channel_name;
                 }
-                return (socket && s.socket_id !== socket.id);
+                return matchesSocket;
             });
         }
         if (!socket) {

@@ -7,8 +7,8 @@ import * as FileType from "file-type";
 import * as sharp from "sharp";
 
 import { DB, DbHandler, Prostgles } from './Prostgles';
-import { asName, AnyObject } from 'prostgles-types';
-import { getKeys, TableHandler } from './DboBuilder';
+import { asName, getKeys } from 'prostgles-types';
+import { TableHandler } from './DboBuilder';
 
 const HOUR = 3600 * 1000;
 
