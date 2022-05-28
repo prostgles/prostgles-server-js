@@ -692,9 +692,10 @@ export const FUNCTIONS: FunctionSpec[] = [
       if(![1,2].includes(validCols)) throw new Error("Must have one or two column names")
       const [leftField, rightField] = args;
       const leftQ = asNameAlias(leftField, tableAlias);
-      const rightQ = rightField? ("," + asNameAlias(rightField, tableAlias)) : "";
+      let rightQ = rightField? asNameAlias(rightField, tableAlias) : "";
       if(funcName === "age"){
-        return `${funcName}(${leftQ}, ${rightQ})`;
+        if(rightQ) rightQ = ", " + rightQ;
+        return `${funcName}(${leftQ} ${rightQ})`;
       } else {
         return `${leftQ} - ${rightQ}`;
       }

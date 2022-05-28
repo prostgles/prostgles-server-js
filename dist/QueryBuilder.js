@@ -558,9 +558,11 @@ exports.FUNCTIONS = [
                 throw new Error("Must have one or two column names");
             const [leftField, rightField] = args;
             const leftQ = (0, exports.asNameAlias)(leftField, tableAlias);
-            const rightQ = rightField ? ("," + (0, exports.asNameAlias)(rightField, tableAlias)) : "";
+            let rightQ = rightField ? (0, exports.asNameAlias)(rightField, tableAlias) : "";
             if (funcName === "age") {
-                return `${funcName}(${leftQ}, ${rightQ})`;
+                if (rightQ)
+                    rightQ = ", " + rightQ;
+                return `${funcName}(${leftQ} ${rightQ})`;
             }
             else {
                 return `${leftQ} - ${rightQ}`;
