@@ -3133,7 +3133,7 @@ export type TxCB = {
                 } else if(this.db) {
 
                     let finalQuery = query + "";
-                    if(returnType === "arrayMode" && !query.toLowerCase().trim().startsWith("listen ")){
+                    if(returnType === "arrayMode" && !["listen ", "notify "].find(c => query.toLowerCase().trim().startsWith(c))){
                         finalQuery = new PQ({ text: pgp.as.format(query, params), rowMode: "array" });
                     }
 
