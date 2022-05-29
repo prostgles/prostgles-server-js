@@ -133,8 +133,8 @@ async function client_only(db, auth, log, methods) {
                         latest: await db.planes.findOne({}, { orderBy: { last_updated: -1 } }),
                     };
                     const syncCounts = {
-                        x10: sync?.getItems().filter(d => d.x == 10),
-                        x20: sync?.getItems().filter(d => d.x == 20),
+                        x10: sync?.getItems().filter(d => d.x == 10).length,
+                        x20: sync?.getItems().filter(d => d.x == 20).length,
                         latest: sync?.getItems()?.sort((a, b) => +b.last_updated - +a.last_updated)[0],
                     };
                     const msg = "Replication test failed due to taking longer than " + msLimit + "ms \n " + JSON.stringify({ dbCounts, syncCounts }, null, 2);
