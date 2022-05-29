@@ -36,7 +36,7 @@ async function client_only(db, auth, log, methods) {
                 });
                 await (0, isomorphic_queries_1.tryRunP)("sql LISTEN NOTIFY events", async (resolve, reject) => {
                     try {
-                        const sub = await db.sql("LISTEN chnl ", {}, { returnType: "allowListen" });
+                        const sub = await db.sql("LISTEN chnl ", {}, { allowListen: true });
                         if (!("addListener" in sub)) {
                             reject("addListener missing");
                             return;

@@ -3118,7 +3118,7 @@ export type TxCB = {
 
                 if(!(await canRunSQL(localParams))) throw "Not allowed to run SQL";
 
-                const { returnType }: SQLOptions = options || ({} as any);
+                const { returnType, allowListen }: SQLOptions = options || ({} as any);
                 const { socket } = localParams || {};
 
                 if(returnType === "noticeSubscription"){
@@ -3159,7 +3159,7 @@ export type TxCB = {
                     }
 
                     if(command === "LISTEN"){
-                        if(returnType !== "allowListen") throw new Error(`Your query contains a LISTEN command. Set { returnType: "allowListen" } to get subscription hooks. Or ignore this message`)
+                        if(!allowListen) throw new Error(`Your query contains a LISTEN command. Set { allowListen: true } to get subscription hooks. Or ignore this message`)
                         if(!socket) throw "Only allowed with client socket"
                         return await this.prostgles.dbEventsManager?.addNotify(query, socket);
 
