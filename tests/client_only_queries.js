@@ -69,12 +69,6 @@ async function client_only(db, auth, log, methods) {
                 }, log);
                 /* REPLICATION */
                 let start = Date.now();
-                const msLimit = 20000;
-                setTimeout(() => {
-                    const msg = "Replication test failed due to taking longer than " + msLimit + "ms";
-                    log(msg);
-                    reject(msg);
-                }, msLimit);
                 await db.planes.delete();
                 let inserts = new Array(100).fill(null).map((d, i) => ({ id: i, flight_number: `FN${i}`, x: Math.random(), y: i }));
                 await db.planes.insert(inserts);
@@ -131,8 +125,22 @@ async function client_only(db, auth, log, methods) {
                         resolve(true);
                     }
                 });
-                // sync.upsert(inserts)
-                // await db.planes.update({}, { x: 20, last_updated: Date.now() });
+                const msLimit = 20000;
+                setTimeout(async () => {
+                    const dbCounts = {
+                        x10: await db.planes.count({ x: 10 }),
+                        x20: await db.planes.count({ x: 20 }),
+                        latest: await db.planes.findOne({}, { orderBy: { last_updated: -1 } }),
+                    };
+                    const syncCounts = {
+                        x10: sync?.getItems().filter(d => d.x == 10),
+                        x20: sync?.getItems().filter(d => d.x == 20),
+                        latest: sync?.getItems()?.sort((a, b) => +b.last_updated - +a.last_updated)[0],
+                    };
+                    const msg = "Replication test failed due to taking longer than " + msLimit + "ms \n " + JSON.stringify({ dbCounts, syncCounts }, null, 2);
+                    log(msg);
+                    reject(msg);
+                }, msLimit);
             }
             catch (err) {
                 log(JSON.stringify(err));

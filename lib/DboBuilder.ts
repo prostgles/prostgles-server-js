@@ -3176,7 +3176,7 @@ export type TxCB = {
                         
                     } else {
 
-                        let qres: SQLResult = {
+                        let qres: SQLResult<typeof returnType> = {
                             duration: 0,
                             ..._qres,
                             fields: fields?.map(f => {
