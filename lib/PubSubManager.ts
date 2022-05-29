@@ -12,7 +12,7 @@ import * as Bluebird from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg from 'pg-promise/typescript/pg-subset';
 
-import { SelectParamsBasic as SelectParams, OrderBy, FieldFilter, asName, WAL, isEmpty, AnyObject } from "prostgles-types";
+import { SelectParamsBasic as SelectParams, OrderBy, FieldFilter, asName, WAL, isEmpty, AnyObject, getKeys } from "prostgles-types";
 
 import { ClientExpressData, syncData } from "./SyncReplication";
 
@@ -1048,8 +1048,7 @@ export class PubSubManager {
 
 
         syncs.map((s) => {
-          log("PG Trigger -> syncData. LR: ", s.lr);
-          this.syncData(s);
+          this.syncData(s, undefined, "trigger");
         });
 
         if (!subs) {
@@ -1153,8 +1152,8 @@ export class PubSubManager {
   }
 
   syncTimeout?: ReturnType<typeof setTimeout>;
-  async syncData(sync: SyncParams, clientData?: ClientExpressData) {
-    return await syncData(this, sync, clientData);
+  async syncData(sync: SyncParams, clientData: ClientExpressData | undefined, source: "trigger" | "client") {
+    return await syncData(this, sync, clientData, source);
   }
 
   /**
@@ -1246,7 +1245,7 @@ export class PubSubManager {
           // } else 
           if (data.onSyncRequest) {
             // console.log("syncData from socket")
-            this.syncData(newSync, data.onSyncRequest);
+            this.syncData(newSync, data.onSyncRequest, "client");
 
             // console.log("onSyncRequest ", socket._user)
           } else {
@@ -1594,20 +1593,21 @@ export class PubSubManager {
   }
 }
 
+export function omitKeys<T extends AnyObject, Exclude extends keyof T>(obj: T, exclude: Exclude[]): Omit<T, Exclude> {
+  return pickKeys(obj, getKeys(obj ?? []).filter(k => !exclude.includes(k as any)))
+}
 
-/* Get only the specified properties of an object */
-export function filterObj(obj: AnyObject, keys: string[] = [], exclude?: string[]): AnyObject {
-  if (exclude && exclude.length) keys = Object.keys(obj).filter(k => !exclude.includes(k))
+export function pickKeys<T extends AnyObject, Include extends keyof T>(obj: T, include: Include[] = []): Pick<T, Include> {
+  let keys = include;
   if (!keys.length) {
-    // console.warn("filterObj: returning empty object");
-    return {};
+    return {} as any;
   }
   if (obj && keys.length) {
     let res: AnyObject = {};
-    keys.map(k => {
+    keys.forEach(k => {
       res[k] = obj[k];
     });
-    return res;
+    return res as any;
   }
 
   return obj;

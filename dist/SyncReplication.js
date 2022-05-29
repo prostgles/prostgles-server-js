@@ -6,8 +6,8 @@ const prostgles_types_1 = require("prostgles-types");
 function getNumbers(numberArr) {
     return numberArr.filter(v => v !== null && v !== undefined && Number.isFinite(+v));
 }
-const syncData = async (_this, sync, clientData) => {
-    // console.log("S", clientData)
+const syncData = async (_this, sync, clientData, source) => {
+    (0, PubSubManager_1.log)("syncData", { clientData, sync: (0, PubSubManager_1.pickKeys)(sync, ["filter", "last_synced", "lr", "is_syncing"]), source });
     const { socket_id, channel_name, table_name, filter, table_rules, allow_delete = false, params, synced_field, id_fields = [], batch_size, wal, throttle = 0 } = sync, socket = _this.sockets[socket_id];
     if (!socket) {
         console.error("Orphaned socket", { sync, clientData });
@@ -98,7 +98,7 @@ const syncData = async (_this, sync, clientData) => {
         // console.log("deleteData deleteData  deleteData " + deleted.length);
         if (allow_delete) {
             return Promise.all(deleted.map(async (d) => {
-                const id_filter = (0, PubSubManager_1.filterObj)(d, id_fields);
+                const id_filter = (0, PubSubManager_1.pickKeys)(d, id_fields);
                 try {
                     await _this.dbo[table_name].delete(id_filter, undefined, undefined, table_rules);
                     return 1;
@@ -118,45 +118,47 @@ const syncData = async (_this, sync, clientData) => {
      * Upserts the given client data where synced_field is higher than on server
      */
     upsertData = (data, isExpress = false) => {
-        let inserted = 0, updated = 0, total = data.length;
         // console.log("isExpress", isExpress, data);
         return _this.dboBuilder.getTX(async (dbTX) => {
             const tbl = dbTX[table_name];
-            const existingData = await tbl.find({ $or: data.map(d => (0, PubSubManager_1.filterObj)(d, id_fields)) }, {
+            const existingData = await tbl.find({ $or: data.map(d => (0, PubSubManager_1.pickKeys)(d, id_fields)) }, {
                 select: [synced_field, ...id_fields],
                 orderBy: orderByAsc,
             }, undefined, table_rules);
-            const inserts = data.filter(d => !existingData.find(ed => rowsIdsMatch(ed, d)));
-            const updates = data.filter(d => existingData.find(ed => rowsIdsMatch(ed, d) && +ed[synced_field] < +d[synced_field]));
+            let inserts = data.filter(d => !existingData.find(ed => rowsIdsMatch(ed, d)));
+            let updates = data.filter(d => existingData.find(ed => rowsIdsMatch(ed, d) && +ed[synced_field] < +d[synced_field]));
             try {
                 if (!table_rules)
                     throw "table_rules missing";
                 if (table_rules.update && updates.length) {
                     let updateData = [];
                     await Promise.all(updates.map(upd => {
-                        const id_filter = (0, PubSubManager_1.filterObj)(upd, id_fields);
+                        const id_filter = (0, PubSubManager_1.pickKeys)(upd, id_fields);
                         const syncSafeFilter = { $and: [id_filter, { [synced_field]: { "<": upd[synced_field] } }] };
-                        // return tbl.update(syncSafeFilter, filterObj(upd, [], id_fields), { fixIssues: true }, table_rules)
-                        updateData.push([syncSafeFilter, (0, PubSubManager_1.filterObj)(upd, [], id_fields)]);
+                        updateData.push([syncSafeFilter, (0, PubSubManager_1.omitKeys)(upd, id_fields)]);
                     }));
                     await tbl.updateBatch(updateData, { fixIssues: true }, table_rules);
-                    updated = updates.length;
+                }
+                else {
+                    updates = [];
                 }
                 if (table_rules.insert && inserts.length) {
                     // const qs = await tbl.insert(inserts, { fixIssues: true }, null, table_rules, { returnQuery: true });
                     // console.log("inserts", qs)
                     await tbl.insert(inserts, { fixIssues: true }, undefined, table_rules);
-                    inserted = inserts.length;
                 }
-                return true;
+                else {
+                    inserts = [];
+                }
+                return { inserts, updates };
             }
             catch (e) {
                 console.trace(e);
                 throw e;
             }
-        }).then(res => {
-            (0, PubSubManager_1.log)(`upsertData: inserted( ${inserted} )    updated( ${updated} )     total( ${total} )`);
-            return { inserted, updated, total };
+        }).then(({ inserts, updates }) => {
+            (0, PubSubManager_1.log)(`upsertData: inserted( ${inserts.length} )    updated( ${updates.length} )     total( ${data.length} ) \n last insert ${JSON.stringify(inserts.at(-1))} \n last update ${JSON.stringify(updates.at(-1))}`);
+            return { inserted: inserts.length, updated: updates.length, total: data.length };
         })
             .catch(err => {
             console.trace("Something went wrong with syncing to server: \n ->", err, data.length, id_fields);
@@ -283,7 +285,7 @@ const syncData = async (_this, sync, clientData) => {
                 });
                 await Promise.all(to_delete.map(d => {
                     deleted++;
-                    return _this.dbo[table_name].delete((0, PubSubManager_1.filterObj)(d, id_fields), {}, undefined, table_rules);
+                    return _this.dbo[table_name].delete((0, PubSubManager_1.pickKeys)(d, id_fields), {}, undefined, table_rules);
                 }));
                 sData = await getServerData(min_synced, offset);
             }
@@ -338,7 +340,7 @@ const syncData = async (_this, sync, clientData) => {
                 /**
                  * After all data was inserted request SyncInfo from client and sync again if necessary
                  */
-                _this.syncData(sync, undefined);
+                _this.syncData(sync, undefined, source);
             },
         });
     }
@@ -350,7 +352,7 @@ const syncData = async (_this, sync, clientData) => {
             _this.syncTimeout = setTimeout(() => {
                 _this.syncTimeout = undefined;
                 // console.log("SYNC FROM TIMEOUT")
-                _this.syncData(sync, undefined);
+                _this.syncData(sync, undefined, source);
             }, throttle);
         }
         // console.log("SYNC THROTTLE")

@@ -19,11 +19,10 @@ export async function tryRun(desc: string, func: () => any, log?: Function){
 export function tryRunP(desc: string, func: (resolve: any, reject: any) => any, log?: Function){
   return new Promise(async (rv, rj) => {
     try {
-      await func(rv, rj)
+      await func(rv, rj);
     } catch(err: any){
-      log?.(JSON.stringify(err));
+      log?.(`${desc} failed: ` + JSON.stringify(err));
       setTimeout(() => {
-        log?.("Throw err");
         throw err;
       }, 1000)
     }
@@ -45,17 +44,6 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     await db.items.delete({ });
   
   }
-
-
-  // await tryRun("UUID data", async () => {
-  //   const r = await db.uuid_text.insert({}, { returning: "*"});
-  //   throw r;
-  // })
-
-  // setTimeout(async () => {
-  // 	await db.any("DROP TABLE IF EXISTS tt; CREATE TABLE tt(id serial);");
-
-  // }, 500)
   
   
   await tryRun("Prepare data", async () => {
@@ -472,8 +460,6 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
   });
 
   await tryRun("Postgis examples", async () => {
-
-  await tryRun("Postgis examples", async () => {
     await db.shapes.delete();
     const p1 = { ST_GeomFromText: ["POINT(-1 1)", 4326] },
       p2 = { ST_GeomFromText: ["POINT(-2 2)", 4326] };
@@ -693,51 +679,6 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
       { select: { id: 1, items2: { name: "$max" } }}
     );
     assert.deepStrictEqual(shortHandAggJoined, { id: 4, items2: [] });
-    // console.log(JSON.stringify(shortHandAggJoined, null, 2));
-    // throw 1;
-
-    /* TODO joins & aggs */
-    // const aggsJoined = await db.items.find(
-    //   {}, 
-    //   { 
-    //     select: {
-    //       id: "$count", 
-    //       name: 1,
-    //       items2: {
-    //         id: 1
-    //       }
-    //     },
-    //     orderBy: {
-    //       id: -1
-    //     }
-    //   }
-    // );
-    // console.log(JSON.stringify(aggsJoined, null, 2))
-    // assert.deepStrictEqual(aggsJoined, [
-    //   {
-    //     "name": "a",
-    //     "items2": [
-    //       {
-    //         "id": 1
-    //       },
-    //       {
-    //         "id": 1
-    //       }
-    //     ],
-    //     "id": "2"
-    //   },
-    //   {
-    //     "name": "b",
-    //     "items2": [],
-    //     "id": "1"
-    //   },
-    //   {
-    //     "name": "tx",
-    //     "items2": [],
-    //     "id": "1"
-    //   }
-    // ], "Joined aggregation query failed");
-
   });
 
 

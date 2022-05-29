@@ -5,7 +5,7 @@
  *--------------------------------------------------------------------------------------------*/
 var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.filterObj = exports.PubSubManager = exports.log = exports.DEFAULT_SYNC_BATCH_SIZE = exports.asValue = void 0;
+exports.pickKeys = exports.omitKeys = exports.PubSubManager = exports.log = exports.DEFAULT_SYNC_BATCH_SIZE = exports.asValue = void 0;
 const PostgresNotifListenManager_1 = require("./PostgresNotifListenManager");
 const utils_1 = require("./utils");
 const Prostgles_1 = require("./Prostgles");
@@ -860,8 +860,7 @@ class PubSubManager {
                     const subs = this.getSubs(table_name, condition);
                     const syncs = this.getSyncs(table_name, condition);
                     syncs.map((s) => {
-                        (0, exports.log)("PG Trigger -> syncData. LR: ", s.lr);
-                        this.syncData(s);
+                        this.syncData(s, undefined, "trigger");
                     });
                     if (!subs) {
                         // console.error(`sub missing for ${table_name} ${condition}`, this.triggers);
@@ -1027,8 +1026,8 @@ class PubSubManager {
             socket.on("disconnect", () => this.onSocketDisconnected(socket));
         }
     }
-    async syncData(sync, clientData) {
-        return await (0, SyncReplication_1.syncData)(this, sync, clientData);
+    async syncData(sync, clientData, source) {
+        return await (0, SyncReplication_1.syncData)(this, sync, clientData, source);
     }
     /**
      * Returns a sync channel
@@ -1103,7 +1102,7 @@ class PubSubManager {
                     // } else 
                     if (data.onSyncRequest) {
                         // console.log("syncData from socket")
-                        this.syncData(newSync, data.onSyncRequest);
+                        this.syncData(newSync, data.onSyncRequest, "client");
                         // console.log("onSyncRequest ", socket._user)
                     }
                     else {
@@ -1357,22 +1356,23 @@ PubSubManager.create = async (options) => {
     return await res.init();
 };
 PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from ";
-/* Get only the specified properties of an object */
-function filterObj(obj, keys = [], exclude) {
-    if (exclude && exclude.length)
-        keys = Object.keys(obj).filter(k => !exclude.includes(k));
+function omitKeys(obj, exclude) {
+    return pickKeys(obj, (0, prostgles_types_1.getKeys)(obj ?? []).filter(k => !exclude.includes(k)));
+}
+exports.omitKeys = omitKeys;
+function pickKeys(obj, include = []) {
+    let keys = include;
     if (!keys.length) {
-        // console.warn("filterObj: returning empty object");
         return {};
     }
     if (obj && keys.length) {
         let res = {};
-        keys.map(k => {
+        keys.forEach(k => {
             res[k] = obj[k];
         });
         return res;
     }
     return obj;
 }
-exports.filterObj = filterObj;
+exports.pickKeys = pickKeys;
 //# sourceMappingURL=PubSubManager.js.map

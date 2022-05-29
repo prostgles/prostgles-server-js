@@ -4,14 +4,13 @@ const assert_1 = require("assert");
 const isomorphic_queries_1 = require("./isomorphic_queries");
 async function client_only(db, auth, log, methods) {
     const testRealtime = () => {
-        log("Started testRealtime");
         return new Promise(async (resolve, reject) => {
             try {
                 /* METHODS */
                 const t222 = await methods.get();
                 assert_1.strict.equal(t222, 222, "methods.get() failed");
                 /* RAWSQL */
-                await (0, isomorphic_queries_1.tryRunP)("SQL Full result", async (resolve, reject) => {
+                await (0, isomorphic_queries_1.tryRun)("SQL Full result", async () => {
                     const sqlStatement = await db.sql("SELECT $1", [1], { returnType: "statement" });
                     assert_1.strict.equal(sqlStatement, "SELECT 1", "db.sql statement query failed");
                     const arrayMode = await db.sql("SELECT 1 as a, 2 as a", undefined, { returnType: "arrayMode" });
@@ -34,29 +33,35 @@ async function client_only(db, auth, log, methods) {
                             udt_name: 'int4',
                             tsDataType: "number"
                         }], "db.sql query failed");
-                    resolve(true);
-                }, log);
+                });
                 await (0, isomorphic_queries_1.tryRunP)("sql LISTEN NOTIFY events", async (resolve, reject) => {
-                    const sub = await db.sql("LISTEN chnl ");
-                    // console.log({ sub })
-                    sub.addListener(notif => {
-                        // console.log({ notif })
-                        if (notif === "hello")
-                            resolve(true);
-                        else
-                            reject("Something went bad");
-                    });
-                    db.sql("NOTIFY chnl , 'hello'; ");
-                }, log);
+                    try {
+                        const sub = await db.sql("LISTEN chnl ", {}, { returnType: "allowListen" });
+                        if (!("addListener" in sub)) {
+                            reject("addListener missing");
+                            return;
+                        }
+                        sub.addListener(notif => {
+                            const expected = "hello";
+                            if (notif === expected)
+                                resolve(true);
+                            else
+                                reject(`Notif value is not what we expect: ${JSON.stringify(notif)} is not ${JSON.stringify(expected)} (expected) `);
+                        });
+                        db.sql("NOTIFY chnl , 'hello'; ");
+                    }
+                    catch (e) {
+                        reject(e);
+                    }
+                });
                 await (0, isomorphic_queries_1.tryRunP)("sql NOTICE events", async (resolve, reject) => {
                     const sub = await db.sql("", {}, { returnType: "noticeSubscription" });
-                    // console.log({ sub })
                     sub.addListener(notice => {
-                        // console.log({ notif })
-                        if (notice.message === "hello2")
+                        const expected = "hello2";
+                        if (notice.message === expected)
                             resolve(true);
                         else
-                            reject("Something went bad");
+                            reject(`Notice value is not what we expect: ${JSON.stringify(notice)} is not ${JSON.stringify(expected)} (expected) `);
                     });
                     db.sql(`
           DO $$ 
@@ -68,7 +73,8 @@ async function client_only(db, auth, log, methods) {
         `);
                 }, log);
                 /* REPLICATION */
-                let start = Date.now();
+                log("Started testRealtime");
+                const start = Date.now();
                 await db.planes.delete();
                 let inserts = new Array(100).fill(null).map((d, i) => ({ id: i, flight_number: `FN${i}`, x: Math.random(), y: i }));
                 await db.planes.insert(inserts);

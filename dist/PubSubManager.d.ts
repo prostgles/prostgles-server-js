@@ -127,7 +127,7 @@ export declare class PubSubManager {
     pushSubData(sub: SubscriptionParams, err?: any): true | Promise<unknown>;
     upsertSocket(socket: any, channel_name: string): void;
     syncTimeout?: ReturnType<typeof setTimeout>;
-    syncData(sync: SyncParams, clientData?: ClientExpressData): Promise<void>;
+    syncData(sync: SyncParams, clientData: ClientExpressData | undefined, source: "trigger" | "client"): Promise<void>;
     /**
      * Returns a sync channel
      * A sync channel is unique per socket for each filter
@@ -150,6 +150,7 @@ export declare class PubSubManager {
         condition: string;
     }): Promise<true | undefined>;
 }
-export declare function filterObj(obj: AnyObject, keys?: string[], exclude?: string[]): AnyObject;
+export declare function omitKeys<T extends AnyObject, Exclude extends keyof T>(obj: T, exclude: Exclude[]): Omit<T, Exclude>;
+export declare function pickKeys<T extends AnyObject, Include extends keyof T>(obj: T, include?: Include[]): Pick<T, Include>;
 export {};
 //# sourceMappingURL=PubSubManager.d.ts.map

@@ -79,7 +79,7 @@ import { getNewQuery, makeQuery, COMPUTED_FIELDS, SelectItem, FieldSpec, asNameA
 import { 
     DB, TableRule, SelectRule, InsertRule, UpdateRule, DeleteRule, SyncRule, Joins, Join, Prostgles, PublishParser, ValidateRow 
 } from "./Prostgles";
-import { PubSubManager, filterObj, asValue, BasicCallback } from "./PubSubManager";
+import { PubSubManager, asValue, BasicCallback, pickKeys, omitKeys } from "./PubSubManager";
 
 import { parseFilterItem } from "./Filtering";
 
@@ -332,7 +332,7 @@ function makeErr(err: any, localParams?: LocalParams, view?: ViewHandler, allowe
     }
     const errObject = {
         ...((!localParams || !localParams.socket)? err : {}),
-        ...filterObj(err, ["column", "code", "table", "constraint"]),
+        ...pickKeys(err, ["column", "code", "table", "constraint"]),
         ...(err && err.toString? { txt: err.toString() } : {}),
         code_info: sqlErrCodeToMsg(err.code)
     };
@@ -384,7 +384,7 @@ class ColSet {
 
         if(isEmpty(data)) throw "No data";
 
-        let row = filterObj(data, allowedCols);
+        let row = pickKeys(data, allowedCols);
         if(validate){
             row = await validate(row);
         }
@@ -1380,7 +1380,7 @@ export class ViewHandler {
         });
         funcFilterkeys.map(f => {
             const funcArgs = data[f.name];
-            if(!Array.isArray(funcArgs)) throw `A function filter must contain an array. E.g: { $funcFilterName: ["col1"] } \n but got: ${JSON.stringify(filterObj(data, [f.name]))} `;
+            if(!Array.isArray(funcArgs)) throw `A function filter must contain an array. E.g: { $funcFilterName: ["col1"] } \n but got: ${JSON.stringify(pickKeys(data, [f.name]))} `;
             const fields = this.parseFieldFilter(f.getFields(funcArgs), true, allowed_colnames);
 
             const dissallowedCols = fields.filter(fname => !allowed_colnames.includes(fname))
@@ -1517,7 +1517,7 @@ export class ViewHandler {
         // const singleFuncs = FUNCTIONS.filter(f => f.singleColArg);
         
 
-        const f = filterObj(data, filterKeys) as any
+        const f = pickKeys(data, filterKeys);
         const q = parseFilterItem({
             filter: f,
             tableAlias,
@@ -1933,7 +1933,7 @@ export class TableHandler extends ViewHandler {
             const { filterFields, forcedFilter } = get(table_rules, "select") || {},
                 condition = await this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: undefined, localParams, tableRule: table_rules }),
                 throttle = get(params, "throttle") || 0,
-                selectParams = filterObj(params || {}, [], ["throttle"]);
+                selectParams = omitKeys(params || {}, ["throttle"]);
 
             // const { subOne = false } = localParams || {};
             const filterSize = JSON.stringify(filter || {}).length;
@@ -2274,7 +2274,7 @@ export class TableHandler extends ViewHandler {
                 /* Ensure we're using the same transaction */
                 const _this = this.t? this : dbTX![this.name] as TableHandler;
 
-                let rootData = filterObj(data, undefined, extraKeys);
+                let rootData = Array.isArray(data)? data.map(d => omitKeys(d, extraKeys)) :  omitKeys(data, extraKeys);
 
                 let insertedChildren: AnyObject[];
                 let targetTableRules: TableRule;
@@ -3159,6 +3159,7 @@ export type TxCB = {
                     }
 
                     if(command === "LISTEN"){
+                        if(returnType !== "allowListen") throw new Error(`Your query contains a LISTEN command. Set { returnType: "allowListen" } to get subscription hooks. Or ignore this message`)
                         if(!socket) throw "Only allowed with client socket"
                         return await this.prostgles.dbEventsManager?.addNotify(query, socket);
 

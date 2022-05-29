@@ -1,5 +1,5 @@
 
-import { PubSubManager, SyncParams, filterObj, log } from "./PubSubManager";
+import { PubSubManager, SyncParams, pickKeys, omitKeys, log } from "./PubSubManager";
 import { OrderBy, WAL, AnyObject, SyncBatchParams } from "prostgles-types";
 import { TableHandler } from "./DboBuilder";
 
@@ -42,8 +42,8 @@ function getNumbers(numberArr: (null | undefined | string | number)[]): number[]
     return numberArr.filter(v => v !== null && v !== undefined && Number.isFinite(+v)) as any;
 }
 
-export const syncData = async (_this: PubSubManager, sync: SyncParams, clientData?: ClientExpressData) => {
-    // console.log("S", clientData)
+export const syncData = async (_this: PubSubManager, sync: SyncParams, clientData: ClientExpressData | undefined, source: "trigger" | "client") => {
+    log("syncData", { clientData, sync: pickKeys(sync, ["filter", "last_synced", "lr", "is_syncing"]) , source })
     const { 
             socket_id, channel_name, table_name, filter, 
             table_rules, allow_delete = false, params,
@@ -162,7 +162,7 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
             // console.log("deleteData deleteData  deleteData " + deleted.length);
             if(allow_delete){
                 return Promise.all(deleted.map(async d => {
-                    const id_filter = filterObj(d, id_fields);
+                    const id_filter = pickKeys(d, id_fields);
                     try {
                         await (_this.dbo[table_name] as TableHandler).delete(id_filter, undefined, undefined, table_rules);
                         return 1;
@@ -181,16 +181,13 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
          * Upserts the given client data where synced_field is higher than on server  
          */
         upsertData = (data: AnyObject[], isExpress = false) => {
-            let inserted = 0,
-                updated = 0,
-                total = data.length;
 
             // console.log("isExpress", isExpress, data);
 
-            return _this.dboBuilder.getTX(async dbTX => {
+            return _this.dboBuilder.getTX(async (dbTX) => {
                 const tbl = dbTX[table_name] as TableHandler;
                 const existingData = await tbl.find(
-                    { $or: data.map(d => filterObj(d, id_fields)) }, 
+                    { $or: data.map(d => pickKeys(d, id_fields)) }, 
                     { 
                         select: [synced_field, ...id_fields] , 
                         orderBy: (orderByAsc as OrderBy), 
@@ -198,37 +195,40 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
                     undefined, 
                     table_rules
                 );
-                const inserts = data.filter(d => !existingData.find(ed => rowsIdsMatch(ed, d)));
-                const updates = data.filter(d =>  existingData.find(ed => rowsIdsMatch(ed, d) && +ed[synced_field] < +d[synced_field]) );
+                let inserts = data.filter(d => !existingData.find(ed => rowsIdsMatch(ed, d)));
+                let updates = data.filter(d =>  existingData.find(ed => rowsIdsMatch(ed, d) && +ed[synced_field] < +d[synced_field]) );
                 try {
                     if(!table_rules) throw "table_rules missing"
                     if(table_rules.update && updates.length){
                         let updateData: [any, any][] = [];
                         await Promise.all(updates.map(upd => {
-                            const id_filter = filterObj(upd, id_fields);
+                            const id_filter = pickKeys(upd, id_fields);
                             const syncSafeFilter = { $and: [id_filter, { [synced_field]: { "<": upd[synced_field] } } ] }
-                            // return tbl.update(syncSafeFilter, filterObj(upd, [], id_fields), { fixIssues: true }, table_rules)
-                            updateData.push([syncSafeFilter, filterObj(upd, [], id_fields)])
+                            
+                            updateData.push([syncSafeFilter, omitKeys(upd, id_fields)])
                         }));
-                        await tbl.updateBatch(updateData, { fixIssues: true }, table_rules)
-                        updated = updates.length;
+                        await tbl.updateBatch(updateData, { fixIssues: true }, table_rules);
+                    } else {
+                        updates = [];
                     }
+
                     if(table_rules.insert && inserts.length){
                         // const qs = await tbl.insert(inserts, { fixIssues: true }, null, table_rules, { returnQuery: true });
                         // console.log("inserts", qs)
                         await tbl.insert(inserts, { fixIssues: true }, undefined, table_rules);
-                        inserted = inserts.length;                       
+                    } else {
+                        inserts = [];
                     }
                     
-                    return true;
+                    return { inserts, updates };
                 } catch(e) {
                     console.trace(e);
                     throw e;
                 }
 
-            }).then(res => {
-                log(`upsertData: inserted( ${inserted} )    updated( ${updated} )     total( ${total} )`);
-                return { inserted , updated , total };
+            }).then(({ inserts, updates }) => {
+                log(`upsertData: inserted( ${inserts.length} )    updated( ${updates.length} )     total( ${data.length} ) \n last insert ${JSON.stringify(inserts.at(-1))} \n last update ${JSON.stringify(updates.at(-1))}`);
+                return { inserted: inserts.length , updated: updates.length , total: data.length };
             })
             .catch(err => {
                 console.trace("Something went wrong with syncing to server: \n ->", err, data.length, id_fields);
@@ -381,7 +381,7 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
                     });
                     await Promise.all(to_delete.map(d => {
                         deleted++;
-                        return (_this.dbo[table_name] as TableHandler).delete(filterObj(d, id_fields), { }, undefined, table_rules);
+                        return (_this.dbo[table_name] as TableHandler).delete(pickKeys(d, id_fields), { }, undefined, table_rules);
                     }));
                     sData = await getServerData(min_synced, offset);
                 }
@@ -447,7 +447,7 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
                 /**
                  * After all data was inserted request SyncInfo from client and sync again if necessary
                  */
-                _this.syncData(sync, undefined);
+                _this.syncData(sync, undefined, source);
             },
         })
     }
@@ -459,7 +459,7 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
             _this.syncTimeout = setTimeout(() => {
                 _this.syncTimeout = undefined;
                 // console.log("SYNC FROM TIMEOUT")
-                _this.syncData(sync, undefined);
+                _this.syncData(sync, undefined, source);
             }, throttle)
         }
         // console.log("SYNC THROTTLE")

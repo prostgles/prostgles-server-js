@@ -68,7 +68,7 @@ function makeErr(err, localParams, view, allowedKeys) {
     }
     const errObject = {
         ...((!localParams || !localParams.socket) ? err : {}),
-        ...(0, PubSubManager_1.filterObj)(err, ["column", "code", "table", "constraint"]),
+        ...(0, PubSubManager_1.pickKeys)(err, ["column", "code", "table", "constraint"]),
         ...(err && err.toString ? { txt: err.toString() } : {}),
         code_info: sqlErrCodeToMsg(err.code)
     };
@@ -106,7 +106,7 @@ class ColSet {
         }
         if ((0, prostgles_types_1.isEmpty)(data))
             throw "No data";
-        let row = (0, PubSubManager_1.filterObj)(data, allowedCols);
+        let row = (0, PubSubManager_1.pickKeys)(data, allowedCols);
         if (validate) {
             row = await validate(row);
         }
@@ -952,7 +952,7 @@ class ViewHandler {
         funcFilterkeys.map(f => {
             const funcArgs = data[f.name];
             if (!Array.isArray(funcArgs))
-                throw `A function filter must contain an array. E.g: { $funcFilterName: ["col1"] } \n but got: ${JSON.stringify((0, PubSubManager_1.filterObj)(data, [f.name]))} `;
+                throw `A function filter must contain an array. E.g: { $funcFilterName: ["col1"] } \n but got: ${JSON.stringify((0, PubSubManager_1.pickKeys)(data, [f.name]))} `;
             const fields = this.parseFieldFilter(f.getFields(funcArgs), true, allowed_colnames);
             const dissallowedCols = fields.filter(fname => !allowed_colnames.includes(fname));
             if (dissallowedCols.length) {
@@ -1063,7 +1063,7 @@ class ViewHandler {
         }
         /* TODO: Allow filter funcs */
         // const singleFuncs = FUNCTIONS.filter(f => f.singleColArg);
-        const f = (0, PubSubManager_1.filterObj)(data, filterKeys);
+        const f = (0, PubSubManager_1.pickKeys)(data, filterKeys);
         const q = (0, Filtering_1.parseFilterItem)({
             filter: f,
             tableAlias,
@@ -1425,7 +1425,7 @@ class TableHandler extends ViewHandler {
                 console.error({ localParams, localFunc });
                 throw " Cannot have localFunc AND socket ";
             }
-            const { filterFields, forcedFilter } = (0, utils_1.get)(table_rules, "select") || {}, condition = await this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: undefined, localParams, tableRule: table_rules }), throttle = (0, utils_1.get)(params, "throttle") || 0, selectParams = (0, PubSubManager_1.filterObj)(params || {}, [], ["throttle"]);
+            const { filterFields, forcedFilter } = (0, utils_1.get)(table_rules, "select") || {}, condition = await this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: undefined, localParams, tableRule: table_rules }), throttle = (0, utils_1.get)(params, "throttle") || 0, selectParams = (0, PubSubManager_1.omitKeys)(params || {}, ["throttle"]);
             // const { subOne = false } = localParams || {};
             const filterSize = JSON.stringify(filter || {}).length;
             if (filterSize * 4 > 2704) {
@@ -1701,7 +1701,7 @@ class TableHandler extends ViewHandler {
             else if (extraKeys.length) {
                 /* Ensure we're using the same transaction */
                 const _this = this.t ? this : dbTX[this.name];
-                let rootData = (0, PubSubManager_1.filterObj)(data, undefined, extraKeys);
+                let rootData = Array.isArray(data) ? data.map(d => (0, PubSubManager_1.omitKeys)(d, extraKeys)) : (0, PubSubManager_1.omitKeys)(data, extraKeys);
                 let insertedChildren;
                 let targetTableRules;
                 const fullRootResult = await _this.insert(rootData, { returning: "*" }, undefined, tableRules, localParams);
@@ -2443,6 +2443,8 @@ export type TxCB = {
                         this.prostgles.onSchemaChange({ command, query });
                     }
                     if (command === "LISTEN") {
+                        if (returnType !== "allowListen")
+                            throw new Error(`Your query contains a LISTEN command. Set { returnType: "allowListen" } to get subscription hooks. Or ignore this message`);
                         if (!socket)
                             throw "Only allowed with client socket";
                         return await this.prostgles.dbEventsManager?.addNotify(query, socket);
