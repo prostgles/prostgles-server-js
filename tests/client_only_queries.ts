@@ -93,6 +93,8 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       let inserts = new Array(100).fill(null).map((d, i) => ({ id: i, flight_number: `FN${i}`, x: Math.random(), y: i }));
       await db.planes.insert(inserts);
     
+      const CLOCK_DRIFT = 2000;
+
       if((await db.planes.count()) !== 100) throw "Not 100 planes";
 
       /**
@@ -112,17 +114,22 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
         log(Date.now() + ": sub stats: x10 -> " + p10.length + "    x20 ->" + planes.filter(p => p.x == 20).length);
   
         if(p10.length === 100){
-          // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log);
-  
-          sP.unsubscribe();
-          log(Date.now() + ": sub: db.planes.update({}, { x: 20, last_updated });");
-          const dLastUpdated = Math.max(...p10.map(v => +v.last_updated))
-          const last_updated = Date.now();
-          if(dLastUpdated >= last_updated) throw "dLastUpdated >= last_updated should not happen"
-          await db.planes.update({}, { x: 20, last_updated });
-          log(Date.now() + ": sub: Updated to x20" , await db.planes.count({ x: 20 }))
-  
-          // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log)
+
+          /** 2 second delay to account for client-server clock drift */
+          setTimeout(async () => {
+
+            // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log);
+    
+            sP.unsubscribe();
+            log(Date.now() + ": sub: db.planes.update({}, { x: 20, last_updated });");
+            const dLastUpdated = Math.max(...p10.map(v => +v.last_updated))
+            const last_updated = Date.now();
+            if(dLastUpdated >= last_updated) throw "dLastUpdated >= last_updated should not happen"
+            await db.planes.update({}, { x: 20, last_updated });
+            log(Date.now() + ": sub: Updated to x20" , await db.planes.count({ x: 20 }))
+    
+            // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log)
+          }, CLOCK_DRIFT)
         }
       }); 
       
@@ -148,7 +155,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
         if(x20 === 100){
           // log(22)
           // console.timeEnd("test")
-          log(Date.now() + ": sync end: Finished replication test. Inserting 100 rows then updating two times took: " + (Date.now() - start) + "ms")
+          log(Date.now() + ": sync end: Finished replication test. Inserting 100 rows then updating two times took: " + (Date.now() - start - CLOCK_DRIFT) + "ms")
           resolve(true)
         }
       });
