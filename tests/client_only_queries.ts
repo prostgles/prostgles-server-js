@@ -48,7 +48,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
         
         try {
           
-          const sub = await db.sql("LISTEN chnl ", {}, { allowListen: true });
+          const sub = await db.sql("LISTEN chnl ", {}, { allowListen: true, returnType: "arrayMode" });
           if(!("addListener" in sub)) {
             reject("addListener missing");
             return
