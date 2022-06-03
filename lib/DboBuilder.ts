@@ -2135,20 +2135,6 @@ export class TableHandler extends ViewHandler {
             }
         }
 
-
-        if(tableRules?.update?.dynamicFields?.length){
-            let found = false;
-            for await(const dfRule of tableRules.update.dynamicFields){
-                if(!found){
-                    const count = await this.count(finalUpdateFilter);
-                    if(count && +count > 0){
-                        found = true;
-                        fields = dfRule.fields;
-                    }
-                }
-            }
-        }
-
         /* Update all allowed fields (fields) except the forcedFilter (so that the user cannot change the forced filter values) */
         let _fields = this.parseFieldFilter(fields);
 
