@@ -568,7 +568,7 @@ const RULE_TO_METHODS = [
         methods: prostgles_types_1.RULE_METHODS.update,
         no_limits: { fields: "*", filterFields: "*", returningFields: "*" },
         table_only: true,
-        allowed_params: ["fields", "filterFields", "forcedFilter", "forcedData", "returningFields", "validate"],
+        allowed_params: ["fields", "filterFields", "forcedFilter", "forcedData", "returningFields", "validate", "dynamicFields"],
         hint: ` expecting "*" | true | { fields: string | string[] | {}  }`
     },
     {

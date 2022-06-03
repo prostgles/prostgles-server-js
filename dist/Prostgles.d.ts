@@ -38,6 +38,10 @@ export declare type UpdateRequestDataBatch = {
 };
 export declare type UpdateRequestData = UpdateRequestDataOne | UpdateRequestDataBatch;
 export declare type ValidateRow = (row: AnyObject) => AnyObject | Promise<AnyObject>;
+export declare type ValidateUpdateRow = (args: {
+    update: AnyObject;
+    filter: AnyObject;
+}) => AnyObject | Promise<AnyObject>;
 export declare type SelectRule = {
     /**
      * Fields allowed to be selected.   Tip: Use false to exclude field
@@ -84,9 +88,20 @@ export declare type InsertRule = {
 };
 export declare type UpdateRule = {
     /**
-     * Fields allowed to be updated.   Tip: Use false to exclude field
+     * Fields allowed to be updated.   Tip: Use false/0 to exclude field
      */
     fields: FieldFilter;
+    /**
+     * Row level FGAC
+     * Used when the editable fields change based on the updated row
+     * If specified then the fields from the first matching filter table.count({ ...filter, ...updateFilter }) > 0 will be used
+     * If none matching then the "fields" will be used
+     * Specify in decreasing order of specificity otherwise a more general filter will match first
+     */
+    dynamicFields?: {
+        filter: AnyObject;
+        fields: FieldFilter;
+    }[];
     /**
      * Filter added to every query (e.g. user_id) to restrict access
      * This filter cannot be updated
@@ -107,7 +122,7 @@ export declare type UpdateRule = {
     /**
      * Validation logic to check/update data for each request
      */
-    validate?: ValidateRow;
+    validate?: ValidateUpdateRow;
 };
 export declare type DeleteRule = {
     /**

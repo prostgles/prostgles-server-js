@@ -61,23 +61,22 @@ export type DbHandler = {
     tx?: TX
   }
   
-// <TXKey extends string = "tx"> 
-//   & {
-//     [K in TXKey]: TX
-//   };
+export const getUpdateFilter = (args: { filter?: AnyObject; forcedFilter?: AnyObject; $and_key: string }): AnyObject => {
+    const { filter, forcedFilter, $and_key } = args;
+    let result = { ...filter };
+    if(forcedFilter){
+        return {
+            [$and_key]: [forcedFilter, filter].filter(isDefined)
+        }
+    }
 
-// const d: DbHandler = { } as any;
-// d.
-//   export type DbHandlerTX = { [key: string]: TX } | DbHandler;
-//   export type DbHandlerTX = DbHandler
-//    & Partial<{
-//     [key: string]: TX
-//   }>
+    return result;
+}
 
 import { get } from "./utils";
 import { getNewQuery, makeQuery, COMPUTED_FIELDS, SelectItem, FieldSpec, asNameAlias, SelectItemBuilder, FUNCTIONS, parseFunction, parseFunctionObject } from "./QueryBuilder";
 import { 
-    DB, TableRule, SelectRule, InsertRule, UpdateRule, DeleteRule, SyncRule, Joins, Join, Prostgles, PublishParser, ValidateRow 
+    DB, TableRule, SelectRule, InsertRule, UpdateRule, DeleteRule, SyncRule, Joins, Join, Prostgles, PublishParser, ValidateRow, ValidateUpdateRow 
 } from "./Prostgles";
 import { PubSubManager, asValue, BasicCallback, pickKeys, omitKeys } from "./PubSubManager";
 
@@ -548,7 +547,22 @@ export class ViewHandler {
         `)` + (alias? ` as ${asName(alias)}` : "");
     }
 
-    async validateViewRules(fields: FieldFilter | undefined, filterFields: FieldFilter | undefined, returningFields: FieldFilter | undefined, forcedFilter: AnyObject | undefined, rule: "update" | "select" | "insert" | "delete"){
+    async validateViewRules(args: {
+        fields?: FieldFilter, 
+        filterFields?: FieldFilter, 
+        returningFields?: FieldFilter, 
+        forcedFilter?: AnyObject, 
+        dynamicFields?: UpdateRule["dynamicFields"],
+        rule: "update" | "select" | "insert" | "delete"
+    }){
+        const {
+            fields,
+            filterFields,
+            returningFields,
+            forcedFilter,
+            dynamicFields,
+            rule,
+        } = args;
 
         /* Safely test publish rules */
         if(fields) {
@@ -580,6 +594,17 @@ export class ViewHandler {
                 await this.find(forcedFilter, { limit: 0 });
             } catch(e){
                 throw ` issue with publish.${this.name}.${rule}.forcedFilter: \nVALUE: ` + JSON.stringify(forcedFilter, null, 2) + "\nERROR: " + JSON.stringify(e, null, 2);
+            }
+        }
+        if(dynamicFields){
+            for await(const dfieldRule of dynamicFields){
+                try {
+                    const { fields, filter } = dfieldRule;
+                    this.parseFieldFilter(fields);
+                    await this.find(filter, { limit: 0 });
+                } catch(e){
+                    throw ` issue with publish.${this.name}.${rule}.dynamicFields: \nVALUE: ` + JSON.stringify(dfieldRule, null, 2) + "\nERROR: " + JSON.stringify(e, null, 2);
+                }
             }
         }
 
@@ -727,12 +752,15 @@ export class ViewHandler {
             has_media,
             has_direct_media,
             media_table_name: mediaTable,
+            dynamicRules: {
+                update: Boolean(tableRules?.update?.dynamicFields?.length)
+            }
         }
     }
 
     // TODO: fix renamed table trigger problem
     
-    async getColumns(lang?: string, param2?: never, param3?: never, tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]> {
+    async getColumns(lang?: string, params?: { rule: "update", filter: AnyObject, data: AnyObject }, param3?: never, tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]> {
 
         try {
             const p = this.getValidatedRules(tableRules, localParams);
@@ -740,8 +768,18 @@ export class ViewHandler {
             if(!p.getColumns) throw "Not allowed";
 
             // console.log("getColumns", this.name, this.columns.map(c => c.name))
+
+
+            let dynamicUpdateFields: string[] | undefined;
+            if(params && "parseUpdateRules" in this && (this as TableHandler).parseUpdateRules){
+                if(!isPlainObject(params) || !isPlainObject(params.data) || !isPlainObject(params.filter) || params.rule !== "update") {
+                    throw "params must be { rule: 'update', data, filter } but got: " + JSON.stringify(params);
+                }
+                const { data, filter } = params;
+                const updateRules = await (this as TableHandler).parseUpdateRules(filter, data, undefined, tableRules, localParams);
+                dynamicUpdateFields = updateRules.fields;
+            }
             
-            let _lang = lang;
             let columns = this.columns
             .filter(c => {
                 const { insert, select, update } = p || {};
@@ -757,6 +795,9 @@ export class ViewHandler {
                 
                 let label = c.comment || capitalizeFirstLetter(c.name, " ");
 
+                /**
+                 * Get labels from TableConfig if specified
+                 */
                 const tblConfig = this.dboBuilder.prostgles?.opts?.tableConfig?.[this.name];
                 if(tblConfig && "columns" in tblConfig){
                     const lbl = tblConfig?.columns[c.name]?.label;
@@ -775,7 +816,7 @@ export class ViewHandler {
                     _delete = this.tableOrViewInfo.privileges.delete;// c.privileges.some(p => p.privilege_type === "DELETE");
                 
                 delete (c as any).privileges;
-                return {
+                let result = {
                     ...c,
                     label,
                     tsDataType: postgresToTsType(c.udt_name),
@@ -786,7 +827,14 @@ export class ViewHandler {
                     delete: _delete && Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)),
                     ...(this.dboBuilder?.prostgles?.tableConfigurator?.getColInfo({ table: this.name, col: c.name}) || {})
                 }
+
+                if(dynamicUpdateFields){
+                    result.update = dynamicUpdateFields.includes(c.name);
+                }
+
+                return result;
             }).filter(c => c.select || c.update || c.delete || c.insert)
+
             //.sort((a, b) => a.ordinal_position - b.ordinal_position);
 
             // const tblInfo = await this.getInfo();
@@ -1190,12 +1238,7 @@ export class ViewHandler {
         if(!isPlainObject(filter)) throw "\nInvalid filter\nExpecting an object but got -> " + JSON.stringify(filter);
         
 
-        let _filter = { ...filter };
-        if(forcedFilter){
-            _filter = {
-                [$and_key]: [forcedFilter, _filter].filter(f => f)
-            }
-        }
+        let _filter = getUpdateFilter({ filter, forcedFilter, $and_key });
             
         // let keys = Object.keys(filter);
         // if(!keys.length) return result;
@@ -2027,47 +2070,126 @@ export class TableHandler extends ViewHandler {
         }
     }
 
-    async update(filter: Filter, newData: AnyObject, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<AnyObject | void>{
-        try {
+    async parseUpdateRules(filter: Filter, newData: AnyObject, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<{
+        fields: string[];
+        validateRow?: ValidateRow;
+        finalUpdateFilter: AnyObject;
+        forcedData?: AnyObject;
+        forcedFilter?: AnyObject;
+        returningFields: FieldFilter;
+        filterFields?: FieldFilter;
+    }> {
+        const { testRule = false } = localParams ?? {};
+        if(!testRule){
+            if(!newData || !Object.keys(newData).length) throw "no update data provided\nEXPECTING db.table.update(filter, updateData, options)";
+            this.checkFilter(filter);
+        }
 
-            const { testRule = false, returnQuery = false } = localParams ?? {};
-            if(!testRule){
-                if(!newData || !Object.keys(newData).length) throw "no update data provided\nEXPECTING db.table.update(filter, updateData, options)";
-                this.checkFilter(filter);
+        let forcedFilter: AnyObject | undefined = {},
+            forcedData: AnyObject | undefined = {},
+            validate: ValidateUpdateRow | undefined,
+            returningFields: FieldFilter = "*",
+            filterFields: FieldFilter | undefined = "*",
+            fields: FieldFilter = "*";
+
+        const { $and: $and_key } = this.dboBuilder.prostgles.keywords;
+        let finalUpdateFilter = { ...filter };
+
+        if(tableRules){
+            if(!tableRules.update) throw "update rules missing for " + this.name;
+            ({ forcedFilter, forcedData, fields, filterFields, validate } = tableRules.update);
+            returningFields = tableRules.update.returningFields ?? get(tableRules, "select.fields") ?? ""
+            if(!returningFields && params?.returning){ 
+                throw "You are not allowed to return any fields from the update"
             }
 
-            let forcedFilter: AnyObject | undefined = {},
-                forcedData: AnyObject | undefined = {},
-                validate: ValidateRow | undefined,
-                returningFields: FieldFilter | undefined = "*",
-                filterFields: FieldFilter | undefined = "*",
-                fields: FieldFilter = "*";
-
-            if(tableRules){
-                if(!tableRules.update) throw "update rules missing for " + this.name;
-                ({ forcedFilter, forcedData, returningFields, fields, filterFields, validate } = tableRules.update);
-                if(!returningFields) returningFields = get(tableRules, "select.fields");
-
-                if(!fields)  throw ` Invalid update rule for ${this.name}. fields missing `;
-
-                /* Safely test publish rules */
-                if(testRule){
-                    await this.validateViewRules(fields, filterFields, returningFields, forcedFilter, "update");
-                    if(forcedData) {
-                        try {
-                            const { data, allowedCols } = this.validateNewData({ row: forcedData, forcedData: undefined, allowedFields: "*", tableRules, fixIssues: false });
-                            const updateQ = await this.colSet.getUpdateQuery(data, allowedCols, validate) //pgp.helpers.update(data, columnSet)
-                            let query = updateQ + " WHERE FALSE ";
-                            await this.db.any("EXPLAIN " + query);
-                        } catch(e){
-                            throw " issue with forcedData: \nVALUE: " + JSON.stringify(forcedData, null, 2) + "\nERROR: " + e;
+            if(!fields)  throw ` Invalid update rule for ${this.name}. fields missing `;
+            finalUpdateFilter = getUpdateFilter({ filter, forcedFilter, $and_key })
+            if(tableRules.update.dynamicFields?.length){
+                let found = false;
+                for await(const dfRule of tableRules.update.dynamicFields){
+                    if(!found){
+                        const count = await this.count(finalUpdateFilter);
+                        if(count && +count > 0){
+                            found = true;
+                            fields = dfRule.fields;
                         }
                     }
-                    return true as unknown as void;
                 }
             }
 
+            /* Safely test publish rules */
+            if(testRule){
+                await this.validateViewRules({ fields, filterFields, returningFields, forcedFilter, dynamicFields: tableRules.update.dynamicFields, rule: "update"});
+                if(forcedData) {
+                    try {
+                        const { data, allowedCols } = this.validateNewData({ row: forcedData, forcedData: undefined, allowedFields: "*", tableRules, fixIssues: false });
+                        const updateQ = await this.colSet.getUpdateQuery(data, allowedCols, validate? ((row) => validate!({ update: row, filter: {}})) : undefined) //pgp.helpers.update(data, columnSet)
+                        let query = updateQ + " WHERE FALSE ";
+                        await this.db.any("EXPLAIN " + query);
+                    } catch(e){
+                        throw " issue with forcedData: \nVALUE: " + JSON.stringify(forcedData, null, 2) + "\nERROR: " + e;
+                    }
+                }
+                return true as unknown as any;
+            }
+        }
+
+
+        if(tableRules?.update?.dynamicFields?.length){
+            let found = false;
+            for await(const dfRule of tableRules.update.dynamicFields){
+                if(!found){
+                    const count = await this.count(finalUpdateFilter);
+                    if(count && +count > 0){
+                        found = true;
+                        fields = dfRule.fields;
+                    }
+                }
+            }
+        }
+
+        /* Update all allowed fields (fields) except the forcedFilter (so that the user cannot change the forced filter values) */
+        let _fields = this.parseFieldFilter(fields);
+
+        /**
+         * forcedFilter must not have any keys in common with the fields
+         * A user is not allowed to change any fields found in the forcedFilter
+         * A forced filter must be basic
+         */
+        if(forcedFilter){
+            const _forcedFilterKeys = Object.keys(forcedFilter);
+            const nonFields = _forcedFilterKeys.filter(key => !this.column_names.includes(key));
+            if(nonFields.length) throw "forcedFilter must be a basic filter but it includes non field keys: " + nonFields;
+            const clashingFields = _forcedFilterKeys.filter(key => _fields.includes(key));
+            if(clashingFields.length) throw "forcedFilter must not include fields from the fields (otherwise the user can update data to bypass the forcedFilter). Clashing fields: " + nonFields;
+        }
+        const validateRow: ValidateRow | undefined = validate? (row) => validate!({ update: row, filter: finalUpdateFilter }) : undefined
+
+        return {
+            fields: _fields,
+            validateRow,
+            finalUpdateFilter, 
+            forcedData,
+            forcedFilter,
+            returningFields,
+            filterFields,
+        }
+    }
+
+    async update(filter: Filter, newData: AnyObject, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<AnyObject | void>{
+        try {
+
+            const parsedRules = await this.parseUpdateRules(filter, newData, params, tableRules, localParams)
+            if(localParams?.testRule){
+                return parsedRules;
+            }
+
+            const { fields, validateRow, forcedData, finalUpdateFilter, returningFields, forcedFilter, filterFields } = parsedRules;
+
+
             let { returning, multi = true, onConflictDoNothing = false, fixIssues = false } = params || {};
+            const { returnQuery = false } = localParams ?? {};
 
 
             if(params){
@@ -2076,16 +2198,8 @@ export class TableHandler extends ViewHandler {
                 if(bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
             }
 
-            /* Update all allowed fields (fields) except the forcedFilter (so that the user cannot change the forced filter values) */
-            let _fields = this.parseFieldFilter(fields);
 
-            if(forcedFilter){
-                let _forcedFilterKeys = Object.keys(forcedFilter);
-                _fields = _fields.filter(fkey => !_forcedFilterKeys.includes(fkey))
-            }
-
-
-            const { data, allowedCols } = this.validateNewData({ row: newData, forcedData, allowedFields: _fields, tableRules, fixIssues });
+            const { data, allowedCols } = this.validateNewData({ row: newData, forcedData, allowedFields: fields, tableRules, fixIssues });
 
             /* Patch data */
             let patchedTextData: { 
@@ -2123,7 +2237,8 @@ export class TableHandler extends ViewHandler {
             // if(tableRules && tableRules.update && tableRules?.update?.validate){
             //     nData = await tableRules.update.validate(nData);
             // }
-            let query = await this.colSet.getUpdateQuery(nData, allowedCols, tableRules?.update?.validate) //pgp.helpers.update(nData, columnSet) + " ";
+            
+            let query = await this.colSet.getUpdateQuery(nData, allowedCols, validateRow) //pgp.helpers.update(nData, columnSet) + " ";
             query += (await this.prepareWhere({
                 filter, 
                 forcedFilter, 
@@ -2142,9 +2257,9 @@ export class TableHandler extends ViewHandler {
             if(returnQuery) return query as unknown as void;
             
             if(this.t){
-                return (this.t as any)[qType](query).catch((err: any) => makeErr(err, localParams, this, _fields));
+                return (this.t as any)[qType](query).catch((err: any) => makeErr(err, localParams, this, fields));
             }
-            return this.db.tx(t => (t as any)[qType](query)).catch(err => makeErr(err, localParams, this, _fields));
+            return this.db.tx(t => (t as any)[qType](query)).catch(err => makeErr(err, localParams, this, fields));
         } catch(e){
             if(localParams && localParams.testRule) throw e;
             throw { err: parseError(e), msg: `Issue with dbo.${this.name}.update(${JSON.stringify(filter || {}, null, 2)}, ${JSON.stringify(newData || {}, null, 2)}, ${JSON.stringify(params || {}, null, 2)})` };
@@ -2451,7 +2566,7 @@ export class TableHandler extends ViewHandler {
                 /* Safely test publish rules */
                 if(testRule){
                     // if(this.is_media && tableRules.insert.preValidate) throw "Media table cannot have a preValidate. It already is used internally by prostgles for file upload";
-                    await this.validateViewRules(fields, undefined, returningFields, undefined, "insert");
+                    await this.validateViewRules({ fields, returningFields, forcedFilter: forcedData, rule: "insert"});
                     if(forcedData) {
                         const keys = Object.keys(forcedData);
                         if(keys.length){
@@ -2603,7 +2718,7 @@ export class TableHandler extends ViewHandler {
 
                 /* Safely test publish rules */
                 if(testRule){
-                    await this.validateViewRules(undefined, filterFields, returningFields, forcedFilter, "delete");
+                    await this.validateViewRules({ filterFields, returningFields, forcedFilter, rule: "delete" });
                     return true;
                 }
             }
@@ -2775,6 +2890,7 @@ export class TableHandler extends ViewHandler {
 
 import { JOIN_TYPES } from "./Prostgles";
 import { BasicSession } from "./AuthHandler";
+import { bool } from "aws-sdk/clients/signer";
 
 export class DboBuilder {
     tablesOrViews?: TableSchema[];   //TableSchema           TableOrViewInfo

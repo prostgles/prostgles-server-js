@@ -290,6 +290,15 @@ const dbConnection = {
 						forcedData: {
 							id: 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e'
 						}
+					},
+					update: {
+						fields: [],
+						dynamicFields: [{
+							fields: { id: 1 },
+							filter: {
+								id: 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e'
+							}
+						}]
 					}
 				}
 			};

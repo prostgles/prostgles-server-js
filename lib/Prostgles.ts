@@ -107,6 +107,7 @@ export type UpdateRequestDataBatch = {
 export type UpdateRequestData = UpdateRequestDataOne | UpdateRequestDataBatch;
 
 export type ValidateRow = (row: AnyObject) => AnyObject | Promise<AnyObject>;
+export type ValidateUpdateRow = (args: { update: AnyObject, filter: AnyObject }) => AnyObject | Promise<AnyObject>;
 
 export type SelectRule = {
 
@@ -166,9 +167,21 @@ export type InsertRule = {
 export type UpdateRule = {
 
     /**
-     * Fields allowed to be updated.   Tip: Use false to exclude field
+     * Fields allowed to be updated.   Tip: Use false/0 to exclude field
      */
     fields: FieldFilter;
+    
+    /**
+     * Row level FGAC
+     * Used when the editable fields change based on the updated row
+     * If specified then the fields from the first matching filter table.count({ ...filter, ...updateFilter }) > 0 will be used
+     * If none matching then the "fields" will be used
+     * Specify in decreasing order of specificity otherwise a more general filter will match first
+     */
+    dynamicFields?: {
+        filter: AnyObject;
+        fields: FieldFilter;
+    }[];
 
     /**
      * Filter added to every query (e.g. user_id) to restrict access
@@ -194,8 +207,10 @@ export type UpdateRule = {
     /**
      * Validation logic to check/update data for each request
      */
-    validate?: ValidateRow
-}
+    validate?: ValidateUpdateRow;
+
+};
+
 export type DeleteRule = {
     
     /**
@@ -1065,7 +1080,7 @@ const RULE_TO_METHODS = [
        methods: RULE_METHODS.update, 
        no_limits: <UpdateRule>{ fields: "*", filterFields: "*", returningFields: "*"  },
        table_only: true, 
-       allowed_params: <Array<keyof UpdateRule>>["fields", "filterFields", "forcedFilter", "forcedData", "returningFields", "validate"] ,
+       allowed_params: <Array<keyof UpdateRule>>["fields", "filterFields", "forcedFilter", "forcedData", "returningFields", "validate", "dynamicFields"] ,
        hint: ` expecting "*" | true | { fields: string | string[] | {}  }`
     },
    { 

@@ -87,7 +87,7 @@ async function isomorphic(db) {
     await tryRun("getColumns definition", async () => {
         const res = await db.tr2.getColumns("fr");
         // console.log(JSON.stringify(res, null, 2))
-        assert_1.strict.deepStrictEqual(res, [
+        const expected = [
             {
                 "label": "Id",
                 "name": "id",
@@ -180,7 +180,10 @@ async function isomorphic(db) {
                 "update": true,
                 "delete": true
             }
-        ]);
+        ];
+        assert_1.strict.deepStrictEqual(res, expected);
+        const resDynamic = await db.tr2.getColumns("fr", { rule: "update", filter: {}, data: { t2: "a" } });
+        assert_1.strict.deepStrictEqual(resDynamic, expected);
     });
     await tryRun("$unnest_words", async () => {
         const res = await db.various.find({}, { returnType: "values", select: { name: "$unnest_words" } });

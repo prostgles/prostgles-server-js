@@ -201,6 +201,18 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
         { id: 1, public: 'public data' },
         { id: 2, public: 'public data' }
       ]);
+
+
+      const cols = await db.insert_rules.getColumns();
+      assert.equal(cols.filter(({ insert, update: u, select: s, delete: d }) => insert && !u && !s && !d).length, 3, "Validated getColumns failed")
+
+      /* Validated insert */
+      const expectB = await db.insert_rules.insert({ name: "a" }, { returning: "*" });
+      assert.deepStrictEqual(expectB, { name: "b" }, "Validated insert failed");
+
+      /* forced UUID insert */
+      const row: any = await db.uuid_text.insert({}, {returning: "*"});
+      assert.equal(row.id, 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e');
     });
 
     // await tryRun("Duplicate subscription", async () => {
@@ -228,16 +240,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
     //   })
     // })
 
-    const cols = await db.insert_rules.getColumns();
-    assert.equal(cols.filter(({ insert, update: u, select: s, delete: d }) => insert && !u && !s && !d).length, 3, "Validated getColumns failed")
 
-    /* Validated insert */
-    const expectB = await db.insert_rules.insert({ name: "a" }, { returning: "*" });
-    assert.deepStrictEqual(expectB, { name: "b" }, "Validated insert failed");
-
-    /* forced UUID insert */
-    const row: any = await db.uuid_text.insert({}, {returning: "*"});
-    assert.equal(row.id, 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e')
 
     await testRealtime();
 
@@ -254,6 +257,29 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
         { id: 1, public: 'public data' },
         { id: 2, public: 'public data' }
       ]);
+
+
+      const dynamicCols = await db.uuid_text.getColumns(undefined, {
+        rule: "update",
+        filter: {
+          id: 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e'
+        },
+        data: {
+          id: "dwadwa"
+        }
+      });
+      assert.equal(dynamicCols.length, 1);
+      assert.equal(dynamicCols[0].name, "id");
+      const defaultCols = await db.uuid_text.getColumns(undefined, {
+        rule: "update",
+        filter: {
+          id: 'not matching'
+        },
+        data: {
+          id: "dwadwa"
+        }
+      });
+      throw defaultCols.map(c => c.name);
     }, log);
   }
 

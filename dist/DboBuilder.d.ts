@@ -30,8 +30,13 @@ export declare type DbHandler = {
 } & {
     tx?: TX;
 };
+export declare const getUpdateFilter: (args: {
+    filter?: AnyObject;
+    forcedFilter?: AnyObject;
+    $and_key: string;
+}) => AnyObject;
 import { SelectItem, FieldSpec } from "./QueryBuilder";
-import { DB, TableRule, Join, Prostgles, PublishParser, ValidateRow } from "./Prostgles";
+import { DB, TableRule, UpdateRule, Join, Prostgles, PublishParser, ValidateRow } from "./Prostgles";
 import { PubSubManager, BasicCallback } from "./PubSubManager";
 declare type PGP = pgPromise.IMain<{}, pg.IClient>;
 export declare const pgp: PGP;
@@ -204,7 +209,14 @@ export declare class ViewHandler {
     is_media: boolean;
     constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths);
     getRowHashSelect(allowedFields: FieldFilter, alias?: string, tableAlias?: string): string;
-    validateViewRules(fields: FieldFilter | undefined, filterFields: FieldFilter | undefined, returningFields: FieldFilter | undefined, forcedFilter: AnyObject | undefined, rule: "update" | "select" | "insert" | "delete"): Promise<boolean>;
+    validateViewRules(args: {
+        fields?: FieldFilter;
+        filterFields?: FieldFilter;
+        returningFields?: FieldFilter;
+        forcedFilter?: AnyObject;
+        dynamicFields?: UpdateRule["dynamicFields"];
+        rule: "update" | "select" | "insert" | "delete";
+    }): Promise<boolean>;
     getShortestJoin(table1: string, table2: string, startAlias: number, isInner?: boolean): {
         query: string;
         toOne: boolean;
@@ -212,7 +224,11 @@ export declare class ViewHandler {
     getJoins(source: string, target: string, path?: string[], checkTableConfig?: boolean): JoinInfo;
     checkFilter(filter: any): void;
     getInfo(param1?: any, param2?: any, param3?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<TInfo>;
-    getColumns(lang?: string, param2?: never, param3?: never, tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]>;
+    getColumns(lang?: string, params?: {
+        rule: "update";
+        filter: AnyObject;
+        data: AnyObject;
+    }, param3?: never, tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]>;
     getValidatedRules(tableRules?: TableRule, localParams?: LocalParams): ValidatedTableRules;
     find(filter?: Filter, selectParams?: SelectParams, param3_unused?: never, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]>;
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: never, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
@@ -306,6 +322,15 @@ export declare class TableHandler extends ViewHandler {
     }>;
     subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: AnyObject) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>;
     updateBatch(data: [Filter, AnyObject][], params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
+    parseUpdateRules(filter: Filter, newData: AnyObject, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<{
+        fields: string[];
+        validateRow?: ValidateRow;
+        finalUpdateFilter: AnyObject;
+        forcedData?: AnyObject;
+        forcedFilter?: AnyObject;
+        returningFields: FieldFilter;
+        filterFields?: FieldFilter;
+    }>;
     update(filter: Filter, newData: AnyObject, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<AnyObject | void>;
     validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues }: ValidatedParams): {
         data: any;
