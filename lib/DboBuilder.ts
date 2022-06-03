@@ -2106,6 +2106,28 @@ export class TableHandler extends ViewHandler {
             if(!fields)  throw ` Invalid update rule for ${this.name}. fields missing `;
             finalUpdateFilter = getUpdateFilter({ filter, forcedFilter, $and_key })
             if(tableRules.update.dynamicFields?.length){
+
+                /**
+                 * Ensure that dynamicFields.fields are less permissive than fields
+                 * This is because an update filter can target dynamicFields.filter AND also other records
+                 */
+                if(testRule){
+                    const defaultFields = this.parseFieldFilter(fields);
+                    const morePermissiveRule = tableRules.update.dynamicFields.find(r => {
+                        const ruleFields = this.parseFieldFilter(r.fields);
+                        return defaultFields.length && defaultFields.every(f => ruleFields.includes(f)) && ruleFields.length > defaultFields.length;
+                    });
+
+                    if(morePermissiveRule){
+                        throw `${this.name}.update.dynamicFields must be less permissive than the default ${this.name}.update.fields. 
+                            This is because an update filter can target dynamicFields.filter AND also other records. 
+                            Bad dynamicFields.fields: ${this.parseFieldFilter(morePermissiveRule.fields)}
+                            default fields: ${defaultFields}
+                            Bad dynamicFields: ${JSON.stringify(morePermissiveRule)}
+                            `;
+                    }
+                }
+
                 let found = false;
                 for await(const dfRule of tableRules.update.dynamicFields){
                     if(!found){
@@ -2131,6 +2153,7 @@ export class TableHandler extends ViewHandler {
                         throw " issue with forcedData: \nVALUE: " + JSON.stringify(forcedData, null, 2) + "\nERROR: " + e;
                     }
                 }
+
                 return true as unknown as any;
             }
         }
