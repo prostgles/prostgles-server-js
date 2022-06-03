@@ -1,7 +1,7 @@
 
 
 import { SelectItem } from "./QueryBuilder";
-import { isEmpty, getKeys, FullFilter, EXISTS_KEYS, FilterDataType, GeomFilterKeys, GeomFilter_Funcs, TextFilter_FullTextSearchFilterKeys } from "prostgles-types";
+import { isEmpty, getKeys, FullFilter, EXISTS_KEYS, FilterDataType, GeomFilterKeys, GeomFilter_Funcs, TextFilter_FullTextSearchFilterKeys, ColumnInfo } from "prostgles-types";
 import { isPlainObject } from "./DboBuilder";
 
 /**
@@ -27,7 +27,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       filter: { [fk]: _f[fk] },
       select, 
       tableAlias,
-      pgp
+      pgp,
     }))
     .sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
     .join(" AND ")

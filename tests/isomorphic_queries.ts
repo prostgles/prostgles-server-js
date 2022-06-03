@@ -470,7 +470,9 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
   await tryRun("JSONB filtering", async () => {
     const row = await db.obj_table.insert({obj: { propName: 3232 }}, { returning: "*" });
     const sameRow = await db.obj_table.findOne({obj: { propName: 3232 }});
-    assert.deepStrictEqual(row, sameRow)
+    const count = await db.obj_table.count({obj: { propName: 3232 }});
+    assert.deepStrictEqual(row, sameRow);
+    assert.deepStrictEqual(+count, 1);
   })
 
   await tryRun("Postgis examples", async () => {

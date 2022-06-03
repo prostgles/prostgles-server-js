@@ -19,7 +19,7 @@ const parseFilterItem = (args) => {
             filter: { [fk]: _f[fk] },
             select,
             tableAlias,
-            pgp
+            pgp,
         }))
             .sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
             .join(" AND ");

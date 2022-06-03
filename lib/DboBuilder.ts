@@ -1491,7 +1491,8 @@ export class ViewHandler {
                     allowedFields: allowed_colnames 
                 }),
                 selected: false,
-                getFields: () => [f.name]
+                getFields: () => [f.name],
+                column_udt_type: f.type === "column"? this.columns.find(c => c.name === f.name)?.udt_name : undefined
             }))
         );
 
@@ -1559,7 +1560,6 @@ export class ViewHandler {
         /* TODO: Allow filter funcs */
         // const singleFuncs = FUNCTIONS.filter(f => f.singleColArg);
         
-
         const f = pickKeys(data, filterKeys);
         const q = parseFilterItem({
             filter: f,
@@ -2899,7 +2899,6 @@ export class TableHandler extends ViewHandler {
 
 import { JOIN_TYPES } from "./Prostgles";
 import { BasicSession } from "./AuthHandler";
-import { bool } from "aws-sdk/clients/signer";
 
 export class DboBuilder {
     tablesOrViews?: TableSchema[];   //TableSchema           TableOrViewInfo

@@ -1033,7 +1033,8 @@ class ViewHandler {
                 allowedFields: allowed_colnames
             }),
             selected: false,
-            getFields: () => [f.name]
+            getFields: () => [f.name],
+            column_udt_type: f.type === "column" ? this.columns.find(c => c.name === f.name)?.udt_name : undefined
         })));
         /* Parse complex filters
             { $filter: [{ $func: [...] }, "=", value | { $func: [..] }] }

@@ -416,7 +416,9 @@ async function isomorphic(db) {
     await tryRun("JSONB filtering", async () => {
         const row = await db.obj_table.insert({ obj: { propName: 3232 } }, { returning: "*" });
         const sameRow = await db.obj_table.findOne({ obj: { propName: 3232 } });
+        const count = await db.obj_table.count({ obj: { propName: 3232 } });
         assert_1.strict.deepStrictEqual(row, sameRow);
+        assert_1.strict.deepStrictEqual(+count, 1);
     });
     await tryRun("Postgis examples", async () => {
         await db.shapes.delete();
