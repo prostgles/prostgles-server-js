@@ -2109,7 +2109,7 @@ export class TableHandler extends ViewHandler {
                 let found = false;
                 for await(const dfRule of tableRules.update.dynamicFields){
                     if(!found){
-                        const count = await this.count(finalUpdateFilter);
+                        const count = await this.count({ $and: [finalUpdateFilter, dfRule.filter].filter(isDefined) });
                         if(count && +count > 0){
                             found = true;
                             fields = dfRule.fields;
