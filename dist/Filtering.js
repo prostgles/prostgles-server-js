@@ -256,6 +256,10 @@ const parseFilterItem = (args) => {
             }
         }
         else {
+            /** Maybe it's an object key which means it's an equality comparison against a json object */
+            if (selItem?.column_udt_type?.startsWith("json")) {
+                return leftQ + " = " + parseRightVal(fVal);
+            }
             return mErr("Unrecognised filter operand: " + fOpType + " ");
         }
     }
