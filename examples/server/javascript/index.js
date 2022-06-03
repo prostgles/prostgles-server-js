@@ -19,7 +19,7 @@ prostgles({
 	// Optional sql file to be run on each reload
 	sqlFilePath: path.join(__dirname+'/init.sql'),
 
-	publish: (socket, dbo) => "*",
+	publish: () => "*",
 	io,
 	onReady: async (db, _db) => {
 

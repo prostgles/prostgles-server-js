@@ -1,7 +1,6 @@
 import path from 'path';
 import express from 'express';
-// const prostgles = require("prostgles-server");
-import prostgles from "../../../dist/index";
+import prostgles from "prostgles-server";
 const app = express();
 const http = require('http').createServer(app);
 const io = require("socket.io")(http);
@@ -21,7 +20,7 @@ prostgles({
 	io,
 	tsGeneratedTypesDir: path.join(__dirname + '/'),
 	transactions: "tt",
-	publish: (socket, dbo: DBObj) => {
+	publish: () => {
 		
 		return "*";
 	},

@@ -9,10 +9,10 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "bluebird": "^3.7.2",
-    "express": "^4.17.1",
-    "mongodb": "^3.6.3",
-    "prostgles-server": "^1.5.39",
-    "socket.io": "^3.1.2"
+    "bluebird": "latest",
+    "express": "latest",
+    "mongodb": "latest",
+    "prostgles-server": "latest",
+    "socket.io": "latest"
   }
 }

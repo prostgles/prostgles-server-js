@@ -4,7 +4,7 @@ import path from 'path';
 var http = require('http').createServer(app);
 var io = require("socket.io")(http);
 http.listen(30009);
-var prostgles = require("../../dist/index");
+import prostgles from "prostgles-server"
 
 import { DBObj } from "./DBoGenerated";
 
@@ -17,34 +17,26 @@ prostgles({
         user: process.env.PRGL_USER,
         password: process.env.PRGL_PWD
     },
-    // dbOptions: {
-    //     application_name: "prostgles_api",
-    //     max: 100,
-    //     poolIdleTimeout: 10000
-    // },
+    
     sqlFilePath: path.join(__dirname+'/init.sql'),
     io,
     tsGeneratedTypesDir: path.join(__dirname + '/'),
-	publish: (socket, dbo ) => {
-		// if(!socket || !socket._user.admin && !socket._user.id){
-		// 	return false;
-        // }
-
+	publish: () => {
 
         return {
             planes: "*"
         }
     },
-    // publishMethods: (socket, dbo: DBObj) => { 
-    //     return {
-    //         insertPlanes: async (data) => {
-    //             // let  tl = Date.now();
-    //             let res = await (dbo.planes).insert(data);
-    //             // console.log(Date.now() - tl, "ms");
-    //             return res;
-    //         }
-    //     }
-    // },
+    publishMethods: ({ dbo }) => { 
+        return {
+            insertPlanes: async (data) => {
+                // let  tl = Date.now();
+                let res = await (dbo.planes).insert(data);
+                // console.log(Date.now() - tl, "ms");
+                return res;
+            }
+        }
+    },
     
     onReady: async (dbo: DBObj) => {
 
@@ -59,16 +51,4 @@ prostgles({
 			res.status(404).send('Page not found');
 		});
     },
-	// onSocketConnect: async ({ socket, dbo }) => {
-    //     return true;
-    // },
-	// onSocketDisconnect: async ({ socket, dbo }) => {
-    //     return true;
-    // },
-    // auth: {
-    //     login: (data, { socket, dbo }) => {},
-    //     register: (data, { socket, dbo }) => {},
-    //     logout: (data, { socket, dbo }) => {},
-    //     onChange: (state, { socket, dbo }) => {},
-    // },
 });

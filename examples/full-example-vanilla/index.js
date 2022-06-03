@@ -5,8 +5,7 @@ var http = require('http').createServer(app);
 var io = require('socket.io')(http, { path: "/s" });
 http.listen(3001);
 
-let prostgles = require('../../dist/index.js');
-// let prostgles = require('prostgles-server');
+let prostgles = require('prostgles-server');
 
 
 prostgles({
@@ -25,32 +24,14 @@ prostgles({
     
     io,
     
-    onReady: async (dbo, db) => {
-        try {
-            // dbo.Events.subscribe({}, {}, console.log)
-            // setTimeout(async ()=>{
-            //     try {
-            //     await dbo.Events.insert({ Id: 1 });
-            //     await dbo.Events.insert({ Id: 21 });
-            //     await dbo.Events.update({ Id: { $lt: 4 }}, { Id: 12 });
-            //     await dbo.Events.delete({});
-
-            //     } catch(err) {
-            //         console.error(err)
-            //     }
-            // }, 1000);
-            
-        } catch(err) {
-            console.error(err)
-        }
-        
+    onReady: async () => {
         app.get('*', function(req, res){
             console.log(req.originalUrl)
 			res.sendFile(path.join(__dirname+'/home.html'));
 		});
     },
 
-	publish: (socket, dbo) => {
+	publish: () => {
         return {
             
             Points: {
@@ -75,34 +56,4 @@ prostgles({
             }
         }
     },
-
-    // publishMethods: ( socket, dbo) => { 
-
-    //     return {
-    //         upload: async (data) => {
-    //             // let  tl = Date.now();
-    //             //let res = await dbo.pixels.insert(data);
-    //             // console.log(Date.now() - tl, "ms");
-    //             console.log(data)// res;
-    //             dbo.pixels.insert({ blb: data })
-    //         }
-    //     }
-    // },
-	// onSocketConnect: async ({ socket, dbo }) => {
-    //     /* Sending file */
-    //     fs.readFile('home.html', function(err, buf){
-    //         socket.emit('home', { image: true, buffer: buf });
-    //     });
-
-    //     return true;
-    // },
-	// onSocketDisconnect: async ({ socket, dbo }) => {
-    //     return true;
-    // },
-    // auth: {
-    //     login: (data, { socket, dbo }) => {},
-    //     register: (data, { socket, dbo }) => {},
-    //     logout: (data, { socket, dbo }) => {},
-    //     onChange: (state, { socket, dbo }) => {},
-    // },
 });
