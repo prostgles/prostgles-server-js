@@ -467,6 +467,12 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
     console.log("TODO: socket.io stringifies dates")
   });
 
+  await tryRun("JSONB filtering", async () => {
+    const row = await db.obj_table.insert({obj: { propName: 3232 }}, { returning: "*" });
+    const sameRow = await db.obj_table.findOne({obj: { propName: 3232 }});
+    assert.deepStrictEqual(row, sameRow)
+  })
+
   await tryRun("Postgis examples", async () => {
     await db.shapes.delete();
     const p1 = { ST_GeomFromText: ["POINT(-1 1)", 4326] },

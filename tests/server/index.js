@@ -246,6 +246,7 @@ const dbConnection = {
                     insert: "*",
                     update: "*",
                 },
+                obj_table: "*",
                 media: "*",
                 items_with_one_media: "*",
                 items_with_media: "*",

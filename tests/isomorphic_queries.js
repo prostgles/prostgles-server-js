@@ -413,6 +413,11 @@ async function isomorphic(db) {
         assert_1.strict.deepStrictEqual(d, [{ id: 1, name: 'abc123', public: 'public data2', $rowhash: '9d18ddfbff9e13411d13f82d414644de', added_day: 'monday' }]);
         console.log("TODO: socket.io stringifies dates");
     });
+    await tryRun("JSONB filtering", async () => {
+        const row = await db.obj_table.insert({ obj: { propName: 3232 } }, { returning: "*" });
+        const sameRow = await db.obj_table.findOne({ obj: { propName: 3232 } });
+        assert_1.strict.deepStrictEqual(row, sameRow);
+    });
     await tryRun("Postgis examples", async () => {
         await db.shapes.delete();
         const p1 = { ST_GeomFromText: ["POINT(-1 1)", 4326] }, p2 = { ST_GeomFromText: ["POINT(-2 2)", 4326] };

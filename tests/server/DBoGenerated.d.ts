@@ -100,6 +100,10 @@ export type Media = {
   "signed_url_expires"?: number;
   "url"?: string;
 }
+export type Obj_table = { 
+  "id"?: number;
+  "obj"?: Object;
+}
 export type Planes = { 
   "flight_number"?: string;
   "id"?: number;
@@ -188,6 +192,7 @@ export type DBObj = {
   "items_with_one_media": TableHandler<Items_with_one_media> 
   "lookup_col1": TableHandler<Lookup_col1> 
   "media": TableHandler<Media> 
+  "obj_table": TableHandler<Obj_table> 
   "planes": TableHandler<Planes> 
   "prostgles_lookup_media_items_with_media": TableHandler<Prostgles_lookup_media_items_with_media> 
   "prostgles_lookup_media_items_with_one_media": TableHandler<Prostgles_lookup_media_items_with_one_media> 
@@ -253,6 +258,9 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
     }; 
     "media": { 
       [key in "content_type" | "description" | "etag" | "extension" | "id" | "name" | "original_name" | "s3_url" | "signed_url" | "signed_url_expires" | "url"]: { [lang_id in keyof LANG_IDS]: string }; 
+    }; 
+    "obj_table": { 
+      [key in "id" | "obj"]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "planes": { 
       [key in "flight_number" | "id" | "last_updated" | "x" | "y"]: { [lang_id in keyof LANG_IDS]: string }; 
