@@ -12,152 +12,152 @@ export type TxCB = {
 
 /* SCHEMA DEFINITON. Table names have been altered to work with Typescript */
 export type D_34_42_34 = { 
-  "\"*\""?: string;
-  "id"?: number;
+  "\"*\""?: string  | null ;
+  "id"?: number ;
 }
 export type D_42 = { 
-  "*"?: string;
-  "id"?: number;
+  "*"?: string  | null ;
+  "id"?: number ;
 }
 export type Ex_j_ins = { 
-  "added"?: Date;
-  "id"?: number;
-  "name"?: string;
-  "public"?: string;
+  "added"?: Date  | null ;
+  "id"?: number ;
+  "name"?: string ;
+  "public"?: string  | null ;
 }
 export type Geography_columns = { 
-  "coord_dimension"?: number;
-  "f_geography_column"?: string;
-  "f_table_catalog"?: string;
-  "f_table_name"?: string;
-  "f_table_schema"?: string;
-  "srid"?: number;
-  "type"?: string;
+  "coord_dimension"?: number  | null ;
+  "f_geography_column"?: string  | null ;
+  "f_table_catalog"?: string  | null ;
+  "f_table_name"?: string  | null ;
+  "f_table_schema"?: string  | null ;
+  "srid"?: number  | null ;
+  "type"?: string  | null ;
 }
 export type Geometry_columns = { 
-  "coord_dimension"?: number;
-  "f_geometry_column"?: string;
-  "f_table_catalog"?: string;
-  "f_table_name"?: string;
-  "f_table_schema"?: string;
-  "srid"?: number;
-  "type"?: string;
+  "coord_dimension"?: number  | null ;
+  "f_geometry_column"?: string  | null ;
+  "f_table_catalog"?: string  | null ;
+  "f_table_name"?: string  | null ;
+  "f_table_schema"?: string  | null ;
+  "srid"?: number  | null ;
+  "type"?: string  | null ;
 }
 export type Insert_rules = { 
-  "added"?: Date;
-  "id"?: number;
-  "name"?: string;
+  "added"?: Date  | null ;
+  "id"?: number ;
+  "name"?: string  | null ;
 }
 export type Items = { 
-  "h"?: Array<string>;
-  "id"?: number;
-  "name"?: string;
+  "h"?: Array<string>  | null ;
+  "id"?: number ;
+  "name"?: string  | null ;
 }
 export type Items2 = { 
-  "hh"?: Array<string>;
-  "id"?: number;
-  "items_id"?: number;
-  "name"?: string;
+  "hh"?: Array<string>  | null ;
+  "id"?: number ;
+  "items_id"?: number  | null ;
+  "name"?: string  | null ;
 }
 export type Items3 = { 
-  "h"?: Array<string>;
-  "id"?: number;
-  "name"?: string;
+  "h"?: Array<string>  | null ;
+  "id"?: number ;
+  "name"?: string  | null ;
 }
 export type Items4 = { 
-  "added"?: Date;
-  "id"?: number;
-  "name"?: string;
-  "public"?: string;
+  "added"?: Date  | null ;
+  "id"?: number ;
+  "name"?: string ;
+  "public"?: string  | null ;
 }
 export type Items4_pub = { 
-  "added"?: Date;
-  "id"?: number;
-  "name"?: string;
-  "public"?: string;
+  "added"?: Date  | null ;
+  "id"?: number ;
+  "name"?: string ;
+  "public"?: string  | null ;
 }
 export type Items_with_media = { 
-  "id"?: number;
-  "name"?: string;
+  "id"?: number ;
+  "name"?: string  | null ;
 }
 export type Items_with_one_media = { 
-  "id"?: number;
-  "name"?: string;
+  "id"?: number ;
+  "name"?: string  | null ;
 }
 export type Lookup_col1 = { 
-  "id"?: string;
+  "id"?: string ;
 }
 export type Media = { 
-  "content_type"?: string;
-  "description"?: string;
-  "etag"?: string;
-  "extension"?: string;
-  "id"?: string;
-  "name"?: string;
-  "original_name"?: string;
-  "s3_url"?: string;
-  "signed_url"?: string;
-  "signed_url_expires"?: number;
-  "url"?: string;
+  "content_type"?: string ;
+  "description"?: string  | null ;
+  "etag"?: string  | null ;
+  "extension"?: string ;
+  "id"?: string ;
+  "name"?: string ;
+  "original_name"?: string ;
+  "s3_url"?: string  | null ;
+  "signed_url"?: string  | null ;
+  "signed_url_expires"?: number  | null ;
+  "url"?: string ;
 }
 export type Obj_table = { 
-  "id"?: number;
-  "obj"?: Object;
+  "id"?: number ;
+  "obj"?: any  | null ;
 }
 export type Planes = { 
-  "flight_number"?: string;
-  "id"?: number;
-  "last_updated"?: number;
-  "x"?: number;
-  "y"?: number;
+  "flight_number"?: string  | null ;
+  "id"?: number ;
+  "last_updated"?: number ;
+  "x"?: number  | null ;
+  "y"?: number  | null ;
 }
 export type Prostgles_lookup_media_items_with_media = { 
-  "foreign_id"?: number;
-  "media_id"?: string;
+  "foreign_id"?: number  | null ;
+  "media_id"?: string ;
 }
 export type Prostgles_lookup_media_items_with_one_media = { 
-  "foreign_id"?: number;
-  "media_id"?: string;
+  "foreign_id"?: number ;
+  "media_id"?: string ;
 }
 export type Shapes = { 
-  "geog"?: any;
-  "geom"?: any;
-  "id"?: string;
+  "geog"?: any  | null ;
+  "geom"?: any  | null ;
+  "id"?: string ;
 }
 export type Spatial_ref_sys = { 
-  "auth_name"?: string;
-  "auth_srid"?: number;
-  "proj4text"?: string;
-  "srid"?: number;
-  "srtext"?: string;
+  "auth_name"?: string  | null ;
+  "auth_srid"?: number  | null ;
+  "proj4text"?: string  | null ;
+  "srid"?: number ;
+  "srtext"?: string  | null ;
 }
 export type Tr1 = { 
-  "id"?: number;
-  "t1"?: string;
+  "id"?: number ;
+  "t1"?: string  | null ;
 }
 export type Tr2 = { 
-  "id"?: number;
-  "t1"?: string;
-  "t2"?: string;
-  "tr1_id"?: number;
+  "id"?: number ;
+  "t1"?: string  | null ;
+  "t2"?: string  | null ;
+  "tr1_id"?: number  | null ;
 }
 export type Uuid_text = { 
-  "col1"?: string;
-  "col2"?: string;
-  "id"?: string;
-  "name"?: string;
+  "col1"?: string  | null ;
+  "col2"?: string  | null ;
+  "id"?: string ;
+  "name"?: string  | null ;
 }
 export type V_items = { 
-  "id"?: number;
-  "name"?: string;
+  "id"?: number  | null ;
+  "name"?: string  | null ;
 }
 export type Various = { 
-  "added"?: Date;
-  "h"?: Array<string>;
-  "id"?: number;
-  "jsn"?: Object;
-  "name"?: string;
-  "tsv"?: any;
+  "added"?: Date  | null ;
+  "h"?: Array<string>  | null ;
+  "id"?: number ;
+  "jsn"?: any  | null ;
+  "name"?: string  | null ;
+  "tsv"?: any  | null ;
 }
 
 export type JoinMakerTables = {

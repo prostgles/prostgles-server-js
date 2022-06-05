@@ -508,8 +508,8 @@ export class ViewHandler {
         // this.tsDataName = snakify(this.name, true);
         // if(this.tsDataName === "T") this.tsDataName = this.tsDataName + "_";
         // this.tsDataDef = `export type ${this.tsDataName} = {\n`;
-        this.columnsForTypes.map(({ name, udt_name }) => {
-            this.tsColumnDefs.push(`${escapeTSNames(name, false)}?: ${postgresToTsType(udt_name) as string};`);
+        this.columnsForTypes.map(({ name, udt_name, is_nullable }) => {
+            this.tsColumnDefs.push(`${escapeTSNames(name, false)}?: ${postgresToTsType(udt_name) as string} ${is_nullable? " | null " : ""};`);
         });
         // this.tsDataDef += "};";
         // this.tsDataDef += "\n";
@@ -3611,8 +3611,8 @@ export function isPlainObject(o: any): o is Record<string, any> {
 export function postgresToTsType(udt_data_type: PG_COLUMN_UDT_DATA_TYPE): keyof typeof TS_PG_Types {
     return getKeys(TS_PG_Types).find(k => {
         // @ts-ignore
-        return TS_PG_Types[k].includes(udt_data_type) || !TS_PG_Types[k].length;
-    }) as keyof typeof TS_PG_Types;
+        return TS_PG_Types[k].includes(udt_data_type)
+    }) ?? "any";
 }
 
 function sqlErrCodeToMsg(code: string){
