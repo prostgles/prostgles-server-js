@@ -13,196 +13,196 @@ export type TxCB = {
 /* SCHEMA DEFINITON. Table names have been altered to work with Typescript */
 export type D_34_42_34 = { 
   "\"*\""?: string  | null ;
-  "id"?: number ;
+  id?: number ;
 }
 export type D_42 = { 
   "*"?: string  | null ;
-  "id"?: number ;
+  id?: number ;
 }
 export type Ex_j_ins = { 
-  "added"?: Date  | null ;
-  "id"?: number ;
-  "name"?: string ;
-  "public"?: string  | null ;
+  added?: Date  | null ;
+  id?: number ;
+  name?: string ;
+  public?: string  | null ;
 }
 export type Geography_columns = { 
-  "coord_dimension"?: number  | null ;
-  "f_geography_column"?: string  | null ;
-  "f_table_catalog"?: string  | null ;
-  "f_table_name"?: string  | null ;
-  "f_table_schema"?: string  | null ;
-  "srid"?: number  | null ;
-  "type"?: string  | null ;
+  coord_dimension?: number  | null ;
+  f_geography_column?: string  | null ;
+  f_table_catalog?: string  | null ;
+  f_table_name?: string  | null ;
+  f_table_schema?: string  | null ;
+  srid?: number  | null ;
+  type?: string  | null ;
 }
 export type Geometry_columns = { 
-  "coord_dimension"?: number  | null ;
-  "f_geometry_column"?: string  | null ;
-  "f_table_catalog"?: string  | null ;
-  "f_table_name"?: string  | null ;
-  "f_table_schema"?: string  | null ;
-  "srid"?: number  | null ;
-  "type"?: string  | null ;
+  coord_dimension?: number  | null ;
+  f_geometry_column?: string  | null ;
+  f_table_catalog?: string  | null ;
+  f_table_name?: string  | null ;
+  f_table_schema?: string  | null ;
+  srid?: number  | null ;
+  type?: string  | null ;
 }
 export type Insert_rules = { 
-  "added"?: Date  | null ;
-  "id"?: number ;
-  "name"?: string  | null ;
+  added?: Date  | null ;
+  id?: number ;
+  name?: string  | null ;
 }
 export type Items = { 
-  "h"?: Array<string>  | null ;
-  "id"?: number ;
-  "name"?: string  | null ;
+  h?: Array<string>  | null ;
+  id?: number ;
+  name?: string  | null ;
 }
 export type Items2 = { 
-  "hh"?: Array<string>  | null ;
-  "id"?: number ;
-  "items_id"?: number  | null ;
-  "name"?: string  | null ;
+  hh?: Array<string>  | null ;
+  id?: number ;
+  items_id?: number  | null ;
+  name?: string  | null ;
 }
 export type Items3 = { 
-  "h"?: Array<string>  | null ;
-  "id"?: number ;
-  "name"?: string  | null ;
+  h?: Array<string>  | null ;
+  id?: number ;
+  name?: string  | null ;
 }
 export type Items4 = { 
-  "added"?: Date  | null ;
-  "id"?: number ;
-  "name"?: string ;
-  "public"?: string  | null ;
+  added?: Date  | null ;
+  id?: number ;
+  name?: string ;
+  public?: string  | null ;
 }
 export type Items4_pub = { 
-  "added"?: Date  | null ;
-  "id"?: number ;
-  "name"?: string ;
-  "public"?: string  | null ;
+  added?: Date  | null ;
+  id?: number ;
+  name?: string ;
+  public?: string  | null ;
 }
 export type Items_with_media = { 
-  "id"?: number ;
-  "name"?: string  | null ;
+  id?: number ;
+  name?: string  | null ;
 }
 export type Items_with_one_media = { 
-  "id"?: number ;
-  "name"?: string  | null ;
+  id?: number ;
+  name?: string  | null ;
 }
 export type Lookup_col1 = { 
-  "id"?: string ;
+  id?: string ;
 }
 export type Media = { 
-  "content_type"?: string ;
-  "description"?: string  | null ;
-  "etag"?: string  | null ;
-  "extension"?: string ;
-  "id"?: string ;
-  "name"?: string ;
-  "original_name"?: string ;
-  "s3_url"?: string  | null ;
-  "signed_url"?: string  | null ;
-  "signed_url_expires"?: number  | null ;
-  "url"?: string ;
+  content_type?: string ;
+  description?: string  | null ;
+  etag?: string  | null ;
+  extension?: string ;
+  id?: string ;
+  name?: string ;
+  original_name?: string ;
+  s3_url?: string  | null ;
+  signed_url?: string  | null ;
+  signed_url_expires?: number  | null ;
+  url?: string ;
 }
 export type Obj_table = { 
-  "id"?: number ;
-  "obj"?: any  | null ;
+  id?: number ;
+  obj?: any  | null ;
 }
 export type Planes = { 
-  "flight_number"?: string  | null ;
-  "id"?: number ;
-  "last_updated"?: number ;
-  "x"?: number  | null ;
-  "y"?: number  | null ;
+  flight_number?: string  | null ;
+  id?: number ;
+  last_updated?: number ;
+  x?: number  | null ;
+  y?: number  | null ;
 }
 export type Prostgles_lookup_media_items_with_media = { 
-  "foreign_id"?: number  | null ;
-  "media_id"?: string ;
+  foreign_id?: number  | null ;
+  media_id?: string ;
 }
 export type Prostgles_lookup_media_items_with_one_media = { 
-  "foreign_id"?: number ;
-  "media_id"?: string ;
+  foreign_id?: number ;
+  media_id?: string ;
 }
 export type Shapes = { 
-  "geog"?: any  | null ;
-  "geom"?: any  | null ;
-  "id"?: string ;
+  geog?: any  | null ;
+  geom?: any  | null ;
+  id?: string ;
 }
 export type Spatial_ref_sys = { 
-  "auth_name"?: string  | null ;
-  "auth_srid"?: number  | null ;
-  "proj4text"?: string  | null ;
-  "srid"?: number ;
-  "srtext"?: string  | null ;
+  auth_name?: string  | null ;
+  auth_srid?: number  | null ;
+  proj4text?: string  | null ;
+  srid?: number ;
+  srtext?: string  | null ;
 }
 export type Tr1 = { 
-  "id"?: number ;
-  "t1"?: string  | null ;
+  id?: number ;
+  t1?: string  | null ;
 }
 export type Tr2 = { 
-  "id"?: number ;
-  "t1"?: string  | null ;
-  "t2"?: string  | null ;
-  "tr1_id"?: number  | null ;
+  id?: number ;
+  t1?: string  | null ;
+  t2?: string  | null ;
+  tr1_id?: number  | null ;
 }
 export type Uuid_text = { 
-  "col1"?: string  | null ;
-  "col2"?: string  | null ;
-  "id"?: string ;
-  "name"?: string  | null ;
+  col1?: string  | null ;
+  col2?: string  | null ;
+  id?: string ;
+  name?: string  | null ;
 }
 export type V_items = { 
-  "id"?: number  | null ;
-  "name"?: string  | null ;
+  id?: number  | null ;
+  name?: string  | null ;
 }
 export type Various = { 
-  "added"?: Date  | null ;
-  "h"?: Array<string>  | null ;
-  "id"?: number ;
-  "jsn"?: any  | null ;
-  "name"?: string  | null ;
-  "tsv"?: any  | null ;
+  added?: Date  | null ;
+  h?: Array<string>  | null ;
+  id?: number ;
+  jsn?: any  | null ;
+  name?: string  | null ;
+  tsv?: any  | null ;
 }
 
 export type JoinMakerTables = {
- "items": JoinMaker<Items>;
- "items2": JoinMaker<Items2>;
- "items3": JoinMaker<Items3>;
- "items_with_media": JoinMaker<Items_with_media>;
- "items_with_one_media": JoinMaker<Items_with_one_media>;
- "lookup_col1": JoinMaker<Lookup_col1>;
- "media": JoinMaker<Media>;
- "prostgles_lookup_media_items_with_media": JoinMaker<Prostgles_lookup_media_items_with_media>;
- "prostgles_lookup_media_items_with_one_media": JoinMaker<Prostgles_lookup_media_items_with_one_media>;
- "tr1": JoinMaker<Tr1>;
- "tr2": JoinMaker<Tr2>;
- "uuid_text": JoinMaker<Uuid_text>;
+ items: JoinMaker<Items>;
+ items2: JoinMaker<Items2>;
+ items3: JoinMaker<Items3>;
+ items_with_media: JoinMaker<Items_with_media>;
+ items_with_one_media: JoinMaker<Items_with_one_media>;
+ lookup_col1: JoinMaker<Lookup_col1>;
+ media: JoinMaker<Media>;
+ prostgles_lookup_media_items_with_media: JoinMaker<Prostgles_lookup_media_items_with_media>;
+ prostgles_lookup_media_items_with_one_media: JoinMaker<Prostgles_lookup_media_items_with_one_media>;
+ tr1: JoinMaker<Tr1>;
+ tr2: JoinMaker<Tr2>;
+ uuid_text: JoinMaker<Uuid_text>;
 };
 
 /* DBO Definition. Isomorphic */
 export type DBObj = {
   "\"*\"": TableHandler<D_34_42_34> 
   "*": TableHandler<D_42> 
-  "ex_j_ins": TableHandler<Ex_j_ins> 
-  "geography_columns": ViewHandler<Geography_columns> 
-  "geometry_columns": ViewHandler<Geometry_columns> 
-  "insert_rules": TableHandler<Insert_rules> 
-  "items": TableHandler<Items> 
-  "items2": TableHandler<Items2> 
-  "items3": TableHandler<Items3> 
-  "items4": TableHandler<Items4> 
-  "items4_pub": TableHandler<Items4_pub> 
-  "items_with_media": TableHandler<Items_with_media> 
-  "items_with_one_media": TableHandler<Items_with_one_media> 
-  "lookup_col1": TableHandler<Lookup_col1> 
-  "media": TableHandler<Media> 
-  "obj_table": TableHandler<Obj_table> 
-  "planes": TableHandler<Planes> 
-  "prostgles_lookup_media_items_with_media": TableHandler<Prostgles_lookup_media_items_with_media> 
-  "prostgles_lookup_media_items_with_one_media": TableHandler<Prostgles_lookup_media_items_with_one_media> 
-  "shapes": TableHandler<Shapes> 
-  "spatial_ref_sys": TableHandler<Spatial_ref_sys> 
-  "tr1": TableHandler<Tr1> 
-  "tr2": TableHandler<Tr2> 
-  "uuid_text": TableHandler<Uuid_text> 
-  "v_items": ViewHandler<V_items> 
-  "various": TableHandler<Various> 
+  ex_j_ins: TableHandler<Ex_j_ins> 
+  geography_columns: ViewHandler<Geography_columns> 
+  geometry_columns: ViewHandler<Geometry_columns> 
+  insert_rules: TableHandler<Insert_rules> 
+  items: TableHandler<Items> 
+  items2: TableHandler<Items2> 
+  items3: TableHandler<Items3> 
+  items4: TableHandler<Items4> 
+  items4_pub: TableHandler<Items4_pub> 
+  items_with_media: TableHandler<Items_with_media> 
+  items_with_one_media: TableHandler<Items_with_one_media> 
+  lookup_col1: TableHandler<Lookup_col1> 
+  media: TableHandler<Media> 
+  obj_table: TableHandler<Obj_table> 
+  planes: TableHandler<Planes> 
+  prostgles_lookup_media_items_with_media: TableHandler<Prostgles_lookup_media_items_with_media> 
+  prostgles_lookup_media_items_with_one_media: TableHandler<Prostgles_lookup_media_items_with_one_media> 
+  shapes: TableHandler<Shapes> 
+  spatial_ref_sys: TableHandler<Spatial_ref_sys> 
+  tr1: TableHandler<Tr1> 
+  tr2: TableHandler<Tr2> 
+  uuid_text: TableHandler<Uuid_text> 
+  v_items: ViewHandler<V_items> 
+  various: TableHandler<Various> 
   leftJoin: JoinMakerTables;
   innerJoin: JoinMakerTables;
   leftJoinOne: JoinMakerTables;
@@ -215,82 +215,82 @@ export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = {
   fallbackLang: keyof LANG_IDS; 
   column_labels?: DeepPartial<{ 
     "\"*\"": { 
-      [key in "\"*\"" | "id"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in keyof D_34_42_34]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
     "*": { 
-      [key in "*" | "id"]: { [lang_id in keyof LANG_IDS]: string }; 
+      [key in keyof D_42]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "ex_j_ins": { 
-      [key in "added" | "id" | "name" | "public"]: { [lang_id in keyof LANG_IDS]: string }; 
+    ex_j_ins: { 
+      [key in keyof Ex_j_ins]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "geography_columns": { 
-      [key in "coord_dimension" | "f_geography_column" | "f_table_catalog" | "f_table_name" | "f_table_schema" | "srid" | "type"]: { [lang_id in keyof LANG_IDS]: string }; 
+    geography_columns: { 
+      [key in keyof Geography_columns]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "geometry_columns": { 
-      [key in "coord_dimension" | "f_geometry_column" | "f_table_catalog" | "f_table_name" | "f_table_schema" | "srid" | "type"]: { [lang_id in keyof LANG_IDS]: string }; 
+    geometry_columns: { 
+      [key in keyof Geometry_columns]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "insert_rules": { 
-      [key in "added" | "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+    insert_rules: { 
+      [key in keyof Insert_rules]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "items": { 
-      [key in "h" | "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+    items: { 
+      [key in keyof Items]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "items2": { 
-      [key in "hh" | "id" | "items_id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+    items2: { 
+      [key in keyof Items2]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "items3": { 
-      [key in "h" | "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+    items3: { 
+      [key in keyof Items3]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "items4": { 
-      [key in "added" | "id" | "name" | "public"]: { [lang_id in keyof LANG_IDS]: string }; 
+    items4: { 
+      [key in keyof Items4]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "items4_pub": { 
-      [key in "added" | "id" | "name" | "public"]: { [lang_id in keyof LANG_IDS]: string }; 
+    items4_pub: { 
+      [key in keyof Items4_pub]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "items_with_media": { 
-      [key in "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+    items_with_media: { 
+      [key in keyof Items_with_media]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "items_with_one_media": { 
-      [key in "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+    items_with_one_media: { 
+      [key in keyof Items_with_one_media]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "lookup_col1": { 
-      [key in "id"]: { [lang_id in keyof LANG_IDS]: string }; 
+    lookup_col1: { 
+      [key in keyof Lookup_col1]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "media": { 
-      [key in "content_type" | "description" | "etag" | "extension" | "id" | "name" | "original_name" | "s3_url" | "signed_url" | "signed_url_expires" | "url"]: { [lang_id in keyof LANG_IDS]: string }; 
+    media: { 
+      [key in keyof Media]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "obj_table": { 
-      [key in "id" | "obj"]: { [lang_id in keyof LANG_IDS]: string }; 
+    obj_table: { 
+      [key in keyof Obj_table]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "planes": { 
-      [key in "flight_number" | "id" | "last_updated" | "x" | "y"]: { [lang_id in keyof LANG_IDS]: string }; 
+    planes: { 
+      [key in keyof Planes]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "prostgles_lookup_media_items_with_media": { 
-      [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
+    prostgles_lookup_media_items_with_media: { 
+      [key in keyof Prostgles_lookup_media_items_with_media]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "prostgles_lookup_media_items_with_one_media": { 
-      [key in "foreign_id" | "media_id"]: { [lang_id in keyof LANG_IDS]: string }; 
+    prostgles_lookup_media_items_with_one_media: { 
+      [key in keyof Prostgles_lookup_media_items_with_one_media]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "shapes": { 
-      [key in "geog" | "geom" | "id"]: { [lang_id in keyof LANG_IDS]: string }; 
+    shapes: { 
+      [key in keyof Shapes]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "spatial_ref_sys": { 
-      [key in "auth_name" | "auth_srid" | "proj4text" | "srid" | "srtext"]: { [lang_id in keyof LANG_IDS]: string }; 
+    spatial_ref_sys: { 
+      [key in keyof Spatial_ref_sys]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "tr1": { 
-      [key in "id" | "t1"]: { [lang_id in keyof LANG_IDS]: string }; 
+    tr1: { 
+      [key in keyof Tr1]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "tr2": { 
-      [key in "id" | "t1" | "t2" | "tr1_id"]: { [lang_id in keyof LANG_IDS]: string }; 
+    tr2: { 
+      [key in keyof Tr2]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "uuid_text": { 
-      [key in "col1" | "col2" | "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+    uuid_text: { 
+      [key in keyof Uuid_text]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "v_items": { 
-      [key in "id" | "name"]: { [lang_id in keyof LANG_IDS]: string }; 
+    v_items: { 
+      [key in keyof V_items]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
-    "various": { 
-      [key in "added" | "h" | "id" | "jsn" | "name" | "tsv"]: { [lang_id in keyof LANG_IDS]: string }; 
+    various: { 
+      [key in keyof Various]: { [lang_id in keyof LANG_IDS]: string }; 
     }; 
   }> 
 } 

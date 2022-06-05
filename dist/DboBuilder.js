@@ -54,9 +54,18 @@ function snakify(str, capitalize = false) {
         return c;
     }).join("");
 }
-function escapeTSNames(str, capitalize = true) {
+function canBeUsedAsIsInTypescript(str) {
+    if (!str)
+        return false;
+    const isAlphaNumericOrUnderline = str.match(/^[a-z0-9_]+$/i);
+    const startsWithCharOrUnderscore = str[0].match(/^[a-z_]+$/i);
+    return Boolean(isAlphaNumericOrUnderline && startsWithCharOrUnderscore);
+}
+function escapeTSNames(str, capitalize = false) {
     let res = str;
     res = (capitalize ? str[0].toUpperCase() : str[0]) + str.slice(1);
+    if (canBeUsedAsIsInTypescript(res))
+        return res;
     return JSON.stringify(res);
 }
 const shortestPath_1 = require("./shortestPath");
@@ -191,7 +200,7 @@ class ViewHandler {
         // if(this.tsDataName === "T") this.tsDataName = this.tsDataName + "_";
         // this.tsDataDef = `export type ${this.tsDataName} = {\n`;
         this.columnsForTypes.map(({ name, udt_name, is_nullable }) => {
-            this.tsColumnDefs.push(`${escapeTSNames(name, false)}?: ${postgresToTsType(udt_name)} ${is_nullable ? " | null " : ""};`);
+            this.tsColumnDefs.push(`${escapeTSNames(name)}?: ${postgresToTsType(udt_name)} ${is_nullable ? " | null " : ""};`);
         });
         // this.tsDataDef += "};";
         // this.tsDataDef += "\n";
@@ -2412,8 +2421,9 @@ export type TxCB = {
         i18nDef += "  column_labels?: DeepPartial<{ \n";
         this.tablesOrViews.map(tov => {
             const columnsForTypes = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
-            i18nDef += `    ${JSON.stringify(tov.name)}: { \n`;
-            i18nDef += `      [key in ${columnsForTypes.map(c => JSON.stringify(c.name)).join(" | ")}]: { [lang_id in keyof LANG_IDS]: string }; \n`;
+            i18nDef += `    ${escapeTSNames(tov.name)}: { \n`;
+            // i18nDef += `      [key in ${columnsForTypes.map(c => JSON.stringify(c.name)).join(" | ")}]: { [lang_id in keyof LANG_IDS]: string }; \n`;
+            i18nDef += `      [key in keyof ${snakify(tov.name, true)}]: { [lang_id in keyof LANG_IDS]: string }; \n`;
             i18nDef += `    }; \n`;
             const filterKeywords = Object.values(this.prostgles.keywords);
             const $filterCol = columnsForTypes.find(c => filterKeywords.includes(c.name));
@@ -2423,7 +2433,7 @@ export type TxCB = {
                 Alternatively you can rename the table column\n`;
             }
             const TSTableDataName = snakify(tov.name, true);
-            const TSTableHandlerName = JSON.stringify(tov.name);
+            const TSTableHandlerName = escapeTSNames(tov.name);
             if (tov.is_view) {
                 this.dbo[tov.name] = new ViewHandler(this.db, tov, this, undefined, undefined, this.joinPaths);
                 this.dboDefinition += `  ${TSTableHandlerName}: ViewHandler<${TSTableDataName}> \n`;
@@ -2471,7 +2481,7 @@ export type TxCB = {
         if (joinTableNames.length) {
             joinBuilderDef += "export type JoinMakerTables = {\n";
             joinTableNames.map(tname => {
-                joinBuilderDef += ` ${JSON.stringify(tname)}: JoinMaker<${snakify(tname, true)}>;\n`;
+                joinBuilderDef += ` ${escapeTSNames(tname)}: JoinMaker<${snakify(tname, true)}>;\n`;
             });
             joinBuilderDef += "};\n";
             ["leftJoin", "innerJoin", "leftJoinOne", "innerJoinOne"].map(joinType => {
