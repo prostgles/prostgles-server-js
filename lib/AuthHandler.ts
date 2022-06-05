@@ -1,7 +1,7 @@
 import { AnyObject, AuthGuardLocation, AuthGuardLocationResponse, CHANNELS } from "prostgles-types";
 import { LocalParams, PRGLIOSocket } from "./DboBuilder";
 import { DB, DbHandler, Prostgles } from "./Prostgles";
-
+type Awaitable<T> = T | Promise<T>;
 type AuthSocketSchema = {
   user?: AnyObject;
   register?: boolean;
@@ -98,30 +98,34 @@ export type Auth<DBO = DbHandler> = {
       /**
        * Used in creating a session/logging in using a magic link
        */
-      check: (magicId: string, dbo: DBO, db: DB) => Promise<BasicSession | undefined>;
+      check: (magicId: string, dbo: DBO, db: DB) => Awaitable<BasicSession | undefined>;
     }
 
   }
 
-  /**
-   * User data used on server. Mainly used in http request auth
-   */
-  getUser: (sid: string | undefined, dbo: DBO, db: DB, client: AuthClientRequest) => Promise<AnyObject | undefined> | AnyObject | undefined;
+  getUser: (sid: string | undefined, dbo: DBO, db: DB, client: AuthClientRequest) => Awaitable<{
 
-  /**
-   * User data sent to client. Mainly used in socket request auth
-   */
-  getClientUser: (sid: string, dbo: DBO, db: DB) => Promise<AnyObject | undefined> | AnyObject | undefined;
+    /**
+     * User data used on server. Mainly used in http request auth
+     */
+    user: AnyObject;
 
-  register?: (params: AnyObject, dbo: DBO, db: DB) => Promise<BasicSession> | BasicSession;
-  login?: (params: AnyObject, dbo: DBO, db: DB) => Promise<BasicSession> | BasicSession;
-  logout?: (sid: string | undefined, dbo: DBO, db: DB) => Promise<any>;
+    /**
+     * User data sent to client. Mainly used in socket request auth
+     */
+    clientUser: AnyObject;
+
+  } | undefined>;
+
+  register?: (params: AnyObject, dbo: DBO, db: DB) => Awaitable<BasicSession> | BasicSession;
+  login?: (params: AnyObject, dbo: DBO, db: DB) => Awaitable<BasicSession> | BasicSession;
+  logout?: (sid: string | undefined, dbo: DBO, db: DB) => Awaitable<any>;
 
   /**
    * If provided then then session info will be saved on socket.__prglCache and reused from there
    */
   cacheSession?: {
-    getSession: (sid: string | undefined, dbo: DBO, db: DB) => Promise<BasicSession>
+    getSession: (sid: string | undefined, dbo: DBO, db: DB) => Awaitable<BasicSession>
   }
 }
 
@@ -223,7 +227,7 @@ export default class AuthHandler {
     if (!this.opts) return;
 
     this.opts.sidKeyName = this.opts.sidKeyName || "session_id";
-    const { sidKeyName, login, getUser, getClientUser, expressConfig } = this.opts;
+    const { sidKeyName, login, getUser, expressConfig } = this.opts;
     this.sidKeyName = this.opts.sidKeyName;
 
     if (typeof sidKeyName !== "string" && !login) {
@@ -234,7 +238,7 @@ export default class AuthHandler {
      */
     if (this.sidKeyName === "sid") throw "sidKeyName cannot be 'sid' please provide another name.";
 
-    if (!getUser || !getClientUser) throw "getUser OR getClientUser missing from auth config";
+    if (!getUser) throw "getUser missing from auth config";
 
     if (expressConfig) {
       const { app, publicRoutes = [], onGetRequestOK, magicLinks } = expressConfig;
@@ -465,15 +469,16 @@ export default class AuthHandler {
 
     const res = await this.throttledFunc(async () => {
 
-      const { getUser, getClientUser } = this.opts ?? {};
+      const { getUser } = this.opts ?? {};
 
-      if (getUser && getClientUser && localParams && (localParams.httpReq || localParams.socket)) {
+      if (getUser && localParams && (localParams.httpReq || localParams.socket)) {
         const sid = this.getSID(localParams);
         const clientReq = localParams.httpReq? { httpReq: localParams.httpReq } : { socket: localParams.socket };
         let user, clientUser;
         if(sid){
-          user = await getUser(sid, this.dbo as any, this.db, clientReq),
-          clientUser = await getClientUser(sid, this.dbo as any, this.db)
+          const res = await getUser(sid, this.dbo as any, this.db, clientReq);
+          user = res?.user;
+          clientUser = res?.clientUser;
         }
         if(getSession && isSocket){
           const session = await getSession(sid, this.dbo as any, this.db)

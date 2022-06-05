@@ -1,6 +1,7 @@
 import { AnyObject } from "prostgles-types";
 import { LocalParams, PRGLIOSocket } from "./DboBuilder";
 import { DB, DbHandler, Prostgles } from "./Prostgles";
+declare type Awaitable<T> = T | Promise<T>;
 declare type AuthSocketSchema = {
     user?: AnyObject;
     register?: boolean;
@@ -86,25 +87,27 @@ export declare type Auth<DBO = DbHandler> = {
             /**
              * Used in creating a session/logging in using a magic link
              */
-            check: (magicId: string, dbo: DBO, db: DB) => Promise<BasicSession | undefined>;
+            check: (magicId: string, dbo: DBO, db: DB) => Awaitable<BasicSession | undefined>;
         };
     };
-    /**
-     * User data used on server. Mainly used in http request auth
-     */
-    getUser: (sid: string | undefined, dbo: DBO, db: DB, client: AuthClientRequest) => Promise<AnyObject | undefined> | AnyObject | undefined;
-    /**
-     * User data sent to client. Mainly used in socket request auth
-     */
-    getClientUser: (sid: string, dbo: DBO, db: DB) => Promise<AnyObject | undefined> | AnyObject | undefined;
-    register?: (params: AnyObject, dbo: DBO, db: DB) => Promise<BasicSession> | BasicSession;
-    login?: (params: AnyObject, dbo: DBO, db: DB) => Promise<BasicSession> | BasicSession;
-    logout?: (sid: string | undefined, dbo: DBO, db: DB) => Promise<any>;
+    getUser: (sid: string | undefined, dbo: DBO, db: DB, client: AuthClientRequest) => Awaitable<{
+        /**
+         * User data used on server. Mainly used in http request auth
+         */
+        user: AnyObject;
+        /**
+         * User data sent to client. Mainly used in socket request auth
+         */
+        clientUser: AnyObject;
+    } | undefined>;
+    register?: (params: AnyObject, dbo: DBO, db: DB) => Awaitable<BasicSession> | BasicSession;
+    login?: (params: AnyObject, dbo: DBO, db: DB) => Awaitable<BasicSession> | BasicSession;
+    logout?: (sid: string | undefined, dbo: DBO, db: DB) => Awaitable<any>;
     /**
      * If provided then then session info will be saved on socket.__prglCache and reused from there
      */
     cacheSession?: {
-        getSession: (sid: string | undefined, dbo: DBO, db: DB) => Promise<BasicSession>;
+        getSession: (sid: string | undefined, dbo: DBO, db: DB) => Awaitable<BasicSession>;
     };
 };
 export declare type ClientInfo = {

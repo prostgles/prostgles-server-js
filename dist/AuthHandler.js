@@ -194,7 +194,7 @@ class AuthHandler {
         if (!this.opts)
             return;
         this.opts.sidKeyName = this.opts.sidKeyName || "session_id";
-        const { sidKeyName, login, getUser, getClientUser, expressConfig } = this.opts;
+        const { sidKeyName, login, getUser, expressConfig } = this.opts;
         this.sidKeyName = this.opts.sidKeyName;
         if (typeof sidKeyName !== "string" && !login) {
             throw "Invalid auth: Provide { sidKeyName: string } ";
@@ -204,8 +204,8 @@ class AuthHandler {
          */
         if (this.sidKeyName === "sid")
             throw "sidKeyName cannot be 'sid' please provide another name.";
-        if (!getUser || !getClientUser)
-            throw "getUser OR getClientUser missing from auth config";
+        if (!getUser)
+            throw "getUser missing from auth config";
         if (expressConfig) {
             const { app, publicRoutes = [], onGetRequestOK, magicLinks } = expressConfig;
             if (publicRoutes.find(r => typeof r !== "string" || !r)) {
@@ -367,14 +367,15 @@ class AuthHandler {
                 return {};
         }
         const res = await this.throttledFunc(async () => {
-            const { getUser, getClientUser } = this.opts ?? {};
-            if (getUser && getClientUser && localParams && (localParams.httpReq || localParams.socket)) {
+            const { getUser } = this.opts ?? {};
+            if (getUser && localParams && (localParams.httpReq || localParams.socket)) {
                 const sid = this.getSID(localParams);
                 const clientReq = localParams.httpReq ? { httpReq: localParams.httpReq } : { socket: localParams.socket };
                 let user, clientUser;
                 if (sid) {
-                    user = await getUser(sid, this.dbo, this.db, clientReq),
-                        clientUser = await getClientUser(sid, this.dbo, this.db);
+                    const res = await getUser(sid, this.dbo, this.db, clientReq);
+                    user = res?.user;
+                    clientUser = res?.clientUser;
                 }
                 if (getSession && isSocket) {
                     const session = await getSession(sid, this.dbo, this.db);

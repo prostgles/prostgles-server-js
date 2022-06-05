@@ -163,24 +163,17 @@ const dbConnection = {
         },
         auth: {
             sidKeyName: "token",
-            getClientUser: async (sid) => {
-                if (sid) {
-                    const s = sessions.find(s => s.id === sid);
-                    if (s) {
-                        const u = users.find(u => s && s.user_id === u.id);
-                        if (u)
-                            return { sid: s.id, uid: u.id };
-                    }
-                }
-                return null;
-            },
             getUser: async (sid) => {
                 if (sid) {
                     const s = sessions.find(s => s.id === sid);
-                    if (s)
-                        return users.find(u => s && s.user_id === u.id);
+                    if (s) {
+                        const user = users.find(u => s && s.user_id === u.id);
+                        if (user) {
+                            return { user, clientUser: { sid: s.id, uid: user.id } };
+                        }
+                    }
                 }
-                return null;
+                return undefined;
             },
             login: async ({ username, password } = {}) => {
                 const u = users.find(u => u.username === username && u.password === password);
