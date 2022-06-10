@@ -21,14 +21,14 @@ import { PubSubManager, DEFAULT_SYNC_BATCH_SIZE, asValue } from "./PubSubManager
 export { DbHandler }
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 
-import { SQLRequest, TableSchemaForClient, MethodKey, CHANNELS, AnyObject, RULE_METHODS, ClientSchema, getKeys } from "prostgles-types";
+import { SQLRequest, TableSchemaForClient, MethodKey, CHANNELS, AnyObject, RULE_METHODS, ClientSchema, getKeys, DBSchemaTable, TableInfo } from "prostgles-types";
 
 import { DBEventsManager } from "./DBEventsManager";
 
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 type DbConnectionOpts = pg.IDefaults;
-const TABLE_METHODS = ["update", "find", "findOne", "insert", "delete", "upsert"];
+const TABLE_METHODS = ["update", "find", "findOne", "insert", "delete", "upsert"] as const;
 function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts | undefined, debugQueries = false, onNotice: ProstglesInitOptions["onNotice"]): { db: DB, pgp: PGP } {
     let pgp: PGP = pgPromise({
         
@@ -935,24 +935,26 @@ export class Prostgles<DBO = DbHandler> {
         // let DATA_TYPES = !needType? [] : await this.db.any("SELECT oid, typname FROM pg_type");
         // let USER_TABLES = !needType? [] :  await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
 
-        let schema: TableSchemaForClient = {};
+        const { dbo, db, pgp, publishParser } = this;
+        let fullSchema: {
+            schema: TableSchemaForClient;
+            tables: DBSchemaTable[];
+        } | undefined;
         let publishValidationError;
         let rawSQL = false;
         
-        const { dbo, db, pgp, publishParser } = this;
         try {
             if(!publishParser) throw "publishParser undefined";
-            schema = await publishParser.getSchemaFromPublish(socket);
+            fullSchema = await publishParser.getSchemaFromPublish(socket);
         } catch(e){
             publishValidationError = "Server Error: PUBLISH VALIDATION ERROR";
             console.error(`\nProstgles PUBLISH VALIDATION ERROR (after socket connected):\n    ->`, e);
         }
         socket.prostgles = socket.prostgles || {};
-        socket.prostgles.schema = schema;
+        socket.prostgles.schema = fullSchema?.schema;
         /*  RUN Raw sql from client IF PUBLISHED
         */
-        let fullSchema: TableSchema[] = [];
-        let allTablesViews = this.dboBuilder.tablesOrViews ?? [];
+       
         if(this.opts.publishRawSQL && typeof this.opts.publishRawSQL === "function"){
             const canRunSQL = async () => {
                 const publishParams = await this.publishParser?.getPublishParams({ socket })
@@ -974,13 +976,13 @@ export class Prostgles<DBO = DbHandler> {
                 });
                 if(db){
                     // let allTablesViews = await db.any(STEP2_GET_ALL_TABLES_AND_COLUMNS);
-                    fullSchema = allTablesViews;
+                    // fullSchema = allTablesViews;
                     rawSQL = true;
                 } else console.error("db missing");
             }
         }
 
-        // let joinTables = [];
+        const { schema, tables } = fullSchema ?? { schema: {}, tables: [] };
         let joinTables2: string[][] = [];
         if(this.opts.joins){
             // joinTables = Array.from(new Set(flat(this.dboBuilder.getJoins().map(j => j.tables)).filter(t => schema[t])));
@@ -999,7 +1001,7 @@ export class Prostgles<DBO = DbHandler> {
         const clientSchema: ClientSchema = {
             schema, 
             methods: getKeys(methods), 
-            ...(fullSchema? { fullSchema } : {}),
+            tableSchema: tables,
             rawSQL,
             joinTables: joinTables2,
             auth,
@@ -1330,7 +1332,11 @@ export class PublishParser {
                         .find(method => {
                             let rm = MY_RULES.find(r => r.rule === method || (r.methods as any).includes(method));
                             if(!rm){
-                                throw `Invalid rule in publish.${tableName} -> ${method} \nExpecting any of: ${MY_RULES.flatMap(r => [r.rule, ...r.methods]).join(", ")}`;
+                                let extraInfo = "";
+                                if(is_view && RULE_TO_METHODS.find(r => !is_view && r.rule === method || (r.methods as any).includes(method))){
+                                    extraInfo = "You've specified table rules to a view\n";
+                                }
+                                throw `Invalid rule in publish.${tableName} -> ${method} \n${extraInfo}Expecting any of: ${MY_RULES.flatMap(r => [r.rule, ...r.methods]).join(", ")}`;
                             }
 
                             /** Check user privileges */
@@ -1393,8 +1399,9 @@ export class PublishParser {
 
     
     /* Prepares schema for client. Only allowed views and commands will be present */
-    async getSchemaFromPublish(socket: any): Promise<TableSchemaForClient> {
+    async getSchemaFromPublish(socket: any): Promise<{schema: TableSchemaForClient; tables: DBSchemaTable[] }> {
         let schema: TableSchemaForClient = {};
+        let tables: DBSchemaTable[] = []
         
         try {
             /* Publish tables and views based on socket */
@@ -1420,10 +1427,11 @@ export class PublishParser {
 
                         const table_rules = await this.getTableRules({ localParams: {socket}, tableName }, clientInfo);
             
-                        // if(tableName === "insert_rule") throw {table_rules}
                         if(table_rules && Object.keys(table_rules).length){
                             schema[tableName] = {};
-                            let methods: Array<MethodKey> = [];
+                            let methods: MethodKey[] = [];
+                            let tableInfo: TableInfo | undefined;
+                            let tableColumns: DBSchemaTable["columns"] | undefined;
         
                             if(typeof table_rules === "object"){
                                 methods = getKeys(table_rules) as any;
@@ -1438,13 +1446,13 @@ export class PublishParser {
 
                                     schema[tableName][method] = {};
 
-                                    /* Test for issues with the publish rules */
-                                    if(TABLE_METHODS.includes(method)){
+                                    /* Test for issues with the common table CRUD methods () */
+                                    if(TABLE_METHODS.includes(method as any)){
 
                                         let err = null;
                                         try {
                                             let valid_table_command_rules = await this.getValidatedRequestRule({ tableName, command: method, localParams: {socket} }, clientInfo);
-                                            await (this.dbo[tableName] as any)[method]({}, {}, {}, valid_table_command_rules, { socket, has_rules: true, testRule: true }); 
+                                            await (this.dbo[tableName] as any)[method]({}, {}, {}, valid_table_command_rules, { socket, has_rules: true, testRule: true });
                                                 
                                         } catch(e) {
                                             err = "INTERNAL PUBLISH ERROR";
@@ -1453,8 +1461,28 @@ export class PublishParser {
                                             throw `publish.${tableName}.${method}: \n   -> ${e}`;
                                         }
                                     }
+
+
+                                    if(method === "getInfo" || method === "getColumns"){
+                                        let tableRules = await this.getValidatedRequestRule({ tableName, command: method, localParams: {socket} }, clientInfo);
+                                        const res = await (this.dbo[tableName] as any)[method](undefined, undefined, undefined , tableRules, { socket, has_rules: true });
+                                        if(method === "getInfo"){
+                                            tableInfo = res;
+                                        } else if(method === "getColumns"){
+                                            tableColumns = res;
+                                        }
+                                    }
                                 }
                             }));
+
+                            if(tableInfo && tableColumns){
+
+                                tables.push({
+                                    name: tableName,
+                                    info: tableInfo,
+                                    columns: tableColumns
+                                })
+                            }
                         }
                         
                         return true;
@@ -1467,8 +1495,8 @@ export class PublishParser {
             console.error("Prostgles \nERRORS IN PUBLISH: ", JSON.stringify(e));
             throw e;
         }
-
-        return schema;
+        
+        return { schema, tables };
     }
 
 }

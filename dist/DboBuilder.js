@@ -420,7 +420,7 @@ class ViewHandler {
         };
     }
     // TODO: fix renamed table trigger problem
-    async getColumns(lang, params, param3, tableRules, localParams) {
+    async getColumns(lang, params, _param3, tableRules, localParams) {
         try {
             const p = this.getValidatedRules(tableRules, localParams);
             if (!p.getColumns)
@@ -447,21 +447,6 @@ class ViewHandler {
                 .map(_c => {
                 let c = { ..._c };
                 let label = c.comment || capitalizeFirstLetter(c.name, " ");
-                /**
-                 * Get labels from TableConfig if specified
-                 */
-                const tblConfig = this.dboBuilder.prostgles?.opts?.tableConfig?.[this.name];
-                if (tblConfig && "columns" in tblConfig) {
-                    const lbl = tblConfig?.columns[c.name]?.label;
-                    if (["string", "object"].includes(typeof lbl)) {
-                        if (typeof lbl === "string") {
-                            label = lbl;
-                        }
-                        else if (lang) {
-                            label = (lbl?.[lang]) || lbl?.en || label;
-                        }
-                    }
-                }
                 const select = c.privileges.some(p => p.privilege_type === "SELECT"), insert = c.privileges.some(p => p.privilege_type === "INSERT"), update = c.privileges.some(p => p.privilege_type === "UPDATE"), _delete = this.tableOrViewInfo.privileges.delete; // c.privileges.some(p => p.privilege_type === "DELETE");
                 delete c.privileges;
                 let result = {
@@ -473,7 +458,7 @@ class ViewHandler {
                     filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)),
                     update: update && Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)),
                     delete: _delete && Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)),
-                    ...(this.dboBuilder?.prostgles?.tableConfigurator?.getColInfo({ table: this.name, col: c.name }) || {})
+                    ...(this.dboBuilder?.prostgles?.tableConfigurator?.getColInfo({ table: this.name, col: c.name, lang }) || {})
                 };
                 if (dynamicUpdateFields) {
                     result.update = dynamicUpdateFields.includes(c.name);

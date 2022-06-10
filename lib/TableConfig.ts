@@ -117,7 +117,7 @@ type NamedJoinColumn = {
     joinDef: JoinDef[];
 }
 
-type ColumnConfig<LANG_IDS= { en: 1 }> = NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn))
+type ColumnConfig<LANG_IDS = { en: 1 }> = NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn))
 
 type TableDefinition<LANG_IDS> = {
     columns: {
@@ -208,8 +208,39 @@ export default class TableConfigurator {
         return undefined;
     }
 
-    getColInfo = (params: {col: string, table: string}): ColExtraInfo | undefined => {
-        return (this.config as any)[params.table]?.[params.col]?.info;
+    getColInfo = (params: {col: string, table: string, lang?: string }): (ColExtraInfo & { label?: string }) | undefined => {
+        const colConf = this.getColumnConfig(params.table, params.col);
+        let result: (ColExtraInfo & { label?: string }) | undefined = undefined;
+        if(colConf){
+
+            if("info" in colConf){
+                result = {
+                    ...(result ?? {}),
+                    ...colConf?.info
+                }
+            }
+
+            /**
+             * Get labels from TableConfig if specified
+             */
+            if(colConf.label){
+                const { lang } = params;
+                const lbl = colConf?.label;
+                if(["string", "object"].includes(typeof lbl)){
+                    if(typeof lbl === "string") {
+                        result ??= {};
+                        result.label = lbl
+                    } else if(lang && (lbl?.[lang as "en"] || lbl?.en)) {
+                        result ??= {};
+                        result.label = (lbl?.[lang as "en"]) || lbl?.en;
+                    }
+                }
+
+            }
+        }
+
+                
+        return result;
     }
 
     checkColVal = (params: {col: string, table: string, value: any }): void => {

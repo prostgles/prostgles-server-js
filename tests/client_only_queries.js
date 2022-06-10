@@ -1,8 +1,31 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const assert_1 = require("assert");
+const dist_1 = require("./client/node_modules/prostgles-types/dist");
 const isomorphic_queries_1 = require("./isomorphic_queries");
-async function client_only(db, auth, log, methods) {
+async function client_only(db, auth, log, methods, tableSchema) {
+    /**
+     * onReady(dbo, methodsObj, tableSchema, _auth)
+     * tableSchema must contan an array of all tables and their columns that have getInfo and getColumns allowed
+     */
+    await (0, isomorphic_queries_1.tryRun)("Check tableSchema", async () => {
+        const dbTables = Object.keys(db).map(k => {
+            const h = db[k];
+            return !!(h.getColumns && h.getInfo) ? k : undefined;
+        }).filter(dist_1.isDefined);
+        const missingTbl = dbTables.find(t => !tableSchema.some(st => st.name === t));
+        if (missingTbl)
+            throw `${missingTbl} is missing from tableSchema: ${JSON.stringify(tableSchema)}`;
+        const missingscTbl = tableSchema.find(t => !dbTables.includes(t.name));
+        if (missingscTbl)
+            throw `${missingscTbl} is missing from db`;
+        await Promise.all(tableSchema.map(async (tbl) => {
+            const cols = await db[tbl.name]?.getColumns();
+            const info = await db[tbl.name]?.getInfo();
+            assert_1.strict.deepStrictEqual(tbl.columns, cols);
+            assert_1.strict.deepStrictEqual(tbl.info, info);
+        }));
+    });
     const testRealtime = () => {
         return new Promise(async (resolve, reject) => {
             try {

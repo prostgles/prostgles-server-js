@@ -140,6 +140,9 @@ async function isomorphic(db) {
             },
             {
                 "label": "fr_t1",
+                hint: "hint...",
+                min: "a",
+                max: "b",
                 "name": "t1",
                 "data_type": "text",
                 "udt_name": "text",

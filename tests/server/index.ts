@@ -80,7 +80,7 @@ const dbConnection = {
 
 		tr2: {
 			columns: {
-				t1: { label: { fr: "fr_t1" } },
+				t1: { label: { fr: "fr_t1" }, info: { hint: "hint...", min: "a", max: "b" } },
 				t2: { label: { en: "en_t2" } },
 			}
 		},

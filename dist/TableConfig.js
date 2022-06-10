@@ -15,7 +15,34 @@ class TableConfigurator {
             return undefined;
         };
         this.getColInfo = (params) => {
-            return this.config[params.table]?.[params.col]?.info;
+            const colConf = this.getColumnConfig(params.table, params.col);
+            let result = undefined;
+            if (colConf) {
+                if ("info" in colConf) {
+                    result = {
+                        ...(result ?? {}),
+                        ...colConf?.info
+                    };
+                }
+                /**
+                 * Get labels from TableConfig if specified
+                 */
+                if (colConf.label) {
+                    const { lang } = params;
+                    const lbl = colConf?.label;
+                    if (["string", "object"].includes(typeof lbl)) {
+                        if (typeof lbl === "string") {
+                            result ?? (result = {});
+                            result.label = lbl;
+                        }
+                        else if (lang && (lbl?.[lang] || lbl?.en)) {
+                            result ?? (result = {});
+                            result.label = (lbl?.[lang]) || lbl?.en;
+                        }
+                    }
+                }
+            }
+            return result;
         };
         this.checkColVal = (params) => {
             const conf = this.getColInfo(params);

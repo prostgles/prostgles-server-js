@@ -768,7 +768,13 @@ export class ViewHandler {
 
     // TODO: fix renamed table trigger problem
     
-    async getColumns(lang?: string, params?: { rule: "update", filter: AnyObject, data: AnyObject }, param3?: never, tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]> {
+    async getColumns(
+        lang?: string, 
+        params?: { rule: "update", filter: AnyObject, data: AnyObject }, 
+        _param3?: never, 
+        tableRules?: TableRule, 
+        localParams?: LocalParams
+    ): Promise<ValidatedColumnInfo[]> {
 
         try {
             const p = this.getValidatedRules(tableRules, localParams);
@@ -803,21 +809,6 @@ export class ViewHandler {
                 
                 let label = c.comment || capitalizeFirstLetter(c.name, " ");
 
-                /**
-                 * Get labels from TableConfig if specified
-                 */
-                const tblConfig = this.dboBuilder.prostgles?.opts?.tableConfig?.[this.name];
-                if(tblConfig && "columns" in tblConfig){
-                    const lbl = tblConfig?.columns[c.name]?.label;
-                    if(["string", "object"].includes(typeof lbl)){
-                        if(typeof lbl === "string") {
-                            label = lbl
-                        } else if(lang) {
-                            label = (lbl?.[lang as "en"]) || lbl?.en || label;
-                        }
-                    }
-                }
-
                 const select = c.privileges.some(p => p.privilege_type === "SELECT"),
                     insert = c.privileges.some(p => p.privilege_type === "INSERT"),
                     update = c.privileges.some(p => p.privilege_type === "UPDATE"),
@@ -833,7 +824,7 @@ export class ViewHandler {
                     filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)),
                     update: update && Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)),
                     delete: _delete && Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)),
-                    ...(this.dboBuilder?.prostgles?.tableConfigurator?.getColInfo({ table: this.name, col: c.name}) || {})
+                    ...(this.dboBuilder?.prostgles?.tableConfigurator?.getColInfo({ table: this.name, col: c.name, lang }) || {})
                 }
 
                 if(dynamicUpdateFields){
@@ -3585,6 +3576,7 @@ async function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"):
             if(col.has_default){
                 col.column_default = (col.udt_name !== "uuid" && !col.is_pkey && !col.column_default.startsWith("nextval("))? col.column_default : null;
             }
+            
             return col;
 
         })//.slice(0).sort((a, b) => a.name.localeCompare(b.name))

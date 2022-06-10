@@ -50,7 +50,7 @@ try {
       onReconnect: (socket) => {
         log("Reconnected")          
       },
-      onReady: async (db, methods, fullSchema, auth) => {
+      onReady: async (db, methods, tableSchema, auth) => {
         log("onReady.auth", auth)
         try {
           log("Starting Client isomorphic tests")
@@ -62,7 +62,7 @@ try {
           log("Client isomorphic tests successful")
   
           // try {
-            await client_only(db, auth, log, methods);
+            await client_only(db, auth, log, methods, tableSchema);
           // } catch(e){
           //   throw { ClientErr: e }
           // }

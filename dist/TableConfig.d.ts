@@ -159,7 +159,10 @@ export default class TableConfigurator {
     getColInfo: (params: {
         col: string;
         table: string;
-    }) => ColExtraInfo | undefined;
+        lang?: string;
+    }) => (ColExtraInfo & {
+        label?: string;
+    }) | undefined;
     checkColVal: (params: {
         col: string;
         table: string;

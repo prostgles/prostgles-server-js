@@ -6,7 +6,7 @@ import TableConfigurator, { TableConfig } from "./TableConfig";
 import { DboBuilder, DbHandler, LocalParams, CommonTableRules, PRGLIOSocket } from "./DboBuilder";
 export { DbHandler };
 export declare type PGP = pgPromise.IMain<{}, pg.IClient>;
-import { TableSchemaForClient, AnyObject } from "prostgles-types";
+import { TableSchemaForClient, AnyObject, DBSchemaTable } from "prostgles-types";
 import { DBEventsManager } from "./DBEventsManager";
 export declare type DB = pgPromise.IDatabase<{}, pg.IClient>;
 declare type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
@@ -421,7 +421,10 @@ export declare class PublishParser {
     getValidatedRequestRuleWusr({ tableName, command, localParams }: DboTableCommand): Promise<TableRule>;
     getValidatedRequestRule({ tableName, command, localParams }: DboTableCommand, clientInfo?: ClientInfo): Promise<TableRule>;
     getTableRules({ tableName, localParams }: DboTable, clientInfo?: ClientInfo): Promise<PublishTable>;
-    getSchemaFromPublish(socket: any): Promise<TableSchemaForClient>;
+    getSchemaFromPublish(socket: any): Promise<{
+        schema: TableSchemaForClient;
+        tables: DBSchemaTable[];
+    }>;
 }
 export declare function isSuperUser(db: DB): Promise<boolean>;
 //# sourceMappingURL=Prostgles.d.ts.map

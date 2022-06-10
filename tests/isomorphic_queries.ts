@@ -126,6 +126,9 @@ export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHand
         },
         {
           "label": "fr_t1",
+          hint: "hint...",
+          min: "a", 
+          max: "b",
           "name": "t1",
           "data_type": "text",
           "udt_name": "text",
