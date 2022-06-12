@@ -1,6 +1,6 @@
 import { DBSchemaColumns, DBSchemaInsertColumns, DBSchema, TableHandler, ViewHandler } from "prostgles-types";
 import { DBHandlerServer, DboBuilder, escapeTSNames, postgresToTsType } from "./DboBuilder";
-import { PublishAllOrNothing, PublishTableRule, PublishViewRule, TableRule, ViewRule } from "./PublishParser";
+import { PublishAllOrNothing, PublishParams, PublishTableRule, PublishViewRule, TableRule, ViewRule } from "./PublishParser";
 
 
 export const getDBSchema = (dboBuilder: DboBuilder): string => {
@@ -50,6 +50,9 @@ export type DBOFullyTyped<Schema extends DBSchema | undefined = undefined> = Sch
   ddb.dwad.insert!;
   ddb.dwad.delete!;
 
+  const p: PublishParams = 1 as any;
+  p.dbo.dwad.insert!;
+  ddb.dwad.delete!;
 })
 
 type S = {
@@ -75,12 +78,28 @@ const test: DBSchema = c;
 const db: DBOFullyTyped<S> = 1 as any;
 
 
-export type PublishFullyTyped<Schema extends DBSchema> = { 
+export type PublishFullyTyped<Schema extends DBSchema | undefined = undefined> = Schema extends DBSchema? { 
   [tov_name in keyof Partial<Schema>]: PublishAllOrNothing | (Schema[tov_name]["is_view"] extends true? PublishViewRule<Schema[tov_name]> : PublishTableRule<Schema[tov_name]>);
-};
+} : (PublishAllOrNothing | Record<string, PublishViewRule | PublishTableRule>);
 
 
 const publish = (): PublishFullyTyped<S> => {
+  const r = {
+    tbl1: {
+      select: {
+        fields: "*" as "*", 
+        forcedFilter: { col1: 32, col2: "" }
+      },
+      getColumns: true,
+      getInfo: true,
+      delete: {
+        filterFields: {col1: 1}
+      }
+    },
+    tbl2: {
+      delete: {forcedFilter: {col1: 2}}
+    }
+  }
   const res: PublishFullyTyped<S> = {
     tbl1: {
       select: {
@@ -97,6 +116,9 @@ const publish = (): PublishFullyTyped<S> => {
       delete: {forcedFilter: {col1: 2}}
     }
   }
+  const res1: PublishFullyTyped = r
+
+  // const res2: PublishFullyTyped = res;
 
   return res;
 }

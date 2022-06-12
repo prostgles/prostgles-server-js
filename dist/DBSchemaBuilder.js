@@ -35,12 +35,31 @@ const ccc = {
     const ddb = 1;
     ddb.dwad.insert;
     ddb.dwad.delete;
+    const p = 1;
+    p.dbo.dwad.insert;
+    ddb.dwad.delete;
 });
 /** Test the created schema */
 const c = 1;
 const test = c;
 const db = 1;
 const publish = () => {
+    const r = {
+        tbl1: {
+            select: {
+                fields: "*",
+                forcedFilter: { col1: 32, col2: "" }
+            },
+            getColumns: true,
+            getInfo: true,
+            delete: {
+                filterFields: { col1: 1 }
+            }
+        },
+        tbl2: {
+            delete: { forcedFilter: { col1: 2 } }
+        }
+    };
     const res = {
         tbl1: {
             select: {
@@ -57,6 +76,8 @@ const publish = () => {
             delete: { forcedFilter: { col1: 2 } }
         }
     };
+    const res1 = r;
+    // const res2: PublishFullyTyped = res;
     return res;
 };
 //# sourceMappingURL=DBSchemaBuilder.js.map

@@ -1,6 +1,6 @@
 import { ProstglesInitOptions } from "./Prostgles";
 import { DBSchema } from "prostgles-types";
-declare function prostgles<S extends DBSchema = any>(params: ProstglesInitOptions<S>): Promise<{
+declare function prostgles<S extends DBSchema | undefined = undefined>(params: ProstglesInitOptions<S>): Promise<{
     db: import("./DBSchemaBuilder").DBOFullyTyped<S>;
     _db: import("./Prostgles").DB;
     pgp: import("./Prostgles").PGP;

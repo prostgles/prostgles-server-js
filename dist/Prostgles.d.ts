@@ -79,7 +79,7 @@ export declare type FileTableConfig = {
     };
     imageOptions?: ImageOptions;
 };
-export declare type ProstglesInitOptions<S extends DBSchema = never> = {
+export declare type ProstglesInitOptions<S extends DBSchema | undefined = undefined> = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
     tsGeneratedTypesDir?: string;
@@ -140,7 +140,7 @@ export declare type OnReady = {
     db: DB;
 };
 import { DBOFullyTyped } from "./DBSchemaBuilder";
-export declare class Prostgles<S extends DBSchema = any> {
+export declare class Prostgles<S extends DBSchema | undefined = undefined> {
     opts: ProstglesInitOptions<S>;
     db?: DB;
     pgp?: PGP;

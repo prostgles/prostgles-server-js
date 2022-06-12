@@ -1,7 +1,7 @@
 import { Prostgles, ProstglesInitOptions } from "./Prostgles";
 import { DBSchema } from "prostgles-types";
 
-function prostgles<S extends DBSchema = any>(params: ProstglesInitOptions<S>){
+function prostgles<S extends DBSchema | undefined = undefined>(params: ProstglesInitOptions<S>){
 
     let prgl = new Prostgles<S>(params as any);
     return prgl.init(params.onReady);

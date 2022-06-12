@@ -37,7 +37,7 @@ export declare type AuthClientRequest = {
 } | {
     httpReq: ExpressReq;
 };
-export declare type Auth<S extends DBSchema = any> = {
+export declare type Auth<S extends DBSchema | undefined = undefined> = {
     /**
      * Name of the cookie or socket hadnshake query param that represents the session id.
      * Defaults to "session_id"
@@ -116,7 +116,7 @@ export declare type ClientInfo = {
     clientUser?: AnyObject;
     sid?: string;
 };
-export default class AuthHandler<S extends DBSchema = any> {
+export default class AuthHandler<S extends DBSchema | undefined = undefined> {
     protected opts?: Auth<S>;
     dbo: DBHandlerServer;
     db: DB;

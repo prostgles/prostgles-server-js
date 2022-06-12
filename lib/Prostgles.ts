@@ -165,7 +165,7 @@ export type FileTableConfig = {
     imageOptions?: ImageOptions
 };
 
-export type ProstglesInitOptions<S extends DBSchema = never> = {
+export type ProstglesInitOptions<S extends DBSchema | undefined = undefined> = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
     tsGeneratedTypesDir?: string;
@@ -246,7 +246,7 @@ const DEFAULT_KEYWORDS = {
 
 import * as fs from 'fs';
 import { DBOFullyTyped } from "./DBSchemaBuilder";
-export class Prostgles<S extends DBSchema = any> {
+export class Prostgles<S extends DBSchema | undefined = undefined> {
 
     opts: ProstglesInitOptions<S> = {
         DEBUG_MODE: false,
