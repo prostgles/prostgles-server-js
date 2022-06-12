@@ -5,7 +5,9 @@ import prostgles from "prostgles-server";
 const app = express();
 const http = require('http').createServer(app);
 const { exec } = require('child_process');
+import { testPublishTypes } from "./publishTypeCheck";
 
+import { testDboTypes } from "./dboTypeCheck"
 
 const clientTest = (process.env.TEST_TYPE === "client");
 const io = !clientTest? undefined : require("socket.io")(http, { path: "/teztz/s" });
@@ -15,10 +17,13 @@ http.listen(3001);
 import isomorphic from "../isomorphic_queries";
 import server_only_queries from "../server_only_queries";
 
-import { DBObj, DBSchema } from "./DBoGenerated";
+import { DBSchemaGenerated } from "./DBoGenerated";
 // type DBObj = any;
 
 import { TableConfig } from '../../dist/TableConfig';
+import { DBOFullyTyped } from "../../lib/DBSchemaBuilder";
+import { ProstglesInitOptions } from "../../dist/Prostgles";
+import { PublishFullyTyped } from "../../dist/DBSchemaBuilder";
 
 const log = (msg: string, extra?: any, trace?: boolean) => {
 	const msgs = ["(server): " + msg, extra].filter(v => v);
@@ -59,6 +64,14 @@ const dbConnection = {
 	// password:  "usr",
 };
 
+function dd(){
+	
+	const dbo: DBOFullyTyped<{ tbl: { is_view: true; columns: { col1: { type: number } } }}> = 1 as any
+	if(!dbo) return;
+	dbo.tbl.find
+
+}
+
 (async () => {
 
 
@@ -96,8 +109,9 @@ const dbConnection = {
 				}
 			}
 		}
-	}
-	let prgl = await prostgles<DBSchema>({
+	} 
+	// ProstglesInitOptions<DBSchemaGenerated>
+	let prgl = await prostgles<DBSchemaGenerated>({
 		dbConnection,
 		sqlFilePath: path.join(__dirname+'/init.sql'),
 		io,
@@ -127,7 +141,9 @@ const dbConnection = {
 
 		onSocketDisconnect:  (socket, db) => {
 			log("onSocketDisconnect")
-			console.trace("onSocketDisconnect")
+			console.trace("onSocketDisconnect");
+			// const c: DBOFullyTyped<DBSchemaGenerated> = 1 as any;
+			// c["*"].
 		},
 		
 		onSocketConnect:  (socket, db) => {
@@ -210,7 +226,7 @@ const dbConnection = {
 			}
 		},
 		publish: async ({ user }) => {
-			return  {
+			const res: PublishFullyTyped<DBSchemaGenerated> =  {
 				shapes: "*",
 				items: "*",
 				items2: "*",
@@ -286,16 +302,7 @@ const dbConnection = {
 				}
 			};
 			
-			// return {
-			// 	items: {
-			// 		select: {
-			// 			fields: "*",
-			// 			forcedFilter: {
-			// 				$exists: { items3: { name: "a" } }
-			// 			}
-			// 		}
-			// 	}
-			// };
+			return res;
 		},
 		// joins: "inferred",
 		joins: [

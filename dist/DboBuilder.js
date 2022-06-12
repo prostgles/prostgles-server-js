@@ -1196,7 +1196,7 @@ class ViewHandler {
             const selectedAliases = select.filter(s => s.selected).map(s => s.alias);
             return (excludeOrder ? "" : " ORDER BY ") + (_ob.map(({ key, asc, nulls, nullEmpty = false }) => {
                 /* Order by column index when possible to bypass name collision when ordering by a computed column.
-                    (Postgres will sort by existing columns whenever possible)
+                    (Postgres will sort by existing columns wheundefined possible)
                 */
                 const orderType = asc ? " ASC " : " DESC ";
                 const index = selectedAliases.indexOf(key) + 1;

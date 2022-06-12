@@ -1,10 +1,10 @@
-import { getKeys, RULE_METHODS, AnyObject, get, TableSchemaForClient, DBSchemaTable, MethodKey, TableInfo, FullFilter, DBSchemaColumns, DBSchema, DBTableSchema } from "prostgles-types";
+import { getKeys, RULE_METHODS, AnyObject, get, TableSchemaForClient, DBSchemaTable, MethodKey, TableInfo, FullFilter } from "prostgles-types";
 import { ClientInfo } from "./AuthHandler";
 import { CommonTableRules, Filter, isPlainObject, LocalParams, PRGLIOSocket, TableHandler, ViewHandler } from "./DboBuilder";
 import { Prostgles, DBHandlerServer, DB, TABLE_METHODS } from "./Prostgles";
 import type { DBOFullyTyped, PublishFullyTyped } from "./DBSchemaBuilder";
 export type Method = (...args: any) => ( any | Promise<any> );
-export type PublishMethods<S extends DBSchema | undefined = undefined> = (params: PublishParams<S>) => { [key:string]: Method } | Promise<{ [key:string]: Method }>;
+export type PublishMethods<S = void> = (params: PublishParams<S>) => { [key:string]: Method } | Promise<{ [key:string]: Method }>;
 
 export type Awaitable<T> = T | Promise<T>;
 
@@ -129,12 +129,13 @@ export type UpdateRequestData<R extends AnyObject = AnyObject> = UpdateRequestDa
 export type ValidateRow<R extends AnyObject = AnyObject> = (row: R) => R | Promise<R>;
 export type ValidateUpdateRow<R extends AnyObject = AnyObject> = (args: { update: Partial<R>, filter: FullFilter<R> }) => R | Promise<R>;
 
-export type SelectRule<S extends DBTableSchema | undefined = undefined> = {
+
+export type SelectRule<Cols extends AnyObject = AnyObject> = {
 
     /**
      * Fields allowed to be selected.   Tip: Use false to exclude field
      */
-    fields: FieldFilter<S extends DBTableSchema? DBSchemaColumns<S["columns"]> : AnyObject>;
+    fields: FieldFilter<Cols>;
 
     /**
      * The maximum number of rows a user can get in a select query. null by default. Unless a null or higher limit is specified 100 rows will be returned by the default
@@ -144,12 +145,12 @@ export type SelectRule<S extends DBTableSchema | undefined = undefined> = {
     /**
      * Filter added to every query (e.g. user_id) to restrict access
      */
-    forcedFilter?: FullFilter<S extends DBTableSchema? DBSchemaColumns<S["columns"]> : AnyObject>;
+    forcedFilter?: FullFilter<Cols>;
 
     /**
      * Fields user can filter by 
      * */
-    filterFields?: FieldFilter<S extends DBTableSchema? DBSchemaColumns<S["columns"]> : AnyObject>;
+    filterFields?: FieldFilter<Cols>;
 
     /**
      * Validation logic to check/update data for each request
@@ -157,39 +158,39 @@ export type SelectRule<S extends DBTableSchema | undefined = undefined> = {
     validate?(args: SelectRequestData): SelectRequestData | Promise<SelectRequestData>;
 
 }
-export type InsertRule<S extends DBTableSchema | undefined = undefined> = {
+export type InsertRule<Cols extends AnyObject = AnyObject> = {
 
     /**
      * Fields allowed to be inserted.   Tip: Use false to exclude field
      */
-    fields: SelectRule<S>["fields"]
+    fields: SelectRule<Cols>["fields"]
 
     /**
      * Data to include/overwrite on each insert
      */
-    forcedData?: Partial<S extends DBTableSchema? DBSchemaColumns<S["columns"]> : AnyObject>;
+    forcedData?: Partial<Cols>;
 
     /**
      * Fields user can view after inserting
      */
-    returningFields?: SelectRule<S>["fields"]
+    returningFields?: SelectRule<Cols>["fields"]
 
     /**
      * Validation logic to check/update data for each request. Happens before publish rule checks (for fields, forcedData/forcedFilter)
      */
-    preValidate?: ValidateRow<S extends DBTableSchema? DBSchemaColumns<S["columns"]> : AnyObject>;
+    preValidate?: ValidateRow<Cols>;
 
     /**
      * Validation logic to check/update data for each request. Happens after publish rule checks (for fields, forcedData/forcedFilter)
      */
-    validate?: InsertRule<S>["preValidate"]
+    validate?: InsertRule<Cols>["preValidate"]
 }
-export type UpdateRule<S extends DBTableSchema | undefined = undefined> = {
+export type UpdateRule<Cols extends AnyObject = AnyObject> = {
 
     /**
      * Fields allowed to be updated.   Tip: Use false/0 to exclude field
      */
-    fields: SelectRule<S>["fields"]
+    fields: SelectRule<Cols>["fields"]
     
     /**
      * Row level FGAC
@@ -199,71 +200,71 @@ export type UpdateRule<S extends DBTableSchema | undefined = undefined> = {
      * Specify in decreasing order of specificity otherwise a more general filter will match first
      */
     dynamicFields?: {
-      filter: SelectRule<S>["forcedFilter"]
-      fields: SelectRule<S>["fields"]
+      filter: SelectRule<Cols>["forcedFilter"]
+      fields: SelectRule<Cols>["fields"]
     }[];
 
     /**
      * Filter added to every query (e.g. user_id) to restrict access
      * This filter cannot be updated
      */
-    forcedFilter?: SelectRule<S>["forcedFilter"]
+    forcedFilter?: SelectRule<Cols>["forcedFilter"]
 
     /**
      * Data to include/overwrite on each updatDBe
      */
-    forcedData?: InsertRule<S>["forcedData"]
+    forcedData?: InsertRule<Cols>["forcedData"]
 
     /**
      * Fields user can use to find the updates
      */
-    filterFields?: SelectRule<S>["fields"]
+    filterFields?: SelectRule<Cols>["fields"]
 
     /**
      * Fields user can view after updating
      */
-    returningFields?: SelectRule<S>["fields"]
+    returningFields?: SelectRule<Cols>["fields"]
 
     /**
      * Validation logic to check/update data for each request
      */
-    validate?: ValidateUpdateRow<S extends DBTableSchema? DBSchemaColumns<S["columns"]> : AnyObject>;
+    validate?: ValidateUpdateRow<Cols>;
 
 };
 
-export type DeleteRule<S extends DBTableSchema | undefined = undefined> = {
+export type DeleteRule<Cols extends AnyObject = AnyObject> = {
     
     /**
      * Filter added to every query (e.g. user_id) to restrict access
      */
-    forcedFilter?: FullFilter<S extends DBTableSchema? DBSchemaColumns<S["columns"]> : AnyObject>;
+    forcedFilter?: SelectRule<Cols>["forcedFilter"]
 
     /**
      * Fields user can filter by
      */
-    filterFields?: FieldFilter<S extends DBTableSchema? DBSchemaColumns<S["columns"]> : AnyObject>;
+    filterFields?: SelectRule<Cols>["filterFields"]
 
     /**
      * Fields user can view after deleting
      */
-    returningFields?: FieldFilter<S extends DBTableSchema? DBSchemaColumns<S["columns"]> : AnyObject>;
+    returningFields?: SelectRule<Cols>["filterFields"]
 
     /**
      * Validation logic to check/update data for each request
      */
-    validate?(...args: any[]): UpdateRequestData<S extends DBTableSchema? DBSchemaColumns<S["columns"]> : AnyObject>;
+    validate?(...args: any[]): UpdateRequestData<Cols>;
 }
-export type SyncRule<S extends DBTableSchema | undefined = undefined> = {
+export type SyncRule<Cols extends AnyObject = AnyObject> = {
     
     /**
      * Primary keys used in updating data
      */
-    id_fields: S extends DBTableSchema? (keyof S["dataTypes"])[] : string[];
+    id_fields: (keyof Cols)[];
     
     /**
      * Numerical incrementing fieldname (last updated timestamp) used to sync items
      */
-    synced_field:  S extends DBTableSchema? (keyof S["dataTypes"]) : string;
+    synced_field: keyof Cols;
 
     /**
      * EXPERIMENTAL. Disabled by default. If true then server will attempt to delete any records missing from client.
@@ -284,25 +285,25 @@ export type SubscribeRule = {
   throttle?: number;
 }
 
-export type ViewRule<S extends DBTableSchema | undefined = undefined> = CommonTableRules & {
+export type ViewRule<S = AnyObject> = CommonTableRules & {
   /**
    * What can be read from the table
    */
   select?: SelectRule<S>;
 };
-export type TableRule<S extends DBTableSchema | undefined = undefined> = ViewRule<S> & {
+export type TableRule<S = AnyObject> = ViewRule<S> & {
   insert?: InsertRule<S>;
   update?: UpdateRule<S>;
   delete?: DeleteRule<S>;
   sync?: SyncRule<S>;
   subscribe?: SubscribeRule;
 };
-export type PublishViewRule<S extends DBTableSchema | undefined = undefined> = {
+export type PublishViewRule<S extends AnyObject = AnyObject> = {
   select?: SelectRule<S> | PublishAllOrNothing
   getColumns?: PublishAllOrNothing;
   getInfo?: PublishAllOrNothing;
 };
-export type PublishTableRule<S extends DBTableSchema | undefined = undefined> = PublishViewRule<S> & {
+export type PublishTableRule<S extends AnyObject = AnyObject> = PublishViewRule<S> & {
   insert?: InsertRule<S> | PublishAllOrNothing
   update?: UpdateRule<S> | PublishAllOrNothing
   delete?: DeleteRule<S> | PublishAllOrNothing
@@ -327,7 +328,7 @@ export type ParsedPublishTable = {
 // export type Publish = {
 //     tablesOrViews: {[key:string]: TableRule | ViewRule | "*" }
 // }
-export type PublishParams<S extends DBSchema | undefined = undefined> = {
+export type PublishParams<S = void> = {
   sid?: string;
   dbo: DBOFullyTyped<S>;
   db?: DB;
@@ -336,14 +337,14 @@ export type PublishParams<S extends DBSchema | undefined = undefined> = {
 }
 export type RequestParams = { dbo?: DBHandlerServer, socket?: any };
 export type PublishAllOrNothing = true | "*" | false | null;
-export type PublishObject<Schema extends DBSchema | undefined = undefined> = { 
-    [table_name: string]: (PublishTableRule | PublishViewRule | PublishAllOrNothing ) 
+type PublishObject = { 
+  [table_name: string]: (PublishTableRule | PublishViewRule | PublishAllOrNothing ) 
 };
 export type ParsedPublishTables = { 
   [table_name: string]: ParsedPublishTable
 };
-export type PublishedResult<Schema extends DBSchema | undefined = undefined> = PublishAllOrNothing | PublishFullyTyped<Schema> ;
-export type Publish<Schema extends DBSchema | undefined = undefined> = PublishedResult<Schema> | ((params: PublishParams<Schema>) => Awaitable<PublishedResult<Schema>>);
+export type PublishedResult<Schema = void> = PublishAllOrNothing | PublishFullyTyped<Schema> ;
+export type Publish<Schema = void> = PublishedResult<Schema> | ((params: PublishParams<Schema>) => Awaitable<PublishedResult<Schema>>);
 
 export class PublishParser {
   publish: any;

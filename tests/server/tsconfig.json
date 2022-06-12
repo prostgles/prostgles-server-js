@@ -1,17 +1,16 @@
 {
 	"files": ["./index.ts"],
 	"compilerOptions": {
-		// "outDir": "dist",
 		"target": "es2020",
 		"lib": [ "es2020" ],
 		"esModuleInterop" : true,
 		"allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
 		"allowJs": true,
 		"module": "commonjs",
-		// "sourceMap": true,
-		// "rootDir": ".",
-		// "declaration": true,
-		// "declarationMap": true,
+    "moduleResolution": "node",
+		"declaration": true,
+		"declarationMap": true,
 		"keyofStringsOnly": true
 	},
 	"exclude": [

@@ -1,4 +1,4 @@
-import { AnyObject, DBSchema } from "prostgles-types";
+import { AnyObject } from "prostgles-types";
 import { LocalParams, PRGLIOSocket } from "./DboBuilder";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
@@ -37,7 +37,7 @@ export declare type AuthClientRequest = {
 } | {
     httpReq: ExpressReq;
 };
-export declare type Auth<S extends DBSchema | undefined = undefined> = {
+export declare type Auth<S = void> = {
     /**
      * Name of the cookie or socket hadnshake query param that represents the session id.
      * Defaults to "session_id"
@@ -116,8 +116,8 @@ export declare type ClientInfo = {
     clientUser?: AnyObject;
     sid?: string;
 };
-export default class AuthHandler<S extends DBSchema | undefined = undefined> {
-    protected opts?: Auth<S>;
+export default class AuthHandler {
+    protected opts?: Auth;
     dbo: DBHandlerServer;
     db: DB;
     sidKeyName?: string;

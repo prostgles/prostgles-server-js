@@ -1,10 +1,9 @@
 import { Prostgles, ProstglesInitOptions } from "./Prostgles";
-import { DBSchema } from "prostgles-types";
 
-function prostgles<S extends DBSchema | undefined = undefined>(params: ProstglesInitOptions<S>){
+function prostgles<S = void>(params: ProstglesInitOptions<S>){
 
-    let prgl = new Prostgles<S>(params as any);
-    return prgl.init(params.onReady);
+    let prgl = new Prostgles(params as any);
+    return prgl.init(params.onReady as any);
 }
 export = prostgles;//{ , TableHandler, ViewHandler };
 

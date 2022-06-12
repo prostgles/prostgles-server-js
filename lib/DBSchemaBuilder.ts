@@ -1,6 +1,8 @@
-import { DBSchemaColumns, DBSchemaInsertColumns, DBSchema, TableHandler, ViewHandler } from "prostgles-types";
+import { DBSchema, TableHandler, ViewHandler } from "prostgles-types";
+import prostgles from ".";
+import { Auth } from "./AuthHandler";
 import { DBHandlerServer, DboBuilder, escapeTSNames, postgresToTsType } from "./DboBuilder";
-import { PublishAllOrNothing, PublishParams, PublishTableRule, PublishViewRule, TableRule, ViewRule } from "./PublishParser";
+import { PublishAllOrNothing, PublishParams, PublishTableRule, PublishViewRule,  } from "./PublishParser";
 
 
 export const getDBSchema = (dboBuilder: DboBuilder): string => {
@@ -15,59 +17,78 @@ tables.push(`${escapeTSNames(tov.name)}: {
     insert: ${tov.privileges.insert}
     update: ${tov.privileges.update}
     delete: ${tov.privileges.delete}
-    dataTypes: { ${cols.map(c => `${escapeTSNames(c.name)}: ${postgresToTsType(c.udt_name)}${c.is_nullable? " | null" : ""}`).join("; ")} };
     columns: {${cols.map(c => `
-      ${escapeTSNames(c.name)}: { type: ${postgresToTsType(c.udt_name)}; is_nullable: ${c.is_nullable}; is_nullable_or_has_default: ${c.is_nullable || c.has_default}; }`).join(";\n")}
+      ${escapeTSNames(c.name)}${c.is_nullable || c.has_default? "?" : ""}: ${postgresToTsType(c.udt_name)}${c.is_nullable? " | null" : ""}`).join(";")}
     }
   };\n  `)
   })
 return `
-type DBSchema = {
+export type DBSchemaGenerated = {
   ${tables.join("")}
 }
 `;
 }
 
-const ccc: DBSchemaInsertColumns<{ col1: { type: string; }; col2: { type: number; is_nullable_or_has_default: true } }> = {
-  col1: "",
-  col2: 22
-}
-
-
-
-export type DBOFullyTyped<Schema extends DBSchema | undefined = undefined> = Schema extends DBSchema? (
+export type DBOFullyTyped<Schema = void> = Schema extends DBSchema? (
     { 
       [tov_name in keyof Schema]: Schema[tov_name]["is_view"] extends true? 
-        ViewHandler<DBSchemaColumns<Schema[tov_name]["columns"]>> : 
-        TableHandler<DBSchemaColumns<Schema[tov_name]["columns"]>>
+        ViewHandler<Schema[tov_name]["columns"]> : 
+        TableHandler<Schema[tov_name]["columns"]>
     } & Pick<DBHandlerServer, "tx" | "sql">
   ) : 
   DBHandlerServer;
 
+
+  
+
 /** Type checks */
 (() => {
+
   const ddb: DBOFullyTyped = 1 as any;
   ddb.dwad.insert!;
   ddb.dwad.delete!;
 
+  const d: DBOFullyTyped<undefined> = 1 as any;
+  d.dwad.insert!;
+  d.dwad.delete!;
+
   const p: PublishParams = 1 as any;
   p.dbo.dwad.insert!;
   ddb.dwad.delete!;
+
+  prostgles({
+    dbConnection: 1 as any,
+    publish: async (params) => {
+      const row = await params.dbo.dwadwa.find?.({});
+      
+      return "*" as "*"
+    },
+    onReady: (dbo) => {
+      dbo.tdwa.find!()
+    }
+  });
+
+
+  const auth: Auth = {
+    sidKeyName: "sid_token",
+    getUser: async (sid, db, _db) => {
+      db.dwadaw.find;
+      return 1 as any;
+    }
+  }
 })
 
 type S = {
   tbl1: {
-    dataTypes: {type: string;};
     columns: {
-      col1: { type: number | null;}
-      col2: { type: string; }
+      col1: number | null;
+      col2: string; 
     }
   },
   tbl2: {
-    dataTypes: {type: string;};
     columns: {
-      col1: { type: number | null;}
-      col2: { type: string; }
+      col1: number | null;
+      col2: string; 
     }
   }
 }
@@ -78,9 +99,21 @@ const test: DBSchema = c;
 const db: DBOFullyTyped<S> = 1 as any;
 
 
-export type PublishFullyTyped<Schema extends DBSchema | undefined = undefined> = Schema extends DBSchema? { 
-  [tov_name in keyof Partial<Schema>]: PublishAllOrNothing | (Schema[tov_name]["is_view"] extends true? PublishViewRule<Schema[tov_name]> : PublishTableRule<Schema[tov_name]>);
-} : (PublishAllOrNothing | Record<string, PublishViewRule | PublishTableRule>);
+export type PublishFullyTyped<Schema = void> = Schema extends DBSchema? (
+  | PublishAllOrNothing 
+  | { 
+    [tov_name in keyof Partial<Schema>]: 
+      | PublishAllOrNothing 
+      | (
+        Schema[tov_name]["is_view"] extends true? 
+          PublishViewRule<Schema[tov_name]["columns"]> : 
+          PublishTableRule<Schema[tov_name]["columns"]>
+      );
+  }
+) : (
+  | PublishAllOrNothing 
+  | Record<string, PublishViewRule | PublishTableRule | PublishAllOrNothing>
+);
 
 
 const publish = (): PublishFullyTyped<S> => {
@@ -109,16 +142,18 @@ const publish = (): PublishFullyTyped<S> => {
       getColumns: true,
       getInfo: true,
       delete: {
-        filterFields: {col1: 1}
+        filterFields: { col1: 1 }
       }
     },
     tbl2: {
-      delete: {forcedFilter: {col1: 2}}
+      delete: {forcedFilter: { col1: 2 }}
     }
   }
   const res1: PublishFullyTyped = r
 
-  // const res2: PublishFullyTyped = res;
+  const p: PublishParams<undefined> = 1 as any;
+
+  p.dbo.dwadaw.find!();
 
   return res;
 }

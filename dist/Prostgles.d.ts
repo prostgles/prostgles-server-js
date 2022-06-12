@@ -6,7 +6,7 @@ import TableConfigurator, { TableConfig } from "./TableConfig";
 import { DboBuilder, DBHandlerServer, PRGLIOSocket } from "./DboBuilder";
 export { DBHandlerServer };
 export declare type PGP = pgPromise.IMain<{}, pg.IClient>;
-import { AnyObject, DBSchema } from "prostgles-types";
+import { AnyObject } from "prostgles-types";
 import { Publish, PublishMethods, PublishParams, PublishParser } from "./PublishParser";
 import { DBEventsManager } from "./DBEventsManager";
 export declare type DB = pgPromise.IDatabase<{}, pg.IClient>;
@@ -79,7 +79,7 @@ export declare type FileTableConfig = {
     };
     imageOptions?: ImageOptions;
 };
-export declare type ProstglesInitOptions<S extends DBSchema | undefined = undefined> = {
+export declare type ProstglesInitOptions<S = void> = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
     tsGeneratedTypesDir?: string;
@@ -140,8 +140,8 @@ export declare type OnReady = {
     db: DB;
 };
 import { DBOFullyTyped } from "./DBSchemaBuilder";
-export declare class Prostgles<S extends DBSchema | undefined = undefined> {
-    opts: ProstglesInitOptions<S>;
+export declare class Prostgles {
+    opts: ProstglesInitOptions;
     db?: DB;
     pgp?: PGP;
     dbo?: DBHandlerServer;
@@ -149,7 +149,7 @@ export declare class Prostgles<S extends DBSchema | undefined = undefined> {
     get dboBuilder(): DboBuilder;
     set dboBuilder(d: DboBuilder);
     publishParser?: PublishParser;
-    authHandler?: AuthHandler<S>;
+    authHandler?: AuthHandler;
     keywords: {
         $filter: string;
         $and: string;
@@ -174,13 +174,11 @@ export declare class Prostgles<S extends DBSchema | undefined = undefined> {
     };
     private getFileText;
     writeDBSchema(force?: boolean): void;
-    refreshDBO: () => Promise<DBHandlerServer<{
-        [key: string]: Partial<import("./DboBuilder").TableHandler>;
-    }> | undefined>;
+    refreshDBO: () => Promise<DBHandlerServer | undefined>;
     isSuperUser: boolean;
     schema_checkIntervalMillis: any;
-    init(onReady: (dbo: DBOFullyTyped<S>, db: DB) => any): Promise<{
-        db: DBOFullyTyped<S>;
+    init(onReady: (dbo: DBOFullyTyped, db: DB) => any): Promise<{
+        db: DBOFullyTyped;
         _db: DB;
         pgp: PGP;
         io?: any;

@@ -45,6 +45,12 @@ const dbConnection = {
     // user: "usr",
     // password:  "usr",
 };
+function dd() {
+    const dbo = 1;
+    if (!dbo)
+        return;
+    dbo.tbl.find;
+}
 (async () => {
     log("created prostgles");
     const tableConfig = {
@@ -80,6 +86,7 @@ const dbConnection = {
             }
         }
     };
+    // ProstglesInitOptions<DBSchemaGenerated>
     let prgl = await (0, prostgles_server_1.default)({
         dbConnection,
         sqlFilePath: path_1.default.join(__dirname + '/init.sql'),
@@ -109,6 +116,8 @@ const dbConnection = {
         onSocketDisconnect: (socket, db) => {
             log("onSocketDisconnect");
             console.trace("onSocketDisconnect");
+            // const c: DBOFullyTyped<DBSchemaGenerated> = 1 as any;
+            // c["*"].
         },
         onSocketConnect: (socket, db) => {
             log("onSocketConnect");
@@ -187,7 +196,7 @@ const dbConnection = {
             };
         },
         publish: async ({ user }) => {
-            return {
+            const res = {
                 shapes: "*",
                 items: "*",
                 items2: "*",
@@ -261,16 +270,7 @@ const dbConnection = {
                     }
                 }
             };
-            // return {
-            // 	items: {
-            // 		select: {
-            // 			fields: "*",
-            // 			forcedFilter: {
-            // 				$exists: { items3: { name: "a" } }
-            // 			}
-            // 		}
-            // 	}
-            // };
+            return res;
         },
         // joins: "inferred",
         joins: [

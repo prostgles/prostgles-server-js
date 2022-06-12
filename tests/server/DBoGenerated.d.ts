@@ -4,18 +4,16 @@
  /* SCHEMA DEFINITON. Table names have been altered to work with Typescript */
 /* DBO Definition. Isomorphic */
 
-type DBSchema = {
+export type DBSchemaGenerated = {
   "\"*\"": {
     is_view: false;
     select: true
     insert: true
     update: true
     delete: true
-    dataTypes: { "\"*\"": string | null; id: number };
     columns: {
-      "\"*\"": { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      id: { type: number; is_nullable: false; is_nullable_or_has_default: true; }
+      "\"*\""?: string | null;
+      id?: number
     }
   };
   "*": {
@@ -24,11 +22,9 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { "*": string | null; id: number };
     columns: {
-      "*": { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      id: { type: number; is_nullable: false; is_nullable_or_has_default: true; }
+      "*"?: string | null;
+      id?: number
     }
   };
   ex_j_ins: {
@@ -37,15 +33,11 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { added: Date | null; id: number; name: string; public: string | null };
     columns: {
-      added: { type: Date; is_nullable: true; is_nullable_or_has_default: true; };
-
-      id: { type: number; is_nullable: false; is_nullable_or_has_default: true; };
-
-      name: { type: string; is_nullable: false; is_nullable_or_has_default: false; };
-
-      public: { type: string; is_nullable: true; is_nullable_or_has_default: true; }
+      added?: Date | null;
+      id?: number;
+      name: string;
+      public?: string | null
     }
   };
   geography_columns: {
@@ -54,21 +46,14 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { coord_dimension: number | null; f_geography_column: string | null; f_table_catalog: string | null; f_table_name: string | null; f_table_schema: string | null; srid: number | null; type: string | null };
     columns: {
-      coord_dimension: { type: number; is_nullable: true; is_nullable_or_has_default: true; };
-
-      f_geography_column: { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      f_table_catalog: { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      f_table_name: { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      f_table_schema: { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      srid: { type: number; is_nullable: true; is_nullable_or_has_default: true; };
-
-      type: { type: string; is_nullable: true; is_nullable_or_has_default: true; }
+      coord_dimension?: number | null;
+      f_geography_column?: string | null;
+      f_table_catalog?: string | null;
+      f_table_name?: string | null;
+      f_table_schema?: string | null;
+      srid?: number | null;
+      type?: string | null
     }
   };
   geometry_columns: {
@@ -77,21 +62,14 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { coord_dimension: number | null; f_geometry_column: string | null; f_table_catalog: string | null; f_table_name: string | null; f_table_schema: string | null; srid: number | null; type: string | null };
     columns: {
-      coord_dimension: { type: number; is_nullable: true; is_nullable_or_has_default: true; };
-
-      f_geometry_column: { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      f_table_catalog: { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      f_table_name: { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      f_table_schema: { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      srid: { type: number; is_nullable: true; is_nullable_or_has_default: true; };
-
-      type: { type: string; is_nullable: true; is_nullable_or_has_default: true; }
+      coord_dimension?: number | null;
+      f_geometry_column?: string | null;
+      f_table_catalog?: string | null;
+      f_table_name?: string | null;
+      f_table_schema?: string | null;
+      srid?: number | null;
+      type?: string | null
     }
   };
   insert_rules: {
@@ -100,13 +78,10 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { added: Date | null; id: number; name: string | null };
     columns: {
-      added: { type: Date; is_nullable: true; is_nullable_or_has_default: true; };
-
-      id: { type: number; is_nullable: false; is_nullable_or_has_default: true; };
-
-      name: { type: string; is_nullable: true; is_nullable_or_has_default: true; }
+      added?: Date | null;
+      id?: number;
+      name?: string | null
     }
   };
   items: {
@@ -115,13 +90,10 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { h: Array<string> | null; id: number; name: string | null };
     columns: {
-      h: { type: Array<string>; is_nullable: true; is_nullable_or_has_default: true; };
-
-      id: { type: number; is_nullable: false; is_nullable_or_has_default: true; };
-
-      name: { type: string; is_nullable: true; is_nullable_or_has_default: true; }
+      h?: Array<string> | null;
+      id?: number;
+      name?: string | null
     }
   };
   items_with_media: {
@@ -130,11 +102,9 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { id: number; name: string | null };
     columns: {
-      id: { type: number; is_nullable: false; is_nullable_or_has_default: true; };
-
-      name: { type: string; is_nullable: true; is_nullable_or_has_default: true; }
+      id?: number;
+      name?: string | null
     }
   };
   items_with_one_media: {
@@ -143,11 +113,9 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { id: number; name: string | null };
     columns: {
-      id: { type: number; is_nullable: false; is_nullable_or_has_default: true; };
-
-      name: { type: string; is_nullable: true; is_nullable_or_has_default: true; }
+      id?: number;
+      name?: string | null
     }
   };
   items2: {
@@ -156,15 +124,11 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { hh: Array<string> | null; id: number; items_id: number | null; name: string | null };
     columns: {
-      hh: { type: Array<string>; is_nullable: true; is_nullable_or_has_default: true; };
-
-      id: { type: number; is_nullable: false; is_nullable_or_has_default: true; };
-
-      items_id: { type: number; is_nullable: true; is_nullable_or_has_default: true; };
-
-      name: { type: string; is_nullable: true; is_nullable_or_has_default: true; }
+      hh?: Array<string> | null;
+      id?: number;
+      items_id?: number | null;
+      name?: string | null
     }
   };
   items3: {
@@ -173,13 +137,10 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { h: Array<string> | null; id: number; name: string | null };
     columns: {
-      h: { type: Array<string>; is_nullable: true; is_nullable_or_has_default: true; };
-
-      id: { type: number; is_nullable: false; is_nullable_or_has_default: true; };
-
-      name: { type: string; is_nullable: true; is_nullable_or_has_default: true; }
+      h?: Array<string> | null;
+      id?: number;
+      name?: string | null
     }
   };
   items4: {
@@ -188,15 +149,11 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { added: Date | null; id: number; name: string; public: string | null };
     columns: {
-      added: { type: Date; is_nullable: true; is_nullable_or_has_default: true; };
-
-      id: { type: number; is_nullable: false; is_nullable_or_has_default: true; };
-
-      name: { type: string; is_nullable: false; is_nullable_or_has_default: false; };
-
-      public: { type: string; is_nullable: true; is_nullable_or_has_default: true; }
+      added?: Date | null;
+      id?: number;
+      name: string;
+      public?: string | null
     }
   };
   items4_pub: {
@@ -205,15 +162,11 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { added: Date | null; id: number; name: string; public: string | null };
     columns: {
-      added: { type: Date; is_nullable: true; is_nullable_or_has_default: true; };
-
-      id: { type: number; is_nullable: false; is_nullable_or_has_default: true; };
-
-      name: { type: string; is_nullable: false; is_nullable_or_has_default: false; };
-
-      public: { type: string; is_nullable: true; is_nullable_or_has_default: true; }
+      added?: Date | null;
+      id?: number;
+      name: string;
+      public?: string | null
     }
   };
   lookup_col1: {
@@ -222,9 +175,8 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { id: string };
     columns: {
-      id: { type: string; is_nullable: false; is_nullable_or_has_default: false; }
+      id: string
     }
   };
   media: {
@@ -233,29 +185,18 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { content_type: string; description: string | null; etag: string | null; extension: string; id: string; name: string; original_name: string; s3_url: string | null; signed_url: string | null; signed_url_expires: number | null; url: string };
     columns: {
-      content_type: { type: string; is_nullable: false; is_nullable_or_has_default: false; };
-
-      description: { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      etag: { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      extension: { type: string; is_nullable: false; is_nullable_or_has_default: false; };
-
-      id: { type: string; is_nullable: false; is_nullable_or_has_default: true; };
-
-      name: { type: string; is_nullable: false; is_nullable_or_has_default: false; };
-
-      original_name: { type: string; is_nullable: false; is_nullable_or_has_default: false; };
-
-      s3_url: { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      signed_url: { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      signed_url_expires: { type: number; is_nullable: true; is_nullable_or_has_default: true; };
-
-      url: { type: string; is_nullable: false; is_nullable_or_has_default: false; }
+      content_type: string;
+      description?: string | null;
+      etag?: string | null;
+      extension: string;
+      id?: string;
+      name: string;
+      original_name: string;
+      s3_url?: string | null;
+      signed_url?: string | null;
+      signed_url_expires?: number | null;
+      url: string
     }
   };
   obj_table: {
@@ -264,11 +205,9 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { id: number; obj: any | null };
     columns: {
-      id: { type: number; is_nullable: false; is_nullable_or_has_default: true; };
-
-      obj: { type: any; is_nullable: true; is_nullable_or_has_default: true; }
+      id?: number;
+      obj?: any | null
     }
   };
   planes: {
@@ -277,17 +216,12 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { flight_number: string | null; id: number; last_updated: number; x: number | null; y: number | null };
     columns: {
-      flight_number: { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      id: { type: number; is_nullable: false; is_nullable_or_has_default: true; };
-
-      last_updated: { type: number; is_nullable: false; is_nullable_or_has_default: false; };
-
-      x: { type: number; is_nullable: true; is_nullable_or_has_default: true; };
-
-      y: { type: number; is_nullable: true; is_nullable_or_has_default: true; }
+      flight_number?: string | null;
+      id?: number;
+      last_updated: number;
+      x?: number | null;
+      y?: number | null
     }
   };
   prostgles_lookup_media_items_with_media: {
@@ -296,11 +230,9 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { foreign_id: number | null; media_id: string };
     columns: {
-      foreign_id: { type: number; is_nullable: true; is_nullable_or_has_default: true; };
-
-      media_id: { type: string; is_nullable: false; is_nullable_or_has_default: false; }
+      foreign_id?: number | null;
+      media_id: string
     }
   };
   prostgles_lookup_media_items_with_one_media: {
@@ -309,11 +241,9 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { foreign_id: number; media_id: string };
     columns: {
-      foreign_id: { type: number; is_nullable: false; is_nullable_or_has_default: false; };
-
-      media_id: { type: string; is_nullable: false; is_nullable_or_has_default: false; }
+      foreign_id: number;
+      media_id: string
     }
   };
   shapes: {
@@ -322,13 +252,10 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { geog: any | null; geom: any | null; id: string };
     columns: {
-      geog: { type: any; is_nullable: true; is_nullable_or_has_default: true; };
-
-      geom: { type: any; is_nullable: true; is_nullable_or_has_default: true; };
-
-      id: { type: string; is_nullable: false; is_nullable_or_has_default: true; }
+      geog?: any | null;
+      geom?: any | null;
+      id?: string
     }
   };
   spatial_ref_sys: {
@@ -337,17 +264,12 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { auth_name: string | null; auth_srid: number | null; proj4text: string | null; srid: number; srtext: string | null };
     columns: {
-      auth_name: { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      auth_srid: { type: number; is_nullable: true; is_nullable_or_has_default: true; };
-
-      proj4text: { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      srid: { type: number; is_nullable: false; is_nullable_or_has_default: false; };
-
-      srtext: { type: string; is_nullable: true; is_nullable_or_has_default: true; }
+      auth_name?: string | null;
+      auth_srid?: number | null;
+      proj4text?: string | null;
+      srid: number;
+      srtext?: string | null
     }
   };
   tr1: {
@@ -356,11 +278,9 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { id: number; t1: string | null };
     columns: {
-      id: { type: number; is_nullable: false; is_nullable_or_has_default: true; };
-
-      t1: { type: string; is_nullable: true; is_nullable_or_has_default: true; }
+      id?: number;
+      t1?: string | null
     }
   };
   tr2: {
@@ -369,15 +289,11 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { id: number; t1: string | null; t2: string | null; tr1_id: number | null };
     columns: {
-      id: { type: number; is_nullable: false; is_nullable_or_has_default: true; };
-
-      t1: { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      t2: { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      tr1_id: { type: number; is_nullable: true; is_nullable_or_has_default: true; }
+      id?: number;
+      t1?: string | null;
+      t2?: string | null;
+      tr1_id?: number | null
     }
   };
   uuid_text: {
@@ -386,15 +302,11 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { col1: string | null; col2: string | null; id: string; name: string | null };
     columns: {
-      col1: { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      col2: { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      id: { type: string; is_nullable: false; is_nullable_or_has_default: true; };
-
-      name: { type: string; is_nullable: true; is_nullable_or_has_default: true; }
+      col1?: string | null;
+      col2?: string | null;
+      id?: string;
+      name?: string | null
     }
   };
   v_items: {
@@ -403,11 +315,9 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { id: number | null; name: string | null };
     columns: {
-      id: { type: number; is_nullable: true; is_nullable_or_has_default: true; };
-
-      name: { type: string; is_nullable: true; is_nullable_or_has_default: true; }
+      id?: number | null;
+      name?: string | null
     }
   };
   various: {
@@ -416,19 +326,13 @@ type DBSchema = {
     insert: true
     update: true
     delete: true
-    dataTypes: { added: Date | null; h: Array<string> | null; id: number; jsn: any | null; name: string | null; tsv: any | null };
     columns: {
-      added: { type: Date; is_nullable: true; is_nullable_or_has_default: true; };
-
-      h: { type: Array<string>; is_nullable: true; is_nullable_or_has_default: true; };
-
-      id: { type: number; is_nullable: false; is_nullable_or_has_default: true; };
-
-      jsn: { type: any; is_nullable: true; is_nullable_or_has_default: true; };
-
-      name: { type: string; is_nullable: true; is_nullable_or_has_default: true; };
-
-      tsv: { type: any; is_nullable: true; is_nullable_or_has_default: true; }
+      added?: Date | null;
+      h?: Array<string> | null;
+      id?: number;
+      jsn?: any | null;
+      name?: string | null;
+      tsv?: any | null
     }
   };
   

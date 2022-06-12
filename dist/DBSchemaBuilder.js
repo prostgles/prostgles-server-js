@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getDBSchema = void 0;
+const _1 = require(".");
 const DboBuilder_1 = require("./DboBuilder");
 const getDBSchema = (dboBuilder) => {
     let tables = [];
@@ -13,31 +14,46 @@ const getDBSchema = (dboBuilder) => {
     insert: ${tov.privileges.insert}
     update: ${tov.privileges.update}
     delete: ${tov.privileges.delete}
-    dataTypes: { ${cols.map(c => `${(0, DboBuilder_1.escapeTSNames)(c.name)}: ${(0, DboBuilder_1.postgresToTsType)(c.udt_name)}${c.is_nullable ? " | null" : ""}`).join("; ")} };
     columns: {${cols.map(c => `
-      ${(0, DboBuilder_1.escapeTSNames)(c.name)}: { type: ${(0, DboBuilder_1.postgresToTsType)(c.udt_name)}; is_nullable: ${c.is_nullable}; is_nullable_or_has_default: ${c.is_nullable || c.has_default}; }`).join(";\n")}
+      ${(0, DboBuilder_1.escapeTSNames)(c.name)}${c.is_nullable || c.has_default ? "?" : ""}: ${(0, DboBuilder_1.postgresToTsType)(c.udt_name)}${c.is_nullable ? " | null" : ""}`).join(";")}
     }
   };\n  `);
     });
     return `
-type DBSchema = {
+export type DBSchemaGenerated = {
   ${tables.join("")}
 }
 `;
 };
 exports.getDBSchema = getDBSchema;
-const ccc = {
-    col1: "",
-    col2: 22
-};
 /** Type checks */
 (() => {
     const ddb = 1;
     ddb.dwad.insert;
     ddb.dwad.delete;
+    const d = 1;
+    d.dwad.insert;
+    d.dwad.delete;
     const p = 1;
     p.dbo.dwad.insert;
     ddb.dwad.delete;
+    (0, _1.default)({
+        dbConnection: 1,
+        publish: async (params) => {
+            const row = await params.dbo.dwadwa.find?.({});
+            return "*";
+        },
+        onReady: (dbo) => {
+            dbo.tdwa.find();
+        }
+    });
+    const auth = {
+        sidKeyName: "sid_token",
+        getUser: async (sid, db, _db) => {
+            db.dwadaw.find;
+            return 1;
+        }
+    };
 });
 /** Test the created schema */
 const c = 1;
@@ -77,7 +93,8 @@ const publish = () => {
         }
     };
     const res1 = r;
-    // const res2: PublishFullyTyped = res;
+    const p = 1;
+    p.dbo.dwadaw.find();
     return res;
 };
 //# sourceMappingURL=DBSchemaBuilder.js.map

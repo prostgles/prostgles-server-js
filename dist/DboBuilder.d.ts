@@ -14,20 +14,19 @@ export declare type Media = {
     "original_name"?: string;
     "etag"?: string;
 };
-export declare type TxHandler = TablesAndViewHandlers;
-export declare type TxCB<DBO extends TablesAndViewHandlers = TablesAndViewHandlers> = {
-    (t: DBO, _t: pgPromise.ITask<{}>): (any | void);
+export declare type TxCB = {
+    (t: TableHandlers, _t: pgPromise.ITask<{}>): (any | void);
 };
-export declare type TX<DBO extends TablesAndViewHandlers = TablesAndViewHandlers> = {
-    (t: TxCB<DBO>): Promise<(any | void)>;
+export declare type TX = {
+    (t: TxCB): Promise<(any | void)>;
 };
-declare type TablesAndViewHandlers = {
+declare type TableHandlers = {
     [key: string]: Partial<TableHandler>;
 };
-export declare type DBHandlerServer<DBO extends TablesAndViewHandlers = TablesAndViewHandlers> = TablesAndViewHandlers & DbJoinMaker & {
+export declare type DBHandlerServer = TableHandlers & DbJoinMaker & {
     sql?: SQLHandler;
 } & {
-    tx?: TX<DBO>;
+    tx?: TX;
 };
 export declare const getUpdateFilter: (args: {
     filter?: AnyObject;
@@ -83,7 +82,7 @@ export declare type LocalParams = {
     has_rules?: boolean;
     testRule?: boolean;
     tableAlias?: string;
-    dbTX?: TxHandler;
+    dbTX?: TableHandlers;
     localDBTX?: DBHandlerServer;
     returnQuery?: boolean;
     nestedJoin?: {
@@ -204,11 +203,11 @@ export declare class ViewHandler {
     joinPaths?: JoinPaths;
     dboBuilder: DboBuilder;
     t?: pgPromise.ITask<{}>;
-    dbTX?: TxHandler;
+    dbTX?: TableHandlers;
     is_view: boolean;
     filterDef: string;
     is_media: boolean;
-    constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths);
+    constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TableHandlers, joinPaths?: JoinPaths);
     getRowHashSelect(allowedFields: FieldFilter, alias?: string, tableAlias?: string): string;
     validateViewRules(args: {
         fields?: FieldFilter;
@@ -229,12 +228,12 @@ export declare class ViewHandler {
         rule: "update";
         filter: AnyObject;
         data: AnyObject;
-    }, _param3?: never, tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]>;
+    }, _param3?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<ValidatedColumnInfo[]>;
     getValidatedRules(tableRules?: TableRule, localParams?: LocalParams): ValidatedTableRules;
-    find(filter?: Filter, selectParams?: SelectParams, param3_unused?: never, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]>;
-    findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: never, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
-    count(filter?: Filter, param2_unused?: never, param3_unused?: never, table_rules?: TableRule, localParams?: any): Promise<number>;
-    size(filter?: Filter, selectParams?: SelectParams, param3_unused?: never, table_rules?: TableRule, localParams?: any): Promise<string>;
+    find(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]>;
+    findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
+    count(filter?: Filter, param2_unused?: undefined, param3_unused?: undefined, table_rules?: TableRule, localParams?: any): Promise<number>;
+    size(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: any): Promise<string>;
     getAllowedSelectFields(selectParams: FieldFilter<AnyObject> | undefined, allowed_cols: FieldFilter, allow_empty?: boolean): string[];
     prepareColumnSet(selectParams: FieldFilter<AnyObject> | undefined, allowed_cols: FieldFilter, allow_empty?: boolean, onlyNames?: boolean): string | pgPromise.ColumnSet;
     prepareSelect(selectParams: FieldFilter<AnyObject> | undefined, allowed_cols: FieldFilter, allow_empty?: boolean, tableAlias?: string): string;
@@ -312,7 +311,7 @@ export declare class TableHandler extends ViewHandler {
         queries: number;
         batching: string[] | null;
     };
-    constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths);
+    constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TableHandlers, joinPaths?: JoinPaths);
     willBatch(query: string): true | undefined;
     subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: AnyObject[]) => any): Promise<{
         unsubscribe: () => any;
@@ -338,13 +337,13 @@ export declare class TableHandler extends ViewHandler {
         allowedCols: string[];
     };
     private insertDataParse;
-    insert(rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: never, tableRules?: TableRule, _localParams?: LocalParams): Promise<any | any[] | boolean>;
+    insert(rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: undefined, tableRules?: TableRule, _localParams?: LocalParams): Promise<any | any[] | boolean>;
     prepareReturning: (returning: Select | undefined, allowedFields: string[]) => Promise<SelectItem[]>;
     makeReturnQuery(items?: SelectItem[]): string;
-    delete(filter?: Filter, params?: DeleteParams, param3_unused?: never, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
-    remove(filter: Filter, params?: UpdateParams, param3_unused?: never, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
+    delete(filter?: Filter, params?: DeleteParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
+    remove(filter: Filter, params?: UpdateParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
     upsert(filter: Filter, newData: AnyObject, params?: UpdateParams, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
-    sync(filter: Filter, params: SelectParams, param3_unused: never, table_rules: TableRule, localParams: LocalParams): Promise<{
+    sync(filter: Filter, params: SelectParams, param3_unused: undefined, table_rules: TableRule, localParams: LocalParams): Promise<{
         channelName: string;
         id_fields: string[];
         synced_field: string;

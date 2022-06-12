@@ -165,7 +165,7 @@ export type FileTableConfig = {
     imageOptions?: ImageOptions
 };
 
-export type ProstglesInitOptions<S extends DBSchema | undefined = undefined> = {
+export type ProstglesInitOptions<S = void> = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
     tsGeneratedTypesDir?: string;
@@ -246,9 +246,9 @@ const DEFAULT_KEYWORDS = {
 
 import * as fs from 'fs';
 import { DBOFullyTyped } from "./DBSchemaBuilder";
-export class Prostgles<S extends DBSchema | undefined = undefined> {
+export class Prostgles {
 
-    opts: ProstglesInitOptions<S> = {
+    opts: ProstglesInitOptions = {
         DEBUG_MODE: false,
         dbConnection: {
             host: "localhost",
@@ -280,7 +280,7 @@ export class Prostgles<S extends DBSchema | undefined = undefined> {
     }
     publishParser?: PublishParser;
 
-    authHandler?: AuthHandler<S>;
+    authHandler?: AuthHandler;
 
 
     keywords = DEFAULT_KEYWORDS;
@@ -409,8 +409,8 @@ export class Prostgles<S extends DBSchema | undefined = undefined> {
 
     isSuperUser = false;
     schema_checkIntervalMillis: any;
-    async init(onReady: (dbo: DBOFullyTyped<S>, db: DB) => any): Promise<{
-        db: DBOFullyTyped<S>;
+    async init(onReady: (dbo: DBOFullyTyped, db: DB) => any): Promise<{
+        db: DBOFullyTyped;
         _db: DB;
         pgp: PGP;
         io?: any;

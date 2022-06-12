@@ -42,23 +42,23 @@ export type Media = {
     "etag"?: string;
 }
 
-export type TxHandler = TablesAndViewHandlers;
-export type TxCB<DBO extends TablesAndViewHandlers = TablesAndViewHandlers> = {
-    (t: DBO, _t: pgPromise.ITask<{}>): (any | void);
+export type TxCB = {
+    (t: TableHandlers, _t: pgPromise.ITask<{}>): (any | void);
 }
-export type TX<DBO extends TablesAndViewHandlers = TablesAndViewHandlers> = {
-    (t: TxCB<DBO>): Promise<(any | void)>;
+export type TX = {
+    (t: TxCB): Promise<(any | void)>;
 }
 
-type TablesAndViewHandlers = {
+type TableHandlers = {
     [key: string]: Partial<TableHandler>;
 }
-export type DBHandlerServer<DBO extends TablesAndViewHandlers = TablesAndViewHandlers>= 
-  TablesAndViewHandlers & 
+
+export type DBHandlerServer = 
+  TableHandlers & 
   DbJoinMaker & {
     sql?: SQLHandler
   } & {
-    tx?: TX<DBO>
+    tx?: TX
   }
 
 export const getUpdateFilter = (args: { filter?: AnyObject; forcedFilter?: AnyObject; $and_key: string }): AnyObject => {
@@ -146,7 +146,7 @@ export type LocalParams = {
     testRule?: boolean;
     tableAlias?: string;
     // subOne?: boolean;
-    dbTX?: TxHandler;
+    dbTX?: TableHandlers;
 
     // localTX?: pgPromise.ITask<{}>;
     localDBTX?: DBHandlerServer;
@@ -482,14 +482,14 @@ export class ViewHandler {
     dboBuilder: DboBuilder;
 
     t?: pgPromise.ITask<{}>;
-    dbTX?: TxHandler;
+    dbTX?: TableHandlers;
 
     is_view: boolean = true;
     filterDef: string = "";
 
     // pubSubManager: PubSubManager;
     is_media: boolean = false;
-    constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths){
+    constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TableHandlers, joinPaths?: JoinPaths){
         if(!db || !tableOrViewInfo) throw "";
 
         this.db = db;
@@ -774,7 +774,7 @@ export class ViewHandler {
     async getColumns(
         lang?: string, 
         params?: { rule: "update", filter: AnyObject, data: AnyObject }, 
-        _param3?: never, 
+        _param3?: undefined, 
         tableRules?: TableRule, 
         localParams?: LocalParams
     ): Promise<ValidatedColumnInfo[]> {
@@ -997,7 +997,7 @@ export class ViewHandler {
 
     }
 
-    async find(filter?: Filter, selectParams?: SelectParams , param3_unused?: never, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]>{
+    async find(filter?: Filter, selectParams?: SelectParams , param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]>{
         try {
             filter = filter || {};
             const allowedReturnTypes: Array<SelectParams["returnType"]> = ["row", "value", "values"]
@@ -1068,7 +1068,7 @@ export class ViewHandler {
         }                             
     }
 
-    findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: never, table_rules?: TableRule, localParams?: LocalParams): Promise<any>{
+    findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any>{
 
         try {
             const { select = "*", orderBy, offset = 0 } = selectParams || {};
@@ -1084,7 +1084,7 @@ export class ViewHandler {
         }
     }
 
-    async count(filter?: Filter, param2_unused?: never, param3_unused?: never, table_rules?: TableRule, localParams: any = {}): Promise<number>{
+    async count(filter?: Filter, param2_unused?: undefined, param3_unused?: undefined, table_rules?: TableRule, localParams: any = {}): Promise<number>{
         filter = filter || {};
         try {
             return await this.find(filter, { select: "", limit: 0 }, undefined, table_rules, localParams)
@@ -1100,7 +1100,7 @@ export class ViewHandler {
         } 
     }
 
-    async size(filter?: Filter, selectParams?: SelectParams, param3_unused?: never, table_rules?: TableRule, localParams: any = {}): Promise<string>{
+    async size(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams: any = {}): Promise<string>{
         filter = filter || {};
         try {
             return await this.find(filter, { ...selectParams, limit: 2 }, undefined, table_rules, localParams)
@@ -1685,7 +1685,7 @@ export class ViewHandler {
             return (excludeOrder? "" : " ORDER BY ") + (_ob.map(({ key, asc, nulls, nullEmpty = false }) => {
 
                 /* Order by column index when possible to bypass name collision when ordering by a computed column. 
-                    (Postgres will sort by existing columns whenever possible) 
+                    (Postgres will sort by existing columns wheundefined possible) 
                 */
                 const orderType = asc? " ASC " : " DESC ";
                 const index = selectedAliases.indexOf(key) + 1;
@@ -1930,7 +1930,7 @@ export class TableHandler extends ViewHandler {
         batching: string[] | null
     }
     
-    constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TxHandler, joinPaths?: JoinPaths){
+    constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TableHandlers, joinPaths?: JoinPaths){
         super(db, tableOrViewInfo, dboBuilder, t, dbTX, joinPaths);
 
         this.remove = this.delete;
@@ -2305,7 +2305,7 @@ export class TableHandler extends ViewHandler {
     }
     
 
-    private async insertDataParse(data: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: never, tableRules?: TableRule, _localParams?: LocalParams): Promise<{
+    private async insertDataParse(data: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: undefined, tableRules?: TableRule, _localParams?: LocalParams): Promise<{
         data?: AnyObject | AnyObject[];
         insertResult?: AnyObject | AnyObject[];
     }>{
@@ -2551,7 +2551,7 @@ export class TableHandler extends ViewHandler {
         return res;
     }
 
-    async insert(rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: never, tableRules?: TableRule, _localParams?: LocalParams): Promise<any | any[] | boolean>{
+    async insert(rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: undefined, tableRules?: TableRule, _localParams?: LocalParams): Promise<any | any[] | boolean>{
         const localParams = _localParams || {};
         const {dbTX} = localParams
         try {
@@ -2703,7 +2703,7 @@ export class TableHandler extends ViewHandler {
         return "";
     }
     
-    async delete(filter?: Filter, params?: DeleteParams, param3_unused?: never, table_rules?: TableRule, localParams?: LocalParams): Promise<any> {    //{ socket, func, has_rules = false, socketDb } = {}
+    async delete(filter?: Filter, params?: DeleteParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any> {    //{ socket, func, has_rules = false, socketDb } = {}
         try {
             const { returning } = params || {};
             filter = filter || {};
@@ -2769,7 +2769,7 @@ export class TableHandler extends ViewHandler {
         }
     };
    
-    remove(filter: Filter, params?: UpdateParams, param3_unused?: never, tableRules?: TableRule, localParams?: LocalParams){
+    remove(filter: Filter, params?: UpdateParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams){
         return this.delete(filter, params, param3_unused , tableRules, localParams);
     }
 
@@ -2799,7 +2799,7 @@ export class TableHandler extends ViewHandler {
     };
 
     /* External request. Cannot sync from server */
-    async sync(filter: Filter, params: SelectParams, param3_unused: never, table_rules: TableRule, localParams: LocalParams){
+    async sync(filter: Filter, params: SelectParams, param3_unused: undefined, table_rules: TableRule, localParams: LocalParams){
         if(!localParams) throw "Sync not allowed within the same server code";
         const { socket } = localParams;
         if(!socket) throw "INTERNAL ERROR: socket missing";
@@ -3340,7 +3340,7 @@ export class DboBuilder {
 
     getTX = (cb: TxCB) => {
         return this.db.tx((t) => {
-            let dbTX: TxHandler = {};
+            let dbTX: TableHandlers = {};
             this.tablesOrViews?.map(tov => {
                 if(tov.is_view){
 

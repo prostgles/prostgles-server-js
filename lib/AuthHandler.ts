@@ -36,7 +36,7 @@ export type BasicSession = {
 
 };
 export type AuthClientRequest = { socket: any } | { httpReq: ExpressReq }
-export type Auth<S extends DBSchema | undefined = undefined> = {
+export type Auth<S = void> = {
   /**
    * Name of the cookie or socket hadnshake query param that represents the session id. 
    * Defaults to "session_id"
@@ -136,8 +136,8 @@ export type ClientInfo = {
   sid?: string;
 }
 
-export default class AuthHandler<S extends DBSchema | undefined = undefined> {
-  protected opts?: Auth<S>;
+export default class AuthHandler {
+  protected opts?: Auth;
   dbo: DBHandlerServer;
   db: DB;
   sidKeyName?: string;
