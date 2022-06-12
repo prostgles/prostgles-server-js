@@ -5,6 +5,10 @@ function prostgles(params) {
     return prgl.init(params.onReady);
 }
 module.exports = prostgles;
+// declare const init (params: InitOptions) => {
+//     let prgl = new Prostgles(params);
+//     prgl.init(params.isReady);
+// }
 // module.exports = {
 //     pgp,
 //     init,

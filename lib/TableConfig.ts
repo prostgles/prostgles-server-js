@@ -1,7 +1,7 @@
 import { getKeys, asName } from "prostgles-types";
 import { JoinInfo } from "./DboBuilder";
 import { ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE } from "./FileManager";
-import { DB, DbHandler, Prostgles } from "./Prostgles";
+import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
 import { asValue } from "./PubSubManager";
 
 type ColExtraInfo = {
@@ -184,7 +184,7 @@ export type TableConfig<LANG_IDS = { en: 1 }> = {
 export default class TableConfigurator {
 
     config?: TableConfig;
-    get dbo(): DbHandler {
+    get dbo(): DBHandlerServer {
         if(!this.prostgles.dbo) throw "this.prostgles.dbo missing"
         return this.prostgles.dbo 
     };

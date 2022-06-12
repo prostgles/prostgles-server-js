@@ -1,215 +1,18 @@
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import FileManager, { ImageOptions, LocalConfig, S3Config } from "./FileManager";
-import AuthHandler, { ClientInfo, Auth } from "./AuthHandler";
+import AuthHandler, { Auth } from "./AuthHandler";
 import TableConfigurator, { TableConfig } from "./TableConfig";
-import { DboBuilder, DbHandler, LocalParams, CommonTableRules, PRGLIOSocket } from "./DboBuilder";
-export { DbHandler };
+import { DboBuilder, DBHandlerServer, PRGLIOSocket } from "./DboBuilder";
+export { DBHandlerServer };
 export declare type PGP = pgPromise.IMain<{}, pg.IClient>;
-import { TableSchemaForClient, AnyObject, DBSchemaTable } from "prostgles-types";
+import { AnyObject, DBSchema } from "prostgles-types";
+import { Publish, PublishMethods, PublishParams, PublishParser } from "./PublishParser";
 import { DBEventsManager } from "./DBEventsManager";
 export declare type DB = pgPromise.IDatabase<{}, pg.IClient>;
 declare type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 declare type DbConnectionOpts = pg.IDefaults;
-import { FieldFilter, SelectParamsBasic as SelectParams } from "prostgles-types";
-export declare type InsertRequestData = {
-    data: object | object[];
-    returning: FieldFilter;
-};
-export declare type SelectRequestData = {
-    filter: object;
-    params: SelectParams;
-};
-export declare type DeleteRequestData = {
-    filter: object;
-    returning: FieldFilter;
-};
-export declare type UpdateRequestDataOne = {
-    filter: object;
-    data: object;
-    returning: FieldFilter;
-};
-export declare type UpdateReq = {
-    filter: object;
-    data: object;
-};
-export declare type UpdateRequestDataBatch = {
-    data: UpdateReq[];
-};
-export declare type UpdateRequestData = UpdateRequestDataOne | UpdateRequestDataBatch;
-export declare type ValidateRow = (row: AnyObject) => AnyObject | Promise<AnyObject>;
-export declare type ValidateUpdateRow = (args: {
-    update: AnyObject;
-    filter: AnyObject;
-}) => AnyObject | Promise<AnyObject>;
-export declare type SelectRule = {
-    /**
-     * Fields allowed to be selected.   Tip: Use false to exclude field
-     */
-    fields: FieldFilter;
-    /**
-     * The maximum number of rows a user can get in a select query. null by default. Unless a null or higher limit is specified 100 rows will be returned by the default
-     */
-    maxLimit?: number | null;
-    /**
-     * Filter added to every query (e.g. user_id) to restrict access
-     */
-    forcedFilter?: AnyObject;
-    /**
-     * Fields user can filter by
-     * */
-    filterFields?: FieldFilter;
-    /**
-     * Validation logic to check/update data for each request
-     */
-    validate?(args: SelectRequestData): SelectRequestData | Promise<SelectRequestData>;
-};
-export declare type InsertRule = {
-    /**
-     * Fields allowed to be inserted.   Tip: Use false to exclude field
-     */
-    fields: FieldFilter;
-    /**
-     * Data to include/overwrite on each insert
-     */
-    forcedData?: AnyObject;
-    /**
-     * Fields user can view after inserting
-     */
-    returningFields?: FieldFilter;
-    /**
-     * Validation logic to check/update data for each request. Happens before publish rule checks (for fields, forcedData/forcedFilter)
-     */
-    preValidate?: ValidateRow;
-    /**
-     * Validation logic to check/update data for each request. Happens after publish rule checks (for fields, forcedData/forcedFilter)
-     */
-    validate?: ValidateRow;
-};
-export declare type UpdateRule = {
-    /**
-     * Fields allowed to be updated.   Tip: Use false/0 to exclude field
-     */
-    fields: FieldFilter;
-    /**
-     * Row level FGAC
-     * Used when the editable fields change based on the updated row
-     * If specified then the fields from the first matching filter table.count({ ...filter, ...updateFilter }) > 0 will be used
-     * If none matching then the "fields" will be used
-     * Specify in decreasing order of specificity otherwise a more general filter will match first
-     */
-    dynamicFields?: {
-        filter: AnyObject;
-        fields: FieldFilter;
-    }[];
-    /**
-     * Filter added to every query (e.g. user_id) to restrict access
-     * This filter cannot be updated
-     */
-    forcedFilter?: AnyObject;
-    /**
-     * Data to include/overwrite on each updatDBe
-     */
-    forcedData?: AnyObject;
-    /**
-     * Fields user can use to find the updates
-     */
-    filterFields?: FieldFilter;
-    /**
-     * Fields user can view after updating
-     */
-    returningFields?: FieldFilter;
-    /**
-     * Validation logic to check/update data for each request
-     */
-    validate?: ValidateUpdateRow;
-};
-export declare type DeleteRule = {
-    /**
-     * Filter added to every query (e.g. user_id) to restrict access
-     */
-    forcedFilter?: AnyObject;
-    /**
-     * Fields user can filter by
-     */
-    filterFields?: FieldFilter;
-    /**
-     * Fields user can view after deleting
-     */
-    returningFields?: FieldFilter;
-    /**
-     * Validation logic to check/update data for each request
-     */
-    validate?(...args: any[]): UpdateRequestData;
-};
-export declare type SyncRule = {
-    /**
-     * Primary keys used in updating data
-     */
-    id_fields: string[];
-    /**
-     * Numerical incrementing fieldname (last updated timestamp) used to sync items
-     */
-    synced_field: string;
-    /**
-     * EXPERIMENTAL. Disabled by default. If true then server will attempt to delete any records missing from client.
-     */
-    allow_delete?: boolean;
-    /**
-     * Throttle replication transmission in milliseconds. Defaults to 100
-     */
-    throttle?: number;
-    /**
-     * Number of rows to send per trip. Defaults to 50
-     */
-    batch_size?: number;
-};
-export declare type SubscribeRule = {
-    throttle?: number;
-};
-export declare type TableRule = CommonTableRules & {
-    select?: SelectRule;
-    insert?: InsertRule;
-    update?: UpdateRule;
-    delete?: DeleteRule;
-    sync?: SyncRule;
-    subscribe?: SubscribeRule;
-};
-export declare type ViewRule = {
-    select: SelectRule;
-};
-export declare type PublishTableRule = {
-    select?: SelectRule | "*" | false | null;
-    insert?: InsertRule | "*" | false | null;
-    update?: UpdateRule | "*" | false | null;
-    delete?: DeleteRule | "*" | false | null;
-    sync?: SyncRule;
-    subscribe?: SubscribeRule | "*";
-};
-export declare type PublishViewRule = {
-    select: SelectRule | "*" | false | null;
-};
-export declare type RequestParams = {
-    dbo?: DbHandler;
-    socket?: any;
-};
-export declare type PublishAllOrNothing = "*" | false | null;
-export declare type PublishObject = {
-    [table_name: string]: (PublishTableRule | PublishViewRule | PublishAllOrNothing);
-};
-export declare type PublishTable = {
-    [table_name: string]: (PublishTableRule | PublishViewRule);
-};
-export declare type PublishedResult = PublishAllOrNothing | PublishObject;
-export declare type PublishParams<DBO = DbHandler> = {
-    sid?: string;
-    dbo?: DBO;
-    db?: DB;
-    user?: AnyObject;
-    socket: PRGLIOSocket;
-};
-export declare type Publish<DBO> = PublishedResult | ((params: PublishParams<DBO>) => (PublishedResult | Promise<PublishedResult>));
-export declare type Method = (...args: any) => (any | Promise<any>);
+export declare const TABLE_METHODS: readonly ["update", "find", "findOne", "insert", "delete", "upsert"];
 export declare const JOIN_TYPES: readonly ["one-many", "many-one", "one-one", "many-many"];
 export declare type Join = {
     tables: [string, string];
@@ -219,11 +22,6 @@ export declare type Join = {
     type: typeof JOIN_TYPES[number];
 };
 export declare type Joins = Join[] | "inferred";
-export declare type PublishMethods<DBO> = (params: PublishParams<DBO>) => {
-    [key: string]: Method;
-} | Promise<{
-    [key: string]: Method;
-}>;
 declare type Keywords = {
     $and: string;
     $or: string;
@@ -281,23 +79,23 @@ export declare type FileTableConfig = {
     };
     imageOptions?: ImageOptions;
 };
-export declare type ProstglesInitOptions<DBO = DbHandler> = {
+export declare type ProstglesInitOptions<S extends DBSchema = never> = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
     tsGeneratedTypesDir?: string;
     io?: any;
-    publish?: Publish<DBO>;
-    publishMethods?: PublishMethods<DBO>;
-    publishRawSQL?(params: PublishParams<DBO>): ((boolean | "*") | Promise<(boolean | "*")>);
+    publish?: Publish<S>;
+    publishMethods?: PublishMethods<S>;
+    publishRawSQL?(params: PublishParams<S>): ((boolean | "*") | Promise<(boolean | "*")>);
     joins?: Joins;
     schema?: string;
     sqlFilePath?: string;
-    onReady(dbo: DBO, db: DB): void;
+    onReady(dbo: DBOFullyTyped<S>, db: DB): void;
     transactions?: string | boolean;
     wsChannelNamePrefix?: string;
-    onSocketConnect?(socket: PRGLIOSocket, dbo: DBO, db?: DB): any;
-    onSocketDisconnect?(socket: PRGLIOSocket, dbo: DBO, db?: DB): any;
-    auth?: Auth<DBO>;
+    onSocketConnect?(socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB): any;
+    onSocketDisconnect?(socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB): any;
+    auth?: Auth<S>;
     DEBUG_MODE?: boolean;
     watchSchemaType?: 
     /**
@@ -338,19 +136,20 @@ export declare type ProstglesInitOptions<DBO = DbHandler> = {
     tableConfig?: TableConfig;
 };
 export declare type OnReady = {
-    dbo: DbHandler;
+    dbo: DBHandlerServer;
     db: DB;
 };
-export declare class Prostgles<DBO = DbHandler> {
-    opts: ProstglesInitOptions<DBO>;
+import { DBOFullyTyped } from "./DBSchemaBuilder";
+export declare class Prostgles<S extends DBSchema = any> {
+    opts: ProstglesInitOptions<S>;
     db?: DB;
     pgp?: PGP;
-    dbo?: DbHandler;
+    dbo?: DBHandlerServer;
     _dboBuilder?: DboBuilder;
     get dboBuilder(): DboBuilder;
     set dboBuilder(d: DboBuilder);
     publishParser?: PublishParser;
-    authHandler?: AuthHandler;
+    authHandler?: AuthHandler<S>;
     keywords: {
         $filter: string;
         $and: string;
@@ -375,11 +174,13 @@ export declare class Prostgles<DBO = DbHandler> {
     };
     private getFileText;
     writeDBSchema(force?: boolean): void;
-    refreshDBO: () => Promise<DbHandler | undefined>;
+    refreshDBO: () => Promise<DBHandlerServer<{
+        [key: string]: import("./DboBuilder").TableHandler | Partial<import("./DboBuilder").TableHandler>;
+    }> | undefined>;
     isSuperUser: boolean;
     schema_checkIntervalMillis: any;
-    init(onReady: (dbo: DBO, db: DB) => any): Promise<{
-        db: DbHandler;
+    init(onReady: (dbo: DBOFullyTyped<S>, db: DB) => any): Promise<{
+        db: DBOFullyTyped<S>;
         _db: DB;
         pgp: PGP;
         io?: any;
@@ -389,42 +190,6 @@ export declare class Prostgles<DBO = DbHandler> {
     connectedSockets: any[];
     setSocketEvents(): Promise<void>;
     pushSocketSchema: (socket: any) => Promise<void>;
-}
-declare type Request = {
-    socket?: any;
-    httpReq?: any;
-};
-declare type DboTable = Request & {
-    tableName: string;
-    localParams: LocalParams;
-};
-declare type DboTableCommand = Request & DboTable & {
-    command: string;
-    localParams: LocalParams;
-};
-export declare class PublishParser {
-    publish: any;
-    publishMethods?: any;
-    publishRawSQL?: any;
-    dbo: DbHandler;
-    db: DB;
-    prostgles: Prostgles;
-    constructor(publish: any, publishMethods: any, publishRawSQL: any, dbo: DbHandler, db: DB, prostgles: Prostgles);
-    getPublishParams(localParams: LocalParams, clientInfo?: ClientInfo): Promise<PublishParams>;
-    getMethods(socket: any): Promise<{}>;
-    /**
-     * Parses the first level of publish. (If false then nothing if * then all tables and views)
-     * @param socket
-     * @param user
-     */
-    getPublish(localParams: LocalParams, clientInfo?: ClientInfo): Promise<PublishObject>;
-    getValidatedRequestRuleWusr({ tableName, command, localParams }: DboTableCommand): Promise<TableRule>;
-    getValidatedRequestRule({ tableName, command, localParams }: DboTableCommand, clientInfo?: ClientInfo): Promise<TableRule>;
-    getTableRules({ tableName, localParams }: DboTable, clientInfo?: ClientInfo): Promise<PublishTable>;
-    getSchemaFromPublish(socket: any): Promise<{
-        schema: TableSchemaForClient;
-        tables: DBSchemaTable[];
-    }>;
 }
 export declare function isSuperUser(db: DB): Promise<boolean>;
 //# sourceMappingURL=Prostgles.d.ts.map

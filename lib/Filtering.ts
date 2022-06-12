@@ -1,7 +1,7 @@
 
 
 import { SelectItem } from "./QueryBuilder";
-import { isEmpty, getKeys, FullFilter, EXISTS_KEYS, FilterDataType, GeomFilterKeys, GeomFilter_Funcs, TextFilter_FullTextSearchFilterKeys, ColumnInfo } from "prostgles-types";
+import { isEmpty, getKeys, FullFilter, EXISTS_KEYS, FilterDataType, GeomFilterKeys, GeomFilter_Funcs, TextFilter_FullTextSearchFilterKeys } from "prostgles-types";
 import { isPlainObject } from "./DboBuilder";
 
 /**
@@ -200,7 +200,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
     }
 
     /** st_makeenvelope */
-    if(GeomFilterKeys.includes(fOpType) && sOpType && GeomFilter_Funcs.includes(sOpType)){
+    if(GeomFilterKeys.includes(fOpType as any) && sOpType && GeomFilter_Funcs.includes(sOpType)){
       /** If leftQ is geography then this err can happen: 'Antipodal (180 degrees long) edge detected!' */
       if(sOpType.toLowerCase() === "st_makeenvelope") leftQ += "::geometry"
       return leftQ + ` ${fOpType} ` + `${sOpType}${parseRightVal(sVal, "csv")}`;
@@ -277,7 +277,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
         return leftQ + operand + parseRightVal(fVal, "array");
           
       /* FTSQuery */
-      } else if(["@@"].includes(fOpType) && TextFilter_FullTextSearchFilterKeys.includes(sOpType!)) {
+      } else if(["@@"].includes(fOpType) && TextFilter_FullTextSearchFilterKeys.includes(sOpType! as any)) {
         let lq = `to_tsvector(${leftQ}::text)`;
         if(selItem && selItem.columnPGDataType === "tsvector") lq = leftQ!;
 

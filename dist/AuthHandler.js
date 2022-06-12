@@ -103,11 +103,14 @@ class AuthHandler {
                 const err = {
                     msg: "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number } but got: " + JSON.stringify(result)
                 };
+                if (!result)
+                    throw err;
                 if (result && (typeof result.sid !== "string" || typeof result.expires !== "number") || !result && ![undefined, null].includes(result)) {
                     throw err;
                 }
-                if (!result)
-                    throw "Could not login";
+                if (result && result.expires < Date.now()) {
+                    throw { msg: "auth.login() is returning an expired session. Can only login with a session.expires greater than Date.now()" };
+                }
                 return result;
             }, responseThrottle);
         };

@@ -42,23 +42,23 @@ export type Media = {
     "etag"?: string;
 }
 
-export interface TxHandler {
-    [key: string]: TableHandler | ViewHandler;
+export type TxHandler = TablesAndViewHandlers;
+export type TxCB<DBO extends TablesAndViewHandlers = TablesAndViewHandlers> = {
+    (t: DBO, _t: pgPromise.ITask<{}>): (any | void);
 }
-export type TxCB = {
-    (t: TxHandler, _t: pgPromise.ITask<{}>): (any | void);
+export type TX<DBO extends TablesAndViewHandlers = TablesAndViewHandlers> = {
+    (t: TxCB<DBO>): Promise<(any | void)>;
 }
-export type TX = {
-    (t: TxCB): Promise<(any | void)>;
+
+type TablesAndViewHandlers = {
+    [key: string]: Partial<TableHandler> | TableHandler;
 }
-export type DbHandler = {
-    [key: string]: Partial<TableHandler>;
-  } & 
-  DbJoinMaker & 
-  {
+export type DBHandlerServer<DBO extends TablesAndViewHandlers = TablesAndViewHandlers>= 
+  TablesAndViewHandlers & 
+  DbJoinMaker & {
     sql?: SQLHandler
   } & {
-    tx?: TX
+    tx?: TX<DBO>
   }
   
 export const getUpdateFilter = (args: { filter?: AnyObject; forcedFilter?: AnyObject; $and_key: string }): AnyObject => {
@@ -76,8 +76,11 @@ export const getUpdateFilter = (args: { filter?: AnyObject; forcedFilter?: AnyOb
 import { get } from "./utils";
 import { getNewQuery, makeQuery, COMPUTED_FIELDS, SelectItem, FieldSpec, asNameAlias, SelectItemBuilder, FUNCTIONS, parseFunction, parseFunctionObject } from "./QueryBuilder";
 import { 
-    DB, TableRule, SelectRule, InsertRule, UpdateRule, DeleteRule, SyncRule, Joins, Join, Prostgles, PublishParser, ValidateRow, ValidateUpdateRow 
+    Join, Prostgles, DB
 } from "./Prostgles";
+import { 
+ TableRule, UpdateRule, SyncRule, PublishParser, ValidateRow, ValidateUpdateRow, PublishAllOrNothing 
+} from "./PublishParser";
 import { PubSubManager, asValue, BasicCallback, pickKeys, omitKeys } from "./PubSubManager";
 
 import { parseFilterItem } from "./Filtering";
@@ -146,7 +149,7 @@ export type LocalParams = {
     dbTX?: TxHandler;
 
     // localTX?: pgPromise.ITask<{}>;
-    localDBTX?: DbHandler;
+    localDBTX?: DBHandlerServer;
 
     returnQuery?: boolean;
 
@@ -165,22 +168,22 @@ function capitalizeFirstLetter(string: string, nonalpha_replacement?: string) : 
 
 function snakify(str: string, capitalize = false) : string {
 
-    return str.split("").map((c, i)=> {
+  return str.split("").map((c, i)=> {
 
-        if(!i) {
-            if(capitalize) c = c.toUpperCase();
-            if(c.match(/[^a-z_A-Z]/)){
-                return ((capitalize)? "D_" : "_") + c.charCodeAt(0);
-            }
-        } else {
-            if(c.match(/[^a-zA-Z_0-9]/)){
-                return "_" + c.charCodeAt(0);
-            }
-        }
-        
-        return c;
+    if(!i) {
+      if(capitalize) c = c.toUpperCase();
+      if(c.match(/[^a-z_A-Z]/)){
+          return ((capitalize)? "D_" : "_") + c.charCodeAt(0);
+      }
+    } else {
+      if(c.match(/[^a-zA-Z_0-9]/)){
+        return "_" + c.charCodeAt(0);
+      }
+    }
+    
+    return c;
 
-    }).join("");
+  }).join("");
 }
 
 function canBeUsedAsIsInTypescript(str: string): boolean {
@@ -190,7 +193,7 @@ function canBeUsedAsIsInTypescript(str: string): boolean {
     return Boolean(isAlphaNumericOrUnderline && startsWithCharOrUnderscore);
 }
 
-function escapeTSNames(str: string, capitalize = false): string {
+export function escapeTSNames(str: string, capitalize = false): string {
     let res = str;
     res = (capitalize? str[0].toUpperCase() : str[0]) + str.slice(1);
     if(canBeUsedAsIsInTypescript(res)) return res;
@@ -267,12 +270,12 @@ export type CommonTableRules = {
     /**
      * True by default. Allows clients to get column information on any columns that are allowed in (select, insert, update) field rules. 
      */
-     getColumns?: boolean;
+     getColumns?: PublishAllOrNothing;
     
     /**
      * True by default. Allows clients to get table information (oid, comment, label, has_media). 
      */
-    getInfo?: boolean | null;
+    getInfo?: PublishAllOrNothing
 }
 
 export type ValidatedTableRules = CommonTableRules & {
@@ -2676,7 +2679,7 @@ export class TableHandler extends ViewHandler {
         } 
     };
 
-    prepareReturning = async (returning: Select<AnyObject>, allowedFields: string[]): Promise<SelectItem[]> => {
+    prepareReturning = async (returning: Select | undefined, allowedFields: string[]): Promise<SelectItem[]> => {
         let result: SelectItem[] = [];
         if(returning){
             let sBuilder = new SelectItemBuilder({
@@ -2898,6 +2901,7 @@ export class TableHandler extends ViewHandler {
 
 import { JOIN_TYPES } from "./Prostgles";
 import { BasicSession } from "./AuthHandler";
+import { getDBSchema } from "./DBSchemaBuilder";
 
 export class DboBuilder {
     tablesOrViews?: TableSchema[];   //TableSchema           TableOrViewInfo
@@ -2909,8 +2913,8 @@ export class DboBuilder {
     db: DB;
     schema: string = "public";
 
-    // dbo: DbHandler | DbHandlerTX;
-    dbo: DbHandler;
+    // dbo: DBHandlerServer | DBHandlerServerTX;
+    dbo: DBHandlerServer;
     _pubSubManager?: PubSubManager;
 
     getPubSubManager = async () : Promise<PubSubManager> => {
@@ -2931,7 +2935,7 @@ export class DboBuilder {
                 this._pubSubManager = await PubSubManager.create({
                     dboBuilder: this,
                     db: this.db, 
-                    dbo: this.dbo as unknown as DbHandler,
+                    dbo: this.dbo as unknown as DBHandlerServer,
                     onSchemaChange
                 });
             } else {
@@ -2961,7 +2965,7 @@ export class DboBuilder {
         if(!this.prostgles.db) throw "db missing"
         this.db = this.prostgles.db;
         this.schema = this.prostgles.opts.schema || "public";
-        this.dbo = { } as unknown as DbHandler;
+        this.dbo = { } as unknown as DBHandlerServer;
         // this.joins = this.prostgles.joins;
         
     }
@@ -3099,7 +3103,7 @@ export class DboBuilder {
         
     }
 
-    async build(): Promise<DbHandler>{
+    async build(): Promise<DBHandlerServer>{
 
         // await this.pubSubManager.init()
 
@@ -3107,38 +3111,30 @@ export class DboBuilder {
         // console.log(this.tablesOrViews.map(t => `${t.name} (${t.columns.map(c => c.name).join(", ")})`))
 
         this.constraints = await getConstraints(this.db);
-
-        const common_types = 
-`
-
-import { ViewHandler, TableHandler, JoinMaker } from "prostgles-types";
-
-export type TxCB = {
-    (t: DBObj): (any | void | Promise<(any | void)>)
-};
-
-`
-        this.dboDefinition = `export type DBObj = {\n`;
-
         await this.parseJoins();
 
-        let joinTableNames: string[] = [];
+//         const common_types = 
+// `
 
-        let allDataDefs = "";
-        let i18nDef = "type DeepPartial<T> = { [P in keyof T]?: DeepPartial<T[P]>; }; \n"
-        i18nDef += "export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = { \n";
-        i18nDef += "  fallbackLang: keyof LANG_IDS; \n";
-        i18nDef += "  column_labels?: DeepPartial<{ \n";
+// import { ViewHandler, TableHandler, JoinMaker } from "prostgles-types";
+
+// export type TxCB = {
+//     (t: DBObj): (any | void | Promise<(any | void)>)
+// };
+
+// `
+        // this.dboDefinition = `export type DBObj = {\n`;
+
+
+        // let joinTableNames: string[] = [];
+
+        // let allDataDefs = "";
             
             
 
         this.tablesOrViews.map(tov => {
             const columnsForTypes = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
             
-            i18nDef += `    ${escapeTSNames(tov.name)}: { \n`;
-            // i18nDef += `      [key in ${columnsForTypes.map(c => JSON.stringify(c.name)).join(" | ")}]: { [lang_id in keyof LANG_IDS]: string }; \n`;
-            i18nDef += `      [key in keyof ${snakify(tov.name, true)}]: { [lang_id in keyof LANG_IDS]: string }; \n`;
-            i18nDef += `    }; \n`;
 
             const filterKeywords = Object.values(this.prostgles.keywords);
             const $filterCol = columnsForTypes.find(c => filterKeywords.includes(c.name));
@@ -3152,21 +3148,21 @@ export type TxCB = {
             const TSTableHandlerName = escapeTSNames(tov.name)
             if(tov.is_view){
                 this.dbo[tov.name] = new ViewHandler(this.db, tov, this, undefined, undefined, this.joinPaths);
-                this.dboDefinition  += `  ${TSTableHandlerName}: ViewHandler<${TSTableDataName}> \n`;
+                // this.dboDefinition  += `  ${TSTableHandlerName}: ViewHandler<${TSTableDataName}> \n`;
             } else {
                 this.dbo[tov.name] = new TableHandler(this.db, tov, this, undefined, undefined, this.joinPaths);
-                this.dboDefinition  += `  ${TSTableHandlerName}: TableHandler<${TSTableDataName}> \n`;
+                // this.dboDefinition  += `  ${TSTableHandlerName}: TableHandler<${TSTableDataName}> \n`;
             }
-            allDataDefs += `export type ${TSTableDataName} = { \n` + 
-                (this.dbo[tov.name] as ViewHandler).tsColumnDefs.map(str => `  ` + str).join("\n") +
-                `\n}\n`;
+            // allDataDefs += `export type ${TSTableDataName} = { \n` + 
+            //     (this.dbo[tov.name] as ViewHandler).tsColumnDefs.map(str => `  ` + str).join("\n") +
+            //     `\n}\n`;
 
             // this.dboDefinition += ` ${escapeTSNames(tov.name, false)}: ${(this.dbo[tov.name] as TableHandler).tsDboName};\n`;
 
             if(this.joinPaths && this.joinPaths.find(jp => [jp.t1, jp.t2].includes(tov.name))){
 
                 let table = tov.name;
-                joinTableNames.push(table);
+                // joinTableNames.push(table);
 
                 const makeJoin = (
                     isLeft = true, 
@@ -3199,20 +3195,18 @@ export type TxCB = {
                 }
             }
         });
-        i18nDef += "  }> \n";
-        i18nDef += "} \n";
 
-        let joinBuilderDef = "";
-        if(joinTableNames.length){
-            joinBuilderDef += "export type JoinMakerTables = {\n";
-            joinTableNames.map(tname => {
-                joinBuilderDef += ` ${escapeTSNames(tname)}: JoinMaker<${snakify(tname, true)}>;\n`
-            })
-            joinBuilderDef += "};\n";
-            ["leftJoin", "innerJoin", "leftJoinOne", "innerJoinOne"].map(joinType => {
-                this.dboDefinition += `  ${joinType}: JoinMakerTables;\n`;
-            });
-        }
+        // let joinBuilderDef = "";
+        // if(joinTableNames.length){
+        //     joinBuilderDef += "export type JoinMakerTables = {\n";
+        //     joinTableNames.map(tname => {
+        //         joinBuilderDef += ` ${escapeTSNames(tname)}: JoinMaker<${snakify(tname, true)}>;\n`
+        //     })
+        //     joinBuilderDef += "};\n";
+        //     ["leftJoin", "innerJoin", "leftJoinOne", "innerJoinOne"].map(joinType => {
+        //         this.dboDefinition += `  ${joinType}: JoinMakerTables;\n`;
+        //     });
+        // }
 
 
         if(this.prostgles.opts.transactions){
@@ -3330,14 +3324,14 @@ export type TxCB = {
         this.dboDefinition += "};\n";
         
         this.tsTypesDefinition = [
-            common_types, 
+            // common_types, 
             `/* SCHEMA DEFINITON. Table names have been altered to work with Typescript */`,
-            allDataDefs, 
-            joinBuilderDef,
+            // allDataDefs, 
+            // joinBuilderDef,
             
             `/* DBO Definition. Isomorphic */`,
             this.dboDefinition,
-            i18nDef,
+            getDBSchema(this)
         ].join("\n");
 
         return this.dbo;
@@ -3372,7 +3366,7 @@ export type TxCB = {
 
 
 
-// export async function makeDBO(db: DB): Promise<DbHandler> {
+// export async function makeDBO(db: DB): Promise<DBHandlerServer> {
 //     return await DBO.build(db, "public");
 // }
 

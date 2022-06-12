@@ -5,8 +5,8 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { pgp, Filter, LocalParams, isPlainObject, TableHandler, ViewHandler, postgresToTsType } from "./DboBuilder";
-import { TableRule } from "./Prostgles";
-import { SelectParamsBasic as SelectParams, isEmpty, FieldFilter, asName, TextFilter_FullTextSearchFilterKeys, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, isObject } from "prostgles-types";
+import { TableRule } from "./PublishParser";
+import { SelectParams, isEmpty, FieldFilter, asName, TextFilter_FullTextSearchFilterKeys, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, isObject, Select } from "prostgles-types";
 import { get } from "./utils";
 
 
@@ -200,7 +200,7 @@ const FTS_Funcs: FunctionSpec[] =
       if(isPlainObject(qVal)){
         const keys = Object.keys(qVal);
         if(!keys.length) throw "Bad arg";
-        if(keys.length !==1 || !searchTypes.includes(keys[0])) throw "Expecting a an object with a single key named one of: " + searchTypes.join(", ");
+        if(keys.length !==1 || !searchTypes.includes(keys[0] as any)) throw "Expecting a an object with a single key named one of: " + searchTypes.join(", ");
         qType = keys[0];
         qVal = asValue(qVal[qType]);
 
@@ -1094,7 +1094,7 @@ export class SelectItemBuilder {
     });
   }
 
-  parseUserSelect = async (userSelect: FieldFilter, joinParse?: (key: string, val: any, throwErr: (msg: string) => any) => any) => {
+  parseUserSelect = async (userSelect: Select, joinParse?: (key: string, val: any, throwErr: (msg: string) => any) => any) => {
 
     /* Array select */
     if(Array.isArray(userSelect)){
@@ -1113,7 +1113,8 @@ export class SelectItemBuilder {
       return [];
     } else if(userSelect === "*"){
       this.allowedFields.map(key => this.addColumn(key, true) );
-    } else if(isPlainObject(userSelect) && !isEmpty(userSelect as object)){
+
+    } else if(isPlainObject(userSelect) && !isEmpty(userSelect)){
       const selectKeys = Object.keys(userSelect),
         selectValues = Object.values(userSelect);
   

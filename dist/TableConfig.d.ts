@@ -1,6 +1,6 @@
 import { JoinInfo } from "./DboBuilder";
 import { ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE } from "./FileManager";
-import { DB, DbHandler, Prostgles } from "./Prostgles";
+import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
 declare type ColExtraInfo = {
     min?: string | number;
     max?: string | number;
@@ -151,7 +151,7 @@ export declare type TableConfig<LANG_IDS = {
  */
 export default class TableConfigurator {
     config?: TableConfig;
-    get dbo(): DbHandler;
+    get dbo(): DBHandlerServer;
     get db(): DB;
     prostgles: Prostgles;
     constructor(prostgles: Prostgles);

@@ -16,19 +16,19 @@ console.log("Add a basic auth mode where user and sessions table are created");
 import TableConfigurator, { TableConfig } from "./TableConfig";
 
 import { get } from "./utils";
-import { DboBuilder, DbHandler, TableHandler, ViewHandler, isPlainObject, LocalParams, CommonTableRules, TableSchema, PRGLIOSocket } from "./DboBuilder";
+import { DboBuilder, DBHandlerServer, isPlainObject, LocalParams, TableSchema, PRGLIOSocket } from "./DboBuilder";
 import { PubSubManager, DEFAULT_SYNC_BATCH_SIZE, asValue } from "./PubSubManager";
-export { DbHandler }
+export { DBHandlerServer }
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 
-import { SQLRequest, TableSchemaForClient, MethodKey, CHANNELS, AnyObject, RULE_METHODS, ClientSchema, getKeys, DBSchemaTable, TableInfo } from "prostgles-types";
-
+import { SQLRequest, TableSchemaForClient, CHANNELS, AnyObject, ClientSchema, getKeys, DBSchemaTable, DBSchema } from "prostgles-types";
+import { Publish, PublishMethods, PublishParams, PublishParser } from "./PublishParser";
 import { DBEventsManager } from "./DBEventsManager";
 
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 type DbConnectionOpts = pg.IDefaults;
-const TABLE_METHODS = ["update", "find", "findOne", "insert", "delete", "upsert"] as const;
+export const TABLE_METHODS = ["update", "find", "findOne", "insert", "delete", "upsert"] as const;
 function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts | undefined, debugQueries = false, onNotice: ProstglesInitOptions["onNotice"]): { db: DB, pgp: PGP } {
     let pgp: PGP = pgPromise({
         
@@ -76,238 +76,6 @@ function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts |
     };
 }
 
-
-import { Socket } from "dgram";
-import { FieldFilter, SelectParamsBasic as SelectParams } from "prostgles-types";
-
-export type InsertRequestData = {
-    data: object | object[]
-    returning: FieldFilter;
-}
-export type SelectRequestData = {
-    filter: object;
-    params: SelectParams;
-}
-export type DeleteRequestData = {
-    filter: object;
-    returning: FieldFilter;
-}
-export type UpdateRequestDataOne = {
-    filter: object;
-    data: object;
-    returning: FieldFilter;
-}
-export type UpdateReq = {
-    filter: object;
-    data: object;
-}
-export type UpdateRequestDataBatch = {
-    data: UpdateReq[];
-}
-export type UpdateRequestData = UpdateRequestDataOne | UpdateRequestDataBatch;
-
-export type ValidateRow = (row: AnyObject) => AnyObject | Promise<AnyObject>;
-export type ValidateUpdateRow = (args: { update: AnyObject, filter: AnyObject }) => AnyObject | Promise<AnyObject>;
-
-export type SelectRule = {
-
-    /**
-     * Fields allowed to be selected.   Tip: Use false to exclude field
-     */
-    fields: FieldFilter;
-
-    /**
-     * The maximum number of rows a user can get in a select query. null by default. Unless a null or higher limit is specified 100 rows will be returned by the default
-     */
-    maxLimit?: number | null;
-
-    /**
-     * Filter added to every query (e.g. user_id) to restrict access
-     */
-    forcedFilter?: AnyObject;
-
-    /**
-     * Fields user can filter by 
-     * */
-    filterFields?: FieldFilter;
-
-    /**
-     * Validation logic to check/update data for each request
-     */
-    validate?(args: SelectRequestData): SelectRequestData | Promise<SelectRequestData>;
-
-}
-export type InsertRule = {
-
-    /**
-     * Fields allowed to be inserted.   Tip: Use false to exclude field
-     */
-    fields: FieldFilter;
-
-    /**
-     * Data to include/overwrite on each insert
-     */
-    forcedData?: AnyObject;
-
-    /**
-     * Fields user can view after inserting
-     */
-    returningFields?: FieldFilter;
-
-    /**
-     * Validation logic to check/update data for each request. Happens before publish rule checks (for fields, forcedData/forcedFilter)
-     */
-    preValidate?: ValidateRow
-
-    /**
-     * Validation logic to check/update data for each request. Happens after publish rule checks (for fields, forcedData/forcedFilter)
-     */
-    validate?: ValidateRow
-}
-export type UpdateRule = {
-
-    /**
-     * Fields allowed to be updated.   Tip: Use false/0 to exclude field
-     */
-    fields: FieldFilter;
-    
-    /**
-     * Row level FGAC
-     * Used when the editable fields change based on the updated row
-     * If specified then the fields from the first matching filter table.count({ ...filter, ...updateFilter }) > 0 will be used
-     * If none matching then the "fields" will be used
-     * Specify in decreasing order of specificity otherwise a more general filter will match first
-     */
-    dynamicFields?: {
-        filter: AnyObject;
-        fields: FieldFilter;
-    }[];
-
-    /**
-     * Filter added to every query (e.g. user_id) to restrict access
-     * This filter cannot be updated
-     */
-    forcedFilter?: AnyObject;
-
-    /**
-     * Data to include/overwrite on each updatDBe
-     */
-    forcedData?: AnyObject;
-
-    /**
-     * Fields user can use to find the updates
-     */
-    filterFields?: FieldFilter;
-
-    /**
-     * Fields user can view after updating
-     */
-    returningFields?: FieldFilter;
-
-    /**
-     * Validation logic to check/update data for each request
-     */
-    validate?: ValidateUpdateRow;
-
-};
-
-export type DeleteRule = {
-    
-    /**
-     * Filter added to every query (e.g. user_id) to restrict access
-     */
-    forcedFilter?: AnyObject;
-
-    /**
-     * Fields user can filter by
-     */
-    filterFields?: FieldFilter;
-
-    /**
-     * Fields user can view after deleting
-     */
-    returningFields?: FieldFilter;
-
-    /**
-     * Validation logic to check/update data for each request
-     */
-    validate?(...args: any[]): UpdateRequestData
-}
-export type SyncRule = {
-    
-    /**
-     * Primary keys used in updating data
-     */
-    id_fields: string[];
-    
-    /**
-     * Numerical incrementing fieldname (last updated timestamp) used to sync items
-     */
-    synced_field: string;
-
-    /**
-     * EXPERIMENTAL. Disabled by default. If true then server will attempt to delete any records missing from client.
-     */
-    allow_delete?: boolean;
-
-     /**
-      * Throttle replication transmission in milliseconds. Defaults to 100
-      */
-    throttle?: number;
-
-    /**
-     * Number of rows to send per trip. Defaults to 50 
-     */
-    batch_size?: number;
-}
-export type SubscribeRule = {
-    throttle?: number;
-}
-
-export type TableRule = CommonTableRules & {
-    select?: SelectRule;
-    insert?: InsertRule;
-    update?: UpdateRule;
-    delete?: DeleteRule;
-    sync?: SyncRule;
-    subscribe?: SubscribeRule;
-};
-export type ViewRule = {
-    select: SelectRule;
-};
-export type PublishTableRule = {
-    select?: SelectRule | "*" | false | null;
-    insert?: InsertRule | "*" | false | null;
-    update?: UpdateRule | "*" | false | null;
-    delete?: DeleteRule | "*" | false | null;
-    sync?: SyncRule;
-    subscribe?: SubscribeRule | "*";
-};
-export type PublishViewRule = {
-    select: SelectRule | "*" | false | null;
-};
-// export type Publish = {
-//     tablesOrViews: {[key:string]: TableRule | ViewRule | "*" }
-// }
-export type RequestParams = { dbo?: DbHandler, socket?: any };
-export type PublishAllOrNothing = "*" | false | null;
-export type PublishObject = { 
-    [table_name: string]: (PublishTableRule | PublishViewRule | PublishAllOrNothing ) 
-};
-export type PublishTable = { 
-    [table_name: string]: (PublishTableRule | PublishViewRule) 
-};
-export type PublishedResult = PublishAllOrNothing | PublishObject ;
-export type PublishParams<DBO = DbHandler> = {
-    sid?: string;
-    dbo?: DBO;
-    db?: DB;
-    user?: AnyObject;
-    socket: PRGLIOSocket
-}
-export type Publish<DBO> = PublishedResult | ((params: PublishParams<DBO>) => (PublishedResult | Promise<PublishedResult>)); 
-
-export type Method = (...args: any) => ( any | Promise<any> );
 export const JOIN_TYPES = ["one-many", "many-one", "one-one", "many-many"] as const;
 export type Join = {
     tables: [string, string];
@@ -316,7 +84,6 @@ export type Join = {
 };
 export type Joins = Join[] | "inferred";
 
-export type PublishMethods<DBO> = (params: PublishParams<DBO>) => { [key:string]: Method } | Promise<{ [key:string]: Method }>;
 
 
 type Keywords = {
@@ -398,23 +165,23 @@ export type FileTableConfig = {
     imageOptions?: ImageOptions
 };
 
-export type ProstglesInitOptions<DBO = DbHandler> = {
+export type ProstglesInitOptions<S extends DBSchema = never> = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
     tsGeneratedTypesDir?: string;
     io?: any;
-    publish?: Publish<DBO>;
-    publishMethods?: PublishMethods<DBO>;
-    publishRawSQL?(params: PublishParams<DBO>): ( (boolean | "*") | Promise<(boolean | "*")>);
+    publish?: Publish<S>;
+    publishMethods?: PublishMethods<S>;
+    publishRawSQL?(params: PublishParams<S>): ( (boolean | "*") | Promise<(boolean | "*")>);
     joins?: Joins;
     schema?: string;
     sqlFilePath?: string;
-    onReady(dbo: DBO, db: DB): void;
+    onReady(dbo: DBOFullyTyped<S>, db: DB): void;
     transactions?: string | boolean;
     wsChannelNamePrefix?: string;
-    onSocketConnect?(socket: PRGLIOSocket, dbo: DBO, db?: DB): any;
-    onSocketDisconnect?(socket: PRGLIOSocket, dbo: DBO, db?: DB): any;
-    auth?: Auth<DBO>;
+    onSocketConnect?(socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB): any;
+    onSocketDisconnect?(socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB): any;
+    auth?: Auth<S>;
     DEBUG_MODE?: boolean;
     watchSchemaType?: 
 
@@ -466,7 +233,7 @@ export type ProstglesInitOptions<DBO = DbHandler> = {
 */
 
 export type OnReady = {
-    dbo: DbHandler;
+    dbo: DBHandlerServer;
     db: DB;
 }
 
@@ -478,9 +245,10 @@ const DEFAULT_KEYWORDS = {
 };
 
 import * as fs from 'fs';
-export class Prostgles<DBO = DbHandler> {
+import { DBOFullyTyped } from "./DBSchemaBuilder";
+export class Prostgles<S extends DBSchema = any> {
 
-    opts: ProstglesInitOptions<DBO> = {
+    opts: ProstglesInitOptions<S> = {
         DEBUG_MODE: false,
         dbConnection: {
             host: "localhost",
@@ -501,7 +269,7 @@ export class Prostgles<DBO = DbHandler> {
     // dbOptions: DbConnectionOpts;
     db?: DB;
     pgp?: PGP;
-    dbo?: DbHandler;
+    dbo?: DBHandlerServer;
     _dboBuilder?: DboBuilder;
     get dboBuilder(): DboBuilder {
         if(!this._dboBuilder) throw "get dboBuilder: it's undefined"
@@ -512,7 +280,7 @@ export class Prostgles<DBO = DbHandler> {
     }
     publishParser?: PublishParser;
 
-    authHandler?: AuthHandler;
+    authHandler?: AuthHandler<S>;
 
 
     keywords = DEFAULT_KEYWORDS;
@@ -641,8 +409,8 @@ export class Prostgles<DBO = DbHandler> {
 
     isSuperUser = false;
     schema_checkIntervalMillis: any;
-    async init(onReady: (dbo: DBO, db: DB) => any): Promise<{
-        db: DbHandler;
+    async init(onReady: (dbo: DBOFullyTyped<S>, db: DB) => any): Promise<{
+        db: DBOFullyTyped<S>;
         _db: DB;
         pgp: PGP;
         io?: any;
@@ -766,7 +534,7 @@ export class Prostgles<DBO = DbHandler> {
 
             this.loaded = true;
             return {
-                db: this.dbo!,
+                db: this.dbo! as any,
                 _db: db,
                 pgp,
                 io: this.opts.io,
@@ -1033,95 +801,6 @@ type SocketMethodRequest = {
     params: any;
 }
 
-
-type Request = {
-    socket?: any;
-    httpReq?: any;
-}
-
-type DboTable = Request & {
-    tableName: string;
-    localParams: LocalParams;
-}
-type DboTableCommand = Request & DboTable & {
-    command: string;
-    localParams: LocalParams;
-}
-
-const RULE_TO_METHODS = [
-    { 
-        rule: "getColumns",
-        sqlRule: "select",
-        methods: RULE_METHODS.getColumns, 
-        no_limits: true, 
-        allowed_params: [],
-        table_only: false,
-        hint: ` expecting false | true | undefined`
-    },
-    { 
-        rule: "getInfo",
-        sqlRule: "select",
-        methods: RULE_METHODS.getInfo, 
-        no_limits: true, 
-        allowed_params: [],
-        table_only: false,
-        hint: ` expecting false | true | undefined`
-    },
-   { 
-       rule: "insert",
-       sqlRule: "insert",
-       methods: RULE_METHODS.insert, 
-       no_limits: <SelectRule>{ fields: "*" }, 
-       table_only: true,
-       allowed_params: <Array<keyof InsertRule>>["fields", "forcedData", "returningFields", "validate", "preValidate"] ,
-       hint: ` expecting "*" | true | { fields: string | string[] | {}  }`
-    },
-   { 
-       rule: "update", 
-       sqlRule: "update",
-       methods: RULE_METHODS.update, 
-       no_limits: <UpdateRule>{ fields: "*", filterFields: "*", returningFields: "*"  },
-       table_only: true, 
-       allowed_params: <Array<keyof UpdateRule>>["fields", "filterFields", "forcedFilter", "forcedData", "returningFields", "validate", "dynamicFields"] ,
-       hint: ` expecting "*" | true | { fields: string | string[] | {}  }`
-    },
-   { 
-       rule: "select", 
-       sqlRule: "select",
-       methods: RULE_METHODS.select, 
-       no_limits: <SelectRule>{ fields: "*", filterFields: "*" }, 
-       table_only: false,
-       allowed_params: <Array<keyof SelectRule>>["fields", "filterFields", "forcedFilter", "validate", "maxLimit"] ,
-       hint: ` expecting "*" | true | { fields: ( string | string[] | {} )  }`
-    },
-   { 
-       rule: "delete", 
-       sqlRule: "delete",
-       methods: RULE_METHODS.delete, 
-       no_limits: <DeleteRule>{ filterFields: "*" } , 
-       table_only: true,
-       allowed_params: <Array<keyof DeleteRule>>["filterFields", "forcedFilter", "returningFields", "validate"] ,
-       hint: ` expecting "*" | true | { filterFields: ( string | string[] | {} ) } \n Will use "select", "update", "delete" and "insert" rules`
-    },
-    { 
-       rule: "sync", 
-       sqlRule: "select",
-       methods: RULE_METHODS.sync, 
-       no_limits: null,
-       table_only: true,
-       allowed_params: <Array<keyof SyncRule>>["id_fields", "synced_field", "sync_type", "allow_delete", "throttle", "batch_size"],
-       hint: ` expecting "*" | true | { id_fields: string[], synced_field: string }`
-    },
-    { 
-        rule: "subscribe", 
-        sqlRule: "select",
-        methods: RULE_METHODS.subscribe, 
-        no_limits: <SubscribeRule>{  throttle: 0  },
-        table_only: true,
-        allowed_params: <Array<keyof SubscribeRule>>["throttle"],
-        hint: ` expecting "*" | true | { throttle: number } \n Will use "select" rules`
-    }
-] as const;
 // const ALL_PUBLISH_METHODS = ["update", "upsert", "delete", "insert", "find", "findOne", "subscribe", "unsubscribe", "sync", "unsync", "remove"];
 // const ALL_PUBLISH_METHODS = RULE_TO_METHODS.map(r => r.methods).flat();
 
@@ -1134,385 +813,7 @@ const RULE_TO_METHODS = [
 //     return res;
 // }
 
-export class PublishParser {
-    publish: any;
-    publishMethods?: any;
-    publishRawSQL?: any;
-    dbo: DbHandler;
-    db: DB
-    prostgles: Prostgles;
 
-    constructor(publish: any, publishMethods: any, publishRawSQL: any, dbo: DbHandler, db: DB, prostgles: Prostgles){
-        this.publish = publish;
-        this.publishMethods = publishMethods;
-        this.publishRawSQL = publishRawSQL;
-        this.dbo = dbo;
-        this.db = db;
-        this.prostgles = prostgles;
-
-        if(!this.dbo || !this.publish) throw "INTERNAL ERROR: dbo and/or publish missing";
-    }
-
-    async getPublishParams(localParams: LocalParams, clientInfo?: ClientInfo): Promise<PublishParams> {
-        return {
-            ...(clientInfo || await this.prostgles.authHandler?.getClientInfo(localParams)),
-            dbo: this.dbo,
-            db: this.db,
-            socket: localParams.socket!
-        }
-    }
-
-    async getMethods(socket: any){
-        let methods = {};
-    
-        const publishParams = await this.getPublishParams({ socket });
-        const _methods = await applyParamsIfFunc(this.publishMethods, publishParams);
-    
-        if(_methods && Object.keys(_methods).length){
-            getKeys(_methods).map(key => {
-                if(_methods[key] && (typeof _methods[key] === "function" || typeof _methods[key].then === "function")){
-                    //@ts-ignore
-                    methods[key] = _methods[key];
-                } else {
-                    throw `invalid publishMethods item -> ${key} \n Expecting a function or promise`
-                }
-            });
-        }
-    
-        return methods;
-    }
-
-    /**
-     * Parses the first level of publish. (If false then nothing if * then all tables and views)
-     * @param socket 
-     * @param user 
-     */
-    async getPublish(localParams: LocalParams, clientInfo?: ClientInfo): Promise<PublishObject> {
-        const publishParams: PublishParams = await this.getPublishParams(localParams, clientInfo)
-        let _publish = await applyParamsIfFunc(this.publish, publishParams );
-
-        if(_publish === "*"){
-            let publish = {} as any;
-            this.prostgles.dboBuilder.tablesOrViews?.map(tov => {
-                publish[tov.name] = "*";
-            });
-            return publish;
-        }
-
-        return _publish;
-    }
-    async getValidatedRequestRuleWusr({ tableName, command, localParams }: DboTableCommand): Promise<TableRule>{
-        const clientInfo = await this.prostgles.authHandler!.getClientInfo(localParams);
-        return await this.getValidatedRequestRule({ tableName, command, localParams }, clientInfo);
-    }
-    
-    async getValidatedRequestRule({ tableName, command, localParams }: DboTableCommand, clientInfo?: ClientInfo): Promise<TableRule>{
-        if(!this.dbo) throw "INTERNAL ERROR: dbo is missing";
-
-        if(!command || !tableName) throw "command OR tableName are missing";
-
-        let rtm = RULE_TO_METHODS.find(rtms => (rtms.methods as any).includes(command));
-        if(!rtm){
-            throw "Invalid command: " + command;
-        }
-
-        /* Must be local request -> allow everything */
-        if(!localParams || (!localParams.socket && !localParams.httpReq)){
-            return RULE_TO_METHODS.reduce((a, v) => ({
-                ...a,
-                [v.rule]: v.no_limits
-            }), {})
-        }
-
-        /* Must be from socket. Must have a publish */
-        if(!this.publish) throw "publish is missing";
-
-        /* Get any publish errors for socket */
-        const schm = localParams?.socket?.prostgles?.schema?.[tableName]?.[command];
-
-        if(schm && schm.err) throw schm.err;
-
-        let table_rule = await this.getTableRules({ tableName, localParams }, clientInfo);
-        if(!table_rule) throw "Invalid or disallowed table: " + tableName;
-
-
-        if(command === "upsert"){
-            if(!table_rule.update || !table_rule.insert){
-                throw `Invalid or disallowed command: upsert`;
-            }
-        }
-
-        if(rtm && table_rule && table_rule[rtm.rule]){
-            return table_rule;
-        } else throw `Invalid or disallowed command: ${tableName}.${command}`;
-    }
-    
-    async getTableRules({ tableName, localParams }: DboTable, clientInfo?: ClientInfo): Promise<PublishTable> {
-        
-        try {
-            if(!localParams || !tableName) throw "publish OR socket OR dbo OR tableName are missing";
-    
-            let _publish = await this.getPublish(localParams, clientInfo);
-    
-            let table_rules = _publish[tableName];// applyParamsIfFunc(_publish[tableName],  localParams, this.dbo, this.db, user);
-
-            /* Get view or table specific rules */
-            const tHandler = (this.dbo[tableName] as TableHandler | ViewHandler);
-            
-            const is_view = tHandler.is_view,
-                MY_RULES = RULE_TO_METHODS.filter(r => !is_view || !r.table_only);
-
-            // if(tableName === "various") console.warn(1033, MY_RULES)
-            if(table_rules){
-
-                /* All methods allowed. Add no limits for table rules */
-                if([true, "*"].includes(table_rules as any)){
-                    table_rules = {};
-                    MY_RULES.map(r => {
-                        /** Check PG User privileges */
-                        if(
-                            tHandler.tableOrViewInfo.privileges[r.sqlRule]
-                        ){
-                            // @ts-ignore
-                            table_rules[r.rule] = { ...(r as any).no_limits } as any;
-                        }
-                        
-
-                    });
-                    // if(tableName === "various") console.warn(1042, table_rules)
-                }
-
-                /* Add missing implied rules */
-                MY_RULES.map(r => {
-
-                    if(["getInfo", "getColumns"].includes(r.rule) && ![null, false, 0].includes((table_rules as any)[r.rule])){
-                        // @ts-ignore
-                        table_rules[r.rule] = r.no_limits;
-                        return ;
-                    } 
-
-                    /* Add nested properties for fully allowed rules */
-                        // @ts-ignore
-                    if ([true, "*"].includes(table_rules[r.rule]) && r.no_limits) {
-                        // @ts-ignore
-                        table_rules[r.rule] = Object.assign({}, r.no_limits);
-                    }
-
-                            // @ts-ignore
-                    if(table_rules[r.rule]){
-                        /* Add implied methods if not falsy */
-                        // @ts-ignore
-                        r.methods.forEach(method => {
-                            // @ts-ignore
-                            if(table_rules[method] === undefined){
-                                const publishedTable = (table_rules as PublishTable);
-                                if(method === "updateBatch" && !publishedTable.update){
-                                
-                                } else if(method === "upsert" && (!publishedTable.update || !publishedTable.insert)){
-                                    // return;
-                                } else {
-                                    // @ts-ignore
-                                    table_rules[method] = {};
-                                }
-                            }
-                        });
-                    }
-                    // if(tableName === "v_various") console.warn(table_rules, r)
-                });
-                
-                /*
-                    Add defaults
-                    Check for invalid params 
-                */
-                if(table_rules && getKeys(table_rules).length && table_rules !== "*"){
-                    const ruleKeys = getKeys(table_rules as PublishTableRule | PublishViewRule)
-                    
-                            // @ts-ignore
-                    ruleKeys.filter(m => table_rules[m])
-                        .find(method => {
-                            let rm = MY_RULES.find(r => r.rule === method || (r.methods as any).includes(method));
-                            if(!rm){
-                                let extraInfo = "";
-                                if(is_view && RULE_TO_METHODS.find(r => !is_view && r.rule === method || (r.methods as any).includes(method))){
-                                    extraInfo = "You've specified table rules to a view\n";
-                                }
-                                throw `Invalid rule in publish.${tableName} -> ${method} \n${extraInfo}Expecting any of: ${MY_RULES.flatMap(r => [r.rule, ...r.methods]).join(", ")}`;
-                            }
-
-                            /** Check user privileges */
-                            if(!tHandler.tableOrViewInfo.privileges[rm.sqlRule]){
-                                // @ts-ignore
-                                delete table_rules![method];
-                                return;
-                            }
-
-                            /* Check RULES for invalid params */
-                            /* Methods do not have params -> They use them from rules */
-                            if(method === rm.rule){
-                                // @ts-ignore
-                                let method_params = getKeys(table_rules![method]);
-                                let iparam = method_params.find(p => !rm?.allowed_params.includes(<never>p));
-                                if(iparam){
-                                    throw `Invalid setting in publish.${tableName}.${method} -> ${iparam}. \n Expecting any of: ${rm.allowed_params.join(", ")}`;
-                                }
-                            }
-
-                            /* Add default params (if missing) */
-                            // @ts-ignore
-                            if(method === "sync"){
-                            
-                                // @ts-ignore
-                                if([true, "*"].includes(table_rules![method])){
-                                    throw "Invalid sync rule. Expecting { id_fields: string[], synced_field: string } ";
-                                }
-                                if(typeof get(table_rules, [method, "throttle"]) !== "number"){
-                                    // @ts-ignore
-                                    table_rules![method].throttle = 100;
-                                }
-                                if(typeof get(table_rules, [method, "batch_size"]) !== "number"){
-                                    // @ts-ignore
-                                    table_rules![method].batch_size = DEFAULT_SYNC_BATCH_SIZE;
-                                }
-                            }
-
-                            /* Enable subscribe if not explicitly disabled */
-                            // @ts-ignore
-                            if(method === "select" && !ruleKeys.includes("subscribe")){
-                                const sr = MY_RULES.find(r => r.rule === "subscribe");
-                                if(sr){
-                                    // @ts-ignore
-                                    table_rules[sr.rule] = { ...sr.no_limits };
-                                    // @ts-ignore
-                                    (table_rules as PublishTable).subscribeOne = { ...sr.no_limits };
-                                }
-                            }
-                        });                
-                }
-            }
-            
-            return table_rules as PublishTable;
-        } catch (e) {
-            throw e;
-        }
-    }
-
-
-    
-    /* Prepares schema for client. Only allowed views and commands will be present */
-    async getSchemaFromPublish(socket: any): Promise<{schema: TableSchemaForClient; tables: DBSchemaTable[] }> {
-        let schema: TableSchemaForClient = {};
-        let tables: DBSchemaTable[] = []
-        
-        try {
-            /* Publish tables and views based on socket */
-            const clientInfo = await this.prostgles.authHandler?.getClientInfo({ socket });
-            let _publish = await this.getPublish(socket, clientInfo);
-
-    
-            if(_publish && Object.keys(_publish).length){
-                let txKey = "tx";
-                if(!this.prostgles.opts.transactions) txKey = "";
-                if(typeof this.prostgles.opts.transactions === "string") txKey = this.prostgles.opts.transactions;
-                
-                const tableNames = Object.keys(_publish).filter(k => !txKey || txKey !== k);
-                
-                await Promise.all(tableNames                 
-                    .map(async tableName => {
-                        if(!this.dbo[tableName]) {
-                            throw `Table ${tableName} does not exist
-                            Expecting one of: ${this.prostgles.dboBuilder.tablesOrViews?.map(tov => tov.name).join(", ")}
-                            DBO tables: ${Object.keys(this.dbo).filter(k => (this.dbo[k] as any).find).join(", ")}
-                            `;
-                        }
-
-                        const table_rules = await this.getTableRules({ localParams: {socket}, tableName }, clientInfo);
-            
-                        if(table_rules && Object.keys(table_rules).length){
-                            schema[tableName] = {};
-                            let methods: MethodKey[] = [];
-                            let tableInfo: TableInfo | undefined;
-                            let tableColumns: DBSchemaTable["columns"] | undefined;
-        
-                            if(typeof table_rules === "object"){
-                                methods = getKeys(table_rules) as any;
-                            }
-                            
-                            await Promise.all(methods.filter(m => m !== "select" as any).map(async method => {
-                                if(method === "sync" && table_rules[method]){
-
-                                    /* Pass sync info */
-                                    schema[tableName][method] = table_rules[method];
-                                } else if(table_rules[method]) {
-
-                                    schema[tableName][method] = {};
-
-                                    /* Test for issues with the common table CRUD methods () */
-                                    if(TABLE_METHODS.includes(method as any)){
-
-                                        let err = null;
-                                        try {
-                                            let valid_table_command_rules = await this.getValidatedRequestRule({ tableName, command: method, localParams: {socket} }, clientInfo);
-                                            await (this.dbo[tableName] as any)[method]({}, {}, {}, valid_table_command_rules, { socket, has_rules: true, testRule: true });
-                                                
-                                        } catch(e) {
-                                            err = "INTERNAL PUBLISH ERROR";
-                                            schema[tableName][method] = { err };
-
-                                            throw `publish.${tableName}.${method}: \n   -> ${e}`;
-                                        }
-                                    }
-
-
-                                    if(method === "getInfo" || method === "getColumns"){
-                                        let tableRules = await this.getValidatedRequestRule({ tableName, command: method, localParams: {socket} }, clientInfo);
-                                        const res = await (this.dbo[tableName] as any)[method](undefined, undefined, undefined , tableRules, { socket, has_rules: true });
-                                        if(method === "getInfo"){
-                                            tableInfo = res;
-                                        } else if(method === "getColumns"){
-                                            tableColumns = res;
-                                        }
-                                    }
-                                }
-                            }));
-
-                            if(tableInfo && tableColumns){
-
-                                tables.push({
-                                    name: tableName,
-                                    info: tableInfo,
-                                    columns: tableColumns
-                                })
-                            }
-                        }
-                        
-                        return true;
-                    })
-                );
-            }
-            
-    
-        } catch (e) {
-            console.error("Prostgles \nERRORS IN PUBLISH: ", JSON.stringify(e));
-            throw e;
-        }
-        
-        return { schema, tables };
-    }
-
-}
-
-
-                            
-function applyParamsIfFunc(maybeFunc: any, ...params: any): any{
-    if(
-        (maybeFunc !== null && maybeFunc !== undefined) &&
-        (typeof maybeFunc === "function" || typeof maybeFunc.then === "function")
-    ){
-        return maybeFunc(...params);
-    }
-
-    return maybeFunc;
-}
 
 export async function isSuperUser(db: DB): Promise<boolean>{
     return db.oneOrNone("select usesuper from pg_user where usename = CURRENT_USER;").then(r => r.usesuper);

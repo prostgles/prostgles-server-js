@@ -46,19 +46,6 @@ const dbConnection = {
     // password:  "usr",
 };
 (async () => {
-    const i18n = {
-        fallbackLang: "en",
-        column_labels: {
-            tr2: {
-                t1: {
-                    fr: "fr_t1"
-                },
-                t2: {
-                    en: "en_t2"
-                },
-            }
-        }
-    };
     log("created prostgles");
     const tableConfig = {
         tr2: {

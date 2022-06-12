@@ -15,9 +15,9 @@ http.listen(3001);
 import isomorphic from "../isomorphic_queries";
 import server_only_queries from "../server_only_queries";
 
-import { DBObj, I18N_DBO_CONFIG } from "./DBoGenerated";
+import { DBObj, DBSchema } from "./DBoGenerated";
 // type DBObj = any;
-import { DB, DbHandler } from 'prostgles-server/dist/Prostgles';
+
 import { TableConfig } from '../../dist/TableConfig';
 
 const log = (msg: string, extra?: any, trace?: boolean) => {
@@ -61,19 +61,6 @@ const dbConnection = {
 
 (async () => {
 
-	const i18n: I18N_DBO_CONFIG = {
-		fallbackLang: "en",
-		column_labels: {
-			tr2: {
-				t1: {
-					fr: "fr_t1"
-				},
-				t2: {
-					en: "en_t2"
-				},
-			}
-		}
-	}
 
 	log("created prostgles")
 	const tableConfig: TableConfig<{ en: 1, fr: 1 }> = {
@@ -110,7 +97,7 @@ const dbConnection = {
 			}
 		}
 	}
-	let prgl = await prostgles({
+	let prgl = await prostgles<DBSchema>({
 		dbConnection,
 		sqlFilePath: path.join(__dirname+'/init.sql'),
 		io,
@@ -346,14 +333,13 @@ const dbConnection = {
 					
 				} else if(process.env.TEST_TYPE === "server"){
 
-					await isomorphic(db);
+					await isomorphic(db as any);
 					log("Server isomorphic tests successful");
 					await server_only_queries(db);
 					log("Server-only query tests successful");
 
 					stopTest()
 				} else {
-					
 					// await db.items4.delete();
 					// await db.items4.insert([
 					// 	{ name: "abc", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },

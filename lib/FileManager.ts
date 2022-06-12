@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import * as FileType from "file-type";
 import * as sharp from "sharp";
 
-import { DB, DbHandler, Prostgles } from './Prostgles';
+import { DB, DBHandlerServer, Prostgles } from './Prostgles';
 import { asName, getKeys } from 'prostgles-types';
 import { TableHandler } from './DboBuilder';
 
@@ -71,7 +71,7 @@ export default class FileManager {
   imageOptions?: ImageOptions;
 
   prostgles?: Prostgles;
-  get dbo(): DbHandler { 
+  get dbo(): DBHandlerServer { 
     if(!this.prostgles?.dbo) throw "this.prostgles.dbo missing"
     return this.prostgles.dbo 
   };

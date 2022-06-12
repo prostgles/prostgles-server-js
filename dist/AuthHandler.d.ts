@@ -1,6 +1,7 @@
-import { AnyObject } from "prostgles-types";
+import { AnyObject, DBSchema } from "prostgles-types";
 import { LocalParams, PRGLIOSocket } from "./DboBuilder";
-import { DB, DbHandler, Prostgles } from "./Prostgles";
+import { DBOFullyTyped } from "./DBSchemaBuilder";
+import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
 declare type Awaitable<T> = T | Promise<T>;
 declare type AuthSocketSchema = {
     user?: AnyObject;
@@ -36,7 +37,7 @@ export declare type AuthClientRequest = {
 } | {
     httpReq: ExpressReq;
 };
-export declare type Auth<DBO = DbHandler> = {
+export declare type Auth<S extends DBSchema = any> = {
     /**
      * Name of the cookie or socket hadnshake query param that represents the session id.
      * Defaults to "session_id"
@@ -87,10 +88,10 @@ export declare type Auth<DBO = DbHandler> = {
             /**
              * Used in creating a session/logging in using a magic link
              */
-            check: (magicId: string, dbo: DBO, db: DB) => Awaitable<BasicSession | undefined>;
+            check: (magicId: string, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession | undefined>;
         };
     };
-    getUser: (sid: string | undefined, dbo: DBO, db: DB, client: AuthClientRequest) => Awaitable<{
+    getUser: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB, client: AuthClientRequest) => Awaitable<{
         /**
          * User data used on server. Mainly used in http request auth
          */
@@ -100,14 +101,14 @@ export declare type Auth<DBO = DbHandler> = {
          */
         clientUser: AnyObject;
     } | undefined>;
-    register?: (params: AnyObject, dbo: DBO, db: DB) => Awaitable<BasicSession> | BasicSession;
-    login?: (params: AnyObject, dbo: DBO, db: DB) => Awaitable<BasicSession> | BasicSession;
-    logout?: (sid: string | undefined, dbo: DBO, db: DB) => Awaitable<any>;
+    register?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession> | BasicSession;
+    login?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession> | BasicSession;
+    logout?: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<any>;
     /**
      * If provided then then session info will be saved on socket.__prglCache and reused from there
      */
     cacheSession?: {
-        getSession: (sid: string | undefined, dbo: DBO, db: DB) => Awaitable<BasicSession>;
+        getSession: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession>;
     };
 };
 export declare type ClientInfo = {
@@ -115,9 +116,9 @@ export declare type ClientInfo = {
     clientUser?: AnyObject;
     sid?: string;
 };
-export default class AuthHandler {
-    protected opts?: Auth;
-    dbo: DbHandler;
+export default class AuthHandler<S extends DBSchema = any> {
+    protected opts?: Auth<S>;
+    dbo: DBHandlerServer;
     db: DB;
     sidKeyName?: string;
     returnURL?: string;

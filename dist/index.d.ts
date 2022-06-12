@@ -1,7 +1,7 @@
 import { ProstglesInitOptions } from "./Prostgles";
-import { DbHandler } from "./DboBuilder";
-declare function prostgles<DBObj = DbHandler>(params: ProstglesInitOptions<DBObj>): Promise<{
-    db: DbHandler;
+import { DBSchema } from "prostgles-types";
+declare function prostgles<S extends DBSchema = any>(params: ProstglesInitOptions<S>): Promise<{
+    db: import("./DBSchemaBuilder").DBOFullyTyped<S>;
     _db: import("./Prostgles").DB;
     pgp: import("./Prostgles").PGP;
     io?: any;

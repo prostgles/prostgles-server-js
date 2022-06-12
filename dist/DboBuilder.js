@@ -5,7 +5,7 @@
  *--------------------------------------------------------------------------------------------*/
 var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.postgresToTsType = exports.isPlainObject = exports.DboBuilder = exports.TableHandler = exports.ViewHandler = exports.EXISTS_KEYS = exports.pgp = exports.getUpdateFilter = void 0;
+exports.postgresToTsType = exports.isPlainObject = exports.DboBuilder = exports.TableHandler = exports.ViewHandler = exports.EXISTS_KEYS = exports.escapeTSNames = exports.pgp = exports.getUpdateFilter = void 0;
 const Bluebird = require("bluebird");
 // declare global { export interface Promise<T> extends Bluebird<T> {} }
 const pgPromise = require("pg-promise");
@@ -68,6 +68,7 @@ function escapeTSNames(str, capitalize = false) {
         return res;
     return JSON.stringify(res);
 }
+exports.escapeTSNames = escapeTSNames;
 const shortestPath_1 = require("./shortestPath");
 /* DEBUG CLIENT ERRORS HERE */
 function makeErr(err, localParams, view, allowedKeys) {
@@ -2215,6 +2216,7 @@ class TableHandler extends ViewHandler {
 }
 exports.TableHandler = TableHandler;
 const Prostgles_1 = require("./Prostgles");
+const DBSchemaBuilder_1 = require("./DBSchemaBuilder");
 class DboBuilder {
     constructor(prostgles) {
         this.schema = "public";
@@ -2387,29 +2389,19 @@ class DboBuilder {
         this.tablesOrViews = await getTablesForSchemaPostgresSQL(this.db); //, this.schema
         // console.log(this.tablesOrViews.map(t => `${t.name} (${t.columns.map(c => c.name).join(", ")})`))
         this.constraints = await getConstraints(this.db);
-        const common_types = `
-
-import { ViewHandler, TableHandler, JoinMaker } from "prostgles-types";
-
-export type TxCB = {
-    (t: DBObj): (any | void | Promise<(any | void)>)
-};
-
-`;
-        this.dboDefinition = `export type DBObj = {\n`;
         await this.parseJoins();
-        let joinTableNames = [];
-        let allDataDefs = "";
-        let i18nDef = "type DeepPartial<T> = { [P in keyof T]?: DeepPartial<T[P]>; }; \n";
-        i18nDef += "export type I18N_DBO_CONFIG<LANG_IDS = { en: 1, fr: 1 }> = { \n";
-        i18nDef += "  fallbackLang: keyof LANG_IDS; \n";
-        i18nDef += "  column_labels?: DeepPartial<{ \n";
+        //         const common_types = 
+        // `
+        // import { ViewHandler, TableHandler, JoinMaker } from "prostgles-types";
+        // export type TxCB = {
+        //     (t: DBObj): (any | void | Promise<(any | void)>)
+        // };
+        // `
+        // this.dboDefinition = `export type DBObj = {\n`;
+        // let joinTableNames: string[] = [];
+        // let allDataDefs = "";
         this.tablesOrViews.map(tov => {
             const columnsForTypes = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
-            i18nDef += `    ${escapeTSNames(tov.name)}: { \n`;
-            // i18nDef += `      [key in ${columnsForTypes.map(c => JSON.stringify(c.name)).join(" | ")}]: { [lang_id in keyof LANG_IDS]: string }; \n`;
-            i18nDef += `      [key in keyof ${snakify(tov.name, true)}]: { [lang_id in keyof LANG_IDS]: string }; \n`;
-            i18nDef += `    }; \n`;
             const filterKeywords = Object.values(this.prostgles.keywords);
             const $filterCol = columnsForTypes.find(c => filterKeywords.includes(c.name));
             if ($filterCol) {
@@ -2421,19 +2413,19 @@ export type TxCB = {
             const TSTableHandlerName = escapeTSNames(tov.name);
             if (tov.is_view) {
                 this.dbo[tov.name] = new ViewHandler(this.db, tov, this, undefined, undefined, this.joinPaths);
-                this.dboDefinition += `  ${TSTableHandlerName}: ViewHandler<${TSTableDataName}> \n`;
+                // this.dboDefinition  += `  ${TSTableHandlerName}: ViewHandler<${TSTableDataName}> \n`;
             }
             else {
                 this.dbo[tov.name] = new TableHandler(this.db, tov, this, undefined, undefined, this.joinPaths);
-                this.dboDefinition += `  ${TSTableHandlerName}: TableHandler<${TSTableDataName}> \n`;
+                // this.dboDefinition  += `  ${TSTableHandlerName}: TableHandler<${TSTableDataName}> \n`;
             }
-            allDataDefs += `export type ${TSTableDataName} = { \n` +
-                this.dbo[tov.name].tsColumnDefs.map(str => `  ` + str).join("\n") +
-                `\n}\n`;
+            // allDataDefs += `export type ${TSTableDataName} = { \n` + 
+            //     (this.dbo[tov.name] as ViewHandler).tsColumnDefs.map(str => `  ` + str).join("\n") +
+            //     `\n}\n`;
             // this.dboDefinition += ` ${escapeTSNames(tov.name, false)}: ${(this.dbo[tov.name] as TableHandler).tsDboName};\n`;
             if (this.joinPaths && this.joinPaths.find(jp => [jp.t1, jp.t2].includes(tov.name))) {
                 let table = tov.name;
-                joinTableNames.push(table);
+                // joinTableNames.push(table);
                 const makeJoin = (isLeft = true, filter, select, options) => {
                     return {
                         [isLeft ? "$leftJoin" : "$innerJoin"]: table,
@@ -2460,19 +2452,17 @@ export type TxCB = {
                 };
             }
         });
-        i18nDef += "  }> \n";
-        i18nDef += "} \n";
-        let joinBuilderDef = "";
-        if (joinTableNames.length) {
-            joinBuilderDef += "export type JoinMakerTables = {\n";
-            joinTableNames.map(tname => {
-                joinBuilderDef += ` ${escapeTSNames(tname)}: JoinMaker<${snakify(tname, true)}>;\n`;
-            });
-            joinBuilderDef += "};\n";
-            ["leftJoin", "innerJoin", "leftJoinOne", "innerJoinOne"].map(joinType => {
-                this.dboDefinition += `  ${joinType}: JoinMakerTables;\n`;
-            });
-        }
+        // let joinBuilderDef = "";
+        // if(joinTableNames.length){
+        //     joinBuilderDef += "export type JoinMakerTables = {\n";
+        //     joinTableNames.map(tname => {
+        //         joinBuilderDef += ` ${escapeTSNames(tname)}: JoinMaker<${snakify(tname, true)}>;\n`
+        //     })
+        //     joinBuilderDef += "};\n";
+        //     ["leftJoin", "innerJoin", "leftJoinOne", "innerJoinOne"].map(joinType => {
+        //         this.dboDefinition += `  ${joinType}: JoinMakerTables;\n`;
+        //     });
+        // }
         if (this.prostgles.opts.transactions) {
             let txKey = "tx";
             if (typeof this.prostgles.opts.transactions === "string")
@@ -2574,13 +2564,13 @@ export type TxCB = {
         }
         this.dboDefinition += "};\n";
         this.tsTypesDefinition = [
-            common_types,
+            // common_types, 
             `/* SCHEMA DEFINITON. Table names have been altered to work with Typescript */`,
-            allDataDefs,
-            joinBuilderDef,
+            // allDataDefs, 
+            // joinBuilderDef,
             `/* DBO Definition. Isomorphic */`,
             this.dboDefinition,
-            i18nDef,
+            (0, DBSchemaBuilder_1.getDBSchema)(this)
         ].join("\n");
         return this.dbo;
         // let dbo = makeDBO(db, allTablesViews, pubSubManager, true);

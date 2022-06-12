@@ -1,6 +1,7 @@
-import { AnyObject, AuthGuardLocation, AuthGuardLocationResponse, CHANNELS } from "prostgles-types";
+import { AnyObject, AuthGuardLocation, AuthGuardLocationResponse, CHANNELS, DBSchema } from "prostgles-types";
 import { LocalParams, PRGLIOSocket } from "./DboBuilder";
-import { DB, DbHandler, Prostgles } from "./Prostgles";
+import { DBOFullyTyped } from "./DBSchemaBuilder";
+import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
 type Awaitable<T> = T | Promise<T>;
 type AuthSocketSchema = {
   user?: AnyObject;
@@ -35,7 +36,7 @@ export type BasicSession = {
 
 };
 export type AuthClientRequest = { socket: any } | { httpReq: ExpressReq }
-export type Auth<DBO = DbHandler> = {
+export type Auth<S extends DBSchema = any> = {
   /**
    * Name of the cookie or socket hadnshake query param that represents the session id. 
    * Defaults to "session_id"
@@ -98,12 +99,12 @@ export type Auth<DBO = DbHandler> = {
       /**
        * Used in creating a session/logging in using a magic link
        */
-      check: (magicId: string, dbo: DBO, db: DB) => Awaitable<BasicSession | undefined>;
+      check: (magicId: string, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession | undefined>;
     }
 
   }
 
-  getUser: (sid: string | undefined, dbo: DBO, db: DB, client: AuthClientRequest) => Awaitable<{
+  getUser: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB, client: AuthClientRequest) => Awaitable<{
 
     /**
      * User data used on server. Mainly used in http request auth
@@ -117,15 +118,15 @@ export type Auth<DBO = DbHandler> = {
 
   } | undefined>;
 
-  register?: (params: AnyObject, dbo: DBO, db: DB) => Awaitable<BasicSession> | BasicSession;
-  login?: (params: AnyObject, dbo: DBO, db: DB) => Awaitable<BasicSession> | BasicSession;
-  logout?: (sid: string | undefined, dbo: DBO, db: DB) => Awaitable<any>;
+  register?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession> | BasicSession;
+  login?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession> | BasicSession;
+  logout?: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<any>;
 
   /**
    * If provided then then session info will be saved on socket.__prglCache and reused from there
    */
   cacheSession?: {
-    getSession: (sid: string | undefined, dbo: DBO, db: DB) => Awaitable<BasicSession>
+    getSession: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession>
   }
 }
 
@@ -135,9 +136,9 @@ export type ClientInfo = {
   sid?: string;
 }
 
-export default class AuthHandler {
-  protected opts?: Auth;
-  dbo: DbHandler;
+export default class AuthHandler<S extends DBSchema = any> {
+  protected opts?: Auth<S>;
+  dbo: DBHandlerServer;
   db: DB;
   sidKeyName?: string;
   returnURL?: string;
@@ -146,7 +147,7 @@ export default class AuthHandler {
   logoutGetPath?: string;
 
   constructor(prostgles: Prostgles) {
-    this.opts = prostgles.opts.auth;
+    this.opts = prostgles.opts.auth as any;
     if (prostgles.opts.auth?.expressConfig) {
       this.returnURL = prostgles.opts.auth?.expressConfig?.returnURL || "returnURL";
       this.loginRoute = prostgles.opts.auth?.expressConfig?.loginRoute || "/login";
@@ -215,7 +216,7 @@ export default class AuthHandler {
     try {
       return this.throttledFunc(async () => {
 
-        return this.opts!.getUser(this.validateSid(sid), this.dbo, this.db, clientReq);
+        return this.opts!.getUser(this.validateSid(sid), this.dbo as any, this.db, clientReq);
       }, 50)
     } catch (err) {
       console.error(err);
@@ -257,7 +258,7 @@ export default class AuthHandler {
           } else {
             try {
               const session = await this.throttledFunc(async () => {
-                return check(id, this.dbo, this.db);
+                return check(id, this.dbo as any, this.db);
               });
               if (!session) {
                 res.status(404).json({ msg: "Invalid magic-link" });
@@ -401,10 +402,15 @@ export default class AuthHandler {
       const err = {
         msg: "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number } but got: " + JSON.stringify(result) 
       }
+      
+      if(!result) throw err;
       if(result && (typeof result.sid !== "string" || typeof result.expires !== "number") || !result && ![undefined, null].includes(result)) {
         throw err
       }
-      if(!result) throw "Could not login"
+      if(result && result.expires < Date.now()){
+        throw { msg: "auth.login() is returning an expired session. Can only login with a session.expires greater than Date.now()"}
+      }
+
       return result;
     }, responseThrottle);
 
@@ -551,9 +557,9 @@ export default class AuthHandler {
       ch: string;
       func: Function;
     }[] = [
-      { func: (params: any, dbo: DbHandler, db: DB) => register?.(params, dbo, db), ch: CHANNELS.REGISTER, name: "register" as keyof Omit<AuthSocketSchema, "user"> },
-      { func: (params: any, dbo: DbHandler, db: DB) => login(params), ch: CHANNELS.LOGIN, name: "login" as keyof Omit<AuthSocketSchema, "user"> },
-      { func: (params: any, dbo: DbHandler, db: DB) => logout?.(this.getSID({ socket }), dbo, db), ch: CHANNELS.LOGOUT, name: "logout"  as keyof Omit<AuthSocketSchema, "user">}
+      { func: (params: any, dbo: any, db: DB) => register?.(params, dbo, db), ch: CHANNELS.REGISTER, name: "register" as keyof Omit<AuthSocketSchema, "user"> },
+      { func: (params: any, dbo: any, db: DB) => login(params), ch: CHANNELS.LOGIN, name: "login" as keyof Omit<AuthSocketSchema, "user"> },
+      { func: (params: any, dbo: any, db: DB) => logout?.(this.getSID({ socket }), dbo, db), ch: CHANNELS.LOGOUT, name: "logout"  as keyof Omit<AuthSocketSchema, "user">}
     ].filter(h => h.func);
 
     const usrData = await this.getClientInfo({ socket });

@@ -5,16 +5,17 @@
 
 import { PostgresNotifListenManager } from "./PostgresNotifListenManager";
 import { get } from "./utils";
-import { TableOrViewInfo, TableInfo, DbHandler, TableHandler, DboBuilder, PRGLIOSocket } from "./DboBuilder";
-import { TableRule, DB, isSuperUser } from "./Prostgles";
+import { TableOrViewInfo, TableInfo, DBHandlerServer, TableHandler, DboBuilder, PRGLIOSocket } from "./DboBuilder";
+import { DB, isSuperUser } from "./Prostgles";
 
 import * as Bluebird from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg from 'pg-promise/typescript/pg-subset';
 
-import { SelectParamsBasic as SelectParams, OrderBy, FieldFilter, asName, WAL, isEmpty, AnyObject, getKeys } from "prostgles-types";
+import { SelectParams, FieldFilter, asName, WAL, isEmpty, AnyObject, getKeys } from "prostgles-types";
 
 import { ClientExpressData, syncData } from "./SyncReplication";
+import { TableRule } from "./PublishParser";
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 let pgp: PGP = pgPromise({
@@ -90,7 +91,7 @@ type AddSubscriptionParams = SubscriptionParams & {
 export type PubSubManagerOptions = {
   dboBuilder: DboBuilder;
   db: DB;
-  dbo: DbHandler;
+  dbo: DBHandlerServer;
   wsChannelNamePrefix?: string;
   pgChannelName?: string;
   onSchemaChange?: (event: { command: string; query: string }) => void;
@@ -101,7 +102,7 @@ export class PubSubManager {
 
   dboBuilder: DboBuilder;
   db: DB;
-  dbo: DbHandler;
+  dbo: DBHandlerServer;
   _triggers?: Record<string, string[]>;
   sockets: any;
   subs: { [ke: string]: { [ke: string]: { subs: SubscriptionParams[] } } };

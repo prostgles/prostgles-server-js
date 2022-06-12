@@ -1,6 +1,6 @@
 import { Filter, LocalParams, TableHandler } from "./DboBuilder";
-import { TableRule } from "./Prostgles";
-import { SelectParamsBasic as SelectParams, FieldFilter, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE } from "prostgles-types";
+import { TableRule } from "./PublishParser";
+import { SelectParams, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, Select } from "prostgles-types";
 export declare type SelectItem = {
     type: "column" | "function" | "aggregation" | "joinedColumn" | "computed";
     getFields: (args?: any[]) => string[] | "*";
@@ -114,9 +114,25 @@ export declare class SelectItemBuilder {
     private addItem;
     private addFunction;
     addColumn: (fieldName: string, selected: boolean) => void;
-    parseUserSelect: (userSelect: FieldFilter, joinParse?: ((key: string, val: any, throwErr: (msg: string) => any) => any) | undefined) => Promise<never[] | undefined>;
+    parseUserSelect: (userSelect: Select, joinParse?: ((key: string, val: any, throwErr: (msg: string) => any) => any) | undefined) => Promise<never[] | undefined>;
 }
-export declare function getNewQuery(_this: TableHandler, filter: Filter, selectParams: (SelectParams & {
+export declare function getNewQuery(_this: TableHandler, filter: Filter, selectParams: ({
+    limit?: number | undefined;
+    offset?: number | undefined;
+    groupBy?: boolean | undefined;
+    returnType?: "values" | "row" | "value" | undefined;
+} & {
+    select?: import("prostgles-types").AnyObject | ("" | "*") | {
+        [key: string]: string | true | 1 | Record<string, any[]>;
+    } | {
+        [x: string]: string | true | 1 | Record<string, any[]>;
+    } | {
+        [x: string]: false | 0;
+    } | {
+        [x: string]: false | 0;
+    } | undefined;
+    orderBy?: import("prostgles-types").OrderBy<any> | undefined;
+} & {
     alias?: string | undefined;
 }) | undefined, param3_unused: null | undefined, tableRules: TableRule | undefined, localParams: LocalParams | undefined, columns: ColumnInfo[]): Promise<NewQuery>;
 export declare function makeQuery(_this: TableHandler, q: NewQuery, depth?: number, joinFields?: string[], selectParams?: SelectParams): string;

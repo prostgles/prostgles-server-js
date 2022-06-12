@@ -1,9 +1,10 @@
 /// <reference types="node" />
 import { PostgresNotifListenManager } from "./PostgresNotifListenManager";
-import { TableOrViewInfo, TableInfo, DbHandler, DboBuilder, PRGLIOSocket } from "./DboBuilder";
-import { TableRule, DB } from "./Prostgles";
-import { SelectParamsBasic as SelectParams, FieldFilter, WAL, AnyObject } from "prostgles-types";
+import { TableOrViewInfo, TableInfo, DBHandlerServer, DboBuilder, PRGLIOSocket } from "./DboBuilder";
+import { DB } from "./Prostgles";
+import { SelectParams, FieldFilter, WAL, AnyObject } from "prostgles-types";
 import { ClientExpressData } from "./SyncReplication";
+import { TableRule } from "./PublishParser";
 export declare const asValue: (v: any) => string;
 export declare const DEFAULT_SYNC_BATCH_SIZE = 50;
 export declare const log: (...args: any[]) => void;
@@ -63,7 +64,7 @@ declare type AddSubscriptionParams = SubscriptionParams & {
 export declare type PubSubManagerOptions = {
     dboBuilder: DboBuilder;
     db: DB;
-    dbo: DbHandler;
+    dbo: DBHandlerServer;
     wsChannelNamePrefix?: string;
     pgChannelName?: string;
     onSchemaChange?: (event: {
@@ -75,7 +76,7 @@ export declare class PubSubManager {
     static DELIMITER: string;
     dboBuilder: DboBuilder;
     db: DB;
-    dbo: DbHandler;
+    dbo: DBHandlerServer;
     _triggers?: Record<string, string[]>;
     sockets: any;
     subs: {

@@ -1,6 +1,6 @@
 import { strict as assert } from 'assert';
 
-import { DbHandler} from "../dist/Prostgles";
+import { DBHandlerServer} from "../dist/Prostgles";
 import { DBHandlerClient } from "./client/index";
 import * as fs from "fs";
 
@@ -29,7 +29,7 @@ export function tryRunP(desc: string, func: (resolve: any, reject: any) => any, 
   });
 }
 
-export default async function isomorphic(db: Partial<DbHandler> | Partial<DBHandlerClient>) {
+export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<DBHandlerClient>) {
   console.log("Starting isomorphic queries");
 
   if(await db.items.count()){

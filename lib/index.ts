@@ -1,11 +1,12 @@
 import { Prostgles, ProstglesInitOptions } from "./Prostgles";
-import { DbHandler, TableHandler, ViewHandler } from "./DboBuilder";
+import { DBSchema } from "prostgles-types";
 
-function prostgles<DBObj = DbHandler>(params: ProstglesInitOptions<DBObj>){
+function prostgles<S extends DBSchema = any>(params: ProstglesInitOptions<S>){
 
-    let prgl = new Prostgles<DBObj>(params as any);
+    let prgl = new Prostgles<S>(params as any);
     return prgl.init(params.onReady);
 }
+export = prostgles;//{ , TableHandler, ViewHandler };
 
 
 // declare const init (params: InitOptions) => {
@@ -13,7 +14,6 @@ function prostgles<DBObj = DbHandler>(params: ProstglesInitOptions<DBObj>){
 //     prgl.init(params.isReady);
 // }
 
-export = prostgles;//{ , TableHandler, ViewHandler };
 
 
 

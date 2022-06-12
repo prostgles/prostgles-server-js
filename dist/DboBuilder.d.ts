@@ -14,21 +14,20 @@ export declare type Media = {
     "original_name"?: string;
     "etag"?: string;
 };
-export interface TxHandler {
-    [key: string]: TableHandler | ViewHandler;
-}
-export declare type TxCB = {
-    (t: TxHandler, _t: pgPromise.ITask<{}>): (any | void);
+export declare type TxHandler = TablesAndViewHandlers;
+export declare type TxCB<DBO extends TablesAndViewHandlers = TablesAndViewHandlers> = {
+    (t: DBO, _t: pgPromise.ITask<{}>): (any | void);
 };
-export declare type TX = {
-    (t: TxCB): Promise<(any | void)>;
+export declare type TX<DBO extends TablesAndViewHandlers = TablesAndViewHandlers> = {
+    (t: TxCB<DBO>): Promise<(any | void)>;
 };
-export declare type DbHandler = {
-    [key: string]: Partial<TableHandler>;
-} & DbJoinMaker & {
+declare type TablesAndViewHandlers = {
+    [key: string]: Partial<TableHandler> | TableHandler;
+};
+export declare type DBHandlerServer<DBO extends TablesAndViewHandlers = TablesAndViewHandlers> = TablesAndViewHandlers & DbJoinMaker & {
     sql?: SQLHandler;
 } & {
-    tx?: TX;
+    tx?: TX<DBO>;
 };
 export declare const getUpdateFilter: (args: {
     filter?: AnyObject;
@@ -36,7 +35,8 @@ export declare const getUpdateFilter: (args: {
     $and_key: string;
 }) => AnyObject;
 import { SelectItem, FieldSpec } from "./QueryBuilder";
-import { DB, TableRule, UpdateRule, Join, Prostgles, PublishParser, ValidateRow } from "./Prostgles";
+import { Join, Prostgles, DB } from "./Prostgles";
+import { TableRule, UpdateRule, PublishParser, ValidateRow, PublishAllOrNothing } from "./PublishParser";
 import { PubSubManager, BasicCallback } from "./PubSubManager";
 declare type PGP = pgPromise.IMain<{}, pg.IClient>;
 export declare const pgp: PGP;
@@ -84,13 +84,14 @@ export declare type LocalParams = {
     testRule?: boolean;
     tableAlias?: string;
     dbTX?: TxHandler;
-    localDBTX?: DbHandler;
+    localDBTX?: DBHandlerServer;
     returnQuery?: boolean;
     nestedJoin?: {
         depth: number;
         data: AnyObject;
     };
 };
+export declare function escapeTSNames(str: string, capitalize?: boolean): string;
 export declare type Aggregation = {
     field: string;
     query: string;
@@ -135,11 +136,11 @@ export declare type CommonTableRules = {
     /**
      * True by default. Allows clients to get column information on any columns that are allowed in (select, insert, update) field rules.
      */
-    getColumns?: boolean;
+    getColumns?: PublishAllOrNothing;
     /**
      * True by default. Allows clients to get table information (oid, comment, label, has_media).
      */
-    getInfo?: boolean | null;
+    getInfo?: PublishAllOrNothing;
 };
 export declare type ValidatedTableRules = CommonTableRules & {
     allColumns: FieldSpec[];
@@ -234,9 +235,9 @@ export declare class ViewHandler {
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: never, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
     count(filter?: Filter, param2_unused?: never, param3_unused?: never, table_rules?: TableRule, localParams?: any): Promise<number>;
     size(filter?: Filter, selectParams?: SelectParams, param3_unused?: never, table_rules?: TableRule, localParams?: any): Promise<string>;
-    getAllowedSelectFields(selectParams: FieldFilter | undefined, allowed_cols: FieldFilter, allow_empty?: boolean): string[];
-    prepareColumnSet(selectParams: FieldFilter | undefined, allowed_cols: FieldFilter, allow_empty?: boolean, onlyNames?: boolean): string | pgPromise.ColumnSet;
-    prepareSelect(selectParams: FieldFilter | undefined, allowed_cols: FieldFilter, allow_empty?: boolean, tableAlias?: string): string;
+    getAllowedSelectFields(selectParams: FieldFilter<AnyObject> | undefined, allowed_cols: FieldFilter, allow_empty?: boolean): string[];
+    prepareColumnSet(selectParams: FieldFilter<AnyObject> | undefined, allowed_cols: FieldFilter, allow_empty?: boolean, onlyNames?: boolean): string | pgPromise.ColumnSet;
+    prepareSelect(selectParams: FieldFilter<AnyObject> | undefined, allowed_cols: FieldFilter, allow_empty?: boolean, tableAlias?: string): string;
     prepareHaving(params: {
         having: Filter;
         select: SelectItem[];
@@ -295,7 +296,7 @@ export declare class ViewHandler {
     * @param {FieldFilter} fieldParams - { col1: 0, col2: 0 } | { col1: true, col2: true } | "*" | ["key1", "key2"] | []
     * @param {boolean} allow_empty - allow empty select. defaults to true
     */
-    static _parseFieldFilter(fieldParams: FieldFilter | undefined, allow_empty: boolean | undefined, all_cols: string[]): string[];
+    static _parseFieldFilter(fieldParams: FieldFilter<AnyObject> | undefined, allow_empty: boolean | undefined, all_cols: string[]): string[];
 }
 declare type ValidatedParams = {
     row: AnyObject;
@@ -338,7 +339,7 @@ export declare class TableHandler extends ViewHandler {
     };
     private insertDataParse;
     insert(rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: never, tableRules?: TableRule, _localParams?: LocalParams): Promise<any | any[] | boolean>;
-    prepareReturning: (returning: Select<AnyObject>, allowedFields: string[]) => Promise<SelectItem[]>;
+    prepareReturning: (returning: Select | undefined, allowedFields: string[]) => Promise<SelectItem[]>;
     makeReturnQuery(items?: SelectItem[]): string;
     delete(filter?: Filter, params?: DeleteParams, param3_unused?: never, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
     remove(filter: Filter, params?: UpdateParams, param3_unused?: never, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
@@ -358,7 +359,7 @@ export declare class DboBuilder {
     constraints?: PGConstraint[];
     db: DB;
     schema: string;
-    dbo: DbHandler;
+    dbo: DBHandlerServer;
     _pubSubManager?: PubSubManager;
     getPubSubManager: () => Promise<PubSubManager>;
     pojoDefinitions?: string[];
@@ -381,7 +382,7 @@ export declare class DboBuilder {
     getJoinPaths(): JoinPaths;
     parseJoins(): Promise<JoinPaths>;
     buildJoinPaths(): void;
-    build(): Promise<DbHandler>;
+    build(): Promise<DBHandlerServer>;
     getTX: (cb: TxCB) => Promise<any>;
 }
 export declare type TableSchema = {
