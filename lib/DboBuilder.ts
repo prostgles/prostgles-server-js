@@ -51,7 +51,7 @@ export type TX<DBO extends TablesAndViewHandlers = TablesAndViewHandlers> = {
 }
 
 type TablesAndViewHandlers = {
-    [key: string]: Partial<TableHandler> | TableHandler;
+    [key: string]: Partial<TableHandler>;
 }
 export type DBHandlerServer<DBO extends TablesAndViewHandlers = TablesAndViewHandlers>= 
   TablesAndViewHandlers & 

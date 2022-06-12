@@ -22,7 +22,7 @@ export declare type TX<DBO extends TablesAndViewHandlers = TablesAndViewHandlers
     (t: TxCB<DBO>): Promise<(any | void)>;
 };
 declare type TablesAndViewHandlers = {
-    [key: string]: Partial<TableHandler> | TableHandler;
+    [key: string]: Partial<TableHandler>;
 };
 export declare type DBHandlerServer<DBO extends TablesAndViewHandlers = TablesAndViewHandlers> = TablesAndViewHandlers & DbJoinMaker & {
     sql?: SQLHandler;

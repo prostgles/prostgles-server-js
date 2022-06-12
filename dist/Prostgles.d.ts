@@ -175,7 +175,7 @@ export declare class Prostgles<S extends DBSchema = any> {
     private getFileText;
     writeDBSchema(force?: boolean): void;
     refreshDBO: () => Promise<DBHandlerServer<{
-        [key: string]: import("./DboBuilder").TableHandler | Partial<import("./DboBuilder").TableHandler>;
+        [key: string]: Partial<import("./DboBuilder").TableHandler>;
     }> | undefined>;
     isSuperUser: boolean;
     schema_checkIntervalMillis: any;
