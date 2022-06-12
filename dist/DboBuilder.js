@@ -2042,7 +2042,7 @@ class TableHandler extends ViewHandler {
             filter = filter || {};
             this.checkFilter(filter);
             // table_rules = table_rules || {};
-            let forcedFilter = {}, filterFields = "*", returningFields = "*";
+            let forcedFilter = {}, filterFields = "*", returningFields = "*", validate;
             const { testRule = false, returnQuery = false } = localParams || {};
             if (table_rules) {
                 if (!table_rules.delete)
@@ -2050,6 +2050,7 @@ class TableHandler extends ViewHandler {
                 forcedFilter = table_rules.delete.forcedFilter;
                 filterFields = table_rules.delete.filterFields;
                 returningFields = table_rules.delete.returningFields;
+                validate = table_rules.delete.validate;
                 if (!returningFields)
                     returningFields = (0, utils_1.get)(table_rules, "select.fields");
                 if (!returningFields)
@@ -2077,6 +2078,10 @@ class TableHandler extends ViewHandler {
                 localParams,
                 tableRule: table_rules
             }));
+            if (validate) {
+                const _filter = (0, exports.getUpdateFilter)({ filter, forcedFilter, $and_key: this.dboBuilder.prostgles.keywords.$and });
+                await validate(_filter);
+            }
             if (returning) {
                 queryType = "any";
                 if (!returningFields) {

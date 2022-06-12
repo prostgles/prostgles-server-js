@@ -79,7 +79,7 @@ import {
     Join, Prostgles, DB
 } from "./Prostgles";
 import { 
- TableRule, UpdateRule, SyncRule, PublishParser, ValidateRow, ValidateUpdateRow, PublishAllOrNothing, PublishParams 
+ TableRule, UpdateRule, SyncRule, PublishParser, ValidateRow, ValidateUpdateRow, PublishAllOrNothing, PublishParams, DeleteRule 
 } from "./PublishParser";
 import { PubSubManager, asValue, BasicCallback, pickKeys, omitKeys } from "./PubSubManager";
 
@@ -2713,7 +2713,8 @@ export class TableHandler extends ViewHandler {
 
             let forcedFilter: AnyObject | undefined = {},
                 filterFields: FieldFilter | undefined = "*",
-                returningFields: FieldFilter | undefined = "*";
+                returningFields: FieldFilter | undefined = "*",
+                validate: DeleteRule["validate"];
 
             const { testRule = false, returnQuery = false } = localParams || {};
             if(table_rules){
@@ -2721,6 +2722,7 @@ export class TableHandler extends ViewHandler {
                 forcedFilter = table_rules.delete.forcedFilter;
                 filterFields = table_rules.delete.filterFields;
                 returningFields = table_rules.delete.returningFields;
+                validate = table_rules.delete.validate;
 
                 if(!returningFields) returningFields = get(table_rules, "select.fields");
                 if(!returningFields) returningFields = get(table_rules, "delete.filterFields");
@@ -2751,6 +2753,10 @@ export class TableHandler extends ViewHandler {
                 localParams, 
                 tableRule: table_rules
             }));
+            if(validate){
+                const _filter = getUpdateFilter({ filter, forcedFilter, $and_key: this.dboBuilder.prostgles.keywords.$and });
+                await validate(_filter);
+            }
 
             if(returning){
                 queryType = "any";

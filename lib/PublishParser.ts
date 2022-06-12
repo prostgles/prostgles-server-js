@@ -242,7 +242,7 @@ export type DeleteRule<Cols extends AnyObject = AnyObject> = {
     /**
      * Fields user can filter by
      */
-    filterFields?: SelectRule<Cols>["filterFields"]
+    filterFields: FieldFilter<Cols>;
 
     /**
      * Fields user can view after deleting
@@ -252,7 +252,7 @@ export type DeleteRule<Cols extends AnyObject = AnyObject> = {
     /**
      * Validation logic to check/update data for each request
      */
-    validate?(...args: any[]): UpdateRequestData<Cols>;
+    validate?(...args: any[]): Awaitable<void>;// UpdateRequestData<Cols>;
 }
 export type SyncRule<Cols extends AnyObject = AnyObject> = {
     

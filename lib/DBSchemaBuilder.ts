@@ -8,18 +8,19 @@ import { PublishAllOrNothing, PublishParams, PublishTableRule, PublishViewRule, 
 export const getDBSchema = (dboBuilder: DboBuilder): string => {
   let tables: string[] = [];
 
+  
   /** Tables and columns are sorted to avoid infinite loops due to changing order */
   dboBuilder.tablesOrViews?.slice(0).sort((a, b) => a.name.localeCompare(b.name)).forEach(tov => {
     const cols = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
 tables.push(`${escapeTSNames(tov.name)}: {
     is_view: ${tov.is_view};
-    select: ${tov.privileges.select}
-    insert: ${tov.privileges.insert}
-    update: ${tov.privileges.update}
-    delete: ${tov.privileges.delete}
+    select: ${tov.privileges.select};
+    insert: ${tov.privileges.insert};
+    update: ${tov.privileges.update};
+    delete: ${tov.privileges.delete};
     columns: {${cols.map(c => `
       ${escapeTSNames(c.name)}${c.is_nullable || c.has_default? "?" : ""}: ${postgresToTsType(c.udt_name)}${c.is_nullable? " | null" : ""}`).join(";")}
-    }
+    };
   };\n  `)
   })
 return `
@@ -130,7 +131,10 @@ const publish = (): PublishFullyTyped<S> => {
       }
     },
     tbl2: {
-      delete: {forcedFilter: {col1: 2}}
+      delete: {
+        filterFields: "*" as "*",
+        forcedFilter: {col1: 2}
+      }
     }
   }
   const res: PublishFullyTyped<S> = {
@@ -146,7 +150,10 @@ const publish = (): PublishFullyTyped<S> => {
       }
     },
     tbl2: {
-      delete: {forcedFilter: { col1: 2 }}
+      delete: {
+        filterFields: "*" as "*",
+        forcedFilter: { col1: 2 }
+      }
     }
   }
   const res1: PublishFullyTyped = r

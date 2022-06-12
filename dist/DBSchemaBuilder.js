@@ -10,13 +10,13 @@ const getDBSchema = (dboBuilder) => {
         const cols = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
         tables.push(`${(0, DboBuilder_1.escapeTSNames)(tov.name)}: {
     is_view: ${tov.is_view};
-    select: ${tov.privileges.select}
-    insert: ${tov.privileges.insert}
-    update: ${tov.privileges.update}
-    delete: ${tov.privileges.delete}
+    select: ${tov.privileges.select};
+    insert: ${tov.privileges.insert};
+    update: ${tov.privileges.update};
+    delete: ${tov.privileges.delete};
     columns: {${cols.map(c => `
       ${(0, DboBuilder_1.escapeTSNames)(c.name)}${c.is_nullable || c.has_default ? "?" : ""}: ${(0, DboBuilder_1.postgresToTsType)(c.udt_name)}${c.is_nullable ? " | null" : ""}`).join(";")}
-    }
+    };
   };\n  `);
     });
     return `
@@ -73,7 +73,10 @@ const publish = () => {
             }
         },
         tbl2: {
-            delete: { forcedFilter: { col1: 2 } }
+            delete: {
+                filterFields: "*",
+                forcedFilter: { col1: 2 }
+            }
         }
     };
     const res = {
@@ -89,7 +92,10 @@ const publish = () => {
             }
         },
         tbl2: {
-            delete: { forcedFilter: { col1: 2 } }
+            delete: {
+                filterFields: "*",
+                forcedFilter: { col1: 2 }
+            }
         }
     };
     const res1 = r;
