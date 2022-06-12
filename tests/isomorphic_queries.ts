@@ -457,7 +457,7 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
     assert.deepStrictEqual(MonAgg, [{ added: "Dec", public: '2' }]);
 
     // Returning
-    const returningParam = { returning: { id: 1, name: 1, public: 1 , $rowhash: 1, added_day: { "$day": ["added"] } }} ;  //   ctid: 1,
+    const returningParam: Parameters<typeof db.items4_pub.insert>[1] = { returning: { id: 1, name: 1, public: 1 , $rowhash: 1, added_day: { "$day": ["added"] } }} ;  //   ctid: 1,
     let i = await db.items4_pub.insert( { name: "abc123", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') }, returningParam);
     assert.deepStrictEqual(i, { id: 1,  name: 'abc123', public: 'public data', $rowhash: '347c26babad535aa697a794af89195fe', added_day: 'monday'  }); //  , ctid: '(0,1)'
   

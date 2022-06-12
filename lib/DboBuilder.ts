@@ -60,7 +60,7 @@ export type DBHandlerServer<DBO extends TablesAndViewHandlers = TablesAndViewHan
   } & {
     tx?: TX<DBO>
   }
-  
+
 export const getUpdateFilter = (args: { filter?: AnyObject; forcedFilter?: AnyObject; $and_key: string }): AnyObject => {
     const { filter, forcedFilter, $and_key } = args;
     let result = { ...filter };
@@ -79,7 +79,7 @@ import {
     Join, Prostgles, DB
 } from "./Prostgles";
 import { 
- TableRule, UpdateRule, SyncRule, PublishParser, ValidateRow, ValidateUpdateRow, PublishAllOrNothing 
+ TableRule, UpdateRule, SyncRule, PublishParser, ValidateRow, ValidateUpdateRow, PublishAllOrNothing, PublishParams 
 } from "./PublishParser";
 import { PubSubManager, asValue, BasicCallback, pickKeys, omitKeys } from "./PubSubManager";
 
@@ -2901,7 +2901,7 @@ export class TableHandler extends ViewHandler {
 
 import { JOIN_TYPES } from "./Prostgles";
 import { BasicSession } from "./AuthHandler";
-import { getDBSchema } from "./DBSchemaBuilder";
+import { DBOFullyTyped, getDBSchema } from "./DBSchemaBuilder";
 
 export class DboBuilder {
     tablesOrViews?: TableSchema[];   //TableSchema           TableOrViewInfo
@@ -3330,7 +3330,7 @@ export class DboBuilder {
             // joinBuilderDef,
             
             `/* DBO Definition. Isomorphic */`,
-            this.dboDefinition,
+            // this.dboDefinition,
             getDBSchema(this)
         ].join("\n");
 

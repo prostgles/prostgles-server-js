@@ -3,9 +3,6 @@
 
  /* SCHEMA DEFINITON. Table names have been altered to work with Typescript */
 /* DBO Definition. Isomorphic */
-undefined tx: (t: TxCB) => Promise<any | void> ;
-};
-
 
 type DBSchema = {
   "\"*\"": {

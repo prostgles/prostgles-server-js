@@ -10,6 +10,7 @@
 		// "rootDir": ".",
 		// "declaration": true,
 		// "declarationMap": true,
+		"keyofStringsOnly": true
 	},
 	"exclude": [
 		"dist"

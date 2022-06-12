@@ -2569,7 +2569,7 @@ class DboBuilder {
             // allDataDefs, 
             // joinBuilderDef,
             `/* DBO Definition. Isomorphic */`,
-            this.dboDefinition,
+            // this.dboDefinition,
             (0, DBSchemaBuilder_1.getDBSchema)(this)
         ].join("\n");
         return this.dbo;

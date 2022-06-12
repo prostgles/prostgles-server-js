@@ -30,6 +30,12 @@ const ccc = {
     col1: "",
     col2: 22
 };
+/** Type checks */
+(() => {
+    const ddb = 1;
+    ddb.dwad.insert;
+    ddb.dwad.delete;
+});
 /** Test the created schema */
 const c = 1;
 const test = c;
