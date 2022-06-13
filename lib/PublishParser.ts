@@ -130,7 +130,7 @@ export type ValidateRow<R extends AnyObject = AnyObject> = (row: R) => R | Promi
 export type ValidateUpdateRow<R extends AnyObject = AnyObject> = (args: { update: Partial<R>, filter: FullFilter<R> }) => R | Promise<R>;
 
 
-export type SelectRule<Cols extends AnyObject = AnyObject> = {
+export type SelectRule<Cols extends AnyObject = AnyObject, S = void> = {
 
     /**
      * Fields allowed to be selected.   Tip: Use false to exclude field
@@ -145,7 +145,7 @@ export type SelectRule<Cols extends AnyObject = AnyObject> = {
     /**
      * Filter added to every query (e.g. user_id) to restrict access
      */
-    forcedFilter?: FullFilter<Cols>;
+    forcedFilter?: FullFilter<Cols, S>;
 
     /**
      * Fields user can filter by 
@@ -185,7 +185,7 @@ export type InsertRule<Cols extends AnyObject = AnyObject> = {
      */
     validate?: InsertRule<Cols>["preValidate"]
 }
-export type UpdateRule<Cols extends AnyObject = AnyObject> = {
+export type UpdateRule<Cols extends AnyObject = AnyObject, S = void> = {
 
     /**
      * Fields allowed to be updated.   Tip: Use false/0 to exclude field
@@ -200,7 +200,7 @@ export type UpdateRule<Cols extends AnyObject = AnyObject> = {
      * Specify in decreasing order of specificity otherwise a more general filter will match first
      */
     dynamicFields?: {
-      filter: SelectRule<Cols>["forcedFilter"]
+      filter: SelectRule<Cols, S>["forcedFilter"]
       fields: SelectRule<Cols>["fields"]
     }[];
 
@@ -208,7 +208,7 @@ export type UpdateRule<Cols extends AnyObject = AnyObject> = {
      * Filter added to every query (e.g. user_id) to restrict access
      * This filter cannot be updated
      */
-    forcedFilter?: SelectRule<Cols>["forcedFilter"]
+    forcedFilter?: SelectRule<Cols, S>["forcedFilter"]
 
     /**
      * Data to include/overwrite on each updatDBe
@@ -232,12 +232,12 @@ export type UpdateRule<Cols extends AnyObject = AnyObject> = {
 
 };
 
-export type DeleteRule<Cols extends AnyObject = AnyObject> = {
+export type DeleteRule<Cols extends AnyObject = AnyObject, S = void> = {
     
     /**
      * Filter added to every query (e.g. user_id) to restrict access
      */
-    forcedFilter?: SelectRule<Cols>["forcedFilter"]
+    forcedFilter?: SelectRule<Cols, S>["forcedFilter"]
 
     /**
      * Fields user can filter by
@@ -298,16 +298,16 @@ export type TableRule<S = AnyObject> = ViewRule<S> & {
   sync?: SyncRule<S>;
   subscribe?: SubscribeRule;
 };
-export type PublishViewRule<S extends AnyObject = AnyObject> = {
-  select?: SelectRule<S> | PublishAllOrNothing
+export type PublishViewRule<Col extends AnyObject = AnyObject, S = void> = {
+  select?: SelectRule<Col, S> | PublishAllOrNothing
   getColumns?: PublishAllOrNothing;
   getInfo?: PublishAllOrNothing;
 };
-export type PublishTableRule<S extends AnyObject = AnyObject> = PublishViewRule<S> & {
-  insert?: InsertRule<S> | PublishAllOrNothing
-  update?: UpdateRule<S> | PublishAllOrNothing
-  delete?: DeleteRule<S> | PublishAllOrNothing
-  sync?: SyncRule<S>;
+export type PublishTableRule<Col extends AnyObject = AnyObject, S = void> = PublishViewRule<Col, S> & {
+  insert?: InsertRule<Col> | PublishAllOrNothing
+  update?: UpdateRule<Col, S> | PublishAllOrNothing
+  delete?: DeleteRule<Col, S> | PublishAllOrNothing
+  sync?: SyncRule<Col>;
   subscribe?: SubscribeRule | PublishAllOrNothing;
 };
 

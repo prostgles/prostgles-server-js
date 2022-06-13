@@ -10,7 +10,10 @@ export const testPublishTypes = () => {
         delete: "*",
         select: {
           fields: { h: 1, id: 1 },
-          forcedFilter: { h: { $overlaps: ["23", "32"]} }
+          forcedFilter: { $and: [
+            { h: { $overlaps: ["23", "32"]} },
+            { $existsJoined: { items: { "h.$eq": [] } } }
+          ]}
         }
       },
       items3: "*"
@@ -22,11 +25,18 @@ export const testPublishTypes = () => {
         delete: "*",
         select: {
           fields: { h: 1, id: 1 },
-          forcedFilter: { h: { $overlaps: ["23", "32"]} }
+          forcedFilter: { 
+            $and: [ 
+              { h: { $overlaps: ["23", "32"]} },
+              { $existsJoined: { items: { "h.$eq": [] } } }
+            ] 
+          }
         }
       },
       items3: "*"
     };
+    const p123: PublishFullyTyped<DBSchemaGenerated> = p11; 
+    const p1234: PublishFullyTyped = p1;
 
     const p12: PublishFullyTyped = "*";
 

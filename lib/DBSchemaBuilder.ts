@@ -107,8 +107,8 @@ export type PublishFullyTyped<Schema = void> = Schema extends DBSchema? (
       | PublishAllOrNothing 
       | (
         Schema[tov_name]["is_view"] extends true? 
-          PublishViewRule<Schema[tov_name]["columns"]> : 
-          PublishTableRule<Schema[tov_name]["columns"]>
+          PublishViewRule<Schema[tov_name]["columns"], Schema> : 
+          PublishTableRule<Schema[tov_name]["columns"], Schema>
       );
   }
 ) : (
