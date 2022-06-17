@@ -1,3 +1,4 @@
+import { AnyObject, TableInfo } from "prostgles-types";
 import { JoinInfo } from "./DboBuilder";
 import { ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE } from "./FileManager";
 import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
@@ -6,7 +7,19 @@ declare type ColExtraInfo = {
     max?: string | number;
     hint?: string;
 };
-declare type BaseTableDefinition = {
+export declare type I18N_Config<LANG_IDS> = {
+    [lang_id in keyof LANG_IDS]: string;
+};
+export declare const parseI18N: <LANG_IDS, Def extends string>(params: {
+    config?: string | I18N_Config<LANG_IDS>;
+    lang?: string | keyof LANG_IDS;
+    defaultLang: string | keyof LANG_IDS;
+    defaultValue: Def;
+}) => string | Def;
+declare type BaseTableDefinition<LANG_IDS = AnyObject> = {
+    info?: {
+        label?: string | I18N_Config<LANG_IDS>;
+    };
     dropIfExistsCascade?: boolean;
     dropIfExists?: boolean;
 };
@@ -96,7 +109,7 @@ declare type ColumnConfig<LANG_IDS = {
     en: 1;
 }> = NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn));
 declare type TableDefinition<LANG_IDS> = {
-    columns: {
+    columns?: {
         [column_name: string]: ColumnConfig<LANG_IDS>;
     };
     constraints?: {
@@ -144,18 +157,24 @@ declare type TableDefinition<LANG_IDS> = {
 export declare type TableConfig<LANG_IDS = {
     en: 1;
 }> = {
-    [table_name: string]: BaseTableDefinition & (TableDefinition<LANG_IDS> | LookupTableDefinition<LANG_IDS>);
+    [table_name: string]: BaseTableDefinition<LANG_IDS> & (TableDefinition<LANG_IDS> | LookupTableDefinition<LANG_IDS>);
 };
 /**
  * Will be run between initSQL and fileTable
  */
-export default class TableConfigurator {
-    config?: TableConfig;
+export default class TableConfigurator<LANG_IDS = {
+    en: 1;
+}> {
+    config?: TableConfig<LANG_IDS>;
     get dbo(): DBHandlerServer;
     get db(): DB;
     prostgles: Prostgles;
     constructor(prostgles: Prostgles);
     getColumnConfig: (tableName: string, colName: string) => ColumnConfig | undefined;
+    getTableInfo: (params: {
+        tableName: string;
+        lang?: string;
+    }) => TableInfo["info"] | undefined;
     getColInfo: (params: {
         col: string;
         table: string;

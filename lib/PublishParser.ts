@@ -365,7 +365,7 @@ export class PublishParser {
       if(!this.dbo || !this.publish) throw "INTERNAL ERROR: dbo and/or publish missing";
   }
 
-  async getPublishParams(localParams: LocalParams, clientInfo?: ClientInfo): Promise<PublishParams<any>> {
+  async getPublishParams(localParams: LocalParams, clientInfo?: ClientInfo): Promise<PublishParams> {
     if(!this.dbo) throw "dbo missing"
       return {
           ...(clientInfo || await this.prostgles.authHandler?.getClientInfo(localParams)),
@@ -401,7 +401,7 @@ export class PublishParser {
    * @param user 
    */
   async getPublish(localParams: LocalParams, clientInfo?: ClientInfo): Promise<PublishObject> {
-      const publishParams: PublishParams = await this.getPublishParams(localParams, clientInfo)
+      const publishParams = await this.getPublishParams(localParams, clientInfo)
       let _publish = await applyParamsIfFunc(this.publish, publishParams );
 
       if(_publish === "*"){

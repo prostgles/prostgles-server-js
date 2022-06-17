@@ -242,7 +242,7 @@ export declare class PublishParser {
     db: DB;
     prostgles: Prostgles;
     constructor(publish: any, publishMethods: any, publishRawSQL: any, dbo: DBHandlerServer, db: DB, prostgles: Prostgles);
-    getPublishParams(localParams: LocalParams, clientInfo?: ClientInfo): Promise<PublishParams<any>>;
+    getPublishParams(localParams: LocalParams, clientInfo?: ClientInfo): Promise<PublishParams>;
     getMethods(socket: any): Promise<{}>;
     /**
      * Parses the first level of publish. (If false then nothing if * then all tables and views)

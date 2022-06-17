@@ -721,7 +721,7 @@ export class ViewHandler {
         if(filter === null || filter && !isPojoObject(filter)) throw `invalid filter -> ${JSON.stringify(filter)} \nExpecting:    undefined | {} | { field_name: "value" } | { field: { $gt: 22 } } ... `;
     }
 
-    async getInfo(param1?: any, param2?: any, param3?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<TInfo>{
+    async getInfo(lang?: string, param2?: any, param3?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<TInfo>{
         const p = this.getValidatedRules(tableRules, localParams);
         if(!p.getInfo) throw "Not allowed";
 
@@ -755,10 +755,11 @@ export class ViewHandler {
                 }
             }
         }
-        
+
         return {
             oid: this.tableOrViewInfo.oid,
             comment: this.tableOrViewInfo.comment,
+            info: this.dboBuilder.prostgles?.tableConfigurator?.getTableInfo({ tableName: this.name, lang }),
             is_media: this.is_media,      // this.name === this.dboBuilder.prostgles?.opts?.fileTable?.tableName
             has_media,
             has_direct_media,

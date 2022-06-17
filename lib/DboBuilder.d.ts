@@ -223,7 +223,7 @@ export declare class ViewHandler {
     };
     getJoins(source: string, target: string, path?: string[], checkTableConfig?: boolean): JoinInfo;
     checkFilter(filter: any): void;
-    getInfo(param1?: any, param2?: any, param3?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<TInfo>;
+    getInfo(lang?: string, param2?: any, param3?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<TInfo>;
     getColumns(lang?: string, params?: {
         rule: "update";
         filter: AnyObject;
