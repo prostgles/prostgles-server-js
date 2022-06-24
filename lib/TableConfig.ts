@@ -1,5 +1,6 @@
+import { doesNotMatch } from "assert";
 import { getKeys, asName, AnyObject, TableInfo } from "prostgles-types";
-import { isPlainObject, JoinInfo } from "./DboBuilder";
+import { DboBuilder, isPlainObject, JoinInfo } from "./DboBuilder";
 import { ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE } from "./FileManager";
 import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
 import { asValue } from "./PubSubManager";
@@ -429,8 +430,11 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
         }
       }
       if ("constraints" in tableConf && tableConf.constraints) {
+        const constraints = await getTableConstraings(this.db, tableName);
         getKeys(tableConf.constraints).map(constraintName => {
-          queries.push(`ALTER TABLE ${asName(tableName)} ADD CONSTRAINT ${asName(constraintName)} ${tableConf.constraints![constraintName]} ;`);
+          if(!constraints.some(c => c.conname === constraintName)){
+            queries.push(`ALTER TABLE ${asName(tableName)} ADD CONSTRAINT ${asName(constraintName)} ${tableConf.constraints![constraintName]} ;`);
+          }
         });
       }
       if ("indexes" in tableConf && tableConf.indexes) {
@@ -461,4 +465,17 @@ async function columnExists(args: { tableName: string; colName: string; db: DB }
         WHERE table_name=${asValue(tableName)} and column_name=${asValue(colName)}
         LIMIT 1;
     `))?.column_name);
+}
+
+function getTableConstraings(db: DB, tableName: string): Promise<{ oid: number; conname: string; definition: string; }[]>{
+  return db.any(`
+    SELECT con.*, pg_get_constraintdef(con.oid)
+    FROM pg_catalog.pg_constraint con
+        INNER JOIN pg_catalog.pg_class rel
+            ON rel.oid = con.conrelid
+        INNER JOIN pg_catalog.pg_namespace nsp
+            ON nsp.oid = connamespace
+    WHERE 1=1
+    AND nsp.nspname = current_schema
+    AND rel.relname = ` + "${tableName}", { tableName })
 }

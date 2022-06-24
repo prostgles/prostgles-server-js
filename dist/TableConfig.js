@@ -222,8 +222,11 @@ class TableConfigurator {
                 }
             }
             if ("constraints" in tableConf && tableConf.constraints) {
+                const constraints = await getTableConstraings(this.db, tableName);
                 (0, prostgles_types_1.getKeys)(tableConf.constraints).map(constraintName => {
-                    queries.push(`ALTER TABLE ${(0, prostgles_types_1.asName)(tableName)} ADD CONSTRAINT ${(0, prostgles_types_1.asName)(constraintName)} ${tableConf.constraints[constraintName]} ;`);
+                    if (!constraints.some(c => c.conname === constraintName)) {
+                        queries.push(`ALTER TABLE ${(0, prostgles_types_1.asName)(tableName)} ADD CONSTRAINT ${(0, prostgles_types_1.asName)(constraintName)} ${tableConf.constraints[constraintName]} ;`);
+                    }
                 });
             }
             if ("indexes" in tableConf && tableConf.indexes) {
@@ -252,5 +255,17 @@ async function columnExists(args) {
         WHERE table_name=${(0, PubSubManager_1.asValue)(tableName)} and column_name=${(0, PubSubManager_1.asValue)(colName)}
         LIMIT 1;
     `))?.column_name);
+}
+function getTableConstraings(db, tableName) {
+    return db.any(`
+    SELECT con.*, pg_get_constraintdef(con.oid)
+    FROM pg_catalog.pg_constraint con
+        INNER JOIN pg_catalog.pg_class rel
+            ON rel.oid = con.conrelid
+        INNER JOIN pg_catalog.pg_namespace nsp
+            ON nsp.oid = connamespace
+    WHERE 1=1
+    AND nsp.nspname = current_schema
+    AND rel.relname = ` + "${tableName}", { tableName });
 }
 //# sourceMappingURL=TableConfig.js.map

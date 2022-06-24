@@ -122,10 +122,14 @@ export declare function getNewQuery(_this: TableHandler, filter: Filter, selectP
     groupBy?: boolean | undefined;
     returnType?: "values" | "row" | "value" | undefined;
 } & {
-    select?: import("prostgles-types").AnyObject | ("" | "*") | {
+    select?: import("prostgles-types").AnyObject | ("" | "*" | {
+        "*": 1;
+    }) | {
         [key: string]: string | true | 1 | Record<string, any[]>;
-    } | {
-        [x: string]: string | true | 1 | Record<string, any[]>;
+    } | ({
+        [x: string]: string | true | 1;
+    } & Record<string, Record<string, any[]>>) | {
+        [x: string]: string | true | 1;
     } | {
         [x: string]: false | 0;
     } | {
