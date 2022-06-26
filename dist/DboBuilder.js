@@ -2229,9 +2229,9 @@ class DboBuilder {
         this.getPubSubManager = async () => {
             if (!this._pubSubManager) {
                 let onSchemaChange;
-                if (this.prostgles.opts.watchSchema && this.prostgles.opts.watchSchemaType === "events") {
+                if (this.prostgles.opts.watchSchema && this.prostgles.opts.watchSchemaType === "DDL_trigger") {
                     if (!this.prostgles.isSuperUser) {
-                        console.warn(`watchSchemaType "events" cannot be used because db user is not a superuser. Will fallback to watchSchemaType "queries" `);
+                        console.warn(`watchSchemaType "events" cannot be used because db user is not a superuser. Will fallback to watchSchemaType "prostgles_queries" `);
                     }
                     else {
                         onSchemaChange = (event) => {
@@ -2251,15 +2251,17 @@ class DboBuilder {
                     console.warn(`subscribe and sync cannot be used because db user is not a superuser `);
                 }
             }
-            if (!this._pubSubManager)
+            if (!this._pubSubManager) {
+                console.trace("Could not create this._pubSubManager");
                 throw "Could not create this._pubSubManager";
+            }
             return this._pubSubManager;
         };
         this.joinPaths = [];
         this.init = async () => {
             /* If watchSchema then PubSubManager must be created */
             await this.build();
-            if (this.prostgles.opts.watchSchema) {
+            if (this.prostgles.opts.watchSchema && (this.prostgles.opts.watchSchemaType === "DDL_trigger" || !this.prostgles.opts.watchSchemaType) && this.prostgles.isSuperUser) {
                 await this.getPubSubManager();
             }
             return this;
@@ -2518,11 +2520,16 @@ class DboBuilder {
                      */
                     const { watchSchema, watchSchemaType } = this.prostgles?.opts || {};
                     if (watchSchema &&
-                        (!this.prostgles.isSuperUser || watchSchemaType === "queries") &&
-                        (["CREATE", "ALTER", "DROP"].includes(command) ||
-                            //  Cover this case: `CREATE TABLE mytable AS SELECT` 
-                            query && query.toLowerCase().replace(/\s\s+/g, ' ').includes("create table"))) {
-                        this.prostgles.onSchemaChange({ command, query });
+                        (!this.prostgles.isSuperUser || watchSchemaType === "prostgles_queries")) {
+                        if (["CREATE", "ALTER", "DROP"].includes(command)) {
+                            this.prostgles.onSchemaChange({ command, query });
+                        }
+                        else if (query) {
+                            const cleanedQuery = query.toLowerCase().replace(/\s\s+/g, ' ');
+                            if (PubSubManager_1.PubSubManager.SCHEMA_ALTERING_QUERIES.some(q => cleanedQuery.includes(q.toLowerCase()))) {
+                                this.prostgles.onSchemaChange({ command, query });
+                            }
+                        }
                     }
                     if (command === "LISTEN") {
                         if (!allowListen)

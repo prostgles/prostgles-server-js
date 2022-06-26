@@ -186,16 +186,22 @@ export type ProstglesInitOptions<S = void> = {
     watchSchemaType?: 
 
     /**
-     * Will check client queries for schema changes
+     * Will set database event trigger for schema changes. Requires superuser
      * Default
      */
-    | "events" 
+    | "DDL_trigger" 
 
     /**
-     * Will set database event trigger for schema changes. Requires superuser
+     * Will check client queries for schema changes
+     * fallback if DDL not possible
      */
-    | "queries";
+    | "prostgles_queries"
     
+    /**
+     * Schema checked for changes every 'checkIntervalMillis" milliseconds
+     */
+    | { checkIntervalMillis: number };
+
     watchSchema?: 
 
         /**
@@ -204,7 +210,7 @@ export type ProstglesInitOptions<S = void> = {
         | boolean 
 
         /**
-         * "hotReloadMode" will only rewrite the DBoGenerated.d.ts found in tsGeneratedTypesDir
+         * Will only rewrite the DBoGenerated.d.ts found in tsGeneratedTypesDir
          * This is meant to be used in development when server restarts on file change
          */
         | "hotReloadMode" 
@@ -214,10 +220,6 @@ export type ProstglesInitOptions<S = void> = {
          */
         | ((event: { command: string; query: string }) => void) 
 
-        /**
-         * Schema checked for changes every 'checkIntervalMillis" milliseconds
-         */
-        | { checkIntervalMillis: number };
     keywords?: Keywords;
     onNotice?: (notice: AnyObject, message?: string) => void;
     fileTable?: FileTableConfig;
@@ -258,7 +260,7 @@ export class Prostgles {
         onReady: () => {},
         schema: "public",
         watchSchema: false,
-        watchSchemaType: "queries",
+        watchSchemaType: "DDL_trigger",
     };
 
     // dbConnection: DbConnection = {
@@ -331,7 +333,7 @@ export class Prostgles {
     destroyed = false;
 
     async onSchemaChange(event: { command: string; query: string }){
-        const { watchSchema, onReady, tsGeneratedTypesDir } = this.opts;
+        const { watchSchema, watchSchemaType, onReady, tsGeneratedTypesDir } = this.opts;
         if(watchSchema && this.loaded){
             console.log("Schema changed");
             const { query } = event;
@@ -353,7 +355,7 @@ export class Prostgles {
                     this.writeDBSchema(true);
                 }
 
-            } else if(watchSchema === true || "checkIntervalMillis" in watchSchema){
+            } else if(watchSchema === true || isPlainObject(watchSchemaType) && "checkIntervalMillis" in watchSchemaType){
                 /* Full re-init. Sockets must reconnect */
                 console.log("watchSchema: Full re-initialisation")
                 this.init(onReady);
@@ -408,7 +410,7 @@ export class Prostgles {
     }
 
     isSuperUser = false;
-    schema_checkIntervalMillis: any;
+    schema_checkIntervalMillis?: NodeJS.Timeout;
     async init(onReady: (dbo: DBOFullyTyped, db: DB) => any): Promise<{
         db: DBOFullyTyped;
         _db: DB;
@@ -423,9 +425,9 @@ export class Prostgles {
             throw "tsGeneratedTypesDir option is needed for watchSchema: hotReloadMode to work ";
         } else if(
             this.opts.watchSchema && 
-            typeof this.opts.watchSchema === "object" && 
-            "checkIntervalMillis" in this.opts.watchSchema && 
-            typeof this.opts.watchSchema.checkIntervalMillis === "number"
+            typeof this.opts.watchSchemaType === "object" && 
+            "checkIntervalMillis" in this.opts.watchSchemaType && 
+            typeof this.opts.watchSchemaType.checkIntervalMillis === "number"
         ){
 
             if(this.schema_checkIntervalMillis){
@@ -436,7 +438,7 @@ export class Prostgles {
                         this.refreshDBO();
                         this.init(onReady);
                     }
-                }, this.opts.watchSchema.checkIntervalMillis)
+                }, this.opts.watchSchemaType.checkIntervalMillis)
             }
         }
 

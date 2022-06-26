@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import FileManager, { ImageOptions, LocalConfig, S3Config } from "./FileManager";
@@ -99,21 +100,28 @@ export declare type ProstglesInitOptions<S = void> = {
     DEBUG_MODE?: boolean;
     watchSchemaType?: 
     /**
-     * Will check client queries for schema changes
+     * Will set database event trigger for schema changes. Requires superuser
      * Default
      */
-    "events"
+    "DDL_trigger"
     /**
-     * Will set database event trigger for schema changes. Requires superuser
+     * Will check client queries for schema changes
+     * fallback if DDL not possible
      */
-     | "queries";
+     | "prostgles_queries"
+    /**
+     * Schema checked for changes every 'checkIntervalMillis" milliseconds
+     */
+     | {
+        checkIntervalMillis: number;
+    };
     watchSchema?: 
     /**
      * If true then DBoGenerated.d.ts will be updated and "onReady" will be called with new schema on both client and server
      */
     boolean
     /**
-     * "hotReloadMode" will only rewrite the DBoGenerated.d.ts found in tsGeneratedTypesDir
+     * Will only rewrite the DBoGenerated.d.ts found in tsGeneratedTypesDir
      * This is meant to be used in development when server restarts on file change
      */
      | "hotReloadMode"
@@ -123,13 +131,7 @@ export declare type ProstglesInitOptions<S = void> = {
      | ((event: {
         command: string;
         query: string;
-    }) => void)
-    /**
-     * Schema checked for changes every 'checkIntervalMillis" milliseconds
-     */
-     | {
-        checkIntervalMillis: number;
-    };
+    }) => void);
     keywords?: Keywords;
     onNotice?: (notice: AnyObject, message?: string) => void;
     fileTable?: FileTableConfig;
@@ -176,7 +178,7 @@ export declare class Prostgles {
     writeDBSchema(force?: boolean): void;
     refreshDBO: () => Promise<DBHandlerServer>;
     isSuperUser: boolean;
-    schema_checkIntervalMillis: any;
+    schema_checkIntervalMillis?: NodeJS.Timeout;
     init(onReady: (dbo: DBOFullyTyped, db: DB) => any): Promise<{
         db: DBOFullyTyped;
         _db: DB;

@@ -295,6 +295,7 @@ async function isomorphic(db) {
     });
     await tryRunP("subscribe", async (resolve, reject) => {
         await db.various.insert({ id: 99 });
+        console.log("subscribing");
         const sub = await db.various.subscribe({ id: 99 }, {}, async (items) => {
             const item = items[0];
             if (item && item.name === "zz3zz3") {

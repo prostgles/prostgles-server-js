@@ -842,12 +842,14 @@ export class PubSubManager {
     schema_watch_trigger: "prostgles_schema_watch_trigger_new"
   }
 
+  static SCHEMA_ALTERING_QUERIES = ['CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO'];
+
   static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from "
   prepareTriggers = async () => {
     // SELECT * FROM pg_catalog.pg_event_trigger WHERE evtname
     if (!this.appID) throw "prepareTriggers failed: this.appID missing";
     if (this.dboBuilder.prostgles.opts.watchSchema && !(await isSuperUser(this.db))) {
-      console.warn("prostgles watchSchema requires superuser db user. Will not watch")
+      console.warn("prostgles watchSchema requires superuser db user. Will not watch using event triggers")
     }
 
     try {

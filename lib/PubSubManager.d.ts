@@ -117,6 +117,7 @@ export declare class PubSubManager {
         schema_watch_func: string;
         schema_watch_trigger: string;
     };
+    static SCHEMA_ALTERING_QUERIES: string[];
     static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID: string;
     prepareTriggers: () => Promise<boolean>;
     isReady(): any;

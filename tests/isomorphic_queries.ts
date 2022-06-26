@@ -327,6 +327,7 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
 
   await tryRunP("subscribe", async (resolve, reject) => {
     await db.various.insert({ id: 99 });
+    console.log("subscribing")
     const sub = await db.various.subscribe({ id: 99  }, {  }, async items => {
       const item = items[0];
       

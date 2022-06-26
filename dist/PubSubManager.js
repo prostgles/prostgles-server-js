@@ -698,7 +698,7 @@ class PubSubManager {
             if (!this.appID)
                 throw "prepareTriggers failed: this.appID missing";
             if (this.dboBuilder.prostgles.opts.watchSchema && !(await (0, Prostgles_1.isSuperUser)(this.db))) {
-                console.warn("prostgles watchSchema requires superuser db user. Will not watch");
+                console.warn("prostgles watchSchema requires superuser db user. Will not watch using event triggers");
             }
             try {
                 await this.db.any(`
@@ -1355,6 +1355,7 @@ PubSubManager.create = async (options) => {
     const res = new PubSubManager(options);
     return await res.init();
 };
+PubSubManager.SCHEMA_ALTERING_QUERIES = ['CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO'];
 PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from ";
 function omitKeys(obj, exclude) {
     return pickKeys(obj, (0, prostgles_types_1.getKeys)(obj).filter(k => !exclude.includes(k)));
