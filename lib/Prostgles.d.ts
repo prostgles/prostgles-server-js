@@ -19,7 +19,7 @@ export declare type Join = {
     tables: [string, string];
     on: {
         [key: string]: string;
-    };
+    }[];
     type: typeof JOIN_TYPES[number];
 };
 export declare type Joins = Join[] | "inferred";

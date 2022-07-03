@@ -7,7 +7,9 @@ const http = require('http').createServer(app);
 const { exec } = require('child_process');
 import { testPublishTypes } from "./publishTypeCheck";
 
-import { testDboTypes } from "./dboTypeCheck"
+import { testDboTypes } from "./dboTypeCheck";
+testDboTypes();
+testPublishTypes();
 
 const clientTest = (process.env.TEST_TYPE === "client");
 const io = !clientTest? undefined : require("socket.io")(http, { path: "/teztz/s" });
@@ -22,7 +24,6 @@ import { DBSchemaGenerated } from "./DBoGenerated";
 
 import { TableConfig } from '../../dist/TableConfig';
 import { DBOFullyTyped } from "../../lib/DBSchemaBuilder";
-import { ProstglesInitOptions } from "../../dist/Prostgles";
 import { PublishFullyTyped } from "../../dist/DBSchemaBuilder";
 
 const log = (msg: string, extra?: any, trace?: boolean) => {
@@ -231,6 +232,9 @@ function dd(){
 				items: "*",
 				items2: "*",
 				items3: "*",
+				items4a: "*",
+				// items_with_media_cols: "*",
+				items_multi: "*",
 				v_items: "*",
 				various: "*",
 				tr1: "*",
@@ -308,14 +312,36 @@ function dd(){
 		joins: [
 			{ 
 				tables: ["items", "items2"],
-				on: { name: "name" },
+				on: [{ name: "name" }],
 				type: "many-many"
 			},
 			{ 
 				tables: ["items2", "items3"],
-				on: { name: "name" },
+				on: [{ name: "name" }],
+				type: "many-many"
+			},
+			{ 
+				tables: ["items4a", "items"],
+				on: [{ items_id: "id" }],
+				type: "many-many"
+			},
+			{ 
+				tables: ["items4a", "items2"],
+				on: [{ items2_id: "id" }],
+				type: "many-many"
+			},
+			{ 
+				tables: ["items_multi", "items"],
+				on: [
+					{ items0_id: "id" },
+					{ items1_id: "id" },
+					{ items2_id: "id" },
+					{ items3_id: "id" },
+				],
 				type: "many-many"
 			}
+
+			
 		],
 		onReady: async (db, _db) => {
 			log("prostgles onReady")

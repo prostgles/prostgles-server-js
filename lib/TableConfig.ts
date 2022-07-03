@@ -2,7 +2,7 @@ import { doesNotMatch } from "assert";
 import { getKeys, asName, AnyObject, TableInfo } from "prostgles-types";
 import { DboBuilder, isPlainObject, JoinInfo } from "./DboBuilder";
 import { ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE } from "./FileManager";
-import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
+import { DB, DBHandlerServer, Joins, Prostgles } from "./Prostgles";
 import { asValue } from "./PubSubManager";
 
 type ColExtraInfo = {
@@ -129,11 +129,7 @@ type ReferencedColumn = {
 type JoinDef = {
   sourceTable: string;
   targetTable: string;
-
-  /**
-   * E.g.: [sourceCol: string, targetCol: string][];
-   */
-  on: [string, string][];
+  on: JoinInfo["paths"][number]["on"];
 }
 
 /**

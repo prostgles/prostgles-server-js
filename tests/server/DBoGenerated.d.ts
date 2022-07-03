@@ -84,6 +84,19 @@ export type DBSchemaGenerated = {
       name?: string | null
     };
   };
+  item_children: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id?: number;
+      item_id?: number | null;
+      name?: string | null;
+      tst?: Date | null
+    };
+  };
   items: {
     is_view: false;
     select: true;
@@ -93,6 +106,21 @@ export type DBSchemaGenerated = {
     columns: {
       h?: Array<string> | null;
       id?: number;
+      name?: string | null
+    };
+  };
+  items_multi: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id?: number;
+      items0_id?: number | null;
+      items1_id?: number | null;
+      items2_id?: number | null;
+      items3_id?: number | null;
       name?: string | null
     };
   };
@@ -169,6 +197,19 @@ export type DBSchemaGenerated = {
       public?: string | null
     };
   };
+  items4a: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id?: number;
+      items_id?: number | null;
+      items2_id?: number | null;
+      name?: string | null
+    };
+  };
   lookup_col1: {
     is_view: false;
     select: true;
@@ -176,6 +217,18 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
+      id: string
+    };
+  };
+  lookup_status: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      en?: string | null;
+      fr?: string | null;
       id: string
     };
   };
@@ -187,6 +240,8 @@ export type DBSchemaGenerated = {
     delete: true;
     columns: {
       content_type: string;
+      deleted?: number | null;
+      deleted_from_storage?: number | null;
       description?: string | null;
       etag?: string | null;
       extension: string;
@@ -294,6 +349,21 @@ export type DBSchemaGenerated = {
       t1?: string | null;
       t2?: string | null;
       tr1_id?: number | null
+    };
+  };
+  usr: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      added?: Date | null;
+      age?: number | null;
+      id?: number;
+      is_active?: boolean | null;
+      msg?: string | null;
+      status?: string | null
     };
   };
   uuid_text: {

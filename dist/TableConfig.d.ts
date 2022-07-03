@@ -93,10 +93,7 @@ declare type ReferencedColumn = {
 declare type JoinDef = {
     sourceTable: string;
     targetTable: string;
-    /**
-     * E.g.: [sourceCol: string, targetCol: string][];
-     */
-    on: [string, string][];
+    on: JoinInfo["paths"][number]["on"];
 };
 /**
  * Used in specifying a join path to a table. This column name can then be used in select

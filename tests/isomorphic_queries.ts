@@ -1,15 +1,16 @@
 import { strict as assert } from 'assert';
 
 import { DBHandlerServer} from "../dist/Prostgles";
-import { DBHandlerClient } from "./client/index";
+import type { DBHandlerClient } from "./client/index";
 import * as fs from "fs";
 
 export async function tryRun(desc: string, func: () => any, log?: Function){
   try {
     await func();
   } catch(err) {
-    console.error(desc + " FAILED:");
+    console.error(desc + " FAILED:", err);
     log?.("FAIL: ", err);
+    console.trace(err)
     setTimeout(() => {
       throw err;
 
@@ -42,9 +43,8 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
     await db.items3.delete({ });
     await db.items2.delete({ });
     await db.items.delete({ });
-  
   }
-  
+ 
   
   await tryRun("Prepare data", async () => {
     await db.items.insert([{ name: "a" }, { name: "a" }, { name: "b" }]);
@@ -563,6 +563,21 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
       // const _data = fs.readFileSync(__dirname + "/server/media/"+file.name);
       assert.equal(name, "somename.txt");
     });
+
+    // await tryRun("Media col insert", async () => {
+  
+    //   const resp = await db.items_with_media_cols.insert({ desc: "description", file_id: mediaFile }, { returning: "*" });
+      
+    //   assert.equal(
+    //     +(await db.items_with_media_cols.count(resp)),
+    //     1
+    //   );
+      
+    //   assert.equal(
+    //     +(await db.media.count({ original_name: 'sample_file.txt', id: resp.file_id })), 
+    //     1
+    //   );
+    // });
   });
 
   
@@ -724,5 +739,51 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
     ){ 
       throw "$rowhash query failed";
     }
+  });
+
+
+  await tryRun("Reference column nested insert", async () => {
+    const nestedRow = { name: "nested_insert" };
+    const parentRow = { name: "parent insert" }
+    const pr = await db.items2.insert({ items_id: nestedRow, ...parentRow }, { returning: "*" });
+    
+    const childRows = await db.items.find(nestedRow);
+    assert.equal(childRows.length, 1);
+    assert.deepStrictEqual(await db.items2.findOne(parentRow), { hh: null, id: pr.id, ...parentRow, items_id: childRows[0].id });
+
+  });
+
+  await tryRun("Reference column deep nested insert", async () => {
+    
+    const pr = await db.items4a.insert({ 
+      items_id: { name: "it" }, 
+      items2_id: { name: "it2", items_id: { name: "it" } }, 
+      name: "it4a" 
+    }, { returning: "*" });
+    const itemsCount = await db.items.count({ name: "it" })
+    const items2Count = await db.items2.count({ name: "it2" })
+    const items4aCount = await db.items4a.count({ name: "it4a" })
+    
+    assert.equal(+itemsCount, 2);
+    assert.equal(+items2Count, 1);
+    assert.equal(+items4aCount, 1);
+    
+  });
+
+  await tryRun("Multi reference column nested insert", async () => {
+    await db.items_multi.insert({ 
+      items0_id: { name: "multi" }, 
+      items1_id: { name: "multi" }, 
+      items2_id: { name: "multi" }, 
+      items3_id: { name: "multi" }, 
+      name: "root_multi" 
+    }, { returning: "*" });
+    const itemsCount = await db.items.count({ name: "multi" })
+    const multiItem = await db.items_multi.findOne({ name: "root_multi" }, { select: { "*": 1, items: "*" } });
+    
+    assert.equal(+itemsCount, 4);
+    assert.equal(multiItem?.name, "root_multi");
+    assert.equal(multiItem?.items.filter(d => d.name === "multi").length, 4);
+    
   });
 }

@@ -1189,7 +1189,9 @@ function makeQuery(_this, q, depth = 0, joinFields = [], selectParams = {}) {
                         return (0, prostgles_types_1.asName)(`agg_${s.alias}`) + " AS " + (0, prostgles_types_1.asName)(s.alias);
                     return (0, prostgles_types_1.asName)(s.alias);
                 }).concat(q2.joins?.map(j => (0, prostgles_types_1.asName)(j.table)) ?? []).join(", ");
-                const _iiQ = makeQuery(_this, q2, depth + 1, on.map(([c1, c2]) => (0, prostgles_types_1.asName)(c2)), selectParams);
+                const _iiQ = makeQuery(_this, q2, depth + 1, 
+                // on.map(([c1, c2]) => asName(c2)),
+                on.flatMap(cond => cond.map(([c1, c2]) => (0, prostgles_types_1.asName)(c2))), selectParams);
                 // const iiQ = flat(_iiQ.split("\n")); // prettify for debugging
                 // console.log(_iiQ)
                 const iiQ = [_iiQ];
@@ -1207,10 +1209,13 @@ function makeQuery(_this, q, depth = 0, joinFields = [], selectParams = {}) {
                     `) ${thisAlias}`
                 ];
             }
+            const getJoinCondition = (t1Alias, t2Alias, on) => {
+                return on.map(cond => cond.map(([c1, c2]) => `${t1Alias}.${(0, prostgles_types_1.asName)(getPrevColName(c1))} = ${t2Alias}.${(0, prostgles_types_1.asName)(getThisColName(c2))} `).join(" AND ")).join(" OR ");
+            };
             let jres = [
                 `${q2.isLeftJoin ? "LEFT" : "INNER"} JOIN `,
                 ...iQ,
-                `ON ${on.map(([c1, c2]) => `${prevAlias}.${(0, prostgles_types_1.asName)(getPrevColName(c1))} = ${thisAlias}.${(0, prostgles_types_1.asName)(getThisColName(c2))} `).join(" AND ")}`
+                `ON ${getJoinCondition(prevAlias, thisAlias, on)}`
             ];
             return jres;
         });

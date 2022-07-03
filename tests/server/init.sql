@@ -40,6 +40,14 @@ CREATE TABLE IF NOT EXISTS items_with_media (
 	name	TEXT
 );
 
+-- DROP TABLE IF EXISTS items_with_media_cols CASCADE;
+-- CREATE TABLE IF NOT EXISTS items_with_media_cols (
+-- 	id		SERIAL PRIMARY KEY,
+-- 	"desc" TEXT,
+-- 	file_id UUID REFERENCES media(id)
+-- );
+
+
 DROP TABLE IF EXISTS various CASCADE;
 CREATE TABLE IF NOT EXISTS various (
 	id		SERIAL PRIMARY KEY,
@@ -73,6 +81,23 @@ CREATE TABLE IF NOT EXISTS items3 (
 	name	TEXT
 );
 
+DROP TABLE IF EXISTS items4a CASCADE;
+CREATE TABLE IF NOT EXISTS items4a (
+	id		SERIAL PRIMARY KEY,
+	items_id	INTEGER REFERENCES items(id),
+	items2_id	INTEGER REFERENCES items2(id),
+	name	TEXT
+);
+
+DROP TABLE IF EXISTS items_multi CASCADE;
+CREATE TABLE IF NOT EXISTS items_multi (
+	id		SERIAL PRIMARY KEY,
+	items0_id	INTEGER REFERENCES items(id),
+	items1_id	INTEGER REFERENCES items(id),
+	items2_id	INTEGER REFERENCES items(id),
+	items3_id	INTEGER REFERENCES items(id),
+	name	TEXT
+);
 
 DROP TABLE IF EXISTS items4 CASCADE;
 CREATE TABLE IF NOT EXISTS items4 (

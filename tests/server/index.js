@@ -9,6 +9,10 @@ const prostgles_server_1 = __importDefault(require("prostgles-server"));
 const app = (0, express_1.default)();
 const http = require('http').createServer(app);
 const { exec } = require('child_process');
+const publishTypeCheck_1 = require("./publishTypeCheck");
+const dboTypeCheck_1 = require("./dboTypeCheck");
+(0, dboTypeCheck_1.testDboTypes)();
+(0, publishTypeCheck_1.testPublishTypes)();
 const clientTest = (process.env.TEST_TYPE === "client");
 const io = !clientTest ? undefined : require("socket.io")(http, { path: "/teztz/s" });
 http.listen(3001);
@@ -201,6 +205,9 @@ function dd() {
                 items: "*",
                 items2: "*",
                 items3: "*",
+                items4a: "*",
+                // items_with_media_cols: "*",
+                items_multi: "*",
                 v_items: "*",
                 various: "*",
                 tr1: "*",
@@ -276,12 +283,32 @@ function dd() {
         joins: [
             {
                 tables: ["items", "items2"],
-                on: { name: "name" },
+                on: [{ name: "name" }],
                 type: "many-many"
             },
             {
                 tables: ["items2", "items3"],
-                on: { name: "name" },
+                on: [{ name: "name" }],
+                type: "many-many"
+            },
+            {
+                tables: ["items4a", "items"],
+                on: [{ items_id: "id" }],
+                type: "many-many"
+            },
+            {
+                tables: ["items4a", "items2"],
+                on: [{ items2_id: "id" }],
+                type: "many-many"
+            },
+            {
+                tables: ["items_multi", "items"],
+                on: [
+                    { items0_id: "id" },
+                    { items1_id: "id" },
+                    { items2_id: "id" },
+                    { items3_id: "id" },
+                ],
                 type: "many-many"
             }
         ],

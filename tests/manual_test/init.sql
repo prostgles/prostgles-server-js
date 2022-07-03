@@ -10,17 +10,48 @@ CREATE TABLE IF NOT EXISTS various (
 	added		TIMESTAMP DEFAULT NOW()
 );
 
-
 DROP TABLE IF EXISTS items CASCADE;
 CREATE TABLE IF NOT EXISTS items (
-	id	SERIAL PRIMARY KEY,
-	name	TEXT,
-	tst TIMESTAMP DEFAULT NOW()
+	id		SERIAL PRIMARY KEY,
+	h		TEXT[],
+	name	TEXT
+	-- PRIMARY KEY(id, id1)
 );
 
-INSERT INTO items(name) VALUES ('a'), ('b'),('a'), ('b'),('a'), ('b'),('a'), ('b'), ('c');
+DROP TABLE IF EXISTS items2 CASCADE;
+CREATE TABLE IF NOT EXISTS items2 (
+	id			SERIAL PRIMARY KEY,
+	items_id	INTEGER REFERENCES items(id),
+	hh			TEXT[],
+	name		TEXT
+);
 
+DROP TABLE IF EXISTS items3 CASCADE;
+CREATE TABLE IF NOT EXISTS items3 (
+	id			SERIAL PRIMARY KEY,
+	items_id	INTEGER REFERENCES items(id),
+	items2_id	INTEGER REFERENCES items2(id),
+	hh			TEXT[],
+	name		TEXT
+);
 
+DROP TABLE IF EXISTS items4a CASCADE;
+CREATE TABLE IF NOT EXISTS items4a (
+	id		SERIAL PRIMARY KEY,
+	items_id	INTEGER REFERENCES items(id),
+	items2_id	INTEGER REFERENCES items2(id),
+	name	TEXT
+);
+
+DROP TABLE IF EXISTS items_multi CASCADE;
+CREATE TABLE IF NOT EXISTS items_multi (
+	id		SERIAL PRIMARY KEY,
+	items0_id	INTEGER REFERENCES items(id),
+	items1_id	INTEGER REFERENCES items(id),
+	items2_id	INTEGER REFERENCES items(id),
+	items3_id	INTEGER REFERENCES items(id),
+	name	TEXT
+);
 
 DROP TABLE IF EXISTS item_children CASCADE;
 CREATE TABLE IF NOT EXISTS item_children (

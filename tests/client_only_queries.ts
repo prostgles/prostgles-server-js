@@ -1,6 +1,6 @@
 import { strict as assert } from 'assert';
 
-import { DBHandlerClient, Auth } from "./client/index";
+import type { DBHandlerClient, Auth } from "./client/index";
 import { DBSchemaTable, isDefined } from "./client/node_modules/prostgles-types/dist";
 import { tryRun, tryRunP } from './isomorphic_queries';
 

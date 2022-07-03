@@ -5,7 +5,7 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<!-- <script src="https://unpkg.com/socket.io-client@2.3.1/dist/socket.io.slim.js" type="text/javascript"></script> -->
 	
-		<script src="https://unpkg.com/socket.io-client@3.1.0/dist/socket.io.min.js" type="text/javascript"></script>
+		<script src="https://unpkg.com/socket.io-client@latest/dist/socket.io.min.js" type="text/javascript"></script>
 		<script src="https://unpkg.com/prostgles-client@latest/dist/index.js" type="text/javascript"></script>
 	</head>
 	<body>
@@ -28,18 +28,8 @@
 			// })
 			const log = console.log;
 
-			const socket = io("wss://prostgles.com", { path: "/teztz/s", reconnect: true });
-
 			
-			// socket.on("connected", () => {
-			// 	log("Client connected.")
-			// });
-			// socket.on("connect", () => {
-			// 	log("Client connect.")
-			// });
-			// socket.on("connect_failed", (err) => {
-			// 	log("connect_failed", err)
-			// })
+			const socket = io("/", { path: "/s", reconnect: true });
 
 			prostgles({
 				socket,
@@ -57,21 +47,22 @@
 						window.dbo = db;
 						window.s = socket;
 
-						// let schema = await Promise.all(Object.keys(db).filter(t => db[t].find).map(async t => ({
-						// 	table: t,
-						// 	cols: await db[t].getColumns()
-						// })))
-						// console.log("onReady", schema);
 						const d1 = document.body.querySelector(".d1"),
 							d2 = document.body.querySelector(".d2"),
 							d3 = document.body.querySelector(".d3");
 
-						db.various.subscribe({ $and: [] }, {}, d => {
-							if(d1) d1.innerText = JSON.stringify(d, null, 2)
-						})
-						db.various.subscribe({ "id.<": 75648356348 }, {}, d => {
-							if(d2) d2.innerText = JSON.stringify(d, null, 2)
-						})
+						// db.various.subscribe({ $and: [] }, {}, d => {
+						// 	if(d1) d1.innerText = JSON.stringify(d, null, 2)
+						// })
+						// db.various.subscribe({ "id.<": 75648356348 }, {}, d => {
+						// 	if(d2) d2.innerText = JSON.stringify(d, null, 2)
+						// })
+							d1.style.whiteSpace = "pre"
+						d1.innerText = JSON.stringify({
+							items: await db.items.find(),
+							items2: await db.items2.find(),
+							items4a: await db.items4a.find(),
+						}, null, 2)
 
 					} catch(e) {
 						console.error(e)

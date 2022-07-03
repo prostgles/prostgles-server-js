@@ -1436,7 +1436,8 @@ export function makeQuery(
             _this, 
             q2, 
             depth + 1, 
-            on.map(([c1, c2]) => asName(c2)),
+            // on.map(([c1, c2]) => asName(c2)),
+            on.flatMap(cond => cond.map(([c1, c2]) => asName(c2))),
             selectParams,
           );
           // const iiQ = flat(_iiQ.split("\n")); // prettify for debugging
@@ -1457,14 +1458,18 @@ export function makeQuery(
           ,   `) ${thisAlias}`
           ]
       }
-      let jres =  [
+
+      const getJoinCondition = (t1Alias: string, t2Alias: string,  on: [string, string][][]) => {
+        return on.map(cond => cond.map(([c1, c2]) => 
+          `${t1Alias}.${asName(getPrevColName(c1))} = ${t2Alias}.${asName(getThisColName(c2))} `
+          ).join(" AND ")
+        ).join(" OR ")
+      }
+
+      let jres: string[] = [
           `${q2.isLeftJoin? "LEFT" : "INNER"} JOIN `
       , ...iQ
-      ,   `ON ${
-              on.map(([c1, c2]) => 
-                  `${prevAlias}.${asName(getPrevColName(c1))} = ${thisAlias}.${asName(getThisColName(c2))} `
-              ).join(" AND ")
-          }`
+      ,   `ON ${getJoinCondition(prevAlias, thisAlias, on)}`
       ];
       return jres;
     });

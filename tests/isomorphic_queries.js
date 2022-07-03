@@ -31,8 +31,9 @@ async function tryRun(desc, func, log) {
         await func();
     }
     catch (err) {
-        console.error(desc + " FAILED:");
+        console.error(desc + " FAILED:", err);
         log?.("FAIL: ", err);
+        console.trace(err);
         setTimeout(() => {
             throw err;
         }, 2000);
@@ -495,6 +496,17 @@ async function isomorphic(db) {
             // const _data = fs.readFileSync(__dirname + "/server/media/"+file.name);
             assert_1.strict.equal(name, "somename.txt");
         });
+        // await tryRun("Media col insert", async () => {
+        //   const resp = await db.items_with_media_cols.insert({ desc: "description", file_id: mediaFile }, { returning: "*" });
+        //   assert.equal(
+        //     +(await db.items_with_media_cols.count(resp)),
+        //     1
+        //   );
+        //   assert.equal(
+        //     +(await db.media.count({ original_name: 'sample_file.txt', id: resp.file_id })), 
+        //     1
+        //   );
+        // });
     });
     await tryRun("Exists filter example", async () => {
         const fo = await db.items.findOne(), f = await db.items.find();
@@ -618,6 +630,41 @@ async function isomorphic(db) {
             rowhashView.$rowhash !== rhView.$rowhash) {
             throw "$rowhash query failed";
         }
+    });
+    await tryRun("Reference column nested insert", async () => {
+        const nestedRow = { name: "nested_insert" };
+        const parentRow = { name: "parent insert" };
+        const pr = await db.items2.insert({ items_id: nestedRow, ...parentRow }, { returning: "*" });
+        const childRows = await db.items.find(nestedRow);
+        assert_1.strict.equal(childRows.length, 1);
+        assert_1.strict.deepStrictEqual(await db.items2.findOne(parentRow), { hh: null, id: pr.id, ...parentRow, items_id: childRows[0].id });
+    });
+    await tryRun("Reference column deep nested insert", async () => {
+        const pr = await db.items4a.insert({
+            items_id: { name: "it" },
+            items2_id: { name: "it2", items_id: { name: "it" } },
+            name: "it4a"
+        }, { returning: "*" });
+        const itemsCount = await db.items.count({ name: "it" });
+        const items2Count = await db.items2.count({ name: "it2" });
+        const items4aCount = await db.items4a.count({ name: "it4a" });
+        assert_1.strict.equal(+itemsCount, 2);
+        assert_1.strict.equal(+items2Count, 1);
+        assert_1.strict.equal(+items4aCount, 1);
+    });
+    await tryRun("Multi reference column nested insert", async () => {
+        await db.items_multi.insert({
+            items0_id: { name: "multi" },
+            items1_id: { name: "multi" },
+            items2_id: { name: "multi" },
+            items3_id: { name: "multi" },
+            name: "root_multi"
+        }, { returning: "*" });
+        const itemsCount = await db.items.count({ name: "multi" });
+        const multiItem = await db.items_multi.findOne({ name: "root_multi" }, { select: { "*": 1, items: "*" } });
+        assert_1.strict.equal(+itemsCount, 4);
+        assert_1.strict.equal(multiItem?.name, "root_multi");
+        assert_1.strict.equal(multiItem?.items.filter(d => d.name === "multi").length, 4);
     });
 }
 exports.default = isomorphic;

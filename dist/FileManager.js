@@ -66,7 +66,7 @@ class FileManager {
                 throw "fileTable missing";
             const { tableName = "media", referencedTables = {} } = fileTable;
             this.tableName = tableName;
-            const maxBfSizeMB = prg.opts.io?.engine?.opts?.maxHttpBufferSize / 1e6;
+            const maxBfSizeMB = (prg.opts.io?.engine?.opts?.maxHttpBufferSize || 1e6) / 1e6;
             console.log(`Prostgles: Initiated file manager. Max allowed file size: ${maxBfSizeMB}MB (maxHttpBufferSize = 1e6). To increase this set maxHttpBufferSize in socket.io server init options`);
             // throw "Why are constraints dissapearing?"
             /**
@@ -76,18 +76,20 @@ class FileManager {
                 console.log(`Creating fileTable ${(0, prostgles_types_1.asName)(tableName)} ...`);
                 await this.db.any(`CREATE EXTENSION IF NOT EXISTS pgcrypto `);
                 await this.db.any(`CREATE TABLE IF NOT EXISTS ${(0, prostgles_types_1.asName)(tableName)} (
-          id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          name                TEXT NOT NULL,
-          extension           TEXT NOT NULL,
-          content_type        TEXT NOT NULL,
-          url                 TEXT NOT NULL,
-          original_name       TEXT NOT NULL,
+          id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          name                  TEXT NOT NULL,
+          extension             TEXT NOT NULL,
+          content_type          TEXT NOT NULL,
+          url                   TEXT NOT NULL,
+          original_name         TEXT NOT NULL,
 
-          description         TEXT,
-          s3_url              TEXT,
-          signed_url          TEXT,
-          signed_url_expires  BIGINT,
-          etag                TEXT,
+          description           TEXT,
+          s3_url                TEXT,
+          signed_url            TEXT,
+          signed_url_expires    BIGINT,
+          etag                  TEXT,
+          deleted               BIGINT,
+          deleted_from_storage  BIGINT,
           UNIQUE(name)
       )`);
                 console.log(`Created fileTable ${(0, prostgles_types_1.asName)(tableName)}`);
@@ -154,6 +156,9 @@ class FileManager {
              * 4. Serve media through express
              */
             const { fileServeRoute = `/${tableName}`, expressApp: app } = fileTable;
+            if (fileServeRoute.endsWith("/")) {
+                throw `fileServeRoute must not end with a '/'`;
+            }
             this.fileRoute = fileServeRoute;
             if (app) {
                 app.get(this.fileRoute + "/:name", async (req, res) => {

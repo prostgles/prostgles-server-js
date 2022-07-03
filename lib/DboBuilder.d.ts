@@ -20,8 +20,8 @@ export declare type TxCB = {
 export declare type TX = {
     (t: TxCB): Promise<(any | void)>;
 };
-declare type TableHandlers = {
-    [key: string]: Partial<TableHandler>;
+export declare type TableHandlers = {
+    [key: string]: Partial<TableHandler> | TableHandler;
 };
 export declare type DBHandlerServer = TableHandlers & DbJoinMaker & {
     sql?: SQLHandler;
@@ -37,6 +37,7 @@ import { SelectItem, FieldSpec } from "./QueryBuilder";
 import { Join, Prostgles, DB } from "./Prostgles";
 import { TableRule, UpdateRule, PublishParser, ValidateRow, PublishAllOrNothing } from "./PublishParser";
 import { PubSubManager, BasicCallback } from "./PubSubManager";
+import { insertDataParse } from "./DboBuilder/insertDataParse";
 declare type PGP = pgPromise.IMain<{}, pg.IClient>;
 export declare const pgp: PGP;
 export declare type TableInfo = TInfo & {
@@ -112,9 +113,10 @@ export declare type JoinInfo = {
         table: string;
         /**
          * Source and target JOIN ON columns
-         * e.g.:    [source_table_column: string, table_column: string][]
+         * Each inner array group will be combined with AND and outer arrays with OR to allow multiple references to the same table
+         * e.g.:    [[source_table_column: string, table_column: string]]
          */
-        on: [string, string][];
+        on: [string, string][][];
         /**
          * Source table name
          */
@@ -167,8 +169,10 @@ export declare type ValidatedTableRules = CommonTableRules & {
         returningFields: string[];
     };
 };
+export declare function makeErr(err: any, localParams?: LocalParams, view?: ViewHandler, allowedKeys?: string[]): Promise<never>;
 export declare const EXISTS_KEYS: readonly ["$exists", "$notExists", "$existsJoined", "$notExistsJoined"];
 export declare type EXISTS_KEY = typeof EXISTS_KEYS[number];
+export declare function parseError(e: any): any;
 declare class ColSet {
     opts: {
         columns: ColumnInfo[];
@@ -297,6 +301,7 @@ export declare class ViewHandler {
     */
     static _parseFieldFilter(fieldParams: FieldFilter, allow_empty: boolean, all_cols: string[]): string[];
 }
+export declare function isPojoObject<T>(obj: T): obj is Record<string, any>;
 declare type ValidatedParams = {
     row: AnyObject;
     forcedData?: AnyObject;
@@ -336,7 +341,7 @@ export declare class TableHandler extends ViewHandler {
         data: any;
         allowedCols: string[];
     };
-    private insertDataParse;
+    insertDataParse: typeof insertDataParse;
     insert(rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: undefined, tableRules?: TableRule, _localParams?: LocalParams): Promise<any | any[] | boolean>;
     prepareReturning: (returning: Select | undefined, allowedFields: string[]) => Promise<SelectItem[]>;
     makeReturnQuery(items?: SelectItem[]): string;
