@@ -277,7 +277,8 @@ const referencedInsert = async (tableHandler, dbTX, localParams, targetTable, ta
         .insert(m, { returning: "*" }, undefined, childRules, localParams)
         .catch(e => {
         console.trace({ childInsertErr: e });
-        return Promise.reject({ childInsertErr: e });
+        return Promise.reject(e);
+        // return Promise.reject({ childInsertErr: e });
     })));
 };
 //# sourceMappingURL=insertDataParse.js.map

@@ -347,7 +347,8 @@ const referencedInsert = async (tableHandler: TableHandler, dbTX: TableHandlers 
         .insert(m, { returning: "*" }, undefined, childRules, localParams)
         .catch(e => {
           console.trace({ childInsertErr: e })
-          return Promise.reject({ childInsertErr: e });
+          return Promise.reject(e);
+          // return Promise.reject({ childInsertErr: e });
         })
       )
   );
