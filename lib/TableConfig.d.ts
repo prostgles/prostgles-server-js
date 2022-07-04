@@ -1,6 +1,5 @@
-import { AnyObject, TableInfo } from "prostgles-types";
+import { AnyObject, TableInfo, ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE } from "prostgles-types";
 import { JoinInfo } from "./DboBuilder";
-import { ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE } from "./FileManager";
 import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
 declare type ColExtraInfo = {
     min?: string | number;

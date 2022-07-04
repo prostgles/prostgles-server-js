@@ -92,7 +92,8 @@ async function insertDataParse(data, param2, param3_unused, tableRules, _localPa
                 throw "name is not of type string";
             }
             const media_id = (await this.db.oneOrNone("SELECT gen_random_uuid() as name")).name;
-            const type = await this.dboBuilder.prostgles.fileManager.getMIME(data, name);
+            const nestedInsert = localParams?.nestedInsert;
+            const type = await this.dboBuilder.prostgles.fileManager.parseFile({ file: data, fileName: name, tableName: nestedInsert?.previousTable, colName: nestedInsert?.referencingColumn });
             const media_name = `${media_id}.${type.ext}`;
             let media = {
                 id: media_id,
@@ -134,7 +135,16 @@ async function insertDataParse(data, param2, param3_unused, tableRules, _localPa
             /** Insert referenced first and then populate root data with referenced keys */
             if (colInserts.length) {
                 for await (const colInsert of colInserts) {
-                    const colRows = await referencedInsert(_this, dbTX, localParams, colInsert.tableName, row[colInsert.col]);
+                    const newLocalParams = {
+                        ...(localParams ?? {}),
+                        nestedInsert: {
+                            depth: (localParams.nestedInsert?.depth ?? 0) + 1,
+                            previousData: rootData,
+                            previousTable: this.name,
+                            referencingColumn: colInsert.col
+                        }
+                    };
+                    const colRows = await referencedInsert(_this, dbTX, newLocalParams, colInsert.tableName, row[colInsert.col]);
                     if (!Array.isArray(colRows) || colRows.length !== 1 || [null, undefined].includes(colRows[0][colInsert.fcol])) {
                         throw new Error("Could not do nested column insert: Unexpected return " + JSON.stringify(colRows));
                     }
@@ -154,7 +164,6 @@ async function insertDataParse(data, param2, param3_unused, tableRules, _localPa
             }
             await Promise.all(extraKeys.map(async (targetTable) => {
                 const childDataItems = Array.isArray(row[targetTable]) ? row[targetTable] : [row[targetTable]];
-                const thisInfo = await this.getInfo();
                 const childInsert = async (cdata, tableName) => {
                     return referencedInsert(this, dbTX, localParams, tableName, cdata);
                 };

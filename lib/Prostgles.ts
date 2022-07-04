@@ -21,7 +21,7 @@ import { PubSubManager, DEFAULT_SYNC_BATCH_SIZE, asValue } from "./PubSubManager
 export { DBHandlerServer }
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 
-import { SQLRequest, TableSchemaForClient, CHANNELS, AnyObject, ClientSchema, getKeys, DBSchemaTable, DBSchema } from "prostgles-types";
+import { SQLRequest, TableSchemaForClient, CHANNELS, AnyObject, ClientSchema, getKeys, DBSchemaTable, DBSchema, FileColumnConfig } from "prostgles-types";
 import { Publish, PublishMethods, PublishParams, PublishParser } from "./PublishParser";
 import { DBEventsManager } from "./DBEventsManager";
 
@@ -172,7 +172,7 @@ export type FileTableConfig = {
        * If defined then will try to create (if necessary) this column which will reference files_table(id) 
        * Prostgles UI will use these hints (obtained through tableHandler.getInfo())
        * */ 
-      // | { type: "column", referenceColumns: Record<string, { maxFileSizeMB: number; }> }
+      | { type: "column", referenceColumns: Record<string, FileColumnConfig> }
   },
   imageOptions?: ImageOptions
 };

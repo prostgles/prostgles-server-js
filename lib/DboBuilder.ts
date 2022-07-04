@@ -155,9 +155,11 @@ export type LocalParams = {
 
     returnQuery?: boolean;
 
-    nestedJoin?: {
+    nestedInsert?: {
         depth: number;
-        data: AnyObject;
+        previousData: AnyObject;
+        previousTable: string;
+        referencingColumn?: string;
     }
 }
 function replaceNonAlphaNumeric(string: string, replacement = "_"): string {
@@ -711,7 +713,7 @@ export class ViewHandler {
             };
         });
         let expectOne = false; 
-        paths.map(({ source, target, on }, i) => {
+        // paths.map(({ source, target, on }, i) => {
             // if(expectOne && on.length === 1){
             //     const sourceCol = on[0][1];
             //     const targetCol = on[0][0];
@@ -721,7 +723,7 @@ export class ViewHandler {
             //     console.log({ sourceCol, targetCol, sCol, source, tCol, target, on})
             //     expectOne = sCol.is_pkey && tCol.is_pkey
             // }
-        })
+        // })
         return {
             paths,
             expectOne
@@ -739,31 +741,30 @@ export class ViewHandler {
 
         let has_media: "one" | "many" | undefined = undefined;
 
-        /**
-         * Media is directly related to this table (does not come from a deeply joined table)
-         */ 
-        let has_direct_media = false;
-
         const mediaTable = this.dboBuilder.prostgles?.opts?.fileTable?.tableName;
         
         if(!this.is_media && mediaTable){
-            if(this.dboBuilder.prostgles?.opts?.fileTable?.referencedTables?.[this.name]){
-                has_media = this.dboBuilder.prostgles?.opts?.fileTable?.referencedTables?.[this.name];
-                has_direct_media = true;
+            const joinConf = this.dboBuilder.prostgles?.opts?.fileTable?.referencedTables?.[this.name]
+            if(joinConf){
+                has_media = typeof joinConf === "string"? joinConf : "one";
             } else {
                 const jp = this.dboBuilder.joinPaths.find(jp => jp.t1 === this.name && jp.t2 === mediaTable);
                 if(jp && jp.path.length <= 3){
-                    await Promise.all(jp.path.map(async tableName => {
-                        const cols = (await this?.dboBuilder?.dbo?.[tableName]?.getColumns?.())?.filter(c => jp.path.includes(c?.references?.ftable as any));
-                        if(cols && cols.length && has_media !== "many"){
-                            if(cols.find(c => !c.is_pkey)){
-                                has_media = "many"
-                            } else {
-                                has_media = "one"
+                    if(jp.path.length <= 2){
+                        has_media = "one"
+                    } else {
+                        await Promise.all(jp.path.map(async tableName => {
+                            const pkeyFcols = this?.dboBuilder?.dbo?.[tableName]?.columns?.filter(c => c.is_pkey).map(c => c.name);
+                            const cols = this?.dboBuilder?.dbo?.[tableName]?.columns?.filter(c => c?.references && jp.path.includes(c?.references?.ftable));
+                            if(cols && cols.length && has_media !== "many"){
+                                if(cols.some(c => !pkeyFcols?.includes(c.name))){
+                                    has_media = "many"
+                                } else {
+                                    has_media = "one"
+                                }
                             }
-                            has_direct_media = jp.path.length === 2;
-                        }
-                    }));
+                        }));
+                    }
                 }
             }
         }
@@ -774,7 +775,6 @@ export class ViewHandler {
             info: this.dboBuilder.prostgles?.tableConfigurator?.getTableInfo({ tableName: this.name, lang }),
             is_media: this.is_media,      // this.name === this.dboBuilder.prostgles?.opts?.fileTable?.tableName
             has_media,
-            has_direct_media,
             media_table_name: mediaTable,
             dynamicRules: {
                 update: Boolean(tableRules?.update?.dynamicFields?.length)
@@ -831,7 +831,11 @@ export class ViewHandler {
                     _delete = this.tableOrViewInfo.privileges.delete;// c.privileges.some(p => p.privilege_type === "DELETE");
                 
                 delete (c as any).privileges;
-                let result = {
+
+                const prostgles = this.dboBuilder?.prostgles;
+                const fileConfig = prostgles.fileManager?.getColInfo({ colName: c.name, tableName: this.name })
+
+                let result: ValidatedColumnInfo = {
                     ...c,
                     label,
                     tsDataType: postgresToTsType(c.udt_name),
@@ -840,7 +844,8 @@ export class ViewHandler {
                     filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)),
                     update: update && Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)),
                     delete: _delete && Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)),
-                    ...(this.dboBuilder?.prostgles?.tableConfigurator?.getColInfo({ table: this.name, col: c.name, lang }) || {})
+                    ...(prostgles?.tableConfigurator?.getColInfo({ table: this.name, col: c.name, lang }) || {}),
+                    ...(fileConfig && { file: fileConfig })
                 }
 
                 if(dynamicUpdateFields){
@@ -1828,10 +1833,10 @@ export class ViewHandler {
     * @param {FieldFilter} fieldParams - { col1: 0, col2: 0 } | { col1: true, col2: true } | "*" | ["key1", "key2"] | []
     * @param {boolean} allow_empty - allow empty select. defaults to true
     */
-    static _parseFieldFilter(fieldParams: FieldFilter = "*", allow_empty: boolean = true, all_cols: string[]): string[] {
+    static _parseFieldFilter<AllowedKeys extends string[]>(fieldParams: FieldFilter<Record<AllowedKeys[number], any>> = "*", allow_empty: boolean = true, all_cols: AllowedKeys): AllowedKeys | [""] {
         if(!all_cols) throw "all_cols missing"
         const all_fields = all_cols;// || this.column_names.slice(0);
-        let colNames: string[] = [],
+        let colNames: AllowedKeys = [] as any,
             initialParams = JSON.stringify(fieldParams);
 
         if(fieldParams){
@@ -1849,7 +1854,7 @@ export class ViewHandler {
                     ["*"] 
                 */
                 if(fieldParams[0] === "*"){
-                    return all_fields.slice(0);
+                    return all_fields.slice(0) as typeof all_fields;
 
                 /* 
                     [""] 
@@ -1864,7 +1869,7 @@ export class ViewHandler {
                     ["field1", "field2", "field3"] 
                 */
                 } else {
-                    colNames = fieldParams.slice(0);
+                    colNames = fieldParams.slice(0) as AllowedKeys;
                 }
 
             /*
@@ -1873,10 +1878,10 @@ export class ViewHandler {
             */
             } else if(isPlainObject(fieldParams)){
 
-                if(Object.keys(fieldParams).length){
-                    let keys = Object.keys(fieldParams as {
+                if(getKeys(fieldParams).length){
+                    let keys = getKeys(fieldParams as {
                         [key: string]: boolean | 0 | 1;
-                    });
+                    }) as AllowedKeys;
                     if(keys[0] === ""){ 
                         if(allow_empty){
                             return [""];
@@ -1897,12 +1902,12 @@ export class ViewHandler {
 
 
                     if(disallowed && disallowed.length){
-                        return all_fields.filter(col => !disallowed.includes(col));
+                        return all_fields.filter(col => !disallowed.includes(col)) as typeof all_fields;
                     } else {
-                        return [...allowed];
+                        return [...allowed] as any;
                     }
                 } else {
-                    return all_fields.slice(0);
+                    return all_fields.slice(0) as typeof all_fields;
                 }
             } else {
                 throw " Unrecognised field filter.\nExpecting any of:   string | string[] | { [field]: boolean } \n Received ->  " + initialParams;
@@ -1910,9 +1915,9 @@ export class ViewHandler {
 
             validate(colNames);
         }
-        return colNames;
+        return colNames as any;
 
-        function validate(cols: string[]){
+        function validate(cols: AllowedKeys){
             let bad_keys = cols.filter(col => !all_fields.includes(col));
             if(bad_keys && bad_keys.length){
                 throw "\nUnrecognised or illegal fields: " + bad_keys.join(", ");
@@ -2765,32 +2770,10 @@ export class DboBuilder {
 
     async build(): Promise<DBHandlerServer>{
 
-        // await this.pubSubManager.init()
-
-        this.tablesOrViews = await getTablesForSchemaPostgresSQL(this.db);  //, this.schema
-        // console.log(this.tablesOrViews.map(t => `${t.name} (${t.columns.map(c => c.name).join(", ")})`))
+        this.tablesOrViews = await getTablesForSchemaPostgresSQL(this.db);
 
         this.constraints = await getConstraints(this.db);
         await this.parseJoins();
-
-//         const common_types = 
-// `
-
-// import { ViewHandler, TableHandler, JoinMaker } from "prostgles-types";
-
-// export type TxCB = {
-//     (t: DBObj): (any | void | Promise<(any | void)>)
-// };
-
-// `
-        // this.dboDefinition = `export type DBObj = {\n`;
-
-
-        // let joinTableNames: string[] = [];
-
-        // let allDataDefs = "";
-            
-            
 
         this.tablesOrViews.map(tov => {
             const columnsForTypes = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
@@ -2803,26 +2786,12 @@ export class DboBuilder {
                 Please provide a replacement keyword name using the $filter_keyName init option. 
                 Alternatively you can rename the table column\n`;
             }
-
-            const TSTableDataName = snakify(tov.name, true);
-            const TSTableHandlerName = escapeTSNames(tov.name)
-            if(tov.is_view){
-                this.dbo[tov.name] = new ViewHandler(this.db, tov, this, undefined, undefined, this.joinPaths);
-                // this.dboDefinition  += `  ${TSTableHandlerName}: ViewHandler<${TSTableDataName}> \n`;
-            } else {
-                this.dbo[tov.name] = new TableHandler(this.db, tov, this, undefined, undefined, this.joinPaths);
-                // this.dboDefinition  += `  ${TSTableHandlerName}: TableHandler<${TSTableDataName}> \n`;
-            }
-            // allDataDefs += `export type ${TSTableDataName} = { \n` + 
-            //     (this.dbo[tov.name] as ViewHandler).tsColumnDefs.map(str => `  ` + str).join("\n") +
-            //     `\n}\n`;
-
-            // this.dboDefinition += ` ${escapeTSNames(tov.name, false)}: ${(this.dbo[tov.name] as TableHandler).tsDboName};\n`;
+            
+            this.dbo[tov.name] = new (tov.is_view? ViewHandler : TableHandler)(this.db, tov, this, undefined, undefined, this.joinPaths);
 
             if(this.joinPaths && this.joinPaths.find(jp => [jp.t1, jp.t2].includes(tov.name))){
 
                 let table = tov.name;
-                // joinTableNames.push(table);
 
                 const makeJoin = (
                     isLeft = true, 
@@ -2856,19 +2825,6 @@ export class DboBuilder {
             }
         });
 
-        // let joinBuilderDef = "";
-        // if(joinTableNames.length){
-        //     joinBuilderDef += "export type JoinMakerTables = {\n";
-        //     joinTableNames.map(tname => {
-        //         joinBuilderDef += ` ${escapeTSNames(tname)}: JoinMaker<${snakify(tname, true)}>;\n`
-        //     })
-        //     joinBuilderDef += "};\n";
-        //     ["leftJoin", "innerJoin", "leftJoinOne", "innerJoinOne"].map(joinType => {
-        //         this.dboDefinition += `  ${joinType}: JoinMakerTables;\n`;
-        //     });
-        // }
-
-
         if(this.prostgles.opts.transactions){
             let txKey = "tx";
             if(typeof this.prostgles.opts.transactions === "string") txKey = this.prostgles.opts.transactions;
@@ -2879,7 +2835,7 @@ export class DboBuilder {
 
         if(!this.dbo.sql){
 
-            let needType = true;// this.publishRawSQL && typeof this.publishRawSQL === "function";
+            let needType = true;
             let DATA_TYPES: {oid: string, typname: PG_COLUMN_UDT_DATA_TYPE }[] = !needType? [] : await this.db.any("SELECT oid, typname FROM pg_type");
             let USER_TABLES: { relid: string; relname: string; }[] = !needType? [] :  await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
 
@@ -2985,39 +2941,21 @@ export class DboBuilder {
         this.dboDefinition += "};\n";
         
         this.tsTypesDefinition = [
-            // common_types, 
             `/* SCHEMA DEFINITON. Table names have been altered to work with Typescript */`,
-            // allDataDefs, 
-            // joinBuilderDef,
-            
-            `/* DBO Definition. Isomorphic */`,
-            // this.dboDefinition,
+            `/* DBO Definition */`,
             getDBSchema(this)
         ].join("\n");
 
         return this.dbo;
-            // let dbo = makeDBO(db, allTablesViews, pubSubManager, true);
     }
 
     getTX = (cb: TxCB) => {
         return this.db.tx((t) => {
             let dbTX: TableHandlers = {};
             this.tablesOrViews?.map(tov => {
-                if(tov.is_view){
-
-                    dbTX[tov.name] = new ViewHandler(this.db, tov, this, t, dbTX, this.joinPaths);
-                } else {
-                    dbTX[tov.name] = new TableHandler(this.db, tov, this, t, dbTX, this.joinPaths);
-                
-                    /**
-                     * Pass only the transaction object to ensure consistency
-                     */
-                    //     dbTX[tov.name] = new ViewHandler(t, tov, this.pubSubManager, this, t, this.joinPaths);
-                    // } else {
-                    //     dbTX[tov.name] = new TableHandler(t as any, tov, this.pubSubManager, this, t, this.joinPaths);
-                }
+                dbTX[tov.name] = new (tov.is_view? ViewHandler: TableHandler)(this.db, tov, this, t, dbTX, this.joinPaths);
             });
-            Object.keys(dbTX).map(k => {
+            getKeys(dbTX).map(k => {
                 dbTX[k].dbTX = dbTX;
             })
             return cb(dbTX, t);
@@ -3216,16 +3154,6 @@ async function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"):
     // console.log(pgp.as.format(query, { schema }), schema);
     let res: TableSchema[] = await db.any(query, { schema });
 
-    // res = await Promise.all(res.map(async tbl => {
-    //     tbl.columns = await Promise.all(tbl.columns.map(async col => {
-    //         if(col.has_default){
-    //             col.column_default = !col.column_default.startsWith("nextval(")? (await db.oneOrNone(`SELECT ${col.column_default} as val`)).val : null;
-    //         }
-    //         return col;
-    //     }))
-        
-    //     return tbl;
-    // }))
     res = res.map(tbl => {
         tbl.columns = tbl.columns.map(col => {
             if(col.has_default){
@@ -3245,10 +3173,8 @@ async function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"):
 
 /** 
 * Throw error if illegal keys found in object
-* @param {Object} obj - Object to be checked
-* @param {string[]} allowedKeys - The name of the employee.
 */
-function validateObj(obj: object, allowedKeys: string[]): object{
+function validateObj<T extends Record<string, any>>(obj: T, allowedKeys: string[]): T {
     if(obj && Object.keys(obj).length){
         const invalid_keys = Object.keys(obj).filter(k => !allowedKeys.includes(k));
         if(invalid_keys.length){ 
@@ -3526,15 +3452,20 @@ function sqlErrCodeToMsg(code: string){
 }
 
 
-async function getInferredJoins2(schema: TableSchema[]): Promise<Join[]>{
+async function getInferredJoins2(schema: TableSchema[]): Promise<Join[]> {
     let joins: Join[] = [];
-    const upsertJoin = (t1: string, t2: string, cols: { col1: string; col2: string }[]) => {
+    const upsertJoin = (t1: string, t2: string, cols: { col1: string; col2: string }[], type: Join["type"]) => {
         let existingIdx = joins.findIndex(j => j.tables.slice(0).sort().join() === [t1, t2].sort().join());
         let existing = joins[existingIdx];
         const normalCond = cols.reduce((a, v) => ({ ...a, [v.col1]: v.col2 }), {});
         const revertedCond = cols.reduce((a, v) => ({ ...a, [v.col2]: v.col1 }), {});
         if(existing){
-            const cond = existing.tables[0] === t1? normalCond : revertedCond;
+            const isLTR = existing.tables[0] === t1
+            const cond = isLTR? normalCond : revertedCond;
+
+            /** At some point we should add relationship type to EACH JOIN CONDITION GROUP */
+            // const fixedType = isLTR? type : type.split("").reverse().join("") as Join["type"];
+
             /** Avoid duplicates */
             if(!existing.on.some(_cond => JSON.stringify(_cond) === JSON.stringify(cond))){
                 existing.on.push(cond);
@@ -3544,7 +3475,7 @@ async function getInferredJoins2(schema: TableSchema[]): Promise<Join[]>{
             joins.push({
                 tables: [t1, t2],
                 on: [normalCond],
-                type: "many-many"
+                type
             })
         }
     }
@@ -3552,56 +3483,15 @@ async function getInferredJoins2(schema: TableSchema[]): Promise<Join[]>{
         tov.columns.map(col => {
             if(col.references){
                 const r = col.references;
-                upsertJoin(tov.name, r.ftable, r.cols.map((c, i) => ({ col1: c, col2: r.fcols[i] })))
+                const joinCols = r.cols.map((c, i) => ({ col1: c, col2: r.fcols[i] }));
+                let type: Join["type"] = "one-many";
+                const ftablePkeys = schema.find(_tov => _tov.name === r.ftable)?.columns.filter(fcol => fcol.is_pkey);
+                if(ftablePkeys?.length && ftablePkeys.every(fkey => r.fcols.includes(fkey.name))){
+                    type = "one-one";
+                }
+                upsertJoin(tov.name, r.ftable, joinCols, type)
             }
         })
     })
     return joins;
 }
-// async function getInferredJoins(db: DB, schema: string = "public"): Promise<Join[]>{
-//     let joins: Join[] = [];
-//     let res = await db.any(`SELECT
-//             tc.table_schema, 
-//             tc.constraint_name, 
-//             tc.table_name, 
-//             kcu.column_name, 
-//             ccu.table_schema AS foreign_table_schema,
-//             ccu.table_name AS foreign_table_name,
-//             ccu.column_name AS foreign_column_name,
-//             tc.constraint_type IN ('UNIQUE', 'PRIMARY KEY') as foreign_is_unique
-//         FROM 
-//             information_schema.table_constraints AS tc 
-//             JOIN information_schema.key_column_usage AS kcu
-//             ON tc.constraint_name = kcu.constraint_name
-//             AND tc.table_schema = kcu.table_schema
-//             JOIN information_schema.constraint_column_usage AS ccu
-//             ON ccu.constraint_name = tc.constraint_name
-//             AND ccu.table_schema = tc.table_schema
-//         WHERE tc.table_schema=` + "${schema}" + ` 
-//         AND tc.constraint_type = 'FOREIGN KEY' 
-//         AND tc.table_name <> ccu.table_name -- Exclude self-referencing tables
-//     `, { schema });
-        
-//     res.map((d: any) => {
-//         let eIdx = joins.findIndex(j => j.tables.includes(d.table_name) && j.tables.includes(d.foreign_table_name));
-//         let existing = joins[eIdx];
-//         if(existing){
-//             if(existing.tables[0] === d.table_name){
-//                 existing.on = { ...existing.on,  [d.column_name]:  d.foreign_column_name }
-//             } else {
-//                 existing.on = { ...existing.on,  [d.foreign_column_name]:  d.column_name }
-//             }
-//             joins[eIdx] = existing;
-//         } else {
-//             joins.push({
-//                 tables: [d.table_name, d.foreign_table_name],
-//                 on: {
-//                     [d.column_name]:  d.foreign_column_name 
-//                 },
-//                 type: "many-many"
-//             })
-//         }
-//     });
-    
-//     return joins;
-// }

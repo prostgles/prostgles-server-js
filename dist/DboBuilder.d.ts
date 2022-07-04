@@ -86,9 +86,11 @@ export declare type LocalParams = {
     dbTX?: TableHandlers;
     localDBTX?: DBHandlerServer;
     returnQuery?: boolean;
-    nestedJoin?: {
+    nestedInsert?: {
         depth: number;
-        data: AnyObject;
+        previousData: AnyObject;
+        previousTable: string;
+        referencingColumn?: string;
     };
 };
 export declare function escapeTSNames(str: string, capitalize?: boolean): string;
@@ -299,7 +301,7 @@ export declare class ViewHandler {
     * @param {FieldFilter} fieldParams - { col1: 0, col2: 0 } | { col1: true, col2: true } | "*" | ["key1", "key2"] | []
     * @param {boolean} allow_empty - allow empty select. defaults to true
     */
-    static _parseFieldFilter(fieldParams: FieldFilter<AnyObject> | undefined, allow_empty: boolean | undefined, all_cols: string[]): string[];
+    static _parseFieldFilter<AllowedKeys extends string[]>(fieldParams: FieldFilter<Record<AllowedKeys[number], any>> | undefined, allow_empty: boolean | undefined, all_cols: AllowedKeys): AllowedKeys | [""];
 }
 export declare function isPojoObject<T>(obj: T): obj is Record<string, any>;
 declare type ValidatedParams = {

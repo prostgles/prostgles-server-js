@@ -1,11 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.asSQLIdentifier = void 0;
+exports.getFileType = exports.getFileTypeFromFilename = exports.asSQLIdentifier = void 0;
 const aws_sdk_1 = require("aws-sdk");
 const fs = require("fs");
-const FileType = require("file-type");
 const sharp = require("sharp");
 const prostgles_types_1 = require("prostgles-types");
+const DboBuilder_1 = require("./DboBuilder");
 const HOUR = 3600 * 1000;
 const asSQLIdentifier = async (name, db) => {
     return (await db.one("select format('%I', $1) as name", [name]))?.name;
@@ -58,6 +58,14 @@ class FileManager {
             return res;
         };
         this.parseSQLIdentifier = async (name) => (0, exports.asSQLIdentifier)(name, this.prostgles.db); //  this.prostgles.dbo.sql<"value">("select format('%I', $1)", [name], { returnType: "value" } )
+        this.getColInfo = (args) => {
+            const { colName, tableName } = args;
+            const tableConfig = this.prostgles?.opts.fileTable?.referencedTables?.[tableName];
+            if (tableConfig && typeof tableConfig !== "string") {
+                return tableConfig.referenceColumns[colName];
+            }
+            return undefined;
+        };
         this.init = async (prg) => {
             this.prostgles = prg;
             // const { dbo, db, opts } = prg;
@@ -98,56 +106,96 @@ class FileManager {
             /**
              * 2. Create media lookup tables
              */
-            await Promise.all(Object.keys(referencedTables).map(async (refTable) => {
+            await Promise.all((0, prostgles_types_1.getKeys)(referencedTables).map(async (refTable) => {
                 if (!this.dbo[refTable])
-                    throw `Referenced table (${refTable}) from fileTable.referencedTables record is missing`;
-                // const lookupTableName = asName(`lookup_${tableName}_${refTable}`);
-                const lookupTableName = await this.parseSQLIdentifier(`prostgles_lookup_${tableName}_${refTable}`);
-                const pKeyFields = (await this.dbo[refTable].getColumns()).filter(f => f.is_pkey);
-                if (pKeyFields.length !== 1)
-                    throw `Could not make link table for ${refTable}. ${pKeyFields} must have exactly one primary key column. Current pkeys: ${pKeyFields.map(f => f.name)}`;
-                const pkField = pKeyFields[0];
-                const refType = referencedTables[refTable];
-                if (!this.dbo[lookupTableName]) {
-                    // if(!(await dbo[lookupTableName].count())) await db.any(`DROP TABLE IF EXISTS  ${lookupTableName};`);
-                    const action = ` (${tableName} <-> ${refTable}) join table ${lookupTableName}`; //  PRIMARY KEY
-                    const query = `        
-        CREATE TABLE ${lookupTableName} (
-          foreign_id  ${pkField.udt_name} ${refType === "one" ? " PRIMARY KEY " : ""} REFERENCES ${(0, prostgles_types_1.asName)(refTable)}(${(0, prostgles_types_1.asName)(pkField.name)}),
-          media_id    UUID NOT NULL REFERENCES ${(0, prostgles_types_1.asName)(tableName)}(id)
-        )
-        `;
-                    console.log(`Creating ${action} ...`, lookupTableName);
-                    await this.db.any(query);
-                    console.log(`Created ${action}`);
-                }
-                else {
-                    const cols = await this.dbo[lookupTableName].getColumns();
-                    const badCols = cols.filter(c => !c.references);
-                    await Promise.all(badCols.map(async (badCol) => {
-                        console.error(`Prostgles: media ${lookupTableName} joining table has lost a reference constraint for column ${badCol.name}.` +
-                            ` This may have been caused by a DROP TABLE ... CASCADE.`);
-                        let q = `
-            ALTER TABLE ${(0, prostgles_types_1.asName)(lookupTableName)} 
-            ADD CONSTRAINT ${(lookupTableName + "_" + badCol.name + "_r")} FOREIGN KEY (${badCol.name})
-          `;
-                        console.log("Trying to add the missing constraint back");
-                        if (badCol.name === "foreign_id") {
-                            q += `REFERENCES ${(0, prostgles_types_1.asName)(refTable)}(${(0, prostgles_types_1.asName)(pkField.name)}) `;
+                    throw `Referenced table (${refTable}) from fileTable.referencedTables prostgles init config is missing`;
+                const cols = await this.dbo[refTable].getColumns();
+                const tableConfig = referencedTables[refTable];
+                if (typeof tableConfig !== "string") {
+                    for await (const colName of (0, prostgles_types_1.getKeys)(tableConfig.referenceColumns)) {
+                        const existingCol = cols.find(c => c.name === colName);
+                        if (existingCol) {
+                            if (existingCol.references?.ftable === tableName) {
+                                // All ok
+                            }
+                            else {
+                                if (existingCol.udt_name === "uuid") {
+                                    try {
+                                        const query = `ALTER TABLE ${(0, prostgles_types_1.asName)(tableName)} ADD CONSTRAINT FOREIGN KEY (${(0, prostgles_types_1.asName)(colName)}) REFERENCES ${(0, prostgles_types_1.asName)(tableName)} (id);`;
+                                        console.log(`Referenced file column ${refTable} (${colName}) exists but is not referencing file table. Trying to add REFERENCE constraing...\n${query}`);
+                                        await this.db.any(query);
+                                        console.log("SUCCESS: " + query);
+                                    }
+                                    catch (e) {
+                                        throw new Error(`Could not add constraing. Err: ${e instanceof Error ? e.message : JSON.stringify(e)}`);
+                                    }
+                                }
+                                else {
+                                    throw new Error(`Referenced file column ${refTable} (${colName}) exists but is not of required type (UUID). Choose a different column name or ALTER the existing column to match the type and the data found in file table ${tableName}(id)`);
+                                }
+                            }
                         }
-                        else if (badCol.name === "media_id") {
-                            q += `REFERENCES ${(0, prostgles_types_1.asName)(tableName)}(id) `;
-                        }
-                        if (q) {
+                        else {
                             try {
-                                await this.db.any(q);
-                                console.log("Added missing constraint back");
+                                const query = `ALTER TABLE ${(0, prostgles_types_1.asName)(tableName)} ADD COLUMN ${(0, prostgles_types_1.asName)(colName)} UUID REFERENCES ${(0, prostgles_types_1.asName)(tableName)} (id);`;
+                                console.log(`Creating referenced file column ${refTable} (${colName})...\n${query}`);
+                                await this.db.any(query);
+                                console.log("SUCCESS: " + query);
                             }
                             catch (e) {
-                                console.error("Failed to add missing constraint", e);
+                                throw new Error(`FAILED. Err: ${e instanceof Error ? e.message : JSON.stringify(e)}`);
                             }
                         }
-                    }));
+                    }
+                }
+                else {
+                    const lookupTableName = await this.parseSQLIdentifier(`prostgles_lookup_${tableName}_${refTable}`);
+                    const pKeyFields = cols.filter(f => f.is_pkey);
+                    if (pKeyFields.length !== 1)
+                        throw `Could not make link table for ${refTable}. ${pKeyFields} must have exactly one primary key column. Current pkeys: ${pKeyFields.map(f => f.name)}`;
+                    const pkField = pKeyFields[0];
+                    const refType = referencedTables[refTable];
+                    if (!this.dbo[lookupTableName]) {
+                        // if(!(await dbo[lookupTableName].count())) await db.any(`DROP TABLE IF EXISTS  ${lookupTableName};`);
+                        const action = ` (${tableName} <-> ${refTable}) join table ${lookupTableName}`; //  PRIMARY KEY
+                        const query = `        
+          CREATE TABLE ${lookupTableName} (
+            foreign_id  ${pkField.udt_name} ${refType === "one" ? " PRIMARY KEY " : ""} REFERENCES ${(0, prostgles_types_1.asName)(refTable)}(${(0, prostgles_types_1.asName)(pkField.name)}),
+            media_id    UUID NOT NULL REFERENCES ${(0, prostgles_types_1.asName)(tableName)}(id)
+          )
+          `;
+                        console.log(`Creating ${action} ...`, lookupTableName);
+                        await this.db.any(query);
+                        console.log(`Created ${action}`);
+                    }
+                    else {
+                        const cols = await this.dbo[lookupTableName].getColumns();
+                        const badCols = cols.filter(c => !c.references);
+                        await Promise.all(badCols.map(async (badCol) => {
+                            console.error(`Prostgles: media ${lookupTableName} joining table has lost a reference constraint for column ${badCol.name}.` +
+                                ` This may have been caused by a DROP TABLE ... CASCADE.`);
+                            let q = `
+              ALTER TABLE ${(0, prostgles_types_1.asName)(lookupTableName)} 
+              ADD CONSTRAINT ${(lookupTableName + "_" + badCol.name + "_r")} FOREIGN KEY (${badCol.name})
+            `;
+                            console.log("Trying to add the missing constraint back");
+                            if (badCol.name === "foreign_id") {
+                                q += `REFERENCES ${(0, prostgles_types_1.asName)(refTable)}(${(0, prostgles_types_1.asName)(pkField.name)}) `;
+                            }
+                            else if (badCol.name === "media_id") {
+                                q += `REFERENCES ${(0, prostgles_types_1.asName)(tableName)}(id) `;
+                            }
+                            if (q) {
+                                try {
+                                    await this.db.any(q);
+                                    console.log("Added missing constraint back");
+                                }
+                                catch (e) {
+                                    console.error("Failed to add missing constraint", e);
+                                }
+                            }
+                        }));
+                    }
                 }
                 await prg.refreshDBO();
                 return true;
@@ -228,63 +276,108 @@ class FileManager {
         return this.prostgles.db;
     }
     ;
-    async getMIME(file, fileName, allowedExtensions, dissallowedExtensions, onlyFromName = true) {
-        const nameParts = fileName.split(".");
-        const nameExt = nameParts[nameParts.length - 1].toLowerCase(), mime = (0, prostgles_types_1.getKeys)(CONTENT_TYPE_TO_EXT).find(k => CONTENT_TYPE_TO_EXT[k].includes(nameExt));
-        let type = {
-            fileName,
-            mime,
-            ext: nameExt,
-        };
-        if (onlyFromName && !mime)
-            throw `Invalid file extension: content_type could not be found for extension(${nameExt})`;
-        if (!mime) {
-            /* Set correct/missing extension */
-            if (["xml", "txt", "csv", "tsv", "doc"].includes(nameExt)) {
-                type = { ...type, mime: ("text/" + nameExt), ext: nameExt };
-            }
-            else if (["svg"].includes(nameExt)) {
-                type = { ...type, mime: "image/svg+xml", ext: nameExt };
-            }
-            else if (Buffer.isBuffer(file)) {
-                const res = await FileType.fromBuffer(file);
-                type = {
-                    ...res,
-                    fileName,
-                };
-            }
-            else if (typeof file === "string") {
-                const res = await FileType.fromFile(file);
-                type = {
-                    ...res,
-                    fileName,
-                };
-            }
-            else {
-                throw "Unexpected file. Expecting: Buffer | String";
+    async parseFile(args) {
+        const { file, fileName, tableName, colName } = args;
+        const config = this.prostgles?.opts.fileTable;
+        if (!config)
+            throw new Error("File table config missing");
+        const buffer = typeof file === "string" ? Buffer.from(file, 'utf8') : file;
+        const mime = await (0, exports.getFileType)(buffer, fileName);
+        if (tableName && colName) {
+            const tableConfig = config.referencedTables?.[tableName];
+            if (tableConfig && (0, prostgles_types_1.isObject)(tableConfig) && tableConfig.referenceColumns[colName]) {
+                const colConfig = tableConfig.referenceColumns[colName];
+                if (colConfig.maxFileSizeMB) {
+                    const actualBufferSize = Buffer.byteLength(buffer);
+                    if ((actualBufferSize / 1e6) > colConfig.maxFileSizeMB) {
+                        throw new Error(`Provided file is larger than the ${colConfig.maxFileSizeMB}MB limit`);
+                    }
+                }
+                if ("acceptedContent" in colConfig && colConfig.acceptedContent) {
+                    const CONTENTS = [
+                        "image",
+                        "audio",
+                        "video",
+                        "text",
+                        "application",
+                    ];
+                    const allowedContent = DboBuilder_1.ViewHandler._parseFieldFilter(colConfig.acceptedContent, false, CONTENTS);
+                    if (!allowedContent.some(c => mime.mime.startsWith(c))) {
+                        throw new Error(`Dissallowed content type provided: ${mime.mime.split("/")[0]}. Allowed content types: ${allowedContent} `);
+                    }
+                }
+                else if ("acceptedContentType" in colConfig && colConfig.acceptedContentType) {
+                    const allowedContentTypes = DboBuilder_1.ViewHandler._parseFieldFilter(colConfig.acceptedContentType, false, (0, prostgles_types_1.getKeys)(prostgles_types_1.CONTENT_TYPE_TO_EXT));
+                    if (!allowedContentTypes.some(c => c === mime.mime)) {
+                        throw new Error(`Dissallowed MIME provided: ${mime.mime}. Allowed MIME values: ${allowedContentTypes} `);
+                    }
+                }
+                else if ("acceptedFileTypes" in colConfig && colConfig.acceptedFileTypes) {
+                    const allowedExtensions = DboBuilder_1.ViewHandler._parseFieldFilter(colConfig.acceptedFileTypes, false, Object.values(prostgles_types_1.CONTENT_TYPE_TO_EXT).flat());
+                    if (!allowedExtensions.some(c => c === mime.ext)) {
+                        throw new Error(`Dissallowed extension provided: ${mime.ext}. Allowed extension values: ${allowedExtensions} `);
+                    }
+                }
             }
         }
-        if (allowedExtensions &&
-            !allowedExtensions.map(v => v.toLowerCase())?.includes(type.ext)) {
-            throw fileName + " -> File type ( " + type.ext + " ) not allowed. Expecting one of: " + allowedExtensions.map(v => v.toLowerCase()).join(", ");
-        }
-        else if (dissallowedExtensions &&
-            dissallowedExtensions.map(v => v.toLowerCase())?.includes(type.ext)) {
-            throw fileName + " -> File type ( " + type.ext + " ) not allowed";
-        }
-        if (!onlyFromName) {
-            let { ext } = type;
-            if (nameExt !== ext)
-                fileName = nameParts.slice(0, -1).join('') + "." + ext;
-        }
-        const res = {
-            ...type,
-            fileName
-        };
-        if (!res.mime)
-            throw "Could not find mime";
-        return res;
+        return mime;
     }
+    // private async getMIME(
+    //   file: Buffer | string, 
+    //   fileName: string, 
+    //   allowedExtensions?: Array<ALLOWED_EXTENSION>,
+    //   dissallowedExtensions?: Array<ALLOWED_EXTENSION>,
+    //   onlyFromName = true
+    // ): Promise<{
+    //   mime: string;
+    //   ext: string | ALLOWED_EXTENSION;
+    //   fileName: string;
+    // }> {
+    //   const nameParts = fileName.split(".");
+    //   const nameExt = nameParts[nameParts.length - 1].toLowerCase(),
+    //     mime = getKeys(CONTENT_TYPE_TO_EXT).find(k => (CONTENT_TYPE_TO_EXT[k] as readonly string[]).includes(nameExt));
+    //   let type = {
+    //     fileName,
+    //     mime,
+    //     ext: nameExt,
+    //   }
+    //   if(onlyFromName && !mime) throw `Invalid file extension: content_type could not be found for extension(${nameExt})`;
+    //   if(!mime){
+    //     /* Set correct/missing extension */
+    //     if(["xml", "txt", "csv", "tsv"].includes(nameExt)){
+    //       type = { ...type, mime: ("text/" + nameExt) as any, ext: nameExt };
+    //     } else if(["svg"].includes(nameExt)){
+    //       type = { ...type, mime: "image/svg+xml", ext: nameExt };
+    //     } else {
+    //       const res = await getFileTypeFromBuffer(file);
+    //       type = {
+    //         ...(res as any),
+    //         fileName,
+    //       }
+    //     }
+    //   }
+    //   if(
+    //     allowedExtensions &&
+    //     !allowedExtensions.map(v => v.toLowerCase())?.includes(type.ext)
+    //   ){
+    //     throw fileName + " -> File type ( " + type.ext + " ) not allowed. Expecting one of: " + allowedExtensions.map(v => v.toLowerCase()).join(", ");
+    //   } else if(
+    //     dissallowedExtensions &&
+    //     dissallowedExtensions.map(v => v.toLowerCase())?.includes(type.ext)
+    //   ){
+    //     throw fileName + " -> File type ( " + type.ext + " ) not allowed";
+    //   }
+    //   if(!onlyFromName){
+    //     let { ext } = type;
+    //     if(nameExt !== ext) fileName = nameParts.slice(0, -1).join('') + "." + ext;
+    //   }
+    //   const res = {
+    //     ...type,
+    //     fileName
+    //   }
+    //   if(!res.mime) throw "Could not find mime"
+    //   return res as any;
+    // }
     // async getUploadURL(fileName: string): Promise<string> {
     //   const thisHour = new Date();
     //   thisHour.setMilliseconds(0);
@@ -368,72 +461,43 @@ class FileManager {
     }
 }
 exports.default = FileManager;
-const CONTENT_TYPE_TO_EXT = {
-    "text/html": ["html", "htm", "shtml"],
-    "text/css": ["css"],
-    "text/xml": ["xml"],
-    "text/mathml": ["mml"],
-    "text/plain": ["txt"],
-    "text/vnd.sun.j2me.app-descriptor": ["jad"],
-    "text/vnd.wap.wml": ["wml"],
-    "text/x-component": ["htc"],
-    "image/gif": ["gif"],
-    "image/jpeg": ["jpeg", "jpg"],
-    "image/png": ["png"],
-    "image/tiff": ["tif", "tiff"],
-    "image/vnd.wap.wbmp": ["wbmp"],
-    "image/x-icon": ["ico"],
-    "image/x-jng": ["jng"],
-    "image/x-ms-bmp": ["bmp"],
-    "image/svg+xml": ["svg"],
-    "image/webp": ["webp"],
-    "application/x-javascript": ["js"],
-    "application/atom+xml": ["atom"],
-    "application/rss+xml": ["rss"],
-    "application/java-archive": ["jar", "war", "ear"],
-    "application/mac-binhex40": ["hqx"],
-    "application/msword": ["doc", "docx"],
-    "application/pdf": ["pdf"],
-    "application/postscript": ["ps", "eps", "ai"],
-    "application/rtf": ["rtf"],
-    "application/vnd.ms-excel": ["xls", "xlsx"],
-    "application/vnd.ms-powerpoint": ["ppt", "pptx"],
-    "application/vnd.wap.wmlc": ["wmlc"],
-    "application/vnd.google-earth.kml+xml": ["kml"],
-    "application/vnd.google-earth.kmz": ["kmz"],
-    "application/x-7z-compressed": ["7z"],
-    "application/x-cocoa": ["cco"],
-    "application/x-java-archive-diff": ["jardiff"],
-    "application/x-java-jnlp-file": ["jnlp"],
-    "application/x-makeself": ["run"],
-    "application/x-perl": ["pl", "pm"],
-    "application/x-pilot": ["prc", "pdb"],
-    "application/x-rar-compressed": ["rar"],
-    "application/x-redhat-package-manager": ["rpm"],
-    "application/x-sea": ["sea"],
-    "application/x-shockwave-flash": ["swf"],
-    "application/x-stuffit": ["sit"],
-    "application/x-tcl": ["tcl", "tk"],
-    "application/x-x509-ca-cert": ["der", "pem", "crt"],
-    "application/x-xpinstall": ["xpi"],
-    "application/xhtml+xml": ["xhtml"],
-    "application/zip": ["zip"],
-    "application/octet-stream": ["bin", "exe", "dll", "deb", "dmg", "eot", "iso", "img", "msi", "msp", "msm"],
-    "audio/midi": ["mid", "midi", "kar"],
-    "audio/mpeg": ["mp3"],
-    "audio/ogg": ["ogg"],
-    "audio/x-realaudio": ["ra"],
-    "video/3gpp": ["3gpp", "3gp"],
-    "video/mpeg": ["mpeg", "mpg"],
-    "video/quicktime": ["mov"],
-    "video/x-flv": ["flv"],
-    "video/x-mng": ["mng"],
-    "video/x-ms-asf": ["asx", "asf"],
-    "video/x-ms-wmv": ["wmv"],
-    "video/x-msvideo": ["avi"],
-    "video/mp4": ["m4v", "mp4"],
-    "video/webm": ["webm"],
+const getFileTypeFromFilename = (fileName) => {
+    const nameParts = fileName.split(".");
+    if (!nameParts.length)
+        return undefined;
+    const nameExt = nameParts[nameParts.length - 1].toLowerCase(), mime = (0, prostgles_types_1.getKeys)(prostgles_types_1.CONTENT_TYPE_TO_EXT).find(k => prostgles_types_1.CONTENT_TYPE_TO_EXT[k].includes(nameExt));
+    if (!mime)
+        return undefined;
+    return {
+        mime,
+        ext: nameExt,
+    };
 };
+exports.getFileTypeFromFilename = getFileTypeFromFilename;
+// const fileType = require("file-type");
+// const res = await fileType.fromBuffer(typeof file === "string"? Buffer.from(file, 'utf8') : file);
+const getFileType = async (file, fileName) => {
+    const { fileTypeFromBuffer } = await eval('import("file-type")');
+    const fileNameMime = (0, exports.getFileTypeFromFilename)(fileName);
+    if (!fileNameMime?.ext)
+        throw new Error("File name must contain extenions");
+    const res = await fileTypeFromBuffer(typeof file === "string" ? Buffer.from(file, 'utf8') : file);
+    if (!res) {
+        /* Set correct/missing extension */
+        const nameExt = fileNameMime?.ext;
+        if (["xml", "txt", "csv", "tsv", "svg"].includes(nameExt)) {
+            return fileNameMime;
+        }
+        throw new Error("Could not get the file type from file buffer");
+    }
+    else {
+        if (!res.ext || fileNameMime?.ext.toLowerCase() !== res.ext.toLowerCase()) {
+            throw new Error(`There is a mismatch between file name extension and actual buffer extension: ${fileNameMime?.ext} vs ${res.ext}`);
+        }
+    }
+    return res;
+};
+exports.getFileType = getFileType;
 /**
  *
  

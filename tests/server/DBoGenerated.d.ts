@@ -2,7 +2,7 @@
 */ 
 
  /* SCHEMA DEFINITON. Table names have been altered to work with Typescript */
-/* DBO Definition. Isomorphic */
+/* DBO Definition */
 
 export type DBSchemaGenerated = {
   "\"*\"": {

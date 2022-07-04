@@ -7,7 +7,7 @@ import TableConfigurator, { TableConfig } from "./TableConfig";
 import { DboBuilder, DBHandlerServer, PRGLIOSocket } from "./DboBuilder";
 export { DBHandlerServer };
 export declare type PGP = pgPromise.IMain<{}, pg.IClient>;
-import { AnyObject } from "prostgles-types";
+import { AnyObject, FileColumnConfig } from "prostgles-types";
 import { Publish, PublishMethods, PublishParams, PublishParser } from "./PublishParser";
 import { DBEventsManager } from "./DBEventsManager";
 export declare type DB = pgPromise.IDatabase<{}, pg.IClient>;
@@ -76,7 +76,18 @@ export declare type FileTableConfig = {
     localConfig?: LocalConfig;
     expressApp: ExpressApp;
     referencedTables?: {
-        [tableName: string]: "one" | "many";
+        [tableName: string]: "one" | "many"
+        /**
+         * If defined then will try to create (if necessary) a column in the files table which will reference this table's primary key (must have one)
+         * */
+        /**
+         * If defined then will try to create (if necessary) this column which will reference files_table(id)
+         * Prostgles UI will use these hints (obtained through tableHandler.getInfo())
+         * */
+         | {
+            type: "column";
+            referenceColumns: Record<string, FileColumnConfig>;
+        };
     };
     imageOptions?: ImageOptions;
 };
