@@ -373,9 +373,13 @@ export default class FileManager {
 
   getColInfo = (args: { tableName: string; colName: string }): ValidatedColumnInfo["file"] | undefined => {
     const { colName, tableName } = args;
-    const tableConfig = this.prostgles?.opts.fileTable?.referencedTables?.[tableName]
-    if(tableConfig && typeof tableConfig !== "string"){
-      return tableConfig.referenceColumns[colName];
+    const tableConfig = this.prostgles?.opts.fileTable?.referencedTables?.[tableName];
+    const isReferencingFileTable = this.dbo[tableName]?.columns?.some(c => c.name === colName && c.references && c.references?.ftable === this.tableName);
+    if(isReferencingFileTable){
+      if(tableConfig && typeof tableConfig !== "string"){
+        return tableConfig.referenceColumns[colName];
+      }
+      return { acceptedContent: "*" };
     }
     return undefined;
   }
