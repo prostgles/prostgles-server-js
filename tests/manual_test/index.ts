@@ -11,7 +11,7 @@ process.on('unhandledRejection', (reason, p) => {
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-const _http = require("http");
+import _http from "http";
 const http = _http.createServer(app);
 const io = require("socket.io")(http, { 
   path: "/s" 

@@ -113,7 +113,7 @@ class FileManager {
              */
             await Promise.all((0, prostgles_types_1.getKeys)(referencedTables).map(async (refTable) => {
                 if (!this.dbo[refTable])
-                    throw `Referenced table (${refTable}) from fileTable.referencedTables prostgles init config is missing`;
+                    throw `Referenced table (${refTable}) from fileTable.referencedTables prostgles init config does not exist`;
                 const cols = await this.dbo[refTable].getColumns();
                 const tableConfig = referencedTables[refTable];
                 if (typeof tableConfig !== "string") {
@@ -327,62 +327,6 @@ class FileManager {
         }
         return mime;
     }
-    // private async getMIME(
-    //   file: Buffer | string, 
-    //   fileName: string, 
-    //   allowedExtensions?: Array<ALLOWED_EXTENSION>,
-    //   dissallowedExtensions?: Array<ALLOWED_EXTENSION>,
-    //   onlyFromName = true
-    // ): Promise<{
-    //   mime: string;
-    //   ext: string | ALLOWED_EXTENSION;
-    //   fileName: string;
-    // }> {
-    //   const nameParts = fileName.split(".");
-    //   const nameExt = nameParts[nameParts.length - 1].toLowerCase(),
-    //     mime = getKeys(CONTENT_TYPE_TO_EXT).find(k => (CONTENT_TYPE_TO_EXT[k] as readonly string[]).includes(nameExt));
-    //   let type = {
-    //     fileName,
-    //     mime,
-    //     ext: nameExt,
-    //   }
-    //   if(onlyFromName && !mime) throw `Invalid file extension: content_type could not be found for extension(${nameExt})`;
-    //   if(!mime){
-    //     /* Set correct/missing extension */
-    //     if(["xml", "txt", "csv", "tsv"].includes(nameExt)){
-    //       type = { ...type, mime: ("text/" + nameExt) as any, ext: nameExt };
-    //     } else if(["svg"].includes(nameExt)){
-    //       type = { ...type, mime: "image/svg+xml", ext: nameExt };
-    //     } else {
-    //       const res = await getFileTypeFromBuffer(file);
-    //       type = {
-    //         ...(res as any),
-    //         fileName,
-    //       }
-    //     }
-    //   }
-    //   if(
-    //     allowedExtensions &&
-    //     !allowedExtensions.map(v => v.toLowerCase())?.includes(type.ext)
-    //   ){
-    //     throw fileName + " -> File type ( " + type.ext + " ) not allowed. Expecting one of: " + allowedExtensions.map(v => v.toLowerCase()).join(", ");
-    //   } else if(
-    //     dissallowedExtensions &&
-    //     dissallowedExtensions.map(v => v.toLowerCase())?.includes(type.ext)
-    //   ){
-    //     throw fileName + " -> File type ( " + type.ext + " ) not allowed";
-    //   }
-    //   if(!onlyFromName){
-    //     let { ext } = type;
-    //     if(nameExt !== ext) fileName = nameParts.slice(0, -1).join('') + "." + ext;
-    //   }
-    //   const res = {
-    //     ...type,
-    //     fileName
-    //   }
-    //   if(!res.mime) throw "Could not find mime"
-    //   return res as any;
-    // }
     // async getUploadURL(fileName: string): Promise<string> {
     //   const thisHour = new Date();
     //   thisHour.setMilliseconds(0);
