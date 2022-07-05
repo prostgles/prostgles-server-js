@@ -1,6 +1,6 @@
 import pgPromise from "pg-promise";
-import { AnyObject, asName, FieldFilter, get, InsertParams, isObject } from "prostgles-types";
-import { isPojoObject, LocalParams, makeErr, parseError, pgp, TableHandler } from "../DboBuilder";
+import { AnyObject, asName, FieldFilter, get, getKeys, InsertParams, isObject } from "prostgles-types";
+import { isPlainObject, isPojoObject, LocalParams, makeErr, parseError, pgp, TableHandler } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 
 export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: undefined, tableRules?: TableRule, _localParams?: LocalParams): Promise<any | any[] | boolean> {
@@ -125,12 +125,22 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
   } catch (e) {
     if (localParams && localParams.testRule) throw e;
 
+    const removeBuffers = (o: any) => {
+      if(isPlainObject(o)){
+        return JSON.stringify(getKeys(o).reduce((a, k) => {
+          const value = o[k]
+          return { ...a, [k]: Buffer.isBuffer(value)? `Buffer[${value.byteLength}][...REMOVED]` : value 
+        }
+      }, {}));
+      }
+    }
     // ${JSON.stringify(rowOrRows || {}, null, 2)}, 
     // ${JSON.stringify(param2 || {}, null, 2)}
     throw {
-      err: parseError(e), msg: `Issue with dbo.${this.name}.insert(...)`,
+      err: isPlainObject(e) && e.err? e.err : parseError(e), 
+      msg:  isPlainObject(e) && e.msg? e.msg : `Issue with dbo.${this.name}.insert(...)`,
       args: {
-        1: rowOrRows,
+        1: Array.isArray(rowOrRows)? rowOrRows.map(r => removeBuffers(r)) : isPlainObject(rowOrRows)? removeBuffers(rowOrRows) : rowOrRows,
         2: param2
       }
     };

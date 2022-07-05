@@ -534,11 +534,11 @@ export default class FileManager {
   }
 }
 
-export const getFileTypeFromFilename = (fileName: string): { mime: ALLOWED_CONTENT_TYPE; ext: ALLOWED_EXTENSION } | undefined => {
+export const getFileTypeFromFilename = (fileName: string): { mime: ALLOWED_CONTENT_TYPE; ext: ALLOWED_EXTENSION | string } | undefined => {
 
   const nameParts = fileName.split(".");
 
-  if(!nameParts.length) return undefined;
+  if(nameParts.length < 2) return undefined;
 
   const nameExt = nameParts[nameParts.length - 1].toLowerCase(),
     mime = getKeys(CONTENT_TYPE_TO_EXT).find(k => (CONTENT_TYPE_TO_EXT[k] as readonly string[]).includes(nameExt));
@@ -559,15 +559,15 @@ export const getFileType = async (file: Buffer | string, fileName: string): Prom
   const { fileTypeFromBuffer } = await (eval('import("file-type")') as Promise<typeof import('file-type')>);
   
   const fileNameMime = getFileTypeFromFilename(fileName);
-  if(!fileNameMime?.ext) throw new Error("File name must contain extenions")
+  if(!fileNameMime?.ext) throw new Error("File name must contain extenion")
   const res = await fileTypeFromBuffer(typeof file === "string"? Buffer.from(file, 'utf8') : file);
   
   if(!res) {
 
     /* Set correct/missing extension */
     const nameExt = fileNameMime?.ext;
-    if(["xml", "txt", "csv", "tsv", "svg"].includes(nameExt)){
-      return fileNameMime
+    if(["xml", "txt", "csv", "tsv", "svg"].includes(nameExt) && fileNameMime.mime){
+      return fileNameMime as any;
     } 
     
     throw new Error("Could not get the file type from file buffer");

@@ -87,7 +87,7 @@ export default class FileManager {
 }
 export declare const getFileTypeFromFilename: (fileName: string) => {
     mime: ALLOWED_CONTENT_TYPE;
-    ext: ALLOWED_EXTENSION;
+    ext: ALLOWED_EXTENSION | string;
 } | undefined;
 export declare const getFileType: (file: Buffer | string, fileName: string) => Promise<{
     mime: ALLOWED_CONTENT_TYPE;
