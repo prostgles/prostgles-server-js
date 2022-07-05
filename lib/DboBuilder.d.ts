@@ -23,7 +23,7 @@ export declare type TX = {
 export declare type TableHandlers = {
     [key: string]: Partial<TableHandler> | TableHandler;
 };
-export declare type DBHandlerServer = TableHandlers & DbJoinMaker & {
+export declare type DBHandlerServer = TableHandlers & Partial<DbJoinMaker> & {
     sql?: SQLHandler;
 } & {
     tx?: TX;
@@ -369,7 +369,6 @@ export declare class DboBuilder {
     _pubSubManager?: PubSubManager;
     getPubSubManager: () => Promise<PubSubManager>;
     pojoDefinitions?: string[];
-    dboDefinition?: string;
     tsTypesDefinition?: string;
     joins?: Join[];
     joinGraph?: Graph;

@@ -55,7 +55,7 @@ export type TableHandlers = {
 
 export type DBHandlerServer = 
   TableHandlers & 
-  DbJoinMaker & {
+  Partial<DbJoinMaker> & {
     sql?: SQLHandler
   } & {
     tx?: TX
@@ -2606,7 +2606,7 @@ export class DboBuilder {
     }
 
     pojoDefinitions?: string[];
-    dboDefinition?: string;
+    // dboDefinition?: string;
 
     tsTypesDefinition?: string;
 
@@ -2771,6 +2771,7 @@ export class DboBuilder {
         this.constraints = await getConstraints(this.db);
         await this.parseJoins();
 
+        this.dbo = {};
         this.tablesOrViews.map(tov => {
             const columnsForTypes = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
             
@@ -2824,7 +2825,6 @@ export class DboBuilder {
         if(this.prostgles.opts.transactions){
             let txKey = "tx";
             if(typeof this.prostgles.opts.transactions === "string") txKey = this.prostgles.opts.transactions;
-            this.dboDefinition += ` ${txKey}: (t: TxCB) => Promise<any | void> ;\n`;
 
             (this.dbo[txKey] as unknown as TX) = (cb: TxCB) => this.getTX(cb);
         }
@@ -2933,8 +2933,6 @@ export class DboBuilder {
         } else {
             console.warn(`Could not create dbo.sql handler because there is already a table named "sql"`)
         }
-
-        this.dboDefinition += "};\n";
         
         this.tsTypesDefinition = [
             `/* SCHEMA DEFINITON. Table names have been altered to work with Typescript */`,
@@ -2958,16 +2956,6 @@ export class DboBuilder {
         });
     }
 }
-
-
-
-// export async function makeDBO(db: DB): Promise<DBHandlerServer> {
-//     return await DBO.build(db, "public");
-// }
-
-
-/* UTILS */
-
 
 
 

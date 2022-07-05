@@ -2098,6 +2098,7 @@ class DboBuilder {
         this.tablesOrViews = await getTablesForSchemaPostgresSQL(this.db);
         this.constraints = await getConstraints(this.db);
         await this.parseJoins();
+        this.dbo = {};
         this.tablesOrViews.map(tov => {
             const columnsForTypes = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
             const filterKeywords = Object.values(this.prostgles.keywords);
@@ -2140,7 +2141,6 @@ class DboBuilder {
             let txKey = "tx";
             if (typeof this.prostgles.opts.transactions === "string")
                 txKey = this.prostgles.opts.transactions;
-            this.dboDefinition += ` ${txKey}: (t: TxCB) => Promise<any | void> ;\n`;
             this.dbo[txKey] = (cb) => this.getTX(cb);
         }
         if (!this.dbo.sql) {
@@ -2240,7 +2240,6 @@ class DboBuilder {
         else {
             console.warn(`Could not create dbo.sql handler because there is already a table named "sql"`);
         }
-        this.dboDefinition += "};\n";
         this.tsTypesDefinition = [
             `/* SCHEMA DEFINITON. Table names have been altered to work with Typescript */`,
             `/* DBO Definition */`,
