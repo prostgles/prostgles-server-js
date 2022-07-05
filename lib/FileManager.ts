@@ -397,6 +397,8 @@ export default class FileManager {
     const maxBfSizeMB = (prg.opts.io?.engine?.opts?.maxHttpBufferSize || 1e6)/1e6;
     console.log(`Prostgles: Initiated file manager. Max allowed file size: ${maxBfSizeMB}MB (maxHttpBufferSize = 1e6). To increase this set maxHttpBufferSize in socket.io server init options`);
 
+    // throw `this.db.tx(d => do everything in a transaction pls!!!!`;
+
     // throw "Why are constraints dissapearing?"
     /**
      * 1. Create media table

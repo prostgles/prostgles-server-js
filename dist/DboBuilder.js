@@ -2094,8 +2094,6 @@ class DboBuilder {
         }
         return this.joinPaths;
     }
-    buildJoinPaths() {
-    }
     async build() {
         this.tablesOrViews = await getTablesForSchemaPostgresSQL(this.db);
         this.constraints = await getConstraints(this.db);

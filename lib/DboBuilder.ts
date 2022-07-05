@@ -2764,10 +2764,6 @@ export class DboBuilder {
         return this.joinPaths;
     }
 
-    buildJoinPaths(){
-        
-    }
-
     async build(): Promise<DBHandlerServer>{
 
         this.tablesOrViews = await getTablesForSchemaPostgresSQL(this.db);

@@ -387,7 +387,6 @@ export declare class DboBuilder {
     getJoins(): Join[] | undefined;
     getJoinPaths(): JoinPaths;
     parseJoins(): Promise<JoinPaths>;
-    buildJoinPaths(): void;
     build(): Promise<DBHandlerServer>;
     getTX: (cb: TxCB) => Promise<any>;
 }

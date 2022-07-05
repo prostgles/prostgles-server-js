@@ -74,7 +74,10 @@ export class PostgresNotifListenManager {
     }
 
     destroy = () => {
-        if(this.connection) this.connection.done();
+        if(this.connection) {
+            this.connection.done();
+            this.connection = undefined;
+        }
     }
 
     stopListening = () => {

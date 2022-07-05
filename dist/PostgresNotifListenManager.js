@@ -8,8 +8,10 @@ exports.PostgresNotifListenManager = void 0;
 class PostgresNotifListenManager {
     constructor(db_pg, notifListener, db_channel_name, noInit = false) {
         this.destroy = () => {
-            if (this.connection)
+            if (this.connection) {
                 this.connection.done();
+                this.connection = undefined;
+            }
         };
         this.stopListening = () => {
             if (this.db_channel_name) {

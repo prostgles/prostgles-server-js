@@ -414,8 +414,12 @@ export class Prostgles {
   }
 
   refreshDBO = async () => {
-    if (this._dboBuilder) this._dboBuilder.destroy();
-    this.dboBuilder = await DboBuilder.create(this as any) as any;
+    if (this._dboBuilder) {
+      await this._dboBuilder.build();
+      // this._dboBuilder.destroy();
+    } else {
+      this.dboBuilder = await DboBuilder.create(this as any) as any;
+    }
     if (!this.dboBuilder) throw "this.dboBuilder"
     this.dbo = this.dboBuilder.dbo as any;
     return this.dbo;
@@ -447,7 +451,7 @@ export class Prostgles {
         this.schema_checkIntervalMillis = setInterval(async () => {
           const dbuilder = await DboBuilder.create(this as any);
           if (dbuilder.tsTypesDefinition !== this.dboBuilder.tsTypesDefinition) {
-            this.refreshDBO();
+            await this.refreshDBO();
             this.init(onReady);
           }
         }, this.opts.watchSchemaType.checkIntervalMillis)

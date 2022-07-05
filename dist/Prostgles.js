@@ -90,9 +90,13 @@ class Prostgles {
         this.loaded = false;
         this.destroyed = false;
         this.refreshDBO = async () => {
-            if (this._dboBuilder)
-                this._dboBuilder.destroy();
-            this.dboBuilder = await DboBuilder_1.DboBuilder.create(this);
+            if (this._dboBuilder) {
+                await this._dboBuilder.build();
+                // this._dboBuilder.destroy();
+            }
+            else {
+                this.dboBuilder = await DboBuilder_1.DboBuilder.create(this);
+            }
             if (!this.dboBuilder)
                 throw "this.dboBuilder";
             this.dbo = this.dboBuilder.dbo;
@@ -290,7 +294,7 @@ class Prostgles {
                 this.schema_checkIntervalMillis = setInterval(async () => {
                     const dbuilder = await DboBuilder_1.DboBuilder.create(this);
                     if (dbuilder.tsTypesDefinition !== this.dboBuilder.tsTypesDefinition) {
-                        this.refreshDBO();
+                        await this.refreshDBO();
                         this.init(onReady);
                     }
                 }, this.opts.watchSchemaType.checkIntervalMillis);
