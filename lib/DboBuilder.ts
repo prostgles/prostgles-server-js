@@ -2448,8 +2448,8 @@ export class TableHandler extends ViewHandler {
                         if(!tbl.t) throw new Error("Missing transaction object t");
                         const files = await this.find(filterOpts.filter);
                         for await(const file of files){
-                            await tbl.dboBuilder.prostgles.fileManager?.deleteFile(file.name);
                             await tbl.t?.any(`DELETE FROM ${asName(this.name)} WHERE id = ` + "${id}", file);
+                            await tbl.dboBuilder.prostgles.fileManager?.deleteFile(file.name);
                         }
 
                         if(returning){
