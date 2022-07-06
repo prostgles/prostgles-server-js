@@ -1828,7 +1828,7 @@ class TableHandler extends ViewHandler {
                         const files = await this.find(filterOpts.filter);
                         for await (const file of files) {
                             await tbl.dboBuilder.prostgles.fileManager?.deleteFile(file.name);
-                            await tbl.t?.any(`DELETE FROM ${(0, prostgles_types_1.asName)(this.name)} ${filterOpts.where} WHERE id = ` + "${id}", file);
+                            await tbl.t?.any(`DELETE FROM ${(0, prostgles_types_1.asName)(this.name)} WHERE id = ` + "${id}", file);
                         }
                         if (returning) {
                             return files.map(f => (0, PubSubManager_1.pickKeys)(f, ["id", "name"]));
