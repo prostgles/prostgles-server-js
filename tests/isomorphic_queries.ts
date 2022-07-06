@@ -539,10 +539,11 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
 
   });
 
+  const fileName = "sample_file.txt"
   await tryRun("Local file upload", async () => {
     let str = "This is a string",
       data = Buffer.from(str, "utf-8"),
-      mediaFile = { data, name: "sample_file.txt" }
+      mediaFile = { data, name: fileName }
 
     const file = await db.media.insert(mediaFile, { returning: "*" });
     const _data = fs.readFileSync(__dirname + "/server/media/"+file.name);
@@ -579,6 +580,12 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
     //   );
     // });
   });
+
+  await tryRun("Local file delete", async () => {
+
+    const file = await db.media.delete({ name: fileName }, { returning: "*" });
+    
+  })
 
   
   await tryRun("Exists filter example", async () => {

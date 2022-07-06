@@ -2445,11 +2445,11 @@ export class TableHandler extends ViewHandler {
                 } else {
                     
                     const txDelete = async (tbl: TableHandler) => {
-
+                        if(!tbl.t) throw new Error("Missing transaction object t");
                         const files = await this.find(filterOpts.filter);
                         for await(const file of files){
                             await tbl.dboBuilder.prostgles.fileManager?.deleteFile(file.name);
-                            await tbl.delete({ id: file.id });
+                            await tbl.t?.any(`DELETE FROM ${asName(this.name)} ${filterOpts.where} WHERE id = ` + "${id}", file);
                         }
 
                         if(returning){

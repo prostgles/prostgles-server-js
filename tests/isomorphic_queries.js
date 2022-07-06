@@ -481,8 +481,9 @@ async function isomorphic(db) {
             //  extent3D: 'BOX3D(-2 1 0,-1 2 6.952908662134e-310)' <-- looks like a value that will fail tests at some point
         });
     });
+    const fileName = "sample_file.txt";
     await tryRun("Local file upload", async () => {
-        let str = "This is a string", data = Buffer.from(str, "utf-8"), mediaFile = { data, name: "sample_file.txt" };
+        let str = "This is a string", data = Buffer.from(str, "utf-8"), mediaFile = { data, name: fileName };
         const file = await db.media.insert(mediaFile, { returning: "*" });
         const _data = fs.readFileSync(__dirname + "/server/media/" + file.name);
         assert_1.strict.equal(str, _data.toString('utf8'));
@@ -507,6 +508,9 @@ async function isomorphic(db) {
         //     1
         //   );
         // });
+    });
+    await tryRun("Local file delete", async () => {
+        const file = await db.media.delete({ name: fileName }, { returning: "*" });
     });
     await tryRun("Exists filter example", async () => {
         const fo = await db.items.findOne(), f = await db.items.find();
