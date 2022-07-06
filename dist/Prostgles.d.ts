@@ -74,6 +74,21 @@ export declare type FileTableConfig = {
     fileServeRoute?: string;
     awsS3Config?: S3Config;
     localConfig?: LocalConfig;
+    /**
+     * If defined the the files will not be deleted immediately
+     * Instead, the "deleted" field will be updated to the current timestamp and after the day interval provided in "deleteAfterNDays" the files will be deleted
+     * "checkIntervalMinutes" is the frequency in hours at which the files ready for deletion are deleted
+     */
+    delayedDelete?: {
+        /**
+         * Minimum amount of time measured in days for which the files will not be deleted after requesting delete
+         */
+        deleteAfterNDays: number;
+        /**
+         * How freuquently the files will be checked for deletion delay
+         */
+        checkIntervalHours?: number;
+    };
     expressApp: ExpressApp;
     referencedTables?: {
         [tableName: string]: "one" | "many"

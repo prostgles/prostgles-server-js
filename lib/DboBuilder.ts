@@ -8,7 +8,7 @@ import * as Bluebird from "bluebird";
 // declare global { export interface Promise<T> extends Bluebird<T> {} }
 
 import * as pgPromise from 'pg-promise';
-const {ParameterizedQuery: PQ} = require('pg-promise');
+const { ParameterizedQuery: PQ } = require('pg-promise');
 import pg = require('pg-promise/typescript/pg-subset');
 import { 
     ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams, 
@@ -61,17 +61,21 @@ export type DBHandlerServer =
     tx?: TX
   }
 
-export const getUpdateFilter = (args: { filter?: AnyObject; forcedFilter?: AnyObject; $and_key: string }): AnyObject => {
-    const { filter, forcedFilter, $and_key } = args;
-    let result = { ...filter };
-    if(forcedFilter){
-        return {
-            [$and_key]: [forcedFilter, filter].filter(isDefined)
-        }
-    }
+// export const getFilterFields = (f: Filter | any, $and_key: string, $or_key: string, prevFields: string[] = []): string[] => {
+//     if(Array.isArray(f)){
+//         return f.flatMap(_f => getFilterFields(_f, $and_key, $or_key, prevFields) );
+//     }
+//     if($and_key in f && Array.isArray(f[$and_key]) ){
+//         return f[$and_key].flatMap((_f: any) => getFilterFields(_f, $and_key, $or_key, prevFields) );
+//     } else if($or_key in f && Array.isArray(f[$or_key]) ){
+//         return f[$or_key].flatMap((_f: any) => getFilterFields(_f, $and_key, $or_key, prevFields) );
+//     } else if(isObject(f)){
+//         const filter: 
+//     }
 
-    return result;
-}
+//     return []
+// }
+
 
 import { get } from "./utils";
 import { getNewQuery, makeQuery, COMPUTED_FIELDS, SelectItem, FieldSpec, asNameAlias, SelectItemBuilder, FUNCTIONS, parseFunction, parseFunctionObject } from "./QueryBuilder";
@@ -1109,7 +1113,7 @@ export class ViewHandler {
             return await this.find(filter, { select: "", limit: 0 }, undefined, table_rules, localParams)
             .then(async allowed => {
                 const { filterFields, forcedFilter } = get(table_rules, "select") || {};
-                const where = (await this.prepareWhere({ filter, forcedFilter, filterFields, addKeywords: true, localParams, tableRule: table_rules }));
+                const where = (await this.prepareWhere({ filter, forcedFilter, filterFields, addKeywords: true, localParams, tableRule: table_rules })).where;
                 let query = "SELECT COUNT(*) FROM " + this.escapedName + " " + where;
                 return (this.t || this.db).one(query, { _psqlWS_tableName: this.name }).then(({ count }) => +count);
             });
@@ -1213,7 +1217,7 @@ export class ViewHandler {
         tableAlias?: string, 
         localParams: LocalParams | undefined, 
         tableRule: TableRule | undefined
-    }): Promise<string> 
+    }): Promise<{ where: string; filter: AnyObject; }> 
     {
         const { filter, select, forcedFilter, filterFields: ff, addKeywords = true, tableAlias, localParams, tableRule } = params;
         const { $and: $and_key, $or: $or_key } = this.dboBuilder.prostgles.keywords;
@@ -1258,7 +1262,17 @@ export class ViewHandler {
 
         if(!isPlainObject(filter)) throw "\nInvalid filter\nExpecting an object but got -> " + JSON.stringify(filter);
         
-
+        const getUpdateFilter = (args: { filter?: AnyObject; forcedFilter?: AnyObject; $and_key: string; }): AnyObject => {
+            const { filter, forcedFilter, $and_key } = args;
+            let result = { ...filter };
+            if(forcedFilter){
+                return {
+                    [$and_key]: [forcedFilter, filter].filter(isDefined)
+                }
+            }
+        
+            return result;
+        }
         let _filter = getUpdateFilter({ filter, forcedFilter, $and_key });
             
         // let keys = Object.keys(filter);
@@ -1266,7 +1280,7 @@ export class ViewHandler {
         
         let cond = await parseFullFilter(_filter, null);
         if(cond && addKeywords)  cond = "WHERE " + cond;
-        return cond || "";
+        return { where: cond || "", filter: _filter };
     }
 
     async prepareExistCondition(eConfig: ExistsFilterConfig, localParams: LocalParams | undefined): Promise<string> {
@@ -1367,7 +1381,7 @@ export class ViewHandler {
                 tableAlias, 
                 localParams, 
                 tableRule: t2Rules //tableRules
-            }))
+            })).where
         } catch(err) {
             // console.trace(err)
             throw "Issue with preparing $exists query for table " + t2 + "\n->" + JSON.stringify(err);
@@ -1996,7 +2010,8 @@ export class TableHandler extends ViewHandler {
             }
 
             const { filterFields, forcedFilter } = get(table_rules, "select") || {},
-                condition = await this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: undefined, localParams, tableRule: table_rules }),
+                filterOpts = await this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: undefined, localParams, tableRule: table_rules }),
+                condition = filterOpts.where,
                 throttle = get(params, "throttle") || 0,
                 selectParams = omitKeys(params || {}, ["throttle"]);
 
@@ -2114,7 +2129,6 @@ export class TableHandler extends ViewHandler {
             filterFields: FieldFilter | undefined = "*",
             fields: FieldFilter = "*";
 
-        const { $and: $and_key } = this.dboBuilder.prostgles.keywords;
         let finalUpdateFilter = { ...filter };
 
         if(tableRules){
@@ -2125,8 +2139,8 @@ export class TableHandler extends ViewHandler {
                 throw "You are not allowed to return any fields from the update"
             }
 
-            if(!fields)  throw ` Invalid update rule for ${this.name}. fields missing `;
-            finalUpdateFilter = getUpdateFilter({ filter, forcedFilter, $and_key })
+            if(!fields)  throw ` Invalid update rule fo r ${this.name}. fields missing `;
+            finalUpdateFilter = (await this.prepareWhere({ filter, forcedFilter, filterFields, localParams, tableRule: tableRules })).filter;
             if(tableRules.update.dynamicFields?.length){
 
                 /**
@@ -2276,7 +2290,7 @@ export class TableHandler extends ViewHandler {
                 filterFields,
                 localParams,
                 tableRule: tableRules
-            }));
+            })).where;
             if(onConflictDoNothing) query += " ON CONFLICT DO NOTHING ";
 
             let qType = "none";
@@ -2395,29 +2409,68 @@ export class TableHandler extends ViewHandler {
 
             let queryType: keyof pgPromise.ITask<{}> = 'none';
             let _query = "DELETE FROM " + this.escapedName;
-
-            _query += (await this.prepareWhere({
+            const filterOpts = (await this.prepareWhere({
                 filter, 
                 forcedFilter, 
                 filterFields, 
                 localParams, 
                 tableRule: table_rules
-            }));
+            }))
+            _query += filterOpts.where;
             if(validate){
-                const _filter = getUpdateFilter({ filter, forcedFilter, $and_key: this.dboBuilder.prostgles.keywords.$and });
+                const _filter = filterOpts.filter;
                 await validate(_filter);
             }
 
+            let returningQuery = "";
             if(returning){
                 queryType = "any";
                 if(!returningFields) {
                     throw "Returning dissallowed";
                 }
-                _query += this.makeReturnQuery(await this.prepareReturning(returning, this.parseFieldFilter(returningFields)));
+                returningQuery = this.makeReturnQuery(await this.prepareReturning(returning, this.parseFieldFilter(returningFields)));
+                _query += returningQuery
             }
             
             if(returnQuery) return _query;
-            return (this.t || this.db as any)[queryType](_query).catch((err: any) => makeErr(err, localParams));
+
+            /**
+             * Delete file
+             */
+            const dbHandler = (this.t || this.db)
+            if(this.is_media && this.dboBuilder.prostgles.fileManager){
+                
+                if(this.dboBuilder.prostgles.opts.fileTable?.delayedDelete){
+                    return dbHandler[queryType](`UPDATE ${asName(this.name)} SET deleted = now() ${filterOpts.where} ${returningQuery};`)
+                } else {
+                    
+                    const txDelete = async (tbl: TableHandler) => {
+
+                        const files = await this.find(filterOpts.filter);
+                        for await(const file of files){
+                            await tbl.dboBuilder.prostgles.fileManager?.deleteFile(file.name);
+                            await tbl.delete({ id: file.id });
+                        }
+
+                        if(returning){
+                            return files.map(f => pickKeys(f, ["id", "name"]));
+                        }
+                    }
+
+                    if(localParams?.dbTX){
+                        return txDelete(localParams.dbTX[this.name] as TableHandler)
+                    } else if(this.t) {
+                        return txDelete(this)
+                    } else {
+
+                        return this.dboBuilder.getTX(tx => {
+                            return txDelete(tx[this.name] as any)
+                        })
+                    }
+                }
+            }
+
+            return dbHandler[queryType](_query).catch((err: any) => makeErr(err, localParams));
         } catch(e){
             // console.trace(e)
             if(localParams && localParams.testRule) throw e;
@@ -2504,7 +2557,7 @@ export class TableHandler extends ViewHandler {
                 .then(async isValid => {
 
                     const { filterFields, forcedFilter } = get(table_rules, "select") || {};
-                    const condition = await this.prepareWhere({ filter, forcedFilter, filterFields, addKeywords: false, localParams, tableRule: table_rules });
+                    const condition = (await this.prepareWhere({ filter, forcedFilter, filterFields, addKeywords: false, localParams, tableRule: table_rules })).where;
 
                     // let final_filter = getFindFilter(filter, table_rules);
                     const pubSubManager = await this.dboBuilder.getPubSubManager();

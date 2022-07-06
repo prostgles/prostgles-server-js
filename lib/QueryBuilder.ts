@@ -1326,7 +1326,7 @@ export async function getNewQuery(
   //   .filter(s => s.type !== "joinedColumn")
   //   .map(s => s.alias);
     
-  const where = await _this.prepareWhere({
+  const filterOpts = await _this.prepareWhere({
     filter, 
     select, 
     forcedFilter: get(tableRules, "select.forcedFilter"), 
@@ -1335,6 +1335,7 @@ export async function getNewQuery(
     localParams,
     tableRule: tableRules
   });
+  const where = filterOpts.where;
   const p = _this.getValidatedRules(tableRules, localParams);
 
   let resQuery: NewQuery = {

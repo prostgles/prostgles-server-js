@@ -33,7 +33,6 @@ export type S3Config = {
   bucket: string;
   accessKeyId: string;
   secretAccessKey: string;
-  // onUploaded?: () => any;
 }
 
 export type LocalConfig = {
@@ -93,6 +92,7 @@ export default class FileManager {
   tableName?: string;
 
   private fileRoute?: string;
+  private checkInterval?: NodeJS.Timeout;
 
   constructor(config: FileManager["config"], imageOptions?: ImageOptions){
     this.config = config;
@@ -104,8 +104,37 @@ export default class FileManager {
         region, 
         credentials: { accessKeyId, secretAccessKey },
       });
-      
     }
+
+    const fullConfig = this.prostgles?.opts.fileTable;
+    if(fullConfig?.delayedDelete){
+      this.checkInterval = setInterval(async () => {
+        const fTable = fullConfig.tableName;
+        const daysDelay = fullConfig.delayedDelete?.deleteAfterNDays ?? 0;
+        if(fTable && this.dbo[fTable]?.delete && daysDelay){
+          const files = await this.dbo[fTable]?.find?.({ deleted_from_storage: null, deleted: { ">": Date.now() - (daysDelay * HOUR * 24) } }) ?? [];
+          for await(const file of files){
+            
+          }
+        } else {
+          console.error("FileManager checkInterval delayedDelete FAIL: Could not access file table tableHandler.delete()")
+        }
+      }, Math.max(10000, (fullConfig.delayedDelete.checkIntervalHours || 0) * HOUR))
+    }
+  }
+
+  async deleteFile(name: string) {
+    if("bucket" in this.config && this.s3Client){
+      const res = await this.s3Client?.deleteObject({ Bucket: this.config.bucket, Key: name }).promise();
+      return res;
+    } else if("localFolderPath" in this.config){
+      const path = `${this.config.localFolderPath}/${name}`;
+      if(!fs.existsSync(path)){
+        throw `File ${path} could not be found`;
+      }
+      fs.unlinkSync(path);
+    }
+    return true
   }
 
   async parseFile(args: {
@@ -191,7 +220,7 @@ export default class FileManager {
   // }
   
   private async upload(
-    file: Buffer | String, 
+    file: Buffer | string, 
     name: string,
     mime: string
   ): Promise<UploadedItem> {
@@ -535,7 +564,9 @@ export default class FileManager {
 
           } else {
             const pth = `${(this.config as LocalConfig).localFolderPath}/${media.name}`;
-
+            if(!fs.existsSync(pth)){
+              throw new Error("File not found");
+            }
             res.contentType(media.content_type);
             res.sendFile(pth);
           }

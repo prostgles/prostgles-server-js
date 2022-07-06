@@ -28,11 +28,6 @@ export declare type DBHandlerServer = TableHandlers & Partial<DbJoinMaker> & {
 } & {
     tx?: TX;
 };
-export declare const getUpdateFilter: (args: {
-    filter?: AnyObject;
-    forcedFilter?: AnyObject;
-    $and_key: string;
-}) => AnyObject;
 import { SelectItem, FieldSpec } from "./QueryBuilder";
 import { Join, Prostgles, DB } from "./Prostgles";
 import { TableRule, UpdateRule, PublishParser, ValidateRow, PublishAllOrNothing } from "./PublishParser";
@@ -265,7 +260,10 @@ export declare class ViewHandler {
         tableAlias?: string;
         localParams: LocalParams | undefined;
         tableRule: TableRule | undefined;
-    }): Promise<string>;
+    }): Promise<{
+        where: string;
+        filter: AnyObject;
+    }>;
     prepareExistCondition(eConfig: ExistsFilterConfig, localParams: LocalParams | undefined): Promise<string>;
     /**
      * parses a single filter

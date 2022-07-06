@@ -62,7 +62,9 @@ export default class FileManager {
     get db(): DB;
     tableName?: string;
     private fileRoute?;
+    private checkInterval?;
     constructor(config: FileManager["config"], imageOptions?: ImageOptions);
+    deleteFile(name: string): Promise<true | import("aws-sdk/lib/request").PromiseResult<S3.DeleteObjectOutput, AWS.AWSError>>;
     parseFile(args: {
         file: Buffer | string;
         fileName: string;

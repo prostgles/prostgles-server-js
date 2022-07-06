@@ -157,7 +157,6 @@ function dd() {
             }
             return true;
         },
-        // DEBUG_MODE: true,
         publishRawSQL: async (params) => {
             return true; // Boolean(user && user.type === "admin")
         },
