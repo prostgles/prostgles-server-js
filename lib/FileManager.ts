@@ -1,5 +1,5 @@
 
-import { S3 } from 'aws-sdk';
+import { S3, IAM } from 'aws-sdk';
 import { ManagedUpload } from 'aws-sdk/clients/s3';
 import * as fs from 'fs';
 
@@ -61,8 +61,19 @@ export type UploadedItem = {
    */
   s3_url?: string;
 };
-
+import AWS from 'aws-sdk';
 export default class FileManager {
+
+  static testCredentials = async (accessKeyId: string, secretAccessKey: string) => {
+    const sts = new AWS.STS();
+    AWS.config.credentials = {
+      accessKeyId,
+      secretAccessKey
+    }
+
+    const ident = await sts.getCallerIdentity({}).promise();
+    return ident;
+  }
   
   s3Client?: S3;
 
@@ -93,6 +104,7 @@ export default class FileManager {
         region, 
         credentials: { accessKeyId, secretAccessKey },
       });
+      
     }
   }
 
@@ -113,8 +125,8 @@ export default class FileManager {
     if(!config) throw new Error("File table config missing");
 
     const buffer = typeof file === "string"? Buffer.from(file, 'utf8') : file;
-    const mime = await getFileType(buffer, fileName);
 
+    let result = await getFileTypeFromFilename(fileName);
     if(tableName && colName){
       const tableConfig = config.referencedTables?.[tableName];
 
@@ -127,7 +139,8 @@ export default class FileManager {
           }
         }
         
-        if("acceptedContent" in colConfig && colConfig.acceptedContent){
+        if("acceptedContent" in colConfig && colConfig.acceptedContent && colConfig.acceptedContent !== "*"){
+          const mime = await getFileType(buffer, fileName);
           const CONTENTS = [ 
             "image",
             "audio",
@@ -139,13 +152,15 @@ export default class FileManager {
           if(!allowedContent.some(c => mime.mime.startsWith(c))){
             throw new Error(`Dissallowed content type provided: ${mime.mime.split("/")[0]}. Allowed content types: ${allowedContent} `)
           }
-        } else if("acceptedContentType" in colConfig && colConfig.acceptedContentType){
+        } else if("acceptedContentType" in colConfig && colConfig.acceptedContentType && colConfig.acceptedContentType !== "*"){
+          const mime = await getFileType(buffer, fileName);
           const allowedContentTypes = ViewHandler._parseFieldFilter(colConfig.acceptedContentType, false, getKeys(CONTENT_TYPE_TO_EXT));
           
           if(!allowedContentTypes.some(c => c === mime.mime)){
             throw new Error(`Dissallowed MIME provided: ${mime.mime}. Allowed MIME values: ${allowedContentTypes} `)
           }
-        } else if("acceptedFileTypes" in colConfig && colConfig.acceptedFileTypes){
+        } else if("acceptedFileTypes" in colConfig && colConfig.acceptedFileTypes && colConfig.acceptedFileTypes !== "*"){
+          const mime = await getFileType(buffer, fileName);
           const allowedExtensions = ViewHandler._parseFieldFilter(colConfig.acceptedFileTypes, false, Object.values(CONTENT_TYPE_TO_EXT).flat());
           
           if(!allowedExtensions.some(c => c === mime.ext)){
@@ -154,8 +169,8 @@ export default class FileManager {
         }
       } 
     }
-
-    return mime;
+    if(!result?.mime) throw `File MIME type not found for the provided extension: ${result?.ext}`;
+    return result;
   }
 
   // async getUploadURL(fileName: string): Promise<string> {
@@ -566,9 +581,9 @@ export const getFileType = async (file: Buffer | string, fileName: string): Prom
 
     /* Set correct/missing extension */
     const nameExt = fileNameMime?.ext;
-    if(["xml", "txt", "csv", "tsv", "svg"].includes(nameExt) && fileNameMime.mime){
+    if(["xml", "txt", "csv", "tsv", "svg", "sql"].includes(nameExt) && fileNameMime.mime){
       return fileNameMime as any;
-    } 
+    }
     
     throw new Error("Could not get the file type from file buffer");
   } else {

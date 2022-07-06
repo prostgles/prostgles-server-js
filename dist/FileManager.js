@@ -1,4 +1,5 @@
 "use strict";
+var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getFileType = exports.getFileTypeFromFilename = exports.asSQLIdentifier = void 0;
 const aws_sdk_1 = require("aws-sdk");
@@ -11,6 +12,7 @@ const asSQLIdentifier = async (name, db) => {
     return (await db.one("select format('%I', $1) as name", [name]))?.name;
 };
 exports.asSQLIdentifier = asSQLIdentifier;
+const aws_sdk_2 = require("aws-sdk");
 class FileManager {
     constructor(config, imageOptions) {
         this.uploadAsMedia = async (params) => {
@@ -287,7 +289,7 @@ class FileManager {
         if (!config)
             throw new Error("File table config missing");
         const buffer = typeof file === "string" ? Buffer.from(file, 'utf8') : file;
-        const mime = await (0, exports.getFileType)(buffer, fileName);
+        let result = await (0, exports.getFileTypeFromFilename)(fileName);
         if (tableName && colName) {
             const tableConfig = config.referencedTables?.[tableName];
             if (tableConfig && (0, prostgles_types_1.isObject)(tableConfig) && tableConfig.referenceColumns[colName]) {
@@ -298,7 +300,8 @@ class FileManager {
                         throw new Error(`Provided file is larger than the ${colConfig.maxFileSizeMB}MB limit`);
                     }
                 }
-                if ("acceptedContent" in colConfig && colConfig.acceptedContent) {
+                if ("acceptedContent" in colConfig && colConfig.acceptedContent && colConfig.acceptedContent !== "*") {
+                    const mime = await (0, exports.getFileType)(buffer, fileName);
                     const CONTENTS = [
                         "image",
                         "audio",
@@ -311,13 +314,15 @@ class FileManager {
                         throw new Error(`Dissallowed content type provided: ${mime.mime.split("/")[0]}. Allowed content types: ${allowedContent} `);
                     }
                 }
-                else if ("acceptedContentType" in colConfig && colConfig.acceptedContentType) {
+                else if ("acceptedContentType" in colConfig && colConfig.acceptedContentType && colConfig.acceptedContentType !== "*") {
+                    const mime = await (0, exports.getFileType)(buffer, fileName);
                     const allowedContentTypes = DboBuilder_1.ViewHandler._parseFieldFilter(colConfig.acceptedContentType, false, (0, prostgles_types_1.getKeys)(prostgles_types_1.CONTENT_TYPE_TO_EXT));
                     if (!allowedContentTypes.some(c => c === mime.mime)) {
                         throw new Error(`Dissallowed MIME provided: ${mime.mime}. Allowed MIME values: ${allowedContentTypes} `);
                     }
                 }
-                else if ("acceptedFileTypes" in colConfig && colConfig.acceptedFileTypes) {
+                else if ("acceptedFileTypes" in colConfig && colConfig.acceptedFileTypes && colConfig.acceptedFileTypes !== "*") {
+                    const mime = await (0, exports.getFileType)(buffer, fileName);
                     const allowedExtensions = DboBuilder_1.ViewHandler._parseFieldFilter(colConfig.acceptedFileTypes, false, Object.values(prostgles_types_1.CONTENT_TYPE_TO_EXT).flat());
                     if (!allowedExtensions.some(c => c === mime.ext)) {
                         throw new Error(`Dissallowed extension provided: ${mime.ext}. Allowed extension values: ${allowedExtensions} `);
@@ -325,7 +330,9 @@ class FileManager {
                 }
             }
         }
-        return mime;
+        if (!result?.mime)
+            throw `File MIME type not found for the provided extension: ${result?.ext}`;
+        return result;
     }
     // async getUploadURL(fileName: string): Promise<string> {
     //   const thisHour = new Date();
@@ -410,6 +417,16 @@ class FileManager {
     }
 }
 exports.default = FileManager;
+_a = FileManager;
+FileManager.testCredentials = async (accessKeyId, secretAccessKey) => {
+    const sts = new aws_sdk_2.default.STS();
+    aws_sdk_2.default.config.credentials = {
+        accessKeyId,
+        secretAccessKey
+    };
+    const ident = await sts.getCallerIdentity({}).promise();
+    return ident;
+};
 const getFileTypeFromFilename = (fileName) => {
     const nameParts = fileName.split(".");
     if (nameParts.length < 2)
@@ -434,7 +451,7 @@ const getFileType = async (file, fileName) => {
     if (!res) {
         /* Set correct/missing extension */
         const nameExt = fileNameMime?.ext;
-        if (["xml", "txt", "csv", "tsv", "svg"].includes(nameExt) && fileNameMime.mime) {
+        if (["xml", "txt", "csv", "tsv", "svg", "sql"].includes(nameExt) && fileNameMime.mime) {
             return fileNameMime;
         }
         throw new Error("Could not get the file type from file buffer");

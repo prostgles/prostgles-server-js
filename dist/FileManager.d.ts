@@ -51,7 +51,9 @@ export declare type UploadedItem = {
      */
     s3_url?: string;
 };
+import AWS from 'aws-sdk';
 export default class FileManager {
+    static testCredentials: (accessKeyId: string, secretAccessKey: string) => Promise<import("aws-sdk/lib/request").PromiseResult<AWS.STS.GetCallerIdentityResponse, AWS.AWSError>>;
     s3Client?: S3;
     config: S3Config | LocalConfig;
     imageOptions?: ImageOptions;
