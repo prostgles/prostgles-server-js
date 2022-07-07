@@ -63,8 +63,6 @@ declare type AddSubscriptionParams = SubscriptionParams & {
 };
 export declare type PubSubManagerOptions = {
     dboBuilder: DboBuilder;
-    db: DB;
-    dbo: DBHandlerServer;
     wsChannelNamePrefix?: string;
     pgChannelName?: string;
     onSchemaChange?: (event: {
@@ -75,8 +73,8 @@ export declare type PubSubManagerOptions = {
 export declare class PubSubManager {
     static DELIMITER: string;
     dboBuilder: DboBuilder;
-    db: DB;
-    dbo: DBHandlerServer;
+    get db(): DB;
+    get dbo(): DBHandlerServer;
     _triggers?: Record<string, string[]>;
     sockets: any;
     subs: {

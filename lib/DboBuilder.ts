@@ -2460,8 +2460,6 @@ export class DboBuilder {
             if(this.prostgles.isSuperUser){
                 this._pubSubManager = await PubSubManager.create({
                     dboBuilder: this,
-                    db: this.db, 
-                    dbo: this.dbo as unknown as DBHandlerServer,
                     onSchemaChange
                 });
             } else {
@@ -2472,6 +2470,7 @@ export class DboBuilder {
             console.trace("Could not create this._pubSubManager")
             throw "Could not create this._pubSubManager";
         }
+        
         return this._pubSubManager;
     }
 

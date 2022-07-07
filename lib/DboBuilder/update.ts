@@ -33,6 +33,8 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
         const newFile = await uploadFile.bind(this)(newData, validate, localParams, existingFile.id)
         newData = omitKeys(newFile, ["id"]);
       }
+    } else if(this.is_media && isObject(newData) && typeof newData.name === "string"){
+      throw new Error("Cannot update the 'name' field of the file. It is used in interacting with the file")
     }
 
     const parsedRules = await this.parseUpdateRules(filter, newData, params, tableRules, localParams)

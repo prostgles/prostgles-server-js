@@ -950,12 +950,10 @@ class PubSubManager {
         `, [this.appID]);
         };
         this.addTriggerPool = undefined;
-        const { db, dbo, wsChannelNamePrefix, pgChannelName, onSchemaChange, dboBuilder } = options;
-        if (!db || !dbo) {
+        const { wsChannelNamePrefix, pgChannelName, onSchemaChange, dboBuilder } = options;
+        if (!dboBuilder.db || !dboBuilder.dbo) {
             throw 'MISSING: db_pg, db';
         }
-        this.db = db;
-        this.dbo = dbo;
         this.onSchemaChange = onSchemaChange;
         this.dboBuilder = dboBuilder;
         this.sockets = {};
@@ -963,6 +961,12 @@ class PubSubManager {
         this.syncs = [];
         this.socketChannelPreffix = wsChannelNamePrefix || "_psqlWS_";
         (0, exports.log)("Created PubSubManager");
+    }
+    get db() {
+        return this.dboBuilder.db;
+    }
+    get dbo() {
+        return this.dboBuilder.dbo;
     }
     isReady() {
         if (!this.postgresNotifListenManager)
@@ -990,8 +994,9 @@ class PubSubManager {
         return new Promise(async (resolve, reject) => {
             /* TODO: Retire subOne -> it's redundant */
             // this.dbo[table_name][subOne? "findOne" : "find"](filter, params, null, table_rules)
-            if (!this.dbo?.[table_name]?.find)
-                throw "1107 this.dbo[table_name].find";
+            if (!this.dbo?.[table_name]?.find) {
+                throw new Error(`1107 this.dbo.${table_name}.find`);
+            }
             this.dbo?.[table_name]?.find?.(filter, params, undefined, table_rules)
                 .then(data => {
                 if (socket_id && this.sockets[socket_id]) {
@@ -1000,7 +1005,7 @@ class PubSubManager {
                         resolve(data);
                     });
                     /* TO DO: confirm receiving data or server will unsubscribe
-                            { data }, (cb)=> { console.log(cb) });
+                      { data }, (cb)=> { console.log(cb) });
                     */
                 }
                 else if (func) {

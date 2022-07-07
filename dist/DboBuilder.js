@@ -1837,8 +1837,6 @@ class DboBuilder {
                 if (this.prostgles.isSuperUser) {
                     this._pubSubManager = await PubSubManager_1.PubSubManager.create({
                         dboBuilder: this,
-                        db: this.db,
-                        dbo: this.dbo,
                         onSchemaChange
                     });
                 }
