@@ -139,10 +139,6 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
     throw {
       err: isPlainObject(e) && e.err? e.err : parseError(e), 
       msg:  isPlainObject(e) && e.msg? e.msg : `Issue with dbo.${this.name}.insert(...)`,
-      args: {
-        1: Array.isArray(rowOrRows)? rowOrRows.map(r => removeBuffers(r)) : isPlainObject(rowOrRows)? removeBuffers(rowOrRows) : rowOrRows,
-        2: param2
-      }
     };
   }
 };

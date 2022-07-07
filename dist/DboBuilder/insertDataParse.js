@@ -4,6 +4,7 @@ exports.insertDataParse = void 0;
 const prostgles_types_1 = require("prostgles-types");
 const DboBuilder_1 = require("../DboBuilder");
 const PubSubManager_1 = require("../PubSubManager");
+const uploadFile_1 = require("./uploadFile");
 /**
  * Used for doing referenced inserts within a single transaction
  */
@@ -75,53 +76,11 @@ async function insertDataParse(data, param2, param3_unused, tableRules, _localPa
         if (preValidate) {
             row = await preValidate(row);
         }
-        const dataKeys = Object.keys(row);
         const extraKeys = getExtraKeys(row);
         const colInserts = getColumnInserts(row);
         /* Upload file then continue insert */
         if (this.is_media) {
-            if (!this.dboBuilder.prostgles?.fileManager)
-                throw "fileManager not set up";
-            const { data, name } = row;
-            if (dataKeys.length !== 2)
-                throw "Expecting only two properties: { name: string; data: File }";
-            // if(!Buffer.isBuffer(data)) throw "data is not of type Buffer"
-            if (!data)
-                throw "data not provided";
-            if (typeof name !== "string") {
-                throw "name is not of type string";
-            }
-            const media_id = (await this.db.oneOrNone("SELECT gen_random_uuid() as name")).name;
-            const nestedInsert = localParams?.nestedInsert;
-            const type = await this.dboBuilder.prostgles.fileManager.parseFile({ file: data, fileName: name, tableName: nestedInsert?.previousTable, colName: nestedInsert?.referencingColumn });
-            const media_name = `${media_id}.${type.ext}`;
-            let media = {
-                id: media_id,
-                name: media_name,
-                original_name: name,
-                extension: type.ext,
-                content_type: type.mime
-            };
-            if (validate) {
-                media = await validate(media);
-            }
-            const _media = await this.dboBuilder.prostgles.fileManager.uploadAsMedia({
-                item: {
-                    data,
-                    name: media.name ?? "????",
-                    content_type: media.content_type
-                },
-                // imageCompression: {
-                //     inside: {
-                //         width: 1100,
-                //         height: 630
-                //     }
-                // }
-            });
-            return {
-                ...media,
-                ..._media,
-            };
+            return uploadFile_1.uploadFile.bind(this)(row, validate, localParams);
             /* Potentially a nested join */
         }
         else if (extraKeys.length || colInserts.length) {

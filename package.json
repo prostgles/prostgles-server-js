@@ -29,7 +29,7 @@
     "bluebird": "^3.7.2",
     "file-type": "^17.1.2",
     "pg-promise": "^10.11.1",
-    "prostgles-types": "^1.5.163",
+    "prostgles-types": "^1.5.165",
     "sharp": "^0.30.7"
   },
   "devDependencies": {

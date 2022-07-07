@@ -581,12 +581,49 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
     // });
   });
 
-  await tryRun("Local file delete", async () => {
 
-    const file = await db.media.delete({ name: fileName }, { returning: "*" });
+  await tryRun("Local file delete", async () => {
+    const file = { 
+      data: Buffer.from("str", "utf-8"), 
+      name: "will delete.txt" 
+    }
+    await db.media.insert(file);
     
+    const files = await db.media.find({ original_name: file.name });
+    assert.equal(files.length, 1);
+    const exists0 = fs.existsSync(__dirname + "/server/media/"+files[0].name);
+    assert.equal(exists0, true);
+    await db.media.delete({ original_name: file.name }, { returning: "*" });
+    const exists = fs.existsSync(__dirname + "/server/media/"+files[0].name);
+    assert.equal(exists, false);
   })
 
+  await tryRun("Local file update", async () => {
+    const initialStr = "str";
+    const newStr = "str new";
+    const file = { 
+      data: Buffer.from(initialStr, "utf-8"), 
+      name: "will update.txt" 
+    }
+    const newFile = { 
+      data: Buffer.from(newStr, "utf-8"), 
+      name: "will update new.txt" 
+    }
+    await db.media.insert(file);
+    const original = await db.media.findOne({ original_name: file.name });
+    
+    const initialFileStr = fs.readFileSync(__dirname + "/server/media/" + original.name).toString('utf8');
+    assert.equal(initialStr, initialFileStr);
+
+    await db.media.update({ id: original.id }, newFile);
+    
+    const newFileStr = fs.readFileSync(__dirname + "/server/media/" + original.name).toString('utf8');
+    assert.equal(newStr, newFileStr);
+    
+    const newF = await db.media.findOne({ id: original.id });
+
+    assert.equal(newF.original_name, newFile.name)
+  })
   
   await tryRun("Exists filter example", async () => {
   

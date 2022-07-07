@@ -2,6 +2,7 @@ import { AnyObject, asName, FieldFilter, get, getKeys, InsertParams, isDefined, 
 import { DboBuilder, isPojoObject, LocalParams, makeErr, Media, parseError, pgp, TableHandler, TableHandlers } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 import { omitKeys } from "../PubSubManager";
+import { isFile, uploadFile } from "./uploadFile";
 
 /**
  * Used for doing referenced inserts within a single transaction
@@ -102,57 +103,12 @@ export async function insertDataParse(
       row = await preValidate(row);
     }
 
-    const dataKeys = Object.keys(row);
     const extraKeys = getExtraKeys(row);
     const colInserts = getColumnInserts(row);
 
     /* Upload file then continue insert */
     if (this.is_media) {
-      if (!this.dboBuilder.prostgles?.fileManager) throw "fileManager not set up";
-      const { data, name } = row;
-
-      if (dataKeys.length !== 2) throw "Expecting only two properties: { name: string; data: File }";
-
-      // if(!Buffer.isBuffer(data)) throw "data is not of type Buffer"
-      if (!data) throw "data not provided"
-      if (typeof name !== "string") {
-        throw "name is not of type string"
-      }
-
-      const media_id = (await this.db.oneOrNone("SELECT gen_random_uuid() as name")).name;
-      const nestedInsert = localParams?.nestedInsert;
-      const type = await this.dboBuilder.prostgles.fileManager.parseFile({  file: data, fileName: name, tableName: nestedInsert?.previousTable, colName: nestedInsert?.referencingColumn });
-      const media_name = `${media_id}.${type.ext}`;
-      let media: Media = {
-        id: media_id,
-        name: media_name,
-        original_name: name,
-        extension: type.ext,
-        content_type: type.mime
-      }
-
-      if (validate) {
-        media = await validate(media);
-      }
-
-      const _media: Media = await this.dboBuilder.prostgles.fileManager.uploadAsMedia({
-        item: {
-          data,
-          name: media.name ?? "????",
-          content_type: media.content_type as any
-        },
-        // imageCompression: {
-        //     inside: {
-        //         width: 1100,
-        //         height: 630
-        //     }
-        // }
-      });
-
-      return {
-        ...media,
-        ..._media,
-      };
+      return uploadFile.bind(this)(row, validate, localParams)
 
       /* Potentially a nested join */
     } else if (extraKeys.length || colInserts.length) {

@@ -133,6 +133,7 @@ export default class FileManager {
         throw `File ${path} could not be found`;
       }
       fs.unlinkSync(path);
+      if(fs.existsSync(path)) throw new Error("Could not delete file");
     }
     return true
   }

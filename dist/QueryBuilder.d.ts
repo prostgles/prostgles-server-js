@@ -125,10 +125,14 @@ export declare function getNewQuery(_this: TableHandler, filter: Filter, selectP
     select?: import("prostgles-types").AnyObject | ("" | "*" | {
         "*": 1;
     }) | {
+        [x: string]: Record<string, any[]>;
+    } | {
         [key: string]: string | true | 1 | Record<string, any[]>;
     } | ({
         [x: string]: string | true | 1;
-    } & Record<string, Record<string, any[]>>) | {
+    } & {
+        [x: string]: Record<string, any[]>;
+    }) | {
         [x: string]: string | true | 1;
     } | {
         [x: string]: false | 0;

@@ -40,6 +40,8 @@ export type Media = {
     "name"?: string;
     "original_name"?: string;
     "etag"?: string;
+    deleted?: string | null;
+    deleted_from_storage?: string | null;
 }
 
 export type TxCB = {
@@ -88,6 +90,8 @@ import {
 import { PubSubManager, asValue, BasicCallback, pickKeys, omitKeys } from "./PubSubManager";
 import { insertDataParse } from "./DboBuilder/insertDataParse";
 import { insert } from "./DboBuilder/insert";
+import { update } from "./DboBuilder/update";
+import { _delete } from "./DboBuilder/delete";
 
 import { parseFilterItem } from "./Filtering";
 
@@ -215,7 +219,7 @@ export type Aggregation = {
     getQuery: (alias: string) => string;
 };
 
-export type Filter = object | { $and: Filter[] } | { $or: Filter[] } | {};
+export type Filter = AnyObject | { $and: Filter[] } | { $or: Filter[] };
 
 type SelectFunc = {
     alias: string;
@@ -378,9 +382,14 @@ const FILTER_FUNCS = FUNCTIONS.filter(f => f.canBeUsedForFilter);
 
 export function parseError(e: any){
     
-    // console.trace("INTERNAL ERROR: ", e);
     let res = e instanceof Error? e.message : (!Object.keys(e || {}).length? e : (e && e.toString)? e.toString() : e);
-    if(isPlainObject(e)) res = JSON.stringify(e, null, 2)
+    if(isPlainObject(e)) {
+        if(typeof e.err === "string"){
+            res = e.err;
+        } else {
+            res = JSON.stringify(e, null, 2)
+        }
+    }
     return res;
 }
 
@@ -2223,92 +2232,7 @@ export class TableHandler extends ViewHandler {
     }
 
     async update(filter: Filter, newData: AnyObject, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<AnyObject | void>{
-        try {
-
-            const parsedRules = await this.parseUpdateRules(filter, newData, params, tableRules, localParams)
-            if(localParams?.testRule){
-                return parsedRules;
-            }
-
-            const { fields, validateRow, forcedData, finalUpdateFilter, returningFields, forcedFilter, filterFields } = parsedRules;
-
-
-            let { returning, multi = true, onConflictDoNothing = false, fixIssues = false } = params || {};
-            const { returnQuery = false } = localParams ?? {};
-
-
-            if(params){
-                const good_params = ["returning", "multi", "onConflictDoNothing", "fixIssues"];
-                const bad_params = Object.keys(params).filter(k => !good_params.includes(k));
-                if(bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
-            }
-
-
-            const { data, allowedCols } = this.validateNewData({ row: newData, forcedData, allowedFields: fields, tableRules, fixIssues });
-
-            /* Patch data */
-            let patchedTextData: { 
-                fieldName: string; 
-                from: number; 
-                to: number; 
-                text: string; 
-                md5: string
-            }[] = [];
-            this.columns.map(c => {
-                const d = data[c.name];
-                if(c.data_type === "text" && d && isPlainObject(d) && !["from", "to"].find(key => typeof d[key] !== "number")){
-                    const unrecProps = Object.keys(d).filter(k => !["from", "to", "text", "md5"].includes(k));
-                    if(unrecProps.length) throw "Unrecognised params in textPatch field: " + unrecProps.join(", ");
-                    patchedTextData.push({ ...d, fieldName: c.name } as (typeof patchedTextData)[number]);
-                }
-            });
-
-            if(patchedTextData && patchedTextData.length){
-                if(tableRules && !tableRules.select) throw "Select needs to be permitted to patch data";
-                const rows = await this.find(filter, { select: patchedTextData.reduce((a, v) => ({ ...a, [v.fieldName]: 1 }), {}) }, undefined, tableRules);
-                
-                if(rows.length !== 1) {
-                    throw "Cannot patch data within a filter that affects more/less than 1 row";
-                }
-                patchedTextData.map(p => {
-                    data[p.fieldName] = unpatchText(rows[0][p.fieldName], p);
-                })
-
-                // https://w3resource.com/PostgreSQL/overlay-function.p hp
-                //  overlay(coalesce(status, '') placing 'hom' from 2 for 0)
-            }
-
-            let nData = { ...data };
-            // if(tableRules && tableRules.update && tableRules?.update?.validate){
-            //     nData = await tableRules.update.validate(nData);
-            // }
-            
-            let query = await this.colSet.getUpdateQuery(nData, allowedCols, validateRow) //pgp.helpers.update(nData, columnSet) + " ";
-            query += (await this.prepareWhere({
-                filter, 
-                forcedFilter, 
-                filterFields,
-                localParams,
-                tableRule: tableRules
-            })).where;
-            if(onConflictDoNothing) query += " ON CONFLICT DO NOTHING ";
-
-            let qType = "none";
-            if(returning){
-                qType = multi? "any" : "one";
-                query += this.makeReturnQuery(await this.prepareReturning(returning, this.parseFieldFilter(returningFields)));
-            }
-
-            if(returnQuery) return query as unknown as void;
-            
-            if(this.t){
-                return (this.t as any)[qType](query).catch((err: any) => makeErr(err, localParams, this, fields));
-            }
-            return this.db.tx(t => (t as any)[qType](query)).catch(err => makeErr(err, localParams, this, fields));
-        } catch(e){
-            if(localParams && localParams.testRule) throw e;
-            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.update(${JSON.stringify(filter || {}, null, 2)}, ${JSON.stringify(newData || {}, null, 2)}, ${JSON.stringify(params || {}, null, 2)})` };
-        }
+        return update.bind(this)(filter, newData, params, tableRules, localParams);
     };
 
     validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues = false }: ValidatedParams): { data: any; allowedCols: string[] } {
@@ -2367,115 +2291,8 @@ export class TableHandler extends ViewHandler {
         return "";
     }
     
-    async delete(filter?: Filter, params?: DeleteParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any> {    //{ socket, func, has_rules = false, socketDb } = {}
-        try {
-            const { returning } = params || {};
-            filter = filter || {};
-            this.checkFilter(filter);
-
-            // table_rules = table_rules || {};
-
-            let forcedFilter: AnyObject | undefined = {},
-                filterFields: FieldFilter | undefined = "*",
-                returningFields: FieldFilter | undefined = "*",
-                validate: DeleteRule["validate"];
-
-            const { testRule = false, returnQuery = false } = localParams || {};
-            if(table_rules){
-                if(!table_rules.delete) throw "delete rules missing";
-                forcedFilter = table_rules.delete.forcedFilter;
-                filterFields = table_rules.delete.filterFields;
-                returningFields = table_rules.delete.returningFields;
-                validate = table_rules.delete.validate;
-
-                if(!returningFields) returningFields = get(table_rules, "select.fields");
-                if(!returningFields) returningFields = get(table_rules, "delete.filterFields");
-
-                if(!filterFields)  throw ` Invalid delete rule for ${this.name}. filterFields missing `;
-
-                /* Safely test publish rules */
-                if(testRule){
-                    await this.validateViewRules({ filterFields, returningFields, forcedFilter, rule: "delete" });
-                    return true;
-                }
-            }
-
-
-            if(params){
-                const good_params = ["returning"];
-                const bad_params = Object.keys(params).filter(k => !good_params.includes(k));
-                if(bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
-            }
-
-            let queryType: keyof pgPromise.ITask<{}> = 'none';
-            let _query = "DELETE FROM " + this.escapedName;
-            const filterOpts = (await this.prepareWhere({
-                filter, 
-                forcedFilter, 
-                filterFields, 
-                localParams, 
-                tableRule: table_rules
-            }))
-            _query += filterOpts.where;
-            if(validate){
-                const _filter = filterOpts.filter;
-                await validate(_filter);
-            }
-
-            let returningQuery = "";
-            if(returning){
-                queryType = "any";
-                if(!returningFields) {
-                    throw "Returning dissallowed";
-                }
-                returningQuery = this.makeReturnQuery(await this.prepareReturning(returning, this.parseFieldFilter(returningFields)));
-                _query += returningQuery
-            }
-            
-            if(returnQuery) return _query;
-
-            /**
-             * Delete file
-             */
-            const dbHandler = (this.t || this.db)
-            if(this.is_media && this.dboBuilder.prostgles.fileManager){
-                
-                if(this.dboBuilder.prostgles.opts.fileTable?.delayedDelete){
-                    return dbHandler[queryType](`UPDATE ${asName(this.name)} SET deleted = now() ${filterOpts.where} ${returningQuery};`)
-                } else {
-                    
-                    const txDelete = async (tbl: TableHandler) => {
-                        if(!tbl.t) throw new Error("Missing transaction object t");
-                        const files = await this.find(filterOpts.filter);
-                        for await(const file of files){
-                            await tbl.t?.any(`DELETE FROM ${asName(this.name)} WHERE id = ` + "${id}", file);
-                            await tbl.dboBuilder.prostgles.fileManager?.deleteFile(file.name);
-                        }
-
-                        if(returning){
-                            return files.map(f => pickKeys(f, ["id", "name"]));
-                        }
-                    }
-
-                    if(localParams?.dbTX){
-                        return txDelete(localParams.dbTX[this.name] as TableHandler)
-                    } else if(this.t) {
-                        return txDelete(this)
-                    } else {
-
-                        return this.dboBuilder.getTX(tx => {
-                            return txDelete(tx[this.name] as any)
-                        })
-                    }
-                }
-            }
-
-            return dbHandler[queryType](_query).catch((err: any) => makeErr(err, localParams));
-        } catch(e){
-            // console.trace(e)
-            if(localParams && localParams.testRule) throw e;
-            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.delete(${JSON.stringify(filter || {}, null, 2)}, ${JSON.stringify(params || {}, null, 2)})` };
-        }
+    async delete(filter?: Filter, params?: DeleteParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any> {
+        return _delete.bind(this)(filter, params, param3_unused, table_rules, localParams);
     };
    
     remove(filter: Filter, params?: UpdateParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams){

@@ -13,6 +13,8 @@ export declare type Media = {
     "name"?: string;
     "original_name"?: string;
     "etag"?: string;
+    deleted?: string | null;
+    deleted_from_storage?: string | null;
 };
 export declare type TxCB = {
     (t: TableHandlers, _t: pgPromise.ITask<{}>): (any | void);
@@ -95,11 +97,11 @@ export declare type Aggregation = {
     alias: string;
     getQuery: (alias: string) => string;
 };
-export declare type Filter = object | {
+export declare type Filter = AnyObject | {
     $and: Filter[];
 } | {
     $or: Filter[];
-} | {};
+};
 export declare type JoinInfo = {
     expectOne?: boolean;
     paths: {
