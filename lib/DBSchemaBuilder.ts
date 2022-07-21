@@ -19,7 +19,7 @@ tables.push(`${escapeTSNames(tov.name)}: {
     update: ${tov.privileges.update};
     delete: ${tov.privileges.delete};
     columns: {${cols.map(c => `
-      ${escapeTSNames(c.name)}${c.is_nullable || c.has_default? "?" : ""}: ${postgresToTsType(c.udt_name)}${c.is_nullable? " | null" : ""}`).join(";")}
+      ${escapeTSNames(c.name)}${c.is_nullable || c.has_default? "?" : ""}: ${postgresToTsType(c.udt_name)}${c.is_nullable? " | null;" : ""}`).join("")}
     };
   };\n  `)
   })

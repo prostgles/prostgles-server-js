@@ -420,7 +420,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
           queries.push(`CREATE TABLE ${asName(tableName)} (
                         ${colDefs.join(", \n")}
                     );`)
-          console.error("TableConfigurator: Created table: \n" + queries[0])
+          console.log("TableConfigurator: Created table: \n" + queries[0])
         }
       }
       if ("constraints" in tableConf && tableConf.constraints) {

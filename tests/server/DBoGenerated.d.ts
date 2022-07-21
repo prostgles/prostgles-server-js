@@ -35,9 +35,9 @@ export type DBSchemaGenerated = {
     delete: true;
     columns: {
       added?: Date | null;
-      id?: number;
-      name: string;
-      public?: string | null
+      id?: number
+      name: string
+      public?: string | null;
     };
   };
   geography_columns: {
@@ -53,7 +53,7 @@ export type DBSchemaGenerated = {
       f_table_name?: string | null;
       f_table_schema?: string | null;
       srid?: number | null;
-      type?: string | null
+      type?: string | null;
     };
   };
   geometry_columns: {
@@ -69,7 +69,7 @@ export type DBSchemaGenerated = {
       f_table_name?: string | null;
       f_table_schema?: string | null;
       srid?: number | null;
-      type?: string | null
+      type?: string | null;
     };
   };
   insert_rules: {
@@ -80,8 +80,8 @@ export type DBSchemaGenerated = {
     delete: true;
     columns: {
       added?: Date | null;
-      id?: number;
-      name?: string | null
+      id?: number
+      name?: string | null;
     };
   };
   item_children: {
@@ -91,10 +91,10 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      id?: number;
+      id?: number
       item_id?: number | null;
       name?: string | null;
-      tst?: Date | null
+      tst?: Date | null;
     };
   };
   items: {
@@ -105,8 +105,8 @@ export type DBSchemaGenerated = {
     delete: true;
     columns: {
       h?: Array<string> | null;
-      id?: number;
-      name?: string | null
+      id?: number
+      name?: string | null;
     };
   };
   items_multi: {
@@ -116,12 +116,12 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      id?: number;
+      id?: number
       items0_id?: number | null;
       items1_id?: number | null;
       items2_id?: number | null;
       items3_id?: number | null;
-      name?: string | null
+      name?: string | null;
     };
   };
   items_with_media: {
@@ -131,8 +131,8 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      id?: number;
-      name?: string | null
+      id?: number
+      name?: string | null;
     };
   };
   items_with_one_media: {
@@ -142,8 +142,8 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      id?: number;
-      name?: string | null
+      id?: number
+      name?: string | null;
     };
   };
   items2: {
@@ -154,9 +154,9 @@ export type DBSchemaGenerated = {
     delete: true;
     columns: {
       hh?: Array<string> | null;
-      id?: number;
+      id?: number
       items_id?: number | null;
-      name?: string | null
+      name?: string | null;
     };
   };
   items3: {
@@ -167,8 +167,8 @@ export type DBSchemaGenerated = {
     delete: true;
     columns: {
       h?: Array<string> | null;
-      id?: number;
-      name?: string | null
+      id?: number
+      name?: string | null;
     };
   };
   items4: {
@@ -179,9 +179,9 @@ export type DBSchemaGenerated = {
     delete: true;
     columns: {
       added?: Date | null;
-      id?: number;
-      name: string;
-      public?: string | null
+      id?: number
+      name: string
+      public?: string | null;
     };
   };
   items4_pub: {
@@ -192,9 +192,9 @@ export type DBSchemaGenerated = {
     delete: true;
     columns: {
       added?: Date | null;
-      id?: number;
-      name: string;
-      public?: string | null
+      id?: number
+      name: string
+      public?: string | null;
     };
   };
   items4a: {
@@ -204,10 +204,10 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      id?: number;
+      id?: number
       items_id?: number | null;
       items2_id?: number | null;
-      name?: string | null
+      name?: string | null;
     };
   };
   lookup_col1: {
@@ -239,15 +239,15 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      content_type: string;
+      content_type: string
       deleted?: number | null;
       deleted_from_storage?: number | null;
       description?: string | null;
       etag?: string | null;
-      extension: string;
-      id?: string;
-      name: string;
-      original_name: string;
+      extension: string
+      id?: string
+      name: string
+      original_name: string
       s3_url?: string | null;
       signed_url?: string | null;
       signed_url_expires?: number | null;
@@ -261,8 +261,8 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      id?: number;
-      obj?: any | null
+      id?: number
+      obj?: any | null;
     };
   };
   planes: {
@@ -273,10 +273,10 @@ export type DBSchemaGenerated = {
     delete: true;
     columns: {
       flight_number?: string | null;
-      id?: number;
-      last_updated: number;
+      id?: number
+      last_updated: number
       x?: number | null;
-      y?: number | null
+      y?: number | null;
     };
   };
   prostgles_lookup_media_items_with_media: {
@@ -297,7 +297,7 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      foreign_id: number;
+      foreign_id: number
       media_id: string
     };
   };
@@ -323,8 +323,8 @@ export type DBSchemaGenerated = {
       auth_name?: string | null;
       auth_srid?: number | null;
       proj4text?: string | null;
-      srid: number;
-      srtext?: string | null
+      srid: number
+      srtext?: string | null;
     };
   };
   tr1: {
@@ -334,8 +334,8 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      id?: number;
-      t1?: string | null
+      id?: number
+      t1?: string | null;
     };
   };
   tr2: {
@@ -345,10 +345,10 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      id?: number;
+      id?: number
       t1?: string | null;
       t2?: string | null;
-      tr1_id?: number | null
+      tr1_id?: number | null;
     };
   };
   usr: {
@@ -360,10 +360,10 @@ export type DBSchemaGenerated = {
     columns: {
       added?: Date | null;
       age?: number | null;
-      id?: number;
+      id?: number
       is_active?: boolean | null;
       msg?: string | null;
-      status?: string | null
+      status?: string | null;
     };
   };
   uuid_text: {
@@ -375,8 +375,8 @@ export type DBSchemaGenerated = {
     columns: {
       col1?: string | null;
       col2?: string | null;
-      id?: string;
-      name?: string | null
+      id?: string
+      name?: string | null;
     };
   };
   v_items: {
@@ -387,7 +387,7 @@ export type DBSchemaGenerated = {
     delete: true;
     columns: {
       id?: number | null;
-      name?: string | null
+      name?: string | null;
     };
   };
   various: {
@@ -399,10 +399,10 @@ export type DBSchemaGenerated = {
     columns: {
       added?: Date | null;
       h?: Array<string> | null;
-      id?: number;
+      id?: number
       jsn?: any | null;
       name?: string | null;
-      tsv?: any | null
+      tsv?: any | null;
     };
   };
   

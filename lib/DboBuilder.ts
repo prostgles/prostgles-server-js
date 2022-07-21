@@ -852,10 +852,10 @@ export class ViewHandler {
                     ...c,
                     label,
                     tsDataType: postgresToTsType(c.udt_name),
-                    insert: insert && Boolean(p.insert && p.insert.fields && p.insert.fields.includes(c.name)),
+                    insert: insert && Boolean(p.insert && p.insert.fields && p.insert.fields.includes(c.name)) && tableRules?.insert?.forcedData?.[c.name] === undefined,
                     select: select && Boolean(p.select && p.select.fields && p.select.fields.includes(c.name)),
                     filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)),
-                    update: update && Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)),
+                    update: update && Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)) && tableRules?.update?.forcedData?.[c.name] === undefined,
                     delete: _delete && Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)),
                     ...(prostgles?.tableConfigurator?.getColInfo({ table: this.name, col: c.name, lang }) || {}),
                     ...(fileConfig && { file: fileConfig })

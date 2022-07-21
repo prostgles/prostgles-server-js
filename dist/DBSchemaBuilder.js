@@ -15,7 +15,7 @@ const getDBSchema = (dboBuilder) => {
     update: ${tov.privileges.update};
     delete: ${tov.privileges.delete};
     columns: {${cols.map(c => `
-      ${(0, DboBuilder_1.escapeTSNames)(c.name)}${c.is_nullable || c.has_default ? "?" : ""}: ${(0, DboBuilder_1.postgresToTsType)(c.udt_name)}${c.is_nullable ? " | null" : ""}`).join(";")}
+      ${(0, DboBuilder_1.escapeTSNames)(c.name)}${c.is_nullable || c.has_default ? "?" : ""}: ${(0, DboBuilder_1.postgresToTsType)(c.udt_name)}${c.is_nullable ? " | null;" : ""}`).join("")}
     };
   };\n  `);
     });

@@ -266,10 +266,12 @@ export default class FileManager {
               ContentType: mime,
               Body: file
             };
-            this.s3Client.upload(params, (err: any, res: ManagedUpload.SendData) => {
+            const c = this.s3Client.createMultipartUpload();
+            c.createReadStream()
+            const manager = this.s3Client.upload(params, (err: Error, res: ManagedUpload.SendData) => {
               
               if(err){
-                reject("Something went wrong");
+                reject(err.toString());
                 console.error(err)
               } else {
                 // console.log("Uploaded file:", res)
@@ -279,6 +281,9 @@ export default class FileManager {
                   s3_url: res.Location,
                 });
               }
+            });
+            manager.on('httpUploadProgress', (progress) => {
+              console.log('s3 file upload progress', progress)
             });
       }
 
