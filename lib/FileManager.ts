@@ -223,7 +223,8 @@ export default class FileManager {
   async upload(
     file: Buffer | string, 
     name: string,
-    mime: string
+    mime: string,
+    onProgress?: (progress: S3.ManagedUpload.Progress) => void
   ): Promise<UploadedItem> {
 
     return new Promise(async (resolve, reject) => {
@@ -266,8 +267,7 @@ export default class FileManager {
               ContentType: mime,
               Body: file
             };
-            const c = this.s3Client.createMultipartUpload();
-            c.createReadStream()
+            
             const manager = this.s3Client.upload(params, (err: Error, res: ManagedUpload.SendData) => {
               
               if(err){
@@ -282,9 +282,9 @@ export default class FileManager {
                 });
               }
             });
-            manager.on('httpUploadProgress', (progress) => {
-              console.log('s3 file upload progress', progress)
-            });
+            if(onProgress){
+              manager.on('httpUploadProgress', onProgress);
+            }
       }
 
     });

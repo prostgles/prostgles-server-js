@@ -384,7 +384,7 @@ class FileManager {
     //   };
     //   return await this.s3Client.getSignedUrlPromise("putObject", params)
     // }
-    async upload(file, name, mime) {
+    async upload(file, name, mime, onProgress) {
         return new Promise(async (resolve, reject) => {
             if (!file) {
                 throw "No file. Expecting: Buffer | String";
@@ -424,8 +424,6 @@ class FileManager {
                     ContentType: mime,
                     Body: file
                 };
-                const c = this.s3Client.createMultipartUpload();
-                c.createReadStream();
                 const manager = this.s3Client.upload(params, (err, res) => {
                     if (err) {
                         reject(err.toString());
@@ -440,9 +438,9 @@ class FileManager {
                         });
                     }
                 });
-                manager.on('httpUploadProgress', (progress) => {
-                    console.log('s3 file upload progress', progress);
-                });
+                if (onProgress) {
+                    manager.on('httpUploadProgress', onProgress);
+                }
             }
         });
     }
