@@ -220,7 +220,7 @@ export default class FileManager {
   //   return await this.s3Client.getSignedUrlPromise("putObject", params)
   // }
   
-  private async upload(
+  async upload(
     file: Buffer | string, 
     name: string,
     mime: string

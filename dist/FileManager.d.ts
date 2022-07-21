@@ -74,7 +74,7 @@ export default class FileManager {
         mime: string | ALLOWED_CONTENT_TYPE;
         ext: string | ALLOWED_EXTENSION;
     }>;
-    private upload;
+    upload(file: Buffer | string, name: string, mime: string): Promise<UploadedItem>;
     uploadAsMedia: (params: {
         item: UploadItem;
         allowedExtensions?: Array<ALLOWED_EXTENSION>;
