@@ -227,13 +227,15 @@ export default class FileManager {
   uploadStream = (
     name: string,
     mime: string,
-    onProgress?: OnProgress
+    onProgress?: OnProgress,
+    onError?: (error: any)=>void,
+    onEnd?: (item: UploadedItem)=>void
   ) => {
     if(!this.s3Client) throw new Error("S3 config missing. Can only upload streams to S3");
 
     const pass = new stream.PassThrough();
 
-    this.upload(pass, name, mime, onProgress)
+    this.upload(pass, name, mime, onProgress).then(onEnd).catch(onError)
     
     return pass;
   }
@@ -282,30 +284,30 @@ export default class FileManager {
             "s3:GetObject",
             "s3:GetObjectAcl",
           */
-            const params = {
-              Bucket: (this.config as S3Config).bucket, 
-              Key: name,
-              ContentType: mime,
-              Body: file
-            };
-            
-            const manager = this.s3Client.upload(params, (err: Error, res: ManagedUpload.SendData) => {
-              
-              if(err){
-                reject(err.toString());
-                console.error(err)
-              } else {
-                // console.log("Uploaded file:", res)
-                resolve({
-                  url,
-                  etag: res.ETag,
-                  s3_url: res.Location,
-                });
-              }
+        const params = {
+          Bucket: (this.config as S3Config).bucket, 
+          Key: name,
+          ContentType: mime,
+          Body: file
+        };
+        
+        const manager = this.s3Client.upload(params, (err: Error, res: ManagedUpload.SendData) => {
+          
+          if(err){
+            reject(err.toString());
+            console.error(err)
+          } else {
+            // console.log("Uploaded file:", res)
+            resolve({
+              url,
+              etag: res.ETag,
+              s3_url: res.Location,
             });
-            if(onProgress){
-              manager.on('httpUploadProgress', onProgress);
-            }
+          }
+        });
+        if(onProgress){
+          manager.on('httpUploadProgress', onProgress);
+        }
       }
 
     });
