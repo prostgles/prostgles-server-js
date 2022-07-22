@@ -1,8 +1,11 @@
 /// <reference types="node" />
+/// <reference types="node" />
 import { S3 } from 'aws-sdk';
+import * as stream from 'stream';
 import { DB, DBHandlerServer, Prostgles } from './Prostgles';
 import { ALLOWED_CONTENT_TYPE, ALLOWED_EXTENSION, ValidatedColumnInfo } from 'prostgles-types';
 export declare const asSQLIdentifier: (name: string, db: DB) => Promise<string>;
+declare type OnProgress = (progress: S3.ManagedUpload.Progress) => void;
 export declare type ImageOptions = {
     keepMetadata?: boolean;
     compression?: 
@@ -74,7 +77,8 @@ export default class FileManager {
         mime: string | ALLOWED_CONTENT_TYPE;
         ext: string | ALLOWED_EXTENSION;
     }>;
-    upload(file: Buffer | string, name: string, mime: string, onProgress?: (progress: S3.ManagedUpload.Progress) => void): Promise<UploadedItem>;
+    uploadStream: (name: string, mime: string, onProgress?: OnProgress) => stream.PassThrough;
+    private upload;
     uploadAsMedia: (params: {
         item: UploadItem;
         allowedExtensions?: Array<ALLOWED_EXTENSION>;
@@ -97,6 +101,7 @@ export declare const getFileType: (file: Buffer | string, fileName: string) => P
     mime: ALLOWED_CONTENT_TYPE;
     ext: ALLOWED_EXTENSION;
 }>;
+export {};
 /**
  *
  

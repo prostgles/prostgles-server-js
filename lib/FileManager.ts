@@ -2,6 +2,7 @@
 import { S3, IAM } from 'aws-sdk';
 import { ManagedUpload } from 'aws-sdk/clients/s3';
 import * as fs from 'fs';
+import * as stream from 'stream';
 
 import * as sharp from "sharp";
 
@@ -14,6 +15,8 @@ const HOUR = 3600 * 1000;
 export const asSQLIdentifier = async (name: string, db: DB): Promise<string> => {
   return (await db.one("select format('%I', $1) as name", [name]))?.name
 }
+
+type OnProgress = (progress: S3.ManagedUpload.Progress) => void
 
 export type ImageOptions = {
   keepMetadata?: boolean;
@@ -61,6 +64,7 @@ export type UploadedItem = {
   s3_url?: string;
 };
 import AWS from 'aws-sdk';
+import internal from "stream";
 export default class FileManager {
 
   static testCredentials = async (accessKeyId: string, secretAccessKey: string) => {
@@ -220,16 +224,30 @@ export default class FileManager {
   //   return await this.s3Client.getSignedUrlPromise("putObject", params)
   // }
   
-  async upload(
-    file: Buffer | string, 
+  uploadStream = (
     name: string,
     mime: string,
-    onProgress?: (progress: S3.ManagedUpload.Progress) => void
+    onProgress?: OnProgress
+  ) => {
+    if(!this.s3Client) throw new Error("S3 config missing. Can only upload streams to S3");
+
+    const pass = new stream.PassThrough();
+
+    this.upload(pass, name, mime, onProgress)
+    
+    return pass;
+  }
+
+  private async upload(
+    file: Buffer | string | stream.PassThrough, 
+    name: string,
+    mime: string,
+    onProgress?: OnProgress
   ): Promise<UploadedItem> {
 
     return new Promise(async (resolve, reject) => {
       if(!file){
-        throw "No file. Expecting: Buffer | String";
+        throw "No file. Expecting: Buffer | String | stream";
       }
       if(!name){
         throw "No name. Expecting: String";
@@ -238,6 +256,9 @@ export default class FileManager {
       // let type = await this.getMIME(file, name, allowedExtensions);
       const url = `${this.fileRoute}/${name}`;
       if(!this.s3Client){
+        if(file instanceof stream.PassThrough){
+          throw new Error("S3 config missing. Can only upload streams to S3");
+        }
         const config = this.config as LocalConfig;
         try {
           await fs.promises.mkdir(config.localFolderPath, { recursive: true });

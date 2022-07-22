@@ -4,6 +4,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getFileType = exports.getFileTypeFromFilename = exports.asSQLIdentifier = void 0;
 const aws_sdk_1 = require("aws-sdk");
 const fs = require("fs");
+const stream = require("stream");
 const sharp = require("sharp");
 const prostgles_types_1 = require("prostgles-types");
 const DboBuilder_1 = require("./DboBuilder");
@@ -15,6 +16,29 @@ exports.asSQLIdentifier = asSQLIdentifier;
 const aws_sdk_2 = require("aws-sdk");
 class FileManager {
     constructor(config, imageOptions) {
+        // async getUploadURL(fileName: string): Promise<string> {
+        //   const thisHour = new Date();
+        //   thisHour.setMilliseconds(0);
+        //   thisHour.setSeconds(0);
+        //   thisHour.setMinutes(0);
+        //   const now = Date.now();
+        //   const HOUR = 60 * 60;
+        //   const params = {
+        //     Bucket: this.config.bucket, 
+        //     Key: fileName, 
+        //     Expires: Math.round(((now - (+thisHour))/1000 + 2 * HOUR )), // one hour
+        //     ACL: "bucket-owner-full-control", 
+        //     ContentType: "image/png",
+        //   };
+        //   return await this.s3Client.getSignedUrlPromise("putObject", params)
+        // }
+        this.uploadStream = (name, mime, onProgress) => {
+            if (!this.s3Client)
+                throw new Error("S3 config missing. Can only upload streams to S3");
+            const pass = new stream.PassThrough();
+            this.upload(pass, name, mime, onProgress);
+            return pass;
+        };
         this.uploadAsMedia = async (params) => {
             const { item, imageOptions } = params;
             const { name, data, content_type } = item;
@@ -368,26 +392,10 @@ class FileManager {
             throw `File MIME type not found for the provided extension: ${result?.ext}`;
         return result;
     }
-    // async getUploadURL(fileName: string): Promise<string> {
-    //   const thisHour = new Date();
-    //   thisHour.setMilliseconds(0);
-    //   thisHour.setSeconds(0);
-    //   thisHour.setMinutes(0);
-    //   const now = Date.now();
-    //   const HOUR = 60 * 60;
-    //   const params = {
-    //     Bucket: this.config.bucket, 
-    //     Key: fileName, 
-    //     Expires: Math.round(((now - (+thisHour))/1000 + 2 * HOUR )), // one hour
-    //     ACL: "bucket-owner-full-control", 
-    //     ContentType: "image/png",
-    //   };
-    //   return await this.s3Client.getSignedUrlPromise("putObject", params)
-    // }
     async upload(file, name, mime, onProgress) {
         return new Promise(async (resolve, reject) => {
             if (!file) {
-                throw "No file. Expecting: Buffer | String";
+                throw "No file. Expecting: Buffer | String | stream";
             }
             if (!name) {
                 throw "No name. Expecting: String";
@@ -395,6 +403,9 @@ class FileManager {
             // let type = await this.getMIME(file, name, allowedExtensions);
             const url = `${this.fileRoute}/${name}`;
             if (!this.s3Client) {
+                if (file instanceof stream.PassThrough) {
+                    throw new Error("S3 config missing. Can only upload streams to S3");
+                }
                 const config = this.config;
                 try {
                     await fs.promises.mkdir(config.localFolderPath, { recursive: true });
