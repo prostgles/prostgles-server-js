@@ -261,19 +261,21 @@ export default class FileManager {
         const filePath = `${this.config.localFolderPath}/${name}`;
         const writeStream = fs.createWriteStream(filePath);
 
-        writeStream.on("exit", (code) => {
-          if(code){
-            onError?.(code)
-          } else {
-            onEnd?.({
-              url,
-              etag: `none`,
-              content_length: fs.statSync(filePath).size
-            })
-          }
-
-        });
+        let errored = false;
+        writeStream.on('error', err => {
+          errored = true;
+          onError?.(err)
+        })
+        if(onEnd) writeStream.on('finish', () => {
+          if(errored) return;
+          onEnd?.({
+            url,
+            etag: `none`,
+            content_length: fs.statSync(filePath).size
+          })
+        })
         
+
         passThrough.pipe(writeStream);
       } catch(err){
         onError?.(err)
