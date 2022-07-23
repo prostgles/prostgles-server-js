@@ -64,11 +64,18 @@ class FileManager {
                         writeStream.on('finish', () => {
                             if (errored)
                                 return;
-                            onEnd?.({
-                                url,
-                                etag: `none`,
-                                content_length: fs.statSync(filePath).size
-                            });
+                            let content_length = 0;
+                            try {
+                                content_length = fs.statSync(filePath).size;
+                                onEnd?.({
+                                    url,
+                                    etag: `none`,
+                                    content_length
+                                });
+                            }
+                            catch (err) {
+                                onError?.(err);
+                            }
                         });
                     passThrough.pipe(writeStream);
                 }
