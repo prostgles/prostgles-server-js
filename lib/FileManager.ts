@@ -239,6 +239,8 @@ export default class FileManager {
   //   };
   //   return await this.s3Client.getSignedUrlPromise("putObject", params)
   // }
+
+  getFileUrl = (name: string) => `${this.fileRoute}/${name}`
   
   uploadStream = (
     name: string,
@@ -247,14 +249,42 @@ export default class FileManager {
     onError?: (error: any)=>void,
     onEnd?: (item: UploadedItem)=>void
   ) => {
-    if(!this.s3Client) throw new Error("S3 config missing. Can only upload streams to S3");
+    const passThrough = new stream.PassThrough();
 
-    const pass = new stream.PassThrough();
+    if(!this.s3Client && "localFolderPath" in this.config) {
+      // throw new Error("S3 config missing. Can only upload streams to S3");
 
-    this.upload(pass, name, mime, onProgress).then(onEnd)
-      .catch(onError)
+      try {
+
+        const url = this.getFileUrl(name)
+        fs.mkdirSync(this.config.localFolderPath, { recursive: true });
+        const filePath = `${this.config.localFolderPath}/${name}`;
+        const writeStream = fs.createWriteStream(filePath);
+
+        writeStream.on("exit", (code) => {
+          if(code){
+            onError?.(code)
+          } else {
+            onEnd?.({
+              url,
+              etag: `none`,
+              content_length: fs.statSync(filePath).size
+            })
+          }
+
+        });
+        
+        passThrough.pipe(writeStream);
+      } catch(err){
+        onError?.(err)
+      }
+    } else {
+      this.upload(passThrough, name, mime, onProgress).then(onEnd)
+        .catch(onError)
+    }
+
     
-    return pass;
+    return passThrough;
   }
 
   private async upload(
@@ -273,7 +303,7 @@ export default class FileManager {
       }
 
       // let type = await this.getMIME(file, name, allowedExtensions);
-      const url = `${this.fileRoute}/${name}`;
+      const url = this.getFileUrl(name)
       if(!this.s3Client){
         if(file instanceof stream.PassThrough){
           throw new Error("S3 config missing. Can only upload streams to S3");

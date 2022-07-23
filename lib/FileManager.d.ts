@@ -82,6 +82,7 @@ export default class FileManager {
         mime: string | ALLOWED_CONTENT_TYPE;
         ext: string | ALLOWED_EXTENSION;
     }>;
+    getFileUrl: (name: string) => string;
     uploadStream: (name: string, mime: string, onProgress?: OnProgress, onError?: (error: any) => void, onEnd?: (item: UploadedItem) => void) => stream.PassThrough;
     private upload;
     uploadAsMedia: (params: {
