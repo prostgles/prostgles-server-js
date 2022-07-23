@@ -267,10 +267,19 @@ export default class FileManager {
           errored = true;
           onError?.(err)
         });
-        passThrough.on('data', function(chunk){
-          loaded += chunk.length;
-          onProgress?.({ loaded, total: 0 })
-        });
+
+        let lastProgress = Date.now();
+        const throttle = 3000;
+        if(onProgress){
+          passThrough.on('data', function(chunk){
+            loaded += chunk.length;
+            const now = Date.now();
+            if(now - lastProgress > throttle){
+              lastProgress = now;
+              onProgress?.({ loaded, total: 0 })
+            }
+          });
+        }
 
         if(onEnd) writeStream.on('finish', () => {
           if(errored) return;
