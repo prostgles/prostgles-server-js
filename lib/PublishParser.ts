@@ -4,7 +4,7 @@ import { CommonTableRules, Filter, isPlainObject, LocalParams, PRGLIOSocket, Tab
 import { Prostgles, DBHandlerServer, DB, TABLE_METHODS } from "./Prostgles";
 import type { DBOFullyTyped, PublishFullyTyped } from "./DBSchemaBuilder";
 export type Method = (...args: any) => ( any | Promise<any> );
-export type PublishMethods<S = void> = (params: PublishParams<S>) => { [key:string]: Method } | Promise<{ [key:string]: Method }>;
+export type PublishMethods<S = void> = (params: PublishParams<S>) => { [key:string]: Method } | Promise<{ [key:string]: Method } | null>;
 
 export type Awaitable<T> = T | Promise<T>;
 
@@ -331,7 +331,7 @@ export type ParsedPublishTable = {
 export type PublishParams<S = void> = {
   sid?: string;
   dbo: DBOFullyTyped<S>;
-  db?: DB;
+  db: DB;
   user?: AnyObject;
   socket: PRGLIOSocket
 }

@@ -8,7 +8,7 @@ export declare type PublishMethods<S = void> = (params: PublishParams<S>) => {
     [key: string]: Method;
 } | Promise<{
     [key: string]: Method;
-}>;
+} | null>;
 export declare type Awaitable<T> = T | Promise<T>;
 declare type Request = {
     socket?: any;
@@ -217,7 +217,7 @@ export declare type ParsedPublishTable = {
 export declare type PublishParams<S = void> = {
     sid?: string;
     dbo: DBOFullyTyped<S>;
-    db?: DB;
+    db: DB;
     user?: AnyObject;
     socket: PRGLIOSocket;
 };
