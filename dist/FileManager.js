@@ -530,7 +530,7 @@ class FileManager {
         const params = {
             Bucket: this.config.bucket,
             Key: fileName,
-            Expires: expiresInSeconds || 30 * 60
+            Expires: Math.round(expiresInSeconds || 30 * 60) // Error if float
         };
         return await this.s3Client?.getSignedUrlPromise("getObject", params);
     }
