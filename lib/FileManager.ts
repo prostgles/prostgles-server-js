@@ -64,7 +64,6 @@ export type UploadedItem = {
   s3_url?: string;
 };
 import AWS from 'aws-sdk';
-import internal from "stream";
 export default class FileManager {
 
   static testCredentials = async (accessKeyId: string, secretAccessKey: string) => {
@@ -125,6 +124,18 @@ export default class FileManager {
         }
       }, Math.max(10000, (fullConfig.delayedDelete.checkIntervalHours || 0) * HOUR))
     }
+  }
+
+  async getFileStream(name: string): Promise<stream.Readable> {
+    if("bucket" in this.config && this.s3Client){
+      return this.s3Client.getObject({ Key: name, Bucket: this.config.bucket }).createReadStream()
+    } else if("localFolderPath" in this.config){
+      const path = `${this.config.localFolderPath}/${name}`;
+      if(!fs.existsSync(path)){
+        throw `File ${path} could not be found`;
+      }
+      return fs.createReadStream(path)
+    } else throw new Error("Not expected")
   }
 
   async deleteFile(name: string) {
