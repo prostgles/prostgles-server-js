@@ -440,7 +440,7 @@ export default class FileManager {
     return res
   }
 
-  private async getFileURL(fileName: string, expiresInSeconds: number = 30 * 60){
+  async getFileS3URL(fileName: string, expiresInSeconds: number = 30 * 60){
     const params = {
       Bucket: (this.config as S3Config).bucket, 
       Key: fileName,
@@ -661,7 +661,7 @@ export default class FileManager {
             
             const EXPIRES = Date.now() + HOUR;
             if(!url || expires < EXPIRES){
-              url = await this.getFileURL(media.name, 60 * 60);
+              url = await this.getFileS3URL(media.name, 60 * 60);
               await mediaTable.update({ name }, { signed_url: url, signed_url_expires: EXPIRES });
             }
   

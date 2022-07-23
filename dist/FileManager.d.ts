@@ -91,7 +91,7 @@ export default class FileManager {
         dissallowedExtensions?: Array<ALLOWED_EXTENSION>;
         imageOptions?: ImageOptions;
     }) => Promise<UploadedItem>;
-    private getFileURL;
+    getFileS3URL(fileName: string, expiresInSeconds?: number): Promise<string | undefined>;
     private parseSQLIdentifier;
     getColInfo: (args: {
         tableName: string;

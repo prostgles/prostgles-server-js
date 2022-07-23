@@ -318,7 +318,7 @@ class FileManager {
                             const expires = +(media.signed_url_expires || 0);
                             const EXPIRES = Date.now() + HOUR;
                             if (!url || expires < EXPIRES) {
-                                url = await this.getFileURL(media.name, 60 * 60);
+                                url = await this.getFileS3URL(media.name, 60 * 60);
                                 await mediaTable.update({ name }, { signed_url: url, signed_url_expires: EXPIRES });
                             }
                             res.redirect(url);
@@ -526,7 +526,7 @@ class FileManager {
             }
         });
     }
-    async getFileURL(fileName, expiresInSeconds = 30 * 60) {
+    async getFileS3URL(fileName, expiresInSeconds = 30 * 60) {
         const params = {
             Bucket: this.config.bucket,
             Key: fileName,
