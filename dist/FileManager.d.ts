@@ -53,6 +53,10 @@ export declare type UploadedItem = {
      * S3 url of the resource
      */
     s3_url?: string;
+    /**
+     * Total uploaded file size in bytes
+     */
+    content_length: number;
 };
 import AWS from 'aws-sdk';
 export default class FileManager {

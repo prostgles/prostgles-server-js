@@ -62,6 +62,11 @@ export type UploadedItem = {
    * S3 url of the resource
    */
   s3_url?: string;
+
+  /**
+   * Total uploaded file size in bytes
+   */
+  content_length: number;
 };
 import AWS from 'aws-sdk';
 export default class FileManager {
@@ -246,7 +251,8 @@ export default class FileManager {
 
     const pass = new stream.PassThrough();
 
-    this.upload(pass, name, mime, onProgress).then(onEnd).catch(onError)
+    this.upload(pass, name, mime, onProgress).then(onEnd)
+      .catch(onError)
     
     return pass;
   }
@@ -275,11 +281,12 @@ export default class FileManager {
         const config = this.config as LocalConfig;
         try {
           await fs.promises.mkdir(config.localFolderPath, { recursive: true });
-
-          fs.writeFileSync(`${config.localFolderPath}/${name}`, file as any);
+          const filePath = `${config.localFolderPath}/${name}`;
+          fs.writeFileSync(filePath, file as any);
           resolve({
             url,
             etag: `none`,
+            content_length: fs.statSync(filePath).size
           })
         } catch(err){
           console.error("Error saving file locally", err);
@@ -302,6 +309,7 @@ export default class FileManager {
           Body: file
         };
         
+        let content_length = 0;
         const manager = this.s3Client.upload(params, (err: Error, res: ManagedUpload.SendData) => {
           
           if(err){
@@ -313,12 +321,14 @@ export default class FileManager {
               url,
               etag: res.ETag,
               s3_url: res.Location,
+              content_length // await fileMgr.s3Client?.headObject({ Bucket: ..., Key: ... }).promise() ).ContentLength;
             });
           }
         });
-        if(onProgress){
-          manager.on('httpUploadProgress', onProgress);
-        }
+        manager.on('httpUploadProgress', prog => { 
+          content_length = prog.total;
+          onProgress?.(prog);
+        });
       }
 
     });
@@ -427,6 +437,7 @@ export default class FileManager {
           name                  TEXT NOT NULL,
           extension             TEXT NOT NULL,
           content_type          TEXT NOT NULL,
+          content_length        BIGINT NOT NULL DEFAULT 0,
           url                   TEXT NOT NULL,
           original_name         TEXT NOT NULL,
 

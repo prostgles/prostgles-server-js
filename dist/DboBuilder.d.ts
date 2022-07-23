@@ -6,7 +6,7 @@ export declare type Media = {
     "title"?: string;
     "extension"?: string;
     "content_type"?: string;
-    "local_url"?: string;
+    content_length?: number;
     "url"?: string;
     "signed_url"?: string;
     "signed_url_expires"?: number;

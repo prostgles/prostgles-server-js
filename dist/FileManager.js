@@ -36,7 +36,8 @@ class FileManager {
             if (!this.s3Client)
                 throw new Error("S3 config missing. Can only upload streams to S3");
             const pass = new stream.PassThrough();
-            this.upload(pass, name, mime, onProgress).then(onEnd).catch(onError);
+            this.upload(pass, name, mime, onProgress).then(onEnd)
+                .catch(onError);
             return pass;
         };
         this.uploadAsMedia = async (params) => {
@@ -119,6 +120,7 @@ class FileManager {
           name                  TEXT NOT NULL,
           extension             TEXT NOT NULL,
           content_type          TEXT NOT NULL,
+          content_length        BIGINT NOT NULL DEFAULT 0,
           url                   TEXT NOT NULL,
           original_name         TEXT NOT NULL,
 
@@ -424,10 +426,12 @@ class FileManager {
                 const config = this.config;
                 try {
                     await fs.promises.mkdir(config.localFolderPath, { recursive: true });
-                    fs.writeFileSync(`${config.localFolderPath}/${name}`, file);
+                    const filePath = `${config.localFolderPath}/${name}`;
+                    fs.writeFileSync(filePath, file);
                     resolve({
                         url,
                         etag: `none`,
+                        content_length: fs.statSync(filePath).size
                     });
                 }
                 catch (err) {
@@ -450,6 +454,7 @@ class FileManager {
                     ContentType: mime,
                     Body: file
                 };
+                let content_length = 0;
                 const manager = this.s3Client.upload(params, (err, res) => {
                     if (err) {
                         reject(err.toString());
@@ -461,12 +466,14 @@ class FileManager {
                             url,
                             etag: res.ETag,
                             s3_url: res.Location,
+                            content_length // await fileMgr.s3Client?.headObject({ Bucket: ..., Key: ... }).promise() ).ContentLength;
                         });
                     }
                 });
-                if (onProgress) {
-                    manager.on('httpUploadProgress', onProgress);
-                }
+                manager.on('httpUploadProgress', prog => {
+                    content_length = prog.total;
+                    onProgress?.(prog);
+                });
             }
         });
     }
