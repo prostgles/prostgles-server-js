@@ -25,6 +25,7 @@
   "homepage": "https://github.com/prostgles/prostgles-server-js#readme",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.121.0",
+    "@types/express": "^4.17.13",
     "aws-sdk": "^2.1168.0",
     "bluebird": "^3.7.2",
     "file-type": "^17.1.3",

@@ -1,3 +1,4 @@
+import { Request, Response } from "express";
 import { AnyObject } from "prostgles-types";
 import { LocalParams, PRGLIOSocket } from "./DboBuilder";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
@@ -10,22 +11,8 @@ declare type AuthSocketSchema = {
     logout?: boolean;
     pathGuard?: boolean;
 };
-declare type ExpressReq = {
-    body?: AnyObject;
-    query?: AnyObject;
-    cookies?: AnyObject;
-    params?: AnyObject;
-    path: string;
-    originalUrl: string;
-};
-declare type ExpressRes = {
-    status: (code: number) => ({
-        json: (response: AnyObject) => any;
-    });
-    cookie: (name: string, value: string, options: AnyObject) => any;
-    sendFile: (filepath: string) => void;
-    redirect: (url: string) => void;
-};
+declare type ExpressReq = Request;
+declare type ExpressRes = Response;
 export declare type BasicSession = {
     /** Must be hard to bruteforce */
     sid: string;
@@ -75,7 +62,11 @@ export declare type Auth<S = void> = {
         /**
          * Will be called after a GET request is authorised
          */
-        onGetRequestOK?: (req: ExpressReq, res: ExpressRes, getUser: () => Promise<AnyObject | undefined>) => any;
+        onGetRequestOK?: (req: ExpressReq, res: ExpressRes, params: {
+            db: DB;
+            dbo: DBOFullyTyped<S>;
+            getUser: () => Promise<AnyObject | undefined>;
+        }) => any;
         /**
          * Name of get url parameter used in redirecting user after successful login. Defaults to returnURL
          */

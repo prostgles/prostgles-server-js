@@ -301,7 +301,7 @@ class AuthHandler {
                                 res.redirect("/");
                                 return;
                             }
-                            onGetRequestOK?.(req, res, () => getUser(clientReq));
+                            onGetRequestOK?.(req, res, { getUser: () => getUser(clientReq), dbo: this.dbo, db: this.db });
                         }
                         catch (error) {
                             console.error(error);

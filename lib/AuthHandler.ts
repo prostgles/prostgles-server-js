@@ -1,3 +1,4 @@
+import { Request, Response } from "express";
 import { AnyObject, AuthGuardLocation, AuthGuardLocationResponse, CHANNELS, DBSchema } from "prostgles-types";
 import { LocalParams, PRGLIOSocket } from "./DboBuilder";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
@@ -11,20 +12,22 @@ type AuthSocketSchema = {
   pathGuard?: boolean;
 };
 
-type ExpressReq = {
-  body?: AnyObject;
-  query?: AnyObject;
-  cookies?: AnyObject;
-  params?: AnyObject;
-  path: string;
-  originalUrl: string;
-}
-type ExpressRes = {
-  status: (code: number) => ({ json: (response: AnyObject) => any; });
-  cookie: (name: string, value: string, options: AnyObject) => any;
-  sendFile: (filepath: string) => void;
-  redirect: (url: string) => void;
-}
+type ExpressReq = Request;//<ParamsDictionar, any, any, QueryString.ParsedQs, Record<string, any>>
+//  {
+//   body?: AnyObject;
+//   query?: AnyObject;
+//   cookies?: AnyObject;
+//   params?: AnyObject;
+//   path: string;
+//   originalUrl: string;
+// }
+type ExpressRes = Response;
+// {
+//   status: (code: number) => ({ json: (response: AnyObject) => any; });
+//   cookie: (name: string, value: string, options: AnyObject) => any;
+//   sendFile: (filepath: string) => void;
+//   redirect: (url: string) => void;
+// }
 
 export type BasicSession = {
 
@@ -82,7 +85,11 @@ export type Auth<S = void> = {
     /**
      * Will be called after a GET request is authorised
      */
-    onGetRequestOK?: (req: ExpressReq, res: ExpressRes, getUser: () => Promise<AnyObject | undefined>) => any;
+    onGetRequestOK?: (
+      req: ExpressReq, 
+      res: ExpressRes, 
+      params: { db: DB, dbo: DBOFullyTyped<S>; getUser: () => Promise<AnyObject | undefined> }
+    ) => any;
 
     /**
      * Name of get url parameter used in redirecting user after successful login. Defaults to returnURL
@@ -196,7 +203,7 @@ export default class AuthHandler {
         httpOnly: true, // The cookie only accessible by the web server
         //signed: true // Indicates if the cookie should be signed
       }
-      const cookieOpts = { ...options, secure: true, sameSite: "strict", ...(this.opts?.expressConfig?.cookieOptions || {}) };
+      const cookieOpts = { ...options, secure: true, sameSite: "strict" as "strict", ...(this.opts?.expressConfig?.cookieOptions || {}) };
       const cookieData = sid;
       if(!this.sidKeyName || !this.returnURL) throw "sidKeyName or returnURL missing"
       res.cookie(this.sidKeyName, cookieData, cookieOpts);
@@ -346,7 +353,7 @@ export default class AuthHandler {
                 return;
               }
 
-              onGetRequestOK?.(req, res, () => getUser(clientReq))
+              onGetRequestOK?.(req, res, { getUser: () => getUser(clientReq), dbo: this.dbo, db: this.db })
 
             } catch (error) {
               console.error(error);
@@ -598,7 +605,7 @@ export default class AuthHandler {
  */
 function getReturnUrl(req: ExpressReq, name?: string) {
   if (req?.query?.returnURL && name) {
-    return decodeURIComponent(req?.query?.[name]);
+    return decodeURIComponent(req?.query?.[name] as string);
   }
   return null;
 }
