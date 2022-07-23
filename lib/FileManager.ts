@@ -113,12 +113,12 @@ export default class FileManager {
     const fullConfig = this.prostgles?.opts.fileTable;
     if(fullConfig?.delayedDelete){
       this.checkInterval = setInterval(async () => {
-        const fTable = fullConfig.tableName;
+        const fileTable = fullConfig.tableName;
         const daysDelay = fullConfig.delayedDelete?.deleteAfterNDays ?? 0;
-        if(fTable && this.dbo[fTable]?.delete && daysDelay){
-          const files = await this.dbo[fTable]?.find?.({ deleted_from_storage: null, deleted: { ">": Date.now() - (daysDelay * HOUR * 24) } }) ?? [];
-          for await(const file of files){
-            
+        if(fileTable && this.dbo[fileTable]?.delete && daysDelay){
+          const filesToDelete = await this.dbo[fileTable]?.find?.({ deleted_from_storage: null, deleted: { ">": Date.now() - (daysDelay * HOUR * 24) } }) ?? [];
+          for await(const file of filesToDelete){
+            await this.deleteFile(file.name)
           }
         } else {
           console.error("FileManager checkInterval delayedDelete FAIL: Could not access file table tableHandler.delete()")
