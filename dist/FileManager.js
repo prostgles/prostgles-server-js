@@ -48,7 +48,7 @@ class FileManager {
                         errored = true;
                         onError?.(err);
                     });
-                    writeStream.on('data', function (chunk) {
+                    passThrough.on('data', function (chunk) {
                         loaded += chunk.length;
                         onProgress?.({ loaded, total: 0 });
                     });
