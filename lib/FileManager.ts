@@ -269,7 +269,7 @@ export default class FileManager {
         });
 
         let lastProgress = Date.now();
-        const throttle = 3000;
+        const throttle = 1000;
         if(onProgress){
           passThrough.on('data', function(chunk){
             loaded += chunk.length;

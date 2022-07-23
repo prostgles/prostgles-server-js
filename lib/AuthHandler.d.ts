@@ -75,7 +75,7 @@ export declare type Auth<S = void> = {
         /**
          * Will be called after a GET request is authorised
          */
-        onGetRequestOK?: (req: ExpressReq, res: ExpressRes) => any;
+        onGetRequestOK?: (req: ExpressReq, res: ExpressRes, getUser: () => Promise<AnyObject | undefined>) => any;
         /**
          * Name of get url parameter used in redirecting user after successful login. Defaults to returnURL
          */
