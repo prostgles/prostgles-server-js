@@ -262,10 +262,16 @@ export default class FileManager {
         const writeStream = fs.createWriteStream(filePath);
 
         let errored = false;
+        let loaded = 0;
         writeStream.on('error', err => {
           errored = true;
           onError?.(err)
-        })
+        });
+        writeStream.on('data', function(chunk){
+          loaded += chunk.length;
+          onProgress?.({ loaded, total: 0 })
+        });
+
         if(onEnd) writeStream.on('finish', () => {
           if(errored) return;
           onEnd?.({
