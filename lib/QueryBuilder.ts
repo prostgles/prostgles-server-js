@@ -687,20 +687,25 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: true,
     getFields: (args: any[]) => args,
     getQuery: ({ allowedFields, args, tableAlias }) => {
-      const validCols = args.filter(a => typeof a === "string").length
+      const validCols = args.slice(0, 2).filter(a => typeof a === "string").length;
+      const trunc = args[2];
+      const allowedTruncs = ["second", "minute", "hour", "year"];
+      if(trunc && !allowedTruncs.includes(trunc)) throw new Error("Incorrect trunc provided. Allowed values: " + allowedTruncs)
       if(funcName === "difference" && validCols !== 2) throw new Error("Must have two column names")
       if(![1,2].includes(validCols)) throw new Error("Must have one or two column names")
       const [leftField, rightField] = args;
       const leftQ = asNameAlias(leftField, tableAlias);
       let rightQ = rightField? asNameAlias(rightField, tableAlias) : "";
+      let query = "";
       if(funcName === "ageNow" && validCols === 1){
-        return `age(now(), ${leftQ})`;
+        query = `age(now(), ${leftQ})`;
       } else if(funcName === "age" || funcName === "ageNow"){
         if(rightQ) rightQ = ", " + rightQ;
-        return `age(${leftQ} ${rightQ})`;
+        query = `age(${leftQ} ${rightQ})`;
       } else {
-        return `${leftQ} - ${rightQ}`;
+        query = `${leftQ} - ${rightQ}`;
       }
+      return trunc? `date_trunc(${trunc}, ${query})` : query;
     }
   } as FunctionSpec)),
 
