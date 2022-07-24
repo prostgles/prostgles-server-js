@@ -680,7 +680,7 @@ export const FUNCTIONS: FunctionSpec[] = [
   } as FunctionSpec)),
 
   /* Interval funcs */
-  ...["age", "difference"].map(funcName => ({
+  ...["age", "ageNow", "difference"].map(funcName => ({
     name: "$" + funcName,
     type: "function",
     numArgs: 1,
@@ -693,9 +693,11 @@ export const FUNCTIONS: FunctionSpec[] = [
       const [leftField, rightField] = args;
       const leftQ = asNameAlias(leftField, tableAlias);
       let rightQ = rightField? asNameAlias(rightField, tableAlias) : "";
-      if(funcName === "age"){
+      if(funcName === "ageNow" && validCols === 1){
+        return `age(now(), ${leftQ})`;
+      } else if(funcName === "age" || funcName === "ageNow"){
         if(rightQ) rightQ = ", " + rightQ;
-        return `${funcName}(${leftQ} ${rightQ})`;
+        return `age(${leftQ} ${rightQ})`;
       } else {
         return `${leftQ} - ${rightQ}`;
       }
