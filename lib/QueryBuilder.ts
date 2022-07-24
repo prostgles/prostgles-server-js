@@ -685,7 +685,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     type: "function",
     numArgs: 1,
     singleColArg: true,
-    getFields: (args: any[]) => args,
+    getFields: (args: any[]) => args.slice(0, 2).filter(a => typeof a === "string"),
     getQuery: ({ allowedFields, args, tableAlias }) => {
       const validCols = args.slice(0, 2).filter(a => typeof a === "string").length;
       const trunc = args[2];
