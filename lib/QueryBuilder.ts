@@ -705,7 +705,7 @@ export const FUNCTIONS: FunctionSpec[] = [
       } else {
         query = `${leftQ} - ${rightQ}`;
       }
-      return trunc? `date_trunc(${trunc}, ${query})` : query;
+      return trunc? `date_trunc(${asValue(trunc)}, ${query})` : query;
     }
   } as FunctionSpec)),
 
