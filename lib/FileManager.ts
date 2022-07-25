@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as stream from 'stream';
 
 import * as sharp from "sharp";
+import checkDiskSpace from 'check-disk-space';
 
 import { DB, DBHandlerServer, Prostgles } from './Prostgles';
 import { ALLOWED_CONTENT_TYPE, ALLOWED_EXTENSION, asName, CONTENT_TYPE_TO_EXT, getKeys, isObject, ValidatedColumnInfo } from 'prostgles-types';
@@ -44,6 +45,12 @@ export type LocalConfig = {
    * note that this location will be relative to the compiled file location
    */
   localFolderPath: string;
+
+  /**
+   * Minimum amount of free bytes available to allow saving files
+   * Defaults to 100MB
+   */
+  minFreeBytes?: number;
 }
 
 export type UploadItem = {
@@ -223,31 +230,29 @@ export default class FileManager {
     return result;
   }
 
-  // async getUploadURL(fileName: string): Promise<string> {
-  //   const thisHour = new Date();
-  //   thisHour.setMilliseconds(0);
-  //   thisHour.setSeconds(0);
-  //   thisHour.setMinutes(0);
-  //   const now = Date.now();
-  //   const HOUR = 60 * 60;
-  //   const params = {
-  //     Bucket: this.config.bucket, 
-  //     Key: fileName, 
-  //     Expires: Math.round(((now - (+thisHour))/1000 + 2 * HOUR )), // one hour
-  //     ACL: "bucket-owner-full-control", 
-  //     ContentType: "image/png",
-  //   };
-  //   return await this.s3Client.getSignedUrlPromise("putObject", params)
-  // }
+  getFileUrl = (name: string) => this.fileRoute? `${this.fileRoute}/${name}` : "";
 
-  getFileUrl = (name: string) => `${this.fileRoute}/${name}`
+  checkFreeSpace = async (fileSize = 0) => {
+    if(!this.s3Client && "localFolderPath" in this.config) {
+      const { minFreeBytes = 1.048e6 } = this.config;
+      const required = Math.max(fileSize, minFreeBytes)
+      if(required){
+        const diskSpace = await checkDiskSpace('/');
+        if(diskSpace.free < required){
+          const err =  `There is not enough space on the server to save files.\nTotal: ${bytesToSize(diskSpace.size)} \nRemaning: ${bytesToSize(diskSpace.free)} \nRequired: ${bytesToSize(required)}`
+          throw new Error(err);
+        }
+      }
+    }
+  }
   
   uploadStream = (
     name: string,
     mime: string,
     onProgress?: OnProgress,
     onError?: (error: any)=>void,
-    onEnd?: (item: UploadedItem)=>void
+    onEnd?: (item: UploadedItem)=>void,
+    expectedSizeBytes?: number
   ) => {
     const passThrough = new stream.PassThrough();
 
@@ -255,7 +260,10 @@ export default class FileManager {
       // throw new Error("S3 config missing. Can only upload streams to S3");
 
       try {
-
+        this.checkFreeSpace(expectedSizeBytes).catch(err => {
+          onError?.(err)
+          passThrough.end();
+        });
         const url = this.getFileUrl(name)
         fs.mkdirSync(this.config.localFolderPath, { recursive: true });
         const filePath = `${this.config.localFolderPath}/${name}`;
@@ -729,6 +737,13 @@ export const getFileType = async (file: Buffer | string, fileName: string): Prom
     }
   }
   return res as any;
+}
+
+export function bytesToSize(bytes: number) {
+  var sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  if (bytes == 0) return '0 Byte';
+  var i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)) + "");
+  return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
 }
 
 

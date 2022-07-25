@@ -37,6 +37,11 @@ export declare type LocalConfig = {
      * note that this location will be relative to the compiled file location
      */
     localFolderPath: string;
+    /**
+     * Minimum amount of free bytes available to allow saving files
+     * Defaults to 100MB
+     */
+    minFreeBytes?: number;
 };
 export declare type UploadItem = {
     name: string;
@@ -83,7 +88,8 @@ export default class FileManager {
         ext: string | ALLOWED_EXTENSION;
     }>;
     getFileUrl: (name: string) => string;
-    uploadStream: (name: string, mime: string, onProgress?: OnProgress, onError?: ((error: any) => void) | undefined, onEnd?: ((item: UploadedItem) => void) | undefined) => stream.PassThrough;
+    checkFreeSpace: (fileSize?: number) => Promise<void>;
+    uploadStream: (name: string, mime: string, onProgress?: OnProgress, onError?: ((error: any) => void) | undefined, onEnd?: ((item: UploadedItem) => void) | undefined, expectedSizeBytes?: number) => stream.PassThrough;
     private upload;
     uploadAsMedia: (params: {
         item: UploadItem;
@@ -107,6 +113,7 @@ export declare const getFileType: (file: Buffer | string, fileName: string) => P
     mime: ALLOWED_CONTENT_TYPE;
     ext: ALLOWED_EXTENSION;
 }>;
+export declare function bytesToSize(bytes: number): string;
 export {};
 /**
  *
