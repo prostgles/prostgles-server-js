@@ -399,7 +399,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
         const colCreateLines: string[] = [];
         const tableHandler = this.dbo[tableName];
         if (tableConf.columns) {
-          getKeys(tableConf?.columns).filter(c => !("joinDef" in tableConf.columns![c])).map(colName => {
+          getKeys(tableConf.columns).filter(c => !("joinDef" in tableConf.columns![c])).map(colName => {
             const colConf = tableConf.columns![colName];
 
             /* Add columns to create statement */

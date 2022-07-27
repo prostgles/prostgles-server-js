@@ -337,7 +337,8 @@ export type DBSchemaGenerated = {
     columns: {
       json:       { 
         a:  boolean;
-        arr:  1 | 2 | 3;
+        arr:  '1' | '2' | '3';
+        arr1:  1 | 2 | 3;
         arr2:  number[];
         o?:  
         | {  o1:  number; }

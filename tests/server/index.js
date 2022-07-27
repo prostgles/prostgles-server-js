@@ -70,6 +70,7 @@ function dd() {
                 json: { jsonbSchema: {
                         a: { type: "boolean" },
                         arr: { oneOf: ["1", "2", "3"] },
+                        arr1: { oneOf: [1, 2, 3] },
                         arr2: { type: "integer[]" },
                         o: { oneOfTypes: [{ o1: { type: "integer" } }, { o2: { type: "boolean" } }], optional: true },
                     }

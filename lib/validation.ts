@@ -109,8 +109,7 @@ export function getPGCheckConstraint(args: { escapedFieldName: string; schema: V
       if(oneOfHasNull) checks.push(`${valAsText} IS NULL`);
       const oneOf = t.oneOf.filter(o => o !== null);
       oneOf.forEach(o => {
-        asValue(o.toString())
-        checks.push(`${valAsText}${(jsToPGtypes as any)[typeof o]} = ${asValue(o)}`);
+        checks.push(`(${valAsText})${(jsToPGtypes as any)[typeof o]} = ${asValue(o)}`);
       })
     } else if("type" in t){
       if(typeof t.type === "string") {
@@ -144,7 +143,7 @@ export function getSchemaTSTypes(schema: ValidationSchema, leading = "", isOneOf
         return getSchemaTSTypes(def.type)
       }
     } else if("oneOf" in def){
-      return def.oneOf.map(v => v).join(" | ")
+      return def.oneOf.map(v => asValue(v)).join(" | ")
     } else if("oneOfTypes" in def){
       return def.oneOfTypes.map(v => `\n${leading}  | ` + getSchemaTSTypes(v, "", true)).join("")
     } else throw "Unexpected getSchemaTSTypes"

@@ -195,7 +195,7 @@ class TableConfigurator {
                 const colCreateLines = [];
                 const tableHandler = this.dbo[tableName];
                 if (tableConf.columns) {
-                    (0, prostgles_types_1.getKeys)(tableConf?.columns).filter(c => !("joinDef" in tableConf.columns[c])).map(colName => {
+                    (0, prostgles_types_1.getKeys)(tableConf.columns).filter(c => !("joinDef" in tableConf.columns[c])).map(colName => {
                         const colConf = tableConf.columns[colName];
                         /* Add columns to create statement */
                         if (!tableHandler) {

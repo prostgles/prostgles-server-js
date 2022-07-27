@@ -80,8 +80,7 @@ function getPGCheckConstraint(args) {
                 checks.push(`${valAsText} IS NULL`);
             const oneOf = t.oneOf.filter(o => o !== null);
             oneOf.forEach(o => {
-                (0, PubSubManager_1.asValue)(o.toString());
-                checks.push(`${valAsText}${jsToPGtypes[typeof o]} = ${(0, PubSubManager_1.asValue)(o)}`);
+                checks.push(`(${valAsText})${jsToPGtypes[typeof o]} = ${(0, PubSubManager_1.asValue)(o)}`);
             });
         }
         else if ("type" in t) {
@@ -118,7 +117,7 @@ function getSchemaTSTypes(schema, leading = "", isOneOf = false) {
             }
         }
         else if ("oneOf" in def) {
-            return def.oneOf.map(v => v).join(" | ");
+            return def.oneOf.map(v => (0, PubSubManager_1.asValue)(v)).join(" | ");
         }
         else if ("oneOfTypes" in def) {
             return def.oneOfTypes.map(v => `\n${leading}  | ` + getSchemaTSTypes(v, "", true)).join("");
