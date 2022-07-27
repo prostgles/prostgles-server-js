@@ -67,7 +67,7 @@ function dd() {
         tjson: {
             dropIfExists: true,
             columns: {
-                json: { jsonSchema: {
+                json: { jsonbSchema: {
                         a: { type: "boolean" },
                         arr: { oneOf: ["1", "2", "3"] },
                         arr2: { type: "integer[]" },

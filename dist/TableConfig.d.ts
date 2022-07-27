@@ -63,7 +63,7 @@ declare type TextColumn = TextColDef & {
     lowerCased?: boolean;
 };
 declare type JSONBColumnDef = TextColDef & {
-    jsonSchema: ValidationSchema;
+    jsonbSchema: ValidationSchema;
 };
 /**
  * Allows referencing media to this table.

@@ -625,12 +625,12 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
     assert.equal(newF.original_name, newFile.name)
   });
 
-  await tryRun("jsonSchema validation", async () => {
+  await tryRun("jsonbSchema validation", async () => {
     
     /**
      * 
   tjson: {
-    json: { jsonSchema: { 
+    json: { jsonbSchema: { 
         a: { type: "boolean" },
         arr: { oneOf: ["1", "2", "3"] },
         arr2: { type: "integer[]" },

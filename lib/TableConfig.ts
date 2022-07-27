@@ -87,7 +87,7 @@ type TextColumn = TextColDef & {
 }
 
 type JSONBColumnDef = TextColDef & {
-  jsonSchema: ValidationSchema;
+  jsonbSchema: ValidationSchema;
 }
 
 /**
@@ -356,7 +356,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     queries = [];
 
     /* Create referenced columns */
-    await Promise.all(Object.keys(this.config).map(async tableName => {
+    await Promise.all(getKeys(this.config).map(async tableName => {
       const tableConf = this.config![tableName];
       if ("columns" in tableConf) {
         const getColDef = (name: string, colConf: ColumnConfig): string => {
@@ -387,49 +387,49 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
             }
             return ` ${colNameEsc} ${getColDef(colConf, "TEXT")} ${checks}`;
 
-          } else if ("jsonSchema" in colConf && colConf.jsonSchema) {
+          } else if ("jsonbSchema" in colConf && colConf.jsonbSchema) {
 
-            return ` ${colNameEsc} ${getColDef(colConf, "JSONB")} CHECK(${getPGCheckConstraint({ schema: colConf.jsonSchema, escapedFieldName: colNameEsc })})`;
+            return ` ${colNameEsc} ${getColDef(colConf, "JSONB")} CHECK(${getPGCheckConstraint({ schema: colConf.jsonbSchema, escapedFieldName: colNameEsc })})`;
 
           } else {
             throw "Unknown column config: " + JSON.stringify(colConf);
           }
         }
 
-        const colDefs: string[] = [];
+        const colCreateLines: string[] = [];
+        const tableHandler = this.dbo[tableName];
         if (tableConf.columns) {
           getKeys(tableConf?.columns).filter(c => !("joinDef" in tableConf.columns![c])).map(colName => {
             const colConf = tableConf.columns![colName];
 
-            if (!this.dbo[tableName]) {
-              colDefs.push(getColDef(colName, colConf))
-            } else if (!colDefs.length && !this.dbo[tableName].columns?.find(c => colName === c.name)) {
+            /* Add columns to create statement */
+            if (!tableHandler) {
+              colCreateLines.push(getColDef(colName, colConf));
 
+            } else if (tableHandler && !tableHandler.columns?.find(c => colName === c.name)) {
+
+
+              queries.push(`
+                ALTER TABLE ${asName(tableName)} 
+                ADD COLUMN ${getColDef(colName, colConf)};
+              `)
               if ("references" in colConf && colConf.references) {
 
                 const { tableName: lookupTable, } = colConf.references;
-                queries.push(`
-                              ALTER TABLE ${asName(tableName)} 
-                              ADD COLUMN ${getColDef(colName, colConf)};
-                          `)
                 console.log(`TableConfigurator: ${tableName}(${colName})` + " referenced lookup table " + lookupTable);
-
-              } else if ("sqlDefinition" in colConf && colConf.sqlDefinition) {
-
-                queries.push(`
-                                ALTER TABLE ${asName(tableName)} 
-                                ADD COLUMN ${getColDef(colName, colConf)};
-                            `)
-                console.log(`TableConfigurator: created/added column ${tableName}(${colName}) ` + colConf.sqlDefinition)
+              }  else {
+                console.log(`TableConfigurator: created/added column ${tableName}(${colName}) `)
               }
             }
           });
         }
 
-        if (colDefs.length) {
-          queries.push(`CREATE TABLE ${asName(tableName)} (
-                        ${colDefs.join(", \n")}
-                    );`)
+        if (colCreateLines.length) {
+          queries.push([
+            `CREATE TABLE ${asName(tableName)} (`,
+              colCreateLines.join(", \n"),
+            `);`
+          ].join("\n"))
           console.log("TableConfigurator: Created table: \n" + queries[0])
         }
       }

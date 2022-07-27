@@ -121,15 +121,20 @@ function getSchemaTSTypes(schema, leading = "", isOneOf = false) {
             return def.oneOf.map(v => v).join(" | ");
         }
         else if ("oneOfTypes" in def) {
-            return def.oneOfTypes.map(v => getSchemaTSTypes(v, leading, true)).join(" | ");
+            return def.oneOfTypes.map(v => `\n${leading}  | ` + getSchemaTSTypes(v, "", true)).join("");
         }
         else
             throw "Unexpected getSchemaTSTypes";
     };
-    return `${leading}{ \n` + (0, prostgles_types_1.getKeys)(schema).map(k => {
+    let spacing = isOneOf ? " " : "  ";
+    let res = `${leading}{ \n` + (0, prostgles_types_1.getKeys)(schema).map(k => {
         const def = schema[k];
-        return `${leading}  ${k}${def.optional ? "?" : ""}: ${def.nullable ? " null | " : ""} ` + getFieldType(def);
-    }).join(";\n") + ` \n${leading}} ${isOneOf ? "" : ";"}`;
+        return `${leading}${spacing}${k}${def.optional ? "?" : ""}: ${def.nullable ? " null | " : ""} ` + getFieldType(def) + ";";
+    }).join("\n") + ` \n${leading}}${isOneOf ? "" : ";"}`;
+    /** Keep single line */
+    if (isOneOf)
+        res = res.split("\n").join("");
+    return res;
 }
 exports.getSchemaTSTypes = getSchemaTSTypes;
 //# sourceMappingURL=validation.js.map

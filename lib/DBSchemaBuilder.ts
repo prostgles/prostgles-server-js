@@ -14,10 +14,10 @@ export const getDBSchema = (dboBuilder: DboBuilder): string => {
   dboBuilder.tablesOrViews?.slice(0).sort((a, b) => a.name.localeCompare(b.name)).forEach(tov => {
     const cols = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
     const getColType = (c: typeof cols[number]) => {
-      let type: string = postgresToTsType(c.udt_name)
+      let type: string = postgresToTsType(c.udt_name) + ";"
       const colConf = dboBuilder.prostgles.tableConfigurator?.getColumnConfig(tov.name, c.name);
-      if(colConf && "jsonSchema" in colConf){
-        type = getSchemaTSTypes(colConf.jsonSchema, "      ");
+      if(colConf && "jsonbSchema" in colConf){
+        type = getSchemaTSTypes(colConf.jsonbSchema, "      ");
       }
       return `${escapeTSNames(c.name)}${c.is_nullable || c.has_default? "?" : ""}: ${c.is_nullable? "null | " : ""}${type}`
     }
@@ -28,7 +28,7 @@ tables.push(`${escapeTSNames(tov.name)}: {
     update: ${tov.privileges.update};
     delete: ${tov.privileges.delete};
     columns: {${cols.map(c => `
-      ${getColType(c)}`).join(";")}
+      ${getColType(c)}`).join("")}
     };
   };\n  `)
   })

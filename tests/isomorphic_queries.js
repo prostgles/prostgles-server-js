@@ -544,15 +544,15 @@ async function isomorphic(db) {
         const newF = await db.media.findOne({ id: original.id });
         assert_1.strict.equal(newF.original_name, newFile.name);
     });
-    await tryRun("jsonSchema validation", async () => {
+    await tryRun("jsonbSchema validation", async () => {
         /**
          *
       tjson: {
-        columns: {
-          json: { jsonSchema: {
-              a: { type: "boolean" },
-              arr: { oneOf: ["1", "2", "3"] }
-            }
+        json: { jsonbSchema: {
+            a: { type: "boolean" },
+            arr: { oneOf: ["1", "2", "3"] },
+            arr2: { type: "integer[]" },
+            o: { oneOfTypes: [{ o1: { type: "integer" } }, { o2: { type: "boolean" } }], optional: true },
           }
         }
       },
