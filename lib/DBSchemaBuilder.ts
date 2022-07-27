@@ -3,6 +3,7 @@ import prostgles from ".";
 import { Auth } from "./AuthHandler";
 import { DBHandlerServer, DboBuilder, escapeTSNames, postgresToTsType } from "./DboBuilder";
 import { PublishAllOrNothing, PublishParams, PublishTableRule, PublishViewRule,  } from "./PublishParser";
+import { getSchemaTSTypes } from "./validation";
 
 
 export const getDBSchema = (dboBuilder: DboBuilder): string => {
@@ -12,6 +13,14 @@ export const getDBSchema = (dboBuilder: DboBuilder): string => {
   /** Tables and columns are sorted to avoid infinite loops due to changing order */
   dboBuilder.tablesOrViews?.slice(0).sort((a, b) => a.name.localeCompare(b.name)).forEach(tov => {
     const cols = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
+    const getColType = (c: typeof cols[number]) => {
+      let type: string = postgresToTsType(c.udt_name)
+      const colConf = dboBuilder.prostgles.tableConfigurator?.getColumnConfig(tov.name, c.name);
+      if(colConf && "jsonSchema" in colConf){
+        type = getSchemaTSTypes(colConf.jsonSchema, "      ");
+      }
+      return `${escapeTSNames(c.name)}${c.is_nullable || c.has_default? "?" : ""}: ${c.is_nullable? "null | " : ""}${type}`
+    }
 tables.push(`${escapeTSNames(tov.name)}: {
     is_view: ${tov.is_view};
     select: ${tov.privileges.select};
@@ -19,7 +28,7 @@ tables.push(`${escapeTSNames(tov.name)}: {
     update: ${tov.privileges.update};
     delete: ${tov.privileges.delete};
     columns: {${cols.map(c => `
-      ${escapeTSNames(c.name)}${c.is_nullable || c.has_default? "?" : ""}: ${postgresToTsType(c.udt_name)}${c.is_nullable? " | null;" : ""}`).join("")}
+      ${getColType(c)}`).join(";")}
     };
   };\n  `)
   })

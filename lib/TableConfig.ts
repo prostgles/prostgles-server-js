@@ -2,6 +2,7 @@ import { getKeys, asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONT
 import { isPlainObject, JoinInfo } from "./DboBuilder";
 import { DB, DBHandlerServer, Joins, Prostgles } from "./Prostgles";
 import { asValue } from "./PubSubManager";
+import { getPGCheckConstraint, ValidationSchema } from "./validation";
 
 type ColExtraInfo = {
   min?: string | number;
@@ -85,6 +86,10 @@ type TextColumn = TextColDef & {
   lowerCased?: boolean;
 }
 
+type JSONBColumnDef = TextColDef & {
+  jsonSchema: ValidationSchema;
+}
+
 /**
  * Allows referencing media to this table.
  * Requires this table to have a primary key AND a valid fileTable config
@@ -138,7 +143,7 @@ type NamedJoinColumn = {
   joinDef: JoinDef[];
 }
 
-type ColumnConfig<LANG_IDS = { en: 1 }> = NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn))
+type ColumnConfig<LANG_IDS = { en: 1 }> = NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef))
 
 type TableDefinition<LANG_IDS> = {
   columns?: {
@@ -356,14 +361,14 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       if ("columns" in tableConf) {
         const getColDef = (name: string, colConf: ColumnConfig): string => {
           const colNameEsc = asName(name);
-          const getTextDef = (colConf: TextColDef) => {
+          const getColDef = (colConf: TextColDef, pgType: "TEXT" | "JSONB") => {
             const { nullable, defaultValue } = colConf;
-            return ` TEXT ${!nullable ? " NOT NULL " : ""} ${defaultValue ? ` DEFAULT ${asValue(defaultValue)} ` : ""}`
+            return `${pgType} ${!nullable ? " NOT NULL " : ""} ${defaultValue ? ` DEFAULT ${asValue(defaultValue)} ` : ""}`
           }
           if ("references" in colConf && colConf.references) {
 
             const { tableName: lookupTable, columnName: lookupCol = "id" } = colConf.references;
-            return ` ${colNameEsc} ${getTextDef(colConf.references)} REFERENCES ${lookupTable} (${lookupCol}) `;
+            return ` ${colNameEsc} ${getColDef(colConf.references, "TEXT")} REFERENCES ${lookupTable} (${lookupCol}) `;
 
           } else if ("sqlDefinition" in colConf && colConf.sqlDefinition) {
 
@@ -380,7 +385,12 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
             if (cArr.length) {
               checks = `CHECK (${cArr.join(" AND ")})`
             }
-            return ` ${colNameEsc} ${getTextDef(colConf)} ${checks}`;
+            return ` ${colNameEsc} ${getColDef(colConf, "TEXT")} ${checks}`;
+
+          } else if ("jsonSchema" in colConf && colConf.jsonSchema) {
+
+            return ` ${colNameEsc} ${getColDef(colConf, "JSONB")} CHECK(${getPGCheckConstraint({ schema: colConf.jsonSchema, escapedFieldName: colNameEsc })})`;
+
           } else {
             throw "Unknown column config: " + JSON.stringify(colConf);
           }

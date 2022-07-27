@@ -544,6 +544,31 @@ async function isomorphic(db) {
         const newF = await db.media.findOne({ id: original.id });
         assert_1.strict.equal(newF.original_name, newFile.name);
     });
+    await tryRun("jsonSchema validation", async () => {
+        /**
+         *
+      tjson: {
+        columns: {
+          json: { jsonSchema: {
+              a: { type: "boolean" },
+              arr: { oneOf: ["1", "2", "3"] }
+            }
+          }
+        }
+      },
+         */
+        const json = { a: true, arr: "2" };
+        const fo = await db.tjson.insert({ json }, { returning: "*" });
+        assert_1.strict.deepStrictEqual(fo.json, json);
+        await db.tjson.insert({ json: { o: { o1: 2, o2: true }, a: true, arr: 1 } });
+        try {
+            await db.tjson.insert({ json: { a: true, arr: "22" } });
+            throw "Should have failed";
+        }
+        catch (e) {
+            // Perfect
+        }
+    });
     await tryRun("Exists filter example", async () => {
         const fo = await db.items.findOne(), f = await db.items.find();
         assert_1.strict.deepStrictEqual(fo, { h: null, id: 1, name: 'a' }, "findOne query failed");

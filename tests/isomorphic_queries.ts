@@ -623,7 +623,34 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
     const newF = await db.media.findOne({ id: original.id });
 
     assert.equal(newF.original_name, newFile.name)
-  })
+  });
+
+  await tryRun("jsonSchema validation", async () => {
+    
+    /**
+     * 
+  tjson: {
+    json: { jsonSchema: { 
+        a: { type: "boolean" },
+        arr: { oneOf: ["1", "2", "3"] },
+        arr2: { type: "integer[]" },
+        o: { oneOfTypes: [{ o1: { type: "integer" } }, { o2: { type: "boolean" } }], optional: true },
+      }  
+    }
+  },
+     */
+
+    const json = {a: true, arr: "2"}
+    const fo = await db.tjson.insert({ json }, { returning: "*"});
+    assert.deepStrictEqual(fo.json, json);
+    await db.tjson.insert({ json: {o: { o1: 2, o2: true }, a: true, arr: 1 } })
+    try {
+      await db.tjson.insert({ json: { a: true, arr: "22"} });
+      throw "Should have failed"
+    } catch(e){
+      // Perfect
+    }
+  });
   
   await tryRun("Exists filter example", async () => {
   

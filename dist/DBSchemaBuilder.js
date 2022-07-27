@@ -3,11 +3,20 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getDBSchema = void 0;
 const _1 = require(".");
 const DboBuilder_1 = require("./DboBuilder");
+const validation_1 = require("./validation");
 const getDBSchema = (dboBuilder) => {
     let tables = [];
     /** Tables and columns are sorted to avoid infinite loops due to changing order */
     dboBuilder.tablesOrViews?.slice(0).sort((a, b) => a.name.localeCompare(b.name)).forEach(tov => {
         const cols = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
+        const getColType = (c) => {
+            let type = (0, DboBuilder_1.postgresToTsType)(c.udt_name);
+            const colConf = dboBuilder.prostgles.tableConfigurator?.getColumnConfig(tov.name, c.name);
+            if (colConf && "jsonSchema" in colConf) {
+                type = (0, validation_1.getSchemaTSTypes)(colConf.jsonSchema, "      ");
+            }
+            return `${(0, DboBuilder_1.escapeTSNames)(c.name)}${c.is_nullable || c.has_default ? "?" : ""}: ${c.is_nullable ? "null | " : ""}${type}`;
+        };
         tables.push(`${(0, DboBuilder_1.escapeTSNames)(tov.name)}: {
     is_view: ${tov.is_view};
     select: ${tov.privileges.select};
@@ -15,7 +24,7 @@ const getDBSchema = (dboBuilder) => {
     update: ${tov.privileges.update};
     delete: ${tov.privileges.delete};
     columns: {${cols.map(c => `
-      ${(0, DboBuilder_1.escapeTSNames)(c.name)}${c.is_nullable || c.has_default ? "?" : ""}: ${(0, DboBuilder_1.postgresToTsType)(c.udt_name)}${c.is_nullable ? " | null;" : ""}`).join("")}
+      ${getColType(c)}`).join(";")}
     };
   };\n  `);
     });

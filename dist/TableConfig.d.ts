@@ -1,6 +1,7 @@
 import { AnyObject, TableInfo, ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE } from "prostgles-types";
 import { JoinInfo } from "./DboBuilder";
 import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
+import { ValidationSchema } from "./validation";
 declare type ColExtraInfo = {
     min?: string | number;
     max?: string | number;
@@ -61,6 +62,9 @@ declare type TextColumn = TextColDef & {
      */
     lowerCased?: boolean;
 };
+declare type JSONBColumnDef = TextColDef & {
+    jsonSchema: ValidationSchema;
+};
 /**
  * Allows referencing media to this table.
  * Requires this table to have a primary key AND a valid fileTable config
@@ -103,7 +107,7 @@ declare type NamedJoinColumn = {
 };
 declare type ColumnConfig<LANG_IDS = {
     en: 1;
-}> = NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn));
+}> = NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef));
 declare type TableDefinition<LANG_IDS> = {
     columns?: {
         [column_name: string]: ColumnConfig<LANG_IDS>;

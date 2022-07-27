@@ -64,6 +64,18 @@ function dd() {
                 t2: { label: { en: "en_t2" } },
             }
         },
+        tjson: {
+            dropIfExists: true,
+            columns: {
+                json: { jsonSchema: {
+                        a: { type: "boolean" },
+                        arr: { oneOf: ["1", "2", "3"] },
+                        arr2: { type: "integer[]" },
+                        o: { oneOfTypes: [{ o1: { type: "integer" } }, { o2: { type: "boolean" } }], optional: true },
+                    }
+                }
+            }
+        },
         lookup_col1: {
             dropIfExists: true,
             isLookupTable: {
@@ -205,6 +217,7 @@ function dd() {
                 items2: "*",
                 items3: "*",
                 items4a: "*",
+                tjson: "*",
                 // items_with_media_cols: "*",
                 items_multi: "*",
                 v_items: "*",
