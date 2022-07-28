@@ -88,6 +88,11 @@ type TextColumn = TextColDef & {
 
 type JSONBColumnDef = TextColDef & {
   jsonbSchema: ValidationSchema;
+
+  /**
+   * If the new schema CHECK fails old rows the update old rows using this function
+   */
+  // onMigrationFail?: <T>(failedRow: T) => AnyObject | Promise<AnyObject>;
 }
 
 /**

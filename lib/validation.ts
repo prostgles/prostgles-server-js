@@ -86,9 +86,10 @@ export function getPGCheckConstraint(args: { escapedFieldName: string; schema: V
   const { schema: s, escapedFieldName } = args;
 
   const jsToPGtypes = {
+    "integer": "::INTEGER",
     "number": "::NUMERIC",
     "boolean": "::BOOLEAN",
-    "string": "" // already a string
+    "string": "::TEXT"
   }
 
   const kChecks = (k: string) => {
@@ -113,13 +114,11 @@ export function getPGCheckConstraint(args: { escapedFieldName: string; schema: V
       })
     } else if("type" in t){
       if(typeof t.type === "string") {
-        const correctType = t.type.replace("integer", "number")
         if(t.type.endsWith("[]")){
-          /** Must add custom functions to type check each array element */
-          checks.push(`
-          jsonb_typeof(${valAsJson}) = 'array' AND 
-          ( jsonb_array_length(${valAsJson}) = 0 OR jsonb_typeof(jsonb_array_element(${valAsJson}, 0)) = ${asValue(correctType.slice(0, -2))} )`)
+          const correctType = t.type.slice(0, -2);
+          checks.push(`jsonb_typeof(${valAsJson}) = 'array' AND ('{' || right(left(${valAsText},-1),-1) || '}')${jsToPGtypes[correctType as keyof typeof jsToPGtypes]}[] IS NOT NULL`)
         } else {
+          const correctType = t.type.replace("integer", "number")
           checks.push(`jsonb_typeof(${valAsJson}) = ${asValue(correctType)} `)
         }
       } else {
