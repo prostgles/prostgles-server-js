@@ -389,7 +389,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
           } else if ("jsonbSchema" in colConf && colConf.jsonbSchema) {
 
-            return ` ${colNameEsc} ${getColDef(colConf, "JSONB")} CHECK(${getPGCheckConstraint({ schema: colConf.jsonbSchema, escapedFieldName: colNameEsc })})`;
+            return ` ${colNameEsc} ${getColDef(colConf, "JSONB")} CHECK(${getPGCheckConstraint({ schema: colConf.jsonbSchema, escapedFieldName: colNameEsc }, 0)})`;
 
           } else {
             throw "Unknown column config: " + JSON.stringify(colConf);

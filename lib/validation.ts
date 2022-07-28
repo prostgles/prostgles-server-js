@@ -82,7 +82,7 @@ export function validateSchema<S extends ValidationSchema>(schema: S, obj: Schem
   getKeys(schema).forEach(k => validate(obj as any, k, schema[k]));
 }
 
-export function getPGCheckConstraint(args: { escapedFieldName: string; schema: ValidationSchema }): string {
+export function getPGCheckConstraint(args: { escapedFieldName: string; schema: ValidationSchema }, depth: number): string {
   const { schema: s, escapedFieldName } = args;
 
   const jsToPGtypes = {
@@ -100,7 +100,7 @@ export function getPGCheckConstraint(args: { escapedFieldName: string; schema: V
     if(t.optional) checks.push(`${escapedFieldName} ? ${asValue(k)} = FALSE`);
 
     if("oneOfTypes" in t){
-      checks.push(`(${t.oneOfTypes.map(subType => getPGCheckConstraint({ escapedFieldName: valAsJson, schema: subType })).join(" OR ")})`)
+      checks.push(`(${t.oneOfTypes.map(subType => getPGCheckConstraint({ escapedFieldName: valAsJson, schema: subType }, depth + 1)).join(" OR ")})`)
     } else if("oneOf" in t){
       if(!t.oneOf.length || t.oneOf.some(v => v === undefined || !["number", "boolean", "string", null].includes(typeof v))) {
         throw new Error(`Invalid ValidationSchema for property: ${k} of field ${escapedFieldName}: oneOf cannot be empty AND can only contain: numbers, text, boolean, null`);
@@ -118,16 +118,17 @@ export function getPGCheckConstraint(args: { escapedFieldName: string; schema: V
           /** Must add custom functions to type check each array element */
           checks.push(`
           jsonb_typeof(${valAsJson}) = 'array' AND 
-          ( jsonb_array_length(${valAsJson}) = 0 OR jsonb_typeof(jsonb_array_element(${valAsJson}, 1)) = ${asValue(correctType.slice(0, -2))} )`)
+          ( jsonb_array_length(${valAsJson}) = 0 OR jsonb_typeof(jsonb_array_element(${valAsJson}, 0)) = ${asValue(correctType.slice(0, -2))} )`)
         } else {
           checks.push(`jsonb_typeof(${valAsJson}) = ${asValue(correctType)} `)
         }
       } else {
-        checks.push("( " + getPGCheckConstraint({ escapedFieldName: valAsJson, schema: t.type }) + " )")
+        checks.push("( " + getPGCheckConstraint({ escapedFieldName: valAsJson, schema: t.type }, depth + 1) + " )")
       }
     }
-
-    return checks.join(" OR ")
+    const result = checks.join(" OR ")
+    if(!depth) return `COALESCE(${result}, false)`
+    return result
   }
 
   return getKeys(s).map(k => "(" + kChecks(k) + ")").join(" AND ");

@@ -631,19 +631,20 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
      * 
   tjson: {
     json: { jsonbSchema: { 
-        a: { type: "boolean" },
-        arr: { oneOf: ["1", "2", "3"] },
-        arr2: { type: "integer[]" },
-        o: { oneOfTypes: [{ o1: { type: "integer" } }, { o2: { type: "boolean" } }], optional: true },
+      a: { type: "boolean" },
+      arr: { oneOf: ["1", "2", "3"] },
+      arr1: { oneOf: [1, 2, 3] },
+      arr2: { type: "integer[]" },
+      o: { oneOfTypes: [{ o1: { type: "integer" } }, { o2: { type: "boolean" } }], optional: true },
       }  
     }
   },
      */
 
-    const json = {a: true, arr: "2"}
+    const json = {a: true, arr: "2", arr1: 3, arr2: [1] }
     const fo = await db.tjson.insert({ json }, { returning: "*"});
-    assert.deepStrictEqual(fo.json, json);
-    await db.tjson.insert({ json: {o: { o1: 2, o2: true }, a: true, arr: 1 } })
+    // assert.deepStrictEqual(fo.json, json);
+    await db.tjson.insert({ json: {...json, o: { o1: 2, o2: true } } })
     try {
       await db.tjson.insert({ json: { a: true, arr: "22"} });
       throw "Should have failed"

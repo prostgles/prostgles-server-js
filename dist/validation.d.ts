@@ -44,7 +44,7 @@ export declare function validateSchema<S extends ValidationSchema>(schema: S, ob
 export declare function getPGCheckConstraint(args: {
     escapedFieldName: string;
     schema: ValidationSchema;
-}): string;
+}, depth: number): string;
 export declare function getSchemaTSTypes(schema: ValidationSchema, leading?: string, isOneOf?: boolean): string;
 export {};
 //# sourceMappingURL=validation.d.ts.map
