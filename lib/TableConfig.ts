@@ -2,7 +2,7 @@ import { getKeys, asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONT
 import { isPlainObject, JoinInfo } from "./DboBuilder";
 import { DB, DBHandlerServer, Joins, Prostgles } from "./Prostgles";
 import { asValue } from "./PubSubManager";
-import { getPGCheckConstraint, ValidationSchema } from "./validation";
+import { getPGCheckConstraint, OneOfTypes, ValidationSchema } from "./validation";
 
 type ColExtraInfo = {
   min?: string | number;
@@ -87,7 +87,7 @@ type TextColumn = TextColDef & {
 }
 
 type JSONBColumnDef = TextColDef & {
-  jsonbSchema: ValidationSchema;
+  jsonbSchema: ValidationSchema | Pick<OneOfTypes, "oneOfTypes">;
 
   /**
    * If the new schema CHECK fails old rows the update old rows using this function
@@ -394,7 +394,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
           } else if ("jsonbSchema" in colConf && colConf.jsonbSchema) {
 
-            return ` ${colNameEsc} ${getColDef(colConf, "JSONB")} CHECK(${getPGCheckConstraint({ schema: colConf.jsonbSchema, escapedFieldName: colNameEsc }, 0)})`;
+            return ` ${colNameEsc} ${getColDef(colConf, "JSONB")} CHECK(${getPGCheckConstraint({ schema: colConf.jsonbSchema, escapedFieldName: colNameEsc, nullable: !!colConf.nullable }, 0)})`;
 
           } else {
             throw "Unknown column config: " + JSON.stringify(colConf);

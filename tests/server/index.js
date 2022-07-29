@@ -72,7 +72,24 @@ function dd() {
                         arr: { oneOf: ["1", "2", "3"] },
                         arr1: { oneOf: [1, 2, 3] },
                         arr2: { type: "integer[]" },
-                        o: { oneOfTypes: [{ o1: { type: "integer" } }, { o2: { type: "boolean" } }], optional: true },
+                        arrStr: { type: "string[]", optional: true, nullable: true },
+                        o: { oneOfTypes: [{ o1: { type: "integer" } }, { o2: { type: "boolean" } }], optional: true, nullable: true },
+                    }
+                },
+                jsonOneOf: { nullable: true, jsonbSchema: {
+                        oneOfTypes: [
+                            { command: { oneOf: ["a"] } },
+                            {
+                                command: { oneOf: ["b"] },
+                                option: { type: "integer[]" }
+                            }
+                        ]
+                        // a: { type: "boolean" },
+                        // arr: { oneOf: ["1", "2", "3"] },
+                        // arr1: { oneOf: [1, 2, 3] },
+                        // arr2: { type: "integer[]" },
+                        // arrStr: { type: "string[]", optional: true },
+                        // o: { oneOfTypes: [{ o1: { type: "integer" } }, { o2: { type: "boolean" } }], optional: true },
                     }
                 }
             }

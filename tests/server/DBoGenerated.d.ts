@@ -336,14 +336,20 @@ export type DBSchemaGenerated = {
     delete: true;
     columns: {
       json:       { 
-        a:  boolean;
-        arr:  '1' | '2' | '3';
-        arr1:  1 | 2 | 3;
-        arr2:  number[];
-        o?:  
-        | {  o1:  number; }
-        | {  o2:  boolean; }; 
+        a: boolean;
+        arr: '1' | '2' | '3';
+        arr1: 1 | 2 | 3;
+        arr2: number[];
+        arrStr?: null | string[];
+        o?: 
+        | null
+        | {  o1: number; }
+        | {  o2: boolean; }; 
       };
+      jsonOneOf?: 
+        | null
+        | {  command: 'a'; }
+        | {  command: 'b'; option: number[]; }
     };
   };
   tr1: {

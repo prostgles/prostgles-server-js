@@ -10,12 +10,12 @@ const getDBSchema = (dboBuilder) => {
     dboBuilder.tablesOrViews?.slice(0).sort((a, b) => a.name.localeCompare(b.name)).forEach(tov => {
         const cols = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
         const getColType = (c) => {
-            let type = (0, DboBuilder_1.postgresToTsType)(c.udt_name) + ";";
+            let type = (c.is_nullable ? "null | " : "") + (0, DboBuilder_1.postgresToTsType)(c.udt_name) + ";";
             const colConf = dboBuilder.prostgles.tableConfigurator?.getColumnConfig(tov.name, c.name);
             if (colConf && "jsonbSchema" in colConf) {
-                type = (0, validation_1.getSchemaTSTypes)(colConf.jsonbSchema, "      ");
+                type = (0, validation_1.getJSONBSchemaTSTypes)(colConf.jsonbSchema, { nullable: colConf.nullable }, "      ");
             }
-            return `${(0, DboBuilder_1.escapeTSNames)(c.name)}${c.is_nullable || c.has_default ? "?" : ""}: ${c.is_nullable ? "null | " : ""}${type}`;
+            return `${(0, DboBuilder_1.escapeTSNames)(c.name)}${c.is_nullable || c.has_default ? "?" : ""}: ${type}`;
         };
         tables.push(`${(0, DboBuilder_1.escapeTSNames)(tov.name)}: {
     is_view: ${tov.is_view};

@@ -1,7 +1,12 @@
 import { asName, getKeys, isEmpty, isObject } from "prostgles-types";
 import { asValue } from "./PubSubManager";
 
-type FieldType = ({
+type BaseOptions = {
+  optional?: boolean;
+  nullable?: boolean;
+};
+
+type SimpleType = BaseOptions & ({
   type:  
   | "number" | "boolean" | "integer" | "string" 
   | "number[]" | "boolean[]" | "integer[]" | "string[]" 
@@ -9,12 +14,12 @@ type FieldType = ({
 
 } | {
   oneOf: readonly any[];
-} | {
+})
+
+export type OneOfTypes = BaseOptions & {
   oneOfTypes: readonly ValidationSchema[];
-}) & {
-  optional?: boolean;
-  nullable?: boolean;
-};
+}
+type FieldType = SimpleType | OneOfTypes;
 
 type GetType<T extends FieldType> = 
 | T extends { type: ValidationSchema }? SchemaObject<T["type"]> : 
@@ -82,8 +87,8 @@ export function validateSchema<S extends ValidationSchema>(schema: S, obj: Schem
   getKeys(schema).forEach(k => validate(obj as any, k, schema[k]));
 }
 
-export function getPGCheckConstraint(args: { escapedFieldName: string; schema: ValidationSchema }, depth: number): string {
-  const { schema: s, escapedFieldName } = args;
+export function getPGCheckConstraint(args: { escapedFieldName: string; schema: ValidationSchema | OneOfTypes, nullable: boolean; isRootQuery?: boolean; }, depth: number): string {
+  const { schema: s, escapedFieldName, nullable } = args;
 
   const jsToPGtypes = {
     "integer": "::INTEGER",
@@ -92,7 +97,7 @@ export function getPGCheckConstraint(args: { escapedFieldName: string; schema: V
     "string": "::TEXT"
   }
 
-  const kChecks = (k: string) => {
+  const kChecks = (k: string, s: ValidationSchema) => {
     const t = s[k];
     const checks: string[] = [];
     const valAsJson = `${escapedFieldName}->${asValue(k)}`;
@@ -101,7 +106,7 @@ export function getPGCheckConstraint(args: { escapedFieldName: string; schema: V
     if(t.optional) checks.push(`${escapedFieldName} ? ${asValue(k)} = FALSE`);
 
     if("oneOfTypes" in t){
-      checks.push(`(${t.oneOfTypes.map(subType => getPGCheckConstraint({ escapedFieldName: valAsJson, schema: subType }, depth + 1)).join(" OR ")})`)
+      checks.push(`(${t.oneOfTypes.map(subType => getPGCheckConstraint({ escapedFieldName: valAsJson, schema: subType, nullable }, depth + 1)).join(" OR ")})`)
     } else if("oneOf" in t){
       if(!t.oneOf.length || t.oneOf.some(v => v === undefined || !["number", "boolean", "string", null].includes(typeof v))) {
         throw new Error(`Invalid ValidationSchema for property: ${k} of field ${escapedFieldName}: oneOf cannot be empty AND can only contain: numbers, text, boolean, null`);
@@ -122,7 +127,7 @@ export function getPGCheckConstraint(args: { escapedFieldName: string; schema: V
           checks.push(`jsonb_typeof(${valAsJson}) = ${asValue(correctType)} `)
         }
       } else {
-        checks.push("( " + getPGCheckConstraint({ escapedFieldName: valAsJson, schema: t.type }, depth + 1) + " )")
+        checks.push("( " + getPGCheckConstraint({ escapedFieldName: valAsJson, schema: t.type, nullable: !!t.nullable }, depth + 1) + " )")
       }
     }
     const result = checks.join(" OR ")
@@ -130,22 +135,42 @@ export function getPGCheckConstraint(args: { escapedFieldName: string; schema: V
     return result
   }
 
-  return getKeys(s).map(k => "(" + kChecks(k) + ")").join(" AND ");
+  const getSchemaChecks = (s: ValidationSchema) => getKeys(s).map(k => "(" + kChecks(k, s) + ")").join(" AND ")
+
+  let q = "";
+  if(isOneOfTypes(s)){
+    q = s.oneOfTypes.map(t => `(${getSchemaChecks(t)})` ).join(" OR ");
+  } else {
+    q = getSchemaChecks(s);
+  }
+  return nullable? ` ${escapedFieldName} IS NULL OR (${q})` : q
+}
+type ColOpts = { nullable?: boolean };
+const isOneOfTypes = (s: ValidationSchema | OneOfTypes): s is OneOfTypes => {
+
+  if("oneOfTypes" in s){
+    if(!Array.isArray(s.oneOfTypes)){
+      throw "Expecting oneOfTypes to be an array of types";
+    }
+    return true;
+  }
+  return false;
 }
 
 export function getSchemaTSTypes(schema: ValidationSchema, leading = "", isOneOf = false): string {
   const getFieldType = (def: FieldType) => {
+    const nullType = (def.nullable? `null | ` : "");
     if("type" in def){
       if(typeof def.type === "string"){
         const correctType = def.type.replace("integer", "number")
-        return correctType
+        return nullType + correctType
       } else {
-        return getSchemaTSTypes(def.type)
+        return nullType + getSchemaTSTypes(def.type)
       }
     } else if("oneOf" in def){
-      return def.oneOf.map(v => asValue(v)).join(" | ")
+      return nullType + def.oneOf.map(v => asValue(v)).join(" | ")
     } else if("oneOfTypes" in def){
-      return def.oneOfTypes.map(v => `\n${leading}  | ` + getSchemaTSTypes(v, "", true)).join("")
+      return (def.nullable? `\n${leading}  | null` : "") + def.oneOfTypes.map(v => `\n${leading}  | ` + getSchemaTSTypes(v, "", true)).join("")
     } else throw "Unexpected getSchemaTSTypes"
   }
 
@@ -153,10 +178,18 @@ export function getSchemaTSTypes(schema: ValidationSchema, leading = "", isOneOf
 
   let res = `${leading}{ \n` + getKeys(schema).map(k => {
     const def = schema[k];
-    return `${leading}${spacing}${k}${def.optional? "?" : ""}: ${def.nullable? " null | " : ""} ` + getFieldType(def) + ";";
+    return `${leading}${spacing}${k}${def.optional? "?" : ""}: ` + getFieldType(def) + ";";
   }).join("\n") + ` \n${leading}}${isOneOf? "" : ";"}`;
   
   /** Keep single line */
   if(isOneOf) res = res.split("\n").join("")
   return res;
+}
+
+export function getJSONBSchemaTSTypes(schema: ValidationSchema | OneOfTypes, colOpts: ColOpts, leading = "", isOneOf = false): string {
+  if(isOneOfTypes(schema)){
+    return (colOpts.nullable? `\n${leading}  | null` : "") + schema.oneOfTypes.map(s => `\n${leading}  | ` + getSchemaTSTypes(s, "", true)).join("")
+  } else {
+    return (colOpts.nullable? `null | ` : "") + getSchemaTSTypes(schema, leading, isOneOf);
+  }
 }

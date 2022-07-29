@@ -3,7 +3,7 @@ import prostgles from ".";
 import { Auth } from "./AuthHandler";
 import { DBHandlerServer, DboBuilder, escapeTSNames, postgresToTsType } from "./DboBuilder";
 import { PublishAllOrNothing, PublishParams, PublishTableRule, PublishViewRule,  } from "./PublishParser";
-import { getSchemaTSTypes } from "./validation";
+import { getJSONBSchemaTSTypes } from "./validation";
 
 
 export const getDBSchema = (dboBuilder: DboBuilder): string => {
@@ -14,12 +14,12 @@ export const getDBSchema = (dboBuilder: DboBuilder): string => {
   dboBuilder.tablesOrViews?.slice(0).sort((a, b) => a.name.localeCompare(b.name)).forEach(tov => {
     const cols = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
     const getColType = (c: typeof cols[number]) => {
-      let type: string = postgresToTsType(c.udt_name) + ";"
+      let type: string = (c.is_nullable? "null | " : "") + postgresToTsType(c.udt_name) + ";"
       const colConf = dboBuilder.prostgles.tableConfigurator?.getColumnConfig(tov.name, c.name);
       if(colConf && "jsonbSchema" in colConf){
-        type = getSchemaTSTypes(colConf.jsonbSchema, "      ");
+        type = getJSONBSchemaTSTypes(colConf.jsonbSchema, { nullable: colConf.nullable }, "      ");
       }
-      return `${escapeTSNames(c.name)}${c.is_nullable || c.has_default? "?" : ""}: ${c.is_nullable? "null | " : ""}${type}`
+      return `${escapeTSNames(c.name)}${c.is_nullable || c.has_default? "?" : ""}: ${type}`
     }
 tables.push(`${escapeTSNames(tov.name)}: {
     is_view: ${tov.is_view};

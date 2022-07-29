@@ -558,7 +558,7 @@ async function isomorphic(db) {
         }
       },
          */
-        const json = { a: true, arr: "2", arr1: 3, arr2: [1] };
+        const json = { a: true, arr: "2", arr1: 3, arr2: [1], arrStr: ["1123.string"] };
         const fo = await db.tjson.insert({ json }, { returning: "*" });
         // assert.deepStrictEqual(fo.json, json);
         await db.tjson.insert({ json: { ...json, o: { o1: 2, o2: true } } });

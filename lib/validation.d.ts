@@ -1,13 +1,16 @@
-declare type FieldType = ({
-    type: "number" | "boolean" | "integer" | "string" | "number[]" | "boolean[]" | "integer[]" | "string[]" | ValidationSchema;
-} | {
-    oneOf: readonly any[];
-} | {
-    oneOfTypes: readonly ValidationSchema[];
-}) & {
+declare type BaseOptions = {
     optional?: boolean;
     nullable?: boolean;
 };
+declare type SimpleType = BaseOptions & ({
+    type: "number" | "boolean" | "integer" | "string" | "number[]" | "boolean[]" | "integer[]" | "string[]" | ValidationSchema;
+} | {
+    oneOf: readonly any[];
+});
+export declare type OneOfTypes = BaseOptions & {
+    oneOfTypes: readonly ValidationSchema[];
+};
+declare type FieldType = SimpleType | OneOfTypes;
 declare type GetType<T extends FieldType> = T extends {
     type: ValidationSchema;
 } ? SchemaObject<T["type"]> : T extends {
@@ -43,8 +46,14 @@ export declare function validate<T>(obj: T, key: keyof T, validation: FieldType)
 export declare function validateSchema<S extends ValidationSchema>(schema: S, obj: SchemaObject<S>, objName?: string, optional?: boolean): void;
 export declare function getPGCheckConstraint(args: {
     escapedFieldName: string;
-    schema: ValidationSchema;
+    schema: ValidationSchema | OneOfTypes;
+    nullable: boolean;
+    isRootQuery?: boolean;
 }, depth: number): string;
+declare type ColOpts = {
+    nullable?: boolean;
+};
 export declare function getSchemaTSTypes(schema: ValidationSchema, leading?: string, isOneOf?: boolean): string;
+export declare function getJSONBSchemaTSTypes(schema: ValidationSchema | OneOfTypes, colOpts: ColOpts, leading?: string, isOneOf?: boolean): string;
 export {};
 //# sourceMappingURL=validation.d.ts.map

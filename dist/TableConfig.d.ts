@@ -1,7 +1,7 @@
 import { AnyObject, TableInfo, ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE } from "prostgles-types";
 import { JoinInfo } from "./DboBuilder";
 import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
-import { ValidationSchema } from "./validation";
+import { OneOfTypes, ValidationSchema } from "./validation";
 declare type ColExtraInfo = {
     min?: string | number;
     max?: string | number;
@@ -63,7 +63,7 @@ declare type TextColumn = TextColDef & {
     lowerCased?: boolean;
 };
 declare type JSONBColumnDef = TextColDef & {
-    jsonbSchema: ValidationSchema;
+    jsonbSchema: ValidationSchema | Pick<OneOfTypes, "oneOfTypes">;
 };
 /**
  * Allows referencing media to this table.

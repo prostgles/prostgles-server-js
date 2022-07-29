@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getSchemaTSTypes = exports.getPGCheckConstraint = exports.validateSchema = exports.validate = void 0;
+exports.getJSONBSchemaTSTypes = exports.getSchemaTSTypes = exports.getPGCheckConstraint = exports.validateSchema = exports.validate = void 0;
 const prostgles_types_1 = require("prostgles-types");
 const PubSubManager_1 = require("./PubSubManager");
 /** tests */
@@ -53,14 +53,14 @@ function validateSchema(schema, obj, objName, optional = false) {
 }
 exports.validateSchema = validateSchema;
 function getPGCheckConstraint(args, depth) {
-    const { schema: s, escapedFieldName } = args;
+    const { schema: s, escapedFieldName, nullable } = args;
     const jsToPGtypes = {
         "integer": "::INTEGER",
         "number": "::NUMERIC",
         "boolean": "::BOOLEAN",
         "string": "::TEXT"
     };
-    const kChecks = (k) => {
+    const kChecks = (k, s) => {
         const t = s[k];
         const checks = [];
         const valAsJson = `${escapedFieldName}->${(0, PubSubManager_1.asValue)(k)}`;
@@ -70,7 +70,7 @@ function getPGCheckConstraint(args, depth) {
         if (t.optional)
             checks.push(`${escapedFieldName} ? ${(0, PubSubManager_1.asValue)(k)} = FALSE`);
         if ("oneOfTypes" in t) {
-            checks.push(`(${t.oneOfTypes.map(subType => getPGCheckConstraint({ escapedFieldName: valAsJson, schema: subType }, depth + 1)).join(" OR ")})`);
+            checks.push(`(${t.oneOfTypes.map(subType => getPGCheckConstraint({ escapedFieldName: valAsJson, schema: subType, nullable }, depth + 1)).join(" OR ")})`);
         }
         else if ("oneOf" in t) {
             if (!t.oneOf.length || t.oneOf.some(v => v === undefined || !["number", "boolean", "string", null].includes(typeof v))) {
@@ -96,7 +96,7 @@ function getPGCheckConstraint(args, depth) {
                 }
             }
             else {
-                checks.push("( " + getPGCheckConstraint({ escapedFieldName: valAsJson, schema: t.type }, depth + 1) + " )");
+                checks.push("( " + getPGCheckConstraint({ escapedFieldName: valAsJson, schema: t.type, nullable: !!t.nullable }, depth + 1) + " )");
             }
         }
         const result = checks.join(" OR ");
@@ -104,25 +104,43 @@ function getPGCheckConstraint(args, depth) {
             return `COALESCE(${result}, false)`;
         return result;
     };
-    return (0, prostgles_types_1.getKeys)(s).map(k => "(" + kChecks(k) + ")").join(" AND ");
+    const getSchemaChecks = (s) => (0, prostgles_types_1.getKeys)(s).map(k => "(" + kChecks(k, s) + ")").join(" AND ");
+    let q = "";
+    if (isOneOfTypes(s)) {
+        q = s.oneOfTypes.map(t => `(${getSchemaChecks(t)})`).join(" OR ");
+    }
+    else {
+        q = getSchemaChecks(s);
+    }
+    return nullable ? ` ${escapedFieldName} IS NULL OR (${q})` : q;
 }
 exports.getPGCheckConstraint = getPGCheckConstraint;
+const isOneOfTypes = (s) => {
+    if ("oneOfTypes" in s) {
+        if (!Array.isArray(s.oneOfTypes)) {
+            throw "Expecting oneOfTypes to be an array of types";
+        }
+        return true;
+    }
+    return false;
+};
 function getSchemaTSTypes(schema, leading = "", isOneOf = false) {
     const getFieldType = (def) => {
+        const nullType = (def.nullable ? `null | ` : "");
         if ("type" in def) {
             if (typeof def.type === "string") {
                 const correctType = def.type.replace("integer", "number");
-                return correctType;
+                return nullType + correctType;
             }
             else {
-                return getSchemaTSTypes(def.type);
+                return nullType + getSchemaTSTypes(def.type);
             }
         }
         else if ("oneOf" in def) {
-            return def.oneOf.map(v => (0, PubSubManager_1.asValue)(v)).join(" | ");
+            return nullType + def.oneOf.map(v => (0, PubSubManager_1.asValue)(v)).join(" | ");
         }
         else if ("oneOfTypes" in def) {
-            return def.oneOfTypes.map(v => `\n${leading}  | ` + getSchemaTSTypes(v, "", true)).join("");
+            return (def.nullable ? `\n${leading}  | null` : "") + def.oneOfTypes.map(v => `\n${leading}  | ` + getSchemaTSTypes(v, "", true)).join("");
         }
         else
             throw "Unexpected getSchemaTSTypes";
@@ -130,7 +148,7 @@ function getSchemaTSTypes(schema, leading = "", isOneOf = false) {
     let spacing = isOneOf ? " " : "  ";
     let res = `${leading}{ \n` + (0, prostgles_types_1.getKeys)(schema).map(k => {
         const def = schema[k];
-        return `${leading}${spacing}${k}${def.optional ? "?" : ""}: ${def.nullable ? " null | " : ""} ` + getFieldType(def) + ";";
+        return `${leading}${spacing}${k}${def.optional ? "?" : ""}: ` + getFieldType(def) + ";";
     }).join("\n") + ` \n${leading}}${isOneOf ? "" : ";"}`;
     /** Keep single line */
     if (isOneOf)
@@ -138,4 +156,13 @@ function getSchemaTSTypes(schema, leading = "", isOneOf = false) {
     return res;
 }
 exports.getSchemaTSTypes = getSchemaTSTypes;
+function getJSONBSchemaTSTypes(schema, colOpts, leading = "", isOneOf = false) {
+    if (isOneOfTypes(schema)) {
+        return (colOpts.nullable ? `\n${leading}  | null` : "") + schema.oneOfTypes.map(s => `\n${leading}  | ` + getSchemaTSTypes(s, "", true)).join("");
+    }
+    else {
+        return (colOpts.nullable ? `null | ` : "") + getSchemaTSTypes(schema, leading, isOneOf);
+    }
+}
+exports.getJSONBSchemaTSTypes = getJSONBSchemaTSTypes;
 //# sourceMappingURL=validation.js.map
