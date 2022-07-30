@@ -624,6 +624,7 @@ export const FUNCTIONS: FunctionSpec[] = [
   ...[
     ["date", "YYYY-MM-DD"],
     ["datetime", "YYYY-MM-DD HH24:MI"],
+    ["datetime_", "YYYY_MM_DD__HH24_MI"],
     ["timedate", "HH24:MI YYYY-MM-DD"],
 
     ["time", "HH24:MI"],
