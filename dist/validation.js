@@ -133,7 +133,7 @@ function getSchemaTSTypes(schema, leading = "", isOneOf = false) {
                 return nullType + correctType;
             }
             else {
-                return nullType + getSchemaTSTypes(def.type);
+                return nullType + getSchemaTSTypes(def.type, "", true);
             }
         }
         else if ("oneOf" in def) {

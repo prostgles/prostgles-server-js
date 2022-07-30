@@ -165,7 +165,7 @@ export function getSchemaTSTypes(schema: ValidationSchema, leading = "", isOneOf
         const correctType = def.type.replace("integer", "number")
         return nullType + correctType
       } else {
-        return nullType + getSchemaTSTypes(def.type)
+        return nullType + getSchemaTSTypes(def.type, "", true)
       }
     } else if("oneOf" in def){
       return nullType + def.oneOf.map(v => asValue(v)).join(" | ")

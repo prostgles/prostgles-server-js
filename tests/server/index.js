@@ -76,6 +76,22 @@ function dd() {
                         o: { oneOfTypes: [{ o1: { type: "integer" } }, { o2: { type: "boolean" } }], optional: true, nullable: true },
                     }
                 },
+                status: {
+                    nullable: true,
+                    jsonbSchema: {
+                        oneOfTypes: [
+                            { ok: { type: "string" } },
+                            { err: { type: "string" } },
+                            {
+                                loading: { type: {
+                                        loaded: { type: "number" },
+                                        total: { type: "number" }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
                 jsonOneOf: { nullable: true, jsonbSchema: {
                         oneOfTypes: [
                             { command: { oneOf: ["a"] } },

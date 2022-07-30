@@ -350,6 +350,11 @@ export type DBSchemaGenerated = {
         | null
         | {  command: 'a'; }
         | {  command: 'b'; option: number[]; }
+      status?: 
+        | null
+        | {  ok: string; }
+        | {  err: string; }
+        | {  loading: {  loaded: number; total: number; }; }
     };
   };
   tr1: {
