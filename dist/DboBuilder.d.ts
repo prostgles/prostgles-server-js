@@ -16,19 +16,19 @@ export declare type Media = {
     deleted?: string | null;
     deleted_from_storage?: string | null;
 };
-export declare type TxCB = {
-    (t: TableHandlers, _t: pgPromise.ITask<{}>): (any | void);
+export declare type TxCB<TH = TableHandlers> = {
+    (t: TH & Pick<DBHandlerServer, "sql">, _t: pgPromise.ITask<{}>): (any | void);
 };
-export declare type TX = {
-    (t: TxCB): Promise<(any | void)>;
+export declare type TX<TH = TableHandlers> = {
+    (t: TxCB<TH>): Promise<(any | void)>;
 };
 export declare type TableHandlers = {
     [key: string]: Partial<TableHandler> | TableHandler;
 };
-export declare type DBHandlerServer = TableHandlers & Partial<DbJoinMaker> & {
+export declare type DBHandlerServer<TH = TableHandlers> = TH & Partial<DbJoinMaker> & {
     sql?: SQLHandler;
 } & {
-    tx?: TX;
+    tx?: TX<TH>;
 };
 import { SelectItem, FieldSpec } from "./QueryBuilder";
 import { Join, Prostgles, DB } from "./Prostgles";

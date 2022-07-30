@@ -44,23 +44,23 @@ export type Media = {
     deleted_from_storage?: string | null;
 }
 
-export type TxCB = {
-    (t: TableHandlers, _t: pgPromise.ITask<{}>): (any | void);
+export type TxCB<TH = TableHandlers> = {
+    (t: TH & Pick<DBHandlerServer, "sql">, _t: pgPromise.ITask<{}>): (any | void);
 }
-export type TX = {
-    (t: TxCB): Promise<(any | void)>;
+export type TX<TH  = TableHandlers> = {
+    (t: TxCB<TH>): Promise<(any | void)>;
 }
 
 export type TableHandlers = {
     [key: string]: Partial<TableHandler> | TableHandler;
 }
 
-export type DBHandlerServer = 
-  TableHandlers & 
+export type DBHandlerServer<TH = TableHandlers> = 
+  TH & 
   Partial<DbJoinMaker> & {
     sql?: SQLHandler
   } & {
-    tx?: TX
+    tx?: TX<TH>
   }
 
 // export const getFilterFields = (f: Filter | any, $and_key: string, $or_key: string, prevFields: string[] = []): string[] => {

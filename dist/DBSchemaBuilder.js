@@ -63,53 +63,60 @@ exports.getDBSchema = getDBSchema;
             return 1;
         }
     };
+    /** Test the created schema */
+    const c = 1;
+    const test = c;
+    const dbt = 1;
+    dbt.tx(t => {
+        t.tbl1.delete();
+    });
+    const db = 1;
+    db.tx(t => {
+        t.wadwa.find();
+    });
+    const publish = () => {
+        const r = {
+            tbl1: {
+                select: {
+                    fields: "*",
+                    forcedFilter: { col1: 32, col2: "" }
+                },
+                getColumns: true,
+                getInfo: true,
+                delete: {
+                    filterFields: { col1: 1 }
+                }
+            },
+            tbl2: {
+                delete: {
+                    filterFields: "*",
+                    forcedFilter: { col1: 2 }
+                }
+            }
+        };
+        const res = {
+            tbl1: {
+                select: {
+                    fields: "*",
+                    forcedFilter: { col1: 32, col2: "" }
+                },
+                getColumns: true,
+                getInfo: true,
+                delete: {
+                    filterFields: { col1: 1 }
+                }
+            },
+            tbl2: {
+                delete: {
+                    filterFields: "*",
+                    forcedFilter: { col1: 2 }
+                }
+            }
+        };
+        const res1 = r;
+        const p = 1;
+        p.dbo.dwadaw.find();
+        return res;
+    };
 });
-/** Test the created schema */
-const c = 1;
-const test = c;
-const db = 1;
-const publish = () => {
-    const r = {
-        tbl1: {
-            select: {
-                fields: "*",
-                forcedFilter: { col1: 32, col2: "" }
-            },
-            getColumns: true,
-            getInfo: true,
-            delete: {
-                filterFields: { col1: 1 }
-            }
-        },
-        tbl2: {
-            delete: {
-                filterFields: "*",
-                forcedFilter: { col1: 2 }
-            }
-        }
-    };
-    const res = {
-        tbl1: {
-            select: {
-                fields: "*",
-                forcedFilter: { col1: 32, col2: "" }
-            },
-            getColumns: true,
-            getInfo: true,
-            delete: {
-                filterFields: { col1: 1 }
-            }
-        },
-        tbl2: {
-            delete: {
-                filterFields: "*",
-                forcedFilter: { col1: 2 }
-            }
-        }
-    };
-    const res1 = r;
-    const p = 1;
-    p.dbo.dwadaw.find();
-    return res;
-};
 //# sourceMappingURL=DBSchemaBuilder.js.map

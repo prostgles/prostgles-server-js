@@ -202,7 +202,7 @@ export declare class Prostgles {
     };
     private getFileText;
     writeDBSchema(force?: boolean): void;
-    refreshDBO: () => Promise<DBHandlerServer>;
+    refreshDBO: () => Promise<DBHandlerServer<import("./DboBuilder").TableHandlers>>;
     isSuperUser: boolean;
     schema_checkIntervalMillis?: NodeJS.Timeout;
     init(onReady: (dbo: DBOFullyTyped, db: DB) => any): Promise<{
