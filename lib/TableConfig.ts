@@ -148,7 +148,13 @@ type NamedJoinColumn = {
   joinDef: JoinDef[];
 }
 
-type ColumnConfig<LANG_IDS = { en: 1 }> = NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef))
+type OneOf = { 
+  oneOf: (string | number)[];
+  nullable?: boolean; 
+  defaultValue?: OneOf["oneOf"][number]; 
+};
+
+type ColumnConfig<LANG_IDS = { en: 1 }> = NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef | OneOf))
 
 type TableDefinition<LANG_IDS> = {
   columns?: {
@@ -340,7 +346,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
           const keys = Object.keys(rows[0]).filter(k => k !== "id");
           queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
                         id  TEXT PRIMARY KEY
-                        ${keys.length ? (", " + keys.map(k => asName(k) + " TEXT ").join(", ")) : ""}
+                        ${keys.length? (", " + keys.map(k => asName(k) + " TEXT ").join(", ")) : ""}
                     );`);
 
           rows.map(row => {
@@ -394,7 +400,25 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
           } else if ("jsonbSchema" in colConf && colConf.jsonbSchema) {
 
-            return ` ${colNameEsc} ${getColDef(colConf, "JSONB")} CHECK(${getPGCheckConstraint({ schema: colConf.jsonbSchema, escapedFieldName: colNameEsc, nullable: !!colConf.nullable }, 0)})`;
+            /** Validate default value against jsonbSchema  */
+            if(colConf.defaultValue){
+              const checkStatement = getPGCheckConstraint({ schema: colConf.jsonbSchema, escapedFieldName: asValue(colConf.defaultValue)+"::JSONB", nullable: !!colConf.nullable }, 0)
+              const q = `SELECT ${checkStatement} as v`
+              console.log(q)
+              this.dbo.sql!(q, {}, { returnType: "row" }).then(row => {
+                if(!row?.v) {
+                  console.error(`Default value (${colConf.defaultValue}) for ${tableName}.${name} does not satisfy the jsonb constraint check: ${checkStatement}`);
+                }
+              })
+            }
+            const checkStatement = getPGCheckConstraint({ schema: colConf.jsonbSchema, escapedFieldName: colNameEsc, nullable: !!colConf.nullable }, 0)
+            return ` ${colNameEsc} ${getColDef(colConf, "JSONB")} CHECK(${checkStatement})`;
+
+          } else if("oneOf" in colConf) {
+            if(!colConf.oneOf.length) throw new Error("Must not be empty");
+            const type = colConf.oneOf.every(v => Number.isFinite(v))? "NUMERIC" : "TEXT";
+            const checks = colConf.oneOf.map(v => `${colNameEsc} = ${asValue(v)}`).join(" OR ");
+            return ` ${colNameEsc} ${type} ${colConf.nullable? "" : "NOT NULL"} ${"defaultValue" in colConf? ` DEFAULT ${asValue(colConf.defaultValue)}` : ""} CHECK(${checks})`;
 
           } else {
             throw "Unknown column config: " + JSON.stringify(colConf);
@@ -435,7 +459,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
               colCreateLines.join(", \n"),
             `);`
           ].join("\n"))
-          console.log("TableConfigurator: Created table: \n" + queries[0])
+          console.log("TableConfigurator: Created table: \n" + queries.at(-1))
         }
       }
       if ("constraints" in tableConf && tableConf.constraints) {
@@ -460,7 +484,16 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     if (queries.length) {
       const q = queries.join("\n");
       console.log("TableConfig: \n", q)
-      await this.db.multi(q);
+      await this.db.multi(q).catch(err => {
+        if(err.position){
+          const pos = +err.position;
+          if(Number.isInteger(pos)){
+            return Promise.reject(err.toString() + "\n At:" + q.slice(pos - 50, pos + 50));
+          }
+        }
+        console.error("TableConfig error: ", err)
+        return Promise.reject(err);
+      });
     }
   }
 }

@@ -641,14 +641,15 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
   },
      */
 
-    const json = {a: true, arr: "2", arr1: 3, arr2: [1], arrStr: ["1123.string"] }
-    const fo = await db.tjson.insert({ json }, { returning: "*"});
+    const json = { a: true, arr: "2", arr1: 3, arr2: [1], arrStr: ["1123.string"] }
+    const fo = await db.tjson.insert({ colOneOf: "a", json }, { returning: "*"});
     // assert.deepStrictEqual(fo.json, json);
-    await db.tjson.insert({ json: {...json, o: { o1: 2, o2: true } } })
+    await db.tjson.insert({ colOneOf: "a", json: {...json, o: { o1: 2, o2: true } } })
     try {
-      await db.tjson.insert({ json: { a: true, arr: "22"} });
+      await db.tjson.insert({ colOneOf: "a", json: { a: true, arr: "22"} });
       throw "Should have failed"
     } catch(e){
+      console.log("Perfect:", e)
       // Perfect
     }
   });

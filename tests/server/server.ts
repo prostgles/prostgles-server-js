@@ -1,0 +1,29 @@
+
+import path from 'path';
+import prostgles from "prostgles-server";
+import { DBSchemaGenerated } from "./DBoGenerated";
+
+prostgles<DBSchemaGenerated>({
+  dbConnection: {
+    connectionString: process.env.DB_CONNECTION
+  },
+  tsGeneratedTypesDir: path.join(__dirname + '/'),
+  tableConfig: {
+    user: {
+      columns: {
+        id:           { sqlDefinition: `SERIAL PRIMARY KEY ` },
+        email:        { sqlDefinition: `TEXT NOT NULL` },
+        status:       { oneOf: ["active", "disabled", "pending"] },
+        preferences:  { defaultValue: "{}", 
+          jsonbSchema: { 
+            showIntro:  { type: "boolean", optional: true },
+            theme:      { oneOf: ["light", "dark"], optional: true },
+          } 
+        },
+      }
+    }
+  },
+  onReady: async (db) => {
+    db.insert_rules.findOne()
+  }
+});

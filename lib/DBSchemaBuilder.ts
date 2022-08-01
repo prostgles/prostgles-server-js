@@ -16,8 +16,16 @@ export const getDBSchema = (dboBuilder: DboBuilder): string => {
     const getColType = (c: typeof cols[number]) => {
       let type: string = (c.is_nullable? "null | " : "") + postgresToTsType(c.udt_name) + ";"
       const colConf = dboBuilder.prostgles.tableConfigurator?.getColumnConfig(tov.name, c.name);
-      if(colConf && "jsonbSchema" in colConf){
-        type = getJSONBSchemaTSTypes(colConf.jsonbSchema, { nullable: colConf.nullable }, "      ");
+      if(colConf){
+        if("jsonbSchema" in colConf){
+          type = getJSONBSchemaTSTypes(colConf.jsonbSchema, { nullable: colConf.nullable }, "      ");
+        } else if("oneOf" in colConf){
+          const types = colConf.oneOf.map(t => typeof t === "number"? t : JSON.stringify(t));
+          if(colConf.nullable){
+            types.unshift("null")
+          }
+          type = types.join(" | ");
+        }
       }
       return `${escapeTSNames(c.name)}${c.is_nullable || c.has_default? "?" : ""}: ${type}`
     }

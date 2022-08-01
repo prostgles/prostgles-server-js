@@ -64,6 +64,20 @@ function dd() {
                 t2: { label: { en: "en_t2" } },
             }
         },
+        users: {
+            dropIfExists: true,
+            columns: {
+                id: { sqlDefinition: `SERIAL PRIMARY KEY ` },
+                email: { sqlDefinition: `TEXT NOT NULL` },
+                status: { oneOf: ["active", "disabled", "pending"] },
+                preferences: { defaultValue: "{}",
+                    jsonbSchema: {
+                        showIntro: { type: "boolean", optional: true },
+                        theme: { oneOf: ["light", "dark"], optional: true },
+                    }
+                },
+            }
+        },
         tjson: {
             dropIfExists: true,
             columns: {
@@ -76,6 +90,7 @@ function dd() {
                         o: { oneOfTypes: [{ o1: { type: "integer" } }, { o2: { type: "boolean" } }], optional: true, nullable: true },
                     }
                 },
+                colOneOf: { oneOf: ["a", "b", "c"] },
                 status: {
                     nullable: true,
                     jsonbSchema: {

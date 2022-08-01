@@ -335,6 +335,7 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
+      colOneOf: "a" | "b" | "c"
       json:       { 
         a: boolean;
         arr: '1' | '2' | '3';
@@ -379,6 +380,22 @@ export type DBSchemaGenerated = {
       t1?: null | string;
       t2?: null | string;
       tr1_id?: null | number;
+    };
+  };
+  users: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      email: string;
+      id?: number;
+      preferences?:       { 
+        showIntro?: boolean;
+        theme?: 'light' | 'dark'; 
+      };
+      status: "active" | "disabled" | "pending"
     };
   };
   usr: {

@@ -105,9 +105,14 @@ declare type NamedJoinColumn = {
     label?: string;
     joinDef: JoinDef[];
 };
+declare type OneOf = {
+    oneOf: (string | number)[];
+    nullable?: boolean;
+    defaultValue?: OneOf["oneOf"][number];
+};
 declare type ColumnConfig<LANG_IDS = {
     en: 1;
-}> = NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef));
+}> = NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef | OneOf));
 declare type TableDefinition<LANG_IDS> = {
     columns?: {
         [column_name: string]: ColumnConfig<LANG_IDS>;
