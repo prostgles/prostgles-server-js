@@ -9,7 +9,7 @@
 
 
 New: JSONB schema runtime validation and TS types   
-<img src="https://prostgles.com/tsdef2.png" width="33%"/>  
+<img src="https://prostgles.com/tsdef2.png" width="600px" style="max-width: 90vw; " />  
 
 ## Features
  
