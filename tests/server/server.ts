@@ -11,19 +11,21 @@ prostgles<DBSchemaGenerated>({
   tableConfig: {
     user: {
       columns: {
-        id:           { sqlDefinition: `SERIAL PRIMARY KEY ` },
-        email:        { sqlDefinition: `TEXT NOT NULL` },
-        status:       { oneOf: ["active", "disabled", "pending"] },
-        preferences:  { defaultValue: "{}", 
-          jsonbSchema: { 
-            showIntro:  { type: "boolean", optional: true },
-            theme:      { oneOf: ["light", "dark"], optional: true },
-          } 
+        id: { sqlDefinition: `SERIAL PRIMARY KEY ` },
+        email: { sqlDefinition: `TEXT NOT NULL` },
+        status: { oneOf: ["active", "disabled", "pending"] },
+        preferences: {
+          defaultValue: "{}",
+          jsonbSchema: {
+            showIntro: { type: "boolean", optional: true },
+            theme: { oneOf: ["light", "dark"], optional: true },
+          }
         },
       }
     }
   },
   onReady: async (db) => {
-    db.insert_rules.findOne()
+    const user = await db.users.findOne({ id: 123 });
+    // user.preferences.theme === ""
   }
 });
