@@ -133,9 +133,9 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
 
     const allowedFieldKeys = this.parseFieldFilter(fields);
     if (tx) {
-      result = (tx as any)[queryType](query).catch((err: any) => makeErr(err, localParams, this, allowedFieldKeys));
+      result = await (tx as any)[queryType](query).catch((err: any) => makeErr(err, localParams, this, allowedFieldKeys));
     } else {
-      result = this.db.tx(t => (t as any)[queryType](query)).catch(err => makeErr(err, localParams, this, allowedFieldKeys));
+      result = await this.db.tx(t => (t as any)[queryType](query)).catch(err => makeErr(err, localParams, this, allowedFieldKeys));
     }
 
     if(tableRules?.insert?.postValidate){
