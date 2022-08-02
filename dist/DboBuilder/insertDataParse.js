@@ -10,7 +10,6 @@ const uploadFile_1 = require("./uploadFile");
  */
 async function insertDataParse(data, param2, param3_unused, tableRules, _localParams) {
     const localParams = _localParams || {};
-    let dbTX = localParams?.dbTX || this.dbTX;
     const MEDIA_COL_NAMES = ["data", "name"];
     const isMultiInsert = Array.isArray(data);
     const getExtraKeys = (d) => (0, prostgles_types_1.getKeys)(d).filter(k => {
@@ -65,9 +64,11 @@ async function insertDataParse(data, param2, param3_unused, tableRules, _localPa
     /**
      * Make sure nested insert uses a transaction
      */
-    if (isNestedInsert && !dbTX) {
+    const dbTX = localParams?.tx?.dbTX || this.dbTX;
+    const t = localParams?.tx?.t || this.t;
+    if (isNestedInsert && (!dbTX || !t)) {
         return {
-            insertResult: await this.dboBuilder.getTX((dbTX) => dbTX[this.name].insert(data, param2, param3_unused, tableRules, { dbTX, ...localParams }))
+            insertResult: await this.dboBuilder.getTX((dbTX, _t) => dbTX[this.name].insert(data, param2, param3_unused, tableRules, { tx: { dbTX, t: _t }, ...localParams }))
         };
     }
     // if(!dbTX && this.t) dbTX = this.d;

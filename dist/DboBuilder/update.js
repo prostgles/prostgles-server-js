@@ -24,7 +24,7 @@ async function update(filter, _newData, params, tableRules, localParams) {
                 const validate = tableRules?.update?.validate ? async (row) => {
                     return tableRules?.update?.validate({ update: row, filter }, this.dbTX || this.dboBuilder.dbo);
                 } : undefined;
-                let existingFile = await (localParams?.dbTX?.[this.name] || this).findOne({ id: existingMediaId });
+                let existingFile = await (localParams?.tx?.dbTX?.[this.name] || this).findOne({ id: existingMediaId });
                 if (!existingFile?.name)
                     throw new Error("Existing file record not found");
                 // oldFileDelete = () => fileManager.deleteFile(existingFile!.name!)

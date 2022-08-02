@@ -94,8 +94,8 @@ async function _delete(filter, params, param3_unused, table_rules, localParams) 
                     }
                     return undefined;
                 };
-                if (localParams?.dbTX) {
-                    return txDelete(localParams.dbTX[this.name]);
+                if (localParams?.tx?.dbTX) {
+                    return txDelete(localParams.tx.dbTX[this.name]);
                 }
                 else if (this.t) {
                     return txDelete(this);

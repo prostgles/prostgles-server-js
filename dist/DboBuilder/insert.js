@@ -3,14 +3,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.insert = void 0;
 const prostgles_types_1 = require("prostgles-types");
 const DboBuilder_1 = require("../DboBuilder");
+const PubSubManager_1 = require("../PubSubManager");
 async function insert(rowOrRows, param2, param3_unused, tableRules, _localParams) {
     const localParams = _localParams || {};
-    const { dbTX } = localParams;
     try {
         const { onConflictDoNothing, fixIssues = false } = param2 || {};
         let { returning } = param2 || {};
         const { testRule = false, returnQuery = false } = localParams || {};
-        const finalDBtx = dbTX || this.dbTX;
+        const finalDBtx = localParams?.tx?.dbTX || this.dbTX;
         if (tableRules?.insert?.postValidate) {
             if (!finalDBtx) {
                 return this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.insert?.(rowOrRows, param2, param3_unused, tableRules, _localParams));
@@ -64,7 +64,12 @@ async function insert(rowOrRows, param2, param3_unused, tableRules, _localParams
         }
         if (!rowOrRows)
             rowOrRows = {}; //throw "Provide data in param1";
-        let returningSelect = this.makeReturnQuery(await this.prepareReturning(returning, this.parseFieldFilter(returningFields)));
+        const originalReturning = await this.prepareReturning(returning, this.parseFieldFilter(returningFields));
+        let fullReturning = await this.prepareReturning(returning, this.parseFieldFilter("*"));
+        /** Used for postValidate. Add any missing computed returning from original query */
+        fullReturning.concat(originalReturning.filter(s => !fullReturning.some(f => f.alias === s.alias)));
+        const finalSelect = tableRules?.insert?.postValidate ? fullReturning : originalReturning;
+        let returningSelect = this.makeReturnQuery(finalSelect);
         const makeQuery = async (_row, isOne = false) => {
             let row = { ..._row };
             if (!(0, DboBuilder_1.isPojoObject)(row)) {
@@ -115,7 +120,7 @@ async function insert(rowOrRows, param2, param3_unused, tableRules, _localParams
         if (this.dboBuilder.prostgles.opts.DEBUG_MODE) {
             console.log(this.t?.ctx?.start, "insert in " + this.name, data);
         }
-        const tx = dbTX?.[this.name]?.t || this.t;
+        const tx = localParams?.tx?.t || this.t;
         const allowedFieldKeys = this.parseFieldFilter(fields);
         if (tx) {
             result = await tx[queryType](query).catch((err) => (0, DboBuilder_1.makeErr)(err, localParams, this, allowedFieldKeys));
@@ -130,6 +135,16 @@ async function insert(rowOrRows, param2, param3_unused, tableRules, _localParams
             for await (const row of rows) {
                 await tableRules?.insert?.postValidate(row ?? {}, finalDBtx);
             }
+            /* We used a full returning for postValidate. Now we must filter out dissallowed columns  */
+            if (returning) {
+                if (Array.isArray(result)) {
+                    return result.map(row => {
+                        (0, PubSubManager_1.pickKeys)(row, originalReturning.map(s => s.alias));
+                    });
+                }
+                return (0, PubSubManager_1.pickKeys)(result, originalReturning.map(s => s.alias));
+            }
+            return undefined;
         }
         return result;
     }

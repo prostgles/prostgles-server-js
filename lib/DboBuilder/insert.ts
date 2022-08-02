@@ -2,6 +2,7 @@ import pgPromise from "pg-promise";
 import { AnyObject, asName, FieldFilter, get, getKeys, InsertParams, isObject } from "prostgles-types";
 import { isPlainObject, isPojoObject, LocalParams, makeErr, parseError, pgp, TableHandler } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
+import { omitKeys, pickKeys } from "../PubSubManager";
 
 export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: undefined, tableRules?: TableRule, _localParams?: LocalParams): Promise<any | any[] | boolean> {
   const localParams = _localParams || {};
@@ -73,7 +74,14 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
     }
 
     if (!rowOrRows) rowOrRows = {}; //throw "Provide data in param1";
-    let returningSelect = this.makeReturnQuery(await this.prepareReturning(returning, this.parseFieldFilter(returningFields)));
+    const originalReturning = await this.prepareReturning(returning, this.parseFieldFilter(returningFields))
+    let fullReturning = await this.prepareReturning(returning, this.parseFieldFilter("*"));
+
+    /** Used for postValidate. Add any missing computed returning from original query */
+    fullReturning.concat(originalReturning.filter(s => !fullReturning.some(f => f.alias === s.alias)));
+
+    const finalSelect = tableRules?.insert?.postValidate? fullReturning : originalReturning;
+    let returningSelect = this.makeReturnQuery(finalSelect);
     const makeQuery = async (_row: AnyObject | undefined, isOne = false) => {
       let row = { ..._row };
 
@@ -144,6 +152,18 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
       for await (const row of rows){
         await tableRules?.insert?.postValidate(row ?? {}, finalDBtx)
       }
+
+      /* We used a full returning for postValidate. Now we must filter out dissallowed columns  */
+      if(returning){
+        if(Array.isArray(result)){
+          return result.map(row => {
+            pickKeys(row, originalReturning.map(s => s.alias))
+          });
+        }
+        return pickKeys(result, originalReturning.map(s => s.alias))
+      }
+
+      return undefined;
     }
 
     return result;
