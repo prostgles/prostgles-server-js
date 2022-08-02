@@ -25,7 +25,7 @@ export async function uploadFile(this: TableHandler, row: AnyObject, validate: V
   }
 
   if (validate) {
-    media = await validate(media);
+    media = await validate(media, this.dbTX || this.dboBuilder.dbo);
   }
 
   const _media: Media = await this.dboBuilder.prostgles.fileManager.uploadAsMedia({

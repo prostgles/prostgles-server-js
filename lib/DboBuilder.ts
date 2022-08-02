@@ -404,7 +404,7 @@ class ColSet {
         this.opts = { columns, tableName, colNames: columns.map(c => c.name) }
     }
 
-    private async getRow(data: any, allowedCols: string[], validate?: ValidateRow): Promise<{ escapedCol: string; escapedVal: string }[]> {
+    private async getRow(data: any, allowedCols: string[], dbTx: DBHandlerServer, validate?: ValidateRow): Promise<{ escapedCol: string; escapedVal: string }[]> {
         const badCol = allowedCols.find(c => !this.opts.colNames.includes(c))
         if(!allowedCols || badCol){
             throw "Missing or unexpected columns: " + badCol;
@@ -414,7 +414,7 @@ class ColSet {
 
         let row = pickKeys(data, allowedCols);
         if(validate){
-            row = await validate(row);
+            row = await validate(row, dbTx);
         }
         const rowKeys = Object.keys(row);
         
@@ -440,7 +440,9 @@ class ColSet {
                 const funcExists = basicFuncNames.includes(funcName);
                 const funcArgs = row[key]?.[funcName]
                 if(dataKeys.length !== 1 || !funcExists || !Array.isArray(funcArgs)){
-                    throw `Expecting only one function key (${basicFuncNames.join(", ")}) \nwith an array of arguments \n within column (${key}) data but got: ${JSON.stringify(row[key])} \nExample: { geo_col: { ST_GeomFromText: ["POINT(-71.064544 42.28787)", 4326] } }`;
+                    throw `Expecting only one function key (${
+                            basicFuncNames.join(", ")}) \nwith an array of arguments \n within column (${key}) data but got: ${
+                            JSON.stringify(row[key])} \nExample: { geo_col: { ST_GeomFromText: ["POINT(-71.064544 42.28787)", 4326] } }`;
                 }
                 escapedVal = `${funcName}(${basicFunc(funcArgs)})`
                 
@@ -456,9 +458,9 @@ class ColSet {
     
     }
 
-    async getInsertQuery(data: any[], allowedCols: string[], validate: ValidateRow | undefined): Promise<string> {
+    async getInsertQuery(data: any[], allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRow | undefined): Promise<string> {
         const res = (await Promise.all((Array.isArray(data)? data : [data]).map(async d => {
-            const rowParts = await this.getRow(d, allowedCols, validate);
+            const rowParts = await this.getRow(d, allowedCols, dbTx, validate);
             const select = rowParts.map(r => r.escapedCol).join(", "),
                 values = rowParts.map(r => r.escapedVal).join(", ");
         
@@ -466,9 +468,9 @@ class ColSet {
         }))).join(";\n") + " ";
         return res;
     }
-    async getUpdateQuery(data: any[], allowedCols: string[], validate: ValidateRow | undefined): Promise<string> {
+    async getUpdateQuery(data: any[], allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRow | undefined): Promise<string> {
         const res = (await Promise.all((Array.isArray(data)? data : [data]).map(async d => {
-            const rowParts = await this.getRow(d, allowedCols, validate);
+            const rowParts = await this.getRow(d, allowedCols, dbTx, validate);
             return `UPDATE ${asName(this.opts.tableName)} SET ` +  rowParts.map(r => `${r.escapedCol} = ${r.escapedVal} `).join(",\n")
         }))).join(";\n") + " ";
         return res;
@@ -2191,7 +2193,12 @@ export class TableHandler extends ViewHandler {
                 if(forcedData) {
                     try {
                         const { data, allowedCols } = this.validateNewData({ row: forcedData, forcedData: undefined, allowedFields: "*", tableRules, fixIssues: false });
-                        const updateQ = await this.colSet.getUpdateQuery(data, allowedCols, validate? ((row) => validate!({ update: row, filter: {}})) : undefined) //pgp.helpers.update(data, columnSet)
+                        const updateQ = await this.colSet.getUpdateQuery(
+                                data, 
+                                allowedCols, 
+                                this.dbTX || this.dboBuilder.dbo,
+                                validate? ((row) => validate!({ update: row, filter: {}}, this.dbTX || this.dboBuilder.dbo)) : undefined
+                            ) //pgp.helpers.update(data, columnSet)
                         let query = updateQ + " WHERE FALSE ";
                         await this.db.any("EXPLAIN " + query);
                     } catch(e){
@@ -2218,7 +2225,7 @@ export class TableHandler extends ViewHandler {
             const clashingFields = _forcedFilterKeys.filter(key => _fields.includes(key));
             if(clashingFields.length) throw "forcedFilter must not include fields from the fields (otherwise the user can update data to bypass the forcedFilter). Clashing fields: " + nonFields;
         }
-        const validateRow: ValidateRow | undefined = validate? (row) => validate!({ update: row, filter: finalUpdateFilter }) : undefined
+        const validateRow: ValidateRow | undefined = validate? (row) => validate!({ update: row, filter: finalUpdateFilter }, this.dbTX || this.dboBuilder.dbo) : undefined
 
         return {
             fields: _fields,

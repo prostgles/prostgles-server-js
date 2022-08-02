@@ -180,8 +180,8 @@ declare class ColSet {
     };
     constructor(columns: ColumnInfo[], tableName: string);
     private getRow;
-    getInsertQuery(data: any[], allowedCols: string[], validate: ValidateRow | undefined): Promise<string>;
-    getUpdateQuery(data: any[], allowedCols: string[], validate: ValidateRow | undefined): Promise<string>;
+    getInsertQuery(data: any[], allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRow | undefined): Promise<string>;
+    getUpdateQuery(data: any[], allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRow | undefined): Promise<string>;
 }
 export declare type ExistsFilterConfig = {
     key: string;

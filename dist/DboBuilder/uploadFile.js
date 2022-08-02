@@ -24,7 +24,7 @@ async function uploadFile(row, validate, localParams, mediaId) {
         content_type: type.mime
     };
     if (validate) {
-        media = await validate(media);
+        media = await validate(media, this.dbTX || this.dboBuilder.dbo);
     }
     const _media = await this.dboBuilder.prostgles.fileManager.uploadAsMedia({
         item: {

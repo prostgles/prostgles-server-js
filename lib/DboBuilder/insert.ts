@@ -5,7 +5,11 @@ import { TableRule } from "../PublishParser";
 
 export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: undefined, tableRules?: TableRule, _localParams?: LocalParams): Promise<any | any[] | boolean> {
   const localParams = _localParams || {};
-  const { dbTX } = localParams
+  const { dbTX } = localParams;
+  const finalDBtx = dbTX || this.dbTX;
+  if(tableRules?.insert?.postValidate && !finalDBtx){
+    return this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.insert?.(rowOrRows, param2, param3_unused, tableRules, _localParams))
+  }
   try {
 
     const { returning, onConflictDoNothing, fixIssues = false } = param2 || {};
@@ -55,7 +59,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
 
     if (param2) {
       const good_params = ["returning", "multi", "onConflictDoNothing", "fixIssues"];
-      const bad_params = Object.keys(param2).filter(k => !good_params.includes(k));
+      const bad_params = getKeys(param2).filter(k => !good_params.includes(k));
       if (bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
     }
 
@@ -73,8 +77,12 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
       let _data = { ...data };
 
       let insertQ = "";
-      if (!Object.keys(_data).length) insertQ = `INSERT INTO ${asName(this.name)} DEFAULT VALUES `;
-      else insertQ = await this.colSet.getInsertQuery(_data, allowedCols, tableRules?.insert?.validate) // pgp.helpers.insert(_data, columnSet); 
+      if (!Array.isArray(_data) && !getKeys(_data).length || Array.isArray(_data) && !_data.length) {
+        await tableRules?.insert?.validate?.(_data, this.dbTX || this.dboBuilder.dbo);
+        insertQ = `INSERT INTO ${asName(this.name)} DEFAULT VALUES `;
+      } else {
+        insertQ = await this.colSet.getInsertQuery(_data, allowedCols, this.dbTX || this.dboBuilder.dbo, tableRules?.insert?.validate) // pgp.helpers.insert(_data, columnSet); 
+      }
       return insertQ + conflict_query + returningSelect;
     };
 
@@ -119,6 +127,14 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
       result = (tx as any)[queryType](query).catch((err: any) => makeErr(err, localParams, this, allowedFieldKeys));
     } else {
       result = this.db.tx(t => (t as any)[queryType](query)).catch(err => makeErr(err, localParams, this, allowedFieldKeys));
+    }
+
+    if(tableRules?.insert?.postValidate){
+      if(!finalDBtx) throw new Error("Unexpected: no dbTX for postValidate");
+      const rows = Array.isArray(data)? data : [data];
+      for await (const row of rows){
+        await tableRules?.insert?.postValidate(row ?? {}, finalDBtx)
+      }
     }
 
     return result;

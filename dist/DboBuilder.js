@@ -122,7 +122,7 @@ class ColSet {
     constructor(columns, tableName) {
         this.opts = { columns, tableName, colNames: columns.map(c => c.name) };
     }
-    async getRow(data, allowedCols, validate) {
+    async getRow(data, allowedCols, dbTx, validate) {
         const badCol = allowedCols.find(c => !this.opts.colNames.includes(c));
         if (!allowedCols || badCol) {
             throw "Missing or unexpected columns: " + badCol;
@@ -131,7 +131,7 @@ class ColSet {
             throw "No data";
         let row = (0, PubSubManager_1.pickKeys)(data, allowedCols);
         if (validate) {
-            row = await validate(row);
+            row = await validate(row, dbTx);
         }
         const rowKeys = Object.keys(row);
         return rowKeys.map(key => {
@@ -167,17 +167,17 @@ class ColSet {
             };
         });
     }
-    async getInsertQuery(data, allowedCols, validate) {
+    async getInsertQuery(data, allowedCols, dbTx, validate) {
         const res = (await Promise.all((Array.isArray(data) ? data : [data]).map(async (d) => {
-            const rowParts = await this.getRow(d, allowedCols, validate);
+            const rowParts = await this.getRow(d, allowedCols, dbTx, validate);
             const select = rowParts.map(r => r.escapedCol).join(", "), values = rowParts.map(r => r.escapedVal).join(", ");
             return `INSERT INTO ${(0, prostgles_types_1.asName)(this.opts.tableName)} (${select}) VALUES (${values})`;
         }))).join(";\n") + " ";
         return res;
     }
-    async getUpdateQuery(data, allowedCols, validate) {
+    async getUpdateQuery(data, allowedCols, dbTx, validate) {
         const res = (await Promise.all((Array.isArray(data) ? data : [data]).map(async (d) => {
-            const rowParts = await this.getRow(d, allowedCols, validate);
+            const rowParts = await this.getRow(d, allowedCols, dbTx, validate);
             return `UPDATE ${(0, prostgles_types_1.asName)(this.opts.tableName)} SET ` + rowParts.map(r => `${r.escapedCol} = ${r.escapedVal} `).join(",\n");
         }))).join(";\n") + " ";
         return res;
@@ -1621,7 +1621,7 @@ class TableHandler extends ViewHandler {
                 if (forcedData) {
                     try {
                         const { data, allowedCols } = this.validateNewData({ row: forcedData, forcedData: undefined, allowedFields: "*", tableRules, fixIssues: false });
-                        const updateQ = await this.colSet.getUpdateQuery(data, allowedCols, validate ? ((row) => validate({ update: row, filter: {} })) : undefined); //pgp.helpers.update(data, columnSet)
+                        const updateQ = await this.colSet.getUpdateQuery(data, allowedCols, this.dbTX || this.dboBuilder.dbo, validate ? ((row) => validate({ update: row, filter: {} }, this.dbTX || this.dboBuilder.dbo)) : undefined); //pgp.helpers.update(data, columnSet)
                         let query = updateQ + " WHERE FALSE ";
                         await this.db.any("EXPLAIN " + query);
                     }
@@ -1648,7 +1648,7 @@ class TableHandler extends ViewHandler {
             if (clashingFields.length)
                 throw "forcedFilter must not include fields from the fields (otherwise the user can update data to bypass the forcedFilter). Clashing fields: " + nonFields;
         }
-        const validateRow = validate ? (row) => validate({ update: row, filter: finalUpdateFilter }) : undefined;
+        const validateRow = validate ? (row) => validate({ update: row, filter: finalUpdateFilter }, this.dbTX || this.dboBuilder.dbo) : undefined;
         return {
             fields: _fields,
             validateRow,

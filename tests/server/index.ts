@@ -333,12 +333,17 @@ function dd(){
 				prostgles_lookup_media_items_with_one_media: "*",
 				prostgles_lookup_media_items_with_media: "*",
 				insert_rules: {
+					select: "*",
 					insert: {
 						fields: "*",
 						returningFields: { name: 1 },
 						validate: async (row) => {
 							if(row.name === "a") row.name = "b"
 							return row
+						},
+						postValidate: async (row, dbo) => {
+							if(row.name === "fail") throw "Failed";
+							return undefined
 						}
 					}
 				},

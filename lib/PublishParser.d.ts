@@ -48,11 +48,11 @@ export declare type UpdateRequestDataBatch<R> = {
     data: UpdateReq<R>[];
 };
 export declare type UpdateRequestData<R extends AnyObject = AnyObject> = UpdateRequestDataOne<R> | UpdateRequestDataBatch<R>;
-export declare type ValidateRow<R extends AnyObject = AnyObject> = (row: R) => R | Promise<R>;
-export declare type ValidateUpdateRow<R extends AnyObject = AnyObject> = (args: {
+export declare type ValidateRow<R extends AnyObject = AnyObject, S = void> = (row: R, dbx: DBOFullyTyped<S>) => R | Promise<R>;
+export declare type ValidateUpdateRow<R extends AnyObject = AnyObject, S = void> = (args: {
     update: Partial<R>;
     filter: FullFilter<R>;
-}) => R | Promise<R>;
+}, dbx: DBOFullyTyped<S>) => R | Promise<R>;
 export declare type SelectRule<Cols extends AnyObject = AnyObject, S = void> = {
     /**
      * Fields allowed to be selected.   Tip: Use false to exclude field
@@ -75,7 +75,7 @@ export declare type SelectRule<Cols extends AnyObject = AnyObject, S = void> = {
      */
     validate?(args: SelectRequestData): SelectRequestData | Promise<SelectRequestData>;
 };
-export declare type InsertRule<Cols extends AnyObject = AnyObject> = {
+export declare type InsertRule<Cols extends AnyObject = AnyObject, S = void> = {
     /**
      * Fields allowed to be inserted.   Tip: Use false to exclude field
      */
@@ -91,11 +91,15 @@ export declare type InsertRule<Cols extends AnyObject = AnyObject> = {
     /**
      * Validation logic to check/update data for each request. Happens before publish rule checks (for fields, forcedData/forcedFilter)
      */
-    preValidate?: ValidateRow<Cols>;
+    preValidate?: ValidateRow<Cols, S>;
     /**
      * Validation logic to check/update data for each request. Happens after publish rule checks (for fields, forcedData/forcedFilter)
      */
-    validate?: InsertRule<Cols>["preValidate"];
+    validate?: ValidateRow<Cols, S>;
+    /**
+     * Validation logic to check/update data after the insert. Happens in the same transaction so upon throwing an error the record will be deleted (not committed)
+     */
+    postValidate?: ValidateRow<Required<Cols>, S>;
 };
 export declare type UpdateRule<Cols extends AnyObject = AnyObject, S = void> = {
     /**
@@ -121,7 +125,7 @@ export declare type UpdateRule<Cols extends AnyObject = AnyObject, S = void> = {
     /**
      * Data to include/overwrite on each updatDBe
      */
-    forcedData?: InsertRule<Cols>["forcedData"];
+    forcedData?: InsertRule<Cols, S>["forcedData"];
     /**
      * Fields user can use to find the updates
      */
@@ -133,7 +137,7 @@ export declare type UpdateRule<Cols extends AnyObject = AnyObject, S = void> = {
     /**
      * Validation logic to check/update data for each request
      */
-    validate?: ValidateUpdateRow<Cols>;
+    validate?: ValidateUpdateRow<Cols, S>;
 };
 export declare type DeleteRule<Cols extends AnyObject = AnyObject, S = void> = {
     /**
@@ -184,11 +188,11 @@ export declare type ViewRule<S = AnyObject> = CommonTableRules & {
      */
     select?: SelectRule<S>;
 };
-export declare type TableRule<S = AnyObject> = ViewRule<S> & {
-    insert?: InsertRule<S>;
-    update?: UpdateRule<S>;
-    delete?: DeleteRule<S>;
-    sync?: SyncRule<S>;
+export declare type TableRule<RowType = AnyObject, S = void> = ViewRule<RowType> & {
+    insert?: InsertRule<RowType, S>;
+    update?: UpdateRule<RowType, S>;
+    delete?: DeleteRule<RowType, S>;
+    sync?: SyncRule<RowType>;
     subscribe?: SubscribeRule;
 };
 export declare type PublishViewRule<Col extends AnyObject = AnyObject, S = void> = {
@@ -197,7 +201,7 @@ export declare type PublishViewRule<Col extends AnyObject = AnyObject, S = void>
     getInfo?: PublishAllOrNothing;
 };
 export declare type PublishTableRule<Col extends AnyObject = AnyObject, S = void> = PublishViewRule<Col, S> & {
-    insert?: InsertRule<Col> | PublishAllOrNothing;
+    insert?: InsertRule<Col, S> | PublishAllOrNothing;
     update?: UpdateRule<Col, S> | PublishAllOrNothing;
     delete?: DeleteRule<Col, S> | PublishAllOrNothing;
     sync?: SyncRule<Col>;

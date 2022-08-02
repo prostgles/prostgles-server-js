@@ -100,7 +100,7 @@ export async function insertDataParse(
 
   let _data = await Promise.all((isMultiInsert? data : [data]).map(async row => {
     if (preValidate) {
-      row = await preValidate(row);
+      row = await preValidate(row, this.dbTX || this.dboBuilder.dbo);
     }
 
     const extraKeys = getExtraKeys(row);

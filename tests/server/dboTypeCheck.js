@@ -11,6 +11,17 @@ const testDboTypes = () => {
         db.items2.find;
         const values = await db.items2.find({}, { select: { items_id: 1 }, returnType: "values" });
         const numArr = values;
+        const publish = {
+            items: {
+                insert: {
+                    fields: { name: 1 },
+                    validate: async (row) => ({
+                        ...row,
+                        h: [""]
+                    })
+                }
+            }
+        };
     });
 };
 exports.testDboTypes = testDboTypes;

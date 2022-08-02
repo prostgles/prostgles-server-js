@@ -224,9 +224,8 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
         { id: 2, public: 'public data' }
       ]);
 
-
       const cols = await db.insert_rules.getColumns();
-      assert.equal(cols.filter(({ insert, update: u, select: s, delete: d }) => insert && !u && !s && !d).length, 3, "Validated getColumns failed")
+      assert.equal(cols.filter(({ insert, update: u, select: s, delete: d }) => insert && !u && s && !d).length, 3, "Validated getColumns failed")
 
       /* Validated insert */
       const expectB = await db.insert_rules.insert({ name: "a" }, { returning: "*" });
@@ -235,6 +234,16 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       /* forced UUID insert */
       const row: any = await db.uuid_text.insert({}, {returning: "*"});
       assert.equal(row.id, 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e');
+
+
+      try {
+        await db.insert_rules.insert({ name: "notfail" }, { returning: "*" });
+        await db.insert_rules.insert({ name: "fail" }, { returning: "*" });
+      } catch(err){
+
+      }
+      assert.equal(0, +(await db.insert_rules.count({ name: "fail" })), "postValidation failed");
+      assert.equal(1, +(await db.insert_rules.count({ name: "notfail" })), "postValidation failed");
     });
 
     // await tryRun("Duplicate subscription", async () => {
