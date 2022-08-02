@@ -126,7 +126,7 @@ async function insert(rowOrRows, param2, param3_unused, tableRules, _localParams
         if (tableRules?.insert?.postValidate) {
             if (!finalDBtx)
                 throw new Error("Unexpected: no dbTX for postValidate");
-            const rows = Array.isArray(data) ? data : [data];
+            const rows = Array.isArray(result) ? result : [result];
             for await (const row of rows) {
                 await tableRules?.insert?.postValidate(row ?? {}, finalDBtx);
             }
