@@ -156,10 +156,13 @@ export type LocalParams = {
     testRule?: boolean;
     tableAlias?: string;
     // subOne?: boolean;
-    dbTX?: TableHandlers;
+
+    tx?: {
+        dbTX: TableHandlers;
+        t: pgPromise.ITask<{}>;
+    }
 
     // localTX?: pgPromise.ITask<{}>;
-    localDBTX?: DBHandlerServer;
 
     returnQuery?: boolean;
 
@@ -2431,6 +2434,8 @@ export class TableHandler extends ViewHandler {
 
 }
 
+let DATA_TYPES: {oid: string, typname: PG_COLUMN_UDT_DATA_TYPE }[] | undefined;
+let USER_TABLES: { relid: string; relname: string; }[] | undefined;
 
 import { JOIN_TYPES } from "./Prostgles";
 import { BasicSession } from "./AuthHandler";
@@ -2640,6 +2645,107 @@ export class DboBuilder {
         return this.joinPaths;
     }
 
+    runSQL = async (query: string, params: any, options: SQLOptions | undefined, localParams?: LocalParams) => {
+
+        /** Cache types */
+        DATA_TYPES ??= await this.db.any("SELECT oid, typname FROM pg_type") ?? [];
+        USER_TABLES ??= await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables") ?? [];
+                
+        const canRunSQL = async (localParams?: LocalParams) => {
+            if(!localParams?.socket || !localParams?.httpReq) return true;
+
+            const { socket } = localParams;
+            const publishParams = await this.prostgles.publishParser!.getPublishParams({ socket });
+            let res = await this.prostgles.opts.publishRawSQL?.(publishParams);
+            return Boolean(res && typeof res === "boolean" || res === "*");
+        }
+
+        if(!(await canRunSQL(localParams))) throw "Not allowed to run SQL";
+
+        const { returnType, allowListen }: SQLOptions = options || ({} as any);
+        const { socket } = localParams || {};
+
+        const db = localParams?.tx?.t || this.db;
+        if(returnType === "noticeSubscription"){
+            if(!socket) throw "Only allowed with client socket"
+            return await this.prostgles.dbEventsManager?.addNotice(socket);
+        } else if(returnType === "statement"){
+            try {
+                return pgp.as.format(query, params);
+            } catch (err){
+                throw (err as any).toString();
+            }
+        } else if(db) {
+
+            let finalQuery = query + "";
+            if(returnType === "arrayMode" && !["listen ", "notify "].find(c => query.toLowerCase().trim().startsWith(c))){
+                finalQuery = new PQ({ text: pgp.as.format(query, params), rowMode: "array" });
+            }
+
+            let _qres = await db.result(finalQuery, params)
+            const { fields, rows, command } = _qres;
+
+            /**
+             * Fallback for watchSchema in case not superuser and cannot add db event listener
+             */
+            const { watchSchema, watchSchemaType } = this.prostgles?.opts || {};
+
+            if(
+                watchSchema &&
+                (!this.prostgles.isSuperUser || watchSchemaType === "prostgles_queries")
+            ){
+                if(["CREATE", "ALTER", "DROP"].includes(command)){
+                    this.prostgles.onSchemaChange({ command, query })
+                } else if(query) {
+                    const cleanedQuery = query.toLowerCase().replace(/\s\s+/g, ' ');
+                    if(PubSubManager.SCHEMA_ALTERING_QUERIES.some(q => cleanedQuery.includes(q.toLowerCase()))){
+                        this.prostgles.onSchemaChange({ command, query })
+                    }
+                }
+            }
+
+            if(command === "LISTEN"){
+                if(!allowListen) throw new Error(`Your query contains a LISTEN command. Set { allowListen: true } to get subscription hooks. Or ignore this message`)
+                if(!socket) throw "Only allowed with client socket"
+                return await this.prostgles.dbEventsManager?.addNotify(query, socket);
+
+            } else if(returnType === "rows") {
+                return rows;
+                
+            } else if(returnType === "row") {
+                return rows[0];
+                
+            } else if(returnType === "value") {
+                return Object.values(rows?.[0] || {})?.[0];
+                
+            } else if(returnType === "values") {
+                return rows.map(r => Object.values(r[0]));
+                
+            } else {
+
+                let qres: SQLResult<typeof returnType> = {
+                    duration: 0,
+                    ..._qres,
+                    fields: fields?.map(f => {
+                        const dataType = DATA_TYPES!.find(dt => +dt.oid === +f.dataTypeID)?.typname ?? "text",
+                            tableName = USER_TABLES!.find(t => +t.relid === +f.tableID),
+                            tsDataType = postgresToTsType(dataType);
+
+                        return {
+                            ...f,
+                            tsDataType,
+                            dataType,
+                            udt_name: dataType,
+                            tableName: tableName?.relname
+                        }
+                    }) ?? []
+                };
+                return qres;
+            }
+            
+        } else console.error("db missing");
+    }
+
     async build(): Promise<DBHandlerServer>{
 
         this.tablesOrViews = await getTablesForSchemaPostgresSQL(this.db);
@@ -2707,105 +2813,102 @@ export class DboBuilder {
 
         if(!this.dbo.sql){
 
-            let needType = true;
-            let DATA_TYPES: {oid: string, typname: PG_COLUMN_UDT_DATA_TYPE }[] = !needType? [] : await this.db.any("SELECT oid, typname FROM pg_type");
-            let USER_TABLES: { relid: string; relname: string; }[] = !needType? [] :  await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
-
-            this.dbo.sql = async (query: string, params: any, options: SQLOptions | undefined, localParams?: LocalParams) => {
+            this.dbo.sql = this.runSQL;
+            // this.dbo.sql = async (query: string, params: any, options: SQLOptions | undefined, localParams?: LocalParams) => {
                 
-                const canRunSQL = async (localParams?: LocalParams) => {
-                    if(!localParams) return true;
+            //     const canRunSQL = async (localParams?: LocalParams) => {
+            //         if(!localParams?.socket || !localParams?.httpReq) return true;
 
-                    const { socket } = localParams;
-                    const publishParams = await this.prostgles.publishParser!.getPublishParams({ socket });
-                    let res = await this.prostgles.opts.publishRawSQL?.(publishParams);
-                    return Boolean(res && typeof res === "boolean" || res === "*");
-                }
+            //         const { socket } = localParams;
+            //         const publishParams = await this.prostgles.publishParser!.getPublishParams({ socket });
+            //         let res = await this.prostgles.opts.publishRawSQL?.(publishParams);
+            //         return Boolean(res && typeof res === "boolean" || res === "*");
+            //     }
 
-                if(!(await canRunSQL(localParams))) throw "Not allowed to run SQL";
+            //     if(!(await canRunSQL(localParams))) throw "Not allowed to run SQL";
 
-                const { returnType, allowListen }: SQLOptions = options || ({} as any);
-                const { socket } = localParams || {};
+            //     const { returnType, allowListen }: SQLOptions = options || ({} as any);
+            //     const { socket } = localParams || {};
 
-                if(returnType === "noticeSubscription"){
-                    if(!socket) throw "Only allowed with client socket"
-                    return await this.prostgles.dbEventsManager?.addNotice(socket);
-                } else if(returnType === "statement"){
-                    try {
-                        return pgp.as.format(query, params);
-                    } catch (err){
-                        throw (err as any).toString();
-                    }
-                } else if(this.db) {
+            //     if(returnType === "noticeSubscription"){
+            //         if(!socket) throw "Only allowed with client socket"
+            //         return await this.prostgles.dbEventsManager?.addNotice(socket);
+            //     } else if(returnType === "statement"){
+            //         try {
+            //             return pgp.as.format(query, params);
+            //         } catch (err){
+            //             throw (err as any).toString();
+            //         }
+            //     } else if(this.db) {
 
-                    let finalQuery = query + "";
-                    if(returnType === "arrayMode" && !["listen ", "notify "].find(c => query.toLowerCase().trim().startsWith(c))){
-                        finalQuery = new PQ({ text: pgp.as.format(query, params), rowMode: "array" });
-                    }
+            //         let finalQuery = query + "";
+            //         if(returnType === "arrayMode" && !["listen ", "notify "].find(c => query.toLowerCase().trim().startsWith(c))){
+            //             finalQuery = new PQ({ text: pgp.as.format(query, params), rowMode: "array" });
+            //         }
 
-                    let _qres = await this.db.result(finalQuery, params)
-                    const { fields, rows, command } = _qres;
+            //         let _qres = await this.db.result(finalQuery, params)
+            //         const { fields, rows, command } = _qres;
 
-                    /**
-                     * Fallback for watchSchema in case not superuser and cannot add db event listener
-                     */
-                    const { watchSchema, watchSchemaType } = this.prostgles?.opts || {};
+            //         /**
+            //          * Fallback for watchSchema in case not superuser and cannot add db event listener
+            //          */
+            //         const { watchSchema, watchSchemaType } = this.prostgles?.opts || {};
 
-                    if(
-                        watchSchema &&
-                        (!this.prostgles.isSuperUser || watchSchemaType === "prostgles_queries")
-                    ){
-                        if(["CREATE", "ALTER", "DROP"].includes(command)){
-                            this.prostgles.onSchemaChange({ command, query })
-                        } else if(query) {
-                            const cleanedQuery = query.toLowerCase().replace(/\s\s+/g, ' ');
-                            if(PubSubManager.SCHEMA_ALTERING_QUERIES.some(q => cleanedQuery.includes(q.toLowerCase()))){
-                                this.prostgles.onSchemaChange({ command, query })
-                            }
-                        }
-                    }
+            //         if(
+            //             watchSchema &&
+            //             (!this.prostgles.isSuperUser || watchSchemaType === "prostgles_queries")
+            //         ){
+            //             if(["CREATE", "ALTER", "DROP"].includes(command)){
+            //                 this.prostgles.onSchemaChange({ command, query })
+            //             } else if(query) {
+            //                 const cleanedQuery = query.toLowerCase().replace(/\s\s+/g, ' ');
+            //                 if(PubSubManager.SCHEMA_ALTERING_QUERIES.some(q => cleanedQuery.includes(q.toLowerCase()))){
+            //                     this.prostgles.onSchemaChange({ command, query })
+            //                 }
+            //             }
+            //         }
 
-                    if(command === "LISTEN"){
-                        if(!allowListen) throw new Error(`Your query contains a LISTEN command. Set { allowListen: true } to get subscription hooks. Or ignore this message`)
-                        if(!socket) throw "Only allowed with client socket"
-                        return await this.prostgles.dbEventsManager?.addNotify(query, socket);
+            //         if(command === "LISTEN"){
+            //             if(!allowListen) throw new Error(`Your query contains a LISTEN command. Set { allowListen: true } to get subscription hooks. Or ignore this message`)
+            //             if(!socket) throw "Only allowed with client socket"
+            //             return await this.prostgles.dbEventsManager?.addNotify(query, socket);
 
-                    } else if(returnType === "rows") {
-                        return rows;
+            //         } else if(returnType === "rows") {
+            //             return rows;
                         
-                    } else if(returnType === "row") {
-                        return rows[0];
+            //         } else if(returnType === "row") {
+            //             return rows[0];
                         
-                    } else if(returnType === "value") {
-                        return Object.values(rows?.[0] || {})?.[0];
+            //         } else if(returnType === "value") {
+            //             return Object.values(rows?.[0] || {})?.[0];
                         
-                    } else if(returnType === "values") {
-                        return rows.map(r => Object.values(r[0]));
+            //         } else if(returnType === "values") {
+            //             return rows.map(r => Object.values(r[0]));
                         
-                    } else {
+            //         } else {
 
-                        let qres: SQLResult<typeof returnType> = {
-                            duration: 0,
-                            ..._qres,
-                            fields: fields?.map(f => {
-                                const dataType = DATA_TYPES.find(dt => +dt.oid === +f.dataTypeID)?.typname ?? "text",
-                                    tableName = USER_TABLES.find(t => +t.relid === +f.tableID),
-                                    tsDataType = postgresToTsType(dataType);
+            //             let qres: SQLResult<typeof returnType> = {
+            //                 duration: 0,
+            //                 ..._qres,
+            //                 fields: fields?.map(f => {
+            //                     const dataType = DATA_TYPES.find(dt => +dt.oid === +f.dataTypeID)?.typname ?? "text",
+            //                         tableName = USER_TABLES.find(t => +t.relid === +f.tableID),
+            //                         tsDataType = postgresToTsType(dataType);
 
-                                return {
-                                    ...f,
-                                    tsDataType,
-                                    dataType,
-                                    udt_name: dataType,
-                                    tableName: tableName?.relname
-                                }
-                            }) ?? []
-                        };
-                        return qres;
-                    }
+            //                     return {
+            //                         ...f,
+            //                         tsDataType,
+            //                         dataType,
+            //                         udt_name: dataType,
+            //                         tableName: tableName?.relname
+            //                     }
+            //                 }) ?? []
+            //             };
+            //             return qres;
+            //         }
                     
-                } else console.error("db missing");
-            }
+            //     } else console.error("db missing");
+            // }
         } else {
             console.warn(`Could not create dbo.sql handler because there is already a table named "sql"`)
         }
@@ -2821,13 +2924,19 @@ export class DboBuilder {
 
     getTX = (cb: TxCB) => {
         return this.db.tx((t) => {
-            let dbTX: TableHandlers = {};
+            let dbTX: TableHandlers & Pick<DBHandlerServer, "sql"> = {};
             this.tablesOrViews?.map(tov => {
                 dbTX[tov.name] = new (tov.is_view? ViewHandler: TableHandler)(this.db, tov, this, t, dbTX, this.joinPaths);
             });
+            if(!dbTX.sql){
+                dbTX.sql = this.runSQL;
+            }
             getKeys(dbTX).map(k => {
                 dbTX[k].dbTX = dbTX;
-            })
+            });
+             
+            dbTX.sql = (q, args, opts, localP) => this.runSQL(q, args, opts, { tx: {dbTX, t },  ...(localP ?? {}) }) 
+            
             return cb(dbTX, t);
         });
     }

@@ -640,7 +640,7 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
     }
   },
      */
-
+  
     const json = { a: true, arr: "2", arr1: 3, arr2: [1], arrStr: ["1123.string"] }
     const fo = await db.tjson.insert({ colOneOf: "a", json }, { returning: "*"});
     // assert.deepStrictEqual(fo.json, json);

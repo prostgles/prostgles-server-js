@@ -24,7 +24,7 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
           return tableRules?.update?.validate!({ update: row, filter }, this.dbTX || this.dboBuilder.dbo)
         } : undefined;
 
-        let existingFile: Media | undefined = await (localParams?.dbTX?.[this.name] as TableHandler || this).findOne({ id: existingMediaId });
+        let existingFile: Media | undefined = await (localParams?.tx?.dbTX?.[this.name] as TableHandler || this).findOne({ id: existingMediaId });
          
         if(!existingFile?.name) throw new Error("Existing file record not found");
 

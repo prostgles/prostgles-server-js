@@ -341,7 +341,14 @@ function dd(){
 							if(row.name === "a") row.name = "b"
 							return row
 						},
-						postValidate: async (row, dbo) => {
+						postValidate: async (row, dboTx) => {
+							/** Records must exist in this transaction */
+							const exists = await dboTx.sql("SELECT * FROM insert_rules WHERE id = ${id}", row, { returnType: "row" });
+							const existsd = await dboTx.insert_rules.findOne({ id: row.id });
+							if(row.id !== exists.id || row.id !== existsd.id){
+								console.error("postValidate failed");
+								process.exit(1)
+							}
 							if(row.name === "fail") throw "Failed";
 							return undefined
 						}

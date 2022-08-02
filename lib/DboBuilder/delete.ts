@@ -105,8 +105,8 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
           return undefined;
         }
 
-        if (localParams?.dbTX) {
-          return txDelete(localParams.dbTX[this.name] as TableHandler)
+        if (localParams?.tx?.dbTX) {
+          return txDelete(localParams.tx.dbTX[this.name] as TableHandler)
         } else if (this.t) {
           return txDelete(this)
         } else {

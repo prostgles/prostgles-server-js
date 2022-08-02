@@ -5,13 +5,13 @@ import { TableRule } from "../PublishParser";
 
 export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: undefined, tableRules?: TableRule, _localParams?: LocalParams): Promise<any | any[] | boolean> {
   const localParams = _localParams || {};
-  const { dbTX } = localParams;
+  
   try {
 
     const { onConflictDoNothing, fixIssues = false } = param2 || {};
     let { returning } = param2 || {};
     const { testRule = false, returnQuery = false } = localParams || {};
-    const finalDBtx = dbTX || this.dbTX;
+    const finalDBtx = localParams?.tx?.dbTX || this.dbTX;
     if(tableRules?.insert?.postValidate ){
       if(!finalDBtx){
         return this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.insert?.(rowOrRows, param2, param3_unused, tableRules, _localParams))
@@ -129,7 +129,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
       console.log(this.t?.ctx?.start, "insert in " + this.name, data);
     }
 
-    const tx = dbTX?.[this.name]?.t || this.t;
+    const tx = localParams?.tx?.t || this.t;
 
     const allowedFieldKeys = this.parseFieldFilter(fields);
     if (tx) {

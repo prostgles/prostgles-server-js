@@ -19,7 +19,6 @@ export async function insertDataParse(
   insertResult?: AnyObject | AnyObject[];
 }> {
   const localParams = _localParams || {};
-  let dbTX = localParams?.dbTX || this.dbTX;
   const MEDIA_COL_NAMES = ["data", "name"];
 
   const isMultiInsert = Array.isArray(data);
@@ -80,15 +79,17 @@ export async function insertDataParse(
   /**
    * Make sure nested insert uses a transaction
    */
-  if (isNestedInsert && !dbTX) {
+  const dbTX = localParams?.tx?.dbTX || this.dbTX;
+  const t = localParams?.tx?.t || this.t;
+  if (isNestedInsert && (!dbTX || !t)) {
     return {
-      insertResult: await this.dboBuilder.getTX((dbTX) =>
+      insertResult: await this.dboBuilder.getTX((dbTX, _t) =>
         (dbTX[this.name] as TableHandler).insert(
           data,
           param2,
           param3_unused,
           tableRules,
-          { dbTX, ...localParams }
+          { tx: { dbTX, t: _t }, ...localParams }
         )
       )
     }
