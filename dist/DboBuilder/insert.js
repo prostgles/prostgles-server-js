@@ -6,13 +6,21 @@ const DboBuilder_1 = require("../DboBuilder");
 async function insert(rowOrRows, param2, param3_unused, tableRules, _localParams) {
     const localParams = _localParams || {};
     const { dbTX } = localParams;
-    const finalDBtx = dbTX || this.dbTX;
-    if (tableRules?.insert?.postValidate && !finalDBtx) {
-        return this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.insert?.(rowOrRows, param2, param3_unused, tableRules, _localParams));
-    }
     try {
-        const { returning, onConflictDoNothing, fixIssues = false } = param2 || {};
+        const { onConflictDoNothing, fixIssues = false } = param2 || {};
+        let { returning } = param2 || {};
         const { testRule = false, returnQuery = false } = localParams || {};
+        const finalDBtx = dbTX || this.dbTX;
+        if (tableRules?.insert?.postValidate) {
+            if (!finalDBtx) {
+                return this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.insert?.(rowOrRows, param2, param3_unused, tableRules, _localParams));
+            }
+            /** Post validate can only access the fields that are accessible to the client */
+            returning ?? (returning = {});
+            if (returning !== "*") {
+                returning["*"] = 1;
+            }
+        }
         let returningFields, forcedData, fields;
         if (tableRules) {
             if (!tableRules.insert)
@@ -128,15 +136,6 @@ async function insert(rowOrRows, param2, param3_unused, tableRules, _localParams
     catch (e) {
         if (localParams && localParams.testRule)
             throw e;
-        const removeBuffers = (o) => {
-            if ((0, DboBuilder_1.isPlainObject)(o)) {
-                return JSON.stringify((0, prostgles_types_1.getKeys)(o).reduce((a, k) => {
-                    const value = o[k];
-                    return { ...a, [k]: Buffer.isBuffer(value) ? `Buffer[${value.byteLength}][...REMOVED]` : value
-                    };
-                }, {}));
-            }
-        };
         // ${JSON.stringify(rowOrRows || {}, null, 2)}, 
         // ${JSON.stringify(param2 || {}, null, 2)}
         throw {
@@ -147,4 +146,13 @@ async function insert(rowOrRows, param2, param3_unused, tableRules, _localParams
 }
 exports.insert = insert;
 ;
+const removeBuffers = (o) => {
+    if ((0, DboBuilder_1.isPlainObject)(o)) {
+        return JSON.stringify((0, prostgles_types_1.getKeys)(o).reduce((a, k) => {
+            const value = o[k];
+            return { ...a, [k]: Buffer.isBuffer(value) ? `Buffer[${value.byteLength}][...REMOVED]` : value
+            };
+        }, {}));
+    }
+};
 //# sourceMappingURL=insert.js.map

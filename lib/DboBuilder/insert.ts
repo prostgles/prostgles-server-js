@@ -6,14 +6,23 @@ import { TableRule } from "../PublishParser";
 export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: undefined, tableRules?: TableRule, _localParams?: LocalParams): Promise<any | any[] | boolean> {
   const localParams = _localParams || {};
   const { dbTX } = localParams;
-  const finalDBtx = dbTX || this.dbTX;
-  if(tableRules?.insert?.postValidate && !finalDBtx){
-    return this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.insert?.(rowOrRows, param2, param3_unused, tableRules, _localParams))
-  }
   try {
 
-    const { returning, onConflictDoNothing, fixIssues = false } = param2 || {};
+    const { onConflictDoNothing, fixIssues = false } = param2 || {};
+    let { returning } = param2 || {};
     const { testRule = false, returnQuery = false } = localParams || {};
+    const finalDBtx = dbTX || this.dbTX;
+    if(tableRules?.insert?.postValidate ){
+      if(!finalDBtx){
+        return this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.insert?.(rowOrRows, param2, param3_unused, tableRules, _localParams))
+      }
+
+      /** Post validate can only access the fields that are accessible to the client */
+      returning ??= {};
+      if(returning !== "*"){
+        returning["*"] = 1;
+      }
+    }
 
     let returningFields: FieldFilter | undefined,
       forcedData: AnyObject | undefined,
@@ -141,15 +150,6 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
   } catch (e) {
     if (localParams && localParams.testRule) throw e;
 
-    const removeBuffers = (o: any) => {
-      if(isPlainObject(o)){
-        return JSON.stringify(getKeys(o).reduce((a, k) => {
-          const value = o[k]
-          return { ...a, [k]: Buffer.isBuffer(value)? `Buffer[${value.byteLength}][...REMOVED]` : value 
-        }
-      }, {}));
-      }
-    }
     // ${JSON.stringify(rowOrRows || {}, null, 2)}, 
     // ${JSON.stringify(param2 || {}, null, 2)}
     throw {
@@ -158,3 +158,14 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
     };
   }
 };
+
+
+const removeBuffers = (o: any) => {
+  if(isPlainObject(o)){
+    return JSON.stringify(getKeys(o).reduce((a, k) => {
+      const value = o[k]
+      return { ...a, [k]: Buffer.isBuffer(value)? `Buffer[${value.byteLength}][...REMOVED]` : value 
+    }
+  }, {}));
+  }
+}
