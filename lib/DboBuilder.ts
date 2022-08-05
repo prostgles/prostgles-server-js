@@ -3055,7 +3055,7 @@ async function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"):
     , array_to_json(vr.table_names) as parent_tables
     , obj_description(cc.table_oid::regclass) as comment
     FROM information_schema.tables t  
-    INNER join (
+    LEFT JOIN (    -- INNER join slows things down
          SELECT c.table_schema, c.table_name, c.column_name, c.data_type, c.udt_name
         , e.data_type as element_type
         , e.udt_name as element_udt_name

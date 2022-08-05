@@ -320,7 +320,7 @@ function dd() {
                             const existsd = await dboTx.insert_rules.findOne({ id: row.id });
                             if (row.id !== exists.id || row.id !== existsd.id) {
                                 console.error("postValidate failed");
-                                // process.exit(1)
+                                // process.exit(1) 
                             }
                             if (row.name === "fail")
                                 throw "Failed";

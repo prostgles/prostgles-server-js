@@ -4,21 +4,16 @@ exports.insert = void 0;
 const prostgles_types_1 = require("prostgles-types");
 const DboBuilder_1 = require("../DboBuilder");
 const PubSubManager_1 = require("../PubSubManager");
-async function insert(rowOrRows, param2, param3_unused, tableRules, _localParams) {
-    const localParams = _localParams || {};
+async function insert(rowOrRows, param2, param3_unused, tableRules, localParams) {
+    // const localParams = _localParams || {};
     try {
         const { onConflictDoNothing, fixIssues = false } = param2 || {};
-        let { returning } = param2 || {};
         const { testRule = false, returnQuery = false } = localParams || {};
+        let { returning } = param2 || {};
         const finalDBtx = localParams?.tx?.dbTX || this.dbTX;
         if (tableRules?.insert?.postValidate) {
             if (!finalDBtx) {
-                return this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.insert?.(rowOrRows, param2, param3_unused, tableRules, _localParams));
-            }
-            /** Post validate can only access the fields that are accessible to the client */
-            returning ?? (returning = {});
-            if (returning !== "*") {
-                returning["*"] = 1;
+                return this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.insert?.(rowOrRows, param2, param3_unused, tableRules, localParams));
             }
         }
         let returningFields, forcedData, fields;
@@ -100,18 +95,17 @@ async function insert(rowOrRows, param2, param3_unused, tableRules, _localParams
             return insertResult;
         }
         if (Array.isArray(data)) {
-            // if(returning) throw "Sorry but [returning] is dissalowed for multi insert";
             let queries = await Promise.all(data.map(async (p) => {
                 const q = await makeQuery(p);
                 return q;
             }));
             query = DboBuilder_1.pgp.helpers.concat(queries);
-            if (returning)
+            if (returningSelect)
                 queryType = "many";
         }
         else {
             query = await makeQuery(data, true);
-            if (returning)
+            if (returningSelect)
                 queryType = "one";
         }
         if (returnQuery)

@@ -4,24 +4,19 @@ import { isPlainObject, isPojoObject, LocalParams, makeErr, parseError, pgp, Tab
 import { TableRule } from "../PublishParser";
 import { omitKeys, pickKeys } from "../PubSubManager";
 
-export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: undefined, tableRules?: TableRule, _localParams?: LocalParams): Promise<any | any[] | boolean> {
-  const localParams = _localParams || {};
+export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any | any[] | boolean> {
+  // const localParams = _localParams || {};
   
   try {
 
     const { onConflictDoNothing, fixIssues = false } = param2 || {};
-    let { returning } = param2 || {};
     const { testRule = false, returnQuery = false } = localParams || {};
+
+    let { returning } = param2 || {};
     const finalDBtx = localParams?.tx?.dbTX || this.dbTX;
     if(tableRules?.insert?.postValidate ){
       if(!finalDBtx){
-        return this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.insert?.(rowOrRows, param2, param3_unused, tableRules, _localParams))
-      }
-
-      /** Post validate can only access the fields that are accessible to the client */
-      returning ??= {};
-      if(returning !== "*"){
-        returning["*"] = 1;
+        return this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.insert?.(rowOrRows, param2, param3_unused, tableRules, localParams))
       }
     }
 
@@ -74,6 +69,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
     }
 
     if (!rowOrRows) rowOrRows = {}; //throw "Provide data in param1";
+
     const originalReturning = await this.prepareReturning(returning, this.parseFieldFilter(returningFields))
     let fullReturning = await this.prepareReturning(returning, this.parseFieldFilter("*"));
 
@@ -82,6 +78,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
 
     const finalSelect = tableRules?.insert?.postValidate? fullReturning : originalReturning;
     let returningSelect = this.makeReturnQuery(finalSelect);
+    
     const makeQuery = async (_row: AnyObject | undefined, isOne = false) => {
       let row = { ..._row };
 
@@ -117,17 +114,16 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
     }
 
     if (Array.isArray(data)) {
-      // if(returning) throw "Sorry but [returning] is dissalowed for multi insert";
       let queries = await Promise.all(data.map(async p => {
         const q = await makeQuery(p);
         return q;
       }));
 
       query = pgp.helpers.concat(queries);
-      if (returning) queryType = "many";
+      if (returningSelect) queryType = "many";
     } else {
       query = await makeQuery(data, true);
-      if (returning) queryType = "one";
+      if (returningSelect) queryType = "one";
     }
 
     if (returnQuery) return query;

@@ -97,7 +97,8 @@ export declare type InsertRule<Cols extends AnyObject = AnyObject, S = void> = {
      */
     validate?: ValidateRow<Cols, S>;
     /**
-     * Validation logic to check/update data after the insert. Happens in the same transaction so upon throwing an error the record will be deleted (not committed)
+     * Validation logic to check/update data after the insert.
+     * Happens in the same transaction so upon throwing an error the record will be deleted (not committed)
      */
     postValidate?: ValidateRow<Required<Cols>, S>;
 };
@@ -138,6 +139,11 @@ export declare type UpdateRule<Cols extends AnyObject = AnyObject, S = void> = {
      * Validation logic to check/update data for each request
      */
     validate?: ValidateUpdateRow<Cols, S>;
+    /**
+     * Validation logic to check/update data after the insert.
+     * Happens in the same transaction so upon throwing an error the record will be deleted (not committed)
+     */
+    postValidate?: ValidateRow<Required<Cols>, S>;
 };
 export declare type DeleteRule<Cols extends AnyObject = AnyObject, S = void> = {
     /**

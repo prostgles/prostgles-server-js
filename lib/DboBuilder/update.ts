@@ -1,16 +1,22 @@
 import { AnyObject, getKeys, isObject, unpatchText, UpdateParams } from "prostgles-types";
 import { Filter, isPlainObject, LocalParams, makeErr, Media, parseError, TableHandler } from "../DboBuilder";
 import { TableRule, ValidateRow } from "../PublishParser";
-import { omitKeys } from "../PubSubManager";
+import { omitKeys, pickKeys } from "../PubSubManager";
 import { isFile, uploadFile } from "./uploadFile"
 
 export async function update(this: TableHandler, filter: Filter, _newData: AnyObject, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<AnyObject | void> {
   try {
 
-    let oldFileDelete = () => {};
+    /** postValidate */
+    const finalDBtx = localParams?.tx?.dbTX || this.dbTX;
+    if(tableRules?.update?.postValidate ){
+      if(!finalDBtx){
+        return this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.update?.(filter, _newData, params, tableRules, localParams))
+      }
+    }
 
     let newData = _newData;
-    if(this.is_media && isFile(newData) && (!tableRules || tableRules.insert)){
+    if(this.is_media && isFile(newData) && (!tableRules || tableRules.update)){
       let existingMediaId: string = !(!filter || !isObject(filter) || getKeys(filter).join() !== "id" || typeof (filter as any).id !== "string")? (filter as any).id : undefined
       if(!existingMediaId){
         throw new Error(`Updating the file table with file data can only be done by providing a single id filter. E.g. { id: "9ea4e23c-2b1a-4e33-8ec0-c15919bb45ec"} `);
@@ -42,10 +48,10 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
       return parsedRules;
     }
 
-    const { fields, validateRow, forcedData, finalUpdateFilter, returningFields, forcedFilter, filterFields } = parsedRules;
+    const { fields, validateRow, forcedData,  returningFields, forcedFilter, filterFields } = parsedRules;
 
 
-    let { returning, multi = true, onConflictDoNothing = false, fixIssues = false } = params || {};
+    const { returning, multi = true, onConflictDoNothing = false, fixIssues = false } = params || {};
     const { returnQuery = false } = localParams ?? {};
 
 
@@ -102,10 +108,19 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
     })).where;
     if (onConflictDoNothing) query += " ON CONFLICT DO NOTHING ";
 
+
+    /** postValidate */
+    const originalReturning = await this.prepareReturning(returning, this.parseFieldFilter(returningFields))
+    let fullReturning = await this.prepareReturning(returning, this.parseFieldFilter("*"));
+    /** Used for postValidate. Add any missing computed returning from original query */
+    fullReturning.concat(originalReturning.filter(s => !fullReturning.some(f => f.alias === s.alias)));
+    const finalSelect = tableRules?.insert?.postValidate? fullReturning : originalReturning;
+    const returningSelect = this.makeReturnQuery(finalSelect);
+
     let qType: "none" | "any" | "one" = "none";
-    if (returning) {
+    if (returningSelect) {
       qType = multi ? "any" : "one";
-      query += this.makeReturnQuery(await this.prepareReturning(returning, this.parseFieldFilter(returningFields)));
+      query += returningSelect;
     }
 
     if (returnQuery) return query as unknown as void;
@@ -119,6 +134,27 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
     
     /** TODO: Delete old file at the end in case new file update fails */
     // await oldFileDelete();
+
+    /** postValidate */
+    if(tableRules?.insert?.postValidate){
+      if(!finalDBtx) throw new Error("Unexpected: no dbTX for postValidate");
+      const rows = Array.isArray(result)? result : [result];
+      for await (const row of rows){
+        await tableRules?.insert?.postValidate(row ?? {}, finalDBtx)
+      }
+
+      /* We used a full returning for postValidate. Now we must filter out dissallowed columns  */
+      if(returningSelect){
+        if(Array.isArray(result)){
+          return result.map(row => {
+            pickKeys(row, originalReturning.map(s => s.alias))
+          });
+        }
+        return pickKeys(result, originalReturning.map(s => s.alias))
+      }
+
+      return undefined;
+    }
 
     return result;
 
