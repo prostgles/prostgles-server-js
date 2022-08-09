@@ -292,11 +292,11 @@ export default class AuthHandler {
               this.setCookieAndGoToReturnURLIFSet({ sid, expires }, { req, res });
 
             } else {
-              throw ("no user or session")
+              throw ("Internal error: no user or session")
             }
           } catch (err) {
             console.log(err)
-            res.status(404).json({ err: "Invalid username or password" });
+            res.status(404).json({ err });
           }
 
 

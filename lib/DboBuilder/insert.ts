@@ -70,6 +70,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
 
     if (!rowOrRows) rowOrRows = {}; //throw "Provide data in param1";
 
+    /** TODO: use WITH inserted as (query) SELECT jsonb_agg(inserted.*) as validateReturn, userReturning */
     const originalReturning = await this.prepareReturning(returning, this.parseFieldFilter(returningFields))
     let fullReturning = await this.prepareReturning(returning, this.parseFieldFilter("*"));
 
