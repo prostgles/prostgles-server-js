@@ -413,7 +413,7 @@ let PostGIS_Funcs: FunctionSpec[] = [
       return `ST_Length(${escTabelName})`;
     }
   }]);
-  
+   
 /**
 * Each function expects a column at the very least
 */
