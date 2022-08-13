@@ -8,7 +8,7 @@
 ![tests](https://github.com/prostgles/prostgles-server-js/workflows/tests/badge.svg?branch=master)
 
 
-###New: JSONB schema runtime validation and TS types   
+### New: JSONB schema runtime validation and TS types   
 <img src="https://prostgles.com/tsdef2.png" width="600px" style="max-width: 90vw; " />  
 
 ## Features
