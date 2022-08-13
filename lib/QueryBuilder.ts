@@ -400,6 +400,19 @@ let PostGIS_Funcs: FunctionSpec[] = [
       return res;
     }),
   );
+
+  PostGIS_Funcs = PostGIS_Funcs.concat([{
+    name: "$ST_Length",
+    type: "function",
+    singleColArg: true,
+    numArgs: 1,
+    getFields: (args: any[]) => [args[0]],
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      const escTabelName = asNameAlias(args[0], tableAlias);
+      
+      return `ST_Length(${escTabelName})`;
+    }
+  }]);
   
 /**
 * Each function expects a column at the very least
