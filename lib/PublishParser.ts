@@ -507,7 +507,7 @@ export class PublishParser {
       /* All methods allowed. Add no limits for table rules */
       if([true, "*"].includes(raw_table_rules as any)){
         parsed_table = {};
-        MY_RULES.map(r => {
+        MY_RULES.filter(r => r.no_limits).forEach(r => {
           parsed_table[r.rule] = { ...r.no_limits as object } as any;
         });
 

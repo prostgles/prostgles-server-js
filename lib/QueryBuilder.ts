@@ -401,18 +401,23 @@ let PostGIS_Funcs: FunctionSpec[] = [
     }),
   );
 
-  PostGIS_Funcs = PostGIS_Funcs.concat([{
-    name: "$ST_Length",
-    type: "function",
-    singleColArg: true,
-    numArgs: 1,
-    getFields: (args: any[]) => [args[0]],
-    getQuery: ({ allowedFields, args, tableAlias }) => {
-      const escTabelName = asNameAlias(args[0], tableAlias);
-      
-      return `ST_Length(${escTabelName})`;
-    }
-  }]);
+  PostGIS_Funcs = PostGIS_Funcs.concat(
+    ["ST_Length", "ST_X", "ST_Y", "ST_Z"].map(fname => ({
+      name: "$" + fname,
+      type: "function",
+      singleColArg: true,
+      numArgs: 1,
+      getFields: (args: any[]) => [args[0]],
+      getQuery: ({ allColumns, args, tableAlias }) => {
+        const colName = args[0];
+        const escapedColName = asNameAlias(colName, tableAlias);
+        const col = allColumns.find(c => c.name === colName);
+        if(!col) throw new Error("Col not found: " + colName)
+        
+        return `${fname}(${escapedColName})`;
+      }
+    }))
+    );
    
 /**
 * Each function expects a column at the very least
