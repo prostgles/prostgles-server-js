@@ -102,6 +102,28 @@ class Prostgles {
             this.dbo = this.dboBuilder.dbo;
             return this.dbo;
         };
+        this.initWatchSchema = (onReady) => {
+            if (this.opts.watchSchema === "hotReloadMode" && !this.opts.tsGeneratedTypesDir) {
+                throw "tsGeneratedTypesDir option is needed for watchSchema: hotReloadMode to work ";
+            }
+            else if (this.opts.watchSchema &&
+                typeof this.opts.watchSchemaType === "object" &&
+                "checkIntervalMillis" in this.opts.watchSchemaType &&
+                typeof this.opts.watchSchemaType.checkIntervalMillis === "number") {
+                if (this.schema_checkIntervalMillis) {
+                    clearInterval(this.schema_checkIntervalMillis);
+                }
+                this.schema_checkIntervalMillis = setInterval(async () => {
+                    if (!this.loaded)
+                        return;
+                    const dbuilder = await DboBuilder_1.DboBuilder.create(this);
+                    if (dbuilder.tsTypesDefinition !== this.dboBuilder.tsTypesDefinition) {
+                        await this.refreshDBO();
+                        this.init(onReady);
+                    }
+                }, this.opts.watchSchemaType.checkIntervalMillis);
+            }
+        };
         this.isSuperUser = false;
         this.connectedSockets = [];
         this.pushSocketSchema = async (socket) => {
@@ -282,24 +304,7 @@ class Prostgles {
     }
     async init(onReady) {
         this.loaded = false;
-        if (this.opts.watchSchema === "hotReloadMode" && !this.opts.tsGeneratedTypesDir) {
-            throw "tsGeneratedTypesDir option is needed for watchSchema: hotReloadMode to work ";
-        }
-        else if (this.opts.watchSchema &&
-            typeof this.opts.watchSchemaType === "object" &&
-            "checkIntervalMillis" in this.opts.watchSchemaType &&
-            typeof this.opts.watchSchemaType.checkIntervalMillis === "number") {
-            if (this.schema_checkIntervalMillis) {
-                clearInterval(this.schema_checkIntervalMillis);
-                this.schema_checkIntervalMillis = setInterval(async () => {
-                    const dbuilder = await DboBuilder_1.DboBuilder.create(this);
-                    if (dbuilder.tsTypesDefinition !== this.dboBuilder.tsTypesDefinition) {
-                        await this.refreshDBO();
-                        this.init(onReady);
-                    }
-                }, this.opts.watchSchemaType.checkIntervalMillis);
-            }
-        }
+        this.initWatchSchema(onReady);
         /* 1. Connect to db */
         if (!this.db) {
             const { db, pgp } = getDbConnection(this.opts.dbConnection, this.opts.dbOptions, this.opts.DEBUG_MODE, notice => {

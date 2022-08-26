@@ -204,7 +204,7 @@ export type ProstglesInitOptions<S = void> = {
   joins?: Joins;
   schema?: string;
   sqlFilePath?: string;
-  onReady(dbo: DBOFullyTyped<S>, db: DB): void;
+  onReady: OnReadyCallback;
   transactions?: string | boolean;
   wsChannelNamePrefix?: string;
   onSocketConnect?(socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB): any;
@@ -266,6 +266,8 @@ export type OnReady = {
   dbo: DBHandlerServer;
   db: DB;
 }
+
+type OnReadyCallback = (dbo: DBOFullyTyped, db: DB) => any;
 
 const DEFAULT_KEYWORDS = {
   $filter: "$filter",
@@ -441,17 +443,7 @@ export class Prostgles {
     return this.dbo;
   }
 
-  isSuperUser = false;
-  schema_checkIntervalMillis?: NodeJS.Timeout;
-  async init(onReady: (dbo: DBOFullyTyped, db: DB) => any): Promise<{
-    db: DBOFullyTyped;
-    _db: DB;
-    pgp: PGP;
-    io?: any;
-    destroy: () => Promise<boolean>;
-  }> {
-    this.loaded = false;
-
+  private initWatchSchema = (onReady: OnReadyCallback) => {
 
     if (this.opts.watchSchema === "hotReloadMode" && !this.opts.tsGeneratedTypesDir) {
       throw "tsGeneratedTypesDir option is needed for watchSchema: hotReloadMode to work ";
@@ -464,15 +456,31 @@ export class Prostgles {
 
       if (this.schema_checkIntervalMillis) {
         clearInterval(this.schema_checkIntervalMillis);
-        this.schema_checkIntervalMillis = setInterval(async () => {
-          const dbuilder = await DboBuilder.create(this as any);
-          if (dbuilder.tsTypesDefinition !== this.dboBuilder.tsTypesDefinition) {
-            await this.refreshDBO();
-            this.init(onReady);
-          }
-        }, this.opts.watchSchemaType.checkIntervalMillis)
       }
+      this.schema_checkIntervalMillis = setInterval(async () => {
+        if(!this.loaded) return;
+        const dbuilder = await DboBuilder.create(this as any);
+        if (dbuilder.tsTypesDefinition !== this.dboBuilder.tsTypesDefinition) {
+          await this.refreshDBO();
+          this.init(onReady);
+        }
+      }, this.opts.watchSchemaType.checkIntervalMillis)
     }
+
+  }
+
+  isSuperUser = false;
+  schema_checkIntervalMillis?: NodeJS.Timeout;
+  async init(onReady: OnReadyCallback): Promise<{
+    db: DBOFullyTyped;
+    _db: DB;
+    pgp: PGP;
+    io?: any;
+    destroy: () => Promise<boolean>;
+  }> {
+    this.loaded = false;
+
+    this.initWatchSchema(onReady);
 
     /* 1. Connect to db */
     if (!this.db) {

@@ -117,7 +117,7 @@ export declare type ProstglesInitOptions<S = void> = {
     joins?: Joins;
     schema?: string;
     sqlFilePath?: string;
-    onReady(dbo: DBOFullyTyped<S>, db: DB): void;
+    onReady: OnReadyCallback;
     transactions?: string | boolean;
     wsChannelNamePrefix?: string;
     onSocketConnect?(socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB): any;
@@ -167,6 +167,7 @@ export declare type OnReady = {
     dbo: DBHandlerServer;
     db: DB;
 };
+declare type OnReadyCallback = (dbo: DBOFullyTyped, db: DB) => any;
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 export declare class Prostgles {
     opts: ProstglesInitOptions;
@@ -203,9 +204,10 @@ export declare class Prostgles {
     private getFileText;
     writeDBSchema(force?: boolean): void;
     refreshDBO: () => Promise<DBHandlerServer<import("./DboBuilder").TableHandlers> | undefined>;
+    private initWatchSchema;
     isSuperUser: boolean;
     schema_checkIntervalMillis?: NodeJS.Timeout;
-    init(onReady: (dbo: DBOFullyTyped, db: DB) => any): Promise<{
+    init(onReady: OnReadyCallback): Promise<{
         db: DBOFullyTyped;
         _db: DB;
         pgp: PGP;

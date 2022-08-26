@@ -494,11 +494,19 @@ export class PublishParser {
 
         /** Check PG User privileges */
         const pgUserIsAllowedThis = tHandler.tableOrViewInfo.privileges[r.sqlRule];
-        const result = (!is_view || !r.table_only) &&  pgUserIsAllowedThis;
+        let result = (!is_view || !r.table_only) && pgUserIsAllowedThis;
 
         if(!pgUserIsAllowedThis && isPlainObject(raw_table_rules) && (raw_table_rules as PublishTableRule)[r.sqlRule]){
           throw `Your postgres user is not allowed ${r.sqlRule} on table ${tableName}`;
         }
+
+        if((r.rule === "subscribe" || r.rule === "sync") && !this.prostgles.isSuperUser){
+          result = false;
+          if(isPlainObject(raw_table_rules) && (raw_table_rules as PublishTableRule)[r.rule]){
+            throw `Cannot publish realtime rule ${tableName}.${r.rule}. Superuser is required for this`
+          }
+        }
+
         return result;
       });
 
