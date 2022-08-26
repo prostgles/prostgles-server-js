@@ -204,7 +204,7 @@ export type ProstglesInitOptions<S = void> = {
   joins?: Joins;
   schema?: string;
   sqlFilePath?: string;
-  onReady: OnReadyCallback;
+  onReady: OnReadyCallback<S>;
   transactions?: string | boolean;
   wsChannelNamePrefix?: string;
   onSocketConnect?(socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB): any;
@@ -267,7 +267,7 @@ export type OnReady = {
   db: DB;
 }
 
-type OnReadyCallback = (dbo: DBOFullyTyped, db: DB) => any;
+type OnReadyCallback<S = void> = (dbo: DBOFullyTyped<S>, db: DB) => any;
 
 const DEFAULT_KEYWORDS = {
   $filter: "$filter",

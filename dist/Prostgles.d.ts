@@ -117,7 +117,7 @@ export declare type ProstglesInitOptions<S = void> = {
     joins?: Joins;
     schema?: string;
     sqlFilePath?: string;
-    onReady: OnReadyCallback;
+    onReady: OnReadyCallback<S>;
     transactions?: string | boolean;
     wsChannelNamePrefix?: string;
     onSocketConnect?(socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB): any;
@@ -167,7 +167,7 @@ export declare type OnReady = {
     dbo: DBHandlerServer;
     db: DB;
 };
-declare type OnReadyCallback = (dbo: DBOFullyTyped, db: DB) => any;
+declare type OnReadyCallback<S = void> = (dbo: DBOFullyTyped<S>, db: DB) => any;
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 export declare class Prostgles {
     opts: ProstglesInitOptions;
