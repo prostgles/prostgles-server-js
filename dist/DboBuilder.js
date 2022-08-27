@@ -112,7 +112,7 @@ function parseError(e) {
             res = e.err;
         }
         else {
-            res = JSON.stringify(e, null, 2);
+            res = e;
         }
     }
     return res;

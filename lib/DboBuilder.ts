@@ -390,7 +390,7 @@ export function parseError(e: any){
         if(typeof e.err === "string"){
             res = e.err;
         } else {
-            res = JSON.stringify(e, null, 2)
+            res = e;
         }
     }
     return res;
