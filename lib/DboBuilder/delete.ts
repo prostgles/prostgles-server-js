@@ -122,6 +122,6 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
   } catch (e) {
     // console.trace(e)
     if (localParams && localParams.testRule) throw e;
-    throw { err: parseError(e), msg: `Issue with dbo.${this.name}.delete(${JSON.stringify(filter || {}, null, 2)}, ${JSON.stringify(params || {}, null, 2)})` };
+    throw parseError(e, `dbo.${this.name}.delete(${JSON.stringify(filter || {}, null, 2)}, ${JSON.stringify(params || {}, null, 2)})`);
   }
 };

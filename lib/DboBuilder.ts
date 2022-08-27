@@ -25,7 +25,7 @@ import {
     SQLResult,
     Select,
     JoinMaker,
-    isObject, isDefined, getKeys
+    isObject, isDefined, getKeys, ProstglesError
 } from "prostgles-types";
 
 export type Media = {
@@ -383,17 +383,24 @@ export type EXISTS_KEY = typeof EXISTS_KEYS[number];
 
 const FILTER_FUNCS = FUNCTIONS.filter(f => f.canBeUsedForFilter);
 
-export function parseError(e: any){
+/**
+ * Ensure the error is an Object and has 
+ */
+export function parseError(e: any, caller: string): ProstglesError {
     
-    let res = e instanceof Error? e.message : (!Object.keys(e || {}).length? e : (e && e.toString)? e.toString() : e);
-    if(isPlainObject(e)) {
-        if(typeof e.err === "string"){
-            res = e.err;
-        } else {
-            res = e;
-        }
+    const errorObject = isObject(e)? e : undefined;
+    const message = e instanceof Error? e.message : 
+        errorObject? (errorObject.message ?? errorObject.toString?.() ?? "") :  "";
+    const stack = [
+        ...(errorObject && Array.isArray(errorObject.stack)? errorObject.stack : []),
+        caller
+    ]
+    const result: ProstglesError = {
+        ...errorObject,
+        message,
+        stack,
     }
-    return res;
+    return result;
 }
 
 class ColSet {
@@ -1100,8 +1107,8 @@ export class ViewHandler {
         } catch(e){
             // console.trace(e)
             if(localParams && localParams.testRule) throw e;
-            // ${JSON.stringify(filter || {}, null, 2)}, ${JSON.stringify(selectParams || {}, null, 2)}
-            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.find()`, args: { filter, selectParams} };
+            throw parseError(e, `dbo.${this.name}.find()`);
+            // throw { err: parseError(e), msg: `Issue with dbo.${this.name}.find()`, args: { filter, selectParams} };
         }                             
     }
 
@@ -1117,7 +1124,7 @@ export class ViewHandler {
             return this.find(filter, { select, orderBy, limit: 1, offset, returnType: "row" }, undefined, table_rules, localParams);
         } catch(e){
             if(localParams && localParams.testRule) throw e;
-            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.findOne()` };
+            throw parseError(e, `Issue with dbo.${this.name}.findOne()`);
         }
     }
 
@@ -1133,7 +1140,7 @@ export class ViewHandler {
             });
         } catch(e){
             if(localParams && localParams.testRule) throw e;
-            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.count()` };
+            throw parseError(e, `dbo.${this.name}.count()`)
         } 
     }
 
@@ -1163,7 +1170,7 @@ export class ViewHandler {
                 });
         } catch(e){
             if(localParams && localParams.testRule) throw e;
-            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.size()` };
+            throw parseError(e, `dbo.${this.name}.size()`);
         } 
     }
 
@@ -2082,7 +2089,7 @@ export class TableHandler extends ViewHandler {
             }
         } catch(e){
             if(localParams && localParams.testRule) throw e;
-            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.subscribe()` };
+            throw parseError(e, `dbo.${this.name}.subscribe()`);
         }        
     }
 
@@ -2117,7 +2124,7 @@ export class TableHandler extends ViewHandler {
             }).catch(err => makeErr(err, localParams, this, keys));
         } catch(e){
             if(localParams && localParams.testRule) throw e;
-            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.update()` };
+            throw parseError(e, `dbo.${this.name}.update()`);
         }
     }
 
@@ -2330,7 +2337,7 @@ export class TableHandler extends ViewHandler {
             }
         } catch(e){
             if(localParams && localParams.testRule) throw e;
-            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.upsert()` };
+            throw parseError(e, `dbo.${this.name}.upsert()`);
         }
     };
 
@@ -2402,7 +2409,7 @@ export class TableHandler extends ViewHandler {
 
         } catch(e){
             if(localParams && localParams.testRule) throw e;
-            throw { err: parseError(e), msg: `Issue with dbo.${this.name}.sync()` };
+            throw parseError(e, `dbo.${this.name}.sync()`);
         }
 
             /*

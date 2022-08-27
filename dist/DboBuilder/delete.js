@@ -113,7 +113,7 @@ async function _delete(filter, params, param3_unused, table_rules, localParams) 
         // console.trace(e)
         if (localParams && localParams.testRule)
             throw e;
-        throw { err: (0, DboBuilder_1.parseError)(e), msg: `Issue with dbo.${this.name}.delete(${JSON.stringify(filter || {}, null, 2)}, ${JSON.stringify(params || {}, null, 2)})` };
+        throw (0, DboBuilder_1.parseError)(e, `dbo.${this.name}.delete(${JSON.stringify(filter || {}, null, 2)}, ${JSON.stringify(params || {}, null, 2)})`);
     }
 }
 exports._delete = _delete;

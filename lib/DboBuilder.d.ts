@@ -1,6 +1,6 @@
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams, OrderBy, InsertParams, UpdateParams, DeleteParams, SQLOptions, DbJoinMaker, PG_COLUMN_UDT_DATA_TYPE, TS_PG_Types, TableInfo as TInfo, SQLHandler, AnyObject, Select } from "prostgles-types";
+import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams, OrderBy, InsertParams, UpdateParams, DeleteParams, SQLOptions, DbJoinMaker, PG_COLUMN_UDT_DATA_TYPE, TS_PG_Types, TableInfo as TInfo, SQLHandler, AnyObject, Select, ProstglesError } from "prostgles-types";
 export declare type Media = {
     "id"?: string;
     "title"?: string;
@@ -173,7 +173,10 @@ export declare type ValidatedTableRules = CommonTableRules & {
 export declare function makeErr(err: any, localParams?: LocalParams, view?: ViewHandler, allowedKeys?: string[]): Promise<never>;
 export declare const EXISTS_KEYS: readonly ["$exists", "$notExists", "$existsJoined", "$notExistsJoined"];
 export declare type EXISTS_KEY = typeof EXISTS_KEYS[number];
-export declare function parseError(e: any): any;
+/**
+ * Ensure the error is an Object and has
+ */
+export declare function parseError(e: any, caller: string): ProstglesError;
 declare class ColSet {
     opts: {
         columns: ColumnInfo[];

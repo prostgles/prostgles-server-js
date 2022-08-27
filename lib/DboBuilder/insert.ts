@@ -170,10 +170,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
 
     // ${JSON.stringify(rowOrRows || {}, null, 2)}, 
     // ${JSON.stringify(param2 || {}, null, 2)}
-    throw {
-      err: isPlainObject(e) && e.err? e.err : parseError(e), 
-      msg:  isPlainObject(e) && e.msg? e.msg : `Issue with dbo.${this.name}.${ACTION}(...)`,
-    };
+    throw parseError(e, `dbo.${this.name}.${ACTION}()`)
   }
 };
 
