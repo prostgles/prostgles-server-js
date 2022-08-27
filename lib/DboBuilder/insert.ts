@@ -7,6 +7,7 @@ import { omitKeys, pickKeys } from "../PubSubManager";
 export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any | any[] | boolean> {
   // const localParams = _localParams || {};
   
+  const ACTION = "insert";
   try {
 
     const { onConflictDoNothing, fixIssues = false } = param2 || {};
@@ -14,9 +15,9 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
 
     let { returning } = param2 || {};
     const finalDBtx = localParams?.tx?.dbTX || this.dbTX;
-    if(tableRules?.insert?.postValidate ){
+    if(tableRules?.[ACTION]?.postValidate ){
       if(!finalDBtx){
-        return this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.insert?.(rowOrRows, param2, param3_unused, tableRules, localParams))
+        return this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.[ACTION]?.(rowOrRows, param2, param3_unused, tableRules, localParams))
       }
     }
 
@@ -25,10 +26,10 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
       fields: FieldFilter | undefined;
 
     if (tableRules) {
-      if (!tableRules.insert) throw "insert rules missing for " + this.name;
-      returningFields = tableRules.insert.returningFields;
-      forcedData = tableRules.insert.forcedData;
-      fields = tableRules.insert.fields;
+      if (!tableRules[ACTION]) throw "insert rules missing for " + this.name;
+      returningFields = tableRules[ACTION].returningFields;
+      forcedData = tableRules[ACTION].forcedData;
+      fields = tableRules[ACTION].fields;
 
       /* If no returning fields specified then take select fields as returning */
       if (!returningFields) returningFields = get(tableRules, "select.fields") || get(tableRules, "insert.fields");
@@ -77,7 +78,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
     /** Used for postValidate. Add any missing computed returning from original query */
     fullReturning.concat(originalReturning.filter(s => !fullReturning.some(f => f.alias === s.alias)));
 
-    const finalSelect = tableRules?.insert?.postValidate? fullReturning : originalReturning;
+    const finalSelect = tableRules?.[ACTION]?.postValidate? fullReturning : originalReturning;
     let returningSelect = this.makeReturnQuery(finalSelect);
     
     const makeQuery = async (_row: AnyObject | undefined, isOne = false) => {
@@ -93,10 +94,10 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
 
       let insertQ = "";
       if (!Array.isArray(_data) && !getKeys(_data).length || Array.isArray(_data) && !_data.length) {
-        await tableRules?.insert?.validate?.(_data, this.dbTX || this.dboBuilder.dbo);
+        await tableRules?.[ACTION]?.validate?.(_data, this.dbTX || this.dboBuilder.dbo);
         insertQ = `INSERT INTO ${asName(this.name)} DEFAULT VALUES `;
       } else {
-        insertQ = await this.colSet.getInsertQuery(_data, allowedCols, this.dbTX || this.dboBuilder.dbo, tableRules?.insert?.validate) // pgp.helpers.insert(_data, columnSet); 
+        insertQ = await this.colSet.getInsertQuery(_data, allowedCols, this.dbTX || this.dboBuilder.dbo, tableRules?.[ACTION]?.validate) // pgp.helpers.insert(_data, columnSet); 
       }
       return insertQ + conflict_query + returningSelect;
     };
@@ -143,11 +144,11 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
       result = await this.db.tx(t => (t as any)[queryType](query)).catch(err => makeErr(err, localParams, this, allowedFieldKeys));
     }
 
-    if(tableRules?.insert?.postValidate){
+    if(tableRules?.[ACTION]?.postValidate){
       if(!finalDBtx) throw new Error("Unexpected: no dbTX for postValidate");
       const rows = Array.isArray(result)? result : [result];
       for await (const row of rows){
-        await tableRules?.insert?.postValidate(row ?? {}, finalDBtx)
+        await tableRules?.[ACTION]?.postValidate(row ?? {}, finalDBtx)
       }
 
       /* We used a full returning for postValidate. Now we must filter out dissallowed columns  */
@@ -171,7 +172,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
     // ${JSON.stringify(param2 || {}, null, 2)}
     throw {
       err: isPlainObject(e) && e.err? e.err : parseError(e), 
-      msg:  isPlainObject(e) && e.msg? e.msg : `Issue with dbo.${this.name}.insert(...)`,
+      msg:  isPlainObject(e) && e.msg? e.msg : `Issue with dbo.${this.name}.${ACTION}(...)`,
     };
   }
 };

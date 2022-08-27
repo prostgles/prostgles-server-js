@@ -5,13 +5,14 @@ import { omitKeys, pickKeys } from "../PubSubManager";
 import { isFile, uploadFile } from "./uploadFile"
 
 export async function update(this: TableHandler, filter: Filter, _newData: AnyObject, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<AnyObject | void> {
+  const ACTION = "update";
   try {
 
     /** postValidate */
     const finalDBtx = localParams?.tx?.dbTX || this.dbTX;
-    if(tableRules?.update?.postValidate ){
+    if(tableRules?.[ACTION]?.postValidate ){
       if(!finalDBtx){
-        return this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.update?.(filter, _newData, params, tableRules, localParams))
+        return this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.[ACTION]?.(filter, _newData, params, tableRules, localParams))
       }
     }
 
@@ -26,8 +27,8 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
       } else {
         const fileManager = this.dboBuilder.prostgles.fileManager
         if(!fileManager) throw new Error("fileManager missing");
-        const validate: ValidateRow | undefined = tableRules?.update?.validate? async (row) => {
-          return tableRules?.update?.validate!({ update: row, filter }, this.dbTX || this.dboBuilder.dbo)
+        const validate: ValidateRow | undefined = tableRules?.[ACTION]?.validate? async (row) => {
+          return tableRules?.[ACTION]?.validate!({ update: row, filter }, this.dbTX || this.dboBuilder.dbo)
         } : undefined;
 
         let existingFile: Media | undefined = await (localParams?.tx?.dbTX?.[this.name] as TableHandler || this).findOne({ id: existingMediaId });
@@ -136,11 +137,11 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
     // await oldFileDelete();
 
     /** postValidate */
-    if(tableRules?.insert?.postValidate){
+    if(tableRules?.[ACTION]?.postValidate){
       if(!finalDBtx) throw new Error("Unexpected: no dbTX for postValidate");
       const rows = Array.isArray(result)? result : [result];
       for await (const row of rows){
-        await tableRules?.insert?.postValidate(row ?? {}, finalDBtx)
+        await tableRules?.[ACTION]?.postValidate(row ?? {}, finalDBtx)
       }
 
       /* We used a full returning for postValidate. Now we must filter out dissallowed columns  */
@@ -160,6 +161,6 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
 
   } catch (e) {
     if (localParams && localParams.testRule) throw e;
-    throw { err: parseError(e), msg: `Issue with dbo.${this.name}.update(${JSON.stringify(filter || {}, null, 2)}, ${Array.isArray(_newData)? "...DATA[]": "...DATA"}, ${JSON.stringify(params || {}, null, 2)})` };
+    throw { err: parseError(e), msg: `Issue with dbo.${this.name}.${ACTION}(${JSON.stringify(filter || {}, null, 2)}, ${Array.isArray(_newData)? "...DATA[]": "...DATA"}, ${JSON.stringify(params || {}, null, 2)})` };
   }
 };
