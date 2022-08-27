@@ -17,7 +17,7 @@ import TableConfigurator, { TableConfig } from "./TableConfig";
 
 import { get } from "./utils";
 import { DboBuilder, DBHandlerServer, isPlainObject, LocalParams, TableSchema, PRGLIOSocket } from "./DboBuilder";
-import { PubSubManager, DEFAULT_SYNC_BATCH_SIZE, asValue } from "./PubSubManager";
+import { PubSubManager, DEFAULT_SYNC_BATCH_SIZE, asValue, pickKeys } from "./PubSubManager";
 export { DBHandlerServer }
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 
@@ -34,9 +34,17 @@ function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts |
 
     promiseLib: promise,
     ...(debugQueries ? {
-      query: function (e) {
-        console.log({ psql: e.query, params: e.params });
+      query: function (ctx) {
+        console.log({ 
+          ...pickKeys(ctx, ["params", "query"]),
+        });
       },
+      error: (error, ctx) => {
+        console.log({ 
+          ...pickKeys(ctx, ["params", "query"]),
+          error 
+        });        
+      }
     } : {}),
     ...((onNotice || debugQueries) ? {
       connect: function (client, dc, isFresh) {

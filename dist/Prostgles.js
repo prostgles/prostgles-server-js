@@ -24,9 +24,17 @@ function getDbConnection(dbConnection, options, debugQueries = false, onNotice) 
     let pgp = pgPromise({
         promiseLib: promise,
         ...(debugQueries ? {
-            query: function (e) {
-                console.log({ psql: e.query, params: e.params });
+            query: function (ctx) {
+                console.log({
+                    ...(0, PubSubManager_1.pickKeys)(ctx, ["params", "query"]),
+                });
             },
+            error: (error, ctx) => {
+                console.log({
+                    ...(0, PubSubManager_1.pickKeys)(ctx, ["params", "query"]),
+                    error
+                });
+            }
         } : {}),
         ...((onNotice || debugQueries) ? {
             connect: function (client, dc, isFresh) {
