@@ -1247,7 +1247,7 @@ export class ViewHandler {
         /* Local update allow all. TODO -> FIX THIS */
         if(!ff && !tableRule) filterFields = "*";
 
-        const parseFullFilter = async (f: any, parentFilter: any = null, checkForeignTablePublished = true): Promise<string> => {
+        const parseFullFilter = async (f: any, parentFilter: any = null, isForcedFilterBypass: boolean): Promise<string> => {
             if(!f) throw "Invalid/missing group filter provided";
             let result = "";
             let keys = getKeys(f);
@@ -1262,21 +1262,21 @@ export class ViewHandler {
 
             if(group && group.length){
                 const operand = $and? " AND " : " OR ";
-                let conditions = (await Promise.all(group.map(async gf => await parseFullFilter(gf, group, checkForeignTablePublished)))).filter(c => c);
+                let conditions = (await Promise.all(group.map(async gf => await parseFullFilter(gf, group, isForcedFilterBypass)))).filter(c => c);
                 if(conditions && conditions.length){
                     if(conditions.length === 1) return conditions.join(operand);
                     else return ` ( ${conditions.sort().join(operand)} ) `;
                 }       
             } else if(!group) {
                 
+                /** forcedFilters do not get checked against publish and are treated as server-side requests */
                 result = await this.getCondition({
                     filter: { ...f },
                     select,
                     allowed_colnames: this.parseFieldFilter(filterFields), 
                     tableAlias, 
-                    localParams, 
-                    tableRules: tableRule, 
-                    checkForeignTablePublished
+                    localParams: isForcedFilterBypass? undefined : localParams, 
+                    tableRules: isForcedFilterBypass? undefined : tableRule
                 });
             }
             return result;
@@ -1286,8 +1286,8 @@ export class ViewHandler {
        
             
         /* A forced filter condition will not check if the existsJoined filter tables have been published */
-        const forcedFilterCond = forcedFilter? await parseFullFilter(forcedFilter, null, false) : undefined;
-        const filterCond = await parseFullFilter(filter, null);
+        const forcedFilterCond = forcedFilter? await parseFullFilter(forcedFilter, null, true) : undefined;
+        const filterCond = await parseFullFilter(filter, null, false);
         let cond = [
             forcedFilterCond, filterCond
         ].filter(c => c).join(" AND ");
@@ -1300,7 +1300,7 @@ export class ViewHandler {
         return { where: cond || "", filter: finalFilter };
     }
 
-    async prepareExistCondition(eConfig: ExistsFilterConfig, localParams: LocalParams | undefined, checkForeignTablePublished = true): Promise<string> {
+    async prepareExistCondition(eConfig: ExistsFilterConfig, localParams: LocalParams | undefined): Promise<string> {
         let res = "";
         const thisTable = this.name;
         const isNotExists = ["$notExists", "$notExistsJoined"].includes(eConfig.existType);
@@ -1377,15 +1377,15 @@ export class ViewHandler {
 
         let finalWhere = "";
 
-        console.error("NEED TO ENSURE PUBLISH FILTERS BYPASS THE CHECKS HERE")
         let t2Rules: TableRule | undefined = undefined,
             forcedFilter: AnyObject | undefined,
             filterFields: FieldFilter | undefined,
             tableAlias;
 
-        /* Check if allowed to view data */
-        if(localParams && checkForeignTablePublished && (localParams.socket || localParams.httpReq) && this.dboBuilder.publishParser){
-            /* Need to think about joining through dissallowed tables */
+        /* Check if allowed to view data - forcedFilters will bypass this check through isForcedFilterBypass */
+        if(localParams && (!localParams?.socket && !localParams?.httpReq)) throw "Unexpected: localParams missing socket/httpReq"
+        if(localParams && (localParams.socket || localParams.httpReq) && this.dboBuilder.publishParser){
+            
             t2Rules = await this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: t2, command: "find", localParams }) as TableRule;
             if(!t2Rules || !t2Rules.select) throw "Dissallowed";
             ({ forcedFilter, filterFields } = t2Rules.select);
@@ -1420,8 +1420,8 @@ export class ViewHandler {
      *  { fff: 2 } => "fff" = 2
      *  { fff: { $ilike: 'abc' } } => "fff" ilike 'abc'
      */
-    async getCondition(params: { filter: any, select?: SelectItem[], allowed_colnames: string[], tableAlias?: string, localParams?: LocalParams, tableRules?: TableRule, checkForeignTablePublished: boolean }){
-        const { filter, select, allowed_colnames, tableAlias, localParams, tableRules, checkForeignTablePublished = true  } = params;
+    async getCondition(params: { filter: any, select?: SelectItem[], allowed_colnames: string[], tableAlias?: string, localParams?: LocalParams, tableRules?: TableRule }){
+        const { filter, select, allowed_colnames, tableAlias, localParams, tableRules } = params;
            
 
         let data = { ... (filter as any) } as any ;
@@ -1491,7 +1491,7 @@ export class ViewHandler {
         
         let existsCond = "";
         if(existsKeys.length){
-            existsCond = (await Promise.all(existsKeys.map(async k => await this.prepareExistCondition(k, localParams, checkForeignTablePublished)))).join(" AND ");
+            existsCond = (await Promise.all(existsKeys.map(async k => await this.prepareExistCondition(k, localParams)))).join(" AND ");
         }
 
         /* Computed field queries */
