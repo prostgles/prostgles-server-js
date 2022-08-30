@@ -814,7 +814,7 @@ class ViewHandler {
         /* Local update allow all. TODO -> FIX THIS */
         if (!ff && !tableRule)
             filterFields = "*";
-        const parseFullFilter = async (f, parentFilter = null) => {
+        const parseFullFilter = async (f, parentFilter = null, checkForeignTablePublished = true) => {
             if (!f)
                 throw "Invalid/missing group filter provided";
             let result = "";
@@ -830,7 +830,7 @@ class ViewHandler {
             const { [$and_key]: $and, [$or_key]: $or } = f, group = $and || $or;
             if (group && group.length) {
                 const operand = $and ? " AND " : " OR ";
-                let conditions = (await Promise.all(group.map(async (gf) => await parseFullFilter(gf, group)))).filter(c => c);
+                let conditions = (await Promise.all(group.map(async (gf) => await parseFullFilter(gf, group, checkForeignTablePublished)))).filter(c => c);
                 if (conditions && conditions.length) {
                     if (conditions.length === 1)
                         return conditions.join(operand);
@@ -845,32 +845,28 @@ class ViewHandler {
                     allowed_colnames: this.parseFieldFilter(filterFields),
                     tableAlias,
                     localParams,
-                    tableRules: tableRule
+                    tableRules: tableRule,
+                    checkForeignTablePublished
                 });
             }
             return result;
         };
         if (!isPlainObject(filter))
             throw "\nInvalid filter\nExpecting an object but got -> " + JSON.stringify(filter);
-        const getUpdateFilter = (args) => {
-            const { filter, forcedFilter, $and_key } = args;
-            let result = { ...filter };
-            if (forcedFilter) {
-                return {
-                    [$and_key]: [forcedFilter, filter].filter(prostgles_types_1.isDefined)
-                };
-            }
-            return result;
-        };
-        let _filter = getUpdateFilter({ filter, forcedFilter, $and_key });
-        // let keys = Object.keys(filter);
-        // if(!keys.length) return result;
-        let cond = await parseFullFilter(_filter, null);
+        /* A forced filter condition will not check if the existsJoined filter tables have been published */
+        const forcedFilterCond = forcedFilter ? await parseFullFilter(forcedFilter, null, false) : undefined;
+        const filterCond = await parseFullFilter(filter, null);
+        let cond = [
+            forcedFilterCond, filterCond
+        ].filter(c => c).join(" AND ");
+        const finalFilter = forcedFilter ? {
+            [$and_key]: [forcedFilter, filter].filter(prostgles_types_1.isDefined)
+        } : { ...filter };
         if (cond && addKeywords)
             cond = "WHERE " + cond;
-        return { where: cond || "", filter: _filter };
+        return { where: cond || "", filter: finalFilter };
     }
-    async prepareExistCondition(eConfig, localParams) {
+    async prepareExistCondition(eConfig, localParams, checkForeignTablePublished = true) {
         let res = "";
         const thisTable = this.name;
         const isNotExists = ["$notExists", "$notExistsJoined"].includes(eConfig.existType);
@@ -926,16 +922,17 @@ class ViewHandler {
                 return indent(res, ji);
             }
         };
+        let finalWhere = "";
+        console.error("NEED TO ENSURE PUBLISH FILTERS BYPASS THE CHECKS HERE");
         let t2Rules = undefined, forcedFilter, filterFields, tableAlias;
         /* Check if allowed to view data */
-        if (localParams && (localParams.socket || localParams.httpReq) && this.dboBuilder.publishParser) {
+        if (localParams && checkForeignTablePublished && (localParams.socket || localParams.httpReq) && this.dboBuilder.publishParser) {
             /* Need to think about joining through dissallowed tables */
             t2Rules = await this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: t2, command: "find", localParams });
             if (!t2Rules || !t2Rules.select)
                 throw "Dissallowed";
             ({ forcedFilter, filterFields } = t2Rules.select);
         }
-        let finalWhere;
         try {
             finalWhere = (await this.dboBuilder.dbo[t2].prepareWhere({
                 filter: f2,
@@ -944,12 +941,12 @@ class ViewHandler {
                 addKeywords: false,
                 tableAlias,
                 localParams,
-                tableRule: t2Rules //tableRules
+                tableRule: t2Rules
             })).where;
         }
         catch (err) {
             // console.trace(err)
-            throw "Issue with preparing $exists query for table " + t2 + "\n->" + JSON.stringify(err);
+            throw err;
         }
         if (!isJoined) {
             res = `${isNotExists ? " NOT " : " "} EXISTS (SELECT 1 \nFROM ${(0, prostgles_types_1.asName)(t2)} \n${finalWhere ? `WHERE ${finalWhere}` : ""}) `;
@@ -966,7 +963,7 @@ class ViewHandler {
      *  { fff: { $ilike: 'abc' } } => "fff" ilike 'abc'
      */
     async getCondition(params) {
-        const { filter, select, allowed_colnames, tableAlias, localParams, tableRules } = params;
+        const { filter, select, allowed_colnames, tableAlias, localParams, tableRules, checkForeignTablePublished = true } = params;
         let data = { ...filter };
         /* Exists join filter */
         const ERR = "Invalid exists filter. \nExpecting somethibng like: { $exists: { tableName.tableName2: Filter } } | { $exists: { \"**.tableName3\": Filter } }\n";
@@ -1026,7 +1023,7 @@ class ViewHandler {
         });
         let existsCond = "";
         if (existsKeys.length) {
-            existsCond = (await Promise.all(existsKeys.map(async (k) => await this.prepareExistCondition(k, localParams)))).join(" AND ");
+            existsCond = (await Promise.all(existsKeys.map(async (k) => await this.prepareExistCondition(k, localParams, checkForeignTablePublished)))).join(" AND ");
         }
         /* Computed field queries */
         const p = this.getValidatedRules(tableRules, localParams);

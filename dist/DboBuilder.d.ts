@@ -271,7 +271,7 @@ export declare class ViewHandler {
         where: string;
         filter: AnyObject;
     }>;
-    prepareExistCondition(eConfig: ExistsFilterConfig, localParams: LocalParams | undefined): Promise<string>;
+    prepareExistCondition(eConfig: ExistsFilterConfig, localParams: LocalParams | undefined, checkForeignTablePublished?: boolean): Promise<string>;
     /**
      * parses a single filter
      * @example
@@ -285,6 +285,7 @@ export declare class ViewHandler {
         tableAlias?: string;
         localParams?: LocalParams;
         tableRules?: TableRule;
+        checkForeignTablePublished: boolean;
     }): Promise<string>;
     prepareSort(orderBy: OrderBy | undefined, allowed_cols: FieldFilter, tableAlias: string | undefined, excludeOrder: boolean | undefined, select: SelectItem[]): string;
     prepareLimitQuery(limit: number | undefined, p: ValidatedTableRules): number;
