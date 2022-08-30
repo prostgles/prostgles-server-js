@@ -389,7 +389,7 @@ const FILTER_FUNCS = FUNCTIONS.filter(f => f.canBeUsedForFilter);
 export function parseError(e: any, caller: string): ProstglesError {
     
     const errorObject = isObject(e)? e : undefined;
-    const message = e instanceof Error? e.message : 
+    const message = typeof e === "string"? e : e instanceof Error? e.message : 
         errorObject? (errorObject.message ?? errorObject.toString?.() ?? "") :  "";
     const stack = [
         ...(errorObject && Array.isArray(errorObject.stack)? errorObject.stack : []),
@@ -1313,13 +1313,13 @@ export class ViewHandler {
         let t2 = tables[tables.length - 1];
 
         tables.forEach(t => {
-            if(!this.dboBuilder.dbo[t]) throw "Invalid or dissallowed table: " + t;
+            if(!this.dboBuilder.dbo[t]) throw { stack: ["prepareExistCondition()"], message: `Invalid or dissallowed table: ${t}` };
         });
 
 
         /* Nested $exists not allowed */
         if(f2 && Object.keys(f2).find(fk => EXISTS_KEYS.includes(fk as EXISTS_KEY))){
-            throw "Nested exists dissallowed";
+            throw { stack: ["prepareExistCondition()"], message: "Nested exists dissallowed" } ;
         }
 
         const makeTableChain = (finalFilter: string) => {

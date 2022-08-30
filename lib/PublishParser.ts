@@ -458,24 +458,24 @@ export class PublishParser {
     if(schm && schm.err) throw schm.err;
 
     let table_rule = await this.getTableRules({ tableName, localParams }, clientInfo);
-    if(!table_rule) throw "Invalid or disallowed table: " + tableName;
+    if(!table_rule) throw { stack: ["getValidatedRequestRule()"], message: "Invalid or disallowed table: " + tableName};
 
 
     if(command === "upsert"){
       if(!table_rule.update || !table_rule.insert){
-        throw `Invalid or disallowed command: upsert`;
+        throw { stack: ["getValidatedRequestRule()"], message: `Invalid or disallowed command: upsert` };
       }
     }
 
     if(rtm && table_rule && table_rule[rtm.rule]){
       return table_rule;
-    } else throw `Invalid or disallowed command: ${tableName}.${command}`;
+    } else throw { stack: ["getValidatedRequestRule()"], message: `Invalid or disallowed command: ${tableName}.${command}` };
   }
   
   async getTableRules({ tableName, localParams }: DboTable, clientInfo?: ClientInfo): Promise<ParsedPublishTable | undefined> {
       
     try {
-      if(!localParams || !tableName) throw "publish OR socket OR dbo OR tableName are missing";
+      if(!localParams || !tableName) throw { stack: ["getTableRules()"], message: "publish OR socket OR dbo OR tableName are missing" };
 
       let _publish = await this.getPublish(localParams, clientInfo);
 
@@ -487,7 +487,7 @@ export class PublishParser {
       /* Get view or table specific rules */
       const tHandler = (this.dbo[tableName] as TableHandler | ViewHandler);
 
-      if(!tHandler) throw `${tableName} could not be found in dbo`;
+      if(!tHandler) throw { stack: ["getTableRules()"], message: `${tableName} could not be found in dbo` };
       
       const is_view = tHandler.is_view;
       const MY_RULES = RULE_TO_METHODS.filter(r => {
