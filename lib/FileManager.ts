@@ -516,6 +516,7 @@ export default class FileManager {
           etag                  TEXT,
           deleted               BIGINT,
           deleted_from_storage  BIGINT,
+          UNIQUE(id),
           UNIQUE(name)
       )`);
       console.log(`Created fileTable ${asName(tableName)}`);
@@ -542,7 +543,7 @@ export default class FileManager {
             } else {
               if(existingCol.udt_name === "uuid"){
                 try {
-                  const query = `ALTER TABLE ${asName(tableName)} ADD CONSTRAINT FOREIGN KEY (${asName(colName)}) REFERENCES ${asName(tableName)} (id);`;
+                  const query = `ALTER TABLE ${asName(refTable)} ADD FOREIGN KEY (${asName(colName)}) REFERENCES ${asName(tableName)} (id);`;
                   console.log(`Referenced file column ${refTable} (${colName}) exists but is not referencing file table. Trying to add REFERENCE constraing...\n${query}`);
                   await runQuery(query);
                   console.log("SUCCESS: " + query);
@@ -596,10 +597,7 @@ export default class FileManager {
               `Prostgles: media ${lookupTableName} joining table has lost a reference constraint for column ${badCol.name}.` + 
               ` This may have been caused by a DROP TABLE ... CASCADE.`
             );
-            let q = `
-              ALTER TABLE ${asName(lookupTableName)} 
-              ADD CONSTRAINT ${(lookupTableName + "_" + badCol.name + "_r")} FOREIGN KEY (${badCol.name})
-            `;
+            let q = ` ALTER TABLE ${asName(lookupTableName)} ADD FOREIGN KEY (${badCol.name}) `;
             console.log("Trying to add the missing constraint back");
             if(badCol.name === "foreign_id"){
               q += `REFERENCES ${asName(refTable)}(${asName(pkField.name)}) `;
