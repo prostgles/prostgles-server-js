@@ -704,7 +704,7 @@ export class Prostgles {
             let valid_table_command_rules = await this.publishParser.getValidatedRequestRule({ tableName, command, localParams: { socket } }, clientInfo);
             if (valid_table_command_rules) {
               //@ts-ignore
-              let res = await this.dbo[tableName][command]!(param1, param2, param3, valid_table_command_rules, { socket, has_rules: true });
+              let res = await this.dbo[tableName][command]!(param1, param2, param3, valid_table_command_rules, { socket, isRemoteRequest: true });
               cb(null, res);
             } else throw `Invalid OR disallowed request: ${tableName}.${command} `;
 

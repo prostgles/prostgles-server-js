@@ -77,7 +77,7 @@ export declare type LocalParams = {
     httpReq?: any;
     socket?: PRGLIOSocket;
     func?: () => any;
-    has_rules?: boolean;
+    isRemoteRequest?: boolean;
     testRule?: boolean;
     tableAlias?: string;
     tx?: {
@@ -240,8 +240,8 @@ export declare class ViewHandler {
     getValidatedRules(tableRules?: TableRule, localParams?: LocalParams): ValidatedTableRules;
     find(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]>;
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
-    count(filter?: Filter, param2_unused?: undefined, param3_unused?: undefined, table_rules?: TableRule, localParams?: any): Promise<number>;
-    size(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: any): Promise<string>;
+    count(filter?: Filter, param2_unused?: undefined, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<number>;
+    size(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<string>;
     getAllowedSelectFields(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean): string[];
     prepareColumnSet(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, onlyNames?: boolean): string | pgPromise.ColumnSet;
     prepareSelect(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, tableAlias?: string): string;

@@ -347,7 +347,7 @@ class PublishParser {
                                     let err = null;
                                     try {
                                         let valid_table_command_rules = await this.getValidatedRequestRule({ tableName, command: method, localParams: { socket } }, clientInfo);
-                                        await this.dbo[tableName][method]({}, {}, {}, valid_table_command_rules, { socket, has_rules: true, testRule: true });
+                                        await this.dbo[tableName][method]({}, {}, {}, valid_table_command_rules, { socket, isRemoteRequest: true, testRule: true });
                                     }
                                     catch (e) {
                                         err = "INTERNAL PUBLISH ERROR";
@@ -357,7 +357,7 @@ class PublishParser {
                                 }
                                 if (method === "getInfo" || method === "getColumns") {
                                     let tableRules = await this.getValidatedRequestRule({ tableName, command: method, localParams: { socket } }, clientInfo);
-                                    const res = await this.dbo[tableName][method](undefined, undefined, undefined, tableRules, { socket, has_rules: true });
+                                    const res = await this.dbo[tableName][method](undefined, undefined, undefined, tableRules, { socket, isRemoteRequest: true });
                                     if (method === "getInfo") {
                                         tableInfo = res;
                                     }

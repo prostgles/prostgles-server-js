@@ -152,7 +152,7 @@ export type LocalParams = {
     httpReq?: any;
     socket?: PRGLIOSocket;
     func?: () => any;
-    has_rules?: boolean;
+    isRemoteRequest?: boolean;
     testRule?: boolean;
     tableAlias?: string;
     // subOne?: boolean;
@@ -1043,7 +1043,7 @@ export class ViewHandler {
     async find(filter?: Filter, selectParams?: SelectParams , param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]>{
         try {
             filter = filter || {};
-            const allowedReturnTypes: Array<SelectParams["returnType"]> = ["row", "value", "values"]
+            const allowedReturnTypes: Array<SelectParams["returnType"]> = ["row", "value", "values", "statement"]
             const { returnType } = selectParams || {};
             if(returnType && !allowedReturnTypes.includes(returnType)){
                 throw `returnType (${returnType}) can only be ${allowedReturnTypes.join(" OR ")}`
@@ -1136,7 +1136,7 @@ export class ViewHandler {
         }
     }
 
-    async count(filter?: Filter, param2_unused?: undefined, param3_unused?: undefined, table_rules?: TableRule, localParams: any = {}): Promise<number>{
+    async count(filter?: Filter, param2_unused?: undefined, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<number>{
         filter = filter || {};
         try {
             return await this.find(filter, { select: "", limit: 0 }, undefined, table_rules, localParams)
@@ -1152,7 +1152,7 @@ export class ViewHandler {
         } 
     }
 
-    async size(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams: any = {}): Promise<string>{
+    async size(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<string>{
         filter = filter || {};
         try {
             return await this.find(filter, { ...selectParams, limit: 2 }, undefined, table_rules, localParams)
@@ -1391,7 +1391,7 @@ export class ViewHandler {
             tableAlias;
 
         /* Check if allowed to view data - forcedFilters will bypass this check through isForcedFilterBypass */
-        if(localParams && (!localParams?.socket && !localParams?.httpReq)) throw "Unexpected: localParams missing socket/httpReq"
+        if(localParams?.isRemoteRequest && (!localParams?.socket && !localParams?.httpReq)) throw "Unexpected: localParams isRemoteRequest and missing socket/httpReq: ";
         if(localParams && (localParams.socket || localParams.httpReq) && this.dboBuilder.publishParser){
             
             t2Rules = await this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: t2, command: "find", localParams }) as TableRule;
