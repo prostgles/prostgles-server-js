@@ -120,11 +120,13 @@ export declare function getNewQuery(_this: TableHandler, filter: Filter, selectP
     limit?: number | undefined;
     offset?: number | undefined;
     groupBy?: boolean | undefined;
-    returnType?: "values" | "row" | "value" | undefined;
+    returnType?: "values" | "row" | "value" | "statement" | undefined;
 } & {
     select?: import("prostgles-types").AnyObject | ("" | "*" | {
         "*": 1;
     }) | {
+        [x: string]: Record<string, import("prostgles-types").AnyObject>;
+    } | {
         [x: string]: Record<string, any[]>;
     } | {
         [key: string]: string | true | 1 | Record<string, any[]>;

@@ -1,6 +1,6 @@
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams, OrderBy, InsertParams, UpdateParams, DeleteParams, SQLOptions, DbJoinMaker, PG_COLUMN_UDT_DATA_TYPE, TS_PG_Types, TableInfo as TInfo, SQLHandler, AnyObject, Select, ProstglesError } from "prostgles-types";
+import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams, OrderBy, InsertParams, UpdateParams, DeleteParams, DbJoinMaker, PG_COLUMN_UDT_DATA_TYPE, TS_PG_Types, TableInfo as TInfo, SQLHandler, AnyObject, Select, ProstglesError } from "prostgles-types";
 export declare type Media = {
     "id"?: string;
     "title"?: string;
@@ -391,7 +391,7 @@ export declare class DboBuilder {
     getJoins(): Join[];
     getJoinPaths(): JoinPaths;
     parseJoins(): Promise<JoinPaths>;
-    runSQL: (query: string, params: any, options: SQLOptions | undefined, localParams?: LocalParams) => Promise<any>;
+    private runSQL;
     build(): Promise<DBHandlerServer>;
     getTX: (cb: TxCB) => Promise<any>;
 }
