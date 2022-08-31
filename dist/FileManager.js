@@ -15,6 +15,7 @@ const asSQLIdentifier = async (name, db) => {
 };
 exports.asSQLIdentifier = asSQLIdentifier;
 const aws_sdk_2 = require("aws-sdk");
+const runSQL_1 = require("./DboBuilder/runSQL");
 class FileManager {
     constructor(config, imageOptions) {
         this.getFileUrl = (name) => this.fileRoute ? `${this.fileRoute}/${name}` : "";
@@ -159,14 +160,19 @@ class FileManager {
             const maxBfSizeMB = (prg.opts.io?.engine?.opts?.maxHttpBufferSize || 1e6) / 1e6;
             console.log(`Prostgles: Initiated file manager. Max allowed file size: ${maxBfSizeMB}MB (maxHttpBufferSize = 1e6). To increase this set maxHttpBufferSize in socket.io server init options`);
             // throw `this.db.tx(d => do everything in a transaction pls!!!!`;
-            // throw "Why are constraints dissapearing?"
+            const canCreate = await (0, runSQL_1.canCreateTables)(this.db);
+            const runQuery = (q) => {
+                if (!canCreate)
+                    throw "File table creation failed. Your postgres user does not have CREATE table privileges";
+                return this.db.any(q);
+            };
             /**
              * 1. Create media table
              */
             if (!this.dbo[tableName]) {
                 console.log(`Creating fileTable ${(0, prostgles_types_1.asName)(tableName)} ...`);
-                await this.db.any(`CREATE EXTENSION IF NOT EXISTS pgcrypto `);
-                await this.db.any(`CREATE TABLE IF NOT EXISTS ${(0, prostgles_types_1.asName)(tableName)} (
+                await runQuery(`CREATE EXTENSION IF NOT EXISTS pgcrypto `);
+                await runQuery(`CREATE TABLE IF NOT EXISTS ${(0, prostgles_types_1.asName)(tableName)} (
           id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           name                  TEXT NOT NULL,
           extension             TEXT NOT NULL,
@@ -207,7 +213,7 @@ class FileManager {
                                     try {
                                         const query = `ALTER TABLE ${(0, prostgles_types_1.asName)(tableName)} ADD CONSTRAINT FOREIGN KEY (${(0, prostgles_types_1.asName)(colName)}) REFERENCES ${(0, prostgles_types_1.asName)(tableName)} (id);`;
                                         console.log(`Referenced file column ${refTable} (${colName}) exists but is not referencing file table. Trying to add REFERENCE constraing...\n${query}`);
-                                        await this.db.any(query);
+                                        await runQuery(query);
                                         console.log("SUCCESS: " + query);
                                     }
                                     catch (e) {
@@ -223,7 +229,7 @@ class FileManager {
                             try {
                                 const query = `ALTER TABLE ${(0, prostgles_types_1.asName)(tableName)} ADD COLUMN ${(0, prostgles_types_1.asName)(colName)} UUID REFERENCES ${(0, prostgles_types_1.asName)(tableName)} (id);`;
                                 console.log(`Creating referenced file column ${refTable} (${colName})...\n${query}`);
-                                await this.db.any(query);
+                                await runQuery(query);
                                 console.log("SUCCESS: " + query);
                             }
                             catch (e) {
@@ -249,7 +255,7 @@ class FileManager {
           )
           `;
                         console.log(`Creating ${action} ...`, lookupTableName);
-                        await this.db.any(query);
+                        await runQuery(query);
                         console.log(`Created ${action}`);
                     }
                     else {
@@ -271,7 +277,7 @@ class FileManager {
                             }
                             if (q) {
                                 try {
-                                    await this.db.any(q);
+                                    await runQuery(q);
                                     console.log("Added missing constraint back");
                                 }
                                 catch (e) {

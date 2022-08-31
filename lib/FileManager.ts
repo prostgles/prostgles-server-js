@@ -76,6 +76,7 @@ export type UploadedItem = {
   content_length: number;
 };
 import AWS from 'aws-sdk';
+import { canCreateTables } from "./DboBuilder/runSQL";
 export default class FileManager {
 
   static testCredentials = async (accessKeyId: string, secretAccessKey: string) => {
@@ -487,14 +488,19 @@ export default class FileManager {
 
     // throw `this.db.tx(d => do everything in a transaction pls!!!!`;
 
-    // throw "Why are constraints dissapearing?"
+    const canCreate = await canCreateTables(this.db);
+    const runQuery = (q: string): Promise<any[]> => {
+      if(!canCreate) throw "File table creation failed. Your postgres user does not have CREATE table privileges";
+      return this.db.any(q)
+    }
     /**
      * 1. Create media table
      */
     if(!this.dbo[tableName]){
+      
       console.log(`Creating fileTable ${asName(tableName)} ...`);
-      await this.db.any(`CREATE EXTENSION IF NOT EXISTS pgcrypto `);
-      await this.db.any(`CREATE TABLE IF NOT EXISTS ${asName(tableName)} (
+      await runQuery(`CREATE EXTENSION IF NOT EXISTS pgcrypto `);
+      await runQuery(`CREATE TABLE IF NOT EXISTS ${asName(tableName)} (
           id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           name                  TEXT NOT NULL,
           extension             TEXT NOT NULL,
@@ -538,7 +544,7 @@ export default class FileManager {
                 try {
                   const query = `ALTER TABLE ${asName(tableName)} ADD CONSTRAINT FOREIGN KEY (${asName(colName)}) REFERENCES ${asName(tableName)} (id);`;
                   console.log(`Referenced file column ${refTable} (${colName}) exists but is not referencing file table. Trying to add REFERENCE constraing...\n${query}`);
-                  await this.db.any(query);
+                  await runQuery(query);
                   console.log("SUCCESS: " + query);
                 } catch(e){
                   throw new Error(`Could not add constraing. Err: ${e instanceof Error? e.message : JSON.stringify(e)}`)
@@ -551,7 +557,7 @@ export default class FileManager {
             try {
               const query = `ALTER TABLE ${asName(tableName)} ADD COLUMN ${asName(colName)} UUID REFERENCES ${asName(tableName)} (id);`
               console.log(`Creating referenced file column ${refTable} (${colName})...\n${query}`);
-              await this.db.any(query);
+              await runQuery(query);
               console.log("SUCCESS: " + query);
             } catch(e){
               throw new Error(`FAILED. Err: ${e instanceof Error? e.message : JSON.stringify(e)}`)
@@ -579,7 +585,7 @@ export default class FileManager {
           )
           `;
           console.log(`Creating ${action} ...`, lookupTableName);
-          await this.db.any(query);
+          await runQuery(query);
           console.log(`Created ${action}`);
   
         } else {
@@ -604,7 +610,7 @@ export default class FileManager {
             if(q){
   
               try {
-                await this.db.any(q)
+                await runQuery(q)
                 console.log("Added missing constraint back");
   
               } catch(e){

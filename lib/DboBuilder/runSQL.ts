@@ -1,6 +1,6 @@
 import { PG_COLUMN_UDT_DATA_TYPE, SQLHandler, SQLOptions, SQLResult } from "prostgles-types";
 import { DboBuilder, LocalParams, pgp, postgresToTsType } from "../DboBuilder";
-import { Prostgles } from "../Prostgles";
+import { DB, Prostgles } from "../Prostgles";
 import { PubSubManager } from "../PubSubManager";
 const { ParameterizedQuery: PQ } = require('pg-promise');
 
@@ -107,3 +107,7 @@ export const canRunSQL = async (prostgles: Prostgles, localParams?: LocalParams)
   let res = await prostgles.opts.publishRawSQL?.(publishParams);
   return Boolean(res && typeof res === "boolean" || res === "*");
 }
+
+export const canCreateTables = async(db: DB): Promise<boolean> => {
+    return db.any(`SELECT has_database_privilege(current_database(), 'create') as yes`).then(rows => rows?.[0].yes === true)
+} 
