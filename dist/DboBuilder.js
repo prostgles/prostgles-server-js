@@ -7,7 +7,7 @@ var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.postgresToTsType = exports.isPlainObject = exports.DboBuilder = exports.TableHandler = exports.isPojoObject = exports.ViewHandler = exports.parseError = exports.EXISTS_KEYS = exports.makeErr = exports.escapeTSNames = exports.pgp = void 0;
 const Bluebird = require("bluebird");
-// declare global { export interface Promise<T> extends Bluebird<T> {} }
+const makeSelectQuery_1 = require("./DboBuilder/QueryBuilder/makeSelectQuery");
 const pgPromise = require("pg-promise");
 const runSQL_1 = require("./DboBuilder/runSQL");
 const prostgles_types_1 = require("prostgles-types");
@@ -25,7 +25,7 @@ const prostgles_types_1 = require("prostgles-types");
 //     return []
 // }
 const utils_1 = require("./utils");
-const QueryBuilder_1 = require("./QueryBuilder");
+const QueryBuilder_1 = require("./DboBuilder/QueryBuilder/QueryBuilder");
 const PubSubManager_1 = require("./PubSubManager");
 const insertDataParse_1 = require("./DboBuilder/insertDataParse");
 const insert_1 = require("./DboBuilder/insert");
@@ -673,7 +673,7 @@ class ViewHandler {
                 if (maxLimit && !Number.isInteger(maxLimit))
                     throw ` invalid publish.${this.name}.select.maxLimit -> expecting integer but got ` + maxLimit;
             }
-            let q = await (0, QueryBuilder_1.getNewQuery)(this, filter, selectParams, param3_unused, tableRules, localParams, this.columns), _query = (0, QueryBuilder_1.makeQuery)(this, q, undefined, undefined, selectParams);
+            let q = await (0, QueryBuilder_1.getNewQuery)(this, filter, selectParams, param3_unused, tableRules, localParams, this.columns), _query = (0, makeSelectQuery_1.makeSelectQuery)(this, q, undefined, undefined, selectParams);
             // console.log(_query, JSON.stringify(q, null, 2))
             if (testRule) {
                 try {

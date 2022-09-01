@@ -67,8 +67,7 @@ function getPGCheckConstraint(args, depth) {
         const valAsText = `${escapedFieldName}->>${(0, PubSubManager_1.asValue)(k)}`;
         if (t.nullable)
             checks.push(`${valAsJson} IS NULL`);
-        if (t.optional)
-            checks.push(`${escapedFieldName} ? ${(0, PubSubManager_1.asValue)(k)} = FALSE`);
+        checks.push(`jsonb_typeof(${escapedFieldName}) = 'object' ` + (t.optional ? `AND ${escapedFieldName} ? ${(0, PubSubManager_1.asValue)(k)} = FALSE` : ""));
         if ("oneOfTypes" in t) {
             checks.push(`(${t.oneOfTypes.map(subType => getPGCheckConstraint({ escapedFieldName: valAsJson, schema: subType, nullable }, depth + 1)).join(" OR ")})`);
         }

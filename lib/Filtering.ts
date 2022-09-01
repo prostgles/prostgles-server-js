@@ -1,6 +1,6 @@
 
 
-import { SelectItem } from "./QueryBuilder";
+import { SelectItem } from "./DboBuilder/QueryBuilder/QueryBuilder";
 import { isEmpty, getKeys, FullFilter, EXISTS_KEYS, FilterDataType, GeomFilterKeys, GeomFilter_Funcs, TextFilter_FullTextSearchFilterKeys } from "prostgles-types";
 import { isPlainObject } from "./DboBuilder";
 

@@ -154,7 +154,11 @@ type OneOf = {
   defaultValue?: OneOf["oneOf"][number]; 
 };
 
-type ColumnConfig<LANG_IDS = { en: 1 }> = NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef | OneOf))
+type ColumnConfig<LANG_IDS = { en: 1 }> = StrictUnion<NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef | OneOf))>
+
+type UnionKeys<T> = T extends T ? keyof T : never;
+type StrictUnionHelper<T, TAll> = T extends any ? T & Partial<Record<Exclude<UnionKeys<TAll>, keyof T>, never>> : never;
+type StrictUnion<T> = StrictUnionHelper<T, T>
 
 type TableDefinition<LANG_IDS> = {
   columns?: {
@@ -309,6 +313,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       if ("columns" in td && td.columns?.[targetTable]) {
         const cd = td.columns[targetTable];
         if ("joinDef" in cd) {
+          if(!cd.joinDef) throw "cd.joinDef missing"
           const { joinDef } = cd;
           const res: JoinInfo = {
             expectOne: false,
@@ -372,14 +377,14 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       if ("columns" in tableConf) {
         const getColDef = (name: string, colConf: ColumnConfig): string => {
           const colNameEsc = asName(name);
-          const getColDef = (colConf: TextColDef, pgType: "TEXT" | "JSONB") => {
+          const getColTypeDef = (colConf: TextColDef, pgType: "TEXT" | "JSONB") => {
             const { nullable, defaultValue } = colConf;
             return `${pgType} ${!nullable ? " NOT NULL " : ""} ${defaultValue ? ` DEFAULT ${asValue(defaultValue)} ` : ""}`
           }
           if ("references" in colConf && colConf.references) {
 
             const { tableName: lookupTable, columnName: lookupCol = "id" } = colConf.references;
-            return ` ${colNameEsc} ${getColDef(colConf.references, "TEXT")} REFERENCES ${lookupTable} (${lookupCol}) `;
+            return ` ${colNameEsc} ${getColTypeDef(colConf.references, "TEXT")} REFERENCES ${lookupTable} (${lookupCol}) `;
 
           } else if ("sqlDefinition" in colConf && colConf.sqlDefinition) {
 
@@ -396,7 +401,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
             if (cArr.length) {
               checks = `CHECK (${cArr.join(" AND ")})`
             }
-            return ` ${colNameEsc} ${getColDef(colConf, "TEXT")} ${checks}`;
+            return ` ${colNameEsc} ${getColTypeDef(colConf, "TEXT")} ${checks}`;
 
           } else if ("jsonbSchema" in colConf && colConf.jsonbSchema) {
 
@@ -412,10 +417,10 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
               })
             }
             const checkStatement = getPGCheckConstraint({ schema: colConf.jsonbSchema, escapedFieldName: colNameEsc, nullable: !!colConf.nullable }, 0)
-            return ` ${colNameEsc} ${getColDef(colConf, "JSONB")} CHECK(${checkStatement})`;
+            return ` ${colNameEsc} ${getColTypeDef(colConf, "JSONB")} CHECK(${checkStatement})`;
 
           } else if("oneOf" in colConf) {
-            if(!colConf.oneOf.length) throw new Error("Must not be empty");
+            if(!colConf.oneOf?.length) throw new Error("colConf.oneOf Must not be empty");
             const type = colConf.oneOf.every(v => Number.isFinite(v))? "NUMERIC" : "TEXT";
             const checks = colConf.oneOf.map(v => `${colNameEsc} = ${asValue(v)}`).join(" OR ");
             return ` ${colNameEsc} ${type} ${colConf.nullable? "" : "NOT NULL"} ${"defaultValue" in colConf? ` DEFAULT ${asValue(colConf.defaultValue)}` : ""} CHECK(${checks})`;

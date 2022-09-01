@@ -30,7 +30,7 @@ export declare type DBHandlerServer<TH = TableHandlers> = TH & Partial<DbJoinMak
 } & {
     tx?: TX<TH>;
 };
-import { SelectItem, FieldSpec } from "./QueryBuilder";
+import { SelectItem, FieldSpec } from "./DboBuilder/QueryBuilder/QueryBuilder";
 import { Join, Prostgles, DB } from "./Prostgles";
 import { TableRule, UpdateRule, PublishParser, ValidateRow, PublishAllOrNothing } from "./PublishParser";
 import { PubSubManager, BasicCallback } from "./PubSubManager";

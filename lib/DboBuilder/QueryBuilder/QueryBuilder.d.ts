@@ -1,5 +1,5 @@
-import { Filter, LocalParams, TableHandler } from "./DboBuilder";
-import { TableRule } from "./PublishParser";
+import { Filter, LocalParams, TableHandler } from "../../DboBuilder";
+import { TableRule } from "../../PublishParser";
 import { SelectParams, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, Select } from "prostgles-types";
 export declare type SelectItem = {
     type: "column" | "function" | "aggregation" | "joinedColumn" | "computed";
@@ -119,6 +119,5 @@ export declare class SelectItemBuilder {
 export declare function getNewQuery(_this: TableHandler, filter: Filter, selectParams: (SelectParams & {
     alias?: string;
 }), param3_unused: any, tableRules: TableRule | undefined, localParams: LocalParams | undefined, columns: ColumnInfo[]): Promise<NewQuery>;
-export declare function makeQuery(_this: TableHandler, q: NewQuery, depth?: number, joinFields?: string[], selectParams?: SelectParams): string;
 export {};
 //# sourceMappingURL=QueryBuilder.d.ts.map

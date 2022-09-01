@@ -18,8 +18,10 @@ export const getDBSchema = (dboBuilder: DboBuilder): string => {
       const colConf = dboBuilder.prostgles.tableConfigurator?.getColumnConfig(tov.name, c.name);
       if(colConf){
         if("jsonbSchema" in colConf){
+          if(!colConf.jsonbSchema) throw "colConf.jsonbSchema missing"
           type = getJSONBSchemaTSTypes(colConf.jsonbSchema, { nullable: colConf.nullable }, "      ");
         } else if("oneOf" in colConf){
+          if(!colConf.oneOf) throw "colConf.oneOf missing"
           const types = colConf.oneOf.map(t => typeof t === "number"? t : JSON.stringify(t));
           if(colConf.nullable){
             types.unshift("null")

@@ -1,4 +1,4 @@
-import { SelectItem } from "./QueryBuilder";
+import { SelectItem } from "./DboBuilder/QueryBuilder/QueryBuilder";
 import { FullFilter } from "prostgles-types";
 /**
 * Parse a single filter

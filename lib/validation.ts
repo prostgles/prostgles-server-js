@@ -103,7 +103,7 @@ export function getPGCheckConstraint(args: { escapedFieldName: string; schema: V
     const valAsJson = `${escapedFieldName}->${asValue(k)}`;
     const valAsText = `${escapedFieldName}->>${asValue(k)}`;
     if(t.nullable) checks.push(`${valAsJson} IS NULL`);
-    if(t.optional) checks.push(`${escapedFieldName} ? ${asValue(k)} = FALSE`);
+    checks.push(`jsonb_typeof(${escapedFieldName}) = 'object' ` + (t.optional? `AND ${escapedFieldName} ? ${asValue(k)} = FALSE` : ""));
 
     if("oneOfTypes" in t){
       checks.push(`(${t.oneOfTypes.map(subType => getPGCheckConstraint({ escapedFieldName: valAsJson, schema: subType, nullable }, depth + 1)).join(" OR ")})`)
@@ -113,7 +113,7 @@ export function getPGCheckConstraint(args: { escapedFieldName: string; schema: V
       }
       const oneOfHasNull = t.oneOf.includes(null);
       if(oneOfHasNull) checks.push(`${valAsText} IS NULL`);
-      const oneOf = t.oneOf.filter(o => o !== null);
+    const oneOf = t.oneOf.filter(o => o !== null);
       oneOf.forEach(o => {
         checks.push(`(${valAsText})${(jsToPGtypes as any)[typeof o]} = ${asValue(o)}`);
       })

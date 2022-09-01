@@ -5,7 +5,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as Bluebird from "bluebird";
-// declare global { export interface Promise<T> extends Bluebird<T> {} }
+import { makeSelectQuery } from "./DboBuilder/QueryBuilder/makeSelectQuery"
 
 import * as pgPromise from 'pg-promise';
 import { canRunSQL, runSQL } from "./DboBuilder/runSQL";
@@ -80,7 +80,7 @@ export type DBHandlerServer<TH = TableHandlers> =
 
 
 import { get } from "./utils";
-import { getNewQuery, makeQuery, COMPUTED_FIELDS, SelectItem, FieldSpec, asNameAlias, SelectItemBuilder, FUNCTIONS, parseFunction, parseFunctionObject } from "./QueryBuilder";
+import { getNewQuery, COMPUTED_FIELDS, SelectItem, FieldSpec, asNameAlias, SelectItemBuilder, FUNCTIONS, parseFunction, parseFunctionObject } from "./DboBuilder/QueryBuilder/QueryBuilder";
 import { 
     Join, Prostgles, DB, isSuperUser
 } from "./Prostgles";
@@ -1078,7 +1078,7 @@ export class ViewHandler {
             }
 
             let q = await getNewQuery(this as unknown as TableHandler, filter, selectParams, param3_unused, tableRules, localParams, this.columns),
-                _query = makeQuery(this as unknown as TableHandler, q, undefined, undefined, selectParams);
+                _query = makeSelectQuery(this as unknown as TableHandler, q, undefined, undefined, selectParams);
             // console.log(_query, JSON.stringify(q, null, 2))
             if(testRule){
                 try {
