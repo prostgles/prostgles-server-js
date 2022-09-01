@@ -83,7 +83,12 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
 
         const txDelete = async (tbl: TableHandler) => {
           if (!tbl.t) throw new Error("Missing transaction object t");
-          const files = await tbl.find(filterOpts.filter);
+          let files: { id: string; name: string }[] = [];
+          const totalFiles = await tbl.count(filterOpts.filter);
+          do {
+            const batch = await tbl.find(filterOpts.filter, { limit: 100, offset: files.length });
+            files = files.concat(batch);
+          } while(files.length < totalFiles)
           
           const fileManager = tbl.dboBuilder.prostgles.fileManager
           if (!fileManager) throw new Error("fileManager missing");
