@@ -114,7 +114,7 @@ export type DeepPartial<T> = {
 //     }>;
 // }
 
-type ExpressApp = {
+export type ExpressApp = {
   get: (
     routePath: string,
     cb: (
@@ -131,7 +131,17 @@ type ExpressApp = {
         }
       }
     ) => any
-  ) => any
+  ) => any;
+  _router?: { 
+    stack?: {
+      handle: Function;
+      path: undefined,
+      keys?: any[];
+      route?: { 
+        path?: string;
+      }
+    }[]
+  }
 };
 
 /**
@@ -610,8 +620,9 @@ export class Prostgles {
             //   console.log("this.io.close")
             // }
           }
-
+          this.fileManager?.destroy();
           this.dboBuilder?.destroy();
+          this.authHandler?.destroy();
           this.dbo = undefined;
           this.db = undefined;
           await db.$pool.end();

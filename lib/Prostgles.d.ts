@@ -31,7 +31,7 @@ declare type Keywords = {
 export declare type DeepPartial<T> = {
     [P in keyof T]?: DeepPartial<T[P]>;
 };
-declare type ExpressApp = {
+export declare type ExpressApp = {
     get: (routePath: string, cb: (req: {
         params: {
             name: string;
@@ -49,6 +49,16 @@ declare type ExpressApp = {
             json: (response: AnyObject) => any;
         };
     }) => any) => any;
+    _router?: {
+        stack?: {
+            handle: Function;
+            path: undefined;
+            keys?: any[];
+            route?: {
+                path?: string;
+            };
+        }[];
+    };
 };
 /**
  * Allows uploading and downloading files.

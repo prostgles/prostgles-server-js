@@ -7,8 +7,8 @@ import * as stream from 'stream';
 import * as sharp from "sharp";
 import checkDiskSpace from 'check-disk-space';
 
-import { DB, DBHandlerServer, Prostgles } from './Prostgles';
-import { ALLOWED_CONTENT_TYPE, ALLOWED_EXTENSION, asName, CONTENT_TYPE_TO_EXT, getKeys, isObject, ValidatedColumnInfo } from 'prostgles-types';
+import { DB, DBHandlerServer, ExpressApp, Prostgles } from './Prostgles';
+import { ALLOWED_CONTENT_TYPE, ALLOWED_EXTENSION, asName, CONTENT_TYPE_TO_EXT, getKeys, isDefined, isObject, ValidatedColumnInfo } from 'prostgles-types';
 import { TableHandler, ViewHandler } from './DboBuilder';
 
 const HOUR = 3600 * 1000;
@@ -97,7 +97,10 @@ export default class FileManager {
 
   prostgles?: Prostgles;
   get dbo(): DBHandlerServer { 
-    if(!this.prostgles?.dbo) throw "this.prostgles.dbo missing"
+    if(!this.prostgles?.dbo) {
+      // this.prostgles?.refreshDBO();
+      throw "this.prostgles.dbo missing"
+    }
     return this.prostgles.dbo 
   };
   get db(): DB { 
@@ -108,6 +111,9 @@ export default class FileManager {
   tableName?: string;
 
   private fileRoute?: string;
+  get fileRouteExpress (){
+    return this.fileRoute + "/:name";
+  }
   private checkInterval?: NodeJS.Timeout;
 
   constructor(config: FileManager["config"], imageOptions?: ImageOptions){
@@ -639,7 +645,7 @@ export default class FileManager {
     this.fileRoute = fileServeRoute;
 
     if(app){
-      app.get(this.fileRoute + "/:name", async (req, res) => {
+      app.get(this.fileRouteExpress, async (req, res) => {
         if(!this.dbo[tableName]){
           res.status(500).json({ err: `Internal error: media table (${tableName}) not valid` });
           return false;
@@ -694,6 +700,22 @@ export default class FileManager {
         }
       });
     }
+  }
+
+  destroy = () => {
+    removeExpressRoute(this.prostgles?.opts.fileTable?.expressApp, [this.fileRouteExpress]);
+  }
+}
+
+export const removeExpressRoute = (app: ExpressApp | undefined, routePaths: (string | undefined)[]) => {
+
+  const routes = app?._router?.stack;
+  if(routes){
+    routes.forEach((route, i) => {
+      if(routePaths.filter(isDefined).includes(route.route?.path!)){
+        routes.splice(i, 1);
+      }
+    })
   }
 }
 

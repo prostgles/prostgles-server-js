@@ -2,7 +2,7 @@
 /// <reference types="node" />
 import { S3 } from 'aws-sdk';
 import * as stream from 'stream';
-import { DB, DBHandlerServer, Prostgles } from './Prostgles';
+import { DB, DBHandlerServer, ExpressApp, Prostgles } from './Prostgles';
 import { ALLOWED_CONTENT_TYPE, ALLOWED_EXTENSION, ValidatedColumnInfo } from 'prostgles-types';
 export declare const asSQLIdentifier: (name: string, db: DB) => Promise<string>;
 declare type OnProgress = (progress: S3.ManagedUpload.Progress) => void;
@@ -74,6 +74,7 @@ export default class FileManager {
     get db(): DB;
     tableName?: string;
     private fileRoute?;
+    get fileRouteExpress(): string;
     private checkInterval?;
     constructor(config: FileManager["config"], imageOptions?: ImageOptions);
     getFileStream(name: string): Promise<stream.Readable>;
@@ -104,7 +105,9 @@ export default class FileManager {
         colName: string;
     }) => ValidatedColumnInfo["file"] | undefined;
     init: (prg: Prostgles) => Promise<void>;
+    destroy: () => void;
 }
+export declare const removeExpressRoute: (app: ExpressApp | undefined, routePaths: (string | undefined)[]) => void;
 export declare const getFileTypeFromFilename: (fileName: string) => {
     mime: ALLOWED_CONTENT_TYPE;
     ext: ALLOWED_EXTENSION | string;

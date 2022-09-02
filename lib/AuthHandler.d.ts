@@ -112,9 +112,16 @@ export default class AuthHandler {
     dbo: DBHandlerServer;
     db: DB;
     sidKeyName?: string;
-    returnURL?: string;
-    loginRoute?: string;
-    logoutGetPath?: string;
+    routes: {
+        login?: string;
+        returnURL?: string;
+        logoutGetPath?: string;
+        magicLinks?: {
+            route: string;
+            expressRoute: string;
+        };
+        readonly catchAll: '*';
+    };
     constructor(prostgles: Prostgles);
     validateSid: (sid: string | undefined) => string;
     matchesRoute: (route: string | undefined, clientFullRoute: string) => boolean;
@@ -122,6 +129,7 @@ export default class AuthHandler {
     private setCookieAndGoToReturnURLIFSet;
     getUser: (clientReq: AuthClientRequest) => Promise<AnyObject | undefined>;
     init(): Promise<void>;
+    destroy: () => void;
     throttledFunc: <T>(func: () => Promise<T>, throttle?: number) => Promise<T>;
     loginThrottled: (params: AnyObject) => Promise<BasicSession>;
     /**

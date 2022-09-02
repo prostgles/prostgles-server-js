@@ -1,7 +1,7 @@
 "use strict";
 var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.bytesToSize = exports.getFileType = exports.getFileTypeFromFilename = exports.asSQLIdentifier = void 0;
+exports.bytesToSize = exports.getFileType = exports.getFileTypeFromFilename = exports.removeExpressRoute = exports.asSQLIdentifier = void 0;
 const aws_sdk_1 = require("aws-sdk");
 const fs = require("fs");
 const stream = require("stream");
@@ -297,7 +297,7 @@ class FileManager {
             }
             this.fileRoute = fileServeRoute;
             if (app) {
-                app.get(this.fileRoute + "/:name", async (req, res) => {
+                app.get(this.fileRouteExpress, async (req, res) => {
                     if (!this.dbo[tableName]) {
                         res.status(500).json({ err: `Internal error: media table (${tableName}) not valid` });
                         return false;
@@ -345,6 +345,9 @@ class FileManager {
                 });
             }
         };
+        this.destroy = () => {
+            (0, exports.removeExpressRoute)(this.prostgles?.opts.fileTable?.expressApp, [this.fileRouteExpress]);
+        };
         this.config = config;
         this.imageOptions = imageOptions;
         if ("region" in config) {
@@ -372,8 +375,10 @@ class FileManager {
         }
     }
     get dbo() {
-        if (!this.prostgles?.dbo)
+        if (!this.prostgles?.dbo) {
+            // this.prostgles?.refreshDBO();
             throw "this.prostgles.dbo missing";
+        }
         return this.prostgles.dbo;
     }
     ;
@@ -383,6 +388,9 @@ class FileManager {
         return this.prostgles.db;
     }
     ;
+    get fileRouteExpress() {
+        return this.fileRoute + "/:name";
+    }
     async getFileStream(name) {
         if ("bucket" in this.config && this.s3Client) {
             return this.s3Client.getObject({ Key: name, Bucket: this.config.bucket }).createReadStream();
@@ -552,6 +560,17 @@ FileManager.testCredentials = async (accessKeyId, secretAccessKey) => {
     const ident = await sts.getCallerIdentity({}).promise();
     return ident;
 };
+const removeExpressRoute = (app, routePaths) => {
+    const routes = app?._router?.stack;
+    if (routes) {
+        routes.forEach((route, i) => {
+            if (routePaths.filter(prostgles_types_1.isDefined).includes(route.route?.path)) {
+                routes.splice(i, 1);
+            }
+        });
+    }
+};
+exports.removeExpressRoute = removeExpressRoute;
 const getFileTypeFromFilename = (fileName) => {
     const nameParts = fileName.split(".");
     if (nameParts.length < 2)

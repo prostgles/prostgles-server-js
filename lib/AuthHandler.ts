@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { AnyObject, AuthGuardLocation, AuthGuardLocationResponse, CHANNELS, DBSchema } from "prostgles-types";
 import { LocalParams, PRGLIOSocket } from "./DboBuilder";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
+import { removeExpressRoute } from "./FileManager";
 import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
 type Awaitable<T> = T | Promise<T>;
 type AuthSocketSchema = {
@@ -148,17 +149,35 @@ export default class AuthHandler {
   dbo: DBHandlerServer;
   db: DB;
   sidKeyName?: string;
-  returnURL?: string;
 
-  loginRoute?: string;
-  logoutGetPath?: string;
+  routes: {
+    login?: string;
+    returnURL?: string;
+    logoutGetPath?: string;
+    magicLinks?: {
+      route: string;
+      expressRoute: string;
+    }
+    readonly catchAll: '*';
+  } = {
+    catchAll: "*"
+  }
 
   constructor(prostgles: Prostgles) {
     this.opts = prostgles.opts.auth as any;
     if (prostgles.opts.auth?.expressConfig) {
-      this.returnURL = prostgles.opts.auth?.expressConfig?.returnURL || "returnURL";
-      this.loginRoute = prostgles.opts.auth?.expressConfig?.loginRoute || "/login";
-      this.logoutGetPath = prostgles.opts.auth?.expressConfig?.logoutGetPath || "/logout";
+      const { magicLinks, returnURL, loginRoute, logoutGetPath } = prostgles.opts.auth.expressConfig;
+      this.routes = {
+        magicLinks: magicLinks? {
+          expressRoute: `${magicLinks.route}/:id`,
+          route: magicLinks.route || "/magic-link"
+        } : undefined,
+        returnURL: returnURL || "returnURL",
+        login: loginRoute || "/login",
+        logoutGetPath: logoutGetPath || "/logout",
+        catchAll: "*"
+      }
+      
     }
     if(!prostgles.dbo || !prostgles.db) throw "dbo or db missing";
     this.dbo = prostgles.dbo;
@@ -182,8 +201,8 @@ export default class AuthHandler {
     const pubRoutes = [
       ...this.opts?.expressConfig?.publicRoutes || [],
     ];
-    if (this.loginRoute) pubRoutes.push(this.loginRoute);
-    if (this.logoutGetPath) pubRoutes.push(this.logoutGetPath);
+    if (this.routes?.login) pubRoutes.push(this.routes?.login);
+    if (this.routes?.logoutGetPath) pubRoutes.push(this.routes?.logoutGetPath);
 
     return Boolean(!pubRoutes.find(publicRoute => {
       return this.matchesRoute(publicRoute, pathname); // publicRoute === pathname || pathname.startsWith(publicRoute) && ["/", "?", "#"].includes(pathname.slice(-1));
@@ -205,9 +224,9 @@ export default class AuthHandler {
       }
       const cookieOpts = { ...options, secure: true, sameSite: "strict" as "strict", ...(this.opts?.expressConfig?.cookieOptions || {}) };
       const cookieData = sid;
-      if(!this.sidKeyName || !this.returnURL) throw "sidKeyName or returnURL missing"
+      if(!this.sidKeyName || !this.routes?.returnURL) throw "sidKeyName or returnURL missing"
       res.cookie(this.sidKeyName, cookieData, cookieOpts);
-      const successURL = getReturnUrl(req, this.returnURL) || "/";
+      const successURL = getReturnUrl(req, this.routes.returnURL) || "/";
       res.redirect(successURL);
 
     } else {
@@ -254,10 +273,10 @@ export default class AuthHandler {
         throw "Invalid or empty string provided within publicRoutes "
       }
 
-      if (app && magicLinks) {
-        const { route = "/magic-link", check } = magicLinks;
+      if (app && magicLinks && this.routes.magicLinks) {
+        const { check } = magicLinks;
         if (!check) throw "Check must be defined for magicLinks";
-        app.get(`${route}/:id`, async (req: ExpressReq, res: ExpressRes) => {
+        app.get(this.routes.magicLinks?.expressRoute, async (req: ExpressReq, res: ExpressRes) => {
           const { id } = req.params ?? {};
 
           if (typeof id !== "string" || !id) {
@@ -280,10 +299,11 @@ export default class AuthHandler {
         });
       }
 
-      if (app && this.loginRoute) {
+      const loginRoute = this.routes?.login;
+      if (app && loginRoute) {
         
 
-        app.post(this.loginRoute, async (req: ExpressReq, res: ExpressRes) => {
+        app.post(loginRoute, async (req: ExpressReq, res: ExpressRes) => {
           try {
             const { sid, expires } = await this.loginThrottled(req.body || {}) || {};
 
@@ -302,8 +322,8 @@ export default class AuthHandler {
 
         });
 
-        if (app && this.logoutGetPath && this.opts.logout) {
-          app.get(this.logoutGetPath, async (req: ExpressReq, res: ExpressRes) => {
+        if (app && this.routes.logoutGetPath && this.opts.logout) {
+          app.get(this.routes.logoutGetPath, async (req: ExpressReq, res: ExpressRes) => {
             const sid = this.validateSid(req?.cookies?.[sidKeyName]);
             if (sid) {
               try {
@@ -322,11 +342,11 @@ export default class AuthHandler {
         if (app && Array.isArray(publicRoutes)) {
 
           /* Redirect if not logged in and requesting non public content */
-          app.get('*', async (req: ExpressReq, res: ExpressRes) => {
+          app.get(this.routes.catchAll, async (req: ExpressReq, res: ExpressRes) => {
             const clientReq: AuthClientRequest = { httpReq: req }
             const getUser = this.getUser;
             try {
-              const returnURL = getReturnUrl(req, this.returnURL)
+              const returnURL = getReturnUrl(req, this.routes.returnURL)
 
 
               /**
@@ -336,7 +356,7 @@ export default class AuthHandler {
                 /* Check auth. Redirect if unauthorized */
                 const u = await getUser(clientReq);
                 if (!u) {
-                  res.redirect(`${this.loginRoute}?returnURL=${encodeURIComponent(req.originalUrl)}`);
+                  res.redirect(`${loginRoute}?returnURL=${encodeURIComponent(req.originalUrl)}`);
                   return;
                 }
 
@@ -347,7 +367,7 @@ export default class AuthHandler {
                 return;
 
                 /** If Logged in and requesting login then redirect */
-              } else if (this.matchesRoute(this.loginRoute, req.path) && (await getUser(clientReq))) {
+              } else if (this.matchesRoute(loginRoute, req.path) && (await getUser(clientReq))) {
 
                 res.redirect("/");
                 return;
@@ -364,6 +384,12 @@ export default class AuthHandler {
         }
       }
     }
+  }
+
+  destroy = () => {
+    const app = this.opts?.expressConfig?.app;
+    const { login, logoutGetPath, magicLinks } = this.routes;
+    removeExpressRoute(app, [login, logoutGetPath, magicLinks?.expressRoute]);
   }
 
   throttledFunc = <T>(func: () => Promise<T>, throttle = 500): Promise<T> => {
