@@ -49,6 +49,7 @@ export declare function getPGCheckConstraint(args: {
     schema: ValidationSchema | OneOfTypes;
     nullable: boolean;
     isRootQuery?: boolean;
+    optional?: boolean;
 }, depth: number): string;
 declare type ColOpts = {
     nullable?: boolean;

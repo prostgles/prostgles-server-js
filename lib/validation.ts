@@ -87,8 +87,8 @@ export function validateSchema<S extends ValidationSchema>(schema: S, obj: Schem
   getKeys(schema).forEach(k => validate(obj as any, k, schema[k]));
 }
 
-export function getPGCheckConstraint(args: { escapedFieldName: string; schema: ValidationSchema | OneOfTypes, nullable: boolean; isRootQuery?: boolean; }, depth: number): string {
-  const { schema: s, escapedFieldName, nullable } = args;
+export function getPGCheckConstraint(args: { escapedFieldName: string; schema: ValidationSchema | OneOfTypes, nullable: boolean; isRootQuery?: boolean; optional?: boolean; }, depth: number): string {
+  const { schema: s, escapedFieldName, nullable, optional, isRootQuery } = args;
 
   const jsToPGtypes = {
     "integer": "::INTEGER",
@@ -103,10 +103,10 @@ export function getPGCheckConstraint(args: { escapedFieldName: string; schema: V
     const valAsJson = `${escapedFieldName}->${asValue(k)}`;
     const valAsText = `${escapedFieldName}->>${asValue(k)}`;
     if(t.nullable) checks.push(`${valAsJson} IS NULL`);
-    checks.push(`jsonb_typeof(${escapedFieldName}) = 'object' ` + (t.optional? `AND ${escapedFieldName} ? ${asValue(k)} = FALSE` : ""));
+    if(t.optional) checks.push(`${escapedFieldName} ? ${asValue(k)} = FALSE`);
 
     if("oneOfTypes" in t){
-      checks.push(`(${t.oneOfTypes.map(subType => getPGCheckConstraint({ escapedFieldName: valAsJson, schema: subType, nullable }, depth + 1)).join(" OR ")})`)
+      checks.push(`(${t.oneOfTypes.map(subType => getPGCheckConstraint({ escapedFieldName: valAsJson, schema: subType, nullable, optional: t.optional }, depth + 1)).join(" OR ")})`)
     } else if("oneOf" in t){
       if(!t.oneOf.length || t.oneOf.some(v => v === undefined || !["number", "boolean", "string", null].includes(typeof v))) {
         throw new Error(`Invalid ValidationSchema for property: ${k} of field ${escapedFieldName}: oneOf cannot be empty AND can only contain: numbers, text, boolean, null`);
@@ -127,7 +127,7 @@ export function getPGCheckConstraint(args: { escapedFieldName: string; schema: V
           checks.push(`jsonb_typeof(${valAsJson}) = ${asValue(correctType)} `)
         }
       } else {
-        const check = getPGCheckConstraint({ escapedFieldName: valAsJson, schema: t.type, nullable: !!t.nullable }, depth + 1).trim();
+        const check = getPGCheckConstraint({ escapedFieldName: valAsJson, schema: t.type, nullable: !!t.nullable, optional: !!t.optional }, depth + 1).trim();
         if(check) checks.push(`(${check})`)
       }
     }
@@ -138,13 +138,16 @@ export function getPGCheckConstraint(args: { escapedFieldName: string; schema: V
 
   const getSchemaChecks = (s: ValidationSchema) => getKeys(s).map(k => "(" + kChecks(k, s) + ")").join(" AND ")
 
-  let q = "";
+  const checks: string[] = [];
+  let typeChecks = "";
   if(isOneOfTypes(s)){
-    q = s.oneOfTypes.map(t => `(${getSchemaChecks(t)})` ).join(" OR ");
+    typeChecks = s.oneOfTypes.map(t => `(${getSchemaChecks(t)})` ).join(" OR ");
   } else {
-    q = getSchemaChecks(s);
+    typeChecks = getSchemaChecks(s);
   }
-  return nullable? ` ${escapedFieldName} IS NULL OR (${q})` : q
+  if(nullable) checks.push(` ${escapedFieldName} IS NULL `);
+  checks.push(`jsonb_typeof(${escapedFieldName}) = 'object' ${typeChecks? ` AND (${typeChecks})` : "" }`);
+  return checks.join(" OR ");
 }
 type ColOpts = { nullable?: boolean };
 const isOneOfTypes = (s: ValidationSchema | OneOfTypes): s is OneOfTypes => {
