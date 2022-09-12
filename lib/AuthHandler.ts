@@ -193,7 +193,7 @@ export default class AuthHandler {
   matchesRoute = (route: string | undefined, clientFullRoute: string) => {
     return route && clientFullRoute && (
       route === clientFullRoute ||
-      clientFullRoute.startsWith(route) && ["/", "?", "#"].includes(clientFullRoute.slice(-1))
+      clientFullRoute.startsWith(route) && ["/", "?", "#"].includes(clientFullRoute[route.length])
     )
   }
 

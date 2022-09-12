@@ -16,7 +16,7 @@ class AuthHandler {
         };
         this.matchesRoute = (route, clientFullRoute) => {
             return route && clientFullRoute && (route === clientFullRoute ||
-                clientFullRoute.startsWith(route) && ["/", "?", "#"].includes(clientFullRoute.slice(-1)));
+                clientFullRoute.startsWith(route) && ["/", "?", "#"].includes(clientFullRoute[route.length]));
         };
         this.isUserRoute = (pathname) => {
             const pubRoutes = [
