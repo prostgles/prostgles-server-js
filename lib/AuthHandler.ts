@@ -201,12 +201,13 @@ export default class AuthHandler {
     const pubRoutes = [
       ...this.opts?.expressConfig?.publicRoutes || [],
     ];
-    if (this.routes?.login) pubRoutes.push(this.routes?.login);
-    if (this.routes?.logoutGetPath) pubRoutes.push(this.routes?.logoutGetPath);
+    if (this.routes?.login) pubRoutes.push(this.routes.login);
+    if (this.routes?.logoutGetPath) pubRoutes.push(this.routes.logoutGetPath);
+    if (this.routes?.magicLinks?.route) pubRoutes.push(this.routes.magicLinks.route);
 
-    return Boolean(!pubRoutes.find(publicRoute => {
+    return !pubRoutes.some(publicRoute => {
       return this.matchesRoute(publicRoute, pathname); // publicRoute === pathname || pathname.startsWith(publicRoute) && ["/", "?", "#"].includes(pathname.slice(-1));
-    }));
+    });
   }
 
   private setCookieAndGoToReturnURLIFSet = (cookie: { sid: string; expires: number; }, r: { req: ExpressReq; res: ExpressRes }) => {
