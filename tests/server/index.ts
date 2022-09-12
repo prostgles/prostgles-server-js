@@ -127,17 +127,24 @@ function dd(){
 							}
 						]
 					}
-				 },
-				jsonOneOf: { nullable: true, jsonbSchema: { 
-					oneOfTypes: [
-						{ command: { oneOf: ["a"] } },
-						{ 
-							command: { oneOf: ["b"] },
-							option: { type: "integer[]" }
-						}
-					]
-				}  
-			}
+				},
+				jsonOneOf: { 
+					nullable: true, 
+					jsonbSchema: { 
+						oneOfTypes: [
+							{ command: { oneOf: ["a"] } },
+							{ 
+								command: { oneOf: ["b"] },
+								option: { type: "integer[]" }
+							}
+						]
+					}
+				},
+				table_config:        {
+        nullable: true,
+        jsonbSchema: {
+          referencedTables: { type: {}, optional: true },
+				}}
 			}
 		},
 		lookup_col1: {

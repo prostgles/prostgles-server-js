@@ -127,7 +127,8 @@ export function getPGCheckConstraint(args: { escapedFieldName: string; schema: V
           checks.push(`jsonb_typeof(${valAsJson}) = ${asValue(correctType)} `)
         }
       } else {
-        checks.push("( " + getPGCheckConstraint({ escapedFieldName: valAsJson, schema: t.type, nullable: !!t.nullable }, depth + 1) + " )")
+        const check = getPGCheckConstraint({ escapedFieldName: valAsJson, schema: t.type, nullable: !!t.nullable }, depth + 1).trim();
+        if(check) checks.push(`(${check})`)
       }
     }
     const result = checks.join(" OR ")

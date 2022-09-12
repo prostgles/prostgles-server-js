@@ -356,6 +356,9 @@ export type DBSchemaGenerated = {
         | {  ok: string; }
         | {  err: string; }
         | {  loading: {  loaded: number; total: number; }; }
+      table_config?: null |       { 
+        referencedTables?: {  }; 
+      };
     };
   };
   tr1: {

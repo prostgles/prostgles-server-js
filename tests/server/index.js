@@ -107,7 +107,9 @@ function dd() {
                         ]
                     }
                 },
-                jsonOneOf: { nullable: true, jsonbSchema: {
+                jsonOneOf: {
+                    nullable: true,
+                    jsonbSchema: {
                         oneOfTypes: [
                             { command: { oneOf: ["a"] } },
                             {
@@ -115,6 +117,12 @@ function dd() {
                                 option: { type: "integer[]" }
                             }
                         ]
+                    }
+                },
+                table_config: {
+                    nullable: true,
+                    jsonbSchema: {
+                        referencedTables: { type: {}, optional: true },
                     }
                 }
             }
