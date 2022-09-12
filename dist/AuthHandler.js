@@ -196,10 +196,11 @@ class AuthHandler {
         this.opts = prostgles.opts.auth;
         if (prostgles.opts.auth?.expressConfig) {
             const { magicLinks, returnURL, loginRoute, logoutGetPath } = prostgles.opts.auth.expressConfig;
+            const magicLinksRoute = magicLinks?.route || "/magic-link";
             this.routes = {
                 magicLinks: magicLinks ? {
-                    expressRoute: `${magicLinks.route}/:id`,
-                    route: magicLinks.route || "/magic-link"
+                    expressRoute: `${magicLinksRoute}/:id`,
+                    route: magicLinksRoute
                 } : undefined,
                 returnURL: returnURL || "returnURL",
                 login: loginRoute || "/login",
