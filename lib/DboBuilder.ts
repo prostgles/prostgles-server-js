@@ -390,7 +390,7 @@ export function parseError(e: any, caller: string): ProstglesError {
     
     const errorObject = isObject(e)? e : undefined;
     const message = typeof e === "string"? e : e instanceof Error? e.message : 
-        errorObject? (errorObject.message ?? errorObject.toString?.() ?? "") :  "";
+       isObject(errorObject)? (errorObject.message ?? errorObject.txt ?? JSON.stringify(errorObject) ?? "") :  "";
     const stack = [
         ...(errorObject && Array.isArray(errorObject.stack)? errorObject.stack : []),
         caller

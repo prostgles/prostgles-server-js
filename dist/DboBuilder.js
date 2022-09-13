@@ -111,7 +111,7 @@ const FILTER_FUNCS = QueryBuilder_1.FUNCTIONS.filter(f => f.canBeUsedForFilter);
 function parseError(e, caller) {
     const errorObject = (0, prostgles_types_1.isObject)(e) ? e : undefined;
     const message = typeof e === "string" ? e : e instanceof Error ? e.message :
-        errorObject ? (errorObject.message ?? errorObject.toString?.() ?? "") : "";
+        (0, prostgles_types_1.isObject)(errorObject) ? (errorObject.message ?? errorObject.txt ?? JSON.stringify(errorObject) ?? "") : "";
     const stack = [
         ...(errorObject && Array.isArray(errorObject.stack) ? errorObject.stack : []),
         caller
