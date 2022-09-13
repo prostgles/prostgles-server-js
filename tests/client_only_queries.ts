@@ -4,7 +4,7 @@ import type { DBHandlerClient, Auth } from "./client/index";
 import { DBSchemaTable, isDefined } from "./client/node_modules/prostgles-types/dist";
 import { tryRun, tryRunP } from './isomorphic_queries';
 
-export default async function client_only(db: DBHandlerClient, auth: Auth, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[]){
+export default async function client_only(db: Required<DBHandlerClient>, auth: Auth, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[]){
   
   /**
    * onReady(dbo, methodsObj, tableSchema, _auth)
@@ -21,8 +21,8 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
     if(missingscTbl) throw `${missingscTbl} is missing from db`;
 
     await Promise.all(tableSchema.map(async tbl => {
-      const cols = await db[tbl.name]?.getColumns();
-      const info = await db[tbl.name]?.getInfo();
+      const cols = await db[tbl.name]?.getColumns!();
+      const info = await db[tbl.name]?.getInfo!();
       assert.deepStrictEqual(tbl.columns, cols);
       assert.deepStrictEqual(tbl.info, info);
     }))
@@ -41,6 +41,9 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       await tryRun("SQL Full result", async () => {
         const sqlStatement = await db.sql("SELECT $1", [1], { returnType: "statement" });
         assert.equal(sqlStatement, "SELECT 1", "db.sql statement query failed");
+
+
+        await db.sql("SELECT 1 -- ${param}", {}, { hasParams: false });
       
         const arrayMode = await db.sql("SELECT 1 as a, 2 as a", undefined, { returnType: "arrayMode" });
         assert.equal(arrayMode.rows?.[0].join("."), "1.2", "db.sql statement arrayMode failed");
@@ -111,13 +114,13 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       log("Started testRealtime")
       const start = Date.now();
   
-      await db.planes.delete();
+      await db.planes.delete!();
       let inserts = new Array(100).fill(null).map((d, i) => ({ id: i, flight_number: `FN${i}`, x: Math.random(), y: i }));
-      await db.planes.insert(inserts);
+      await db.planes.insert!(inserts);
     
       const CLOCK_DRIFT = 2000;
 
-      if((await db.planes.count()) !== 100) throw "Not 100 planes";
+      if((await db.planes.count!()) !== 100) throw "Not 100 planes";
 
       /**
        * Two listeners are added at the same time to dbo.planes (which has 100 records):
@@ -130,7 +133,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
        */
 
       /* After all sync records are updated to x10 here we'll update them to x20 */
-      const sP = await db.planes.subscribe({ x: 10 }, { }, async planes => {
+      const sP = await db.planes.subscribe!({ x: 10 }, { }, async planes => {
   
         const p10 = planes.filter(p => p.x == 10);
         log(Date.now() + ": sub stats: x10 -> " + p10.length + "    x20 ->" + planes.filter(p => p.x == 20).length);
@@ -147,8 +150,8 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
             const dLastUpdated = Math.max(...p10.map(v => +v.last_updated))
             const last_updated = Date.now();
             if(dLastUpdated >= last_updated) throw "dLastUpdated >= last_updated should not happen"
-            await db.planes.update({}, { x: 20, last_updated });
-            log(Date.now() + ": sub: Updated to x20" , await db.planes.count({ x: 20 }))
+            await db.planes.update!({}, { x: 20, last_updated });
+            log(Date.now() + ": sub: Updated to x20" , await db.planes.count!({ x: 20 }))
     
             // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log)
           }, CLOCK_DRIFT)
@@ -156,7 +159,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       }); 
       
       let updt = 0;
-      const sync = await db.planes.sync({}, { handlesOnData: true, patchText: true, }, (planes, deltas) => {
+      const sync = await db.planes.sync!({}, { handlesOnData: true, patchText: true, }, (planes, deltas) => {
         const x20 = planes.filter(p => p.x == 20).length;
         const x10 = planes.filter(p => p.x == 10);
         log(Date.now() + `: sync stats: x10 -> ${x10.length}  x20 -> ${x20}`);
@@ -168,7 +171,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
           if(+p.x < 10){
             updt++;
             update = true;
-            p.$update({ x: 10 });
+            p.$update!({ x: 10 });
             log(Date.now() + `: sync: p.$update({ x: 10 }); (id: ${p.id})`);
           }
         });
@@ -186,9 +189,9 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       const msLimit = 20000;
       setTimeout(async () => {
         const dbCounts = {
-          x10: await db.planes.count({ x: 10 }),
-          x20: await db.planes.count({ x: 20 }),
-          latest: await db.planes.findOne({}, { orderBy: { last_updated: -1 } }),
+          x10: await db.planes.count!({ x: 10 }),
+          x20: await db.planes.count!({ x: 20 }),
+          latest: await db.planes.findOne!({}, { orderBy: { last_updated: -1 } }),
         }
         const syncCounts = {
           x10: sync?.getItems().filter(d => d.x == 10).length,
@@ -218,32 +221,32 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
     log("Checking public data");
     // Public data
     await tryRun("Security rules example", async () => {
-      const vQ = await db.items4.find({}, { select: { added: 0 }});
+      const vQ = await db.items4.find!({}, { select: { added: 0 }});
       assert.deepStrictEqual(vQ, [
         { id: 1, public: 'public data' },
         { id: 2, public: 'public data' }
       ]);
 
-      const cols = await db.insert_rules.getColumns();
+      const cols = await db.insert_rules.getColumns!();
       assert.equal(cols.filter(({ insert, update: u, select: s, delete: d }) => insert && !u && s && !d).length, 3, "Validated getColumns failed")
 
       /* Validated insert */
-      const expectB = await db.insert_rules.insert({ name: "a" }, { returning: "*" });
+      const expectB = await db.insert_rules.insert!({ name: "a" }, { returning: "*" });
       assert.deepStrictEqual(expectB, { name: "b" }, "Validated insert failed");
 
       /* forced UUID insert */
-      const row: any = await db.uuid_text.insert({}, {returning: "*"});
+      const row: any = await db.uuid_text.insert!({}, {returning: "*"});
       assert.equal(row.id, 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e');
 
 
       try {
-        await db.insert_rules.insert({ name: "notfail" }, { returning: "*" });
-        await db.insert_rules.insert({ name: "fail" }, { returning: "*" });
+        await db.insert_rules.insert!({ name: "notfail" }, { returning: "*" });
+        await db.insert_rules.insert!({ name: "fail" }, { returning: "*" });
       } catch(err){
 
       }
-      assert.equal(0, +(await db.insert_rules.count({ name: "fail" })), "postValidation failed");
-      assert.equal(1, +(await db.insert_rules.count({ name: "notfail" })), "postValidation failed");
+      assert.equal(0, +(await db.insert_rules.count!({ name: "fail" })), "postValidation failed");
+      assert.equal(1, +(await db.insert_rules.count!({ name: "notfail" })), "postValidation failed");
     });
 
     // await tryRun("Duplicate subscription", async () => {
@@ -283,14 +286,14 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
     log("Checking User data");
     // User data
     await tryRun("Security rules example", async () => {
-      const vQ = await db.items4.find();
+      const vQ = await db.items4.find!();
       assert.deepStrictEqual(vQ, [
         { id: 1, public: 'public data' },
         { id: 2, public: 'public data' }
       ]);
 
 
-      const dynamicCols = await db.uuid_text.getColumns(undefined, {
+      const dynamicCols = await db.uuid_text.getColumns!(undefined, {
         rule: "update",
         filter: {
           id: 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e'
@@ -301,7 +304,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       });
       assert.equal(dynamicCols.length, 1);
       assert.equal(dynamicCols[0].name, "id");
-      const defaultCols = await db.uuid_text.getColumns(undefined, {
+      const defaultCols = await db.uuid_text.getColumns!(undefined, {
         rule: "update",
         filter: {
           id: 'not matching'

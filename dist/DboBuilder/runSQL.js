@@ -12,7 +12,7 @@ async function runSQL(query, params, options, localParams) {
     USER_TABLES ?? (USER_TABLES = await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables") ?? []);
     if (!(await (0, exports.canRunSQL)(this.prostgles, localParams)))
         throw "Not allowed to run SQL";
-    const { returnType, allowListen } = options || {};
+    const { returnType, allowListen, hasParams = true } = options || {};
     const { socket } = localParams || {};
     const db = localParams?.tx?.t || this.db;
     if (returnType === "noticeSubscription") {
@@ -30,10 +30,10 @@ async function runSQL(query, params, options, localParams) {
     }
     else if (db) {
         let finalQuery = query + "";
-        if (returnType === "arrayMode" && !["listen ", "notify "].find(c => query.toLowerCase().trim().startsWith(c))) {
+        if (returnType === "arrayMode" && !["listen ", "notify "].find(c => query.toLowerCase().trim().startsWith(c)) && hasParams) {
             finalQuery = new PQ({ text: DboBuilder_1.pgp.as.format(query, params), rowMode: "array" });
         }
-        let _qres = await db.result(finalQuery, params);
+        let _qres = await db.result(finalQuery, hasParams ? params : undefined);
         const { fields, rows, command } = _qres;
         /**
          * Fallback for watchSchema in case not superuser and cannot add db event listener

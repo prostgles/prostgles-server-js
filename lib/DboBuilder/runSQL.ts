@@ -15,7 +15,7 @@ export async function runSQL(this: DboBuilder, query: string, params: any, optio
 
       if(!(await canRunSQL(this.prostgles, localParams))) throw "Not allowed to run SQL";
 
-      const { returnType, allowListen }: SQLOptions = options || ({} as any);
+      const { returnType, allowListen, hasParams = true }: SQLOptions = options || ({} as any);
       const { socket } = localParams || {};
 
       const db = localParams?.tx?.t || this.db;
@@ -31,11 +31,11 @@ export async function runSQL(this: DboBuilder, query: string, params: any, optio
       } else if(db) {
 
           let finalQuery = query + "";
-          if(returnType === "arrayMode" && !["listen ", "notify "].find(c => query.toLowerCase().trim().startsWith(c))){
+          if(returnType === "arrayMode" && !["listen ", "notify "].find(c => query.toLowerCase().trim().startsWith(c)) && hasParams){
               finalQuery = new PQ({ text: pgp.as.format(query, params), rowMode: "array" });
           }
 
-          let _qres = await db.result(finalQuery, params)
+          let _qres = await db.result(finalQuery, hasParams? params : undefined)
           const { fields, rows, command } = _qres;
 
           /**

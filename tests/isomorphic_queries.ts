@@ -30,38 +30,38 @@ export function tryRunP(desc: string, func: (resolve: any, reject: any) => any, 
   });
 }
 
-export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<DBHandlerClient>) {
+export default async function isomorphic(db: Required<DBHandlerServer> | Required<DBHandlerClient>) {
   console.log("Starting isomorphic queries");
 
-  if(await db.items.count()){
+  if(await db.items.count!()){
     console.log("DELETING items");
     
     /* Access controlled */
-    await db.items4.delete({ });
+    await db.items4.delete!({ });
 
-    await db.items4_pub.delete({ });
-    await db.items3.delete({ });
-    await db.items2.delete({ });
-    await db.items.delete({ });
+    await db.items4_pub.delete!({ });
+    await db.items3.delete!({ });
+    await db.items2.delete!({ });
+    await db.items.delete!({ });
   }
  
   
   await tryRun("Prepare data", async () => {
-    await db.items.insert([{ name: "a" }, { name: "a" }, { name: "b" }]);
-    console.log(await db.items.find())
-    await db.items2.insert([{ name: "a", items_id: 1 }]);
-    await db.items3.insert([{ name: "a" }, { name: "za123" }]);
-    await db.items4.insert([
+    await db.items.insert!([{ name: "a" }, { name: "a" }, { name: "b" }]);
+    console.log(await db.items.find!())
+    await db.items2.insert!([{ name: "a", items_id: 1 }]);
+    await db.items3.insert!([{ name: "a" }, { name: "za123" }]);
+    await db.items4.insert!([
       { name: "abc1", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
       { name: "abc2", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
       { name: "abcd", public: "public data d", added: new Date('04 Dec 1996 00:12:00 GMT') }
     ]);
     
     /* Ensure */
-    await db["*"].insert([{ "*": "a" }, { "*": "a" }, { "*": "b" }]);
-    await db[`"*"`].insert([{ [`"*"`]: "a" }, { [`"*"`]: "a" }, { [`"*"`]: "b" }]);
+    await db["*"].insert!([{ "*": "a" }, { "*": "a" }, { "*": "b" }]);
+    await db[`"*"`].insert!([{ [`"*"`]: "a" }, { [`"*"`]: "a" }, { [`"*"`]: "b" }]);
 
-    await db.various.insert([
+    await db.various.insert!([
       { name: "abc9",  added: new Date('04 Dec 1995 00:12:00 GMT'), jsn: { "a": { "b": 2 } }  },
       { name: "abc1",  added: new Date('04 Dec 1996 00:12:00 GMT'), jsn: { "a": { "b": 3 } }  },
       { name: "abc81 here", added: new Date('04 Dec 1997 00:12:00 GMT'), jsn: { "a": { "b": 2 } }  }
@@ -71,7 +71,7 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
   });
 
   await tryRun("getColumns definition", async () => {
-    const res = await db.tr2.getColumns("fr");
+    const res = await db.tr2.getColumns!("fr");
     // console.log(JSON.stringify(res, null, 2))
     const expected =  [
         {
@@ -176,7 +176,7 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
       expected
     );
 
-    const resDynamic = await db.tr2.getColumns("fr", { rule: "update", filter: {}, data: { t2: "a" } });
+    const resDynamic = await db.tr2.getColumns!("fr", { rule: "update", filter: {}, data: { t2: "a" } });
     assert.deepStrictEqual(
       resDynamic, 
       expected
@@ -184,7 +184,7 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
   });
 
   await tryRun("$unnest_words", async () => {
-    const res = await db.various.find({}, { returnType: "values", select: { name: "$unnest_words" } });
+    const res = await db.various.find!({}, { returnType: "values", select: { name: "$unnest_words" } });
 
     assert.deepStrictEqual( res,  [
       'abc9',
@@ -198,8 +198,8 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
    * Group by/Distinct
    */
   await tryRun("Group by/Distinct", async () => {
-    const res = await db.items.find({}, { select: { name: 1 }, groupBy: true });
-    const resV = await db.items.find({}, { select: { name: 1 }, groupBy: true, returnType: "values" });
+    const res = await db.items.find!({}, { select: { name: 1 }, groupBy: true });
+    const resV = await db.items.find!({}, { select: { name: 1 }, groupBy: true, returnType: "values" });
     
     assert.deepStrictEqual(
       res,
@@ -218,7 +218,7 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
    * returnType "value"
    */
   await tryRun("returnType: value", async () => {
-    const resVl = await db.items.find({}, { select: { name: { $array_agg: ["name"] } }, returnType: "value" });
+    const resVl = await db.items.find!({}, { select: { name: { $array_agg: ["name"] } }, returnType: "value" });
     
     assert.deepStrictEqual(
       resVl,
@@ -234,11 +234,11 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
    * TODO -> ADD ALL FILTER TYPES
    */   
   await tryRun("FTS filtering", async () => {
-    const res = await db.various.count({ "tsv.@@.to_tsquery": ["a"] });
+    const res = await db.various.count!({ "tsv.@@.to_tsquery": ["a"] });
     assert.equal(res, 0);
 
 
-    const d = await db.various.findOne(
+    const d = await db.various.findOne!(
       { "name.@@.to_tsquery": ["abc81"] }, 
       { select: { 
         h: { "$ts_headline_simple": ["name", { plainto_tsquery: "abc81" }] },
@@ -247,7 +247,7 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
         addedY: { "$date_trunc_5minute": ["added"] }
       }});
     // console.log(d);
-    await db.various.findOne(
+    await db.various.findOne!(
       { }, 
       { select: { 
         h: { "$ts_headline_simple": ["name", { plainto_tsquery: "abc81" }] },
@@ -271,7 +271,7 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
 
   await tryRun("$term_highlight", async () => {
     const term = "abc81";
-    const res = await db.various.find(
+    const res = await db.various.find!(
       { "hIdx.>": -2 }, 
       { select: { 
           h: { $term_highlight: [["name"], term, { }] },
@@ -319,54 +319,54 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
 
   await tryRun("funcFilters: $term_highlight", async () => {
     const term = "abc81";
-    const res = await db.various.count(
+    const res = await db.various.count!(
       { $term_highlight: [["*"], term, { returnType: "boolean" }] }
     );
     assert.equal(+res, 1)
   });
 
   await tryRunP("subscribe", async (resolve, reject) => {
-    await db.various.insert({ id: 99 });
+    await db.various.insert!({ id: 99 });
     console.log("subscribing")
-    const sub = await db.various.subscribe({ id: 99  }, {  }, async items => {
+    const sub = await db.various.subscribe!({ id: 99  }, {  }, async items => {
       const item = items[0];
       
       if(item && item.name === "zz3zz3"){
-        await db.various.delete({ name: "zz3zz3" });
+        await db.various.delete!({ name: "zz3zz3" });
         sub.unsubscribe();
         resolve(true)
       }
     });
-    await db.various.update({ id: 99 }, { name: "zz3zz1" });
-    await db.various.update({ id: 99 }, { name: "zz3zz2" });
-    await db.various.update({ id: 99 }, { name: "zz3zz3" });
+    await db.various.update!({ id: 99 }, { name: "zz3zz1" });
+    await db.various.update!({ id: 99 }, { name: "zz3zz2" });
+    await db.various.update!({ id: 99 }, { name: "zz3zz3" });
   });
 
   await tryRunP("subscribeOne with throttle", async (resolve, reject) => {
-    await db.various.insert({ id: 99 });
+    await db.various.insert!({ id: 99 });
     const start = Date.now(); // name: "zz3zz" 
-    const sub = await db.various.subscribeOne({ id: 99  }, { throttle: 1700 }, async item => {
+    const sub = await db.various.subscribeOne!({ id: 99  }, { throttle: 1700 }, async item => {
       // const item = items[0]
       // console.log(item)
 
       const now = Date.now();
       if(item && item.name === "zz3zz2" &&  now - start > 1600 &&  now - start < 1800){
-        await db.various.delete({ name: "zz3zz2" });
+        await db.various.delete!({ name: "zz3zz2" });
         sub.unsubscribe()
         resolve(true)
       }
     });
-    await db.various.update({ id: 99 }, { name: "zz3zz1" });
-    await db.various.update({ id: 99 }, { name: "zz3zz2" });
+    await db.various.update!({ id: 99 }, { name: "zz3zz1" });
+    await db.various.update!({ id: 99 }, { name: "zz3zz2" });
   });
 
   await tryRun("JSON filtering", async () => {
-    const res = await db.various.count({ "jsn->a->>b": '3' });
+    const res = await db.various.count!({ "jsn->a->>b": '3' });
     assert.equal(res, 1)
   });
 
   await tryRun("Complex filtering", async () => {
-    const res = await db.various.count({ 
+    const res = await db.various.count!({ 
       $and: [
         { 
           $filter: [
@@ -389,13 +389,13 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
   });
 
   await tryRun("template_string function", async () => {
-    const res = await db.various.findOne({ name: 'abc9' }, { select: { tstr: { $template_string: ["{name} is hehe"] } } });
-    const res2 = await db.various.findOne({ name: 'abc9' }, { select: { tstr: { $template_string: ["is hehe"] } } });
+    const res = await db.various.findOne!({ name: 'abc9' }, { select: { tstr: { $template_string: ["{name} is hehe"] } } });
+    const res2 = await db.various.findOne!({ name: 'abc9' }, { select: { tstr: { $template_string: ["is hehe"] } } });
     assert.equal(res.tstr, "'abc9 is hehe'")
   });
 
   await tryRun("Between filtering", async () => {
-    const res = await db.various.count({ 
+    const res = await db.various.count!({ 
       added: { $between: [
         new Date('06 Dec 1995 00:12:00 GMT'),
         new Date('03 Dec 1997 00:12:00 GMT')
@@ -403,7 +403,7 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
     assert.equal(res, 1)
   });
   await tryRun("In filtering", async () => {
-    const res = await db.various.count({ 
+    const res = await db.various.count!({ 
       added: { $in: [
         new Date('04 Dec 1996 00:12:00 GMT')
       ] } });
@@ -411,85 +411,85 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
   });
 
   await tryRun("Order by", async () => {
-    const res = await db.items.find({}, { select: { name: 1 }, orderBy: [{ key: "name", asc: false, nulls: "first", nullEmpty: true }] });
+    const res = await db.items.find!({}, { select: { name: 1 }, orderBy: [{ key: "name", asc: false, nulls: "first", nullEmpty: true }] });
     assert.deepStrictEqual(res, [{ name: 'b'}, { name: 'a'}, { name: 'a'}]);
   });
 
   await tryRun("Order by aliased func", async () => {
-    const res = await db.items.find({ }, { select: { uname: { $upper: ["name"] }, count: { $countAll: [] } }, orderBy: { uname: -1 }});
+    const res = await db.items.find!({ }, { select: { uname: { $upper: ["name"] }, count: { $countAll: [] } }, orderBy: { uname: -1 }});
     assert.deepStrictEqual(res, [{ uname: 'B', count: '1'}, { uname: 'A', count: '2'} ])
   });
 
   await tryRun("Order by aggregation", async () => {
-    const res = await db.items.find({ }, { select: { name: 1, count: { $countAll: [] } }, orderBy: { count: -1 }});
+    const res = await db.items.find!({ }, { select: { name: 1, count: { $countAll: [] } }, orderBy: { count: -1 }});
     assert.deepStrictEqual(res, [  { name: 'a', count: '2'} , { name: 'b', count: '1'} ])
   });
 
   await tryRun("Order by colliding alias name", async () => {
-    const res = await db.items.find({ }, { select: { name: { $countAll: [] }, n: { $left: ["name", 1]} }, orderBy: { name: -1 }});
+    const res = await db.items.find!({ }, { select: { name: { $countAll: [] }, n: { $left: ["name", 1]} }, orderBy: { name: -1 }});
     assert.deepStrictEqual(res, [  { name: '2', n: 'a' } , { name: '1', n: 'b'} ])
   });
 
   await tryRun("Update batch example", async () => {
     
-    await db.items4.updateBatch([
+    await db.items4.updateBatch!([
       [{ name: "abc1" }, { name: "abc" }],
       [{ name: "abc2" }, { name: "abc" }]
     ]);
-    assert.equal(await db.items4.count({ name: "abc" }), 2);
+    assert.equal(await db.items4.count!({ name: "abc" }), 2);
   })
 
   await tryRun("Function example", async () => {
   
-    const f = await db.items4.findOne({}, { select: { public: 1, p_5: { $left: ["public", 3] } } });
+    const f = await db.items4.findOne!({}, { select: { public: 1, p_5: { $left: ["public", 3] } } });
     assert.equal(f.p_5.length, 3);
     assert.equal(f.p_5, f.public.substr(0, 3));
 
     // Nested function
-    const fg = await db.items2.findOne({}, { select: { id: 1, name: 1, items3: { name: "$upper" } } });// { $upper: ["public"] } } });
+    const fg = await db.items2.findOne!({}, { select: { id: 1, name: 1, items3: { name: "$upper" } } });// { $upper: ["public"] } } });
     assert.deepStrictEqual(fg, { id: 1, name: 'a', items3: [ { name: 'A' } ] });
 
     // Date utils
-    const Mon = await db.items4.findOne({ name: "abc" }, { select: { added: "$Mon" } });
+    const Mon = await db.items4.findOne!({ name: "abc" }, { select: { added: "$Mon" } });
     assert.deepStrictEqual(Mon, { added: "Dec" });
 
     // Date + agg
-    const MonAgg = await db.items4.find({ name: "abc" }, { select: { added: "$Mon", public: "$count" } });
+    const MonAgg = await db.items4.find!({ name: "abc" }, { select: { added: "$Mon", public: "$count" } });
     assert.deepStrictEqual(MonAgg, [{ added: "Dec", public: '2' }]);
 
     // Returning
-    const returningParam: Parameters<typeof db.items4_pub.insert>[1] = { returning: { id: 1, name: 1, public: 1 , $rowhash: 1, added_day: { "$day": ["added"] } }} ;  //   ctid: 1,
-    let i = await db.items4_pub.insert( { name: "abc123", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') }, returningParam);
+    const returningParam: Parameters<Required<typeof db.items4_pub>["insert"]>[1] = { returning: { id: 1, name: 1, public: 1 , $rowhash: 1, added_day: { "$day": ["added"] } }} ;  //   ctid: 1,
+    let i = await db.items4_pub.insert!( { name: "abc123", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') }, returningParam);
     assert.deepStrictEqual(i, { id: 1,  name: 'abc123', public: 'public data', $rowhash: '347c26babad535aa697a794af89195fe', added_day: 'monday'  }); //  , ctid: '(0,1)'
   
-    let u = await db.items4_pub.update( { name: "abc123" }, { public: "public data2" }, returningParam);
+    let u = await db.items4_pub.update! ({ name: "abc123" }, { public: "public data2" }, returningParam);
     assert.deepStrictEqual(u, [{ id: 1,  name: 'abc123', public: 'public data2', $rowhash: '9d18ddfbff9e13411d13f82d414644de', added_day: 'monday'  }]);
   
-    let d = await db.items4_pub.delete( { name: "abc123" }, returningParam);
+    let d = await db.items4_pub.delete!( { name: "abc123" }, returningParam);
     assert.deepStrictEqual(d, [{ id: 1,  name: 'abc123', public: 'public data2', $rowhash: '9d18ddfbff9e13411d13f82d414644de', added_day: 'monday'  }]);
 	
     console.log("TODO: socket.io stringifies dates")
   });
 
   await tryRun("JSONB filtering", async () => {
-    const row = await db.obj_table.insert({obj: { propName: 3232 }}, { returning: "*" });
-    const sameRow = await db.obj_table.findOne({obj: { propName: 3232 }});
-    const count = await db.obj_table.count({obj: { propName: 3232 }});
+    const row = await db.obj_table.insert!({obj: { propName: 3232 }}, { returning: "*" });
+    const sameRow = await db.obj_table.findOne!({obj: { propName: 3232 }});
+    const count = await db.obj_table.count!({obj: { propName: 3232 }});
     assert.deepStrictEqual(row, sameRow);
     assert.deepStrictEqual(+count, 1);
   })
 
   await tryRun("Postgis examples", async () => {
-    await db.shapes.delete();
+    await db.shapes.delete!();
     const p1 = { ST_GeomFromText: ["POINT(-1 1)", 4326] },
       p2 = { ST_GeomFromText: ["POINT(-2 2)", 4326] };
-    await db.shapes.insert([
+    await db.shapes.insert!([
       { geom: p1, geog: p1 },
       { geom: p2, geog: p2  },
     ])
   
     /** Basic functions and extent filters */
-    const f = await db.shapes.findOne({ $and: [
+    const f = await db.shapes.findOne!({ $and: [
       {"geom.&&.st_makeenvelope": [
         -3, 2,
         -2, 2
@@ -514,7 +514,7 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
     });
 
     /**Aggregate functions */
-    const aggs = await db.shapes.findOne({ }, { 
+    const aggs = await db.shapes.findOne!({ }, { 
       select: {
         xMin: { "$ST_XMin_Agg": ["geom"] },
         xMax: { "$ST_XMax_Agg": ["geom"] },
@@ -545,13 +545,13 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
       data = Buffer.from(str, "utf-8"),
       mediaFile = { data, name: fileName }
 
-    const file = await db.media.insert(mediaFile, { returning: "*" });
+    const file = await db.media.insert!(mediaFile, { returning: "*" });
     const _data = fs.readFileSync(__dirname + "/server/media/"+file.name);
     assert.equal(str, _data.toString('utf8'));
 
     await tryRun("Nested insert", async () => {
   
-      const { name, media: { extension, content_type, original_name } } = await db.items_with_one_media.insert({ name: "somename.txt", media: mediaFile }, { returning: "*" });
+      const { name, media: { extension, content_type, original_name } } = await db.items_with_one_media.insert!({ name: "somename.txt", media: mediaFile }, { returning: "*" });
       
       assert.deepStrictEqual(
         { extension, content_type, original_name },
@@ -587,13 +587,13 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
       data: Buffer.from("str", "utf-8"), 
       name: "will delete.txt" 
     }
-    await db.media.insert(file);
+    await db.media.insert!(file);
     
-    const files = await db.media.find({ original_name: file.name });
+    const files = await db.media.find!({ original_name: file.name });
     assert.equal(files.length, 1);
     const exists0 = fs.existsSync(__dirname + "/server/media/"+files[0].name);
     assert.equal(exists0, true);
-    await db.media.delete({ original_name: file.name }, { returning: "*" });
+    await db.media.delete!({ original_name: file.name }, { returning: "*" });
     const exists = fs.existsSync(__dirname + "/server/media/"+files[0].name);
     assert.equal(exists, false);
   })
@@ -609,18 +609,18 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
       data: Buffer.from(newStr, "utf-8"), 
       name: "will update new.txt" 
     }
-    await db.media.insert(file);
-    const original = await db.media.findOne({ original_name: file.name });
+    await db.media.insert!(file);
+    const original = await db.media.findOne!({ original_name: file.name });
     
     const initialFileStr = fs.readFileSync(__dirname + "/server/media/" + original.name).toString('utf8');
     assert.equal(initialStr, initialFileStr);
 
-    await db.media.update({ id: original.id }, newFile);
+    await db.media.update!({ id: original.id }, newFile);
     
     const newFileStr = fs.readFileSync(__dirname + "/server/media/" + original.name).toString('utf8');
     assert.equal(newStr, newFileStr);
     
-    const newF = await db.media.findOne({ id: original.id });
+    const newF = await db.media.findOne!({ id: original.id });
 
     assert.equal(newF.original_name, newFile.name)
   });
@@ -642,11 +642,11 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
      */
   
     const json = { a: true, arr: "2", arr1: 3, arr2: [1], arrStr: ["1123.string"] }
-    const fo = await db.tjson.insert({ colOneOf: "a", json }, { returning: "*"});
+    const fo = await db.tjson.insert!({ colOneOf: "a", json }, { returning: "*"});
     // assert.deepStrictEqual(fo.json, json);
-    await db.tjson.insert({ colOneOf: "a", json: {...json, o: { o1: 2, o2: true } } })
+    await db.tjson.insert!({ colOneOf: "a", json: {...json, o: { o1: 2, o2: true } } })
     try {
-      await db.tjson.insert({ colOneOf: "a", json: { a: true, arr: "22"} });
+      await db.tjson.insert!({ colOneOf: "a", json: { a: true, arr: "22"} });
       throw "Should have failed"
     } catch(e){
       console.log("Perfect:", e)
@@ -656,21 +656,21 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
   
   await tryRun("Exists filter example", async () => {
   
-    const fo = await db.items.findOne(),
-      f = await db.items.find();
+    const fo = await db.items.findOne!(),
+      f = await db.items.find!();
       
     assert.deepStrictEqual(fo,    { h: null, id: 1, name: 'a' }, "findOne query failed" );
     assert.deepStrictEqual(f[0],  { h: null, id: 1, name: 'a' }, "findOne query failed" );
   });
 
   await tryRun("Result size", async () => {
-    const is75bits = await db.items.size({ 
+    const is75bits = await db.items.size!({ 
     }, { select: { name: 1 } });
     assert.equal(is75bits, '75', "Result size query failed")
   });
 
   await tryRun("Basic exists", async () => {
-    const expect0 = await db.items.count({ 
+    const expect0 = await db.items.count!({ 
       $and: [
         { $exists: { items2: { name: "a" } } },
         { $exists: { items3: { name: "b" } } },
@@ -680,7 +680,7 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
   });
   
   await tryRun("Basic fts with shorthand notation", async () => {
-    const res = await db.items.count({ 
+    const res = await db.items.count!({ 
       $and: [
         { $exists: { items2: { "name.@@.to_tsquery": ["a"] } } },
         { $exists: { items3: { "name.@@.to_tsquery": ["b"] } } },
@@ -691,7 +691,7 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
   });
 
   await tryRun("Exists with shortest path wildcard filter example", async () => {
-    const expect2 = await db.items.find({ 
+    const expect2 = await db.items.find!({ 
       $and: [
         { $existsJoined: { "**.items3": { name: "a" } } },
         { $existsJoined: { items2: { name: "a" } } }
@@ -702,7 +702,7 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
      
 
   await tryRun("Exists with exact path filter example", async () => {
-    const _expect2 = await db.items.find({ 
+    const _expect2 = await db.items.find!({ 
       $and: [
         // { "items2": { name: "a" } },
         // { "items2.items3": { name: "a" } },
@@ -713,7 +713,7 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
   });
 
   await tryRun("Not Exists with exact path filter example", async () => {
-    const _expect1 = await db.items.find({ 
+    const _expect1 = await db.items.find!({ 
       $and: [
         // { "items2": { name: "a" } },
         // { "items2.items3": { name: "a" } },
@@ -725,14 +725,14 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
 
   /* Upsert */
   await tryRun("Upsert example", async () => {
-    await db.items.upsert({ name: "tx" }, { name: "tx" });
-    await db.items.upsert({ name: "tx" }, { name: "tx" });
-    assert.equal(await db.items.count({ name: "tx" }), 1, "upsert command failed");
+    await db.items.upsert!({ name: "tx" }, { name: "tx" });
+    await db.items.upsert!({ name: "tx" }, { name: "tx" });
+    assert.equal(await db.items.count!({ name: "tx" }), 1, "upsert command failed");
   });
 
   /* Joins example */
   await tryRun("Joins example", async () => {
-    const items = await db.items.find({}, {
+    const items = await db.items.find!({}, {
       select: {
         "*": 1,
         items3: "*",
@@ -748,13 +748,13 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
 
   /* Joins duplicate table example */
   await tryRun("Joins repeating table example", async () => {
-    const items2 = await db.items.find({}, {
+    const items2 = await db.items.find!({}, {
       select: {
         "*": 1,
         items2: "*"
       }
     });
-    const items2j = await db.items.find({}, {
+    const items2j = await db.items.find!({}, {
       select: {
         "*": 1,
         items2: "*",
@@ -771,18 +771,18 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
   
   
   await tryRun("Join aggregate functions example", async () => {
-    const singleShortHandAgg = await db.items.findOne(
+    const singleShortHandAgg = await db.items.findOne!(
       {},
       { select: { id: "$max" }}
     );
-    const singleAgg = await db.items.findOne(
+    const singleAgg = await db.items.findOne!(
       {},
       { select: { id: { "$max": ["id"] } }}
     );
     assert.deepStrictEqual(singleShortHandAgg, { id: 4 });
     assert.deepStrictEqual(singleAgg, { id: 4 });
 
-    const shortHandAggJoined = await db.items.findOne(
+    const shortHandAggJoined = await db.items.findOne!(
       { id: 4 },
       { select: { id: 1, items2: { name: "$max" } }}
     );
@@ -793,14 +793,14 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
 
   /* $rowhash -> Custom column that returms md5(ctid + allowed select columns). Used in joins & CRUD to bypass PKey details */
   await tryRun("$rowhash example", async () => {
-    const rowhash = await db.items.findOne({}, { select: { $rowhash: 1, "*": 1 }});
+    const rowhash = await db.items.findOne!({}, { select: { $rowhash: 1, "*": 1 }});
     const f = { $rowhash: rowhash.$rowhash };
-    const rowhashView = await db.v_items.findOne({}, { select: { $rowhash: 1 }});
-    const rh1 = await db.items.findOne({ $rowhash: rowhash.$rowhash }, { select: { $rowhash: 1 }});
-    const rhView = await db.v_items.findOne({ $rowhash: rowhashView.$rowhash }, { select: { $rowhash: 1 }});
+    const rowhashView = await db.v_items.findOne!({}, { select: { $rowhash: 1 }});
+    const rh1 = await db.items.findOne!({ $rowhash: rowhash.$rowhash }, { select: { $rowhash: 1 }});
+    const rhView = await db.v_items.findOne!({ $rowhash: rowhashView.$rowhash }, { select: { $rowhash: 1 }});
     // console.log({ rowhash, f });
 
-    await db.items.update(f, { name: 'a' });
+    await db.items.update!(f, { name: 'a' });
     
     // console.log(rowhash, rh1)
     // console.log(rowhashView, rhView)
@@ -818,24 +818,24 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
   await tryRun("Reference column nested insert", async () => {
     const nestedRow = { name: "nested_insert" };
     const parentRow = { name: "parent insert" }
-    const pr = await db.items2.insert({ items_id: nestedRow, ...parentRow }, { returning: "*" });
+    const pr = await db.items2.insert!({ items_id: nestedRow, ...parentRow }, { returning: "*" });
     
-    const childRows = await db.items.find(nestedRow);
+    const childRows = await db.items.find!(nestedRow);
     assert.equal(childRows.length, 1);
-    assert.deepStrictEqual(await db.items2.findOne(parentRow), { hh: null, id: pr.id, ...parentRow, items_id: childRows[0].id });
+    assert.deepStrictEqual(await db.items2.findOne!(parentRow), { hh: null, id: pr.id, ...parentRow, items_id: childRows[0].id });
 
   });
 
   await tryRun("Reference column deep nested insert", async () => {
     
-    const pr = await db.items4a.insert({ 
+    const pr = await db.items4a.insert!({ 
       items_id: { name: "it" }, 
       items2_id: { name: "it2", items_id: { name: "it" } }, 
       name: "it4a" 
     }, { returning: "*" });
-    const itemsCount = await db.items.count({ name: "it" })
-    const items2Count = await db.items2.count({ name: "it2" })
-    const items4aCount = await db.items4a.count({ name: "it4a" })
+    const itemsCount = await db.items.count!({ name: "it" })
+    const items2Count = await db.items2.count!({ name: "it2" })
+    const items4aCount = await db.items4a.count!({ name: "it4a" })
     
     assert.equal(+itemsCount, 2);
     assert.equal(+items2Count, 1);
@@ -844,15 +844,15 @@ export default async function isomorphic(db: Partial<DBHandlerServer> | Partial<
   });
 
   await tryRun("Multi reference column nested insert", async () => {
-    await db.items_multi.insert({ 
+    await db.items_multi.insert!({ 
       items0_id: { name: "multi" }, 
       items1_id: { name: "multi" }, 
       items2_id: { name: "multi" }, 
       items3_id: { name: "multi" }, 
       name: "root_multi" 
     }, { returning: "*" });
-    const itemsCount = await db.items.count({ name: "multi" })
-    const multiItem = await db.items_multi.findOne({ name: "root_multi" }, { select: { "*": 1, items: "*" } });
+    const itemsCount = await db.items.count!({ name: "multi" })
+    const multiItem = await db.items_multi.findOne!({ name: "root_multi" }, { select: { "*": 1, items: "*" } });
     
     assert.equal(+itemsCount, 4);
     assert.equal(multiItem?.name, "root_multi");

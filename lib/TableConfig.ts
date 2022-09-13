@@ -395,17 +395,18 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
       if(triggers){
 
-        const existingTriggers: { trigger_name: string }[] = await this.dbo.sql!(`
-          SELECT event_object_table
-            ,trigger_name
-          FROM  information_schema.triggers
-          WHERE event_object_table = `+ "${tableName}" + `
-          ORDER BY event_object_table
-        `,
-        { tableName: tableNameRaw }, 
-        { returnType: "rows" }) as any;
+        const existingTriggers = await this.dbo.sql!(`
+            SELECT event_object_table
+              ,trigger_name
+            FROM  information_schema.triggers
+            WHERE event_object_table = `+ "${tableName}" + `
+            ORDER BY event_object_table
+          `,
+          { tableName: tableNameRaw }, 
+          { returnType: "rows" }
+        ) as { trigger_name: string }[];
 
-        getKeys(triggers).map(triggerName => {
+        getKeys(triggers).forEach(triggerName => {
           const trigger = triggers[triggerName];
           if(isDropped){
             queries.push(`DROP TRIGGER IF EXISTS ${asName(triggerName)} ON ${tableName};`)
@@ -436,7 +437,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
               REFERENCING NEW TABLE AS new_table
               FOR EACH ${trigger.forEach}
               EXECUTE PROCEDURE ${funcNameParsed}();
-            `)
+            `);
           })
         })
       }

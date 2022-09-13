@@ -36,6 +36,7 @@ async function client_only(db, auth, log, methods, tableSchema) {
                 await (0, isomorphic_queries_1.tryRun)("SQL Full result", async () => {
                     const sqlStatement = await db.sql("SELECT $1", [1], { returnType: "statement" });
                     assert_1.strict.equal(sqlStatement, "SELECT 1", "db.sql statement query failed");
+                    await db.sql("SELECT 1 -- ${param}", {}, { hasParams: false });
                     const arrayMode = await db.sql("SELECT 1 as a, 2 as a", undefined, { returnType: "arrayMode" });
                     assert_1.strict.equal(arrayMode.rows?.[0].join("."), "1.2", "db.sql statement arrayMode failed");
                     assert_1.strict.equal(arrayMode.fields?.map(f => f.name).join("."), "a.a", "db.sql statement arrayMode failed");
