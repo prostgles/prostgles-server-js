@@ -3,6 +3,8 @@ import io from "socket.io-client";
 
 import isomorphic from "../isomorphic_queries";
 import client_only from "../client_only_queries";
+import { DBHandler } from "prostgles-types";
+import { DBHandlerClient } from "prostgles-client/dist/prostgles";
 export { DBHandlerClient, Auth } from "prostgles-client/dist/prostgles";
 
 const start = Date.now();
@@ -55,14 +57,14 @@ try {
         try {
           log("Starting Client isomorphic tests")
           // try {
-            await isomorphic(db);
+            await isomorphic(db as any);
           // } catch(e){
           //   throw { isoErr: e }
           // }
           log("Client isomorphic tests successful")
   
           // try {
-            await client_only(db, auth, log, methods, tableSchema);
+            await client_only(db as any, auth, log, methods, tableSchema);
           // } catch(e){
           //   throw { ClientErr: e }
           // }

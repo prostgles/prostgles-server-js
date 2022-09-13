@@ -59,9 +59,29 @@ function dd() {
     log("created prostgles");
     const tableConfig = {
         tr2: {
+            // dropIfExists: true,
             columns: {
                 t1: { label: { fr: "fr_t1" }, info: { hint: "hint...", min: "a", max: "b" } },
                 t2: { label: { en: "en_t2" } },
+            },
+            triggers: {
+                atLeastOneA: {
+                    actions: ["delete", "update"],
+                    forEach: "statement",
+                    type: "after",
+                    query: `
+						DECLARE
+						x_rec record;
+						BEGIN
+
+							IF NOT EXISTS(SELECT * FROM tr2 WHERE t1 = 'a' AND t2 = 'b') THEN
+								RAISE EXCEPTION 'Must have at least one row with t1 = a AND t2 = b';
+							END IF;
+
+							RETURN NULL;
+						END;
+					`
+                }
             }
         },
         users: {

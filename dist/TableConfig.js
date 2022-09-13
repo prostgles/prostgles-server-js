@@ -125,10 +125,10 @@ class TableConfigurator {
         if (!this.config || !this.prostgles.pgp)
             throw "config or pgp missing";
         /* Create lookup tables */
-        Object.keys(this.config).map(async (tableNameRaw) => {
+        (0, prostgles_types_1.getKeys)(this.config).map(async (tableNameRaw) => {
             const tableName = (0, prostgles_types_1.asName)(tableNameRaw);
             const tableConf = this.config[tableNameRaw];
-            const { dropIfExists = false, dropIfExistsCascade = false, triggers } = tableConf;
+            const { dropIfExists = false, dropIfExistsCascade = false } = tableConf;
             const isDropped = dropIfExists || dropIfExistsCascade;
             if (dropIfExistsCascade) {
                 queries.push(`DROP TABLE IF EXISTS ${tableName} CASCADE;`);
@@ -151,47 +151,6 @@ class TableConfigurator {
                     // console.log("Created lookup table " + tableName)
                 }
             }
-            if (triggers) {
-                const existingTriggers = await this.dbo.sql(`
-            SELECT event_object_table
-              ,trigger_name
-            FROM  information_schema.triggers
-            WHERE event_object_table = ` + "${tableName}" + `
-            ORDER BY event_object_table
-          `, { tableName: tableNameRaw }, { returnType: "rows" });
-                (0, prostgles_types_1.getKeys)(triggers).forEach(triggerName => {
-                    const trigger = triggers[triggerName];
-                    if (isDropped) {
-                        queries.push(`DROP TRIGGER IF EXISTS ${(0, prostgles_types_1.asName)(triggerName)} ON ${tableName};`);
-                    }
-                    const funcNameParsed = (0, prostgles_types_1.asName)(triggerName);
-                    if (isDropped || !existingTriggers.some(t => t.trigger_name === triggerName)) {
-                        queries.push(`
-              CREATE OR REPLACE FUNCTION ${funcNameParsed}()
-                RETURNS trigger
-                LANGUAGE plpgsql
-              AS
-              $$
-              ${trigger.query}
-              $$;
-            `);
-                    }
-                    trigger.actions.forEach(action => {
-                        const triggerActionName = triggerName + "_" + action;
-                        const triggerActionNameParsed = (0, prostgles_types_1.asName)(triggerActionName);
-                        if (dropIfExists || dropIfExistsCascade) {
-                            queries.push(`DROP TRIGGER IF EXISTS ${triggerActionNameParsed} ON ${tableName};`);
-                        }
-                        queries.push(`
-              CREATE TRIGGER ${triggerActionNameParsed}
-              ${trigger.type} ${action} ON ${tableName}
-              REFERENCING NEW TABLE AS new_table
-              FOR EACH ${trigger.forEach}
-              EXECUTE PROCEDURE ${funcNameParsed}();
-            `);
-                    });
-                });
-            }
         });
         if (queries.length) {
             const q = queries.join("\n");
@@ -200,7 +159,7 @@ class TableConfigurator {
             await this.prostgles.refreshDBO();
         }
         queries = [];
-        /* Create referenced columns */
+        /* Create columns */
         await Promise.all((0, prostgles_types_1.getKeys)(this.config).map(async (tableName) => {
             const tableConf = this.config[tableName];
             if ("columns" in tableConf) {
@@ -304,6 +263,56 @@ class TableConfigurator {
                         queries.push(`DROP INDEX IF EXISTS ${(0, prostgles_types_1.asName)(indexName)}  ;`);
                     }
                     queries.push(`CREATE ${unique ? "UNIQUE" : ""} ${!concurrently ? "" : "CONCURRENTLY"} INDEX ${(0, prostgles_types_1.asName)(indexName)} ON ${(0, prostgles_types_1.asName)(tableName)} ${!using ? "" : ("USING " + using)} (${definition}) ;`);
+                });
+            }
+            const { triggers, dropIfExists, dropIfExistsCascade } = tableConf;
+            if (triggers) {
+                const isDropped = dropIfExists || dropIfExistsCascade;
+                const existingTriggers = await this.dbo.sql(`
+            SELECT event_object_table
+              ,trigger_name
+            FROM  information_schema.triggers
+            WHERE event_object_table = ` + "${tableName}" + `
+            ORDER BY event_object_table
+          `, { tableName }, { returnType: "rows" });
+                // const existingTriggerFuncs = await this.dbo.sql!(`
+                //   SELECT p.oid,proname,prosrc,u.usename
+                //   FROM  pg_proc p  
+                //   JOIN  pg_user u ON u.usesysid = p.proowner  
+                //   WHERE prorettype = 2279;
+                // `, {}, { returnType: "rows" }) as { proname: string }[];
+                (0, prostgles_types_1.getKeys)(triggers).forEach(triggerFuncName => {
+                    const trigger = triggers[triggerFuncName];
+                    const funcNameParsed = (0, prostgles_types_1.asName)(triggerFuncName);
+                    queries.push(`
+            CREATE OR REPLACE FUNCTION ${funcNameParsed}()
+              RETURNS trigger
+              LANGUAGE plpgsql
+            AS
+            $$
+
+            ${trigger.query}
+            
+            $$;
+          `);
+                    trigger.actions.forEach(action => {
+                        const triggerActionName = triggerFuncName + "_" + action;
+                        const triggerActionNameParsed = (0, prostgles_types_1.asName)(triggerActionName);
+                        if (isDropped) {
+                            queries.push(`DROP TRIGGER IF EXISTS ${triggerActionNameParsed} ON ${tableName};`);
+                        }
+                        if (isDropped || !existingTriggers.some(t => t.trigger_name === triggerActionName)) {
+                            const newTableName = action !== "delete" ? "NEW TABLE AS new_table" : "";
+                            const oldTableName = action !== "insert" ? "OLD TABLE AS old_table" : "";
+                            queries.push(`
+                CREATE TRIGGER ${triggerActionNameParsed}
+                ${trigger.type} ${action} ON ${tableName}
+                REFERENCING ${newTableName} ${oldTableName}
+                FOR EACH ${trigger.forEach}
+                EXECUTE PROCEDURE ${funcNameParsed}();
+              `);
+                        }
+                    });
                 });
             }
         }));

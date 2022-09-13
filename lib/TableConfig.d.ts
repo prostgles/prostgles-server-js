@@ -24,6 +24,9 @@ declare type BaseTableDefinition<LANG_IDS = AnyObject> = {
     dropIfExists?: boolean;
     triggers?: {
         [triggerName: string]: {
+            /**
+             * Use "before" when you need to change the data before the action
+             */
             type: "before" | "after" | "instead of";
             actions: ("insert" | "update" | "delete")[];
             forEach: "statement" | "row";
