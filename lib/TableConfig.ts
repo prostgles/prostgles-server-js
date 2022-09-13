@@ -39,6 +39,34 @@ type BaseTableDefinition<LANG_IDS = AnyObject> = {
   }
   dropIfExistsCascade?: boolean;
   dropIfExists?: boolean;
+  triggers?: {
+    [triggerName: string]: {
+      type: "before" | "after" | "instead of";
+      actions: ("insert" | "update" | "delete")[];
+      forEach: "statement" | "row";
+      /**
+       * @example
+       * DECLARE
+          x_rec record;
+        BEGIN
+            raise notice '=operation: % =', TG_OP;
+            IF (TG_OP = 'UPDATE' OR TG_OP = 'DELETE') THEN
+                FOR x_rec IN SELECT * FROM old_table LOOP
+                    raise notice 'OLD: %', x_rec;
+                END loop;
+            END IF;
+            IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN
+                FOR x_rec IN SELECT * FROM new_table LOOP
+                    raise notice 'NEW: %', x_rec;
+                END loop;
+            END IF;
+
+            RETURN NULL;
+        END;
+       */
+      query: string;
+    }
+  };
 }
 
 type LookupTableDefinition<LANG_IDS> = {
@@ -337,9 +365,10 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
     if (!this.config || !this.prostgles.pgp) throw "config or pgp missing"
     /* Create lookup tables */
-    Object.keys(this.config).map(tableName => {
-      const tableConf = this.config![tableName];
-      const { dropIfExists = false, dropIfExistsCascade = false } = tableConf;
+    Object.keys(this.config).map(async tableNameRaw => {
+      const tableName = asName(tableNameRaw);
+      const tableConf = this.config![tableNameRaw];
+      const { dropIfExists = false, dropIfExistsCascade = false, triggers } = tableConf;
       if (dropIfExistsCascade) {
         queries.push(`DROP TABLE IF EXISTS ${tableName} CASCADE;`);
       } else if (dropIfExists) {
@@ -347,7 +376,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       }
       if ("isLookupTable" in tableConf && Object.keys(tableConf.isLookupTable?.values).length) {
         const rows = Object.keys(tableConf.isLookupTable?.values).map(id => ({ id, ...(tableConf.isLookupTable?.values[id]) }));
-        if (dropIfExists || dropIfExistsCascade || !this.dbo?.[tableName]) {
+        if (dropIfExists || dropIfExistsCascade || !this.dbo?.[tableNameRaw]) {
           const keys = Object.keys(rows[0]).filter(k => k !== "id");
           queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
                         id  TEXT PRIMARY KEY
@@ -360,6 +389,52 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
           });
           // console.log("Created lookup table " + tableName)
         }
+      }
+
+      if(triggers){
+
+        const existingTriggers: { trigger_name: string }[] = await this.dbo.sql!(`
+          SELECT event_object_table
+            ,trigger_name
+          FROM  information_schema.triggers
+          WHERE event_object_table = `+ "${tableName}" + `
+          ORDER BY event_object_table
+        `,
+        { tableName: tableNameRaw }, 
+        { returnType: "rows" }) as any;
+
+        getKeys(triggers).map(triggerName => {
+          const trigger = triggers[triggerName];
+          if(dropIfExists || dropIfExistsCascade){
+            queries.push(`DROP TRIGGER IF EXISTS ${asName(triggerName)} ON ${tableName};`)
+          }
+          if(!existingTriggers.some(t => t.trigger_name === triggerName)){
+            const funcNameParsed = asName(triggerName+"_func")
+            queries.push(`
+              CREATE OR REPLACE FUNCTION ${funcNameParsed}()
+                RETURNS trigger
+                LANGUAGE plpgsql
+              AS
+              $$
+              ${trigger.query}
+              $$;
+            `);
+            trigger.actions.forEach(action => {
+              const triggerActionName = triggerName+"_"+action;
+              const triggerActionNameParsed = asName(triggerActionName)
+              if(dropIfExists || dropIfExistsCascade){
+                queries.push(`DROP TRIGGER IF EXISTS ${triggerActionNameParsed} ON ${tableName};`)
+              }
+              queries.push(`
+                CREATE TRIGGER ${triggerActionNameParsed}
+                AFTER INSERT ON ${tableName}
+                REFERENCING NEW TABLE AS new_table
+                FOR EACH STATEMENT
+                EXECUTE PROCEDURE ${funcNameParsed}();
+              `)
+            })
+          }
+        })
       }
     });
 

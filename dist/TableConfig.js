@@ -125,9 +125,10 @@ class TableConfigurator {
         if (!this.config || !this.prostgles.pgp)
             throw "config or pgp missing";
         /* Create lookup tables */
-        Object.keys(this.config).map(tableName => {
-            const tableConf = this.config[tableName];
-            const { dropIfExists = false, dropIfExistsCascade = false } = tableConf;
+        Object.keys(this.config).map(async (tableNameRaw) => {
+            const tableName = (0, prostgles_types_1.asName)(tableNameRaw);
+            const tableConf = this.config[tableNameRaw];
+            const { dropIfExists = false, dropIfExistsCascade = false, triggers } = tableConf;
             if (dropIfExistsCascade) {
                 queries.push(`DROP TABLE IF EXISTS ${tableName} CASCADE;`);
             }
@@ -136,7 +137,7 @@ class TableConfigurator {
             }
             if ("isLookupTable" in tableConf && Object.keys(tableConf.isLookupTable?.values).length) {
                 const rows = Object.keys(tableConf.isLookupTable?.values).map(id => ({ id, ...(tableConf.isLookupTable?.values[id]) }));
-                if (dropIfExists || dropIfExistsCascade || !this.dbo?.[tableName]) {
+                if (dropIfExists || dropIfExistsCascade || !this.dbo?.[tableNameRaw]) {
                     const keys = Object.keys(rows[0]).filter(k => k !== "id");
                     queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
                         id  TEXT PRIMARY KEY
@@ -148,6 +149,47 @@ class TableConfigurator {
                     });
                     // console.log("Created lookup table " + tableName)
                 }
+            }
+            if (triggers) {
+                const existingTriggers = await this.dbo.sql(`
+          SELECT event_object_table
+            ,trigger_name
+          FROM  information_schema.triggers
+          WHERE event_object_table = ` + "${tableName}" + `
+          ORDER BY event_object_table
+        `, { tableName: tableNameRaw }, { returnType: "rows" });
+                (0, prostgles_types_1.getKeys)(triggers).map(triggerName => {
+                    const trigger = triggers[triggerName];
+                    if (dropIfExists || dropIfExistsCascade) {
+                        queries.push(`DROP TRIGGER IF EXISTS ${(0, prostgles_types_1.asName)(triggerName)} ON ${tableName};`);
+                    }
+                    if (!existingTriggers.some(t => t.trigger_name === triggerName)) {
+                        const funcNameParsed = (0, prostgles_types_1.asName)(triggerName + "_func");
+                        queries.push(`
+              CREATE OR REPLACE FUNCTION ${funcNameParsed}()
+                RETURNS trigger
+                LANGUAGE plpgsql
+              AS
+              $$
+              ${trigger.query}
+              $$;
+            `);
+                        trigger.actions.forEach(action => {
+                            const triggerActionName = triggerName + "_" + action;
+                            const triggerActionNameParsed = (0, prostgles_types_1.asName)(triggerActionName);
+                            if (dropIfExists || dropIfExistsCascade) {
+                                queries.push(`DROP TRIGGER IF EXISTS ${triggerActionNameParsed} ON ${tableName};`);
+                            }
+                            queries.push(`
+                CREATE TRIGGER ${triggerActionNameParsed}
+                AFTER INSERT ON ${tableName}
+                REFERENCING NEW TABLE AS new_table
+                FOR EACH STATEMENT
+                EXECUTE PROCEDURE ${funcNameParsed}();
+              `);
+                        });
+                    }
+                });
             }
         });
         if (queries.length) {

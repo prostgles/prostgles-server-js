@@ -22,6 +22,34 @@ declare type BaseTableDefinition<LANG_IDS = AnyObject> = {
     };
     dropIfExistsCascade?: boolean;
     dropIfExists?: boolean;
+    triggers?: {
+        [triggerName: string]: {
+            type: "before" | "after" | "instead of";
+            actions: ("insert" | "update" | "delete")[];
+            forEach: "statement" | "row";
+            /**
+             * @example
+             * DECLARE
+                x_rec record;
+              BEGIN
+                  raise notice '=operation: % =', TG_OP;
+                  IF (TG_OP = 'UPDATE' OR TG_OP = 'DELETE') THEN
+                      FOR x_rec IN SELECT * FROM old_table LOOP
+                          raise notice 'OLD: %', x_rec;
+                      END loop;
+                  END IF;
+                  IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN
+                      FOR x_rec IN SELECT * FROM new_table LOOP
+                          raise notice 'NEW: %', x_rec;
+                      END loop;
+                  END IF;
+      
+                  RETURN NULL;
+              END;
+             */
+            query: string;
+        };
+    };
 };
 declare type LookupTableDefinition<LANG_IDS> = {
     isLookupTable: {
