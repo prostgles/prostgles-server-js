@@ -31,8 +31,8 @@ export async function runSQL(this: DboBuilder, query: string, params: any, optio
       } else if(db) {
 
           let finalQuery = query + "";
-          if(returnType === "arrayMode" && !["listen ", "notify "].find(c => query.toLowerCase().trim().startsWith(c)) && hasParams){
-              finalQuery = new PQ({ text: pgp.as.format(query, params), rowMode: "array" });
+          if(returnType === "arrayMode" && !["listen ", "notify "].find(c => query.toLowerCase().trim().startsWith(c))){
+              finalQuery = new PQ({ text: hasParams? pgp.as.format(query, params) : query, rowMode: "array" });
           }
 
           let _qres = await db.result(finalQuery, hasParams? params : undefined)
