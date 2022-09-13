@@ -369,6 +369,8 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       const tableName = asName(tableNameRaw);
       const tableConf = this.config![tableNameRaw];
       const { dropIfExists = false, dropIfExistsCascade = false, triggers } = tableConf;
+      const isDropped = dropIfExists || dropIfExistsCascade;
+
       if (dropIfExistsCascade) {
         queries.push(`DROP TABLE IF EXISTS ${tableName} CASCADE;`);
       } else if (dropIfExists) {
@@ -376,7 +378,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       }
       if ("isLookupTable" in tableConf && Object.keys(tableConf.isLookupTable?.values).length) {
         const rows = Object.keys(tableConf.isLookupTable?.values).map(id => ({ id, ...(tableConf.isLookupTable?.values[id]) }));
-        if (dropIfExists || dropIfExistsCascade || !this.dbo?.[tableNameRaw]) {
+        if (isDropped || !this.dbo?.[tableNameRaw]) {
           const keys = Object.keys(rows[0]).filter(k => k !== "id");
           queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
                         id  TEXT PRIMARY KEY
@@ -405,11 +407,12 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
         getKeys(triggers).map(triggerName => {
           const trigger = triggers[triggerName];
-          if(dropIfExists || dropIfExistsCascade){
+          if(isDropped){
             queries.push(`DROP TRIGGER IF EXISTS ${asName(triggerName)} ON ${tableName};`)
           }
-          if(!existingTriggers.some(t => t.trigger_name === triggerName)){
-            const funcNameParsed = asName(triggerName+"_func")
+
+          const funcNameParsed = asName(triggerName);
+          if(isDropped || !existingTriggers.some(t => t.trigger_name === triggerName)){
             queries.push(`
               CREATE OR REPLACE FUNCTION ${funcNameParsed}()
                 RETURNS trigger
@@ -419,21 +422,22 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
               ${trigger.query}
               $$;
             `);
-            trigger.actions.forEach(action => {
-              const triggerActionName = triggerName+"_"+action;
-              const triggerActionNameParsed = asName(triggerActionName)
-              if(dropIfExists || dropIfExistsCascade){
-                queries.push(`DROP TRIGGER IF EXISTS ${triggerActionNameParsed} ON ${tableName};`)
-              }
-              queries.push(`
-                CREATE TRIGGER ${triggerActionNameParsed}
-                AFTER INSERT ON ${tableName}
-                REFERENCING NEW TABLE AS new_table
-                FOR EACH STATEMENT
-                EXECUTE PROCEDURE ${funcNameParsed}();
-              `)
-            })
           }
+          trigger.actions.forEach(action => {
+            const triggerActionName = triggerName+"_"+action;
+            
+            const triggerActionNameParsed = asName(triggerActionName)
+            if(dropIfExists || dropIfExistsCascade){
+              queries.push(`DROP TRIGGER IF EXISTS ${triggerActionNameParsed} ON ${tableName};`)
+            }
+            queries.push(`
+              CREATE TRIGGER ${triggerActionNameParsed}
+              ${trigger.type} ${action} ON ${tableName}
+              REFERENCING NEW TABLE AS new_table
+              FOR EACH ${trigger.forEach}
+              EXECUTE PROCEDURE ${funcNameParsed}();
+            `)
+          })
         })
       }
     });
