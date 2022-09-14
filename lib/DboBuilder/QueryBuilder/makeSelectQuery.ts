@@ -1,5 +1,5 @@
 
-import { TableHandler } from "../../DboBuilder";
+import { prepareSort, TableHandler } from "../../DboBuilder";
 import { SelectParams, asName } from "prostgles-types";
 import { NewQuery, SelectItem } from "./QueryBuilder";
 
@@ -179,7 +179,7 @@ export function makeSelectQuery(
     ,   q.where
     ,   groupBy //!aggs.length? "" : `GROUP BY ${nonAggs.map(sf => asName(sf.alias)).join(", ")}`,
     ,   q.having? `HAVING ${q.having}` : ""
-    ,   q.orderBy.join(", ")
+    ,   prepareSort(q.orderByItems)
     ,   !depth? `LIMIT ${q.limit} ` : null
     ,   !depth? `OFFSET ${q.offset || 0} ` : null
     ].filter(v => v && (v + "").trim().length) as unknown as string[]);
@@ -202,17 +202,23 @@ export function makeSelectQuery(
 
   let rootGroupBy: string | undefined;
   if((selectParams.groupBy || aggs.length || q.joins && q.joins.length) && nonAggs.length){
-    // console.log({ aggs, nonAggs, joins: q.joins })
-    // rootGroupBy = getGroupBy(rootSelectItems, depth? rootSelectItems : nonAggs) + (aggs?.length? "" : ", ctid")
-    rootGroupBy = `GROUP BY ${
-      (depth? 
-        q.allFields.map(f => asName(f)) : 
-        nonAggs.map(s => s.type === "function"? s.getQuery() : asName(s.alias))
-      ).concat(
-        (aggs && aggs.length)? 
-          [] : 
-          [`ctid`]
-        ).filter(s => s).join(", ")} `
+    const groupByItems = (depth? 
+      q.allFields.map(f => asName(f)) : 
+      nonAggs.map(s => s.type === "function"? s.getQuery() : asName(s.alias))
+    ).concat(
+      (aggs?.length)? 
+        [] : 
+        [`ctid`]
+    ).filter(s => s);
+
+    /** Add ORDER BY items not included in root select */
+    q.orderByItems.forEach(sortItem => {
+      if("fieldQuery" in sortItem && !groupByItems.includes(sortItem.fieldQuery)){
+        groupByItems.push(sortItem.fieldQuery);
+      }
+    })
+
+    rootGroupBy = `GROUP BY ${groupByItems.join(", ")} `
   }
 
   /* Joined query */
@@ -271,7 +277,7 @@ export function makeSelectQuery(
   ,   ") t0"
   ,   rootGroupBy
   ,   q.having? `HAVING ${q.having} ` : ""
-  ,   q.orderBy
+  ,   prepareSort(q.orderByItems)
   ,   depth? null : `LIMIT ${q.limit || 0} OFFSET ${q.offset || 0}`
   ,   "-- EOF 0. joined root"
   ,   " \n"

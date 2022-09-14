@@ -1,6 +1,15 @@
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import { ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams, OrderBy, InsertParams, UpdateParams, DeleteParams, DbJoinMaker, PG_COLUMN_UDT_DATA_TYPE, TS_PG_Types, TableInfo as TInfo, SQLHandler, AnyObject, Select, ProstglesError } from "prostgles-types";
+export declare type SortItem = {
+    asc: boolean;
+    nulls?: "first" | "last";
+    nullEmpty?: boolean;
+} & ({
+    fieldQuery: string;
+} | {
+    fieldPosition: number;
+});
 export declare type Media = {
     "id"?: string;
     "title"?: string;
@@ -286,7 +295,7 @@ export declare class ViewHandler {
         localParams?: LocalParams;
         tableRules?: TableRule;
     }): Promise<string>;
-    prepareSort(orderBy: OrderBy | undefined, allowed_cols: FieldFilter, tableAlias: string | undefined, excludeOrder: boolean, select: SelectItem[]): string;
+    prepareSortItems(orderBy: OrderBy | undefined, allowed_cols: FieldFilter, tableAlias: string | undefined, select: SelectItem[]): SortItem[];
     prepareLimitQuery(limit: number, p: ValidatedTableRules): number;
     prepareOffsetQuery(offset?: number): number;
     intersectColumns(allowedFields: FieldFilter, dissallowedFields: FieldFilter, fixIssues?: boolean): string[];
@@ -435,5 +444,6 @@ declare type PGConstraint = {
 };
 export declare function isPlainObject(o: any): o is Record<string, any>;
 export declare function postgresToTsType(udt_data_type: PG_COLUMN_UDT_DATA_TYPE): keyof typeof TS_PG_Types;
+export declare const prepareSort: (items: SortItem[], excludeOrder?: boolean) => string;
 export {};
 //# sourceMappingURL=DboBuilder.d.ts.map

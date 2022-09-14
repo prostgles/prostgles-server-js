@@ -28,6 +28,16 @@ import {
     isObject, isDefined, getKeys, ProstglesError
 } from "prostgles-types";
 
+export type SortItem = {
+    asc: boolean;
+    nulls?: "first" | "last";
+    nullEmpty?: boolean;
+} & ({
+    fieldQuery: string;
+} | {
+    fieldPosition: number;
+});
+
 export type Media = {
     "id"?: string;
     "title"?: string;
@@ -1650,7 +1660,7 @@ export class ViewHandler {
     }
 
     /* This relates only to SELECT */
-    prepareSort(orderBy: OrderBy | undefined, allowed_cols: FieldFilter, tableAlias: string | undefined, excludeOrder: boolean = false, select: SelectItem[]): string {
+    prepareSortItems(orderBy: OrderBy | undefined, allowed_cols: FieldFilter, tableAlias: string | undefined, select: SelectItem[]): SortItem[] {
         let column_names = this.column_names.slice(0);
 
         const throwErr = () => {
@@ -1697,7 +1707,7 @@ export class ViewHandler {
                 } else return throwErr();
             };
 
-        if(!orderBy) return "";
+        if(!orderBy) return [];
 
         let allowedFields: string[] = [];
         if(allowed_cols){
@@ -1718,18 +1728,11 @@ export class ViewHandler {
                 /* [string] */
                 _ob = _orderBy.map(key => ({ key, asc: true }));
             } else if(_orderBy.find(v => isPlainObject(v) && Object.keys(v).length)) {
-                // if(_orderBy.find(v => typeof v.key === "string")){
-                //     /* [{ key, asc, nulls }] */
-                //     _ob = Object.freeze(_orderBy) as any;
-                // } else {
-                //     /* [{ [key]: asc }] | [{ [key]: -1 }] */
-                //     _ob = _orderBy.map(v => parseOrderObj(v, true)[0]);
-                // }
                 _ob = _orderBy.map(v => parseOrderObj(v, true)[0]);
             } else return throwErr();
         } else return throwErr();
 
-        if(!_ob || !_ob.length) return "";
+        if(!_ob || !_ob.length) return [];
 
         const validatedAggAliases = select.filter(s => s.type !== "joinedColumn").map(s => s.alias)
         
@@ -1743,7 +1746,8 @@ export class ViewHandler {
         if(!bad_param){
             
             const selectedAliases = select.filter(s => s.selected).map(s => s.alias);
-            return (excludeOrder? "" : " ORDER BY ") + (_ob.map(({ key, asc, nulls, nullEmpty = false }) => {
+            // return (excludeOrder? "" : " ORDER BY ") + (_ob.map(({ key, asc, nulls, nullEmpty = false }) => {
+            return _ob.map(({ key, asc, nulls, nullEmpty = false }) => {
 
                 /* Order by column index when possible to bypass name collision when ordering by a computed column. 
                     (Postgres will sort by existing columns wheundefined possible) 
@@ -1757,9 +1761,19 @@ export class ViewHandler {
                 }
 
                 const res = `${colKey} ${orderType} ${nullOrder}`;
+
+                if(typeof colKey === "number"){
+                    return {
+                        asc,
+                        fieldPosition: colKey
+                    }
+                }
                 
-                return res;
-            }).join(", "))
+                return {
+                    fieldQuery: colKey,
+                    asc,
+                }
+            })
         } else {
             throw "Invalid/disallowed orderBy fields or params: " + bad_param.key;
         }
@@ -3288,4 +3302,15 @@ async function getInferredJoins2(schema: TableSchema[]): Promise<Join[]> {
         })
     })
     return joins;
+}
+
+export const prepareSort = (items: SortItem[], excludeOrder: boolean = false): string => {
+    if(!items.length) return "";
+    return (excludeOrder? "" : " ORDER BY ") + items.map(d => {
+
+        const orderType = d.asc? " ASC " : " DESC ";
+        const nullOrder = d.nulls? ` NULLS ${d.nulls === "first"? " FIRST " : " LAST "}` : "";
+        let colKey = "fieldQuery" in d? d.fieldQuery : d.fieldPosition;
+        return `${colKey} ${orderType} ${nullOrder}`;
+    }).join(", ")
 }

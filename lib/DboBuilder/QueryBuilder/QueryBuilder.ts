@@ -4,7 +4,7 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { pgp, Filter, LocalParams, isPlainObject, TableHandler, ViewHandler, postgresToTsType } from "../../DboBuilder";
+import { pgp, Filter, LocalParams, isPlainObject, TableHandler, ViewHandler, postgresToTsType, SortItem } from "../../DboBuilder";
 import { TableRule } from "../../PublishParser";
 import { SelectParams, isEmpty, FieldFilter, asName, TextFilter_FullTextSearchFilterKeys, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, isObject, Select } from "prostgles-types";
 import { get } from "../../utils";
@@ -34,7 +34,7 @@ export type NewQuery = {
 
   table: string;
   where: string;
-  orderBy: string[];
+  orderByItems: SortItem[];
   having: string;
   limit: number;
   offset: number;
@@ -1378,7 +1378,7 @@ export async function getNewQuery(
     isLeftJoin: false,
     // having: cond.having,
     limit: _this.prepareLimitQuery(selectParams.limit, p),
-    orderBy: [_this.prepareSort(selectParams.orderBy, allowedOrderByFields, selectParams.alias, undefined, select)],
+    orderByItems: _this.prepareSortItems(selectParams.orderBy, allowedOrderByFields, selectParams.alias, select),
     offset: _this.prepareOffsetQuery(selectParams.offset)
   };
 

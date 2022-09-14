@@ -1,4 +1,4 @@
-import { Filter, LocalParams, TableHandler } from "../../DboBuilder";
+import { Filter, LocalParams, TableHandler, SortItem } from "../../DboBuilder";
 import { TableRule } from "../../PublishParser";
 import { SelectParams, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, Select } from "prostgles-types";
 export declare type SelectItem = {
@@ -21,7 +21,7 @@ export declare type NewQuery = {
     select: SelectItem[];
     table: string;
     where: string;
-    orderBy: string[];
+    orderByItems: SortItem[];
     having: string;
     limit: number;
     offset: number;

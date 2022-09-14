@@ -1148,7 +1148,7 @@ async function getNewQuery(_this, filter, selectParams = {}, param3_unused = nul
         isLeftJoin: false,
         // having: cond.having,
         limit: _this.prepareLimitQuery(selectParams.limit, p),
-        orderBy: [_this.prepareSort(selectParams.orderBy, allowedOrderByFields, selectParams.alias, undefined, select)],
+        orderByItems: _this.prepareSortItems(selectParams.orderBy, allowedOrderByFields, selectParams.alias, select),
         offset: _this.prepareOffsetQuery(selectParams.offset)
     };
     // console.log(resQuery);
