@@ -97,6 +97,7 @@ export declare class SelectItemBuilder {
     select: SelectItem[];
     private allFields;
     private allowedFields;
+    private allowedOrderByFields;
     private computedFields;
     private functions;
     private allowedFieldsIncludingComputed;
@@ -104,6 +105,7 @@ export declare class SelectItemBuilder {
     private columns;
     constructor(params: {
         allowedFields: string[];
+        allowedOrderByFields: string[];
         computedFields: FieldSpec[];
         functions: FunctionSpec[];
         allFields: string[];

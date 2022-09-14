@@ -2295,7 +2295,8 @@ export class TableHandler extends ViewHandler {
         if(returning){
             let sBuilder = new SelectItemBuilder({
                 allFields: this.column_names.slice(0),
-                allowedFields, 
+                allowedFields,
+                allowedOrderByFields: allowedFields,
                 computedFields: COMPUTED_FIELDS, 
                 functions: FUNCTIONS.filter(f => f.type === "function" && f.singleColArg),
                 isView: this.is_view,

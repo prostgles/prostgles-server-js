@@ -1026,15 +1026,17 @@ export class SelectItemBuilder {
   private allFields: string[];
 
   private allowedFields: string[];
+  private allowedOrderByFields: string[];
   private computedFields: FieldSpec[];
   private functions: FunctionSpec[];
   private allowedFieldsIncludingComputed: string[];
   private isView: boolean;
   private columns: ColumnInfo[];
 
-  constructor(params: { allowedFields: string[]; computedFields: FieldSpec[]; functions: FunctionSpec[]; allFields: string[]; isView: boolean; columns: ColumnInfo[]; }){
+  constructor(params: { allowedFields: string[]; allowedOrderByFields: string[]; computedFields: FieldSpec[]; functions: FunctionSpec[]; allFields: string[]; isView: boolean; columns: ColumnInfo[]; }){
     this.allFields = params.allFields;
     this.allowedFields = params.allowedFields;
+    this.allowedOrderByFields = params.allowedOrderByFields;
     this.computedFields = params.computedFields;
     this.isView = params.isView;
     this.functions = params.functions;
@@ -1051,9 +1053,12 @@ export class SelectItemBuilder {
     }
   }
 
-  private checkField = (f: string) => {
-    if(!this.allowedFieldsIncludingComputed.includes(f)){ 
-      console.log(f, f === "name", this.allowedFieldsIncludingComputed.includes("name"), this.allowedFieldsIncludingComputed)
+  private checkField = (f: string, isSelected: boolean) => {
+    const allowedSelectedFields = this.allowedFieldsIncludingComputed;
+    const allowedNonSelectedFields = [...this.allowedFieldsIncludingComputed, ...this.allowedOrderByFields];
+
+    /** Not selected items can be part of the orderBy fields */
+    if(!(isSelected? allowedSelectedFields : allowedNonSelectedFields).includes(f)){
       throw "Field " + f + " is invalid or dissallowed";
     }
     return f;
@@ -1062,10 +1067,12 @@ export class SelectItemBuilder {
   private addItem = (item: SelectItem) => {
     let fields = item.getFields();
     // console.trace(fields)
-    if(fields === "*") fields = this.allowedFields.slice(0);//.concat(fields.filter(f => f !== "*"));
-    fields.map(this.checkField);
+    if(fields === "*") fields = this.allowedFields.slice(0);
+    fields.map(f => this.checkField(f, item.selected));
 
-    if(this.select.find(s => s.alias === item.alias)) throw `Cannot specify duplicate columns ( ${item.alias} ). Perhaps you're using "*" with column names?`;
+    if(this.select.find(s => s.alias === item.alias)){ 
+      throw `Cannot specify duplicate columns ( ${item.alias} ). Perhaps you're using "*" with column names?`;
+    }
     this.select.push(item);
   }
 
@@ -1189,7 +1196,7 @@ export class SelectItemBuilder {
               if(typeof val === "string") {
                 /* Shorthand notation -> it is expected that the key is the column name used as the only argument */
                 try {
-                  this.checkField(key)
+                  this.checkField(key, true)
                 } catch (err){
                   throwErr(` Shorthand function notation error: the specifield column ( ${key} ) is invalid or dissallowed. \n Use correct column name or full aliased function notation, e.g.: -> { alias: { $func_name: ["column_name"] } } `)
                 }
@@ -1242,7 +1249,15 @@ export async function getNewQuery(
   let  joinQueries: NewQuery[] = [];
 
   const { select: userSelect = "*" } = selectParams,
-    sBuilder = new SelectItemBuilder({ allowedFields: allowedSelectFields, computedFields: COMPUTED_FIELDS, isView: _this.is_view, functions: FUNCTIONS, allFields: _this.column_names.slice(0), columns });
+    sBuilder = new SelectItemBuilder({ 
+      allowedFields: allowedSelectFields, 
+      allowedOrderByFields,
+      computedFields: COMPUTED_FIELDS, 
+      isView: _this.is_view, 
+      functions: FUNCTIONS, 
+      allFields: _this.column_names.slice(0), 
+      columns 
+    });
 
   
  

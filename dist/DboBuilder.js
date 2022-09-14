@@ -1449,6 +1449,7 @@ class TableHandler extends ViewHandler {
                 let sBuilder = new QueryBuilder_1.SelectItemBuilder({
                     allFields: this.column_names.slice(0),
                     allowedFields,
+                    allowedOrderByFields: allowedFields,
                     computedFields: QueryBuilder_1.COMPUTED_FIELDS,
                     functions: QueryBuilder_1.FUNCTIONS.filter(f => f.type === "function" && f.singleColArg),
                     isView: this.is_view,
