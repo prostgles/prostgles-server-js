@@ -1256,7 +1256,7 @@ class ViewHandler {
             }).join(", "));
         }
         else {
-            throw "Unrecognised orderBy fields or params: " + bad_param.key;
+            throw "Invalid/disallowed orderBy fields or params: " + bad_param.key;
         }
     }
     /* This relates only to SELECT */

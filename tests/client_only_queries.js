@@ -241,7 +241,7 @@ async function client_only(db, auth, log, methods, tableSchema) {
         log("Checking User data");
         // User data
         await (0, isomorphic_queries_1.tryRun)("Security rules example", async () => {
-            const vQ = await db.items4.find();
+            const vQ = await db.items4.find({}, { orderBy: { added: 1 } });
             assert_1.strict.deepStrictEqual(vQ, [
                 { id: 1, public: 'public data' },
                 { id: 2, public: 'public data' }

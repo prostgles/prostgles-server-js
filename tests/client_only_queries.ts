@@ -286,7 +286,7 @@ export default async function client_only(db: Required<DBHandlerClient>, auth: A
     log("Checking User data");
     // User data
     await tryRun("Security rules example", async () => {
-      const vQ = await db.items4.find!();
+      const vQ = await db.items4.find!({}, { orderBy: { added: 1 } });
       assert.deepStrictEqual(vQ, [
         { id: 1, public: 'public data' },
         { id: 2, public: 'public data' }

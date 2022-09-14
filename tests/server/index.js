@@ -308,6 +308,7 @@ function dd() {
                 items4: {
                     select: user ? "*" : {
                         fields: { name: 0 },
+                        orderByFields: { added: 1 },
                         forcedFilter: { name: "abc" }
                     },
                     insert: "*",

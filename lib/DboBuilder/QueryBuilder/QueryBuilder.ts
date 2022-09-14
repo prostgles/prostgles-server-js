@@ -1231,42 +1231,23 @@ export async function getNewQuery(
   columns: ColumnInfo[],
 ): Promise<NewQuery> {
 
-  if((localParams?.socket || localParams?.httpReq) && !get(tableRules, "select.fields")){
+  if(localParams?.isRemoteRequest && !tableRules?.select?.fields){
     throw `INTERNAL ERROR: publish.${_this.name}.select.fields rule missing`;
   }
 
-  // const all_columns: SelectItem[] = _this.column_names.slice(0).map(fieldName => ({
-  //   type: "column",
-  //   alias: fieldName,
-  //   getQuery: () => asName(fieldName),
-  //   getFields: () => [fieldName],
-  //   selected: false
-  // } as SelectItem))
-  // .concat(COMPUTED_FIELDS.map(c => ({
-  //   type: c.type,
-  //   alias: c.name,
-  //   getQuery: () => c.getQuery(),
-  //   getFields: c.getFields,
-  //   selected: false
-  // })))
+  const allowedOrderByFields = !tableRules? _this.column_names.slice(0) : _this.parseFieldFilter(tableRules?.select?.orderByFields ?? tableRules?.select?.fields);
+  const allowedSelectFields = !tableRules? _this.column_names.slice(0) :  _this.parseFieldFilter(tableRules?.select?.fields);
 
-  // let select: SelectItem[] = [],
+
   let  joinQueries: NewQuery[] = [];
 
-    // const all_colnames = _this.column_names.slice(0).concat(COMPUTED_FIELDS.map(c => c.name));
-
   const { select: userSelect = "*" } = selectParams,
-    // allCols = _this.column_names.slice(0),
-    // allFieldsIncludingComputed = allCols.concat(COMPUTED_FIELDS.map(c => c.name)),
-    allowedFields = _this.parseFieldFilter(get(tableRules, "select.fields")) || _this.column_names.slice(0),
-    // allowedFieldsIncludingComputed = _this.parseFieldFilter(get(tableRules, "select.fields"), true, allFieldsIncludingComputed) || allFieldsIncludingComputed,
-    sBuilder = new SelectItemBuilder({ allowedFields, computedFields: COMPUTED_FIELDS, isView: _this.is_view, functions: FUNCTIONS, allFields: _this.column_names.slice(0), columns });
+    sBuilder = new SelectItemBuilder({ allowedFields: allowedSelectFields, computedFields: COMPUTED_FIELDS, isView: _this.is_view, functions: FUNCTIONS, allFields: _this.column_names.slice(0), columns });
 
   
  
   await sBuilder.parseUserSelect(userSelect, async (key, val, throwErr) => {
 
-    // console.log({ key, val })
     let j_filter: Filter = {},
         j_selectParams: SelectParams = {},
         j_path: string[] | undefined,
@@ -1341,7 +1322,7 @@ export async function getNewQuery(
 
   /* Add non selected columns */
   /* WHY???? */
-  allowedFields.map(key => {
+  allowedSelectFields.map(key => {
     if(!sBuilder.select.find(s => s.alias === key && s.type === "column")){
       sBuilder.addColumn(key, false);
     }
@@ -1365,14 +1346,14 @@ export async function getNewQuery(
   const p = _this.getValidatedRules(tableRules, localParams);
 
   let resQuery: NewQuery = {
-    allFields: allowedFields,
+    allFields: allowedSelectFields,
     select,
     table: _this.name,
     joins: joinQueries,
     where,
     // having: cond.having,
     limit: _this.prepareLimitQuery(selectParams.limit, p),
-    orderBy: [_this.prepareSort(selectParams.orderBy, allowedFields, selectParams.alias, undefined, select)],
+    orderBy: [_this.prepareSort(selectParams.orderBy, allowedOrderByFields, selectParams.alias, undefined, select)],
     offset: _this.prepareOffsetQuery(selectParams.offset)
   } as NewQuery;
 

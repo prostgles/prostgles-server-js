@@ -55,9 +55,15 @@ export declare type ValidateUpdateRow<R extends AnyObject = AnyObject, S = void>
 }, dbx: DBOFullyTyped<S>) => R | Promise<R>;
 export declare type SelectRule<Cols extends AnyObject = AnyObject, S = void> = {
     /**
-     * Fields allowed to be selected.   Tip: Use false to exclude field
+     * Fields allowed to be selected.
+     * Tip: Use false to exclude field
      */
     fields: FieldFilter<Cols>;
+    /**
+     * Fields allowed to sorted
+     * Defaults to the "fields". Use empty array/object to disallow sorting
+     */
+    orderByFields?: FieldFilter<Cols>;
     /**
      * The maximum number of rows a user can get in a select query. null by default. Unless a null or higher limit is specified 100 rows will be returned by the default
      */

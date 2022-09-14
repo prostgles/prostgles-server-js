@@ -66,7 +66,7 @@ const RULE_TO_METHODS = [
     methods: RULE_METHODS.select,
     no_limits: <SelectRule>{ fields: "*", filterFields: "*" },
     table_only: false,
-    allowed_params: <Array<keyof SelectRule>>["fields", "filterFields", "forcedFilter", "validate", "maxLimit"],
+    allowed_params: <Array<keyof SelectRule>>["fields", "filterFields", "forcedFilter", "validate", "maxLimit", "orderByFields"],
     hint: ` expecting "*" | true | { fields: ( string | string[] | {} )  }`
   },
   {
@@ -134,9 +134,16 @@ export type ValidateUpdateRow<R extends AnyObject = AnyObject, S = void> = (args
 export type SelectRule<Cols extends AnyObject = AnyObject, S = void> = {
 
   /**
-   * Fields allowed to be selected.   Tip: Use false to exclude field
+   * Fields allowed to be selected.   
+   * Tip: Use false to exclude field
    */
   fields: FieldFilter<Cols>;
+
+  /**
+   * Fields allowed to sorted
+   * Defaults to the "fields". Use empty array/object to disallow sorting
+   */
+  orderByFields?: FieldFilter<Cols>;
 
   /**
    * The maximum number of rows a user can get in a select query. null by default. Unless a null or higher limit is specified 100 rows will be returned by the default
@@ -683,7 +690,7 @@ export class PublishParser {
 
                     let err = null;
                     try {
-                      let valid_table_command_rules = await this.getValidatedRequestRule({ tableName, command: method, localParams: { socket } }, clientInfo);
+                      const valid_table_command_rules = await this.getValidatedRequestRule({ tableName, command: method, localParams: { socket } }, clientInfo);
                       await (this.dbo[tableName] as any)[method]({}, {}, {}, valid_table_command_rules, { socket, isRemoteRequest: true, testRule: true });
 
                     } catch (e) {
