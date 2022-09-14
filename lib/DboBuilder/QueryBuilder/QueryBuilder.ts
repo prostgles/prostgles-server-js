@@ -1320,9 +1320,11 @@ export async function getNewQuery(
     }
   })
 
-  /* Add non selected columns */
-  /* WHY???? */
-  allowedSelectFields.map(key => {
+  /**
+   * Add non selected columns
+   * This ensures all fields are available for orderBy in case of nested select
+   * */
+  Array.from(new Set([...allowedSelectFields, ...allowedOrderByFields])).map(key => {
     if(!sBuilder.select.find(s => s.alias === key && s.type === "column")){
       sBuilder.addColumn(key, false);
     }
