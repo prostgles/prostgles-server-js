@@ -22,6 +22,9 @@ export type SelectItem = {
 };
 
 export type NewQuery = {
+  /**
+   * All fields from the table will be in nested SELECT and GROUP BY to allow order/filter by fields not in select 
+   */
   allFields: string[];
 
   /**
@@ -1363,16 +1366,21 @@ export async function getNewQuery(
   const p = _this.getValidatedRules(tableRules, localParams);
 
   let resQuery: NewQuery = {
-    allFields: allowedSelectFields,
+    /** Why was this the case? */
+    // allFields: allowedSelectFields,
+
+    allFields: _this.column_names.slice(0),
     select,
     table: _this.name,
     joins: joinQueries,
     where,
+    having: "",
+    isLeftJoin: false,
     // having: cond.having,
     limit: _this.prepareLimitQuery(selectParams.limit, p),
     orderBy: [_this.prepareSort(selectParams.orderBy, allowedOrderByFields, selectParams.alias, undefined, select)],
     offset: _this.prepareOffsetQuery(selectParams.offset)
-  } as NewQuery;
+  };
 
   // console.log(resQuery);
   // console.log(buildJoinQuery(_this, resQuery));

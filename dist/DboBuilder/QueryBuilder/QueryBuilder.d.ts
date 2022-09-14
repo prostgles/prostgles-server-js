@@ -11,6 +11,9 @@ export declare type SelectItem = {
     selected: boolean;
 };
 export declare type NewQuery = {
+    /**
+     * All fields from the table will be in nested SELECT and GROUP BY to allow order/filter by fields not in select
+     */
     allFields: string[];
     /**
      * Contains user selection and all the allowed columns. Allowed columns not selected are marked with  selected: false
