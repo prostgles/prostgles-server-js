@@ -3,7 +3,7 @@ declare type BaseOptions = {
     nullable?: boolean;
 };
 declare type SimpleType = BaseOptions & ({
-    type: "number" | "boolean" | "integer" | "string" | "number[]" | "boolean[]" | "integer[]" | "string[]" | ValidationSchema;
+    type: "number" | "boolean" | "integer" | "string" | "any" | "number[]" | "boolean[]" | "integer[]" | "string[]" | "any[]" | ValidationSchema;
 } | {
     oneOf: readonly any[];
 });
@@ -22,6 +22,8 @@ declare type GetType<T extends FieldType> = T extends {
 } ? number : T extends {
     type: "string";
 } ? string : T extends {
+    type: "any";
+} ? any : T extends {
     type: "number[]";
 } ? number[] : T extends {
     type: "boolean[]";
@@ -30,6 +32,8 @@ declare type GetType<T extends FieldType> = T extends {
 } ? number[] : T extends {
     type: "string[]";
 } ? string[] : T extends {
+    type: "any[]";
+} ? any[] : T extends {
     oneOf: readonly any[];
 } ? T["oneOf"][number] : 
 /** This needs fixing */

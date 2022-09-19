@@ -396,7 +396,8 @@ export type DBSchemaGenerated = {
       id?: number;
       preferences?:       { 
         showIntro?: boolean;
-        theme?: 'light' | 'dark'; 
+        theme?: 'light' | 'dark' | 'auto';
+        others: any[]; 
       };
       status: "active" | "disabled" | "pending"
     };

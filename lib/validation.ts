@@ -8,8 +8,8 @@ type BaseOptions = {
 
 type SimpleType = BaseOptions & ({
   type:  
-  | "number" | "boolean" | "integer" | "string" 
-  | "number[]" | "boolean[]" | "integer[]" | "string[]" 
+  | "number" | "boolean" | "integer" | "string" | "any"
+  | "number[]" | "boolean[]" | "integer[]" | "string[]" | "any[]"
   | ValidationSchema;
 
 } | {
@@ -27,10 +27,12 @@ type GetType<T extends FieldType> =
 | T extends { type: "boolean" }? boolean:
 | T extends { type: "integer" }? number:
 | T extends { type: "string" }? string:
+| T extends { type: "any" }? any:
 | T extends { type: "number[]" }? number[]:
 | T extends { type: "boolean[]" }? boolean[]:
 | T extends { type: "integer[]" }? number[]:
 | T extends { type: "string[]" }? string[]:
+| T extends { type: "any[]" }? any[]:
 | T extends { oneOf: readonly any[] }? T["oneOf"][number] : 
 
 /** This needs fixing */
@@ -94,7 +96,8 @@ export function getPGCheckConstraint(args: { escapedFieldName: string; schema: V
     "integer": "::INTEGER",
     "number": "::NUMERIC",
     "boolean": "::BOOLEAN",
-    "string": "::TEXT"
+    "string": "::TEXT",
+    "any": "::JSONB"
   }
 
   const kChecks = (k: string, s: ValidationSchema) => {
@@ -121,10 +124,13 @@ export function getPGCheckConstraint(args: { escapedFieldName: string; schema: V
       if(typeof t.type === "string") {
         if(t.type.endsWith("[]")){
           const correctType = t.type.slice(0, -2);
-          checks.push(`jsonb_typeof(${valAsJson}) = 'array' AND ('{' || right(left(${valAsText},-1),-1) || '}')${jsToPGtypes[correctType as keyof typeof jsToPGtypes]}[] IS NOT NULL`)
+          let elemCheck = correctType === "any"? "" : `AND ('{' || right(left(${valAsText},-1),-1) || '}')${jsToPGtypes[correctType as keyof typeof jsToPGtypes]}[] IS NOT NULL`
+          checks.push(`jsonb_typeof(${valAsJson}) = 'array' ${elemCheck}`)
         } else {
-          const correctType = t.type.replace("integer", "number")
-          checks.push(`jsonb_typeof(${valAsJson}) = ${asValue(correctType)} `)
+          const correctType = t.type.replace("integer", "number");
+          if(correctType !== "any"){
+            checks.push(`jsonb_typeof(${valAsJson}) = ${asValue(correctType)} `)
+          }
         }
       } else {
         const check = getPGCheckConstraint({ escapedFieldName: valAsJson, schema: t.type, nullable: !!t.nullable, optional: !!t.optional }, depth + 1).trim();

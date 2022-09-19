@@ -93,7 +93,8 @@ function dd() {
                 preferences: { defaultValue: "{}",
                     jsonbSchema: {
                         showIntro: { type: "boolean", optional: true },
-                        theme: { oneOf: ["light", "dark"], optional: true },
+                        theme: { oneOf: ["light", "dark", "auto"], optional: true },
+                        others: { type: "any[]" }
                     }
                 },
             }
