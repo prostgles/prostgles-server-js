@@ -97,7 +97,12 @@ class PublishParser {
             ...(clientInfo || await this.prostgles.authHandler?.getClientInfo(localParams)),
             dbo: this.dbo,
             db: this.db,
-            socket: localParams.socket
+            socket: localParams.socket,
+            tables: (this.prostgles.dboBuilder.tablesOrViews ?? []).map(({ name, columns }) => ({
+                name,
+                columns,
+                info: this.dbo[name].tableOrViewInfo
+            }))
         };
     }
     async getMethods(socket) {

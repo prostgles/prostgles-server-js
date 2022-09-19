@@ -404,17 +404,18 @@ export declare class DboBuilder {
     build(): Promise<DBHandlerServer>;
     getTX: (cb: TxCB) => Promise<any>;
 }
+export declare type TableSchemaColumn = ColumnInfo & {
+    privileges: {
+        privilege_type: "INSERT" | "REFERENCES" | "SELECT" | "UPDATE";
+        is_grantable: "YES" | "NO";
+    }[];
+};
 export declare type TableSchema = {
     schema: string;
     name: string;
     oid: number;
     comment: string;
-    columns: (ColumnInfo & {
-        privileges: {
-            privilege_type: "INSERT" | "REFERENCES" | "SELECT" | "UPDATE";
-            is_grantable: "YES" | "NO";
-        }[];
-    })[];
+    columns: TableSchemaColumn[];
     is_view: boolean;
     parent_tables: string[];
     privileges: {

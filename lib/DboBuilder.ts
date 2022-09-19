@@ -2774,7 +2774,12 @@ export class DboBuilder {
     }
 }
 
-
+export type TableSchemaColumn = ColumnInfo & {
+    privileges: {
+        privilege_type: "INSERT" | "REFERENCES" | "SELECT" | "UPDATE";// | "DELETE";
+        is_grantable: "YES" | "NO"
+    }[];
+}
 
 /* UTILS */
 export type TableSchema = {
@@ -2782,12 +2787,7 @@ export type TableSchema = {
     name: string;
     oid: number;
     comment: string;
-    columns: (ColumnInfo & {
-        privileges: {
-            privilege_type: "INSERT" | "REFERENCES" | "SELECT" | "UPDATE";// | "DELETE";
-            is_grantable: "YES" | "NO"
-        }[];
-    })[];
+    columns: TableSchemaColumn[];
     is_view: boolean;
     parent_tables: string[];
     privileges: {

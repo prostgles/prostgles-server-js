@@ -1,6 +1,6 @@
 import { getKeys, RULE_METHODS, AnyObject, get, TableSchemaForClient, DBSchemaTable, MethodKey, TableInfo, FullFilter, isObject } from "prostgles-types";
 import { ClientInfo } from "./AuthHandler";
-import { CommonTableRules, Filter, isPlainObject, LocalParams, PRGLIOSocket, TableHandler, ViewHandler } from "./DboBuilder";
+import { CommonTableRules, Filter, isPlainObject, LocalParams, PRGLIOSocket, TableHandler, TableOrViewInfo, TableSchemaColumn, ViewHandler } from "./DboBuilder";
 import type { TableHandler as TableHandlerFromTypes } from "prostgles-types";
 import { Prostgles, DBHandlerServer, DB, TABLE_METHODS } from "./Prostgles";
 import type { DBOFullyTyped, PublishFullyTyped } from "./DBSchemaBuilder";
@@ -352,7 +352,12 @@ export type PublishParams<S = void> = {
   dbo: DBOFullyTyped<S>;
   db: DB;
   user?: AnyObject;
-  socket: PRGLIOSocket
+  socket: PRGLIOSocket;
+  tables: {
+    name: string;
+    info: TableOrViewInfo;
+    columns: TableSchemaColumn[];
+  }[];
 }
 export type RequestParams = { dbo?: DBHandlerServer, socket?: any };
 export type PublishAllOrNothing = true | "*" | false | null;
@@ -390,7 +395,12 @@ export class PublishParser {
       ...(clientInfo || await this.prostgles.authHandler?.getClientInfo(localParams)),
       dbo: this.dbo,
       db: this.db,
-      socket: localParams.socket!
+      socket: localParams.socket!,
+      tables: (this.prostgles.dboBuilder.tablesOrViews ?? []).map(({ name, columns }) => ({
+        name,
+        columns,
+        info: this.dbo[name]!.tableOrViewInfo!
+      }))
     }
   }
 

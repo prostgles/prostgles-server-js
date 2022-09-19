@@ -1,6 +1,6 @@
 import { AnyObject, TableSchemaForClient, DBSchemaTable, FullFilter } from "prostgles-types";
 import { ClientInfo } from "./AuthHandler";
-import { CommonTableRules, LocalParams, PRGLIOSocket } from "./DboBuilder";
+import { CommonTableRules, LocalParams, PRGLIOSocket, TableOrViewInfo, TableSchemaColumn } from "./DboBuilder";
 import { Prostgles, DBHandlerServer, DB } from "./Prostgles";
 import type { DBOFullyTyped, PublishFullyTyped } from "./DBSchemaBuilder";
 export declare type Method = (...args: any) => (any | Promise<any>);
@@ -236,6 +236,11 @@ export declare type PublishParams<S = void> = {
     db: DB;
     user?: AnyObject;
     socket: PRGLIOSocket;
+    tables: {
+        name: string;
+        info: TableOrViewInfo;
+        columns: TableSchemaColumn[];
+    }[];
 };
 export declare type RequestParams = {
     dbo?: DBHandlerServer;
