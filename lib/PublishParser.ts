@@ -655,7 +655,14 @@ export class PublishParser {
     try {
       /* Publish tables and views based on socket */
       const clientInfo = await this.prostgles.authHandler?.getClientInfo({ socket });
-      let _publish = await this.getPublish(socket, clientInfo);
+
+      let _publish: PublishObject | undefined;
+      try {
+        _publish = await this.getPublish(socket, clientInfo);
+      } catch(err){
+        console.error("Error within then Publish function ", err)
+        throw err;
+      }
 
 
       if (_publish && Object.keys(_publish).length) {

@@ -91,6 +91,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
           "tsDataType": "number",
           "insert": true,
           "select": true,
+          "orderBy": true,
           "filter": true,
           "update": true,
           "delete": true
@@ -120,6 +121,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
           "tsDataType": "number",
           "insert": true,
           "select": true,
+          "orderBy": true,
           "filter": true,
           "update": true,
           "delete": true
@@ -144,6 +146,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
           "tsDataType": "string",
           "insert": true,
           "select": true,
+          "orderBy": true,
           "filter": true,
           "update": true,
           "delete": true
@@ -165,6 +168,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
           "tsDataType": "string",
           "insert": true,
           "select": true,
+          "orderBy": true,
           "filter": true,
           "update": true,
           "delete": true

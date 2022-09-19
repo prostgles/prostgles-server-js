@@ -106,6 +106,7 @@ async function isomorphic(db) {
                 "tsDataType": "number",
                 "insert": true,
                 "select": true,
+                "orderBy": true,
                 "filter": true,
                 "update": true,
                 "delete": true
@@ -135,6 +136,7 @@ async function isomorphic(db) {
                 "tsDataType": "number",
                 "insert": true,
                 "select": true,
+                "orderBy": true,
                 "filter": true,
                 "update": true,
                 "delete": true
@@ -159,6 +161,7 @@ async function isomorphic(db) {
                 "tsDataType": "string",
                 "insert": true,
                 "select": true,
+                "orderBy": true,
                 "filter": true,
                 "update": true,
                 "delete": true
@@ -180,6 +183,7 @@ async function isomorphic(db) {
                 "tsDataType": "string",
                 "insert": true,
                 "select": true,
+                "orderBy": true,
                 "filter": true,
                 "update": true,
                 "delete": true

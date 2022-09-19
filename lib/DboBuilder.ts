@@ -313,6 +313,9 @@ export type ValidatedTableRules = CommonTableRules & {
         /* Fields you can select */
         fields: string[];
 
+        /* Fields you can select */
+        orderByFields: string[];
+
         /* Filter applied to every select */
         filterFields: string[];
 
@@ -876,6 +879,7 @@ export class ViewHandler {
                     tsDataType: postgresToTsType(c.udt_name),
                     insert: insert && Boolean(p.insert && p.insert.fields && p.insert.fields.includes(c.name)) && tableRules?.insert?.forcedData?.[c.name] === undefined,
                     select: select && Boolean(p.select && p.select.fields && p.select.fields.includes(c.name)),
+                    orderBy: select && Boolean(p.select && p.select.fields && p.select.orderByFields.includes(c.name)),
                     filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)),
                     update: update && Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)) && tableRules?.update?.forcedData?.[c.name] === undefined,
                     delete: _delete && Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)),
@@ -966,8 +970,10 @@ export class ViewHandler {
                     maxLimit = ml;
                 }
             
+                const fields = this.parseFieldFilter(tableRules.select.fields)
                 res.select = {
-                    fields: this.parseFieldFilter(tableRules.select.fields),
+                    fields,
+                    orderByFields: tableRules.select.orderByFields? this.parseFieldFilter(tableRules.select.orderByFields) : fields,
                     forcedFilter: { ...tableRules.select.forcedFilter },
                     filterFields: this.parseFieldFilter(tableRules.select.filterFields),
                     maxLimit
@@ -1024,6 +1030,7 @@ export class ViewHandler {
                 select: {
                     fields: all_cols,
                     filterFields: all_cols,
+                    orderByFields: all_cols,
                     forcedFilter: {},
                     maxLimit: null,
                 },

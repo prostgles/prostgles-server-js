@@ -157,6 +157,7 @@ export declare type ValidatedTableRules = CommonTableRules & {
     allColumns: FieldSpec[];
     select: {
         fields: string[];
+        orderByFields: string[];
         filterFields: string[];
         forcedFilter: any;
         maxLimit: number | null;
