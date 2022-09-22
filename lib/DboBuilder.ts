@@ -2653,10 +2653,12 @@ export class DboBuilder {
                 this.joinGraph![t2] = this.joinGraph![t2] || {};
                 this.joinGraph![t2][t1] = 1;
             });
-            const tables = this.joins.flatMap(t => t.tables);
+            const tables = Array.from(new Set(this.joins.flatMap(t => t.tables)));
             this.joinPaths = [];
-            tables.map(t1 => {
-                tables.map(t2 => {
+            tables.forEach(t1 => {
+                tables.forEach(t2 => {
+                    if(t1 === t2) return;
+                    
                     const spath = findShortestPath(this.joinGraph!, t1, t2);
                     if(spath && spath.distance < Infinity){
 
