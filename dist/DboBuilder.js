@@ -1934,12 +1934,15 @@ class DboBuilder {
             // Validate joins
             try {
                 // 1 find duplicates
-                const dup = joins.find(j => j.tables[0] === j.tables[1] ||
-                    joins.find(jj => j.tables.join() !== jj.tables.join() &&
-                        j.tables.slice().sort().join() === jj.tables.slice().sort().join()));
-                if (dup) {
-                    throw "Duplicate join declaration for table: " + dup.tables[0];
-                }
+                // const dup = joins.find(j => 
+                //     j.tables[0] === j.tables[1] || 
+                //     joins.find(jj => 
+                //         j.tables.join() !== jj.tables.join() && 
+                //         j.tables.slice().sort().join() === jj.tables.slice().sort().join())
+                //     );
+                // if(dup){
+                //     throw "Duplicate join declaration for table: " + dup.tables[0];
+                // }
                 const tovNames = this.tablesOrViews.map(t => t.name);
                 // 2 find incorrect tables
                 const missing = joins.flatMap(j => j.tables).find(t => !tovNames.includes(t));

@@ -20,6 +20,7 @@ export declare class PostgresNotifListenManager {
     init(): Promise<PostgresNotifListenManager>;
     isReady(): any;
     startListening(): Promise<unknown>;
+    destroyed: boolean;
     destroy: () => void;
     stopListening: () => void;
     reconnect(delay?: number | undefined, maxAttempts?: number | undefined): Promise<unknown>;

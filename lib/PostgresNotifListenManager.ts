@@ -73,8 +73,10 @@ export class PostgresNotifListenManager {
             });
     }
 
+    destroyed = false;
     destroy = () => {
         if(this.connection) {
+            this.destroyed = true;
             this.connection.done();
             this.connection = undefined;
         }
@@ -106,17 +108,20 @@ export class PostgresNotifListenManager {
                 client.removeListener('notification', this.notifListener);
             },
             onConnectionLost = (err: any, e: pgPromise.ILostContext<pg.IClient>) => {
+
                 console.log('PostgresNotifListenManager: Connectivity Problem:', err);
                 this.connection = undefined; // prevent use of the broken connection
                 removeListeners(e.client);
+                
+                if(this.destroyed) return;
                 this.reconnect(5000, 10) // retry 10 times, with 5-second intervals
                     .then(() => {
                         console.log('PostgresNotifListenManager: Successfully Reconnected');
                     })
                     .catch(() => {
                         // failed after 10 attempts
-                        console.log('PostgresNotifListenManager: Connection Lost Permanently. TERMINATING NODE PROCESS');
-                        process.exit(); // exiting the process
+                        console.log('PostgresNotifListenManager: Connection Lost Permanently. No more retryies');
+                        // process.exit(); // exiting the process
                     });
             }
 

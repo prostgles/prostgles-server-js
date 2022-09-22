@@ -7,8 +7,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PostgresNotifListenManager = void 0;
 class PostgresNotifListenManager {
     constructor(db_pg, notifListener, db_channel_name, noInit = false) {
+        this.destroyed = false;
         this.destroy = () => {
             if (this.connection) {
+                this.destroyed = true;
                 this.connection.done();
                 this.connection = undefined;
             }
@@ -84,14 +86,16 @@ class PostgresNotifListenManager {
             console.log('PostgresNotifListenManager: Connectivity Problem:', err);
             this.connection = undefined; // prevent use of the broken connection
             removeListeners(e.client);
+            if (this.destroyed)
+                return;
             this.reconnect(5000, 10) // retry 10 times, with 5-second intervals
                 .then(() => {
                 console.log('PostgresNotifListenManager: Successfully Reconnected');
             })
                 .catch(() => {
                 // failed after 10 attempts
-                console.log('PostgresNotifListenManager: Connection Lost Permanently. TERMINATING NODE PROCESS');
-                process.exit(); // exiting the process
+                console.log('PostgresNotifListenManager: Connection Lost Permanently. No more retryies');
+                // process.exit(); // exiting the process
             });
         };
         return new Promise((resolve, reject) => {
