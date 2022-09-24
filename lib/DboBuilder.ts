@@ -1298,7 +1298,7 @@ export class ViewHandler {
                 result = await this.getCondition({
                     filter: { ...f },
                     select,
-                    allowed_colnames: this.parseFieldFilter(filterFields), 
+                    allowed_colnames: isForcedFilterBypass? this.column_names.slice(0) : this.parseFieldFilter(filterFields), 
                     tableAlias, 
                     localParams: isForcedFilterBypass? undefined : localParams, 
                     tableRules: isForcedFilterBypass? undefined : tableRule
@@ -1966,7 +1966,7 @@ export class ViewHandler {
                 } else {
                     return [...allowed] as any;
                 }
-                
+
             } else {
                 throw " Unrecognised field filter.\nExpecting any of:   string | string[] | { [field]: boolean } \n Received ->  " + initialParams;
             }
