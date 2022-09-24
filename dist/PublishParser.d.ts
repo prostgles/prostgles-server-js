@@ -121,7 +121,7 @@ export declare type UpdateRule<Cols extends AnyObject = AnyObject, S = void> = {
      * Specify in decreasing order of specificity otherwise a more general filter will match first
      */
     dynamicFields?: {
-        filter: SelectRule<Cols, S>["forcedFilter"];
+        filter: FullFilter<Cols, S>;
         fields: SelectRule<Cols>["fields"];
     }[];
     /**

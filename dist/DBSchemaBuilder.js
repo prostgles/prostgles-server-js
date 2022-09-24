@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getDBSchema = void 0;
+const prostgles_types_1 = require("prostgles-types");
 const _1 = require(".");
 const DboBuilder_1 = require("./DboBuilder");
 const validation_1 = require("./validation");
@@ -13,12 +14,12 @@ const getDBSchema = (dboBuilder) => {
             let type = (c.is_nullable ? "null | " : "") + (0, DboBuilder_1.postgresToTsType)(c.udt_name) + ";";
             const colConf = dboBuilder.prostgles.tableConfigurator?.getColumnConfig(tov.name, c.name);
             if (colConf) {
-                if ("jsonbSchema" in colConf) {
+                if ((0, prostgles_types_1.isObject)(colConf) && "jsonbSchema" in colConf) {
                     if (!colConf.jsonbSchema)
                         throw "colConf.jsonbSchema missing";
                     type = (0, validation_1.getJSONBSchemaTSTypes)(colConf.jsonbSchema, { nullable: colConf.nullable }, "      ");
                 }
-                else if ("oneOf" in colConf) {
+                else if ((0, prostgles_types_1.isObject)(colConf) && "oneOf" in colConf) {
                     if (!colConf.oneOf)
                         throw "colConf.oneOf missing";
                     const types = colConf.oneOf.map(t => typeof t === "number" ? t : JSON.stringify(t));

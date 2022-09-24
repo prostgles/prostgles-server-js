@@ -1,4 +1,4 @@
-import { getKeys, asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE } from "prostgles-types";
+import { getKeys, asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE, isObject } from "prostgles-types";
 import { isPlainObject, JoinInfo } from "./DboBuilder";
 import { DB, DBHandlerServer, Joins, Prostgles } from "./Prostgles";
 import { asValue } from "./PubSubManager";
@@ -185,7 +185,7 @@ type OneOf = {
   defaultValue?: OneOf["oneOf"][number]; 
 };
 
-type ColumnConfig<LANG_IDS = { en: 1 }> = StrictUnion<NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef | OneOf))>
+type ColumnConfig<LANG_IDS = { en: 1 }> = string | StrictUnion<NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef | OneOf))>
 
 type UnionKeys<T> = T extends T ? keyof T : never;
 type StrictUnionHelper<T, TAll> = T extends any ? T & Partial<Record<Exclude<UnionKeys<TAll>, keyof T>, never>> : never;
@@ -293,7 +293,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     let result: (ColExtraInfo & { label?: string }) | undefined = undefined;
     if (colConf) {
 
-      if ("info" in colConf) {
+      if (isObject(colConf) && "info" in colConf) {
         result = {
           ...(result ?? {}),
           ...colConf?.info
@@ -303,7 +303,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       /**
        * Get labels from TableConfig if specified
        */
-      if (colConf.label) {
+      if (isObject(colConf) && colConf.label) {
         const { lang } = params;
         const lbl = colConf?.label;
         if (["string", "object"].includes(typeof lbl)) {
@@ -343,7 +343,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       const td = this.config[sourceTable];
       if ("columns" in td && td.columns?.[targetTable]) {
         const cd = td.columns[targetTable];
-        if ("joinDef" in cd) {
+        if (isObject(cd) && "joinDef" in cd) {
           if(!cd.joinDef) throw "cd.joinDef missing"
           const { joinDef } = cd;
           const res: JoinInfo = {
@@ -416,16 +416,16 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
             const { nullable, defaultValue } = colConf;
             return `${pgType} ${!nullable ? " NOT NULL " : ""} ${defaultValue ? ` DEFAULT ${asValue(defaultValue)} ` : ""}`
           }
-          if ("references" in colConf && colConf.references) {
+          if (isObject(colConf) && "references" in colConf && colConf.references) {
 
             const { tableName: lookupTable, columnName: lookupCol = "id" } = colConf.references;
             return ` ${colNameEsc} ${getColTypeDef(colConf.references, "TEXT")} REFERENCES ${lookupTable} (${lookupCol}) `;
 
-          } else if ("sqlDefinition" in colConf && colConf.sqlDefinition) {
+          } else if (typeof colConf === "string" || "sqlDefinition" in colConf && colConf.sqlDefinition) {
 
-            return ` ${colNameEsc} ${colConf.sqlDefinition} `;
+            return ` ${colNameEsc} ${typeof colConf === "string"? colConf : colConf.sqlDefinition} `;
 
-          } else if ("isText" in colConf && colConf.isText) {
+          } else if (isObject(colConf) && "isText" in colConf && colConf.isText) {
             let checks = "", cArr = [];
             if (colConf.lowerCased) {
               cArr.push(`${colNameEsc} = LOWER(${colNameEsc})`)
@@ -468,7 +468,10 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
         const colCreateLines: string[] = [];
         const tableHandler = this.dbo[tableName];
         if (tableConf.columns) {
-          getKeys(tableConf.columns).filter(c => !("joinDef" in tableConf.columns![c])).map(colName => {
+          getKeys(tableConf.columns).filter(c => {
+            const colDef = tableConf.columns![c];
+            return typeof colDef === "string" || !("joinDef" in colDef)
+          }).map(colName => {
             const colConf = tableConf.columns![colName];
 
             /* Add columns to create statement */
@@ -482,7 +485,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
                 ALTER TABLE ${asName(tableName)} 
                 ADD COLUMN ${getColDef(colName, colConf)};
               `)
-              if ("references" in colConf && colConf.references) {
+              if (isObject(colConf) && "references" in colConf && colConf.references) {
 
                 const { tableName: lookupTable, } = colConf.references;
                 console.log(`TableConfigurator: ${tableName}(${colName})` + " referenced lookup table " + lookupTable);

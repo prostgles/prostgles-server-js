@@ -1655,15 +1655,10 @@ export class ViewHandler {
         templates = templates.concat(computedColConditions);
         templates = templates.concat(complexFilters);
 
-        return templates.sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
+        /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
+        return templates.sort() 
             .join(" AND \n");
 
-        // return templates; //pgp.as.format(template, data);
-                            
-        /* 
-            SHOULD CHECK DATA TYPES TO AVOID "No operator matches the given data type" error
-            console.log(table.columns)
-        */
     }
 
     /* This relates only to SELECT */
@@ -2192,34 +2187,46 @@ export class TableHandler extends ViewHandler {
             if(tableRules.update.dynamicFields?.length){
 
                 /**
-                 * Ensure that dynamicFields.fields are less permissive than fields
-                 * This is because an update filter can target dynamicFields.filter AND also other records
+                 * dynamicFields.fields used to allow a custom list of fields for specific records
+                 * dynamicFields.filter cannot overlap each other
+                 * updates must target records from a specific dynamicFields.filter or not match any dynamicFields.filter
                  */
-                if(testRule){
-                    const defaultFields = this.parseFieldFilter(fields);
-                    const morePermissiveRule = tableRules.update.dynamicFields.find(r => {
-                        const ruleFields = this.parseFieldFilter(r.fields);
-                        return defaultFields.length && defaultFields.every(f => ruleFields.includes(f)) && ruleFields.length > defaultFields.length;
-                    });
+                if(testRule){                    
+                    for await(const [dfIndex, dfRule] of tableRules.update.dynamicFields.entries() ){
+                        const condition = await this.getCondition({ allowed_colnames: this.column_names, filter: dfRule.filter });
+                        if(!condition) throw "dynamicFields.filter cannot be empty: " + JSON.stringify(dfRule);
+                        await this.find(dfRule.filter, { limit: 0 });
 
-                    if(morePermissiveRule){
-                        throw `${this.name}.update.dynamicFields must be less permissive than the default ${this.name}.update.fields. 
-                            This is because an update filter can target dynamicFields.filter AND also other records. 
-                            Bad dynamicFields.fields: ${this.parseFieldFilter(morePermissiveRule.fields)}
-                            default fields: ${defaultFields}
-                            Bad dynamicFields: ${JSON.stringify(morePermissiveRule)}
-                            `;
+                        /** Ensure dynamicFields filters do not overlap */
+                        for await(const [_dfIndex, _dfRule] of tableRules.update.dynamicFields.entries() ){
+                            if(dfIndex !== _dfIndex){
+                                if(await this.findOne({ $and: [dfRule.filter, _dfRule.filter]}, { select: "" })){
+                                    throw `dynamicFields.filter cannot overlap each other. \n
+                                    Overlapping dynamicFields rules:
+                                        ${JSON.stringify(dfRule)} 
+                                        AND
+                                        ${JSON.stringify(_dfRule)} 
+                                    `;
+                                }
+                            }
+                        }
                     }
                 }
 
-                let found = false;
+                /** Pick dynamicFields.fields if matching filter */
+                let matchedRule: Required<UpdateRule>["dynamicFields"][number] | undefined;
                 for await(const dfRule of tableRules.update.dynamicFields){
-                    if(!found){
-                        const count = await this.count({ $and: [finalUpdateFilter, dfRule.filter].filter(isDefined) });
-                        if(count && +count > 0){
-                            found = true;
-                            fields = dfRule.fields;
+                    const match = await this.findOne({ $and: [finalUpdateFilter, dfRule.filter].filter(isDefined) });
+                    
+                    if(match){
+                        
+                        /** Ensure it doesn't overlap with other dynamicFields.filter */
+                        if(matchedRule){
+                            throw "Your update is targeting multiple tableRules.update.dynamicFields. Restrict update filter to only target one rule";
                         }
+
+                        matchedRule = dfRule;
+                        fields = dfRule.fields;
                     }
                 }
             }
@@ -2293,7 +2300,7 @@ export class TableHandler extends ViewHandler {
         dataKeys.map(col => {
             this.dboBuilder.prostgles?.tableConfigurator?.checkColVal({ table: this.name, col, value: data[col] });
             const colConfig = this.dboBuilder.prostgles?.tableConfigurator?.getColumnConfig(this.name, col);
-            if(colConfig && "isText" in colConfig && data[col]){
+            if(colConfig && isObject(colConfig) && "isText" in colConfig && data[col]){
                 if(colConfig.lowerCased){
                     data[col] = data[col].toString().toLowerCase()
                 } 

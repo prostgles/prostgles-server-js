@@ -143,7 +143,7 @@ declare type OneOf = {
 };
 declare type ColumnConfig<LANG_IDS = {
     en: 1;
-}> = StrictUnion<NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef | OneOf))>;
+}> = string | StrictUnion<NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef | OneOf))>;
 declare type UnionKeys<T> = T extends T ? keyof T : never;
 declare type StrictUnionHelper<T, TAll> = T extends any ? T & Partial<Record<Exclude<UnionKeys<TAll>, keyof T>, never>> : never;
 declare type StrictUnion<T> = StrictUnionHelper<T, T>;

@@ -1,4 +1,4 @@
-import { DBSchema, TableHandler, ViewHandler } from "prostgles-types";
+import { DBSchema, isObject, TableHandler, ViewHandler } from "prostgles-types";
 import prostgles from ".";
 import { Auth } from "./AuthHandler";
 import { DBHandlerServer, DboBuilder, escapeTSNames, postgresToTsType, TableHandlers } from "./DboBuilder";
@@ -17,10 +17,10 @@ export const getDBSchema = (dboBuilder: DboBuilder): string => {
       let type: string = (c.is_nullable? "null | " : "") + postgresToTsType(c.udt_name) + ";"
       const colConf = dboBuilder.prostgles.tableConfigurator?.getColumnConfig(tov.name, c.name);
       if(colConf){
-        if("jsonbSchema" in colConf){
+        if(isObject(colConf) && "jsonbSchema" in colConf){
           if(!colConf.jsonbSchema) throw "colConf.jsonbSchema missing"
           type = getJSONBSchemaTSTypes(colConf.jsonbSchema, { nullable: colConf.nullable }, "      ");
-        } else if("oneOf" in colConf){
+        } else if(isObject(colConf) && "oneOf" in colConf){
           if(!colConf.oneOf) throw "colConf.oneOf missing"
           const types = colConf.oneOf.map(t => typeof t === "number"? t : JSON.stringify(t));
           if(colConf.nullable){
