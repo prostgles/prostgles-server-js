@@ -1935,37 +1935,38 @@ export class ViewHandler {
             */
             } else if(isPlainObject(fieldParams)){
 
-                if(getKeys(fieldParams).length){
-                    let keys = getKeys(fieldParams as {
-                        [key: string]: boolean | 0 | 1;
-                    }) as AllowedKeys;
-                    if(keys[0] === ""){ 
-                        if(allow_empty){
-                            return [""];
-                        } else {
-                            throw "Empty value not allowed";
-                        }
-                    }
-
-                    validate(keys);
-
-                    keys.forEach(key => {
-                        const allowedVals = [true, false, 0, 1];
-                        if(!allowedVals.includes((fieldParams as any)[key])) throw `Invalid field selection value for: { ${key}: ${(fieldParams as any)[key]} }. \n Allowed values: ${allowedVals.join(" OR ")}`
-                    })
-
-                    let allowed = keys.filter(key => (fieldParams as any)[key]),
-                        disallowed = keys.filter(key => !(fieldParams as any)[key]);
-
-
-                    if(disallowed && disallowed.length){
-                        return all_fields.filter(col => !disallowed.includes(col)) as typeof all_fields;
-                    } else {
-                        return [...allowed] as any;
-                    }
-                } else {
-                    return all_fields.slice(0) as typeof all_fields;
+                if(!getKeys(fieldParams).length){
+                    return [] as unknown as typeof all_fields; //all_fields.slice(0) as typeof all_fields;
                 }
+
+                let keys = getKeys(fieldParams as {
+                    [key: string]: boolean | 0 | 1;
+                }) as AllowedKeys;
+                if(keys[0] === ""){ 
+                    if(allow_empty){
+                        return [""];
+                    } else {
+                        throw "Empty value not allowed";
+                    }
+                }
+
+                validate(keys);
+
+                keys.forEach(key => {
+                    const allowedVals = [true, false, 0, 1];
+                    if(!allowedVals.includes((fieldParams as any)[key])) throw `Invalid field selection value for: { ${key}: ${(fieldParams as any)[key]} }. \n Allowed values: ${allowedVals.join(" OR ")}`
+                })
+
+                let allowed = keys.filter(key => (fieldParams as any)[key]),
+                    disallowed = keys.filter(key => !(fieldParams as any)[key]);
+
+
+                if(disallowed && disallowed.length){
+                    return all_fields.filter(col => !disallowed.includes(col)) as typeof all_fields;
+                } else {
+                    return [...allowed] as any;
+                }
+                
             } else {
                 throw " Unrecognised field filter.\nExpecting any of:   string | string[] | { [field]: boolean } \n Received ->  " + initialParams;
             }
@@ -2219,7 +2220,7 @@ export class TableHandler extends ViewHandler {
                     const match = await this.findOne({ $and: [finalUpdateFilter, dfRule.filter].filter(isDefined) });
                     
                     if(match){
-                        
+
                         /** Ensure it doesn't overlap with other dynamicFields.filter */
                         if(matchedRule){
                             throw "Your update is targeting multiple tableRules.update.dynamicFields. Restrict update filter to only target one rule";

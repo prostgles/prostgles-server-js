@@ -1392,32 +1392,30 @@ class ViewHandler {
                 */
             }
             else if (isPlainObject(fieldParams)) {
-                if ((0, prostgles_types_1.getKeys)(fieldParams).length) {
-                    let keys = (0, prostgles_types_1.getKeys)(fieldParams);
-                    if (keys[0] === "") {
-                        if (allow_empty) {
-                            return [""];
-                        }
-                        else {
-                            throw "Empty value not allowed";
-                        }
-                    }
-                    validate(keys);
-                    keys.forEach(key => {
-                        const allowedVals = [true, false, 0, 1];
-                        if (!allowedVals.includes(fieldParams[key]))
-                            throw `Invalid field selection value for: { ${key}: ${fieldParams[key]} }. \n Allowed values: ${allowedVals.join(" OR ")}`;
-                    });
-                    let allowed = keys.filter(key => fieldParams[key]), disallowed = keys.filter(key => !fieldParams[key]);
-                    if (disallowed && disallowed.length) {
-                        return all_fields.filter(col => !disallowed.includes(col));
+                if (!(0, prostgles_types_1.getKeys)(fieldParams).length) {
+                    return []; //all_fields.slice(0) as typeof all_fields;
+                }
+                let keys = (0, prostgles_types_1.getKeys)(fieldParams);
+                if (keys[0] === "") {
+                    if (allow_empty) {
+                        return [""];
                     }
                     else {
-                        return [...allowed];
+                        throw "Empty value not allowed";
                     }
                 }
+                validate(keys);
+                keys.forEach(key => {
+                    const allowedVals = [true, false, 0, 1];
+                    if (!allowedVals.includes(fieldParams[key]))
+                        throw `Invalid field selection value for: { ${key}: ${fieldParams[key]} }. \n Allowed values: ${allowedVals.join(" OR ")}`;
+                });
+                let allowed = keys.filter(key => fieldParams[key]), disallowed = keys.filter(key => !fieldParams[key]);
+                if (disallowed && disallowed.length) {
+                    return all_fields.filter(col => !disallowed.includes(col));
+                }
                 else {
-                    return all_fields.slice(0);
+                    return [...allowed];
                 }
             }
             else {
@@ -1624,11 +1622,12 @@ class TableHandler extends ViewHandler {
                         }
                     }
                 }
+                /** Pick dynamicFields.fields if matching filter */
                 let matchedRule;
                 for await (const dfRule of tableRules.update.dynamicFields) {
                     const match = await this.findOne({ $and: [finalUpdateFilter, dfRule.filter].filter(prostgles_types_1.isDefined) });
-                    /** Ensure it doesn't overlap with other dynamicFields.filter */
                     if (match) {
+                        /** Ensure it doesn't overlap with other dynamicFields.filter */
                         if (matchedRule) {
                             throw "Your update is targeting multiple tableRules.update.dynamicFields. Restrict update filter to only target one rule";
                         }
