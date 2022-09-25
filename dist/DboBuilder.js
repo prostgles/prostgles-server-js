@@ -1222,7 +1222,8 @@ class ViewHandler {
             return throwErr();
         if (!_ob || !_ob.length)
             return [];
-        const validatedAggAliases = select.filter(s => s.type !== "joinedColumn").map(s => s.alias);
+        const validatedAggAliases = select.filter(s => s.type !== "joinedColumn" &&
+            (!s.fields.length || s.fields.every(f => allowed_cols.includes(f)))).map(s => s.alias);
         let bad_param = _ob.find(({ key }) => !(validatedAggAliases || []).includes(key) &&
             !allowed_cols.includes(key));
         if (!bad_param) {

@@ -20,6 +20,7 @@ export type SelectItem = {
   alias: string;
   selected: boolean;
 };
+export type SelectItemValidated = SelectItem & { fields: string[]; }
 
 export type NewQuery = {
   /**
@@ -1025,7 +1026,7 @@ export const COMPUTED_FIELDS: FieldSpec[] = [
 
 export class SelectItemBuilder {
 
-  select: SelectItem[] = [];
+  select: SelectItemValidated[] = [];
   private allFields: string[];
 
   private allowedFields: string[];
@@ -1076,7 +1077,7 @@ export class SelectItemBuilder {
     if(this.select.find(s => s.alias === item.alias)){ 
       throw `Cannot specify duplicate columns ( ${item.alias} ). Perhaps you're using "*" with column names?`;
     }
-    this.select.push(item);
+    this.select.push({ ...item, fields });
   }
 
   private addFunction = (func: FunctionSpec | string, args: any[], alias: string) => {
@@ -1348,7 +1349,7 @@ export async function getNewQuery(
     }
   });
 
-  let select: SelectItem[] = sBuilder.select;
+  let select = sBuilder.select;
   // const validatedAggAliases = select
   //   .filter(s => s.type !== "joinedColumn")
   //   .map(s => s.alias);

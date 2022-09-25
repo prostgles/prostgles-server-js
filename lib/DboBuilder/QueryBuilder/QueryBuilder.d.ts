@@ -10,6 +10,9 @@ export declare type SelectItem = {
     alias: string;
     selected: boolean;
 };
+export declare type SelectItemValidated = SelectItem & {
+    fields: string[];
+};
 export declare type NewQuery = {
     /**
      * All fields from the table will be in nested SELECT and GROUP BY to allow order/filter by fields not in select
@@ -97,7 +100,7 @@ export declare type FunctionSpec = {
 export declare const FUNCTIONS: FunctionSpec[];
 export declare const COMPUTED_FIELDS: FieldSpec[];
 export declare class SelectItemBuilder {
-    select: SelectItem[];
+    select: SelectItemValidated[];
     private allFields;
     private allowedFields;
     private allowedOrderByFields;

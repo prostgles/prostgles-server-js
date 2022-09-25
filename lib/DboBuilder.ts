@@ -90,7 +90,7 @@ export type DBHandlerServer<TH = TableHandlers> =
 
 
 import { get } from "./utils";
-import { getNewQuery, COMPUTED_FIELDS, SelectItem, FieldSpec, asNameAlias, SelectItemBuilder, FUNCTIONS, parseFunction, parseFunctionObject } from "./DboBuilder/QueryBuilder/QueryBuilder";
+import { getNewQuery, COMPUTED_FIELDS, SelectItem, FieldSpec, asNameAlias, SelectItemBuilder, FUNCTIONS, parseFunction, parseFunctionObject, SelectItemValidated } from "./DboBuilder/QueryBuilder/QueryBuilder";
 import { 
     Join, Prostgles, DB, isSuperUser
 } from "./Prostgles";
@@ -1662,7 +1662,7 @@ export class ViewHandler {
     }
 
     /* This relates only to SELECT */
-    prepareSortItems(orderBy: OrderBy | undefined, allowed_cols: string[], tableAlias: string | undefined, select: SelectItem[]): SortItem[] {
+    prepareSortItems(orderBy: OrderBy | undefined, allowed_cols: string[], tableAlias: string | undefined, select: SelectItemValidated[]): SortItem[] {
 
         const throwErr = () => {
                 throw "\nInvalid orderBy option -> " + JSON.stringify(orderBy) + 
@@ -1730,14 +1730,16 @@ export class ViewHandler {
 
         if(!_ob || !_ob.length) return [];
 
-        const validatedAggAliases = select.filter(s => s.type !== "joinedColumn").map(s => s.alias)
+        const validatedAggAliases = select.filter(s => 
+                s.type !== "joinedColumn" && 
+                (!s.fields.length || s.fields.every(f => allowed_cols.includes(f)))
+            ).map(s => s.alias)
         
         let bad_param = _ob.find(({ key }) => 
             !(validatedAggAliases || []).includes(key) &&
             !allowed_cols.includes(key)
         );
         if(!bad_param){
-            
             const selectedAliases = select.filter(s => s.selected).map(s => s.alias);
             // return (excludeOrder? "" : " ORDER BY ") + (_ob.map(({ key, asc, nulls, nullEmpty = false }) => {
             return _ob.map(({ key, asc, nulls, nullEmpty = false }) => {

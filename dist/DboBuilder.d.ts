@@ -39,7 +39,7 @@ export declare type DBHandlerServer<TH = TableHandlers> = TH & Partial<DbJoinMak
 } & {
     tx?: TX<TH>;
 };
-import { SelectItem, FieldSpec } from "./DboBuilder/QueryBuilder/QueryBuilder";
+import { SelectItem, FieldSpec, SelectItemValidated } from "./DboBuilder/QueryBuilder/QueryBuilder";
 import { Join, Prostgles, DB } from "./Prostgles";
 import { TableRule, UpdateRule, PublishParser, ValidateRow, PublishAllOrNothing } from "./PublishParser";
 import { PubSubManager, BasicCallback } from "./PubSubManager";
@@ -296,7 +296,7 @@ export declare class ViewHandler {
         localParams?: LocalParams;
         tableRules?: TableRule;
     }): Promise<string>;
-    prepareSortItems(orderBy: OrderBy | undefined, allowed_cols: string[], tableAlias: string | undefined, select: SelectItem[]): SortItem[];
+    prepareSortItems(orderBy: OrderBy | undefined, allowed_cols: string[], tableAlias: string | undefined, select: SelectItemValidated[]): SortItem[];
     prepareLimitQuery(limit: number | undefined, p: ValidatedTableRules): number;
     prepareOffsetQuery(offset?: number): number;
     intersectColumns(allowedFields: FieldFilter, dissallowedFields: FieldFilter, fixIssues?: boolean): string[];
