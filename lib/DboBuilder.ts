@@ -1221,6 +1221,10 @@ export class ViewHandler {
     prepareColumnSet(selectParams: FieldFilter = "*", allowed_cols: FieldFilter, allow_empty: boolean = true, onlyNames: boolean = true): string | pgPromise.ColumnSet {
         let all_columns = this.column_names.slice(0);
         let col_names = this.getAllowedSelectFields(selectParams, all_columns, allow_empty);
+        /** Ensure order is maintained */
+        if(selectParams && Array.isArray(selectParams) && typeof selectParams[0] === "string"){
+            col_names = col_names.sort((a, b) => selectParams.indexOf(a) - selectParams.indexOf(b))
+        }
         try{
             let colSet = new pgp.helpers.ColumnSet(col_names);
             return onlyNames? colSet.names : colSet;
