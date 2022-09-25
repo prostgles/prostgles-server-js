@@ -1154,7 +1154,6 @@ class ViewHandler {
     }
     /* This relates only to SELECT */
     prepareSortItems(orderBy, allowed_cols, tableAlias, select) {
-        let column_names = this.column_names.slice(0);
         const throwErr = () => {
             throw "\nInvalid orderBy option -> " + JSON.stringify(orderBy) +
                 "Expecting: \
@@ -1198,10 +1197,6 @@ class ViewHandler {
         };
         if (!orderBy)
             return [];
-        let allowedFields = [];
-        if (allowed_cols) {
-            allowedFields = this.parseFieldFilter(allowed_cols);
-        }
         let _ob = [];
         if (isPlainObject(orderBy)) {
             _ob = parseOrderObj(orderBy);
@@ -1229,8 +1224,7 @@ class ViewHandler {
             return [];
         const validatedAggAliases = select.filter(s => s.type !== "joinedColumn").map(s => s.alias);
         let bad_param = _ob.find(({ key }) => !(validatedAggAliases || []).includes(key) &&
-            (!column_names.includes(key) ||
-                (allowedFields.length && !allowedFields.includes(key))));
+            !allowed_cols.includes(key));
         if (!bad_param) {
             const selectedAliases = select.filter(s => s.selected).map(s => s.alias);
             // return (excludeOrder? "" : " ORDER BY ") + (_ob.map(({ key, asc, nulls, nullEmpty = false }) => {

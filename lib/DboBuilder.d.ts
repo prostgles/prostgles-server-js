@@ -296,7 +296,7 @@ export declare class ViewHandler {
         localParams?: LocalParams;
         tableRules?: TableRule;
     }): Promise<string>;
-    prepareSortItems(orderBy: OrderBy | undefined, allowed_cols: FieldFilter, tableAlias: string | undefined, select: SelectItem[]): SortItem[];
+    prepareSortItems(orderBy: OrderBy | undefined, allowed_cols: string[], tableAlias: string | undefined, select: SelectItem[]): SortItem[];
     prepareLimitQuery(limit: number, p: ValidatedTableRules): number;
     prepareOffsetQuery(offset?: number): number;
     intersectColumns(allowedFields: FieldFilter, dissallowedFields: FieldFilter, fixIssues?: boolean): string[];

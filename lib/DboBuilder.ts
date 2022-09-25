@@ -1662,8 +1662,7 @@ export class ViewHandler {
     }
 
     /* This relates only to SELECT */
-    prepareSortItems(orderBy: OrderBy | undefined, allowed_cols: FieldFilter, tableAlias: string | undefined, select: SelectItem[]): SortItem[] {
-        let column_names = this.column_names.slice(0);
+    prepareSortItems(orderBy: OrderBy | undefined, allowed_cols: string[], tableAlias: string | undefined, select: SelectItem[]): SortItem[] {
 
         const throwErr = () => {
                 throw "\nInvalid orderBy option -> " + JSON.stringify(orderBy) + 
@@ -1711,11 +1710,6 @@ export class ViewHandler {
 
         if(!orderBy) return [];
 
-        let allowedFields: string[] = [];
-        if(allowed_cols){
-            allowedFields = this.parseFieldFilter(allowed_cols);
-        }
-
         let _ob: { key: string, asc: boolean, nulls?: "first" | "last", nullEmpty?: boolean }[] = [];
         if(isPlainObject(orderBy)){
             _ob = parseOrderObj(orderBy);
@@ -1740,10 +1734,7 @@ export class ViewHandler {
         
         let bad_param = _ob.find(({ key }) => 
             !(validatedAggAliases || []).includes(key) &&
-            (
-                !column_names.includes(key) || 
-                (allowedFields.length && !allowedFields.includes(key))
-            )
+            !allowed_cols.includes(key)
         );
         if(!bad_param){
             
