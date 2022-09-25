@@ -46,7 +46,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
             try {
               const colset = new pgp.helpers.ColumnSet(this.columns.filter(c => keys.includes(c.name)).map(c => ({ name: c.name, cast: c.udt_name }))),
                 // values = pgp.helpers.values(forcedData, colset),
-                values = "(" + keys.map(k => asValue(forcedData![k]) + "::" + this.columns.find(c => keys.includes(c.name))!.udt_name).join(", ") + ")",
+                values = "(" + keys.map(k => asValue(forcedData![k]) + "::" + this.columns.find(c => c.name === k)!.udt_name).join(", ") + ")",
                 // colNames = this.prepareSelect(keys, this.column_names),
                 colNames = keys.map(k => asName(k)).join(",");
               const query = pgp.as.format("EXPLAIN INSERT INTO " + this.escapedName + " (${colNames:raw}) SELECT * FROM ( VALUES ${values:raw} ) t WHERE FALSE;", { colNames, values })
