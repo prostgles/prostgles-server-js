@@ -2,7 +2,7 @@ import pgPromise from "pg-promise";
 import { AnyObject, asName, FieldFilter, get, getKeys, InsertParams, isObject } from "prostgles-types";
 import { isPlainObject, isPojoObject, LocalParams, makeErr, parseError, pgp, TableHandler } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
-import { omitKeys, pickKeys } from "../PubSubManager";
+import { asValue, omitKeys, pickKeys } from "../PubSubManager";
 
 export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any | any[] | boolean> {
   // const localParams = _localParams || {};
@@ -44,9 +44,11 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
           const keys = Object.keys(forcedData);
           if (keys.length) {
             try {
-              const colset = new pgp.helpers.ColumnSet(this.columns.filter(c => keys.includes(c.name)).map(c => ({ name: c.name, cast: c.udt_name === "uuid" ? c.udt_name : undefined }))),
-                values = pgp.helpers.values(forcedData, colset),
-                colNames = this.prepareSelect(keys, this.column_names);
+              const colset = new pgp.helpers.ColumnSet(this.columns.filter(c => keys.includes(c.name)).map(c => ({ name: c.name, cast: c.udt_name }))),
+                // values = pgp.helpers.values(forcedData, colset),
+                values = "(" + keys.map(k => asValue(forcedData![k]) + "::" + this.columns.find(c => keys.includes(c.name))!.udt_name).join(", ") + ")",
+                // colNames = this.prepareSelect(keys, this.column_names),
+                colNames = keys.map(k => asName(k)).join(",");
               const query = pgp.as.format("EXPLAIN INSERT INTO " + this.escapedName + " (${colNames:raw}) SELECT * FROM ( VALUES ${values:raw} ) t WHERE FALSE;", { colNames, values })
               await this.db.any(query);
             } catch (e) {

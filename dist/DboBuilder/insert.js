@@ -37,7 +37,11 @@ async function insert(rowOrRows, param2, param3_unused, tableRules, localParams)
                     const keys = Object.keys(forcedData);
                     if (keys.length) {
                         try {
-                            const colset = new DboBuilder_1.pgp.helpers.ColumnSet(this.columns.filter(c => keys.includes(c.name)).map(c => ({ name: c.name, cast: c.udt_name === "uuid" ? c.udt_name : undefined }))), values = DboBuilder_1.pgp.helpers.values(forcedData, colset), colNames = this.prepareSelect(keys, this.column_names);
+                            const colset = new DboBuilder_1.pgp.helpers.ColumnSet(this.columns.filter(c => keys.includes(c.name)).map(c => ({ name: c.name, cast: c.udt_name }))), 
+                            // values = pgp.helpers.values(forcedData, colset),
+                            values = "(" + keys.map(k => (0, PubSubManager_1.asValue)(forcedData[k]) + "::" + this.columns.find(c => keys.includes(c.name)).udt_name).join(", ") + ")", 
+                            // colNames = this.prepareSelect(keys, this.column_names),
+                            colNames = keys.map(k => (0, prostgles_types_1.asName)(k)).join(",");
                             const query = DboBuilder_1.pgp.as.format("EXPLAIN INSERT INTO " + this.escapedName + " (${colNames:raw}) SELECT * FROM ( VALUES ${values:raw} ) t WHERE FALSE;", { colNames, values });
                             await this.db.any(query);
                         }
