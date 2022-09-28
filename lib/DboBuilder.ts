@@ -863,7 +863,7 @@ export class ViewHandler {
                 
                 let label = c.comment || capitalizeFirstLetter(c.name, " ");
 
-                const select = c.privileges.some(p => p.privilege_type === "SELECT"),
+                let select = c.privileges.some(p => p.privilege_type === "SELECT"),
                     insert = c.privileges.some(p => p.privilege_type === "INSERT"),
                     update = c.privileges.some(p => p.privilege_type === "UPDATE"),
                     _delete = this.tableOrViewInfo.privileges.delete;// c.privileges.some(p => p.privilege_type === "DELETE");
@@ -871,7 +871,12 @@ export class ViewHandler {
                 delete (c as any).privileges;
 
                 const prostgles = this.dboBuilder?.prostgles;
-                const fileConfig = prostgles.fileManager?.getColInfo({ colName: c.name, tableName: this.name })
+                const fileConfig = prostgles.fileManager?.getColInfo({ colName: c.name, tableName: this.name });
+
+                /** Do not allow updates to file table unless it's to delete fields */
+                if(prostgles.fileManager?.config && prostgles.fileManager.tableName === this.name){
+                    update = false;
+                }
 
                 let result: ValidatedColumnInfo = {
                     ...c,

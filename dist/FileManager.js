@@ -128,8 +128,11 @@ class FileManager {
                     /**
                      * Remove exif
                      */
-                    _data = await sharp(data)
-                        .clone()
+                    // const metadata = await simg.metadata();
+                    // const simg = await sharp(data);
+                    _data = await sharp(data).clone().withMetadata({
+                        exif: {}
+                    })
                         .toBuffer();
                 }
             }

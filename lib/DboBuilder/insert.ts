@@ -43,12 +43,18 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
         if (forcedData) {
           const keys = Object.keys(forcedData);
           if (keys.length) {
+            const dataCols = keys.filter(k => this.column_names.includes(k));
+            const nestedInsertCols = keys.filter(k => !this.column_names.includes(k) && this.dboBuilder.dbo[k].insert);
+            if(nestedInsertCols.length){
+              throw `Nested insert not supported for forcedData rule: ${nestedInsertCols}`;
+            }
+            const badCols = keys.filter(k => !dataCols.includes(k) && !nestedInsertCols.includes(k));
+            if(badCols.length){
+              throw `Invalid columns found in forced filter: ${badCols.join(", ")}`;
+            }
             try {
-              const colset = new pgp.helpers.ColumnSet(this.columns.filter(c => keys.includes(c.name)).map(c => ({ name: c.name, cast: c.udt_name }))),
-                // values = pgp.helpers.values(forcedData, colset),
-                values = "(" + keys.map(k => asValue(forcedData![k]) + "::" + this.columns.find(c => c.name === k)!.udt_name).join(", ") + ")",
-                // colNames = this.prepareSelect(keys, this.column_names),
-                colNames = keys.map(k => asName(k)).join(",");
+              const values = "(" + dataCols.map(k => asValue(forcedData![k]) + "::" + this.columns.find(c => c.name === k)!.udt_name).join(", ") + ")",
+                colNames = dataCols.map(k => asName(k)).join(",");
               const query = pgp.as.format("EXPLAIN INSERT INTO " + this.escapedName + " (${colNames:raw}) SELECT * FROM ( VALUES ${values:raw} ) t WHERE FALSE;", { colNames, values })
               await this.db.any(query);
             } catch (e) {

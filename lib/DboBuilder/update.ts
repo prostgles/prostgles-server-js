@@ -10,7 +10,7 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
 
     /** postValidate */
     const finalDBtx = localParams?.tx?.dbTX || this.dbTX;
-    if(tableRules?.[ACTION]?.postValidate ){
+    if(tableRules?.[ACTION]?.postValidate){
       if(!finalDBtx){
         return this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.[ACTION]?.(filter, _newData, params, tableRules, localParams))
       }
