@@ -38,6 +38,8 @@ export type SortItem = {
     fieldPosition: number;
 });
 
+export type ParsedMedia = Required<Pick<Media, "extension" | "content_type">>;
+
 export type Media = {
     "id"?: string;
     "title"?: string;

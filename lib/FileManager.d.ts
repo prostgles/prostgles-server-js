@@ -47,6 +47,7 @@ export declare type UploadItem = {
     name: string;
     content_type: string;
     data: Buffer;
+    extension: string;
 };
 export declare type UploadedItem = {
     /**

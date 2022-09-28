@@ -57,6 +57,7 @@ export type UploadItem = {
   name: string;
   content_type: string;
   data: Buffer;
+  extension: string;
 };
 export type UploadedItem = {
   /**
@@ -410,7 +411,7 @@ export default class FileManager {
     imageOptions?: ImageOptions;
   }): Promise<UploadedItem> => {
     const { item, imageOptions } = params;
-    const { name, data, content_type } = item;
+    const { name, data, content_type, extension } = item;
     if(!data) throw "No file provided";
     if(!name || typeof name !== "string") throw "Expecting a string name";
     
@@ -418,7 +419,8 @@ export default class FileManager {
 
     let _data = data;
     
-    if(content_type.startsWith("image")){
+    /** Resize/compress/remove exif from photos */
+    if(content_type.startsWith("image") && extension.toLowerCase() !== "gif"){
 
       const compression = imageOptions?.compression
       if(compression){

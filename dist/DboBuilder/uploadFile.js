@@ -16,6 +16,7 @@ async function uploadFile(row, validate, localParams, mediaId) {
     const nestedInsert = localParams?.nestedInsert;
     const type = await this.dboBuilder.prostgles.fileManager.parseFile({ file: data, fileName: name, tableName: nestedInsert?.previousTable, colName: nestedInsert?.referencingColumn });
     const media_name = `${media_id}.${type.ext}`;
+    const parsedMediaKeys = ["id", "name", "original_name", "extension", "content_type"];
     let media = {
         id: media_id,
         name: media_name,
@@ -24,13 +25,18 @@ async function uploadFile(row, validate, localParams, mediaId) {
         content_type: type.mime
     };
     if (validate) {
-        media = await validate(media, this.dbTX || this.dboBuilder.dbo);
+        const parsedMedia = await validate(media, this.dbTX || this.dboBuilder.dbo);
+        const missingKeys = parsedMediaKeys.filter(k => !parsedMedia[k]);
+        if (missingKeys.length) {
+            throw `Some keys are missing from file insert validation: ${missingKeys}`;
+        }
     }
     const _media = await this.dboBuilder.prostgles.fileManager.uploadAsMedia({
         item: {
             data,
             name: media.name ?? "????",
-            content_type: media.content_type
+            content_type: media.content_type,
+            extension: media.extension
         },
         // imageCompression: {
         //     inside: {

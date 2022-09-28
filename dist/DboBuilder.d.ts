@@ -10,6 +10,7 @@ export declare type SortItem = {
 } | {
     fieldPosition: number;
 });
+export declare type ParsedMedia = Required<Pick<Media, "extension" | "content_type">>;
 export declare type Media = {
     "id"?: string;
     "title"?: string;

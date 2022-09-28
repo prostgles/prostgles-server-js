@@ -94,14 +94,15 @@ class FileManager {
         };
         this.uploadAsMedia = async (params) => {
             const { item, imageOptions } = params;
-            const { name, data, content_type } = item;
+            const { name, data, content_type, extension } = item;
             if (!data)
                 throw "No file provided";
             if (!name || typeof name !== "string")
                 throw "Expecting a string name";
             // const type = await this.getMIME(data, name, allowedExtensions, dissallowedExtensions);
             let _data = data;
-            if (content_type.startsWith("image")) {
+            /** Resize/compress/remove exif from photos */
+            if (content_type.startsWith("image") && extension.toLowerCase() !== "gif") {
                 const compression = imageOptions?.compression;
                 if (compression) {
                     console.log("Resizing image");
