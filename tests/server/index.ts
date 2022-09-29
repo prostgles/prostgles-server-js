@@ -192,6 +192,18 @@ function dd(){
 					}
 				}
 			}
+		},
+		rec_ref: {
+			columns: {
+				id: "SERIAL PRIMARY KEY",
+			}
+		},
+		rec: {
+			columns: {
+				id: "SERIAL PRIMARY KEY",
+				parent_id: "INTEGER REFERENCES rec",
+				recf: "INTEGER REFERENCES rec_ref",
+			}
 		}
 	} 
 	// ProstglesInitOptions<DBSchemaGenerated>

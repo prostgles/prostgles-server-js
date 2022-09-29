@@ -2655,34 +2655,50 @@ export class DboBuilder {
 
             // Make joins graph
             this.joinGraph = {};
-            this.joins.map(({ tables }) => {
+            this.joins.forEach(({ tables }) => {
                 let _t = tables.slice().sort(),
                     t1 = _t[0],
                     t2 = _t[1];
-                this.joinGraph![t1] = this.joinGraph![t1] || {};
+
+                if(t1 === t2) return;
+
+                this.joinGraph![t1] ??= {};
                 this.joinGraph![t1][t2] = 1;
 
-                this.joinGraph![t2] = this.joinGraph![t2] || {};
+                this.joinGraph![t2] ??= {};
                 this.joinGraph![t2][t1] = 1;
             });
             const tables = Array.from(new Set(this.joins.flatMap(t => t.tables)));
             this.joinPaths = [];
-            tables.forEach(t1 => {
-                tables.forEach(t2 => {
-                    if(t1 === t2) return;
-                    
-                    const spath = findShortestPath(this.joinGraph!, t1, t2);
-                    if(spath && spath.distance < Infinity){
+            tables.forEach((t1, i1) => {
+                tables.forEach((t2, i2) => {
 
-                        const existing1 = this.joinPaths.find(j => j.t1 === t1 && j.t2 === t2)
-                        if(!existing1){
-                            this.joinPaths.push({ t1, t2, path: spath.path });
-                        }
-                        
-                        const existing2 = this.joinPaths.find(j => j.t2 === t1 && j.t1 === t2);
-                        if(!existing2){
-                            this.joinPaths.push({ t1: t2, t2: t1, path: spath.path.slice().reverse() });
-                        }
+                    /** Prevent recursion */
+                    if(
+                        t1 === t2 || 
+                        this.joinPaths.some(jp => {
+                            if(arrayValuesMatch([jp.t1, jp.t2], [t1, t2])){
+                                const spath = findShortestPath(this.joinGraph!, t1, t2);
+                                if(spath && arrayValuesMatch(spath.path, jp.path) ){
+                                    return true;
+                                }
+                            }
+                        })
+                    ) {
+                        return;
+                    }
+
+                    const spath = findShortestPath(this.joinGraph!, t1, t2);
+                    if(!(spath && spath.distance < Infinity)) return;
+                    
+                    const existing1 = this.joinPaths.find(j => j.t1 === t1 && j.t2 === t2)
+                    if(!existing1){
+                        this.joinPaths.push({ t1, t2, path: spath.path });
+                    }
+                    
+                    const existing2 = this.joinPaths.find(j => j.t2 === t1 && j.t1 === t2);
+                    if(!existing2){
+                        this.joinPaths.push({ t1: t2, t2: t1, path: spath.path.slice().reverse() });
                     }
                 });
             });
@@ -3280,11 +3296,14 @@ function sqlErrCodeToMsg(code: string){
       */
 }
 
+const arrayValuesMatch = <T>(arr1: T[], arr2: T[]): boolean => {
+    return arr1.sort().join() === arr2.sort().join()
+}
 
 async function getInferredJoins2(schema: TableSchema[]): Promise<Join[]> {
     let joins: Join[] = [];
     const upsertJoin = (t1: string, t2: string, cols: { col1: string; col2: string }[], type: Join["type"]) => {
-        let existingIdx = joins.findIndex(j => j.tables.slice(0).sort().join() === [t1, t2].sort().join());
+        let existingIdx = joins.findIndex(j => arrayValuesMatch(j.tables.slice(0), [t1, t2]));
         let existing = joins[existingIdx];
         const normalCond = cols.reduce((a, v) => ({ ...a, [v.col1]: v.col2 }), {});
         const revertedCond = cols.reduce((a, v) => ({ ...a, [v.col2]: v.col1 }), {});

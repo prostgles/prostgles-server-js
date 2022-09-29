@@ -302,6 +302,28 @@ export type DBSchemaGenerated = {
       media_id: string;
     };
   };
+  rec: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id?: number;
+      parent_id?: null | number;
+      recf?: null | number;
+    };
+  };
+  rec_ref: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id?: number;
+    };
+  };
   shapes: {
     is_view: false;
     select: true;
