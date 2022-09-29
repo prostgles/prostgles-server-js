@@ -718,7 +718,7 @@ export class ViewHandler {
         paths = (path || jp.path).slice(1).map((t2, i, arr) => {
             const t1 = i === 0? source : arr[i-1];
             
-            if(!this.joins) this.joins = JSON.parse(JSON.stringify(this.dboBuilder.joins));
+            if(!this.joins) this.joins = structuredClone(this.dboBuilder.joins)?.filter(j => j.tables[0] !== j.tables[1]) as Join[];
 
             /* Get join options */
             const jo = this.joins.find(j => j.tables.includes(t1) && j.tables.includes(t2));
