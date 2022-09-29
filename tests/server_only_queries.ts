@@ -1,5 +1,8 @@
 export default async function f(db: any){
 
+  /** Self reference recursion bug */
+  await db.rec.findOne({ id: 1 }, { select: { "*": 1, rec_ref: "*" } })
+
   /* Transaction example */
   await db.tx(async t => {
     await t.items.insert({ name: "tx_" });

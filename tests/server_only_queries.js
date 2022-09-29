@@ -1,6 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 async function f(db) {
+    /** Self reference recursion bug */
+    await db.rec.findOne({ id: 1 }, { select: { "*": 1, rec_ref: "*" } });
     /* Transaction example */
     await db.tx(async (t) => {
         await t.items.insert({ name: "tx_" });
