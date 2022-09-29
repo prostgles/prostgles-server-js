@@ -2010,7 +2010,7 @@ class DboBuilder {
                         return;
                     const existing1 = this.joinPaths.find(j => j.t1 === t1 && j.t2 === t2);
                     if (!existing1) {
-                        this.joinPaths.push({ t1, t2, path: spath.path });
+                        this.joinPaths.push({ t1, t2, path: spath.path.slice() });
                     }
                     const existing2 = this.joinPaths.find(j => j.t2 === t1 && j.t1 === t2);
                     if (!existing2) {
@@ -2511,7 +2511,7 @@ function sqlErrCodeToMsg(code) {
     */
 }
 const arrayValuesMatch = (arr1, arr2) => {
-    return arr1.sort().join() === arr2.sort().join();
+    return arr1.slice().sort().join() === arr2.slice().sort().join();
 };
 async function getInferredJoins2(schema) {
     let joins = [];
