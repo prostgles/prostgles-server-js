@@ -718,7 +718,7 @@ export class ViewHandler {
         paths = (path || jp.path).slice(1).map((t2, i, arr) => {
             const t1 = i === 0? source : arr[i-1];
             
-            if(!this.joins) this.joins = structuredClone(this.dboBuilder.joins)?.filter(j => j.tables[0] !== j.tables[1]) as Join[];
+            this.joins ??= this.dboBuilder.joins;
 
             /* Get join options */
             const jo = this.joins.find(j => j.tables.includes(t1) && j.tables.includes(t2));
@@ -2535,7 +2535,6 @@ export class DboBuilder {
 
     tsTypesDefinition?: string;
 
-    joins?: Join[];
     joinGraph?: Graph;
     joinPaths: JoinPaths = [];
 
@@ -2550,7 +2549,6 @@ export class DboBuilder {
         this.db = this.prostgles.db;
         this.schema = this.prostgles.opts.schema || "public";
         this.dbo = { } as unknown as DBHandlerServer;
-        // this.joins = this.prostgles.joins;
         
     }
 
@@ -2575,9 +2573,15 @@ export class DboBuilder {
         this._pubSubManager?.destroy();
     }
 
-    getJoins(){
-        return this.joins;
+    _joins?: Join[];
+    get joins(): Join[] {
+        return structuredClone(this._joins ?? []).filter(j => j.tables[0] !== j.tables[1]) as Join[];;
     }
+
+    set joins(j: Join[]){
+        this._joins = structuredClone(j);
+    }
+
     getJoinPaths(){
         return this.joinPaths;
     }

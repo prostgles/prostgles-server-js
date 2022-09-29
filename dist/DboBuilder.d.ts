@@ -386,7 +386,6 @@ export declare class DboBuilder {
     getPubSubManager: () => Promise<PubSubManager>;
     pojoDefinitions?: string[];
     tsTypesDefinition?: string;
-    joins?: Join[];
     joinGraph?: Graph;
     joinPaths: JoinPaths;
     prostgles: Prostgles;
@@ -399,7 +398,9 @@ export declare class DboBuilder {
     private init;
     static create: (prostgles: Prostgles) => Promise<DboBuilder>;
     destroy(): void;
-    getJoins(): Join[] | undefined;
+    _joins?: Join[];
+    get joins(): Join[];
+    set joins(j: Join[]);
     getJoinPaths(): JoinPaths;
     parseJoins(): Promise<JoinPaths>;
     private runSQL;

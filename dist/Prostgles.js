@@ -185,7 +185,6 @@ class Prostgles {
             const { schema, tables } = fullSchema ?? { schema: {}, tables: [] };
             let joinTables2 = [];
             if (this.opts.joins) {
-                // joinTables = Array.from(new Set(flat(this.dboBuilder.getJoins().map(j => j.tables)).filter(t => schema[t])));
                 let _joinTables2 = this.dboBuilder.getJoinPaths()
                     .filter(jp => ![jp.t1, jp.t2].find(t => !schema[t] || !schema[t].findOne)).map(jp => [jp.t1, jp.t2].sort());
                 _joinTables2.map(jt => {
