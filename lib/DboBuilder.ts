@@ -91,7 +91,7 @@ export type DBHandlerServer<TH = TableHandlers> =
 // }
 
 
-import { get } from "./utils";
+import { clone, get } from "./utils";
 import { getNewQuery, COMPUTED_FIELDS, SelectItem, FieldSpec, asNameAlias, SelectItemBuilder, FUNCTIONS, parseFunction, parseFunctionObject, SelectItemValidated } from "./DboBuilder/QueryBuilder/QueryBuilder";
 import { 
     Join, Prostgles, DB, isSuperUser
@@ -2575,11 +2575,11 @@ export class DboBuilder {
 
     _joins?: Join[];
     get joins(): Join[] {
-        return structuredClone(this._joins ?? []).filter(j => j.tables[0] !== j.tables[1]) as Join[];;
+        return clone(this._joins ?? []).filter(j => j.tables[0] !== j.tables[1]) as Join[];;
     }
 
     set joins(j: Join[]){
-        this._joins = structuredClone(j);
+        this._joins = clone(j);
     }
 
     getJoinPaths(){
