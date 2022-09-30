@@ -1,6 +1,6 @@
 export { get } from "prostgles-types";
 export const clone = <T extends any[] | Record<string, any>>(obj: T): T => {
-  if(structuredClone !== undefined){
+  if(typeof structuredClone !== "undefined"){
     return structuredClone(obj);
   }
   
