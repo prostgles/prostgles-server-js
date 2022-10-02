@@ -360,7 +360,7 @@ class ViewHandler {
                             table: target,
                             on: fcols.map(fc => fc.references.fcols.map(fcol => [fc.name, fcol]))
                         }],
-                    expectOne: true
+                    expectOne: false
                 };
             }
         }

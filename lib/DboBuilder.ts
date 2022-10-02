@@ -724,9 +724,9 @@ export class ViewHandler {
                         source,
                         target,
                         table: target,
-                        on: fcols.map(fc => fc.references!.fcols.map(fcol =>[fc.name,  fcol]))
+                        on: fcols.map(fc => fc.references!.fcols.map(fcol => [fc.name,  fcol]))
                     }],
-                    expectOne: true
+                    expectOne: false
                 }
             }
         }
