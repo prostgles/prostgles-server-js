@@ -346,8 +346,24 @@ class ViewHandler {
                 path
             };
         }
-        if (!jp || !this.joinPaths.find(j => path ? j.path.join() === path.join() : j.t1 === source && j.t2 === target))
+        /* Self join */
+        if (source === target && source === this.name) {
+            const fcols = this.columns.filter(c => c.references?.ftable === this.name);
+            if (fcols.length) {
+                return {
+                    paths: [{
+                            source,
+                            target,
+                            table: target,
+                            on: fcols.map(fc => fc.references.fcols.map(fcol => [fc.name, fcol]))
+                        }],
+                    expectOne: true
+                };
+            }
+        }
+        if (!jp || !this.joinPaths.find(j => path ? j.path.join() === path.join() : j.t1 === source && j.t2 === target)) {
             throw `Joining ${source} <-...-> ${target} dissallowed or missing`;
+        }
         /* Make the join chain info excluding root table */
         paths = (path || jp.path).slice(1).map((t2, i, arr) => {
             const t1 = i === 0 ? source : arr[i - 1];
