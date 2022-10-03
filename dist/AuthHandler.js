@@ -130,7 +130,7 @@ class AuthHandler {
             if (this.opts?.expressConfig?.publicRoutes && !this.opts.expressConfig?.disableSocketAuthGuard) {
                 if (hasExpired) {
                     socket.emit(prostgles_types_1.CHANNELS.AUTHGUARD, { shouldReload: true });
-                    throw "";
+                    throw new Error("Session has expired");
                 }
             }
             return Boolean(session && !hasExpired);
