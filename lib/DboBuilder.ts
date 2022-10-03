@@ -2949,14 +2949,14 @@ async function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"):
             , e.udt_name as element_udt_name
             ,  col_description(format('%I.%I', c.table_schema, c.table_name)::regclass::oid, c.ordinal_position) as comment
             , CASE WHEN fc.ftable IS NOT NULL THEN row_to_json((SELECT t FROM (SELECT fc.ftable, fc.fcols, fc.cols) t)) END as references
-            , EXISTS ( 
+            , c.is_identity = 'YES' OR EXISTS ( 
                 SELECT 1    
                 FROM information_schema.table_constraints as tc 
                 JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema  
                 WHERE kcu.table_schema = c.table_schema AND kcu.table_name = c.table_name AND kcu.column_name = c.column_name AND tc.constraint_type IN ('PRIMARY KEY') 
             ) as is_pkey
             , c.ordinal_position
-            , c.column_default IS NOT NULL as has_default
+            , COALESCE(c.column_default IS NOT NULL OR c.identity_generation = 'ALWAYS', false) as has_default
             , c.column_default
             , format('%I.%I', c.table_schema, c.table_name)::regclass::oid AS table_oid
             , c.is_nullable
@@ -3018,6 +3018,7 @@ async function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"):
         .map(tbl => {
         tbl.columns = tbl.columns.map(col => {
             if(col.has_default){
+                /** Hide pkey default value */
                 col.column_default = (col.udt_name !== "uuid" && !col.is_pkey && !col.column_default.startsWith("nextval("))? col.column_default : null;
             }
             
