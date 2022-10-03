@@ -692,7 +692,7 @@ export class Prostgles {
       }
       this.connectedSockets.push(socket);
 
-      if (!this.db || !this.dbo) throw "db/dbo missing";
+      if (!this.db || !this.dbo) throw new Error("db/dbo missing");
       let { dbo, db, pgp } = this;
 
       try {
@@ -767,85 +767,92 @@ export class Prostgles {
 
   pushSocketSchema = async (socket: any) => {
 
-    let { auth, userData } = await this.authHandler?.makeSocketAuth(socket) || {};
-
-    // let needType = this.publishRawSQL && typeof this.publishRawSQL === "function";
-    // let DATA_TYPES = !needType? [] : await this.db.any("SELECT oid, typname FROM pg_type");
-    // let USER_TABLES = !needType? [] :  await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
-
-    const { dbo, db, pgp, publishParser } = this;
-    let fullSchema: {
-      schema: TableSchemaForClient;
-      tables: DBSchemaTable[];
-    } | undefined;
-    let publishValidationError;
-    let rawSQL = false;
-
     try {
-      if (!publishParser) throw "publishParser undefined";
-      fullSchema = await publishParser.getSchemaFromPublish(socket, userData);
-    } catch (e) {
-      publishValidationError = "Server Error: PUBLISH VALIDATION ERROR";
-      console.error(`\nProstgles PUBLISH VALIDATION ERROR (after socket connected):\n    ->`, e);
-    }
-    socket.prostgles = socket.prostgles || {};
-    socket.prostgles.schema = fullSchema?.schema;
-    /*  RUN Raw sql from client IF PUBLISHED
-    */
+      let { auth, userData } = await this.authHandler?.makeSocketAuth(socket) || {};
 
-    if (this.opts.publishRawSQL && typeof this.opts.publishRawSQL === "function") {
-      const canRunSQL = async () => {
-        const publishParams = await this.publishParser?.getPublishParams({ socket })
-        let res = await this.opts.publishRawSQL?.(publishParams as any);
-        return Boolean(res && typeof res === "boolean" || res === "*");
+      // let needType = this.publishRawSQL && typeof this.publishRawSQL === "function";
+      // let DATA_TYPES = !needType? [] : await this.db.any("SELECT oid, typname FROM pg_type");
+      // let USER_TABLES = !needType? [] :  await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
+  
+      const { dbo, db, pgp, publishParser } = this;
+      let fullSchema: {
+        schema: TableSchemaForClient;
+        tables: DBSchemaTable[];
+      } | undefined;
+      let publishValidationError;
+      let rawSQL = false;
+  
+      try {
+        if (!publishParser) throw "publishParser undefined";
+        fullSchema = await publishParser.getSchemaFromPublish(socket, userData);
+      } catch (e) {
+        publishValidationError = "Server Error: PUBLISH VALIDATION ERROR";
+        console.error(`\nProstgles PUBLISH VALIDATION ERROR (after socket connected):\n    ->`, e);
       }
-
-      if (await canRunSQL()) {
-        socket.removeAllListeners(CHANNELS.SQL)
-        socket.on(CHANNELS.SQL, async ({ query, params, options }: SQLRequest, cb = (...callback: any) => { }) => {
-
-          if (!this.dbo?.sql) throw "Internal error: sql handler missing";
-
-          this.dbo.sql(query, params, options, { socket }).then(res => {
-            cb(null, res)
-          }).catch(err => {
-            makeSocketError(cb, err);
-          })
-        });
-        if (db) {
-          // let allTablesViews = await db.any(STEP2_GET_ALL_TABLES_AND_COLUMNS);
-          // fullSchema = allTablesViews;
-          rawSQL = true;
-        } else console.error("db missing");
-      }
-    }
-
-    const { schema, tables } = fullSchema ?? { schema: {}, tables: [] };
-    let joinTables2: string[][] = [];
-    if (this.opts.joins) {
-      let _joinTables2 = this.dboBuilder.getJoinPaths()
-        .filter(jp =>
-          ![jp.t1, jp.t2].find(t => !schema[t] || !schema[t].findOne)
-        ).map(jp => [jp.t1, jp.t2].sort());
-      _joinTables2.map(jt => {
-        if (!joinTables2.find(_jt => _jt.join() === jt.join())) {
-          joinTables2.push(jt);
+      socket.prostgles = socket.prostgles || {};
+      socket.prostgles.schema = fullSchema?.schema;
+      /*  RUN Raw sql from client IF PUBLISHED
+      */
+  
+      if (this.opts.publishRawSQL && typeof this.opts.publishRawSQL === "function") {
+        const canRunSQL = async () => {
+          const publishParams = await this.publishParser?.getPublishParams({ socket })
+          let res = await this.opts.publishRawSQL?.(publishParams as any);
+          return Boolean(res && typeof res === "boolean" || res === "*");
         }
-      });
-    }
+  
+        if (await canRunSQL()) {
+          socket.removeAllListeners(CHANNELS.SQL)
+          socket.on(CHANNELS.SQL, async ({ query, params, options }: SQLRequest, cb = (...callback: any) => { }) => {
+  
+            if (!this.dbo?.sql) throw "Internal error: sql handler missing";
+  
+            this.dbo.sql(query, params, options, { socket }).then(res => {
+              cb(null, res)
+            }).catch(err => {
+              makeSocketError(cb, err);
+            })
+          });
+          if (db) {
+            // let allTablesViews = await db.any(STEP2_GET_ALL_TABLES_AND_COLUMNS);
+            // fullSchema = allTablesViews;
+            rawSQL = true;
+          } else console.error("db missing");
+        }
+      }
+  
+      const { schema, tables } = fullSchema ?? { schema: {}, tables: [] };
+      let joinTables2: string[][] = [];
+      if (this.opts.joins) {
+        let _joinTables2 = this.dboBuilder.getJoinPaths()
+          .filter(jp =>
+            ![jp.t1, jp.t2].find(t => !schema[t] || !schema[t].findOne)
+          ).map(jp => [jp.t1, jp.t2].sort());
+        _joinTables2.map(jt => {
+          if (!joinTables2.find(_jt => _jt.join() === jt.join())) {
+            joinTables2.push(jt);
+          }
+        });
+      }
+  
+      const methods = await publishParser?.getMethods(socket, userData);
+  
+      const clientSchema: ClientSchema = {
+        schema,
+        methods: getKeys(methods),
+        tableSchema: tables,
+        rawSQL,
+        joinTables: joinTables2,
+        auth,
+        version,
+        err: publishValidationError
+      }
+      socket.emit(CHANNELS.SCHEMA, clientSchema);
 
-    const methods = await publishParser?.getMethods(socket, userData);
-    const clientSchema: ClientSchema = {
-      schema,
-      methods: getKeys(methods),
-      tableSchema: tables,
-      rawSQL,
-      joinTables: joinTables2,
-      auth,
-      version,
-      err: publishValidationError
+    } catch (error) {
+      socket.emit(CHANNELS.SCHEMA, { error });
+
     }
-    socket.emit(CHANNELS.SCHEMA, clientSchema);
   }
 }
 function makeSocketError(cb: Function, err: any) {
