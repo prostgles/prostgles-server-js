@@ -135,7 +135,7 @@ class Prostgles {
         this.isSuperUser = false;
         this.connectedSockets = [];
         this.pushSocketSchema = async (socket) => {
-            let auth = await this.authHandler?.makeSocketAuth(socket) || {};
+            let { auth, userData } = await this.authHandler?.makeSocketAuth(socket) || {};
             // let needType = this.publishRawSQL && typeof this.publishRawSQL === "function";
             // let DATA_TYPES = !needType? [] : await this.db.any("SELECT oid, typname FROM pg_type");
             // let USER_TABLES = !needType? [] :  await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
@@ -146,7 +146,7 @@ class Prostgles {
             try {
                 if (!publishParser)
                     throw "publishParser undefined";
-                fullSchema = await publishParser.getSchemaFromPublish(socket);
+                fullSchema = await publishParser.getSchemaFromPublish(socket, userData);
             }
             catch (e) {
                 publishValidationError = "Server Error: PUBLISH VALIDATION ERROR";
@@ -193,7 +193,7 @@ class Prostgles {
                     }
                 });
             }
-            const methods = await publishParser?.getMethods(socket);
+            const methods = await publishParser?.getMethods(socket, userData);
             const clientSchema = {
                 schema,
                 methods: (0, prostgles_types_1.getKeys)(methods),

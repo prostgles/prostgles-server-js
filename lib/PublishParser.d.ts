@@ -264,7 +264,7 @@ export declare class PublishParser {
     prostgles: Prostgles;
     constructor(publish: any, publishMethods: any, publishRawSQL: any, dbo: DBHandlerServer, db: DB, prostgles: Prostgles);
     getPublishParams(localParams: LocalParams, clientInfo?: ClientInfo): Promise<PublishParams>;
-    getMethods(socket: any): Promise<{}>;
+    getMethods(socket: any, userData?: ClientInfo): Promise<{}>;
     /**
      * Parses the first level of publish. (If false then nothing if * then all tables and views)
      * @param socket
@@ -274,7 +274,7 @@ export declare class PublishParser {
     getValidatedRequestRuleWusr({ tableName, command, localParams }: DboTableCommand): Promise<TableRule>;
     getValidatedRequestRule({ tableName, command, localParams }: DboTableCommand, clientInfo?: ClientInfo): Promise<TableRule>;
     getTableRules({ tableName, localParams }: DboTable, clientInfo?: ClientInfo): Promise<ParsedPublishTable | undefined>;
-    getSchemaFromPublish(socket: any): Promise<{
+    getSchemaFromPublish(socket: any, userData?: ClientInfo): Promise<{
         schema: TableSchemaForClient;
         tables: DBSchemaTable[];
     }>;

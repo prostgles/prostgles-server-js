@@ -404,10 +404,10 @@ export class PublishParser {
     }
   }
 
-  async getMethods(socket: any) {
+  async getMethods(socket: any, userData?: ClientInfo) {
     let methods = {};
 
-    const publishParams = await this.getPublishParams({ socket });
+    const publishParams = await this.getPublishParams({ socket }, userData);
     const _methods = await applyParamsIfFunc(this.publishMethods, publishParams);
 
     if (_methods && Object.keys(_methods).length) {
@@ -648,13 +648,13 @@ export class PublishParser {
 
 
   /* Prepares schema for client. Only allowed views and commands will be present */
-  async getSchemaFromPublish(socket: any): Promise<{ schema: TableSchemaForClient; tables: DBSchemaTable[] }> {
+  async getSchemaFromPublish(socket: any, userData?: ClientInfo): Promise<{ schema: TableSchemaForClient; tables: DBSchemaTable[] }> {
     let schema: TableSchemaForClient = {};
     let tables: DBSchemaTable[] = []
 
     try {
       /* Publish tables and views based on socket */
-      const clientInfo = await this.prostgles.authHandler?.getClientInfo({ socket });
+      const clientInfo = userData ?? await this.prostgles.authHandler?.getClientInfo({ socket });
 
       let _publish: PublishObject | undefined;
       try {

@@ -141,7 +141,10 @@ export default class AuthHandler {
     getSID(localParams: LocalParams): string | undefined;
     getClientInfo(localParams: Pick<LocalParams, "socket" | "httpReq">): Promise<ClientInfo | undefined>;
     isValidSocketSession: (socket: PRGLIOSocket, session: BasicSession) => boolean;
-    makeSocketAuth: (socket: PRGLIOSocket) => Promise<AuthSocketSchema>;
+    makeSocketAuth: (socket: PRGLIOSocket) => Promise<Record<string, never> | {
+        auth: AuthSocketSchema;
+        userData: ClientInfo | undefined;
+    }>;
 }
 export {};
 //# sourceMappingURL=AuthHandler.d.ts.map

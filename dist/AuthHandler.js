@@ -167,9 +167,9 @@ class AuthHandler {
                 { func: (params, dbo, db) => login(params), ch: prostgles_types_1.CHANNELS.LOGIN, name: "login" },
                 { func: (params, dbo, db) => logout?.(this.getSID({ socket }), dbo, db), ch: prostgles_types_1.CHANNELS.LOGOUT, name: "logout" }
             ].filter(h => h.func);
-            const usrData = await this.getClientInfo({ socket });
-            if (usrData) {
-                auth.user = usrData.clientUser;
+            const userData = await this.getClientInfo({ socket });
+            if (userData) {
+                auth.user = userData.clientUser;
                 handlers = handlers.filter(h => h.name === "logout");
             }
             handlers.map(({ func, ch, name }) => {
@@ -191,7 +191,7 @@ class AuthHandler {
                     }
                 });
             });
-            return auth;
+            return { auth, userData };
         };
         this.opts = prostgles.opts.auth;
         if (prostgles.opts.auth?.expressConfig) {

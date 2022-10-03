@@ -353,6 +353,7 @@ class ViewHandler {
                 throw `Table not found for joining ${source}`;
             const fcols = tableHandler.columns.filter(c => c.references?.ftable === this.name);
             if (fcols.length) {
+                throw "Self referencing not supported yet";
                 return {
                     paths: [{
                             source,

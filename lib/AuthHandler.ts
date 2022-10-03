@@ -551,7 +551,7 @@ export default class AuthHandler {
     return Boolean(session && !hasExpired);
   }
 
-  makeSocketAuth = async (socket: PRGLIOSocket): Promise<AuthSocketSchema> => {
+  makeSocketAuth = async (socket: PRGLIOSocket): Promise<{ auth: AuthSocketSchema; userData: ClientInfo | undefined; } | Record<string, never>> => {
     if (!this.opts) return {};
 
     let auth: Partial<Record<keyof Omit<AuthSocketSchema, "user">, boolean | undefined>> & { user?: AnyObject | undefined } = {};
@@ -595,9 +595,9 @@ export default class AuthHandler {
       { func: (params: any, dbo: any, db: DB) => logout?.(this.getSID({ socket }), dbo, db), ch: CHANNELS.LOGOUT, name: "logout"  as keyof Omit<AuthSocketSchema, "user">}
     ].filter(h => h.func);
 
-    const usrData = await this.getClientInfo({ socket });
-    if (usrData) {
-      auth.user = usrData.clientUser;
+    const userData = await this.getClientInfo({ socket });
+    if (userData) {
+      auth.user = userData.clientUser;
       handlers = handlers.filter(h => h.name === "logout");
     }
 
@@ -624,7 +624,7 @@ export default class AuthHandler {
       });
     });
 
-    return auth;
+    return { auth, userData };
   }
 }
 
