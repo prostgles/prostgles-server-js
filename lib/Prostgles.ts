@@ -849,8 +849,8 @@ export class Prostgles {
       }
       socket.emit(CHANNELS.SCHEMA, clientSchema);
 
-    } catch (error) {
-      socket.emit(CHANNELS.SCHEMA, { error });
+    } catch (err) {
+      socket.emit(CHANNELS.SCHEMA, { err });
 
     }
   }

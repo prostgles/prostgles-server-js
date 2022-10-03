@@ -207,8 +207,8 @@ class Prostgles {
                 };
                 socket.emit(prostgles_types_1.CHANNELS.SCHEMA, clientSchema);
             }
-            catch (error) {
-                socket.emit(prostgles_types_1.CHANNELS.SCHEMA, { error });
+            catch (err) {
+                socket.emit(prostgles_types_1.CHANNELS.SCHEMA, { err });
             }
         };
         if (!params)
