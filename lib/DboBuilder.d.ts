@@ -67,6 +67,7 @@ export declare type PRGLIOSocket = {
         headers?: {
             cookie?: string;
         };
+        auth?: Record<string, any>;
     };
     readonly on: (channel: string, params: any, cb?: (err: any, res?: any) => void) => Promise<void>;
     readonly emit: (channel: string, message: any, cb?: BasicCallback) => any;

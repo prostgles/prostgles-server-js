@@ -238,9 +238,9 @@ export default class AuthHandler {
     }
   }
 
-  getUser = async (clientReq: AuthClientRequest): Promise<AnyObject | undefined> => {
+  getUser = async (clientReq: { httpReq: ExpressReq; }): Promise<AnyObject | undefined> => {
     if(!this.sidKeyName || !this.opts?.getUser) throw "sidKeyName or this.opts.getUser missing"
-    const sid = "httpReq" in clientReq? clientReq.httpReq?.cookies?.[this.sidKeyName] : clientReq.socket
+    const sid = clientReq.httpReq?.cookies?.[this.sidKeyName];
     if (!sid) return undefined;
 
     try {
@@ -466,7 +466,8 @@ export default class AuthHandler {
     if (!sidKeyName || !localParams) return undefined;
 
     if (localParams.socket) {
-      const querySid = localParams.socket?.handshake?.query?.[sidKeyName];
+      const { handshake } = localParams.socket;
+      const querySid = handshake?.auth?.[sidKeyName] || handshake?.query?.[sidKeyName];
       let rawSid = querySid;
       if (!rawSid) {
         const cookie_str = localParams.socket?.handshake?.headers?.cookie;
@@ -494,18 +495,20 @@ export default class AuthHandler {
     if (!this.opts) return {};
 
     const getSession = this.opts.cacheSession?.getSession;
-    const isSocket = "socket" in localParams
-    if(getSession && isSocket && localParams.socket?.__prglCache){
-      const { session, user, clientUser } = localParams.socket.__prglCache;
-      const isValid = this.isValidSocketSession(localParams.socket, session)
-      if(isValid){
-
-        return {
-          sid: session.sid,
-          user, 
-          clientUser,
-        }
-      } else return {};
+    const isSocket = "socket" in localParams;
+    if(isSocket){
+      if(getSession && localParams.socket?.__prglCache){
+        const { session, user, clientUser } = localParams.socket.__prglCache;
+        const isValid = this.isValidSocketSession(localParams.socket, session)
+        if(isValid){
+  
+          return {
+            sid: session.sid,
+            user, 
+            clientUser,
+          }
+        } else return {};
+      } 
     }
 
     const res = await this.throttledFunc(async () => {

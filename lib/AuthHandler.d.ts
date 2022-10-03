@@ -129,7 +129,9 @@ export default class AuthHandler {
     matchesRoute: (route: string | undefined, clientFullRoute: string) => boolean;
     isUserRoute: (pathname: string) => boolean;
     private setCookieAndGoToReturnURLIFSet;
-    getUser: (clientReq: AuthClientRequest) => Promise<AnyObject | undefined>;
+    getUser: (clientReq: {
+        httpReq: ExpressReq;
+    }) => Promise<AnyObject | undefined>;
     init(): Promise<void>;
     destroy: () => void;
     throttledFunc: <T>(func: () => Promise<T>, throttle?: number) => Promise<T>;
