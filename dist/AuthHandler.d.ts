@@ -18,6 +18,8 @@ export declare type BasicSession = {
     sid: string;
     /** UNIX millisecond timestamp */
     expires: number;
+    /** On expired */
+    onExpiration: "redirect" | "show_error";
 };
 export declare type AuthClientRequest = {
     socket: any;

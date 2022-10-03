@@ -136,10 +136,10 @@ declare type NamedJoinColumn = {
     label?: string;
     joinDef: JoinDef[];
 };
-declare type OneOf = {
-    oneOf: (string | number)[];
+declare type OneOf<T extends string | number = any> = {
+    oneOf: T[];
     nullable?: boolean;
-    defaultValue?: OneOf["oneOf"][number];
+    defaultValue?: T;
 };
 declare type ColumnConfig<LANG_IDS = {
     en: 1;

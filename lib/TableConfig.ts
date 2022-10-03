@@ -179,10 +179,10 @@ type NamedJoinColumn = {
   joinDef: JoinDef[];
 }
 
-type OneOf = { 
-  oneOf: (string | number)[];
+type OneOf<T extends string | number = any> = { 
+  oneOf: T[];
   nullable?: boolean; 
-  defaultValue?: OneOf["oneOf"][number]; 
+  defaultValue?: T; 
 };
 
 type ColumnConfig<LANG_IDS = { en: 1 }> = string | StrictUnion<NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef | OneOf))>

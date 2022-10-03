@@ -38,6 +38,8 @@ export type BasicSession = {
   /** UNIX millisecond timestamp */
   expires: number;
 
+  /** On expired */
+  onExpiration: "redirect" | "show_error";
 };
 export type AuthClientRequest = { socket: any } | { httpReq: ExpressReq }
 export type Auth<S = void> = {
@@ -543,9 +545,14 @@ export default class AuthHandler {
   isValidSocketSession = (socket: PRGLIOSocket, session: BasicSession): boolean => {
     const hasExpired = Boolean(session && session.expires <= Date.now())
     if(this.opts?.expressConfig?.publicRoutes && !this.opts.expressConfig?.disableSocketAuthGuard){
+      const error = "Session has expired";
       if(hasExpired){
-        socket.emit(CHANNELS.AUTHGUARD, { shouldReload: true });
-        throw new Error("Session has expired")
+        if(session.onExpiration === "redirect")
+        socket.emit(CHANNELS.AUTHGUARD, { 
+          shouldReload: session.onExpiration === "redirect",
+          error
+        });
+        throw error;
       }
     }
     return Boolean(session && !hasExpired);
@@ -565,7 +572,8 @@ export default class AuthHandler {
 
         try {
           const { pathname } = typeof params === "string" ? JSON.parse(params) : (params || {});
-          if (pathname && typeof pathname !== "string") console.warn("Invalid pathname provided for AuthGuardLocation: ", pathname)
+          if (pathname && typeof pathname !== "string") console.warn("Invalid pathname provided for AuthGuardLocation: ", pathname);
+          
           if (pathname && typeof pathname === "string" && this.isUserRoute(pathname) && !(await this.getClientInfo({ socket }))?.user) {
             cb(null, { shouldReload: true });
           } else {
