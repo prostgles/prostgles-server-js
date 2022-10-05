@@ -13,6 +13,7 @@ const Bluebird = require("bluebird");
 const pgPromise = require("pg-promise");
 const prostgles_types_1 = require("prostgles-types");
 const SyncReplication_1 = require("./SyncReplication");
+const REALTIME_TRIGGER_CHECK_QUERY = "prostgles-server internal query used to manage realtime triggers";
 let pgp = pgPromise({
     promiseLib: Bluebird
 });
@@ -601,6 +602,7 @@ class PubSubManager {
                                 DO $$
                                 BEGIN
 
+                                    /* ${REALTIME_TRIGGER_CHECK_QUERY} */
                                     /* prostgles schema must exist */
                                     IF
                                         EXISTS (
@@ -673,6 +675,8 @@ class PubSubManager {
                                 (0, exports.log)("updated last_check");
                             }
                             catch (e) {
+                                /** In some cases a query idles and blocks everything else. Terminate all similar queries */
+                                this.db.any("SELECT state, pg_terminate_backend(pid) from pg_stat_activity WHERE query ilike ${qid} and pid <>  pg_backend_pid();", { qid: "%" + REALTIME_TRIGGER_CHECK_QUERY + "%" });
                                 console.error("appCheck FAILED: \n", e, appQ);
                             }
                             this.appChecking = false;
