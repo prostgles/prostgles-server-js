@@ -331,7 +331,7 @@ class AuthHandler {
                         }
                         catch (error) {
                             console.error(error);
-                            res.status(404).json({ msg: "Something went wrong", error });
+                            res.status(404).json({ msg: "Something went wrong when processing your request" });
                         }
                     });
                 }
