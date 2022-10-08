@@ -836,6 +836,7 @@ export class ViewHandler {
             comment: this.tableOrViewInfo.comment,
             info: this.dboBuilder.prostgles?.tableConfigurator?.getTableInfo({ tableName: this.name, lang }),
             is_media: this.is_media,      // this.name === this.dboBuilder.prostgles?.opts?.fileTable?.tableName
+            is_view: this.is_view,
             has_media,
             media_table_name: mediaTable,
             dynamicRules: {
