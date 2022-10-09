@@ -298,7 +298,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
         result = {
           ...(result ?? {}),
           ...("info" in colConf && colConf?.info),
-          ...("jsonbSchema" in colConf && colConf.jsonbSchema && { jsonSchema: getJSONBSchemaAsJSONSchema(params.table, colConf) })
+          ...("jsonbSchema" in colConf && colConf.jsonbSchema && { jsonSchema: getJSONBSchemaAsJSONSchema(params.table, params.col, colConf) })
         }
 
         /**

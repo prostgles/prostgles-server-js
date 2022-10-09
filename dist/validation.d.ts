@@ -64,7 +64,7 @@ declare type ColOpts = {
 };
 export declare function getSchemaTSTypes(schema: ValidationSchema, leading?: string, isOneOf?: boolean): string;
 export declare function getJSONBSchemaTSTypes(schema: ValidationSchema | OneOfTypes, colOpts: ColOpts, leading?: string, isOneOf?: boolean): string;
-export declare function getJSONBSchemaAsJSONSchema(tableName: string, columnConfig: BaseColumn<{
+export declare function getJSONBSchemaAsJSONSchema(tableName: string, colName: string, columnConfig: BaseColumn<{
     en: 1;
 }> & JSONBColumnDef): AnyObject;
 export {};

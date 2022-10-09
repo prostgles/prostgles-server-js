@@ -94,7 +94,7 @@ declare type TextColumn = TextColDef & {
     lowerCased?: boolean;
 };
 export declare type JSONBColumnDef = TextColDef & {
-    jsonbSchema: ValidationSchema | Pick<OneOfTypes, "oneOfTypes">;
+    jsonbSchema: ValidationSchema | Omit<OneOfTypes, "optional">;
 };
 /**
  * Allows referencing media to this table.

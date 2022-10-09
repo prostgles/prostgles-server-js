@@ -258,7 +258,7 @@ const getJSONSchemaObject = <T extends ValidationSchema>(objDef: T): Record<keyo
         oneOf: itemSchema.oneOfTypes.map(t => getJSONSchemaObject(t))
       }
     } else {
-      throw "Unexpected jsonbSchema"
+      throw new Error("Unexpected jsonbSchema itemSchema" + JSON.stringify({itemSchema, objDef}, null, 2))
     }
 
     if(nullable){
@@ -281,25 +281,22 @@ const getJSONSchemaObject = <T extends ValidationSchema>(objDef: T): Record<keyo
   }, resultType)
 }
 
-export function getJSONBSchemaAsJSONSchema(tableName: string, columnConfig: BaseColumn<{ en: 1 }> & JSONBColumnDef): AnyObject {
+export function getJSONBSchemaAsJSONSchema(tableName: string, colName: string, columnConfig: BaseColumn<{ en: 1 }> & JSONBColumnDef): AnyObject {
 
   const schema = columnConfig.jsonbSchema;
-  // const jSchema = isOneOfTypes(schema)? getJSONSchemaObject({ d: schema }).d : getJSONSchemaObject(schema as ValidationSchema);
-  let jSchema = {} as any; 
-  if(isOneOfTypes(schema)){
-    jSchema = getJSONSchemaObject({ field1: schema }).field1;
-  } else {
-    jSchema = getJSONSchemaObject({ field1: schema as any }).field1;
-  }
-  getJSONSchemaObject({ d: schema as FieldType }).d; // : getJSONSchemaObject(schema as ValidationSchema);
+  
+  let jSchema = getJSONSchemaObject({ 
+      field1: isOneOfTypes(schema)? schema as OneOfTypes : 
+      { type: schema as ValidationSchema } 
+    }).field1;
 
   return {
-    "$id": tableName ?? "???",
+    "$id": `${tableName}.${colName}`,
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": tableName,
-    "type": "object",
-    description: columnConfig.info?.hint ,
-    ...jSchema
+    ...jSchema,
+    "title": columnConfig.label ?? colName,
+    ...(!!columnConfig.info?.hint && { description: columnConfig.info?.hint }),
+    required: !columnConfig.nullable
   }
 
 }

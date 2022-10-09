@@ -226,7 +226,7 @@ const getJSONSchemaObject = (objDef) => {
             };
         }
         else {
-            throw "Unexpected jsonbSchema";
+            throw new Error("Unexpected jsonbSchema itemSchema" + JSON.stringify({ itemSchema, objDef }, null, 2));
         }
         if (nullable) {
             const nullDef = { type: "null" };
@@ -248,16 +248,19 @@ const getJSONSchemaObject = (objDef) => {
         };
     }, resultType);
 };
-function getJSONBSchemaAsJSONSchema(tableName, columnConfig) {
+function getJSONBSchemaAsJSONSchema(tableName, colName, columnConfig) {
     const schema = columnConfig.jsonbSchema;
-    const jSchema = isOneOfTypes(schema) ? getJSONSchemaObject({ d: schema }).d : getJSONSchemaObject(schema);
+    let jSchema = getJSONSchemaObject({
+        field1: isOneOfTypes(schema) ? schema :
+            { type: schema }
+    }).field1;
     return {
-        "$id": tableName ?? "???",
+        "$id": `${tableName}.${colName}`,
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "title": tableName,
-        "type": "object",
-        description: columnConfig.info?.hint,
-        ...jSchema
+        ...jSchema,
+        "title": columnConfig.label ?? colName,
+        ...(!!columnConfig.info?.hint && { description: columnConfig.info?.hint }),
+        required: !columnConfig.nullable
     };
 }
 exports.getJSONBSchemaAsJSONSchema = getJSONBSchemaAsJSONSchema;
