@@ -177,75 +177,77 @@ function getJSONBSchemaTSTypes(schema, colOpts, leading = "", isOneOf = false) {
     }
 }
 exports.getJSONBSchemaTSTypes = getJSONBSchemaTSTypes;
-// type JSONSchema = 
 const getJSONSchemaObject = (objDef) => {
-    const resultType = {};
-    return (0, prostgles_types_1.getKeys)(objDef).reduce((a, k) => {
-        const itemSchema = objDef[k];
-        const { nullable, optional, description, title } = itemSchema;
-        let item = {};
-        if ("type" in itemSchema) {
-            const { type } = itemSchema;
-            /**
-             * Is primitive or any
-             */
-            if (typeof type === "string") {
-                const arrayType = type.endsWith("[]") ? type.slice(0, -2) : undefined;
-                if (arrayType) {
-                    item = {
-                        type: "array",
-                        items: { type: arrayType === "any" ? {} : arrayType }
-                    };
+    const resultType = {
+        type: "object",
+        properties: (0, prostgles_types_1.getKeys)(objDef).reduce((a, k) => {
+            const itemSchema = objDef[k];
+            const { nullable, optional, description, title } = itemSchema;
+            let item = {};
+            if ("type" in itemSchema) {
+                const { type } = itemSchema;
+                /**
+                 * Is primitive or any
+                 */
+                if (typeof type === "string") {
+                    const arrayType = type.endsWith("[]") ? type.slice(0, -2) : undefined;
+                    if (arrayType) {
+                        item = {
+                            type: "array",
+                            items: { type: arrayType === "any" ? {} : arrayType }
+                        };
+                    }
+                    else {
+                        item = {
+                            type: type === "any" ? {} : type
+                        };
+                    }
+                    /**
+                     * Is object
+                     */
                 }
                 else {
                     item = {
-                        type: type === "any" ? {} : type
+                        type: "object",
+                        properties: getJSONSchemaObject(type)
                     };
                 }
-                /**
-                 * Is object
-                 */
+            }
+            else if ("enum" in itemSchema) {
+                item = {
+                    type: typeof itemSchema.enum[0],
+                    "enum": itemSchema.enum //.concat(nullable? [null] : [])
+                };
+            }
+            else if ("oneOf" in itemSchema) {
+                item = {
+                    oneOf: itemSchema.oneOf.map(t => getJSONSchemaObject(t))
+                };
             }
             else {
-                item = {
-                    type: "object",
-                    properties: getJSONSchemaObject(type)
-                };
+                throw new Error("Unexpected jsonbSchema itemSchema" + JSON.stringify({ itemSchema, objDef }, null, 2));
             }
-        }
-        else if ("enum" in itemSchema) {
-            item = {
-                type: typeof itemSchema.enum[0],
-                "enum": itemSchema.enum //.concat(nullable? [null] : [])
-            };
-        }
-        else if ("oneOf" in itemSchema) {
-            item = {
-                oneOf: itemSchema.oneOf.map(t => getJSONSchemaObject(t))
-            };
-        }
-        else {
-            throw new Error("Unexpected jsonbSchema itemSchema" + JSON.stringify({ itemSchema, objDef }, null, 2));
-        }
-        if (nullable) {
-            const nullDef = { type: "null" };
-            if (item.oneOf)
-                item.oneOf.push(nullDef);
-            else
-                item = {
-                    oneOf: [item, nullDef]
-                };
-        }
-        return {
-            ...a,
-            [k]: {
-                ...item,
-                required: !optional,
-                description,
-                title,
+            if (nullable) {
+                const nullDef = { type: "null" };
+                if (item.oneOf)
+                    item.oneOf.push(nullDef);
+                else
+                    item = {
+                        oneOf: [item, nullDef]
+                    };
             }
-        };
-    }, resultType);
+            return {
+                ...a,
+                [k]: {
+                    ...item,
+                    required: !optional,
+                    description,
+                    title,
+                }
+            };
+        }, {})
+    };
+    return resultType;
 };
 function getJSONBSchemaAsJSONSchema(tableName, colName, columnConfig) {
     const schema = columnConfig.jsonbSchema;

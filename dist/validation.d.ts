@@ -1,4 +1,3 @@
-import { AnyObject } from "prostgles-types";
 import { BaseColumn, JSONBColumnDef } from "./TableConfig";
 declare type BaseOptions = {
     optional?: boolean;
@@ -64,8 +63,36 @@ declare type ColOpts = {
 };
 export declare function getSchemaTSTypes(schema: ValidationSchema, leading?: string, isOneOf?: boolean): string;
 export declare function getJSONBSchemaTSTypes(schema: ValidationSchema | OneOf, colOpts: ColOpts, leading?: string, isOneOf?: boolean): string;
+declare namespace JSTypes {
+    type Base = {
+        $id?: string;
+        $schema?: string;
+        title?: string;
+        description?: string;
+        required?: boolean;
+    };
+    export type Any = {};
+    export type Object = Base & {
+        type: "object";
+        properties: Record<string, Schema>;
+    };
+    export type Enum = Base & {
+        type: "string" | "number";
+        enum: (string | number)[];
+    };
+    export type Array = Base & {
+        type: "array";
+        items: (string | number)[];
+    };
+    export type OneOf = {
+        oneOf: (Object | Enum | Array | Any)[];
+    };
+    export type Schema = Any | Object | Enum | Array | OneOf;
+    export {};
+}
+declare type JSONSchema = JSTypes.Schema;
 export declare function getJSONBSchemaAsJSONSchema(tableName: string, colName: string, columnConfig: BaseColumn<{
     en: 1;
-}> & JSONBColumnDef): AnyObject;
+}> & JSONBColumnDef): JSONSchema;
 export {};
 //# sourceMappingURL=validation.d.ts.map
