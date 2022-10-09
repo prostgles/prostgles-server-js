@@ -594,6 +594,42 @@ async function isomorphic(db) {
             // Perfect
         }
     });
+    await tryRun("jsonb JSON Schema validation", async () => {
+        const cols = await db.tjson.getColumns();
+        assert_1.strict.deepEqual({
+            '$id': 'tjson',
+            '$schema': 'https://json-schema.org/draft/2020-12/schema',
+            title: 'tjson',
+            type: 'object',
+            a: { type: 'boolean', required: true },
+            arr: {
+                type: 'array',
+                items: { type: 'string', enum: ['1', '2', '3'] },
+                required: true
+            },
+            arr1: {
+                type: 'array',
+                items: { type: 'number', enum: [1, 2, 3] },
+                required: true
+            },
+            arr2: { type: 'array', items: { type: 'integer' }, required: true },
+            arrStr: {
+                oneOf: [
+                    { type: 'array', items: { type: 'string' } },
+                    { type: 'null' }
+                ],
+                required: false
+            },
+            o: {
+                oneOf: [
+                    { o1: { type: 'integer', required: true } },
+                    { o2: { type: 'boolean', required: true } },
+                    { type: 'null' }
+                ],
+                required: false
+            }
+        }, cols.find(c => c.name === "json").jsonSchema);
+    });
     await tryRun("Exists filter example", async () => {
         const fo = await db.items.findOne(), f = await db.items.find();
         assert_1.strict.deepStrictEqual(fo, { h: null, id: 1, name: 'a' }, "findOne query failed");

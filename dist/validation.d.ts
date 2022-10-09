@@ -1,6 +1,10 @@
+import { AnyObject } from "prostgles-types";
+import { BaseColumn, JSONBColumnDef } from "./TableConfig";
 declare type BaseOptions = {
     optional?: boolean;
     nullable?: boolean;
+    description?: string;
+    title?: string;
 };
 declare type SimpleType = BaseOptions & ({
     type: "number" | "boolean" | "integer" | "string" | "any" | "number[]" | "boolean[]" | "integer[]" | "string[]" | "any[]" | ValidationSchema;
@@ -60,5 +64,8 @@ declare type ColOpts = {
 };
 export declare function getSchemaTSTypes(schema: ValidationSchema, leading?: string, isOneOf?: boolean): string;
 export declare function getJSONBSchemaTSTypes(schema: ValidationSchema | OneOfTypes, colOpts: ColOpts, leading?: string, isOneOf?: boolean): string;
+export declare function getJSONBSchemaAsJSONSchema(tableName: string, columnConfig: BaseColumn<{
+    en: 1;
+}> & JSONBColumnDef): AnyObject;
 export {};
 //# sourceMappingURL=validation.d.ts.map

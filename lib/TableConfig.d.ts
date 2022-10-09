@@ -63,7 +63,7 @@ declare type LookupTableDefinition<LANG_IDS> = {
         };
     };
 };
-declare type BaseColumn<LANG_IDS> = {
+export declare type BaseColumn<LANG_IDS> = {
     /**
      * Will add these values to .getColumns() result
      */
@@ -93,7 +93,7 @@ declare type TextColumn = TextColDef & {
      */
     lowerCased?: boolean;
 };
-declare type JSONBColumnDef = TextColDef & {
+export declare type JSONBColumnDef = TextColDef & {
     jsonbSchema: ValidationSchema | Pick<OneOfTypes, "oneOfTypes">;
 };
 /**
@@ -141,7 +141,7 @@ declare type OneOf<T extends string | number = any> = {
     nullable?: boolean;
     defaultValue?: T;
 };
-declare type ColumnConfig<LANG_IDS = {
+export declare type ColumnConfig<LANG_IDS = {
     en: 1;
 }> = string | StrictUnion<NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef | OneOf))>;
 declare type UnionKeys<T> = T extends T ? keyof T : never;
@@ -220,6 +220,7 @@ export default class TableConfigurator<LANG_IDS = {
         lang?: string;
     }) => (ColExtraInfo & {
         label?: string;
+        jsonSchema?: AnyObject;
     }) | undefined;
     checkColVal: (params: {
         col: string;

@@ -677,6 +677,44 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       // Perfect
     }
   });
+
+
+  await tryRun("jsonb JSON Schema validation", async () => {
+    const cols = await db.tjson.getColumns!();
+    assert.deepEqual({
+      '$id': 'tjson',
+      '$schema': 'https://json-schema.org/draft/2020-12/schema',
+      title: 'tjson',
+      type: 'object',
+      a: { type: 'boolean', required: true },
+      arr: {
+        type: 'array',
+        items: { type: 'string', enum: [ '1', '2', '3' ] },
+        required: true
+      },
+      arr1: {
+        type: 'array',
+        items: { type: 'number', enum: [ 1, 2, 3 ] },
+        required: true
+      },
+      arr2: { type: 'array', items: { type: 'integer' }, required: true },
+      arrStr: {
+        oneOf: [
+          { type: 'array', items: { type: 'string' } },
+          { type: 'null' }
+        ],
+        required: false
+      },
+      o: {
+        oneOf: [
+          { o1: { type: 'integer', required: true } },
+          { o2: { type: 'boolean', required: true } },
+          { type: 'null' }
+        ],
+        required: false
+      }
+    }, cols.find(c => c.name === "json").jsonSchema)
+  })
   
   await tryRun("Exists filter example", async () => {
   

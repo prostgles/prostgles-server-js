@@ -1,9 +1,12 @@
-import { asName, getKeys, isEmpty, isObject } from "prostgles-types";
+import { AnyObject, asName, getKeys, isEmpty, isObject } from "prostgles-types";
 import { asValue } from "./PubSubManager";
+import { BaseColumn, ColumnConfig, JSONBColumnDef } from "./TableConfig";
 
 type BaseOptions = {
   optional?: boolean;
   nullable?: boolean;
+  description?: string;
+  title?: string;
 };
 
 type SimpleType = BaseOptions & ({
@@ -202,4 +205,94 @@ export function getJSONBSchemaTSTypes(schema: ValidationSchema | OneOfTypes, col
   } else {
     return (colOpts.nullable? `null | ` : "") + getSchemaTSTypes(schema, leading, isOneOf);
   }
+}
+
+// type JSONSchema = 
+const getJSONSchemaObject = <T extends ValidationSchema>(objDef: T): Record<keyof T, any> => {
+  const resultType: Record<keyof T, any> = {} as any;
+  
+  return getKeys(objDef).reduce((a, k) => {
+    const itemSchema: FieldType = objDef[k];
+    const { nullable, optional, description, title } = itemSchema;
+    let item = {} as any;
+
+    if("type" in itemSchema){
+      const { type } = itemSchema;
+      /**
+       * Is primitive or any
+       */
+      if(typeof type === "string"){
+        const arrayType = type.endsWith("[]")? type.slice(0, -2) : undefined;
+        if(arrayType){
+          item = {
+            type: "array",
+            items: { type: arrayType === "any"? {} : arrayType }
+          }
+        } else {
+          item = {
+            type: type === "any"? {} : type
+          }
+        }
+
+      /**
+       * Is object
+       */
+      } else {
+        item = {
+          type: "object",
+          properties: getJSONSchemaObject(type)
+        }
+
+      }
+
+    } else if("oneOf" in itemSchema) {
+      item = { 
+        type: "array",
+        items: {
+          "type": typeof itemSchema.oneOf[0]!,
+          "enum": itemSchema.oneOf //.concat(nullable? [null] : [])
+        }
+      }
+    } else if("oneOfTypes" in itemSchema) {
+      item = {
+        oneOf: itemSchema.oneOfTypes.map(t => getJSONSchemaObject(t))
+      }
+    } else {
+      throw "Unexpected jsonbSchema"
+    }
+
+    if(nullable){
+      const nullDef = { type: "null" }
+      if(item.oneOf) item.oneOf.push(nullDef)
+      else item = {
+        oneOf: [item, nullDef]
+      }
+    }
+
+    return { 
+      ...a,
+      [k]: {
+        ...item,
+        required: !optional,
+        description, 
+        title,
+      }
+    }
+  }, resultType)
+}
+
+export function getJSONBSchemaAsJSONSchema(tableName: string, columnConfig: BaseColumn<{ en: 1 }> & JSONBColumnDef): AnyObject {
+
+  const schema = columnConfig.jsonbSchema;
+  const jSchema = isOneOfTypes(schema)? getJSONSchemaObject({ d: schema }).d : getJSONSchemaObject(schema as ValidationSchema);
+
+  return {
+    "$id": tableName ?? "???",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": tableName,
+    "type": "object",
+    description: columnConfig.info?.hint ,
+    ...jSchema
+  }
+
 }

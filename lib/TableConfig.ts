@@ -2,7 +2,7 @@ import { getKeys, asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONT
 import { isPlainObject, JoinInfo } from "./DboBuilder";
 import { DB, DBHandlerServer, Joins, Prostgles } from "./Prostgles";
 import { asValue } from "./PubSubManager";
-import { getPGCheckConstraint, OneOfTypes, ValidationSchema } from "./validation";
+import { getJSONBSchemaAsJSONSchema, getPGCheckConstraint, OneOfTypes, ValidationSchema } from "./validation";
 
 type ColExtraInfo = {
   min?: string | number;
@@ -82,7 +82,7 @@ type LookupTableDefinition<LANG_IDS> = {
   }
 }
 
-type BaseColumn<LANG_IDS> = {
+export type BaseColumn<LANG_IDS> = {
   /**
    * Will add these values to .getColumns() result
    */
@@ -117,7 +117,7 @@ type TextColumn = TextColDef & {
   lowerCased?: boolean;
 }
 
-type JSONBColumnDef = TextColDef & {
+export type JSONBColumnDef = TextColDef & {
   jsonbSchema: ValidationSchema | Pick<OneOfTypes, "oneOfTypes">;
 
   /**
@@ -185,7 +185,7 @@ type OneOf<T extends string | number = any> = {
   defaultValue?: T; 
 };
 
-type ColumnConfig<LANG_IDS = { en: 1 }> = string | StrictUnion<NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef | OneOf))>
+export type ColumnConfig<LANG_IDS = { en: 1 }> = string | StrictUnion<NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef | OneOf))>
 
 type UnionKeys<T> = T extends T ? keyof T : never;
 type StrictUnionHelper<T, TAll> = T extends any ? T & Partial<Record<Exclude<UnionKeys<TAll>, keyof T>, never>> : never;
@@ -288,35 +288,39 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     }
   }
 
-  getColInfo = (params: { col: string, table: string, lang?: string }): (ColExtraInfo & { label?: string }) | undefined => {
+  getColInfo = (params: { col: string, table: string, lang?: string }): (ColExtraInfo & { label?: string; jsonSchema?: AnyObject; }) | undefined => {
     const colConf = this.getColumnConfig(params.table, params.col);
-    let result: (ColExtraInfo & { label?: string }) | undefined = undefined;
+    let result: ReturnType<typeof this.getColInfo> = undefined;
     if (colConf) {
 
-      if (isObject(colConf) && "info" in colConf) {
+      if (isObject(colConf)) {
+        
         result = {
           ...(result ?? {}),
-          ...colConf?.info
+          ...("info" in colConf && colConf?.info),
+          ...("jsonbSchema" in colConf && colConf.jsonbSchema && { jsonSchema: getJSONBSchemaAsJSONSchema(params.table, colConf) })
         }
-      }
 
-      /**
-       * Get labels from TableConfig if specified
-       */
-      if (isObject(colConf) && colConf.label) {
-        const { lang } = params;
-        const lbl = colConf?.label;
-        if (["string", "object"].includes(typeof lbl)) {
-          if (typeof lbl === "string") {
-            result ??= {};
-            result.label = lbl
-          } else if (lang && (lbl?.[lang as "en"] || lbl?.en)) {
-            result ??= {};
-            result.label = (lbl?.[lang as "en"]) || lbl?.en;
+        /**
+         * Get labels from TableConfig if specified
+         */
+        if (colConf.label) {
+          const { lang } = params;
+          const lbl = colConf?.label;
+          if (["string", "object"].includes(typeof lbl)) {
+            if (typeof lbl === "string") {
+              result ??= {};
+              result.label = lbl
+            } else if (lang && (lbl?.[lang as "en"] || lbl?.en)) {
+              result ??= {};
+              result.label = (lbl?.[lang as "en"]) || lbl?.en;
+            }
           }
+
         }
 
       }
+
     }
 
 
