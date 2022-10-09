@@ -692,13 +692,11 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
         properties: {
           a: { type: 'boolean', required: true },
           arr: {
-            type: 'array',
-            items: { type: 'string', enum: [ '1', '2', '3' ] },
+            type: 'string', enum: [ '1', '2', '3' ],
             required: true
           },
           arr1: {
-            type: 'array',
-            items: { type: 'number', enum: [ 1, 2, 3 ] },
+            type: 'number', enum: [ 1, 2, 3 ],
             required: true
           },
           arr2: { type: 'array', items: { type: 'integer' }, required: true },

@@ -247,11 +247,8 @@ const getJSONSchemaObject = <T extends ValidationSchema>(objDef: T): Record<keyo
 
     } else if("oneOf" in itemSchema) {
       item = { 
-        type: "array",
-        items: {
-          "type": typeof itemSchema.oneOf[0]!,
-          "enum": itemSchema.oneOf //.concat(nullable? [null] : [])
-        }
+        type: typeof itemSchema.oneOf[0]!,
+        "enum": itemSchema.oneOf //.concat(nullable? [null] : [])
       }
     } else if("oneOfTypes" in itemSchema) {
       item = {
