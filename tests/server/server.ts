@@ -13,12 +13,12 @@ prostgles<DBSchemaGenerated>({
       columns: {
         id: { sqlDefinition: `SERIAL PRIMARY KEY ` },
         email: { sqlDefinition: `TEXT NOT NULL` },
-        status: { oneOf: ["active", "disabled", "pending"] },
+        status: { enum: ["active", "disabled", "pending"] },
         preferences: {
           defaultValue: "{}",
           jsonbSchema: {
             showIntro: { type: "boolean", optional: true },
-            theme: { oneOf: ["light", "dark"], optional: true },
+            theme: { enum: ["light", "dark"], optional: true },
           }
         },
       }

@@ -1,7 +1,7 @@
 import { AnyObject, TableInfo, ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE } from "prostgles-types";
 import { JoinInfo } from "./DboBuilder";
 import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
-import { OneOfTypes, ValidationSchema } from "./validation";
+import { OneOf, ValidationSchema } from "./validation";
 declare type ColExtraInfo = {
     min?: string | number;
     max?: string | number;
@@ -78,11 +78,11 @@ declare type SQLDefColumn = {
      */
     sqlDefinition?: string;
 };
-declare type TextColDef = {
-    defaultValue?: string;
+declare type BaseColumnTypes = {
+    defaultValue?: any;
     nullable?: boolean;
 };
-declare type TextColumn = TextColDef & {
+declare type TextColumn = BaseColumnTypes & {
     isText: true;
     /**
      * Value will be trimmed before update/insert
@@ -93,8 +93,8 @@ declare type TextColumn = TextColDef & {
      */
     lowerCased?: boolean;
 };
-export declare type JSONBColumnDef = TextColDef & {
-    jsonbSchema: ValidationSchema | Omit<OneOfTypes, "optional">;
+export declare type JSONBColumnDef = BaseColumnTypes & {
+    jsonbSchema: ValidationSchema | Omit<OneOf, "optional">;
 };
 /**
  * Allows referencing media to this table.
@@ -116,7 +116,7 @@ declare type ReferencedColumn = {
     /**
      * Will create a lookup table that this column will reference
      */
-    references?: TextColDef & {
+    references?: BaseColumnTypes & {
         tableName: string;
         /**
          * Defaults to id
@@ -136,14 +136,25 @@ declare type NamedJoinColumn = {
     label?: string;
     joinDef: JoinDef[];
 };
-declare type OneOf<T extends string | number = any> = {
-    oneOf: T[];
+declare type Enum<T extends string | number = any> = {
+    enum: T[];
     nullable?: boolean;
     defaultValue?: T;
 };
 export declare type ColumnConfig<LANG_IDS = {
     en: 1;
-}> = string | StrictUnion<NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef | OneOf))>;
+}> = string | StrictUnion<NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef | Enum))>;
+export declare type ColumnConfigs<LANG_IDS = {
+    en: 1;
+}> = {
+    sql: string | BaseColumn<LANG_IDS> & SQLDefColumn;
+    join: BaseColumn<LANG_IDS> & NamedJoinColumn;
+    media: BaseColumn<LANG_IDS> & MediaColumn;
+    referenced: BaseColumn<LANG_IDS> & ReferencedColumn;
+    text: BaseColumn<LANG_IDS> & TextColumn;
+    jsonb: BaseColumn<LANG_IDS> & JSONBColumnDef;
+    enum: BaseColumn<LANG_IDS> & Enum;
+};
 declare type UnionKeys<T> = T extends T ? keyof T : never;
 declare type StrictUnionHelper<T, TAll> = T extends any ? T & Partial<Record<Exclude<UnionKeys<TAll>, keyof T>, never>> : never;
 declare type StrictUnion<T> = StrictUnionHelper<T, T>;

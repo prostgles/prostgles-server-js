@@ -9,12 +9,12 @@ declare type BaseOptions = {
 declare type SimpleType = BaseOptions & ({
     type: "number" | "boolean" | "integer" | "string" | "any" | "number[]" | "boolean[]" | "integer[]" | "string[]" | "any[]" | ValidationSchema;
 } | {
-    oneOf: readonly any[];
+    enum: readonly any[];
 });
-export declare type OneOfTypes = BaseOptions & {
-    oneOfTypes: readonly ValidationSchema[];
+export declare type OneOf = BaseOptions & {
+    oneOf: readonly ValidationSchema[];
 };
-declare type FieldType = SimpleType | OneOfTypes;
+declare type FieldType = SimpleType | OneOf;
 declare type GetType<T extends FieldType> = T extends {
     type: ValidationSchema;
 } ? SchemaObject<T["type"]> : T extends {
@@ -38,12 +38,12 @@ declare type GetType<T extends FieldType> = T extends {
 } ? string[] : T extends {
     type: "any[]";
 } ? any[] : T extends {
-    oneOf: readonly any[];
-} ? T["oneOf"][number] : 
+    enum: readonly any[];
+} ? T["enum"][number] : 
 /** This needs fixing */
 T extends {
-    oneOfTypes: readonly ValidationSchema[];
-} ? SchemaObject<T["oneOfTypes"][number]> : any;
+    oneOf: readonly ValidationSchema[];
+} ? SchemaObject<T["oneOf"][number]> : any;
 export declare type ValidationSchema = Record<string, FieldType>;
 export declare type SchemaObject<S extends ValidationSchema> = ({
     [K in keyof S as S[K]["optional"] extends true ? K : never]?: GetType<S[K]>;
@@ -54,7 +54,7 @@ export declare function validate<T>(obj: T, key: keyof T, validation: FieldType)
 export declare function validateSchema<S extends ValidationSchema>(schema: S, obj: SchemaObject<S>, objName?: string, optional?: boolean): void;
 export declare function getPGCheckConstraint(args: {
     escapedFieldName: string;
-    schema: ValidationSchema | OneOfTypes;
+    schema: ValidationSchema | OneOf;
     nullable: boolean;
     isRootQuery?: boolean;
     optional?: boolean;
@@ -63,7 +63,7 @@ declare type ColOpts = {
     nullable?: boolean;
 };
 export declare function getSchemaTSTypes(schema: ValidationSchema, leading?: string, isOneOf?: boolean): string;
-export declare function getJSONBSchemaTSTypes(schema: ValidationSchema | OneOfTypes, colOpts: ColOpts, leading?: string, isOneOf?: boolean): string;
+export declare function getJSONBSchemaTSTypes(schema: ValidationSchema | OneOf, colOpts: ColOpts, leading?: string, isOneOf?: boolean): string;
 export declare function getJSONBSchemaAsJSONSchema(tableName: string, colName: string, columnConfig: BaseColumn<{
     en: 1;
 }> & JSONBColumnDef): AnyObject;

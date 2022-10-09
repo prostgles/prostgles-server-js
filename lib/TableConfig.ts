@@ -2,7 +2,7 @@ import { getKeys, asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONT
 import { isPlainObject, JoinInfo } from "./DboBuilder";
 import { DB, DBHandlerServer, Joins, Prostgles } from "./Prostgles";
 import { asValue } from "./PubSubManager";
-import { getJSONBSchemaAsJSONSchema, getPGCheckConstraint, OneOfTypes, ValidationSchema } from "./validation";
+import { getJSONBSchemaAsJSONSchema, getPGCheckConstraint, OneOf, ValidationSchema } from "./validation";
 
 type ColExtraInfo = {
   min?: string | number;
@@ -99,12 +99,12 @@ type SQLDefColumn = {
   sqlDefinition?: string;
 }
 
-type TextColDef = {
-  defaultValue?: string;
+type BaseColumnTypes = {
+  defaultValue?: any;
   nullable?: boolean;
 }
 
-type TextColumn = TextColDef & {
+type TextColumn = BaseColumnTypes & {
   isText: true;
   /**
    * Value will be trimmed before update/insert
@@ -117,8 +117,8 @@ type TextColumn = TextColDef & {
   lowerCased?: boolean;
 }
 
-export type JSONBColumnDef = TextColDef & {
-  jsonbSchema: ValidationSchema | Omit<OneOfTypes, "optional">;
+export type JSONBColumnDef = BaseColumnTypes & {
+  jsonbSchema: ValidationSchema | Omit<OneOf, "optional">;
 
   /**
    * If the new schema CHECK fails old rows the update old rows using this function
@@ -153,7 +153,7 @@ type ReferencedColumn = {
   /**
    * Will create a lookup table that this column will reference
    */
-  references?: TextColDef & {
+  references?: BaseColumnTypes & {
 
 
     tableName: string;
@@ -179,13 +179,23 @@ type NamedJoinColumn = {
   joinDef: JoinDef[];
 }
 
-type OneOf<T extends string | number = any> = { 
-  oneOf: T[];
+type Enum<T extends string | number = any> = { 
+  enum: T[];
   nullable?: boolean; 
   defaultValue?: T; 
 };
 
-export type ColumnConfig<LANG_IDS = { en: 1 }> = string | StrictUnion<NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef | OneOf))>
+export type ColumnConfig<LANG_IDS = { en: 1 }> = string | StrictUnion<NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef | Enum))>;
+
+export type ColumnConfigs<LANG_IDS = { en: 1 }> = {
+  sql: string | BaseColumn<LANG_IDS> & SQLDefColumn;
+  join: BaseColumn<LANG_IDS> & NamedJoinColumn;
+  media: BaseColumn<LANG_IDS> & MediaColumn;
+  referenced: BaseColumn<LANG_IDS> & ReferencedColumn;
+  text: BaseColumn<LANG_IDS> & TextColumn;
+  jsonb: BaseColumn<LANG_IDS> & JSONBColumnDef;
+  enum: BaseColumn<LANG_IDS> & Enum;
+}
 
 type UnionKeys<T> = T extends T ? keyof T : never;
 type StrictUnionHelper<T, TAll> = T extends any ? T & Partial<Record<Exclude<UnionKeys<TAll>, keyof T>, never>> : never;
@@ -416,7 +426,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       if ("columns" in tableConf) {
         const getColDef = (name: string, colConf: ColumnConfig): string => {
           const colNameEsc = asName(name);
-          const getColTypeDef = (colConf: TextColDef, pgType: "TEXT" | "JSONB") => {
+          const getColTypeDef = (colConf: BaseColumnTypes, pgType: "TEXT" | "JSONB") => {
             const { nullable, defaultValue } = colConf;
             return `${pgType} ${!nullable ? " NOT NULL " : ""} ${defaultValue ? ` DEFAULT ${asValue(defaultValue)} ` : ""}`
           }
@@ -458,10 +468,10 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
             const checkStatement = getPGCheckConstraint({ schema: colConf.jsonbSchema, escapedFieldName: colNameEsc, nullable: !!colConf.nullable }, 0)
             return ` ${colNameEsc} ${getColTypeDef(colConf, "JSONB")} CHECK(${checkStatement})`;
 
-          } else if("oneOf" in colConf) {
-            if(!colConf.oneOf?.length) throw new Error("colConf.oneOf Must not be empty");
-            const type = colConf.oneOf.every(v => Number.isFinite(v))? "NUMERIC" : "TEXT";
-            const checks = colConf.oneOf.map(v => `${colNameEsc} = ${asValue(v)}`).join(" OR ");
+          } else if("enum" in colConf) {
+            if(!colConf.enum?.length) throw new Error("colConf.enum Must not be empty");
+            const type = colConf.enum.every(v => Number.isFinite(v))? "NUMERIC" : "TEXT";
+            const checks = colConf.enum.map(v => `${colNameEsc} = ${asValue(v)}`).join(" OR ");
             return ` ${colNameEsc} ${type} ${colConf.nullable? "" : "NOT NULL"} ${"defaultValue" in colConf? ` DEFAULT ${asValue(colConf.defaultValue)}` : ""} CHECK(${checks})`;
 
           } else {

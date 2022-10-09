@@ -20,9 +20,9 @@ export const getDBSchema = (dboBuilder: DboBuilder): string => {
         if(isObject(colConf) && "jsonbSchema" in colConf){
           if(!colConf.jsonbSchema) throw "colConf.jsonbSchema missing"
           type = getJSONBSchemaTSTypes(colConf.jsonbSchema, { nullable: colConf.nullable }, "      ");
-        } else if(isObject(colConf) && "oneOf" in colConf){
-          if(!colConf.oneOf) throw "colConf.oneOf missing"
-          const types = colConf.oneOf.map(t => typeof t === "number"? t : JSON.stringify(t));
+        } else if(isObject(colConf) && "enum" in colConf){
+          if(!colConf.enum) throw "colConf.enum missing"
+          const types = colConf.enum.map(t => typeof t === "number"? t : JSON.stringify(t));
           if(colConf.nullable){
             types.unshift("null")
           }

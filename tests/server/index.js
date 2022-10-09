@@ -89,11 +89,11 @@ function dd() {
             columns: {
                 id: { sqlDefinition: `SERIAL PRIMARY KEY ` },
                 email: { sqlDefinition: `TEXT NOT NULL` },
-                status: { oneOf: ["active", "disabled", "pending"] },
+                status: { enum: ["active", "disabled", "pending"] },
                 preferences: { defaultValue: "{}",
                     jsonbSchema: {
                         showIntro: { type: "boolean", optional: true },
-                        theme: { oneOf: ["light", "dark", "auto"], optional: true },
+                        theme: { enum: ["light", "dark", "auto"], optional: true },
                         others: { type: "any[]" }
                     }
                 },
@@ -104,18 +104,18 @@ function dd() {
             columns: {
                 json: { jsonbSchema: {
                         a: { type: "boolean" },
-                        arr: { oneOf: ["1", "2", "3"] },
-                        arr1: { oneOf: [1, 2, 3] },
+                        arr: { enum: ["1", "2", "3"] },
+                        arr1: { enum: [1, 2, 3] },
                         arr2: { type: "integer[]" },
                         arrStr: { type: "string[]", optional: true, nullable: true },
-                        o: { oneOfTypes: [{ o1: { type: "integer" } }, { o2: { type: "boolean" } }], optional: true, nullable: true },
+                        o: { oneOf: [{ o1: { type: "integer" } }, { o2: { type: "boolean" } }], optional: true, nullable: true },
                     }
                 },
-                colOneOf: { oneOf: ["a", "b", "c"] },
+                colOneOf: { enum: ["a", "b", "c"] },
                 status: {
                     nullable: true,
                     jsonbSchema: {
-                        oneOfTypes: [
+                        oneOf: [
                             { ok: { type: "string" } },
                             { err: { type: "string" } },
                             {
@@ -131,10 +131,10 @@ function dd() {
                 jsonOneOf: {
                     nullable: true,
                     jsonbSchema: {
-                        oneOfTypes: [
-                            { command: { oneOf: ["a"] } },
+                        oneOf: [
+                            { command: { enum: ["a"] } },
                             {
-                                command: { oneOf: ["b"] },
+                                command: { enum: ["b"] },
                                 option: { type: "integer[]" }
                             }
                         ]

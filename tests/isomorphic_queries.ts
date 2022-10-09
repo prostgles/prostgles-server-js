@@ -656,10 +656,10 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
   tjson: {
     json: { jsonbSchema: { 
       a: { type: "boolean" },
-      arr: { oneOf: ["1", "2", "3"] },
-      arr1: { oneOf: [1, 2, 3] },
+      arr: { enum: ["1", "2", "3"] },
+      arr1: { enum: [1, 2, 3] },
       arr2: { type: "integer[]" },
-      o: { oneOfTypes: [{ o1: { type: "integer" } }, { o2: { type: "boolean" } }], optional: true },
+      o: { oneOf: [{ o1: { type: "integer" } }, { o2: { type: "boolean" } }], optional: true },
       }  
     }
   },
