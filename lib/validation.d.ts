@@ -1,3 +1,4 @@
+import { AnyObject } from "prostgles-types";
 import { BaseColumn, JSONBColumnDef } from "./TableConfig";
 declare type BaseOptions = {
     optional?: boolean;
@@ -72,9 +73,9 @@ declare namespace JSTypes {
         required?: boolean;
     };
     export type Any = {};
-    export type Object = Base & {
+    export type Object<T extends AnyObject = AnyObject> = Base & {
         type: "object";
-        properties: Record<string, Schema>;
+        properties: Record<keyof T, Schema>;
     };
     export type Enum = Base & {
         type: "string" | "number";
@@ -85,7 +86,7 @@ declare namespace JSTypes {
         items: (string | number)[];
     };
     export type OneOf = {
-        oneOf: (Object | Enum | Array | Any)[];
+        oneOf: (Any | Object | Enum | Array)[];
     };
     export type Schema = Any | Object | Enum | Array | OneOf;
     export {};

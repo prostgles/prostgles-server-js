@@ -221,9 +221,9 @@ namespace JSTypes {
   }
   export type Any = {};
 
-  export type Object = Base & {
+  export type Object<T extends AnyObject = AnyObject> = Base & {
     type: "object";
-    properties: Record<string, Schema>;
+    properties: Record<keyof T, Schema>;
   }
   export type Enum = Base & {
     type: "string" | "number";
@@ -246,7 +246,7 @@ namespace JSTypes {
 
 type JSONSchema = JSTypes.Schema
 
-const getJSONSchemaObject = <T extends ValidationSchema>(objDef: T): Record<keyof T, JSONSchema> => {
+const getJSONSchemaObject = <T extends ValidationSchema>(objDef: T): JSTypes.Object<T> => {
   const resultType: JSONSchema = {
     type: "object",
     properties: getKeys(objDef).reduce((a, k) => {
@@ -276,10 +276,7 @@ const getJSONSchemaObject = <T extends ValidationSchema>(objDef: T): Record<keyo
            * Is object
            */
         } else {
-          item = {
-            type: "object",
-            properties: getJSONSchemaObject(type)
-          }
+          item = getJSONSchemaObject(type)
 
         }
 
@@ -309,8 +306,8 @@ const getJSONSchemaObject = <T extends ValidationSchema>(objDef: T): Record<keyo
         [k]: {
           ...item,
           required: !optional,
-          description,
-          title,
+          ...(!!description && {description}),
+          ...(!!title && {title}),
         }
       }
     }, {} as Record<string, JSTypes.Schema>)
@@ -323,11 +320,21 @@ export function getJSONBSchemaAsJSONSchema(tableName: string, colName: string, c
 
   const schema = columnConfig.jsonbSchema;
 
-  let jSchema = getJSONSchemaObject({
-    field1: 
-      isOneOfTypes(schema) ? schema :
-      { type: schema as ValidationSchema }
-  }).field1;
+  let jSchema: JSONSchema | undefined = undefined;
+  // if(isOneOfTypes(schema)){
+    jSchema = getJSONSchemaObject({
+      field1: 
+        isOneOfTypes(schema) ? schema :
+        { type: schema as ValidationSchema }
+    }).properties.field1;
+  // } else {
+  //   jSchema = getJSONSchemaObject({
+  //     field1: 
+  //       isOneOfTypes(schema) ? schema :
+  //       { type: schema as ValidationSchema }
+  //   }).properties.field1;
+
+  // }
 
   return {
     "$id": `${tableName}.${colName}`,

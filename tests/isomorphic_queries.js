@@ -622,8 +622,8 @@ async function isomorphic(db) {
                 },
                 o: {
                     oneOf: [
-                        { o1: { type: 'integer', required: true } },
-                        { o2: { type: 'boolean', required: true } },
+                        { type: "object", properties: { o1: { type: 'integer', required: true } } },
+                        { type: "object", properties: { o2: { type: 'boolean', required: true } } },
                         { type: 'null' }
                     ],
                     required: false
@@ -634,16 +634,18 @@ async function isomorphic(db) {
             '$id': 'tjson.status',
             '$schema': 'https://json-schema.org/draft/2020-12/schema',
             oneOf: [
-                { ok: { required: true, type: 'string' } },
-                { err: { required: true, type: 'string' } },
+                { type: "object", properties: { ok: { required: true, type: 'string' } } },
+                { type: "object", properties: { err: { required: true, type: 'string' } } },
                 {
-                    loading: {
-                        properties: {
-                            loaded: { required: true, type: 'number' },
-                            total: { required: true, type: 'number' }
-                        },
-                        required: true,
-                        type: 'object'
+                    type: "object", properties: {
+                        loading: {
+                            properties: {
+                                loaded: { required: true, type: 'number' },
+                                total: { required: true, type: 'number' }
+                            },
+                            required: true,
+                            type: 'object'
+                        }
                     }
                 }
             ],
