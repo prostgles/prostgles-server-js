@@ -118,7 +118,7 @@ type TextColumn = TextColDef & {
 }
 
 export type JSONBColumnDef = TextColDef & {
-  jsonbSchema: ValidationSchema | Pick<OneOfTypes, "oneOfTypes">;
+  jsonbSchema: ValidationSchema | Omit<OneOfTypes, "optional">;
 
   /**
    * If the new schema CHECK fails old rows the update old rows using this function

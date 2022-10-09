@@ -284,7 +284,14 @@ const getJSONSchemaObject = <T extends ValidationSchema>(objDef: T): Record<keyo
 export function getJSONBSchemaAsJSONSchema(tableName: string, columnConfig: BaseColumn<{ en: 1 }> & JSONBColumnDef): AnyObject {
 
   const schema = columnConfig.jsonbSchema;
-  const jSchema = isOneOfTypes(schema)? getJSONSchemaObject({ d: schema }).d : getJSONSchemaObject(schema as ValidationSchema);
+  // const jSchema = isOneOfTypes(schema)? getJSONSchemaObject({ d: schema }).d : getJSONSchemaObject(schema as ValidationSchema);
+  let jSchema = {} as any; 
+  if(isOneOfTypes(schema)){
+    jSchema = getJSONSchemaObject({ field1: schema }).field1;
+  } else {
+    jSchema = getJSONSchemaObject({ field1: schema as any }).field1;
+  }
+  getJSONSchemaObject({ d: schema as FieldType }).d; // : getJSONSchemaObject(schema as ValidationSchema);
 
   return {
     "$id": tableName ?? "???",
