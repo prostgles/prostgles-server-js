@@ -237,7 +237,8 @@ class PublishParser {
                     }
                 });
                 allRuleKeys.filter(m => parsed_table[m])
-                    .find((method) => {
+                    .forEach((method) => {
+                    const rule = parsed_table[method];
                     let rm = MY_RULES.find(r => r.rule === method || r.methods.includes(method));
                     if (!rm) {
                         let extraInfo = "";
@@ -248,8 +249,8 @@ class PublishParser {
                     }
                     /* Check RULES for invalid params */
                     /* Methods do not have params -> They use them from rules */
-                    if (method === rm.rule) {
-                        let method_params = (0, prostgles_types_1.getKeys)(parsed_table[method]);
+                    if (method === rm.rule && (0, prostgles_types_1.isObject)(rule)) {
+                        let method_params = (0, prostgles_types_1.getKeys)(rule);
                         let iparam = method_params.find(p => !rm?.allowed_params.includes(p));
                         if (iparam) {
                             throw `Invalid setting in publish.${tableName}.${method} -> ${iparam}. \n Expecting any of: ${rm.allowed_params.join(", ")}`;

@@ -113,16 +113,16 @@ export type DeleteRequestData = {
   filter: object;
   returning: FieldFilter;
 }
-export type UpdateRequestDataOne<R> = {
+export type UpdateRequestDataOne<R extends AnyObject> = {
   filter: FullFilter<R>
   data: Partial<R>;
   returning: FieldFilter<R>;
 }
-export type UpdateReq<R> = {
+export type UpdateReq<R extends AnyObject> = {
   filter: FullFilter<R>
   data: Partial<R>;
 }
-export type UpdateRequestDataBatch<R> = {
+export type UpdateRequestDataBatch<R extends AnyObject> = {
   data: UpdateReq<R>[];
 }
 export type UpdateRequestData<R extends AnyObject = AnyObject> = UpdateRequestDataOne<R> | UpdateRequestDataBatch<R>;
@@ -304,13 +304,13 @@ export type SubscribeRule = {
   throttle?: number;
 }
 
-export type ViewRule<S = AnyObject> = CommonTableRules & {
+export type ViewRule<S extends AnyObject = AnyObject> = CommonTableRules & {
   /**
    * What can be read from the table
    */
   select?: SelectRule<S>;
 };
-export type TableRule<RowType = AnyObject, S = void> = ViewRule<RowType> & {
+export type TableRule<RowType extends AnyObject = AnyObject, S = void> = ViewRule<RowType> & {
   insert?: InsertRule<RowType, S>;
   update?: UpdateRule<RowType, S>;
   delete?: DeleteRule<RowType, S>;
@@ -561,7 +561,9 @@ export class PublishParser {
         });
 
         allRuleKeys.filter(m => parsed_table[m])
-          .find((method) => {
+          .forEach((method) => {
+            const rule = parsed_table[method];
+            
             let rm = MY_RULES.find(r => r.rule === method || (r.methods as readonly string[]).includes(method));
             if (!rm) {
               let extraInfo = "";
@@ -573,8 +575,8 @@ export class PublishParser {
 
             /* Check RULES for invalid params */
             /* Methods do not have params -> They use them from rules */
-            if (method === rm.rule) {
-              let method_params = getKeys(parsed_table[method]);
+            if (method === rm.rule && isObject(rule)) {
+              let method_params = getKeys(rule);
               let iparam = method_params.find(p => !rm?.allowed_params.includes(<never>p));
               if (iparam) {
                 throw `Invalid setting in publish.${tableName}.${method} -> ${iparam}. \n Expecting any of: ${rm.allowed_params.join(", ")}`;

@@ -839,7 +839,7 @@ export class Prostgles {
   
       const clientSchema: ClientSchema = {
         schema,
-        methods: getKeys(methods),
+        methods: getKeys(methods ?? {}),
         tableSchema: tables,
         rawSQL,
         joinTables: joinTables2,

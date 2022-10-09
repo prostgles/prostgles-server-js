@@ -197,7 +197,7 @@ class Prostgles {
                 const methods = await publishParser?.getMethods(socket, userData);
                 const clientSchema = {
                     schema,
-                    methods: (0, prostgles_types_1.getKeys)(methods),
+                    methods: (0, prostgles_types_1.getKeys)(methods ?? {}),
                     tableSchema: tables,
                     rawSQL,
                     joinTables: joinTables2,

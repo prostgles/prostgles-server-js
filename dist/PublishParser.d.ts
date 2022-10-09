@@ -35,16 +35,16 @@ export declare type DeleteRequestData = {
     filter: object;
     returning: FieldFilter;
 };
-export declare type UpdateRequestDataOne<R> = {
+export declare type UpdateRequestDataOne<R extends AnyObject> = {
     filter: FullFilter<R>;
     data: Partial<R>;
     returning: FieldFilter<R>;
 };
-export declare type UpdateReq<R> = {
+export declare type UpdateReq<R extends AnyObject> = {
     filter: FullFilter<R>;
     data: Partial<R>;
 };
-export declare type UpdateRequestDataBatch<R> = {
+export declare type UpdateRequestDataBatch<R extends AnyObject> = {
     data: UpdateReq<R>[];
 };
 export declare type UpdateRequestData<R extends AnyObject = AnyObject> = UpdateRequestDataOne<R> | UpdateRequestDataBatch<R>;
@@ -194,13 +194,13 @@ export declare type SyncRule<Cols extends AnyObject = AnyObject> = {
 export declare type SubscribeRule = {
     throttle?: number;
 };
-export declare type ViewRule<S = AnyObject> = CommonTableRules & {
+export declare type ViewRule<S extends AnyObject = AnyObject> = CommonTableRules & {
     /**
      * What can be read from the table
      */
     select?: SelectRule<S>;
 };
-export declare type TableRule<RowType = AnyObject, S = void> = ViewRule<RowType> & {
+export declare type TableRule<RowType extends AnyObject = AnyObject, S = void> = ViewRule<RowType> & {
     insert?: InsertRule<RowType, S>;
     update?: UpdateRule<RowType, S>;
     delete?: DeleteRule<RowType, S>;
