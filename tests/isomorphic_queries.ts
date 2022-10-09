@@ -684,8 +684,8 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
     assert.deepEqual(
       cols.find(c => c.name === "json")?.jsonSchema,
       {
-        '$id': 'tjson.json',
-        '$schema': 'https://json-schema.org/draft/2020-12/schema',
+        $id: 'tjson.json',
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
         title: 'json',
         required: true,
         type: 'object',
@@ -701,6 +701,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
           },
           arr2: { type: 'array', items: { type: 'integer' }, required: true },
           arrStr: {
+            type: "object",
             oneOf: [
               { type: 'array', items: { type: 'string' } },
               { type: 'null' }
@@ -708,6 +709,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
             required: false
           },
           o: {
+            type: "object",
             oneOf: [
               { type: "object", properties: {o1: { type: 'integer', required: true } } },
               { type: "object", properties: {o2: { type: 'boolean', required: true } } },
@@ -722,8 +724,9 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
     assert.deepEqual(
       cols.find(c => c.name === "status")?.jsonSchema, 
       {
-        '$id': 'tjson.status',
-        '$schema': 'https://json-schema.org/draft/2020-12/schema',
+        $id: 'tjson.status',
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: "object",
         oneOf: [
           { type: "object", properties: { ok: { required: true, type: 'string' } } },
           { type: "object", properties: { err: { required: true, type: 'string' } } },

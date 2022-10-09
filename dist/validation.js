@@ -218,6 +218,7 @@ const getJSONSchemaObject = (objDef) => {
             }
             else if ("oneOf" in itemSchema) {
                 item = {
+                    type: "object",
                     oneOf: itemSchema.oneOf.map(t => getJSONSchemaObject(t))
                 };
             }
@@ -230,6 +231,7 @@ const getJSONSchemaObject = (objDef) => {
                     item.oneOf.push(nullDef);
                 else
                     item = {
+                        type: 'object',
                         oneOf: [item, nullDef]
                     };
             }
@@ -248,19 +250,10 @@ const getJSONSchemaObject = (objDef) => {
 };
 function getJSONBSchemaAsJSONSchema(tableName, colName, columnConfig) {
     const schema = columnConfig.jsonbSchema;
-    let jSchema = undefined;
-    // if(isOneOfTypes(schema)){
-    jSchema = getJSONSchemaObject({
+    let jSchema = getJSONSchemaObject({
         field1: isOneOfTypes(schema) ? schema :
             { type: schema }
     }).properties.field1;
-    // } else {
-    //   jSchema = getJSONSchemaObject({
-    //     field1: 
-    //       isOneOfTypes(schema) ? schema :
-    //       { type: schema as ValidationSchema }
-    //   }).properties.field1;
-    // }
     return {
         "$id": `${tableName}.${colName}`,
         "$schema": "https://json-schema.org/draft/2020-12/schema",

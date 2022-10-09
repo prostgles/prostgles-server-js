@@ -597,8 +597,8 @@ async function isomorphic(db) {
     await tryRun("jsonb JSON Schema validation", async () => {
         const cols = await db.tjson.getColumns();
         assert_1.strict.deepEqual(cols.find(c => c.name === "json")?.jsonSchema, {
-            '$id': 'tjson.json',
-            '$schema': 'https://json-schema.org/draft/2020-12/schema',
+            $id: 'tjson.json',
+            $schema: 'https://json-schema.org/draft/2020-12/schema',
             title: 'json',
             required: true,
             type: 'object',
@@ -614,6 +614,7 @@ async function isomorphic(db) {
                 },
                 arr2: { type: 'array', items: { type: 'integer' }, required: true },
                 arrStr: {
+                    type: "object",
                     oneOf: [
                         { type: 'array', items: { type: 'string' } },
                         { type: 'null' }
@@ -621,6 +622,7 @@ async function isomorphic(db) {
                     required: false
                 },
                 o: {
+                    type: "object",
                     oneOf: [
                         { type: "object", properties: { o1: { type: 'integer', required: true } } },
                         { type: "object", properties: { o2: { type: 'boolean', required: true } } },
@@ -631,8 +633,9 @@ async function isomorphic(db) {
             }
         });
         assert_1.strict.deepEqual(cols.find(c => c.name === "status")?.jsonSchema, {
-            '$id': 'tjson.status',
-            '$schema': 'https://json-schema.org/draft/2020-12/schema',
+            $id: 'tjson.status',
+            $schema: 'https://json-schema.org/draft/2020-12/schema',
+            type: "object",
             oneOf: [
                 { type: "object", properties: { ok: { required: true, type: 'string' } } },
                 { type: "object", properties: { err: { required: true, type: 'string' } } },

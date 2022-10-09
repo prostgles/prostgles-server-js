@@ -287,6 +287,7 @@ const getJSONSchemaObject = <T extends ValidationSchema>(objDef: T): JSTypes.Obj
         }
       } else if ("oneOf" in itemSchema) {
         item = {
+          type: "object",
           oneOf: itemSchema.oneOf.map(t => getJSONSchemaObject(t))
         }
       } else {
@@ -297,6 +298,7 @@ const getJSONSchemaObject = <T extends ValidationSchema>(objDef: T): JSTypes.Obj
         const nullDef = { type: "null" }
         if (item.oneOf) item.oneOf.push(nullDef)
         else item = {
+          type: 'object',
           oneOf: [item, nullDef]
         }
       }
@@ -320,21 +322,11 @@ export function getJSONBSchemaAsJSONSchema(tableName: string, colName: string, c
 
   const schema = columnConfig.jsonbSchema;
 
-  let jSchema: JSONSchema | undefined = undefined;
-  // if(isOneOfTypes(schema)){
-    jSchema = getJSONSchemaObject({
-      field1: 
-        isOneOfTypes(schema) ? schema :
-        { type: schema as ValidationSchema }
-    }).properties.field1;
-  // } else {
-  //   jSchema = getJSONSchemaObject({
-  //     field1: 
-  //       isOneOfTypes(schema) ? schema :
-  //       { type: schema as ValidationSchema }
-  //   }).properties.field1;
-
-  // }
+  let jSchema: JSONSchema = getJSONSchemaObject({
+    field1: 
+      isOneOfTypes(schema) ? schema :
+      { type: schema as ValidationSchema }
+  }).properties.field1;
 
   return {
     "$id": `${tableName}.${colName}`,
