@@ -296,8 +296,12 @@ const getJSONSchemaObject = <T extends ValidationSchema>(objDef: T): JSTypes.Obj
 
       if (nullable) {
         const nullDef = { type: "null" }
-        if (item.oneOf) item.oneOf.push(nullDef)
-        else item = {
+        if (item.oneOf){ 
+          item.oneOf.push(nullDef)
+        } else if(item.enum){
+          item.enum.push(null)
+
+        } else item = {
           type: 'object',
           oneOf: [item, nullDef]
         }
