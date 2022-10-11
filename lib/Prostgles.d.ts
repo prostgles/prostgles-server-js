@@ -130,8 +130,11 @@ export declare type ProstglesInitOptions<S = void> = {
     onReady: OnReadyCallback<S>;
     transactions?: string | boolean;
     wsChannelNamePrefix?: string;
-    onSocketConnect?(socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB): any;
-    onSocketDisconnect?(socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB): any;
+    /**
+     * Use for connection verification. Will disconnect socket on any errors
+     */
+    onSocketConnect?: (socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB) => void | Promise<void>;
+    onSocketDisconnect?: (socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB) => void | Promise<void>;
     auth?: Auth<S>;
     DEBUG_MODE?: boolean;
     watchSchemaType?: 

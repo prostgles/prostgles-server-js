@@ -486,8 +486,17 @@ class Prostgles {
                 throw new Error("db/dbo missing");
             let { dbo, db, pgp } = this;
             try {
-                if (this.opts.onSocketConnect)
-                    await this.opts.onSocketConnect(socket, dbo, db);
+                if (this.opts.onSocketConnect) {
+                    try {
+                        await this.opts.onSocketConnect(socket, dbo, db);
+                    }
+                    catch (error) {
+                        const connectionError = error instanceof Error ? error.message : typeof error === "string" ? error : JSON.stringify(error);
+                        socket.emit(prostgles_types_1.CHANNELS.CONNECTION, { connectionError });
+                        socket.disconnect();
+                        return;
+                    }
+                }
                 /*  RUN Client request from Publish.
                     Checks request against publish and if OK run it with relevant publish functions. Local (server) requests do not check the policy
                 */

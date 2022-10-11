@@ -225,8 +225,11 @@ export type ProstglesInitOptions<S = void> = {
   onReady: OnReadyCallback<S>;
   transactions?: string | boolean;
   wsChannelNamePrefix?: string;
-  onSocketConnect?(socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB): any;
-  onSocketDisconnect?(socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB): any;
+  /**
+   * Use for connection verification. Will disconnect socket on any errors
+   */
+  onSocketConnect?: (socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB) => void | Promise<void>;
+  onSocketDisconnect?: (socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB) => void | Promise<void>;
   auth?: Auth<S>;
   DEBUG_MODE?: boolean;
   watchSchemaType?:
@@ -696,7 +699,16 @@ export class Prostgles {
       let { dbo, db, pgp } = this;
 
       try {
-        if (this.opts.onSocketConnect) await this.opts.onSocketConnect(socket, dbo as any, db);
+        if (this.opts.onSocketConnect) {
+          try {
+            await this.opts.onSocketConnect(socket, dbo as any, db);
+          } catch(error) {
+            const connectionError = error instanceof Error? error.message : typeof error === "string"? error : JSON.stringify(error);
+            socket.emit(CHANNELS.CONNECTION, { connectionError });
+            socket.disconnect();
+            return;
+          }
+        }
 
 
         /*  RUN Client request from Publish.

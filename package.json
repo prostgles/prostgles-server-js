@@ -31,7 +31,7 @@
     "check-disk-space": "^3.3.1",
     "file-type": "^17.1.4",
     "pg-promise": "^10.11.1",
-    "prostgles-types": "^1.5.179",
+    "prostgles-types": "^1.5.180",
     "sharp": "^0.31.0"
   },
   "devDependencies": {
