@@ -57,7 +57,7 @@ const RULE_TO_METHODS = [
     methods: RULE_METHODS.update,
     no_limits: <UpdateRule>{ fields: "*", filterFields: "*", returningFields: "*" },
     table_only: true,
-    allowed_params: <Array<keyof UpdateRule>>["fields", "filterFields", "forcedFilter", "forcedData", "returningFields", "validate", "dynamicFields"],
+    allowed_params: <Array<keyof UpdateRule>>["fields", "filterFields", "forcedFilter", "forcedData", "returningFields", "validate", "postValidate", "dynamicFields"],
     hint: ` expecting "*" | true | { fields: string | string[] | {}  }`
   },
   {
