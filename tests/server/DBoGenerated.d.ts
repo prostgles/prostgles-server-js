@@ -475,7 +475,7 @@ export type DBSchemaGenerated = {
       id?: number;
       jsn?: null | any;
       name?: null | string;
-      tsv?: null | any;
+      tsv?: null | string;
     };
   };
   
