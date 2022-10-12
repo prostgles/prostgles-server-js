@@ -144,8 +144,6 @@ class ColSet {
             const col = this.opts.columns.find(c => c.name === key);
             if (!col)
                 throw "Unexpected missing col name";
-            const colIsJSON = ["json", "jsonb"].includes(col.data_type);
-            const colIsUUID = ["uuid"].includes(col.data_type);
             /**
              * Add utility functions for PostGIS data
              */
@@ -165,7 +163,9 @@ class ColSet {
                 escapedVal = `${funcName}(${basicFunc(funcArgs)})`;
             }
             else {
-                escapedVal = exports.pgp.as.format("$1", [row[key]]);
+                /** Prevent pg-promise formatting jsonb */
+                const colIsJSON = ["json", "jsonb"].includes(col.data_type);
+                escapedVal = exports.pgp.as.format(colIsJSON ? "$1:json" : "$1", [row[key]]);
             }
             /**
              * Cast to type to avoid array errors (they do not cast automatically)
@@ -174,7 +174,6 @@ class ColSet {
             return {
                 escapedCol: (0, prostgles_types_1.asName)(key),
                 escapedVal,
-                udt_name: col.udt_name
             };
         });
     }
