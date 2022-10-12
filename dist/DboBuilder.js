@@ -149,7 +149,7 @@ class ColSet {
             /**
              * Add utility functions for PostGIS data
              */
-            let escapedVal;
+            let escapedVal = "";
             if (["geometry", "geography"].includes(col.udt_name) && row[key] && isPlainObject(row[key])) {
                 const basicFunc = (args) => {
                     return args.map(arg => (0, PubSubManager_1.asValue)(arg)).join(", ");
@@ -165,11 +165,16 @@ class ColSet {
                 escapedVal = `${funcName}(${basicFunc(funcArgs)})`;
             }
             else {
-                escapedVal = exports.pgp.as.format(colIsUUID ? "$1::uuid" : colIsJSON ? "$1:json" : "$1", [row[key]]);
+                escapedVal = exports.pgp.as.format("$1", [row[key]]);
             }
+            /**
+             * Cast to type to avoid array errors (they do not cast automatically)
+             */
+            escapedVal += `::${col.udt_name}`;
             return {
                 escapedCol: (0, prostgles_types_1.asName)(key),
-                escapedVal
+                escapedVal,
+                udt_name: col.udt_name
             };
         });
     }

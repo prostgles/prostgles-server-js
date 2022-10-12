@@ -430,7 +430,7 @@ class ColSet {
         this.opts = { columns, tableName, colNames: columns.map(c => c.name) }
     }
 
-    private async getRow(data: any, allowedCols: string[], dbTx: DBHandlerServer, validate?: ValidateRow): Promise<{ escapedCol: string; escapedVal: string }[]> {
+    private async getRow(data: any, allowedCols: string[], dbTx: DBHandlerServer, validate?: ValidateRow): Promise<{ escapedCol: string; escapedVal: string; udt_name: PG_COLUMN_UDT_DATA_TYPE; }[]> {
         const badCol = allowedCols.find(c => !this.opts.colNames.includes(c))
         if(!allowedCols || badCol){
             throw "Missing or unexpected columns: " + badCol;
@@ -453,7 +453,7 @@ class ColSet {
             /**
              * Add utility functions for PostGIS data
              */
-            let escapedVal: string;
+            let escapedVal: string = "";
             if(["geometry", "geography"].includes(col.udt_name) && row[key] && isPlainObject(row[key])){
               
                 const basicFunc = (args: any[]) => {
@@ -473,12 +473,18 @@ class ColSet {
                 escapedVal = `${funcName}(${basicFunc(funcArgs)})`
                 
             } else {
-                escapedVal = pgp.as.format(colIsUUID? "$1::uuid" : colIsJSON? "$1:json" : "$1", [row[key]])
+                escapedVal = pgp.as.format("$1", [row[key]])
             }
+
+            /**
+             * Cast to type to avoid array errors (they do not cast automatically)
+             */
+            escapedVal += `::${col.udt_name}`
 
             return {
                 escapedCol: asName(key),
-                escapedVal
+                escapedVal,
+                udt_name: col.udt_name
             }
         });
     
