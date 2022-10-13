@@ -251,7 +251,6 @@ function dd() {
                     stopTest(err);
                 });
             }
-            return true;
         },
         publishRawSQL: async (params) => {
             return true; // Boolean(user && user.type === "admin")
@@ -280,14 +279,14 @@ function dd() {
                     sessions.push(s);
                 }
                 log("Logged in!");
-                return { sid: s.id, expires: Infinity };
+                return { sid: s.id, expires: Infinity, onExpiration: "redirect" };
             },
             cacheSession: {
                 getSession: async (sid) => {
                     const s = sessions.find(s => s.id === sid);
-                    return s ? { sid: s.id, expires: Infinity } : undefined;
+                    return s ? { sid: s.id, expires: Infinity, onExpiration: "redirect" } : undefined;
                 }
-            }
+            },
         },
         publishMethods: async (params) => {
             return {

@@ -119,12 +119,8 @@ export function getPGCheckConstraint(args: { escapedFieldName: string; schema: V
       if (!t.enum.length || t.enum.some(v => v === undefined || !["number", "boolean", "string", null].includes(typeof v))) {
         throw new Error(`Invalid ValidationSchema for property: ${k} of field ${escapedFieldName}: enum cannot be empty AND can only contain: numbers, text, boolean, null`);
       }
-      const oneOfHasNull = t.enum.includes(null);
-      if (oneOfHasNull) checks.push(`${valAsText} IS NULL`);
-      const _enum = t.enum.filter(o => o !== null);
-      _enum.forEach(o => {
-        checks.push(`(${valAsText})${(jsToPGtypes as any)[typeof o]} = ${asValue(o)}`);
-      })
+      
+      checks.push(`array_position(${asValue(t.enum)}::text[], ${valAsText}::text) IS NOT NULL`)
     } else if ("type" in t) {
       if (typeof t.type === "string") {
         if (t.type.endsWith("[]")) {
