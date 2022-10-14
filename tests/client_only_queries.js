@@ -1,7 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const assert_1 = require("assert");
-const dist_1 = require("./client/node_modules/prostgles-types/dist");
+// import { DBSchemaTable, isDefined } from "./client/node_modules/prostgles-types/dist";
+const prostgles_types_1 = require("prostgles-types");
 const isomorphic_queries_1 = require("./isomorphic_queries");
 async function client_only(db, auth, log, methods, tableSchema) {
     /**
@@ -12,7 +13,7 @@ async function client_only(db, auth, log, methods, tableSchema) {
         const dbTables = Object.keys(db).map(k => {
             const h = db[k];
             return !!(h.getColumns && h.getInfo) ? k : undefined;
-        }).filter(dist_1.isDefined);
+        }).filter(prostgles_types_1.isDefined);
         const missingTbl = dbTables.find(t => !tableSchema.some(st => st.name === t));
         if (missingTbl)
             throw `${missingTbl} is missing from tableSchema: ${JSON.stringify(tableSchema)}`;

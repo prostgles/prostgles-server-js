@@ -1,7 +1,8 @@
 import { strict as assert } from 'assert';
 
 import type { DBHandlerClient, Auth } from "./client/index";
-import { DBSchemaTable, isDefined } from "./client/node_modules/prostgles-types/dist";
+// import { DBSchemaTable, isDefined } from "./client/node_modules/prostgles-types/dist";
+import { DBSchemaTable, isDefined } from "prostgles-types";
 import { tryRun, tryRunP } from './isomorphic_queries';
 
 export default async function client_only(db: Required<DBHandlerClient>, auth: Auth, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[]){
