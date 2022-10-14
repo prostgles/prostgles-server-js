@@ -1,5 +1,5 @@
 import { AnyObject, TableSchemaForClient, DBSchemaTable, FullFilter } from "prostgles-types";
-import { ClientInfo, SessionUser } from "./AuthHandler";
+import { AuthResult, SessionUser } from "./AuthHandler";
 import { CommonTableRules, LocalParams, PRGLIOSocket, TableOrViewInfo, TableSchemaColumn } from "./DboBuilder";
 import { Prostgles, DBHandlerServer, DB } from "./Prostgles";
 import type { DBOFullyTyped, PublishFullyTyped } from "./DBSchemaBuilder";
@@ -263,18 +263,18 @@ export declare class PublishParser {
     db: DB;
     prostgles: Prostgles;
     constructor(publish: any, publishMethods: any, publishRawSQL: any, dbo: DBHandlerServer, db: DB, prostgles: Prostgles);
-    getPublishParams(localParams: LocalParams, clientInfo?: ClientInfo): Promise<PublishParams>;
-    getMethods(socket: any, userData?: ClientInfo): Promise<{}>;
+    getPublishParams(localParams: LocalParams, clientInfo?: AuthResult): Promise<PublishParams>;
+    getMethods(socket: any, userData?: AuthResult): Promise<{}>;
     /**
      * Parses the first level of publish. (If false then nothing if * then all tables and views)
      * @param socket
      * @param user
      */
-    getPublish(localParams: LocalParams, clientInfo?: ClientInfo): Promise<PublishObject>;
+    getPublish(localParams: LocalParams, clientInfo?: AuthResult): Promise<PublishObject>;
     getValidatedRequestRuleWusr({ tableName, command, localParams }: DboTableCommand): Promise<TableRule>;
-    getValidatedRequestRule({ tableName, command, localParams }: DboTableCommand, clientInfo?: ClientInfo): Promise<TableRule>;
-    getTableRules({ tableName, localParams }: DboTable, clientInfo?: ClientInfo): Promise<ParsedPublishTable | undefined>;
-    getSchemaFromPublish(socket: any, userData?: ClientInfo): Promise<{
+    getValidatedRequestRule({ tableName, command, localParams }: DboTableCommand, clientInfo?: AuthResult): Promise<TableRule>;
+    getTableRules({ tableName, localParams }: DboTable, clientInfo?: AuthResult): Promise<ParsedPublishTable | undefined>;
+    getSchemaFromPublish(socket: any, userData?: AuthResult): Promise<{
         schema: TableSchemaForClient;
         tables: DBSchemaTable[];
     }>;

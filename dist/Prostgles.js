@@ -488,7 +488,8 @@ class Prostgles {
             try {
                 if (this.opts.onSocketConnect) {
                     try {
-                        await this.opts.onSocketConnect(socket, dbo, db);
+                        const getUser = async () => { return await this.authHandler?.getClientInfo({ socket }); };
+                        await this.opts.onSocketConnect({ socket, dbo: dbo, db, getUser });
                     }
                     catch (error) {
                         const connectionError = error instanceof Error ? error.message : typeof error === "string" ? error : JSON.stringify(error);
@@ -530,7 +531,8 @@ class Prostgles {
                     this.connectedSockets = this.connectedSockets.filter(s => s.id !== socket.id);
                     // subscriptions = subscriptions.filter(sub => sub.socket.id !== socket.id);
                     if (this.opts.onSocketDisconnect) {
-                        this.opts.onSocketDisconnect(socket, dbo);
+                        const getUser = async () => { return await this.authHandler?.getClientInfo({ socket }); };
+                        this.opts.onSocketDisconnect({ socket, dbo: dbo, db, getUser });
                     }
                     ;
                 });

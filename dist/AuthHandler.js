@@ -235,11 +235,23 @@ class AuthHandler {
         if (!getUser)
             throw "getUser missing from auth config";
         if (expressConfig) {
-            const { app, publicRoutes = [], onGetRequestOK, magicLinks } = expressConfig;
+            const { app, publicRoutes = [], onGetRequestOK, magicLinks, use } = expressConfig;
             if (publicRoutes.find(r => typeof r !== "string" || !r)) {
                 throw "Invalid or empty string provided within publicRoutes ";
             }
-            if (app && magicLinks && this.routes.magicLinks) {
+            if (use) {
+                app.use((req, res, next) => {
+                    use({
+                        req,
+                        res,
+                        next,
+                        getUser: () => this.getUser({ httpReq: req }),
+                        dbo: this.dbo,
+                        db: this.db,
+                    });
+                });
+            }
+            if (magicLinks && this.routes.magicLinks) {
                 const { check } = magicLinks;
                 if (!check)
                     throw "Check must be defined for magicLinks";
@@ -267,7 +279,7 @@ class AuthHandler {
                 });
             }
             const loginRoute = this.routes?.login;
-            if (app && loginRoute) {
+            if (loginRoute) {
                 app.post(loginRoute, async (req, res) => {
                     try {
                         const { sid, expires } = await this.loginThrottled(req.body || {}) || {};
@@ -393,7 +405,9 @@ class AuthHandler {
                     };
                 }
                 else
-                    return {};
+                    return {
+                        sid: session.sid
+                    };
             }
         }
         const res = await this.throttledFunc(async () => {

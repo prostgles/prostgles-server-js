@@ -1,4 +1,5 @@
-import { Request, Response } from "express";
+/// <reference types="express-serve-static-core" />
+import { Express, NextFunction, Request, Response } from "express";
 import { AnyObject } from "prostgles-types";
 import { LocalParams, PRGLIOSocket } from "./DboBuilder";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
@@ -36,6 +37,18 @@ export declare type SessionUser<ServerUser extends AnyObject = AnyObject, Client
      */
     clientUser: ClientUser;
 };
+export declare type AuthResult<SU = SessionUser> = SU & {
+    sid: string;
+} | {
+    user?: undefined;
+    clientUser?: undefined;
+    sid?: string;
+} | undefined;
+export declare type AuthRequestParams<S, SUser extends SessionUser> = {
+    db: DB;
+    dbo: DBOFullyTyped<S>;
+    getUser: () => Promise<AuthResult<SUser>>;
+};
 export declare type Auth<S = void, SUser extends SessionUser = SessionUser> = {
     /**
      * Name of the cookie or socket hadnshake query param that represents the session id.
@@ -50,7 +63,7 @@ export declare type Auth<S = void, SUser extends SessionUser = SessionUser> = {
         /**
          * Express app instance. If provided Prostgles will attempt to set sidKeyName to user cookie
          */
-        app: any;
+        app: Express;
         /**
          * Used in allowing logging in through express. Defaults to /login
          */
@@ -73,14 +86,19 @@ export declare type Auth<S = void, SUser extends SessionUser = SessionUser> = {
          */
         publicRoutes?: string[];
         /**
+         * Will attach a app.use listener and will expose getUser
+         * Used for blocking access
+         */
+        use?: (args: {
+            req: Express.Request;
+            res: Express.Response;
+            next: NextFunction;
+        } & AuthRequestParams<S, SUser>) => void | Promise<void>;
+        /**
          * Will be called after a GET request is authorised
          * This means that
          */
-        onGetRequestOK?: (req: ExpressReq, res: ExpressRes, params: {
-            db: DB;
-            dbo: DBOFullyTyped<S>;
-            getUser: () => Promise<SessionUser["user"] | undefined>;
-        }) => any;
+        onGetRequestOK?: (req: ExpressReq, res: ExpressRes, params: AuthRequestParams<S, SUser>) => any;
         /**
          * Name of get url parameter used in redirecting user after successful login. Defaults to returnURL
          */
@@ -96,16 +114,7 @@ export declare type Auth<S = void, SUser extends SessionUser = SessionUser> = {
             check: (magicId: string, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession | undefined>;
         };
     };
-    getUser: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB, client: AuthClientRequest) => Awaitable<{
-        /**
-         * User data used on server. Mainly used in http request auth
-         */
-        user: SUser["user"];
-        /**
-         * User data sent to client. Mainly used in socket request auth
-         */
-        clientUser: SUser["clientUser"];
-    } | undefined>;
+    getUser: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB, client: AuthClientRequest) => Awaitable<AuthResult<SUser>>;
     register?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession> | BasicSession;
     login?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession> | BasicSession;
     logout?: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<any>;
@@ -115,11 +124,6 @@ export declare type Auth<S = void, SUser extends SessionUser = SessionUser> = {
     cacheSession?: {
         getSession: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession>;
     };
-};
-export declare type ClientInfo = {
-    user?: AnyObject;
-    clientUser?: AnyObject;
-    sid?: string;
 };
 export default class AuthHandler {
     protected opts?: Auth;
@@ -143,7 +147,7 @@ export default class AuthHandler {
     private setCookieAndGoToReturnURLIFSet;
     getUser: (clientReq: {
         httpReq: ExpressReq;
-    }) => Promise<AnyObject | undefined>;
+    }) => Promise<AuthResult>;
     init(): Promise<void>;
     destroy: () => void;
     throttledFunc: <T>(func: () => Promise<T>, throttle?: number) => Promise<T>;
@@ -155,11 +159,11 @@ export default class AuthHandler {
      * @returns string
      */
     getSID(localParams: LocalParams): string | undefined;
-    getClientInfo(localParams: Pick<LocalParams, "socket" | "httpReq">): Promise<ClientInfo | undefined>;
+    getClientInfo(localParams: Pick<LocalParams, "socket" | "httpReq">): Promise<AuthResult>;
     isValidSocketSession: (socket: PRGLIOSocket, session: BasicSession) => boolean;
     makeSocketAuth: (socket: PRGLIOSocket) => Promise<Record<string, never> | {
         auth: AuthSocketSchema;
-        userData: ClientInfo | undefined;
+        userData: AuthResult;
     }>;
 }
 export {};

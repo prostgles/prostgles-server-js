@@ -2,7 +2,7 @@
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import FileManager, { ImageOptions, LocalConfig, S3Config } from "./FileManager";
-import AuthHandler, { Auth, SessionUser } from "./AuthHandler";
+import AuthHandler, { Auth, SessionUser, AuthRequestParams } from "./AuthHandler";
 import TableConfigurator, { TableConfig } from "./TableConfig";
 import { DboBuilder, DBHandlerServer, PRGLIOSocket } from "./DboBuilder";
 export { DBHandlerServer };
@@ -133,8 +133,12 @@ export declare type ProstglesInitOptions<S = void, SUser extends SessionUser = S
     /**
      * Use for connection verification. Will disconnect socket on any errors
      */
-    onSocketConnect?: (socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB) => void | Promise<void>;
-    onSocketDisconnect?: (socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB) => void | Promise<void>;
+    onSocketConnect?: (args: AuthRequestParams<S, SUser> & {
+        socket: PRGLIOSocket;
+    }) => void | Promise<void>;
+    onSocketDisconnect?: (args: AuthRequestParams<S, SUser> & {
+        socket: PRGLIOSocket;
+    }) => void | Promise<void>;
     auth?: Auth<S, SUser>;
     DEBUG_MODE?: boolean;
     watchSchemaType?: 

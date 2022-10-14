@@ -10,7 +10,7 @@ import FileManager, { ImageOptions, LocalConfig, S3Config } from "./FileManager"
 
 const pkgj = require('../package.json');
 const version = pkgj.version;
-import AuthHandler, { ClientInfo, Auth, SessionUser } from "./AuthHandler";
+import AuthHandler, { Auth, SessionUser, AuthRequestParams } from "./AuthHandler";
 console.log("Add a basic auth mode where user and sessions table are created");
 
 import TableConfigurator, { TableConfig } from "./TableConfig";
@@ -228,8 +228,8 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
   /**
    * Use for connection verification. Will disconnect socket on any errors
    */
-  onSocketConnect?: (socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB) => void | Promise<void>;
-  onSocketDisconnect?: (socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB) => void | Promise<void>;
+  onSocketConnect?: (args: AuthRequestParams<S, SUser> & { socket: PRGLIOSocket }) => void | Promise<void>;
+  onSocketDisconnect?: (args: AuthRequestParams<S, SUser> & { socket: PRGLIOSocket }) => void | Promise<void>;
   auth?: Auth<S, SUser>;
   DEBUG_MODE?: boolean;
   watchSchemaType?:
@@ -701,7 +701,8 @@ export class Prostgles {
       try {
         if (this.opts.onSocketConnect) {
           try {
-            await this.opts.onSocketConnect(socket, dbo as any, db);
+            const getUser = async () => { return await this.authHandler?.getClientInfo({ socket }); }
+            await this.opts.onSocketConnect({ socket, dbo: dbo as any, db, getUser });
           } catch(error) {
             const connectionError = error instanceof Error? error.message : typeof error === "string"? error : JSON.stringify(error);
             socket.emit(CHANNELS.CONNECTION, { connectionError });
@@ -745,7 +746,8 @@ export class Prostgles {
           this.connectedSockets = this.connectedSockets.filter(s => s.id !== socket.id);
           // subscriptions = subscriptions.filter(sub => sub.socket.id !== socket.id);
           if (this.opts.onSocketDisconnect) {
-            this.opts.onSocketDisconnect(socket, dbo as any);
+            const getUser = async () => { return await this.authHandler?.getClientInfo({ socket }); }
+            this.opts.onSocketDisconnect({ socket, dbo: dbo as any, db, getUser });
           };
         });
 

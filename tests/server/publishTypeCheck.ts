@@ -2,7 +2,6 @@
 import { DBSchemaGenerated } from "./DBoGenerated";
 
 import { PublishFullyTyped } from "../../dist/DBSchemaBuilder";
-import { FullFilter } from "prostgles-types";
 export const testPublishTypes = () => {
   (() => {
     const p1: PublishFullyTyped<DBSchemaGenerated> = {

@@ -235,14 +235,14 @@ function dd(){
 			expressApp: app,
 		},
 
-		onSocketDisconnect:  (socket, db) => {
+		onSocketDisconnect:  ({ socket, db }) => {
 			log("onSocketDisconnect")
 			console.trace("onSocketDisconnect");
 			// const c: DBOFullyTyped<DBSchemaGenerated> = 1 as any;
 			// c["*"].
 		},
 		
-		onSocketConnect:  (socket, db) => {
+		onSocketConnect:  ({ socket, db }) => {
 			log("onSocketConnect")
 			if(clientTest){
 				log("Client connected -> CLIENT ERRORS ARE NOT LOGGED HERE!");
@@ -291,7 +291,7 @@ function dd(){
 					if(s) {
 						const user = users.find(u => s && s.user_id === u.id);
 						if(user) {
-							return { user, clientUser: { sid: s.id, uid: user.id } }
+							return { sid: s.id, user, clientUser: { sid: s.id, uid: user.id } }
 						}
 					}
 				}

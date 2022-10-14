@@ -1,5 +1,5 @@
 import { getKeys, RULE_METHODS, AnyObject, get, TableSchemaForClient, DBSchemaTable, MethodKey, TableInfo, FullFilter, isObject } from "prostgles-types";
-import { ClientInfo, SessionUser } from "./AuthHandler";
+import { AuthResult, SessionUser } from "./AuthHandler";
 import { CommonTableRules, Filter, isPlainObject, LocalParams, PRGLIOSocket, TableHandler, TableOrViewInfo, TableSchemaColumn, ViewHandler } from "./DboBuilder";
 import { Prostgles, DBHandlerServer, DB, TABLE_METHODS } from "./Prostgles";
 import type { DBOFullyTyped, PublishFullyTyped } from "./DBSchemaBuilder";
@@ -388,7 +388,7 @@ export class PublishParser {
     if (!this.dbo || !this.publish) throw "INTERNAL ERROR: dbo and/or publish missing";
   }
 
-  async getPublishParams(localParams: LocalParams, clientInfo?: ClientInfo): Promise<PublishParams> {
+  async getPublishParams(localParams: LocalParams, clientInfo?: AuthResult): Promise<PublishParams> {
     if (!this.dbo) throw "dbo missing"
     return {
       ...(clientInfo || await this.prostgles.authHandler?.getClientInfo(localParams)),
@@ -403,7 +403,7 @@ export class PublishParser {
     }
   }
 
-  async getMethods(socket: any, userData?: ClientInfo) {
+  async getMethods(socket: any, userData?: AuthResult) {
     let methods = {};
 
     const publishParams = await this.getPublishParams({ socket }, userData);
@@ -428,7 +428,7 @@ export class PublishParser {
    * @param socket 
    * @param user 
    */
-  async getPublish(localParams: LocalParams, clientInfo?: ClientInfo): Promise<PublishObject> {
+  async getPublish(localParams: LocalParams, clientInfo?: AuthResult): Promise<PublishObject> {
     const publishParams = await this.getPublishParams(localParams, clientInfo)
     let _publish = await applyParamsIfFunc(this.publish, publishParams);
 
@@ -447,7 +447,7 @@ export class PublishParser {
     return await this.getValidatedRequestRule({ tableName, command, localParams }, clientInfo);
   }
 
-  async getValidatedRequestRule({ tableName, command, localParams }: DboTableCommand, clientInfo?: ClientInfo): Promise<TableRule> {
+  async getValidatedRequestRule({ tableName, command, localParams }: DboTableCommand, clientInfo?: AuthResult): Promise<TableRule> {
     if (!this.dbo) throw "INTERNAL ERROR: dbo is missing";
 
     if (!command || !tableName) throw "command OR tableName are missing";
@@ -488,7 +488,7 @@ export class PublishParser {
     } else throw { stack: ["getValidatedRequestRule()"], message: `Invalid or disallowed command: ${tableName}.${command}` };
   }
 
-  async getTableRules({ tableName, localParams }: DboTable, clientInfo?: ClientInfo): Promise<ParsedPublishTable | undefined> {
+  async getTableRules({ tableName, localParams }: DboTable, clientInfo?: AuthResult): Promise<ParsedPublishTable | undefined> {
 
     try {
       if (!localParams || !tableName) throw { stack: ["getTableRules()"], message: "publish OR socket OR dbo OR tableName are missing" };
@@ -649,7 +649,7 @@ export class PublishParser {
 
 
   /* Prepares schema for client. Only allowed views and commands will be present */
-  async getSchemaFromPublish(socket: any, userData?: ClientInfo): Promise<{ schema: TableSchemaForClient; tables: DBSchemaTable[] }> {
+  async getSchemaFromPublish(socket: any, userData?: AuthResult): Promise<{ schema: TableSchemaForClient; tables: DBSchemaTable[] }> {
     let schema: TableSchemaForClient = {};
     let tables: DBSchemaTable[] = []
 

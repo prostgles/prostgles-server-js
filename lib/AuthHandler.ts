@@ -1,9 +1,9 @@
-import { Request, Response } from "express";
+import { Express, NextFunction, Request, Response } from "express";
 import { AnyObject, AuthGuardLocation, AuthGuardLocationResponse, CHANNELS, DBSchema } from "prostgles-types";
 import { LocalParams, PRGLIOSocket } from "./DboBuilder";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { removeExpressRoute } from "./FileManager";
-import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
+import { DB, DBHandlerServer, ExpressApp, Prostgles } from "./Prostgles";
 type Awaitable<T> = T | Promise<T>;
 type AuthSocketSchema = {
   user?: AnyObject;
@@ -38,6 +38,16 @@ export type SessionUser<ServerUser extends AnyObject = AnyObject, ClientUser ext
    */
   clientUser: ClientUser;
 }
+
+export type AuthResult<SU = SessionUser> = SU & { sid: string; } | {
+  user?: undefined; 
+  clientUser?: undefined; 
+  sid?: string;
+} | undefined
+
+
+export type AuthRequestParams<S, SUser extends SessionUser> = { db: DB, dbo: DBOFullyTyped<S>; getUser: () => Promise<AuthResult<SUser>> }
+
 export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
   /**
    * Name of the cookie or socket hadnshake query param that represents the session id. 
@@ -54,7 +64,7 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
     /**
      * Express app instance. If provided Prostgles will attempt to set sidKeyName to user cookie
      */
-    app: any;
+    app: Express;
 
     /**
      * Used in allowing logging in through express. Defaults to /login
@@ -83,13 +93,19 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
     publicRoutes?: string[];
 
     /**
+     * Will attach a app.use listener and will expose getUser
+     * Used for blocking access
+     */
+    use?: (args: { req: Express.Request, res: Express.Response, next: NextFunction } & AuthRequestParams<S, SUser>) => void | Promise<void>;
+
+    /**
      * Will be called after a GET request is authorised
      * This means that 
      */
     onGetRequestOK?: (
       req: ExpressReq, 
       res: ExpressRes, 
-      params: { db: DB, dbo: DBOFullyTyped<S>; getUser: () => Promise<SessionUser["user"] | undefined> }
+      params: AuthRequestParams<S, SUser>
     ) => any;
 
     /**
@@ -112,19 +128,7 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
 
   }
 
-  getUser: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB, client: AuthClientRequest) => Awaitable<{
-
-    /**
-     * User data used on server. Mainly used in http request auth
-     */
-    user: SUser["user"];
-
-    /**
-     * User data sent to client. Mainly used in socket request auth
-     */
-    clientUser: SUser["clientUser"];
-
-  } | undefined>;
+  getUser: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB, client: AuthClientRequest) => Awaitable<AuthResult<SUser>>;
 
   register?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession> | BasicSession;
   login?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession> | BasicSession;
@@ -136,12 +140,6 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
   cacheSession?: {
     getSession: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession>
   }
-}
-
-export type ClientInfo = {
-  user?: AnyObject;
-  clientUser?: AnyObject;
-  sid?: string;
 }
 
 export default class AuthHandler {
@@ -236,7 +234,7 @@ export default class AuthHandler {
     }
   }
 
-  getUser = async (clientReq: { httpReq: ExpressReq; }): Promise<AnyObject | undefined> => {
+  getUser = async (clientReq: { httpReq: ExpressReq; }): Promise<AuthResult> => {
     if(!this.sidKeyName || !this.opts?.getUser) throw "sidKeyName or this.opts.getUser missing"
     const sid = clientReq.httpReq?.cookies?.[this.sidKeyName];
     if (!sid) return undefined;
@@ -270,12 +268,25 @@ export default class AuthHandler {
     if (!getUser) throw "getUser missing from auth config";
 
     if (expressConfig) {
-      const { app, publicRoutes = [], onGetRequestOK, magicLinks } = expressConfig;
+      const { app, publicRoutes = [], onGetRequestOK, magicLinks, use } = expressConfig;
       if (publicRoutes.find(r => typeof r !== "string" || !r)) {
         throw "Invalid or empty string provided within publicRoutes "
       }
 
-      if (app && magicLinks && this.routes.magicLinks) {
+      if(use){
+        app.use((req, res, next) => {
+          use({ 
+            req, 
+            res, 
+            next, 
+            getUser: () => this.getUser({ httpReq: req }) as any,
+            dbo: this.dbo, 
+            db: this.db,
+          })
+        })
+      }
+
+      if (magicLinks && this.routes.magicLinks) {
         const { check } = magicLinks;
         if (!check) throw "Check must be defined for magicLinks";
 
@@ -303,7 +314,7 @@ export default class AuthHandler {
       }
 
       const loginRoute = this.routes?.login;
-      if (app && loginRoute) {
+      if (loginRoute) {
         
 
         app.post(loginRoute, async (req: ExpressReq, res: ExpressRes) => {
@@ -491,7 +502,7 @@ export default class AuthHandler {
     }
   }
 
-  async getClientInfo(localParams: Pick<LocalParams, "socket" | "httpReq">): Promise<ClientInfo | undefined> {
+  async getClientInfo(localParams: Pick<LocalParams, "socket" | "httpReq">): Promise<AuthResult> {
     if (!this.opts) return {};
 
     const getSession = this.opts.cacheSession?.getSession;
@@ -507,7 +518,9 @@ export default class AuthHandler {
             user, 
             clientUser,
           }
-        } else return {};
+        } else return {
+          sid: session.sid
+        };
       } 
     }
 
@@ -520,7 +533,7 @@ export default class AuthHandler {
         const clientReq = localParams.httpReq? { httpReq: localParams.httpReq } : { socket: localParams.socket };
         let user, clientUser;
         if(sid){
-          const res = await getUser(sid, this.dbo as any, this.db, clientReq);
+          const res = await getUser(sid, this.dbo as any, this.db, clientReq) as any;
           user = res?.user;
           clientUser = res?.clientUser;
         }
@@ -561,7 +574,7 @@ export default class AuthHandler {
     return Boolean(session && !hasExpired);
   }
 
-  makeSocketAuth = async (socket: PRGLIOSocket): Promise<{ auth: AuthSocketSchema; userData: ClientInfo | undefined; } | Record<string, never>> => {
+  makeSocketAuth = async (socket: PRGLIOSocket): Promise<{ auth: AuthSocketSchema; userData: AuthResult; } | Record<string, never>> => {
     if (!this.opts) return {};
 
     let auth: Partial<Record<keyof Omit<AuthSocketSchema, "user">, boolean | undefined>> & { user?: AnyObject | undefined } = {};
