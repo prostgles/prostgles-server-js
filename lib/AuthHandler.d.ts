@@ -26,7 +26,17 @@ export declare type AuthClientRequest = {
 } | {
     httpReq: ExpressReq;
 };
-export declare type Auth<S = void> = {
+export declare type SessionUser<ServerUser extends AnyObject = AnyObject, ClientUser extends AnyObject = AnyObject> = {
+    /**
+     * This user will be available in all serverside prostgles options
+     * */
+    user: ServerUser;
+    /**
+     * User data sent to the authenticated client
+     */
+    clientUser: ClientUser;
+};
+export declare type Auth<S = void, SUser extends SessionUser = SessionUser> = {
     /**
      * Name of the cookie or socket hadnshake query param that represents the session id.
      * Defaults to "session_id"
@@ -54,20 +64,22 @@ export declare type Auth<S = void> = {
          */
         cookieOptions?: AnyObject;
         /**
-         * If provided, any client requests to NOT these routes (or their subroutes) will be redirected to loginRoute and then redirected back to the initial route after logging in
-         */
-        publicRoutes?: string[];
-        /**
          * False by default. If false and userRoutes are provided then the socket will request window.location.reload if the current url is on a user route.
          */
         disableSocketAuthGuard?: boolean;
         /**
+         * If provided, any client requests to NOT these routes (or their subroutes) will be redirected to loginRoute (if logged in) and then redirected back to the initial route after logging in
+         * If logged in the user is allowed to access these routes
+         */
+        publicRoutes?: string[];
+        /**
          * Will be called after a GET request is authorised
+         * This means that
          */
         onGetRequestOK?: (req: ExpressReq, res: ExpressRes, params: {
             db: DB;
             dbo: DBOFullyTyped<S>;
-            getUser: () => Promise<AnyObject | undefined>;
+            getUser: () => Promise<SessionUser["user"] | undefined>;
         }) => any;
         /**
          * Name of get url parameter used in redirecting user after successful login. Defaults to returnURL
@@ -88,11 +100,11 @@ export declare type Auth<S = void> = {
         /**
          * User data used on server. Mainly used in http request auth
          */
-        user: AnyObject;
+        user: SUser["user"];
         /**
          * User data sent to client. Mainly used in socket request auth
          */
-        clientUser: AnyObject;
+        clientUser: SUser["clientUser"];
     } | undefined>;
     register?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession> | BasicSession;
     login?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession> | BasicSession;

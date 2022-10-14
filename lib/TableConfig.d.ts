@@ -240,6 +240,7 @@ export default class TableConfigurator<LANG_IDS = {
     }) => void;
     getJoinInfo: (sourceTable: string, targetTable: string) => JoinInfo | undefined;
     init(): Promise<void>;
+    log: (...args: any[]) => void;
 }
 export {};
 //# sourceMappingURL=TableConfig.d.ts.map

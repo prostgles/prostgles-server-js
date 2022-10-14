@@ -2,7 +2,7 @@
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import FileManager, { ImageOptions, LocalConfig, S3Config } from "./FileManager";
-import AuthHandler, { Auth } from "./AuthHandler";
+import AuthHandler, { Auth, SessionUser } from "./AuthHandler";
 import TableConfigurator, { TableConfig } from "./TableConfig";
 import { DboBuilder, DBHandlerServer, PRGLIOSocket } from "./DboBuilder";
 export { DBHandlerServer };
@@ -116,14 +116,14 @@ export declare type FileTableConfig = {
     };
     imageOptions?: ImageOptions;
 };
-export declare type ProstglesInitOptions<S = void> = {
+export declare type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUser> = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
     tsGeneratedTypesDir?: string;
     io?: any;
-    publish?: Publish<S>;
-    publishMethods?: PublishMethods<S>;
-    publishRawSQL?(params: PublishParams<S>): ((boolean | "*") | Promise<(boolean | "*")>);
+    publish?: Publish<S, SUser>;
+    publishMethods?: PublishMethods<S, SUser>;
+    publishRawSQL?(params: PublishParams<S, SUser>): ((boolean | "*") | Promise<(boolean | "*")>);
     joins?: Joins;
     schema?: string;
     sqlFilePath?: string;
@@ -135,7 +135,7 @@ export declare type ProstglesInitOptions<S = void> = {
      */
     onSocketConnect?: (socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB) => void | Promise<void>;
     onSocketDisconnect?: (socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB) => void | Promise<void>;
-    auth?: Auth<S>;
+    auth?: Auth<S, SUser>;
     DEBUG_MODE?: boolean;
     watchSchemaType?: 
     /**

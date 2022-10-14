@@ -1,11 +1,10 @@
 import { getKeys, RULE_METHODS, AnyObject, get, TableSchemaForClient, DBSchemaTable, MethodKey, TableInfo, FullFilter, isObject } from "prostgles-types";
-import { ClientInfo } from "./AuthHandler";
+import { ClientInfo, SessionUser } from "./AuthHandler";
 import { CommonTableRules, Filter, isPlainObject, LocalParams, PRGLIOSocket, TableHandler, TableOrViewInfo, TableSchemaColumn, ViewHandler } from "./DboBuilder";
-import type { TableHandler as TableHandlerFromTypes } from "prostgles-types";
 import { Prostgles, DBHandlerServer, DB, TABLE_METHODS } from "./Prostgles";
 import type { DBOFullyTyped, PublishFullyTyped } from "./DBSchemaBuilder";
 export type Method = (...args: any) => (any | Promise<any>);
-export type PublishMethods<S = void> = (params: PublishParams<S>) => { [key: string]: Method } | Promise<{ [key: string]: Method } | null>;
+export type PublishMethods<S = void, SUser extends SessionUser = SessionUser> = (params: PublishParams<S, SUser>) => { [key: string]: Method } | Promise<{ [key: string]: Method } | null>;
 
 export type Awaitable<T> = T | Promise<T>;
 
@@ -347,11 +346,11 @@ export type ParsedPublishTable = {
 // export type Publish = {
 //     tablesOrViews: {[key:string]: TableRule | ViewRule | "*" }
 // }
-export type PublishParams<S = void> = {
+export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
   sid?: string;
   dbo: DBOFullyTyped<S>;
   db: DB;
-  user?: AnyObject;
+  user?: SUser["user"];
   socket: PRGLIOSocket;
   tables: {
     name: string;
@@ -368,7 +367,7 @@ export type ParsedPublishTables = {
   [table_name: string]: ParsedPublishTable
 };
 export type PublishedResult<Schema = void> = PublishAllOrNothing | PublishFullyTyped<Schema>;
-export type Publish<Schema = void> = PublishedResult<Schema> | ((params: PublishParams<Schema>) => Awaitable<PublishedResult<Schema>>);
+export type Publish<Schema = void, SUser extends SessionUser = SessionUser> = PublishedResult<Schema> | ((params: PublishParams<Schema, SUser>) => Awaitable<PublishedResult<Schema>>);
 
 export class PublishParser {
   publish: any;

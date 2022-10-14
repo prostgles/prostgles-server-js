@@ -1,10 +1,10 @@
 import { AnyObject, TableSchemaForClient, DBSchemaTable, FullFilter } from "prostgles-types";
-import { ClientInfo } from "./AuthHandler";
+import { ClientInfo, SessionUser } from "./AuthHandler";
 import { CommonTableRules, LocalParams, PRGLIOSocket, TableOrViewInfo, TableSchemaColumn } from "./DboBuilder";
 import { Prostgles, DBHandlerServer, DB } from "./Prostgles";
 import type { DBOFullyTyped, PublishFullyTyped } from "./DBSchemaBuilder";
 export declare type Method = (...args: any) => (any | Promise<any>);
-export declare type PublishMethods<S = void> = (params: PublishParams<S>) => {
+export declare type PublishMethods<S = void, SUser extends SessionUser = SessionUser> = (params: PublishParams<S, SUser>) => {
     [key: string]: Method;
 } | Promise<{
     [key: string]: Method;
@@ -230,11 +230,11 @@ export declare type ParsedPublishTable = {
     subscribe?: SubscribeRule;
     subscribeOne?: SubscribeRule;
 };
-export declare type PublishParams<S = void> = {
+export declare type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
     sid?: string;
     dbo: DBOFullyTyped<S>;
     db: DB;
-    user?: AnyObject;
+    user?: SUser["user"];
     socket: PRGLIOSocket;
     tables: {
         name: string;
@@ -254,7 +254,7 @@ export declare type ParsedPublishTables = {
     [table_name: string]: ParsedPublishTable;
 };
 export declare type PublishedResult<Schema = void> = PublishAllOrNothing | PublishFullyTyped<Schema>;
-export declare type Publish<Schema = void> = PublishedResult<Schema> | ((params: PublishParams<Schema>) => Awaitable<PublishedResult<Schema>>);
+export declare type Publish<Schema = void, SUser extends SessionUser = SessionUser> = PublishedResult<Schema> | ((params: PublishParams<Schema, SUser>) => Awaitable<PublishedResult<Schema>>);
 export declare class PublishParser {
     publish: any;
     publishMethods?: any;

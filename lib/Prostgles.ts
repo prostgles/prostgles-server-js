@@ -10,7 +10,7 @@ import FileManager, { ImageOptions, LocalConfig, S3Config } from "./FileManager"
 
 const pkgj = require('../package.json');
 const version = pkgj.version;
-import AuthHandler, { ClientInfo, Auth } from "./AuthHandler";
+import AuthHandler, { ClientInfo, Auth, SessionUser } from "./AuthHandler";
 console.log("Add a basic auth mode where user and sessions table are created");
 
 import TableConfigurator, { TableConfig } from "./TableConfig";
@@ -211,14 +211,14 @@ export type FileTableConfig = {
   imageOptions?: ImageOptions
 };
 
-export type ProstglesInitOptions<S = void> = {
+export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUser> = {
   dbConnection: DbConnection;
   dbOptions?: DbConnectionOpts;
   tsGeneratedTypesDir?: string;
   io?: any;
-  publish?: Publish<S>;
-  publishMethods?: PublishMethods<S>;
-  publishRawSQL?(params: PublishParams<S>): ((boolean | "*") | Promise<(boolean | "*")>);
+  publish?: Publish<S, SUser>;
+  publishMethods?: PublishMethods<S, SUser>;
+  publishRawSQL?(params: PublishParams<S, SUser>): ((boolean | "*") | Promise<(boolean | "*")>);
   joins?: Joins;
   schema?: string;
   sqlFilePath?: string;
@@ -230,7 +230,7 @@ export type ProstglesInitOptions<S = void> = {
    */
   onSocketConnect?: (socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB) => void | Promise<void>;
   onSocketDisconnect?: (socket: PRGLIOSocket, dbo: DBOFullyTyped<S>, db?: DB) => void | Promise<void>;
-  auth?: Auth<S>;
+  auth?: Auth<S, SUser>;
   DEBUG_MODE?: boolean;
   watchSchemaType?:
 

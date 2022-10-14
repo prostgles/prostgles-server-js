@@ -13,22 +13,8 @@ type AuthSocketSchema = {
   pathGuard?: boolean;
 };
 
-type ExpressReq = Request;//<ParamsDictionar, any, any, QueryString.ParsedQs, Record<string, any>>
-//  {
-//   body?: AnyObject;
-//   query?: AnyObject;
-//   cookies?: AnyObject;
-//   params?: AnyObject;
-//   path: string;
-//   originalUrl: string;
-// }
+type ExpressReq = Request;
 type ExpressRes = Response;
-// {
-//   status: (code: number) => ({ json: (response: AnyObject) => any; });
-//   cookie: (name: string, value: string, options: AnyObject) => any;
-//   sendFile: (filepath: string) => void;
-//   redirect: (url: string) => void;
-// }
 
 export type BasicSession = {
 
@@ -41,8 +27,18 @@ export type BasicSession = {
   /** On expired */
   onExpiration: "redirect" | "show_error";
 };
-export type AuthClientRequest = { socket: any } | { httpReq: ExpressReq }
-export type Auth<S = void> = {
+export type AuthClientRequest = { socket: any } | { httpReq: ExpressReq };
+export type SessionUser<ServerUser extends AnyObject = AnyObject, ClientUser extends AnyObject = AnyObject> = {
+  /** 
+   * This user will be available in all serverside prostgles options 
+   * */
+  user: ServerUser;
+  /**
+   * User data sent to the authenticated client
+   */
+  clientUser: ClientUser;
+}
+export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
   /**
    * Name of the cookie or socket hadnshake query param that represents the session id. 
    * Defaults to "session_id"
@@ -76,22 +72,24 @@ export type Auth<S = void> = {
     cookieOptions?: AnyObject;
 
     /**
-     * If provided, any client requests to NOT these routes (or their subroutes) will be redirected to loginRoute and then redirected back to the initial route after logging in
-     */
-    publicRoutes?: string[];
-
-    /**
      * False by default. If false and userRoutes are provided then the socket will request window.location.reload if the current url is on a user route.
      */
     disableSocketAuthGuard?: boolean;
 
     /**
+     * If provided, any client requests to NOT these routes (or their subroutes) will be redirected to loginRoute (if logged in) and then redirected back to the initial route after logging in
+     * If logged in the user is allowed to access these routes
+     */
+    publicRoutes?: string[];
+
+    /**
      * Will be called after a GET request is authorised
+     * This means that 
      */
     onGetRequestOK?: (
       req: ExpressReq, 
       res: ExpressRes, 
-      params: { db: DB, dbo: DBOFullyTyped<S>; getUser: () => Promise<AnyObject | undefined> }
+      params: { db: DB, dbo: DBOFullyTyped<S>; getUser: () => Promise<SessionUser["user"] | undefined> }
     ) => any;
 
     /**
@@ -119,12 +117,12 @@ export type Auth<S = void> = {
     /**
      * User data used on server. Mainly used in http request auth
      */
-    user: AnyObject;
+    user: SUser["user"];
 
     /**
      * User data sent to client. Mainly used in socket request auth
      */
-    clientUser: AnyObject;
+    clientUser: SUser["clientUser"];
 
   } | undefined>;
 
@@ -280,6 +278,7 @@ export default class AuthHandler {
       if (app && magicLinks && this.routes.magicLinks) {
         const { check } = magicLinks;
         if (!check) throw "Check must be defined for magicLinks";
+
         app.get(this.routes.magicLinks?.expressRoute, async (req: ExpressReq, res: ExpressRes) => {
           const { id } = req.params ?? {};
 
@@ -326,7 +325,7 @@ export default class AuthHandler {
 
         });
 
-        if (app && this.routes.logoutGetPath && this.opts.logout) {
+        if (this.routes.logoutGetPath && this.opts.logout) {
           app.get(this.routes.logoutGetPath, async (req: ExpressReq, res: ExpressRes) => {
             const sid = this.validateSid(req?.cookies?.[sidKeyName]);
             if (sid) {
@@ -343,7 +342,7 @@ export default class AuthHandler {
           });
         }
 
-        if (app && Array.isArray(publicRoutes)) {
+        if (Array.isArray(publicRoutes)) {
 
           /* Redirect if not logged in and requesting non public content */
           app.get(this.routes.catchAll, async (req: ExpressReq, res: ExpressRes) => {
@@ -357,7 +356,8 @@ export default class AuthHandler {
                * Requesting a User route
                */
               if (this.isUserRoute(req.path)) {
-                /* Check auth. Redirect if unauthorized */
+
+                /* Check auth. Redirect to login if unauthorized */
                 const u = await getUser(clientReq);
                 if (!u) {
                   res.redirect(`${loginRoute}?returnURL=${encodeURIComponent(req.originalUrl)}`);
@@ -370,7 +370,7 @@ export default class AuthHandler {
                 res.redirect(returnURL);
                 return;
 
-                /** If Logged in and requesting login then redirect */
+                /** If Logged in and requesting login then redirect to main page */
               } else if (this.matchesRoute(loginRoute, req.path) && (await getUser(clientReq))) {
 
                 res.redirect("/");

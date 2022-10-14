@@ -407,14 +407,16 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
             const values = this.prostgles.pgp!.helpers.values(row)
             queries.push(this.prostgles.pgp!.as.format(`INSERT INTO ${tableName}  (${["id", ...keys].map(t => asName(t)).join(", ")})  ` + " VALUES ${values:raw} ;", { values }))
           });
-          // console.log("Created lookup table " + tableName)
+          // this.log("Created lookup table " + tableName)
         }
       }      
     });
 
     if (queries.length) {
       const q = queries.join("\n");
-      console.log("TableConfig: \n", q)
+      if(this.prostgles.opts.DEBUG_MODE){
+        this.log("TableConfig: \n", q);
+      }
       await this.db.multi(q);
       await this.prostgles.refreshDBO()
     }
@@ -458,7 +460,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
             if(colConf.defaultValue){
               const checkStatement = getPGCheckConstraint({ schema: colConf.jsonbSchema, escapedFieldName: asValue(colConf.defaultValue)+"::JSONB", nullable: !!colConf.nullable }, 0)
               const q = `SELECT ${checkStatement} as v`
-              console.log(q)
+              this.log(q)
               this.dbo.sql!(q, {}, { returnType: "row" }).then(row => {
                 if(!row?.v) {
                   console.error(`Default value (${colConf.defaultValue}) for ${tableName}.${name} does not satisfy the jsonb constraint check: ${checkStatement}`);
@@ -502,9 +504,9 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
               if (isObject(colConf) && "references" in colConf && colConf.references) {
 
                 const { tableName: lookupTable, } = colConf.references;
-                console.log(`TableConfigurator: ${tableName}(${colName})` + " referenced lookup table " + lookupTable);
+                this.log(`TableConfigurator: ${tableName}(${colName})` + " referenced lookup table " + lookupTable);
               }  else {
-                console.log(`TableConfigurator: created/added column ${tableName}(${colName}) `)
+                this.log(`TableConfigurator: created/added column ${tableName}(${colName}) `)
               }
             }
           });
@@ -516,7 +518,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
               colCreateLines.join(", \n"),
             `);`
           ].join("\n"))
-          console.log("TableConfigurator: Created table: \n" + queries.at(-1))
+          this.log("TableConfigurator: Created table: \n" + queries.at(-1))
         }
       }
       if ("constraints" in tableConf && tableConf.constraints) {
@@ -602,7 +604,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
     if (queries.length) {
       const q = queries.join("\n");
-      console.log("TableConfig: \n", q)
+      this.log("TableConfig: \n", q)
       await this.db.multi(q).catch(err => {
         if(err.position){
           const pos = +err.position;
@@ -615,8 +617,14 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       });
     }
   }
-}
 
+  log = (...args: any[]) => {
+    if (this.prostgles.opts.DEBUG_MODE) {
+      console.log("TableConfig: \n", ...args)
+    }
+  }
+  
+}
 
 async function columnExists(args: { tableName: string; colName: string; db: DB }) {
   const { db, tableName, colName } = args;

@@ -283,7 +283,7 @@ class AuthHandler {
                         res.status(404).json({ err });
                     }
                 });
-                if (app && this.routes.logoutGetPath && this.opts.logout) {
+                if (this.routes.logoutGetPath && this.opts.logout) {
                     app.get(this.routes.logoutGetPath, async (req, res) => {
                         const sid = this.validateSid(req?.cookies?.[sidKeyName]);
                         if (sid) {
@@ -299,7 +299,7 @@ class AuthHandler {
                         res.redirect("/");
                     });
                 }
-                if (app && Array.isArray(publicRoutes)) {
+                if (Array.isArray(publicRoutes)) {
                     /* Redirect if not logged in and requesting non public content */
                     app.get(this.routes.catchAll, async (req, res) => {
                         const clientReq = { httpReq: req };
@@ -310,7 +310,7 @@ class AuthHandler {
                              * Requesting a User route
                              */
                             if (this.isUserRoute(req.path)) {
-                                /* Check auth. Redirect if unauthorized */
+                                /* Check auth. Redirect to login if unauthorized */
                                 const u = await getUser(clientReq);
                                 if (!u) {
                                     res.redirect(`${loginRoute}?returnURL=${encodeURIComponent(req.originalUrl)}`);
@@ -321,7 +321,7 @@ class AuthHandler {
                             else if (returnURL && (await getUser(clientReq))) {
                                 res.redirect(returnURL);
                                 return;
-                                /** If Logged in and requesting login then redirect */
+                                /** If Logged in and requesting login then redirect to main page */
                             }
                             else if (this.matchesRoute(loginRoute, req.path) && (await getUser(clientReq))) {
                                 res.redirect("/");

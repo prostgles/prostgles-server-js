@@ -128,7 +128,7 @@ export declare function getNewQuery(_this: TableHandler, filter: Filter, selectP
     limit?: number | undefined;
     offset?: number | undefined;
     groupBy?: boolean | undefined;
-    returnType?: "values" | "row" | "value" | "statement" | undefined;
+    returnType?: "values" | "value" | "row" | "statement" | undefined;
 } & {
     select?: import("prostgles-types").AnyObject | ("" | "*" | {
         "*": 1;
