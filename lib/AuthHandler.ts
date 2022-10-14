@@ -96,7 +96,7 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
      * Will attach a app.use listener and will expose getUser
      * Used for blocking access
      */
-    use?: (args: { req: Express.Request, res: Express.Response, next: NextFunction } & AuthRequestParams<S, SUser>) => void | Promise<void>;
+    use?: (args: { req: ExpressReq; res: ExpressRes, next: NextFunction } & AuthRequestParams<S, SUser>) => void | Promise<void>;
 
     /**
      * Will be called after a GET request is authorised

@@ -1,4 +1,3 @@
-/// <reference types="express-serve-static-core" />
 import { Express, NextFunction, Request, Response } from "express";
 import { AnyObject } from "prostgles-types";
 import { LocalParams, PRGLIOSocket } from "./DboBuilder";
@@ -90,8 +89,8 @@ export declare type Auth<S = void, SUser extends SessionUser = SessionUser> = {
          * Used for blocking access
          */
         use?: (args: {
-            req: Express.Request;
-            res: Express.Response;
+            req: ExpressReq;
+            res: ExpressRes;
             next: NextFunction;
         } & AuthRequestParams<S, SUser>) => void | Promise<void>;
         /**
