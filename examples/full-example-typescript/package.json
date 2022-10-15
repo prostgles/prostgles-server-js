@@ -11,6 +11,6 @@
     "express": "latest",
     "prostgles-client": "latest",
     "prostgles-server": "latest",
-    "socket.io": "^4.5.1"
+    "socket.io": "latest"
   }
 }
