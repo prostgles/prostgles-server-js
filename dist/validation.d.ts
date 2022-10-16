@@ -7,7 +7,7 @@ declare type BaseOptions = {
     title?: string;
 };
 declare type SimpleType = BaseOptions & ({
-    type: "number" | "boolean" | "integer" | "string" | "any" | "number[]" | "boolean[]" | "integer[]" | "string[]" | "any[]" | ValidationSchema;
+    type: "number" | "boolean" | "integer" | "string" | "number[]" | "boolean[]" | "integer[]" | "string[]" | "any[]" | "any" | ValidationSchema;
 } | {
     enum: readonly any[];
 });

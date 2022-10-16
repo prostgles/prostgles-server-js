@@ -9,12 +9,14 @@ type BaseOptions = {
   title?: string;
 };
 
+
 type SimpleType = BaseOptions & ({
   type:
-  | "number" | "boolean" | "integer" | "string" | "any"
-  | "number[]" | "boolean[]" | "integer[]" | "string[]" | "any[]"
+  | "number" | "boolean" | "integer" | "string" 
+  | "number[]" | "boolean[]" | "integer[]" | "string[]" 
+  | "any[]"
+  | "any" 
   | ValidationSchema;
-
 } | {
   enum: readonly any[];
 })

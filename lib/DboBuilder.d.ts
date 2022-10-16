@@ -384,6 +384,17 @@ export declare class DboBuilder {
     schema: string;
     dbo: DBHandlerServer;
     _pubSubManager?: PubSubManager;
+    /**
+     * Used for db.sql field type details
+     */
+    DATA_TYPES: {
+        oid: string;
+        typname: PG_COLUMN_UDT_DATA_TYPE;
+    }[] | undefined;
+    USER_TABLES: {
+        relid: string;
+        relname: string;
+    }[] | undefined;
     getPubSubManager: () => Promise<PubSubManager>;
     pojoDefinitions?: string[];
     tsTypesDefinition?: string;
