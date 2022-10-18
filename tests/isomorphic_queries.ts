@@ -108,7 +108,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
           "comment": null,
           "ordinal_position": 2,
           "is_nullable": true,
-          "references": {
+          "references": [{
             "ftable": "tr1",
             "fcols": [
               "id"
@@ -116,7 +116,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
             "cols": [
               "tr1_id"
             ]
-          },
+          }],
           "has_default": false,
           "tsDataType": "number",
           "insert": true,

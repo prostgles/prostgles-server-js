@@ -123,15 +123,15 @@ async function isomorphic(db) {
                 "comment": null,
                 "ordinal_position": 2,
                 "is_nullable": true,
-                "references": {
-                    "ftable": "tr1",
-                    "fcols": [
-                        "id"
-                    ],
-                    "cols": [
-                        "tr1_id"
-                    ]
-                },
+                "references": [{
+                        "ftable": "tr1",
+                        "fcols": [
+                            "id"
+                        ],
+                        "cols": [
+                            "tr1_id"
+                        ]
+                    }],
                 "has_default": false,
                 "tsDataType": "number",
                 "insert": true,

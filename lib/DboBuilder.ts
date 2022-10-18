@@ -723,18 +723,18 @@ export class ViewHandler {
             const tableHandler = this.dboBuilder.tablesOrViews?.find(t => t.name === source);
             if(!tableHandler) throw `Table not found for joining ${source}`;
 
-            const fcols = tableHandler.columns.filter(c => c.references?.ftable === this.name);
+            const fcols = tableHandler.columns.filter(c => c.references?.some(({ ftable }) => ftable === this.name));
             if(fcols.length){
                 throw "Self referencing not supported yet"
-                return {
-                    paths: [{
-                        source,
-                        target,
-                        table: target,
-                        on: fcols.map(fc => fc.references!.fcols.map(fcol => [fc.name,  fcol]))
-                    }],
-                    expectOne: false
-                }
+                // return {
+                //     paths: [{
+                //         source,
+                //         target,
+                //         table: target,
+                //         on: fcols.map(fc => fc.references!.some(({ fcols }) => fcols.map(fcol => [fc.name,  fcol])))
+                //     }],
+                //     expectOne: false
+                // }
             }
         }
         if(!jp || !this.joinPaths.find(j => path? j.path.join() === path.join() : j.t1 === source && j.t2 === target)){  
@@ -822,7 +822,7 @@ export class ViewHandler {
                     } else {
                         await Promise.all(jp.path.map(async tableName => {
                             const pkeyFcols = this?.dboBuilder?.dbo?.[tableName]?.columns?.filter(c => c.is_pkey).map(c => c.name);
-                            const cols = this?.dboBuilder?.dbo?.[tableName]?.columns?.filter(c => c?.references && jp.path.includes(c?.references?.ftable));
+                            const cols = this?.dboBuilder?.dbo?.[tableName]?.columns?.filter(c => c?.references?.some(({ ftable }) => jp.path.includes(ftable)));
                             if(cols && cols.length && has_media !== "many"){
                                 if(cols.some(c => !pkeyFcols?.includes(c.name))){
                                     has_media = "many"
@@ -2960,7 +2960,8 @@ async function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"):
             , e.data_type as element_type
             , e.udt_name as element_udt_name
             ,  col_description(format('%I.%I', c.table_schema, c.table_name)::regclass::oid, c.ordinal_position) as comment
-            , CASE WHEN fc.ftable IS NOT NULL THEN row_to_json((SELECT t FROM (SELECT fc.ftable, fc.fcols, fc.cols) t)) END as references
+            --, CASE WHEN fc.ftable IS NOT NULL THEN row_to_json((SELECT t FROM (SELECT fc.ftable, fc.fcols, fc.cols) t)) END as references
+            , fc.references
             , c.is_identity = 'YES' OR EXISTS ( 
                 SELECT 1    
                 FROM information_schema.table_constraints as tc 
@@ -2985,7 +2986,8 @@ async function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"):
             ) cp
                 ON c.table_name = cp.table_name AND c.column_name = cp.column_name
             LEFT JOIN (
-                SELECT *
+                --SELECT *
+                SELECT "table", ft.cols, jsonb_agg(row_to_json((SELECT t FROM (SELECT ftable, fcols, cols) t))) as references
                 FROM (
                     select 
                         (select r.relname from pg_class r where r.oid = c.conrelid) as table, 
@@ -2996,9 +2998,10 @@ async function getTablesForSchemaPostgresSQL(db: DB, schema: string = "public"):
                         (select r.relname from pg_class r where r.oid = c.confrelid) as ftable
                     from pg_constraint c 
                 ) ft
-                where ft.table IS NOT NULL 
+                WHERE ft.table IS NOT NULL 
                 AND ft.ftable IS NOT NULL 
-                -- where c.confrelid = 'users'::regclass::oid
+                    --  c.confrelid = 'users'::regclass::oid
+                GROUP BY "table", cols
             ) fc 
             ON fc.table = c.table_name
             AND c.column_name::text = ANY(fc.cols)
@@ -3359,14 +3362,15 @@ async function getInferredJoins2(schema: TableSchema[]): Promise<Join[]> {
     schema.map(tov => {
         tov.columns.map(col => {
             if(col.references){
-                const r = col.references;
-                const joinCols = r.cols.map((c, i) => ({ col1: c, col2: r.fcols[i] }));
-                let type: Join["type"] = "one-many";
-                const ftablePkeys = schema.find(_tov => _tov.name === r.ftable)?.columns.filter(fcol => fcol.is_pkey);
-                if(ftablePkeys?.length && ftablePkeys.every(fkey => r.fcols.includes(fkey.name))){
-                    type = "one-one";
-                }
-                upsertJoin(tov.name, r.ftable, joinCols, type)
+                col.references.forEach(r => {
+                    const joinCols = r.cols.map((c, i) => ({ col1: c, col2: r.fcols[i] }));
+                    let type: Join["type"] = "one-many";
+                    const ftablePkeys = schema.find(_tov => _tov.name === r.ftable)?.columns.filter(fcol => fcol.is_pkey);
+                    if(ftablePkeys?.length && ftablePkeys.every(fkey => r.fcols.includes(fkey.name))){
+                        type = "one-one";
+                    }
+                    upsertJoin(tov.name, r.ftable, joinCols, type)
+                })
             }
         })
     })

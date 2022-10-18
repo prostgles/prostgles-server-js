@@ -44,22 +44,29 @@ export async function insertDataParse(
         c.name === k && 
         ALLOWED_COL_TYPES.includes(c.udt_name)
       );
+      const referencesMultipleTables = insertedCol?.references?.length !== 1;
+      const referencesMultipleColumns = insertedCol?.references?.some(refs => refs.fcols.length !== 1);
       if(insertedCol && (
-        insertedCol.references?.fcols.length !== 1 ||
-        this.columns.some(c => 
-            // c.name !== insertedCol.name && // a bit reduntant: Cannot have one col reference two columns
-            c.references &&
-            c.references?.ftable === insertedCol.references?.ftable && // same ftable
-            c.references?.fcols[0] !== insertedCol.references?.fcols[0] // different fcols
-          ) 
-      )){
-        throw "A reference column insert is not possible for multiple column relationships"
+          referencesMultipleTables ||
+          referencesMultipleColumns ||
+          this.columns.some(c => 
+              // c.name !== insertedCol.name && // a bit reduntant: Cannot have one col reference two columns
+              c.references?.some(({ ftable, fcols }) => 
+                insertedCol.references?.some(inserted => 
+                  ftable === inserted.ftable && // same ftable
+                  fcols[0] !== inserted.fcols[0] // different fcols
+                )
+              )
+          )
+        )
+      ){
+        throw "A reference column insert is not possible for multiple column relationships ";
       }
       if(insertedCol){
         return {
-          tableName: insertedCol.references!.ftable!,
+          tableName: insertedCol.references![0].ftable!,
           col: insertedCol.name,
-          fcol: insertedCol.references!.fcols[0]!
+          fcol: insertedCol.references![0].fcols[0]!
         }
       }
       return undefined;
@@ -174,7 +181,7 @@ export async function insertDataParse(
 
         const cols2 = this.dboBuilder.dbo[tbl2].columns || [];
         if (!this.dboBuilder.dbo[tbl2]) throw "Invalid/disallowed table: " + tbl2;
-        const colsRefT1 = cols2?.filter(c => c.references?.cols.length === 1 && c.references?.ftable === tbl1);
+        const colsRefT1 = cols2?.filter(c => c.references?.some(rc => rc.cols.length === 1 && rc.ftable === tbl1));
 
 
         if (!path.length) {
@@ -189,7 +196,7 @@ export async function insertDataParse(
             childDataItems.map((d: AnyObject) => {
               let result = { ...d };
               colsRefT1.map(col => {
-                result[col.references!.cols[0]] = fullRootResult[col.references!.fcols[0]]
+                result[col.references![0].cols[0]] = fullRootResult[col.references![0].fcols[0]]
               })
               return result;
             }),
@@ -199,7 +206,7 @@ export async function insertDataParse(
 
         } else if (path.length === 3) {
           if (targetTable !== tbl3) throw "Did not expect this";
-          const colsRefT3 = cols2?.filter(c => c.references?.cols.length === 1 && c.references?.ftable === tbl3);
+          const colsRefT3 = cols2?.filter(c => c.references?.some(rc => rc.cols.length === 1 && rc.ftable === tbl3));
           if (!colsRefT1.length || !colsRefT3.length) throw "Incorrectly referenced or missing columns for nested insert";
 
           const fileTable = this.dboBuilder.prostgles.fileManager?.tableName;
@@ -209,11 +216,11 @@ export async function insertDataParse(
 
           /* We expect tbl2 to have only 2 columns (media_id and foreign_id) */
           if (!cols2 || !(
-            cols2.filter(c => c.references?.ftable === fileTable).length === 1 &&
-            cols2.filter(c => c.references?.ftable === _this.name).length === 1
+            cols2.filter(c => c.references?.[0].ftable === fileTable).length === 1 &&
+            cols2.filter(c => c.references?.[0].ftable === _this.name).length === 1
           )){
             console.log({ tbl1, tbl2, tbl3, name: _this.name, tthisName: this.name })
-            throw "Second joining table not of expected format. Must contain exactly one reference column for each table (file table and target table)  ";
+            throw "Second joining table (" + tbl2 + ")  not of expected format. Must contain exactly one reference column for each table (file table and target table)  ";
           }
 
           insertedChildren = await childInsert(childDataItems, targetTable);
@@ -223,10 +230,10 @@ export async function insertDataParse(
             let tbl2Row: AnyObject = {};
 
             colsRefT3.map(col => {
-              tbl2Row[col.name] = t3Child[col.references!.fcols[0]];
+              tbl2Row[col.name] = t3Child[col.references![0].fcols[0]];
             })
             colsRefT1.map(col => {
-              tbl2Row[col.name] = fullRootResult[col.references!.fcols[0]];
+              tbl2Row[col.name] = fullRootResult[col.references![0].fcols[0]];
             })
             // console.log({ rootResult, tbl2Row, t3Child, colsRefT3, colsRefT1, t: this.t?.ctx?.start });
 

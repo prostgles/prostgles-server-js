@@ -144,7 +144,7 @@ class FileManager {
         this.getColInfo = (args) => {
             const { colName, tableName } = args;
             const tableConfig = this.prostgles?.opts.fileTable?.referencedTables?.[tableName];
-            const isReferencingFileTable = this.dbo[tableName]?.columns?.some(c => c.name === colName && c.references && c.references?.ftable === this.tableName);
+            const isReferencingFileTable = this.dbo[tableName]?.columns?.some(c => c.name === colName && c.references && c.references?.some(({ ftable }) => ftable === this.tableName));
             if (isReferencingFileTable) {
                 if (tableConfig && typeof tableConfig !== "string") {
                     return tableConfig.referenceColumns[colName];
@@ -209,7 +209,7 @@ class FileManager {
                     for await (const colName of (0, prostgles_types_1.getKeys)(tableConfig.referenceColumns)) {
                         const existingCol = cols.find(c => c.name === colName);
                         if (existingCol) {
-                            if (existingCol.references?.ftable === tableName) {
+                            if (existingCol.references?.some(({ ftable }) => ftable === tableName)) {
                                 // All ok
                             }
                             else {
