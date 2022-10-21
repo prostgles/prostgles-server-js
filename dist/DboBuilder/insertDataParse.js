@@ -43,7 +43,7 @@ async function insertDataParse(data, param2, param3_unused, tableRules, _localPa
             c.references?.some(({ ftable, fcols }) => insertedCol.references?.some(inserted => ftable === inserted.ftable && // same ftable
                 fcols[0] !== inserted.fcols[0] // different fcols
             ))))) {
-            throw "A reference column insert is not possible for multiple column relationships " + JSON.stringify({ insertedCol, thisCOls: this.columns }, null, 2);
+            throw "A reference column insert is not possible for multiple column relationships ";
         }
         if (insertedCol) {
             return {

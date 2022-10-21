@@ -109,7 +109,8 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
     ) => any;
 
     /**
-     * Name of get url parameter used in redirecting user after successful login. Defaults to returnURL
+     * Name of get url parameter used in redirecting user after successful login. 
+     * Defaults to "returnURL"
      */
     returnURL?: string;
 
@@ -123,7 +124,7 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
       /**
        * Used in creating a session/logging in using a magic link
        */
-      check: (magicId: string, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession | undefined>;
+      check: (magicId: string, dbo: DBOFullyTyped<S>, db: DB, ip_address: string) => Awaitable<BasicSession | undefined>;
     }
 
   }
@@ -131,11 +132,11 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
   getUser: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB, client: AuthClientRequest) => Awaitable<AuthResult<SUser>>;
 
   register?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession> | BasicSession;
-  login?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession> | BasicSession;
+  login?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB, ip_address: string) => Awaitable<BasicSession> | BasicSession;
   logout?: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<any>;
 
   /**
-   * If provided then then session info will be saved on socket.__prglCache and reused from there
+   * If provided then session info will be saved on socket.__prglCache and reused from there
    */
   cacheSession?: {
     getSession: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession>
@@ -298,7 +299,8 @@ export default class AuthHandler {
           } else {
             try {
               const session = await this.throttledFunc(async () => {
-                return check(id, this.dbo as any, this.db);
+                const ip_address = req.ip;
+                return check(id, this.dbo as any, this.db, ip_address);
               });
               if (!session) {
                 res.status(404).json({ msg: "Invalid magic-link" });
@@ -319,7 +321,8 @@ export default class AuthHandler {
 
         app.post(loginRoute, async (req: ExpressReq, res: ExpressRes) => {
           try {
-            const { sid, expires } = await this.loginThrottled(req.body || {}) || {};
+            const ip_address = req.ip;
+            const { sid, expires } = await this.loginThrottled(req.body || {}, ip_address) || {};
 
             if (sid) {
 
@@ -439,12 +442,12 @@ export default class AuthHandler {
     })
   }
 
-  loginThrottled = async (params: AnyObject): Promise<BasicSession> => {
+  loginThrottled = async (params: AnyObject, ip_address: string): Promise<BasicSession> => {
     if (!this.opts?.login) throw "Auth login config missing";
     const { responseThrottle = 500 } = this.opts;
 
     return this.throttledFunc(async () => {
-      let result = await this.opts?.login?.(params, this.dbo as any, this.db);
+      let result = await this.opts?.login?.(params, this.dbo as any, this.db, ip_address);
       const err = {
         msg: "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number } but got: " + JSON.stringify(result) 
       }
@@ -614,9 +617,9 @@ export default class AuthHandler {
       ch: string;
       func: Function;
     }[] = [
-      { func: (params: any, dbo: any, db: DB) => register?.(params, dbo, db), ch: CHANNELS.REGISTER, name: "register" as keyof Omit<AuthSocketSchema, "user"> },
-      { func: (params: any, dbo: any, db: DB) => login(params), ch: CHANNELS.LOGIN, name: "login" as keyof Omit<AuthSocketSchema, "user"> },
-      { func: (params: any, dbo: any, db: DB) => logout?.(this.getSID({ socket }), dbo, db), ch: CHANNELS.LOGOUT, name: "logout"  as keyof Omit<AuthSocketSchema, "user">}
+      { func: (params: any, dbo: any, db: DB, ip_address: string) => register?.(params, dbo, db), ch: CHANNELS.REGISTER, name: "register" as keyof Omit<AuthSocketSchema, "user"> },
+      { func: (params: any, dbo: any, db: DB, ip_address: string) => login(params, ip_address), ch: CHANNELS.LOGIN, name: "login" as keyof Omit<AuthSocketSchema, "user"> },
+      { func: (params: any, dbo: any, db: DB, ip_address: string) => logout?.(this.getSID({ socket }), dbo, db), ch: CHANNELS.LOGOUT, name: "logout"  as keyof Omit<AuthSocketSchema, "user">}
     ].filter(h => h.func);
 
     const userData = await this.getClientInfo({ socket });
@@ -633,8 +636,8 @@ export default class AuthHandler {
 
         try {
           if (!socket) throw "socket missing??!!";
-
-          const res = await func(params, this.dbo as any, this.db);
+          const remoteAddress = (socket as any)?.conn?.remoteAddress;
+          const res = await func(params, this.dbo as any, this.db, remoteAddress);
           if (name === "login" && res && res.sid) {
             /* TODO: Re-send schema to client */
           }
