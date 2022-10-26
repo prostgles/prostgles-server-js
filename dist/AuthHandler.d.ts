@@ -99,7 +99,8 @@ export declare type Auth<S = void, SUser extends SessionUser = SessionUser> = {
          */
         onGetRequestOK?: (req: ExpressReq, res: ExpressRes, params: AuthRequestParams<S, SUser>) => any;
         /**
-         * Name of get url parameter used in redirecting user after successful login. Defaults to returnURL
+         * Name of get url parameter used in redirecting user after successful login.
+         * Defaults to "returnURL"
          */
         returnURL?: string;
         magicLinks?: {
@@ -118,7 +119,7 @@ export declare type Auth<S = void, SUser extends SessionUser = SessionUser> = {
     login?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB, ip_address: string) => Awaitable<BasicSession> | BasicSession;
     logout?: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<any>;
     /**
-     * If provided then then session info will be saved on socket.__prglCache and reused from there
+     * If provided then session info will be saved on socket.__prglCache and reused from there
      */
     cacheSession?: {
         getSession: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession>;
