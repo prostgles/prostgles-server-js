@@ -873,9 +873,14 @@ export class ViewHandler {
                 if(!isPlainObject(params) || !isPlainObject(params.data) || !isPlainObject(params.filter) || params.rule !== "update") {
                     throw "params must be { rule: 'update', data, filter } but got: " + JSON.stringify(params);
                 }
-                const { data, filter } = params;
-                const updateRules = await (this as TableHandler).parseUpdateRules(filter, data, undefined, tableRules, localParams);
-                dynamicUpdateFields = updateRules.fields;
+
+                if(!tableRules?.update){
+                    dynamicUpdateFields = [];
+                } else {
+                    const { data, filter } = params;
+                    const updateRules = await (this as TableHandler).parseUpdateRules(filter, data, undefined, tableRules, localParams);
+                    dynamicUpdateFields = updateRules.fields;
+                }
             }
             
             let columns = this.columns
@@ -945,8 +950,8 @@ export class ViewHandler {
             return columns;
 
         } catch(e){
-            console.trace(e);
-            throw "Something went wrong in " + `db.${this.name}.getColumns()`;
+            throw parseError(e, `db.${this.name}.getColumns()`);
+            // throw "Something went wrong in " + `db.${this.name}.getColumns()`;
         }
     }
 
