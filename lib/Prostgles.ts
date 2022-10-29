@@ -633,9 +633,8 @@ export class Prostgles {
           return true;
         }
       };
-    } catch (e) {
+    } catch (e: any) {
       console.trace(e)
-      // @ts-ignore
       throw "init issues: " + e.toString();
     }
   }
