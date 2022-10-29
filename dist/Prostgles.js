@@ -436,7 +436,6 @@ class Prostgles {
         }
         catch (e) {
             console.trace(e);
-            // @ts-ignore
             throw "init issues: " + e.toString();
         }
     }

@@ -27,6 +27,16 @@ export type DBSchemaGenerated = {
       id?: number;
     };
   };
+  credential_types: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id: string;
+    };
+  };
   ex_j_ins: {
     is_view: false;
     select: true;
@@ -405,6 +415,26 @@ export type DBSchemaGenerated = {
       t1?: null | string;
       t2?: null | string;
       tr1_id?: null | number;
+    };
+  };
+  user_statuses: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id: string;
+    };
+  };
+  user_types: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id: string;
     };
   };
   users: {
