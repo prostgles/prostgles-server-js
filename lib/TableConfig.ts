@@ -217,6 +217,7 @@ type TableDefinition<LANG_IDS> = {
     [index_name: string]: {
 
       /**
+       * If true then will drop any existing index with this name
        * Overrides replaceUniqueIndexes
        */
       replace?: boolean;
@@ -240,15 +241,23 @@ type TableDefinition<LANG_IDS> = {
       // on?: string;
 
       /**
-       * Raw sql statement used excluding parentheses. e.g.: column_name
+       * Column list
+       * @example: col1, col2
        */
-      definition: string;
+      columns: string;
+
+      /**
+       * Where clause without the "where"
+       * Used to create a partial index. A partial index is an index that contains entries for only a portion of a table
+       * Another possible application is to use WHERE with UNIQUE to enforce uniqueness over a subset of a table
+       */
+      where?: string;
 
       /**
        * The name of the index method to be used. 
        * Choices are btree, hash, gist, and gin. The default method is btree.
        */
-      using?: "btree" | "hash" | "gist" | "gin"
+      using?: "btree" | "hash" | "gist" | "gin";
     }
   }
 }
@@ -530,12 +539,35 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
         });
       }
       if ("indexes" in tableConf && tableConf.indexes) {
+
+
+    /*
+        CREATE [ UNIQUE ] INDEX [ CONCURRENTLY ] [ [ IF NOT EXISTS ] name ] ON [ ONLY ] table_name [ USING method ]
+          ( { column_name | ( expression ) } [ COLLATE collation ] [ opclass [ ( opclass_parameter = value [, ... ] ) ] ] [ ASC | DESC ] [ NULLS { FIRST | LAST } ] [, ...] )
+          [ INCLUDE ( column_name [, ...] ) ]
+          [ NULLS [ NOT ] DISTINCT ]
+          [ WITH ( storage_parameter [= value] [, ... ] ) ]
+          [ TABLESPACE tablespace_name ]
+          [ WHERE predicate ]
+    */
         getKeys(tableConf.indexes).map(indexName => {
-          const { concurrently, unique, using, definition, replace } = tableConf.indexes![indexName];
+          const { 
+            replace, 
+            unique, concurrently,
+            using, columns, where = ""
+          } = tableConf.indexes![indexName];
           if (replace || typeof replace !== "boolean" && tableConf.replaceUniqueIndexes) {
             queries.push(`DROP INDEX IF EXISTS ${asName(indexName)}  ;`);
           }
-          queries.push(`CREATE ${unique ? "UNIQUE" : ""} ${!concurrently ? "" : "CONCURRENTLY"} INDEX ${asName(indexName)} ON ${asName(tableName)} ${!using ? "" : ("USING " + using)} (${definition}) ;`);
+          queries.push([
+            "CREATE",
+            unique && "UNIQUE",
+            concurrently && "CONCURRENTLY",
+            `INDEX ${asName(indexName)} ON ${asName(tableName)}`,
+            using && ("USING " + using),
+            `(${columns})`,
+            where && `WHERE ${where}`
+          ].filter(v => v).join(" "));
         });
       }
 

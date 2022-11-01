@@ -74,6 +74,9 @@ export declare type PRGLIOSocket = {
     readonly once: (channel: string, cb: (_data: any, cb: BasicCallback) => void) => void;
     readonly removeAllListeners: (channel: string) => void;
     readonly disconnect: () => void;
+    readonly request: {
+        url: string;
+    };
     /** Used for session caching */
     __prglCache?: {
         session: BasicSession;

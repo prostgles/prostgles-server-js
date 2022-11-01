@@ -190,9 +190,16 @@ declare type TableDefinition<LANG_IDS> = {
              * Table name
              */
             /**
-             * Raw sql statement used excluding parentheses. e.g.: column_name
+             * Column list
+             * @example: col1, col2
              */
-            definition: string;
+            columns: string;
+            /**
+             * Where clause without the "where"
+             * Used to create a partial index. A partial index is an index that contains entries for only a portion of a table
+             * Another possible application is to use WHERE with UNIQUE to enforce uniqueness over a subset of a table
+             */
+            where?: string;
             /**
              * The name of the index method to be used.
              * Choices are btree, hash, gist, and gin. The default method is btree.

@@ -148,6 +148,10 @@ export type PRGLIOSocket = {
 
     readonly disconnect: () => void;
 
+    readonly request: {
+        url: string;
+    }
+
     /** Used for session caching */
     __prglCache?: {
         session: BasicSession;

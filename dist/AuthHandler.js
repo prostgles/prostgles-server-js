@@ -149,10 +149,13 @@ class AuthHandler {
                 socket.removeAllListeners(prostgles_types_1.CHANNELS.AUTHGUARD);
                 socket.on(prostgles_types_1.CHANNELS.AUTHGUARD, async (params, cb = (err, res) => { }) => {
                     try {
-                        const { pathname } = typeof params === "string" ? JSON.parse(params) : (params || {});
-                        if (pathname && typeof pathname !== "string")
+                        const { pathname, origin } = typeof params === "string" ? JSON.parse(params) : (params || {});
+                        if (pathname && typeof pathname !== "string") {
                             console.warn("Invalid pathname provided for AuthGuardLocation: ", pathname);
-                        if (pathname && typeof pathname === "string" && this.isUserRoute(pathname) && !(await this.getClientInfo({ socket }))?.user) {
+                        }
+                        /** These origins  */
+                        const IGNORED_API_ORIGINS = ["file://"];
+                        if (!IGNORED_API_ORIGINS.includes(origin) && pathname && typeof pathname === "string" && this.isUserRoute(pathname) && !(await this.getClientInfo({ socket }))?.user) {
                             cb(null, { shouldReload: true });
                         }
                         else {
