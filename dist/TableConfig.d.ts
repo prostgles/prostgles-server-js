@@ -172,6 +172,7 @@ declare type TableDefinition<LANG_IDS> = {
     indexes?: {
         [index_name: string]: {
             /**
+             * If true then will drop any existing index with this name
              * Overrides replaceUniqueIndexes
              */
             replace?: boolean;

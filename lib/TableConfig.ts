@@ -567,7 +567,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
             using && ("USING " + using),
             `(${columns})`,
             where && `WHERE ${where}`
-          ].filter(v => v).join(" "));
+          ].filter(v => v).join(" ") + ";");
         });
       }
 
