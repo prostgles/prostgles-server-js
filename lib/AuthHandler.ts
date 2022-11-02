@@ -129,7 +129,7 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
       /**
        * Used in creating a session/logging in using a magic link
        */
-      check: (magicId: string, dbo: DBOFullyTyped<S>, db: DB, ip_address: string) => Awaitable<BasicSession | undefined>;
+      check: (magicId: string, dbo: DBOFullyTyped<S>, db: DB, client: LoginClientInfo) => Awaitable<BasicSession | undefined>;
     }
 
   }
@@ -305,7 +305,8 @@ export default class AuthHandler {
             try {
               const session = await this.throttledFunc(async () => {
                 const ip_address = req.ip;
-                return check(id, this.dbo as any, this.db, ip_address);
+                const user_agent = req.headers["user-agent"];
+                return check(id, this.dbo as any, this.db, { ip_address, user_agent });
               });
               if (!session) {
                 res.status(404).json({ msg: "Invalid magic-link" });

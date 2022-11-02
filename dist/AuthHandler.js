@@ -269,7 +269,8 @@ class AuthHandler {
                         try {
                             const session = await this.throttledFunc(async () => {
                                 const ip_address = req.ip;
-                                return check(id, this.dbo, this.db, ip_address);
+                                const user_agent = req.headers["user-agent"];
+                                return check(id, this.dbo, this.db, { ip_address, user_agent });
                             });
                             if (!session) {
                                 res.status(404).json({ msg: "Invalid magic-link" });

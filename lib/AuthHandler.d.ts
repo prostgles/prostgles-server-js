@@ -115,7 +115,7 @@ export declare type Auth<S = void, SUser extends SessionUser = SessionUser> = {
             /**
              * Used in creating a session/logging in using a magic link
              */
-            check: (magicId: string, dbo: DBOFullyTyped<S>, db: DB, ip_address: string) => Awaitable<BasicSession | undefined>;
+            check: (magicId: string, dbo: DBOFullyTyped<S>, db: DB, client: LoginClientInfo) => Awaitable<BasicSession | undefined>;
         };
     };
     getUser: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB, client: AuthClientRequest) => Awaitable<AuthResult<SUser>>;
