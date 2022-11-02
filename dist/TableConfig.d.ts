@@ -137,7 +137,7 @@ declare type NamedJoinColumn = {
     joinDef: JoinDef[];
 };
 declare type Enum<T extends string | number = any> = {
-    enum: T[];
+    enum: T[] | readonly T[];
     nullable?: boolean;
     defaultValue?: T;
 };
