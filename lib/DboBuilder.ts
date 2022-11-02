@@ -134,7 +134,7 @@ export type PRGLIOSocket = {
 
     readonly handshake?: { 
         query?: Record<string, string>;
-        headers?: { cookie?: string; };  //  e.g.: "some_arg=dwdaw; otherarg=23232"
+        headers?: AnyObject & { cookie?: string; };  //  e.g.: "some_arg=dwdaw; otherarg=23232"
         auth?: Record<string, any>;
     }
 

@@ -105,12 +105,12 @@ class AuthHandler {
                 finished = true;
             });
         };
-        this.loginThrottled = async (params, ip_address) => {
+        this.loginThrottled = async (params, client) => {
             if (!this.opts?.login)
                 throw "Auth login config missing";
             const { responseThrottle = 500 } = this.opts;
             return this.throttledFunc(async () => {
-                let result = await this.opts?.login?.(params, this.dbo, this.db, ip_address);
+                let result = await this.opts?.login?.(params, this.dbo, this.db, client);
                 const err = {
                     msg: "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number } but got: " + JSON.stringify(result)
                 };
@@ -171,9 +171,9 @@ class AuthHandler {
             const { register, logout } = this.opts;
             const login = this.loginThrottled;
             let handlers = [
-                { func: (params, dbo, db, ip_address) => register?.(params, dbo, db), ch: prostgles_types_1.CHANNELS.REGISTER, name: "register" },
-                { func: (params, dbo, db, ip_address) => login(params, ip_address), ch: prostgles_types_1.CHANNELS.LOGIN, name: "login" },
-                { func: (params, dbo, db, ip_address) => logout?.(this.getSID({ socket }), dbo, db), ch: prostgles_types_1.CHANNELS.LOGOUT, name: "logout" }
+                { func: (params, dbo, db, client) => register?.(params, dbo, db), ch: prostgles_types_1.CHANNELS.REGISTER, name: "register" },
+                { func: (params, dbo, db, client) => login(params, client), ch: prostgles_types_1.CHANNELS.LOGIN, name: "login" },
+                { func: (params, dbo, db, client) => logout?.(this.getSID({ socket }), dbo, db), ch: prostgles_types_1.CHANNELS.LOGOUT, name: "logout" }
             ].filter(h => h.func);
             const userData = await this.getClientInfo({ socket });
             if (userData) {
@@ -187,8 +187,9 @@ class AuthHandler {
                     try {
                         if (!socket)
                             throw "socket missing??!!";
-                        const remoteAddress = socket?.conn?.remoteAddress;
-                        const res = await func(params, this.dbo, this.db, remoteAddress);
+                        const id_address = socket?.conn?.remoteAddress;
+                        const user_agent = socket.handshake?.headers?.["user-agent"];
+                        const res = await func(params, this.dbo, this.db, { user_agent, id_address });
                         if (name === "login" && res && res.sid) {
                             /* TODO: Re-send schema to client */
                         }
@@ -288,7 +289,8 @@ class AuthHandler {
                 app.post(loginRoute, async (req, res) => {
                     try {
                         const ip_address = req.ip;
-                        const { sid, expires } = await this.loginThrottled(req.body || {}, ip_address) || {};
+                        const user_agent = req.headers["user-agent"];
+                        const { sid, expires } = await this.loginThrottled(req.body || {}, { ip_address, user_agent }) || {};
                         if (sid) {
                             this.setCookieAndGoToReturnURLIFSet({ sid, expires }, { req, res });
                         }

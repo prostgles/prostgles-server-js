@@ -64,7 +64,7 @@ export declare type PRGLIOSocket = {
     readonly id: string;
     readonly handshake?: {
         query?: Record<string, string>;
-        headers?: {
+        headers?: AnyObject & {
             cookie?: string;
         };
         auth?: Record<string, any>;

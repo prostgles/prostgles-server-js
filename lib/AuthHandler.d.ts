@@ -13,6 +13,10 @@ declare type AuthSocketSchema = {
 };
 declare type ExpressReq = Request;
 declare type ExpressRes = Response;
+declare type LoginClientInfo = {
+    ip_address: string;
+    user_agent?: string | undefined;
+};
 export declare type BasicSession = {
     /** Must be hard to bruteforce */
     sid: string;
@@ -116,7 +120,7 @@ export declare type Auth<S = void, SUser extends SessionUser = SessionUser> = {
     };
     getUser: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB, client: AuthClientRequest) => Awaitable<AuthResult<SUser>>;
     register?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession> | BasicSession;
-    login?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB, ip_address: string) => Awaitable<BasicSession> | BasicSession;
+    login?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB, client: LoginClientInfo) => Awaitable<BasicSession> | BasicSession;
     logout?: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<any>;
     /**
      * If provided then session info will be saved on socket.__prglCache and reused from there
@@ -151,7 +155,7 @@ export default class AuthHandler {
     init(): Promise<void>;
     destroy: () => void;
     throttledFunc: <T>(func: () => Promise<T>, throttle?: number) => Promise<T>;
-    loginThrottled: (params: AnyObject, ip_address: string) => Promise<BasicSession>;
+    loginThrottled: (params: AnyObject, client: LoginClientInfo) => Promise<BasicSession>;
     /**
      * Will return first sid value found in : http cookie or query params
      * Based on sid names in auth

@@ -16,6 +16,11 @@ type AuthSocketSchema = {
 type ExpressReq = Request;
 type ExpressRes = Response;
 
+type LoginClientInfo = {
+  ip_address: string;
+  user_agent?: string | undefined;
+}
+
 export type BasicSession = {
 
   /** Must be hard to bruteforce */
@@ -132,7 +137,7 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
   getUser: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB, client: AuthClientRequest) => Awaitable<AuthResult<SUser>>;
 
   register?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession> | BasicSession;
-  login?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB, ip_address: string) => Awaitable<BasicSession> | BasicSession;
+  login?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB, client: LoginClientInfo) => Awaitable<BasicSession> | BasicSession;
   logout?: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<any>;
 
   /**
@@ -322,7 +327,9 @@ export default class AuthHandler {
         app.post(loginRoute, async (req: ExpressReq, res: ExpressRes) => {
           try {
             const ip_address = req.ip;
-            const { sid, expires } = await this.loginThrottled(req.body || {}, ip_address) || {};
+            const user_agent = req.headers["user-agent"];
+
+            const { sid, expires } = await this.loginThrottled(req.body || {}, { ip_address, user_agent }) || {};
 
             if (sid) {
 
@@ -442,12 +449,12 @@ export default class AuthHandler {
     })
   }
 
-  loginThrottled = async (params: AnyObject, ip_address: string): Promise<BasicSession> => {
+  loginThrottled = async (params: AnyObject, client: LoginClientInfo): Promise<BasicSession> => {
     if (!this.opts?.login) throw "Auth login config missing";
     const { responseThrottle = 500 } = this.opts;
 
     return this.throttledFunc(async () => {
-      let result = await this.opts?.login?.(params, this.dbo as any, this.db, ip_address);
+      let result = await this.opts?.login?.(params, this.dbo as any, this.db, client);
       const err = {
         msg: "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number } but got: " + JSON.stringify(result) 
       }
@@ -622,9 +629,9 @@ export default class AuthHandler {
       ch: string;
       func: Function;
     }[] = [
-      { func: (params: any, dbo: any, db: DB, ip_address: string) => register?.(params, dbo, db), ch: CHANNELS.REGISTER, name: "register" as keyof Omit<AuthSocketSchema, "user"> },
-      { func: (params: any, dbo: any, db: DB, ip_address: string) => login(params, ip_address), ch: CHANNELS.LOGIN, name: "login" as keyof Omit<AuthSocketSchema, "user"> },
-      { func: (params: any, dbo: any, db: DB, ip_address: string) => logout?.(this.getSID({ socket }), dbo, db), ch: CHANNELS.LOGOUT, name: "logout"  as keyof Omit<AuthSocketSchema, "user">}
+      { func: (params: any, dbo: any, db: DB, client: LoginClientInfo) => register?.(params, dbo, db), ch: CHANNELS.REGISTER, name: "register" as keyof Omit<AuthSocketSchema, "user"> },
+      { func: (params: any, dbo: any, db: DB, client: LoginClientInfo) => login(params, client), ch: CHANNELS.LOGIN, name: "login" as keyof Omit<AuthSocketSchema, "user"> },
+      { func: (params: any, dbo: any, db: DB, client: LoginClientInfo) => logout?.(this.getSID({ socket }), dbo, db), ch: CHANNELS.LOGOUT, name: "logout"  as keyof Omit<AuthSocketSchema, "user">}
     ].filter(h => h.func);
 
     const userData = await this.getClientInfo({ socket });
@@ -641,8 +648,9 @@ export default class AuthHandler {
 
         try {
           if (!socket) throw "socket missing??!!";
-          const remoteAddress = (socket as any)?.conn?.remoteAddress;
-          const res = await func(params, this.dbo as any, this.db, remoteAddress);
+          const id_address = (socket as any)?.conn?.remoteAddress;
+          const user_agent = socket.handshake?.headers?.["user-agent"];
+          const res = await func(params, this.dbo as any, this.db, { user_agent, id_address });
           if (name === "login" && res && res.sid) {
             /* TODO: Re-send schema to client */
           }
