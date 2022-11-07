@@ -391,10 +391,11 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
     if (!this.config || !this.prostgles.pgp) throw "config or pgp missing";
 
-    const MAX_IDENTIFIER_LENGTH = +(await this.db.any("SHOW max_identifier_length;") as any).max_identifier_length;
+    const MAX_IDENTIFIER_LENGTH = +(await this.db.one("SHOW max_identifier_length;") as any).max_identifier_length;
+    if(!Number.isFinite(MAX_IDENTIFIER_LENGTH)) throw `Could not obtain a valid max_identifier_length`
     const asName = (v: string) => {
       if(v.length > MAX_IDENTIFIER_LENGTH - 1){
-        throw `The identifier name provided (${v}) is longer than the allowed limit (max_identifier_length - 1 = ${MAX_IDENTIFIER_LENGTH -1} characters )`
+        throw `The identifier name provided (${v}) is longer than the allowed limit (max_identifier_length - 1 = ${MAX_IDENTIFIER_LENGTH -1} characters )\n Longest allowed: ${_asName(v.slice(0, MAX_IDENTIFIER_LENGTH - 1))} `
       }
 
       return _asName(v);
@@ -416,15 +417,15 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       if ("isLookupTable" in tableConf && Object.keys(tableConf.isLookupTable?.values).length) {
         const rows = Object.keys(tableConf.isLookupTable?.values).map(id => ({ id, ...(tableConf.isLookupTable?.values[id]) }));
         if (isDropped || !this.dbo?.[tableNameRaw]) {
-          const keys = Object.keys(rows[0]).filter(k => k !== "id");
+          const columnNames = Object.keys(rows[0]).filter(k => k !== "id");
           queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
                         id  TEXT PRIMARY KEY
-                        ${keys.length? (", " + keys.map(k => asName(k) + " TEXT ").join(", ")) : ""}
+                        ${columnNames.length? (", " + columnNames.map(k => asName(k) + " TEXT ").join(", ")) : ""}
                     );`);
 
           rows.map(row => {
             const values = this.prostgles.pgp!.helpers.values(row)
-            queries.push(this.prostgles.pgp!.as.format(`INSERT INTO ${tableName}  (${["id", ...keys].map(t => asName(t)).join(", ")})  ` + " VALUES ${values:raw} ;", { values }))
+            queries.push(this.prostgles.pgp!.as.format(`INSERT INTO ${tableName}  (${["id", ...columnNames].map(t => asName(t)).join(", ")})  ` + " VALUES ${values:raw} ;", { values }))
           });
           // this.log("Created lookup table " + tableName)
         }
