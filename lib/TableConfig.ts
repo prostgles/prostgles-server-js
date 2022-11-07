@@ -532,24 +532,26 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       }
       if ("constraints" in tableConf && tableConf.constraints) {
         const constraints = await getTableConstraings(this.db, tableName);
-        getKeys(tableConf.constraints).map(constraintName => {
-          if(!constraints.some(c => c.conname === constraintName)){
-            queries.push(`ALTER TABLE ${asName(tableName)} ADD CONSTRAINT ${asName(constraintName)} ${tableConf.constraints![constraintName]} ;`);
+        const constraintNames = getKeys(tableConf.constraints)
+        constraintNames.map(constraintName => {
+          /** Drop constraints with the same name */
+          const existingConstraint = constraints.some(c => c.conname === constraintName);
+          if(existingConstraint){
+            queries.push(`ALTER TABLE ${asName(tableName)} DROP CONSTRAINT ${asName(constraintName)};`);
           }
+          queries.push(`ALTER TABLE ${asName(tableName)} ADD CONSTRAINT ${asName(constraintName)} ${tableConf.constraints![constraintName]} ;`);
         });
       }
       if ("indexes" in tableConf && tableConf.indexes) {
-
-
-    /*
-        CREATE [ UNIQUE ] INDEX [ CONCURRENTLY ] [ [ IF NOT EXISTS ] name ] ON [ ONLY ] table_name [ USING method ]
-          ( { column_name | ( expression ) } [ COLLATE collation ] [ opclass [ ( opclass_parameter = value [, ... ] ) ] ] [ ASC | DESC ] [ NULLS { FIRST | LAST } ] [, ...] )
-          [ INCLUDE ( column_name [, ...] ) ]
-          [ NULLS [ NOT ] DISTINCT ]
-          [ WITH ( storage_parameter [= value] [, ... ] ) ]
-          [ TABLESPACE tablespace_name ]
-          [ WHERE predicate ]
-    */
+        /*
+            CREATE [ UNIQUE ] INDEX [ CONCURRENTLY ] [ [ IF NOT EXISTS ] name ] ON [ ONLY ] table_name [ USING method ]
+              ( { column_name | ( expression ) } [ COLLATE collation ] [ opclass [ ( opclass_parameter = value [, ... ] ) ] ] [ ASC | DESC ] [ NULLS { FIRST | LAST } ] [, ...] )
+              [ INCLUDE ( column_name [, ...] ) ]
+              [ NULLS [ NOT ] DISTINCT ]
+              [ WITH ( storage_parameter [= value] [, ... ] ) ]
+              [ TABLESPACE tablespace_name ]
+              [ WHERE predicate ]
+        */
         getKeys(tableConf.indexes).map(indexName => {
           const { 
             replace, 

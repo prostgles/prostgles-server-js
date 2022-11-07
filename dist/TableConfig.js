@@ -261,10 +261,14 @@ class TableConfigurator {
             }
             if ("constraints" in tableConf && tableConf.constraints) {
                 const constraints = await getTableConstraings(this.db, tableName);
-                (0, prostgles_types_1.getKeys)(tableConf.constraints).map(constraintName => {
-                    if (!constraints.some(c => c.conname === constraintName)) {
-                        queries.push(`ALTER TABLE ${(0, prostgles_types_1.asName)(tableName)} ADD CONSTRAINT ${(0, prostgles_types_1.asName)(constraintName)} ${tableConf.constraints[constraintName]} ;`);
+                const constraintNames = (0, prostgles_types_1.getKeys)(tableConf.constraints);
+                constraintNames.map(constraintName => {
+                    /** Drop constraints with the same name */
+                    const existingConstraint = constraints.some(c => c.conname === constraintName);
+                    if (existingConstraint) {
+                        queries.push(`ALTER TABLE ${(0, prostgles_types_1.asName)(tableName)} DROP CONSTRAINT ${(0, prostgles_types_1.asName)(constraintName)};`);
                     }
+                    queries.push(`ALTER TABLE ${(0, prostgles_types_1.asName)(tableName)} ADD CONSTRAINT ${(0, prostgles_types_1.asName)(constraintName)} ${tableConf.constraints[constraintName]} ;`);
                 });
             }
             if ("indexes" in tableConf && tableConf.indexes) {
