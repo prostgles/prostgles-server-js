@@ -130,9 +130,16 @@ class TableConfigurator {
         let queries = [];
         if (!this.config || !this.prostgles.pgp)
             throw "config or pgp missing";
+        const MAX_IDENTIFIER_LENGTH = +(await this.db.any("SHOW max_identifier_length;")).max_identifier_length;
+        const asName = (v) => {
+            if (v.length > MAX_IDENTIFIER_LENGTH - 1) {
+                throw `The identifier name provided (${v}) is longer than the allowed limit (max_identifier_length - 1 = ${MAX_IDENTIFIER_LENGTH - 1} characters )`;
+            }
+            return (0, prostgles_types_1.asName)(v);
+        };
         /* Create lookup tables */
         (0, prostgles_types_1.getKeys)(this.config).map(async (tableNameRaw) => {
-            const tableName = (0, prostgles_types_1.asName)(tableNameRaw);
+            const tableName = asName(tableNameRaw);
             const tableConf = this.config[tableNameRaw];
             const { dropIfExists = false, dropIfExistsCascade = false } = tableConf;
             const isDropped = dropIfExists || dropIfExistsCascade;
@@ -148,11 +155,11 @@ class TableConfigurator {
                     const keys = Object.keys(rows[0]).filter(k => k !== "id");
                     queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
                         id  TEXT PRIMARY KEY
-                        ${keys.length ? (", " + keys.map(k => (0, prostgles_types_1.asName)(k) + " TEXT ").join(", ")) : ""}
+                        ${keys.length ? (", " + keys.map(k => asName(k) + " TEXT ").join(", ")) : ""}
                     );`);
                     rows.map(row => {
                         const values = this.prostgles.pgp.helpers.values(row);
-                        queries.push(this.prostgles.pgp.as.format(`INSERT INTO ${tableName}  (${["id", ...keys].map(t => (0, prostgles_types_1.asName)(t)).join(", ")})  ` + " VALUES ${values:raw} ;", { values }));
+                        queries.push(this.prostgles.pgp.as.format(`INSERT INTO ${tableName}  (${["id", ...keys].map(t => asName(t)).join(", ")})  ` + " VALUES ${values:raw} ;", { values }));
                     });
                     // this.log("Created lookup table " + tableName)
                 }
@@ -172,7 +179,7 @@ class TableConfigurator {
             const tableConf = this.config[tableName];
             if ("columns" in tableConf) {
                 const getColDef = (name, colConf) => {
-                    const colNameEsc = (0, prostgles_types_1.asName)(name);
+                    const colNameEsc = asName(name);
                     const getColTypeDef = (colConf, pgType) => {
                         const { nullable, defaultValue } = colConf;
                         return `${pgType} ${!nullable ? " NOT NULL " : ""} ${defaultValue ? ` DEFAULT ${(0, PubSubManager_1.asValue)(defaultValue)} ` : ""}`;
@@ -237,7 +244,7 @@ class TableConfigurator {
                         }
                         else if (tableHandler && !tableHandler.columns?.find(c => colName === c.name)) {
                             queries.push(`
-                ALTER TABLE ${(0, prostgles_types_1.asName)(tableName)} 
+                ALTER TABLE ${asName(tableName)} 
                 ADD COLUMN ${getColDef(colName, colConf)};
               `);
                             if ((0, prostgles_types_1.isObject)(colConf) && "references" in colConf && colConf.references) {
@@ -252,7 +259,7 @@ class TableConfigurator {
                 }
                 if (colCreateLines.length) {
                     queries.push([
-                        `CREATE TABLE ${(0, prostgles_types_1.asName)(tableName)} (`,
+                        `CREATE TABLE ${asName(tableName)} (`,
                         colCreateLines.join(", \n"),
                         `);`
                     ].join("\n"));
@@ -266,9 +273,9 @@ class TableConfigurator {
                     /** Drop constraints with the same name */
                     const existingConstraint = constraints.some(c => c.conname === constraintName);
                     if (existingConstraint) {
-                        queries.push(`ALTER TABLE ${(0, prostgles_types_1.asName)(tableName)} DROP CONSTRAINT ${(0, prostgles_types_1.asName)(constraintName)};`);
+                        queries.push(`ALTER TABLE ${asName(tableName)} DROP CONSTRAINT ${asName(constraintName)};`);
                     }
-                    queries.push(`ALTER TABLE ${(0, prostgles_types_1.asName)(tableName)} ADD CONSTRAINT ${(0, prostgles_types_1.asName)(constraintName)} ${tableConf.constraints[constraintName]} ;`);
+                    queries.push(`ALTER TABLE ${asName(tableName)} ADD CONSTRAINT ${asName(constraintName)} ${tableConf.constraints[constraintName]} ;`);
                 });
             }
             if ("indexes" in tableConf && tableConf.indexes) {
@@ -284,13 +291,13 @@ class TableConfigurator {
                 (0, prostgles_types_1.getKeys)(tableConf.indexes).map(indexName => {
                     const { replace, unique, concurrently, using, columns, where = "" } = tableConf.indexes[indexName];
                     if (replace || typeof replace !== "boolean" && tableConf.replaceUniqueIndexes) {
-                        queries.push(`DROP INDEX IF EXISTS ${(0, prostgles_types_1.asName)(indexName)}  ;`);
+                        queries.push(`DROP INDEX IF EXISTS ${asName(indexName)}  ;`);
                     }
                     queries.push([
                         "CREATE",
                         unique && "UNIQUE",
                         concurrently && "CONCURRENTLY",
-                        `INDEX ${(0, prostgles_types_1.asName)(indexName)} ON ${(0, prostgles_types_1.asName)(tableName)}`,
+                        `INDEX ${asName(indexName)} ON ${asName(tableName)}`,
                         using && ("USING " + using),
                         `(${columns})`,
                         where && `WHERE ${where}`
@@ -315,7 +322,7 @@ class TableConfigurator {
                 // `, {}, { returnType: "rows" }) as { proname: string }[];
                 (0, prostgles_types_1.getKeys)(triggers).forEach(triggerFuncName => {
                     const trigger = triggers[triggerFuncName];
-                    const funcNameParsed = (0, prostgles_types_1.asName)(triggerFuncName);
+                    const funcNameParsed = asName(triggerFuncName);
                     queries.push(`
             CREATE OR REPLACE FUNCTION ${funcNameParsed}()
               RETURNS trigger
@@ -329,7 +336,7 @@ class TableConfigurator {
           `);
                     trigger.actions.forEach(action => {
                         const triggerActionName = triggerFuncName + "_" + action;
-                        const triggerActionNameParsed = (0, prostgles_types_1.asName)(triggerActionName);
+                        const triggerActionNameParsed = asName(triggerActionName);
                         if (isDropped) {
                             queries.push(`DROP TRIGGER IF EXISTS ${triggerActionNameParsed} ON ${tableName};`);
                         }

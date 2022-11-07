@@ -1,4 +1,4 @@
-import { getKeys, asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE, isObject } from "prostgles-types";
+import { getKeys, asName as _asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE, isObject } from "prostgles-types";
 import { isPlainObject, JoinInfo } from "./DboBuilder";
 import { DB, DBHandlerServer, Joins, Prostgles } from "./Prostgles";
 import { asValue } from "./PubSubManager";
@@ -389,7 +389,17 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
   async init() {
     let queries: string[] = [];
 
-    if (!this.config || !this.prostgles.pgp) throw "config or pgp missing"
+    if (!this.config || !this.prostgles.pgp) throw "config or pgp missing";
+
+    const MAX_IDENTIFIER_LENGTH = +(await this.db.any("SHOW max_identifier_length;") as any).max_identifier_length;
+    const asName = (v: string) => {
+      if(v.length > MAX_IDENTIFIER_LENGTH - 1){
+        throw `The identifier name provided (${v}) is longer than the allowed limit (max_identifier_length - 1 = ${MAX_IDENTIFIER_LENGTH -1} characters )`
+      }
+
+      return _asName(v);
+    }
+
     /* Create lookup tables */
     getKeys(this.config).map(async tableNameRaw => {
       const tableName = asName(tableNameRaw);
