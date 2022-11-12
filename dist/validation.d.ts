@@ -4,6 +4,7 @@ declare type BaseOptions = {
     optional?: boolean;
     nullable?: boolean;
     description?: string;
+    allowedValues?: any[];
     title?: string;
 };
 declare type SimpleType = BaseOptions & ({

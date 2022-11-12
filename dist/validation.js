@@ -87,6 +87,15 @@ function getPGCheckConstraint(args, depth) {
                     const correctType = t.type.slice(0, -2);
                     let elemCheck = correctType === "any" ? "" : `AND ('{' || right(left(${valAsText},-1),-1) || '}')${jsToPGtypes[correctType]}[] IS NOT NULL`;
                     checks.push(`jsonb_typeof(${valAsJson}) = 'array' ${elemCheck}`);
+                    if (t.allowedValues) {
+                        const types = Array.from(new Set(t.allowedValues.map(v => typeof v)));
+                        const allowedTypes = ["boolean", "number", "string"];
+                        if (types.length !== 1 || !allowedTypes.includes(types[0])) {
+                            throw new Error(`Invalid allowedValues (${t.allowedValues}). Must be a non empty array with elements of same type. Allowed types: ${allowedTypes}`);
+                        }
+                        const type = types[0];
+                        checks.push(`${valAsText}${jsToPGtypes[type]} <@ ${(0, PubSubManager_1.asValue)(t.allowedValues)}`);
+                    }
                 }
                 else {
                     const correctType = t.type.replace("integer", "number");
@@ -136,6 +145,9 @@ function getSchemaTSTypes(schema, leading = "", isOneOf = false) {
         if ("type" in def) {
             if (typeof def.type === "string") {
                 const correctType = def.type.replace("integer", "number");
+                if (def.allowedValues && def.type.endsWith("[]")) {
+                    return nullType + ` (${def.allowedValues.map(v => JSON.stringify(v)).join(" | ")})[]`;
+                }
                 return nullType + correctType;
             }
             else {

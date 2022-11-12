@@ -6,6 +6,7 @@ type BaseOptions = {
   optional?: boolean;
   nullable?: boolean;
   description?: string;
+  allowedValues?: any[];
   title?: string;
 };
 
@@ -128,7 +129,16 @@ export function getPGCheckConstraint(args: { escapedFieldName: string; schema: V
         if (t.type.endsWith("[]")) {
           const correctType = t.type.slice(0, -2);
           let elemCheck = correctType === "any" ? "" : `AND ('{' || right(left(${valAsText},-1),-1) || '}')${jsToPGtypes[correctType as keyof typeof jsToPGtypes]}[] IS NOT NULL`
-          checks.push(`jsonb_typeof(${valAsJson}) = 'array' ${elemCheck}`)
+          checks.push(`jsonb_typeof(${valAsJson}) = 'array' ${elemCheck}`);
+          if(t.allowedValues){
+            const types = Array.from(new Set(t.allowedValues.map(v => typeof v)));
+            const allowedTypes = ["boolean", "number", "string"] as const;
+            if(types.length !== 1 || !allowedTypes.includes(types[0] as any)){
+              throw new Error(`Invalid allowedValues (${t.allowedValues}). Must be a non empty array with elements of same type. Allowed types: ${allowedTypes}`)
+            }
+            const type = types[0] as typeof allowedTypes[number];
+            checks.push(`${valAsText}${jsToPGtypes[type]} <@ ${asValue(t.allowedValues)}`)
+          }
         } else {
           const correctType = t.type.replace("integer", "number");
           if (correctType !== "any") {
@@ -175,7 +185,10 @@ export function getSchemaTSTypes(schema: ValidationSchema, leading = "", isOneOf
     const nullType = (def.nullable ? `null | ` : "");
     if ("type" in def) {
       if (typeof def.type === "string") {
-        const correctType = def.type.replace("integer", "number")
+        const correctType = def.type.replace("integer", "number");
+        if(def.allowedValues && def.type.endsWith("[]")){
+          return nullType + ` (${def.allowedValues.map(v => JSON.stringify(v)).join(" | ")})[]`
+        }
         return nullType + correctType
       } else {
         return nullType + getSchemaTSTypes(def.type, "", true)

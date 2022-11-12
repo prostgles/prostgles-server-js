@@ -2300,16 +2300,13 @@ export class TableHandler extends ViewHandler {
         let _fields = this.parseFieldFilter(fields);
 
         /**
-         * forcedFilter must not have any keys in common with the fields
-         * A user is not allowed to change any fields found in the forcedFilter
          * A forced filter must be basic
          */
         if(forcedFilter){
             const _forcedFilterKeys = Object.keys(forcedFilter);
             const nonFields = _forcedFilterKeys.filter(key => !this.column_names.includes(key));
-            if(nonFields.length) throw "forcedFilter must be a basic filter but it includes non field keys: " + nonFields;
-            const clashingFields = _forcedFilterKeys.filter(key => _fields.includes(key));
-            if(clashingFields.length) throw "forcedFilter must not include fields from the fields (otherwise the user can update data to bypass the forcedFilter). Clashing fields: " + nonFields;
+            if(nonFields.length) throw "forcedFilter must be a basic filter ( { col_name: 'value' } ). Invalid filter keys: " + nonFields;
+            // const clashingFields = _forcedFilterKeys.filter(key => _fields.includes(key));
         }
         const validateRow: ValidateRow | undefined = validate? (row) => validate!({ update: row, filter: finalUpdateFilter }, this.dbTX || this.dboBuilder.dbo) : undefined
 
