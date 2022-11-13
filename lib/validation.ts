@@ -275,8 +275,13 @@ const getJSONSchemaObject = <T extends ValidationSchema>(objDef: T): JSTypes.Obj
           if (arrayType) {
             item = {
               type: "array",
-              items: { type: arrayType === "any" ? {} : arrayType }
+              items: itemSchema.allowedValues? {
+                enum: itemSchema.allowedValues
+              } : { 
+                type: arrayType === "any" ? {} : arrayType 
+              }
             }
+            
           } else {
             item = {
               type: type === "any" ? {} : type
