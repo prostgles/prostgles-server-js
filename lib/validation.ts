@@ -137,7 +137,7 @@ export function getPGCheckConstraint(args: { escapedFieldName: string; schema: V
               throw new Error(`Invalid allowedValues (${t.allowedValues}). Must be a non empty array with elements of same type. Allowed types: ${allowedTypes}`)
             }
             const type = types[0] as typeof allowedTypes[number];
-            checks.push(`${valAsText}${jsToPGtypes[type]}[] <@ ${asValue(t.allowedValues)}`)
+            checks.push(`(${valAsText})${jsToPGtypes[type]}[] <@ ${asValue(t.allowedValues)}`)
           }
         } else {
           const correctType = t.type.replace("integer", "number");
