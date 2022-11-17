@@ -54,6 +54,7 @@ export declare type UploadedItem = {
      * Url that is passed to client
      */
     url: string;
+    filePath?: string;
     etag: string;
     /**
      * S3 url of the resource

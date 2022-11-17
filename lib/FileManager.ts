@@ -64,6 +64,7 @@ export type UploadedItem = {
    * Url that is passed to client
    */
   url: string;
+  filePath?: string;
   etag: string;
 
   /**
@@ -305,6 +306,7 @@ export default class FileManager {
 
             onEnd?.({
               url,
+              filePath,
               etag: `none`,
               content_length
             })

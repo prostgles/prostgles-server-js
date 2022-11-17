@@ -72,6 +72,7 @@ class FileManager {
                                 content_length = fs.statSync(filePath).size;
                                 onEnd?.({
                                     url,
+                                    filePath,
                                     etag: `none`,
                                     content_length
                                 });
