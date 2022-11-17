@@ -16,6 +16,7 @@ const asSQLIdentifier = async (name, db) => {
 exports.asSQLIdentifier = asSQLIdentifier;
 const aws_sdk_2 = require("aws-sdk");
 const runSQL_1 = require("./DboBuilder/runSQL");
+const path_1 = require("path");
 class FileManager {
     constructor(config, imageOptions) {
         this.getFileUrl = (name) => this.fileRoute ? `${this.fileRoute}/${name}` : "";
@@ -43,7 +44,7 @@ class FileManager {
                     });
                     const url = this.getFileUrl(name);
                     fs.mkdirSync(this.config.localFolderPath, { recursive: true });
-                    const filePath = `${this.config.localFolderPath}/${name}`;
+                    const filePath = path_1.default.resolve(`${this.config.localFolderPath}/${name}`);
                     const writeStream = fs.createWriteStream(filePath);
                     let errored = false;
                     let loaded = 0;
@@ -400,11 +401,11 @@ class FileManager {
             return this.s3Client.getObject({ Key: name, Bucket: this.config.bucket }).createReadStream();
         }
         else if ("localFolderPath" in this.config) {
-            const path = `${this.config.localFolderPath}/${name}`;
-            if (!fs.existsSync(path)) {
-                throw `File ${path} could not be found`;
+            const filePath = path_1.default.resolve(`${this.config.localFolderPath}/${name}`);
+            if (!fs.existsSync(filePath)) {
+                throw `File ${filePath} could not be found`;
             }
-            return fs.createReadStream(path);
+            return fs.createReadStream(filePath, { encoding: undefined });
         }
         else
             throw new Error("Not expected");
