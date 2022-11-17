@@ -79,7 +79,7 @@ export type UploadedItem = {
 };
 import AWS from 'aws-sdk';
 import { canCreateTables } from "./DboBuilder/runSQL";
-import path from "path";
+import * as path from "path";
 export default class FileManager {
 
   static testCredentials = async (accessKeyId: string, secretAccessKey: string) => {
