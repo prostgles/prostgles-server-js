@@ -16,12 +16,12 @@ console.log("Add a basic auth mode where user and sessions table are created");
 import TableConfigurator, { TableConfig } from "./TableConfig";
 
 import { get } from "./utils";
-import { DboBuilder, DBHandlerServer, isPlainObject, LocalParams, TableSchema, PRGLIOSocket } from "./DboBuilder";
-import { PubSubManager, DEFAULT_SYNC_BATCH_SIZE, asValue, pickKeys } from "./PubSubManager";
+import { DboBuilder, DBHandlerServer, isPlainObject, PRGLIOSocket } from "./DboBuilder";
+import { PubSubManager, pickKeys } from "./PubSubManager";
 export { DBHandlerServer }
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 
-import { SQLRequest, TableSchemaForClient, CHANNELS, AnyObject, ClientSchema, getKeys, DBSchemaTable, DBSchema, FileColumnConfig } from "prostgles-types";
+import { SQLRequest, TableSchemaForClient, CHANNELS, AnyObject, ClientSchema, getKeys, DBSchemaTable, FileColumnConfig } from "prostgles-types";
 import { Publish, PublishMethods, PublishParams, PublishParser } from "./PublishParser";
 import { DBEventsManager } from "./DBEventsManager";
 

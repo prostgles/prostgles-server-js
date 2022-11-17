@@ -240,12 +240,12 @@ export default class FileManager {
 
   getFileUrl = (name: string) => this.fileRoute? `${this.fileRoute}/${name}` : "";
 
-  checkFreeSpace = async (fileSize = 0) => {
+  checkFreeSpace = async (folderPath: string, fileSize = 0) => {
     if(!this.s3Client && "localFolderPath" in this.config) {
       const { minFreeBytes = 1.048e6 } = this.config;
       const required = Math.max(fileSize, minFreeBytes)
       if(required){
-        const diskSpace = await checkDiskSpace('/');
+        const diskSpace = await checkDiskSpace(folderPath);
         if(diskSpace.free < required){
           const err =  `There is not enough space on the server to save files.\nTotal: ${bytesToSize(diskSpace.size)} \nRemaning: ${bytesToSize(diskSpace.free)} \nRequired: ${bytesToSize(required)}`
           throw new Error(err);
@@ -268,7 +268,7 @@ export default class FileManager {
       // throw new Error("S3 config missing. Can only upload streams to S3");
 
       try {
-        this.checkFreeSpace(expectedSizeBytes).catch(err => {
+        this.checkFreeSpace(this.config.localFolderPath, expectedSizeBytes).catch(err => {
           onError?.(err)
           passThrough.end();
         });

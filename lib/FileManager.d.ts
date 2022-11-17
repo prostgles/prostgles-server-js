@@ -90,7 +90,7 @@ export default class FileManager {
         ext: string | ALLOWED_EXTENSION;
     }>;
     getFileUrl: (name: string) => string;
-    checkFreeSpace: (fileSize?: number) => Promise<void>;
+    checkFreeSpace: (folderPath: string, fileSize?: number) => Promise<void>;
     uploadStream: (name: string, mime: string, onProgress?: OnProgress, onError?: (error: any) => void, onEnd?: (item: UploadedItem) => void, expectedSizeBytes?: number) => stream.PassThrough;
     private upload;
     uploadAsMedia: (params: {
