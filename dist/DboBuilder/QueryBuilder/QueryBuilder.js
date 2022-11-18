@@ -70,6 +70,16 @@ const parseFunction = (funcData) => {
 exports.parseFunction = parseFunction;
 const MAX_COL_NUM = 1600;
 const asValue = (v, castAs = "") => DboBuilder_1.pgp.as.format("$1" + castAs, [v]);
+const parseUnix = (colName, tableAlias, allColumns) => {
+    const col = allColumns.find(c => c.name === colName);
+    if (!col)
+        throw `Unexpected: column ${colName} not found`;
+    const escapedName = (0, exports.asNameAlias)(colName, tableAlias);
+    if (col.udt_name === "int8") {
+        return `to_timestamp(${escapedName}/1000)`;
+    }
+    return escapedName;
+};
 const FTS_Funcs = 
 /* Full text search
   https://www.postgresql.org/docs/current/textsearch-dictionaries.html#TEXTSEARCH-SIMPLE-DICTIONARY
@@ -481,8 +491,8 @@ exports.FUNCTIONS = [
         singleColArg: true,
         numArgs: 1,
         getFields: (args) => [args[0]],
-        getQuery: ({ allowedFields, args, tableAlias }) => {
-            const col = (0, exports.asNameAlias)(args[0], tableAlias);
+        getQuery: ({ allColumns, args, tableAlias }) => {
+            const col = parseUnix(args[0], tableAlias, allColumns);
             if (!val)
                 return `date_trunc(${asValue(unit)}, ${col})`;
             const prevInt = {
@@ -504,8 +514,8 @@ exports.FUNCTIONS = [
         description: ` :[unit<string>, column_name] -> ` + (funcName === "date_trunc" ? ` round down timestamp to closest unit value. ` : ` extract date unit as float8. `) + ` E.g. ['hour', col] `,
         singleColArg: false,
         getFields: (args) => [args[1]],
-        getQuery: ({ allowedFields, args, tableAlias }) => {
-            return `${funcName}(${asValue(args[0])}, ${(0, exports.asNameAlias)(args[1], tableAlias)})`;
+        getQuery: ({ allColumns, args, tableAlias }) => {
+            return `${funcName}(${asValue(args[0])}, ${parseUnix(args[1], tableAlias, allColumns)})`;
         }
     })),
     /* Handy date funcs */
@@ -544,8 +554,8 @@ exports.FUNCTIONS = [
         singleColArg: true,
         numArgs: 1,
         getFields: (args) => [args[0]],
-        getQuery: ({ allowedFields, args, tableAlias }) => {
-            return DboBuilder_1.pgp.as.format("trim(to_char(" + (0, exports.asNameAlias)(args[0], tableAlias) + ", $2))", [args[0], txt]);
+        getQuery: ({ allColumns, args, tableAlias }) => {
+            return DboBuilder_1.pgp.as.format("trim(to_char(" + parseUnix(args[0], tableAlias, allColumns) + ", $2))", [args[0], txt]);
         }
     })),
     /* Basic 1 arg col funcs */
@@ -559,28 +569,31 @@ exports.FUNCTIONS = [
             return funcName + "(" + (0, exports.asNameAlias)(args[0], tableAlias) + ")";
         }
     })),
-    /* Interval funcs */
+    /**
+     * Interval funcs
+     * (col1, col2?, trunc )
+     * */
     ...["age", "ageNow", "difference"].map(funcName => ({
         name: "$" + funcName,
         type: "function",
         numArgs: 1,
         singleColArg: true,
         getFields: (args) => args.slice(0, 2).filter(a => typeof a === "string"),
-        getQuery: ({ allowedFields, args, tableAlias }) => {
-            const validCols = args.slice(0, 2).filter(a => typeof a === "string").length;
+        getQuery: ({ allowedFields, args, tableAlias, allColumns }) => {
+            const validColCount = args.slice(0, 2).filter(a => typeof a === "string").length;
             const trunc = args[2];
             const allowedTruncs = ["second", "minute", "hour", "year"];
             if (trunc && !allowedTruncs.includes(trunc))
                 throw new Error("Incorrect trunc provided. Allowed values: " + allowedTruncs);
-            if (funcName === "difference" && validCols !== 2)
+            if (funcName === "difference" && validColCount !== 2)
                 throw new Error("Must have two column names");
-            if (![1, 2].includes(validCols))
+            if (![1, 2].includes(validColCount))
                 throw new Error("Must have one or two column names");
             const [leftField, rightField] = args;
-            const leftQ = (0, exports.asNameAlias)(leftField, tableAlias);
-            let rightQ = rightField ? (0, exports.asNameAlias)(rightField, tableAlias) : "";
+            const leftQ = parseUnix(leftField, tableAlias, allColumns);
+            let rightQ = rightField ? parseUnix(rightField, tableAlias, allColumns) : "";
             let query = "";
-            if (funcName === "ageNow" && validCols === 1) {
+            if (funcName === "ageNow" && validColCount === 1) {
                 query = `age(now(), ${leftQ})`;
             }
             else if (funcName === "age" || funcName === "ageNow") {
