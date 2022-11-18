@@ -726,7 +726,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     getQuery: ({ allowedFields, args, tableAlias, allColumns }) => {
       const validColCount = args.slice(0, 2).filter(a => typeof a === "string").length;
       const trunc = args[2];
-      const allowedTruncs = ["second", "minute", "hour", "year"];
+      const allowedTruncs = ["second", "minute", "hour", "day", "month", "year"];
       if(trunc && !allowedTruncs.includes(trunc)) throw new Error("Incorrect trunc provided. Allowed values: " + allowedTruncs)
       if(funcName === "difference" && validColCount !== 2) throw new Error("Must have two column names")
       if(![1,2].includes(validColCount)) throw new Error("Must have one or two column names")
