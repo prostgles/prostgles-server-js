@@ -185,6 +185,19 @@ export declare type OnReady = {
     db: DB;
 };
 declare type OnReadyCallback<S = void> = (dbo: DBOFullyTyped<S>, db: DB) => any;
+export declare type InitResult = {
+    db: DBOFullyTyped;
+    _db: DB;
+    pgp: PGP;
+    io?: any;
+    destroy: () => Promise<boolean>;
+    /**
+     * Generated database public schema TS types for all tables and views
+     */
+    getTSSchema: () => string;
+    update: (newOpts: Pick<ProstglesInitOptions, "fileTable">) => Promise<void>;
+    restart: () => Promise<InitResult>;
+};
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 export declare class Prostgles {
     opts: ProstglesInitOptions;
@@ -219,18 +232,20 @@ export declare class Prostgles {
         fullPath: string;
     };
     private getFileText;
+    getTSFileContent: () => string;
+    /**
+     * Will write the Schema Typescript definitions to file (tsGeneratedTypesDir)
+     */
     writeDBSchema(force?: boolean): void;
+    /**
+     * Will re-create the dbo object
+     */
     refreshDBO: () => Promise<DBHandlerServer<import("./DboBuilder").TableHandlers> | undefined>;
     private initWatchSchema;
+    initFileTable: () => Promise<void>;
     isSuperUser: boolean;
     schema_checkIntervalMillis?: NodeJS.Timeout;
-    init(onReady: OnReadyCallback): Promise<{
-        db: DBOFullyTyped;
-        _db: DB;
-        pgp: PGP;
-        io?: any;
-        destroy: () => Promise<boolean>;
-    }>;
+    init(onReady: OnReadyCallback): Promise<InitResult>;
     runSQLFile(filePath: string): Promise<any[][] | undefined>;
     connectedSockets: any[];
     setSocketEvents(): Promise<void>;

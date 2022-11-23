@@ -118,6 +118,9 @@ export declare type Auth<S = void, SUser extends SessionUser = SessionUser> = {
             check: (magicId: string, dbo: DBOFullyTyped<S>, db: DB, client: LoginClientInfo) => Awaitable<BasicSession | undefined>;
         };
     };
+    /**
+     * undefined sid is allowed to enable public users
+     */
     getUser: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB, client: AuthClientRequest) => Awaitable<AuthResult<SUser>>;
     register?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession> | BasicSession;
     login?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB, client: LoginClientInfo) => Awaitable<BasicSession> | BasicSession;

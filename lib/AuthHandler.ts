@@ -134,6 +134,9 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
 
   }
 
+  /**
+   * undefined sid is allowed to enable public users
+   */
   getUser: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB, client: AuthClientRequest) => Awaitable<AuthResult<SUser>>;
 
   register?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession> | BasicSession;
