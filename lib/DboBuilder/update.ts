@@ -161,6 +161,6 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
 
   } catch (e) {
     if (localParams && localParams.testRule) throw e;
-    throw parseError(e, `dbo.${this.name}.${ACTION}(${JSON.stringify(filter || {}, null, 2)}, ${Array.isArray(_newData)? "...DATA[]": "...DATA"}, ${JSON.stringify(params || {}, null, 2)})`)
+    throw parseError(e, `dbo.${this.name}.${ACTION}(${JSON.stringify(filter || {}, null, 2)}, ${Array.isArray(_newData)? "[{...}]": "{...}"}, ${JSON.stringify(params || {}, null, 2)})`)
   }
 };

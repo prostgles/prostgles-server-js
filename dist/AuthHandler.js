@@ -36,16 +36,22 @@ class AuthHandler {
             const { sid, expires } = cookie;
             const { res, req } = r;
             if (sid) {
-                let maxAge = 1000 * 60 * 60 * 24; // 24 hours
-                if (expires && Number.isFinite(expires) && !isNaN(+new Date(expires))) {
-                    maxAge = (+new Date(expires) - Date.now());
-                }
-                let options = {
-                    maxAge,
-                    httpOnly: true, // The cookie only accessible by the web server
-                    //signed: true // Indicates if the cookie should be signed
+                const maxAgeOneDay = 60 * 60 * 24; // 24 hours;
+                let cookieDuration = {
+                    maxAge: maxAgeOneDay
                 };
-                const cookieOpts = { ...options, secure: true, sameSite: "strict", ...(this.opts?.expressConfig?.cookieOptions || {}) };
+                if (expires && Number.isFinite(expires) && !isNaN(+new Date(expires))) {
+                    // const maxAge = (+new Date(expires)) - Date.now();
+                    cookieDuration = { expires: new Date(expires) };
+                }
+                const cookieOpts = {
+                    ...cookieDuration,
+                    httpOnly: true,
+                    //signed: true // Indicates if the cookie should be signed
+                    secure: true,
+                    sameSite: "strict",
+                    ...(this.opts?.expressConfig?.cookieOptions || {})
+                };
                 const cookieData = sid;
                 if (!this.sidKeyName || !this.routes?.returnURL)
                     throw "sidKeyName or returnURL missing";

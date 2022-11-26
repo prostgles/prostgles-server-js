@@ -4,7 +4,6 @@
 
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/prostgles/prostgles-server-js/blob/master/LICENSE)
 [![npm version](https://img.shields.io/npm/v/prostgles-server.svg?style=flat)](https://www.npmjs.com/package/prostgles-server)
-[![Known Vulnerabilities](https://snyk.io/test/github/prostgles/prostgles-server-js/badge.svg)](https://snyk.io/test/github/prostgles/prostgles-server-js)
 ![tests](https://github.com/prostgles/prostgles-server-js/workflows/tests/badge.svg?branch=master)
 
 
