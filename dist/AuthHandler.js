@@ -43,6 +43,10 @@ class AuthHandler {
                 if (expires && Number.isFinite(expires) && !isNaN(+new Date(expires))) {
                     // const maxAge = (+new Date(expires)) - Date.now();
                     cookieDuration = { expires: new Date(expires) };
+                    const days = (+cookieDuration.expires - Date.now()) / (24 * 60 * 60e3);
+                    if (days >= 400) {
+                        console.warn(`Cookie expiration higher the limit of 400 days for Chrome: ${days}days`);
+                    }
                 }
                 const cookieOpts = {
                     ...cookieDuration,

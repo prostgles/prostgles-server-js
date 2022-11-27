@@ -786,20 +786,21 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: false,
     getFields: (args: any[]) => [] as string[], // Fields not validated because we'll use the allowed ones anyway
     getQuery: ({ allowedFields, args, tableAlias }) => {
-      let value = asValue(args[0]);
-      if(typeof value !== "string") throw "expecting string argument";
+      if(typeof args[0] !== "string") throw "First argument must be a string. E.g.: '{col1} ..text {col2} ...' ";
       
-      const usedColumns = allowedFields.filter(fName => value.includes(`{${fName}}`));
+      const rawValue = args[0];
+      let finalValue = rawValue;
+      const usedColumns = allowedFields.filter(fName => rawValue.includes(`{${fName}}`));
       usedColumns.forEach((colName, idx) => {
-        value = value.split(`{${colName}}`).join(`%${idx + 1}$s`)
+        finalValue = finalValue.split(`{${colName}}`).join(`%${idx + 1}$s`)
       });
-      value = asValue(value);
+      finalValue = asValue(finalValue);
       
       if(usedColumns.length){
-        return `format(${value}, ${usedColumns.map(c => `${asNameAlias(c, tableAlias)}::TEXT`).join(", ")})`;
+        return `format(${finalValue}, ${usedColumns.map(c => `${asNameAlias(c, tableAlias)}::TEXT`).join(", ")})`;
       }
       
-      return `format(${value})`;
+      return `format(${finalValue})`;
     }
   } as FunctionSpec)),
 

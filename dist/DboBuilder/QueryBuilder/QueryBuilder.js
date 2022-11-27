@@ -643,18 +643,19 @@ exports.FUNCTIONS = [
         singleColArg: false,
         getFields: (args) => [],
         getQuery: ({ allowedFields, args, tableAlias }) => {
-            let value = asValue(args[0]);
-            if (typeof value !== "string")
-                throw "expecting string argument";
-            const usedColumns = allowedFields.filter(fName => value.includes(`{${fName}}`));
+            if (typeof args[0] !== "string")
+                throw "First argument must be a string. E.g.: '{col1} ..text {col2} ...' ";
+            const rawValue = args[0];
+            let finalValue = rawValue;
+            const usedColumns = allowedFields.filter(fName => rawValue.includes(`{${fName}}`));
             usedColumns.forEach((colName, idx) => {
-                value = value.split(`{${colName}}`).join(`%${idx + 1}$s`);
+                finalValue = finalValue.split(`{${colName}}`).join(`%${idx + 1}$s`);
             });
-            value = asValue(value);
+            finalValue = asValue(finalValue);
             if (usedColumns.length) {
-                return `format(${value}, ${usedColumns.map(c => `${(0, exports.asNameAlias)(c, tableAlias)}::TEXT`).join(", ")})`;
+                return `format(${finalValue}, ${usedColumns.map(c => `${(0, exports.asNameAlias)(c, tableAlias)}::TEXT`).join(", ")})`;
             }
-            return `format(${value})`;
+            return `format(${finalValue})`;
         }
     })),
     /** Custom highlight -> myterm => ['some text and', ['myterm'], ' and some other text']
