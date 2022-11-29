@@ -45,8 +45,9 @@ export type Media = {
     "title"?: string;
     "extension"?: string;
     "content_type"?: string;
-    content_length?: number;
+    "content_length"?: number;
     "url"?: string;
+    "added"?: Date;
     "signed_url"?: string;
     "signed_url_expires"?: number;
     "name"?: string;

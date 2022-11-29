@@ -294,7 +294,7 @@ export default class FileManager {
             const now = Date.now();
             if(now - lastProgress > throttle){
               lastProgress = now;
-              onProgress?.({ loaded, total: 0 })
+              onProgress?.({ loaded, total: 0 });
             }
           });
         }
@@ -355,7 +355,7 @@ export default class FileManager {
         try {
           await fs.promises.mkdir(config.localFolderPath, { recursive: true });
           const filePath = `${config.localFolderPath}/${name}`;
-          fs.writeFileSync(filePath, file as any);
+          fs.writeFileSync(filePath, file);
           resolve({
             url,
             etag: `none`,
@@ -523,6 +523,7 @@ export default class FileManager {
           extension             TEXT NOT NULL,
           content_type          TEXT NOT NULL,
           content_length        BIGINT NOT NULL DEFAULT 0,
+          added                 TIMESTAMP NOT NULL DEFAULT NOW(),
           description           TEXT,
           s3_url                TEXT,
           signed_url            TEXT,

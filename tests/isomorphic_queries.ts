@@ -189,18 +189,18 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
 
 
   await tryRun("Table config triggers", async () => {
-    const tr1 = await db.tr1.insert({  })
-    const tr2 = await db.tr2.insert({ 
+    const tr1 = await db.tr1.insert!({  })
+    const tr2 = await db.tr2.insert!({ 
       tr1_id: 1,
       t1: "a",
       t2: "b"
     });
     try {
-      await db.tr2.delete();
+      await db.tr2.delete!();
     } catch(e){
 
     }
-    const one = await db.tr2.findOne({ 
+    const one = await db.tr2.findOne!({ 
       t1: "a",
       t2: "b"
     });

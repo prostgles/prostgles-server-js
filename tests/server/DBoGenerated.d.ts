@@ -249,6 +249,7 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
+      added?: Date;
       content_length?: number;
       content_type: string;
       deleted?: null | number;
