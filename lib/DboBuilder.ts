@@ -2555,10 +2555,16 @@ export class DboBuilder {
             }
 
             if(this.prostgles.isSuperUser){
-                this._pubSubManager = await PubSubManager.create({
-                    dboBuilder: this,
-                    onSchemaChange
-                });
+                const canExecute = await canEXECUTE(this.db);
+                if(!canExecute){
+                    console.error("PubSubManager based subscriptions not possible: Cannot run EXECUTE statements on this connection")
+                } else {
+
+                    this._pubSubManager = await PubSubManager.create({
+                        dboBuilder: this,
+                        onSchemaChange
+                    });
+                }
             } else {
                 console.warn(`subscribe and sync cannot be used because db user is not a superuser `)
             }
@@ -2594,10 +2600,15 @@ export class DboBuilder {
     }
 
     private init = async () => {
+
         
-        /* If watchSchema then PubSubManager must be created */
+        /* If watchSchema then PubSubManager must be created (if possible) */
         await this.build();
-        if(this.prostgles.opts.watchSchema && (this.prostgles.opts.watchSchemaType === "DDL_trigger" || !this.prostgles.opts.watchSchemaType) && this.prostgles.isSuperUser){
+        if(
+            this.prostgles.opts.watchSchema && 
+            (this.prostgles.opts.watchSchemaType === "DDL_trigger" || !this.prostgles.opts.watchSchemaType) && 
+            this.prostgles.isSuperUser
+        ){
             await this.getPubSubManager()
         }
 
@@ -3393,4 +3404,16 @@ export const prepareSort = (items: SortItem[], excludeOrder: boolean = false): s
         let colKey = "fieldQuery" in d? d.fieldQuery : d.fieldPosition;
         return `${colKey} ${orderType} ${nullOrder}`;
     }).join(", ")
+}
+
+export const canEXECUTE = async (db: DB) => {
+
+    try {
+        await db.any(`DO $$ BEGIN  EXECUTE 'select 1'; END $$;`);
+        return true;
+    } catch(error){
+        console.warn(error)
+    }
+
+    return false;
 }

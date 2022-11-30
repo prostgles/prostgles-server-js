@@ -465,5 +465,6 @@ declare type PGConstraint = {
 export declare function isPlainObject(o: any): o is Record<string, any>;
 export declare function postgresToTsType(udt_data_type: PG_COLUMN_UDT_DATA_TYPE): keyof typeof TS_PG_Types;
 export declare const prepareSort: (items: SortItem[], excludeOrder?: boolean) => string;
+export declare const canEXECUTE: (db: DB) => Promise<boolean>;
 export {};
 //# sourceMappingURL=DboBuilder.d.ts.map

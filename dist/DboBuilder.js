@@ -5,7 +5,7 @@
  *--------------------------------------------------------------------------------------------*/
 var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.prepareSort = exports.postgresToTsType = exports.isPlainObject = exports.DboBuilder = exports.TableHandler = exports.isPojoObject = exports.ViewHandler = exports.parseError = exports.EXISTS_KEYS = exports.makeErr = exports.escapeTSNames = exports.pgp = void 0;
+exports.canEXECUTE = exports.prepareSort = exports.postgresToTsType = exports.isPlainObject = exports.DboBuilder = exports.TableHandler = exports.isPojoObject = exports.ViewHandler = exports.parseError = exports.EXISTS_KEYS = exports.makeErr = exports.escapeTSNames = exports.pgp = void 0;
 const Bluebird = require("bluebird");
 const makeSelectQuery_1 = require("./DboBuilder/QueryBuilder/makeSelectQuery");
 const pgPromise = require("pg-promise");
@@ -1884,10 +1884,16 @@ class DboBuilder {
                     }
                 }
                 if (this.prostgles.isSuperUser) {
-                    this._pubSubManager = await PubSubManager_1.PubSubManager.create({
-                        dboBuilder: this,
-                        onSchemaChange
-                    });
+                    const canExecute = await (0, exports.canEXECUTE)(this.db);
+                    if (!canExecute) {
+                        console.error("PubSubManager based subscriptions not possible: Cannot run EXECUTE statements on this connection");
+                    }
+                    else {
+                        this._pubSubManager = await PubSubManager_1.PubSubManager.create({
+                            dboBuilder: this,
+                            onSchemaChange
+                        });
+                    }
                 }
                 else {
                     console.warn(`subscribe and sync cannot be used because db user is not a superuser `);
@@ -1901,9 +1907,11 @@ class DboBuilder {
         };
         this.joinPaths = [];
         this.init = async () => {
-            /* If watchSchema then PubSubManager must be created */
+            /* If watchSchema then PubSubManager must be created (if possible) */
             await this.build();
-            if (this.prostgles.opts.watchSchema && (this.prostgles.opts.watchSchemaType === "DDL_trigger" || !this.prostgles.opts.watchSchemaType) && this.prostgles.isSuperUser) {
+            if (this.prostgles.opts.watchSchema &&
+                (this.prostgles.opts.watchSchemaType === "DDL_trigger" || !this.prostgles.opts.watchSchemaType) &&
+                this.prostgles.isSuperUser) {
                 await this.getPubSubManager();
             }
             return this;
@@ -2597,4 +2605,15 @@ const prepareSort = (items, excludeOrder = false) => {
     }).join(", ");
 };
 exports.prepareSort = prepareSort;
+const canEXECUTE = async (db) => {
+    try {
+        await db.any(`DO $$ BEGIN  EXECUTE 'select 1'; END $$;`);
+        return true;
+    }
+    catch (error) {
+        console.warn(error);
+    }
+    return false;
+};
+exports.canEXECUTE = canEXECUTE;
 //# sourceMappingURL=DboBuilder.js.map
