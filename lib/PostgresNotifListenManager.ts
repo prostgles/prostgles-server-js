@@ -7,14 +7,21 @@ import { DB } from "./Prostgles";
 import pg from "pg-promise/typescript/pg-subset";
 import pgPromise from "pg-promise";
 
-export type PrglNotifListener = (args: { length: number; processId: number; channel: string; payload: string; name: string; }) => void;
+export type PrglNotifListener = (args: { 
+    length: number; 
+    processId: number; 
+    channel: string; 
+    payload: string; 
+    name: string; 
+}) => void;
+
 export class PostgresNotifListenManager {
     connection?: pgPromise.IConnected<{}, pg.IClient>;
     db_pg: DB;
     notifListener: PrglNotifListener;
     db_channel_name: string;
     isListening: any;
-    client: any;
+    client?: pg.IClient;
 
     static create = (db_pg: DB, notifListener: PrglNotifListener, db_channel_name: string): Promise<PostgresNotifListenManager> => {
         let res = new PostgresNotifListenManager(db_pg, notifListener, db_channel_name, true);
@@ -85,7 +92,7 @@ export class PostgresNotifListenManager {
     stopListening = () => {
         if(this.db_channel_name) {
             if(this.connection) this.connection.none('UNLISTEN $1~', this.db_channel_name)
-            if(this.client) this.client.query('UNLISTEN $1~', this.db_channel_name)
+            if(this.client) this.client.query('UNLISTEN $1~', this.db_channel_name as any)
         }
     }
 

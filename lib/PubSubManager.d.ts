@@ -103,6 +103,11 @@ export declare class PubSubManager {
     private appID?;
     appCheckFrequencyMS: number;
     appCheck?: ReturnType<typeof setInterval>;
+    static canCreate: (db: DB) => Promise<{
+        canExecute: boolean;
+        isSuperUs: boolean;
+        yes: boolean;
+    }>;
     static create: (options: PubSubManagerOptions) => Promise<PubSubManager>;
     destroyed: boolean;
     destroy: () => void;

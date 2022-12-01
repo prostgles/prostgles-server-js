@@ -1,7 +1,11 @@
 
 
 import { SelectItem } from "./DboBuilder/QueryBuilder/QueryBuilder";
-import { isEmpty, getKeys, FullFilter, EXISTS_KEYS, FilterDataType, GeomFilterKeys, GeomFilter_Funcs, TextFilter_FullTextSearchFilterKeys } from "prostgles-types";
+import { 
+  isEmpty, getKeys, FullFilter, EXISTS_KEYS, FilterDataType, 
+  GeomFilterKeys, GeomFilter_Funcs, 
+  TextFilter_FullTextSearchFilterKeys, CompareFilterKeys 
+} from "prostgles-types";
 import { isPlainObject } from "./DboBuilder";
 
 /**
@@ -69,7 +73,15 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       mErr("Bad filter. Could not match to a column or alias: ");
       throw " "
     }
-    const remainingStr = fKey.slice(selItem.alias.length);
+
+    let remainingStr = fKey.slice(selItem.alias.length);
+
+    /** Has shorthand operand 'col->>key.<>'  */
+    const matchingOperand = CompareFilterKeys.find(operand => remainingStr.endsWith(`.${operand}`));
+    if(matchingOperand){
+      remainingStr = remainingStr.slice(- matchingOperand.length - 1)
+      rightF = { [matchingOperand]: rightF }
+    }
 
     /* Is json path spec */
     if(remainingStr.startsWith("->")){
@@ -114,7 +126,10 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
         currSep = nextSep;
       }
 
-    /* Is collapsed filter spec  e.g. { "col.$ilike": 'text' } */
+    /* 
+      Is collapsed filter spec  e.g. { "col.$ilike": 'text' } 
+      will transform into { col: { $ilike: ['text'] } }
+    */
     } else if(remainingStr.startsWith(".")){
       leftQ = getLeftQ(selItem);
 

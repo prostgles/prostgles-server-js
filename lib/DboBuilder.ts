@@ -2544,9 +2544,12 @@ export class DboBuilder {
         if(!this._pubSubManager){
             let onSchemaChange;
             
+            const { yes, canExecute, isSuperUs } = await PubSubManager.canCreate(this.db);
+            if(!canEXECUTE) throw "PubSubManager based subscriptions not possible: Cannot run EXECUTE statements on this connection";
+
             if(this.prostgles.opts.watchSchema && this.prostgles.opts.watchSchemaType === "DDL_trigger"){
-                if(!this.prostgles.isSuperUser){
-                    console.warn(`watchSchemaType "events" cannot be used because db user is not a superuser. Will fallback to watchSchemaType "prostgles_queries" `)
+                if(!isSuperUs){
+                    console.warn(`watchSchemaType "${this.prostgles.opts.watchSchemaType}" cannot be used because db user is not a superuser. Will fallback to watchSchemaType "prostgles_queries" `)
                 } else {
                     onSchemaChange = (event: { command: string; query: string }) => { 
                         this.prostgles.onSchemaChange(event)
@@ -2554,20 +2557,10 @@ export class DboBuilder {
                 }
             }
 
-            if(this.prostgles.isSuperUser){
-                const canExecute = await canEXECUTE(this.db);
-                if(!canExecute){
-                    console.error("PubSubManager based subscriptions not possible: Cannot run EXECUTE statements on this connection")
-                } else {
-
-                    this._pubSubManager = await PubSubManager.create({
-                        dboBuilder: this,
-                        onSchemaChange
-                    });
-                }
-            } else {
-                console.warn(`subscribe and sync cannot be used because db user is not a superuser `)
-            }
+            this._pubSubManager = await PubSubManager.create({
+                dboBuilder: this,
+                onSchemaChange
+            });
         }
         if(!this._pubSubManager) {
             console.trace("Could not create this._pubSubManager")

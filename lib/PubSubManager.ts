@@ -5,7 +5,7 @@
 
 import { PostgresNotifListenManager } from "./PostgresNotifListenManager";
 import { get } from "./utils";
-import { TableOrViewInfo, TableInfo, DBHandlerServer, TableHandler, DboBuilder, PRGLIOSocket } from "./DboBuilder";
+import { TableOrViewInfo, TableInfo, DBHandlerServer, DboBuilder, PRGLIOSocket, canEXECUTE } from "./DboBuilder";
 import { DB, isSuperUser } from "./Prostgles";
 
 import * as Bluebird from "bluebird";
@@ -143,8 +143,9 @@ export class PubSubManager {
   NOTIF_CHANNEL = {
     preffix: 'prostgles_',
     getFull: (appID?: string) => {
-      if (!this.appID && !appID) throw "No appID";
-      return this.NOTIF_CHANNEL.preffix + (appID || this.appID);
+      const finalAppId = appID ?? this.appID;
+      if (!finalAppId) throw "No appID";
+      return this.NOTIF_CHANNEL.preffix + finalAppId;
     }
   }
 
@@ -170,6 +171,12 @@ export class PubSubManager {
   //         WHERE application_name IS NOT NULL AND application_name != '' -- state = 'active';
   //     `))
 
+  public static canCreate = async (db: DB) => {
+
+    const canExecute = await canEXECUTE(db);
+    const isSuperUs = await isSuperUser(db);
+    return { canExecute, isSuperUs, yes: canExecute && isSuperUs };
+  }
 
   public static create = async (options: PubSubManagerOptions) => {
     const res = new PubSubManager(options);
@@ -665,29 +672,33 @@ export class PubSubManager {
                             
                                 --RAISE NOTICE 'SCHEMA_WATCH: %', tg_tag;
                     
+                                /* 
+                                  This event trigger will outlive a prostgles app instance. 
+                                  Must ensure it only fires if an app instance is running  
+                                */
                                 IF
-                                    EXISTS (
-                                        SELECT 1 
-                                        FROM information_schema.tables 
-                                        WHERE  table_schema = 'prostgles'
-                                        AND    table_name   = 'apps'
-                                    )          
+                                  EXISTS (
+                                    SELECT 1 
+                                    FROM information_schema.tables 
+                                    WHERE  table_schema = 'prostgles'
+                                    AND    table_name   = 'apps'
+                                  )          
                                 THEN
 
                                     SELECT LEFT(COALESCE(current_query(), ''), 5000)
                                     INTO curr_query;
                                     
                                     FOR arw IN 
-                                        SELECT * FROM prostgles.apps WHERE watching_schema IS TRUE
+                                      SELECT * FROM prostgles.apps WHERE watching_schema IS TRUE
 
                                     LOOP
-                                        PERFORM pg_notify( 
-                                            ${asValue(this.NOTIF_CHANNEL.preffix)} || arw.id, 
-                                            concat_ws(
-                                                ${asValue(PubSubManager.DELIMITER)}, 
-                                                ${asValue(this.NOTIF_TYPE.schema)}, tg_tag , TG_event, curr_query
-                                            )
-                                        );
+                                      PERFORM pg_notify( 
+                                        ${asValue(this.NOTIF_CHANNEL.preffix)} || arw.id, 
+                                        concat_ws(
+                                          ${asValue(PubSubManager.DELIMITER)}, 
+                                          ${asValue(this.NOTIF_TYPE.schema)}, tg_tag , TG_event, curr_query
+                                        )
+                                      );
                                     END LOOP;
 
                                 END IF;

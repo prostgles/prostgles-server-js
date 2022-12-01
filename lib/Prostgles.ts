@@ -7,6 +7,7 @@ import * as promise from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import FileManager, { ImageOptions, LocalConfig, S3Config } from "./FileManager";
+import { SchemaWatch } from "./SchemaWatch";
 
 const pkgj = require('../package.json');
 const version = pkgj.version;
@@ -17,7 +18,7 @@ import TableConfigurator, { TableConfig } from "./TableConfig";
 
 import { get } from "./utils";
 import { DboBuilder, DBHandlerServer, isPlainObject, PRGLIOSocket } from "./DboBuilder";
-import { PubSubManager, pickKeys } from "./PubSubManager";
+import { PubSubManager, pickKeys, log } from "./PubSubManager";
 export { DBHandlerServer }
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 
@@ -252,22 +253,21 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
   | { checkIntervalMillis: number };
 
   watchSchema?:
+    /**
+     * If true then DBoGenerated.d.ts will be updated and "onReady" will be called with new schema on both client and server
+     */
+    | boolean
 
-  /**
-   * If true then DBoGenerated.d.ts will be updated and "onReady" will be called with new schema on both client and server
-   */
-  | boolean
+    /**
+     * Will only rewrite the DBoGenerated.d.ts found in tsGeneratedTypesDir
+     * This is meant to be used in development when server restarts on file change
+     */
+    | "hotReloadMode"
 
-  /**
-   * Will only rewrite the DBoGenerated.d.ts found in tsGeneratedTypesDir
-   * This is meant to be used in development when server restarts on file change
-   */
-  | "hotReloadMode"
-
-  /**
-   * Function called when schema changes. Nothing else triggered
-   */
-  | ((event: { command: string; query: string }) => void)
+    /**
+     * Function called when schema changes. Nothing else triggered
+     */
+    | ((event: { command: string; query: string }) => void)
 
   keywords?: Keywords;
   onNotice?: (notice: AnyObject, message?: string) => void;
@@ -349,6 +349,7 @@ export class Prostgles {
 
   authHandler?: AuthHandler;
 
+  schemaWatch?: SchemaWatch;
 
   keywords = DEFAULT_KEYWORDS;
   private loaded = false;
@@ -400,10 +401,10 @@ export class Prostgles {
   async onSchemaChange(event: { command: string; query: string }) {
     const { watchSchema, watchSchemaType, onReady, tsGeneratedTypesDir } = this.opts;
     if (watchSchema && this.loaded) {
-      console.log("Schema changed");
+      log("Schema changed");
       const { query } = event;
       if (typeof query === "string" && query.includes(PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)) {
-        console.log("Schema change event excluded from triggers due to EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID");
+        log("Schema change event excluded from triggers due to EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID");
         return;
       }
 
@@ -481,10 +482,10 @@ export class Prostgles {
       await this._dboBuilder.build();
       // this._dboBuilder.destroy();
     } else {
-      this.dboBuilder = await DboBuilder.create(this as any) as any;
+      this.dboBuilder = await DboBuilder.create(this);
     }
-    if (!this.dboBuilder) throw "this.dboBuilder"
-    this.dbo = this.dboBuilder.dbo as any;
+    if (!this.dboBuilder) throw "this.dboBuilder";
+    this.dbo = this.dboBuilder.dbo;
     return this.dbo;
   }
 
@@ -504,12 +505,13 @@ export class Prostgles {
       }
       this.schema_checkIntervalMillis = setInterval(async () => {
         if(!this.loaded) return;
-        const dbuilder = await DboBuilder.create(this as any);
+        const dbuilder = await DboBuilder.create(this);
         if (dbuilder.tsTypesDefinition !== this.dboBuilder.tsTypesDefinition) {
           await this.refreshDBO();
           this.init(onReady);
         }
-      }, this.opts.watchSchemaType.checkIntervalMillis)
+      }, this.opts.watchSchemaType.checkIntervalMillis);
+      
     }
 
   }
@@ -603,10 +605,6 @@ export class Prostgles {
       } else if (this.opts.auth) {
         throw "Auth config does not work without publish";
       }
-
-      // if(this.watchSchema){
-      //     if(!(await isSuperUser(db))) throw "Cannot watchSchema without a super user schema. Set watchSchema=false or provide a super user";
-      // }
 
       this.dbEventsManager = new DBEventsManager(db, pgp);
 

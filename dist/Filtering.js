@@ -54,7 +54,13 @@ const parseFilterItem = (args) => {
             mErr("Bad filter. Could not match to a column or alias: ");
             throw " ";
         }
-        const remainingStr = fKey.slice(selItem.alias.length);
+        let remainingStr = fKey.slice(selItem.alias.length);
+        /** Has shorthand operand 'col->>key.<>'  */
+        const matchingOperand = prostgles_types_1.CompareFilterKeys.find(operand => remainingStr.endsWith(`.${operand}`));
+        if (matchingOperand) {
+            remainingStr = remainingStr.slice(-matchingOperand.length - 1);
+            rightF = { [matchingOperand]: rightF };
+        }
         /* Is json path spec */
         if (remainingStr.startsWith("->")) {
             leftQ = getLeftQ(selItem);
@@ -87,7 +93,10 @@ const parseFilterItem = (args) => {
                 leftQ += currSep.sep + asValue(remainingStr.slice(currSep.idx + currSep.sep.length, nextIdx));
                 currSep = nextSep;
             }
-            /* Is collapsed filter spec  e.g. { "col.$ilike": 'text' } */
+            /*
+              Is collapsed filter spec  e.g. { "col.$ilike": 'text' }
+              will transform into { col: { $ilike: ['text'] } }
+            */
         }
         else if (remainingStr.startsWith(".")) {
             leftQ = getLeftQ(selItem);

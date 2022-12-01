@@ -2,6 +2,7 @@
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import FileManager, { ImageOptions, LocalConfig, S3Config } from "./FileManager";
+import { SchemaWatch } from "./SchemaWatch";
 import AuthHandler, { Auth, SessionUser, AuthRequestParams } from "./AuthHandler";
 import TableConfigurator, { TableConfig } from "./TableConfig";
 import { DboBuilder, DBHandlerServer, PRGLIOSocket } from "./DboBuilder";
@@ -209,6 +210,7 @@ export declare class Prostgles {
     set dboBuilder(d: DboBuilder);
     publishParser?: PublishParser;
     authHandler?: AuthHandler;
+    schemaWatch?: SchemaWatch;
     keywords: {
         $filter: string;
         $and: string;
@@ -240,7 +242,7 @@ export declare class Prostgles {
     /**
      * Will re-create the dbo object
      */
-    refreshDBO: () => Promise<DBHandlerServer<import("./DboBuilder").TableHandlers> | undefined>;
+    refreshDBO: () => Promise<DBHandlerServer<import("./DboBuilder").TableHandlers>>;
     private initWatchSchema;
     initFileTable: () => Promise<void>;
     isSuperUser: boolean;

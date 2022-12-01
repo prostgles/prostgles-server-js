@@ -279,10 +279,10 @@ class Prostgles {
     async onSchemaChange(event) {
         const { watchSchema, watchSchemaType, onReady, tsGeneratedTypesDir } = this.opts;
         if (watchSchema && this.loaded) {
-            console.log("Schema changed");
+            (0, PubSubManager_1.log)("Schema changed");
             const { query } = event;
             if (typeof query === "string" && query.includes(PubSubManager_1.PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)) {
-                console.log("Schema change event excluded from triggers due to EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID");
+                (0, PubSubManager_1.log)("Schema change event excluded from triggers due to EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID");
                 return;
             }
             if (typeof watchSchema === "function") {
@@ -394,9 +394,6 @@ class Prostgles {
             else if (this.opts.auth) {
                 throw "Auth config does not work without publish";
             }
-            // if(this.watchSchema){
-            //     if(!(await isSuperUser(db))) throw "Cannot watchSchema without a super user schema. Set watchSchema=false or provide a super user";
-            // }
             this.dbEventsManager = new DBEventsManager_1.DBEventsManager(db, pgp);
             this.writeDBSchema();
             /* 5. Finish init and provide DBO object */
