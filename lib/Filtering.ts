@@ -76,15 +76,17 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
 
     let remainingStr = fKey.slice(selItem.alias.length);
 
-    /** Has shorthand operand 'col->>key.<>'  */
-    const matchingOperand = CompareFilterKeys.find(operand => remainingStr.endsWith(`.${operand}`));
-    if(matchingOperand){
-      remainingStr = remainingStr.slice(- matchingOperand.length - 1)
-      rightF = { [matchingOperand]: rightF }
-    }
 
     /* Is json path spec */
     if(remainingStr.startsWith("->")){
+
+      /** Has shorthand operand 'col->>key.<>'  */
+      const matchingOperand = CompareFilterKeys.find(operand => remainingStr.endsWith(`.${operand}`));
+      if(matchingOperand){
+        remainingStr = remainingStr.slice(0, -matchingOperand.length - 1)
+        rightF = { [matchingOperand]: rightF }
+      }
+
       leftQ = getLeftQ(selItem);
       
       /**
