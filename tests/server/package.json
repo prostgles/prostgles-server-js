@@ -14,7 +14,7 @@
   "license": "ISC",
   "dependencies": {
     "@types/node": "^14.14.19",
-    "express": "^4.17.1",
+    "express": "^4.17.3",
     "prostgles-server": "file:../..",
     "socket.io": "^4.5.4"
   },
