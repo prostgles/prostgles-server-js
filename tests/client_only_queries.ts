@@ -228,7 +228,7 @@ export default async function client_only(db: Required<DBHandlerClient>, auth: A
         { id: 2, public: 'public data' }
       ]);
 
-      const cols = await db.insert_rules.getColumns!();
+      const cols = await db.insert_rules.getColumns!(); 
       assert.equal(cols.filter(({ insert, update: u, select: s, delete: d }) => insert && !u && s && !d).length, 3, "Validated getColumns failed")
 
       /* Validated insert */

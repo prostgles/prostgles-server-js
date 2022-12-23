@@ -833,9 +833,14 @@ export class PubSubManager {
                             `
               await this.db.any(appQ);
               log("updated last_check");
-            } catch (e) {
+            } catch (e: any) {
               /** In some cases a query idles and blocks everything else. Terminate all similar queries */
               this.db.any("SELECT state, pg_terminate_backend(pid) from pg_stat_activity WHERE query ilike ${qid} and pid <>  pg_backend_pid();", { qid: "%" + REALTIME_TRIGGER_CHECK_QUERY + "%" });
+
+              /** If this database was dropped then stop interval */
+              if(e?.code === "3D000"){ //  && e.message.includes(this.db.$cn.database)
+                clearInterval(this.appCheck);
+              }
               console.error("appCheck FAILED: \n", e, appQ);
             }
 

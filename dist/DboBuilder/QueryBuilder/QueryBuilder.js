@@ -80,6 +80,49 @@ const parseUnix = (colName, tableAlias, allColumns) => {
     }
     return escapedName;
 };
+const JSON_Funcs = [
+    {
+        name: "$jsonb_set",
+        description: "[columnName: string, path: (string | number)[], new_value?: any, create_missing?: boolean ]   	Returns target value (columnName) with the section designated by path replaced by new_value, or with new_value added if create_missing is true (default is true) and the item designated by path does not exist",
+        singleColArg: false,
+        numArgs: 4,
+        type: "function",
+        getFields: ([column]) => column,
+        getQuery: ({ args: [colName, path = [], new_value, create_missing = true], tableAlias, allowedFields }) => {
+            if (!allowedFields.includes(colName)) {
+                throw `Unexpected: column ${colName} not found`;
+            }
+            if (!path || !Array.isArray(path) || !path.every(v => ["number", "string"].includes(typeof v))) {
+                throw "Expecting: [columnName: string, path: (string | number)[], new_value?: any, create_missing?: boolean ]";
+            }
+            const escapedName = (0, exports.asNameAlias)(colName, tableAlias);
+            return `jsonb_set(${escapedName}, ${asValue(path)}, ${asValue(new_value)}, ${create_missing})`;
+        }
+    },
+    ...[
+        ["jsonb_array_length", "Returns the number of elements in the outermost JSON array"],
+        ["jsonb_each", "Expands the outermost JSON object into a set of key/value pairs"],
+        ["jsonb_each_text", "Expands the outermost JSON object into a set of key/value pairs. The returned values will be of type text"],
+        ["jsonb_object_keys", "Returns set of keys in the outermost JSON object"],
+        ["jsonb_strip_nulls", "Returns from_json with all object fields that have null values omitted. Other null values are untouched"],
+        ["jsonb_pretty", "Returns from_json as indented JSON text "],
+        ["jsonb_to_record", "Builds an arbitrary record from a JSON object"],
+        ["jsonb_array_elements", "Expands a JSON array to a set of JSON values"],
+        ["jsonb_array_elements_text", "Expands a JSON array to a set of text values "],
+        ["jsonb_typeof", "Returns the type of the outermost JSON value as a text string. Possible types are object, array, string, number, boolean, and null "],
+    ].map(([name, description]) => ({
+        name: "$" + name,
+        description,
+        singleColArg: true,
+        numArgs: 1,
+        type: "function",
+        getFields: ([col]) => col,
+        getQuery: ({ args: [colName], tableAlias }) => {
+            const escapedName = (0, exports.asNameAlias)(colName, tableAlias);
+            return `${name}(${escapedName})`;
+        }
+    }))
+];
 const FTS_Funcs = 
 /* Full text search
   https://www.postgresql.org/docs/current/textsearch-dictionaries.html#TEXTSEARCH-SIMPLE-DICTIONARY
@@ -97,7 +140,7 @@ const FTS_Funcs =
     type: "function",
     singleColArg: true,
     numArgs: 2,
-    getFields: (args) => [args[0]],
+    getFields: ([column]) => [column],
     getQuery: ({ allColumns, args, tableAlias }) => {
         const col = (0, prostgles_types_1.asName)(args[0]);
         let qVal = args[1], qType = "to_tsquery";
@@ -387,6 +430,7 @@ exports.FUNCTIONS = [
         }
     },
     ...FTS_Funcs,
+    ...JSON_Funcs,
     ...PostGIS_Funcs,
     {
         name: "$left",

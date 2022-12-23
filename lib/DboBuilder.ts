@@ -25,7 +25,7 @@ import {
     SQLResult,
     Select,
     JoinMaker,
-    isObject, isDefined, getKeys, ProstglesError
+    isObject, isDefined, getKeys, ProstglesError, _PG_geometric
 } from "prostgles-types";
 
 export type SortItem = {
@@ -874,7 +874,7 @@ export class ViewHandler {
 
 
             let dynamicUpdateFields: string[] | undefined;
-            if(params && "parseUpdateRules" in this && (this as TableHandler).parseUpdateRules){
+            if(params && tableRules && "parseUpdateRules" in this && (this as TableHandler).parseUpdateRules){
                 if(!isPlainObject(params) || !isPlainObject(params.data) || !isPlainObject(params.filter) || params.rule !== "update") {
                     throw "params must be { rule: 'update', data, filter } but got: " + JSON.stringify(params);
                 }
@@ -918,15 +918,17 @@ export class ViewHandler {
                     update = false;
                 }
 
+                const nonOrderableUD_Types: PG_COLUMN_UDT_DATA_TYPE[] = [ ..._PG_geometric, "xml" as any];
+
                 let result: ValidatedColumnInfo = {
                     ...c,
                     label,
                     tsDataType: postgresToTsType(c.udt_name),
-                    insert: insert && Boolean(p.insert && p.insert.fields && p.insert.fields.includes(c.name)) && tableRules?.insert?.forcedData?.[c.name] === undefined,
-                    select: select && Boolean(p.select && p.select.fields && p.select.fields.includes(c.name)),
-                    orderBy: select && Boolean(p.select && p.select.fields && p.select.orderByFields.includes(c.name)),
-                    filter: Boolean(p.select && p.select.filterFields && p.select.filterFields.includes(c.name)),
-                    update: update && Boolean(p.update && p.update.fields && p.update.fields.includes(c.name)) && tableRules?.update?.forcedData?.[c.name] === undefined,
+                    insert: insert && Boolean(p.insert?.fields?.includes(c.name)) && tableRules?.insert?.forcedData?.[c.name] === undefined,
+                    select: select && Boolean(p.select?.fields?.includes(c.name)),
+                    orderBy: select && Boolean(p.select?.fields && p.select.orderByFields.includes(c.name)) && !nonOrderableUD_Types.includes(c.udt_name),
+                    filter: Boolean(p.select?.filterFields?.includes(c.name)),
+                    update: update && Boolean(p.update?.fields?.includes(c.name)) && tableRules?.update?.forcedData?.[c.name] === undefined, 
                     delete: _delete && Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)),
                     ...(prostgles?.tableConfigurator?.getColInfo({ table: this.name, col: c.name, lang }) || {}),
                     ...(fileConfig && { file: fileConfig })
