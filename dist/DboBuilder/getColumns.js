@@ -28,7 +28,7 @@ async function getColumns(lang, params, _param3, tableRules, localParams) {
                 dynamicUpdateFields = updateRules.fields;
             }
         }
-        let columns = this.columns
+        const columns = this.columns
             .filter(c => {
             const { insert, select, update } = p || {};
             return [
