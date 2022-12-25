@@ -1,8 +1,9 @@
-import { AnyObject, asName, FieldFilter, get, getKeys, InsertParams, isDefined, isObject, PG_COLUMN_UDT_DATA_TYPE } from "prostgles-types";
-import { DboBuilder, isPojoObject, LocalParams, makeErr, Media, parseError, pgp, TableHandler, TableHandlers } from "../DboBuilder";
+import { AnyObject, getKeys, InsertParams, isDefined, isObject, PG_COLUMN_UDT_DATA_TYPE } from "prostgles-types";
+import { LocalParams, TableHandlers } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 import { omitKeys } from "../PubSubManager";
-import { isFile, uploadFile } from "./uploadFile";
+import { TableHandler } from "./TableHandler";
+import { uploadFile } from "./uploadFile";
 
 /**
  * Used for doing referenced inserts within a single transaction
@@ -27,7 +28,7 @@ export async function insertDataParse(
     if(this.is_media){
       return !this.column_names.concat(MEDIA_COL_NAMES).includes(k)
     } else if(!this.columns.find(c => c.name === k)){
-      if(!isPojoObject(d[k]) && !Array.isArray(d[k])){
+      if(!isObject(d[k]) && !Array.isArray(d[k])){
         throw new Error("Invalid/Dissalowed field in data: " + k)
       } else if(!this.dboBuilder.dbo[k]){
         throw new Error("Invalid/Dissalowed nested insert table name in data: " + k)
@@ -38,7 +39,7 @@ export async function insertDataParse(
   });
   const ALLOWED_COL_TYPES: PG_COLUMN_UDT_DATA_TYPE[] = ["int2", "int4", "int8", "numeric", "uuid", "text", "varchar", "char"];
   const getColumnInserts = (d: AnyObject) => getKeys(d)
-    .filter(k => d[k] && isPojoObject(d[k]))
+    .filter(k => d[k] && isObject(d[k]))
     .map(k => {
       const insertedCol = this.columns.find(c => 
         c.name === k && 

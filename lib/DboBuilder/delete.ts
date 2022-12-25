@@ -1,8 +1,9 @@
 import pgPromise from "pg-promise";
 import { AnyObject, asName, DeleteParams, FieldFilter } from "prostgles-types";
-import { Filter, LocalParams, makeErr, parseError, TableHandler } from "../DboBuilder";
+import { Filter, LocalParams, makeErr, parseError } from "../DboBuilder";
 import { DeleteRule, TableRule } from "../PublishParser";
 import { pickKeys } from "../PubSubManager";
+import { TableHandler } from "./TableHandler";
 
 export async function _delete(this: TableHandler, filter?: Filter, params?: DeleteParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any> {
   try {

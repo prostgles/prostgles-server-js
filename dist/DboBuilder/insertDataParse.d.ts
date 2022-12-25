@@ -1,6 +1,7 @@
 import { AnyObject, InsertParams } from "prostgles-types";
-import { LocalParams, TableHandler } from "../DboBuilder";
+import { LocalParams } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
+import { TableHandler } from "./TableHandler";
 /**
  * Used for doing referenced inserts within a single transaction
  */

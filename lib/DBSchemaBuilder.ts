@@ -1,7 +1,7 @@
 import { DBSchema, isObject, TableHandler, ViewHandler } from "prostgles-types";
 import prostgles from ".";
 import { Auth } from "./AuthHandler";
-import { DBHandlerServer, DboBuilder, escapeTSNames, postgresToTsType, TableHandlers } from "./DboBuilder";
+import { DBHandlerServer, DboBuilder, escapeTSNames, postgresToTsType } from "./DboBuilder";
 import { PublishAllOrNothing, PublishParams, PublishTableRule, PublishViewRule,  } from "./PublishParser";
 import { getJSONBSchemaTSTypes } from "./validation";
 

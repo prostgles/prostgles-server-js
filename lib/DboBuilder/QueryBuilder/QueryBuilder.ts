@@ -4,10 +4,12 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { pgp, Filter, LocalParams, isPlainObject, TableHandler, ViewHandler, postgresToTsType, SortItem } from "../../DboBuilder";
+import { pgp, Filter, LocalParams, isPlainObject, postgresToTsType, SortItem } from "../../DboBuilder";
 import { TableRule } from "../../PublishParser";
 import { SelectParams, isEmpty, FieldFilter, asName, TextFilter_FullTextSearchFilterKeys, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, isObject, Select } from "prostgles-types";
 import { get } from "../../utils";
+import { TableHandler } from "../TableHandler";
+import { ViewHandler } from "../ViewHandler";
 
 
 export type SelectItem = {

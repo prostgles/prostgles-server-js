@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.insertDataParse = void 0;
 const prostgles_types_1 = require("prostgles-types");
-const DboBuilder_1 = require("../DboBuilder");
 const PubSubManager_1 = require("../PubSubManager");
 const uploadFile_1 = require("./uploadFile");
 /**
@@ -18,7 +17,7 @@ async function insertDataParse(data, param2, param3_unused, tableRules, _localPa
             return !this.column_names.concat(MEDIA_COL_NAMES).includes(k);
         }
         else if (!this.columns.find(c => c.name === k)) {
-            if (!(0, DboBuilder_1.isPojoObject)(d[k]) && !Array.isArray(d[k])) {
+            if (!(0, prostgles_types_1.isObject)(d[k]) && !Array.isArray(d[k])) {
                 throw new Error("Invalid/Dissalowed field in data: " + k);
             }
             else if (!this.dboBuilder.dbo[k]) {
@@ -30,7 +29,7 @@ async function insertDataParse(data, param2, param3_unused, tableRules, _localPa
     });
     const ALLOWED_COL_TYPES = ["int2", "int4", "int8", "numeric", "uuid", "text", "varchar", "char"];
     const getColumnInserts = (d) => (0, prostgles_types_1.getKeys)(d)
-        .filter(k => d[k] && (0, DboBuilder_1.isPojoObject)(d[k]))
+        .filter(k => d[k] && (0, prostgles_types_1.isObject)(d[k]))
         .map(k => {
         const insertedCol = this.columns.find(c => c.name === k &&
             ALLOWED_COL_TYPES.includes(c.udt_name));

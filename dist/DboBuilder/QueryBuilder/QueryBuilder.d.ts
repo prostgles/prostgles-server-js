@@ -1,6 +1,7 @@
-import { Filter, LocalParams, TableHandler, SortItem } from "../../DboBuilder";
+import { Filter, LocalParams, SortItem } from "../../DboBuilder";
 import { TableRule } from "../../PublishParser";
 import { ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, Select } from "prostgles-types";
+import { TableHandler } from "../TableHandler";
 export declare type SelectItem = {
     type: "column" | "function" | "aggregation" | "joinedColumn" | "computed";
     getFields: (args?: any[]) => string[] | "*";

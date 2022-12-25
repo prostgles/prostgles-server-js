@@ -8,6 +8,7 @@ exports.getNewQuery = exports.SelectItemBuilder = exports.COMPUTED_FIELDS = expo
 const DboBuilder_1 = require("../../DboBuilder");
 const prostgles_types_1 = require("prostgles-types");
 const utils_1 = require("../../utils");
+const ViewHandler_1 = require("../ViewHandler");
 const asNameAlias = (field, tableAlias) => {
     let result = (0, prostgles_types_1.asName)(field);
     if (tableAlias)
@@ -716,7 +717,7 @@ exports.FUNCTIONS = [
         canBeUsedForFilter: true,
         getFields: (args) => args[0],
         getQuery: ({ allowedFields, args, tableAlias, allColumns }) => {
-            const cols = DboBuilder_1.ViewHandler._parseFieldFilter(args[0], false, allowedFields);
+            const cols = ViewHandler_1.ViewHandler._parseFieldFilter(args[0], false, allowedFields);
             let term = args[1];
             const rawTerm = args[1];
             let { edgeTruncate, noFields = false, returnType, matchCase = false } = args[2] || {};

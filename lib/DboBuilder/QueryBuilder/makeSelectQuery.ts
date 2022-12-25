@@ -1,7 +1,8 @@
 
-import { prepareSort, TableHandler } from "../../DboBuilder";
+import { prepareSort } from "../../DboBuilder";
 import { SelectParams, asName } from "prostgles-types";
 import { NewQuery, SelectItem } from "./QueryBuilder";
+import { TableHandler } from "../TableHandler";
 
 /* No validation/authorisation at this point */
 export function makeSelectQuery(

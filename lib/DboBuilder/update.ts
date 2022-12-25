@@ -1,7 +1,8 @@
 import { AnyObject, getKeys, isObject, unpatchText, UpdateParams } from "prostgles-types";
-import { Filter, isPlainObject, LocalParams, makeErr, Media, parseError, TableHandler } from "../DboBuilder";
+import { Filter, isPlainObject, LocalParams, makeErr, Media, parseError } from "../DboBuilder";
 import { TableRule, ValidateRow } from "../PublishParser";
 import { omitKeys, pickKeys } from "../PubSubManager";
+import { TableHandler } from "./TableHandler";
 import { isFile, uploadFile } from "./uploadFile"
 
 export async function update(this: TableHandler, filter: Filter, _newData: AnyObject, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<AnyObject | void> {

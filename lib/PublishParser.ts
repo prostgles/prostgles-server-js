@@ -1,6 +1,6 @@
 import { getKeys, RULE_METHODS, AnyObject, get, TableSchemaForClient, DBSchemaTable, MethodKey, TableInfo, FullFilter, isObject } from "prostgles-types";
 import { AuthResult, SessionUser } from "./AuthHandler";
-import { CommonTableRules, Filter, isPlainObject, LocalParams, PRGLIOSocket, TableHandler, TableOrViewInfo, TableSchemaColumn, ViewHandler } from "./DboBuilder";
+import { CommonTableRules, Filter, isPlainObject, LocalParams, PRGLIOSocket, TableOrViewInfo, TableSchemaColumn } from "./DboBuilder";
 import { Prostgles, DBHandlerServer, DB, TABLE_METHODS } from "./Prostgles";
 import type { DBOFullyTyped, PublishFullyTyped } from "./DBSchemaBuilder";
 export type Method = (...args: any) => (any | Promise<any>);
@@ -99,6 +99,8 @@ const RULE_TO_METHODS = [
 
 import { FieldFilter, SelectParams } from "prostgles-types";
 import { DEFAULT_SYNC_BATCH_SIZE } from "./PubSubManager";
+import { TableHandler } from "./DboBuilder/TableHandler";
+import { ViewHandler } from "./DboBuilder/ViewHandler";
 
 export type InsertRequestData = {
   data: object | object[]

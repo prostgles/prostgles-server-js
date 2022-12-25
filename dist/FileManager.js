@@ -8,7 +8,6 @@ const stream = require("stream");
 const sharp = require("sharp");
 const check_disk_space_1 = require("check-disk-space");
 const prostgles_types_1 = require("prostgles-types");
-const DboBuilder_1 = require("./DboBuilder");
 const HOUR = 3600 * 1000;
 const asSQLIdentifier = async (name, db) => {
     return (await db.one("select format('%I', $1) as name", [name]))?.name;
@@ -17,6 +16,7 @@ exports.asSQLIdentifier = asSQLIdentifier;
 const aws_sdk_2 = require("aws-sdk");
 const runSQL_1 = require("./DboBuilder/runSQL");
 const path = require("path");
+const ViewHandler_1 = require("./DboBuilder/ViewHandler");
 class FileManager {
     constructor(config, imageOptions) {
         this.getFileUrl = (name) => this.fileRoute ? `${this.fileRoute}/${name}` : "";
@@ -453,21 +453,21 @@ class FileManager {
                         "text",
                         "application",
                     ];
-                    const allowedContent = DboBuilder_1.ViewHandler._parseFieldFilter(colConfig.acceptedContent, false, CONTENTS);
+                    const allowedContent = ViewHandler_1.ViewHandler._parseFieldFilter(colConfig.acceptedContent, false, CONTENTS);
                     if (!allowedContent.some(c => mime.mime.startsWith(c))) {
                         throw new Error(`Dissallowed content type provided: ${mime.mime.split("/")[0]}. Allowed content types: ${allowedContent} `);
                     }
                 }
                 else if ("acceptedContentType" in colConfig && colConfig.acceptedContentType && colConfig.acceptedContentType !== "*") {
                     const mime = await (0, exports.getFileType)(buffer, fileName);
-                    const allowedContentTypes = DboBuilder_1.ViewHandler._parseFieldFilter(colConfig.acceptedContentType, false, (0, prostgles_types_1.getKeys)(prostgles_types_1.CONTENT_TYPE_TO_EXT));
+                    const allowedContentTypes = ViewHandler_1.ViewHandler._parseFieldFilter(colConfig.acceptedContentType, false, (0, prostgles_types_1.getKeys)(prostgles_types_1.CONTENT_TYPE_TO_EXT));
                     if (!allowedContentTypes.some(c => c === mime.mime)) {
                         throw new Error(`Dissallowed MIME provided: ${mime.mime}. Allowed MIME values: ${allowedContentTypes} `);
                     }
                 }
                 else if ("acceptedFileTypes" in colConfig && colConfig.acceptedFileTypes && colConfig.acceptedFileTypes !== "*") {
                     const mime = await (0, exports.getFileType)(buffer, fileName);
-                    const allowedExtensions = DboBuilder_1.ViewHandler._parseFieldFilter(colConfig.acceptedFileTypes, false, Object.values(prostgles_types_1.CONTENT_TYPE_TO_EXT).flat());
+                    const allowedExtensions = ViewHandler_1.ViewHandler._parseFieldFilter(colConfig.acceptedFileTypes, false, Object.values(prostgles_types_1.CONTENT_TYPE_TO_EXT).flat());
                     if (!allowedExtensions.some(c => c === mime.ext)) {
                         throw new Error(`Dissallowed extension provided: ${mime.ext}. Allowed extension values: ${allowedExtensions} `);
                     }

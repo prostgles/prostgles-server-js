@@ -1,6 +1,7 @@
 import { AnyObject, getKeys, isObject } from "prostgles-types"
-import { LocalParams, Media, TableHandler } from "../DboBuilder";
+import { LocalParams, Media } from "../DboBuilder";
 import { ValidateRow, ValidateUpdateRow } from "../PublishParser";
+import { TableHandler } from "./TableHandler";
 
 export const isFile = (row: AnyObject) => {
   return Boolean(row && isObject(row) && getKeys(row).sort().join() === ["name", "data"].sort().join() && row.data && (typeof row.data === "string" || Buffer.isBuffer(row.data)) && typeof row.name === "string")

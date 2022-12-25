@@ -9,7 +9,7 @@ import checkDiskSpace from 'check-disk-space';
 
 import { DB, DBHandlerServer, ExpressApp, Prostgles } from './Prostgles';
 import { ALLOWED_CONTENT_TYPE, ALLOWED_EXTENSION, asName, CONTENT_TYPE_TO_EXT, getKeys, isDefined, isObject, ValidatedColumnInfo } from 'prostgles-types';
-import { TableHandler, ViewHandler } from './DboBuilder';
+
 
 const HOUR = 3600 * 1000;
 
@@ -80,6 +80,8 @@ export type UploadedItem = {
 import AWS from 'aws-sdk';
 import { canCreateTables } from "./DboBuilder/runSQL";
 import * as path from "path";
+import { TableHandler } from "./DboBuilder/TableHandler";
+import { ViewHandler } from "./DboBuilder/ViewHandler";
 export default class FileManager {
 
   static testCredentials = async (accessKeyId: string, secretAccessKey: string) => {

@@ -1,8 +1,9 @@
 import pgPromise from "pg-promise";
 import { AnyObject, asName, FieldFilter, get, getKeys, InsertParams, isObject } from "prostgles-types";
-import { isPlainObject, isPojoObject, LocalParams, makeErr, parseError, pgp, TableHandler } from "../DboBuilder";
+import { isPlainObject, LocalParams, makeErr, parseError, pgp } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 import { asValue, omitKeys, pickKeys } from "../PubSubManager";
+import { TableHandler } from "./TableHandler";
 
 export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any | any[] | boolean> {
   // const localParams = _localParams || {};
@@ -93,7 +94,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
     const makeQuery = async (_row: AnyObject | undefined, isOne = false) => {
       let row = { ..._row };
 
-      if (!isPojoObject(row)) {
+      if (!isObject(row)) {
         console.trace(row)
         throw "\ninvalid insert data provided -> " + JSON.stringify(row);
       }
