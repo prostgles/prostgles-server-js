@@ -24,7 +24,7 @@ async function getColumns(lang, params, _param3, tableRules, localParams) {
             }
             else {
                 const { data, filter } = params;
-                const updateRules = await this.parseUpdateRules(filter, data, undefined, tableRules, { ...localParams, testRule: true });
+                const updateRules = await this.parseUpdateRules(filter, data, undefined, tableRules, localParams);
                 dynamicUpdateFields = updateRules.fields;
             }
         }
