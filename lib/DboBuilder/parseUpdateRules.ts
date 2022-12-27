@@ -56,7 +56,8 @@ export async function parseUpdateRules(
     finalUpdateFilter = (await this.prepareWhere({ filter, forcedFilter, filterFields, localParams, tableRule: tableRules })).filter;
     if (forcedFilter) {
       const match = await this.findOne(finalUpdateFilter);
-      if (!match) {
+      const requiredItem = await this.findOne(filter);
+      if (!match && requiredItem) {
         fields = [];
       }
     }
