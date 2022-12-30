@@ -43,8 +43,8 @@ async function parseUpdateRules(filter, newData, params, tableRules, localParams
              */
             if (testRule) {
                 for await (const [dfIndex, dfRule] of tableRules.update.dynamicFields.entries()) {
-                    const condition = await this.getCondition({ allowed_colnames: this.column_names, filter: dfRule.filter });
-                    if (!condition)
+                    const condition = await this.prepareWhere({ filterFields: this.column_names, filter: dfRule.filter, localParams, tableRule: tableRules });
+                    if (!condition.where)
                         throw "dynamicFields.filter cannot be empty: " + JSON.stringify(dfRule);
                     await this.find(dfRule.filter, { limit: 0 });
                     /** Ensure dynamicFields filters do not overlap */

@@ -66,7 +66,7 @@ class ColSet {
       if (!col) throw "Unexpected missing col name";
 
       /**
-       * Add utility functions for PostGIS data
+       * Add conversion functions for PostGIS data
        */
       let escapedVal: string = "";
       if (["geometry", "geography"].includes(col.udt_name) && row[key] && isPlainObject(row[key])) {
@@ -74,16 +74,34 @@ class ColSet {
         const basicFunc = (args: any[]) => {
           return args.map(arg => asValue(arg)).join(", ")
         }
-        const basicFuncNames = ["ST_GeomFromText", "ST_Point", "ST_MakePoint", "ST_MakePointM", "ST_PointFromText", "ST_GeomFromEWKT", "ST_GeomFromGeoJSON"]
+
+        type ConvertionFunc =  { name: string; getQuery: (args: any[]) => string; }
+        const convertionFuncs: ConvertionFunc[] = [
+          ...[
+          "ST_GeomFromText", 
+          "ST_Point",
+          "ST_MakePoint",
+          "ST_MakePointM",
+          "ST_PointFromText",
+          "ST_GeomFromEWKT",
+          "ST_GeomFromGeoJSON"].map(name => ({
+            name, 
+            getQuery: () => `${name}(${basicFunc(funcArgs)})`
+          })),
+          {
+            name: "to_timestamp",
+            getQuery: (args: any[]) => `to_timestamp(${asValue(args[0])}::BIGINT/1000.0)::timestamp`
+          }
+        ];
 
         const dataKeys = Object.keys(row[key]);
         const funcName = dataKeys[0];
-        const funcExists = basicFuncNames.includes(funcName);
+        const func = convertionFuncs.find(f => f.name === funcName); 
         const funcArgs = row[key]?.[funcName]
-        if (dataKeys.length !== 1 || !funcExists || !Array.isArray(funcArgs)) {
-          throw `Expecting only one function key (${basicFuncNames.join(", ")}) \nwith an array of arguments \n within column (${key}) data but got: ${JSON.stringify(row[key])} \nExample: { geo_col: { ST_GeomFromText: ["POINT(-71.064544 42.28787)", 4326] } }`;
+        if (dataKeys.length !== 1 || !func || !Array.isArray(funcArgs)) {
+          throw `Expecting only one function key (${convertionFuncs.join(", ")}) \nwith an array of arguments \n within column (${key}) data but got: ${JSON.stringify(row[key])} \nExample: { geo_col: { ST_GeomFromText: ["POINT(-71.064544 42.28787)", 4326] } }`;
         }
-        escapedVal = `${funcName}(${basicFunc(funcArgs)})`
+        escapedVal = func.getQuery(funcArgs);
 
       } else {
         /** Prevent pg-promise formatting jsonb */

@@ -182,7 +182,7 @@ const parseUnix = (colName: string, tableAlias: string | undefined,  allColumns:
   if(!col) throw `Unexpected: column ${colName} not found`;
   const escapedName =  asNameAlias(colName, tableAlias);
   if(col.udt_name === "int8"){
-    return `to_timestamp(${escapedName}/1000)`
+    return `to_timestamp(${escapedName}/1000.0)`
   }
 
   return escapedName;
