@@ -70,8 +70,15 @@ export async function parseUpdateRules(
        */
       if (testRule) {
         for await (const [dfIndex, dfRule] of tableRules.update.dynamicFields.entries()) {
+
+          /**
+           * Validated filter and fields
+           */
           const condition = await this.prepareWhere({ filterFields: this.column_names, filter: dfRule.filter, localParams, tableRule: tableRules }); 
           if (!condition.where) throw "dynamicFields.filter cannot be empty: " + JSON.stringify(dfRule);
+          await this.validateViewRules({ fields: dfRule.fields, filterFields, returningFields, forcedFilter, dynamicFields: tableRules.update.dynamicFields, rule: "update" });
+
+
           await this.find(dfRule.filter, { limit: 0 });
 
           /** Ensure dynamicFields filters do not overlap */
@@ -98,7 +105,7 @@ export async function parseUpdateRules(
         if (match) {
 
           /** Ensure it doesn't overlap with other dynamicFields.filter */
-          if (matchedRule) {
+          if (matchedRule && !testRule) {
             throw "Your update is targeting multiple tableRules.update.dynamicFields. Restrict update filter to only target one rule";
           }
 
