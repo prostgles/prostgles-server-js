@@ -7,10 +7,11 @@ import { omitKeys } from "../PubSubManager";
 import { _delete } from "./delete";
 import { insert } from "./insert";
 import { insertDataParse } from "./insertDataParse";
-import { COMPUTED_FIELDS, FUNCTIONS, SelectItem, SelectItemBuilder } from "./QueryBuilder/QueryBuilder";
+import { SelectItem, SelectItemBuilder } from "./QueryBuilder/QueryBuilder";
 import { update } from "./update";
 import { JoinPaths, ViewHandler } from "./ViewHandler";
 import { parseUpdateRules } from "./parseUpdateRules";
+import { COMPUTED_FIELDS, FUNCTIONS } from "./QueryBuilder/Functions";
 
 
 type ValidatedParams = {
@@ -78,11 +79,11 @@ export class TableHandler extends ViewHandler {
         condition = filterOpts.where,
         throttle = params?.throttle || 0,
         selectParams = omitKeys(params || {}, ["throttle"]);
-
-      // const { subOne = false } = localParams || {};
+ 
+      /** app_triggers condition field has an index which limits it's value */
       const filterSize = JSON.stringify(filter || {}).length;
       if (filterSize * 4 > 2704) {
-        throw "filter too big. Might exceed the btree version 4 maximum 2704"
+        throw "filter too big. Might exceed the btree version 4 maximum 2704. Use a primary key or a $rowhash filter instead"
       }
 
       if (!localFunc) {
@@ -103,8 +104,7 @@ export class TableHandler extends ViewHandler {
               socket_id: socket?.id,
               table_name: this.name,
               throttle,
-              last_throttled: 0,
-              // subOne
+              last_throttled: 0, 
             }).then(channelName => ({ channelName }));
           }) as string;
       } else {
@@ -120,8 +120,7 @@ export class TableHandler extends ViewHandler {
           socket_id: undefined,
           table_name: this.name,
           throttle,
-          last_throttled: 0,
-          // subOne
+          last_throttled: 0, 
         }).then(channelName => ({ channelName }));
         const unsubscribe = async () => {
           const pubSubManager = await this.dboBuilder.getPubSubManager();

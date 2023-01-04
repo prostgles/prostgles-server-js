@@ -22,7 +22,8 @@ import { Graph } from "../shortestPath";
 import { TableRule, UpdateRule, ValidateRow } from "../PublishParser";
 import { asValue } from "../PubSubManager";
 import { TableHandler } from "./TableHandler";
-import { asNameAlias, COMPUTED_FIELDS, FieldSpec, FUNCTIONS, getNewQuery, parseFunction, parseFunctionObject, SelectItem, SelectItemValidated } from "./QueryBuilder/QueryBuilder";
+import { asNameAlias,  getNewQuery, parseFunctionObject, SelectItem, SelectItemValidated } from "./QueryBuilder/QueryBuilder";
+import { COMPUTED_FIELDS, FieldSpec, FUNCTIONS, parseFunction,  } from "./QueryBuilder/Functions";
 import { parseFilterItem } from "../Filtering";
 import { getColumns } from "./getColumns";
 

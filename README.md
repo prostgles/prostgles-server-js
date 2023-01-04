@@ -14,8 +14,8 @@
  
   * CRUD operations 
   * Subscriptions to data changes
-  * Policies and Rules for client data access
-  * Client-Server data replication
+  * Fine grained access control
+  * Optimistic data replication
   * Generated TypeScript Definition for Database schema
 
 ## Installation
@@ -80,31 +80,30 @@ prostgles({
 
 ./public/index.html
 ```html
-
-	  
+ 
 <!DOCTYPE html>
 <html>
-	<head>
-		<title> Prostgles </title>
+  <head>
+   <title> Prostgles </title>
+   
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://unpkg.com/socket.io-client@latest/dist/socket.io.min.js" type="text/javascript"></script>
+    <script src="https://unpkg.com/prostgles-client@latest/dist/index.js" type="text/javascript"></script>	
+  </head>
+  <body>
 
-		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<script src="https://unpkg.com/socket.io-client@latest/dist/socket.io.min.js" type="text/javascript"></script>
-		<script src="https://unpkg.com/prostgles-client@latest/dist/index.js" type="text/javascript"></script>	
-	</head>
-	<body>
+    <script>
 
-		<script>
+      prostgles({
+        socket: io(), 
+        onReady: async (dbo, dbsMethods, schemaTables, auth) => {
 
-			prostgles({
-				socket: io(), 
-				onReady: async ({ db }) => {
+        }
+      });
 
-				}
-			});
-
-		</script>
-		
-	</body>
+    </script>
+    
+  </body>
 </html>
 ```
 

@@ -310,18 +310,6 @@ export class PubSubManager {
                             check_frequency_ms  INTEGER NOT NULL  
                         );
                         COMMENT ON TABLE prostgles.apps IS 'Keep track of prostgles server apps connected to db to combine common triggers. Heartbeat used due to no logout triggers in postgres';
-                    
-/*
-                        CREATE TABLE IF NOT EXISTS prostgles.triggers (
-                            table_name      TEXT NOT NULL,
-                            condition       TEXT NOT NULL,
-                            app_ids         TEXT[] NOT NULL,
-                            inserted        TIMESTAMP NOT NULL DEFAULT NOW(),
-                            last_used       TIMESTAMP NOT NULL DEFAULT NOW(),
-                            PRIMARY KEY (table_name, condition)
-                        );
-                        COMMENT ON TABLE prostgles.triggers IS 'Tables and conditions that are currently subscribed/synced';
-*/
 
                         CREATE TABLE IF NOT EXISTS prostgles.app_triggers (
                             app_id          TEXT NOT NULL,
@@ -329,7 +317,7 @@ export class PubSubManager {
                             condition       TEXT NOT NULL,
                             inserted        TIMESTAMP NOT NULL DEFAULT NOW(),
                             last_used       TIMESTAMP NOT NULL DEFAULT NOW(),
-                            PRIMARY KEY (app_id, table_name, condition)
+                            PRIMARY KEY (app_id, table_name, condition) -- This unqique index limits the condition column value to be less than 'SELECT current_setting('block_size');'
                         );
                         COMMENT ON TABLE prostgles.app_triggers IS 'Tables and conditions that are currently subscribed/synced';
 

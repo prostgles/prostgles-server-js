@@ -7,9 +7,10 @@ const prostgles_types_1 = require("prostgles-types");
 const DboBuilder_1 = require("../DboBuilder");
 const PubSubManager_1 = require("../PubSubManager");
 const QueryBuilder_1 = require("./QueryBuilder/QueryBuilder");
+const Functions_1 = require("./QueryBuilder/Functions");
 const Filtering_1 = require("../Filtering");
 const getColumns_1 = require("./getColumns");
-const FILTER_FUNCS = QueryBuilder_1.FUNCTIONS.filter(f => f.canBeUsedForFilter);
+const FILTER_FUNCS = Functions_1.FUNCTIONS.filter(f => f.canBeUsedForFilter);
 class ColSet {
     constructor(columns, tableName) {
         this.opts = { columns, tableName, colNames: columns.map(c => c.name) };
@@ -386,7 +387,7 @@ class ViewHandler {
             name: fieldName,
             getQuery: ({ tableAlias }) => (0, QueryBuilder_1.asNameAlias)(fieldName, tableAlias),
             selected: false
-        })).concat(QueryBuilder_1.COMPUTED_FIELDS.map(c => ({
+        })).concat(Functions_1.COMPUTED_FIELDS.map(c => ({
             type: c.type,
             name: c.name,
             getQuery: ({ tableAlias, allowedFields }) => c.getQuery({
@@ -956,7 +957,7 @@ class ViewHandler {
         if (complexFilterKey in data) {
             const getFuncQuery = (funcData) => {
                 const { funcName, args } = (0, QueryBuilder_1.parseFunctionObject)(funcData);
-                const funcDef = (0, QueryBuilder_1.parseFunction)({ func: funcName, args, functions: QueryBuilder_1.FUNCTIONS, allowedFields: allowed_colnames });
+                const funcDef = (0, Functions_1.parseFunction)({ func: funcName, args, functions: Functions_1.FUNCTIONS, allowedFields: allowed_colnames });
                 return funcDef.getQuery({ args, tableAlias, allColumns: this.columns, allowedFields: allowed_colnames });
             };
             const complexFilter = data[complexFilterKey];

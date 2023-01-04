@@ -11,6 +11,7 @@ const QueryBuilder_1 = require("./QueryBuilder/QueryBuilder");
 const update_1 = require("./update");
 const ViewHandler_1 = require("./ViewHandler");
 const parseUpdateRules_1 = require("./parseUpdateRules");
+const Functions_1 = require("./QueryBuilder/Functions");
 class TableHandler extends ViewHandler_1.ViewHandler {
     constructor(db, tableOrViewInfo, dboBuilder, t, dbTX, joinPaths) {
         super(db, tableOrViewInfo, dboBuilder, t, dbTX, joinPaths);
@@ -24,8 +25,8 @@ class TableHandler extends ViewHandler_1.ViewHandler {
                     allFields: this.column_names.slice(0),
                     allowedFields,
                     allowedOrderByFields: allowedFields,
-                    computedFields: QueryBuilder_1.COMPUTED_FIELDS,
-                    functions: QueryBuilder_1.FUNCTIONS.filter(f => f.type === "function" && f.singleColArg),
+                    computedFields: Functions_1.COMPUTED_FIELDS,
+                    functions: Functions_1.FUNCTIONS.filter(f => f.type === "function" && f.singleColArg),
                     isView: this.is_view,
                     columns: this.columns,
                 });
@@ -71,10 +72,10 @@ class TableHandler extends ViewHandler_1.ViewHandler {
                 throw " Cannot have localFunc AND socket ";
             }
             const { filterFields, forcedFilter } = table_rules?.select || {}, filterOpts = await this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: undefined, localParams, tableRule: table_rules }), condition = filterOpts.where, throttle = params?.throttle || 0, selectParams = (0, PubSubManager_1.omitKeys)(params || {}, ["throttle"]);
-            // const { subOne = false } = localParams || {};
+            /** app_triggers condition field has an index which limits it's value */
             const filterSize = JSON.stringify(filter || {}).length;
             if (filterSize * 4 > 2704) {
-                throw "filter too big. Might exceed the btree version 4 maximum 2704";
+                throw "filter too big. Might exceed the btree version 4 maximum 2704. Use a primary key or a $rowhash filter instead";
             }
             if (!localFunc) {
                 if (!this.dboBuilder.prostgles.isSuperUser)
@@ -95,7 +96,6 @@ class TableHandler extends ViewHandler_1.ViewHandler {
                         table_name: this.name,
                         throttle,
                         last_throttled: 0,
-                        // subOne
                     }).then(channelName => ({ channelName }));
                 });
             }
@@ -113,7 +113,6 @@ class TableHandler extends ViewHandler_1.ViewHandler {
                     table_name: this.name,
                     throttle,
                     last_throttled: 0,
-                    // subOne
                 }).then(channelName => ({ channelName }));
                 const unsubscribe = async () => {
                     const pubSubManager = await this.dboBuilder.getPubSubManager();
