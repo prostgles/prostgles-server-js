@@ -573,7 +573,7 @@ export default class FileManager {
             }
           } else {
             try {
-              const query = `ALTER TABLE ${asName(tableName)} ADD COLUMN ${asName(colName)} UUID REFERENCES ${asName(tableName)} (id);`
+              const query = `ALTER TABLE ${asName(refTable)} ADD COLUMN ${asName(colName)} UUID REFERENCES ${asName(tableName)} (id);`
               console.log(`Creating referenced file column ${refTable} (${colName})...\n${query}`);
               await runQuery(query);
               console.log("SUCCESS: " + query);
