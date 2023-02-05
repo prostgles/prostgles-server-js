@@ -786,13 +786,15 @@ export class Prostgles {
         socket.removeAllListeners(CHANNELS.METHOD)
         socket.on(CHANNELS.METHOD, async ({ method, params }: SocketMethodRequest, cb = (...callback: any) => { }) => {
           try {
-            const methods = await this.publishParser?.getAllowedMethods(socket) as any;
+            const methods = await this.publishParser?.getAllowedMethods(socket);
 
             if (!methods || !methods[method]) {
               cb("Disallowed/missing method " + JSON.stringify(method));
             } else {
               try {
-                const res = await methods[method](...params);
+                const methodDef = methods[method];
+                const onRun = (typeof methodDef === "function" || typeof (methodDef as any).then === "function")? (methodDef as Function) : methodDef.run;
+                const res = await onRun(...params);
                 cb(null, res);
               } catch (err) {
                 makeSocketError(cb, err);

@@ -571,7 +571,9 @@ class Prostgles {
                         }
                         else {
                             try {
-                                const res = await methods[method](...params);
+                                const methodDef = methods[method];
+                                const onRun = (typeof methodDef === "function" || typeof methodDef.then === "function") ? methodDef : methodDef.run;
+                                const res = await onRun(...params);
                                 cb(null, res);
                             }
                             catch (err) {
