@@ -1,9 +1,8 @@
-import { AnyObject, TableSchemaForClient, DBSchemaTable, FullFilter } from "prostgles-types";
+import { AnyObject, TableSchemaForClient, DBSchemaTable, FullFilter, Method } from "prostgles-types";
 import { AuthResult, SessionUser } from "./AuthHandler";
 import { CommonTableRules, LocalParams, PRGLIOSocket, TableOrViewInfo, TableSchemaColumn } from "./DboBuilder";
 import { Prostgles, DBHandlerServer, DB } from "./Prostgles";
 import type { DBOFullyTyped, PublishFullyTyped } from "./DBSchemaBuilder";
-export declare type Method = (...args: any) => (any | Promise<any>);
 export declare type PublishMethods<S = void, SUser extends SessionUser = SessionUser> = (params: PublishParams<S, SUser>) => {
     [key: string]: Method;
 } | Promise<{
@@ -257,14 +256,16 @@ export declare type PublishedResult<Schema = void> = PublishAllOrNothing | Publi
 export declare type Publish<Schema = void, SUser extends SessionUser = SessionUser> = PublishedResult<Schema> | ((params: PublishParams<Schema, SUser>) => Awaitable<PublishedResult<Schema>>);
 export declare class PublishParser {
     publish: any;
-    publishMethods?: any;
+    publishMethods?: PublishMethods<void, SessionUser<AnyObject, AnyObject>> | undefined;
     publishRawSQL?: any;
     dbo: DBHandlerServer;
     db: DB;
     prostgles: Prostgles;
-    constructor(publish: any, publishMethods: any, publishRawSQL: any, dbo: DBHandlerServer, db: DB, prostgles: Prostgles);
+    constructor(publish: any, publishMethods: PublishMethods<void, SessionUser<AnyObject, AnyObject>> | undefined, publishRawSQL: any, dbo: DBHandlerServer, db: DB, prostgles: Prostgles);
     getPublishParams(localParams: LocalParams, clientInfo?: AuthResult): Promise<PublishParams>;
-    getMethods(socket: any, userData?: AuthResult): Promise<{}>;
+    getAllowedMethods(socket: any, userData?: AuthResult): Promise<{
+        [key: string]: Method;
+    }>;
     /**
      * Parses the first level of publish. (If false then nothing if * then all tables and views)
      * @param socket

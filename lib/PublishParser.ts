@@ -1,9 +1,9 @@
-import { getKeys, RULE_METHODS, AnyObject, get, TableSchemaForClient, DBSchemaTable, MethodKey, TableInfo, FullFilter, isObject } from "prostgles-types";
+import { getKeys, RULE_METHODS, AnyObject, get, TableSchemaForClient, DBSchemaTable, MethodKey, TableInfo, FullFilter, isObject, Method } from "prostgles-types";
 import { AuthResult, SessionUser } from "./AuthHandler";
 import { CommonTableRules, Filter, isPlainObject, LocalParams, PRGLIOSocket, TableOrViewInfo, TableSchemaColumn } from "./DboBuilder";
 import { Prostgles, DBHandlerServer, DB, TABLE_METHODS } from "./Prostgles";
 import type { DBOFullyTyped, PublishFullyTyped } from "./DBSchemaBuilder";
-export type Method = (...args: any) => (any | Promise<any>);
+
 export type PublishMethods<S = void, SUser extends SessionUser = SessionUser> = (params: PublishParams<S, SUser>) => { [key: string]: Method } | Promise<{ [key: string]: Method } | null>;
 
 export type Awaitable<T> = T | Promise<T>;
@@ -373,13 +373,13 @@ export type Publish<Schema = void, SUser extends SessionUser = SessionUser> = Pu
 
 export class PublishParser {
   publish: any;
-  publishMethods?: any;
+  publishMethods?: PublishMethods<void, SessionUser<AnyObject, AnyObject>> | undefined;
   publishRawSQL?: any;
   dbo: DBHandlerServer;
   db: DB
   prostgles: Prostgles;
 
-  constructor(publish: any, publishMethods: any, publishRawSQL: any, dbo: DBHandlerServer, db: DB, prostgles: Prostgles) {
+  constructor(publish: any, publishMethods: PublishMethods<void, SessionUser<AnyObject, AnyObject>> | undefined, publishRawSQL: any, dbo: DBHandlerServer, db: DB, prostgles: Prostgles) {
     this.publish = publish;
     this.publishMethods = publishMethods;
     this.publishRawSQL = publishRawSQL;
@@ -405,16 +405,17 @@ export class PublishParser {
     }
   }
 
-  async getMethods(socket: any, userData?: AuthResult) {
-    let methods = {};
+  async getAllowedMethods(socket: any, userData?: AuthResult): Promise<{ [key: string]: Method; }> {
+    let methods: { [key: string]: Method; } = {};
 
     const publishParams = await this.getPublishParams({ socket }, userData);
     const _methods = await applyParamsIfFunc(this.publishMethods, publishParams);
 
     if (_methods && Object.keys(_methods).length) {
       getKeys(_methods).map(key => {
-        if (_methods[key] && (typeof _methods[key] === "function" || typeof _methods[key].then === "function")) {
-          //@ts-ignore
+        const isFuncLike = (maybeFunc: any) => (typeof maybeFunc === "function" || maybeFunc && typeof maybeFunc.then === "function");
+        const method = _methods[key]
+        if (method && (isFuncLike(method) || isObject(method) && isFuncLike(method.run))) {
           methods[key] = _methods[key];
         } else {
           throw `invalid publishMethods item -> ${key} \n Expecting a function or promise`

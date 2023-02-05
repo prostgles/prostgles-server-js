@@ -565,10 +565,10 @@ export default class FileManager {
                   await runQuery(query);
                   console.log("SUCCESS: " + query);
                 } catch(e){
-                  throw new Error(`Could not add constraing. Err: ${e instanceof Error? e.message : JSON.stringify(e)}`)
+                  console.error(`Could not add constraing. Err: ${e instanceof Error? e.message : JSON.stringify(e)}`)
                 }
               } else {
-                throw new Error(`Referenced file column ${refTable} (${colName}) exists but is not of required type (UUID). Choose a different column name or ALTER the existing column to match the type and the data found in file table ${tableName}(id)`);
+                console.error(`Referenced file column ${refTable} (${colName}) exists but is not of required type (UUID). Choose a different column name or ALTER the existing column to match the type and the data found in file table ${tableName}(id)`);
               }
             }
           } else {
@@ -578,7 +578,7 @@ export default class FileManager {
               await runQuery(query);
               console.log("SUCCESS: " + query);
             } catch(e){
-              throw new Error(`FAILED. Err: ${e instanceof Error? e.message : JSON.stringify(e)}`)
+              console.error(`FAILED. Err: ${e instanceof Error? e.message : JSON.stringify(e)}`)
             }
           }
           
@@ -588,7 +588,9 @@ export default class FileManager {
         const lookupTableName = await this.parseSQLIdentifier(`prostgles_lookup_${tableName}_${refTable}`);
         const pKeyFields = cols.filter(f => f.is_pkey);
   
-        if(pKeyFields.length !== 1) throw `Could not make link table for ${refTable}. ${pKeyFields} must have exactly one primary key column. Current pkeys: ${pKeyFields.map(f => f.name)}`;
+        if(pKeyFields.length !== 1) {
+          console.error(`Could not make link table for ${refTable}. ${pKeyFields} must have exactly one primary key column. Current pkeys: ${pKeyFields.map(f => f.name)}`);
+        }
   
         const pkField = pKeyFields[0];
         const refType = referencedTables[refTable];

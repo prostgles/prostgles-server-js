@@ -22,7 +22,7 @@ import { PubSubManager, pickKeys, log } from "./PubSubManager";
 export { DBHandlerServer }
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 
-import { SQLRequest, TableSchemaForClient, CHANNELS, AnyObject, ClientSchema, getKeys, DBSchemaTable, FileColumnConfig } from "prostgles-types";
+import { SQLRequest, TableSchemaForClient, CHANNELS, AnyObject, ClientSchema, getKeys, DBSchemaTable, FileColumnConfig, isObject } from "prostgles-types";
 import { Publish, PublishMethods, PublishParams, PublishParser } from "./PublishParser";
 import { DBEventsManager } from "./DBEventsManager";
 
@@ -786,7 +786,7 @@ export class Prostgles {
         socket.removeAllListeners(CHANNELS.METHOD)
         socket.on(CHANNELS.METHOD, async ({ method, params }: SocketMethodRequest, cb = (...callback: any) => { }) => {
           try {
-            const methods = await this.publishParser?.getMethods(socket) as any;
+            const methods = await this.publishParser?.getAllowedMethods(socket) as any;
 
             if (!methods || !methods[method]) {
               cb("Disallowed/missing method " + JSON.stringify(method));
@@ -881,11 +881,23 @@ export class Prostgles {
         });
       }
   
-      const methods = await publishParser?.getMethods(socket, userData);
+      const methods = await publishParser?.getAllowedMethods(socket, userData);
+
+      const methodSchema: ClientSchema["methods"] = !methods? [] : getKeys(methods).map(methodName => {
+        const method = methods[methodName];
+ 
+        if(isObject(method) && "run" in method){
+          return {
+            name: methodName,
+            ...pickKeys(method, ["input", "output"])
+          }
+        }
+        return methodName;
+      });
   
       const clientSchema: ClientSchema = {
         schema,
-        methods: getKeys(methods ?? {}),
+        methods: methodSchema, 
         tableSchema: tables,
         rawSQL,
         joinTables: joinTables2,
