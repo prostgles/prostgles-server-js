@@ -64,6 +64,15 @@ function getDbConnection(dbConnection, options, debugQueries = false, onNotice) 
     pgp.pg.defaults.max = 70;
     // /* Casts count/sum/max to bigint. Needs rework to remove casting "+count" and other issues; */
     // pgp.pg.types.setTypeParser(20, BigInt);
+    /**
+     * Prevent timestamp casting to ensure we don't lose the microseconds.
+     * This is needed to ensure the filters work as expected for a given row
+     *
+    register(1114, parseTimestamp) // timestamp without time zone
+    register(1184, parseTimestampTz) // timestamp with time zone
+     */
+    pgp.pg.types.setTypeParser(1114, v => v);
+    pgp.pg.types.setTypeParser(1184, v => v);
     if (options) {
         Object.assign(pgp.pg.defaults, options);
     }

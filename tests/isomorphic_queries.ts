@@ -286,8 +286,8 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
     assert.deepStrictEqual(JSON.parse(JSON.stringify(d)), {
       h: '<b>abc81</b> here',
       hh: '<b>abc81</b> here',
-      added: '1997-12-04T00:00:00.000Z',
-      addedY: '1997-12-04T00:10:00.000Z',
+      added: '1997-12-04 00:00:00',
+      addedY: '1997-12-04 00:10:00',
       // added: new Date('1997-12-04T00:00:00.000Z'),
       // addedY: new Date('1997-12-04T00:10:00.000Z'),
     });
