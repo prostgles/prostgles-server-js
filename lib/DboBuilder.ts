@@ -424,7 +424,10 @@ export class DboBuilder {
      */
     DATA_TYPES: { oid: string, typname: PG_COLUMN_UDT_DATA_TYPE }[] | undefined;
     USER_TABLES: { 
-        relid: string; 
+        /**
+         * oid of the table
+         */
+        relid: number; 
         relname: string; 
         schemaname: string;
         pkey_columns: string[] | null; 

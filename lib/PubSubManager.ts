@@ -1383,8 +1383,8 @@ export class PubSubManager {
     };
 
 
-    if (table_info.is_view && relatedTableSubscriptions) {
-      if (relatedTableSubscriptions.length) {
+    if (table_info.is_view) {
+      if (relatedTableSubscriptions?.length) {
  
         relatedTableSubscriptions.map(async relatedTable => {
           const params: Omit<Parameters<typeof upsertSub>[0], "is_ready"> = {

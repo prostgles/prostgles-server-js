@@ -774,7 +774,7 @@ export class ViewHandler {
               /** Create exists filters for each table */
               const tableIds = Array.from(new Set(tableColumns.map(tc => tc.tableID!.toString())));
               let relatedTableSubscriptions = tableIds.map(tableID => {
-                const table = this.dboBuilder.USER_TABLES?.find(t => t.relid === tableID)!;
+                const table = this.dboBuilder.USER_TABLES?.find(t => t.relid === +tableID)!;
                 let tableCols = tableColumns.filter(tc => tc.tableID!.toString() === tableID);
 
                 /** If table has primary keys and they are all in this view then use only primary keys */

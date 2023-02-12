@@ -1192,8 +1192,8 @@ class PubSubManager {
                 this.pushSubData(newSub);
             }
         };
-        if (table_info.is_view && relatedTableSubscriptions) {
-            if (relatedTableSubscriptions.length) {
+        if (table_info.is_view) {
+            if (relatedTableSubscriptions?.length) {
                 relatedTableSubscriptions.map(async (relatedTable) => {
                     const params = {
                         table_name: relatedTable.tableNameEscaped,
