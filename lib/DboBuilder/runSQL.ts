@@ -31,7 +31,7 @@ export async function runSQL(this: DboBuilder, query: string, params: any, optio
     GROUP BY relid, relname, schemaname
   `) ?? [];
   this.USER_TABLE_COLUMNS ??= await this.db.any(`
-    SELECT t.relid, t.schemaname,t.relname, c.column_name, c.udt_name
+    SELECT t.relid, t.schemaname,t.relname, c.column_name, c.udt_name, c.ordinal_position
     FROM information_schema.columns c
     INNER JOIN pg_catalog.pg_statio_user_tables t
     ON  c.table_schema = t.schemaname AND c.table_name = t.relname 
