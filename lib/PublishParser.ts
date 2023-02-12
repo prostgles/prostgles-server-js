@@ -91,7 +91,7 @@ const RULE_TO_METHODS = [
     sqlRule: "select",
     methods: RULE_METHODS.subscribe,
     no_limits: <SubscribeRule>{ throttle: 0 },
-    table_only: true,
+    table_only: false,
     allowed_params: <Array<keyof SubscribeRule>>["throttle"],
     hint: ` expecting "*" | true | { throttle: number } \n Will use "select" rules`
   }

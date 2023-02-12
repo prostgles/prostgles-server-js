@@ -73,7 +73,7 @@ const RULE_TO_METHODS = [
         sqlRule: "select",
         methods: prostgles_types_1.RULE_METHODS.subscribe,
         no_limits: { throttle: 0 },
-        table_only: true,
+        table_only: false,
         allowed_params: ["throttle"],
         hint: ` expecting "*" | true | { throttle: number } \n Will use "select" rules`
     }
