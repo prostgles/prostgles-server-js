@@ -466,9 +466,10 @@ export class PubSubManager {
                                                     COALESCE(TG_TABLE_NAME, 'MISSING'), 
                                                     COALESCE(TG_OP, 'MISSING'), 
                                                     CASE WHEN has_errors 
-                                                        THEN concat_ws('; ', 'error', err_text, err_detail, err_hint ) 
-                                                        ELSE COALESCE(nrw.cids, '') 
+                                                      THEN concat_ws('; ', 'error', err_text, err_detail, err_hint ) 
+                                                      ELSE COALESCE(nrw.cids, '') 
                                                     END
+                                                    ${this.dboBuilder.prostgles.opts.DEBUG_MODE? (", (select json_agg(t)::TEXT FROM (SELECT * from old_table) t), query") : ""}
                                                 )
                                             );
                                         END LOOP;
@@ -752,12 +753,12 @@ export class PubSubManager {
 
               if (listeners.length) {
                 trgUpdateLastUsed = `
-                                UPDATE prostgles.app_triggers
-                                SET last_used = CASE WHEN (table_name, condition) IN (
-                                    ${listeners.map(l => ` ( ${asValue(l.table_name)}, ${asValue(l.condition)} ) `).join(", ")}
-                                ) THEN NOW() ELSE last_used END
-                                WHERE app_id = ${asValue(this.appID)};
-                                `
+                  UPDATE prostgles.app_triggers
+                  SET last_used = CASE WHEN (table_name, condition) IN (
+                      ${listeners.map(l => ` ( ${asValue(l.table_name)}, ${asValue(l.condition)} ) `).join(", ")}
+                  ) THEN NOW() ELSE last_used END
+                  WHERE app_id = ${asValue(this.appID)};
+                `;
               }
 
               appQ = `
@@ -813,7 +814,7 @@ export class PubSubManager {
                                                 /* DELETE stale triggers for current app. Other triggers will be deleted on app startup */
                                                 DELETE FROM prostgles.app_triggers
                                                 WHERE app_id = ${asValue(this.appID)}
-                                                AND last_used < NOW() - 4 * ${asValue(this.appCheckFrequencyMS)} * interval '1 millisecond';
+                                                AND last_used < NOW() - 4 * ${asValue(this.appCheckFrequencyMS)} * interval '1 millisecond'; -- 10 seconds at the moment
     
                                             END IF;
 
@@ -919,12 +920,11 @@ export class PubSubManager {
                     /**
                      *  Delete stale app records
                      * */
-                    
-                            DELETE FROM prostgles.apps
-                            WHERE last_check < NOW() - 8 * check_frequency_ms * interval '1 millisecond';
+                    DELETE FROM prostgles.apps
+                    WHERE last_check < NOW() - 8 * check_frequency_ms * interval '1 millisecond';
 
-                            DELETE FROM prostgles.app_triggers
-                            WHERE app_id NOT IN (SELECT id FROM prostgles.apps);
+                    DELETE FROM prostgles.app_triggers
+                    WHERE app_id NOT IN (SELECT id FROM prostgles.apps);
                     
                     /* DROP the old buggy schema watch trigger */
                     IF EXISTS (
