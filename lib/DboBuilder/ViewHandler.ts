@@ -760,6 +760,7 @@ export class ViewHandler {
             if(this.is_view){
               const viewName = this.name;
               const viewNameEscaped = this.escapedName;
+              const { current_schema } = await this.db.oneOrNone("SELECT current_schema")
               
               /** Get list of used columns and their parent tables */
               let { def } = (await this.db.oneOrNone("SELECT pg_get_viewdef(${viewName}) as def", { viewName })) as { def: string };
@@ -785,18 +786,16 @@ export class ViewHandler {
                   tableCols = tableCols.filter(c => !["json", "xml"].includes(c.udt_name) )
                 }
 
-                const { tableName, tableSchema } = tableCols[0]!;
-                const tableNameEscaped = [table.schemaname, table.relname].map(v => JSON.stringify(v)).join(".");
-
+                const { relname: tableName, schemaname: tableSchema } = table;
                 if(!tableCols.length){
                   return {
-                    tableName: tableName!,
-                    tableNameEscaped: this.escapedName,// [table.schemaname, table.relname].map(v => JSON.stringify(v)).join("."),
+                    tableName: tableName,
+                    tableNameEscaped: JSON.stringify(tableName),// [table.schemaname, table.relname].map(v => JSON.stringify(v)).join("."),
                     condition: "TRUE"
                   }
                 } 
 
-                // const tableNameEscaped = [tableSchema!, tableName!].map(v => asName(v)).join(".");
+                const tableNameEscaped = tableSchema === current_schema? table.relname : [tableSchema, tableName].map(v => JSON.stringify(v)).join("."); 
 
                 const relatedTableSubscription = {
                   tableName: tableName!,
@@ -825,7 +824,7 @@ export class ViewHandler {
                 ...remainingInnerTables.map(t => ({
                   tableName: t.table_name,
                   tableNameEscaped: [t.table_name, t.table_schema].map(v => JSON.stringify(v)).join("."),
-                  condition: ""
+                  condition: "TRUE"
                 }))
               ];
 
