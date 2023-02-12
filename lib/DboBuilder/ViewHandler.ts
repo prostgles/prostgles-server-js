@@ -773,7 +773,7 @@ export class ViewHandler {
 
               /** Create exists filters for each table */
               const tableIds = Array.from(new Set(tableColumns.map(tc => tc.tableID!.toString())));
-              let relatedTableSubscriptions = tableIds.map(tableID => {
+              relatedTableSubscriptions = tableIds.map(tableID => {
                 const table = this.dboBuilder.USER_TABLES?.find(t => t.relid === +tableID)!;
                 let tableCols = tableColumns.filter(tc => tc.tableID!.toString() === tableID);
 
@@ -789,7 +789,7 @@ export class ViewHandler {
 
                 if(!tableCols.length){
                   return {
-                    tableName,
+                    tableName: tableName!,
                     tableNameEscaped: [table.schemaname, table.relname].map(v => JSON.stringify(v)).join("."),
                     condition: "TRUE"
                   }
@@ -798,7 +798,7 @@ export class ViewHandler {
                 const tableNameEscaped = [tableSchema!, tableName!].map(v => asName(v)).join(".");
 
                 const relatedTableSubscription = {
-                  tableName,
+                  tableName: tableName!,
                   tableNameEscaped,
                   condition: `EXISTS (
                     SELECT 1
