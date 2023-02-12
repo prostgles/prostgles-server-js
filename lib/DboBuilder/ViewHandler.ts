@@ -762,7 +762,11 @@ export class ViewHandler {
               const viewNameEscaped = this.escapedName;
               
               /** Get list of used columns and their parent tables */
-              const { def } = await this.db.oneOrNone("SELECT pg_get_viewdef(${viewName}) as def", { viewName });
+              let { def } = (await this.db.oneOrNone("SELECT pg_get_viewdef(${viewName}) as def", { viewName })) as { def: string };
+              def = def.trim();
+              if(def.endsWith(";")) {
+                def = def.slice(0, -1);
+              }
               if(!def || typeof def !== "string") makeErr("Could get view definition");
               const { fields } = await this.dboBuilder.dbo.sql!(`SELECT * FROM ( \n ${def} \n ) prostgles_subscribe_view_definition LIMIT 0`, {});
               const tableColumns = fields.filter(f => f.tableName && f.columnName);
