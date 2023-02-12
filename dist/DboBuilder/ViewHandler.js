@@ -981,21 +981,37 @@ class ViewHandler {
         const { filter, select, allowed_colnames, tableAlias, localParams, tableRules } = params;
         let data = { ...filter };
         /* Exists join filter */
-        const ERR = "Invalid exists filter. \nExpecting somethibng like: { $exists: { tableName.tableName2: Filter } } | { $exists: { \"**.tableName3\": Filter } }\n";
+        const ERR = "Invalid exists filter. \nExpecting somethibng like: \n | { $exists: { tableName.tableName2: Filter } } \n  | { $exists: { \"**.tableName3\": Filter } }\n | { path: string[]; filter: AnyObject }";
         const SP_WILDCARD = "**";
         let existsKeys = Object.keys(data)
             .filter(k => DboBuilder_1.EXISTS_KEYS.includes(k) && Object.keys(data[k] || {}).length)
             .map(key => {
             const isJoined = DboBuilder_1.EXISTS_KEYS.slice(-2).includes(key);
-            let firstKey = Object.keys(data[key])[0], tables = firstKey.split("."), f2 = data[key][firstKey], shortestJoin = false;
+            const filterValue = data[key];
+            /**
+             * type ExistsJoined =
+             *   | { "table1.table2": { column: filterValue }  }
+             *   | { path: string[]; filter: AnyObject }
+             */
+            const dataKeys = Object.keys(filterValue);
+            const isDetailed = dataKeys.length === 2 && dataKeys.every(key => ["path", "filter"].includes(key));
+            const firstKey = dataKeys[0];
+            /**
+             * Prevent some errors with table names that contain "."
+             */
+            const firstKeyIsATable = !!this.dboBuilder.dbo[firstKey];
+            let tables = isDetailed ? filterValue.path : (firstKeyIsATable ? [firstKey] : firstKey.split("."));
+            let f2 = isDetailed ? filterValue.filter : filterValue[firstKey];
+            let shortestJoin = false;
             if (!isJoined) {
                 if (tables.length !== 1)
                     throw "Expecting single table in exists filter. Example: { $exists: { tableName: Filter } }";
             }
             else {
                 /* First part can be the ** param meaning shortest join. Will be overriden by anything in tableConfig */
-                if (!tables.length)
-                    throw ERR + "\nBut got: " + data[key];
+                if (!tables.length) {
+                    throw ERR + "\nBut got: " + filterValue;
+                }
                 if (tables[0] === SP_WILDCARD) {
                     tables = tables.slice(1);
                     shortestJoin = true;
