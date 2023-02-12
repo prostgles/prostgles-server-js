@@ -18,7 +18,7 @@ export async function runSQL(this: DboBuilder, query: string, params: any, optio
   /** Cache types */
   this.DATA_TYPES ??= await this.db.any("SELECT oid, typname FROM pg_type") ?? [];
   this.USER_TABLES ??= await this.db.any(`
-    SELECT relid, relname, schemaname, array_to_json(array_agg(c.column_name)  FILTER (WHERE c.column_name IS NOT NULL))
+    SELECT relid, relname, schemaname, array_to_json(array_agg(c.column_name) FILTER (WHERE c.column_name IS NOT NULL)) as pkey_columns
     FROM pg_catalog.pg_statio_user_tables t
     LEFT JOIN (
       SELECT a.attname as column_name, i.indrelid as table_oid
