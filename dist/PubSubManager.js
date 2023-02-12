@@ -70,7 +70,7 @@ class PubSubManager {
             if (!this.canContinue())
                 return undefined;
             try {
-                const schema_version = 4;
+                const schema_version = 5;
                 const q = `
                 BEGIN; --  ISOLATION LEVEL SERIALIZABLE;-- TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 
@@ -101,7 +101,7 @@ class PubSubManager {
                             DROP SCHEMA IF EXISTS prostgles CASCADE;
                         ELSE 
                             IF NOT EXISTS(SELECT 1 FROM prostgles.versions WHERE version >= ${schema_version}) THEN
-                                DROP SCHEMA IF EXISTS prostgles CASCADE;
+                              DROP SCHEMA IF EXISTS prostgles CASCADE;
                             END IF;
                         END IF;
 
