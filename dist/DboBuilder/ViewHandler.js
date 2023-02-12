@@ -646,9 +646,16 @@ class ViewHandler {
                             }
                             else {
                                 /** Exclude non comparable data types */
-                                tableCols = tableCols.filter(c => ["json", "xml"].includes(c.udt_name));
+                                tableCols = tableCols.filter(c => !["json", "xml"].includes(c.udt_name));
                             }
                             const { tableName, tableSchema } = tableCols[0];
+                            if (!tableCols.length) {
+                                return {
+                                    tableName,
+                                    tableNameEscaped: [table.schemaname, table.relname].map(v => JSON.stringify(v)).join("."),
+                                    condition: "TRUE"
+                                };
+                            }
                             const tableNameEscaped = [tableSchema, tableName].map(v => (0, prostgles_types_1.asName)(v)).join(".");
                             const relatedTableSubscription = {
                                 tableName,
