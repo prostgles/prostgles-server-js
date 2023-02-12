@@ -1062,11 +1062,12 @@ export class PubSubManager {
         })
       });
     } else if (
-      condition_ids_str &&
-      condition_ids_str.split(",").length &&
-      !condition_ids_str.split(",").find((c: string) => !Number.isInteger(+c)) &&
-      this._triggers && this._triggers[table_name] && this._triggers[table_name].length
+      condition_ids_str?.split(",").length &&
+      condition_ids_str?.split(",").every((c: string) => Number.isInteger(+c)) &&
+      this._triggers?.[table_name]?.length
     ) {
+
+
       const idxs = condition_ids_str.split(",").map(v => +v);
       const conditions = this._triggers[table_name].filter((c, i) => idxs.includes(i))
 
@@ -1388,7 +1389,7 @@ export class PubSubManager {
  
         relatedTableSubscriptions.map(async relatedTable => {
           const params: Omit<Parameters<typeof upsertSub>[0], "is_ready"> = {
-            table_name: relatedTable.tableNameEscaped,
+            table_name: relatedTable.tableName,
             condition: relatedTable.condition,
             parentSubParams: {
               ...subscriptionParams,

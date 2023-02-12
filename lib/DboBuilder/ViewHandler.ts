@@ -786,16 +786,17 @@ export class ViewHandler {
                 }
 
                 const { tableName, tableSchema } = tableCols[0]!;
+                const tableNameEscaped = [table.schemaname, table.relname].map(v => JSON.stringify(v)).join(".");
 
                 if(!tableCols.length){
                   return {
                     tableName: tableName!,
-                    tableNameEscaped: [table.schemaname, table.relname].map(v => JSON.stringify(v)).join("."),
+                    tableNameEscaped: this.escapedName,// [table.schemaname, table.relname].map(v => JSON.stringify(v)).join("."),
                     condition: "TRUE"
                   }
                 } 
 
-                const tableNameEscaped = [tableSchema!, tableName!].map(v => asName(v)).join(".");
+                // const tableNameEscaped = [tableSchema!, tableName!].map(v => asName(v)).join(".");
 
                 const relatedTableSubscription = {
                   tableName: tableName!,

@@ -855,10 +855,9 @@ class PubSubManager {
                     });
                 });
             }
-            else if (condition_ids_str &&
-                condition_ids_str.split(",").length &&
-                !condition_ids_str.split(",").find((c) => !Number.isInteger(+c)) &&
-                this._triggers && this._triggers[table_name] && this._triggers[table_name].length) {
+            else if (condition_ids_str?.split(",").length &&
+                condition_ids_str?.split(",").every((c) => Number.isInteger(+c)) &&
+                this._triggers?.[table_name]?.length) {
                 const idxs = condition_ids_str.split(",").map(v => +v);
                 const conditions = this._triggers[table_name].filter((c, i) => idxs.includes(i));
                 (0, exports.log)("PG Trigger -> ", { table_name, op_name, condition_ids_str, conditions }, this._triggers[table_name]);
@@ -1196,7 +1195,7 @@ class PubSubManager {
             if (relatedTableSubscriptions?.length) {
                 relatedTableSubscriptions.map(async (relatedTable) => {
                     const params = {
-                        table_name: relatedTable.tableNameEscaped,
+                        table_name: relatedTable.tableName,
                         condition: relatedTable.condition,
                         parentSubParams: {
                             ...subscriptionParams,
