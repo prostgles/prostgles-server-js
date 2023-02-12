@@ -1,9 +1,8 @@
 import pgPromise from "pg-promise";
-import { AnyObject, asName, DeleteParams, FieldFilter, getKeys, InsertParams, isDefined, isObject, Select, SelectParams, SubscribeParams, UpdateParams } from "prostgles-types";
+import { AnyObject, asName, DeleteParams, FieldFilter, getKeys, InsertParams, isObject, Select, SelectParams, UpdateParams } from "prostgles-types";
 import { DboBuilder, Filter, LocalParams, makeErr, parseError, TableHandlers, TableSchema } from "../DboBuilder";
 import { DB } from "../Prostgles";
-import { SyncRule, TableRule, UpdateRule, ValidateRow, ValidateUpdateRow } from "../PublishParser";
-import { omitKeys } from "../PubSubManager";
+import { SyncRule, TableRule } from "../PublishParser"; 
 import { _delete } from "./delete";
 import { insert } from "./insert";
 import { insertDataParse } from "./insertDataParse";
@@ -59,89 +58,6 @@ export class TableHandler extends ViewHandler {
 
       return true;
     }
-  }
-
-  async subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: AnyObject[]) => any): Promise<{ unsubscribe: () => any }>
-  async subscribe(filter: Filter, params: SubscribeParams, localFunc?: (items: AnyObject[]) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>
-  async subscribe(filter: Filter, params: SubscribeParams = {}, localFunc?: (items: AnyObject[]) => any, table_rules?: TableRule, localParams?: LocalParams):
-    Promise<string | { unsubscribe: () => any }> {
-    try {
-      if (this.is_view) throw "Cannot subscribe to a view";
-      if (this.t) throw "subscribe not allowed within transactions";
-      if (!localParams && !localFunc) throw " missing data. provide -> localFunc | localParams { socket } ";
-      if (localParams && localParams.socket && localFunc) {
-        console.error({ localParams, localFunc })
-        throw " Cannot have localFunc AND socket ";
-      }
-
-      const { filterFields, forcedFilter } = table_rules?.select || {},
-        filterOpts = await this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: undefined, localParams, tableRule: table_rules }),
-        condition = filterOpts.where,
-        throttle = params?.throttle || 0,
-        selectParams = omitKeys(params || {}, ["throttle"]);
- 
-      /** app_triggers condition field has an index which limits it's value */
-      const filterSize = JSON.stringify(filter || {}).length;
-      if (filterSize * 4 > 2704) {
-        throw "filter too big. Might exceed the btree version 4 maximum 2704. Use a primary key or a $rowhash filter instead"
-      }
-
-      if (!localFunc) {
-        if (!this.dboBuilder.prostgles.isSuperUser) throw "Subscribe not possible. Must be superuser to add triggers 1856";
-        return await this.find(filter, { ...selectParams, limit: 0 }, undefined, table_rules, localParams)
-          .then(async isValid => {
-
-            const { socket } = localParams ?? {};
-            const pubSubManager = await this.dboBuilder.getPubSubManager();
-            return pubSubManager.addSub({
-              table_info: this.tableOrViewInfo,
-              socket,
-              table_rules,
-              condition: condition,
-              func: undefined,
-              filter: { ...filter },
-              params: { ...selectParams },
-              socket_id: socket?.id,
-              table_name: this.name,
-              throttle,
-              last_throttled: 0, 
-            }).then(channelName => ({ channelName }));
-          }) as string;
-      } else {
-        const pubSubManager = await this.dboBuilder.getPubSubManager();
-        pubSubManager.addSub({
-          table_info: this.tableOrViewInfo,
-          socket: undefined,
-          table_rules,
-          condition,
-          func: localFunc,
-          filter: { ...filter },
-          params: { ...selectParams },
-          socket_id: undefined,
-          table_name: this.name,
-          throttle,
-          last_throttled: 0, 
-        }).then(channelName => ({ channelName }));
-        const unsubscribe = async () => {
-          const pubSubManager = await this.dboBuilder.getPubSubManager();
-          pubSubManager.removeLocalSub(this.name, condition, localFunc)
-        };
-        let res: { unsubscribe: () => any } = Object.freeze({ unsubscribe })
-        return res;
-      }
-    } catch (e) {
-      if (localParams && localParams.testRule) throw e;
-      throw parseError(e, `dbo.${this.name}.subscribe()`);
-    }
-  }
-
-  /* This should only be called from server */
-  subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: AnyObject) => any): Promise<{ unsubscribe: () => any }>
-  subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: AnyObject) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>
-  subscribeOne(filter: Filter, params: SubscribeParams = {}, localFunc: (item: AnyObject) => any, table_rules?: TableRule, localParams?: LocalParams):
-    Promise<string | { unsubscribe: () => any }> {
-    let func = localParams ? undefined : (rows: AnyObject[]) => localFunc(rows[0]);
-    return this.subscribe(filter, { ...params, limit: 2 }, func, table_rules, localParams);
   }
 
 

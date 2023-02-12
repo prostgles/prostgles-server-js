@@ -17,7 +17,25 @@ export async function runSQL(this: DboBuilder, query: string, params: any, optio
 
   /** Cache types */
   this.DATA_TYPES ??= await this.db.any("SELECT oid, typname FROM pg_type") ?? [];
-  this.USER_TABLES ??= await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables") ?? [];
+  this.USER_TABLES ??= await this.db.any(`
+    SELECT relid, relname, schemaname, array_to_json(array_agg(c.column_name)  FILTER (WHERE c.column_name IS NOT NULL))
+    FROM pg_catalog.pg_statio_user_tables t
+    LEFT JOIN (
+      SELECT a.attname as column_name, i.indrelid as table_oid
+      FROM   pg_index i
+      JOIN   pg_attribute a ON a.attrelid = i.indrelid
+        AND a.attnum = ANY(i.indkey)
+      WHERE i.indisprimary
+    ) c
+    ON t.relid = c.table_oid
+    GROUP BY relid, relname, schemaname
+  `) ?? [];
+  this.USER_TABLE_COLUMNS ??= await this.db.any(`
+    SELECT t.relid, t.schemaname,t.relname, c.column_name, c.udt_name
+    FROM information_schema.columns c
+    INNER JOIN pg_catalog.pg_statio_user_tables t
+    ON  c.table_schema = t.schemaname AND c.table_name = t.relname 
+  `);
 
   if (!(await canRunSQL(this.prostgles, localParams))) throw "Not allowed to run SQL";
 
@@ -87,7 +105,8 @@ export async function runSQL(this: DboBuilder, query: string, params: any, optio
         ..._qres,
         fields: fields?.map(f => {
           const dataType = this.DATA_TYPES!.find(dt => +dt.oid === +f.dataTypeID)?.typname ?? "text",
-            tableName = this.USER_TABLES!.find(t => +t.relid === +f.tableID),
+            table = this.USER_TABLES!.find(t => +t.relid === +f.tableID),
+            column = this.USER_TABLE_COLUMNS!.find(c => +c.relid === +f.tableID && c.ordinal_position === f.columnID),
             tsDataType = postgresToTsType(dataType);
 
           return {
@@ -95,7 +114,9 @@ export async function runSQL(this: DboBuilder, query: string, params: any, optio
             tsDataType,
             dataType,
             udt_name: dataType,
-            tableName: tableName?.relname
+            tableName: table?.relname,
+            tableSchema: table?.schemaname,
+            columnName: column?.column_name
           }
         }) ?? []
       };

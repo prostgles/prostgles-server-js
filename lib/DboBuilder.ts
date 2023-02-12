@@ -422,8 +422,21 @@ export class DboBuilder {
     /**
      * Used for db.sql field type details
      */
-    DATA_TYPES: {oid: string, typname: PG_COLUMN_UDT_DATA_TYPE }[] | undefined;
-    USER_TABLES: { relid: string; relname: string; }[] | undefined;
+    DATA_TYPES: { oid: string, typname: PG_COLUMN_UDT_DATA_TYPE }[] | undefined;
+    USER_TABLES: { 
+        relid: string; 
+        relname: string; 
+        schemaname: string;
+        pkey_columns: string[] | null; 
+    }[] | undefined;
+    USER_TABLE_COLUMNS: { 
+        relid: number;
+        schemaname: string;
+        relname: string;
+        column_name: string;
+        udt_name: string; 
+        ordinal_position: number;
+    }[] | undefined;
 
     getPubSubManager = async () : Promise<PubSubManager> => {
         if(!this._pubSubManager){

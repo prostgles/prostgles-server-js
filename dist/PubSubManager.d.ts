@@ -48,6 +48,15 @@ declare type SubscriptionParams = {
     channel_name: string;
     table_name: string;
     socket: PRGLIOSocket | undefined;
+    /**
+     * If this is a view then an array with all related tables will be
+     * */
+    relatedTableSubscriptions?: {
+        tableName: string;
+        tableNameEscaped: string;
+        condition: string;
+    }[];
+    parentSubParams: Omit<SubscriptionParams, "parentSubParams"> | undefined;
     table_info: TableOrViewInfo;
     table_rules?: TableRule;
     filter: object;
@@ -138,8 +147,7 @@ export declare class PubSubManager {
      * A sync channel is unique per socket for each filter
      */
     addSync(syncParams: AddSyncParams): Promise<string>;
-    parseCondition: (condition: string) => string;
-    addSub(subscriptionParams: Omit<AddSubscriptionParams, "channel_name">): Promise<string>;
+    addSub(subscriptionParams: Omit<AddSubscriptionParams, "channel_name" | "parentSubParams">): Promise<string>;
     removeLocalSub(table_name: string, condition: string, func: (items: object[]) => any): void;
     getActiveListeners: () => {
         table_name: string;

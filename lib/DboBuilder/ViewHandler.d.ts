@@ -1,5 +1,5 @@
 import * as pgPromise from 'pg-promise';
-import { ColumnInfo, FieldFilter, SelectParams, OrderBy, TableInfo as TInfo, AnyObject } from "prostgles-types";
+import { ColumnInfo, FieldFilter, SelectParams, OrderBy, TableInfo as TInfo, AnyObject, SubscribeParams } from "prostgles-types";
 import { DB, DBHandlerServer, Join } from "../Prostgles";
 import { DboBuilder, ExistsFilterConfig, Filter, JoinInfo, LocalParams, SortItem, TableHandlers, TableSchema, ValidatedTableRules } from "../DboBuilder";
 import { Graph } from "../shortestPath";
@@ -61,6 +61,14 @@ export declare class ViewHandler {
     getValidatedRules(tableRules?: TableRule, localParams?: LocalParams): ValidatedTableRules;
     find(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]>;
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
+    subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: AnyObject[]) => any): Promise<{
+        unsubscribe: () => any;
+    }>;
+    subscribe(filter: Filter, params: SubscribeParams, localFunc?: (items: AnyObject[]) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>;
+    subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: AnyObject) => any): Promise<{
+        unsubscribe: () => any;
+    }>;
+    subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: AnyObject) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>;
     count(filter?: Filter, param2_unused?: undefined, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<number>;
     size(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<string>;
     getAllowedSelectFields(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean): string[];

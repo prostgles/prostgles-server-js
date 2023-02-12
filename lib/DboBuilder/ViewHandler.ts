@@ -10,7 +10,7 @@ import {
   TableInfo as TInfo,
   AnyObject,
   isObject, isDefined, getKeys,
-  _PG_geometric, pickKeys
+  _PG_geometric, pickKeys, SubscribeParams
 } from "prostgles-types";
 import { DB, DBHandlerServer, Join } from "../Prostgles";
 import {
@@ -20,7 +20,7 @@ import {
 } from "../DboBuilder";
 import { Graph } from "../shortestPath";
 import { TableRule, UpdateRule, ValidateRow } from "../PublishParser";
-import { asValue } from "../PubSubManager";
+import { asValue, omitKeys } from "../PubSubManager";
 import { TableHandler } from "./TableHandler";
 import { asNameAlias,  getNewQuery, parseFunctionObject, SelectItem, SelectItemValidated } from "./QueryBuilder/QueryBuilder";
 import { COMPUTED_FIELDS, FieldSpec, FUNCTIONS, parseFunction,  } from "./QueryBuilder/Functions";
@@ -716,6 +716,161 @@ export class ViewHandler {
       if (localParams && localParams.testRule) throw e;
       throw parseError(e, `Issue with dbo.${this.name}.findOne()`);
     }
+  }
+
+
+
+  async subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: AnyObject[]) => any): Promise<{ unsubscribe: () => any }>
+  async subscribe(filter: Filter, params: SubscribeParams, localFunc?: (items: AnyObject[]) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>
+  async subscribe(filter: Filter, params: SubscribeParams = {}, localFunc?: (items: AnyObject[]) => any, table_rules?: TableRule, localParams?: LocalParams):
+    Promise<string | { unsubscribe: () => any }> {
+    try {
+      if (this.is_view) throw "Cannot subscribe to a view";
+      if (this.t) throw "subscribe not allowed within transactions";
+      if (!localParams && !localFunc) throw " missing data. provide -> localFunc | localParams { socket } ";
+      if (localParams && localParams.socket && localFunc) {
+        console.error({ localParams, localFunc })
+        throw " Cannot have localFunc AND socket ";
+      }
+
+      const { filterFields, forcedFilter } = table_rules?.select || {},
+        filterOpts = await this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: undefined, localParams, tableRule: table_rules }),
+        condition = filterOpts.where,
+        throttle = params?.throttle || 0,
+        selectParams = omitKeys(params || {}, ["throttle"]);
+ 
+      /** app_triggers condition field has an index which limits it's value */
+      const filterSize = JSON.stringify(filter || {}).length;
+      if (filterSize * 4 > 2704) {
+        throw "filter too big. Might exceed the btree version 4 maximum 2704. Use a primary key or a $rowhash filter instead"
+      }
+
+      if (!localFunc) {
+        if (!this.dboBuilder.prostgles.isSuperUser) throw "Subscribe not possible. Must be superuser to add triggers 1856";
+        return await this.find(filter, { ...selectParams, limit: 0 }, undefined, table_rules, localParams)
+          .then(async isValid => {
+
+            let relatedTableSubscriptions: {
+              tableName: string;
+              tableNameEscaped: string;
+              condition: string;
+            }[] | undefined = undefined;
+
+            if(this.is_view){
+              const viewName = this.name;
+              const viewNameEscaped = this.escapedName;
+              
+              /** Get list of used columns and their parent tables */
+              const { def } = await this.db.oneOrNone("SELECT pg_get_viewdef(${viewName}) as def", { viewName });
+              if(!def || typeof def !== "string") makeErr("Could get view definition");
+              const { fields } = await this.dboBuilder.dbo.sql!(`SELECT * FROM ( \n ${def} \n ) prostgles_subscribe_view_definition LIMIT 0`, {});
+              const tableColumns = fields.filter(f => f.tableName && f.columnName);
+
+              /** Create exists filters for each table */
+              const tableIds = Array.from(new Set(tableColumns.map(tc => tc.tableID!.toString())));
+              let relatedTableSubscriptions = tableIds.map(tableID => {
+                const table = this.dboBuilder.USER_TABLES?.find(t => t.relid === tableID)!;
+                let tableCols = tableColumns.filter(tc => tc.tableID!.toString() === tableID);
+
+                /** If table has primary keys and they are all in this view then use only primary keys */
+                if(table?.pkey_columns?.every(pkey => tableCols.some(c => c.columnName === pkey))){
+                  tableCols = tableCols.filter(c => table?.pkey_columns?.includes(c.columnName!))
+                } else {
+                  /** Exclude non comparable data types */
+                  tableCols = tableCols.filter(c => ["json", "xml"].includes(c.udt_name) )
+                }
+
+                const { tableName, tableSchema } = tableCols[0]!;
+                const tableNameEscaped = [tableSchema!, tableName!].map(v => asName(v)).join(".");
+
+                const relatedTableSubscription = {
+                  tableName,
+                  tableNameEscaped,
+                  condition: `EXISTS (
+                    SELECT 1
+                    FROM ${viewNameEscaped}
+                    WHERE ${tableCols.map(c => `${tableNameEscaped}.${JSON.stringify(c.columnName)} = ${viewNameEscaped}.${JSON.stringify(c.name)}`).join(" AND \n")}
+                    AND ${condition || "TRUE"}
+                  )`
+                }
+
+                return relatedTableSubscription;
+              })
+              
+              /** Get list of remaining used inner tables */
+              const allUsedTables: { table_name: string; table_schema: string; }[] = await this.db.any(
+                "SELECT distinct table_name, table_schema FROM information_schema.view_column_usage WHERE view_name = ${viewName}", 
+                { viewName }
+              );
+
+              /** Remaining tables will have listeners on all records (condition = "TRUE") */
+              const remainingInnerTables = allUsedTables.filter(at => !tableColumns.some(dc => dc.tableName === at.table_name && dc.tableSchema === at.table_schema));
+              relatedTableSubscriptions = [
+                ...relatedTableSubscriptions,
+                ...remainingInnerTables.map(t => ({
+                  tableName: t.table_name,
+                  tableNameEscaped: [t.table_name, t.table_schema].map(v => JSON.stringify(v)).join("."),
+                  condition: ""
+                }))
+              ];
+
+              if(!relatedTableSubscriptions.length){
+                throw "Could not subscribe to this view: no related tables found";
+              } 
+            }
+
+            const { socket } = localParams ?? {};
+            const pubSubManager = await this.dboBuilder.getPubSubManager();
+            return pubSubManager.addSub({
+              table_info: this.tableOrViewInfo,
+              socket,
+              table_rules,
+              table_name: this.name,
+              condition: condition,
+              relatedTableSubscriptions,
+              func: undefined,
+              filter: { ...filter },
+              params: { ...selectParams },
+              socket_id: socket?.id,
+              throttle,
+              last_throttled: 0, 
+            }).then(channelName => ({ channelName }));
+          }) as string;
+      } else {
+        const pubSubManager = await this.dboBuilder.getPubSubManager();
+        pubSubManager.addSub({
+          table_info: this.tableOrViewInfo,
+          socket: undefined,
+          table_rules,
+          condition,
+          func: localFunc,
+          filter: { ...filter },
+          params: { ...selectParams },
+          socket_id: undefined,
+          table_name: this.name,
+          throttle,
+          last_throttled: 0, 
+        }).then(channelName => ({ channelName }));
+        const unsubscribe = async () => {
+          const pubSubManager = await this.dboBuilder.getPubSubManager();
+          pubSubManager.removeLocalSub(this.name, condition, localFunc)
+        };
+        let res: { unsubscribe: () => any } = Object.freeze({ unsubscribe })
+        return res;
+      }
+    } catch (e) {
+      if (localParams && localParams.testRule) throw e;
+      throw parseError(e, `dbo.${this.name}.subscribe()`);
+    }
+  }
+
+  /* This should only be called from server */
+  subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: AnyObject) => any): Promise<{ unsubscribe: () => any }>
+  subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: AnyObject) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>
+  subscribeOne(filter: Filter, params: SubscribeParams = {}, localFunc: (item: AnyObject) => any, table_rules?: TableRule, localParams?: LocalParams):
+    Promise<string | { unsubscribe: () => any }> {
+    let func = localParams ? undefined : (rows: AnyObject[]) => localFunc(rows[0]);
+    return this.subscribe(filter, { ...params, limit: 2 }, func, table_rules, localParams);
   }
 
   async count(filter?: Filter, param2_unused?: undefined, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<number> {

@@ -82,8 +82,9 @@ function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts |
   register(1114, parseTimestamp) // timestamp without time zone
   register(1184, parseTimestampTz) // timestamp with time zone
    */
-  pgp.pg.types.setTypeParser(1114, v => v);
-  pgp.pg.types.setTypeParser(1184, v => v);
+  pgp.pg.types.setTypeParser(1114, v => v); // timestamp without time zone
+  pgp.pg.types.setTypeParser(1184, v => v); // timestamp with time zone
+  pgp.pg.types.setTypeParser(1182, v => v); // date
 
   if (options) {
     Object.assign(pgp.pg.defaults, options);

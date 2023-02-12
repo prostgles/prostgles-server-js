@@ -201,8 +201,8 @@ class PubSubManager {
 
                         -- Force table into cache
                         IF EXISTS (select * from pg_extension where extname = 'pg_prewarm') THEN
-                            CREATE EXTENSION IF NOT EXISTS pg_prewarm;
-                            PERFORM pg_prewarm('prostgles.app_triggers');
+                          CREATE EXTENSION IF NOT EXISTS pg_prewarm;
+                          PERFORM pg_prewarm('prostgles.app_triggers');
                         END IF;
                     */
 
@@ -228,20 +228,24 @@ class PubSubManager {
                                 -- PERFORM pg_notify('debug', concat_ws(' ', 'TABLE', TG_TABLE_NAME, TG_OP));
 
                                 SELECT string_agg(
-                                    concat_ws(
-                                        E' UNION \n ',
-                                        CASE WHEN (TG_OP = 'DELETE' OR TG_OP = 'UPDATE') THEN (p1 || ' old_table ' || p2) END,
-                                        CASE WHEN (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN (p1 || ' new_table ' || p2) END 
-                                    ),
-                                    E' UNION \n '::text
+                                  concat_ws(
+                                    E' UNION \n ',
+                                    CASE WHEN (TG_OP = 'DELETE' OR TG_OP = 'UPDATE') THEN (p1 || ' old_table ' || p2) END,
+                                    CASE WHEN (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN (p1 || ' new_table ' || p2) END 
+                                  ),
+                                  E' UNION \n '::text
                                 )
                                 INTO unions
                                 FROM (
                                     SELECT 
-                                        $z$ SELECT CASE WHEN EXISTS( SELECT 1 FROM $z$     AS p1,
+                                        $z$ 
+                                          SELECT CASE WHEN EXISTS( SELECT 1 FROM 
+                                        $z$ AS p1,
                                         format( 
-                                            $c$ as %I WHERE %s ) THEN %s::text END AS t_ids $c$
-                                            , table_name, condition, id 
+                                          $c$ 
+                                            as %I WHERE %s ) THEN %s::text END AS t_ids 
+                                          $c$, 
+                                          table_name, condition, id 
                                         ) AS p2
                                     FROM prostgles.v_triggers
                                     WHERE table_name = TG_TABLE_NAME
@@ -249,15 +253,15 @@ class PubSubManager {
                                 
                                 /*
                                 PERFORM pg_notify( 
-                                    ${(0, exports.asValue)(this.NOTIF_CHANNEL.preffix)} || (SELECT id FROM prostgles.apps LIMIT 1) , 
-                                    concat_ws(
-                                        ${(0, exports.asValue)(PubSubManager.DELIMITER)},
+                                  ${(0, exports.asValue)(this.NOTIF_CHANNEL.preffix)} || (SELECT id FROM prostgles.apps LIMIT 1) , 
+                                  concat_ws(
+                                    ${(0, exports.asValue)(PubSubManager.DELIMITER)},
 
-                                        ${(0, exports.asValue)(this.NOTIF_TYPE.data)}, 
-                                        COALESCE(TG_TABLE_NAME, 'MISSING'), 
-                                        COALESCE(TG_OP, 'MISSING'), 
-                                        unions
-                                    )
+                                    ${(0, exports.asValue)(this.NOTIF_TYPE.data)}, 
+                                    COALESCE(TG_TABLE_NAME, 'MISSING'), 
+                                    COALESCE(TG_OP, 'MISSING'), 
+                                    unions
+                                  )
                                 );
                                 RAISE 'unions: % , cids: %', unions, c_ids;
                                 */
@@ -265,25 +269,25 @@ class PubSubManager {
                                 IF unions IS NOT NULL THEN
                                     query = format(
                                         $s$
-                                            SELECT ARRAY_AGG(DISTINCT t.t_ids)
-                                            FROM ( %s ) t
+                                          SELECT ARRAY_AGG(DISTINCT t.t_ids)
+                                          FROM ( %s ) t
                                         $s$, 
                                         unions
                                     );
 
                                     BEGIN
-                                        EXECUTE query INTO t_ids;
+                                      EXECUTE query INTO t_ids;
 
-                                        --RAISE NOTICE 'trigger fired ok';
+                                      --RAISE NOTICE 'trigger fired ok';
 
                                     EXCEPTION WHEN OTHERS THEN
-                                        
-                                        has_errors := TRUE;
+                                      
+                                      has_errors := TRUE;
 
-                                        GET STACKED DIAGNOSTICS 
-                                            err_text = MESSAGE_TEXT,
-                                            err_detail = PG_EXCEPTION_DETAIL,
-                                            err_hint = PG_EXCEPTION_HINT;
+                                      GET STACKED DIAGNOSTICS 
+                                        err_text = MESSAGE_TEXT,
+                                        err_detail = PG_EXCEPTION_DETAIL,
+                                        err_hint = PG_EXCEPTION_HINT;
 
 
                                     END;
@@ -902,7 +906,6 @@ class PubSubManager {
                 console.warn(190, "Trigger sub issue: ", table_name, condition_ids_str, this._triggers);
             }
         };
-        this.parseCondition = (condition) => Boolean(condition && condition.trim().length) ? condition : "TRUE";
         this.getActiveListeners = () => {
             let result = [];
             const upsert = (t, c) => {
@@ -945,11 +948,11 @@ class PubSubManager {
         */
         this.getMyTriggerQuery = async () => {
             return pgp.as.format(` 
-            SELECT * --, ROW_NUMBER() OVER(PARTITION BY table_name ORDER BY table_name, condition ) - 1 as id
-            FROM prostgles.v_triggers
-            WHERE app_id = $1
-            ORDER BY table_name, condition
-        `, [this.appID]);
+      SELECT * --, ROW_NUMBER() OVER(PARTITION BY table_name ORDER BY table_name, condition ) - 1 as id
+      FROM prostgles.v_triggers
+      WHERE app_id = $1
+      ORDER BY table_name, condition
+    `, [this.appID]);
         };
         this.addTriggerPool = undefined;
         const { wsChannelNamePrefix, pgChannelName, onSchemaChange, dboBuilder } = options;
@@ -976,7 +979,7 @@ class PubSubManager {
         return this.postgresNotifListenManager.isListening();
     }
     getSubs(table_name, condition) {
-        return (0, utils_1.get)(this.subs, [table_name, condition, "subs"]);
+        return this.subs?.[table_name]?.[condition]?.subs;
     }
     getSyncs(table_name, condition) {
         return (this.syncs || [])
@@ -1042,7 +1045,7 @@ class PubSubManager {
      */
     async addSync(syncParams) {
         const { socket = null, table_info = null, table_rules, synced_field = null, allow_delete = false, id_fields = [], filter = {}, params, condition = "", throttle = 0 } = syncParams || {};
-        let conditionParsed = this.parseCondition(condition);
+        let conditionParsed = parseCondition(condition);
         if (!socket || !table_info)
             throw "socket or table_info missing";
         const { name: table_name } = table_info, channel_name = `${this.socketChannelPreffix}.${table_name}.${JSON.stringify(filter)}.sync`;
@@ -1133,8 +1136,8 @@ class PubSubManager {
     /* Must return a channel for socket */
     /* The distinct list of channel names must have a corresponding trigger in the database */
     async addSub(subscriptionParams) {
-        const { socket, func = null, table_info = null, table_rules, filter = {}, params = {}, condition = "", throttle = 0 //subOne = false, 
-         } = subscriptionParams || {};
+        const { socket, func = null, table_info = null, table_rules, filter = {}, params = {}, condition = "", throttle = 0, //subOne = false, 
+        relatedTableSubscriptions } = subscriptionParams || {};
         let validated_throttle = subscriptionParams.throttle || 10;
         if ((!socket && !func) || !table_info)
             throw "socket/func or table_info missing";
@@ -1145,10 +1148,10 @@ class PubSubManager {
         if (throttle && Number.isInteger(throttle) && throttle >= pubThrottle) {
             validated_throttle = throttle;
         }
-        let channel_name = `${this.socketChannelPreffix}.${table_info.name}.${JSON.stringify(filter)}.${JSON.stringify(params)}.${"m"}.sub`; //.${subOne? "o" : "m"}.sub`;
+        const channel_name = `${this.socketChannelPreffix}.${table_info.name}.${JSON.stringify(filter)}.${JSON.stringify(params)}.${"m"}.sub`;
         this.upsertSocket(socket, channel_name);
         const upsertSub = (newSubData) => {
-            const { table_name, condition: _cond, is_ready = false } = newSubData, condition = this.parseCondition(_cond), newSub = {
+            const { table_name, condition: _cond, is_ready = false, parentSubParams } = newSubData, condition = parseCondition(_cond), newSub = {
                 socket,
                 table_name: table_info.name,
                 table_info,
@@ -1156,17 +1159,17 @@ class PubSubManager {
                 params,
                 table_rules,
                 channel_name,
-                func: func ? func : undefined,
+                parentSubParams,
+                func: func ?? undefined,
                 socket_id: socket?.id,
                 throttle: validated_throttle,
                 is_throttling: null,
                 last_throttled: 0,
                 is_ready,
-                // subOne
             };
-            this.subs[table_name] = this.subs[table_name] || {};
-            this.subs[table_name][condition] = this.subs[table_name][condition] || { subs: [] };
-            this.subs[table_name][condition].subs = this.subs[table_name][condition].subs || [];
+            this.subs[table_name] = this.subs[table_name] ?? {};
+            this.subs[table_name][condition] = this.subs[table_name][condition] ?? { subs: [] };
+            this.subs[table_name][condition].subs = this.subs[table_name][condition].subs ?? [];
             // console.log("1034 upsertSub", this.subs)
             const sub_idx = this.subs[table_name][condition].subs.findIndex(s => s.channel_name === channel_name &&
                 (socket && s.socket_id === socket.id ||
@@ -1189,22 +1192,24 @@ class PubSubManager {
                 this.pushSubData(newSub);
             }
         };
-        if (table_info.is_view && table_info.parent_tables) {
-            if (table_info.parent_tables.length) {
-                let _condition = "TRUE";
-                table_info.parent_tables.map(async (table_name) => {
+        if (table_info.is_view && relatedTableSubscriptions) {
+            if (relatedTableSubscriptions.length) {
+                relatedTableSubscriptions.map(async (relatedTable) => {
+                    const params = {
+                        table_name: relatedTable.tableNameEscaped,
+                        condition: relatedTable.condition,
+                        parentSubParams: {
+                            ...subscriptionParams,
+                            channel_name
+                        },
+                    };
                     upsertSub({
-                        table_name,
-                        condition: _condition,
-                        is_ready: true
+                        ...params,
+                        is_ready: false
                     });
-                    await this.addTrigger({
-                        table_name,
-                        condition: _condition
-                    });
+                    await this.addTrigger(params);
                     upsertSub({
-                        table_name,
-                        condition: _condition,
+                        ...params,
                         is_ready: true
                     });
                 });
@@ -1220,23 +1225,25 @@ class PubSubManager {
             // console.log(table_info, 202);
             upsertSub({
                 table_name: table_info.name,
-                condition: this.parseCondition(condition),
+                condition: parseCondition(condition),
+                parentSubParams: undefined,
                 is_ready: false
             });
             await this.addTrigger({
                 table_name: table_info.name,
-                condition: this.parseCondition(condition),
+                condition: parseCondition(condition),
             });
             upsertSub({
                 table_name: table_info.name,
-                condition: this.parseCondition(condition),
+                condition: parseCondition(condition),
+                parentSubParams: undefined,
                 is_ready: true
             });
             return channel_name;
         }
     }
     removeLocalSub(table_name, condition, func) {
-        let cond = this.parseCondition(condition);
+        let cond = parseCondition(condition);
         if ((0, utils_1.get)(this.subs, [table_name, cond, "subs"])) {
             this.subs[table_name][cond].subs.map((sub, i) => {
                 if (sub.func && sub.func === func) {
@@ -1302,9 +1309,9 @@ class PubSubManager {
                 throw "MISSING table_name";
             if (!this.appID)
                 throw "MISSING appID";
-            if (!condition || !condition.trim().length)
+            if (!condition || !condition.trim().length) {
                 condition = "TRUE";
-            const app_id = this.appID;
+            }
             // console.log(1623, { app_id, addTrigger: { table_name, condition } });
             await this.checkIfTimescaleBug(table_name);
             const trgVals = {
@@ -1312,15 +1319,15 @@ class PubSubManager {
                 cond: (0, exports.asValue)(condition),
             };
             await this.db.any(`
-                BEGIN WORK;
-                LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
+        BEGIN WORK;
+        LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
 
-                INSERT INTO prostgles.app_triggers (table_name, condition, app_id) 
-                    VALUES (${trgVals.tbl}, ${trgVals.cond}, ${(0, exports.asValue)(this.appID)})
-                ON CONFLICT DO NOTHING;
-                     
-                COMMIT WORK;
-            `);
+        INSERT INTO prostgles.app_triggers (table_name, condition, app_id) 
+          VALUES (${trgVals.tbl}, ${trgVals.cond}, ${(0, exports.asValue)(this.appID)})
+        ON CONFLICT DO NOTHING;
+              
+        COMMIT WORK;
+      `);
             (0, exports.log)("addTrigger.. ", { table_name, condition });
             const triggers = await this.db.any(await this.getMyTriggerQuery());
             this._triggers = {};
@@ -1369,6 +1376,7 @@ PubSubManager.create = async (options) => {
 };
 PubSubManager.SCHEMA_ALTERING_QUERIES = ['CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO'];
 PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from ";
+const parseCondition = (condition) => Boolean(condition && condition.trim().length) ? condition : "TRUE";
 function omitKeys(obj, exclude) {
     return pickKeys(obj, (0, prostgles_types_1.getKeys)(obj).filter(k => !exclude.includes(k)));
 }

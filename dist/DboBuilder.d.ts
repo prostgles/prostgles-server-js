@@ -218,6 +218,16 @@ export declare class DboBuilder {
     USER_TABLES: {
         relid: string;
         relname: string;
+        schemaname: string;
+        pkey_columns: string[] | null;
+    }[] | undefined;
+    USER_TABLE_COLUMNS: {
+        relid: number;
+        schemaname: string;
+        relname: string;
+        column_name: string;
+        udt_name: string;
+        ordinal_position: number;
     }[] | undefined;
     getPubSubManager: () => Promise<PubSubManager>;
     pojoDefinitions?: string[];

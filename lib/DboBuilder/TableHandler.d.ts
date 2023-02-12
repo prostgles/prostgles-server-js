@@ -1,5 +1,5 @@
 import pgPromise from "pg-promise";
-import { AnyObject, DeleteParams, FieldFilter, InsertParams, Select, SelectParams, SubscribeParams, UpdateParams } from "prostgles-types";
+import { AnyObject, DeleteParams, FieldFilter, InsertParams, Select, SelectParams, UpdateParams } from "prostgles-types";
 import { DboBuilder, Filter, LocalParams, TableHandlers, TableSchema } from "../DboBuilder";
 import { DB } from "../Prostgles";
 import { TableRule } from "../PublishParser";
@@ -22,14 +22,6 @@ export declare class TableHandler extends ViewHandler {
     };
     constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TableHandlers, joinPaths?: JoinPaths);
     willBatch(query: string): boolean;
-    subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: AnyObject[]) => any): Promise<{
-        unsubscribe: () => any;
-    }>;
-    subscribe(filter: Filter, params: SubscribeParams, localFunc?: (items: AnyObject[]) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>;
-    subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: AnyObject) => any): Promise<{
-        unsubscribe: () => any;
-    }>;
-    subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: AnyObject) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>;
     updateBatch(data: [Filter, AnyObject][], params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
     parseUpdateRules: any;
     update: any;
