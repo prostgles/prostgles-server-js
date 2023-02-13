@@ -166,7 +166,7 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
                                   SELECT 
                                       CASE WHEN related_view_name IS NOT NULL 
                                         /* E' is used to ensure line breaks are not escaped */
-                                        THEN format(E'WITH %I AS (\n %s \n) ', 'view_nDme', 'select 1 as view_definition')
+                                        THEN format(E'WITH %I AS (\n %s \n) ', related_view_name, related_view_def)
                                       ELSE 
                                         '' 
                                       END ||

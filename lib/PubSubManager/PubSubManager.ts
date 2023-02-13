@@ -955,7 +955,7 @@ export class PubSubManager {
         LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
 
         INSERT INTO prostgles.app_triggers (table_name, condition, app_id, related_view_name, related_view_def) 
-          VALUES (${trgVals.tbl}, ${trgVals.cond}, ${asValue(this.appID)}, ${viewOptions?.viewName ?? null}, ${viewOptions?.definition ?? null})
+          VALUES (${trgVals.tbl}, ${trgVals.cond}, ${asValue(this.appID)}, ${asValue(viewOptions?.viewName ?? null)}, ${asValue(viewOptions?.definition ?? null)})
         ON CONFLICT DO NOTHING;
               
         COMMIT WORK;
