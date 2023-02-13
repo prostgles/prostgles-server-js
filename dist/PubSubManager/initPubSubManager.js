@@ -8,7 +8,7 @@ async function initPubSubManager() {
     if (!this.canContinue())
         return undefined;
     try {
-        const schema_version = 6;
+        const schema_version = 10;
         const initQuery = `
               BEGIN; --  ISOLATION LEVEL SERIALIZABLE;-- TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 
@@ -149,49 +149,65 @@ async function initPubSubManager() {
                           DECLARE err_text    TEXT;
                           DECLARE err_detail  TEXT;
                           DECLARE err_hint    TEXT;
-                          
+                                  
+                          DECLARE view_def_query TEXT := '';   
+
                           BEGIN
 
                               -- PERFORM pg_notify('debug', concat_ws(' ', 'TABLE', TG_TABLE_NAME, TG_OP));
 
                               SELECT string_agg(
-                                concat_ws(
-                                  E' UNION \n ',
-                                  CASE WHEN (TG_OP = 'DELETE' OR TG_OP = 'UPDATE') THEN (p1 || ' old_table ' || p2) END,
-                                  CASE WHEN (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN (p1 || ' new_table ' || p2) END 
+                                format(
+                                  $c$ 
+                                    SELECT CASE WHEN EXISTS( 
+                                      SELECT 1 FROM %I WHERE %s 
+                                    ) THEN %s::text END AS t_ids 
+                                  $c$, 
+                                  table_name, 
+                                  condition, 
+                                  id 
                                 ),
-                                E' UNION \n '::text
-                              )
+                                E' UNION \n ' 
+                              ) 
                               INTO unions
-                              FROM (
-                                  SELECT 
-                                      CASE WHEN related_view_name IS NOT NULL 
-                                        /* E' is used to ensure line breaks are not escaped */
-                                        THEN format(E'WITH %I AS (\n %s \n) ', related_view_name, related_view_def)
-                                      ELSE 
-                                        '' 
-                                      END ||
-                                      $z$ 
-                                        SELECT CASE WHEN EXISTS( SELECT 1 FROM 
-                                      $z$ AS p1,
-                                      format( 
-                                        $c$ 
-                                          as %I WHERE %s ) THEN %s::text END AS t_ids 
-                                        $c$, 
-                                        table_name, condition, id 
-                                      ) AS p2
-                                  FROM prostgles.v_triggers
-                                  WHERE table_name = TG_TABLE_NAME
-                              ) t; 
+                              FROM prostgles.v_triggers
+                              WHERE table_name = TG_TABLE_NAME;
+ 
 
+                              /* unions = 'old_table union new_table' or any one of the tables */
                               IF unions IS NOT NULL THEN
-                                  query = format(
-                                      $s$
-                                        SELECT ARRAY_AGG(DISTINCT t.t_ids)
-                                        FROM ( %s ) t
-                                      $s$, 
-                                      unions
-                                  );
+
+                                  SELECT  
+                                    format(
+                                      E'WITH %I AS (\n %s \n) ', 
+                                      TG_TABLE_NAME, 
+                                      concat_ws(
+                                        E' UNION ALL \n ',
+                                        CASE WHEN (TG_OP = 'DELETE' OR TG_OP = 'UPDATE') THEN ' SELECT * FROM old_table ' END,
+                                        CASE WHEN (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN ' SELECT * FROM new_table ' END 
+                                      )
+                                    ) 
+                                    || 
+                                    COALESCE((
+                                      SELECT ', ' || string_agg(format(E' %I AS ( \n %s \n ) ', related_view_name, related_view_def), ', ')
+                                      FROM (
+                                        SELECT DISTINCT related_view_name, related_view_def 
+                                        FROM prostgles.v_triggers
+                                        WHERE table_name = TG_TABLE_NAME
+                                        AND related_view_name IS NOT NULL
+                                        AND related_view_def  IS NOT NULL
+                                      ) t
+                                    ), '')
+                                    || 
+                                    format(
+                                      $c$
+                                          SELECT ARRAY_AGG(DISTINCT t.t_ids)
+                                          FROM ( 
+                                            %s 
+                                          ) t
+                                      $c$, unions
+                                    )
+                                  INTO query; 
 
                                   BEGIN
                                     EXECUTE query INTO t_ids;
@@ -232,7 +248,7 @@ async function initPubSubManager() {
                                               COALESCE(TG_TABLE_NAME, 'MISSING'), 
                                               COALESCE(TG_OP, 'MISSING'), 
                                               CASE WHEN has_errors 
-                                                THEN concat_ws('; ', 'error', err_text, err_detail, err_hint ) 
+                                                THEN concat_ws('; ', 'error', err_text, err_detail, err_hint, 'query: ' || query ) 
                                                 ELSE COALESCE(nrw.cids, '') 
                                               END
                                               ${this.dboBuilder.prostgles.opts.DEBUG_MODE ? (", (select json_agg(t)::TEXT FROM (SELECT * from old_table) t), query") : ""}

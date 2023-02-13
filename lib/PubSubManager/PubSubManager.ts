@@ -230,7 +230,7 @@ export class PubSubManager {
     data_watch_func: "prostgles.prostgles_trigger_function",
     schema_watch_func: "prostgles.schema_watch_func",
     schema_watch_trigger: "prostgles_schema_watch_trigger_new"
-  }
+  } as const;
 
   static SCHEMA_ALTERING_QUERIES = ['CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO'];
 

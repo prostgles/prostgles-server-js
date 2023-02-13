@@ -1,8 +1,8 @@
 {
 	"files": ["./index.ts"],
 	"compilerOptions": {
-		"target": "es2020",
-		"lib": [ "es2020" ],
+		"target": "es2022",
+		"lib": [ "es2022" ],
 		"esModuleInterop" : true,
 		"allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,

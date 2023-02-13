@@ -129,10 +129,10 @@ export declare class PubSubManager {
     appChecking: boolean;
     init: any;
     DB_OBJ_NAMES: {
-        trigger_add_remove_func: string;
-        data_watch_func: string;
-        schema_watch_func: string;
-        schema_watch_trigger: string;
+        readonly trigger_add_remove_func: "prostgles.trigger_add_remove_func";
+        readonly data_watch_func: "prostgles.prostgles_trigger_function";
+        readonly schema_watch_func: "prostgles.schema_watch_func";
+        readonly schema_watch_trigger: "prostgles_schema_watch_trigger_new";
     };
     static SCHEMA_ALTERING_QUERIES: string[];
     static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID: string;
