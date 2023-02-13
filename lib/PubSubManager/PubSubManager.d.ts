@@ -168,7 +168,5 @@ export declare class PubSubManager {
         condition: string;
     }, viewOptions?: ViewSubscriptionOptions): Promise<boolean>;
 }
-export declare function omitKeys<T extends AnyObject, Exclude extends keyof T>(obj: T, exclude: Exclude[]): Omit<T, Exclude>;
-export declare function pickKeys<T extends AnyObject, Include extends keyof T>(obj: T, include?: Include[]): Pick<T, Include>;
-export {};
+export { pickKeys, omitKeys } from "prostgles-types";
 //# sourceMappingURL=PubSubManager.d.ts.map

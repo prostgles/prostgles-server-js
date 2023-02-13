@@ -995,22 +995,4 @@ export class PubSubManager {
 
 const parseCondition = (condition: string): string => Boolean(condition && condition.trim().length) ? condition : "TRUE"
 
-export function omitKeys<T extends AnyObject, Exclude extends keyof T>(obj: T, exclude: Exclude[]): Omit<T, Exclude> {
-  return pickKeys(obj, getKeys(obj).filter(k => !exclude.includes(k as any)))
-}
-
-export function pickKeys<T extends AnyObject, Include extends keyof T>(obj: T, include: Include[] = []): Pick<T, Include> {
-  let keys = include;
-  if (!keys.length) {
-    return {} as any;
-  }
-  if (obj && keys.length) {
-    let res: AnyObject = {};
-    keys.forEach(k => {
-      res[k] = obj[k];
-    });
-    return res as any;
-  }
-
-  return obj;
-}
+export { pickKeys, omitKeys } from "prostgles-types"

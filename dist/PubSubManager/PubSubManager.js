@@ -5,7 +5,7 @@
  *--------------------------------------------------------------------------------------------*/
 var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.pickKeys = exports.omitKeys = exports.PubSubManager = exports.log = exports.DEFAULT_SYNC_BATCH_SIZE = exports.asValue = void 0;
+exports.omitKeys = exports.pickKeys = exports.PubSubManager = exports.log = exports.DEFAULT_SYNC_BATCH_SIZE = exports.asValue = void 0;
 const utils_1 = require("../utils");
 const DboBuilder_1 = require("../DboBuilder");
 const Prostgles_1 = require("../Prostgles");
@@ -748,23 +748,7 @@ PubSubManager.create = async (options) => {
 PubSubManager.SCHEMA_ALTERING_QUERIES = ['CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO'];
 PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from ";
 const parseCondition = (condition) => Boolean(condition && condition.trim().length) ? condition : "TRUE";
-function omitKeys(obj, exclude) {
-    return pickKeys(obj, (0, prostgles_types_1.getKeys)(obj).filter(k => !exclude.includes(k)));
-}
-exports.omitKeys = omitKeys;
-function pickKeys(obj, include = []) {
-    let keys = include;
-    if (!keys.length) {
-        return {};
-    }
-    if (obj && keys.length) {
-        let res = {};
-        keys.forEach(k => {
-            res[k] = obj[k];
-        });
-        return res;
-    }
-    return obj;
-}
-exports.pickKeys = pickKeys;
+var prostgles_types_2 = require("prostgles-types");
+Object.defineProperty(exports, "pickKeys", { enumerable: true, get: function () { return prostgles_types_2.pickKeys; } });
+Object.defineProperty(exports, "omitKeys", { enumerable: true, get: function () { return prostgles_types_2.omitKeys; } });
 //# sourceMappingURL=PubSubManager.js.map
