@@ -107,7 +107,7 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
                       LIMIT 0
                     )
 
-                    SELECT *
+                    SELECT COUNT(*) as count
                     FROM (
                       ${def}
                     ) prostgles_view_ref_table_test

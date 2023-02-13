@@ -82,7 +82,7 @@ async function subscribe(filter, params, localFunc, table_rules, localParams) {
                       LIMIT 0
                     )
 
-                    SELECT *
+                    SELECT COUNT(*) as count
                     FROM (
                       ${def}
                     ) prostgles_view_ref_table_test
