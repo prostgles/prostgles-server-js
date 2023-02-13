@@ -3,7 +3,7 @@ import { TableRule } from "../../PublishParser";
 import { ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, Select } from "prostgles-types";
 import { TableHandler } from "../TableHandler";
 import { FieldSpec, FunctionSpec } from "./Functions";
-export declare type SelectItem = {
+export type SelectItem = {
     type: "column" | "function" | "aggregation" | "joinedColumn" | "computed";
     getFields: (args?: any[]) => string[] | "*";
     getQuery: (tableAlias?: string) => string;
@@ -12,10 +12,10 @@ export declare type SelectItem = {
     alias: string;
     selected: boolean;
 };
-export declare type SelectItemValidated = SelectItem & {
+export type SelectItemValidated = SelectItem & {
     fields: string[];
 };
-export declare type NewQuery = {
+export type NewQuery = {
     /**
      * All fields from the table will be in nested SELECT and GROUP BY to allow order/filter by fields not in select
      */

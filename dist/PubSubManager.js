@@ -28,6 +28,12 @@ const log = (...args) => {
 };
 exports.log = log;
 class PubSubManager {
+    get db() {
+        return this.dboBuilder.db;
+    }
+    get dbo() {
+        return this.dboBuilder.dbo;
+    }
     constructor(options) {
         this.onSchemaChange = undefined;
         this.NOTIF_TYPE = {
@@ -70,8 +76,8 @@ class PubSubManager {
             if (!this.canContinue())
                 return undefined;
             try {
-                const schema_version = 5;
-                const q = `
+                const schema_version = 6;
+                const initQuery = `
                 BEGIN; --  ISOLATION LEVEL SERIALIZABLE;-- TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 
                 --SET  TRANSACTION ISOLATION LEVEL SERIALIZABLE;
@@ -174,37 +180,26 @@ class PubSubManager {
                             app_id          TEXT NOT NULL,
                             table_name      TEXT NOT NULL,
                             condition       TEXT NOT NULL,
+
+                            /* The view from the root subscription, found in the condition.
+                                We need this because old_table/new_table data is not reflected in the view inside the AFTER trigger
+                            */
+                            related_view_name     TEXT, 
+                            related_view_def      TEXT, /* view definition */
+
                             inserted        TIMESTAMP NOT NULL DEFAULT NOW(),
                             last_used       TIMESTAMP NOT NULL DEFAULT NOW(),
-                            PRIMARY KEY (app_id, table_name, condition) -- This unqique index limits the condition column value to be less than 'SELECT current_setting('block_size');'
+                            PRIMARY KEY (app_id, table_name, condition) /* This unqique index limits the condition column value to be less than 'SELECT current_setting('block_size'); */
                         );
                         COMMENT ON TABLE prostgles.app_triggers IS 'Tables and conditions that are currently subscribed/synced';
 
 
                         CREATE OR REPLACE VIEW prostgles.v_triggers AS
                         SELECT *
-                        , (ROW_NUMBER() OVER( ORDER BY table_name, condition ))::text AS id
-                        -- , concat_ws('-', table_name, condition) AS id
-                        , ROW_NUMBER() OVER(PARTITION BY app_id, table_name ORDER BY table_name, condition ) - 1 AS c_id
+                          , (ROW_NUMBER() OVER( ORDER BY table_name, condition ))::text AS id 
+                          , ROW_NUMBER() OVER(PARTITION BY app_id, table_name ORDER BY table_name, condition ) - 1 AS c_id
                         FROM prostgles.app_triggers;
                         COMMENT ON VIEW prostgles.v_triggers IS 'Augment trigger table with natural IDs and per app IDs';
-
-
-                    /*
-                        CREATE OR REPLACE VIEW prostgles.v_triggers_unnested AS
-                            SELECT *
-                            , ROW_NUMBER() OVER(PARTITION BY app_id, table_name ORDER BY table_name, condition ) - 1 AS c_id
-                            FROM (
-                                SELECT *, unnest(app_ids) as app_id
-                                FROM prostgles.v_triggers
-                            ) t;
-
-                        -- Force table into cache
-                        IF EXISTS (select * from pg_extension where extname = 'pg_prewarm') THEN
-                          CREATE EXTENSION IF NOT EXISTS pg_prewarm;
-                          PERFORM pg_prewarm('prostgles.app_triggers');
-                        END IF;
-                    */
 
 
                         CREATE OR REPLACE FUNCTION ${this.DB_OBJ_NAMES.data_watch_func}() RETURNS TRIGGER 
@@ -238,6 +233,7 @@ class PubSubManager {
                                 INTO unions
                                 FROM (
                                     SELECT 
+                                        
                                         $z$ 
                                           SELECT CASE WHEN EXISTS( SELECT 1 FROM 
                                         $z$ AS p1,
@@ -249,22 +245,7 @@ class PubSubManager {
                                         ) AS p2
                                     FROM prostgles.v_triggers
                                     WHERE table_name = TG_TABLE_NAME
-                                ) t;
-                                
-                                /*
-                                PERFORM pg_notify( 
-                                  ${(0, exports.asValue)(this.NOTIF_CHANNEL.preffix)} || (SELECT id FROM prostgles.apps LIMIT 1) , 
-                                  concat_ws(
-                                    ${(0, exports.asValue)(PubSubManager.DELIMITER)},
-
-                                    ${(0, exports.asValue)(this.NOTIF_TYPE.data)}, 
-                                    COALESCE(TG_TABLE_NAME, 'MISSING'), 
-                                    COALESCE(TG_OP, 'MISSING'), 
-                                    unions
-                                  )
-                                );
-                                RAISE 'unions: % , cids: %', unions, c_ids;
-                                */
+                                ) t; 
 
                                 IF unions IS NOT NULL THEN
                                     query = format(
@@ -306,19 +287,19 @@ class PubSubManager {
                                         LOOP
                                             
                                             PERFORM pg_notify( 
-                                                ${(0, exports.asValue)(this.NOTIF_CHANNEL.preffix)} || nrw.app_id , 
-                                                concat_ws(
-                                                    ${(0, exports.asValue)(PubSubManager.DELIMITER)},
+                                              ${(0, exports.asValue)(this.NOTIF_CHANNEL.preffix)} || nrw.app_id , 
+                                              concat_ws(
+                                                ${(0, exports.asValue)(PubSubManager.DELIMITER)},
 
-                                                    ${(0, exports.asValue)(this.NOTIF_TYPE.data)}, 
-                                                    COALESCE(TG_TABLE_NAME, 'MISSING'), 
-                                                    COALESCE(TG_OP, 'MISSING'), 
-                                                    CASE WHEN has_errors 
-                                                      THEN concat_ws('; ', 'error', err_text, err_detail, err_hint ) 
-                                                      ELSE COALESCE(nrw.cids, '') 
-                                                    END
-                                                    ${this.dboBuilder.prostgles.opts.DEBUG_MODE ? (", (select json_agg(t)::TEXT FROM (SELECT * from old_table) t), query") : ""}
-                                                )
+                                                ${(0, exports.asValue)(this.NOTIF_TYPE.data)}, 
+                                                COALESCE(TG_TABLE_NAME, 'MISSING'), 
+                                                COALESCE(TG_OP, 'MISSING'), 
+                                                CASE WHEN has_errors 
+                                                  THEN concat_ws('; ', 'error', err_text, err_detail, err_hint ) 
+                                                  ELSE COALESCE(nrw.cids, '') 
+                                                END
+                                                ${this.dboBuilder.prostgles.opts.DEBUG_MODE ? ("--, (select json_agg(t)::TEXT FROM (SELECT * from old_table) t), query") : ""}
+                                              )
                                             );
                                         END LOOP;
 
@@ -574,7 +555,7 @@ class PubSubManager {
                 // if(!prgl_exists){
                 //     await this.db.any(q); 
                 // }
-                await this.db.any(q);
+                await this.db.any(initQuery);
                 if (!this.canContinue())
                     return;
                 /* Prepare App id */
@@ -965,12 +946,6 @@ class PubSubManager {
         this.syncs = [];
         this.socketChannelPreffix = wsChannelNamePrefix || "_psqlWS_";
         (0, exports.log)("Created PubSubManager");
-    }
-    get db() {
-        return this.dboBuilder.db;
-    }
-    get dbo() {
-        return this.dboBuilder.dbo;
     }
     isReady() {
         if (!this.postgresNotifListenManager)

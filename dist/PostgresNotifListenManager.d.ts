@@ -1,7 +1,7 @@
 import { DB } from "./Prostgles";
 import pg from "pg-promise/typescript/pg-subset";
 import pgPromise from "pg-promise";
-export declare type PrglNotifListener = (args: {
+export type PrglNotifListener = (args: {
     length: number;
     processId: number;
     channel: string;

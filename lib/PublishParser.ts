@@ -98,7 +98,7 @@ const RULE_TO_METHODS = [
 ] as const;
 
 import { FieldFilter, SelectParams } from "prostgles-types";
-import { DEFAULT_SYNC_BATCH_SIZE } from "./PubSubManager";
+import { DEFAULT_SYNC_BATCH_SIZE } from "./PubSubManager/PubSubManager";
 import { TableHandler } from "./DboBuilder/TableHandler";
 import { ViewHandler } from "./DboBuilder/ViewHandler";
 

@@ -1,7 +1,7 @@
 import { PG_COLUMN_UDT_DATA_TYPE, SQLHandler, SQLOptions, SQLResult } from "prostgles-types";
 import { DboBuilder, LocalParams, pgp, postgresToTsType } from "../DboBuilder";
 import { DB, Prostgles } from "../Prostgles";
-import { PubSubManager } from "../PubSubManager";
+import { PubSubManager } from "../PubSubManager/PubSubManager";
 const { ParameterizedQuery: PQ } = require('pg-promise');
 
 

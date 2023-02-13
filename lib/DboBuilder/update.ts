@@ -1,7 +1,7 @@
 import { AnyObject, getKeys, isObject, unpatchText, UpdateParams } from "prostgles-types";
 import { Filter, isPlainObject, LocalParams, makeErr, Media, parseError } from "../DboBuilder";
 import { TableRule, ValidateRow } from "../PublishParser";
-import { omitKeys, pickKeys } from "../PubSubManager";
+import { omitKeys, pickKeys } from "../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler";
 import { isFile, uploadFile } from "./uploadFile"
 

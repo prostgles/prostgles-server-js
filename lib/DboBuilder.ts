@@ -100,7 +100,7 @@ import {
 import { 
     PublishParser, PublishAllOrNothing, 
 } from "./PublishParser";
-import { PubSubManager, asValue, BasicCallback, pickKeys, omitKeys } from "./PubSubManager"; 
+import { PubSubManager, asValue, BasicCallback, pickKeys, omitKeys } from "./PubSubManager/PubSubManager"; 
 import { _delete } from "./DboBuilder/delete";
 import { JoinPaths, ViewHandler } from "./DboBuilder/ViewHandler";
  

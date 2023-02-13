@@ -5,8 +5,8 @@ import * as stream from 'stream';
 import { DB, DBHandlerServer, ExpressApp, Prostgles } from './Prostgles';
 import { ALLOWED_CONTENT_TYPE, ALLOWED_EXTENSION, ValidatedColumnInfo } from 'prostgles-types';
 export declare const asSQLIdentifier: (name: string, db: DB) => Promise<string>;
-declare type OnProgress = (progress: S3.ManagedUpload.Progress) => void;
-export declare type ImageOptions = {
+type OnProgress = (progress: S3.ManagedUpload.Progress) => void;
+export type ImageOptions = {
     keepMetadata?: boolean;
     compression?: 
     /**
@@ -25,13 +25,13 @@ export declare type ImageOptions = {
         };
     };
 };
-export declare type S3Config = {
+export type S3Config = {
     region: string;
     bucket: string;
     accessKeyId: string;
     secretAccessKey: string;
 };
-export declare type LocalConfig = {
+export type LocalConfig = {
     /**
      * example: path.join(__dirname+'/media')
      * note that this location will be relative to the compiled file location
@@ -43,13 +43,13 @@ export declare type LocalConfig = {
      */
     minFreeBytes?: number;
 };
-export declare type UploadItem = {
+export type UploadItem = {
     name: string;
     content_type: string;
     data: Buffer;
     extension: string;
 };
-export declare type UploadedItem = {
+export type UploadedItem = {
     /**
      * Url that is passed to client
      */

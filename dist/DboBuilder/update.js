@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.update = void 0;
 const prostgles_types_1 = require("prostgles-types");
 const DboBuilder_1 = require("../DboBuilder");
-const PubSubManager_1 = require("../PubSubManager");
+const PubSubManager_1 = require("../PubSubManager/PubSubManager");
 const uploadFile_1 = require("./uploadFile");
 async function update(filter, _newData, params, tableRules, localParams) {
     const ACTION = "update";

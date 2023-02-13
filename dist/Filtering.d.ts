@@ -4,7 +4,7 @@ import { FullFilter } from "prostgles-types";
 * Parse a single filter
 * Ensure only single key objects reach this point
 */
-declare type ParseFilterItemArgs = {
+type ParseFilterItemArgs = {
     filter: FullFilter;
     select?: SelectItem[];
     tableAlias?: string;

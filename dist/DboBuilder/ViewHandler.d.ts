@@ -5,7 +5,8 @@ import { DboBuilder, ExistsFilterConfig, Filter, JoinInfo, LocalParams, SortItem
 import { Graph } from "../shortestPath";
 import { TableRule, UpdateRule, ValidateRow } from "../PublishParser";
 import { SelectItem, SelectItemValidated } from "./QueryBuilder/QueryBuilder";
-export declare type JoinPaths = {
+import { LocalFunc } from "./subscribe";
+export type JoinPaths = {
     t1: string;
     t2: string;
     path: string[];
@@ -65,14 +66,14 @@ export declare class ViewHandler {
     getValidatedRules(tableRules?: TableRule, localParams?: LocalParams): ValidatedTableRules;
     find(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]>;
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
-    subscribe(filter: Filter, params: SubscribeParams, localFunc: (items: AnyObject[]) => any): Promise<{
+    subscribe(filter: Filter, params: SubscribeParams, localFunc: LocalFunc): Promise<{
         unsubscribe: () => any;
     }>;
-    subscribe(filter: Filter, params: SubscribeParams, localFunc?: (items: AnyObject[]) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>;
+    subscribe(filter: Filter, params: SubscribeParams, localFunc: undefined, table_rules: TableRule | undefined, localParams: LocalParams): Promise<string>;
     subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: AnyObject) => any): Promise<{
         unsubscribe: () => any;
     }>;
-    subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: AnyObject) => any, table_rules?: TableRule, localParams?: LocalParams): Promise<string>;
+    subscribeOne(filter: Filter, params: SubscribeParams, localFunc: undefined, table_rules: TableRule, localParams: LocalParams): Promise<string>;
     count(filter?: Filter, param2_unused?: undefined, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<number>;
     size(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<string>;
     getAllowedSelectFields(selectParams: FieldFilter<AnyObject> | undefined, allowed_cols: FieldFilter, allow_empty?: boolean): string[];

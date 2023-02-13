@@ -3,56 +3,56 @@ import { AuthResult, SessionUser } from "./AuthHandler";
 import { CommonTableRules, LocalParams, PRGLIOSocket, TableOrViewInfo, TableSchemaColumn } from "./DboBuilder";
 import { Prostgles, DBHandlerServer, DB } from "./Prostgles";
 import type { DBOFullyTyped, PublishFullyTyped } from "./DBSchemaBuilder";
-export declare type PublishMethods<S = void, SUser extends SessionUser = SessionUser> = (params: PublishParams<S, SUser>) => {
+export type PublishMethods<S = void, SUser extends SessionUser = SessionUser> = (params: PublishParams<S, SUser>) => {
     [key: string]: Method;
 } | Promise<{
     [key: string]: Method;
 } | null>;
-export declare type Awaitable<T> = T | Promise<T>;
-declare type Request = {
+export type Awaitable<T> = T | Promise<T>;
+type Request = {
     socket?: any;
     httpReq?: any;
 };
-declare type DboTable = Request & {
+type DboTable = Request & {
     tableName: string;
     localParams: LocalParams;
 };
-declare type DboTableCommand = Request & DboTable & {
+type DboTableCommand = Request & DboTable & {
     command: string;
     localParams: LocalParams;
 };
 import { FieldFilter, SelectParams } from "prostgles-types";
-export declare type InsertRequestData = {
+export type InsertRequestData = {
     data: object | object[];
     returning: FieldFilter;
 };
-export declare type SelectRequestData = {
+export type SelectRequestData = {
     filter: object;
     params: SelectParams;
 };
-export declare type DeleteRequestData = {
+export type DeleteRequestData = {
     filter: object;
     returning: FieldFilter;
 };
-export declare type UpdateRequestDataOne<R extends AnyObject> = {
+export type UpdateRequestDataOne<R extends AnyObject> = {
     filter: FullFilter<R>;
     data: Partial<R>;
     returning: FieldFilter<R>;
 };
-export declare type UpdateReq<R extends AnyObject> = {
+export type UpdateReq<R extends AnyObject> = {
     filter: FullFilter<R>;
     data: Partial<R>;
 };
-export declare type UpdateRequestDataBatch<R extends AnyObject> = {
+export type UpdateRequestDataBatch<R extends AnyObject> = {
     data: UpdateReq<R>[];
 };
-export declare type UpdateRequestData<R extends AnyObject = AnyObject> = UpdateRequestDataOne<R> | UpdateRequestDataBatch<R>;
-export declare type ValidateRow<R extends AnyObject = AnyObject, S = void> = (row: R, dbx: DBOFullyTyped<S>) => R | Promise<R>;
-export declare type ValidateUpdateRow<R extends AnyObject = AnyObject, S = void> = (args: {
+export type UpdateRequestData<R extends AnyObject = AnyObject> = UpdateRequestDataOne<R> | UpdateRequestDataBatch<R>;
+export type ValidateRow<R extends AnyObject = AnyObject, S = void> = (row: R, dbx: DBOFullyTyped<S>) => R | Promise<R>;
+export type ValidateUpdateRow<R extends AnyObject = AnyObject, S = void> = (args: {
     update: Partial<R>;
     filter: FullFilter<R>;
 }, dbx: DBOFullyTyped<S>) => R | Promise<R>;
-export declare type SelectRule<Cols extends AnyObject = AnyObject, S = void> = {
+export type SelectRule<Cols extends AnyObject = AnyObject, S = void> = {
     /**
      * Fields allowed to be selected.
      * Tip: Use false to exclude field
@@ -80,7 +80,7 @@ export declare type SelectRule<Cols extends AnyObject = AnyObject, S = void> = {
      */
     validate?(args: SelectRequestData): SelectRequestData | Promise<SelectRequestData>;
 };
-export declare type InsertRule<Cols extends AnyObject = AnyObject, S = void> = {
+export type InsertRule<Cols extends AnyObject = AnyObject, S = void> = {
     /**
      * Fields allowed to be inserted.   Tip: Use false to exclude field
      */
@@ -107,7 +107,7 @@ export declare type InsertRule<Cols extends AnyObject = AnyObject, S = void> = {
      */
     postValidate?: ValidateRow<Required<Cols>, S>;
 };
-export declare type UpdateRule<Cols extends AnyObject = AnyObject, S = void> = {
+export type UpdateRule<Cols extends AnyObject = AnyObject, S = void> = {
     /**
      * Fields allowed to be updated.   Tip: Use false/0 to exclude field
      */
@@ -150,7 +150,7 @@ export declare type UpdateRule<Cols extends AnyObject = AnyObject, S = void> = {
      */
     postValidate?: ValidateRow<Required<Cols>, S>;
 };
-export declare type DeleteRule<Cols extends AnyObject = AnyObject, S = void> = {
+export type DeleteRule<Cols extends AnyObject = AnyObject, S = void> = {
     /**
      * Filter added to every query (e.g. user_id) to restrict access
      */
@@ -168,7 +168,7 @@ export declare type DeleteRule<Cols extends AnyObject = AnyObject, S = void> = {
      */
     validate?(...args: any[]): Awaitable<void>;
 };
-export declare type SyncRule<Cols extends AnyObject = AnyObject> = {
+export type SyncRule<Cols extends AnyObject = AnyObject> = {
     /**
      * Primary keys used in updating data
      */
@@ -190,35 +190,35 @@ export declare type SyncRule<Cols extends AnyObject = AnyObject> = {
      */
     batch_size?: number;
 };
-export declare type SubscribeRule = {
+export type SubscribeRule = {
     throttle?: number;
 };
-export declare type ViewRule<S extends AnyObject = AnyObject> = CommonTableRules & {
+export type ViewRule<S extends AnyObject = AnyObject> = CommonTableRules & {
     /**
      * What can be read from the table
      */
     select?: SelectRule<S>;
 };
-export declare type TableRule<RowType extends AnyObject = AnyObject, S = void> = ViewRule<RowType> & {
+export type TableRule<RowType extends AnyObject = AnyObject, S = void> = ViewRule<RowType> & {
     insert?: InsertRule<RowType, S>;
     update?: UpdateRule<RowType, S>;
     delete?: DeleteRule<RowType, S>;
     sync?: SyncRule<RowType>;
     subscribe?: SubscribeRule;
 };
-export declare type PublishViewRule<Col extends AnyObject = AnyObject, S = void> = {
+export type PublishViewRule<Col extends AnyObject = AnyObject, S = void> = {
     select?: SelectRule<Col, S> | PublishAllOrNothing;
     getColumns?: PublishAllOrNothing;
     getInfo?: PublishAllOrNothing;
 };
-export declare type PublishTableRule<Col extends AnyObject = AnyObject, S = void> = PublishViewRule<Col, S> & {
+export type PublishTableRule<Col extends AnyObject = AnyObject, S = void> = PublishViewRule<Col, S> & {
     insert?: InsertRule<Col, S> | PublishAllOrNothing;
     update?: UpdateRule<Col, S> | PublishAllOrNothing;
     delete?: DeleteRule<Col, S> | PublishAllOrNothing;
     sync?: SyncRule<Col>;
     subscribe?: SubscribeRule | PublishAllOrNothing;
 };
-export declare type ParsedPublishTable = {
+export type ParsedPublishTable = {
     select?: SelectRule;
     getColumns?: true;
     getInfo?: true;
@@ -229,7 +229,7 @@ export declare type ParsedPublishTable = {
     subscribe?: SubscribeRule;
     subscribeOne?: SubscribeRule;
 };
-export declare type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
+export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
     sid?: string;
     dbo: DBOFullyTyped<S>;
     db: DB;
@@ -241,19 +241,19 @@ export declare type PublishParams<S = void, SUser extends SessionUser = SessionU
         columns: TableSchemaColumn[];
     }[];
 };
-export declare type RequestParams = {
+export type RequestParams = {
     dbo?: DBHandlerServer;
     socket?: any;
 };
-export declare type PublishAllOrNothing = true | "*" | false | null;
-declare type PublishObject = {
+export type PublishAllOrNothing = true | "*" | false | null;
+type PublishObject = {
     [table_name: string]: (PublishTableRule | PublishViewRule | PublishAllOrNothing);
 };
-export declare type ParsedPublishTables = {
+export type ParsedPublishTables = {
     [table_name: string]: ParsedPublishTable;
 };
-export declare type PublishedResult<Schema = void> = PublishAllOrNothing | PublishFullyTyped<Schema>;
-export declare type Publish<Schema = void, SUser extends SessionUser = SessionUser> = PublishedResult<Schema> | ((params: PublishParams<Schema, SUser>) => Awaitable<PublishedResult<Schema>>);
+export type PublishedResult<Schema = void> = PublishAllOrNothing | PublishFullyTyped<Schema>;
+export type Publish<Schema = void, SUser extends SessionUser = SessionUser> = PublishedResult<Schema> | ((params: PublishParams<Schema, SUser>) => Awaitable<PublishedResult<Schema>>);
 export declare class PublishParser {
     publish: any;
     publishMethods?: PublishMethods<void, SessionUser<AnyObject, AnyObject>> | undefined;

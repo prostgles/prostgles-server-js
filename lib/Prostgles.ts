@@ -18,7 +18,7 @@ import TableConfigurator, { TableConfig } from "./TableConfig";
 
 import { get } from "./utils";
 import { DboBuilder, DBHandlerServer, isPlainObject, PRGLIOSocket } from "./DboBuilder";
-import { PubSubManager, pickKeys, log } from "./PubSubManager";
+import { PubSubManager, pickKeys, log } from "./PubSubManager/PubSubManager";
 export { DBHandlerServer }
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 

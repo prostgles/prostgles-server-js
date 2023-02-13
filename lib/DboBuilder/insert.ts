@@ -2,7 +2,7 @@ import pgPromise from "pg-promise";
 import { AnyObject, asName, FieldFilter, get, getKeys, InsertParams, isObject } from "prostgles-types";
 import { isPlainObject, LocalParams, makeErr, parseError, pgp } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
-import { asValue, omitKeys, pickKeys } from "../PubSubManager";
+import { asValue, omitKeys, pickKeys } from "../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler";
 
 export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any | any[] | boolean> {

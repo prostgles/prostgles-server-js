@@ -1,7 +1,7 @@
 import { AnyObject, getKeys, InsertParams, isDefined, isObject, PG_COLUMN_UDT_DATA_TYPE } from "prostgles-types";
 import { LocalParams, TableHandlers } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
-import { omitKeys } from "../PubSubManager";
+import { omitKeys } from "../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler";
 import { uploadFile } from "./uploadFile";
 

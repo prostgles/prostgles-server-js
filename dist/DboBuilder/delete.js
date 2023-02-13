@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports._delete = void 0;
 const prostgles_types_1 = require("prostgles-types");
 const DboBuilder_1 = require("../DboBuilder");
-const PubSubManager_1 = require("../PubSubManager");
+const PubSubManager_1 = require("../PubSubManager/PubSubManager");
 async function _delete(filter, params, param3_unused, table_rules, localParams) {
     try {
         const { returning } = params || {};

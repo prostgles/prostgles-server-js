@@ -18,6 +18,23 @@ const runSQL_1 = require("./DboBuilder/runSQL");
 const path = require("path");
 const ViewHandler_1 = require("./DboBuilder/ViewHandler");
 class FileManager {
+    get dbo() {
+        if (!this.prostgles?.dbo) {
+            // this.prostgles?.refreshDBO();
+            throw "this.prostgles.dbo missing";
+        }
+        return this.prostgles.dbo;
+    }
+    ;
+    get db() {
+        if (!this.prostgles?.db)
+            throw "this.prostgles.db missing";
+        return this.prostgles.db;
+    }
+    ;
+    get fileRouteExpress() {
+        return this.fileRoute + "/:name";
+    }
     constructor(config, imageOptions) {
         this.getFileUrl = (name) => this.fileRoute ? `${this.fileRoute}/${name}` : "";
         this.checkFreeSpace = async (folderPath, fileSize = 0) => {
@@ -380,23 +397,6 @@ class FileManager {
                 }
             }, Math.max(10000, (fullConfig.delayedDelete.checkIntervalHours || 0) * HOUR));
         }
-    }
-    get dbo() {
-        if (!this.prostgles?.dbo) {
-            // this.prostgles?.refreshDBO();
-            throw "this.prostgles.dbo missing";
-        }
-        return this.prostgles.dbo;
-    }
-    ;
-    get db() {
-        if (!this.prostgles?.db)
-            throw "this.prostgles.db missing";
-        return this.prostgles.db;
-    }
-    ;
-    get fileRouteExpress() {
-        return this.fileRoute + "/:name";
     }
     async getFileStream(name) {
         if ("bucket" in this.config && this.s3Client) {

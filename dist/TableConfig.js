@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.parseI18N = void 0;
 const prostgles_types_1 = require("prostgles-types");
 const DboBuilder_1 = require("./DboBuilder");
-const PubSubManager_1 = require("./PubSubManager");
+const PubSubManager_1 = require("./PubSubManager/PubSubManager");
 const validation_1 = require("./validation");
 const parseI18N = (params) => {
     const { config, lang, defaultLang, defaultValue } = params;
@@ -23,6 +23,18 @@ exports.parseI18N = parseI18N;
  * Will be run between initSQL and fileTable
  */
 class TableConfigurator {
+    get dbo() {
+        if (!this.prostgles.dbo)
+            throw "this.prostgles.dbo missing";
+        return this.prostgles.dbo;
+    }
+    ;
+    get db() {
+        if (!this.prostgles.db)
+            throw "this.prostgles.db missing";
+        return this.prostgles.db;
+    }
+    ;
     constructor(prostgles) {
         this.getColumnConfig = (tableName, colName) => {
             const tconf = this.config?.[tableName];
@@ -114,18 +126,6 @@ class TableConfigurator {
         this.config = prostgles.opts.tableConfig;
         this.prostgles = prostgles;
     }
-    get dbo() {
-        if (!this.prostgles.dbo)
-            throw "this.prostgles.dbo missing";
-        return this.prostgles.dbo;
-    }
-    ;
-    get db() {
-        if (!this.prostgles.db)
-            throw "this.prostgles.db missing";
-        return this.prostgles.db;
-    }
-    ;
     async init() {
         let queries = [];
         if (!this.config || !this.prostgles.pgp)

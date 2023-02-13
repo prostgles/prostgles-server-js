@@ -15,7 +15,7 @@ console.log("Add a basic auth mode where user and sessions table are created");
 const TableConfig_1 = require("./TableConfig");
 const utils_1 = require("./utils");
 const DboBuilder_1 = require("./DboBuilder");
-const PubSubManager_1 = require("./PubSubManager");
+const PubSubManager_1 = require("./PubSubManager/PubSubManager");
 const prostgles_types_1 = require("prostgles-types");
 const PublishParser_1 = require("./PublishParser");
 const DBEventsManager_1 = require("./DBEventsManager");
@@ -91,6 +91,17 @@ const DEFAULT_KEYWORDS = {
 };
 const fs = require("fs");
 class Prostgles {
+    get dboBuilder() {
+        if (!this._dboBuilder)
+            throw "get dboBuilder: it's undefined";
+        return this._dboBuilder;
+    }
+    set dboBuilder(d) {
+        this._dboBuilder = d;
+    }
+    isMedia(tableName) {
+        return this.opts?.fileTable?.tableName === tableName;
+    }
     constructor(params) {
         this.opts = {
             DEBUG_MODE: false,
@@ -284,17 +295,6 @@ class Prostgles {
             ...DEFAULT_KEYWORDS,
             ...params.keywords,
         };
-    }
-    get dboBuilder() {
-        if (!this._dboBuilder)
-            throw "get dboBuilder: it's undefined";
-        return this._dboBuilder;
-    }
-    set dboBuilder(d) {
-        this._dboBuilder = d;
-    }
-    isMedia(tableName) {
-        return this.opts?.fileTable?.tableName === tableName;
     }
     async onSchemaChange(event) {
         const { watchSchema, watchSchemaType, onReady, tsGeneratedTypesDir } = this.opts;

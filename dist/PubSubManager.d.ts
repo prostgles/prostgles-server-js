@@ -8,8 +8,8 @@ import { TableRule } from "./PublishParser";
 export declare const asValue: (v: any) => string;
 export declare const DEFAULT_SYNC_BATCH_SIZE = 50;
 export declare const log: (...args: any[]) => void;
-export declare type BasicCallback = (err?: any, res?: any) => void;
-export declare type SyncParams = {
+export type BasicCallback = (err?: any, res?: any) => void;
+export type SyncParams = {
     socket_id: string;
     channel_name: string;
     table_name: string;
@@ -29,7 +29,7 @@ export declare type SyncParams = {
     last_synced: number;
     is_syncing: boolean;
 };
-declare type AddSyncParams = {
+type AddSyncParams = {
     socket: any;
     table_info: TableInfo;
     table_rules: TableRule;
@@ -43,7 +43,7 @@ declare type AddSyncParams = {
     condition: string;
     throttle?: number;
 };
-declare type SubscriptionParams = {
+type SubscriptionParams = {
     socket_id?: string;
     channel_name: string;
     table_name: string;
@@ -67,10 +67,10 @@ declare type SubscriptionParams = {
     is_throttling?: any;
     is_ready?: boolean;
 };
-declare type AddSubscriptionParams = SubscriptionParams & {
+type AddSubscriptionParams = SubscriptionParams & {
     condition: string;
 };
-export declare type PubSubManagerOptions = {
+export type PubSubManagerOptions = {
     dboBuilder: DboBuilder;
     wsChannelNamePrefix?: string;
     pgChannelName?: string;

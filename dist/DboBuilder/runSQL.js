@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.canCreateTables = exports.canRunSQL = exports.runSQL = void 0;
 const DboBuilder_1 = require("../DboBuilder");
-const PubSubManager_1 = require("../PubSubManager");
+const PubSubManager_1 = require("../PubSubManager/PubSubManager");
 const { ParameterizedQuery: PQ } = require('pg-promise');
 async function runSQL(query, params, options, localParams) {
     if (query?.replace(/\s\s+/g, ' ').toLowerCase().includes("create extension pg_stat_statements")) {

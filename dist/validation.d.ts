@@ -1,22 +1,22 @@
 import { AnyObject } from "prostgles-types";
 import { BaseColumn, JSONBColumnDef } from "./TableConfig";
-declare type BaseOptions = {
+type BaseOptions = {
     optional?: boolean;
     nullable?: boolean;
     description?: string;
     allowedValues?: any[];
     title?: string;
 };
-declare type SimpleType = BaseOptions & ({
+type SimpleType = BaseOptions & ({
     type: "number" | "boolean" | "integer" | "string" | "number[]" | "boolean[]" | "integer[]" | "string[]" | "any[]" | "any" | ValidationSchema;
 } | {
     enum: readonly any[];
 });
-export declare type OneOf = BaseOptions & {
+export type OneOf = BaseOptions & {
     oneOf: readonly ValidationSchema[];
 };
-declare type FieldType = SimpleType | OneOf;
-declare type GetType<T extends FieldType> = T extends {
+type FieldType = SimpleType | OneOf;
+type GetType<T extends FieldType> = T extends {
     type: ValidationSchema;
 } ? SchemaObject<T["type"]> : T extends {
     type: "number";
@@ -45,8 +45,8 @@ declare type GetType<T extends FieldType> = T extends {
 T extends {
     oneOf: readonly ValidationSchema[];
 } ? SchemaObject<T["oneOf"][number]> : any;
-export declare type ValidationSchema = Record<string, FieldType>;
-export declare type SchemaObject<S extends ValidationSchema> = ({
+export type ValidationSchema = Record<string, FieldType>;
+export type SchemaObject<S extends ValidationSchema> = ({
     [K in keyof S as S[K]["optional"] extends true ? K : never]?: GetType<S[K]>;
 } & {
     [K in keyof S as S[K]["optional"] extends true ? never : K]: GetType<S[K]>;
@@ -60,7 +60,7 @@ export declare function getPGCheckConstraint(args: {
     isRootQuery?: boolean;
     optional?: boolean;
 }, depth: number): string;
-declare type ColOpts = {
+type ColOpts = {
     nullable?: boolean;
 };
 export declare function getSchemaTSTypes(schema: ValidationSchema, leading?: string, isOneOf?: boolean): string;
@@ -92,7 +92,7 @@ declare namespace JSTypes {
     export type Schema = Any | Object | Enum | Array | OneOf;
     export {};
 }
-declare type JSONSchema = JSTypes.Schema;
+type JSONSchema = JSTypes.Schema;
 export declare function getJSONBSchemaAsJSONSchema(tableName: string, colName: string, columnConfig: BaseColumn<{
     en: 1;
 }> & JSONBColumnDef): JSONSchema;

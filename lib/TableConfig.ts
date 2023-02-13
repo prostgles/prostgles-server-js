@@ -1,7 +1,7 @@
 import { getKeys, asName as _asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE, isObject } from "prostgles-types";
 import { isPlainObject, JoinInfo } from "./DboBuilder";
 import { DB, DBHandlerServer, Joins, Prostgles } from "./Prostgles";
-import { asValue } from "./PubSubManager";
+import { asValue } from "./PubSubManager/PubSubManager";
 import { getJSONBSchemaAsJSONSchema, getPGCheckConstraint, OneOf, ValidationSchema } from "./validation";
 
 type ColExtraInfo = {

@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getJSONBSchemaAsJSONSchema = exports.getJSONBSchemaTSTypes = exports.getSchemaTSTypes = exports.getPGCheckConstraint = exports.validateSchema = exports.validate = void 0;
 const prostgles_types_1 = require("prostgles-types");
-const PubSubManager_1 = require("./PubSubManager");
+const PubSubManager_1 = require("./PubSubManager/PubSubManager");
 /** tests */
 const s = {
     a: { type: "boolean" },

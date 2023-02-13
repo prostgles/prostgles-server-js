@@ -1,5 +1,5 @@
 import { AnyObject, asName, getKeys, isEmpty, isObject } from "prostgles-types";
-import { asValue } from "./PubSubManager";
+import { asValue } from "./PubSubManager/PubSubManager";
 import { BaseColumn, ColumnConfig, JSONBColumnDef } from "./TableConfig";
 
 type BaseOptions = {
