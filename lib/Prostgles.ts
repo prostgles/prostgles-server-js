@@ -22,7 +22,7 @@ import { PubSubManager, pickKeys, log } from "./PubSubManager/PubSubManager";
 export { DBHandlerServer }
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 
-import { SQLRequest, TableSchemaForClient, CHANNELS, AnyObject, ClientSchema, getKeys, DBSchemaTable, FileColumnConfig, isObject } from "prostgles-types";
+import { SQLRequest, TableSchemaForClient, CHANNELS, AnyObject, ClientSchema, getKeys, DBSchemaTable, FileColumnConfig, isObject, omitKeys } from "prostgles-types";
 import { Publish, PublishMethods, PublishParams, PublishParser } from "./PublishParser";
 import { DBEventsManager } from "./DBEventsManager";
 
@@ -902,7 +902,7 @@ export class Prostgles {
         if(isObject(method) && "run" in method){
           return {
             name: methodName,
-            ...pickKeys(method, ["input", "output"])
+            ...omitKeys(method, ["run"])
           }
         }
         return methodName;

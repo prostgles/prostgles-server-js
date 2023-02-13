@@ -248,7 +248,7 @@ class Prostgles {
                     if ((0, prostgles_types_1.isObject)(method) && "run" in method) {
                         return {
                             name: methodName,
-                            ...(0, PubSubManager_1.pickKeys)(method, ["input", "output"])
+                            ...(0, prostgles_types_1.omitKeys)(method, ["run"])
                         };
                     }
                     return methodName;
