@@ -44,6 +44,7 @@ type AddSyncParams = {
     throttle?: number;
 };
 export type ViewSubscriptionOptions = {
+    viewName: string;
     definition: string;
     relatedTables: {
         tableName: string;
@@ -113,7 +114,7 @@ export declare class PubSubManager {
         preffix: string;
         getFull: (appID?: string) => string;
     };
-    private appID?;
+    appID?: string;
     appCheckFrequencyMS: number;
     appCheck?: ReturnType<typeof setInterval>;
     static canCreate: (db: DB) => Promise<{
@@ -121,12 +122,12 @@ export declare class PubSubManager {
         isSuperUs: boolean;
         yes: boolean;
     }>;
-    static create: (options: PubSubManagerOptions) => Promise<import("../../dist/PubSubManager").PubSubManager | undefined>;
+    static create: (options: PubSubManagerOptions) => Promise<PubSubManager | undefined>;
     destroyed: boolean;
     destroy: () => void;
     canContinue: () => boolean;
     appChecking: boolean;
-    init: () => Promise<import("../../dist/PubSubManager").PubSubManager | undefined>;
+    init: () => Promise<PubSubManager | undefined>;
     DB_OBJ_NAMES: {
         trigger_add_remove_func: string;
         data_watch_func: string;

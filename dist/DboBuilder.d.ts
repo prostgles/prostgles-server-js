@@ -44,7 +44,7 @@ export type DBHandlerServer<TH = TableHandlers> = TH & Partial<DbJoinMaker> & {
 import { FieldSpec } from "./DboBuilder/QueryBuilder/Functions";
 import { Join, Prostgles, DB } from "./Prostgles";
 import { PublishParser, PublishAllOrNothing } from "./PublishParser";
-import { PubSubManager, BasicCallback } from "./PubSubManager";
+import { PubSubManager, BasicCallback } from "./PubSubManager/PubSubManager";
 import { JoinPaths, ViewHandler } from "./DboBuilder/ViewHandler";
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 export declare const pgp: PGP;

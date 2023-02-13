@@ -70,6 +70,7 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
             /** Create exists filters for each table */
             const tableIds: string[] = Array.from(new Set(tableColumns.map(tc => tc.tableID!.toString())));
             viewOptions = {
+              viewName,
               definition: def,
               relatedTables: []
             }
@@ -86,46 +87,52 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
               }
 
               const { relname: tableName, schemaname: tableSchema } = table;
-              let canOverrideReferencedTable = false;
-              try {
-                const { count } = await this.db.oneOrNone(`
-                  WITH ${asName(tableName)} AS (
-                    SELECT * 
-                    FROM ${asName(tableName)}
-                    LIMIT 0
-                  )
 
-                  SELECT *
-                  FROM (
-                    ${def}
-                  ) prostgles_view_ref_table_test
-                `);
-                canOverrideReferencedTable = count.toString() === '0';
-              } catch(e){
-                log(`Could not not override subscribed view (${this.name}) table (${tableName}). Will not check condition`, e);
-              }
-              if (!tableCols.length || !canOverrideReferencedTable) {
-                return {
-                  tableName: tableName,
-                  tableNameEscaped: JSON.stringify(tableName),// [table.schemaname, table.relname].map(v => JSON.stringify(v)).join("."),
-                  condition: "TRUE"
+              if(tableCols.length){
+
+                const tableNameEscaped = tableSchema === current_schema ? table.relname : [tableSchema, tableName].map(v => JSON.stringify(v)).join(".");
+
+                const fullCondition = `EXISTS (
+                  SELECT 1
+                  FROM ${viewNameEscaped}
+                  WHERE ${tableCols.map(c => `${tableNameEscaped}.${JSON.stringify(c.columnName)} = ${viewNameEscaped}.${JSON.stringify(c.name)}`).join(" AND \n")}
+                  AND ${condition || "TRUE"}
+                )`;
+
+                try {
+                  const { count } = await this.db.oneOrNone(`
+                    WITH ${asName(tableName)} AS (
+                      SELECT * 
+                      FROM ${asName(tableName)}
+                      LIMIT 0
+                    )
+
+                    SELECT *
+                    FROM (
+                      ${def}
+                    ) prostgles_view_ref_table_test
+                  `);
+
+                  const relatedTableSubscription = {
+                    tableName: tableName!,
+                    tableNameEscaped,
+                    condition: fullCondition,
+                  }
+  
+                  if(count.toString() === '0'){
+                    return relatedTableSubscription;
+                  }
+                } catch(e){
+                  log(`Could not not override subscribed view (${this.name}) table (${tableName}). Will not check condition`, e);
                 }
               }
 
-              const tableNameEscaped = tableSchema === current_schema ? table.relname : [tableSchema, tableName].map(v => JSON.stringify(v)).join(".");
-
-              const relatedTableSubscription = {
-                tableName: tableName!,
-                tableNameEscaped,
-                condition: `EXISTS (
-                    SELECT 1
-                    FROM ${viewNameEscaped}
-                    WHERE ${tableCols.map(c => `${tableNameEscaped}.${JSON.stringify(c.columnName)} = ${viewNameEscaped}.${JSON.stringify(c.name)}`).join(" AND \n")}
-                    AND ${condition || "TRUE"}
-                  )`
+              return {
+                tableName: tableName,
+                tableNameEscaped: JSON.stringify(tableName),// [table.schemaname, table.relname].map(v => JSON.stringify(v)).join("."),
+                condition: "TRUE"
               }
 
-              return relatedTableSubscription;
             }))
 
             /** Get list of remaining used inner tables */

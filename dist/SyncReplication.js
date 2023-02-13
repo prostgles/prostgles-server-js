@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.syncData = void 0;
-const PubSubManager_1 = require("./PubSubManager");
+const PubSubManager_1 = require("./PubSubManager/PubSubManager");
 const prostgles_types_1 = require("prostgles-types");
 function getNumbers(numberArr) {
     return numberArr.filter(v => v !== null && v !== undefined && Number.isFinite(+v));

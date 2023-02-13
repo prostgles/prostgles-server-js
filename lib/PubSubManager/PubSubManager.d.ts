@@ -1,15 +1,15 @@
 /// <reference types="node" />
-import { PostgresNotifListenManager } from "./PostgresNotifListenManager";
-import { TableOrViewInfo, TableInfo, DBHandlerServer, DboBuilder, PRGLIOSocket } from "./DboBuilder";
-import { DB } from "./Prostgles";
+import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
+import { TableOrViewInfo, TableInfo, DBHandlerServer, DboBuilder, PRGLIOSocket } from "../DboBuilder";
+import { DB } from "../Prostgles";
 import { SelectParams, FieldFilter, WAL, AnyObject } from "prostgles-types";
-import { ClientExpressData } from "./SyncReplication";
-import { TableRule } from "./PublishParser";
+import { ClientExpressData } from "../SyncReplication";
+import { TableRule } from "../PublishParser";
 export declare const asValue: (v: any) => string;
 export declare const DEFAULT_SYNC_BATCH_SIZE = 50;
 export declare const log: (...args: any[]) => void;
-export type BasicCallback = (err?: any, res?: any) => void;
-export type SyncParams = {
+export declare type BasicCallback = (err?: any, res?: any) => void;
+export declare type SyncParams = {
     socket_id: string;
     channel_name: string;
     table_name: string;
@@ -29,7 +29,7 @@ export type SyncParams = {
     last_synced: number;
     is_syncing: boolean;
 };
-type AddSyncParams = {
+declare type AddSyncParams = {
     socket: any;
     table_info: TableInfo;
     table_rules: TableRule;
@@ -43,7 +43,16 @@ type AddSyncParams = {
     condition: string;
     throttle?: number;
 };
-type SubscriptionParams = {
+export declare type ViewSubscriptionOptions = {
+    viewName: string;
+    definition: string;
+    relatedTables: {
+        tableName: string;
+        tableNameEscaped: string;
+        condition: string;
+    }[];
+};
+declare type SubscriptionParams = {
     socket_id?: string;
     channel_name: string;
     table_name: string;
@@ -51,11 +60,7 @@ type SubscriptionParams = {
     /**
      * If this is a view then an array with all related tables will be
      * */
-    relatedTableSubscriptions?: {
-        tableName: string;
-        tableNameEscaped: string;
-        condition: string;
-    }[];
+    viewOptions?: ViewSubscriptionOptions;
     parentSubParams: Omit<SubscriptionParams, "parentSubParams"> | undefined;
     table_info: TableOrViewInfo;
     table_rules?: TableRule;
@@ -67,10 +72,10 @@ type SubscriptionParams = {
     is_throttling?: any;
     is_ready?: boolean;
 };
-type AddSubscriptionParams = SubscriptionParams & {
+declare type AddSubscriptionParams = SubscriptionParams & {
     condition: string;
 };
-export type PubSubManagerOptions = {
+export declare type PubSubManagerOptions = {
     dboBuilder: DboBuilder;
     wsChannelNamePrefix?: string;
     pgChannelName?: string;
@@ -109,7 +114,7 @@ export declare class PubSubManager {
         preffix: string;
         getFull: (appID?: string) => string;
     };
-    private appID?;
+    appID?: string;
     appCheckFrequencyMS: number;
     appCheck?: ReturnType<typeof setInterval>;
     static canCreate: (db: DB) => Promise<{
@@ -117,12 +122,12 @@ export declare class PubSubManager {
         isSuperUs: boolean;
         yes: boolean;
     }>;
-    static create: (options: PubSubManagerOptions) => Promise<PubSubManager | undefined>;
+    static create: (options: PubSubManagerOptions) => Promise<any>;
     destroyed: boolean;
     destroy: () => void;
     canContinue: () => boolean;
     appChecking: boolean;
-    init: () => Promise<PubSubManager | undefined>;
+    init: any;
     DB_OBJ_NAMES: {
         trigger_add_remove_func: string;
         data_watch_func: string;
@@ -161,7 +166,7 @@ export declare class PubSubManager {
     addTrigger(params: {
         table_name: string;
         condition: string;
-    }): Promise<true | undefined>;
+    }, viewOptions?: ViewSubscriptionOptions): Promise<boolean>;
 }
 export declare function omitKeys<T extends AnyObject, Exclude extends keyof T>(obj: T, exclude: Exclude[]): Omit<T, Exclude>;
 export declare function pickKeys<T extends AnyObject, Include extends keyof T>(obj: T, include?: Include[]): Pick<T, Include>;

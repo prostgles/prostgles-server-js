@@ -1,4 +1,6 @@
-import { asValue, PubSubManager } from "../../dist/PubSubManager";
+import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
+import { asValue, log, PubSubManager } from "./PubSubManager";
+const REALTIME_TRIGGER_CHECK_QUERY = "prostgles-server internal query used to manage realtime triggers" as const;
 
 export async function initPubSubManager(this: PubSubManager): Promise<PubSubManager | undefined> {
   if (!this.canContinue()) return undefined;
@@ -162,7 +164,12 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
                               INTO unions
                               FROM (
                                   SELECT 
-                                      
+                                      CASE WHEN related_view_name IS NOT NULL 
+                                        /* E' is used to ensure line breaks are not escaped */
+                                        THEN format(E'WITH %I AS (\n %s \n) ', 'view_nDme', 'select 1 as view_definition')
+                                      ELSE 
+                                        '' 
+                                      END ||
                                       $z$ 
                                         SELECT CASE WHEN EXISTS( SELECT 1 FROM 
                                       $z$ AS p1,

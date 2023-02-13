@@ -18,7 +18,6 @@ import { SelectParams, FieldFilter, asName, WAL, isEmpty, AnyObject, getKeys } f
 import { ClientExpressData, syncData } from "../SyncReplication";
 import { TableRule } from "../PublishParser";
 
-const REALTIME_TRIGGER_CHECK_QUERY = "prostgles-server internal query used to manage realtime triggers" as const;
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 let pgp: PGP = pgPromise({
@@ -72,6 +71,7 @@ type AddSyncParams = {
 }
 
 export type ViewSubscriptionOptions = {
+  viewName: string;
   definition: string;
   relatedTables: {
     tableName: string;
@@ -166,7 +166,7 @@ export class PubSubManager {
     }
   }
 
-  private appID?: string;
+  appID?: string;
 
   appCheckFrequencyMS = 10 * 1000;
   appCheck?: ReturnType<typeof setInterval>;
@@ -949,13 +949,13 @@ export class PubSubManager {
         tbl: asValue(table_name),
         cond: asValue(condition),
       };
-
+      
       await this.db.any(`
         BEGIN WORK;
         LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
 
-        INSERT INTO prostgles.app_triggers (table_name, condition, app_id) 
-          VALUES (${trgVals.tbl}, ${trgVals.cond}, ${asValue(this.appID)})
+        INSERT INTO prostgles.app_triggers (table_name, condition, app_id, related_view_name, related_view_def) 
+          VALUES (${trgVals.tbl}, ${trgVals.cond}, ${asValue(this.appID)}, ${viewOptions?.viewName ?? null}, ${viewOptions?.definition ?? null})
         ON CONFLICT DO NOTHING;
               
         COMMIT WORK;

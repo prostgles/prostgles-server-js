@@ -1,4 +1,4 @@
-import { PubSubManager, SyncParams } from "./PubSubManager";
+import { PubSubManager, SyncParams } from "./PubSubManager/PubSubManager";
 import { AnyObject } from "prostgles-types";
 export type ClientSyncInfo = Partial<{
     c_fr: AnyObject;

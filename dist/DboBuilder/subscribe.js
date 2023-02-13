@@ -50,6 +50,7 @@ async function subscribe(filter, params, localFunc, table_rules, localParams) {
                     /** Create exists filters for each table */
                     const tableIds = Array.from(new Set(tableColumns.map(tc => tc.tableID.toString())));
                     viewOptions = {
+                        viewName,
                         definition: def,
                         relatedTables: []
                     };
@@ -65,44 +66,45 @@ async function subscribe(filter, params, localFunc, table_rules, localParams) {
                             tableCols = tableCols.filter(c => !["json", "xml"].includes(c.udt_name));
                         }
                         const { relname: tableName, schemaname: tableSchema } = table;
-                        let canOverrideReferencedTable = false;
-                        try {
-                            const { count } = await this.db.oneOrNone(`
-                  WITH ${(0, prostgles_types_1.asName)(tableName)} AS (
-                    SELECT * 
-                    FROM ${(0, prostgles_types_1.asName)(tableName)}
-                    LIMIT 0
-                  )
+                        if (tableCols.length) {
+                            const tableNameEscaped = tableSchema === current_schema ? table.relname : [tableSchema, tableName].map(v => JSON.stringify(v)).join(".");
+                            const fullCondition = `EXISTS (
+                  SELECT 1
+                  FROM ${viewNameEscaped}
+                  WHERE ${tableCols.map(c => `${tableNameEscaped}.${JSON.stringify(c.columnName)} = ${viewNameEscaped}.${JSON.stringify(c.name)}`).join(" AND \n")}
+                  AND ${condition || "TRUE"}
+                )`;
+                            try {
+                                const { count } = await this.db.oneOrNone(`
+                    WITH ${(0, prostgles_types_1.asName)(tableName)} AS (
+                      SELECT * 
+                      FROM ${(0, prostgles_types_1.asName)(tableName)}
+                      LIMIT 0
+                    )
 
-                  SELECT *
-                  FROM (
-                    ${def}
-                  ) prostgles_view_ref_table_test
-                `);
-                            canOverrideReferencedTable = count.toString() === '0';
+                    SELECT *
+                    FROM (
+                      ${def}
+                    ) prostgles_view_ref_table_test
+                  `);
+                                const relatedTableSubscription = {
+                                    tableName: tableName,
+                                    tableNameEscaped,
+                                    condition: fullCondition,
+                                };
+                                if (count.toString() === '0') {
+                                    return relatedTableSubscription;
+                                }
+                            }
+                            catch (e) {
+                                (0, PubSubManager_1.log)(`Could not not override subscribed view (${this.name}) table (${tableName}). Will not check condition`, e);
+                            }
                         }
-                        catch (e) {
-                            (0, PubSubManager_1.log)(`Could not not override subscribed view (${this.name}) table (${tableName}). Will not check condition`, e);
-                        }
-                        if (!tableCols.length || !canOverrideReferencedTable) {
-                            return {
-                                tableName: tableName,
-                                tableNameEscaped: JSON.stringify(tableName),
-                                condition: "TRUE"
-                            };
-                        }
-                        const tableNameEscaped = tableSchema === current_schema ? table.relname : [tableSchema, tableName].map(v => JSON.stringify(v)).join(".");
-                        const relatedTableSubscription = {
+                        return {
                             tableName: tableName,
-                            tableNameEscaped,
-                            condition: `EXISTS (
-                    SELECT 1
-                    FROM ${viewNameEscaped}
-                    WHERE ${tableCols.map(c => `${tableNameEscaped}.${JSON.stringify(c.columnName)} = ${viewNameEscaped}.${JSON.stringify(c.name)}`).join(" AND \n")}
-                    AND ${condition || "TRUE"}
-                  )`
+                            tableNameEscaped: JSON.stringify(tableName),
+                            condition: "TRUE"
                         };
-                        return relatedTableSubscription;
                     }));
                     /** Get list of remaining used inner tables */
                     const allUsedTables = await this.db.any("SELECT distinct table_name, table_schema FROM information_schema.view_column_usage WHERE view_name = ${viewName}", { viewName });
