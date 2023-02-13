@@ -234,7 +234,7 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
                                                 THEN concat_ws('; ', 'error', err_text, err_detail, err_hint ) 
                                                 ELSE COALESCE(nrw.cids, '') 
                                               END
-                                              ${this.dboBuilder.prostgles.opts.DEBUG_MODE? ("--, (select json_agg(t)::TEXT FROM (SELECT * from old_table) t), query") : ""}
+                                              ${this.dboBuilder.prostgles.opts.DEBUG_MODE? (", (select json_agg(t)::TEXT FROM (SELECT * from old_table) t), query") : ""}
                                             )
                                           );
                                       END LOOP;

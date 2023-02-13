@@ -763,7 +763,7 @@ export class PubSubManager {
             is_ready: false
           });
 
-          await this.addTrigger(params);
+          await this.addTrigger(params, viewOptions);
 
           upsertSub({
             ...params,

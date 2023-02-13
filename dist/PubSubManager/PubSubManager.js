@@ -578,7 +578,7 @@ class PubSubManager {
                         ...params,
                         is_ready: false
                     });
-                    await this.addTrigger(params);
+                    await this.addTrigger(params, viewOptions);
                     upsertSub({
                         ...params,
                         is_ready: true
