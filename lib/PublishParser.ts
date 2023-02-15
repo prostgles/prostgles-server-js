@@ -600,12 +600,12 @@ export class PublishParser {
               }
             }
 
-            /* Enable subscribe if not explicitly disabled */
+            /* Enable subscribe if not explicitly disabled OR if VIEW with referenced tables */
             const subKey = "subscribe" as const;
 
             if (method === "select" && !dissallowedRuleKeys.includes(subKey)) {
               const sr = MY_RULES.find(r => r.rule === subKey);
-              if (sr) {
+              if (sr && (!is_view || tHandler.columns.some(c => c.references))) {
                 parsed_table[subKey] = { ...sr.no_limits as SubscribeRule };
                 parsed_table.subscribeOne = { ...sr.no_limits as SubscribeRule };
               }

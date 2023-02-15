@@ -532,26 +532,23 @@ async function getTablesForSchemaPostgresSQL({ db, runSQL }, schema = "public") 
                 ftables.forEach(ft => {
                     const fFields = fields.filter(f => f.tableID === ft.oid);
                     const pkeys = ft.columns.filter(c => c.is_pkey);
-                    if (pkeys.length) {
-                        const fFieldPK = fFields.filter(ff => pkeys.some(p => p.name === ff.columnName));
-                        if (fFieldPK.length === pkeys.length) {
-                            const _fcols = fFieldPK.map(ff => {
-                                const d = {
-                                    name: ff.columnName,
-                                    references: [{
-                                            ftable: ft.name,
-                                            fcols: [ff.columnName],
-                                            cols: [ff.name]
-                                        }]
-                                };
-                                return d;
-                            });
-                            viewFCols = [
-                                ...viewFCols,
-                                ..._fcols
-                            ];
-                        }
-                    }
+                    const fFieldPK = fFields.filter(ff => pkeys.some(p => p.name === ff.columnName));
+                    const refCols = pkeys.length && fFieldPK.length === pkeys.length ? fFieldPK : fFields.filter(ff => !["json", "jsonb", "xml"].includes(ff.udt_name));
+                    const _fcols = refCols.map(ff => {
+                        const d = {
+                            name: ff.columnName,
+                            references: [{
+                                    ftable: ft.name,
+                                    fcols: [ff.columnName],
+                                    cols: [ff.name]
+                                }]
+                        };
+                        return d;
+                    });
+                    viewFCols = [
+                        ...viewFCols,
+                        ..._fcols
+                    ];
                 });
             }
             catch (err) {
