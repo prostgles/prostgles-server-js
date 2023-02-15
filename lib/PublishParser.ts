@@ -507,10 +507,12 @@ export class PublishParser {
 
       /* Get view or table specific rules */
       const tHandler = (this.dbo[tableName] as TableHandler | ViewHandler);
-
-      if (!tHandler) throw { stack: ["getTableRules()"], message: `${tableName} could not be found in dbo` };
-
       const is_view = tHandler.is_view;
+      const canSubscribe = (!is_view || tHandler.columns.some(c => c.references));
+      if (!tHandler) {
+        throw { stack: ["getTableRules()"], message: `${tableName} could not be found in dbo` };
+      }
+
       const MY_RULES = RULE_TO_METHODS.filter(r => {
 
         /** Check PG User privileges */
@@ -526,6 +528,10 @@ export class PublishParser {
           if (isPlainObject(raw_table_rules) && (raw_table_rules as PublishTableRule)[r.rule]) {
             throw `Cannot publish realtime rule ${tableName}.${r.rule}. Superuser is required for this`
           }
+        }
+
+        if(r.rule === "subscribe" && !canSubscribe){
+          result = false;
         }
 
         return result;
@@ -605,7 +611,7 @@ export class PublishParser {
 
             if (method === "select" && !dissallowedRuleKeys.includes(subKey)) {
               const sr = MY_RULES.find(r => r.rule === subKey);
-              if (sr && (!is_view || tHandler.columns.some(c => c.references))) {
+              if (sr && canSubscribe) {
                 parsed_table[subKey] = { ...sr.no_limits as SubscribeRule };
                 parsed_table.subscribeOne = { ...sr.no_limits as SubscribeRule };
               }
