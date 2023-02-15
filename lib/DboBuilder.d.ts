@@ -269,6 +269,7 @@ export declare type TableSchema = {
     comment: string;
     columns: TableSchemaColumn[];
     is_view: boolean;
+    view_definition: string | null;
     parent_tables: string[];
     privileges: {
         insert: boolean;

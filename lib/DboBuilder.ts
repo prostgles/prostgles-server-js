@@ -766,6 +766,7 @@ export type TableSchema = {
   comment: string;
   columns: TableSchemaColumn[];
   is_view: boolean;
+  view_definition: string | null;
   parent_tables: string[];
   privileges: {
     insert: boolean;
@@ -968,32 +969,37 @@ async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, schema:
       /** Get view reference cols (based on parent table) */
       let viewFCols: Pick<TableSchemaColumn, "name" | "references">[] = [];
       if(tbl.is_view){
-        const { fields } = await runSQL(`SELECT * FROM ${asName(tbl.name)} LIMIT 0`, {}, {}, undefined) as SQLResult<undefined>;
-        const ftables = result.filter(r => fields.some(f => f.tableID === r.oid));
-        ftables.forEach(ft => {
-          const fFields = fields.filter(f => f.tableID === ft.oid);
-          const pkeys = ft.columns.filter(c => c.is_pkey);
-          if(pkeys.length){
-            const fFieldPK = fFields.filter(ff => pkeys.some(p => p.name === ff.columnName))
-            if(fFieldPK.length === pkeys.length){
-              const _fcols: typeof viewFCols = fFieldPK.map(ff => {
-                const d: Pick<TableSchemaColumn, "name" | "references"> = {
-                  name: ff.columnName!,
-                  references: [{
-                    ftable: ft.name,
-                    fcols: [ff.columnName!],
-                    cols: [ff.name]
-                  }]
-                }
-                return d;
-              })
-              viewFCols = [
-                ...viewFCols,
-                ..._fcols 
-              ];
+        try {
+          const view_definition = tbl.view_definition?.endsWith(";")? tbl.view_definition.slice(0, -1) : tbl.view_definition;
+          const { fields } = await runSQL(`SELECT * FROM \n ( ${view_definition!} \n) t LIMIT 0`, {}, {}, undefined) as SQLResult<undefined>;
+          const ftables = result.filter(r => fields.some(f => f.tableID === r.oid));
+          ftables.forEach(ft => {
+            const fFields = fields.filter(f => f.tableID === ft.oid);
+            const pkeys = ft.columns.filter(c => c.is_pkey);
+            if(pkeys.length){
+              const fFieldPK = fFields.filter(ff => pkeys.some(p => p.name === ff.columnName))
+              if(fFieldPK.length === pkeys.length){
+                const _fcols: typeof viewFCols = fFieldPK.map(ff => {
+                  const d: Pick<TableSchemaColumn, "name" | "references"> = {
+                    name: ff.columnName!,
+                    references: [{
+                      ftable: ft.name,
+                      fcols: [ff.columnName!],
+                      cols: [ff.name]
+                    }]
+                  }
+                  return d;
+                })
+                viewFCols = [
+                  ...viewFCols,
+                  ..._fcols 
+                ];
+              }
             }
-          }
-        });
+          });
+        } catch(err){
+          console.error(err);
+        }
       }
 
       tbl.columns = tbl.columns.map(col => {
