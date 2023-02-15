@@ -294,7 +294,7 @@ class DboBuilder {
         return this.joinPaths;
     }
     async build() {
-        this.tablesOrViews = await getTablesForSchemaPostgresSQL(this.db);
+        this.tablesOrViews = await getTablesForSchemaPostgresSQL(this);
         this.constraints = await getConstraints(this.db);
         await this.parseJoins();
         this.dbo = {};
@@ -373,10 +373,10 @@ async function getConstraints(db, schema = "public") {
         WHERE nsp.nspname = ${(0, PubSubManager_1.asValue)(schema)}
     `);
 }
-async function getTablesForSchemaPostgresSQL(db, schema = "public") {
+async function getTablesForSchemaPostgresSQL({ db, runSQL }, schema = "public") {
     const query = `
     SELECT 
-    jsonb_build_object(
+      jsonb_build_object(
         'insert', EXISTS (
             SELECT 1 
             FROM information_schema.role_table_grants rg
@@ -401,14 +401,36 @@ async function getTablesForSchemaPostgresSQL(db, schema = "public") {
             WHERE rg.table_name = t.table_name
             AND rg.privilege_type = 'DELETE'
         )
-    ) as privileges
-    , t.table_schema as schema, t.table_name as name 
-    , cc.columns 
-    , cc.table_oid as oid
-    , t.table_type = 'VIEW' as is_view 
-    , array_to_json(vr.table_names) as parent_tables
-    , obj_description(cc.table_oid::regclass) as comment
-    FROM information_schema.tables t  
+      ) as privileges
+      , t.table_schema as schema, t.table_name as name 
+      , cc.columns 
+      , cc.table_oid as oid
+      , t.is_view 
+      , t.view_definition 
+      , array_to_json(vr.table_names) as parent_tables
+      , obj_description(cc.table_oid::regclass) as comment
+    FROM ( 
+      SELECT table_name,
+        table_schema,
+        is_view,
+        CASE WHEN is_view THEN pg_get_viewdef(format('%I.%I', table_schema, table_name)::REGCLASS, true) END as view_definition 
+      FROM (
+        SELECT table_name, table_schema, table_type = 'VIEW' as is_view
+        FROM information_schema.tables 
+/* TODO - add support for materialized views
+        UNION ALL 
+        SELECT table_name, table_schema
+        FROM (
+          SELECT relname as table_name, nspname as table_schema, true as is_view
+          FROM pg_catalog.pg_class AS _c
+          JOIN pg_catalog.pg_namespace AS _ns
+            ON _c.relnamespace = _ns.oid 
+          WHERE relkind IN ( 'm' )
+        ) materialized_views
+*/
+      ) tables_matviews
+      WHERE table_schema = ${(0, PubSubManager_1.asValue)(schema)}
+    ) t  
     INNER  join (
         SELECT ccc.table_oid, table_schema, table_name
         , jsonb_agg((SELECT x FROM (
@@ -492,26 +514,59 @@ async function getTablesForSchemaPostgresSQL(db, schema = "public") {
         GROUP BY cl_r.relname 
     ) vr 
     ON t.table_name = vr.view_name 
-    WHERE t.table_schema = ${(0, PubSubManager_1.asValue)(schema)}
-    GROUP BY t.table_schema, t.table_name, t.table_type, vr.table_names , cc.table_oid, cc.columns
+    GROUP BY t.table_schema, t.table_name, t.is_view, t.view_definition, vr.table_names , cc.table_oid, cc.columns
     ORDER BY schema, name
 
     `;
     // console.log(pgp.as.format(query, { schema }), schema);
-    let res = await db.any(query, { schema });
-    res = res
-        .map(tbl => {
+    let result = await db.any(query, { schema });
+    result = await Promise.all(result
+        .map(async (tbl) => {
+        /** Get view reference cols (based on parent table) */
+        let viewFCols = [];
+        if (tbl.is_view) {
+            const { fields } = await runSQL(`SELECT * FROM ${(0, prostgles_types_1.asName)(tbl.name)} LIMIT 0`, {}, {}, undefined);
+            const ftables = result.filter(r => fields.some(f => f.tableID === r.oid));
+            ftables.forEach(ft => {
+                const fFields = fields.filter(f => f.tableID === ft.oid);
+                const pkeys = ft.columns.filter(c => c.is_pkey);
+                if (pkeys.length) {
+                    const fFieldPK = fFields.filter(ff => pkeys.some(p => p.name === ff.columnName));
+                    if (fFieldPK.length === pkeys.length) {
+                        const _fcols = fFieldPK.map(ff => {
+                            const d = {
+                                name: ff.columnName,
+                                references: [{
+                                        ftable: ft.name,
+                                        fcols: [ff.columnName],
+                                        cols: [ff.name]
+                                    }]
+                            };
+                            return d;
+                        });
+                        viewFCols = [
+                            ...viewFCols,
+                            ..._fcols
+                        ];
+                    }
+                }
+            });
+        }
         tbl.columns = tbl.columns.map(col => {
             if (col.has_default) {
                 /** Hide pkey default value */
                 col.column_default = (col.udt_name !== "uuid" && !col.is_pkey && !col.column_default.startsWith("nextval(")) ? col.column_default : null;
             }
+            const viewFCol = viewFCols?.find(fc => fc.name === col.name);
+            if (viewFCol) {
+                col.references = viewFCol.references;
+            }
             return col;
         }); //.slice(0).sort((a, b) => a.name.localeCompare(b.name))
         // .sort((a, b) => a.ordinal_position - b.ordinal_position)
         return tbl;
-    });
-    return res;
+    }));
+    return result;
 }
 function isPlainObject(o) {
     return Object(o) === o && Object.getPrototypeOf(o) === Object.prototype;

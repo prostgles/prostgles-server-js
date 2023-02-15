@@ -1,6 +1,6 @@
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import { ColumnInfo, DbJoinMaker, PG_COLUMN_UDT_DATA_TYPE, TS_PG_Types, TableInfo as TInfo, SQLHandler, AnyObject, ProstglesError } from "prostgles-types";
+import { ColumnInfo, SQLOptions, DbJoinMaker, PG_COLUMN_UDT_DATA_TYPE, TS_PG_Types, TableInfo as TInfo, SQLHandler, AnyObject, ProstglesError } from "prostgles-types";
 export type SortItem = {
     asc: boolean;
     nulls?: "first" | "last";
@@ -252,7 +252,7 @@ export declare class DboBuilder {
     set joins(j: Join[]);
     getJoinPaths(): JoinPaths;
     parseJoins(): Promise<JoinPaths>;
-    private runSQL;
+    runSQL: (query: string, params: any, options: SQLOptions | undefined, localParams?: LocalParams) => Promise<any>;
     build(): Promise<DBHandlerServer>;
     getTX: (cb: TxCB) => Promise<any>;
 }
