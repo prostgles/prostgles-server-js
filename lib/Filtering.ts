@@ -4,7 +4,7 @@ import { SelectItem } from "./DboBuilder/QueryBuilder/QueryBuilder";
 import { 
   isEmpty, getKeys, FullFilter, EXISTS_KEYS, FilterDataType, 
   GeomFilterKeys, GeomFilter_Funcs, 
-  TextFilter_FullTextSearchFilterKeys, CompareFilterKeys 
+  TextFilter_FullTextSearchFilterKeys, CompareFilterKeys, isObject 
 } from "prostgles-types";
 import { isPlainObject } from "./DboBuilder";
 
@@ -174,7 +174,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
   if(!leftQ) mErr("Internal error: leftQ missing?!");
 
   /* Matching sel item */
-  if(isPlainObject(rightF)){
+  if(isPlainObject(rightF) && selItem.column_udt_type !== "jsonb"){
     const parseRightVal = (val: any, expect: "csv" | "array" | null = null) => {
       const checkIfArr = () => {
         if(!Array.isArray(val)) return mErr("This type of filter/column expects an Array of items");
@@ -193,7 +193,9 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
     }
 
     const filterKeys = Object.keys(rightF);
-    if(filterKeys.length !== 1) mErr("Bad filter. Expecting one key only");
+    if(filterKeys.length !== 1) {
+      mErr("Bad filter. Expecting one key only");
+    }
 
     const fOpType = filterKeys[0];
     const fVal = rightF[fOpType];

@@ -135,7 +135,7 @@ const parseFilterItem = (args) => {
     if (!leftQ)
         mErr("Internal error: leftQ missing?!");
     /* Matching sel item */
-    if ((0, DboBuilder_1.isPlainObject)(rightF)) {
+    if ((0, DboBuilder_1.isPlainObject)(rightF) && selItem.column_udt_type !== "jsonb") {
         const parseRightVal = (val, expect = null) => {
             const checkIfArr = () => {
                 if (!Array.isArray(val))
@@ -152,8 +152,9 @@ const parseFilterItem = (args) => {
             return asValue(val);
         };
         const filterKeys = Object.keys(rightF);
-        if (filterKeys.length !== 1)
+        if (filterKeys.length !== 1) {
             mErr("Bad filter. Expecting one key only");
+        }
         const fOpType = filterKeys[0];
         const fVal = rightF[fOpType];
         let sOpType;
