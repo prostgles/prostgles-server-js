@@ -102,20 +102,7 @@ export declare class ViewHandler {
         filter: AnyObject;
     }>;
     prepareExistCondition(eConfig: ExistsFilterConfig, localParams: LocalParams | undefined): Promise<string>;
-    /**
-     * parses a single filter
-     * @example
-     *  { fff: 2 } => "fff" = 2
-     *  { fff: { $ilike: 'abc' } } => "fff" ilike 'abc'
-     */
-    getCondition(params: {
-        filter: any;
-        select?: SelectItem[];
-        allowed_colnames: string[];
-        tableAlias?: string;
-        localParams?: LocalParams;
-        tableRules?: TableRule;
-    }): Promise<string>;
+    getCondition: any;
     prepareSortItems(orderBy: OrderBy | undefined, allowed_cols: string[], tableAlias: string | undefined, select: SelectItemValidated[]): SortItem[];
     prepareLimitQuery(limit: number, p: ValidatedTableRules): number;
     prepareOffsetQuery(offset?: number): number;

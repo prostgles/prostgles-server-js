@@ -1,6 +1,6 @@
 import pgPromise from "pg-promise";
 import { AnyObject, asName, DeleteParams, FieldFilter, getKeys, InsertParams, isObject, Select, SelectParams, UpdateParams } from "prostgles-types";
-import { DboBuilder, Filter, LocalParams, makeErr, parseError, TableHandlers, TableSchema } from "../DboBuilder";
+import { DboBuilder, Filter, LocalParams, makeErrorFromPGError, parseError, TableHandlers, TableSchema } from "../DboBuilder";
 import { DB } from "../Prostgles";
 import { SyncRule, TableRule } from "../PublishParser"; 
 import { _delete } from "./delete";
@@ -78,7 +78,7 @@ export class TableHandler extends ViewHandler {
       return this.db.tx(t => {
         const _queries = queries.map(q => t.none(q as unknown as string))
         return t.batch(_queries)
-      }).catch(err => makeErr(err, localParams, this, keys));
+      }).catch(err => makeErrorFromPGError(err, localParams, this, keys));
     } catch (e) {
       if (localParams && localParams.testRule) throw e;
       throw parseError(e, `dbo.${this.name}.update()`);

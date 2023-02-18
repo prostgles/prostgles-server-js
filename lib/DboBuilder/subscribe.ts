@@ -1,5 +1,5 @@
 import { AnyObject, asName, SubscribeParams } from "prostgles-types";
-import { Filter, LocalParams, makeErr, parseError } from "../DboBuilder";
+import { Filter, LocalParams, makeErrorFromPGError, parseError } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 import { log, omitKeys, ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
 import { ViewHandler } from "./ViewHandler";
@@ -62,7 +62,7 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
               def = def.slice(0, -1);
             }
             if (!def || typeof def !== "string") {
-              throw makeErr("Could get view definition");
+              throw makeErrorFromPGError("Could get view definition");
             }
             const { fields } = await this.dboBuilder.dbo.sql!(`SELECT * FROM ( \n ${def} \n ) prostgles_subscribe_view_definition LIMIT 0`, {});
             const tableColumns = fields.filter(f => f.tableName && f.columnName);

@@ -7,6 +7,7 @@ const REALTIME_TRIGGER_CHECK_QUERY = "prostgles-server internal query used to ma
 async function initPubSubManager() {
     if (!this.canContinue())
         return undefined;
+    let tries = 5;
     try {
         const schema_version = 10;
         const initQuery = `
@@ -605,13 +606,20 @@ async function initPubSubManager() {
                               END $$;
                           `;
                         await this.db.any(appQ);
+                        tries = 5;
                         (0, PubSubManager_1.log)("updated last_check");
                     }
                     catch (e) {
+                        tries--;
                         /** In some cases a query idles and blocks everything else. Terminate all similar queries */
                         this.db.any("SELECT state, pg_terminate_backend(pid) from pg_stat_activity WHERE query ilike ${qid} and pid <>  pg_backend_pid();", { qid: "%" + REALTIME_TRIGGER_CHECK_QUERY + "%" });
-                        /** If this database was dropped then stop interval */
-                        if (e?.code === "3D000") { //  && e.message.includes(this.db.$cn.database)
+                        /** If no tries left
+                         * OR
+                         * If this database was dropped
+                         *
+                         * then stop interval
+                         * */
+                        if (tries <= 0 || e?.code === "3D000") { //  && e.message.includes(this.db.$cn.database)
                             clearInterval(this.appCheck);
                         }
                         console.error("appCheck FAILED: \n", e, appQ);

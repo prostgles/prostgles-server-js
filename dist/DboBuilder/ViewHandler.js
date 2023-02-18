@@ -2,16 +2,15 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ViewHandler = void 0;
 const makeSelectQuery_1 = require("../DboBuilder/QueryBuilder/makeSelectQuery");
+const getCondition_1 = require("./getCondition");
 const runSQL_1 = require("../DboBuilder/runSQL");
 const prostgles_types_1 = require("prostgles-types");
 const DboBuilder_1 = require("../DboBuilder");
 const PubSubManager_1 = require("../PubSubManager/PubSubManager");
 const QueryBuilder_1 = require("./QueryBuilder/QueryBuilder");
 const Functions_1 = require("./QueryBuilder/Functions");
-const Filtering_1 = require("../Filtering");
 const getColumns_1 = require("./getColumns");
 const subscribe_1 = require("./subscribe");
-const FILTER_FUNCS = Functions_1.FUNCTIONS.filter(f => f.canBeUsedForFilter);
 class ColSet {
     constructor(columns, tableName) {
         this.opts = { columns, tableName, colNames: columns.map(c => c.name) };
@@ -107,6 +106,7 @@ class ViewHandler {
         this.is_media = false;
         // TODO: fix renamed table trigger problem
         this.getColumns = getColumns_1.getColumns.bind(this);
+        this.getCondition = getCondition_1.getCondition.bind(this);
         if (!db || !tableOrViewInfo)
             throw "";
         this.db = db;
@@ -564,7 +564,7 @@ class ViewHandler {
             if (["row", "value"].includes(returnType)) {
                 return (this.t || this.db).oneOrNone(_query).then(data => {
                     return (data && returnType === "value") ? Object.values(data)[0] : data;
-                }).catch(err => (0, DboBuilder_1.makeErr)(err, localParams, this));
+                }).catch(err => (0, DboBuilder_1.makeErrorFromPGError)(err, localParams, this));
             }
             else {
                 return (this.t || this.db).any(_query).then(data => {
@@ -572,7 +572,7 @@ class ViewHandler {
                         return data.map(d => Object.values(d)[0]);
                     }
                     return data;
-                }).catch(err => (0, DboBuilder_1.makeErr)(err, localParams, this));
+                }).catch(err => (0, DboBuilder_1.makeErrorFromPGError)(err, localParams, this));
             }
         }
         catch (e) {
@@ -765,7 +765,7 @@ class ViewHandler {
                 throw { stack: ["prepareExistCondition()"], message: `Invalid or dissallowed table: ${t}` };
         });
         /* Nested $exists not allowed */
-        if (f2 && Object.keys(f2).find(fk => DboBuilder_1.EXISTS_KEYS.includes(fk))) {
+        if (f2 && Object.keys(f2).find(fk => prostgles_types_1.EXISTS_KEYS.includes(fk))) {
             throw { stack: ["prepareExistCondition()"], message: "Nested exists dissallowed" };
         }
         const makeTableChain = (finalFilter) => {
@@ -843,208 +843,6 @@ class ViewHandler {
             res = makeTableChain(finalWhere);
         }
         return res;
-    }
-    /**
-     * parses a single filter
-     * @example
-     *  { fff: 2 } => "fff" = 2
-     *  { fff: { $ilike: 'abc' } } => "fff" ilike 'abc'
-     */
-    async getCondition(params) {
-        const { filter, select, allowed_colnames, tableAlias, localParams, tableRules } = params;
-        let data = { ...filter };
-        /* Exists join filter */
-        const ERR = "Invalid exists filter. \nExpecting somethibng like: \n | { $exists: { tableName.tableName2: Filter } } \n  | { $exists: { \"**.tableName3\": Filter } }\n | { path: string[]; filter: AnyObject }";
-        const SP_WILDCARD = "**";
-        let existsKeys = Object.keys(data)
-            .filter(k => DboBuilder_1.EXISTS_KEYS.includes(k) && Object.keys(data[k] || {}).length)
-            .map(key => {
-            const isJoined = DboBuilder_1.EXISTS_KEYS.slice(-2).includes(key);
-            const filterValue = data[key];
-            /**
-             * type ExistsJoined =
-             *   | { "table1.table2": { column: filterValue }  }
-             *   | { path: string[]; filter: AnyObject }
-             */
-            const dataKeys = Object.keys(filterValue);
-            const isDetailed = dataKeys.length === 2 && dataKeys.every(key => ["path", "filter"].includes(key));
-            const firstKey = dataKeys[0];
-            /**
-             * Prevent some errors with table names that contain "."
-             */
-            const firstKeyIsATable = !!this.dboBuilder.dbo[firstKey];
-            let tables = isDetailed ? filterValue.path : (firstKeyIsATable ? [firstKey] : firstKey.split("."));
-            let f2 = isDetailed ? filterValue.filter : filterValue[firstKey];
-            let shortestJoin = false;
-            if (!isJoined) {
-                if (tables.length !== 1)
-                    throw "Expecting single table in exists filter. Example: { $exists: { tableName: Filter } }";
-            }
-            else {
-                /* First part can be the ** param meaning shortest join. Will be overriden by anything in tableConfig */
-                if (!tables.length) {
-                    throw ERR + "\nBut got: " + filterValue;
-                }
-                if (tables[0] === SP_WILDCARD) {
-                    tables = tables.slice(1);
-                    shortestJoin = true;
-                }
-            }
-            return {
-                key,
-                existType: key,
-                isJoined,
-                shortestJoin,
-                f2,
-                tables
-            };
-        });
-        /* Exists with exact path */
-        // Object.keys(data).map(k => {
-        //     let isthis = isPlainObject(data[k]) && !this.column_names.includes(k) && !k.split(".").find(kt => !this.dboBuilder.dbo[kt]);
-        //     if(isthis) {
-        //         existsKeys.push({
-        //             key: k,
-        //             notJoined: false,
-        //             exactPaths: k.split(".")
-        //         });
-        //     }
-        // });
-        let funcConds = [];
-        const funcFilterkeys = FILTER_FUNCS.filter(f => {
-            return f.name in data;
-        });
-        funcFilterkeys.map(f => {
-            const funcArgs = data[f.name];
-            if (!Array.isArray(funcArgs))
-                throw `A function filter must contain an array. E.g: { $funcFilterName: ["col1"] } \n but got: ${JSON.stringify((0, prostgles_types_1.pickKeys)(data, [f.name]))} `;
-            const fields = this.parseFieldFilter(f.getFields(funcArgs), true, allowed_colnames);
-            const dissallowedCols = fields.filter(fname => !allowed_colnames.includes(fname));
-            if (dissallowedCols.length) {
-                throw `Invalid/disallowed columns found in function filter: ${dissallowedCols}`;
-            }
-            funcConds.push(f.getQuery({ args: funcArgs, allColumns: this.columns, allowedFields: allowed_colnames, tableAlias }));
-        });
-        let existsCond = "";
-        if (existsKeys.length) {
-            existsCond = (await Promise.all(existsKeys.map(async (k) => await this.prepareExistCondition(k, localParams)))).join(" AND ");
-        }
-        /* Computed field queries */
-        const p = this.getValidatedRules(tableRules, localParams);
-        const computedFields = p.allColumns.filter(c => c.type === "computed");
-        let computedColConditions = [];
-        Object.keys(data || {}).map(key => {
-            const compCol = computedFields.find(cf => cf.name === key);
-            if (compCol) {
-                computedColConditions.push(compCol.getQuery({
-                    tableAlias,
-                    allowedFields: p.select.fields,
-                    allColumns: this.columns,
-                    /* CTID not available in AFTER trigger */
-                    // ctidField: this.is_view? undefined : "ctid"
-                    ctidField: undefined,
-                }) + ` = ${DboBuilder_1.pgp.as.format("$1", [data[key]])}`);
-                delete data[key];
-            }
-        });
-        let allowedSelect = [];
-        /* Select aliases take precedence over col names. This is to ensure filters work correctly and even on computed cols*/
-        if (select) {
-            /* Allow filtering by selected fields/funcs */
-            allowedSelect = select.filter(s => {
-                /*  */
-                if (["function", "computed", "column"].includes(s.type)) {
-                    if (s.type !== "column" || allowed_colnames.includes(s.alias)) {
-                        return true;
-                    }
-                }
-                return false;
-            });
-        }
-        /* Add remaining allowed fields */
-        allowedSelect = allowedSelect.concat(p.allColumns.filter(c => allowed_colnames.includes(c.name) &&
-            !allowedSelect.find(s => s.alias === c.name)).map(f => ({
-            type: f.type,
-            alias: f.name,
-            getQuery: (tableAlias) => f.getQuery({
-                tableAlias,
-                allColumns: this.columns,
-                allowedFields: allowed_colnames
-            }),
-            selected: false,
-            getFields: () => [f.name],
-            column_udt_type: f.type === "column" ? this.columns.find(c => c.name === f.name)?.udt_name : undefined
-        })));
-        /* Parse complex filters
-            { $filter: [{ $func: [...] }, "=", value | { $func: [..] }] }
-        */
-        const complexFilters = [];
-        const complexFilterKey = "$filter";
-        const allowedComparators = [">", "<", "=", "<=", ">=", "<>", "!="];
-        if (complexFilterKey in data) {
-            const getFuncQuery = (funcData) => {
-                const { funcName, args } = (0, QueryBuilder_1.parseFunctionObject)(funcData);
-                const funcDef = (0, Functions_1.parseFunction)({ func: funcName, args, functions: Functions_1.FUNCTIONS, allowedFields: allowed_colnames });
-                return funcDef.getQuery({ args, tableAlias, allColumns: this.columns, allowedFields: allowed_colnames });
-            };
-            const complexFilter = data[complexFilterKey];
-            if (!Array.isArray(complexFilter))
-                throw `Invalid $filter. Must contain an array of at least element but got: ${JSON.stringify(complexFilter)} `;
-            const leftFilter = complexFilter[0];
-            const comparator = complexFilter[1];
-            const rightFilterOrValue = complexFilter[2];
-            const leftVal = getFuncQuery(leftFilter);
-            let result = leftVal;
-            if (comparator) {
-                if (!allowedComparators.includes(comparator))
-                    throw `Invalid $filter. comparator ${JSON.stringify(comparator)} is not valid. Expecting one of: ${allowedComparators}`;
-                if (!rightFilterOrValue)
-                    throw "Invalid $filter. Expecting a value or function after the comparator";
-                const rightVal = (0, prostgles_types_1.isObject)(rightFilterOrValue) ? getFuncQuery(rightFilterOrValue) : (0, PubSubManager_1.asValue)(rightFilterOrValue);
-                if (leftVal === rightVal)
-                    throw "Invalid $filter. Cannot compare two identical function signatures: " + JSON.stringify(leftFilter);
-                result += ` ${comparator} ${rightVal}`;
-            }
-            complexFilters.push(result);
-        }
-        /* Parse join filters
-            { $joinFilter: { $ST_DWithin: [table.col, foreignTable.col, distance] }
-            will make an exists filter
-        */
-        let filterKeys = Object.keys(data).filter(k => k !== complexFilterKey && !funcFilterkeys.find(ek => ek.name === k) && !computedFields.find(cf => cf.name === k) && !existsKeys.find(ek => ek.key === k));
-        // if(allowed_colnames){
-        //     const aliasedColumns = (select || []).filter(s => 
-        //         ["function", "computed", "column"].includes(s.type) && allowed_colnames.includes(s.alias) ||  
-        //         s.getFields().find(f => allowed_colnames.includes(f))
-        //     ).map(s => s.alias);
-        //     const validCols = [...allowed_colnames, ...aliasedColumns];
-        // }
-        const validFieldNames = allowedSelect.map(s => s.alias);
-        const invalidColumn = filterKeys
-            .find(fName => !validFieldNames.find(c => c === fName ||
-            (fName.startsWith(c) && (fName.slice(c.length).includes("->") ||
-                fName.slice(c.length).includes(".")))));
-        if (invalidColumn) {
-            throw `Table: ${this.name} -> disallowed/inexistent columns in filter: ${invalidColumn} \n  Expecting one of: ${allowedSelect.map(s => s.type === "column" ? s.getQuery() : s.alias).join(", ")}`;
-        }
-        /* TODO: Allow filter funcs */
-        // const singleFuncs = FUNCTIONS.filter(f => f.singleColArg);
-        const f = (0, prostgles_types_1.pickKeys)(data, filterKeys);
-        const q = (0, Filtering_1.parseFilterItem)({
-            filter: f,
-            tableAlias,
-            pgp: DboBuilder_1.pgp,
-            select: allowedSelect
-        });
-        let templates = [q].filter(q => q);
-        if (existsCond)
-            templates.push(existsCond);
-        templates = templates.concat(funcConds);
-        templates = templates.concat(computedColConditions);
-        templates = templates.concat(complexFilters);
-        /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
-        return templates.sort()
-            .join(" AND \n");
     }
     /* This relates only to SELECT */
     prepareSortItems(orderBy, allowed_cols, tableAlias, select) {

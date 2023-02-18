@@ -4,7 +4,7 @@ import { SelectItem } from "./DboBuilder/QueryBuilder/QueryBuilder";
 import { 
   isEmpty, getKeys, FullFilter, EXISTS_KEYS, FilterDataType, 
   GeomFilterKeys, GeomFilter_Funcs, 
-  TextFilter_FullTextSearchFilterKeys, CompareFilterKeys, isObject 
+  TextFilter_FullTextSearchFilterKeys, CompareFilterKeys, isObject, TextFilterKeys, JsonbFilterKeys, CompareInFilterKeys 
 } from "prostgles-types";
 import { isPlainObject } from "./DboBuilder";
 
@@ -19,13 +19,17 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
   if(!_f || isEmpty(_f)) return "";
 
   const mErr = (msg: string) => {
-      throw `${msg}: ${JSON.stringify(_f, null, 2)}`
-    }, 
-    asValue = (v: any) => pgp.as.format("$1", [v]);
+    throw `${msg}: ${JSON.stringify(_f, null, 2)}`
+  };
+  const asValue = (v: any) => pgp.as.format("$1", [v]);
 
   const fKeys = getKeys(_f)
   if(fKeys.length === 0){
-      return "";
+    return "";
+    
+  /**
+   * { field1: cond1, field2: cond2 }
+   */
   } else if(fKeys.length > 1){
     return fKeys.map(fk => parseFilterItem({
       filter: { [fk]: _f[fk] },
@@ -58,20 +62,21 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
     */
   let leftQ: string | undefined;// = asName(selItem.alias);
 
-  /* Check if string notation. Build obj if necessary */
+  /* 
+    Select item not found. 
+    Check if dot/json notation. Build obj if necessary 
+    */
   const dot_notation_delims = ["->", "."];
   if(!selItem){
     
     /* See if dot notation. Pick the best matching starting string */
     if(select){
       selItem = select.find(s => 
-        fKey.startsWith(s.alias) && 
-        dot_notation_delims.find(dn => fKey.slice(s.alias.length).startsWith(dn)) 
+        dot_notation_delims.find(delimiter => fKey.startsWith(s.alias + delimiter))
       );
     }
     if(!selItem) {
-      mErr("Bad filter. Could not match to a column or alias: ");
-      throw " "
+      return mErr("Bad filter. Could not match to a column or alias or dot notation: "); 
     }
 
     let remainingStr = fKey.slice(selItem.alias.length);
@@ -174,7 +179,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
   if(!leftQ) mErr("Internal error: leftQ missing?!");
 
   /* Matching sel item */
-  if(isPlainObject(rightF) && selItem.column_udt_type !== "jsonb"){
+  if(isPlainObject(rightF)){
     const parseRightVal = (val: any, expect: "csv" | "array" | null = null) => {
       const checkIfArr = () => {
         if(!Array.isArray(val)) return mErr("This type of filter/column expects an Array of items");
@@ -192,128 +197,148 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       return asValue(val);
     }
 
+    const OPERANDS = [
+      ...TextFilterKeys,
+      ...JsonbFilterKeys,
+      ...CompareFilterKeys,
+      ...CompareInFilterKeys
+    ] as const;
+
     const filterKeys = Object.keys(rightF);
-    if(filterKeys.length !== 1) {
-      mErr("Bad filter. Expecting one key only");
-    }
-
-    const fOpType = filterKeys[0];
-    const fVal = rightF[fOpType];
-    let sOpType: string | undefined;
-    let sVal: any;
-
-    if(fVal && isPlainObject(fVal)){
-      const keys = Object.keys(fVal);
-      if(!keys.length || keys.length !== 1){
-        return mErr("Bad filter. Expecting a nested object with one key only ");
-      }
-      sOpType = keys[0];
-      sVal = fVal[sOpType];
-
-    }
-    // console.log({ fOpType, fVal, sOpType })
+    const filterOperand: typeof OPERANDS[number] = filterKeys[0] as any;
 
     /** JSON cannot be compared so we'll cast it to TEXT */
-    if(selItem?.column_udt_type === "json" || ["$ilike", "$like", "$nilike", "$nlike"].includes(fOpType)){
+    if(selItem?.column_udt_type === "json" || TextFilterKeys.includes(filterOperand as any)){
       leftQ += "::TEXT "
     }
 
+    /** It's an object key which means it's an equality comparison against a json object */
+    if(selItem?.column_udt_type?.startsWith("json") && !OPERANDS.includes(filterOperand)){
+      return leftQ + " = " + parseRightVal(rightF);
+    }
+
+    if(filterKeys.length !== 1 && selItem.column_udt_type !== "jsonb") {
+      return mErr("Bad filter. Expecting one key only");
+    }
+
+    const filterValue = rightF[filterOperand];
+    const ALLOWED_FUNCS = [ ...GeomFilter_Funcs, ...TextFilter_FullTextSearchFilterKeys] as const;
+    let funcName: undefined | typeof ALLOWED_FUNCS[number];
+    let funcArgs: any[] | undefined;
+
+    /**
+     * Filter notation
+     * geom && st_makeenvelope(funcArgs)
+     */
+    if(isObject(filterValue) && selItem.column_udt_type !== "jsonb"){
+      const filterValueKeys = Object.keys(filterValue);
+      if(!filterValueKeys.length || filterValueKeys.length !== 1){
+        return mErr("Bad filter. Expecting a nested object with one key only ");
+      }
+      funcName = filterValueKeys[0] as any;
+      funcArgs = filterValue[funcName as any];
+      if(!ALLOWED_FUNCS.includes(funcName as any)){
+        return mErr(`Bad filter. Nested function ${funcName} could not be found. Expecting one of: ${ALLOWED_FUNCS}`);
+      }
+    }
+    // console.log({ fOpType, fVal, sOpType })
+
     /** st_makeenvelope */
-    if(GeomFilterKeys.includes(fOpType as any) && sOpType && GeomFilter_Funcs.includes(sOpType)){
+    if(GeomFilterKeys.includes(filterOperand as any) && funcName && GeomFilter_Funcs.includes(funcName as any)){
       /** If leftQ is geography then this err can happen: 'Antipodal (180 degrees long) edge detected!' */
-      if(sOpType.toLowerCase() === "st_makeenvelope") leftQ += "::geometry"
-      return leftQ + ` ${fOpType} ` + `${sOpType}${parseRightVal(sVal, "csv")}`;
+      if(funcName.toLowerCase() === "st_makeenvelope") {
+        leftQ += "::geometry";
+      }
+      return `${leftQ} ${filterOperand} ${funcName}${parseRightVal(funcArgs, "csv")}`;
 
-    } else if(["=", "$eq"].includes(fOpType) && !sOpType){
-      if(fVal === null) return leftQ + " IS NULL ";
-      return leftQ + " = " + parseRightVal(fVal);
+    } else if(["=", "$eq"].includes(filterOperand) && !funcName){
+      if(filterValue === null) return leftQ + " IS NULL ";
+      return leftQ + " = " + parseRightVal(filterValue);
 
-    } else if(["<>", "$ne"].includes(fOpType)){
-      if(fVal === null) return leftQ + " IS NOT NULL ";
-      return leftQ + " <> " + parseRightVal(fVal);
+    } else if(["<>", "$ne"].includes(filterOperand)){
+      if(filterValue === null) return leftQ + " IS NOT NULL ";
+      return leftQ + " <> " + parseRightVal(filterValue);
 
-    } else if([">", "$gt"].includes(fOpType)){
-      return leftQ + " > " + parseRightVal(fVal);
+    } else if([">", "$gt"].includes(filterOperand)){
+      return leftQ + " > " + parseRightVal(filterValue);
 
-    } else if(["<", "$lt"].includes(fOpType)){
-      return leftQ + " < " + parseRightVal(fVal);
+    } else if(["<", "$lt"].includes(filterOperand)){
+      return leftQ + " < " + parseRightVal(filterValue);
 
-    } else if([">=", "$gte"].includes(fOpType)){
-      return leftQ + " >=  " + parseRightVal(fVal);
+    } else if([">=", "$gte"].includes(filterOperand)){
+      return leftQ + " >=  " + parseRightVal(filterValue);
 
-    } else if(["<=", "$lte"].includes(fOpType)){
-      return leftQ + " <= " + parseRightVal(fVal);
+    } else if(["<=", "$lte"].includes(filterOperand)){
+      return leftQ + " <= " + parseRightVal(filterValue);
 
-    } else if(["$in"].includes(fOpType)){
-      if(!fVal?.length) {
+    } else if(["$in"].includes(filterOperand)){
+      if(!filterValue?.length) {
         return " FALSE ";
       }
 
-      let _fVal: any[] = fVal.filter((v: any) => v !== null);
+      let _fVal: any[] = filterValue.filter((v: any) => v !== null);
       let c1 = "", c2 = "";
-      if(_fVal.length) c1 = leftQ + " IN " + parseRightVal(_fVal, "csv");
-      if(fVal.includes(null)) c2 = ` ${leftQ} IS NULL `;
+      if(_fVal.length) {
+        c1 = leftQ + " IN " + parseRightVal(_fVal, "csv");
+      }
+      if(filterValue.includes(null)) c2 = ` ${leftQ} IS NULL `;
       return [c1, c2].filter(c => c).join(" OR ");
 
-    } else if(["$nin"].includes(fOpType)){
-      if(!fVal?.length) {
+    } else if(["$nin"].includes(filterOperand)){
+      if(!filterValue?.length) {
         return " TRUE ";
       }
 
-      let _fVal: any[] = fVal.filter((v: any) => v !== null);
+      let _fVal: any[] = filterValue.filter((v: any) => v !== null);
       let c1 = "", c2 = "";
       if(_fVal.length) c1 = leftQ + " NOT IN " + parseRightVal(_fVal, "csv");
-      if(fVal.includes(null)) c2 = ` ${leftQ} IS NOT NULL `;
+      if(filterValue.includes(null)) c2 = ` ${leftQ} IS NOT NULL `;
       return [c1, c2].filter(c => c).join(" AND ");
 
-    } else if(["$between"].includes(fOpType)){
-      if(!Array.isArray(fVal) || fVal.length !== 2){
+    } else if(["$between"].includes(filterOperand)){
+      if(!Array.isArray(filterValue) || filterValue.length !== 2){
         return mErr("Between filter expects an array of two values");
       }
-      return leftQ + " BETWEEN " + asValue(fVal[0]) + " AND " + asValue(fVal[1]);
+      return leftQ + " BETWEEN " + asValue(filterValue[0]) + " AND " + asValue(filterValue[1]);
 
-    } else if(["$ilike"].includes(fOpType)){
-      return leftQ + " ILIKE " + asValue(fVal);
+    } else if(["$ilike"].includes(filterOperand)){
+      return leftQ + " ILIKE " + asValue(filterValue);
 
-    } else if(["$like"].includes(fOpType)){
-      return leftQ + " LIKE " + asValue(fVal);
+    } else if(["$like"].includes(filterOperand)){
+      return leftQ + " LIKE " + asValue(filterValue);
 
-    } else if(["$nilike"].includes(fOpType)){
-      return leftQ + " NOT ILIKE " + asValue(fVal);
+    } else if(["$nilike"].includes(filterOperand)){
+      return leftQ + " NOT ILIKE " + asValue(filterValue);
 
-    } else if(["$nlike"].includes(fOpType)){
-      return leftQ + " NOT LIKE " + asValue(fVal);
+    } else if(["$nlike"].includes(filterOperand)){
+      return leftQ + " NOT LIKE " + asValue(filterValue);
 
     /* MAYBE TEXT OR MAYBE ARRAY */
-    } else if(["@>", "<@", "$contains", "$containedBy", "&&", "@@"].includes(fOpType)){
-      let operand = fOpType === "@@"? "@@": 
-          ["@>", "$contains"].includes(fOpType)? "@>" : 
-          ["&&"].includes(fOpType)? "&&" : 
+    } else if(["@>", "<@", "$contains", "$containedBy", "&&", "@@"].includes(filterOperand)){
+      let operand = filterOperand === "@@"? "@@": 
+          ["@>", "$contains"].includes(filterOperand)? "@>" : 
+          ["&&"].includes(filterOperand)? "&&" : 
           "<@";
 
       /* Array for sure */
-      if(Array.isArray(fVal)){
-        return leftQ + operand + parseRightVal(fVal, "array");
+      if(Array.isArray(filterValue)){
+        return leftQ + operand + parseRightVal(filterValue, "array");
           
       /* FTSQuery */
-      } else if(["@@"].includes(fOpType) && TextFilter_FullTextSearchFilterKeys.includes(sOpType! as any)) {
+      } else if(["@@"].includes(filterOperand) && TextFilter_FullTextSearchFilterKeys.includes(funcName! as any)) {
         let lq = `to_tsvector(${leftQ}::text)`;
         if(selItem && selItem.columnPGDataType === "tsvector") lq = leftQ!;
 
-        let res = `${lq} ${operand} ` + `${sOpType}${parseRightVal(sVal, "csv")}`;
+        let res = `${lq} ${operand} ` + `${funcName}${parseRightVal(funcArgs, "csv")}`;
 
         return res;
       } else {
-        return mErr("Unrecognised filter operand: " + fOpType + " ");
+        return mErr("Unrecognised filter operand: " + filterOperand + " ");
       }
 
     } else {
-      /** Maybe it's an object key which means it's an equality comparison against a json object */
-      if(selItem?.column_udt_type?.startsWith("json")){
-        return leftQ + " = " + parseRightVal(rightF);
-      }
 
-      return mErr("Unrecognised filter operand: " + fOpType + " ");
+      return mErr("Unrecognised filter operand: " + filterOperand + " ");
     }
 
 

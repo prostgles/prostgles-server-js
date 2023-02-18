@@ -4,19 +4,14 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import * as Bluebird from "bluebird";
-import { makeSelectQuery } from "./DboBuilder/QueryBuilder/makeSelectQuery"
+import * as Bluebird from "bluebird"; 
 
 import * as pgPromise from 'pg-promise';
 import { canRunSQL, runSQL } from "./DboBuilder/runSQL";
 import pg = require('pg-promise/typescript/pg-subset');
 import {
-  ColumnInfo, ValidatedColumnInfo, FieldFilter, SelectParams, SubscribeParams,
-  OrderBy, InsertParams, UpdateParams, DeleteParams, SQLOptions,
-  DbJoinMaker,
-  unpatchText,
-  isEmpty,
-  asName,
+  ColumnInfo, SQLOptions,
+  DbJoinMaker, 
   PG_COLUMN_UDT_DATA_TYPE,
   TS_PG_Types,
   TableInfo as TInfo,
@@ -25,7 +20,7 @@ import {
   SQLResult,
   Select,
   JoinMaker,
-  isObject, isDefined, getKeys, ProstglesError, _PG_geometric
+  isObject, isDefined, getKeys, ProstglesError, _PG_geometric, EXISTS_KEY
 } from "prostgles-types";
 
 export type SortItem = {
@@ -340,7 +335,7 @@ export type ValidatedTableRules = CommonTableRules & {
 }
 
 /* DEBUG CLIENT ERRORS HERE */
-export function makeErr(err: any, localParams?: LocalParams, view?: ViewHandler, allowedKeys?: string[]) {
+export function makeErrorFromPGError(err: any, localParams?: LocalParams, view?: ViewHandler, allowedKeys?: string[]) {
   // console.trace(err)
   if (process.env.TEST_TYPE || process.env.PRGL_DEBUG) {
     console.trace(err)
@@ -367,9 +362,6 @@ export function makeErr(err: any, localParams?: LocalParams, view?: ViewHandler,
   }
   return Promise.reject(errObject);
 }
-export const EXISTS_KEYS = ["$exists", "$notExists", "$existsJoined", "$notExistsJoined"] as const;
-export type EXISTS_KEY = typeof EXISTS_KEYS[number];
-
 
 /**
  * Ensure the error is an Object and has 

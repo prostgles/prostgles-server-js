@@ -1,6 +1,6 @@
 import pgPromise from "pg-promise";
 import { AnyObject, asName, FieldFilter, get, getKeys, InsertParams, isObject } from "prostgles-types";
-import { isPlainObject, LocalParams, makeErr, parseError, pgp } from "../DboBuilder";
+import { isPlainObject, LocalParams, makeErrorFromPGError, parseError, pgp } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 import { asValue, omitKeys, pickKeys } from "../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler";
@@ -149,9 +149,9 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
 
     const allowedFieldKeys = this.parseFieldFilter(fields);
     if (tx) {
-      result = await (tx as any)[queryType](query).catch((err: any) => makeErr(err, localParams, this, allowedFieldKeys));
+      result = await (tx as any)[queryType](query).catch((err: any) => makeErrorFromPGError(err, localParams, this, allowedFieldKeys));
     } else {
-      result = await this.db.tx(t => (t as any)[queryType](query)).catch(err => makeErr(err, localParams, this, allowedFieldKeys));
+      result = await this.db.tx(t => (t as any)[queryType](query)).catch(err => makeErrorFromPGError(err, localParams, this, allowedFieldKeys));
     }
 
     if(tableRules?.[ACTION]?.postValidate){

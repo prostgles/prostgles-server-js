@@ -31,15 +31,15 @@
   ],
   "homepage": "https://prostgles.com",
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.121.0",
+    "@aws-sdk/client-s3": "^3.272.0",
     "@types/express": "^4.17.13",
-    "aws-sdk": "^2.1256.0",
+    "aws-sdk": "^2.1318.0",
     "bluebird": "^3.7.2",
     "check-disk-space": "^3.3.1",
     "file-type": "^17.1.4",
     "g": "^2.0.1",
     "pg-promise": "^10.11.1",
-    "prostgles-types": "^3.0.18",
+    "prostgles-types": "^3.0.20",
     "sharp": "^0.31.0",
     "typescript": "^4.9.5"
   },

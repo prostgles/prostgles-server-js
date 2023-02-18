@@ -5,7 +5,7 @@
  *--------------------------------------------------------------------------------------------*/
 var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.canEXECUTE = exports.prepareSort = exports.postgresToTsType = exports.isPlainObject = exports.DboBuilder = exports.parseError = exports.EXISTS_KEYS = exports.makeErr = exports.escapeTSNames = exports.pgp = void 0;
+exports.canEXECUTE = exports.prepareSort = exports.postgresToTsType = exports.isPlainObject = exports.DboBuilder = exports.parseError = exports.makeErrorFromPGError = exports.escapeTSNames = exports.pgp = void 0;
 const Bluebird = require("bluebird");
 const pgPromise = require("pg-promise");
 const runSQL_1 = require("./DboBuilder/runSQL");
@@ -64,7 +64,7 @@ function escapeTSNames(str, capitalize = false) {
 exports.escapeTSNames = escapeTSNames;
 const shortestPath_1 = require("./shortestPath");
 /* DEBUG CLIENT ERRORS HERE */
-function makeErr(err, localParams, view, allowedKeys) {
+function makeErrorFromPGError(err, localParams, view, allowedKeys) {
     // console.trace(err)
     if (process.env.TEST_TYPE || process.env.PRGL_DEBUG) {
         console.trace(err);
@@ -89,8 +89,7 @@ function makeErr(err, localParams, view, allowedKeys) {
     }
     return Promise.reject(errObject);
 }
-exports.makeErr = makeErr;
-exports.EXISTS_KEYS = ["$exists", "$notExists", "$existsJoined", "$notExistsJoined"];
+exports.makeErrorFromPGError = makeErrorFromPGError;
 /**
  * Ensure the error is an Object and has
  */

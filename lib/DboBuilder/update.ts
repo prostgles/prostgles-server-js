@@ -1,5 +1,5 @@
 import { AnyObject, getKeys, isObject, unpatchText, UpdateParams } from "prostgles-types";
-import { Filter, isPlainObject, LocalParams, makeErr, Media, parseError } from "../DboBuilder";
+import { Filter, isPlainObject, LocalParams, makeErrorFromPGError, Media, parseError } from "../DboBuilder";
 import { TableRule, ValidateRow } from "../PublishParser";
 import { omitKeys, pickKeys } from "../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler";
@@ -129,9 +129,9 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
 
     let result;
     if (this.t) {
-      result = await (this.t)[qType](query).catch((err: any) => makeErr(err, localParams, this, fields));
+      result = await (this.t)[qType](query).catch((err: any) => makeErrorFromPGError(err, localParams, this, fields));
     } else {
-      result = await this.db.tx(t => (t as any)[qType](query)).catch(err => makeErr(err, localParams, this, fields));
+      result = await this.db.tx(t => (t as any)[qType](query)).catch(err => makeErrorFromPGError(err, localParams, this, fields));
     }
     
     /** TODO: Delete old file at the end in case new file update fails */

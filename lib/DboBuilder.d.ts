@@ -1,6 +1,6 @@
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import { ColumnInfo, SQLOptions, DbJoinMaker, PG_COLUMN_UDT_DATA_TYPE, TS_PG_Types, TableInfo as TInfo, SQLHandler, AnyObject, ProstglesError } from "prostgles-types";
+import { ColumnInfo, SQLOptions, DbJoinMaker, PG_COLUMN_UDT_DATA_TYPE, TS_PG_Types, TableInfo as TInfo, SQLHandler, AnyObject, ProstglesError, EXISTS_KEY } from "prostgles-types";
 export declare type SortItem = {
     asc: boolean;
     nulls?: "first" | "last";
@@ -181,9 +181,7 @@ export declare type ValidatedTableRules = CommonTableRules & {
         returningFields: string[];
     };
 };
-export declare function makeErr(err: any, localParams?: LocalParams, view?: ViewHandler, allowedKeys?: string[]): Promise<never>;
-export declare const EXISTS_KEYS: readonly ["$exists", "$notExists", "$existsJoined", "$notExistsJoined"];
-export declare type EXISTS_KEY = typeof EXISTS_KEYS[number];
+export declare function makeErrorFromPGError(err: any, localParams?: LocalParams, view?: ViewHandler, allowedKeys?: string[]): Promise<never>;
 /**
  * Ensure the error is an Object and has
  */

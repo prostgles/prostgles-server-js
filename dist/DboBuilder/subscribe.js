@@ -43,7 +43,7 @@ async function subscribe(filter, params, localFunc, table_rules, localParams) {
                         def = def.slice(0, -1);
                     }
                     if (!def || typeof def !== "string") {
-                        throw (0, DboBuilder_1.makeErr)("Could get view definition");
+                        throw (0, DboBuilder_1.makeErrorFromPGError)("Could get view definition");
                     }
                     const { fields } = await this.dboBuilder.dbo.sql(`SELECT * FROM ( \n ${def} \n ) prostgles_subscribe_view_definition LIMIT 0`, {});
                     const tableColumns = fields.filter(f => f.tableName && f.columnName);

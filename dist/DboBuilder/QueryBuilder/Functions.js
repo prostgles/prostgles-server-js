@@ -74,6 +74,24 @@ const JSON_Funcs = [
             return `jsonb_set(${escapedName}, ${asValue(path)}, ${asValue(new_value)}, ${create_missing})`;
         }
     },
+    {
+        name: "$jsonb_path_query",
+        description: "[columnName: string, jsonPath: string, vars?: object, silent?: boolean]\n  Returns all JSON items returned by the JSON path for the specified JSON value. The optional vars and silent arguments act the same as for jsonb_path_exists.",
+        singleColArg: false,
+        numArgs: 4,
+        type: "function",
+        getFields: ([column]) => column,
+        getQuery: ({ args: [colName, jsonPath, ...otherArgs], tableAlias, allowedFields }) => {
+            if (!allowedFields.includes(colName)) {
+                throw `Unexpected: column ${colName} not found`;
+            }
+            if (!jsonPath || typeof jsonPath !== "string") {
+                throw "Expecting: [columnName: string, jsonPath: string, vars?: object, silent?: boolean]";
+            }
+            const escapedName = (0, QueryBuilder_1.asNameAlias)(colName, tableAlias);
+            return `jsonb_path_query(${escapedName}, ${[jsonPath, ...otherArgs].map(v => asValue(v)).join(", ")})`;
+        }
+    },
     ...[
         ["jsonb_array_length", "Returns the number of elements in the outermost JSON array"],
         ["jsonb_each", "Expands the outermost JSON object into a set of key/value pairs"],

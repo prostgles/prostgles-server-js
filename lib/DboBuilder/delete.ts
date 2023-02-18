@@ -1,6 +1,6 @@
 import pgPromise from "pg-promise";
 import { AnyObject, asName, DeleteParams, FieldFilter } from "prostgles-types";
-import { Filter, LocalParams, makeErr, parseError } from "../DboBuilder";
+import { Filter, LocalParams, makeErrorFromPGError, parseError } from "../DboBuilder";
 import { DeleteRule, TableRule } from "../PublishParser";
 import { pickKeys } from "../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler";
@@ -124,7 +124,7 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
       }
     }
 
-    return dbHandler[queryType](_query).catch((err: any) => makeErr(err, localParams));
+    return dbHandler[queryType](_query).catch((err: any) => makeErrorFromPGError(err, localParams));
   } catch (e) {
     // console.trace(e)
     if (localParams && localParams.testRule) throw e;
