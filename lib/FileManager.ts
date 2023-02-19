@@ -1,6 +1,7 @@
 
 import { S3, IAM } from 'aws-sdk';
 import { ManagedUpload } from 'aws-sdk/clients/s3';
+// import { PutObjectCommand, S3 } from "@aws-sdk/client-s3";
 import * as fs from 'fs';
 import * as stream from 'stream';
 
@@ -386,6 +387,7 @@ export default class FileManager {
         
         let content_length = 0;
         const manager = this.s3Client.upload(params, (err: Error, res: ManagedUpload.SendData) => {
+        // const manager = this.s3Client.send(new PutObjectCommand(params), (err: Error, res) => {
           
           if(err){
             reject(err.toString());

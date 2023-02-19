@@ -263,10 +263,10 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
    */
   | { checkIntervalMillis: number };
 
+  /**
+   * If truthy then DBoGenerated.d.ts will be updated and "onReady" will be called with new schema on both client and server
+   */
   watchSchema?:
-    /**
-     * If true then DBoGenerated.d.ts will be updated and "onReady" will be called with new schema on both client and server
-     */
     | boolean
 
     /**
@@ -432,7 +432,7 @@ export class Prostgles {
           this.writeDBSchema(true);
         }
 
-      } else if (watchSchema === true || isPlainObject(watchSchemaType) && "checkIntervalMillis" in watchSchemaType) {
+      } else if (isObject(watchSchemaType) && "checkIntervalMillis" in watchSchemaType) {
         /* Full re-init. Sockets must reconnect */
         console.log("watchSchema: Full re-initialisation")
         this.init(onReady);

@@ -159,11 +159,10 @@ export declare type ProstglesInitOptions<S = void, SUser extends SessionUser = S
      | {
         checkIntervalMillis: number;
     };
-    watchSchema?: 
     /**
-     * If true then DBoGenerated.d.ts will be updated and "onReady" will be called with new schema on both client and server
+     * If truthy then DBoGenerated.d.ts will be updated and "onReady" will be called with new schema on both client and server
      */
-    boolean
+    watchSchema?: boolean
     /**
      * Will only rewrite the DBoGenerated.d.ts found in tsGeneratedTypesDir
      * This is meant to be used in development when server restarts on file change

@@ -1,4 +1,4 @@
-import { asName, ColumnInfo, isEmpty, PG_COLUMN_UDT_DATA_TYPE, TextFilter_FullTextSearchFilterKeys } from "prostgles-types";
+import { asName, ColumnInfo, isEmpty, isObject, PG_COLUMN_UDT_DATA_TYPE, TextFilter_FullTextSearchFilterKeys } from "prostgles-types";
 import { isPlainObject, pgp, postgresToTsType } from "../../DboBuilder";
 import { ViewHandler } from "../ViewHandler";
 import { asNameAlias } from "./QueryBuilder";
@@ -241,7 +241,7 @@ const FTS_Funcs: FunctionSpec[] =
     }
   }));
 
-let PostGIS_Funcs: FunctionSpec[] = [
+let PostGIS_Funcs: FunctionSpec[] = ([
     {
       fname: "ST_DWithin",
       description: `:[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean; distance: number; }] 
@@ -270,25 +270,29 @@ let PostGIS_Funcs: FunctionSpec[] = [
       fname: "ST_DistanceSphere",
       description: ` :[column_name, { lat?: number; lng?: number; geojson?: object; srid?: number }] -> Returns linear distance in meters between two lon/lat points. Uses a spherical earth and radius of 6370986 meters. Faster than ST_DistanceSpheroid, but less accurate. Only implemented for points.`,
     }
-  ].map(({ fname, description }) => ({
+  ] as const).map(({ fname, description }) => ({
     name: "$" + fname,
     description,
     type: "function" as "function",
     singleColArg: true,
     numArgs: 1,
+    canBeUsedForFilter: fname === "ST_DWithin",
     getFields: (args: any[]) => [args[0]],
-    getQuery: ({ allColumns, args, tableAlias }) => {
-      const arg2 = args[1],
-        mErr = () => { throw `${fname}: Expecting a second argument like: { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean }` };
+    getQuery: ({ allColumns, args: [columnName, arg2], tableAlias }) => { 
+      const mErr = () => { throw `${fname}: Expecting a second argument like: { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean }` };
       
-      if(!isPlainObject(arg2)) mErr();
-      const col = allColumns.find(c => c.name === args[0]);
-      if(!col) throw new Error("Col not found: " + args[0])
+      if(!isObject(arg2)) {
+        mErr();
+      }
+      const col = allColumns.find(c => c.name === columnName);
+      if(!col) {
+        throw new Error("Col not found: " + columnName)
+      }
 
       const { 
         lat, lng, srid = 4326, 
         geojson, text, use_spheroid, 
-        distance, spheroid = 'SPHEROID["WGS 84",6378137,298.257223563]',
+        distance, spheroid = 'SPHEROID["WGS 84", 6378137, 298.257223563]',
         debug
       } = arg2;
       let geomQ = "", extraParams = "";
@@ -360,13 +364,16 @@ let PostGIS_Funcs: FunctionSpec[] = [
       } else if(fname === "<->"){
         colCast = colIsGeog? "::geography" : "::geometry";
         geomQCast = colIsGeog? "::geography" : "::geometry";
-        const q = pgp.as.format(`${asNameAlias(args[0], tableAlias)}${colCast} <-> ${geomQ}${geomQCast}`);
+        const q = pgp.as.format(`${asNameAlias(columnName, tableAlias)}${colCast} <-> ${geomQ}${geomQCast}`);
         if(debug) throw q;
         return q;
       }
-      const q = pgp.as.format(`${fname}(${asNameAlias(args[0], tableAlias)}${colCast} , ${geomQ}${geomQCast} ${extraParams})`);
-      if(debug) throw q;
-      return q;
+
+      const query = pgp.as.format(`${fname}(${asNameAlias(columnName, tableAlias)}${colCast} , ${geomQ}${geomQCast} ${extraParams})`);
+      if(debug) {
+        throw query;
+      }
+      return query;
     }
   }));
 

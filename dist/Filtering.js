@@ -183,18 +183,20 @@ const parseFilterItem = (args) => {
          * Filter notation
          * geom && st_makeenvelope(funcArgs)
          */
-        if ((0, prostgles_types_1.isObject)(filterValue) && selItem.column_udt_type !== "jsonb") {
+        if ((0, prostgles_types_1.isObject)(filterValue) && !(filterValue instanceof Date)) {
             const filterValueKeys = Object.keys(filterValue);
-            if (!filterValueKeys.length || filterValueKeys.length !== 1) {
-                return mErr("Bad filter. Expecting a nested object with one key only ");
-            }
+            // if(!filterValueKeys.length || filterValueKeys.length !== 1){
+            //   return mErr("Bad filter. Expecting a nested object with one key only but got: " + JSON.stringify(filterValue, null, 2));
+            // }
             funcName = filterValueKeys[0];
-            funcArgs = filterValue[funcName];
-            if (!ALLOWED_FUNCS.includes(funcName)) {
-                return mErr(`Bad filter. Nested function ${funcName} could not be found. Expecting one of: ${ALLOWED_FUNCS}`);
+            if (ALLOWED_FUNCS.includes(funcName)) {
+                funcArgs = filterValue[funcName];
+                // return mErr(`Bad filter. Nested function ${funcName} could not be found. Expecting one of: ${ALLOWED_FUNCS}`);
+            }
+            else {
+                funcName = undefined;
             }
         }
-        // console.log({ fOpType, fVal, sOpType })
         /** st_makeenvelope */
         if (prostgles_types_1.GeomFilterKeys.includes(filterOperand) && funcName && prostgles_types_1.GeomFilter_Funcs.includes(funcName)) {
             /** If leftQ is geography then this err can happen: 'Antipodal (180 degrees long) edge detected!' */

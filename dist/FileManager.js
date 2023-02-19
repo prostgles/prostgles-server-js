@@ -3,6 +3,7 @@ var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.bytesToSize = exports.getFileType = exports.getFileTypeFromFilename = exports.removeExpressRoute = exports.asSQLIdentifier = void 0;
 const aws_sdk_1 = require("aws-sdk");
+// import { PutObjectCommand, S3 } from "@aws-sdk/client-s3";
 const fs = require("fs");
 const stream = require("stream");
 const sharp = require("sharp");
@@ -526,6 +527,7 @@ class FileManager {
                 };
                 let content_length = 0;
                 const manager = this.s3Client.upload(params, (err, res) => {
+                    // const manager = this.s3Client.send(new PutObjectCommand(params), (err: Error, res) => {
                     if (err) {
                         reject(err.toString());
                         console.error(err);

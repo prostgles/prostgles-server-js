@@ -224,31 +224,34 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
     const filterValue = rightF[filterOperand];
     const ALLOWED_FUNCS = [ ...GeomFilter_Funcs, ...TextFilter_FullTextSearchFilterKeys] as const;
     let funcName: undefined | typeof ALLOWED_FUNCS[number];
-    let funcArgs: any[] | undefined;
+    let funcArgs: undefined | any[];
 
     /**
      * Filter notation
      * geom && st_makeenvelope(funcArgs)
      */
-    if(isObject(filterValue) && selItem.column_udt_type !== "jsonb"){
+    if(isObject(filterValue) && !(filterValue instanceof Date)){
       const filterValueKeys = Object.keys(filterValue);
-      if(!filterValueKeys.length || filterValueKeys.length !== 1){
-        return mErr("Bad filter. Expecting a nested object with one key only ");
-      }
+      // if(!filterValueKeys.length || filterValueKeys.length !== 1){
+      //   return mErr("Bad filter. Expecting a nested object with one key only but got: " + JSON.stringify(filterValue, null, 2));
+      // }
       funcName = filterValueKeys[0] as any;
-      funcArgs = filterValue[funcName as any];
-      if(!ALLOWED_FUNCS.includes(funcName as any)){
-        return mErr(`Bad filter. Nested function ${funcName} could not be found. Expecting one of: ${ALLOWED_FUNCS}`);
+      if(ALLOWED_FUNCS.includes(funcName as any)){
+        funcArgs = filterValue[funcName as any];
+        // return mErr(`Bad filter. Nested function ${funcName} could not be found. Expecting one of: ${ALLOWED_FUNCS}`);
+      } else {
+        funcName = undefined;
       }
-    }
-    // console.log({ fOpType, fVal, sOpType })
+    } 
 
     /** st_makeenvelope */
     if(GeomFilterKeys.includes(filterOperand as any) && funcName && GeomFilter_Funcs.includes(funcName as any)){
+      
       /** If leftQ is geography then this err can happen: 'Antipodal (180 degrees long) edge detected!' */
       if(funcName.toLowerCase() === "st_makeenvelope") {
         leftQ += "::geometry";
       }
+
       return `${leftQ} ${filterOperand} ${funcName}${parseRightVal(funcArgs, "csv")}`;
 
     } else if(["=", "$eq"].includes(filterOperand) && !funcName){

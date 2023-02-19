@@ -1,6 +1,6 @@
 import { Filter, LocalParams, SortItem } from "../../DboBuilder";
 import { TableRule } from "../../PublishParser";
-import { ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, Select } from "prostgles-types";
+import { ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, Select, JoinSelect } from "prostgles-types";
 import { TableHandler } from "../TableHandler";
 import { FieldSpec, FunctionSpec } from "./Functions";
 export type SelectItem = {
@@ -63,7 +63,7 @@ export declare class SelectItemBuilder {
     private addItem;
     private addFunction;
     addColumn: (fieldName: string, selected: boolean) => void;
-    parseUserSelect: (userSelect: Select, joinParse?: ((key: string, val: any, throwErr: (msg: string) => any) => any) | undefined) => Promise<never[] | undefined>;
+    parseUserSelect: (userSelect: Select, joinParse?: ((key: string, val: JoinSelect, throwErr: (msg: string) => any) => any) | undefined) => Promise<never[] | undefined>;
 }
 export declare function getNewQuery(_this: TableHandler, filter: Filter, selectParams: ({
     limit?: number | undefined;
@@ -74,12 +74,8 @@ export declare function getNewQuery(_this: TableHandler, filter: Filter, selectP
     select?: import("prostgles-types").AnyObject | ("" | "*" | {
         "*": 1;
     }) | {
-        [x: string]: Record<string, import("prostgles-types").AnyObject>;
-    } | {
         [x: string]: Record<string, any[]>;
-    } | {
-        [key: string]: string | true | 1 | Record<string, any[]>;
-    } | ({
+    } | Record<string, Record<string, any>> | import("prostgles-types").DetailedJoinSelect | ({
         [x: string]: string | true | 1;
     } & {
         [x: string]: Record<string, any[]>;
@@ -87,6 +83,8 @@ export declare function getNewQuery(_this: TableHandler, filter: Filter, selectP
         [x: string]: string | true | 1;
     } | {
         [x: string]: false | 0;
+    } | {
+        [key: string]: string | true | 1 | Record<string, any[]>;
     } | {
         [x: string]: false | 0;
     } | undefined;

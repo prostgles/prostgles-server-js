@@ -195,15 +195,18 @@ let PostGIS_Funcs = [
     type: "function",
     singleColArg: true,
     numArgs: 1,
+    canBeUsedForFilter: fname === "ST_DWithin",
     getFields: (args) => [args[0]],
-    getQuery: ({ allColumns, args, tableAlias }) => {
-        const arg2 = args[1], mErr = () => { throw `${fname}: Expecting a second argument like: { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean }`; };
-        if (!(0, DboBuilder_1.isPlainObject)(arg2))
+    getQuery: ({ allColumns, args: [columnName, arg2], tableAlias }) => {
+        const mErr = () => { throw `${fname}: Expecting a second argument like: { lat?: number; lng?: number; geojson?: object; srid?: number; use_spheroid?: boolean }`; };
+        if (!(0, prostgles_types_1.isObject)(arg2)) {
             mErr();
-        const col = allColumns.find(c => c.name === args[0]);
-        if (!col)
-            throw new Error("Col not found: " + args[0]);
-        const { lat, lng, srid = 4326, geojson, text, use_spheroid, distance, spheroid = 'SPHEROID["WGS 84",6378137,298.257223563]', debug } = arg2;
+        }
+        const col = allColumns.find(c => c.name === columnName);
+        if (!col) {
+            throw new Error("Col not found: " + columnName);
+        }
+        const { lat, lng, srid = 4326, geojson, text, use_spheroid, distance, spheroid = 'SPHEROID["WGS 84", 6378137, 298.257223563]', debug } = arg2;
         let geomQ = "", extraParams = "";
         if (typeof text === "string") {
             geomQ = `ST_GeomFromText(${asValue(text)})`;
@@ -269,15 +272,16 @@ let PostGIS_Funcs = [
         else if (fname === "<->") {
             colCast = colIsGeog ? "::geography" : "::geometry";
             geomQCast = colIsGeog ? "::geography" : "::geometry";
-            const q = DboBuilder_1.pgp.as.format(`${(0, QueryBuilder_1.asNameAlias)(args[0], tableAlias)}${colCast} <-> ${geomQ}${geomQCast}`);
+            const q = DboBuilder_1.pgp.as.format(`${(0, QueryBuilder_1.asNameAlias)(columnName, tableAlias)}${colCast} <-> ${geomQ}${geomQCast}`);
             if (debug)
                 throw q;
             return q;
         }
-        const q = DboBuilder_1.pgp.as.format(`${fname}(${(0, QueryBuilder_1.asNameAlias)(args[0], tableAlias)}${colCast} , ${geomQ}${geomQCast} ${extraParams})`);
-        if (debug)
-            throw q;
-        return q;
+        const query = DboBuilder_1.pgp.as.format(`${fname}(${(0, QueryBuilder_1.asNameAlias)(columnName, tableAlias)}${colCast} , ${geomQ}${geomQCast} ${extraParams})`);
+        if (debug) {
+            throw query;
+        }
+        return query;
     }
 }));
 PostGIS_Funcs = PostGIS_Funcs.concat([

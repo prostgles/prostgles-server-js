@@ -1,6 +1,6 @@
 import { Filter, LocalParams, SortItem } from "../../DboBuilder";
 import { TableRule } from "../../PublishParser";
-import { SelectParams, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, Select } from "prostgles-types";
+import { SelectParams, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, Select, JoinSelect } from "prostgles-types";
 import { TableHandler } from "../TableHandler";
 import { FieldSpec, FunctionSpec } from "./Functions";
 export declare type SelectItem = {
@@ -63,7 +63,7 @@ export declare class SelectItemBuilder {
     private addItem;
     private addFunction;
     addColumn: (fieldName: string, selected: boolean) => void;
-    parseUserSelect: (userSelect: Select, joinParse?: (key: string, val: any, throwErr: (msg: string) => any) => any) => Promise<any[]>;
+    parseUserSelect: (userSelect: Select, joinParse?: (key: string, val: JoinSelect, throwErr: (msg: string) => any) => any) => Promise<any[]>;
 }
 export declare function getNewQuery(_this: TableHandler, filter: Filter, selectParams: (SelectParams & {
     alias?: string;

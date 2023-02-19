@@ -39,7 +39,7 @@
     "file-type": "^17.1.4",
     "g": "^2.0.1",
     "pg-promise": "^10.11.1",
-    "prostgles-types": "^3.0.20",
+    "prostgles-types": "^3.0.23",
     "sharp": "^0.31.0",
     "typescript": "^4.9.5"
   },

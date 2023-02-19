@@ -6,7 +6,7 @@
 
 import { pgp, Filter, LocalParams, isPlainObject, postgresToTsType, SortItem } from "../../DboBuilder";
 import { TableRule } from "../../PublishParser";
-import { SelectParams, isEmpty, FieldFilter, asName, TextFilter_FullTextSearchFilterKeys, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, isObject, Select } from "prostgles-types";
+import { SelectParams, isEmpty, FieldFilter, asName, TextFilter_FullTextSearchFilterKeys, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, isObject, Select, JoinSelect } from "prostgles-types";
 import { get } from "../../utils";
 import { TableHandler } from "../TableHandler";
 import { COMPUTED_FIELDS, FieldSpec, FUNCTIONS, FunctionSpec, parseFunction } from "./Functions";
@@ -174,23 +174,18 @@ export class SelectItemBuilder {
     });
   }
 
-  parseUserSelect = async (userSelect: Select, joinParse?: (key: string, val: any, throwErr: (msg: string) => any) => any) => {
+  parseUserSelect = async (userSelect: Select, joinParse?: (key: string, val: JoinSelect, throwErr: (msg: string) => any) => any) => {
 
-    /* Array select */
+    /* [col1, col2, col3] */
     if(Array.isArray(userSelect)){
       if(userSelect.find(key => typeof key !== "string")) throw "Invalid array select. Expecting an array of strings";
   
       userSelect.map(key => this.addColumn(key, true))
   
     /* Empty select */
-    } else if(userSelect === ""){
-      // select.push({
-      //   type: "function",
-      //   alias: "",
-      //   getFields: () => [],
-      //   getQuery: () => ""
-      // })
+    } else if(userSelect === ""){ 
       return [];
+      
     } else if(userSelect === "*"){
       this.allowedFields.map(key => this.addColumn(key, true) );
 
@@ -226,7 +221,7 @@ export class SelectItemBuilder {
             }
   
           /* Aggs and functions */
-          } else if(typeof val === "string" || isPlainObject(val)) {
+          } else if(typeof val === "string" || isObject(val)) {
   
             /* Function shorthand notation
                 { id: "$max" } === { id: { $max: ["id"] } } === SELECT MAX(id) AS id 
@@ -260,8 +255,10 @@ export class SelectItemBuilder {
             /* Join */
             } else {
 
-              if(!joinParse) throw "Joins dissalowed";
-              await joinParse(key, val, throwErr);
+              if(!joinParse) {
+                throw "Joins dissalowed";
+              }
+              await joinParse(key, val as JoinSelect, throwErr);
               
             }
   
@@ -308,7 +305,7 @@ export async function getNewQuery(
 
   
  
-  await sBuilder.parseUserSelect(userSelect, async (key, val, throwErr) => {
+  await sBuilder.parseUserSelect(userSelect, async (key, val: any, throwErr) => {
 
     let j_filter: Filter = {},
         j_selectParams: SelectParams = {},
@@ -325,19 +322,23 @@ export async function getNewQuery(
     } else {
 
       /* Full option join  { field_name: db.innerJoin.table_name(filter, select)  } */
-      const JOIN_KEYS = ["$innerJoin", "$leftJoin"];
-      const JOIN_PARAMS = ["select", "filter", "$path", "offset", "limit", "orderBy"];
-      const joinKeys = Object.keys(val).filter(k => JOIN_KEYS.includes(k));
+      const JOIN_KEYS = ["$innerJoin", "$leftJoin"] as const;
+      const JOIN_PARAMS = ["select", "filter", "$path", "$condition", "offset", "limit", "orderBy"] as const;
+      const joinKeys = Object.keys(val).filter(k => JOIN_KEYS.includes(k as any));
       if(joinKeys.length > 1) {
         throwErr("\nCannot specify more than one join type ( $innerJoin OR $leftJoin )");
       } else if(joinKeys.length === 1) {
-        const invalidParams = Object.keys(val).filter(k => ![ ...JOIN_PARAMS, ...JOIN_KEYS ].includes(k));
-        if(invalidParams.length) throw "Invalid join params: " + invalidParams.join(", ");
+        const invalidParams = Object.keys(val).filter(k => ![ ...JOIN_PARAMS, ...JOIN_KEYS ].includes(k as any));
+        if(invalidParams.length) {
+          throw "Invalid join params: " + invalidParams.join(", ");
+        }
 
         j_isLeftJoin = joinKeys[0] === "$leftJoin";
         j_table = val[joinKeys[0]];
         j_alias = key;
-        if(typeof j_table !== "string") throw "\nIssue with select. \nJoin type must be a string table name but got -> " + JSON.stringify({ [key]: val });
+        if(typeof j_table !== "string") {
+          throw "\nIssue with select. \nJoin type must be a string table name but got -> " + JSON.stringify({ [key]: val });
+        }
         
         j_selectParams.select = val.select || "*";
         j_filter = val.filter || {};
@@ -351,7 +352,9 @@ export async function getNewQuery(
         j_table = key;
       }
     }
-    if(!j_table) throw "j_table missing"
+    if(!j_table) {
+      throw "j_table missing"
+    }
     const _thisJoinedTable: any = _this.dboBuilder.dbo[j_table];
     if(!_thisJoinedTable) {
       throw `Joined table ${JSON.stringify(j_table)} is disallowed or inexistent \nOr you've forgot to put the function arguments into an array`;
