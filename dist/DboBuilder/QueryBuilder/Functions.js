@@ -287,7 +287,7 @@ let PostGIS_Funcs = [
 PostGIS_Funcs = PostGIS_Funcs.concat([
     "ST_AsText", "ST_AsEWKT", "ST_AsEWKB", "ST_AsBinary", "ST_AsMVT", "ST_AsMVTGeom",
     "ST_AsGeoJSON", "ST_Simplify",
-    "ST_SnapToGrid",
+    "ST_SnapToGrid", "ST_Centroid",
 ]
     .map(fname => {
     const res = {
@@ -297,12 +297,11 @@ PostGIS_Funcs = PostGIS_Funcs.concat([
         singleColArg: true,
         numArgs: 1,
         getFields: (args) => [args[0]],
-        getQuery: ({ allowedFields, args, tableAlias }) => {
+        getQuery: ({ allowedFields, args: [colName, ...otherArgs], tableAlias }) => {
             let secondArg = "";
-            const otherArgs = args.slice(1);
             if (otherArgs.length)
                 secondArg = ", " + otherArgs.map(arg => asValue(arg)).join(", ");
-            const escTabelName = (0, QueryBuilder_1.asNameAlias)(args[0], tableAlias) + "::geometry";
+            const escTabelName = (0, QueryBuilder_1.asNameAlias)(colName, tableAlias) + "::geometry";
             let result = DboBuilder_1.pgp.as.format(fname + "(" + escTabelName + secondArg + (fname === "ST_AsGeoJSON" ? ")::jsonb" : ")"));
             if (fname.startsWith("ST_SnapToGrid") || fname.startsWith("ST_Simplify")) {
                 let r = `ST_AsGeoJSON(${result})::jsonb`;
