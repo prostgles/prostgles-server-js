@@ -443,10 +443,15 @@ async function isomorphic(db) {
         console.log("TODO: socket.io stringifies dates");
     });
     await tryRun("JSONB filtering", async () => {
-        const row = await db.obj_table.insert({ obj: { propName: 3232 } }, { returning: "*" });
-        const sameRow = await db.obj_table.findOne({ obj: { propName: 3232 } });
-        const count = await db.obj_table.count({ obj: { propName: 3232 } });
+        const obj = { propName: 3232 };
+        const row = await db.obj_table.insert({ obj }, { returning: "*" });
+        const sameRow = await db.obj_table.findOne({ obj });
+        const sameRow1 = await db.obj_table.findOne({ obj: { "=": obj } });
+        const sameRow2 = await db.obj_table.findOne({ "obj.=": obj });
+        const count = await db.obj_table.count({ obj });
         assert_1.strict.deepStrictEqual(row, sameRow);
+        assert_1.strict.deepStrictEqual(row, sameRow1);
+        assert_1.strict.deepStrictEqual(row, sameRow2);
         assert_1.strict.deepStrictEqual(+count, 1);
     });
     await tryRun("Postgis examples", async () => {

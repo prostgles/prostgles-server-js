@@ -497,10 +497,15 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
   });
 
   await tryRun("JSONB filtering", async () => {
-    const row = await db.obj_table.insert!({obj: { propName: 3232 }}, { returning: "*" });
-    const sameRow = await db.obj_table.findOne!({obj: { propName: 3232 }});
-    const count = await db.obj_table.count!({obj: { propName: 3232 }});
+    const obj = { propName: 3232 };
+    const row = await db.obj_table.insert!({ obj }, { returning: "*" });
+    const sameRow = await db.obj_table.findOne!({obj });
+    const sameRow1 = await db.obj_table.findOne!({ obj: { "=": obj } });
+    const sameRow2 = await db.obj_table.findOne!({ "obj.=": obj });
+    const count = await db.obj_table.count!({ obj });
     assert.deepStrictEqual(row, sameRow);
+    assert.deepStrictEqual(row, sameRow1);
+    assert.deepStrictEqual(row, sameRow2);
     assert.deepStrictEqual(+count, 1);
   })
 
