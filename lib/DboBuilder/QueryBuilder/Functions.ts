@@ -293,6 +293,7 @@ let PostGIS_Funcs: FunctionSpec[] = ([
         lat, lng, srid = 4326, 
         geojson, text, use_spheroid, 
         distance, spheroid = 'SPHEROID["WGS 84", 6378137, 298.257223563]',
+        unit,
         debug
       } = arg2;
       let geomQ = "", extraParams = "";
@@ -334,8 +335,14 @@ let PostGIS_Funcs: FunctionSpec[] = ([
         colCast = colIsGeog? "::geography" : "::geometry";
         geomQCast = colIsGeog? "::geography" : "::geometry";
         
-        if(typeof distance !== "number") throw `ST_DWithin: distance param missing or not a number`;
-        extraParams = ", " + asValue(distance);
+        if(typeof distance !== "number") {
+          throw `ST_DWithin: distance param missing or not a number`;
+        }
+        const allowedUnits = ["m", "km"];
+        if(unit && !allowedUnits.includes(unit)){
+          throw `ST_DWithin: unit can only be one of: ${allowedUnits}`;
+        }
+        extraParams = ", " + asValue(distance * (unit === "km"? 1000 : 1));
 
 
       /**
