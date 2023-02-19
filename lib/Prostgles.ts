@@ -432,7 +432,7 @@ export class Prostgles {
           this.writeDBSchema(true);
         }
 
-      } else if (isObject(watchSchemaType) && "checkIntervalMillis" in watchSchemaType) {
+      } else if (watchSchema === true || isObject(watchSchemaType) && "checkIntervalMillis" in watchSchemaType) {
         /* Full re-init. Sockets must reconnect */
         console.log("watchSchema: Full re-initialisation")
         this.init(onReady);

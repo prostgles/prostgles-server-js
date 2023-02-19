@@ -317,7 +317,7 @@ class Prostgles {
                     this.writeDBSchema(true);
                 }
             }
-            else if ((0, prostgles_types_1.isObject)(watchSchemaType) && "checkIntervalMillis" in watchSchemaType) {
+            else if (watchSchema === true || (0, prostgles_types_1.isObject)(watchSchemaType) && "checkIntervalMillis" in watchSchemaType) {
                 /* Full re-init. Sockets must reconnect */
                 console.log("watchSchema: Full re-initialisation");
                 this.init(onReady);
