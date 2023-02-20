@@ -14,6 +14,7 @@ const Bluebird = require("bluebird");
 const pgPromise = require("pg-promise");
 const prostgles_types_1 = require("prostgles-types");
 const SyncReplication_1 = require("../SyncReplication");
+const util_1 = require("prostgles-types/dist/util");
 let pgp = pgPromise({
     promiseLib: Bluebird
 });
@@ -448,7 +449,7 @@ class PubSubManager {
             };
             /* Only a sync per socket per table per condition allowed */
             this.syncs = this.syncs || [];
-            let existing = this.syncs.find(s => s.socket_id === socket.id && s.channel_name === channel_name);
+            const existing = (0, util_1.find)(this.syncs, { socket_id: socket.id, channel_name });
             if (!existing) {
                 this.syncs.push(newSync);
                 // console.log("Added SYNC");
@@ -495,7 +496,7 @@ class PubSubManager {
                 // });
             }
             else {
-                console.error("UNCLOSED DUPLICATE SYNC FOUND");
+                console.error("UNCLOSED DUPLICATE SYNC FOUND", existing);
             }
             return newSync;
         };

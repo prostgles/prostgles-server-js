@@ -17,6 +17,7 @@ import { SelectParams, FieldFilter, asName, WAL, isEmpty, AnyObject, getKeys } f
 
 import { ClientExpressData, syncData } from "../SyncReplication";
 import { TableRule } from "../PublishParser";
+import { find } from "prostgles-types/dist/util";
 
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -599,7 +600,7 @@ export class PubSubManager {
 
       /* Only a sync per socket per table per condition allowed */
       this.syncs = this.syncs || [];
-      let existing = this.syncs.find(s => s.socket_id === socket.id && s.channel_name === channel_name);
+      const existing = find(this.syncs, { socket_id: socket.id, channel_name });
       if (!existing) {
         this.syncs.push(newSync);
         // console.log("Added SYNC");
@@ -652,7 +653,7 @@ export class PubSubManager {
         //     console.log(response)
         // });
       } else {
-        console.error("UNCLOSED DUPLICATE SYNC FOUND");
+        console.error("UNCLOSED DUPLICATE SYNC FOUND", existing);
       }
 
       return newSync;
