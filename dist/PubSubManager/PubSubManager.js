@@ -522,7 +522,7 @@ class PubSubManager {
         }
         const channel_name = `${this.socketChannelPreffix}.${table_info.name}.${JSON.stringify(filter)}.${JSON.stringify(params)}.${"m"}.sub`;
         this.upsertSocket(socket, channel_name);
-        const upsertSub = (newSubData) => {
+        const upsertSub = (newSubData, isReadyOverride) => {
             const { table_name, condition: _cond, is_ready = false, parentSubParams } = newSubData, condition = parseCondition(_cond), newSub = {
                 socket,
                 table_name: table_info.name,
@@ -560,13 +560,13 @@ class PubSubManager {
             else {
                 this.subs[table_name][condition].subs[sub_idx] = newSub;
             }
-            if (is_ready) {
+            if (isReadyOverride ?? is_ready) {
                 this.pushSubData(newSub);
             }
         };
         if (table_info.is_view) {
             if (viewOptions?.relatedTables.length) {
-                viewOptions?.relatedTables.map(async (relatedTable) => {
+                viewOptions?.relatedTables.map(async (relatedTable, relatedTableIdx) => {
                     const params = {
                         table_name: relatedTable.tableName,
                         condition: relatedTable.condition,
@@ -577,13 +577,15 @@ class PubSubManager {
                     };
                     upsertSub({
                         ...params,
-                        is_ready: false
-                    });
+                        is_ready: false,
+                    }, false);
                     await this.addTrigger(params, viewOptions);
+                    /** Trigger pushSubData only on last related table to prevent duplicate firings */
+                    const isLast = relatedTableIdx === viewOptions.relatedTables.length - 1;
                     upsertSub({
                         ...params,
                         is_ready: true
-                    });
+                    }, isLast);
                 });
                 return channel_name;
             }
@@ -600,7 +602,7 @@ class PubSubManager {
                 condition: parseCondition(condition),
                 parentSubParams: undefined,
                 is_ready: false
-            });
+            }, undefined);
             await this.addTrigger({
                 table_name: table_info.name,
                 condition: parseCondition(condition),
@@ -610,7 +612,7 @@ class PubSubManager {
                 condition: parseCondition(condition),
                 parentSubParams: undefined,
                 is_ready: true
-            });
+            }, undefined);
             return channel_name;
         }
     }

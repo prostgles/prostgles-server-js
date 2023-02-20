@@ -694,7 +694,7 @@ export class PubSubManager {
 
     this.upsertSocket(socket, channel_name);
 
-    const upsertSub = (newSubData: { table_name: string; condition: string; is_ready: boolean; parentSubParams: SubscriptionParams["parentSubParams"] }) => {
+    const upsertSub = (newSubData: { table_name: string; condition: string; is_ready: boolean; parentSubParams: SubscriptionParams["parentSubParams"] }, isReadyOverride: boolean | undefined) => {
       const { table_name, condition: _cond, is_ready = false, parentSubParams } = newSubData,
         condition = parseCondition(_cond),
         newSub: SubscriptionParams = {
@@ -740,7 +740,7 @@ export class PubSubManager {
         this.subs[table_name][condition].subs[sub_idx] = newSub;
       }
 
-      if (is_ready) {
+      if (isReadyOverride ?? is_ready) {
         this.pushSubData(newSub);
       }
     };
@@ -749,7 +749,9 @@ export class PubSubManager {
     if (table_info.is_view) {
       if (viewOptions?.relatedTables.length) {
  
-        viewOptions?.relatedTables.map(async relatedTable => {
+        viewOptions?.relatedTables.map(async (relatedTable, relatedTableIdx) => {
+
+
           const params: Omit<Parameters<typeof upsertSub>[0], "is_ready"> = {
             table_name: relatedTable.tableName,
             condition: relatedTable.condition,
@@ -761,15 +763,18 @@ export class PubSubManager {
           
           upsertSub({
             ...params,
-            is_ready: false
-          });
+            is_ready: false,
+            
+          }, false);
 
           await this.addTrigger(params, viewOptions);
 
+          /** Trigger pushSubData only on last related table to prevent duplicate firings */
+          const isLast = relatedTableIdx === viewOptions.relatedTables.length - 1;
           upsertSub({
             ...params,
             is_ready: true
-          });
+          }, isLast);
         });
 
         return channel_name
@@ -786,7 +791,7 @@ export class PubSubManager {
         condition: parseCondition(condition),
         parentSubParams: undefined,
         is_ready: false
-      });
+      }, undefined);
       await this.addTrigger({
         table_name: table_info.name,
         condition: parseCondition(condition),
@@ -796,7 +801,7 @@ export class PubSubManager {
         condition: parseCondition(condition),
         parentSubParams: undefined,
         is_ready: true
-      });
+      }, undefined);
 
       return channel_name
     }
