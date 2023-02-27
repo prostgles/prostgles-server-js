@@ -16,6 +16,8 @@ DECLARE
   optional boolean;
   nullable boolean; 
   colname TEXT;
+  oneof JSONB;
+  arrayof JSONB;
 
   extra_keys TEXT[];
 BEGIN
@@ -178,15 +180,18 @@ BEGIN
       RAISE EXCEPTION 'Unexpected schema.type ( % ), %',jsonb_typeof(schema->'type'), path USING HINT = path, COLUMN = colname; 
     END IF; 
 
-  /* oneOf: [{ key_name: { type: "string" } }] */
-  ELSIF schema ? 'oneOf' THEN
-    IF jsonb_typeof(schema->'oneOf') != 'array' THEN
-      RAISE EXCEPTION 'Unexpected oneOf schema. Expecting an array of objects but received: % , %',schema->>'oneOf', path USING HINT = path, COLUMN = colname; 
+  /* oneOfType: [{ key_name: { type: "string" } }] */
+  ELSIF (schema ? 'oneOf' OR schema ? 'oneOfType') THEN 
+
+    oneof = COALESCE(schema->'oneOf', schema->'oneOfType');
+
+    IF jsonb_typeof(oneof) != 'array' THEN
+      RAISE EXCEPTION 'Unexpected oneOf schema. Expecting an array of objects but received: % , %', oneof::TEXT, path USING HINT = path, COLUMN = colname; 
     END IF;
 
     FOR sub_schema IN
-      SELECT jsonb_build_object('type', value) as value
-      FROM jsonb_array_elements(schema->'oneOf')
+      SELECT CASE WHEN schema ? 'oneOfType' THEN jsonb_build_object('type', value) ELSE value END as value
+      FROM jsonb_array_elements(oneof)
     LOOP
 
       BEGIN
@@ -204,12 +209,15 @@ BEGIN
       END;
     END LOOP;
 
-    RAISE EXCEPTION 'Could not validate against any oneOf schemas ( % ), %', schema->>'oneOf', path USING HINT = path, COLUMN = colname;  
+    RAISE EXCEPTION 'Could not validate against any oneOf schemas ( % ), %', oneof::TEXT, path USING HINT = path, COLUMN = colname;  
 
-  /* arrayOf: { key_name: { type: "string" } } */
-  ELSIF jsonb_typeof(schema->'arrayOf') = 'object' THEN
+  /* arrayOfType: { key_name: { type: "string" } } */
+  ELSIF (schema ? 'arrayOf' OR schema ? 'arrayOfType') THEN
+
+    arrayof = COALESCE(schema->'arrayOf', schema->'arrayOfType');
+
     IF jsonb_typeof(data) != 'array' THEN
-      RAISE EXCEPTION 'Is not an array. %', path USING HINT = path, COLUMN = colname; 
+      RAISE EXCEPTION '% is not an array.', path USING HINT = path, COLUMN = colname; 
     END IF;
 
     FOR array_element IN 
@@ -217,7 +225,13 @@ BEGIN
       FROM jsonb_array_elements(data)
     LOOP
       IF NOT ${VALIDATE_SCHEMA_FUNCNAME}(
-        (schema - 'arrayOf' || jsonb_build_object('type', schema->'arrayOf'))::TEXT, -- RENAME
+        ( CASE WHEN schema ? 'arrayOf' 
+          THEN 
+            schema->'arrayOf' 
+          ELSE 
+          (schema - 'arrayOfType' || jsonb_build_object('type', schema->'arrayOfType')) 
+          END
+        )::TEXT,
         array_element.value, checked_path || array_element.idx::TEXT
       ) THEN
         RETURN false;
@@ -255,7 +269,7 @@ SELECT ${VALIDATE_SCHEMA_FUNCNAME}(
 
 SELECT ${VALIDATE_SCHEMA_FUNCNAME}(
   '{ 
-    "oneOf": [
+    "oneOfType": [
       { "a": "string" } , 
       {
         "a": {
@@ -270,7 +284,7 @@ SELECT ${VALIDATE_SCHEMA_FUNCNAME}(
 );
 
 SELECT ${VALIDATE_SCHEMA_FUNCNAME}(
-  '{ "arrayOf": { "a": "string", "narr": { "arrayOf": { "a": { "type": "string", "optional": false, "nullable": true } } } } }', 
+  '{ "arrayOfType": { "a": "string", "narr": { "arrayOfType": { "a": { "type": "string", "optional": false, "nullable": true } } } } }', 
   '[{ "a": "ddd", "narr": [{ "a": null }] }]'::JSONB
 );
 
@@ -288,6 +302,6 @@ SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "type": "any"}', '{}');
 
 SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "type": { "a": { "enum": ["a"] } } }', '{ "a": "a"}');
 
-SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "arrayOf": { "a": { "enum": ["a"] } } }', '[{ "a": "a"}]');
+SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "arrayOfType": { "a": { "enum": ["a"] } } }', '[{ "a": "a"}]');
 
 `;

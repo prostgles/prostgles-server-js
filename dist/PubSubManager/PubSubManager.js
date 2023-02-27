@@ -15,7 +15,7 @@ const pgPromise = require("pg-promise");
 const prostgles_types_1 = require("prostgles-types");
 const SyncReplication_1 = require("../SyncReplication");
 const util_1 = require("prostgles-types/dist/util");
-let pgp = pgPromise({
+const pgp = pgPromise({
     promiseLib: Bluebird
 });
 const asValue = (v) => pgp.as.format("$1", [v]);
@@ -252,8 +252,8 @@ class PubSubManager {
                         return;
                     }
                     /* Throttle the subscriptions */
-                    for (var i = 0; i < subs.length; i++) {
-                        var sub = subs[i];
+                    for (let i = 0; i < subs.length; i++) {
+                        const sub = subs[i];
                         if (this.dbo[sub.table_name] &&
                             sub.is_ready &&
                             (sub.socket_id && this.sockets[sub.socket_id]) || sub.func) {
@@ -285,7 +285,7 @@ class PubSubManager {
             }
         };
         this.getActiveListeners = () => {
-            let result = [];
+            const result = [];
             const upsert = (t, c) => {
                 if (!result.find(r => r.table_name === t && r.condition === c)) {
                     result.push({ table_name: t, condition: c });
@@ -312,7 +312,7 @@ class PubSubManager {
                 AND table_name = 'hypertable' \
         );", { schema });
             if (res.exists) {
-                let isHyperTable = await this.db.any("SELECT * FROM " + (0, prostgles_types_1.asName)(schema) + ".hypertable WHERE table_name = ${table_name};", { table_name, schema });
+                const isHyperTable = await this.db.any("SELECT * FROM " + (0, prostgles_types_1.asName)(schema) + ".hypertable WHERE table_name = ${table_name};", { table_name, schema });
                 if (isHyperTable && isHyperTable.length) {
                     throw "Triggers do not work on timescaledb hypertables due to bug:\nhttps://github.com/timescale/timescaledb/issues/1084";
                 }
@@ -417,7 +417,7 @@ class PubSubManager {
      */
     async addSync(syncParams) {
         const { socket = null, table_info = null, table_rules, synced_field = null, allow_delete = false, id_fields = [], filter = {}, params, condition = "", throttle = 0 } = syncParams || {};
-        let conditionParsed = parseCondition(condition);
+        const conditionParsed = parseCondition(condition);
         if (!socket || !table_info)
             throw "socket or table_info missing";
         const { name: table_name } = table_info, channel_name = `${this.socketChannelPreffix}.${table_name}.${JSON.stringify(filter)}.sync`;
@@ -425,7 +425,7 @@ class PubSubManager {
             throw "synced_field missing from table_rules";
         this.upsertSocket(socket, channel_name);
         const upsertSync = () => {
-            let newSync = {
+            const newSync = {
                 channel_name,
                 table_name,
                 filter,
@@ -501,7 +501,7 @@ class PubSubManager {
             return newSync;
         };
         // const { min_id, max_id, count, max_synced } = params;
-        let sync = upsertSync();
+        const _sync = upsertSync();
         await this.addTrigger({ table_name, condition: conditionParsed });
         return channel_name;
     }
@@ -617,7 +617,7 @@ class PubSubManager {
         }
     }
     removeLocalSub(table_name, condition, func) {
-        let cond = parseCondition(condition);
+        const cond = parseCondition(condition);
         if ((0, utils_1.get)(this.subs, [table_name, cond, "subs"])) {
             this.subs[table_name][cond].subs.map((sub, i) => {
                 if (sub.func && sub.func === func) {
@@ -665,6 +665,7 @@ class PubSubManager {
             });
         }
         if (!socket) {
+            // Do nothing
         }
         else if (!channel_name) {
             delete this.sockets[socket.id];
@@ -678,7 +679,8 @@ class PubSubManager {
     }
     async addTrigger(params, viewOptions) {
         try {
-            let { table_name, condition } = { ...params };
+            const { table_name } = { ...params };
+            let { condition } = { ...params };
             if (!table_name)
                 throw "MISSING table_name";
             if (!this.appID)
@@ -750,7 +752,7 @@ PubSubManager.create = async (options) => {
 };
 PubSubManager.SCHEMA_ALTERING_QUERIES = ['CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO'];
 PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from ";
-const parseCondition = (condition) => Boolean(condition && condition.trim().length) ? condition : "TRUE";
+const parseCondition = (condition) => condition && condition.trim().length ? condition : "TRUE";
 var prostgles_types_2 = require("prostgles-types");
 Object.defineProperty(exports, "pickKeys", { enumerable: true, get: function () { return prostgles_types_2.pickKeys; } });
 Object.defineProperty(exports, "omitKeys", { enumerable: true, get: function () { return prostgles_types_2.omitKeys; } });

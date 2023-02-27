@@ -15,8 +15,7 @@ const getDBSchema = (dboBuilder) => {
             const colConf = dboBuilder.prostgles.tableConfigurator?.getColumnConfig(tov.name, c.name);
             if (colConf) {
                 if ((0, prostgles_types_1.isObject)(colConf) && (colConf.jsonbSchema || colConf.jsonbSchemaType)) {
-                    const schema = colConf.jsonbSchema ? colConf.jsonbSchema : { ...colConf, type: colConf.jsonbSchemaType };
-                    // if(!colConf.jsonbSchema) throw "colConf.jsonbSchema missing";
+                    const schema = colConf.jsonbSchema || { ...colConf, type: colConf.jsonbSchemaType };
                     type = (0, validation_1.getJSONBSchemaTSTypes)(schema, { nullable: colConf.nullable }, "      ");
                 }
                 else if ((0, prostgles_types_1.isObject)(colConf) && "enum" in colConf) {

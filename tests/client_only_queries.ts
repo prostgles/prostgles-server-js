@@ -108,7 +108,7 @@ export default async function client_only(db: Required<DBHandlerClient>, auth: A
 
           END $$;
         `);
-      }, log);
+      }, { log });
 
   
       /* REPLICATION */

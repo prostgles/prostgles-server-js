@@ -96,7 +96,7 @@ async function client_only(db, auth, log, methods, tableSchema) {
 
           END $$;
         `);
-                }, log);
+                }, { log });
                 /* REPLICATION */
                 log("Started testRealtime");
                 const start = Date.now();

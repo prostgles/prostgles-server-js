@@ -18,8 +18,8 @@ export const getDBSchema = (dboBuilder: DboBuilder): string => {
       const colConf = dboBuilder.prostgles.tableConfigurator?.getColumnConfig(tov.name, c.name);
       if(colConf){
         if(isObject(colConf) && (colConf.jsonbSchema || colConf.jsonbSchemaType)){
-          const schema: JSONB.JSONBSchema = colConf.jsonbSchema? colConf.jsonbSchema : { ...colConf, type: colConf.jsonbSchemaType }
-          // if(!colConf.jsonbSchema) throw "colConf.jsonbSchema missing";
+          const schema: JSONB.JSONBSchema = colConf.jsonbSchema || { ...colConf, type: colConf.jsonbSchemaType };
+          
           type = getJSONBSchemaTSTypes(schema, { nullable: colConf.nullable }, "      ");
         } else if(isObject(colConf) && "enum" in colConf){
           if(!colConf.enum) throw "colConf.enum missing"

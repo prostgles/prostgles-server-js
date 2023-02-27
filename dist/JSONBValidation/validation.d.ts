@@ -19,42 +19,60 @@ export declare namespace JSONB {
         type: DataType;
         allowedValues?: any[];
         oneOf?: undefined;
+        oneOfType?: undefined;
         arrayOf?: undefined;
+        arrayOfType?: undefined;
         enum?: undefined;
     };
     export type ObjectType = BaseOptions & {
         type: ObjectSchema;
         allowedValues?: undefined;
         oneOf?: undefined;
+        oneOfType?: undefined;
         arrayOf?: undefined;
+        arrayOfType?: undefined;
         enum?: undefined;
     };
     export type EnumType = BaseOptions & {
         type?: undefined;
         enum: readonly any[];
         oneOf?: undefined;
+        oneOfType?: undefined;
         arrayOf?: undefined;
+        arrayOfType?: undefined;
         allowedValues?: undefined;
     };
     export type OneOf = BaseOptions & {
         type?: undefined;
-        oneOf: readonly ObjectSchema[];
         arrayOf?: undefined;
+        arrayOfType?: undefined;
         allowedValues?: undefined;
         enum?: undefined;
-    };
+    } & ({
+        oneOf?: undefined;
+        oneOfType: readonly ObjectSchema[];
+    } | {
+        oneOf: FieldType[];
+        oneOfType?: undefined;
+    });
     export type ArrayOf = BaseOptions & {
         type?: undefined;
-        arrayOf: ObjectSchema;
         allowedValues?: undefined;
         oneOf?: undefined;
+        oneOfType?: undefined;
         enum?: undefined;
-    };
-    export type FieldTypeObj = BasicType | ObjectType | EnumType | OneOf | ArrayOf;
+    } & ({
+        arrayOf?: undefined;
+        arrayOfType: ObjectSchema;
+    } | {
+        arrayOf: FieldType;
+        arrayOfType?: undefined;
+    });
+    export type FieldTypeObj = StrictUnion<BasicType | ObjectType | EnumType | OneOf | ArrayOf>;
     export type FieldType = DataType | FieldTypeObj;
     export type GetType<T extends FieldType | Omit<FieldTypeObj, "optional">> = T extends {
         type: ObjectSchema;
-    } ? NestedSchemaObject<T["type"]> : T extends "number" | {
+    } ? GetObjectType<T["type"]> : T extends "number" | {
         type: "number";
     } ? number : T extends "boolean" | {
         type: "boolean";
@@ -75,18 +93,22 @@ export declare namespace JSONB {
     } ? string[] : T extends "any[]" | {
         type: "any[]";
     } ? any[] : T extends {
-        enum: readonly any[];
+        "enum": readonly any[];
     } ? T["enum"][number] : T extends {
+        oneOf: FieldType[];
+    } ? StrictUnion<GetType<T["oneOf"][number]>> : T extends {
         oneOf: readonly ObjectSchema[];
-    } ? StrictUnion<NestedSchemaObject<T["oneOf"][number]>> : T extends {
+    } ? StrictUnion<GetType<T["oneOf"][number]>> : T extends {
         arrayOf: ObjectSchema;
-    } ? NestedSchemaObject<T["arrayOf"]>[] : any;
+    } ? GetType<T["arrayOf"]>[] : T extends {
+        arrayOfType: ObjectSchema;
+    } ? GetType<T["arrayOfType"]>[] : any;
     type IsOptional<F extends FieldType> = F extends DataType ? false : F extends {
         optional: true;
     } ? true : false;
     export type ObjectSchema = Record<string, FieldType>;
     export type JSONBSchema = Omit<FieldTypeObj, "optional">;
-    export type NestedSchemaObject<S extends ObjectSchema> = ({
+    export type GetObjectType<S extends ObjectSchema> = ({
         [K in keyof S as IsOptional<S[K]> extends true ? K : never]?: GetType<S[K]>;
     } & {
         [K in keyof S as IsOptional<S[K]> extends true ? never : K]: GetType<S[K]>;
@@ -95,12 +117,11 @@ export declare namespace JSONB {
     export {};
 }
 export declare function validate<T>(obj: T, key: keyof T, rawFieldType: JSONB.FieldType): boolean;
-export declare function validateSchema<S extends JSONB.ObjectSchema>(schema: S, obj: JSONB.NestedSchemaObject<S>, objName?: string, optional?: boolean): void;
+export declare function validateSchema<S extends JSONB.ObjectSchema>(schema: S, obj: JSONB.GetObjectType<S>, objName?: string, optional?: boolean): void;
 type ColOpts = {
     nullable?: boolean;
 };
-export declare function getSchemaTSTypes(schema: JSONB.ObjectSchema, leading?: string, isOneOf?: boolean): string;
-export declare function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpts, leading?: string, isOneOf?: boolean): string;
+export declare function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpts, leading?: string): string;
 export declare function getJSONBSchemaAsJSONSchema(tableName: string, colName: string, columnConfig: BaseColumn<{
     en: 1;
 }> & JSONBColumnDef): JSONSchema7;

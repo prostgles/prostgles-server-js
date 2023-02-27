@@ -13,7 +13,7 @@ import * as Bluebird from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg from 'pg-promise/typescript/pg-subset';
 
-import { SelectParams, FieldFilter, asName, WAL, isEmpty, AnyObject, getKeys } from "prostgles-types";
+import { SelectParams, FieldFilter, asName, WAL, isEmpty, AnyObject } from "prostgles-types";
 
 import { ClientExpressData, syncData } from "../SyncReplication";
 import { TableRule } from "../PublishParser";
@@ -21,7 +21,7 @@ import { find } from "prostgles-types/dist/util";
 
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
-let pgp: PGP = pgPromise({
+const pgp: PGP = pgPromise({
   promiseLib: Bluebird
 });
 export const asValue = (v: any) => pgp.as.format("$1", [v]);
@@ -453,8 +453,8 @@ export class PubSubManager {
         }
 
         /* Throttle the subscriptions */
-        for (var i = 0; i < subs.length; i++) {
-          var sub = subs[i];
+        for (let i = 0; i < subs.length; i++) {
+          const sub = subs[i];
           if (
             this.dbo[sub.table_name] &&
             sub.is_ready &&
@@ -563,7 +563,7 @@ export class PubSubManager {
       params, condition = "", throttle = 0
     } = syncParams || {};
 
-    let conditionParsed = parseCondition(condition);
+    const conditionParsed = parseCondition(condition);
     if (!socket || !table_info) throw "socket or table_info missing";
 
 
@@ -575,7 +575,7 @@ export class PubSubManager {
     this.upsertSocket(socket, channel_name);
 
     const upsertSync = () => {
-      let newSync = {
+      const newSync = {
         channel_name,
         table_name,
         filter,
@@ -662,7 +662,7 @@ export class PubSubManager {
 
     // const { min_id, max_id, count, max_synced } = params;
 
-    let sync = upsertSync();
+    const _sync = upsertSync();
 
     await this.addTrigger({ table_name, condition: conditionParsed });
 
@@ -808,7 +808,7 @@ export class PubSubManager {
   }
 
   removeLocalSub(table_name: string, condition: string, func: (items: object[]) => any) {
-    let cond = parseCondition(condition);
+    const cond = parseCondition(condition);
     if (get(this.subs, [table_name, cond, "subs"])) {
       this.subs[table_name][cond].subs.map((sub, i) => {
         if (
@@ -823,7 +823,7 @@ export class PubSubManager {
   }
 
   getActiveListeners = (): { table_name: string; condition: string }[] => {
-    let result: { table_name: string; condition: string }[] = [];
+    const result: { table_name: string; condition: string }[] = [];
     const upsert = (t: string, c: string) => {
       if (!result.find(r => r.table_name === t && r.condition === c)) {
         result.push({ table_name: t, condition: c });
@@ -886,7 +886,7 @@ export class PubSubManager {
     }
 
     if (!socket) {
-
+      // Do nothing
     } else if (!channel_name) {
       delete this.sockets[socket.id];
     } else {
@@ -909,7 +909,7 @@ export class PubSubManager {
                 AND table_name = 'hypertable' \
         );", { schema });
     if (res.exists) {
-      let isHyperTable = await this.db.any("SELECT * FROM " + asName(schema) + ".hypertable WHERE table_name = ${table_name};", { table_name, schema });
+      const isHyperTable = await this.db.any("SELECT * FROM " + asName(schema) + ".hypertable WHERE table_name = ${table_name};", { table_name, schema });
       if (isHyperTable && isHyperTable.length) {
         throw "Triggers do not work on timescaledb hypertables due to bug:\nhttps://github.com/timescale/timescaledb/issues/1084"
       }
@@ -939,7 +939,8 @@ export class PubSubManager {
   async addTrigger(params: { table_name: string; condition: string; }, viewOptions?: ViewSubscriptionOptions) {
     try {
 
-      let { table_name, condition } = { ...params }
+      const { table_name } = { ...params }
+      let { condition } = { ...params }
       if (!table_name) throw "MISSING table_name";
       if (!this.appID) throw "MISSING appID";
 
@@ -999,6 +1000,6 @@ export class PubSubManager {
 }
 
 
-const parseCondition = (condition: string): string => Boolean(condition && condition.trim().length) ? condition : "TRUE"
+const parseCondition = (condition: string): string => condition && condition.trim().length ? condition : "TRUE"
 
 export { pickKeys, omitKeys } from "prostgles-types"

@@ -108,7 +108,7 @@ function dd() {
                         arr1: { enum: [1, 2, 3] },
                         arr2: { type: "integer[]" },
                         arrStr: { type: "string[]", optional: true, nullable: true },
-                        o: { optional: true, nullable: true, oneOf: [
+                        o: { optional: true, nullable: true, oneOfType: [
                                 { o1: "integer" },
                                 { o2: "boolean" }
                             ] },
@@ -118,7 +118,7 @@ function dd() {
                 status: {
                     nullable: true,
                     jsonbSchema: {
-                        oneOf: [
+                        oneOfType: [
                             { ok: { type: "string" } },
                             { err: { type: "string" } },
                             {
@@ -134,7 +134,7 @@ function dd() {
                 jsonOneOf: {
                     nullable: true,
                     jsonbSchema: {
-                        oneOf: [
+                        oneOfType: [
                             { command: { enum: ["a"] } },
                             {
                                 command: { enum: ["b"] },
@@ -144,7 +144,7 @@ function dd() {
                     }
                 },
                 table_config: { nullable: true, jsonbSchemaType: {
-                        referencedTables: { optional: true, arrayOf: { name: "string", minFiles: "number" } },
+                        referencedTables: { optional: true, arrayOfType: { name: "string", minFiles: "number" } },
                     }
                 }
             }
