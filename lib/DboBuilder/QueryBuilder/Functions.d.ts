@@ -5,14 +5,14 @@ export declare const parseFunction: (funcData: {
     functions: FunctionSpec[];
     allowedFields: string[];
 }) => FunctionSpec;
-declare type GetQueryArgs = {
+type GetQueryArgs = {
     allColumns: ColumnInfo[];
     allowedFields: string[];
     args: any[];
     tableAlias?: string;
     ctidField?: string;
 };
-export declare type FieldSpec = {
+export type FieldSpec = {
     name: string;
     type: "column" | "computed";
     /**
@@ -20,7 +20,7 @@ export declare type FieldSpec = {
      */
     getQuery: (params: Omit<GetQueryArgs, "args">) => string;
 };
-export declare type FunctionSpec = {
+export type FunctionSpec = {
     name: string;
     description?: string;
     /**

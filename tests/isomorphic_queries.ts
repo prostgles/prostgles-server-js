@@ -674,7 +674,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
     const json = { a: true, arr: "2", arr1: 3, arr2: [1], arrStr: ["1123.string"] }
     const fo = await db.tjson.insert!({ colOneOf: "a", json }, { returning: "*"});
     // assert.deepStrictEqual(fo.json, json);
-    await db.tjson.insert!({ colOneOf: "a", json: {...json, o: { o1: 2, o2: true } } })
+    await db.tjson.insert!({ colOneOf: "a", json: {...json, o: { o1: 2 } } })
     try {
       await db.tjson.insert!({ colOneOf: "a", json: { a: true, arr: "22"} });
       throw "Should have failed"
@@ -687,70 +687,71 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
 
   await tryRun("jsonb JSON Schema validation", async () => {
     const cols = await db.tjson.getColumns!();
+    const jsonColSchema = cols.find(c => c.name === "json")?.jsonSchema;
+    // console.trace(JSON.stringify(jsonColSchema, null, 2))
     assert.deepEqual(
-      cols.find(c => c.name === "json")?.jsonSchema,
+      jsonColSchema,
       {
         $id: 'tjson.json',
         $schema: 'https://json-schema.org/draft/2020-12/schema',
-        title: 'json',
-        required: true,
+        // title: 'json', 
         type: 'object',
+        required: [ 'a', 'arr', 'arr1', 'arr2' ],
         properties: {
-          a: { type: 'boolean', required: true },
+          a: { type: 'boolean' },
           arr: {
-            type: 'string', enum: [ '1', '2', '3' ],
-            required: true
+            type: 'string', enum: [ '1', '2', '3' ] 
           },
           arr1: {
-            type: 'number', enum: [ 1, 2, 3 ],
-            required: true
+            type: 'number', enum: [ 1, 2, 3 ] 
           },
-          arr2: { type: 'array', items: { type: 'integer' }, required: true },
+          arr2: { type: 'array', items: { type: 'integer' } },
           arrStr: {
             type: "object",
             oneOf: [
               { type: 'array', items: { type: 'string' } },
               { type: 'null' }
-            ],
-            required: false
+            ]
           },
           o: {
             type: "object",
             oneOf: [
-              { type: "object", properties: {o1: { type: 'integer', required: true } } },
-              { type: "object", properties: {o2: { type: 'boolean', required: true } } },
+              { type: "object", required: ["o1"], properties: {o1: { type: 'integer' } } },
+              { type: "object", required: ["o2"], properties: {o2: { type: 'boolean' } } },
               { type: 'null' }
-            ],
-            required: false
+            ]
           }
         }
       }
     );
-
+    const statusColJSONSchema = cols.find(c => c.name === "status")?.jsonSchema;
+    // console.trace(JSON.stringify(statusColJSONSchema, null, 2));
     assert.deepEqual(
-      cols.find(c => c.name === "status")?.jsonSchema, 
+      statusColJSONSchema,
       {
         $id: 'tjson.status',
         $schema: 'https://json-schema.org/draft/2020-12/schema',
         type: "object",
         oneOf: [
-          { type: "object", properties: { ok: { required: true, type: 'string' } } },
-          { type: "object", properties: { err: { required: true, type: 'string' } } },
+          { type: "object", required: ["ok"], properties: { ok: { type: 'string' } } },
+          { type: "object", required: ["err"], properties: { err: { type: 'string' } } },
           {
-            type: "object", properties: { 
+            type: "object", 
+            required: ["loading"],
+            properties: { 
               loading: {
+                required: ["loaded", "total"],
                 properties: {
-                  loaded: { required: true, type: 'number' },
-                  total: { required: true, type: 'number'}
-                },
-                required: true,
+                  loaded: { type: 'number' },
+                  total: { type: 'number'}
+                }, 
                 type: 'object'
               }
             }
-          }
-        ],
-        required: false,
-        title: 'status'
+          },
+          { type: "null" }
+        ], 
+        // title: 'status'
       }
     );
   })

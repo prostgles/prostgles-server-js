@@ -112,7 +112,7 @@ function dd(){
         email:        { sqlDefinition: `TEXT NOT NULL` },
         status:       { enum: ["active", "disabled", "pending"] },
         preferences:  { defaultValue: "{}", 
-          jsonbSchema: { 
+          jsonbSchemaType: { 
             showIntro:  { type: "boolean", optional: true },
             theme:      { enum: ["light", "dark", "auto"], optional: true },
 						others: 		{ type: "any[]" }
@@ -123,13 +123,16 @@ function dd(){
 		tjson: {
 			dropIfExists: true,
 			columns: {
-				json: { jsonbSchema: { 
+				json: { jsonbSchemaType: { 
 						a: { type: "boolean" },
 						arr: { enum: ["1", "2", "3"] },
 						arr1: { enum: [1, 2, 3] },
 						arr2: { type: "integer[]" },
 						arrStr: { type: "string[]", optional: true, nullable: true },
-						o: { oneOf: [{ o1: { type: "integer" } }, { o2: { type: "boolean" } }], optional: true, nullable: true },
+						o: { optional: true, nullable: true, oneOf: [
+							{ o1: "integer" }, 
+							{ o2:  "boolean" }
+						] },
 					}  
 				},
 				colOneOf: { enum: ["a", "b", "c"] },
@@ -161,11 +164,10 @@ function dd(){
 						]
 					}
 				},
-				table_config:        {
-        nullable: true,
-        jsonbSchema: {
-          referencedTables: { type: {}, optional: true },
-				}}
+				table_config:	{ nullable: true, jsonbSchemaType: {
+          	referencedTables: { optional: true, arrayOf: { name: "string", minFiles: "number" } },
+					}
+				}
 			}
 		},
 		lookup_col1: {

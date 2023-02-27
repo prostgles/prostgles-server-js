@@ -10,7 +10,7 @@ const prostgles_types_1 = require("prostgles-types");
 const utils_1 = require("../../utils");
 const Functions_1 = require("./Functions");
 const asNameAlias = (field, tableAlias) => {
-    let result = (0, prostgles_types_1.asName)(field);
+    const result = (0, prostgles_types_1.asName)(field);
     if (tableAlias)
         return (0, prostgles_types_1.asName)(tableAlias) + "." + result;
     return result;
@@ -81,14 +81,14 @@ class SelectItemBuilder {
                         type: "computed",
                         numArgs: 0,
                         singleColArg: false,
-                        getFields: (args) => []
+                        getFields: (_args) => []
                     };
                     this.addFunction(cf, [], compCol.name);
                     return;
                 }
             }
             const colDef = this.columns.find(c => c.name === fieldName);
-            let alias = selected ? fieldName : ("not_selected_" + fieldName);
+            const alias = selected ? fieldName : ("not_selected_" + fieldName);
             this.addItem({
                 type: "column",
                 columnPGDataType: colDef?.data_type,
@@ -208,7 +208,7 @@ async function getNewQuery(_this, filter, selectParams = {}, param3_unused = nul
     }
     const allowedOrderByFields = !tableRules ? _this.column_names.slice(0) : _this.parseFieldFilter(tableRules?.select?.orderByFields ?? tableRules?.select?.fields);
     const allowedSelectFields = !tableRules ? _this.column_names.slice(0) : _this.parseFieldFilter(tableRules?.select?.fields);
-    let joinQueries = [];
+    const joinQueries = [];
     const { select: userSelect = "*" } = selectParams, sBuilder = new SelectItemBuilder({
         allowedFields: allowedSelectFields,
         allowedOrderByFields,
@@ -219,7 +219,8 @@ async function getNewQuery(_this, filter, selectParams = {}, param3_unused = nul
         columns
     });
     await sBuilder.parseUserSelect(userSelect, async (key, val, throwErr) => {
-        let j_filter = {}, j_selectParams = {}, j_path, j_alias, j_tableRules, j_table, j_isLeftJoin = true;
+        const j_selectParams = {};
+        let j_filter = {}, j_isLeftJoin = true, j_path, j_alias, j_tableRules, j_table;
         if (val === "*") {
             j_selectParams.select = "*";
             j_alias = key;
@@ -287,7 +288,7 @@ async function getNewQuery(_this, filter, selectParams = {}, param3_unused = nul
             sBuilder.addColumn(key, false);
         }
     });
-    let select = sBuilder.select;
+    const select = sBuilder.select;
     // const validatedAggAliases = select
     //   .filter(s => s.type !== "joinedColumn")
     //   .map(s => s.alias);
@@ -302,7 +303,7 @@ async function getNewQuery(_this, filter, selectParams = {}, param3_unused = nul
     });
     const where = filterOpts.where;
     const p = _this.getValidatedRules(tableRules, localParams);
-    let resQuery = {
+    const resQuery = {
         /** Why was this the case? */
         // allFields: allowedSelectFields,
         allFields: _this.column_names.slice(0),

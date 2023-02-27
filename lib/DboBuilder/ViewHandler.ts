@@ -2,7 +2,7 @@ import { makeSelectQuery } from "../DboBuilder/QueryBuilder/makeSelectQuery";
 import { getCondition } from "./getCondition";
 
 import * as pgPromise from 'pg-promise';
-import { canRunSQL, runSQL } from "../DboBuilder/runSQL";
+import { canRunSQL } from "../DboBuilder/runSQL";
 import {
   ColumnInfo, FieldFilter, SelectParams,
   OrderBy,
@@ -21,9 +21,9 @@ import {
 } from "../DboBuilder";
 import { Graph } from "../shortestPath";
 import { TableRule, UpdateRule, ValidateRow } from "../PublishParser";
-import { asValue, omitKeys } from "../PubSubManager/PubSubManager";
+import { asValue } from "../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler";
-import { asNameAlias,  getNewQuery, parseFunctionObject, SelectItem, SelectItemValidated } from "./QueryBuilder/QueryBuilder";
+import { asNameAlias,  getNewQuery, SelectItem, SelectItemValidated } from "./QueryBuilder/QueryBuilder";
 import { COMPUTED_FIELDS, FieldSpec } from "./QueryBuilder/Functions"; 
 import { getColumns } from "./getColumns";
 import { LocalFunc, subscribe } from "./subscribe";
@@ -67,7 +67,7 @@ class ColSet {
       /**
        * Add conversion functions for PostGIS data
        */
-      let escapedVal: string = "";
+      let escapedVal = "";
       if (["geometry", "geography"].includes(col.udt_name) && row[key] && isPlainObject(row[key])) {
 
         const basicFunc = (args: any[]) => {
@@ -159,11 +159,11 @@ export class ViewHandler {
   t?: pgPromise.ITask<{}>;
   dbTX?: TableHandlers;
 
-  is_view: boolean = true;
-  filterDef: string = "";
+  is_view = true;
+  filterDef = "";
 
   // pubSubManager: PubSubManager;
-  is_media: boolean = false;
+  is_media = false;
   constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TableHandlers, joinPaths?: JoinPaths) {
     if (!db || !tableOrViewInfo) throw "";
 
@@ -189,7 +189,7 @@ export class ViewHandler {
     // and also make hot schema reload over ws 
     this.colSet = new ColSet(this.columns, this.name);
 
-    const { $and: $and_key, $or: $or_key } = this.dboBuilder.prostgles.keywords;
+    // const { $and: $and_key, $or: $or_key } = this.dboBuilder.prostgles.keywords;
 
     // this.tsDataName = snakify(this.name, true);
     // if(this.tsDataName === "T") this.tsDataName = this.tsDataName + "_";
@@ -297,7 +297,7 @@ export class ViewHandler {
     return true;
   }
 
-  getShortestJoin(table1: string, table2: string, startAlias: number, isInner: boolean = false): { query: string, toOne: boolean } {
+  getShortestJoin(table1: string, table2: string, startAlias: number, isInner = false): { query: string, toOne: boolean } {
     // let searchedTables = [], result; 
     // while (!result && searchedTables.length <= this.joins.length * 2){
 
@@ -307,8 +307,8 @@ export class ViewHandler {
       return on.map(cond => Object.keys(cond).map(lKey => `${leftTable}.${lKey} = ${rightTable}.${cond[lKey]}`).join("\nAND ")).join(" OR ")
     }
 
-    let toOne = true,
-      query = this.joins.map(({ tables, on, type }, i) => {
+    let toOne = true;
+    const query = this.joins.map(({ tables, on, type }, i) => {
         if (type.split("-")[1] === "many") {
           toOne = false;
         }
@@ -375,10 +375,10 @@ export class ViewHandler {
       const jo = this.joins.find(j => j.tables.includes(t1) && j.tables.includes(t2));
       if (!jo) throw `Joining ${t1} <-> ${t2} dissallowed or missing`;;
 
-      let on: [string, string][][] = [];
+      const on: [string, string][][] = [];
 
       jo.on.map(cond => {
-        let condArr: [string, string][] = [];
+        const condArr: [string, string][] = [];
         Object.keys(cond).map(leftKey => {
           const rightKey = cond[leftKey];
 
@@ -403,7 +403,7 @@ export class ViewHandler {
         on
       };
     });
-    let expectOne = false;
+    const expectOne = false;
     // paths.map(({ source, target, on }, i) => {
     // if(expectOne && on.length === 1){
     //     const sourceCol = on[0][1];
@@ -508,7 +508,7 @@ export class ViewHandler {
 
     if (tableRules) {
       if (isEmpty(tableRules)) throw "INTERNAL ERROR: Unexpected case -> Empty table rules for " + this.name;
-      const throwFieldsErr = (command: "select" | "update" | "delete" | "insert", fieldType: string = "fields") => {
+      const throwFieldsErr = (command: "select" | "update" | "delete" | "insert", fieldType = "fields") => {
         throw `Invalid publish.${this.name}.${command} rule -> ${fieldType} setting is missing.\nPlease specify allowed ${fieldType} in this format: "*" | { col_name: false } | { col1: true, col2: true }`;
       },
         getFirstSpecified = (...fieldParams: (FieldFilter | undefined)[]): string[] => {
@@ -516,7 +516,7 @@ export class ViewHandler {
           return this.parseFieldFilter(firstValid)
         };
 
-      let res: ValidatedTableRules = {
+      const res: ValidatedTableRules = {
         allColumns,
         getColumns: tableRules?.getColumns ?? true,
         getInfo: tableRules?.getColumns ?? true,
@@ -639,25 +639,18 @@ export class ViewHandler {
       }
 
       /* Validate publish */
-      if (tableRules) {
-
-        let fields: FieldFilter,
-          filterFields: FieldFilter | undefined,
-          forcedFilter: AnyObject | undefined,
-          maxLimit: number | undefined | null;
+      if (tableRules) { 
 
         if (!tableRules.select) throw "select rules missing for " + this.name;
-        fields = tableRules.select.fields;
-        forcedFilter = tableRules.select.forcedFilter;
-        filterFields = tableRules.select.filterFields;
-        maxLimit = tableRules.select.maxLimit;
+        const fields = tableRules.select.fields; 
+        const maxLimit = tableRules.select.maxLimit;
 
         if (<any>tableRules.select !== "*" && typeof tableRules.select !== "boolean" && !isPlainObject(tableRules.select)) throw `\nINVALID publish.${this.name}.select\nExpecting any of: "*" | { fields: "*" } | true | false`
         if (!fields) throw ` invalid ${this.name}.select rule -> fields (required) setting missing.\nExpecting any of: "*" | { col_name: false } | { col1: true, col2: true }`;
         if (maxLimit && !Number.isInteger(maxLimit)) throw ` invalid publish.${this.name}.select.maxLimit -> expecting integer but got ` + maxLimit;
       }
 
-      let q = await getNewQuery(this as unknown as TableHandler, filter, selectParams, param3_unused, tableRules, localParams, this.columns),
+      const q = await getNewQuery(this as unknown as TableHandler, filter, selectParams, param3_unused, tableRules, localParams, this.columns),
         _query = makeSelectQuery(this as unknown as TableHandler, q, undefined, undefined, selectParams);
       // console.log(_query, JSON.stringify(q, null, 2))
       if (testRule) {
@@ -731,7 +724,7 @@ export class ViewHandler {
     Promise<string | { unsubscribe: () => any }> {
        
       //@ts-ignore
-      let func = localParams? undefined : (rows: AnyObject[]) => localFunc(rows[0]); 
+      const func = localParams? undefined : (rows: AnyObject[]) => localFunc(rows[0]); 
       //@ts-ignore
       return this.subscribe(filter, { ...params, limit: 2 }, func, table_rules, localParams);
   }
@@ -740,10 +733,10 @@ export class ViewHandler {
     filter = filter || {};
     try {
       return await this.find(filter, { select: "", limit: 0 }, undefined, table_rules, localParams)
-        .then(async allowed => {
+        .then(async _allowed => {
           const { filterFields, forcedFilter } = table_rules?.select || {};
           const where = (await this.prepareWhere({ filter, forcedFilter, filterFields, addKeywords: true, localParams, tableRule: table_rules })).where;
-          let query = "SELECT COUNT(*) FROM " + this.escapedName + " " + where;
+          const query = "SELECT COUNT(*) FROM " + this.escapedName + " " + where;
           return (this.t || this.db).one(query, { _psqlWS_tableName: this.name }).then(({ count }) => +count);
         });
     } catch (e) {
@@ -782,9 +775,9 @@ export class ViewHandler {
     }
   }
 
-  getAllowedSelectFields(selectParams: FieldFilter = "*", allowed_cols: FieldFilter, allow_empty: boolean = true): string[] {
-    let all_columns = this.column_names.slice(0),
-      allowedFields = all_columns.slice(0),
+  getAllowedSelectFields(selectParams: FieldFilter = "*", allowed_cols: FieldFilter, allow_empty = true): string[] {
+    const all_columns = this.column_names.slice(0);
+    let allowedFields = all_columns.slice(0),
       resultFields: string[] = [];
 
     if (selectParams) {
@@ -801,42 +794,25 @@ export class ViewHandler {
     return col_names;
   }
 
-  prepareColumnSet(selectParams: FieldFilter = "*", allowed_cols: FieldFilter, allow_empty: boolean = true, onlyNames: boolean = true): string | pgPromise.ColumnSet {
-    let all_columns = this.column_names.slice(0);
+  prepareColumnSet(selectParams: FieldFilter = "*", allowed_cols: FieldFilter, allow_empty = true, onlyNames = true): string | pgPromise.ColumnSet {
+    const all_columns = this.column_names.slice(0);
     let col_names = this.getAllowedSelectFields(selectParams, all_columns, allow_empty);
     /** Ensure order is maintained */
     if (selectParams && Array.isArray(selectParams) && typeof selectParams[0] === "string") {
       col_names = col_names.sort((a, b) => selectParams.indexOf(a) - selectParams.indexOf(b))
-    }
-    try {
-      let colSet = new pgp.helpers.ColumnSet(col_names);
-      return onlyNames ? colSet.names : colSet;
-    } catch (e) {
-      throw e;
-    }
+    } 
+    const colSet = new pgp.helpers.ColumnSet(col_names);
+    return onlyNames ? colSet.names : colSet; 
   }
 
-  prepareSelect(selectParams: FieldFilter = "*", allowed_cols: FieldFilter, allow_empty: boolean = true, tableAlias?: string): string {
+  prepareSelect(selectParams: FieldFilter = "*", allowed_cols: FieldFilter, allow_empty = true, tableAlias?: string): string {
     if (tableAlias) {
-      let cs = <pgPromise.ColumnSet>this.prepareColumnSet(selectParams, allowed_cols, true, false);
+      const cs = <pgPromise.ColumnSet>this.prepareColumnSet(selectParams, allowed_cols, true, false);
       return cs.columns.map(col => `${this.escapedName}.${asName(col.name)}`).join(", ");
     } else {
       return <string>this.prepareColumnSet(selectParams, allowed_cols, true, true);
     }
-  }
-
-  async prepareHaving(params: {
-    having: Filter;
-    select: SelectItem[];
-    forcedFilter: object;
-    filterFields: FieldFilter;
-    addKeywords?: boolean;
-    tableAlias?: string,
-    localParams: LocalParams,
-    tableRule: TableRule
-  }): Promise<string> {
-    return ""
-  }
+  } 
 
   /**
    * Parses group or simple filter
@@ -861,7 +837,7 @@ export class ViewHandler {
     const parseFullFilter = async (f: any, parentFilter: any = null, isForcedFilterBypass: boolean): Promise<string> => {
       if (!f) throw "Invalid/missing group filter provided";
       let result = "";
-      let keys = getKeys(f);
+      const keys = getKeys(f);
       if (!keys.length) return result;
       if ((keys.includes($and_key) || keys.includes($or_key))) {
         if (keys.length > 1) throw `\ngroup filter must contain only one array property. e.g.: { ${$and_key}: [...] } OR { ${$or_key}: [...] } `;
@@ -873,7 +849,7 @@ export class ViewHandler {
 
       if (group && group.length) {
         const operand = $and ? " AND " : " OR ";
-        let conditions = (await Promise.all(group.map(async gf => await parseFullFilter(gf, group, isForcedFilterBypass)))).filter(c => c);
+        const conditions = (await Promise.all(group.map(async gf => await parseFullFilter(gf, group, isForcedFilterBypass)))).filter(c => c);
         if (conditions && conditions.length) {
           if (conditions.length === 1) return conditions.join(operand);
           else return ` ( ${conditions.sort().join(operand)} ) `;
@@ -916,8 +892,8 @@ export class ViewHandler {
     const thisTable = this.name;
     const isNotExists = ["$notExists", "$notExistsJoined"].includes(eConfig.existType);
 
-    let { f2, tables, isJoined } = eConfig;
-    let t2 = tables[tables.length - 1];
+    const { f2, tables, isJoined } = eConfig;
+    const t2 = tables[tables.length - 1];
 
     tables.forEach(t => {
       if (!this.dboBuilder.dbo[t]) throw { stack: ["prepareExistCondition()"], message: `Invalid or dissallowed table: ${t}` };
@@ -934,7 +910,7 @@ export class ViewHandler {
       let joinPaths: JoinInfo["paths"] = [];
       let expectOne = true;
       tables.map((t2, depth) => {
-        let t1 = depth ? tables[depth - 1] : thisTable;
+        const t1 = depth ? tables[depth - 1] : thisTable;
         let exactPaths: string[] | undefined = [t1, t2];
 
         if (!depth && eConfig.shortestJoin) exactPaths = undefined;
@@ -943,7 +919,7 @@ export class ViewHandler {
         joinPaths = joinPaths.concat(jinf.paths);
       });
 
-      let r = makeJoin({ paths: joinPaths, expectOne }, 0);
+      const r = makeJoin({ paths: joinPaths, expectOne }, 0);
       return r;
 
       function makeJoin(joinInfo: JoinInfo, ji: number) {
@@ -951,11 +927,11 @@ export class ViewHandler {
         const jp = paths[ji];
 
         // let prevTable = ji? paths[ji - 1].table : jp.source;
-        let table = paths[ji].table;
-        let tableAlias = asName(ji < paths.length - 1 ? `jd${ji}` : table);
-        let prevTableAlias = asName(ji ? `jd${ji - 1}` : thisTable);
+        const table = paths[ji].table;
+        const tableAlias = asName(ji < paths.length - 1 ? `jd${ji}` : table);
+        const prevTableAlias = asName(ji ? `jd${ji - 1}` : thisTable);
 
-        let cond = `${jp.on.map(c => {
+        const cond = `${jp.on.map(c => {
           return c.map(([c1, c2]) => `${prevTableAlias}.${asName(c1)} = ${tableAlias}.${asName(c2)}`).join(" AND ")
         }).join("\n OR ")
           }`;
@@ -978,7 +954,7 @@ export class ViewHandler {
 
         j = indent(j, ji + 1);
 
-        let res = `${isNotExists ? " NOT " : " "} EXISTS ( \n` +
+        const res = `${isNotExists ? " NOT " : " "} EXISTS ( \n` +
           j +
           `) \n`;
         return indent(res, ji);
@@ -1002,20 +978,15 @@ export class ViewHandler {
       ({ forcedFilter, filterFields } = t2Rules.select);
     }
 
-    try {
-      finalWhere = (await (this.dboBuilder.dbo[t2] as TableHandler).prepareWhere({
-        filter: f2,
-        forcedFilter,
-        filterFields,
-        addKeywords: false,
-        tableAlias,
-        localParams,
-        tableRule: t2Rules
-      })).where
-    } catch (err) {
-      // console.trace(err)
-      throw err
-    }
+    finalWhere = (await (this.dboBuilder.dbo[t2] as TableHandler).prepareWhere({
+      filter: f2,
+      forcedFilter,
+      filterFields,
+      addKeywords: false,
+      tableAlias,
+      localParams,
+      tableRule: t2Rules
+    })).where 
 
     if (!isJoined) {
       res = `${isNotExists ? " NOT " : " "} EXISTS (SELECT 1 \nFROM ${asName(t2)} \n${finalWhere ? `WHERE ${finalWhere}` : ""}) `
@@ -1085,7 +1056,7 @@ export class ViewHandler {
     } else if (Array.isArray(orderBy)) {
 
       /* Order by is formed of a list of ascending field names */
-      let _orderBy = (orderBy as any[]);
+      const _orderBy = (orderBy as any[]);
       if (_orderBy && !_orderBy.find(v => typeof v !== "string")) {
         /* [string] */
         _ob = _orderBy.map(key => ({ key, asc: true }));
@@ -1101,7 +1072,7 @@ export class ViewHandler {
       (!s.fields.length || s.fields.every(f => allowed_cols.includes(f)))
     ).map(s => s.alias)
 
-    let bad_param = _ob.find(({ key }) =>
+    const bad_param = _ob.find(({ key }) =>
       !(validatedAggAliases || []).includes(key) &&
       !allowed_cols.includes(key)
     );
@@ -1178,7 +1149,7 @@ export class ViewHandler {
   }
 
 
-  intersectColumns(allowedFields: FieldFilter, dissallowedFields: FieldFilter, fixIssues: boolean = false): string[] {
+  intersectColumns(allowedFields: FieldFilter, dissallowedFields: FieldFilter, fixIssues = false): string[] {
     let result: string[] = [];
     if (allowedFields) {
       result = this.parseFieldFilter(allowedFields);
@@ -1206,16 +1177,16 @@ export class ViewHandler {
   * @param {string[]} allowed_cols - allowed columns (excluding forcedData) from table rules
   */
   prepareFieldValues(obj: Record<string, any> = {}, forcedData: object = {}, allowed_cols: FieldFilter | undefined, fixIssues = false): AnyObject {
-    let column_names = this.column_names.slice(0);
+    const column_names = this.column_names.slice(0);
     if (!column_names || !column_names.length) throw "table column_names mising";
     let _allowed_cols = column_names.slice(0);
-    let _obj = { ...obj };
+    const _obj = { ...obj };
 
     if (allowed_cols) {
       _allowed_cols = this.parseFieldFilter(allowed_cols, false);
     }
-    let final_filter = { ..._obj },
-      filter_keys: Array<keyof typeof final_filter> = Object.keys(final_filter);
+    let final_filter = { ..._obj };
+    const filter_keys: Array<keyof typeof final_filter> = Object.keys(final_filter);
 
     if (fixIssues && filter_keys.length) {
       final_filter = {};
@@ -1240,7 +1211,7 @@ export class ViewHandler {
   }
 
 
-  parseFieldFilter(fieldParams: FieldFilter = "*", allow_empty: boolean = true, allowed_cols?: string[]): string[] {
+  parseFieldFilter(fieldParams: FieldFilter = "*", allow_empty = true, allowed_cols?: string[]): string[] {
     return ViewHandler._parseFieldFilter(fieldParams, allow_empty, allowed_cols || this.column_names.slice(0))
   }
 
@@ -1249,11 +1220,11 @@ export class ViewHandler {
   * @param {FieldFilter} fieldParams - { col1: 0, col2: 0 } | { col1: true, col2: true } | "*" | ["key1", "key2"] | []
   * @param {boolean} allow_empty - allow empty select. defaults to true
   */
-  static _parseFieldFilter<AllowedKeys extends string[]>(fieldParams: FieldFilter<Record<AllowedKeys[number], any>> = "*", allow_empty: boolean = true, all_cols: AllowedKeys): AllowedKeys | [""] {
+  static _parseFieldFilter<AllowedKeys extends string[]>(fieldParams: FieldFilter<Record<AllowedKeys[number], any>> = "*", allow_empty = true, all_cols: AllowedKeys): AllowedKeys | [""] {
     if (!all_cols) throw "all_cols missing"
     const all_fields = all_cols;// || this.column_names.slice(0);
-    let colNames: AllowedKeys = [] as any,
-      initialParams = JSON.stringify(fieldParams);
+    let colNames: AllowedKeys = [] as any;
+    const initialParams = JSON.stringify(fieldParams);
 
     if (fieldParams) {
 
@@ -1298,7 +1269,7 @@ export class ViewHandler {
           return [] as unknown as typeof all_fields; //all_fields.slice(0) as typeof all_fields;
         }
 
-        let keys = getKeys(fieldParams as {
+        const keys = getKeys(fieldParams as {
           [key: string]: boolean | 0 | 1;
         }) as AllowedKeys;
         if (keys[0] === "") {
@@ -1316,7 +1287,7 @@ export class ViewHandler {
           if (!allowedVals.includes((fieldParams as any)[key])) throw `Invalid field selection value for: { ${key}: ${(fieldParams as any)[key]} }. \n Allowed values: ${allowedVals.join(" OR ")}`
         })
 
-        let allowed = keys.filter(key => (fieldParams as any)[key]),
+        const allowed = keys.filter(key => (fieldParams as any)[key]),
           disallowed = keys.filter(key => !(fieldParams as any)[key]);
 
 
@@ -1335,7 +1306,7 @@ export class ViewHandler {
     return colNames as any;
 
     function validate(cols: AllowedKeys) {
-      let bad_keys = cols.filter(col => !all_fields.includes(col));
+      const bad_keys = cols.filter(col => !all_fields.includes(col));
       if (bad_keys && bad_keys.length) {
         throw "\nUnrecognised or illegal fields: " + bad_keys.join(", ");
       }

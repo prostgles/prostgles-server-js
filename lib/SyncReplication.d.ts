@@ -1,6 +1,6 @@
 import { PubSubManager, SyncParams } from "./PubSubManager/PubSubManager";
 import { AnyObject } from "prostgles-types";
-export declare type ClientSyncInfo = Partial<{
+export type ClientSyncInfo = Partial<{
     c_fr: AnyObject;
     c_lr: AnyObject;
     /**
@@ -8,7 +8,7 @@ export declare type ClientSyncInfo = Partial<{
      */
     c_count: number | string;
 }>;
-export declare type ServerSyncInfo = Partial<{
+export type ServerSyncInfo = Partial<{
     s_fr: AnyObject;
     s_lr: AnyObject;
     /**
@@ -16,17 +16,17 @@ export declare type ServerSyncInfo = Partial<{
      */
     s_count: number | string;
 }>;
-export declare type SyncBatchInfo = Partial<{
+export type SyncBatchInfo = Partial<{
     from_synced: number | null;
     to_synced: number | null;
     end_offset: number | null;
 }>;
-export declare type onSyncRequestResponse = {
+export type onSyncRequestResponse = {
     onSyncRequest?: ClientSyncInfo;
 } | {
     err: AnyObject | string;
 };
-export declare type ClientExpressData = ClientSyncInfo & {
+export type ClientExpressData = ClientSyncInfo & {
     data?: AnyObject[];
     deleted?: AnyObject[];
 };

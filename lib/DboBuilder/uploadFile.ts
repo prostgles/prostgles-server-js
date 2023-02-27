@@ -1,6 +1,6 @@
 import { AnyObject, getKeys, isObject } from "prostgles-types"
 import { LocalParams, Media } from "../DboBuilder";
-import { ValidateRow, ValidateUpdateRow } from "../PublishParser";
+import { ValidateRow } from "../PublishParser";
 import { TableHandler } from "./TableHandler";
 
 export const isFile = (row: AnyObject) => {
@@ -18,7 +18,7 @@ export async function uploadFile(this: TableHandler, row: AnyObject, validate: V
   const type = await this.dboBuilder.prostgles.fileManager.parseFile({  file: data, fileName: name, tableName: nestedInsert?.previousTable, colName: nestedInsert?.referencingColumn });
   const media_name = `${media_id}.${type.ext}`;
   const parsedMediaKeys = ["id", "name", "original_name", "extension", "content_type"] as const
-  let media: Required<Pick<Media, typeof parsedMediaKeys[number]>> = {
+  const media: Required<Pick<Media, typeof parsedMediaKeys[number]>> = {
     id: media_id,
     name: media_name,
     original_name: name,

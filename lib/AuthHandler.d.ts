@@ -3,21 +3,21 @@ import { AnyObject } from "prostgles-types";
 import { LocalParams, PRGLIOSocket } from "./DboBuilder";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
-declare type Awaitable<T> = T | Promise<T>;
-declare type AuthSocketSchema = {
+type Awaitable<T> = T | Promise<T>;
+type AuthSocketSchema = {
     user?: AnyObject;
     register?: boolean;
     login?: boolean;
     logout?: boolean;
     pathGuard?: boolean;
 };
-declare type ExpressReq = Request;
-declare type ExpressRes = Response;
-declare type LoginClientInfo = {
+type ExpressReq = Request;
+type ExpressRes = Response;
+type LoginClientInfo = {
     ip_address: string;
     user_agent?: string | undefined;
 };
-export declare type BasicSession = {
+export type BasicSession = {
     /** Must be hard to bruteforce */
     sid: string;
     /** UNIX millisecond timestamp */
@@ -25,12 +25,12 @@ export declare type BasicSession = {
     /** On expired */
     onExpiration: "redirect" | "show_error";
 };
-export declare type AuthClientRequest = {
+export type AuthClientRequest = {
     socket: any;
 } | {
     httpReq: ExpressReq;
 };
-export declare type SessionUser<ServerUser extends AnyObject = AnyObject, ClientUser extends AnyObject = AnyObject> = {
+export type SessionUser<ServerUser extends AnyObject = AnyObject, ClientUser extends AnyObject = AnyObject> = {
     /**
      * This user will be available in all serverside prostgles options
      * */
@@ -40,19 +40,19 @@ export declare type SessionUser<ServerUser extends AnyObject = AnyObject, Client
      */
     clientUser: ClientUser;
 };
-export declare type AuthResult<SU = SessionUser> = SU & {
+export type AuthResult<SU = SessionUser> = SU & {
     sid: string;
 } | {
     user?: undefined;
     clientUser?: undefined;
     sid?: string;
 } | undefined;
-export declare type AuthRequestParams<S, SUser extends SessionUser> = {
+export type AuthRequestParams<S, SUser extends SessionUser> = {
     db: DB;
     dbo: DBOFullyTyped<S>;
     getUser: () => Promise<AuthResult<SUser>>;
 };
-export declare type Auth<S = void, SUser extends SessionUser = SessionUser> = {
+export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
     /**
      * Name of the cookie or socket hadnshake query param that represents the session id.
      * Defaults to "session_id"

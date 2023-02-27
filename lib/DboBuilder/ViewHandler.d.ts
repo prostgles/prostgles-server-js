@@ -6,7 +6,7 @@ import { Graph } from "../shortestPath";
 import { TableRule, UpdateRule, ValidateRow } from "../PublishParser";
 import { SelectItem, SelectItemValidated } from "./QueryBuilder/QueryBuilder";
 import { LocalFunc } from "./subscribe";
-export declare type JoinPaths = {
+export type JoinPaths = {
     t1: string;
     t2: string;
     path: string[];
@@ -75,16 +75,6 @@ export declare class ViewHandler {
     getAllowedSelectFields(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean): string[];
     prepareColumnSet(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, onlyNames?: boolean): string | pgPromise.ColumnSet;
     prepareSelect(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, tableAlias?: string): string;
-    prepareHaving(params: {
-        having: Filter;
-        select: SelectItem[];
-        forcedFilter: object;
-        filterFields: FieldFilter;
-        addKeywords?: boolean;
-        tableAlias?: string;
-        localParams: LocalParams;
-        tableRule: TableRule;
-    }): Promise<string>;
     /**
      * Parses group or simple filter
      */

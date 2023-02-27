@@ -16,11 +16,11 @@ const FILTER_FUNCS = Functions_1.FUNCTIONS.filter(f => f.canBeUsedForFilter);
  */
 async function getCondition(params) {
     const { filter: rawFilter, select, allowed_colnames, tableAlias, localParams, tableRules } = params;
-    let filter = { ...rawFilter };
+    const filter = { ...rawFilter };
     /* Exists join filter */
     const ERR = "Invalid exists filter. \nExpecting somethibng like: \n | { $exists: { tableName.tableName2: Filter } } \n  | { $exists: { \"**.tableName3\": Filter } }\n | { path: string[]; filter: AnyObject }";
     const SP_WILDCARD = "**";
-    let existsKeys = (0, prostgles_types_1.getKeys)(filter)
+    const existsKeys = (0, prostgles_types_1.getKeys)(filter)
         .filter(k => prostgles_types_1.EXISTS_KEYS.includes(k) && Object.keys(filter[k] ?? {}).length)
         .map(key => {
         const isJoined = key.toLowerCase().includes("join");
@@ -38,7 +38,7 @@ async function getCondition(params) {
          */
         const firstKeyIsATable = !!this.dboBuilder.dbo[firstKey];
         let tables = isDetailed ? filterValue.path : (firstKeyIsATable ? [firstKey] : firstKey.split("."));
-        let f2 = isDetailed ? filterValue.filter : filterValue[firstKey];
+        const f2 = isDetailed ? filterValue.filter : filterValue[firstKey];
         let shortestJoin = false;
         if (!isJoined) {
             if (tables.length !== 1)
@@ -74,7 +74,7 @@ async function getCondition(params) {
     //         });
     //     }
     // });
-    let funcConds = [];
+    const funcConds = [];
     const funcFilter = FILTER_FUNCS.filter(f => f.name in filter);
     funcFilter.map(f => {
         const funcArgs = filter[f.name];
@@ -95,7 +95,7 @@ async function getCondition(params) {
     /* Computed field queries */
     const p = this.getValidatedRules(tableRules, localParams);
     const computedFields = p.allColumns.filter(c => c.type === "computed");
-    let computedColConditions = [];
+    const computedColConditions = [];
     Object.keys(filter || {}).map(key => {
         const compCol = computedFields.find(cf => cf.name === key);
         if (compCol) {
@@ -196,7 +196,7 @@ async function getCondition(params) {
         { $joinFilter: { $ST_DWithin: [table.col, foreignTable.col, distance] }
         will make an exists filter
     */
-    let filterKeys = Object.keys(filter).filter(k => k !== complexFilterKey && !funcFilter.find(ek => ek.name === k) && !computedFields.find(cf => cf.name === k) && !existsKeys.find(ek => ek.key === k));
+    const filterKeys = Object.keys(filter).filter(k => k !== complexFilterKey && !funcFilter.find(ek => ek.name === k) && !computedFields.find(cf => cf.name === k) && !existsKeys.find(ek => ek.key === k));
     // if(allowed_colnames){
     //     const aliasedColumns = (select || []).filter(s => 
     //         ["function", "computed", "column"].includes(s.type) && allowed_colnames.includes(s.alias) ||  

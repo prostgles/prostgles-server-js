@@ -14,7 +14,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
     const { onConflictDoNothing, fixIssues = false } = param2 || {};
     const { testRule = false, returnQuery = false } = localParams || {};
 
-    let { returning } = param2 || {};
+    const { returning } = param2 || {};
     const finalDBtx = localParams?.tx?.dbTX || this.dbTX;
     if(tableRules?.[ACTION]?.postValidate ){
       if(!finalDBtx){
@@ -83,16 +83,16 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
 
     /** TODO: use WITH inserted as (query) SELECT jsonb_agg(inserted.*) as validateReturn, userReturning */
     const originalReturning = await this.prepareReturning(returning, this.parseFieldFilter(returningFields))
-    let fullReturning = await this.prepareReturning(returning, this.parseFieldFilter("*"));
+    const fullReturning = await this.prepareReturning(returning, this.parseFieldFilter("*"));
 
     /** Used for postValidate. Add any missing computed returning from original query */
     fullReturning.concat(originalReturning.filter(s => !fullReturning.some(f => f.alias === s.alias)));
 
     const finalSelect = tableRules?.[ACTION]?.postValidate? fullReturning : originalReturning;
-    let returningSelect = this.makeReturnQuery(finalSelect);
+    const returningSelect = this.makeReturnQuery(finalSelect);
     
     const makeQuery = async (_row: AnyObject | undefined, isOne = false) => {
-      let row = { ..._row };
+      const row = { ..._row };
 
       if (!isObject(row)) {
         console.trace(row)
@@ -100,7 +100,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
       }
 
       const { data, allowedCols } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues });
-      let _data = { ...data };
+      const _data = { ...data };
 
       let insertQ = "";
       if (!Array.isArray(_data) && !getKeys(_data).length || Array.isArray(_data) && !_data.length) {
@@ -126,7 +126,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
     }
 
     if (Array.isArray(data)) {
-      let queries = await Promise.all(data.map(async p => {
+      const queries = await Promise.all(data.map(async p => {
         const q = await makeQuery(p);
         return q;
       }));
@@ -182,15 +182,15 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
     // ${JSON.stringify(param2 || {}, null, 2)}
     throw parseError(e, `dbo.${this.name}.${ACTION}()`)
   }
-};
+} 
 
 
-const removeBuffers = (o: any) => {
-  if(isPlainObject(o)){
-    return JSON.stringify(getKeys(o).reduce((a, k) => {
-      const value = o[k]
-      return { ...a, [k]: Buffer.isBuffer(value)? `Buffer[${value.byteLength}][...REMOVED]` : value 
-    }
-  }, {}));
-  }
-}
+// const removeBuffers = (o: any) => {
+//   if(isPlainObject(o)){
+//     return JSON.stringify(getKeys(o).reduce((a, k) => {
+//       const value = o[k]
+//       return { ...a, [k]: Buffer.isBuffer(value)? `Buffer[${value.byteLength}][...REMOVED]` : value 
+//     }
+//   }, {}));
+//   }
+// }

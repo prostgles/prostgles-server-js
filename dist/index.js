@@ -1,7 +1,7 @@
 "use strict";
 const Prostgles_1 = require("./Prostgles");
 function prostgles(params) {
-    let prgl = new Prostgles_1.Prostgles(params);
+    const prgl = new Prostgles_1.Prostgles(params);
     return prgl.init(params.onReady);
 }
 module.exports = prostgles;

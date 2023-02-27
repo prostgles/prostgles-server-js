@@ -2,7 +2,7 @@ import { AnyObject, SubscribeParams } from "prostgles-types";
 import { Filter, LocalParams } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 import { ViewHandler } from "./ViewHandler";
-export declare type LocalFunc = (items: AnyObject[]) => any;
+export type LocalFunc = (items: AnyObject[]) => any;
 declare function subscribe(this: ViewHandler, filter: Filter, params: SubscribeParams, localFunc: LocalFunc): Promise<{
     unsubscribe: () => any;
 }>;

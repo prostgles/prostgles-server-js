@@ -123,7 +123,7 @@ class PostgresNotifListenManager {
 }
 exports.PostgresNotifListenManager = PostgresNotifListenManager;
 PostgresNotifListenManager.create = (db_pg, notifListener, db_channel_name) => {
-    let res = new PostgresNotifListenManager(db_pg, notifListener, db_channel_name, true);
+    const res = new PostgresNotifListenManager(db_pg, notifListener, db_channel_name, true);
     return res.init();
 };
 //# sourceMappingURL=PostgresNotifListenManager.js.map

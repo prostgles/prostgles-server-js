@@ -3,8 +3,8 @@ import { AnyObject } from "prostgles-types";
 const shortestDistanceNode = (distances: AnyObject, visited: AnyObject) => {
 	let shortest = null;
 
-	for (let node in distances) {
-		let currentIsShortest =
+	for (const node in distances) {
+		const currentIsShortest =
 			shortest === null || distances[node] < distances[shortest];
 		if (currentIsShortest && !visited.includes(node)) {
 			shortest = node;
@@ -23,13 +23,13 @@ export const findShortestPath = (graph: Graph, startNode: string, endNode: strin
 	distances = Object.assign(distances, graph[startNode]);
 
 	// track paths
-	let parents: AnyObject = { endNode: null };
-	for (let child in graph[startNode]) {
+	const parents: AnyObject = { endNode: null };
+	for (const child in graph[startNode]) {
 		parents[child] = startNode;
 	}
 
 	// track nodes that have already been visited
-	let visited: AnyObject = [];
+	const visited: AnyObject = [];
 
 	// find the nearest node
 	let node = shortestDistanceNode(distances, visited);
@@ -37,16 +37,16 @@ export const findShortestPath = (graph: Graph, startNode: string, endNode: strin
 	// for that node
 	while (node) {
 		// find its distance from the start node & its child nodes
-		let distance = distances[node];
-		let children = graph[node];
+		const distance = distances[node];
+		const children = graph[node];
 		// for each of those child nodes
-		for (let child in children) {
+		for (const child in children) {
 			// make sure each child node is not the start node
 			if (String(child) === String(startNode)) {
 				continue;
 			} else {
 				// save the distance from the start node to the child node
-				let newdistance = distance + children[child];
+				const newdistance = distance + children[child];
 				// if there's no recorded distance from the start node to the child node in the distances object
 				// or if the recorded distance is shorter than the previously stored distance from the start node to the child node
 				// save the distance to the object
@@ -65,7 +65,7 @@ export const findShortestPath = (graph: Graph, startNode: string, endNode: strin
 
 	// using the stored paths from start node to end node
 	// record the shortest path
-	let shortestPath = [endNode];
+	const shortestPath = [endNode];
 	let parent = parents[endNode];
 	while (parent) {
 		shortestPath.push(parent);
@@ -74,7 +74,7 @@ export const findShortestPath = (graph: Graph, startNode: string, endNode: strin
 	shortestPath.reverse();
 
 	// return the shortest path from start node to end node & its distance
-	let results = {
+	const results = {
 		distance: distances[endNode],
 		path: shortestPath,
 	};

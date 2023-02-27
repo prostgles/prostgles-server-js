@@ -390,7 +390,7 @@ export type DBSchemaGenerated = {
         | {  err: string; }
         | {  loading: {  loaded: number; total: number; }; }
       table_config?: null |       { 
-        referencedTables?: {  }; 
+        referencedTables?: {  name: string; minFiles: number; }[]; 
       };
     };
   };

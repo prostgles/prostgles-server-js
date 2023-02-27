@@ -1,4 +1,4 @@
-export declare type Graph = {
+export type Graph = {
     [key: string]: {
         [key: string]: number;
     };

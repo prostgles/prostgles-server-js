@@ -24,7 +24,7 @@ export class PostgresNotifListenManager {
     client?: pg.IClient;
 
     static create = (db_pg: DB, notifListener: PrglNotifListener, db_channel_name: string): Promise<PostgresNotifListenManager> => {
-        let res = new PostgresNotifListenManager(db_pg, notifListener, db_channel_name, true);
+        const res = new PostgresNotifListenManager(db_pg, notifListener, db_channel_name, true);
         return res.init();
     }
 

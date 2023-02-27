@@ -9,10 +9,8 @@ import pg = require('pg-promise/typescript/pg-subset');
 import FileManager, { ImageOptions, LocalConfig, S3Config } from "./FileManager";
 import { SchemaWatch } from "./SchemaWatch";
 
-const pkgj = require('../package.json');
-const version = pkgj.version;
-import AuthHandler, { Auth, SessionUser, AuthRequestParams } from "./AuthHandler";
-console.log("Add a basic auth mode where user and sessions table are created");
+const { version } = require('../package.json');
+import AuthHandler, { Auth, SessionUser, AuthRequestParams } from "./AuthHandler"; 
 
 import TableConfigurator, { TableConfig } from "./TableConfig";
 
@@ -31,7 +29,7 @@ type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 type DbConnectionOpts = pg.IDefaults;
 export const TABLE_METHODS = ["update", "find", "findOne", "insert", "delete", "upsert"] as const;
 function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts | undefined, debugQueries = false, onNotice: ProstglesInitOptions["onNotice"]): { db: DB, pgp: PGP } {
-  let pgp: PGP = pgPromise({
+  const pgp: PGP = pgPromise({
 
     promiseLib: promise,
     ...(debugQueries ? {
@@ -48,7 +46,8 @@ function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts |
       }
     } : {}),
     ...((onNotice || debugQueries) ? {
-      connect: function (client, dc, isFresh) {
+      connect: function ({ client, dc, useCount }) {
+        const isFresh = !useCount;
         if (isFresh && !client.listeners('notice').length) {
           client.on('notice', function (msg) {
             if (onNotice) {
@@ -333,7 +332,9 @@ export class Prostgles {
       port: 5432,
       application_name: "prostgles_app"
     },
-    onReady: () => { },
+    onReady: () => { 
+      //empty 
+    },
     schema: "public",
     watchSchema: false,
     watchSchemaType: "DDL_trigger",
@@ -381,7 +382,7 @@ export class Prostgles {
     if (!params.io) console.warn("io missing. WebSockets will not be set up");
 
     // TODO: find an exact keyof T<->arr TS matching method
-    let config: Array<keyof ProstglesInitOptions> = [
+    const config: Array<keyof ProstglesInitOptions> = [
       "transactions", "joins", "tsGeneratedTypesDir",
       "onReady", "dbConnection", "dbOptions", "publishMethods", "io",
       "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect",
@@ -715,7 +716,7 @@ export class Prostgles {
 
     if (!this.dbo) throw "dbo missing";
 
-    let publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods, this.opts.publishRawSQL, this.dbo, this.db!, this as any);
+    const publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods, this.opts.publishRawSQL, this.dbo, this.db!, this as any);
     this.publishParser = publishParser;
 
     if (!this.opts.io) return;
@@ -739,7 +740,7 @@ export class Prostgles {
       this.connectedSockets.push(socket);
 
       if (!this.db || !this.dbo) throw new Error("db/dbo missing");
-      let { dbo, db, pgp } = this;
+      const { dbo, db } = this;
 
       try {
         if (this.opts.onSocketConnect) {
@@ -759,7 +760,7 @@ export class Prostgles {
             Checks request against publish and if OK run it with relevant publish functions. Local (server) requests do not check the policy 
         */
         socket.removeAllListeners(CHANNELS.DEFAULT)
-        socket.on(CHANNELS.DEFAULT, async ({ tableName, command, param1, param2, param3 }: SocketRequestParams, cb = (...callback: any[]) => { }) => {
+        socket.on(CHANNELS.DEFAULT, async ({ tableName, command, param1, param2, param3 }: SocketRequestParams, cb = (..._callback: any[]) => { /* Empty */}) => {
 
           try { /* Channel name will only include client-sent params so we ignore table_rules enforced params */
             if (!socket || !this.authHandler || !this.publishParser || !this.dbo) {
@@ -768,9 +769,9 @@ export class Prostgles {
             }
 
             const clientInfo = await this.authHandler.getClientInfo({ socket });
-            let valid_table_command_rules = await this.publishParser.getValidatedRequestRule({ tableName, command, localParams: { socket } }, clientInfo);
+            const valid_table_command_rules = await this.publishParser.getValidatedRequestRule({ tableName, command, localParams: { socket } }, clientInfo);
             if (valid_table_command_rules) {
-              let res = await this.dbo[tableName][command]!(param1, param2, param3, valid_table_command_rules, { socket, isRemoteRequest: true });
+              const res = await this.dbo[tableName][command]!(param1, param2, param3, valid_table_command_rules, { socket, isRemoteRequest: true });
               cb(null, res);
             } else throw `Invalid OR disallowed request: ${tableName}.${command} `;
 
@@ -791,11 +792,11 @@ export class Prostgles {
           if (this.opts.onSocketDisconnect) {
             const getUser = async () => { return await this.authHandler?.getClientInfo({ socket }); }
             this.opts.onSocketDisconnect({ socket, dbo: dbo as any, db, getUser });
-          };
+          }
         });
 
         socket.removeAllListeners(CHANNELS.METHOD)
-        socket.on(CHANNELS.METHOD, async ({ method, params }: SocketMethodRequest, cb = (...callback: any) => { }) => {
+        socket.on(CHANNELS.METHOD, async ({ method, params }: SocketMethodRequest, cb = (..._callback: any) => { /* Empty */ }) => {
           try {
             const methods = await this.publishParser?.getAllowedMethods(socket);
 
@@ -827,13 +828,13 @@ export class Prostgles {
   pushSocketSchema = async (socket: any) => {
 
     try {
-      let { auth, userData } = await this.authHandler?.makeSocketAuth(socket) || {};
+      const { auth, userData } = await this.authHandler?.makeSocketAuth(socket) || {};
 
       // let needType = this.publishRawSQL && typeof this.publishRawSQL === "function";
       // let DATA_TYPES = !needType? [] : await this.db.any("SELECT oid, typname FROM pg_type");
       // let USER_TABLES = !needType? [] :  await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
   
-      const { dbo, db, pgp, publishParser } = this;
+      const { db, publishParser } = this;
       let fullSchema: {
         schema: TableSchemaForClient;
         tables: DBSchemaTable[];
@@ -856,13 +857,13 @@ export class Prostgles {
       if (this.opts.publishRawSQL && typeof this.opts.publishRawSQL === "function") {
         const canRunSQL = async () => {
           const publishParams = await this.publishParser?.getPublishParams({ socket })
-          let res = await this.opts.publishRawSQL?.(publishParams as any);
+          const res = await this.opts.publishRawSQL?.(publishParams as any);
           return Boolean(res && typeof res === "boolean" || res === "*");
         }
   
         if (await canRunSQL()) {
           socket.removeAllListeners(CHANNELS.SQL)
-          socket.on(CHANNELS.SQL, async ({ query, params, options }: SQLRequest, cb = (...callback: any) => { }) => {
+          socket.on(CHANNELS.SQL, async ({ query, params, options }: SQLRequest, cb = (..._callback: any) => { /* Empty */ }) => {
   
             if (!this.dbo?.sql) throw "Internal error: sql handler missing";
   
@@ -881,9 +882,9 @@ export class Prostgles {
       }
   
       const { schema, tables } = fullSchema ?? { schema: {}, tables: [] };
-      let joinTables2: string[][] = [];
+      const joinTables2: string[][] = [];
       if (this.opts.joins) {
-        let _joinTables2 = this.dboBuilder.getJoinPaths()
+        const _joinTables2 = this.dboBuilder.getJoinPaths()
           .filter(jp =>
             ![jp.t1, jp.t2].find(t => !schema[t] || !schema[t].findOne)
           ).map(jp => [jp.t1, jp.t2].sort());

@@ -97,7 +97,7 @@ export class TableHandler extends ViewHandler {
       row[synced_field] = Date.now();
     }
 
-    let data = this.prepareFieldValues(row, forcedData, allowedFields, fixIssues);
+    const data = this.prepareFieldValues(row, forcedData, allowedFields, fixIssues);
     const dataKeys = getKeys(data);
 
     dataKeys.map(col => {
@@ -122,9 +122,9 @@ export class TableHandler extends ViewHandler {
   }
 
   prepareReturning = async (returning: Select | undefined, allowedFields: string[]): Promise<SelectItem[]> => {
-    let result: SelectItem[] = [];
+    const result: SelectItem[] = [];
     if (returning) {
-      let sBuilder = new SelectItemBuilder({
+      const sBuilder = new SelectItemBuilder({
         allFields: this.column_names.slice(0),
         allowedFields,
         allowedOrderByFields: allowedFields,
@@ -148,7 +148,7 @@ export class TableHandler extends ViewHandler {
 
   async delete(filter?: Filter, params?: DeleteParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any> {
     return _delete.bind(this)(filter, params, param3_unused, table_rules, localParams);
-  };
+  } 
 
   remove(filter: Filter, params?: UpdateParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams) {
     return this.delete(filter, params, param3_unused, tableRules, localParams);
@@ -156,14 +156,7 @@ export class TableHandler extends ViewHandler {
 
   async upsert(filter: Filter, newData: AnyObject, params?: UpdateParams, table_rules?: TableRule, localParams?: LocalParams): Promise<any> {
     try {
-      /* Do it within a transaction to ensure consisency */
-      if (!this.t) {
-        return this.dboBuilder.getTX(dbTX => _upsert(dbTX[this.name] as TableHandler))
-      } else {
-        return _upsert(this);
-      }
-
-      async function _upsert(tblH: TableHandler) {
+      const _upsert = async function (tblH: TableHandler) {
         return tblH.find(filter, { select: "", limit: 1 }, undefined, table_rules, localParams)
           .then(exists => {
             if (exists && exists.length) {
@@ -173,11 +166,19 @@ export class TableHandler extends ViewHandler {
             }
           });
       }
+
+      /* Do it within a transaction to ensure consisency */
+      if (!this.t) {
+        return this.dboBuilder.getTX(dbTX => _upsert(dbTX[this.name] as TableHandler))
+      } else {
+        return _upsert(this);
+      }
+
     } catch (e) {
       if (localParams && localParams.testRule) throw e;
       throw parseError(e, `dbo.${this.name}.upsert()`);
     }
-  };
+  } 
 
   /* External request. Cannot sync from server */
   async sync(filter: Filter, params: SelectParams, param3_unused: undefined, table_rules: TableRule, localParams: LocalParams) {
@@ -197,22 +198,22 @@ export class TableHandler extends ViewHandler {
     try {
 
 
-      let { id_fields, synced_field, allow_delete }: SyncRule = table_rules.sync;
-      const syncFields = [...id_fields, synced_field];
+      const { synced_field, allow_delete }: SyncRule = table_rules.sync;
 
-      if (!id_fields || !synced_field) {
+      if (!table_rules.sync.id_fields.length || !synced_field) {
         const err = "INTERNAL ERROR: id_fields OR synced_field missing from publish";
         console.error(err);
         throw err;
       }
 
-      id_fields = this.parseFieldFilter(id_fields, false);
+      const id_fields = this.parseFieldFilter(table_rules.sync.id_fields, false);
+      const syncFields = [...id_fields, synced_field];
 
-      let allowedSelect = this.parseFieldFilter(table_rules?.select.fields ?? false);
+      const allowedSelect = this.parseFieldFilter(table_rules?.select.fields ?? false);
       if (syncFields.find(f => !allowedSelect.includes(f))) {
         throw `INTERNAL ERROR: sync field missing from publish.${this.name}.select.fields`;
       }
-      let select = this.getAllowedSelectFields(
+      const select = this.getAllowedSelectFields(
         (params || {})?.select || "*",
         allowedSelect,
         false
@@ -226,7 +227,7 @@ export class TableHandler extends ViewHandler {
 
       /* Step 1: parse command and params */
       return this.find(filter, { select, limit: 0 }, undefined, table_rules, localParams)
-        .then(async isValid => {
+        .then(async _isValid => {
 
           const { filterFields, forcedFilter } = table_rules?.select || {};
           const condition = (await this.prepareWhere({ filter, forcedFilter, filterFields, addKeywords: false, localParams, tableRule: table_rules })).where;

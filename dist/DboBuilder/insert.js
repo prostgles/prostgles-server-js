@@ -10,7 +10,7 @@ async function insert(rowOrRows, param2, param3_unused, tableRules, localParams)
     try {
         const { onConflictDoNothing, fixIssues = false } = param2 || {};
         const { testRule = false, returnQuery = false } = localParams || {};
-        let { returning } = param2 || {};
+        const { returning } = param2 || {};
         const finalDBtx = localParams?.tx?.dbTX || this.dbTX;
         if (tableRules?.[ACTION]?.postValidate) {
             if (!finalDBtx) {
@@ -72,19 +72,19 @@ async function insert(rowOrRows, param2, param3_unused, tableRules, localParams)
             rowOrRows = {}; //throw "Provide data in param1";
         /** TODO: use WITH inserted as (query) SELECT jsonb_agg(inserted.*) as validateReturn, userReturning */
         const originalReturning = await this.prepareReturning(returning, this.parseFieldFilter(returningFields));
-        let fullReturning = await this.prepareReturning(returning, this.parseFieldFilter("*"));
+        const fullReturning = await this.prepareReturning(returning, this.parseFieldFilter("*"));
         /** Used for postValidate. Add any missing computed returning from original query */
         fullReturning.concat(originalReturning.filter(s => !fullReturning.some(f => f.alias === s.alias)));
         const finalSelect = tableRules?.[ACTION]?.postValidate ? fullReturning : originalReturning;
-        let returningSelect = this.makeReturnQuery(finalSelect);
+        const returningSelect = this.makeReturnQuery(finalSelect);
         const makeQuery = async (_row, isOne = false) => {
-            let row = { ..._row };
+            const row = { ..._row };
             if (!(0, prostgles_types_1.isObject)(row)) {
                 console.trace(row);
                 throw "\ninvalid insert data provided -> " + JSON.stringify(row);
             }
             const { data, allowedCols } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues });
-            let _data = { ...data };
+            const _data = { ...data };
             let insertQ = "";
             if (!Array.isArray(_data) && !(0, prostgles_types_1.getKeys)(_data).length || Array.isArray(_data) && !_data.length) {
                 await tableRules?.[ACTION]?.validate?.(_data, this.dbTX || this.dboBuilder.dbo);
@@ -107,7 +107,7 @@ async function insert(rowOrRows, param2, param3_unused, tableRules, localParams)
             return insertResult;
         }
         if (Array.isArray(data)) {
-            let queries = await Promise.all(data.map(async (p) => {
+            const queries = await Promise.all(data.map(async (p) => {
                 const q = await makeQuery(p);
                 return q;
             }));
@@ -163,14 +163,13 @@ async function insert(rowOrRows, param2, param3_unused, tableRules, localParams)
     }
 }
 exports.insert = insert;
-;
-const removeBuffers = (o) => {
-    if ((0, DboBuilder_1.isPlainObject)(o)) {
-        return JSON.stringify((0, prostgles_types_1.getKeys)(o).reduce((a, k) => {
-            const value = o[k];
-            return { ...a, [k]: Buffer.isBuffer(value) ? `Buffer[${value.byteLength}][...REMOVED]` : value
-            };
-        }, {}));
-    }
-};
+// const removeBuffers = (o: any) => {
+//   if(isPlainObject(o)){
+//     return JSON.stringify(getKeys(o).reduce((a, k) => {
+//       const value = o[k]
+//       return { ...a, [k]: Buffer.isBuffer(value)? `Buffer[${value.byteLength}][...REMOVED]` : value 
+//     }
+//   }, {}));
+//   }
+// }
 //# sourceMappingURL=insert.js.map

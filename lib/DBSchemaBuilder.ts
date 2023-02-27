@@ -3,11 +3,11 @@ import prostgles from ".";
 import { Auth } from "./AuthHandler";
 import { DBHandlerServer, DboBuilder, escapeTSNames, postgresToTsType } from "./DboBuilder";
 import { PublishAllOrNothing, PublishParams, PublishTableRule, PublishViewRule,  } from "./PublishParser";
-import { getJSONBSchemaTSTypes } from "./validation";
+import { getJSONBSchemaTSTypes, JSONB } from "./JSONBValidation/validation";
 
 
 export const getDBSchema = (dboBuilder: DboBuilder): string => {
-  let tables: string[] = [];
+  const tables: string[] = [];
 
   
   /** Tables and columns are sorted to avoid infinite loops due to changing order */
@@ -17,9 +17,10 @@ export const getDBSchema = (dboBuilder: DboBuilder): string => {
       let type: string = (c.is_nullable? "null | " : "") + postgresToTsType(c.udt_name) + ";"
       const colConf = dboBuilder.prostgles.tableConfigurator?.getColumnConfig(tov.name, c.name);
       if(colConf){
-        if(isObject(colConf) && "jsonbSchema" in colConf){
-          if(!colConf.jsonbSchema) throw "colConf.jsonbSchema missing"
-          type = getJSONBSchemaTSTypes(colConf.jsonbSchema, { nullable: colConf.nullable }, "      ");
+        if(isObject(colConf) && (colConf.jsonbSchema || colConf.jsonbSchemaType)){
+          const schema: JSONB.JSONBSchema = colConf.jsonbSchema? colConf.jsonbSchema : { ...colConf, type: colConf.jsonbSchemaType }
+          // if(!colConf.jsonbSchema) throw "colConf.jsonbSchema missing";
+          type = getJSONBSchemaTSTypes(schema, { nullable: colConf.nullable }, "      ");
         } else if(isObject(colConf) && "enum" in colConf){
           if(!colConf.enum) throw "colConf.enum missing"
           const types = colConf.enum.map(t => typeof t === "number"? t : JSON.stringify(t));
@@ -101,7 +102,7 @@ export type PublishFullyTyped<Schema = void> = Schema extends DBSchema? (
     publish: async (params) => {
       const row = await params.dbo.dwadwa.find?.({});
       
-      return "*" as "*"
+      return "*" as const
     },
     onReady: (dbo) => {
       dbo.tdwa.find!()
@@ -151,7 +152,7 @@ export type PublishFullyTyped<Schema = void> = Schema extends DBSchema? (
     const r = {
       tbl1: {
         select: {
-          fields: "*" as "*", 
+          fields: "*" as const, 
           forcedFilter: { col1: 32, col2: "" }
         },
         getColumns: true,
@@ -162,7 +163,7 @@ export type PublishFullyTyped<Schema = void> = Schema extends DBSchema? (
       },
       tbl2: {
         delete: {
-          filterFields: "*" as "*",
+          filterFields: "*" as const,
           forcedFilter: {col1: 2}
         }
       }
@@ -181,7 +182,7 @@ export type PublishFullyTyped<Schema = void> = Schema extends DBSchema? (
       },
       tbl2: {
         delete: {
-          filterFields: "*" as "*",
+          filterFields: "*" as const,
           forcedFilter: { col1: 2 }
         }
       }

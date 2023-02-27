@@ -58,14 +58,14 @@ export async function getColumns(
         ].includes(c.name)
       })
       .map(_c => {
-        let c = { ..._c };
+        const c = { ..._c };
 
-        let label = c.comment || capitalizeFirstLetter(c.name, " ");
+        const label = c.comment || capitalizeFirstLetter(c.name, " ");
 
-        let select = c.privileges.some(p => p.privilege_type === "SELECT"),
+        const select = c.privileges.some(p => p.privilege_type === "SELECT"),
           insert = c.privileges.some(p => p.privilege_type === "INSERT"),
-          update = c.privileges.some(p => p.privilege_type === "UPDATE"),
           _delete = this.tableOrViewInfo.privileges.delete;// c.privileges.some(p => p.privilege_type === "DELETE");
+        let update = c.privileges.some(p => p.privilege_type === "UPDATE");
 
         delete (c as any).privileges;
 
@@ -79,7 +79,7 @@ export async function getColumns(
 
         const nonOrderableUD_Types: PG_COLUMN_UDT_DATA_TYPE[] = [..._PG_geometric, "xml" as any];
 
-        let result: ValidatedColumnInfo = {
+        const result: ValidatedColumnInfo = {
           ...c,
           label,
           tsDataType: postgresToTsType(c.udt_name),

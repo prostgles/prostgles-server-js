@@ -6,7 +6,7 @@ import { TableRule } from "../PublishParser";
 import { insertDataParse } from "./insertDataParse";
 import { SelectItem } from "./QueryBuilder/QueryBuilder";
 import { JoinPaths, ViewHandler } from "./ViewHandler";
-declare type ValidatedParams = {
+type ValidatedParams = {
     row: AnyObject;
     forcedData?: AnyObject;
     allowedFields?: FieldFilter;

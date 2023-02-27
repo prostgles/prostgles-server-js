@@ -13,7 +13,8 @@ const syncData = async (_this, sync, clientData, source) => {
         console.error("Orphaned socket", { sync, clientData });
         return;
     }
-    const sync_fields = [synced_field, ...id_fields.sort()], orderByAsc = sync_fields.reduce((a, v) => ({ ...a, [v]: true }), {}), orderByDesc = sync_fields.reduce((a, v) => ({ ...a, [v]: false }), {}), 
+    const sync_fields = [synced_field, ...id_fields.sort()], orderByAsc = sync_fields.reduce((a, v) => ({ ...a, [v]: true }), {}), 
+    // orderByDesc = sync_fields.reduce((a, v) => ({ ...a, [v]: false }), {}),
     // desc_params = { orderBy: [{ [synced_field]: false }].concat(id_fields.map(f => ({ [f]: false }) )) },
     // asc_params = { orderBy: [synced_field].concat(id_fields) },
     rowsIdsMatch = (a, b) => {
@@ -22,7 +23,7 @@ const syncData = async (_this, sync, clientData, source) => {
         return rowsIdsMatch(a, b) && a?.[synced_field].toString() === b?.[synced_field].toString();
     }, getServerRowInfo = async (args = {}) => {
         const { from_synced = null, to_synced = null, offset = 0, limit } = args;
-        let _filter = { ...filter };
+        const _filter = { ...filter };
         if (from_synced || to_synced) {
             _filter[synced_field] = {
                 ...(from_synced ? { $gte: from_synced } : {}),
@@ -39,11 +40,11 @@ const syncData = async (_this, sync, clientData, source) => {
         return { s_fr: first_rows?.[0] || null, s_lr: last_rows?.[0] || null, s_count: count };
     }, getClientRowInfo = (args = {}) => {
         const { from_synced = null, to_synced = null, end_offset = null } = args;
-        let res = new Promise((resolve, reject) => {
-            let onSyncRequest = { from_synced, to_synced, end_offset }; //, forReal: true };
+        const res = new Promise((resolve, reject) => {
+            const onSyncRequest = { from_synced, to_synced, end_offset }; //, forReal: true };
             socket.emit(channel_name, { onSyncRequest }, (resp) => {
                 if (resp && "onSyncRequest" in resp && resp?.onSyncRequest) {
-                    let c_fr = resp.onSyncRequest.c_fr, c_lr = resp.onSyncRequest.c_lr, c_count = resp.onSyncRequest.c_count;
+                    const c_fr = resp.onSyncRequest.c_fr, c_lr = resp.onSyncRequest.c_lr, c_count = resp.onSyncRequest.c_count;
                     // console.log(onSyncRequest, { c_fr, c_lr, c_count }, socket._user);
                     return resolve({ c_fr, c_lr, c_count });
                 }
@@ -73,14 +74,14 @@ const syncData = async (_this, sync, clientData, source) => {
             });
         }
     }, getServerData = async (from_synced = 0, offset = 0) => {
-        let _filter = {
+        const _filter = {
             ...filter,
             [synced_field]: { $gte: from_synced || 0 }
         };
         if (!_this?.dbo?.[table_name]?.find)
             throw "_this?.dbo?.[table_name]?.find is missing";
         try {
-            let res = _this?.dbo?.[table_name]?.find?.(_filter, {
+            const res = _this?.dbo?.[table_name]?.find?.(_filter, {
                 select: params.select,
                 orderBy: orderByAsc,
                 offset: offset || 0,
@@ -131,7 +132,7 @@ const syncData = async (_this, sync, clientData, source) => {
                 if (!table_rules)
                     throw "table_rules missing";
                 if (table_rules.update && updates.length) {
-                    let updateData = [];
+                    const updateData = [];
                     await Promise.all(updates.map(upd => {
                         const id_filter = (0, PubSubManager_1.pickKeys)(upd, id_fields);
                         const syncSafeFilter = { $and: [id_filter, { [synced_field]: { "<": upd[synced_field] } }] };
@@ -216,7 +217,7 @@ const syncData = async (_this, sync, clientData, source) => {
             else {
                 result = Math.min(...getNumbers([c_fr[synced_field], s_fr?.[synced_field]]));
             }
-            let min_count = Math.min(...getNumbers([c_count, s_count]));
+            const min_count = Math.min(...getNumbers([c_count, s_count]));
             let end_offset = 1; // Math.min(s_count, c_count) - 1;
             let step = 0;
             while (min_count > 5 && end_offset < min_count) {
@@ -224,7 +225,7 @@ const syncData = async (_this, sync, clientData, source) => {
                 // console.log("getLastSynced... end_offset > " + end_offset);
                 let server_row;
                 if (c_lr) {
-                    let _filter = {};
+                    const _filter = {};
                     sync_fields.map(key => {
                         _filter[key] = c_lr[key];
                     });
@@ -259,13 +260,14 @@ const syncData = async (_this, sync, clientData, source) => {
      * Will push pull sync between client and server from a given from_synced value
      */
     syncBatch = async (from_synced) => {
-        let offset = 0, limit = batch_size, canContinue = true, min_synced = from_synced || 0, max_synced = from_synced;
+        let offset = 0, canContinue = true;
+        const limit = batch_size, min_synced = from_synced || 0, max_synced = from_synced;
         let inserted = 0, updated = 0, pushed = 0, deleted = 0, total = 0;
         // console.log("syncBatch", from_synced)
         while (canContinue) {
-            let cData = await getClientData(min_synced, offset);
+            const cData = await getClientData(min_synced, offset);
             if (cData.length) {
-                let res = await upsertData(cData);
+                const res = await upsertData(cData);
                 inserted += res.inserted;
                 updated += res.updated;
             }
@@ -289,12 +291,12 @@ const syncData = async (_this, sync, clientData, source) => {
                 }));
                 sData = await getServerData(min_synced, offset);
             }
-            let forClient = sData.filter(s => {
+            const forClient = sData.filter(s => {
                 return !cData.find(c => rowsIdsMatch(c, s) &&
                     +c[synced_field] >= +s[synced_field]);
             });
             if (forClient.length) {
-                let res = await pushData(forClient.filter(d => !sync.wal || !sync.wal.isInHistory(d)));
+                const res = await pushData(forClient.filter(d => !sync.wal || !sync.wal.isInHistory(d)));
                 pushed += res.pushed;
             }
             if (sData.length) {
@@ -306,7 +308,7 @@ const syncData = async (_this, sync, clientData, source) => {
             canContinue = sData.length >= limit;
             // console.log(`sData ${sData.length}      limit ${limit}`);
         }
-        // console.log(`syncBatch ${table_name}: inserted( ${inserted} )    updated( ${updated} )   deleted( ${deleted} )    pushed( ${pushed} )     total( ${total} )`, socket._user );
+        (0, PubSubManager_1.log)(`server.syncBatch ${table_name}: inserted( ${inserted} )    updated( ${updated} )   deleted( ${deleted} )    pushed to client( ${pushed} )     total( ${total} )`, socket._user);
         return true;
     };
     if (!wal) {
@@ -377,6 +379,7 @@ const syncData = async (_this, sync, clientData, source) => {
         }
     }
     else {
+        // do nothing
     }
     if (sync.wal.isSending())
         return;

@@ -1,7 +1,6 @@
 
 import path from 'path';
-import prostgles from "prostgles-server";
-import { omitKeys } from "../../dist/PubSubManager";
+import prostgles from "prostgles-server"; 
 import { DBSchemaGenerated } from "./DBoGenerated";
 
 prostgles<DBSchemaGenerated>({
@@ -16,7 +15,7 @@ prostgles<DBSchemaGenerated>({
         email: "TEXT NOT NULL",
         status: { enum: ["active", "disabled", "pending"] },
         preferences: {
-          jsonbSchema: {
+          jsonbSchemaType: {
             showIntro: { type: "boolean", optional: true },
             theme: { enum: ["light", "dark", "auto"], optional: true },
             two_factor_auth: { oneOf: [

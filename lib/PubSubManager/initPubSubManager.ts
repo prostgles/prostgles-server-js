@@ -1,6 +1,9 @@
 import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
 import { asValue, log, PubSubManager } from "./PubSubManager";
 const REALTIME_TRIGGER_CHECK_QUERY = "prostgles-server internal query used to manage realtime triggers" as const; 
+import * as fs from "fs";
+import * as path from "path";
+import { validate_jsonb_schema_sql } from "../JSONBValidation/validate_jsonb_schema_sql";
 
 export async function initPubSubManager(this: PubSubManager): Promise<PubSubManager | undefined> {
   if (!this.canContinue()) return undefined;
@@ -29,14 +32,14 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
                   IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'prostgles') THEN
 
                       IF
-                          NOT EXISTS (
-                              SELECT 1 
-                              FROM information_schema.tables 
-                              WHERE  table_schema = 'prostgles'
-                              AND    table_name   = 'versions'
-                          )
+                        NOT EXISTS (
+                          SELECT 1 
+                          FROM information_schema.tables 
+                          WHERE  table_schema = 'prostgles'
+                          AND    table_name   = 'versions'
+                        )
                       THEN
-                          DROP SCHEMA IF EXISTS prostgles CASCADE;
+                        DROP SCHEMA IF EXISTS prostgles CASCADE;
                       ELSE 
                           IF NOT EXISTS(SELECT 1 FROM prostgles.versions WHERE version >= ${schema_version}) THEN
                             DROP SCHEMA IF EXISTS prostgles CASCADE;
@@ -56,6 +59,8 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
                           version NUMERIC PRIMARY KEY
                       );
                       INSERT INTO prostgles.versions(version) VALUES(${schema_version}) ON CONFLICT DO NOTHING;
+
+                      ${validate_jsonb_schema_sql}
 
                       CREATE OR REPLACE FUNCTION prostgles.random_string(length INTEGER DEFAULT 33) RETURNS TEXT AS $$
                           DECLARE

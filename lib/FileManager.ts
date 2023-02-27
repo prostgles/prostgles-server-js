@@ -108,11 +108,12 @@ export default class FileManager {
       throw "this.prostgles.dbo missing"
     }
     return this.prostgles.dbo 
-  };
+  }
+  
   get db(): DB { 
     if(!this.prostgles?.db) throw "this.prostgles.db missing"
     return this.prostgles.db 
-  };
+  }
   
   tableName?: string;
 
@@ -196,7 +197,7 @@ export default class FileManager {
 
     const buffer = typeof file === "string"? Buffer.from(file, 'utf8') : file;
 
-    let result = await getFileTypeFromFilename(fileName);
+    const result = await getFileTypeFromFilename(fileName);
     if(tableName && colName){
       const tableConfig = config.referencedTables?.[tableName];
 
@@ -727,7 +728,7 @@ export const removeExpressRoute = (app: ExpressApp | undefined, routePaths: (str
   const routes = app?._router?.stack;
   if(routes){
     routes.forEach((route, i) => {
-      if(routePaths.filter(isDefined).includes(route.route?.path!)){
+      if(routePaths.filter(isDefined).includes(route.route?.path as any)){
         routes.splice(i, 1);
       }
     })
@@ -781,9 +782,9 @@ export const getFileType = async (file: Buffer | string, fileName: string): Prom
 }
 
 export function bytesToSize(bytes: number) {
-  var sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
   if (bytes == 0) return '0 Byte';
-  var i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)) + "");
+  const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)) + "");
   return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
 }
 

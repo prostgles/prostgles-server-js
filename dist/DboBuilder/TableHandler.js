@@ -18,9 +18,9 @@ class TableHandler extends ViewHandler_1.ViewHandler {
         this.update = update_1.update.bind(this);
         this.insertDataParse = insertDataParse_1.insertDataParse;
         this.prepareReturning = async (returning, allowedFields) => {
-            let result = [];
+            const result = [];
             if (returning) {
-                let sBuilder = new QueryBuilder_1.SelectItemBuilder({
+                const sBuilder = new QueryBuilder_1.SelectItemBuilder({
                     allFields: this.column_names.slice(0),
                     allowedFields,
                     allowedOrderByFields: allowedFields,
@@ -79,7 +79,7 @@ class TableHandler extends ViewHandler_1.ViewHandler {
         if (synced_field && !row[synced_field]) {
             row[synced_field] = Date.now();
         }
-        let data = this.prepareFieldValues(row, forcedData, allowedFields, fixIssues);
+        const data = this.prepareFieldValues(row, forcedData, allowedFields, fixIssues);
         const dataKeys = (0, prostgles_types_1.getKeys)(data);
         dataKeys.map(col => {
             this.dboBuilder.prostgles?.tableConfigurator?.checkColVal({ table: this.name, col, value: data[col] });
@@ -106,20 +106,12 @@ class TableHandler extends ViewHandler_1.ViewHandler {
     async delete(filter, params, param3_unused, table_rules, localParams) {
         return delete_1._delete.bind(this)(filter, params, param3_unused, table_rules, localParams);
     }
-    ;
     remove(filter, params, param3_unused, tableRules, localParams) {
         return this.delete(filter, params, param3_unused, tableRules, localParams);
     }
     async upsert(filter, newData, params, table_rules, localParams) {
         try {
-            /* Do it within a transaction to ensure consisency */
-            if (!this.t) {
-                return this.dboBuilder.getTX(dbTX => _upsert(dbTX[this.name]));
-            }
-            else {
-                return _upsert(this);
-            }
-            async function _upsert(tblH) {
+            const _upsert = async function (tblH) {
                 return tblH.find(filter, { select: "", limit: 1 }, undefined, table_rules, localParams)
                     .then(exists => {
                     if (exists && exists.length) {
@@ -129,6 +121,13 @@ class TableHandler extends ViewHandler_1.ViewHandler {
                         return tblH.insert({ ...newData, ...filter }, params, undefined, table_rules, localParams);
                     }
                 });
+            };
+            /* Do it within a transaction to ensure consisency */
+            if (!this.t) {
+                return this.dboBuilder.getTX(dbTX => _upsert(dbTX[this.name]));
+            }
+            else {
+                return _upsert(this);
             }
         }
         catch (e) {
@@ -137,7 +136,6 @@ class TableHandler extends ViewHandler_1.ViewHandler {
             throw (0, DboBuilder_1.parseError)(e, `dbo.${this.name}.upsert()`);
         }
     }
-    ;
     /* External request. Cannot sync from server */
     async sync(filter, params, param3_unused, table_rules, localParams) {
         if (!localParams)
@@ -154,19 +152,19 @@ class TableHandler extends ViewHandler_1.ViewHandler {
         if (invalidParams.length)
             throw "Invalid or dissallowed params found: " + invalidParams.join(", ");
         try {
-            let { id_fields, synced_field, allow_delete } = table_rules.sync;
-            const syncFields = [...id_fields, synced_field];
-            if (!id_fields || !synced_field) {
+            const { synced_field, allow_delete } = table_rules.sync;
+            if (!table_rules.sync.id_fields.length || !synced_field) {
                 const err = "INTERNAL ERROR: id_fields OR synced_field missing from publish";
                 console.error(err);
                 throw err;
             }
-            id_fields = this.parseFieldFilter(id_fields, false);
-            let allowedSelect = this.parseFieldFilter(table_rules?.select.fields ?? false);
+            const id_fields = this.parseFieldFilter(table_rules.sync.id_fields, false);
+            const syncFields = [...id_fields, synced_field];
+            const allowedSelect = this.parseFieldFilter(table_rules?.select.fields ?? false);
             if (syncFields.find(f => !allowedSelect.includes(f))) {
                 throw `INTERNAL ERROR: sync field missing from publish.${this.name}.select.fields`;
             }
-            let select = this.getAllowedSelectFields((params || {})?.select || "*", allowedSelect, false);
+            const select = this.getAllowedSelectFields((params || {})?.select || "*", allowedSelect, false);
             if (!select.length)
                 throw "Empty select not allowed";
             /* Add sync fields if missing */
@@ -176,7 +174,7 @@ class TableHandler extends ViewHandler_1.ViewHandler {
             });
             /* Step 1: parse command and params */
             return this.find(filter, { select, limit: 0 }, undefined, table_rules, localParams)
-                .then(async (isValid) => {
+                .then(async (_isValid) => {
                 const { filterFields, forcedFilter } = table_rules?.select || {};
                 const condition = (await this.prepareWhere({ filter, forcedFilter, filterFields, addKeywords: false, localParams, tableRule: table_rules })).where;
                 // let final_filter = getFindFilter(filter, table_rules);

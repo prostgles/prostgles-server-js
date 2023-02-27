@@ -19,7 +19,7 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
 
     let newData = _newData;
     if(this.is_media && isFile(newData) && (!tableRules || tableRules.update)){
-      let existingMediaId: string = !(!filter || !isObject(filter) || getKeys(filter).join() !== "id" || typeof (filter as any).id !== "string")? (filter as any).id : undefined
+      const existingMediaId: string = !(!filter || !isObject(filter) || getKeys(filter).join() !== "id" || typeof (filter as any).id !== "string")? (filter as any).id : undefined
       if(!existingMediaId){
         throw new Error(`Updating the file table with file data can only be done by providing a single id filter. E.g. { id: "9ea4e23c-2b1a-4e33-8ec0-c15919bb45ec"} `);
       }
@@ -32,7 +32,7 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
           return tableRules?.[ACTION]?.validate!({ update: row, filter }, this.dbTX || this.dboBuilder.dbo)
         } : undefined;
 
-        let existingFile: Media | undefined = await (localParams?.tx?.dbTX?.[this.name] as TableHandler || this).findOne({ id: existingMediaId });
+        const existingFile: Media | undefined = await (localParams?.tx?.dbTX?.[this.name] as TableHandler || this).findOne({ id: existingMediaId });
          
         if(!existingFile?.name) throw new Error("Existing file record not found");
 
@@ -66,7 +66,7 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
     const { data, allowedCols } = this.validateNewData({ row: newData, forcedData, allowedFields: fields, tableRules, fixIssues });
 
     /* Patch data */
-    let patchedTextData: {
+    const patchedTextData: {
       fieldName: string;
       from: number;
       to: number;
@@ -97,7 +97,7 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
       //  overlay(coalesce(status, '') placing 'hom' from 2 for 0)
     }
 
-    let nData = { ...data };
+    const nData = { ...data };
     
 
     let query = await this.colSet.getUpdateQuery(nData, allowedCols, this.dbTX || this.dboBuilder.dbo, validateRow)
@@ -113,7 +113,7 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
 
     /** postValidate */
     const originalReturning = await this.prepareReturning(returning, this.parseFieldFilter(returningFields))
-    let fullReturning = await this.prepareReturning(returning, this.parseFieldFilter("*"));
+    const fullReturning = await this.prepareReturning(returning, this.parseFieldFilter("*"));
     /** Used for postValidate. Add any missing computed returning from original query */
     fullReturning.concat(originalReturning.filter(s => !fullReturning.some(f => f.alias === s.alias)));
     const finalSelect = tableRules?.insert?.postValidate? fullReturning : originalReturning;
@@ -164,4 +164,4 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
     if (localParams && localParams.testRule) throw e;
     throw parseError(e, `dbo.${this.name}.${ACTION}(${JSON.stringify(filter || {}, null, 2)}, ${Array.isArray(_newData)? "[{...}]": "{...}"}, ${JSON.stringify(params || {}, null, 2)})`)
   }
-};
+} 

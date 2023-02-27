@@ -394,7 +394,7 @@ export type ExistsFilterConfig = {
 
 import { JOIN_TYPES } from "./Prostgles";
 import { BasicSession } from "./AuthHandler";
-import { DBOFullyTyped, getDBSchema } from "./DBSchemaBuilder";
+import { getDBSchema } from "./DBSchemaBuilder";
 import { TableHandler } from "./DboBuilder/TableHandler";
 
 export class DboBuilder {
@@ -405,7 +405,7 @@ export class DboBuilder {
   constraints?: PGConstraint[];
 
   db: DB;
-  schema: string = "public";
+  schema = "public";
 
   // dbo: DBHandlerServer | DBHandlerServerTX;
   dbo: DBHandlerServer;
@@ -437,7 +437,7 @@ export class DboBuilder {
     if (!this._pubSubManager) {
       let onSchemaChange;
 
-      const { yes, canExecute, isSuperUs } = await PubSubManager.canCreate(this.db);
+      const { isSuperUs } = await PubSubManager.canCreate(this.db);
       if (!canEXECUTE) throw "PubSubManager based subscriptions not possible: Cannot run EXECUTE statements on this connection";
 
       if (this.prostgles.opts.watchSchema && this.prostgles.opts.watchSchemaType === "DDL_trigger") {
@@ -502,7 +502,7 @@ export class DboBuilder {
   }
 
   public static create = async (prostgles: Prostgles): Promise<DboBuilder> => {
-    let res = new DboBuilder(prostgles)
+    const res = new DboBuilder(prostgles)
     return await res.init();
   }
 
@@ -513,7 +513,7 @@ export class DboBuilder {
 
   _joins?: Join[];
   get joins(): Join[] {
-    return clone(this._joins ?? []).filter(j => j.tables[0] !== j.tables[1]) as Join[];;
+    return clone(this._joins ?? []).filter(j => j.tables[0] !== j.tables[1]) as Join[];
   }
 
   set joins(j: Join[]) {
@@ -528,7 +528,7 @@ export class DboBuilder {
     if (this.prostgles.opts.joins) {
       let _joins = await this.prostgles.opts.joins;
       if (!this.tablesOrViews) throw new Error("Could not create join config. this.tablesOrViews missing");
-      let inferredJoins = await getInferredJoins2(this.tablesOrViews);
+      const inferredJoins = await getInferredJoins2(this.tablesOrViews);
       if (_joins === "inferred") {
         _joins = inferredJoins
         /* If joins are specified then include inferred joins except the explicit tables */
@@ -538,7 +538,7 @@ export class DboBuilder {
       } else if (_joins) {
         throw new Error("Unexpected joins init param. Expecting 'inferred' OR joinConfig but got: " + JSON.stringify(_joins))
       }
-      let joins = JSON.parse(JSON.stringify(_joins)) as Join[];
+      const joins = JSON.parse(JSON.stringify(_joins)) as Join[];
       this.joins = joins;
 
       // Validate joins
@@ -560,10 +560,10 @@ export class DboBuilder {
             const f1s = Object.keys(cond),
               f2s = Object.values(cond);
             [[t1, f1s], [t2, f2s]].map(v => {
-              var t = <string>v[0],
+              const t = <string>v[0],
                 f = <string[]>v[1];
 
-              let tov = this.tablesOrViews!.find(_t => _t.name === t);
+                const tov = this.tablesOrViews!.find(_t => _t.name === t);
               if (!tov) throw "Table not found: " + t;
               const m1 = f.filter(k => !tov!.columns.map(c => c.name).includes(k))
               if (m1 && m1.length) {
@@ -588,7 +588,7 @@ export class DboBuilder {
       // Make joins graph
       this.joinGraph = {};
       this.joins.forEach(({ tables }) => {
-        let _t = tables.slice().sort(),
+        const _t = tables.slice().sort(),
           t1 = _t[0],
           t2 = _t[1];
 
@@ -666,7 +666,7 @@ export class DboBuilder {
 
       if (this.joinPaths && this.joinPaths.find(jp => [jp.t1, jp.t2].includes(tov.name))) {
 
-        let table = tov.name;
+        const table = tov.name;
 
         const makeJoin = (
           isLeft = true,
@@ -725,7 +725,7 @@ export class DboBuilder {
 
   getTX = (cb: TxCB) => {
     return this.db.tx((t) => {
-      let dbTX: TableHandlers & Pick<DBHandlerServer, "sql"> = {};
+      const dbTX: TableHandlers & Pick<DBHandlerServer, "sql"> = {};
       this.tablesOrViews?.map(tov => {
         dbTX[tov.name] = new (tov.is_view ? ViewHandler : TableHandler)(this.db, tov, this, t, dbTX, this.joinPaths);
       });
@@ -794,7 +794,7 @@ type PGConstraint = {
   relname: string;
 };
 
-async function getConstraints(db: DB, schema: string = "public"): Promise<PGConstraint[]> {
+async function getConstraints(db: DB, schema = "public"): Promise<PGConstraint[]> {
   return db.any(`
         SELECT rel.relname, con.conkey, con.conname, con.contype
         FROM pg_catalog.pg_constraint con
@@ -806,7 +806,7 @@ async function getConstraints(db: DB, schema: string = "public"): Promise<PGCons
     `);
 }
 
-async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, schema: string = "public"): Promise<TableSchema[]> {
+async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, schema = "public"): Promise<TableSchema[]> {
   const query =
     `
     SELECT 
@@ -1283,10 +1283,10 @@ const arrayValuesMatch = <T>(arr1: T[], arr2: T[]): boolean => {
 }
 
 async function getInferredJoins2(schema: TableSchema[]): Promise<Join[]> {
-  let joins: Join[] = [];
+  const joins: Join[] = [];
   const upsertJoin = (t1: string, t2: string, cols: { col1: string; col2: string }[], type: Join["type"]) => {
-    let existingIdx = joins.findIndex(j => arrayValuesMatch(j.tables.slice(0), [t1, t2]));
-    let existing = joins[existingIdx];
+    const existingIdx = joins.findIndex(j => arrayValuesMatch(j.tables.slice(0), [t1, t2]));
+    const existing = joins[existingIdx];
     const normalCond = cols.reduce((a, v) => ({ ...a, [v.col1]: v.col2 }), {});
     const revertedCond = cols.reduce((a, v) => ({ ...a, [v.col2]: v.col1 }), {});
     if (existing) {
@@ -1327,13 +1327,13 @@ async function getInferredJoins2(schema: TableSchema[]): Promise<Join[]> {
   return joins;
 }
 
-export const prepareSort = (items: SortItem[], excludeOrder: boolean = false): string => {
+export const prepareSort = (items: SortItem[], excludeOrder = false): string => {
   if (!items.length) return "";
   return (excludeOrder ? "" : " ORDER BY ") + items.map(d => {
 
     const orderType = d.asc ? " ASC " : " DESC ";
     const nullOrder = d.nulls ? ` NULLS ${d.nulls === "first" ? " FIRST " : " LAST "}` : "";
-    let colKey = "fieldQuery" in d ? d.fieldQuery : d.fieldPosition;
+    const colKey = "fieldQuery" in d ? d.fieldQuery : d.fieldPosition;
     return `${colKey} ${orderType} ${nullOrder}`;
   }).join(", ")
 }

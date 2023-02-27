@@ -101,7 +101,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       const getSep = (fromIdx = 0): GetSepRes => {
         const strPart = remainingStr.slice(fromIdx)
         let idx = strPart.indexOf("->");
-        let idxx = strPart.indexOf("->>");
+        const idxx = strPart.indexOf("->>");
         if(idx > -1) {
           /* if -> matches then check if it's the last separator */
           if(idx === idxx) return { idx: idx + fromIdx, sep: "->>" }
@@ -140,13 +140,13 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
     } else if(remainingStr.startsWith(".")){
       leftQ = getLeftQ(selItem);
 
-      let getSep = (fromIdx = 0) => {
+      const getSep = (fromIdx = 0) => {
         const idx = remainingStr.slice(fromIdx).indexOf(".");
         if(idx > -1) return fromIdx + idx;
         return idx; 
       }
       let currIdx = getSep();
-      let res: any = {};
+      const res: any = {};
       let curObj = res;
 
       while(currIdx > -1){
@@ -279,7 +279,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
         return " FALSE ";
       }
 
-      let _fVal: any[] = filterValue.filter((v: any) => v !== null);
+      const _fVal: any[] = filterValue.filter((v: any) => v !== null);
       let c1 = "", c2 = "";
       if(_fVal.length) {
         c1 = leftQ + " IN " + parseRightVal(_fVal, "csv");
@@ -292,7 +292,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
         return " TRUE ";
       }
 
-      let _fVal: any[] = filterValue.filter((v: any) => v !== null);
+      const _fVal: any[] = filterValue.filter((v: any) => v !== null);
       let c1 = "", c2 = "";
       if(_fVal.length) c1 = leftQ + " NOT IN " + parseRightVal(_fVal, "csv");
       if(filterValue.includes(null)) c2 = ` ${leftQ} IS NOT NULL `;
@@ -318,7 +318,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
 
     /* MAYBE TEXT OR MAYBE ARRAY */
     } else if(["@>", "<@", "$contains", "$containedBy", "&&", "@@"].includes(filterOperand)){
-      let operand = filterOperand === "@@"? "@@": 
+      const operand = filterOperand === "@@"? "@@": 
           ["@>", "$contains"].includes(filterOperand)? "@>" : 
           ["&&"].includes(filterOperand)? "&&" : 
           "<@";
@@ -332,7 +332,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
         let lq = `to_tsvector(${leftQ}::text)`;
         if(selItem && selItem.columnPGDataType === "tsvector") lq = leftQ!;
 
-        let res = `${lq} ${operand} ` + `${funcName}${parseRightVal(funcArgs, "csv")}`;
+        const res = `${lq} ${operand} ` + `${funcName}${parseRightVal(funcArgs, "csv")}`;
 
         return res;
       } else {

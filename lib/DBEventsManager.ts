@@ -95,7 +95,7 @@ export class DBEventsManager {
     }
     q = q.replace(/""/g, `"`);
 
-    let channel = q;    
+    const channel = q;    
     let notifChannel = await this.getNotifChannelName(channel)
 
     notifChannel = notifChannel.replace(/""/g, `"`);

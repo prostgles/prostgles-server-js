@@ -75,7 +75,7 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
               relatedTables: []
             }
             viewOptions.relatedTables = await Promise.all(tableIds.map(async tableID => {
-              const table = this.dboBuilder.USER_TABLES?.find(t => t.relid === +tableID)!;
+              const table = this.dboBuilder.USER_TABLES!.find(t => t.relid === +tableID)!;
               let tableCols = tableColumns.filter(tc => tc.tableID!.toString() === tableID);
 
               /** If table has primary keys and they are all in this view then use only primary keys */
@@ -128,7 +128,7 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
               }
 
               return {
-                tableName: tableName,
+                tableName,
                 tableNameEscaped: JSON.stringify(tableName),// [table.schemaname, table.relname].map(v => JSON.stringify(v)).join("."),
                 condition: "TRUE"
               }
@@ -193,7 +193,7 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
         const pubSubManager = await this.dboBuilder.getPubSubManager();
         pubSubManager.removeLocalSub(this.name, condition, localFunc)
       };
-      let res: { unsubscribe: () => any } = Object.freeze({ unsubscribe })
+      const res: { unsubscribe: () => any } = Object.freeze({ unsubscribe })
       return res;
     }
   } catch (e) {

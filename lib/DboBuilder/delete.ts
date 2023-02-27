@@ -130,4 +130,4 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
     if (localParams && localParams.testRule) throw e;
     throw parseError(e, `dbo.${this.name}.delete(${JSON.stringify(filter || {}, null, 2)}, ${JSON.stringify(params || {}, null, 2)})`);
   }
-};
+} 

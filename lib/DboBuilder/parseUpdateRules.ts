@@ -127,7 +127,7 @@ export async function parseUpdateRules(
             this.dbTX || this.dboBuilder.dbo,
             validate ? ((row) => validate!({ update: row, filter: {} }, this.dbTX || this.dboBuilder.dbo)) : undefined
           ) //pgp.helpers.update(data, columnSet)
-          let query = updateQ + " WHERE FALSE ";
+          const query = updateQ + " WHERE FALSE ";
           await this.db.any("EXPLAIN " + query);
         } catch (e) {
           throw " issue with forcedData: \nVALUE: " + JSON.stringify(forcedData, null, 2) + "\nERROR: " + e;
@@ -139,7 +139,7 @@ export async function parseUpdateRules(
   }
 
   /* Update all allowed fields (fields) except the forcedFilter (so that the user cannot change the forced filter values) */
-  let _fields = this.parseFieldFilter(fields);
+  const _fields = this.parseFieldFilter(fields);
 
   /**
    * A forced filter must be basic

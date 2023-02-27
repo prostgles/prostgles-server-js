@@ -87,7 +87,7 @@ async function parseUpdateRules(filter, newData, params, tableRules, localParams
                 try {
                     const { data, allowedCols } = this.validateNewData({ row: forcedData, forcedData: undefined, allowedFields: "*", tableRules, fixIssues: false });
                     const updateQ = await this.colSet.getUpdateQuery(data, allowedCols, this.dbTX || this.dboBuilder.dbo, validate ? ((row) => validate({ update: row, filter: {} }, this.dbTX || this.dboBuilder.dbo)) : undefined); //pgp.helpers.update(data, columnSet)
-                    let query = updateQ + " WHERE FALSE ";
+                    const query = updateQ + " WHERE FALSE ";
                     await this.db.any("EXPLAIN " + query);
                 }
                 catch (e) {
@@ -98,7 +98,7 @@ async function parseUpdateRules(filter, newData, params, tableRules, localParams
         }
     }
     /* Update all allowed fields (fields) except the forcedFilter (so that the user cannot change the forced filter values) */
-    let _fields = this.parseFieldFilter(fields);
+    const _fields = this.parseFieldFilter(fields);
     /**
      * A forced filter must be basic
      */

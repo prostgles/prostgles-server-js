@@ -4,9 +4,9 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { pgp, Filter, LocalParams, isPlainObject, postgresToTsType, SortItem } from "../../DboBuilder";
+import { Filter, LocalParams, isPlainObject, SortItem } from "../../DboBuilder";
 import { TableRule } from "../../PublishParser";
-import { SelectParams, isEmpty, FieldFilter, asName, TextFilter_FullTextSearchFilterKeys, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, isObject, Select, JoinSelect } from "prostgles-types";
+import { SelectParams, isEmpty, asName, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, isObject, Select, JoinSelect } from "prostgles-types";
 import { get } from "../../utils";
 import { TableHandler } from "../TableHandler";
 import { COMPUTED_FIELDS, FieldSpec, FUNCTIONS, FunctionSpec, parseFunction } from "./Functions";
@@ -47,7 +47,7 @@ export type NewQuery = {
 };
 
 export const asNameAlias = (field: string, tableAlias?: string) => {
-  let result = asName(field);
+  const result = asName(field);
   if(tableAlias) return asName(tableAlias) + "." + result;
   return result;
 }
@@ -154,7 +154,7 @@ export class SelectItemBuilder {
           type: "computed",
           numArgs: 0,
           singleColArg: false,
-          getFields: (args: any[]) => [] 
+          getFields: (_args: any[]) => [] 
         }
         this.addFunction(cf, [], compCol.name)
         return;
@@ -162,7 +162,7 @@ export class SelectItemBuilder {
     }
 
     const colDef = this.columns.find(c => c.name === fieldName);
-    let alias = selected? fieldName : ("not_selected_" + fieldName);
+    const alias = selected? fieldName : ("not_selected_" + fieldName);
     this.addItem({
       type: "column",
       columnPGDataType: colDef?.data_type,
@@ -207,7 +207,7 @@ export class SelectItemBuilder {
       } else {
         await Promise.all(selectKeys.map(async key => {
           const val: any = userSelect[key as keyof typeof userSelect],
-            throwErr = (extraErr: string = "") => {
+            throwErr = (extraErr = "") => {
               console.trace(extraErr)
               throw "Unexpected select -> " + JSON.stringify({ [key]: val }) + "\n" + extraErr;
             };
@@ -290,7 +290,7 @@ export async function getNewQuery(
   const allowedSelectFields = !tableRules? _this.column_names.slice(0) :  _this.parseFieldFilter(tableRules?.select?.fields);
 
 
-  let  joinQueries: NewQuery[] = [];
+  const joinQueries: NewQuery[] = [];
 
   const { select: userSelect = "*" } = selectParams,
     sBuilder = new SelectItemBuilder({ 
@@ -307,13 +307,13 @@ export async function getNewQuery(
  
   await sBuilder.parseUserSelect(userSelect, async (key, val: any, throwErr) => {
 
+    const j_selectParams: SelectParams = {};
     let j_filter: Filter = {},
-        j_selectParams: SelectParams = {},
+        j_isLeftJoin = true,
         j_path: string[] | undefined,
         j_alias: string | undefined,
         j_tableRules: TableRule | undefined,
-        j_table: string | undefined,
-        j_isLeftJoin: boolean = true;
+        j_table: string | undefined;
 
     if(val === "*"){
       j_selectParams.select = "*";
@@ -395,7 +395,7 @@ export async function getNewQuery(
     }
   });
 
-  let select = sBuilder.select;
+  const select = sBuilder.select;
   // const validatedAggAliases = select
   //   .filter(s => s.type !== "joinedColumn")
   //   .map(s => s.alias);
@@ -412,7 +412,7 @@ export async function getNewQuery(
   const where = filterOpts.where;
   const p = _this.getValidatedRules(tableRules, localParams);
 
-  let resQuery: NewQuery = {
+  const resQuery: NewQuery = {
     /** Why was this the case? */
     // allFields: allowedSelectFields,
 

@@ -7,32 +7,32 @@ import AuthHandler, { Auth, SessionUser, AuthRequestParams } from "./AuthHandler
 import TableConfigurator, { TableConfig } from "./TableConfig";
 import { DboBuilder, DBHandlerServer, PRGLIOSocket } from "./DboBuilder";
 export { DBHandlerServer };
-export declare type PGP = pgPromise.IMain<{}, pg.IClient>;
+export type PGP = pgPromise.IMain<{}, pg.IClient>;
 import { AnyObject, FileColumnConfig } from "prostgles-types";
 import { Publish, PublishMethods, PublishParams, PublishParser } from "./PublishParser";
 import { DBEventsManager } from "./DBEventsManager";
-export declare type DB = pgPromise.IDatabase<{}, pg.IClient>;
-declare type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
-declare type DbConnectionOpts = pg.IDefaults;
+export type DB = pgPromise.IDatabase<{}, pg.IClient>;
+type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
+type DbConnectionOpts = pg.IDefaults;
 export declare const TABLE_METHODS: readonly ["update", "find", "findOne", "insert", "delete", "upsert"];
 export declare const JOIN_TYPES: readonly ["one-many", "many-one", "one-one", "many-many"];
-export declare type Join = {
+export type Join = {
     tables: [string, string];
     on: {
         [key: string]: string;
     }[];
     type: typeof JOIN_TYPES[number];
 };
-export declare type Joins = Join[] | "inferred";
-declare type Keywords = {
+export type Joins = Join[] | "inferred";
+type Keywords = {
     $and: string;
     $or: string;
     $not: string;
 };
-export declare type DeepPartial<T> = {
+export type DeepPartial<T> = {
     [P in keyof T]?: DeepPartial<T[P]>;
 };
-export declare type ExpressApp = {
+export type ExpressApp = {
     get: (routePath: string, cb: (req: {
         params: {
             name: string;
@@ -77,7 +77,7 @@ export declare type ExpressApp = {
  *  1. create a column in that table called media
  *  2. create a lookup table lookup_media_{referencedTable} that joins referencedTable to the media table
  */
-export declare type FileTableConfig = {
+export type FileTableConfig = {
     tableName?: string;
     /**
      * GET path used in serving media. defaults to /${tableName}
@@ -117,7 +117,7 @@ export declare type FileTableConfig = {
     };
     imageOptions?: ImageOptions;
 };
-export declare type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUser> = {
+export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUser> = {
     dbConnection: DbConnection;
     dbOptions?: DbConnectionOpts;
     tsGeneratedTypesDir?: string;
@@ -180,12 +180,12 @@ export declare type ProstglesInitOptions<S = void, SUser extends SessionUser = S
     fileTable?: FileTableConfig;
     tableConfig?: TableConfig;
 };
-export declare type OnReady = {
+export type OnReady = {
     dbo: DBHandlerServer;
     db: DB;
 };
-declare type OnReadyCallback<S = void> = (dbo: DBOFullyTyped<S>, db: DB) => any;
-export declare type InitResult = {
+type OnReadyCallback<S = void> = (dbo: DBOFullyTyped<S>, db: DB) => any;
+export type InitResult = {
     db: DBOFullyTyped;
     _db: DB;
     pgp: PGP;

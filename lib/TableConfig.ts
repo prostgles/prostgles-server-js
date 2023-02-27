@@ -1,8 +1,9 @@
-import { getKeys, asName as _asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE, isObject } from "prostgles-types";
+import { getKeys, asName as _asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE, isObject, pickKeys } from "prostgles-types";
 import { isPlainObject, JoinInfo } from "./DboBuilder";
-import { DB, DBHandlerServer, Joins, Prostgles } from "./Prostgles";
+import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
 import { asValue } from "./PubSubManager/PubSubManager";
-import { getJSONBSchemaAsJSONSchema, getPGCheckConstraint, OneOf, ValidationSchema } from "./validation";
+import { getJSONBSchemaAsJSONSchema, JSONB } from "./JSONBValidation/validation"; 
+import { validate_jsonb_schema_sql, VALIDATE_SCHEMA_FUNCNAME } from "./JSONBValidation/validate_jsonb_schema_sql";
 
 type ColExtraInfo = {
   min?: string | number;
@@ -117,14 +118,18 @@ type TextColumn = BaseColumnTypes & {
   lowerCased?: boolean;
 }
 
-export type JSONBColumnDef = BaseColumnTypes & {
-  jsonbSchema: ValidationSchema | Omit<OneOf, "optional">;
-
+export type JSONBColumnDef = (BaseColumnTypes & {
   /**
    * If the new schema CHECK fails old rows the update old rows using this function
    */
   // onMigrationFail?: <T>(failedRow: T) => AnyObject | Promise<AnyObject>;
-}
+}) & ({
+  jsonbSchema: JSONB.JSONBSchema;
+  jsonbSchemaType?: undefined;
+} | {
+  jsonbSchema?: undefined;
+  jsonbSchemaType: JSONB.ObjectSchema;
+})
 
 /**
  * Allows referencing media to this table.
@@ -199,7 +204,7 @@ export type ColumnConfigs<LANG_IDS = { en: 1 }> = {
 
 type UnionKeys<T> = T extends T ? keyof T : never;
 type StrictUnionHelper<T, TAll> = T extends any ? T & Partial<Record<Exclude<UnionKeys<TAll>, keyof T>, never>> : never;
-type StrictUnion<T> = StrictUnionHelper<T, T>
+export type StrictUnion<T> = StrictUnionHelper<T, T>
 
 type TableDefinition<LANG_IDS> = {
   columns?: {
@@ -278,11 +283,11 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
   get dbo(): DBHandlerServer {
     if (!this.prostgles.dbo) throw "this.prostgles.dbo missing"
     return this.prostgles.dbo
-  };
+  } 
   get db(): DB {
     if (!this.prostgles.db) throw "this.prostgles.db missing"
     return this.prostgles.db
-  };
+  } 
   // sidKeyName: string;
   prostgles: Prostgles
 
@@ -317,7 +322,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
         result = {
           ...(result ?? {}),
           ...("info" in colConf && colConf?.info),
-          ...("jsonbSchema" in colConf && colConf.jsonbSchema && { jsonSchema: getJSONBSchemaAsJSONSchema(params.table, params.col, colConf) })
+          ...((colConf?.jsonbSchema || colConf?.jsonbSchemaType) && { jsonSchema: getJSONBSchemaAsJSONSchema(params.table, params.col, colConf) })
         }
 
         /**
@@ -452,6 +457,15 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
             const { nullable, defaultValue } = colConf;
             return `${pgType} ${!nullable ? " NOT NULL " : ""} ${defaultValue ? ` DEFAULT ${asValue(defaultValue)} ` : ""}`
           }
+
+          const jsonbSchema = 
+            isObject(colConf)? (
+              ("jsonbSchema" in colConf && colConf.jsonbSchema)? { jsonbSchema: colConf.jsonbSchema, jsonbSchemaType: undefined } :
+              ("jsonbSchemaType" in colConf && colConf.jsonbSchemaType)? { jsonbSchema: undefined, jsonbSchemaType: colConf.jsonbSchemaType } : 
+              undefined
+            ) : 
+            undefined;
+
           if (isObject(colConf) && "references" in colConf && colConf.references) {
 
             const { tableName: lookupTable, columnName: lookupCol = "id" } = colConf.references;
@@ -462,7 +476,8 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
             return ` ${colNameEsc} ${typeof colConf === "string"? colConf : colConf.sqlDefinition} `;
 
           } else if (isObject(colConf) && "isText" in colConf && colConf.isText) {
-            let checks = "", cArr = [];
+            let checks = ""; 
+            const cArr = [];
             if (colConf.lowerCased) {
               cArr.push(`${colNameEsc} = LOWER(${colNameEsc})`)
             }
@@ -474,21 +489,24 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
             }
             return ` ${colNameEsc} ${getColTypeDef(colConf, "TEXT")} ${checks}`;
 
-          } else if ("jsonbSchema" in colConf && colConf.jsonbSchema) {
+          } else if (jsonbSchema) {
+
+            const jsonbSchemaStr = asValue({
+              ...pickKeys(colConf, ["enum", "nullable", "info"]), 
+              ...(jsonbSchema.jsonbSchemaType? { type: jsonbSchema.jsonbSchemaType } : jsonbSchema.jsonbSchema)
+            }) + "::TEXT";
 
             /** Validate default value against jsonbSchema  */
-            if(colConf.defaultValue){
-              const checkStatement = getPGCheckConstraint({ schema: colConf.jsonbSchema, escapedFieldName: asValue(colConf.defaultValue)+"::JSONB", nullable: !!colConf.nullable }, 0)
-              const q = `SELECT ${checkStatement} as v`
+            const q = `SELECT ${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${asValue(colConf.defaultValue)+"::JSONB"}, ARRAY[${asValue(name)}]) as v`
+            if(colConf.defaultValue){ 
               this.log(q)
               this.dbo.sql!(q, {}, { returnType: "row" }).then(row => {
                 if(!row?.v) {
-                  console.error(`Default value (${colConf.defaultValue}) for ${tableName}.${name} does not satisfy the jsonb constraint check: ${checkStatement}`);
+                  console.error(`Default value (${colConf.defaultValue}) for ${tableName}.${name} does not satisfy the jsonb constraint check: ${q}`);
                 }
               })
             }
-            const checkStatement = getPGCheckConstraint({ schema: colConf.jsonbSchema, escapedFieldName: colNameEsc, nullable: !!colConf.nullable }, 0)
-            return ` ${colNameEsc} ${getColTypeDef(colConf, "JSONB")} CHECK(${checkStatement})`;
+            return ` ${colNameEsc} ${getColTypeDef(colConf, "JSONB")} CHECK(${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${colNameEsc}, ARRAY[${asValue(name)}]))`;
 
           } else if("enum" in colConf) {
             if(!colConf.enum?.length) throw new Error("colConf.enum Must not be empty");
@@ -504,10 +522,27 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
         const colCreateLines: string[] = [];
         const tableHandler = this.dbo[tableName];
         if (tableConf.columns) {
+          const hasJSONBValidation = getKeys(tableConf.columns).some(c => {
+            const cConf = tableConf.columns?.[c];
+            return cConf && isObject(cConf) && (cConf.jsonbSchema || cConf.jsonbSchemaType)
+          });
+
+          /** Must install validation function */
+          if(hasJSONBValidation){
+            try {
+              
+              const fileContent = `CREATE SCHEMA IF NOT EXISTS prostgles;\n ${validate_jsonb_schema_sql}`;
+              await this.db.any(fileContent);
+            } catch(err: any){
+              console.error("Could not install the jsonb validation function due to error: ", err);
+              throw err;
+            }
+          }
+
           getKeys(tableConf.columns).filter(c => {
             const colDef = tableConf.columns![c];
             return typeof colDef === "string" || !("joinDef" in colDef)
-          }).map(colName => {
+          }).forEach(colName => {
             const colConf = tableConf.columns![colName];
 
             /* Add columns to create statement */
@@ -515,7 +550,6 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
               colCreateLines.push(getColDef(colName, colConf));
 
             } else if (tableHandler && !tableHandler.columns?.find(c => colName === c.name)) {
-
 
               queries.push(`
                 ALTER TABLE ${asName(tableName)} 

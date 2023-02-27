@@ -4,9 +4,9 @@ exports.getDBSchema = void 0;
 const prostgles_types_1 = require("prostgles-types");
 const _1 = require(".");
 const DboBuilder_1 = require("./DboBuilder");
-const validation_1 = require("./validation");
+const validation_1 = require("./JSONBValidation/validation");
 const getDBSchema = (dboBuilder) => {
-    let tables = [];
+    const tables = [];
     /** Tables and columns are sorted to avoid infinite loops due to changing order */
     dboBuilder.tablesOrViews?.slice(0).sort((a, b) => a.name.localeCompare(b.name)).forEach(tov => {
         const cols = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
@@ -14,10 +14,10 @@ const getDBSchema = (dboBuilder) => {
             let type = (c.is_nullable ? "null | " : "") + (0, DboBuilder_1.postgresToTsType)(c.udt_name) + ";";
             const colConf = dboBuilder.prostgles.tableConfigurator?.getColumnConfig(tov.name, c.name);
             if (colConf) {
-                if ((0, prostgles_types_1.isObject)(colConf) && "jsonbSchema" in colConf) {
-                    if (!colConf.jsonbSchema)
-                        throw "colConf.jsonbSchema missing";
-                    type = (0, validation_1.getJSONBSchemaTSTypes)(colConf.jsonbSchema, { nullable: colConf.nullable }, "      ");
+                if ((0, prostgles_types_1.isObject)(colConf) && (colConf.jsonbSchema || colConf.jsonbSchemaType)) {
+                    const schema = colConf.jsonbSchema ? colConf.jsonbSchema : { ...colConf, type: colConf.jsonbSchemaType };
+                    // if(!colConf.jsonbSchema) throw "colConf.jsonbSchema missing";
+                    type = (0, validation_1.getJSONBSchemaTSTypes)(schema, { nullable: colConf.nullable }, "      ");
                 }
                 else if ((0, prostgles_types_1.isObject)(colConf) && "enum" in colConf) {
                     if (!colConf.enum)

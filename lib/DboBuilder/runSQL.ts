@@ -1,8 +1,8 @@
-import { PG_COLUMN_UDT_DATA_TYPE, SQLHandler, SQLOptions, SQLResult } from "prostgles-types";
+import { AnyObject, SQLOptions, SQLResult } from "prostgles-types";
 import { DboBuilder, LocalParams, pgp, postgresToTsType } from "../DboBuilder";
 import { DB, Prostgles } from "../Prostgles";
 import { PubSubManager } from "../PubSubManager/PubSubManager";
-const { ParameterizedQuery: PQ } = require('pg-promise');
+import { ParameterizedQuery as PQ } from 'pg-promise';
 
 
 export async function runSQL(this: DboBuilder, query: string, params: any, options: SQLOptions | undefined, localParams?: LocalParams) {
@@ -56,10 +56,10 @@ export async function runSQL(this: DboBuilder, query: string, params: any, optio
 
     let finalQuery = query + "";
     if (returnType === "arrayMode" && !["listen ", "notify "].find(c => query.toLowerCase().trim().startsWith(c))) {
-      finalQuery = new PQ({ text: hasParams ? pgp.as.format(query, params) : query, rowMode: "array" });
+      finalQuery = (new PQ({ text: hasParams ? pgp.as.format(query, params) : query, rowMode: "array" })) as any;
     }
 
-    let _qres = await db.result(finalQuery, hasParams ? params : undefined)
+    const _qres = await db.result<AnyObject>(finalQuery, hasParams ? params : undefined)
     const { fields, rows, command } = _qres;
 
     /**
@@ -100,7 +100,7 @@ export async function runSQL(this: DboBuilder, query: string, params: any, optio
 
     } else {
 
-      let qres: SQLResult<typeof returnType> = {
+      const qres: SQLResult<typeof returnType> = {
         duration: 0,
         ..._qres,
         fields: fields?.map(f => {
@@ -131,7 +131,7 @@ export const canRunSQL = async (prostgles: Prostgles, localParams?: LocalParams)
 
   const { socket } = localParams;
   const publishParams = await prostgles.publishParser!.getPublishParams({ socket });
-  let res = await prostgles.opts.publishRawSQL?.(publishParams);
+  const res = await prostgles.opts.publishRawSQL?.(publishParams);
   return Boolean(res && typeof res === "boolean" || res === "*");
 }
 

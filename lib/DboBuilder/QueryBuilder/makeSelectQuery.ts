@@ -8,7 +8,7 @@ import { TableHandler } from "../TableHandler";
 export function makeSelectQuery(
   _this: TableHandler,
   q: NewQuery, 
-  depth: number = 0, 
+  depth = 0, 
   joinFields: string[] = [],
   selectParams: SelectParams = {},
 ): string {
@@ -119,7 +119,7 @@ export function makeSelectQuery(
         ).join(" OR ")
       }
 
-      let query: string[] = [
+      const query: string[] = [
           `${q2.isLeftJoin? "LEFT" : "INNER"} JOIN `
       , ...iQ
       ,   `ON ${getJoinCondition(prevAlias, thisAlias, on)}`
@@ -158,12 +158,12 @@ export function makeSelectQuery(
     if(aggs.length || selectParams?.groupBy){
 
         if(nonAggs.length){
-          let groupByFields = nonAggs.filter(sf => !depth || joinFields.includes(sf.getQuery()));
+          const groupByFields = nonAggs.filter(sf => !depth || joinFields.includes(sf.getQuery()));
           groupBy = getGroupBy(rootSelectItems, groupByFields);
         }
     }
 
-    let simpleQuery = indentArrayAndJoin(depth, [
+    const simpleQuery = indentArrayAndJoin(depth, [
         `-- 0. or 5. [leaf query] `
         
         /* Group by selected fields + any join fields */
@@ -290,7 +290,7 @@ export function makeSelectQuery(
   ,   " \n"
   ].filter(v => v)
 
-  let res = indentArrayAndJoin(depth, joinedQuery as unknown as string[]);
+  const res = indentArrayAndJoin(depth, joinedQuery as unknown as string[]);
   // res = indent(res, depth);
   // console.log(res);
   return res;

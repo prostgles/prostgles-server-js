@@ -79,16 +79,6 @@ export declare class ViewHandler {
     getAllowedSelectFields(selectParams: FieldFilter<AnyObject> | undefined, allowed_cols: FieldFilter, allow_empty?: boolean): string[];
     prepareColumnSet(selectParams: FieldFilter<AnyObject> | undefined, allowed_cols: FieldFilter, allow_empty?: boolean, onlyNames?: boolean): string | pgPromise.ColumnSet;
     prepareSelect(selectParams: FieldFilter<AnyObject> | undefined, allowed_cols: FieldFilter, allow_empty?: boolean, tableAlias?: string): string;
-    prepareHaving(params: {
-        having: Filter;
-        select: SelectItem[];
-        forcedFilter: object;
-        filterFields: FieldFilter;
-        addKeywords?: boolean;
-        tableAlias?: string;
-        localParams: LocalParams;
-        tableRule: TableRule;
-    }): Promise<string>;
     /**
      * Parses group or simple filter
      */

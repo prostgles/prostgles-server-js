@@ -1,7 +1,7 @@
 import { AnyObject, TableInfo, ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE } from "prostgles-types";
 import { JoinInfo } from "./DboBuilder";
 import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
-import { OneOf, ValidationSchema } from "./validation";
+import { JSONB } from "./JSONBValidation/validation";
 type ColExtraInfo = {
     min?: string | number;
     max?: string | number;
@@ -93,9 +93,13 @@ type TextColumn = BaseColumnTypes & {
      */
     lowerCased?: boolean;
 };
-export type JSONBColumnDef = BaseColumnTypes & {
-    jsonbSchema: ValidationSchema | Omit<OneOf, "optional">;
-};
+export type JSONBColumnDef = (BaseColumnTypes & {}) & ({
+    jsonbSchema: JSONB.JSONBSchema;
+    jsonbSchemaType?: undefined;
+} | {
+    jsonbSchema?: undefined;
+    jsonbSchemaType: JSONB.ObjectSchema;
+});
 /**
  * Allows referencing media to this table.
  * Requires this table to have a primary key AND a valid fileTable config
@@ -157,7 +161,7 @@ export type ColumnConfigs<LANG_IDS = {
 };
 type UnionKeys<T> = T extends T ? keyof T : never;
 type StrictUnionHelper<T, TAll> = T extends any ? T & Partial<Record<Exclude<UnionKeys<TAll>, keyof T>, never>> : never;
-type StrictUnion<T> = StrictUnionHelper<T, T>;
+export type StrictUnion<T> = StrictUnionHelper<T, T>;
 type TableDefinition<LANG_IDS> = {
     columns?: {
         [column_name: string]: ColumnConfig<LANG_IDS>;

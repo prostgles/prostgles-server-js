@@ -111,7 +111,7 @@ export type FunctionSpec = {
 };
 
 const MAX_COL_NUM = 1600;
-const asValue = (v: any, castAs: string = "") => pgp.as.format("$1" + castAs, [v]);
+const asValue = (v: any, castAs = "") => pgp.as.format("$1" + castAs, [v]);
 
 const parseUnix = (colName: string, tableAlias: string | undefined,  allColumns: ColumnInfo[]) => {
   const col = allColumns.find(c => c.name === colName);
@@ -210,14 +210,14 @@ const FTS_Funcs: FunctionSpec[] =
   ].map(type => ({
     name: "$ts_headline" + (type? ("_" + type) : ""),
     description: ` :[column_name <string>, search_term: <string | { to_tsquery: string } > ] -> sha512 hash of the of column content`,
-    type: "function" as "function",
+    type: "function" as const,
     singleColArg: true,
     numArgs: 2,
     getFields: ([column]) => [column],
     getQuery: ({ allColumns, args, tableAlias }) => {
       const col = asName(args[0]);
       let qVal = args[1], qType = "to_tsquery";
-      let _type = type? (asValue(type) + ",") : "";
+      const _type = type? (asValue(type) + ",") : "";
 
       const searchTypes = TextFilter_FullTextSearchFilterKeys;
       
@@ -234,7 +234,7 @@ const FTS_Funcs: FunctionSpec[] =
         qVal = pgp.as.format(qType + "($1)", [qVal])
       } else throw "Bad second arg. Exepcting search string or { to_tsquery: 'search string' }";
 
-      const res =`ts_headline(${_type} ${col}::text, ${qVal}, 'ShortWord=1 ' )`
+      const res = `ts_headline(${_type} ${col}::text, ${qVal}, 'ShortWord=1 ' )`
       // console.log(res)
       
       return res
@@ -273,7 +273,7 @@ let PostGIS_Funcs: FunctionSpec[] = ([
   ] as const).map(({ fname, description }) => ({
     name: "$" + fname,
     description,
-    type: "function" as "function",
+    type: "function" as const,
     singleColArg: true,
     numArgs: 1,
     canBeUsedForFilter: fname === "ST_DWithin",
@@ -403,9 +403,9 @@ let PostGIS_Funcs: FunctionSpec[] = ([
           let secondArg = ""; 
           if(otherArgs.length) secondArg = ", " + otherArgs.map(arg => asValue(arg)).join(", ");
           const escTabelName = asNameAlias(colName, tableAlias) + "::geometry";
-          let result = pgp.as.format(fname + "(" + escTabelName + secondArg + ( fname === "ST_AsGeoJSON"? ")::jsonb" : ")" ));
+          const result = pgp.as.format(fname + "(" + escTabelName + secondArg + ( fname === "ST_AsGeoJSON"? ")::jsonb" : ")" ));
           if(["ST_Centroid", "ST_SnapToGrid", "ST_Simplify"].includes(fname)){
-            let r = `ST_AsGeoJSON(${result})::jsonb`;
+            const r = `ST_AsGeoJSON(${result})::jsonb`;
             return r;
           }
           return result;
@@ -660,7 +660,7 @@ export const FUNCTIONS: FunctionSpec[] = [
         second: "minute" 
       };
 
-      let res = `(date_trunc(${asValue(prevInt[unit as "month"] || "hour")}, ${col}) + date_part(${asValue(unit, "::text")}, ${col})::int / ${val} * interval ${asValue(val + " " + unit)})`;
+      const res = `(date_trunc(${asValue(prevInt[unit as "month"] || "hour")}, ${col}) + date_part(${asValue(unit, "::text")}, ${col})::int / ${val} * interval ${asValue(val + " " + unit)})`;
       // console.log(res);
       return res;
     }
@@ -848,7 +848,7 @@ export const FUNCTIONS: FunctionSpec[] = [
       const cols = ViewHandler._parseFieldFilter(args[0], false, allowedFields);
       let term = args[1];
       const rawTerm = args[1];
-      let { edgeTruncate, noFields = false, returnType, matchCase = false } = args[2] || {};
+      const { edgeTruncate, noFields = false, returnType, matchCase = false } = args[2] || {};
       if(!isEmpty(args[2])){
         const keys = Object.keys(args[2]);
         const validKeys = ["edgeTruncate", "noFields", "returnType", "matchCase"];
@@ -891,7 +891,7 @@ export const FUNCTIONS: FunctionSpec[] = [
         `;
       }
 
-      let colRaw = "( " + cols.map(c =>`${noFields? "" : (asValue(c + ": ") + " || ")} COALESCE(${asNameAlias(c, tableAlias)}::TEXT, '')`).join(" || ', ' || ") + " )";
+      const colRaw = "( " + cols.map(c =>`${noFields? "" : (asValue(c + ": ") + " || ")} COALESCE(${asNameAlias(c, tableAlias)}::TEXT, '')`).join(" || ', ' || ") + " )";
       let col = colRaw;
       term = asValue(term);
       if(!matchCase) {
@@ -916,7 +916,7 @@ export const FUNCTIONS: FunctionSpec[] = [
 
       } else if(returnType === "object" || returnType === "boolean"){
         const hasChars = Boolean(rawTerm &&  /[a-z]/i.test(rawTerm));
-        let validCols = cols.map(c => {
+        const validCols = cols.map(c => {
             const colInfo = allColumns.find(ac => ac.name === c);
             return {
               key: c,
@@ -925,7 +925,7 @@ export const FUNCTIONS: FunctionSpec[] = [
           })
           .filter(c => c.colInfo && c.colInfo.udt_name !== "bytea")
         
-        let _cols = validCols.filter(c => 
+        const _cols = validCols.filter(c => 
           /** Exclude numeric columns when the search tern contains a character */
           !hasChars ||  
           postgresToTsType(c.colInfo!.udt_name) !== "number"
@@ -951,7 +951,7 @@ export const FUNCTIONS: FunctionSpec[] = [
                 'WK' || trim(to_char(${colNameEscaped}, 'WW'))
               ) END)`
             }
-            let colTxt = `COALESCE(${colSelect}, '')`; //  position(${term} IN ${colTxt}) > 0
+            const colTxt = `COALESCE(${colSelect}, '')`; //  position(${term} IN ${colTxt}) > 0
             if(returnType === "boolean"){
               return ` 
                 WHEN  ${colTxt} ${matchCase? "LIKE" : "ILIKE"} ${asValue('%' + rawTerm + '%')}

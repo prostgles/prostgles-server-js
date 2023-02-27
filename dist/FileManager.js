@@ -26,13 +26,11 @@ class FileManager {
         }
         return this.prostgles.dbo;
     }
-    ;
     get db() {
         if (!this.prostgles?.db)
             throw "this.prostgles.db missing";
         return this.prostgles.db;
     }
-    ;
     get fileRouteExpress() {
         return this.fileRoute + "/:name";
     }
@@ -435,7 +433,7 @@ class FileManager {
         if (!config)
             throw new Error("File table config missing");
         const buffer = typeof file === "string" ? Buffer.from(file, 'utf8') : file;
-        let result = await (0, exports.getFileTypeFromFilename)(fileName);
+        const result = await (0, exports.getFileTypeFromFilename)(fileName);
         if (tableName && colName) {
             const tableConfig = config.referencedTables?.[tableName];
             if (tableConfig && (0, prostgles_types_1.isObject)(tableConfig) && tableConfig.referenceColumns[colName]) {
@@ -618,10 +616,10 @@ const getFileType = async (file, fileName) => {
 };
 exports.getFileType = getFileType;
 function bytesToSize(bytes) {
-    var sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
     if (bytes == 0)
         return '0 Byte';
-    var i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)) + "");
+    const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)) + "");
     return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
 }
 exports.bytesToSize = bytesToSize;

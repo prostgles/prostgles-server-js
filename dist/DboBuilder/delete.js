@@ -122,5 +122,4 @@ async function _delete(filter, params, param3_unused, table_rules, localParams) 
     }
 }
 exports._delete = _delete;
-;
 //# sourceMappingURL=delete.js.map

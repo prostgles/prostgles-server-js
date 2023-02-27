@@ -17,7 +17,7 @@ async function update(filter, _newData, params, tableRules, localParams) {
         }
         let newData = _newData;
         if (this.is_media && (0, uploadFile_1.isFile)(newData) && (!tableRules || tableRules.update)) {
-            let existingMediaId = !(!filter || !(0, prostgles_types_1.isObject)(filter) || (0, prostgles_types_1.getKeys)(filter).join() !== "id" || typeof filter.id !== "string") ? filter.id : undefined;
+            const existingMediaId = !(!filter || !(0, prostgles_types_1.isObject)(filter) || (0, prostgles_types_1.getKeys)(filter).join() !== "id" || typeof filter.id !== "string") ? filter.id : undefined;
             if (!existingMediaId) {
                 throw new Error(`Updating the file table with file data can only be done by providing a single id filter. E.g. { id: "9ea4e23c-2b1a-4e33-8ec0-c15919bb45ec"} `);
             }
@@ -31,7 +31,7 @@ async function update(filter, _newData, params, tableRules, localParams) {
                 const validate = tableRules?.[ACTION]?.validate ? async (row) => {
                     return tableRules?.[ACTION]?.validate({ update: row, filter }, this.dbTX || this.dboBuilder.dbo);
                 } : undefined;
-                let existingFile = await (localParams?.tx?.dbTX?.[this.name] || this).findOne({ id: existingMediaId });
+                const existingFile = await (localParams?.tx?.dbTX?.[this.name] || this).findOne({ id: existingMediaId });
                 if (!existingFile?.name)
                     throw new Error("Existing file record not found");
                 // oldFileDelete = () => fileManager.deleteFile(existingFile!.name!)
@@ -58,7 +58,7 @@ async function update(filter, _newData, params, tableRules, localParams) {
         }
         const { data, allowedCols } = this.validateNewData({ row: newData, forcedData, allowedFields: fields, tableRules, fixIssues });
         /* Patch data */
-        let patchedTextData = [];
+        const patchedTextData = [];
         this.columns.map(c => {
             const d = data[c.name];
             if (c.data_type === "text" && d && (0, DboBuilder_1.isPlainObject)(d) && !["from", "to"].find(key => typeof d[key] !== "number")) {
@@ -81,7 +81,7 @@ async function update(filter, _newData, params, tableRules, localParams) {
             // https://w3resource.com/PostgreSQL/overlay-function.p hp
             //  overlay(coalesce(status, '') placing 'hom' from 2 for 0)
         }
-        let nData = { ...data };
+        const nData = { ...data };
         let query = await this.colSet.getUpdateQuery(nData, allowedCols, this.dbTX || this.dboBuilder.dbo, validateRow);
         query += (await this.prepareWhere({
             filter,
@@ -94,7 +94,7 @@ async function update(filter, _newData, params, tableRules, localParams) {
             query += " ON CONFLICT DO NOTHING ";
         /** postValidate */
         const originalReturning = await this.prepareReturning(returning, this.parseFieldFilter(returningFields));
-        let fullReturning = await this.prepareReturning(returning, this.parseFieldFilter("*"));
+        const fullReturning = await this.prepareReturning(returning, this.parseFieldFilter("*"));
         /** Used for postValidate. Add any missing computed returning from original query */
         fullReturning.concat(originalReturning.filter(s => !fullReturning.some(f => f.alias === s.alias)));
         const finalSelect = tableRules?.insert?.postValidate ? fullReturning : originalReturning;
@@ -143,5 +143,4 @@ async function update(filter, _newData, params, tableRules, localParams) {
     }
 }
 exports.update = update;
-;
 //# sourceMappingURL=update.js.map

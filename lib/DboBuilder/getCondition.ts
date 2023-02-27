@@ -1,5 +1,5 @@
 import { AnyObject, EXISTS_KEY, EXISTS_KEYS, getKeys, isObject, pickKeys } from "prostgles-types";
-import { ExistsFilterConfig, LocalParams, makeErrorFromPGError, pgp } from "../DboBuilder";
+import { ExistsFilterConfig, LocalParams, pgp } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 import { asValue } from "../PubSubManager/PubSubManager";
 import { FUNCTIONS, parseFunction } from "./QueryBuilder/Functions";
@@ -20,12 +20,12 @@ const FILTER_FUNCS = FUNCTIONS.filter(f => f.canBeUsedForFilter);
     const { filter: rawFilter, select, allowed_colnames, tableAlias, localParams, tableRules } = params;
 
 
-    let filter = { ... (rawFilter as any) } as any;
+    const filter = { ... (rawFilter as any) } as any;
 
     /* Exists join filter */
     const ERR = "Invalid exists filter. \nExpecting somethibng like: \n | { $exists: { tableName.tableName2: Filter } } \n  | { $exists: { \"**.tableName3\": Filter } }\n | { path: string[]; filter: AnyObject }"
     const SP_WILDCARD = "**";
-    let existsKeys: ExistsFilterConfig[] = getKeys(filter)
+    const existsKeys: ExistsFilterConfig[] = getKeys(filter)
       .filter(k => EXISTS_KEYS.includes(k as EXISTS_KEY) && Object.keys(filter[k] ?? {}).length)
       .map(key => {
 
@@ -47,7 +47,7 @@ const FILTER_FUNCS = FUNCTIONS.filter(f => f.canBeUsedForFilter);
          */
         const firstKeyIsATable = !!this.dboBuilder.dbo[firstKey];
         let tables = isDetailed? filterValue.path : (firstKeyIsATable? [firstKey] : firstKey.split("."));
-        let f2 = isDetailed? filterValue.filter : filterValue[firstKey];
+        const f2 = isDetailed? filterValue.filter : filterValue[firstKey];
         let shortestJoin = false;
 
         if (!isJoined) {
@@ -86,7 +86,7 @@ const FILTER_FUNCS = FUNCTIONS.filter(f => f.canBeUsedForFilter);
     //     }
     // });
 
-    let funcConds: string[] = [];
+    const funcConds: string[] = [];
     const funcFilter = FILTER_FUNCS.filter(f => f.name in filter);
 
     funcFilter.map(f => {
@@ -112,7 +112,7 @@ const FILTER_FUNCS = FUNCTIONS.filter(f => f.canBeUsedForFilter);
     /* Computed field queries */
     const p = this.getValidatedRules(tableRules, localParams);
     const computedFields = p.allColumns.filter(c => c.type === "computed");
-    let computedColConditions: string[] = [];
+    const computedColConditions: string[] = [];
     Object.keys(filter || {}).map(key => {
       const compCol = computedFields.find(cf => cf.name === key);
       if (compCol) {
@@ -231,7 +231,7 @@ const FILTER_FUNCS = FUNCTIONS.filter(f => f.canBeUsedForFilter);
         will make an exists filter
     */
 
-    let filterKeys = Object.keys(filter).filter(k => k !== complexFilterKey && !funcFilter.find(ek => ek.name === k) && !computedFields.find(cf => cf.name === k) && !existsKeys.find(ek => ek.key === k));
+    const filterKeys = Object.keys(filter).filter(k => k !== complexFilterKey && !funcFilter.find(ek => ek.name === k) && !computedFields.find(cf => cf.name === k) && !existsKeys.find(ek => ek.key === k));
     // if(allowed_colnames){
     //     const aliasedColumns = (select || []).filter(s => 
     //         ["function", "computed", "column"].includes(s.type) && allowed_colnames.includes(s.alias) ||  

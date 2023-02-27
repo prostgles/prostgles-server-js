@@ -80,7 +80,7 @@ function makeSelectQuery(_this, q, depth = 0, joinFields = [], selectParams = {}
             const getJoinCondition = (t1Alias, t2Alias, on) => {
                 return on.map(cond => cond.map(([c1, c2]) => `${t1Alias}.${(0, prostgles_types_1.asName)(getPrevColName(c1))} = ${t2Alias}.${(0, prostgles_types_1.asName)(getThisColName(c2))} `).join(" AND ")).join(" OR ");
             };
-            let query = [
+            const query = [
                 `${q2.isLeftJoin ? "LEFT" : "INNER"} JOIN `,
                 ...iQ,
                 `ON ${getJoinCondition(prevAlias, thisAlias, on)}`
@@ -111,11 +111,11 @@ function makeSelectQuery(_this, q, depth = 0, joinFields = [], selectParams = {}
         /* If aggs exist need to set groupBy add joinFields into select */
         if (aggs.length || selectParams?.groupBy) {
             if (nonAggs.length) {
-                let groupByFields = nonAggs.filter(sf => !depth || joinFields.includes(sf.getQuery()));
+                const groupByFields = nonAggs.filter(sf => !depth || joinFields.includes(sf.getQuery()));
                 groupBy = getGroupBy(rootSelectItems, groupByFields);
             }
         }
-        let simpleQuery = indentArrayAndJoin(depth, [
+        const simpleQuery = indentArrayAndJoin(depth, [
             `-- 0. or 5. [leaf query] `
             /* Group by selected fields + any join fields */
             ,
@@ -217,7 +217,7 @@ function makeSelectQuery(_this, q, depth = 0, joinFields = [], selectParams = {}
         "-- EOF 0. joined root",
         " \n"
     ].filter(v => v);
-    let res = indentArrayAndJoin(depth, joinedQuery);
+    const res = indentArrayAndJoin(depth, joinedQuery);
     // res = indent(res, depth);
     // console.log(res);
     return res;

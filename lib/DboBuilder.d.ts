@@ -1,7 +1,7 @@
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import { ColumnInfo, SQLOptions, DbJoinMaker, PG_COLUMN_UDT_DATA_TYPE, TS_PG_Types, TableInfo as TInfo, SQLHandler, AnyObject, ProstglesError, EXISTS_KEY } from "prostgles-types";
-export declare type SortItem = {
+export type SortItem = {
     asc: boolean;
     nulls?: "first" | "last";
     nullEmpty?: boolean;
@@ -10,8 +10,8 @@ export declare type SortItem = {
 } | {
     fieldPosition: number;
 });
-export declare type ParsedMedia = Required<Pick<Media, "extension" | "content_type">>;
-export declare type Media = {
+export type ParsedMedia = Required<Pick<Media, "extension" | "content_type">>;
+export type Media = {
     "id"?: string;
     "title"?: string;
     "extension"?: string;
@@ -27,16 +27,16 @@ export declare type Media = {
     deleted?: string | null;
     deleted_from_storage?: string | null;
 };
-export declare type TxCB<TH = TableHandlers> = {
+export type TxCB<TH = TableHandlers> = {
     (t: TH & Pick<DBHandlerServer, "sql">, _t: pgPromise.ITask<{}>): (any | void);
 };
-export declare type TX<TH = TableHandlers> = {
+export type TX<TH = TableHandlers> = {
     (t: TxCB<TH>): Promise<(any | void)>;
 };
-export declare type TableHandlers = {
+export type TableHandlers = {
     [key: string]: Partial<TableHandler> | TableHandler;
 };
-export declare type DBHandlerServer<TH = TableHandlers> = TH & Partial<DbJoinMaker> & {
+export type DBHandlerServer<TH = TableHandlers> = TH & Partial<DbJoinMaker> & {
     sql?: SQLHandler;
 } & {
     tx?: TX<TH>;
@@ -46,22 +46,22 @@ import { Join, Prostgles, DB } from "./Prostgles";
 import { PublishParser, PublishAllOrNothing } from "./PublishParser";
 import { PubSubManager, BasicCallback } from "./PubSubManager/PubSubManager";
 import { JoinPaths, ViewHandler } from "./DboBuilder/ViewHandler";
-declare type PGP = pgPromise.IMain<{}, pg.IClient>;
+type PGP = pgPromise.IMain<{}, pg.IClient>;
 export declare const pgp: PGP;
-export declare type TableInfo = TInfo & {
+export type TableInfo = TInfo & {
     schema: string;
     name: string;
     oid: number;
     comment: string;
     columns: ColumnInfo[];
 };
-export declare type ViewInfo = TableInfo & {
+export type ViewInfo = TableInfo & {
     parent_tables: string[];
 };
-export declare type TableOrViewInfo = TableInfo & ViewInfo & {
+export type TableOrViewInfo = TableInfo & ViewInfo & {
     is_view: boolean;
 };
-export declare type PRGLIOSocket = {
+export type PRGLIOSocket = {
     readonly id: string;
     readonly handshake?: {
         query?: Record<string, string>;
@@ -88,7 +88,7 @@ export declare type PRGLIOSocket = {
     /** Used for publish error caching */
     prostgles?: AnyObject;
 };
-export declare type LocalParams = {
+export type LocalParams = {
     httpReq?: any;
     socket?: PRGLIOSocket;
     func?: () => any;
@@ -108,18 +108,18 @@ export declare type LocalParams = {
     };
 };
 export declare function escapeTSNames(str: string, capitalize?: boolean): string;
-export declare type Aggregation = {
+export type Aggregation = {
     field: string;
     query: string;
     alias: string;
     getQuery: (alias: string) => string;
 };
-export declare type Filter = AnyObject | {
+export type Filter = AnyObject | {
     $and: Filter[];
 } | {
     $or: Filter[];
 };
-export declare type JoinInfo = {
+export type JoinInfo = {
     expectOne?: boolean;
     paths: {
         /**
@@ -144,7 +144,7 @@ export declare type JoinInfo = {
     }[];
 };
 import { Graph } from "./shortestPath";
-export declare type CommonTableRules = {
+export type CommonTableRules = {
     /**
      * True by default. Allows clients to get column information on any columns that are allowed in (select, insert, update) field rules.
      */
@@ -154,7 +154,7 @@ export declare type CommonTableRules = {
      */
     getInfo?: PublishAllOrNothing;
 };
-export declare type ValidatedTableRules = CommonTableRules & {
+export type ValidatedTableRules = CommonTableRules & {
     allColumns: FieldSpec[];
     select: {
         fields: string[];
@@ -186,7 +186,7 @@ export declare function makeErrorFromPGError(err: any, localParams?: LocalParams
  * Ensure the error is an Object and has
  */
 export declare function parseError(e: any, caller: string): ProstglesError;
-export declare type ExistsFilterConfig = {
+export type ExistsFilterConfig = {
     key: string;
     f2: Filter;
     existType: EXISTS_KEY;
@@ -254,13 +254,13 @@ export declare class DboBuilder {
     build(): Promise<DBHandlerServer>;
     getTX: (cb: TxCB) => Promise<any>;
 }
-export declare type TableSchemaColumn = ColumnInfo & {
+export type TableSchemaColumn = ColumnInfo & {
     privileges: {
         privilege_type: "INSERT" | "REFERENCES" | "SELECT" | "UPDATE";
         is_grantable: "YES" | "NO";
     }[];
 };
-export declare type TableSchema = {
+export type TableSchema = {
     schema: string;
     name: string;
     oid: number;
@@ -276,7 +276,7 @@ export declare type TableSchema = {
         delete: boolean;
     };
 };
-declare type PGConstraint = {
+type PGConstraint = {
     /**
      * Constraint type
      */

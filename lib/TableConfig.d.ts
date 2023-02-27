@@ -1,13 +1,13 @@
 import { AnyObject, TableInfo, ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE } from "prostgles-types";
 import { JoinInfo } from "./DboBuilder";
 import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
-import { OneOf, ValidationSchema } from "./validation";
-declare type ColExtraInfo = {
+import { JSONB } from "./JSONBValidation/validation";
+type ColExtraInfo = {
     min?: string | number;
     max?: string | number;
     hint?: string;
 };
-export declare type I18N_Config<LANG_IDS> = {
+export type I18N_Config<LANG_IDS> = {
     [lang_id in keyof LANG_IDS]: string;
 };
 export declare const parseI18N: <LANG_IDS, Def extends string>(params: {
@@ -16,7 +16,7 @@ export declare const parseI18N: <LANG_IDS, Def extends string>(params: {
     defaultLang: string | keyof LANG_IDS;
     defaultValue: Def;
 }) => string | Def;
-declare type BaseTableDefinition<LANG_IDS = AnyObject> = {
+type BaseTableDefinition<LANG_IDS = AnyObject> = {
     info?: {
         label?: string | I18N_Config<LANG_IDS>;
     };
@@ -54,7 +54,7 @@ declare type BaseTableDefinition<LANG_IDS = AnyObject> = {
         };
     };
 };
-declare type LookupTableDefinition<LANG_IDS> = {
+type LookupTableDefinition<LANG_IDS> = {
     isLookupTable: {
         values: {
             [id_value: string]: {} | {
@@ -63,7 +63,7 @@ declare type LookupTableDefinition<LANG_IDS> = {
         };
     };
 };
-export declare type BaseColumn<LANG_IDS> = {
+export type BaseColumn<LANG_IDS> = {
     /**
      * Will add these values to .getColumns() result
      */
@@ -72,17 +72,17 @@ export declare type BaseColumn<LANG_IDS> = {
         [lang_id in keyof LANG_IDS]: string;
     }>;
 };
-declare type SQLDefColumn = {
+type SQLDefColumn = {
     /**
      * Raw sql statement used in creating/adding column
      */
     sqlDefinition?: string;
 };
-declare type BaseColumnTypes = {
+type BaseColumnTypes = {
     defaultValue?: any;
     nullable?: boolean;
 };
-declare type TextColumn = BaseColumnTypes & {
+type TextColumn = BaseColumnTypes & {
     isText: true;
     /**
      * Value will be trimmed before update/insert
@@ -93,14 +93,18 @@ declare type TextColumn = BaseColumnTypes & {
      */
     lowerCased?: boolean;
 };
-export declare type JSONBColumnDef = BaseColumnTypes & {
-    jsonbSchema: ValidationSchema | Omit<OneOf, "optional">;
-};
+export type JSONBColumnDef = (BaseColumnTypes & {}) & ({
+    jsonbSchema: JSONB.JSONBSchema;
+    jsonbSchemaType?: undefined;
+} | {
+    jsonbSchema?: undefined;
+    jsonbSchemaType: JSONB.ObjectSchema;
+});
 /**
  * Allows referencing media to this table.
  * Requires this table to have a primary key AND a valid fileTable config
  */
-declare type MediaColumn = ({
+type MediaColumn = ({
     name: string;
     label?: string;
     files: "one" | "many";
@@ -112,7 +116,7 @@ declare type MediaColumn = ({
 } | {
     allowedExtensions?: Record<Partial<ALLOWED_EXTENSION>, 1>;
 }));
-declare type ReferencedColumn = {
+type ReferencedColumn = {
     /**
      * Will create a lookup table that this column will reference
      */
@@ -124,7 +128,7 @@ declare type ReferencedColumn = {
         columnName?: string;
     };
 };
-declare type JoinDef = {
+type JoinDef = {
     sourceTable: string;
     targetTable: string;
     on: JoinInfo["paths"][number]["on"];
@@ -132,19 +136,19 @@ declare type JoinDef = {
 /**
  * Used in specifying a join path to a table. This column name can then be used in select
  */
-declare type NamedJoinColumn = {
+type NamedJoinColumn = {
     label?: string;
     joinDef: JoinDef[];
 };
-declare type Enum<T extends string | number = any> = {
+type Enum<T extends string | number = any> = {
     enum: T[] | readonly T[];
     nullable?: boolean;
     defaultValue?: T;
 };
-export declare type ColumnConfig<LANG_IDS = {
+export type ColumnConfig<LANG_IDS = {
     en: 1;
 }> = string | StrictUnion<NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef | Enum))>;
-export declare type ColumnConfigs<LANG_IDS = {
+export type ColumnConfigs<LANG_IDS = {
     en: 1;
 }> = {
     sql: string | BaseColumn<LANG_IDS> & SQLDefColumn;
@@ -155,10 +159,10 @@ export declare type ColumnConfigs<LANG_IDS = {
     jsonb: BaseColumn<LANG_IDS> & JSONBColumnDef;
     enum: BaseColumn<LANG_IDS> & Enum;
 };
-declare type UnionKeys<T> = T extends T ? keyof T : never;
-declare type StrictUnionHelper<T, TAll> = T extends any ? T & Partial<Record<Exclude<UnionKeys<TAll>, keyof T>, never>> : never;
-declare type StrictUnion<T> = StrictUnionHelper<T, T>;
-declare type TableDefinition<LANG_IDS> = {
+type UnionKeys<T> = T extends T ? keyof T : never;
+type StrictUnionHelper<T, TAll> = T extends any ? T & Partial<Record<Exclude<UnionKeys<TAll>, keyof T>, never>> : never;
+export type StrictUnion<T> = StrictUnionHelper<T, T>;
+type TableDefinition<LANG_IDS> = {
     columns?: {
         [column_name: string]: ColumnConfig<LANG_IDS>;
     };
@@ -212,7 +216,7 @@ declare type TableDefinition<LANG_IDS> = {
 /**
  * Helper utility to create lookup tables for TEXT columns
  */
-export declare type TableConfig<LANG_IDS = {
+export type TableConfig<LANG_IDS = {
     en: 1;
 }> = {
     [table_name: string]: BaseTableDefinition<LANG_IDS> & (TableDefinition<LANG_IDS> | LookupTableDefinition<LANG_IDS>);
