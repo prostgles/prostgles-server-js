@@ -17,12 +17,18 @@ export async function tryRun(desc: string, func: () => any, log?: Function){
     }, 2000)
   }
 }
-export function tryRunP(desc: string, func: (resolve: any, reject: any) => any, log?: Function){
+export function tryRunP(desc: string, func: (resolve: any, reject: any) => any, opts?: { log?: Function; timeout?: number; }){
   return new Promise(async (rv, rj) => {
+    const tout = Number.isFinite(opts?.timeout)? setTimeout(() => {
+      const errMsg = `${desc} failed. Reason: Timout reached: ${opts.timeout}ms`;
+      opts?.log?.(errMsg);
+      rj(errMsg);
+    }, opts.timeout) : undefined
     try {
       await func(rv, rj);
+      clearTimeout(tout);
     } catch(err: any){
-      log?.(`${desc} failed: ` + JSON.stringify(err));
+      opts?.log?.(`${desc} failed: ` + JSON.stringify(err));
       setTimeout(() => {
         throw err;
       }, 1000)
@@ -364,7 +370,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
     await db.various.update!({ id: 99 }, { name: "zz3zz1" });
     await db.various.update!({ id: 99 }, { name: "zz3zz2" });
     await db.various.update!({ id: 99 }, { name: "zz3zz3" });
-  });
+  }, { timeout: 4000 });
 
   await tryRunP("subscribeOne with throttle", async (resolve, reject) => {
     await db.various.insert!({ id: 99 });
@@ -382,7 +388,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
     });
     await db.various.update!({ id: 99 }, { name: "zz3zz1" });
     await db.various.update!({ id: 99 }, { name: "zz3zz2" });
-  });
+  }, { timeout: 4000 });
 
   await tryRun("JSON filtering", async () => {
     const res = await db.various.count!({ "jsn->a->>b": '3' });

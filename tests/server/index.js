@@ -144,7 +144,7 @@ function dd() {
                     }
                 },
                 table_config: { nullable: true, jsonbSchemaType: {
-                        referencedTables: { arrayOf: { name: "string", minFiles: "number" }, optional: true },
+                        referencedTables: { optional: true, arrayOf: { name: "string", minFiles: "number" } },
                     }
                 }
             }

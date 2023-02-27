@@ -61,9 +61,6 @@ export type DBOFullyTyped<Schema = void> = Schema extends DBSchema? (
   ) : 
   DBHandlerServer;
 
-
-  
-
 export type PublishFullyTyped<Schema = void> = Schema extends DBSchema? (
   | PublishAllOrNothing 
   | { 

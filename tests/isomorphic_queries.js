@@ -40,13 +40,19 @@ async function tryRun(desc, func, log) {
     }
 }
 exports.tryRun = tryRun;
-function tryRunP(desc, func, log) {
+function tryRunP(desc, func, opts) {
     return new Promise(async (rv, rj) => {
+        const tout = Number.isFinite(opts?.timeout) ? setTimeout(() => {
+            const errMsg = `${desc} failed. Reason: Timout reached: ${opts.timeout}ms`;
+            opts?.log?.(errMsg);
+            rj(errMsg);
+        }, opts.timeout) : undefined;
         try {
             await func(rv, rj);
+            clearTimeout(tout);
         }
         catch (err) {
-            log?.(`${desc} failed: ` + JSON.stringify(err));
+            opts?.log?.(`${desc} failed: ` + JSON.stringify(err));
             setTimeout(() => {
                 throw err;
             }, 1000);
@@ -331,7 +337,7 @@ async function isomorphic(db) {
         await db.various.update({ id: 99 }, { name: "zz3zz1" });
         await db.various.update({ id: 99 }, { name: "zz3zz2" });
         await db.various.update({ id: 99 }, { name: "zz3zz3" });
-    });
+    }, { timeout: 4000 });
     await tryRunP("subscribeOne with throttle", async (resolve, reject) => {
         await db.various.insert({ id: 99 });
         const start = Date.now(); // name: "zz3zz" 
@@ -347,7 +353,7 @@ async function isomorphic(db) {
         });
         await db.various.update({ id: 99 }, { name: "zz3zz1" });
         await db.various.update({ id: 99 }, { name: "zz3zz2" });
-    });
+    }, { timeout: 4000 });
     await tryRun("JSON filtering", async () => {
         const res = await db.various.count({ "jsn->a->>b": '3' });
         assert_1.strict.equal(res, 1);

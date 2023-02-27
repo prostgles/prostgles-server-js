@@ -1,4 +1,4 @@
-import { JSONSchema7, JSONSchema7TypeName } from "json-schema";
+import type { JSONSchema7, JSONSchema7TypeName } from "json-schema";
 import { getKeys, isEmpty, isObject } from "prostgles-types";
 import { asValue } from "../PubSubManager/PubSubManager";
 import { BaseColumn, JSONBColumnDef, StrictUnion } from "../TableConfig";
