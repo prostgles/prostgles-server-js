@@ -226,7 +226,7 @@ type ColOpts = { nullable?: boolean };
 
 export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpts, leading = ""): string { 
  
-  const getFieldType = (rawFieldType: JSONB.FieldType, isOneOf = false, leading = ""): string => {
+  const getFieldType = (rawFieldType: JSONB.FieldType, isOneOf = false, innerLeading = leading): string => {
     const fieldType = getFieldTypeObj(rawFieldType);
     const nullType = (fieldType.nullable ? `null | ` : "");
     
@@ -242,10 +242,10 @@ export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpt
     } else if (isObject(fieldType.type)) {
       const { type } = fieldType;
       const spacing = isOneOf ? " " : "  ";
-      let objDef = `${leading}{ \n` + getKeys(type).map(k => {
+      let objDef = `${innerLeading}{ \n` + getKeys(type).map(k => {
         const fieldType = getFieldTypeObj(type[k]);
-        return `${leading}${spacing}${k}${fieldType.optional ? "?" : ""}: ` + getFieldType(fieldType, true) + ";";
-      }).join("\n") + ` \n${leading}}`;
+        return `${innerLeading}${spacing}${k}${fieldType.optional ? "?" : ""}: ` + getFieldType(fieldType, true) + ";";
+      }).join("\n") + ` \n${innerLeading}}`;
       if(!objDef.endsWith(";") && !isOneOf){
         objDef += ";";
       }
@@ -261,7 +261,7 @@ export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpt
 
     } else if (fieldType?.oneOf || fieldType?.oneOfType) {
       const oneOf = fieldType?.oneOf || fieldType?.oneOfType.map(type => ({ type }));
-      return (fieldType.nullable ? `\n${leading}  | null` : "") + oneOf.map(v => `\n${leading}  | ` + getFieldType(v, true)).join("");
+      return (fieldType.nullable ? `\n${innerLeading}  | null` : "") + oneOf.map(v => `\n${innerLeading}  | ` + getFieldType(v, true)).join("");
 
     } else if (fieldType?.arrayOf || fieldType?.arrayOfType) {
       const arrayOf = fieldType?.arrayOf || { type: fieldType?.arrayOfType };
