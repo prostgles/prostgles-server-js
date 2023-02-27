@@ -44,7 +44,7 @@ BEGIN
   END IF;
 
 
-  nullable = COALESCE((schema->'nullable')::BOOLEAN, FALSE);
+  nullable = COALESCE((schema->>'nullable')::BOOLEAN, FALSE);
   IF data IS NULL OR jsonb_typeof(data) = 'null' THEN
     IF NOT nullable THEN
       RAISE EXCEPTION 'Is not nullable. %', path USING HINT = path, COLUMN = colname; 
@@ -157,7 +157,7 @@ BEGIN
         SELECT key, value
         FROM jsonb_each(schema->'type')
       LOOP
-        optional = COALESCE((sub_schema.value->'optional')::BOOLEAN, FALSE);
+        optional = COALESCE((sub_schema.value->>'optional')::BOOLEAN, FALSE);
         IF NOT (data ? sub_schema.key) THEN
           
           IF NOT optional THEN

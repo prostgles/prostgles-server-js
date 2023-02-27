@@ -224,9 +224,9 @@ export function validateSchema<S extends JSONB.ObjectSchema>(schema: S, obj: JSO
 type ColOpts = { nullable?: boolean }; 
 
 
-export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpts, leading = ""): string { 
+export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpts, outerLeading = ""): string { 
  
-  const getFieldType = (rawFieldType: JSONB.FieldType, isOneOf = false, innerLeading = leading): string => {
+  const getFieldType = (rawFieldType: JSONB.FieldType, isOneOf = false, innerLeading = outerLeading, depth = 0): string => {
     const fieldType = getFieldTypeObj(rawFieldType);
     const nullType = (fieldType.nullable ? `null | ` : "");
     
@@ -242,10 +242,10 @@ export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpt
     } else if (isObject(fieldType.type)) {
       const { type } = fieldType;
       const spacing = isOneOf ? " " : "  ";
-      let objDef = `${innerLeading}{ \n` + getKeys(type).map(k => {
+      let objDef = `${innerLeading}{${spacing}` + getKeys(type).map(k => {
         const fieldType = getFieldTypeObj(type[k]);
-        return `${innerLeading}${spacing}${k}${fieldType.optional ? "?" : ""}: ` + getFieldType(fieldType, true) + ";";
-      }).join("\n") + ` \n${innerLeading}}`;
+        return `${spacing}${k}${fieldType.optional ? "?" : ""}: ` + getFieldType(fieldType, true, undefined, depth + 1) + ";";
+      }).join(" ") + `${spacing}}`;
       if(!objDef.endsWith(";") && !isOneOf){
         objDef += ";";
       }
@@ -261,20 +261,20 @@ export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpt
 
     } else if (fieldType?.oneOf || fieldType?.oneOfType) {
       const oneOf = fieldType?.oneOf || fieldType?.oneOfType.map(type => ({ type }));
-      return (fieldType.nullable ? `\n${innerLeading}  | null` : "") + oneOf.map(v => `\n${innerLeading}  | ` + getFieldType(v, true)).join("");
+      return (fieldType.nullable ? `\n${innerLeading} | null` : "") + oneOf.map(v => `\n${innerLeading}  | ` + getFieldType(v, true, undefined, depth + 1)).join("");
 
     } else if (fieldType?.arrayOf || fieldType?.arrayOfType) {
       const arrayOf = fieldType?.arrayOf || { type: fieldType?.arrayOfType };
-      return (fieldType.nullable ? `null | ` : "") + getFieldType(arrayOf, true) + "[]";
+      return (fieldType.nullable ? `null | ` : "") + getFieldType(arrayOf, true, undefined, depth + 1) + "[]";
 
     } else if (fieldType?.record) {
       const { keysEnum, values } = fieldType.record;
-      return `${fieldType.nullable ? `null |` : ""} Record<${keysEnum?.map(v => asValue(v)).join(" | ") ?? "string"}, ${!values? "any" : getFieldType(values, true)}>`
+      return `${fieldType.nullable ? `null |` : ""} Record<${keysEnum?.map(v => asValue(v)).join(" | ") ?? "string"}, ${!values? "any" : getFieldType(values, true, undefined, depth + 1)}>`
 
     } else throw "Unexpected getSchemaTSTypes: " + JSON.stringify({ fieldType, schema }, null, 2)
   } 
  
-  return getFieldType({ ...schema as any, nullable: colOpts.nullable }, undefined, leading);
+  return getFieldType({ ...schema as any, nullable: colOpts.nullable }, undefined, outerLeading);
 }
 
 

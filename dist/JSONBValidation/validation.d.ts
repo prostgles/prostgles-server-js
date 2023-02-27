@@ -140,7 +140,7 @@ export declare function validateSchema<S extends JSONB.ObjectSchema>(schema: S, 
 type ColOpts = {
     nullable?: boolean;
 };
-export declare function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpts, leading?: string): string;
+export declare function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpts, outerLeading?: string): string;
 export declare function getJSONBSchemaAsJSONSchema(tableName: string, colName: string, columnConfig: BaseColumn<{
     en: 1;
 }> & JSONBColumnDef): JSONSchema7;
