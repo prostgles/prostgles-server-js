@@ -2,6 +2,9 @@
 
 export const VALIDATE_SCHEMA_FUNCNAME = "prostgles.validate_jsonb_schema" as const;
 export const validate_jsonb_schema_sql = `
+/* prevent duplicate key value violates unique constraint "pg_namespace_nspname_index" Key (nspname)=(prostgles) already exists.*/
+LOCK TABLE pg_catalog.pg_namespace IN SHARE ROW EXCLUSIVE MODE;
+
 DROP FUNCTION IF EXISTS ${VALIDATE_SCHEMA_FUNCNAME}(jsonb_schema text, data jsonb, checked_path text[]);
 
 CREATE OR REPLACE FUNCTION ${VALIDATE_SCHEMA_FUNCNAME}(jsonb_schema TEXT, data JSONB, checked_path TEXT[] DEFAULT ARRAY[]::TEXT[]) RETURNS boolean AS 
