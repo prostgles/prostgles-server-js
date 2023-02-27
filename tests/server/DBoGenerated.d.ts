@@ -376,22 +376,22 @@ export type DBSchemaGenerated = {
         arr2: number[];
         arrStr?: null | string[];
         o?: 
-  | null
-  | {  o1: number; }
-  | {  o2: boolean; }; 
+        | null
+        |       {        o1: number;       }
+        |       {        o2: boolean;       }; 
       };
       jsonOneOf?: 
         | null
-        | {  command: 'a'; }
-        | {  command: 'b'; option: number[]; }
+        |       {        command: 'a';       }
+        |       {        command: 'b';       option: number[];       }
       status?: 
         | null
-        | {  ok: string; }
-        | {  err: string; }
-        | {  loading: {  loaded: number; total: number; }; }
+        |       {        ok: string;       }
+        |       {        err: string;       }
+        |       {        loading:       {        loaded: number;       total: number;       };       }
       table_config?: null |       { 
-        referencedTables?: {  name: string; minFiles: number; }[];
-        recType?: null | Record<'a' | 'b', {  bools: boolean[]; }>; 
+        referencedTables?:       {        name: string;       minFiles: number;       }[];
+        recType?: null | Record<'a' | 'b',       {        bools: boolean[];       }>; 
       };
     };
   };

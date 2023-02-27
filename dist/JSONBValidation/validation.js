@@ -81,7 +81,7 @@ function validateSchema(schema, obj, objName, optional = false) {
 }
 exports.validateSchema = validateSchema;
 function getJSONBSchemaTSTypes(schema, colOpts, leading = "") {
-    const getFieldType = (rawFieldType, isOneOf = false, leading = "") => {
+    const getFieldType = (rawFieldType, isOneOf = false, innerLeading = leading) => {
         const fieldType = getFieldTypeObj(rawFieldType);
         const nullType = (fieldType.nullable ? `null | ` : "");
         /** Primitives */
@@ -96,10 +96,10 @@ function getJSONBSchemaTSTypes(schema, colOpts, leading = "") {
         else if ((0, prostgles_types_1.isObject)(fieldType.type)) {
             const { type } = fieldType;
             const spacing = isOneOf ? " " : "  ";
-            let objDef = `${leading}{ \n` + (0, prostgles_types_1.getKeys)(type).map(k => {
+            let objDef = `${innerLeading}{ \n` + (0, prostgles_types_1.getKeys)(type).map(k => {
                 const fieldType = getFieldTypeObj(type[k]);
-                return `${leading}${spacing}${k}${fieldType.optional ? "?" : ""}: ` + getFieldType(fieldType, true) + ";";
-            }).join("\n") + ` \n${leading}}`;
+                return `${innerLeading}${spacing}${k}${fieldType.optional ? "?" : ""}: ` + getFieldType(fieldType, true) + ";";
+            }).join("\n") + ` \n${innerLeading}}`;
             if (!objDef.endsWith(";") && !isOneOf) {
                 objDef += ";";
             }
@@ -114,7 +114,7 @@ function getJSONBSchemaTSTypes(schema, colOpts, leading = "") {
         }
         else if (fieldType?.oneOf || fieldType?.oneOfType) {
             const oneOf = fieldType?.oneOf || fieldType?.oneOfType.map(type => ({ type }));
-            return (fieldType.nullable ? `\n${leading}  | null` : "") + oneOf.map(v => `\n${leading}  | ` + getFieldType(v, true)).join("");
+            return (fieldType.nullable ? `\n${innerLeading}  | null` : "") + oneOf.map(v => `\n${innerLeading}  | ` + getFieldType(v, true)).join("");
         }
         else if (fieldType?.arrayOf || fieldType?.arrayOfType) {
             const arrayOf = fieldType?.arrayOf || { type: fieldType?.arrayOfType };
