@@ -145,6 +145,9 @@ function dd() {
                 },
                 table_config: { nullable: true, jsonbSchemaType: {
                         referencedTables: { optional: true, arrayOfType: { name: "string", minFiles: "number" } },
+                        recType: {
+                            nullable: true, optional: true, record: { keysEnum: ["a", "b"], values: { type: { bools: "boolean[]" } } }
+                        }
                     }
                 }
             }

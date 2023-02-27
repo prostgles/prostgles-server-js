@@ -10,7 +10,11 @@ const DATA_TYPES = [
 ];
 var JSONB;
 (function (JSONB) {
-    const dd = {
+    const _r = {
+        a: [2],
+        b: [221]
+    };
+    const _dd = {
         enum: [1],
         type: "any"
     };
@@ -29,7 +33,7 @@ const s = {
         }
     }
 };
-const ss = {
+const _ss = {
     a: true,
     arr: [{ d: "" }],
     c: {
@@ -77,7 +81,7 @@ function validateSchema(schema, obj, objName, optional = false) {
 }
 exports.validateSchema = validateSchema;
 function getJSONBSchemaTSTypes(schema, colOpts, leading = "") {
-    const getFieldType = (rawFieldType, isOneOf = false) => {
+    const getFieldType = (rawFieldType, isOneOf = false, leading = "") => {
         const fieldType = getFieldTypeObj(rawFieldType);
         const nullType = (fieldType.nullable ? `null | ` : "");
         /** Primitives */
@@ -94,7 +98,7 @@ function getJSONBSchemaTSTypes(schema, colOpts, leading = "") {
             const spacing = isOneOf ? " " : "  ";
             let objDef = `${leading}{ \n` + (0, prostgles_types_1.getKeys)(type).map(k => {
                 const fieldType = getFieldTypeObj(type[k]);
-                return `${leading}${spacing}${k}${fieldType.optional ? "?" : ""}: ` + getFieldType(fieldType) + ";";
+                return `${leading}${spacing}${k}${fieldType.optional ? "?" : ""}: ` + getFieldType(fieldType, isOneOf) + ";";
             }).join("\n") + ` \n${leading}}${isOneOf ? "" : ";"}`;
             /** Keep single line */
             if (isOneOf) {
@@ -107,20 +111,24 @@ function getJSONBSchemaTSTypes(schema, colOpts, leading = "") {
         }
         else if (fieldType?.oneOf || fieldType?.oneOfType) {
             const oneOf = fieldType?.oneOf || fieldType?.oneOfType.map(type => ({ type }));
-            return (fieldType.nullable ? `\n${leading}  | null` : "") + oneOf.map(v => `\n${leading}  | ` + getFieldType(v)).join("");
+            return (fieldType.nullable ? `\n${leading}  | null` : "") + oneOf.map(v => `\n${leading}  | ` + getFieldType(v, true)).join("");
         }
         else if (fieldType?.arrayOf || fieldType?.arrayOfType) {
             const arrayOf = fieldType?.arrayOf || { type: fieldType?.arrayOfType };
-            return (fieldType.nullable ? `\n${leading}  | null` : "") + getFieldType(arrayOf) + "[]";
+            return (fieldType.nullable ? `null | ` : "") + getFieldType(arrayOf, true) + "[]";
+        }
+        else if (fieldType?.record) {
+            const { keysEnum, values } = fieldType.record;
+            return `${fieldType.nullable ? `null |` : ""} Record<${keysEnum?.map(v => (0, PubSubManager_1.asValue)(v)).join(" | ") ?? "string"}, ${!values ? "any" : getFieldType(values, true)}>`;
         }
         else
             throw "Unexpected getSchemaTSTypes: " + JSON.stringify({ fieldType, schema }, null, 2);
     };
-    return getFieldType({ ...schema, nullable: colOpts.nullable });
+    return getFieldType({ ...schema, nullable: colOpts.nullable }, undefined, leading);
 }
 exports.getJSONBSchemaTSTypes = getJSONBSchemaTSTypes;
 const getJSONSchemaObject = (rawType, rootInfo) => {
-    const { type, arrayOf, arrayOfType, description, nullable, oneOf, oneOfType, title, ...t } = typeof rawType === "string" ? ({ type: rawType }) :
+    const { type, arrayOf, arrayOfType, description, nullable, oneOf, oneOfType, title, record, ...t } = typeof rawType === "string" ? ({ type: rawType }) :
         rawType;
     let result = {};
     const partialProps = {
@@ -176,6 +184,16 @@ const getJSONSchemaObject = (rawType, rootInfo) => {
         result = {
             type: "object",
             oneOf: _oneOf.map(t => getJSONSchemaObject(t))
+        };
+    }
+    else if (record) {
+        result = {
+            type: "object",
+            ...(record.values && !record.keysEnum && { additionalProperties: getJSONSchemaObject(record.values) }),
+            ...(record.keysEnum && { properties: record.keysEnum.reduce((a, v) => ({
+                    ...a,
+                    [v]: !record.values ? { type: {} } : getJSONSchemaObject(record.values)
+                }), {}) })
         };
     }
     if (nullable) {

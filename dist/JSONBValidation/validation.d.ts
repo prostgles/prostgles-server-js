@@ -68,7 +68,20 @@ export declare namespace JSONB {
         arrayOf: FieldType;
         arrayOfType?: undefined;
     });
-    export type FieldTypeObj = StrictUnion<BasicType | ObjectType | EnumType | OneOf | ArrayOf>;
+    export type RecordType = BaseOptions & {
+        type?: undefined;
+        allowedValues?: undefined;
+        oneOf?: undefined;
+        oneOfType?: undefined;
+        arrayOf?: undefined;
+        arrayOfType?: undefined;
+        enum?: undefined;
+        record: {
+            keysEnum?: readonly string[];
+            values?: FieldType;
+        };
+    };
+    export type FieldTypeObj = StrictUnion<BasicType | ObjectType | EnumType | OneOf | ArrayOf | RecordType>;
     export type FieldType = DataType | FieldTypeObj;
     export type GetType<T extends FieldType | Omit<FieldTypeObj, "optional">> = T extends {
         type: ObjectSchema;
@@ -95,6 +108,12 @@ export declare namespace JSONB {
     } ? any[] : T extends {
         "enum": readonly any[];
     } ? T["enum"][number] : T extends {
+        "record": RecordType["record"];
+    } ? Record<T["record"] extends {
+        keysEnum: readonly string[];
+    } ? T["record"]["keysEnum"][number] : string, T["record"] extends {
+        values: FieldType;
+    } ? GetType<T["record"]["values"]> : any> : T extends {
         oneOf: FieldType[];
     } ? StrictUnion<GetType<T["oneOf"][number]>> : T extends {
         oneOf: readonly ObjectSchema[];

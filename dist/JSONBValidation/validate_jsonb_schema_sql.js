@@ -10,6 +10,7 @@ $f$
 DECLARE
   sub_schema RECORD;
   array_element RECORD;
+  obj_key_val RECORD;
   schema JSONB;
   path text;
   allowed_types text[] = '{any,boolean,number,integer,string,boolean[],number[],integer[],string[],any[]}';
@@ -239,6 +240,37 @@ BEGIN
       END IF; 
     END LOOP;
   
+  /* record: { keysEnum?: string[], values?: FieldType } */
+  ELSIF schema ? 'record' THEN
+    IF 
+      jsonb_typeof(schema->'record') != 'object' OR 
+      NOT (schema->'record') ? 'keysEnum' 
+      AND NOT (schema->'record') ? 'values'
+    THEN
+      RAISE EXCEPTION 'Invalid/empty record schema. Expecting a non empty record of: { keysEnum?: string[]; values?: FieldType } : %, %', schema, path USING HINT = path, COLUMN = colname; 
+    END IF;
+
+    IF jsonb_typeof(data) != 'object' THEN
+      RAISE EXCEPTION '% is not an object.', path USING HINT = path, COLUMN = colname; 
+    END IF;
+
+    FOR obj_key_val IN
+      SELECT jsonb_build_object('key',  key, 'value', value) as obj
+      FROM jsonb_each(data)
+    LOOP
+      RETURN (CASE WHEN NOT (schema->'record') ? 'keysEnum' THEN TRUE ELSE ${exports.VALIDATE_SCHEMA_FUNCNAME}( 
+        jsonb_build_object('enum', schema->'record'->'keysEnum')::TEXT,
+        (obj_key_val.obj)->'key', 
+        checked_path || ARRAY[(obj_key_val.obj)->>'key']
+      ) END) 
+      AND 
+      (CASE WHEN NOT (schema->'record') ? 'values' THEN TRUE ELSE ${exports.VALIDATE_SCHEMA_FUNCNAME}(
+        schema->'record'->>'values', 
+        (obj_key_val.obj)->'value', 
+        checked_path || ARRAY[(obj_key_val.obj)->>'key']
+      ) END);
+    END LOOP;
+
   ELSE
     RAISE EXCEPTION 'Unexpected schema: %, %', schema, path USING HINT = path, COLUMN = colname; 
   END IF;
@@ -263,6 +295,16 @@ SELECT ${exports.VALIDATE_SCHEMA_FUNCNAME}(
   '"a"'::JSONB
 );
 
+
+SELECT ${exports.VALIDATE_SCHEMA_FUNCNAME}(
+  '{ "record": { "keysEnum": ["a", "b"] , "values": { "enum": [1, 2] } } }', 
+  '{"a": 1, "b": 2 }'::JSONB
+);
+
+SELECT ${exports.VALIDATE_SCHEMA_FUNCNAME}(
+  '{ "record": { "keysEnum": ["a", "b"]    } }', 
+  '{"a": 1, "b": 2 }'::JSONB
+);
 SELECT ${exports.VALIDATE_SCHEMA_FUNCNAME}(
   '{ "enum": ["a", "b", 2] }', 
   '2'::JSONB
