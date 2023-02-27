@@ -3,8 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.validate_jsonb_schema_sql = exports.VALIDATE_SCHEMA_FUNCNAME = void 0;
 exports.VALIDATE_SCHEMA_FUNCNAME = "prostgles.validate_jsonb_schema";
 exports.validate_jsonb_schema_sql = `
-/* prevent duplicate key value violates unique constraint "pg_namespace_nspname_index" Key (nspname)=(prostgles) already exists.*/
-LOCK TABLE pg_catalog.pg_namespace IN SHARE ROW EXCLUSIVE MODE;
 
 DROP FUNCTION IF EXISTS ${exports.VALIDATE_SCHEMA_FUNCNAME}(jsonb_schema text, data jsonb, checked_path text[]);
 

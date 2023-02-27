@@ -1,1 +1,1 @@
-{"version":3,"file":"validate_jsonb_schema_sql.d.ts","sourceRoot":"","sources":["validate_jsonb_schema_sql.ts"],"names":[],"mappings":"AAEA,eAAO,MAAM,wBAAwB,mCAA6C,CAAC;AACnF,eAAO,MAAM,yBAAyB,QA4VrC,CAAC"}
+{"version":3,"file":"validate_jsonb_schema_sql.d.ts","sourceRoot":"","sources":["validate_jsonb_schema_sql.ts"],"names":[],"mappings":"AAEA,eAAO,MAAM,wBAAwB,mCAA6C,CAAC;AACnF,eAAO,MAAM,yBAAyB,QA0VrC,CAAC"}

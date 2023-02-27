@@ -248,7 +248,11 @@ class TableConfigurator {
                     /** Must install validation function */
                     if (hasJSONBValidation) {
                         try {
-                            const fileContent = `CREATE SCHEMA IF NOT EXISTS prostgles;\n ${validate_jsonb_schema_sql_1.validate_jsonb_schema_sql}`;
+                            const fileContent = `
+              /* prevent duplicate key value violates unique constraint "pg_namespace_nspname_index" Key (nspname)=(prostgles) already exists.*/
+              LOCK TABLE pg_catalog.pg_namespace IN SHARE ROW EXCLUSIVE MODE;
+              CREATE SCHEMA IF NOT EXISTS prostgles;\n 
+              ${validate_jsonb_schema_sql_1.validate_jsonb_schema_sql}`;
                             await this.db.any(fileContent);
                         }
                         catch (err) {
