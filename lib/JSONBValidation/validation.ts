@@ -244,8 +244,11 @@ export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpt
       const spacing = isOneOf ? " " : "  ";
       let objDef = `${leading}{ \n` + getKeys(type).map(k => {
         const fieldType = getFieldTypeObj(type[k]);
-        return `${leading}${spacing}${k}${fieldType.optional ? "?" : ""}: ` + getFieldType(fieldType, isOneOf) + ";";
-      }).join("\n") + ` \n${leading}}${isOneOf ? "" : ";"}`;
+        return `${leading}${spacing}${k}${fieldType.optional ? "?" : ""}: ` + getFieldType(fieldType, true) + ";";
+      }).join("\n") + ` \n${leading}}`;
+      if(!objDef.endsWith(";") && !isOneOf){
+        objDef += ";";
+      }
     
       /** Keep single line */
       if (isOneOf){

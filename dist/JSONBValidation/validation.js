@@ -98,8 +98,11 @@ function getJSONBSchemaTSTypes(schema, colOpts, leading = "") {
             const spacing = isOneOf ? " " : "  ";
             let objDef = `${leading}{ \n` + (0, prostgles_types_1.getKeys)(type).map(k => {
                 const fieldType = getFieldTypeObj(type[k]);
-                return `${leading}${spacing}${k}${fieldType.optional ? "?" : ""}: ` + getFieldType(fieldType, isOneOf) + ";";
-            }).join("\n") + ` \n${leading}}${isOneOf ? "" : ";"}`;
+                return `${leading}${spacing}${k}${fieldType.optional ? "?" : ""}: ` + getFieldType(fieldType, true) + ";";
+            }).join("\n") + ` \n${leading}}`;
+            if (!objDef.endsWith(";") && !isOneOf) {
+                objDef += ";";
+            }
             /** Keep single line */
             if (isOneOf) {
                 objDef = objDef.split("\n").join("");
