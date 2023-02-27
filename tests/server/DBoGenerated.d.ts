@@ -369,20 +369,20 @@ export type DBSchemaGenerated = {
     delete: true;
     columns: {
       colOneOf: "a" | "b" | "c"
-      json:       {    a: boolean;   arr: '1' | '2' | '3';   arr1: 1 | 2 | 3;   arr2: number[];   arrStr?: null | string[];   o?: 
-       | null
-        |       {  o1: number; }
-        |       {  o2: boolean; };  };
+      json:  {    a: boolean;   arr: '1' | '2' | '3';   arr1: 1 | 2 | 3;   arr2: number[];   arrStr?: null | string[];   o?: 
+ | null
+ |  {  o1: number; }
+ |  {  o2: boolean; };  };
       jsonOneOf?: 
        | null
-        |       {  command: 'a'; }
-        |       {  command: 'b';  option: number[]; }
+       |  {  command: 'a'; }
+       |  {  command: 'b';  option: number[]; }
       status?: 
        | null
-        |       {  ok: string; }
-        |       {  err: string; }
-        |       {  loading:       {  loaded: number;  total: number; }; }
-      table_config?: null |       {    referencedTables?:       {  name: string;  minFiles: number; }[];   recType?: null | Record<'a' | 'b',       {  bools: boolean[]; }>;  };
+       |  {  ok: string; }
+       |  {  err: string; }
+       |  {  loading:  {  loaded: number;  total: number; }; }
+      table_config?: null |  {    referencedTables?:  {  name: string;  minFiles: number; }[];   recType?: null | Record<'a' | 'b',  {  bools: boolean[]; }>;  };
     };
   };
   tr1: {
@@ -438,7 +438,7 @@ export type DBSchemaGenerated = {
     columns: {
       email: string;
       id?: number;
-      preferences?:       {    showIntro?: boolean;   theme?: 'light' | 'dark' | 'auto';   others: any[];  };
+      preferences?:  {    showIntro?: boolean;   theme?: 'light' | 'dark' | 'auto';   others: any[];  };
       status: "active" | "disabled" | "pending"
     };
   };

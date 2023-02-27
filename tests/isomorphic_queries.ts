@@ -20,10 +20,10 @@ export async function tryRun(desc: string, func: () => any, log?: Function){
 export function tryRunP(desc: string, func: (resolve: any, reject: any) => any, opts?: { log?: Function; timeout?: number; }){
   return new Promise(async (rv, rj) => {
     const tout = Number.isFinite(opts?.timeout)? setTimeout(() => {
-      const errMsg = `${desc} failed. Reason: Timout reached: ${opts.timeout}ms`;
+      const errMsg = `${desc} failed. Reason: Timout reached: ${opts!.timeout}ms`;
       opts?.log?.(errMsg);
       rj(errMsg);
-    }, opts.timeout) : undefined
+    }, opts!.timeout) : undefined
     try {
       await func(rv, rj);
       clearTimeout(tout);

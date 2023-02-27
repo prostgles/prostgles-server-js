@@ -83,7 +83,7 @@ jobs:
 
     services:
       postgres:
-        image: postgis/postgis:10-2.5
+        image: postgis/postgis:11-3.3
         #image: postgres:10.8
         env:
           POSTGRES_USER: api

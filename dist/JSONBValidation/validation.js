@@ -81,7 +81,7 @@ function validateSchema(schema, obj, objName, optional = false) {
 }
 exports.validateSchema = validateSchema;
 function getJSONBSchemaTSTypes(schema, colOpts, outerLeading = "") {
-    const getFieldType = (rawFieldType, isOneOf = false, innerLeading = outerLeading, depth = 0) => {
+    const getFieldType = (rawFieldType, isOneOf = false, innerLeading = "", depth = 0) => {
         const fieldType = getFieldTypeObj(rawFieldType);
         const nullType = (fieldType.nullable ? `null | ` : "");
         /** Primitives */
@@ -96,7 +96,7 @@ function getJSONBSchemaTSTypes(schema, colOpts, outerLeading = "") {
         else if ((0, prostgles_types_1.isObject)(fieldType.type)) {
             const { type } = fieldType;
             const spacing = isOneOf ? " " : "  ";
-            let objDef = `${innerLeading}{${spacing}` + (0, prostgles_types_1.getKeys)(type).map(k => {
+            let objDef = ` {${spacing}` + (0, prostgles_types_1.getKeys)(type).map(k => {
                 const fieldType = getFieldTypeObj(type[k]);
                 return `${spacing}${k}${fieldType.optional ? "?" : ""}: ` + getFieldType(fieldType, true, undefined, depth + 1) + ";";
             }).join(" ") + `${spacing}}`;
@@ -114,7 +114,7 @@ function getJSONBSchemaTSTypes(schema, colOpts, outerLeading = "") {
         }
         else if (fieldType?.oneOf || fieldType?.oneOfType) {
             const oneOf = fieldType?.oneOf || fieldType?.oneOfType.map(type => ({ type }));
-            return (fieldType.nullable ? `\n${innerLeading} | null` : "") + oneOf.map(v => `\n${innerLeading}  | ` + getFieldType(v, true, undefined, depth + 1)).join("");
+            return (fieldType.nullable ? `\n${innerLeading} | null` : "") + oneOf.map(v => `\n${innerLeading} | ` + getFieldType(v, true, undefined, depth + 1)).join("");
         }
         else if (fieldType?.arrayOf || fieldType?.arrayOfType) {
             const arrayOf = fieldType?.arrayOf || { type: fieldType?.arrayOfType };
