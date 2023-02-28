@@ -18,6 +18,7 @@ import { SelectParams, FieldFilter, asName, WAL, isEmpty, AnyObject } from "pros
 import { ClientExpressData, syncData } from "../SyncReplication";
 import { TableRule } from "../PublishParser";
 import { find } from "prostgles-types/dist/util";
+import { DB_OBJ_NAMES } from "./getInitQuery";
 
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -138,7 +139,7 @@ export class PubSubManager {
   postgresNotifListenManager?: PostgresNotifListenManager;
 
   private constructor(options: PubSubManagerOptions) {
-    const { wsChannelNamePrefix, pgChannelName, onSchemaChange, dboBuilder } = options;
+    const { wsChannelNamePrefix, onSchemaChange, dboBuilder } = options;
     if (!dboBuilder.db || !dboBuilder.dbo) {
       throw 'MISSING: db_pg, db';
     }
@@ -167,6 +168,9 @@ export class PubSubManager {
     }
   }
 
+  /**
+   * Used facilitate concurrent prostgles connections to the same database
+   */
   appID?: string;
 
   appCheckFrequencyMS = 10 * 1000;
@@ -207,11 +211,10 @@ export class PubSubManager {
     if (this.appCheck) {
       clearInterval(this.appCheck);
     }
-    this.onSocketDisconnected();
-    // if(this.postgresNotifListenManager){
-    //     this.postgresNotifListenManager.stopListening();
-    // }
-    if (!this.postgresNotifListenManager) throw "this.postgresNotifListenManager missing"
+    this.onSocketDisconnected(); 
+    if (!this.postgresNotifListenManager) {
+      throw "this.postgresNotifListenManager missing"
+    }
     this.postgresNotifListenManager.destroy();
   }
 
@@ -226,12 +229,6 @@ export class PubSubManager {
   appChecking = false;
   init = initPubSubManager.bind(this);
 
-  DB_OBJ_NAMES = {
-    trigger_add_remove_func: "prostgles.trigger_add_remove_func",
-    data_watch_func: "prostgles.prostgles_trigger_function",
-    schema_watch_func: "prostgles.schema_watch_func",
-    schema_watch_trigger: "prostgles_schema_watch_trigger_new"
-  } as const;
 
   static SCHEMA_ALTERING_QUERIES = ['CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO'];
 
@@ -279,6 +276,7 @@ export class PubSubManager {
                     );
   
                     is_super_user := EXISTS (select 1 from pg_user where usename = CURRENT_USER AND usesuper IS TRUE);
+
                     /**
                      *  Delete stale app records
                      * */
@@ -300,7 +298,7 @@ export class PubSubManager {
                     ev_trg_needed := EXISTS (SELECT 1 FROM prostgles.apps WHERE watching_schema IS TRUE);
                     ev_trg_exists := EXISTS (
                         SELECT 1 FROM pg_catalog.pg_event_trigger
-                        WHERE evtname = ${asValue(this.DB_OBJ_NAMES.schema_watch_trigger)}
+                        WHERE evtname = ${asValue(DB_OBJ_NAMES.schema_watch_trigger)}
                     );
 
                      -- RAISE NOTICE ' ev_trg_needed %, ev_trg_exists %', ev_trg_needed, ev_trg_exists;
@@ -312,7 +310,7 @@ export class PubSubManager {
 
                         SELECT format(
                             $$ DROP EVENT TRIGGER IF EXISTS %I ; $$
-                            , ${asValue(this.DB_OBJ_NAMES.schema_watch_trigger)}
+                            , ${asValue(DB_OBJ_NAMES.schema_watch_trigger)}
                         )
                         INTO q;
 
@@ -329,11 +327,11 @@ export class PubSubManager {
                         AND ev_trg_exists IS FALSE 
                     THEN
 
-                        DROP EVENT TRIGGER IF EXISTS ${this.DB_OBJ_NAMES.schema_watch_trigger};
-                        CREATE EVENT TRIGGER ${this.DB_OBJ_NAMES.schema_watch_trigger} ON ddl_command_end
+                        DROP EVENT TRIGGER IF EXISTS ${DB_OBJ_NAMES.schema_watch_trigger};
+                        CREATE EVENT TRIGGER ${DB_OBJ_NAMES.schema_watch_trigger} ON ddl_command_end
                         WHEN TAG IN ('COMMENT', 'CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO')
                         --WHEN TAG IN ('CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE TRIGGER', 'DROP TRIGGER')
-                        EXECUTE PROCEDURE ${this.DB_OBJ_NAMES.schema_watch_func}();
+                        EXECUTE PROCEDURE ${DB_OBJ_NAMES.schema_watch_func}();
 
                         --RAISE NOTICE ' CREATED EVENT TRIGGER %', q;
                     END IF;
@@ -540,7 +538,7 @@ export class PubSubManager {
     });
   }
 
-  upsertSocket(socket: any, channel_name: string) {
+  upsertSocket(socket: any) {
     if (socket && !this.sockets[socket.id]) {
       this.sockets[socket.id] = socket;
       socket.on("disconnect", () => this.onSocketDisconnected(socket));
@@ -572,7 +570,7 @@ export class PubSubManager {
 
     if (!synced_field) throw "synced_field missing from table_rules";
 
-    this.upsertSocket(socket, channel_name);
+    this.upsertSocket(socket);
 
     const upsertSync = () => {
       const newSync = {
@@ -692,7 +690,7 @@ export class PubSubManager {
 
     const channel_name = `${this.socketChannelPreffix}.${table_info.name}.${JSON.stringify(filter)}.${JSON.stringify(params)}.${"m"}.sub`;
 
-    this.upsertSocket(socket, channel_name);
+    this.upsertSocket(socket);
 
     const upsertSub = (newSubData: { table_name: string; condition: string; is_ready: boolean; parentSubParams: SubscriptionParams["parentSubParams"] }, isReadyOverride: boolean | undefined) => {
       const { table_name, condition: _cond, is_ready = false, parentSubParams } = newSubData,

@@ -288,7 +288,6 @@ class ViewHandler {
             const jo = this.joins.find(j => j.tables.includes(t1) && j.tables.includes(t2));
             if (!jo)
                 throw `Joining ${t1} <-> ${t2} dissallowed or missing`;
-            ;
             const on = [];
             jo.on.map(cond => {
                 const condArr = [];

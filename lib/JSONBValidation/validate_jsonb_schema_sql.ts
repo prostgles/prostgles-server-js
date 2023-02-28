@@ -1,7 +1,12 @@
+import { PubSubManager } from "../PubSubManager/PubSubManager";
 
 
-export const VALIDATE_SCHEMA_FUNCNAME = "prostgles.validate_jsonb_schema" as const;
+export const VALIDATE_SCHEMA_FUNCNAME = "validate_jsonb_schema" as const;
 export const validate_jsonb_schema_sql = `
+
+/* 
+* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
+*/
 
 DROP FUNCTION IF EXISTS ${VALIDATE_SCHEMA_FUNCNAME}(jsonb_schema text, data jsonb, checked_path text[]);
 
@@ -280,7 +285,8 @@ END;
 $f$ LANGUAGE 'plpgsql' IMMUTABLE;
 
 COMMENT ON FUNCTION ${VALIDATE_SCHEMA_FUNCNAME}  
-IS $$Used to validate jsonb data against a schema:
+IS $$prostgles-server internal function used in column CHECK conditions to validate jsonb data against a column schema specified in tableConfig.
+Example usage:
 validate_jsonb_schema(
   '{ "type": { "a": "number[]" } }', 
   '{ "a": [2] }'

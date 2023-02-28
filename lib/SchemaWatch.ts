@@ -31,7 +31,7 @@ export class SchemaWatch {
       }, watchSchemaType.checkIntervalMillis);
 
     } else if(watchSchemaType === "DDL_trigger"){
-
+      /** Do nothing */
     }
 
   }

@@ -1,8 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.validate_jsonb_schema_sql = exports.VALIDATE_SCHEMA_FUNCNAME = void 0;
-exports.VALIDATE_SCHEMA_FUNCNAME = "prostgles.validate_jsonb_schema";
+const PubSubManager_1 = require("../PubSubManager/PubSubManager");
+exports.VALIDATE_SCHEMA_FUNCNAME = "validate_jsonb_schema";
 exports.validate_jsonb_schema_sql = `
+
+/* 
+* ${PubSubManager_1.PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
+*/
 
 DROP FUNCTION IF EXISTS ${exports.VALIDATE_SCHEMA_FUNCNAME}(jsonb_schema text, data jsonb, checked_path text[]);
 
@@ -281,7 +286,8 @@ END;
 $f$ LANGUAGE 'plpgsql' IMMUTABLE;
 
 COMMENT ON FUNCTION ${exports.VALIDATE_SCHEMA_FUNCNAME}  
-IS $$Used to validate jsonb data against a schema:
+IS $$prostgles-server internal function used in column CHECK conditions to validate jsonb data against a column schema specified in tableConfig.
+Example usage:
 validate_jsonb_schema(
   '{ "type": { "a": "number[]" } }', 
   '{ "a": [2] }'

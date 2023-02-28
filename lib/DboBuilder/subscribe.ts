@@ -202,29 +202,4 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
   }
 }
 
-
-async function _subscribe(localFunc: LocalFunc): Promise<string>
-async function _subscribe(localFunc: undefined, table_rules: TableRule, localParams: LocalParams): Promise<{ unsubscribe: () => any }>
-  async function _subscribe(localFunc: LocalFunc | undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<{ unsubscribe: () => any } | string> {
-  if(localFunc && !localParams){
-    return {
-      unsubscribe: () => {}
-    }
-  }
-
-  if(localParams){
-    return ""
-  }
-
-  return {
-    unsubscribe: () => {}
-  }
-}
-
-const d = async () => {
-
-  const res = await _subscribe(()=>{})
-  const res2 = await _subscribe(undefined, {}, {})
-}
-
 export { subscribe }

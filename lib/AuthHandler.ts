@@ -241,7 +241,7 @@ export default class AuthHandler {
         httpOnly: true, // The cookie only accessible by the web server
         //signed: true // Indicates if the cookie should be signed
         secure: true, 
-        sameSite: "strict" as "strict", 
+        sameSite: "strict" as const, 
         ...(this.opts?.expressConfig?.cookieOptions || {}) 
       };
       const cookieData = sid;
@@ -437,12 +437,12 @@ export default class AuthHandler {
 
     return new Promise(async (resolve, reject) => {
 
-      let interval: NodeJS.Timeout, result: any, error: any, finished = false;
+      let result: any, error: any, finished = false;
 
       /**
        * Throttle response times to prevent timing attacks
        */
-      interval = setInterval(() => {
+      const interval = setInterval(() => {
         if (finished) {
           clearInterval(interval);
           if (error) {
@@ -470,7 +470,7 @@ export default class AuthHandler {
     const { responseThrottle = 500 } = this.opts;
 
     return this.throttledFunc(async () => {
-      let result = await this.opts?.login?.(params, this.dbo as any, this.db, client);
+      const result = await this.opts?.login?.(params, this.dbo, this.db, client);
       const err = {
         msg: "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number } but got: " + JSON.stringify(result) 
       }
@@ -603,14 +603,14 @@ export default class AuthHandler {
   makeSocketAuth = async (socket: PRGLIOSocket): Promise<{ auth: AuthSocketSchema; userData: AuthResult; } | Record<string, never>> => {
     if (!this.opts) return {};
 
-    let auth: Partial<Record<keyof Omit<AuthSocketSchema, "user">, boolean | undefined>> & { user?: AnyObject | undefined } = {};
+    const auth: Partial<Record<keyof Omit<AuthSocketSchema, "user">, boolean | undefined>> & { user?: AnyObject | undefined } = {};
 
     if (this.opts.expressConfig?.publicRoutes && !this.opts.expressConfig?.disableSocketAuthGuard) {
 
       auth.pathGuard = true;
 
       socket.removeAllListeners(CHANNELS.AUTHGUARD)
-      socket.on(CHANNELS.AUTHGUARD, async (params: AuthGuardLocation, cb = (err: any, res?: AuthGuardLocationResponse) => { }) => {
+      socket.on(CHANNELS.AUTHGUARD, async (params: AuthGuardLocation, cb = (_err: any, _res?: AuthGuardLocationResponse) => { /** EMPTY */ }) => {
 
         try {
 
@@ -660,7 +660,7 @@ export default class AuthHandler {
       auth[name] = true;
 
       socket.removeAllListeners(ch)
-      socket.on(ch, async (params: any, cb = (...callback: any) => { }) => {
+      socket.on(ch, async (params: any, cb = (..._callback: any) => { /** Empty */ }) => {
 
         try {
           if (!socket) throw "socket missing??!!";

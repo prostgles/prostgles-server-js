@@ -114,6 +114,9 @@ export declare class PubSubManager {
         preffix: string;
         getFull: (appID?: string) => string;
     };
+    /**
+     * Used facilitate concurrent prostgles connections to the same database
+     */
     appID?: string;
     appCheckFrequencyMS: number;
     appCheck?: ReturnType<typeof setInterval>;
@@ -128,12 +131,6 @@ export declare class PubSubManager {
     canContinue: () => boolean;
     appChecking: boolean;
     init: () => Promise<PubSubManager | undefined>;
-    DB_OBJ_NAMES: {
-        readonly trigger_add_remove_func: "prostgles.trigger_add_remove_func";
-        readonly data_watch_func: "prostgles.prostgles_trigger_function";
-        readonly schema_watch_func: "prostgles.schema_watch_func";
-        readonly schema_watch_trigger: "prostgles_schema_watch_trigger_new";
-    };
     static SCHEMA_ALTERING_QUERIES: string[];
     static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID: string;
     prepareTriggers: () => Promise<boolean>;
@@ -144,7 +141,7 @@ export declare class PubSubManager {
         payload: string;
     }) => Promise<void>;
     pushSubData(sub: SubscriptionParams, err?: any): true | Promise<unknown>;
-    upsertSocket(socket: any, channel_name: string): void;
+    upsertSocket(socket: any): void;
     syncTimeout?: ReturnType<typeof setTimeout>;
     syncData(sync: SyncParams, clientData: ClientExpressData | undefined, source: "trigger" | "client"): Promise<void>;
     /**

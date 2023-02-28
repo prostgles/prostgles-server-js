@@ -11,8 +11,8 @@
     "prepare": "npm run build",
     "start": "tsc --watch",
     "build": "tsc",
-    "lint": "eslint . --ext .ts",
-    "test": "rm -rf ./node_modules/* && npm i && tsc && cd tests/ && ./test.sh"
+    "lint": "eslint . --ext .ts --quiet --fix",
+    "test": "npm run lint && rm -rf ./node_modules/* && npm i && tsc && cd tests/ && ./test.sh"
   },
   "repository": {
     "type": "git",
