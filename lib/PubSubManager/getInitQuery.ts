@@ -70,6 +70,7 @@ BEGIN
     THEN 
 
         CREATE SCHEMA IF NOT EXISTS prostgles;
+        COMMENT ON SCHEMA prostgles IS 'Used by prostgles-server to enable data/schema change tracking through subscribe/sync/watchSchema';
 
         CREATE TABLE IF NOT EXISTS prostgles.versions(
           version TEXT PRIMARY KEY,
@@ -532,6 +533,6 @@ COMMIT;
 `};
 
   const res = getQuery();
-  log(res);
+  
   return res;
 }
