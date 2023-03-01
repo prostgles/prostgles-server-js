@@ -1,8 +1,7 @@
-import { getKeys, asName as _asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE, isObject, pickKeys } from "prostgles-types";
+import { getKeys, asName as _asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE, isObject, pickKeys, JSONB, getJSONBSchemaAsJSONSchema, ColumnInfo } from "prostgles-types";
 import { isPlainObject, JoinInfo } from "./DboBuilder";
 import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
 import { asValue } from "./PubSubManager/PubSubManager";
-import { getJSONBSchemaAsJSONSchema, JSONB } from "./JSONBValidation/validation"; 
 import { validate_jsonb_schema_sql, VALIDATE_SCHEMA_FUNCNAME } from "./JSONBValidation/validate_jsonb_schema_sql";
 
 type ColExtraInfo = {
@@ -312,17 +311,17 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     }
   }
 
-  getColInfo = (params: { col: string, table: string, lang?: string }): (ColExtraInfo & { label?: string; jsonSchema?: AnyObject; }) | undefined => {
+  getColInfo = (params: { col: string, table: string, lang?: string }): (ColExtraInfo & { label?: string; } & Pick<ColumnInfo, "jsonbSchema">) | undefined => {
     const colConf = this.getColumnConfig(params.table, params.col);
-    let result: ReturnType<typeof this.getColInfo> = undefined;
+    let result: Partial<ReturnType<typeof this.getColInfo>> = undefined;
     if (colConf) {
 
       if (isObject(colConf)) {
-        
+        const { jsonbSchema, jsonbSchemaType, info } = colConf;
         result = {
           ...(result ?? {}),
-          ...("info" in colConf && colConf?.info),
-          ...((colConf?.jsonbSchema || colConf?.jsonbSchemaType) && { jsonSchema: getJSONBSchemaAsJSONSchema(params.table, params.col, colConf) })
+          ...info,
+          ...((jsonbSchema || jsonbSchemaType) && { jsonbSchema: { nullable: colConf.nullable, ...(jsonbSchema || { type: jsonbSchemaType }) } })
         }
 
         /**

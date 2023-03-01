@@ -4,7 +4,6 @@ exports.parseI18N = void 0;
 const prostgles_types_1 = require("prostgles-types");
 const DboBuilder_1 = require("./DboBuilder");
 const PubSubManager_1 = require("./PubSubManager/PubSubManager");
-const validation_1 = require("./JSONBValidation/validation");
 const validate_jsonb_schema_sql_1 = require("./JSONBValidation/validate_jsonb_schema_sql");
 const parseI18N = (params) => {
     const { config, lang, defaultLang, defaultValue } = params;
@@ -53,10 +52,11 @@ class TableConfigurator {
             let result = undefined;
             if (colConf) {
                 if ((0, prostgles_types_1.isObject)(colConf)) {
+                    const { jsonbSchema, jsonbSchemaType, info } = colConf;
                     result = {
                         ...(result ?? {}),
-                        ...("info" in colConf && colConf?.info),
-                        ...((colConf?.jsonbSchema || colConf?.jsonbSchemaType) && { jsonSchema: (0, validation_1.getJSONBSchemaAsJSONSchema)(params.table, params.col, colConf) })
+                        ...info,
+                        ...((jsonbSchema || jsonbSchemaType) && { jsonbSchema: { nullable: colConf.nullable, ...(jsonbSchema || { type: jsonbSchemaType }) } })
                     };
                     /**
                      * Get labels from TableConfig if specified

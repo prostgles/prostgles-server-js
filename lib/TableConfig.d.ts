@@ -1,7 +1,6 @@
-import { AnyObject, TableInfo, ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE } from "prostgles-types";
+import { AnyObject, TableInfo, ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE, JSONB, ColumnInfo } from "prostgles-types";
 import { JoinInfo } from "./DboBuilder";
 import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
-import { JSONB } from "./JSONBValidation/validation";
 type ColExtraInfo = {
     min?: string | number;
     max?: string | number;
@@ -243,8 +242,7 @@ export default class TableConfigurator<LANG_IDS = {
         lang?: string;
     }) => (ColExtraInfo & {
         label?: string;
-        jsonSchema?: AnyObject;
-    }) | undefined;
+    } & Pick<ColumnInfo, "jsonbSchema">) | undefined;
     checkColVal: (params: {
         col: string;
         table: string;
