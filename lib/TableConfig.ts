@@ -127,7 +127,7 @@ export type JSONBColumnDef = (BaseColumnTypes & {
   jsonbSchemaType?: undefined;
 } | {
   jsonbSchema?: undefined;
-  jsonbSchemaType: JSONB.ObjectSchema;
+  jsonbSchemaType: JSONB.ObjectType["type"];
 })
 
 /**

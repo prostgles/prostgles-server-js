@@ -8,7 +8,7 @@ export const validate_jsonb_schema_sql = `
 * ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
 */
 
-DROP FUNCTION IF EXISTS ${VALIDATE_SCHEMA_FUNCNAME}(jsonb_schema text, data jsonb, checked_path text[]);
+--DROP FUNCTION IF EXISTS ${VALIDATE_SCHEMA_FUNCNAME}(jsonb_schema text, data jsonb, checked_path text[]);
 
 CREATE OR REPLACE FUNCTION ${VALIDATE_SCHEMA_FUNCNAME}(jsonb_schema TEXT, data JSONB, checked_path TEXT[] DEFAULT ARRAY[]::TEXT[]) RETURNS boolean AS 
 $f$

@@ -1,6 +1,6 @@
 import { JSONB } from "prostgles-types";
 export declare function validate<T>(obj: T, key: keyof T, rawFieldType: JSONB.FieldType): boolean;
-export declare function validateSchema<S extends JSONB.ObjectSchema>(schema: S, obj: JSONB.GetObjectType<S>, objName?: string, optional?: boolean): void;
+export declare function validateSchema<S extends JSONB.ObjectType["type"]>(schema: S, obj: JSONB.GetObjectType<S>, objName?: string, optional?: boolean): void;
 type ColOpts = {
     nullable?: boolean;
 };
