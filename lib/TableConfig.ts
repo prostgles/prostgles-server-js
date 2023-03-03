@@ -498,12 +498,15 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
             /** Validate default value against jsonbSchema  */
             const q = `SELECT ${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${asValue(colConf.defaultValue)+"::JSONB"}, ARRAY[${asValue(name)}]) as v`
             if(colConf.defaultValue){ 
-              this.log(q)
+              this.log(q);
+              const failedDefault = (err?: any) => {
+                console.error(`Default value (${colConf.defaultValue}) for ${tableName}.${name} does not satisfy the jsonb constraint check: ${q}`, err);
+              }
               this.dbo.sql!(q, {}, { returnType: "row" }).then(row => {
                 if(!row?.v) {
-                  console.error(`Default value (${colConf.defaultValue}) for ${tableName}.${name} does not satisfy the jsonb constraint check: ${q}`);
+                  failedDefault();
                 }
-              })
+              }).catch(failedDefault)
             }
             return ` ${colNameEsc} ${getColTypeDef(colConf, "JSONB")} CHECK(${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${colNameEsc}, ARRAY[${asValue(name)}]))`;
 

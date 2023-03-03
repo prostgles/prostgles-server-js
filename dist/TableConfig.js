@@ -219,11 +219,14 @@ class TableConfigurator {
                         const q = `SELECT ${validate_jsonb_schema_sql_1.VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${(0, PubSubManager_1.asValue)(colConf.defaultValue) + "::JSONB"}, ARRAY[${(0, PubSubManager_1.asValue)(name)}]) as v`;
                         if (colConf.defaultValue) {
                             this.log(q);
+                            const failedDefault = (err) => {
+                                console.error(`Default value (${colConf.defaultValue}) for ${tableName}.${name} does not satisfy the jsonb constraint check: ${q}`, err);
+                            };
                             this.dbo.sql(q, {}, { returnType: "row" }).then(row => {
                                 if (!row?.v) {
-                                    console.error(`Default value (${colConf.defaultValue}) for ${tableName}.${name} does not satisfy the jsonb constraint check: ${q}`);
+                                    failedDefault();
                                 }
-                            });
+                            }).catch(failedDefault);
                         }
                         return ` ${colNameEsc} ${getColTypeDef(colConf, "JSONB")} CHECK(${validate_jsonb_schema_sql_1.VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${colNameEsc}, ARRAY[${(0, PubSubManager_1.asValue)(name)}]))`;
                     }
