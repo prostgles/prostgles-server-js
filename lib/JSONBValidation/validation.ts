@@ -82,7 +82,7 @@ export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpt
 
     } else if (fieldType?.arrayOf || fieldType?.arrayOfType) {
       const arrayOf = fieldType?.arrayOf || { type: fieldType?.arrayOfType };
-      return (fieldType.nullable ? `null | ` : "") + getFieldType(arrayOf, true, undefined, depth + 1) + "[]";
+      return `${fieldType.nullable ? `null | ` : ""} ( ${getFieldType(arrayOf, true, undefined, depth + 1)} )[]`;
 
     } else if (fieldType?.record) {
       const { keysEnum, values } = fieldType.record;
