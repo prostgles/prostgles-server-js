@@ -718,7 +718,7 @@ class ViewHandler {
             if (!this.dboBuilder.dbo[t])
                 throw { stack: ["prepareExistCondition()"], message: `Invalid or dissallowed table: ${t}` };
         });
-        /* Nested $exists not allowed */
+        /* Nested $exists not allowed ??! */
         if (f2 && Object.keys(f2).find(fk => prostgles_types_1.EXISTS_KEYS.includes(fk))) {
             throw { stack: ["prepareExistCondition()"], message: "Nested exists dissallowed" };
         }

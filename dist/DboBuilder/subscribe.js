@@ -131,7 +131,7 @@ async function subscribe(filter, params, localFunc, table_rules, localParams) {
                         relatedTables: []
                     };
                     /**
-                     * Avoid nested exists error
+                     * Avoid nested exists error. Will affect performance
                      */
                     const nonExistsFilter = filterOpts.exists.length ? {} : filter;
                     for await (const j of (newQuery.joins ?? [])) {
@@ -145,6 +145,7 @@ async function subscribe(filter, params, localFunc, table_rules, localParams) {
                                             [[this.name, ...j.$path ?? [].slice(0).reverse()].join(".")]: nonExistsFilter
                                         }
                                     },
+                                    addKeywords: false,
                                     localParams: undefined,
                                     tableRule: undefined
                                 })).where
@@ -162,6 +163,7 @@ async function subscribe(filter, params, localFunc, table_rules, localParams) {
                                         [[this.name, ...e.tables ?? [].slice(0, -1).reverse()].join(".")]: nonExistsFilter
                                     }
                                 },
+                                addKeywords: false,
                                 localParams: undefined,
                                 tableRule: undefined
                             })).where

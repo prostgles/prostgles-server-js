@@ -182,6 +182,7 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
                         [[this.name, ...j.$path ?? [].slice(0).reverse()].join(".")]: nonExistsFilter
                       } 
                     },
+                    addKeywords: false,
                     localParams: undefined, 
                     tableRule: undefined 
                   })).where
@@ -199,6 +200,7 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
                       [[this.name, ...e.tables ?? [].slice(0, -1).reverse()].join(".")]: nonExistsFilter
                     }
                   },
+                  addKeywords: false,
                   localParams: undefined, 
                   tableRule: undefined 
                 })).where
