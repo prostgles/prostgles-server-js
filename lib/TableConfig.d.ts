@@ -161,12 +161,23 @@ export type ColumnConfigs<LANG_IDS = {
 type UnionKeys<T> = T extends T ? keyof T : never;
 type StrictUnionHelper<T, TAll> = T extends any ? T & Partial<Record<Exclude<UnionKeys<TAll>, keyof T>, never>> : never;
 export type StrictUnion<T> = StrictUnionHelper<T, T>;
+export declare const CONSTRAINT_TYPES: readonly ["PRIMARY KEY", "UNIQUE", "CHECK"];
 type TableDefinition<LANG_IDS> = {
     columns?: {
         [column_name: string]: ColumnConfig<LANG_IDS>;
     };
     constraints?: {
-        [constraint_name: string]: string;
+        [constraint_name: string]: string | {
+            type: typeof CONSTRAINT_TYPES[number];
+            dropIfExists?: boolean;
+            /**
+             * E.g.:
+             * colname
+             * col1, col2
+             * col1 > col3
+             */
+            content: string;
+        };
     };
     /**
      * Similar to unique constraints but expressions are allowed inside definition

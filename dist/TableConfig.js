@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.parseI18N = void 0;
+exports.CONSTRAINT_TYPES = exports.parseI18N = void 0;
 const prostgles_types_1 = require("prostgles-types");
 const DboBuilder_1 = require("./DboBuilder");
 const PubSubManager_1 = require("./PubSubManager/PubSubManager");
@@ -19,6 +19,7 @@ const parseI18N = (params) => {
     return defaultValue;
 };
 exports.parseI18N = parseI18N;
+exports.CONSTRAINT_TYPES = ["PRIMARY KEY", "UNIQUE", "CHECK"]; // "FOREIGN KEY", 
 /**
  * Will be run between initSQL and fileTable
  */
@@ -300,12 +301,18 @@ class TableConfigurator {
                 const constraints = await getTableConstraings(this.db, tableName);
                 const constraintNames = (0, prostgles_types_1.getKeys)(tableConf.constraints);
                 constraintNames.map(constraintName => {
+                    const _cnstr = tableConf.constraints[constraintName];
+                    const constraintDef = typeof _cnstr === "string" ? _cnstr : `${_cnstr.type} (${_cnstr.content})`;
+                    const canDrop = (0, prostgles_types_1.isObject)(_cnstr) && _cnstr.dropIfExists;
                     /** Drop constraints with the same name */
                     const existingConstraint = constraints.some(c => c.conname === constraintName);
                     if (existingConstraint) {
-                        queries.push(`ALTER TABLE ${asName(tableName)} DROP CONSTRAINT ${asName(constraintName)};`);
+                        if (canDrop)
+                            queries.push(`ALTER TABLE ${asName(tableName)} DROP CONSTRAINT ${asName(constraintName)};`);
                     }
-                    queries.push(`ALTER TABLE ${asName(tableName)} ADD CONSTRAINT ${asName(constraintName)} ${tableConf.constraints[constraintName]} ;`);
+                    if (!existingConstraint || canDrop) {
+                        queries.push(`ALTER TABLE ${asName(tableName)} ADD CONSTRAINT ${asName(constraintName)} ${constraintDef} ;`);
+                    }
                 });
             }
             if ("indexes" in tableConf && tableConf.indexes) {

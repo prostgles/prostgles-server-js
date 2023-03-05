@@ -417,12 +417,12 @@ export class PubSubManager {
       condition_ids_str && condition_ids_str.startsWith("error") &&
       this._triggers && this._triggers[table_name] && this._triggers[table_name].length
     ) {
-      const pref = "INTERNAL ERROR. Schema might have changed";
-      console.error(`${pref}: ${condition_ids_str}`)
+      const pref = "INTERNAL ERROR";
+      console.error(`${pref}: condition_ids_str: ${condition_ids_str}`)
       this._triggers[table_name].map(c => {
         const subs = this.getSubs(table_name, c);
         subs.map(s => {
-          this.pushSubData(s, pref + ". Check server logs");
+          this.pushSubData(s, pref + ". Check server logs. Schema might have changed");
         })
       });
     } else if (

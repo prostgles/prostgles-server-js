@@ -205,12 +205,34 @@ type UnionKeys<T> = T extends T ? keyof T : never;
 type StrictUnionHelper<T, TAll> = T extends any ? T & Partial<Record<Exclude<UnionKeys<TAll>, keyof T>, never>> : never;
 export type StrictUnion<T> = StrictUnionHelper<T, T>
 
+export const CONSTRAINT_TYPES = ["PRIMARY KEY", "UNIQUE", "CHECK"] as const; // "FOREIGN KEY", 
 type TableDefinition<LANG_IDS> = {
   columns?: {
     [column_name: string]: ColumnConfig<LANG_IDS>
   },
   constraints?: {
-    [constraint_name: string]: string
+    [constraint_name: string]: 
+    | string 
+    | { 
+        type: typeof CONSTRAINT_TYPES[number]; 
+        dropIfExists?: boolean; 
+        /**
+         * E.g.: 
+         * colname
+         * col1, col2
+         * col1 > col3
+         */
+        content: string;
+      } 
+      // & ({
+      // } 
+      // | {
+      //   type: "FOREIGN KEY",
+      //   columns: string[];
+      //   ftable: string;
+      //   fcols: string[];
+      // }
+      // )
   },
 
   /**
@@ -583,14 +605,19 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       }
       if ("constraints" in tableConf && tableConf.constraints) {
         const constraints = await getTableConstraings(this.db, tableName);
-        const constraintNames = getKeys(tableConf.constraints)
+        const constraintNames = getKeys(tableConf.constraints);
         constraintNames.map(constraintName => {
+          const _cnstr = tableConf.constraints![constraintName];
+          const constraintDef = typeof _cnstr === "string"? _cnstr : `${_cnstr.type} (${_cnstr.content})`;
+          const canDrop = isObject(_cnstr) && _cnstr.dropIfExists;
           /** Drop constraints with the same name */
           const existingConstraint = constraints.some(c => c.conname === constraintName);
           if(existingConstraint){
-            queries.push(`ALTER TABLE ${asName(tableName)} DROP CONSTRAINT ${asName(constraintName)};`);
+            if(canDrop) queries.push(`ALTER TABLE ${asName(tableName)} DROP CONSTRAINT ${asName(constraintName)};`);
           }
-          queries.push(`ALTER TABLE ${asName(tableName)} ADD CONSTRAINT ${asName(constraintName)} ${tableConf.constraints![constraintName]} ;`);
+          if(!existingConstraint || canDrop){
+            queries.push(`ALTER TABLE ${asName(tableName)} ADD CONSTRAINT ${asName(constraintName)} ${constraintDef} ;`);
+          }
         });
       }
       if ("indexes" in tableConf && tableConf.indexes) {
