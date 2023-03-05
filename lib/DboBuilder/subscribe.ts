@@ -2,6 +2,7 @@ import { AnyObject, asName, SubscribeParams } from "prostgles-types";
 import { Filter, LocalParams, makeErrorFromPGError, parseError } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 import { log, omitKeys, ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
+import { NewQuery } from "./QueryBuilder/QueryBuilder";
 import { ViewHandler } from "./ViewHandler";
 
 export type LocalFunc = (items: AnyObject[]) => any;
@@ -70,6 +71,7 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
             /** Create exists filters for each table */
             const tableIds: string[] = Array.from(new Set(tableColumns.map(tc => tc.tableID!.toString())));
             viewOptions = {
+              type: "view",
               viewName,
               definition: def,
               relatedTables: []
@@ -154,6 +156,51 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
 
             if (!viewOptions.relatedTables.length) {
               throw "Could not subscribe to this view: no related tables found";
+            }
+          }
+
+          /** Any joined table used within select or filter must also be added a trigger for this recordset */
+          if(!this.is_view){
+            const newQuery = await this.find(filter, { ...selectParams, limit: 0 }, undefined, table_rules, { ...localParams, returnNewQuery: true }) as unknown as NewQuery;
+            viewOptions = {
+              type: "table",
+              relatedTables: []
+            }
+            for await (const j of (newQuery.joins ?? [])) {
+              if(!viewOptions!.relatedTables.find(rt => rt.tableName === j.table)){
+                viewOptions.relatedTables.push({
+                  tableName: j.table,
+                  tableNameEscaped: asName(j.table),
+                  condition: (await this.dboBuilder.dbo[j.table]!.prepareWhere!({ 
+                    filter: { 
+                      $existsJoined: { 
+                        [[this.name, ...j.$path ?? [].slice(0).reverse()].join(".")]: filter
+                      } 
+                    },
+                    localParams: undefined, 
+                    tableRule: undefined 
+                  })).where
+                })
+              }
+            }
+            for await(const e of newQuery.whereOpts.exists) {              
+              const eTable = e.tables.at(-1)!
+              viewOptions.relatedTables.push({
+                tableName: eTable,
+                tableNameEscaped: asName(eTable),
+                condition: (await this.dboBuilder.dbo[eTable]!.prepareWhere!({ 
+                  filter: { 
+                    $existsJoined: { 
+                      [[this.name, ...e.tables ?? [].slice(0, -1).reverse()].join(".")]: filter
+                    }
+                  },
+                  localParams: undefined, 
+                  tableRule: undefined 
+                })).where
+              });
+            }
+            if(!viewOptions.relatedTables.length){
+              viewOptions = undefined;
             }
           }
 

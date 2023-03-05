@@ -311,6 +311,7 @@ async function getNewQuery(_this, filter, selectParams = {}, param3_unused = nul
         table: _this.name,
         joins: joinQueries,
         where,
+        whereOpts: filterOpts,
         having: "",
         isLeftJoin: false,
         // having: cond.having,

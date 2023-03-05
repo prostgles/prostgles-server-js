@@ -11,6 +11,16 @@ export type JoinPaths = {
     t2: string;
     path: string[];
 }[];
+type PrepareWhereParams = {
+    filter?: Filter;
+    select?: SelectItem[];
+    forcedFilter?: AnyObject;
+    filterFields?: FieldFilter;
+    addKeywords?: boolean;
+    tableAlias?: string;
+    localParams: LocalParams | undefined;
+    tableRule: TableRule | undefined;
+};
 declare class ColSet {
     opts: {
         columns: ColumnInfo[];
@@ -73,23 +83,13 @@ export declare class ViewHandler {
     count(filter?: Filter, param2_unused?: undefined, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<number>;
     size(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<string>;
     getAllowedSelectFields(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean): string[];
-    prepareColumnSet(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, onlyNames?: boolean): string | pgPromise.ColumnSet;
-    prepareSelect(selectParams: FieldFilter, allowed_cols: FieldFilter, allow_empty?: boolean, tableAlias?: string): string;
     /**
      * Parses group or simple filter
      */
-    prepareWhere(params: {
-        filter?: Filter;
-        select?: SelectItem[];
-        forcedFilter?: AnyObject;
-        filterFields?: FieldFilter;
-        addKeywords?: boolean;
-        tableAlias?: string;
-        localParams: LocalParams | undefined;
-        tableRule: TableRule | undefined;
-    }): Promise<{
+    prepareWhere(params: PrepareWhereParams): Promise<{
         where: string;
         filter: AnyObject;
+        exists: ExistsFilterConfig[];
     }>;
     prepareExistCondition(eConfig: ExistsFilterConfig, localParams: LocalParams | undefined): Promise<string>;
     getCondition: any;

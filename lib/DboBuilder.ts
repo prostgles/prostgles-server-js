@@ -90,12 +90,12 @@ export type DBHandlerServer<TH = TableHandlers> =
 import { clone } from "./utils";
 import { FieldSpec, } from "./DboBuilder/QueryBuilder/Functions";
 import {
-  Join, Prostgles, DB, isSuperUser
+  Join, Prostgles, DB 
 } from "./Prostgles";
 import {
   PublishParser, PublishAllOrNothing,
 } from "./PublishParser";
-import { PubSubManager, asValue, BasicCallback, pickKeys, omitKeys } from "./PubSubManager/PubSubManager";
+import { PubSubManager, asValue, BasicCallback, pickKeys } from "./PubSubManager/PubSubManager";
 import { _delete } from "./DboBuilder/delete";
 import { JoinPaths, ViewHandler } from "./DboBuilder/ViewHandler";
 
@@ -175,6 +175,7 @@ export type LocalParams = {
   // localTX?: pgPromise.ITask<{}>;
 
   returnQuery?: boolean;
+  returnNewQuery?: boolean;
 
   nestedInsert?: {
     depth: number;

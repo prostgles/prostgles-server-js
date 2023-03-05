@@ -72,9 +72,15 @@ type AddSyncParams = {
   throttle?: number;
 }
 
-export type ViewSubscriptionOptions = {
+export type ViewSubscriptionOptions = ({
+  type: "view";
   viewName: string;
   definition: string;
+} | {
+  type: "table";
+  viewName?: undefined;
+  definition?: undefined;
+}) & {
   relatedTables: {
     tableName: string;
     tableNameEscaped: string;
@@ -110,9 +116,7 @@ type AddSubscriptionParams = SubscriptionParams & {
 }
 
 export type PubSubManagerOptions = {
-  dboBuilder: DboBuilder;
-  // db: DB;
-  // dbo: DBHandlerServer;
+  dboBuilder: DboBuilder; 
   wsChannelNamePrefix?: string;
   pgChannelName?: string;
   onSchemaChange?: (event: { command: string; query: string }) => void;
@@ -744,65 +748,65 @@ export class PubSubManager {
     };
 
 
+    
+    viewOptions?.relatedTables.map(async (relatedTable, relatedTableIdx) => {
+
+      const params: Omit<Parameters<typeof upsertSub>[0], "is_ready"> = {
+        table_name: relatedTable.tableName,
+        condition: relatedTable.condition,
+        parentSubParams: {
+          ...subscriptionParams,
+          channel_name
+        },
+      } 
+      
+      upsertSub({
+        ...params,
+        is_ready: false,
+        
+      }, false);
+
+      await this.addTrigger(params, viewOptions);
+
+      /** Trigger pushSubData only on last related table (if it's a view) to prevent duplicate firings */
+      const isLast = relatedTableIdx === viewOptions.relatedTables.length - 1;
+      upsertSub({
+        ...params,
+        is_ready: true
+      }, isLast && !table_info.is_view);
+
+    });
+      
     if (table_info.is_view) {
-      if (viewOptions?.relatedTables.length) {
- 
-        viewOptions?.relatedTables.map(async (relatedTable, relatedTableIdx) => {
-
-
-          const params: Omit<Parameters<typeof upsertSub>[0], "is_ready"> = {
-            table_name: relatedTable.tableName,
-            condition: relatedTable.condition,
-            parentSubParams: {
-              ...subscriptionParams,
-              channel_name
-            },
-          } 
-          
-          upsertSub({
-            ...params,
-            is_ready: false,
-            
-          }, false);
-
-          await this.addTrigger(params, viewOptions);
-
-          /** Trigger pushSubData only on last related table to prevent duplicate firings */
-          const isLast = relatedTableIdx === viewOptions.relatedTables.length - 1;
-          upsertSub({
-            ...params,
-            is_ready: true
-          }, isLast);
-        });
-
-        return channel_name
-      } else {
+      if(!viewOptions?.relatedTables.length){
         throw "PubSubManager: view parent_tables missing";
       }
-      /*  */
-    } else {
-      /* Just a table, add table + condition trigger */
-      // console.log(table_info, 202);
-
-      upsertSub({
-        table_name: table_info.name,
-        condition: parseCondition(condition),
-        parentSubParams: undefined,
-        is_ready: false
-      }, undefined);
-      await this.addTrigger({
-        table_name: table_info.name,
-        condition: parseCondition(condition),
-      });
-      upsertSub({
-        table_name: table_info.name,
-        condition: parseCondition(condition),
-        parentSubParams: undefined,
-        is_ready: true
-      }, undefined);
-
-      return channel_name
+      return channel_name;
     }
+    
+    /* Just a table, add table + condition trigger */
+    // console.log(table_info, 202);
+
+    upsertSub({
+      table_name: table_info.name,
+      condition: parseCondition(condition),
+      parentSubParams: undefined,
+      is_ready: false
+    }, undefined);
+
+    await this.addTrigger({
+      table_name: table_info.name,
+      condition: parseCondition(condition),
+    });
+
+    upsertSub({
+      table_name: table_info.name,
+      condition: parseCondition(condition),
+      parentSubParams: undefined,
+      is_ready: true
+    }, undefined);
+
+    return channel_name;
   }
 
   removeLocalSub(table_name: string, condition: string, func: (items: object[]) => any) {

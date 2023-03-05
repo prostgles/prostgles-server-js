@@ -18,6 +18,7 @@
     "no-async-promise-executor": "off",
     "@typescript-eslint/no-var-requires": "off",
     "no-unused-vars": "off",
+    "no-empty":"off",
     "@typescript-eslint/no-unused-vars": [
       "warn", 
       { 

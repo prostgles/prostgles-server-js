@@ -100,6 +100,7 @@ export type LocalParams = {
         t: pgPromise.ITask<{}>;
     };
     returnQuery?: boolean;
+    returnNewQuery?: boolean;
     nestedInsert?: {
         depth: number;
         previousData: AnyObject;

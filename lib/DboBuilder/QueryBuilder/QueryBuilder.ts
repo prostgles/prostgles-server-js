@@ -10,6 +10,7 @@ import { SelectParams, isEmpty, asName, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, isO
 import { get } from "../../utils";
 import { TableHandler } from "../TableHandler";
 import { COMPUTED_FIELDS, FieldSpec, FUNCTIONS, FunctionSpec, parseFunction } from "./Functions";
+import { ViewHandler } from "../ViewHandler";
 
 export type SelectItem = {
   type: "column" | "function" | "aggregation" | "joinedColumn" | "computed";
@@ -36,6 +37,7 @@ export type NewQuery = {
 
   table: string;
   where: string;
+  whereOpts: Awaited<ReturnType<ViewHandler["prepareWhere"]>>;
   orderByItems: SortItem[];
   having: string;
   limit: number;
@@ -421,6 +423,7 @@ export async function getNewQuery(
     table: _this.name,
     joins: joinQueries,
     where,
+    whereOpts: filterOpts,
     having: "",
     isLeftJoin: false,
     // having: cond.having,

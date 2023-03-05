@@ -1,4 +1,4 @@
-import { LocalParams } from "../DboBuilder";
+import { ExistsFilterConfig, LocalParams } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 import { SelectItem } from "./QueryBuilder/QueryBuilder";
 import { ViewHandler } from "./ViewHandler";
@@ -15,5 +15,8 @@ export declare function getCondition(this: ViewHandler, params: {
     tableAlias?: string;
     localParams?: LocalParams;
     tableRules?: TableRule;
-}): Promise<string>;
+}): Promise<{
+    exists: ExistsFilterConfig[];
+    condition: string;
+}>;
 //# sourceMappingURL=getCondition.d.ts.map

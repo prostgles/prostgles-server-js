@@ -4,7 +4,9 @@ import { SelectParams, asName } from "prostgles-types";
 import { NewQuery, SelectItem } from "./QueryBuilder";
 import { TableHandler } from "../TableHandler";
 
-/* No validation/authorisation at this point */
+/**
+ * Creating the text query from the NewQuery spec
+ * No validation/authorisation at this point */
 export function makeSelectQuery(
   _this: TableHandler,
   q: NewQuery, 

@@ -20,7 +20,7 @@ async function getCondition(params) {
     /* Exists join filter */
     const ERR = "Invalid exists filter. \nExpecting somethibng like: \n | { $exists: { tableName.tableName2: Filter } } \n  | { $exists: { \"**.tableName3\": Filter } }\n | { path: string[]; filter: AnyObject }";
     const SP_WILDCARD = "**";
-    const existsKeys = (0, prostgles_types_1.getKeys)(filter)
+    const exists = (0, prostgles_types_1.getKeys)(filter)
         .filter(k => prostgles_types_1.EXISTS_KEYS.includes(k) && Object.keys(filter[k] ?? {}).length)
         .map(key => {
         const isJoined = key.toLowerCase().includes("join");
@@ -89,8 +89,8 @@ async function getCondition(params) {
         funcConds.push(f.getQuery({ args: funcArgs, allColumns: this.columns, allowedFields: allowed_colnames, tableAlias }));
     });
     let existsCond = "";
-    if (existsKeys.length) {
-        existsCond = (await Promise.all(existsKeys.map(async (k) => await this.prepareExistCondition(k, localParams)))).join(" AND ");
+    if (exists.length) {
+        existsCond = (await Promise.all(exists.map(async (k) => await this.prepareExistCondition(k, localParams)))).join(" AND ");
     }
     /* Computed field queries */
     const p = this.getValidatedRules(tableRules, localParams);
@@ -196,7 +196,7 @@ async function getCondition(params) {
         { $joinFilter: { $ST_DWithin: [table.col, foreignTable.col, distance] }
         will make an exists filter
     */
-    const filterKeys = Object.keys(filter).filter(k => k !== complexFilterKey && !funcFilter.find(ek => ek.name === k) && !computedFields.find(cf => cf.name === k) && !existsKeys.find(ek => ek.key === k));
+    const filterKeys = Object.keys(filter).filter(k => k !== complexFilterKey && !funcFilter.find(ek => ek.name === k) && !computedFields.find(cf => cf.name === k) && !exists.find(ek => ek.key === k));
     // if(allowed_colnames){
     //     const aliasedColumns = (select || []).filter(s => 
     //         ["function", "computed", "column"].includes(s.type) && allowed_colnames.includes(s.alias) ||  
@@ -228,8 +228,10 @@ async function getCondition(params) {
     templates = templates.concat(computedColConditions);
     templates = templates.concat(complexFilters);
     /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
-    return templates.sort()
-        .join(" AND \n");
+    return {
+        exists,
+        condition: templates.sort().join(" AND \n")
+    };
 }
 exports.getCondition = getCondition;
 //# sourceMappingURL=getCondition.js.map

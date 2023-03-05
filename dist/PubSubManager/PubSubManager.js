@@ -558,57 +558,52 @@ class PubSubManager {
                 this.pushSubData(newSub);
             }
         };
+        viewOptions?.relatedTables.map(async (relatedTable, relatedTableIdx) => {
+            const params = {
+                table_name: relatedTable.tableName,
+                condition: relatedTable.condition,
+                parentSubParams: {
+                    ...subscriptionParams,
+                    channel_name
+                },
+            };
+            upsertSub({
+                ...params,
+                is_ready: false,
+            }, false);
+            await this.addTrigger(params, viewOptions);
+            /** Trigger pushSubData only on last related table (if it's a view) to prevent duplicate firings */
+            const isLast = relatedTableIdx === viewOptions.relatedTables.length - 1;
+            upsertSub({
+                ...params,
+                is_ready: true
+            }, isLast && !table_info.is_view);
+        });
         if (table_info.is_view) {
-            if (viewOptions?.relatedTables.length) {
-                viewOptions?.relatedTables.map(async (relatedTable, relatedTableIdx) => {
-                    const params = {
-                        table_name: relatedTable.tableName,
-                        condition: relatedTable.condition,
-                        parentSubParams: {
-                            ...subscriptionParams,
-                            channel_name
-                        },
-                    };
-                    upsertSub({
-                        ...params,
-                        is_ready: false,
-                    }, false);
-                    await this.addTrigger(params, viewOptions);
-                    /** Trigger pushSubData only on last related table to prevent duplicate firings */
-                    const isLast = relatedTableIdx === viewOptions.relatedTables.length - 1;
-                    upsertSub({
-                        ...params,
-                        is_ready: true
-                    }, isLast);
-                });
-                return channel_name;
-            }
-            else {
+            if (!viewOptions?.relatedTables.length) {
                 throw "PubSubManager: view parent_tables missing";
             }
-            /*  */
-        }
-        else {
-            /* Just a table, add table + condition trigger */
-            // console.log(table_info, 202);
-            upsertSub({
-                table_name: table_info.name,
-                condition: parseCondition(condition),
-                parentSubParams: undefined,
-                is_ready: false
-            }, undefined);
-            await this.addTrigger({
-                table_name: table_info.name,
-                condition: parseCondition(condition),
-            });
-            upsertSub({
-                table_name: table_info.name,
-                condition: parseCondition(condition),
-                parentSubParams: undefined,
-                is_ready: true
-            }, undefined);
             return channel_name;
         }
+        /* Just a table, add table + condition trigger */
+        // console.log(table_info, 202);
+        upsertSub({
+            table_name: table_info.name,
+            condition: parseCondition(condition),
+            parentSubParams: undefined,
+            is_ready: false
+        }, undefined);
+        await this.addTrigger({
+            table_name: table_info.name,
+            condition: parseCondition(condition),
+        });
+        upsertSub({
+            table_name: table_info.name,
+            condition: parseCondition(condition),
+            parentSubParams: undefined,
+            is_ready: true
+        }, undefined);
+        return channel_name;
     }
     removeLocalSub(table_name, condition, func) {
         const cond = parseCondition(condition);

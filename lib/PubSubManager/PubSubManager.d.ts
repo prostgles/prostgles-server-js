@@ -43,9 +43,15 @@ type AddSyncParams = {
     condition: string;
     throttle?: number;
 };
-export type ViewSubscriptionOptions = {
+export type ViewSubscriptionOptions = ({
+    type: "view";
     viewName: string;
     definition: string;
+} | {
+    type: "table";
+    viewName?: undefined;
+    definition?: undefined;
+}) & {
     relatedTables: {
         tableName: string;
         tableNameEscaped: string;

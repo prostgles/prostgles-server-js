@@ -3,7 +3,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.makeSelectQuery = void 0;
 const DboBuilder_1 = require("../../DboBuilder");
 const prostgles_types_1 = require("prostgles-types");
-/* No validation/authorisation at this point */
+/**
+ * Creating the text query from the NewQuery spec
+ * No validation/authorisation at this point */
 function makeSelectQuery(_this, q, depth = 0, joinFields = [], selectParams = {}) {
     const PREF = `prostgles`, joins = q.joins || [], 
     // aggs = q.aggs || [],

@@ -3,6 +3,7 @@ import { TableRule } from "../../PublishParser";
 import { SelectParams, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, Select, JoinSelect } from "prostgles-types";
 import { TableHandler } from "../TableHandler";
 import { FieldSpec, FunctionSpec } from "./Functions";
+import { ViewHandler } from "../ViewHandler";
 export type SelectItem = {
     type: "column" | "function" | "aggregation" | "joinedColumn" | "computed";
     getFields: (args?: any[]) => string[] | "*";
@@ -26,6 +27,7 @@ export type NewQuery = {
     select: SelectItem[];
     table: string;
     where: string;
+    whereOpts: Awaited<ReturnType<ViewHandler["prepareWhere"]>>;
     orderByItems: SortItem[];
     having: string;
     limit: number;
