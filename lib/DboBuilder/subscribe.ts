@@ -166,6 +166,10 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
               type: "table",
               relatedTables: []
             }
+            /**
+             * Avoid nested exists error. Will affect performance
+             */
+            const nonExistsFilter = filterOpts.exists.length? {} : filter;
             for await (const j of (newQuery.joins ?? [])) {
               if(!viewOptions!.relatedTables.find(rt => rt.tableName === j.table)){
                 viewOptions.relatedTables.push({
@@ -174,7 +178,8 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
                   condition: (await this.dboBuilder.dbo[j.table]!.prepareWhere!({ 
                     filter: { 
                       $existsJoined: { 
-                        [[this.name, ...j.$path ?? [].slice(0).reverse()].join(".")]: filter
+                        
+                        [[this.name, ...j.$path ?? [].slice(0).reverse()].join(".")]: nonExistsFilter
                       } 
                     },
                     localParams: undefined, 
@@ -191,7 +196,7 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
                 condition: (await this.dboBuilder.dbo[eTable]!.prepareWhere!({ 
                   filter: { 
                     $existsJoined: { 
-                      [[this.name, ...e.tables ?? [].slice(0, -1).reverse()].join(".")]: filter
+                      [[this.name, ...e.tables ?? [].slice(0, -1).reverse()].join(".")]: nonExistsFilter
                     }
                   },
                   localParams: undefined, 

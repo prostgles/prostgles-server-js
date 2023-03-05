@@ -864,7 +864,7 @@ export class ViewHandler {
     });
 
 
-    /* Nested $exists not allowed */
+    /* Nested $exists not allowed ??! */
     if (f2 && Object.keys(f2).find(fk => EXISTS_KEYS.includes(fk as EXISTS_KEY))) {
       throw { stack: ["prepareExistCondition()"], message: "Nested exists dissallowed" };
     }
