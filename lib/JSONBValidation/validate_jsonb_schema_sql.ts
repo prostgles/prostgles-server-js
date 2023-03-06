@@ -72,10 +72,11 @@ BEGIN
     END IF;
 
   ELSIF schema ? 'lookup' THEN
+    /* Validate lookup schema */
     IF NOT ${VALIDATE_SCHEMA_FUNCNAME}(
       $sch$ 
         { 
-          "oneOfType": [
+          "oneOfType": [ 
             { 
               "type": { "enum": ["schema"] },
               "object": { "enum": ["table", "column"] },
@@ -83,7 +84,7 @@ BEGIN
               "filter": { "optional": true, "type": "any" }
             },
             { 
-              "type": { "enum": ["data"] },
+              "type": { "enum": ["data", "data-def"] },
               "table": "string",
               "column": "string",
               "isArray": { "type": "boolean", "optional": true },
@@ -106,12 +107,16 @@ BEGIN
 
 
     RETURN ${VALIDATE_SCHEMA_FUNCNAME}(
-      CASE WHEN schema->'lookup'->>'type' = 'schema' THEN 
-        (CASE WHEN schema->'lookup'->>'object' = 'table' THEN 
-          'string' || (CASE WHEN (schema->'lookup'->'isArray')::BOOLEAN THEN '[]' ELSE '' END)
-        ELSE 
-          '{ "type": { "table": "string", "column": "string' || (CASE WHEN (schema->'lookup'->'isArray')::BOOLEAN THEN '[]' ELSE '' END) || '" } }' 
-        END)
+      CASE WHEN schema->'lookup'->>'type' = 'data-def' THEN
+        '{ "type": { "type": { "enum": ["data-def"] }, "table": "string", "column": "string", "isArray": { "type": "boolean", "optional": true } } }'
+      WHEN schema->'lookup'->>'type' = 'schema' THEN 
+        ( 
+          CASE WHEN schema->'lookup'->>'object' = 'table' THEN 
+            'string' || (CASE WHEN (schema->'lookup'->'isArray')::BOOLEAN THEN '[]' ELSE '' END)
+          ELSE 
+            '{ "type": { "table": "string", "column": "string' || (CASE WHEN (schema->'lookup'->'isArray')::BOOLEAN THEN '[]' ELSE '' END) || '" } }' 
+          END
+        )
       ELSE 
         (CASE WHEN (schema->'lookup'->'isArray')::BOOLEAN THEN 'any[]' ELSE 'any' END)
       END,
@@ -215,7 +220,7 @@ BEGIN
         optional = COALESCE((sub_schema.value->>'optional')::BOOLEAN, FALSE);
         IF NOT (data ? sub_schema.key) THEN
           IF NOT optional THEN
-            RAISE EXCEPTION 'Types not matching. Required property (%) is missing. %',sub_schema.key , path USING HINT = path, COLUMN = colname; 
+            RAISE EXCEPTION 'Types not matching. Required property (%) is missing. %', sub_schema.key , path USING HINT = path, COLUMN = colname; 
           END IF;
 
         ELSIF NOT ${VALIDATE_SCHEMA_FUNCNAME}(

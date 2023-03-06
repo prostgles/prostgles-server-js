@@ -95,7 +95,12 @@ export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpt
       return `${fieldType.nullable ? `null |` : ""} Record<${keysEnum?.map(v => asValue(v)).join(" | ") ?? "string"}, ${!values? "any" : getFieldType(values, true, undefined, depth + 1)}>`
 
     } else if(fieldType?.lookup){
-      const l = fieldType.lookup
+
+      const l = fieldType.lookup;
+      if(l.type === "data-def"){
+        return `${fieldType.nullable ? `null |` : ""} { "table": string; "column": string; filter?: Record<string, any>; isArray?: boolean; isFullRow?: { displayColumns?: string[]; searchColumns?: string[]; }; showInRowCard?: Record<string, any>; }`;
+      } 
+      
       const isSChema = l.type === "schema";
       let type = isSChema? (l.object === "table"? "string" : `{ "table": string; "column": string; }`) : "";
       if(!isSChema){
@@ -107,6 +112,7 @@ export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpt
         }
       }
       return `${fieldType.nullable ? `null |` : ""} ${type}${l.isArray? "[]" : ""}`;
+
     } else throw "Unexpected getSchemaTSTypes: " + JSON.stringify({ fieldType, schema }, null, 2)
   } 
  
