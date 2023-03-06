@@ -1,4 +1,5 @@
-import { getKeys, isEmpty, isObject, JSONB } from "prostgles-types";
+import { getKeys, isEmpty, isObject, JSONB, TableSchema } from "prostgles-types";
+import { postgresToTsType } from "../DboBuilder";
 import { asValue } from "../PubSubManager/PubSubManager";
 
 
@@ -41,7 +42,7 @@ export function validateSchema<S extends JSONB.ObjectType["type"]>(schema: S, ob
 type ColOpts = { nullable?: boolean }; 
 
 
-export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpts, outerLeading = ""): string { 
+export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpts, outerLeading = "", tables: TableSchema[]): string { 
  
   const getFieldType = (rawFieldType: JSONB.FieldType, isOneOf = false, innerLeading = "", depth = 0): string => {
     const fieldType = getFieldTypeObj(rawFieldType);
@@ -49,7 +50,12 @@ export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpt
     
     /** Primitives */
     if (typeof fieldType?.type === "string") {
-      const correctType = fieldType.type.replace("integer", "number");
+      const correctType = fieldType.type
+        .replace("integer", "number")
+        .replace("time", "string")
+        .replace("timestamp", "string")
+        .replace("Date", "string");
+        
       if (fieldType.allowedValues && fieldType.type.endsWith("[]")) {
         return nullType + ` (${fieldType.allowedValues.map(v => JSON.stringify(v)).join(" | ")})[]`
       }
@@ -88,6 +94,19 @@ export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpt
       const { keysEnum, values } = fieldType.record;
       return `${fieldType.nullable ? `null |` : ""} Record<${keysEnum?.map(v => asValue(v)).join(" | ") ?? "string"}, ${!values? "any" : getFieldType(values, true, undefined, depth + 1)}>`
 
+    } else if(fieldType?.lookup){
+      const l = fieldType.lookup
+      const isSChema = l.type === "schema";
+      let type = isSChema? "string" : "";
+      if(!isSChema){
+        const cols = tables.find(t => t.name === l.table)?.columns
+        if(!l.isFullRow){
+          type = postgresToTsType(cols?.find(c => c.name === l.column)?.udt_name ?? "text");
+        } else {
+          type = !cols? "any" : `{ ${cols.map(c => `${JSON.stringify(c.name)}: ${c.is_nullable? "null | " : "" } ${postgresToTsType(c.udt_name)}; `).join(" ")} }`
+        }
+      }
+      return `${fieldType.nullable ? `null |` : ""} ${type}${l.isArray? "[]" : ""}`;
     } else throw "Unexpected getSchemaTSTypes: " + JSON.stringify({ fieldType, schema }, null, 2)
   } 
  
