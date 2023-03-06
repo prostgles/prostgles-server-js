@@ -43,7 +43,7 @@ BEGIN
   IF ARRAY[jsonb_schema] <@ allowed_types THEN
     schema = jsonb_build_object('type', jsonb_schema);
   /* { "type": ... } */ 
-  ELSIF BTRIM(jsonb_schema) ILIKE '{%' THEN
+  ELSIF BTRIM(replace(jsonb_schema,E'\n','')) ILIKE '{%' THEN
     schema = jsonb_schema::JSONB;
   ELSE
     RAISE EXCEPTION $$Invalid schema. Expecting 'typename' or { "type": "typename" } but received: %, %$$, jsonb_schema, path USING HINT = path, COLUMN = colname; 
@@ -70,6 +70,46 @@ BEGIN
     IF NOT jsonb_build_array(data) <@ (schema->'enum') THEN
       RAISE EXCEPTION 'Data not in allowed enum list (%), %', schema->'enum', path USING HINT = path, COLUMN = colname; 
     END IF;
+
+  ELSIF schema ? 'lookup' THEN
+    IF NOT ${VALIDATE_SCHEMA_FUNCNAME}(
+      $sch$ 
+        { 
+          "oneOfType": [
+            { 
+              "type": { "enum": ["schema"] },
+              "object": { "enum": ["table", "column"] },
+              "isArray": { "type": "boolean", "optional": true },
+              "filter": { "optional": true, "type": "any" }
+            },
+            { 
+              "type": { "enum": ["data"] },
+              "table": "string",
+              "column": "string",
+              "isArray": { "type": "boolean", "optional": true },
+              "filter": { "optional": true, "type": "any" },
+              "isFullRow": { "optional": true, "type": {
+                "displayColumns": { "optional": true, "type": "string[]" },
+                "searchColumns": { "optional": true, "type": "string[]" }
+              }},
+              "showInRowCard": { "optional": true, "type": "any" }
+            }    
+          ]
+        }
+      $sch$, 
+      schema->'lookup', 
+      checked_path || '.schema'::TEXT
+    ) THEN
+      
+      RETURN FALSE;
+    END IF;
+
+
+    RETURN ${VALIDATE_SCHEMA_FUNCNAME}(
+      CASE WHEN (schema->'lookup'->'isArray')::BOOLEAN THEN 'any[]' ELSE 'any' END,
+      data,
+      checked_path
+    );
 
   ELSIF schema ? 'type' THEN    
     
@@ -163,17 +203,14 @@ BEGIN
         SELECT key, value
         FROM jsonb_each(schema->'type')
       LOOP
+
         optional = COALESCE((sub_schema.value->>'optional')::BOOLEAN, FALSE);
         IF NOT (data ? sub_schema.key) THEN
-          
           IF NOT optional THEN
             RAISE EXCEPTION 'Types not matching. Required property (%) is missing. %',sub_schema.key , path USING HINT = path, COLUMN = colname; 
-          ELSE
-            RETURN true; 
           END IF;
-        END IF;
 
-        IF NOT ${VALIDATE_SCHEMA_FUNCNAME}(
+        ELSIF NOT ${VALIDATE_SCHEMA_FUNCNAME}(
           -- sub_schema.value::TEXT, 
           CASE WHEN jsonb_typeof(sub_schema.value) = 'string' THEN TRIM(both '"' from sub_schema.value::TEXT) ELSE sub_schema.value::TEXT END,
           data->sub_schema.key, 
@@ -183,6 +220,8 @@ BEGIN
         END IF;
 
       END LOOP;
+
+      RETURN TRUE;
     ELSE 
       RAISE EXCEPTION 'Unexpected schema.type ( % ), %',jsonb_typeof(schema->'type'), path USING HINT = path, COLUMN = colname; 
     END IF; 
@@ -352,5 +391,8 @@ SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "type": "any"}', '{}');
 SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "type": { "a": { "enum": ["a"] } } }', '{ "a": "a"}');
 
 SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "arrayOfType": { "a": { "enum": ["a"] } } }', '[{ "a": "a"}]');
+
+
+SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "lookup": { "type": "data", "table": "tblName", "column": "colName" } }', '{}');
 
 `;
