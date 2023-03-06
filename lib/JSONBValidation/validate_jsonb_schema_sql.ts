@@ -106,7 +106,15 @@ BEGIN
 
 
     RETURN ${VALIDATE_SCHEMA_FUNCNAME}(
-      CASE WHEN (schema->'lookup'->'isArray')::BOOLEAN THEN 'any[]' ELSE 'any' END,
+      CASE WHEN schema->'lookup'->>'type' = 'schema' THEN 
+        (CASE WHEN schema->'lookup'->>'object' = 'table' THEN 
+          'string' || (CASE WHEN (schema->'lookup'->'isArray')::BOOLEAN THEN '[]' ELSE '' END)
+        ELSE 
+          '{ "type": { "table": "string", "column": "string' || (CASE WHEN (schema->'lookup'->'isArray')::BOOLEAN THEN '[]' ELSE '' END) || '" } }' 
+        END)
+      ELSE 
+        (CASE WHEN (schema->'lookup'->'isArray')::BOOLEAN THEN 'any[]' ELSE 'any' END)
+      END,
       data,
       checked_path
     );
@@ -394,5 +402,11 @@ SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "arrayOfType": { "a": { "enum": ["a"] } } 
 
 
 SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "lookup": { "type": "data", "table": "tblName", "column": "colName" } }', '{}');
+SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "lookup": { "type": "data", "table": "tblName", "column": "colName", "isArray": true } }', '[{}]');
+SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "lookup": { "type": "schema", "object": "table" } }', '"tblName"'::JSONB);
+SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "lookup": { "type": "schema", "object": "table", "isArray": true } }', '["tblName"]');
+SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "lookup": { "type": "schema", "object": "column" } }', '{  "table": "tblName", "column": "colName" }');
+SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "lookup": { "type": "schema", "object": "column", "isArray": true } }', '{  "table": "tblName", "column": ["colName"] }');
 
 `;
+ 

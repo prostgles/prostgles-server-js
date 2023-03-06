@@ -97,7 +97,7 @@ export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpt
     } else if(fieldType?.lookup){
       const l = fieldType.lookup
       const isSChema = l.type === "schema";
-      let type = isSChema? "string" : "";
+      let type = isSChema? (l.object === "table"? "string" : `{ "table": string; "column": string; }`) : "";
       if(!isSChema){
         const cols = tables.find(t => t.name === l.table)?.columns
         if(!l.isFullRow){
