@@ -655,7 +655,7 @@ export class PubSubManager {
         //     console.log(response)
         // });
       } else {
-        console.error("UNCLOSED DUPLICATE SYNC FOUND", existing);
+        console.warn("UNCLOSED DUPLICATE SYNC FOUND", existing.channel_name);
       }
 
       return newSync;

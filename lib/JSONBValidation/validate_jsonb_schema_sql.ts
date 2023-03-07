@@ -25,6 +25,29 @@ DECLARE
   colname TEXT;
   oneof JSONB;
   arrayof JSONB;
+  lookup_data_def_schema TEXT = $d$  
+    { 
+      "type": { "enum": ["data", "data-def"] },
+      "table": "string",
+      "column": "string",
+      "isArray": { "type": "boolean", "optional": true },
+      "filter": { "optional": true, "type": "any" },
+      "isFullRow": { "optional": true, "type": {
+        "displayColumns": { "optional": true, "type": "string[]" },
+        "searchColumns": { "optional": true, "type": "string[]" }
+      }},
+      "showInRowCard": { "optional": true, "type": "any" }
+    }  
+  
+  $d$;
+  lookup_schema_schema TEXT = $d$  
+    { 
+      "type": { "enum": ["schema"] },
+      "object": { "enum": ["table", "column"] },
+      "isArray": { "type": "boolean", "optional": true },
+      "filter": { "optional": true, "type": "any" }
+    }  
+  $d$;
 
   extra_keys TEXT[];
 BEGIN
@@ -74,30 +97,7 @@ BEGIN
   ELSIF schema ? 'lookup' THEN
     /* Validate lookup schema */
     IF NOT ${VALIDATE_SCHEMA_FUNCNAME}(
-      $sch$ 
-        { 
-          "oneOfType": [ 
-            { 
-              "type": { "enum": ["schema"] },
-              "object": { "enum": ["table", "column"] },
-              "isArray": { "type": "boolean", "optional": true },
-              "filter": { "optional": true, "type": "any" }
-            },
-            { 
-              "type": { "enum": ["data", "data-def"] },
-              "table": "string",
-              "column": "string",
-              "isArray": { "type": "boolean", "optional": true },
-              "filter": { "optional": true, "type": "any" },
-              "isFullRow": { "optional": true, "type": {
-                "displayColumns": { "optional": true, "type": "string[]" },
-                "searchColumns": { "optional": true, "type": "string[]" }
-              }},
-              "showInRowCard": { "optional": true, "type": "any" }
-            }    
-          ]
-        }
-      $sch$, 
+      '{ "oneOfType": [' || concat_ws(',',lookup_data_def_schema, lookup_schema_schema)  || '] }',
       schema->'lookup', 
       checked_path || '.schema'::TEXT
     ) THEN
@@ -108,7 +108,7 @@ BEGIN
 
     RETURN ${VALIDATE_SCHEMA_FUNCNAME}(
       CASE WHEN schema->'lookup'->>'type' = 'data-def' THEN
-        '{ "type": { "type": { "enum": ["data-def"] }, "table": "string", "column": "string", "isArray": { "type": "boolean", "optional": true } } }'
+        lookup_data_def_schema
       WHEN schema->'lookup'->>'type' = 'schema' THEN 
         ( 
           CASE WHEN schema->'lookup'->>'object' = 'table' THEN 
