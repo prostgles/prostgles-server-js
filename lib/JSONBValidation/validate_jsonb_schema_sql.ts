@@ -18,7 +18,7 @@ DECLARE
   obj_key_val RECORD;
   schema JSONB;
   path text;
-  allowed_types text[] = '{any,boolean,number,integer,string,boolean[],number[],integer[],string[],any[]}';
+  allowed_types text[] = '{any,boolean,number,integer,string,Date,timetimestamp,Lookup,boolean[],number[],integer[],string[],any[],Date[],time[],timestamp[],Lookup[]}';
   typeStr TEXT = NULL; 
   optional boolean;
   nullable boolean; 

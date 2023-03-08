@@ -602,7 +602,7 @@ async function isomorphic(db) {
             throw "Should have failed";
         }
         catch (e) {
-            console.log("Perfect:", e);
+            console.log("Perfect fail");
             // Perfect
         }
     });
