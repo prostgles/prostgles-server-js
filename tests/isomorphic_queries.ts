@@ -685,7 +685,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       await db.tjson.insert!({ colOneOf: "a", json: { a: true, arr: "22"} });
       throw "Should have failed"
     } catch(e){
-      console.log("Perfect fail)
+      console.log("Perfect fail")
       // Perfect
     }
   });
