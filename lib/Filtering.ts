@@ -205,7 +205,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
     ] as const;
 
     const filterKeys = Object.keys(rightF);
-    const filterOperand: typeof OPERANDS[number] = filterKeys[0] as any;
+    let filterOperand: typeof OPERANDS[number] = filterKeys[0] as any;
 
     /** JSON cannot be compared so we'll cast it to TEXT */
     if(selItem?.column_udt_type === "json" || TextFilterKeys.includes(filterOperand as any)){
@@ -215,23 +215,26 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
     /** It's an object key which means it's an equality comparison against a json object */
     if(selItem?.column_udt_type?.startsWith("json") && !OPERANDS.includes(filterOperand)){
       return leftQ + " = " + parseRightVal(rightF);
-    }
+    }    
 
-    const udtTypesWithJSONValues = ["interval", "jsonb"] as const;
-    if(filterKeys.length !== 1 && !udtTypesWithJSONValues.includes(selItem.column_udt_type as any)) {
-      return mErr("Bad filter. Expecting one key only");
-    }
-
-    const filterValue = rightF[filterOperand];
+    let filterValue = rightF[filterOperand];
     const ALLOWED_FUNCS = [ ...GeomFilter_Funcs, ...TextFilter_FullTextSearchFilterKeys] as const;
     let funcName: undefined | typeof ALLOWED_FUNCS[number];
     let funcArgs: undefined | any[];
 
-    /**
-     * Filter notation
-     * geom && st_makeenvelope(funcArgs)
-     */
-    if(isObject(filterValue) && !(filterValue instanceof Date)){
+    if(selItem.column_udt_type === "interval" && isObject(rightF) && Object.values(rightF).every(v => Number.isFinite(v))){
+      filterOperand = "=";
+      filterValue = rightF;
+      
+    } else if(filterKeys.length !== 1 && selItem.column_udt_type !== "jsonb") {
+      return mErr("Bad filter. Expecting one key only");
+
+    } else if(isObject(filterValue) && !(filterValue instanceof Date)){
+
+      /**
+       * Filter notation
+       * geom && st_makeenvelope(funcArgs)
+       */
       const filterValueKeys = Object.keys(filterValue);
       // if(!filterValueKeys.length || filterValueKeys.length !== 1){
       //   return mErr("Bad filter. Expecting a nested object with one key only but got: " + JSON.stringify(filterValue, null, 2));
