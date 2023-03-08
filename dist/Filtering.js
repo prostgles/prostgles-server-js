@@ -172,7 +172,8 @@ const parseFilterItem = (args) => {
         if (selItem?.column_udt_type?.startsWith("json") && !OPERANDS.includes(filterOperand)) {
             return leftQ + " = " + parseRightVal(rightF);
         }
-        if (filterKeys.length !== 1 && selItem.column_udt_type !== "jsonb") {
+        const udtTypesWithJSONValues = ["interval", "jsonb"];
+        if (filterKeys.length !== 1 && !udtTypesWithJSONValues.includes(selItem.column_udt_type)) {
             return mErr("Bad filter. Expecting one key only");
         }
         const filterValue = rightF[filterOperand];

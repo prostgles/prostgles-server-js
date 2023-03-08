@@ -217,7 +217,8 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       return leftQ + " = " + parseRightVal(rightF);
     }
 
-    if(filterKeys.length !== 1 && selItem.column_udt_type !== "jsonb") {
+    const udtTypesWithJSONValues = ["interval", "jsonb"] as const;
+    if(filterKeys.length !== 1 && !udtTypesWithJSONValues.includes(selItem.column_udt_type as any)) {
       return mErr("Bad filter. Expecting one key only");
     }
 

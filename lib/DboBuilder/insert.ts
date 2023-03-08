@@ -1,8 +1,8 @@
 import pgPromise from "pg-promise";
 import { AnyObject, asName, FieldFilter, get, getKeys, InsertParams, isObject } from "prostgles-types";
-import { isPlainObject, LocalParams, makeErrorFromPGError, parseError, pgp } from "../DboBuilder";
+import { LocalParams, makeErrorFromPGError, parseError, pgp } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
-import { asValue, omitKeys, pickKeys } from "../PubSubManager/PubSubManager";
+import { asValue, pickKeys } from "../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler";
 
 export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any | any[] | boolean> {
@@ -101,6 +101,10 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
 
       const { data, allowedCols } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues });
       const _data = { ...data };
+
+      if(Array.isArray(_data) && !_data.length){
+        throw "Emprty insert. Provide data";
+      }
 
       let insertQ = "";
       if (!Array.isArray(_data) && !getKeys(_data).length || Array.isArray(_data) && !_data.length) {
