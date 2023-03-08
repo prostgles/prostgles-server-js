@@ -63,14 +63,15 @@ export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpt
 
     /** Object */
     } else if (isObject(fieldType.type)) {
+      const addSemicolonIfMissing = (v: string) => v.trim().endsWith(";")? v : (v.trim() + ";");
       const { type } = fieldType;
       const spacing = isOneOf ? " " : "  ";
       let objDef = ` {${spacing}` + getKeys(type).map(k => {
         const fieldType = getFieldTypeObj(type[k]);
-        return `${spacing}${k}${fieldType.optional ? "?" : ""}: ` + getFieldType(fieldType, true, undefined, depth + 1) + ";";
+        return `${spacing}${k}${fieldType.optional ? "?" : ""}: ` + addSemicolonIfMissing(getFieldType(fieldType, true, undefined, depth + 1));
       }).join(" ") + `${spacing}}`;
-      if(!objDef.endsWith(";") && !isOneOf){
-        objDef += ";";
+      if(!isOneOf){
+        objDef = addSemicolonIfMissing(objDef);
       }
     
       /** Keep single line */
