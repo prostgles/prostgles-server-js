@@ -98,7 +98,7 @@ export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpt
 
       const l = fieldType.lookup;
       if(l.type === "data-def"){
-        return `${fieldType.nullable ? `null |` : ""} { "table": string; "column": string; filter?: Record<string, any>; isArray?: boolean; isFullRow?: { displayColumns?: string[]; searchColumns?: string[]; }; showInRowCard?: Record<string, any>; }`;
+        return `${fieldType.nullable ? `null |` : ""} { "table": string; "column": string; filter?: Record<string, any>; isArray?: boolean; searchColumns?: string[]; isFullRow?: { displayColumns?: string[]; }; showInRowCard?: Record<string, any>; }`;
       } 
       
       const isSChema = l.type === "schema";
