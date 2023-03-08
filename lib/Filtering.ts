@@ -224,7 +224,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
 
     if(selItem.column_udt_type === "interval" && isObject(rightF) && Object.values(rightF).every(v => Number.isFinite(v))){
       filterOperand = "=";
-      filterValue = rightF;
+      filterValue = Object.entries(rightF).map(([k, v]) => `${v}${k}`).join(" ");
       
     } else if(filterKeys.length !== 1 && selItem.column_udt_type !== "jsonb") {
       return mErr("Bad filter. Expecting one key only");
