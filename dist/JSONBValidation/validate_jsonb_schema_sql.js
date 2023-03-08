@@ -414,5 +414,7 @@ SELECT ${exports.VALIDATE_SCHEMA_FUNCNAME}('{ "lookup": { "type": "schema", "obj
 SELECT ${exports.VALIDATE_SCHEMA_FUNCNAME}('{ "lookup": { "type": "schema", "object": "column" } }', '{  "table": "tblName", "column": "colName" }');
 SELECT ${exports.VALIDATE_SCHEMA_FUNCNAME}('{ "lookup": { "type": "schema", "object": "column", "isArray": true } }', '{  "table": "tblName", "column": ["colName"] }');
 
+SELECT ${exports.VALIDATE_SCHEMA_FUNCNAME}('{ "type": "time"}', '"22:22"');
+SELECT ${exports.VALIDATE_SCHEMA_FUNCNAME}('{ "type": "Date"}', '"2222-22-22"');
 `;
 //# sourceMappingURL=validate_jsonb_schema_sql.js.map
