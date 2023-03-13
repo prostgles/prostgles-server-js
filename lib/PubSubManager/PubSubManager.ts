@@ -254,29 +254,29 @@ export class PubSubManager {
                  * */
                 DO
                 $do$
-                    DECLARE trg RECORD;
-                        q   TEXT;
-                        ev_trg_needed BOOLEAN := FALSE;
-                        ev_trg_exists BOOLEAN := FALSE;
-                        is_super_user BOOLEAN := FALSE;
+                  DECLARE trg RECORD;
+                    q   TEXT;
+                    ev_trg_needed BOOLEAN := FALSE;
+                    ev_trg_exists BOOLEAN := FALSE;
+                    is_super_user BOOLEAN := FALSE;
                 BEGIN
                     --SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
                     
                     LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
                     EXECUTE format(
-                        $q$
+                      $q$
 
-                            CREATE TEMP TABLE %1$I AS --ON COMMIT DROP AS
-                            SELECT * FROM prostgles.app_triggers;
+                        CREATE TEMP TABLE %1$I AS --ON COMMIT DROP AS
+                        SELECT * FROM prostgles.app_triggers;
 
-                            DELETE FROM prostgles.app_triggers;
+                        DELETE FROM prostgles.app_triggers;
 
-                            INSERT INTO prostgles.app_triggers
-                            SELECT * FROM %1$I;
+                        INSERT INTO prostgles.app_triggers
+                        SELECT * FROM %1$I;
 
-                            DROP TABLE IF EXISTS %1$I;
-                        $q$, 
-                        ${asValue('triggers_' + this.appID)}
+                        DROP TABLE IF EXISTS %1$I;
+                      $q$, 
+                      ${asValue('triggers_' + this.appID)}
                     );
   
                     is_super_user := EXISTS (select 1 from pg_user where usename = CURRENT_USER AND usesuper IS TRUE);
@@ -292,8 +292,8 @@ export class PubSubManager {
                     
                     /* DROP the old buggy schema watch trigger */
                     IF EXISTS (
-                        SELECT 1 FROM pg_catalog.pg_event_trigger
-                        WHERE evtname = 'prostgles_schema_watch_trigger'
+                      SELECT 1 FROM pg_catalog.pg_event_trigger
+                      WHERE evtname = 'prostgles_schema_watch_trigger'
                     ) AND is_super_user IS TRUE 
                     THEN
                         DROP EVENT TRIGGER IF EXISTS prostgles_schema_watch_trigger;

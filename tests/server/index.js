@@ -90,7 +90,7 @@ function dd() {
                 id: { sqlDefinition: `SERIAL PRIMARY KEY ` },
                 email: { sqlDefinition: `TEXT NOT NULL` },
                 status: { enum: ["active", "disabled", "pending"] },
-                preferences: { defaultValue: "{}",
+                preferences: {
                     jsonbSchemaType: {
                         showIntro: { type: "boolean", optional: true },
                         theme: { enum: ["light", "dark", "auto"], optional: true },

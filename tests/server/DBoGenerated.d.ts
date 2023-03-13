@@ -437,7 +437,7 @@ export type DBSchemaGenerated = {
     columns: {
       email: string;
       id?: number;
-      preferences?: {    showIntro?: boolean;   theme?: 'light' | 'dark' | 'auto';   others: any[];  };
+      preferences: {    showIntro?: boolean;   theme?: 'light' | 'dark' | 'auto';   others: any[];  };
       status: "active" | "disabled" | "pending"
     };
   };

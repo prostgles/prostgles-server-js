@@ -795,7 +795,7 @@ type PGConstraint = {
   relname: string;
 };
 
-async function getConstraints(db: DB, schema = "public"): Promise<PGConstraint[]> {
+async function getConstraints(db: DB, schema = "public", filter?: { table: string; column: string; }): Promise<PGConstraint[]> {
   return db.any(`
         SELECT rel.relname, con.conkey, con.conname, con.contype
         FROM pg_catalog.pg_constraint con
@@ -804,6 +804,7 @@ async function getConstraints(db: DB, schema = "public"): Promise<PGConstraint[]
             INNER JOIN pg_catalog.pg_namespace nsp
                 ON nsp.oid = connamespace
         WHERE nsp.nspname = ${asValue(schema)}
+        ${!filter? "" : "AND rel.relname = ${} AND "}
     `);
 }
 
@@ -917,14 +918,14 @@ async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, schema 
                 --SELECT *
                 SELECT "table", ft.cols, jsonb_agg(row_to_json((SELECT t FROM (SELECT ftable, fcols, cols) t))) as references
                 FROM (
-                    select 
-                        (select r.relname from pg_class r where r.oid = c.conrelid) as table, 
-                        (select array_agg(attname::text) from pg_attribute 
-                        where attrelid = c.conrelid and ARRAY[attnum] <@ c.conkey) as cols, 
-                        (select array_agg(attname::text) from pg_attribute 
-                        where attrelid = c.confrelid and ARRAY[attnum] <@ c.confkey) as fcols, 
-                        (select r.relname from pg_class r where r.oid = c.confrelid) as ftable
-                    from pg_constraint c 
+                  SELECT 
+                    (SELECT r.relname from pg_class r where r.oid = c.conrelid) as table, 
+                    (SELECT array_agg(attname::text) from pg_attribute 
+                    where attrelid = c.conrelid and ARRAY[attnum] <@ c.conkey) as cols, 
+                    (SELECT array_agg(attname::text) from pg_attribute 
+                    where attrelid = c.confrelid and ARRAY[attnum] <@ c.confkey) as fcols, 
+                    (SELECT r.relname from pg_class r where r.oid = c.confrelid) as ftable
+                  FROM pg_constraint c 
                 ) ft
                 WHERE ft.table IS NOT NULL 
                 AND ft.ftable IS NOT NULL 

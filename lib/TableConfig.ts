@@ -472,7 +472,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     await Promise.all(getKeys(this.config).map(async tableName => {
       const tableConf = this.config![tableName];
       if ("columns" in tableConf) {
-        const getColDef = (name: string, colConf: ColumnConfig): string => {
+        const getColDef = async (name: string, colConf: ColumnConfig): Promise<string> => {
           const colNameEsc = asName(name);
           const getColTypeDef = (colConf: BaseColumnTypes, pgType: "TEXT" | "JSONB") => {
             const { nullable, defaultValue } = colConf;
@@ -518,19 +518,53 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
             }) + "::TEXT";
 
             /** Validate default value against jsonbSchema  */
-            const q = `SELECT ${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${asValue(colConf.defaultValue)+"::JSONB"}, ARRAY[${asValue(name)}]) as v`
+            const q = `SELECT ${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${asValue(colConf.defaultValue)+"::JSONB"}, ARRAY[${asValue(name)}]) as v`;
             if(colConf.defaultValue){ 
-              this.log(q);
+              
               const failedDefault = (err?: any) => {
-                console.error(`Default value (${colConf.defaultValue}) for ${tableName}.${name} does not satisfy the jsonb constraint check: ${q}`, err);
+                return { msg: `Default value (${colConf.defaultValue}) for ${tableName}.${name} does not satisfy the jsonb constraint check: ${q}`, err };
               }
-              this.dbo.sql!(q, {}, { returnType: "row" }).then(row => {
+              try {
+                const row = await  this.dbo.sql!(q, {}, { returnType: "row" });
                 if(!row?.v) {
-                  failedDefault();
+                  throw "Error";
                 }
-              }).catch(failedDefault)
+              } catch(e){
+                throw failedDefault(e);
+              }
             }
-            return ` ${colNameEsc} ${getColTypeDef(colConf, "JSONB")} CHECK(${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${colNameEsc}, ARRAY[${asValue(name)}]))`;
+            const namePreffix = 'prostgles_jsonb_' as const;
+            const { val: nameEnding } = await this.db.one("SELECT MD5( ${table} || ${column}  || ${schema}) as val", { table: tableName, column: name, schema: jsonbSchemaStr  });
+            const constraintName = namePreffix + nameEnding;
+            const colConstraints: { 
+              name: string;
+              table: string;
+              cols: Array<string>; 
+            }[] = await this.db.manyOrNone(`
+SELECT *
+FROM (             
+  SELECT distinct c.conname as name,
+  (SELECT r.relname from pg_class r where r.oid = c.conrelid) as "table", 
+  (SELECT array_agg(attname::text) from pg_attribute 
+  where attrelid = c.conrelid and ARRAY[attnum] <@ c.conkey) as cols
+  -- (SELECT array_agg(attname::text) from pg_attribute 
+  -- where attrelid = c.confrelid and ARRAY[attnum] <@ c.confkey) as fcols, 
+  -- (SELECT r.relname from pg_class r where r.oid = c.confrelid) as ftable
+  FROM pg_catalog.pg_constraint c
+  INNER JOIN pg_catalog.pg_class rel
+  ON rel.oid = c.conrelid
+  INNER JOIN pg_catalog.pg_namespace nsp
+  ON nsp.oid = connamespace
+) t   
+WHERE TRUE 
+AND "table" = ${asValue(tableName)} AND cols @> ARRAY[${asValue(name)}]
+            `);
+            const existingNonMatchingConstraints = colConstraints.filter(c => c.name.startsWith(namePreffix) && c.name !== constraintName);
+            for await (const oldCons of existingNonMatchingConstraints){
+              await this.db.any(`ALTER TABLE ${asName(tableName)} DROP CONSTRAINT ${asName(oldCons.name)}`);
+            } 
+
+            return ` ${colNameEsc} ${getColTypeDef(colConf, "JSONB")}, CONSTRAINT ${asName(constraintName)} CHECK(${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${colNameEsc}, ARRAY[${asValue(name)}]))`;
 
           } else if("enum" in colConf) {
             if(!colConf.enum?.length) throw new Error("colConf.enum Must not be empty");
@@ -567,21 +601,23 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
             }
           }
 
-          getKeys(tableConf.columns).filter(c => {
+          const columns = getKeys(tableConf.columns).filter(c => {
             const colDef = tableConf.columns![c];
             return typeof colDef === "string" || !("joinDef" in colDef)
-          }).forEach(colName => {
+          });
+          
+          for await(const colName of columns) {
             const colConf = tableConf.columns![colName];
 
             /* Add columns to create statement */
             if (!tableHandler) {
-              colCreateLines.push(getColDef(colName, colConf));
+              colCreateLines.push(await getColDef(colName, colConf));
 
             } else if (tableHandler && !tableHandler.columns?.find(c => colName === c.name)) {
 
               queries.push(`
                 ALTER TABLE ${asName(tableName)} 
-                ADD COLUMN ${getColDef(colName, colConf)};
+                ADD COLUMN ${await getColDef(colName, colConf)};
               `)
               if (isObject(colConf) && "references" in colConf && colConf.references) {
 
@@ -591,7 +627,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
                 this.log(`TableConfigurator: created/added column ${tableName}(${colName}) `)
               }
             }
-          });
+          }
         }
 
         if (colCreateLines.length) {

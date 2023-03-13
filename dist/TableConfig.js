@@ -180,7 +180,7 @@ class TableConfigurator {
         await Promise.all((0, prostgles_types_1.getKeys)(this.config).map(async (tableName) => {
             const tableConf = this.config[tableName];
             if ("columns" in tableConf) {
-                const getColDef = (name, colConf) => {
+                const getColDef = async (name, colConf) => {
                     const colNameEsc = asName(name);
                     const getColTypeDef = (colConf, pgType) => {
                         const { nullable, defaultValue } = colConf;
@@ -219,17 +219,46 @@ class TableConfigurator {
                         /** Validate default value against jsonbSchema  */
                         const q = `SELECT ${validate_jsonb_schema_sql_1.VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${(0, PubSubManager_1.asValue)(colConf.defaultValue) + "::JSONB"}, ARRAY[${(0, PubSubManager_1.asValue)(name)}]) as v`;
                         if (colConf.defaultValue) {
-                            this.log(q);
                             const failedDefault = (err) => {
-                                console.error(`Default value (${colConf.defaultValue}) for ${tableName}.${name} does not satisfy the jsonb constraint check: ${q}`, err);
+                                return { msg: `Default value (${colConf.defaultValue}) for ${tableName}.${name} does not satisfy the jsonb constraint check: ${q}`, err };
                             };
-                            this.dbo.sql(q, {}, { returnType: "row" }).then(row => {
+                            try {
+                                const row = await this.dbo.sql(q, {}, { returnType: "row" });
                                 if (!row?.v) {
-                                    failedDefault();
+                                    throw "Error";
                                 }
-                            }).catch(failedDefault);
+                            }
+                            catch (e) {
+                                throw failedDefault(e);
+                            }
                         }
-                        return ` ${colNameEsc} ${getColTypeDef(colConf, "JSONB")} CHECK(${validate_jsonb_schema_sql_1.VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${colNameEsc}, ARRAY[${(0, PubSubManager_1.asValue)(name)}]))`;
+                        const namePreffix = 'prostgles_jsonb_';
+                        const { val: nameEnding } = await this.db.one("SELECT MD5( ${table} || ${column}  || ${schema}) as val", { table: tableName, column: name, schema: jsonbSchemaStr });
+                        const constraintName = namePreffix + nameEnding;
+                        const colConstraints = await this.db.manyOrNone(`
+SELECT *
+FROM (             
+  SELECT distinct c.conname as name,
+  (SELECT r.relname from pg_class r where r.oid = c.conrelid) as "table", 
+  (SELECT array_agg(attname::text) from pg_attribute 
+  where attrelid = c.conrelid and ARRAY[attnum] <@ c.conkey) as cols
+  -- (SELECT array_agg(attname::text) from pg_attribute 
+  -- where attrelid = c.confrelid and ARRAY[attnum] <@ c.confkey) as fcols, 
+  -- (SELECT r.relname from pg_class r where r.oid = c.confrelid) as ftable
+  FROM pg_catalog.pg_constraint c
+  INNER JOIN pg_catalog.pg_class rel
+  ON rel.oid = c.conrelid
+  INNER JOIN pg_catalog.pg_namespace nsp
+  ON nsp.oid = connamespace
+) t   
+WHERE TRUE 
+AND "table" = ${(0, PubSubManager_1.asValue)(tableName)} AND cols @> ARRAY[${(0, PubSubManager_1.asValue)(name)}]
+            `);
+                        const existingNonMatchingConstraints = colConstraints.filter(c => c.name.startsWith(namePreffix) && c.name !== constraintName);
+                        for await (const oldCons of existingNonMatchingConstraints) {
+                            await this.db.any(`ALTER TABLE ${asName(tableName)} DROP CONSTRAINT ${asName(oldCons.name)}`);
+                        }
+                        return ` ${colNameEsc} ${getColTypeDef(colConf, "JSONB")}, CONSTRAINT ${asName(constraintName)} CHECK(${validate_jsonb_schema_sql_1.VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${colNameEsc}, ARRAY[${(0, PubSubManager_1.asValue)(name)}]))`;
                     }
                     else if ("enum" in colConf) {
                         if (!colConf.enum?.length)
@@ -264,19 +293,20 @@ class TableConfigurator {
                             throw err;
                         }
                     }
-                    (0, prostgles_types_1.getKeys)(tableConf.columns).filter(c => {
+                    const columns = (0, prostgles_types_1.getKeys)(tableConf.columns).filter(c => {
                         const colDef = tableConf.columns[c];
                         return typeof colDef === "string" || !("joinDef" in colDef);
-                    }).forEach(colName => {
+                    });
+                    for await (const colName of columns) {
                         const colConf = tableConf.columns[colName];
                         /* Add columns to create statement */
                         if (!tableHandler) {
-                            colCreateLines.push(getColDef(colName, colConf));
+                            colCreateLines.push(await getColDef(colName, colConf));
                         }
                         else if (tableHandler && !tableHandler.columns?.find(c => colName === c.name)) {
                             queries.push(`
                 ALTER TABLE ${asName(tableName)} 
-                ADD COLUMN ${getColDef(colName, colConf)};
+                ADD COLUMN ${await getColDef(colName, colConf)};
               `);
                             if ((0, prostgles_types_1.isObject)(colConf) && "references" in colConf && colConf.references) {
                                 const { tableName: lookupTable, } = colConf.references;
@@ -286,7 +316,7 @@ class TableConfigurator {
                                 this.log(`TableConfigurator: created/added column ${tableName}(${colName}) `);
                             }
                         }
-                    });
+                    }
                 }
                 if (colCreateLines.length) {
                     queries.push([

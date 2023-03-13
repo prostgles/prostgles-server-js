@@ -74,7 +74,8 @@ BEGIN
 
         CREATE TABLE IF NOT EXISTS prostgles.versions(
           version TEXT PRIMARY KEY,
-          schema_md5 TEXT NOT NULL
+          schema_md5 TEXT NOT NULL,
+          added_at TIMESTAMP NOT NULL DEFAULT now()
         );
         COMMENT ON TABLE prostgles.versions IS 'Stores the prostgles schema creation query hash and package version number to identify when a newer schema needs to be re-created';
 
