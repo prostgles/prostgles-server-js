@@ -289,8 +289,8 @@ BEGIN
 
                         IF has_errors THEN
 
-                            DELETE FROM prostgles.app_triggers;
-                            RAISE NOTICE 'trigger dropped due to exception: % % %', err_text, err_detail, err_hint;
+                          DELETE FROM prostgles.app_triggers;
+                          RAISE NOTICE 'trigger dropped due to exception: % % %', err_text, err_detail, err_hint;
 
                         END IF;
 
@@ -434,7 +434,7 @@ BEGIN
                             $q$
                                 DO $e$ 
                                 BEGIN
-
+                                    /* ${ PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
                                     IF EXISTS (
                                         SELECT 1 
                                         FROM information_schema.tables 

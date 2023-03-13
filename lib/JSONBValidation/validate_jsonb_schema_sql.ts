@@ -336,7 +336,7 @@ BEGIN
 END;
 $f$ LANGUAGE 'plpgsql' IMMUTABLE;
 
-COMMENT ON FUNCTION ${VALIDATE_SCHEMA_FUNCNAME}  
+COMMENT ON FUNCTION ${VALIDATE_SCHEMA_FUNCNAME}  /* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
 IS $$prostgles-server internal function used in column CHECK conditions to validate jsonb data against a column schema specified in tableConfig.
 Example usage:
 validate_jsonb_schema(

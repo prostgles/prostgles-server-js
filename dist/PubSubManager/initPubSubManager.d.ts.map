@@ -1,1 +1,1 @@
-{"version":3,"file":"initPubSubManager.d.ts","sourceRoot":"","sources":["../../lib/PubSubManager/initPubSubManager.ts"],"names":[],"mappings":"AACA,OAAO,EAAgB,aAAa,EAAE,MAAM,iBAAiB,CAAC;AAI9D,wBAAsB,iBAAiB,CAAC,IAAI,EAAE,aAAa,GAAG,OAAO,CAAC,aAAa,GAAG,SAAS,CAAC,CAqH/F"}
+{"version":3,"file":"initPubSubManager.d.ts","sourceRoot":"","sources":["../../lib/PubSubManager/initPubSubManager.ts"],"names":[],"mappings":"AACA,OAAO,EAAgB,aAAa,EAAE,MAAM,iBAAiB,CAAC;AAI9D,wBAAsB,iBAAiB,CAAC,IAAI,EAAE,aAAa,GAAG,OAAO,CAAC,aAAa,GAAG,SAAS,CAAC,CAwH/F"}

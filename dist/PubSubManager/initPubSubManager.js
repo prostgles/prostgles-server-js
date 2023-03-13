@@ -27,7 +27,10 @@ async function initPubSubManager() {
               DO $$
               BEGIN
 
-                  /* ${REALTIME_TRIGGER_CHECK_QUERY} */
+                  /* 
+                    ${REALTIME_TRIGGER_CHECK_QUERY} 
+                    ${PubSubManager_1.PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
+                  */
                   /* prostgles schema must exist */
                   IF
                     EXISTS (

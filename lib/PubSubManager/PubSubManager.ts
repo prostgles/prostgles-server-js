@@ -961,6 +961,7 @@ export class PubSubManager {
       
       await this.db.any(`
         BEGIN WORK;
+        /* ${ PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
         LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
 
         INSERT INTO prostgles.app_triggers (table_name, condition, app_id, related_view_name, related_view_def) 

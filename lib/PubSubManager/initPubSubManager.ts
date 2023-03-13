@@ -35,7 +35,10 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
               DO $$
               BEGIN
 
-                  /* ${REALTIME_TRIGGER_CHECK_QUERY} */
+                  /* 
+                    ${REALTIME_TRIGGER_CHECK_QUERY} 
+                    ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
+                  */
                   /* prostgles schema must exist */
                   IF
                     EXISTS (
