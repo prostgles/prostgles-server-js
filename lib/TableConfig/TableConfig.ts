@@ -1,8 +1,9 @@
-import { getKeys, asName as _asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE, isObject, pickKeys, JSONB, getJSONBSchemaAsJSONSchema, ColumnInfo } from "prostgles-types";
-import { isPlainObject, JoinInfo } from "./DboBuilder";
-import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
-import { asValue } from "./PubSubManager/PubSubManager";
-import { validate_jsonb_schema_sql, VALIDATE_SCHEMA_FUNCNAME } from "./JSONBValidation/validate_jsonb_schema_sql";
+import { getKeys, asName as _asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE, isObject, JSONB, ColumnInfo } from "prostgles-types";
+import { isPlainObject, JoinInfo } from "../DboBuilder";
+import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
+import { asValue } from "../PubSubManager/PubSubManager";
+import { validate_jsonb_schema_sql } from "../JSONBValidation/validate_jsonb_schema_sql";
+import { getColConstraints, getColumnDefinitionQuery } from "./getColumnDefinitionQuery";
 
 type ColExtraInfo = {
   min?: string | number;
@@ -99,7 +100,7 @@ type SQLDefColumn = {
   sqlDefinition?: string;
 }
 
-type BaseColumnTypes = {
+export type BaseColumnTypes = {
   defaultValue?: any;
   nullable?: boolean;
 }
@@ -418,13 +419,29 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     if (!this.config || !this.prostgles.pgp) throw "config or pgp missing";
 
     const MAX_IDENTIFIER_LENGTH = +(await this.db.one("SHOW max_identifier_length;") as any).max_identifier_length;
-    if(!Number.isFinite(MAX_IDENTIFIER_LENGTH)) throw `Could not obtain a valid max_identifier_length`
+    if(!Number.isFinite(MAX_IDENTIFIER_LENGTH)) throw `Could not obtain a valid max_identifier_length`;
     const asName = (v: string) => {
       if(v.length > MAX_IDENTIFIER_LENGTH - 1){
         throw `The identifier name provided (${v}) is longer than the allowed limit (max_identifier_length - 1 = ${MAX_IDENTIFIER_LENGTH -1} characters )\n Longest allowed: ${_asName(v.slice(0, MAX_IDENTIFIER_LENGTH - 1))} `
       }
 
       return _asName(v);
+    }
+
+    if(this.prostgles.opts.tableConfigMigrations){
+      const { onMigrate, version, versionTableName = "schema_version" } = this.prostgles.opts.tableConfigMigrations;
+      await this.db.any(`CREATE TABLE IF NOT EXISTS ${asName(versionTableName)}(id NUMERIC PRIMARY KEY, table_config JSONB NOT NULL)`);
+
+      let existingVersion: number | undefined;
+      try {
+        existingVersion = (await this.db.oneOrNone(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`)).v;
+      } catch(e){
+
+      }
+
+      if(existingVersion && existingVersion < version){
+        await onMigrate({ db: this.db, oldVersion: existingVersion, getConstraints: (table, col, types) => getColConstraints(this.db, table, col, types) })
+      }
     }
 
     /* Create lookup tables */
@@ -472,111 +489,6 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     await Promise.all(getKeys(this.config).map(async tableName => {
       const tableConf = this.config![tableName];
       if ("columns" in tableConf) {
-        const getColDef = async (name: string, colConf: ColumnConfig): Promise<string> => {
-          const colNameEsc = asName(name);
-          const getColTypeDef = (colConf: BaseColumnTypes, pgType: "TEXT" | "JSONB") => {
-            const { nullable, defaultValue } = colConf;
-            return `${pgType} ${!nullable ? " NOT NULL " : ""} ${defaultValue ? ` DEFAULT ${asValue(defaultValue)} ` : ""}`
-          }
-
-          const jsonbSchema = 
-            isObject(colConf)? (
-              ("jsonbSchema" in colConf && colConf.jsonbSchema)? { jsonbSchema: colConf.jsonbSchema, jsonbSchemaType: undefined } :
-              ("jsonbSchemaType" in colConf && colConf.jsonbSchemaType)? { jsonbSchema: undefined, jsonbSchemaType: colConf.jsonbSchemaType } : 
-              undefined
-            ) : 
-            undefined;
-
-          if (isObject(colConf) && "references" in colConf && colConf.references) {
-
-            const { tableName: lookupTable, columnName: lookupCol = "id" } = colConf.references;
-            return ` ${colNameEsc} ${getColTypeDef(colConf.references, "TEXT")} REFERENCES ${lookupTable} (${lookupCol}) `;
-
-          } else if (typeof colConf === "string" || "sqlDefinition" in colConf && colConf.sqlDefinition) {
-
-            return ` ${colNameEsc} ${typeof colConf === "string"? colConf : colConf.sqlDefinition} `;
-
-          } else if (isObject(colConf) && "isText" in colConf && colConf.isText) {
-            let checks = ""; 
-            const cArr = [];
-            if (colConf.lowerCased) {
-              cArr.push(`${colNameEsc} = LOWER(${colNameEsc})`)
-            }
-            if (colConf.trimmed) {
-              cArr.push(`${colNameEsc} = BTRIM(${colNameEsc})`)
-            }
-            if (cArr.length) {
-              checks = `CHECK (${cArr.join(" AND ")})`
-            }
-            return ` ${colNameEsc} ${getColTypeDef(colConf, "TEXT")} ${checks}`;
-
-          } else if (jsonbSchema) {
-
-            const jsonbSchemaStr = asValue({
-              ...pickKeys(colConf, ["enum", "nullable", "info"]), 
-              ...(jsonbSchema.jsonbSchemaType? { type: jsonbSchema.jsonbSchemaType } : jsonbSchema.jsonbSchema)
-            }) + "::TEXT";
-
-            /** Validate default value against jsonbSchema  */
-            const q = `SELECT ${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${asValue(colConf.defaultValue)+"::JSONB"}, ARRAY[${asValue(name)}]) as v`;
-            if(colConf.defaultValue){ 
-              
-              const failedDefault = (err?: any) => {
-                return { msg: `Default value (${colConf.defaultValue}) for ${tableName}.${name} does not satisfy the jsonb constraint check: ${q}`, err };
-              }
-              try {
-                const row = await  this.dbo.sql!(q, {}, { returnType: "row" });
-                if(!row?.v) {
-                  throw "Error";
-                }
-              } catch(e){
-                throw failedDefault(e);
-              }
-            }
-            const namePreffix = 'prostgles_jsonb_' as const;
-            const { val: nameEnding } = await this.db.one("SELECT MD5( ${table} || ${column}  || ${schema}) as val", { table: tableName, column: name, schema: jsonbSchemaStr  });
-            const constraintName = namePreffix + nameEnding;
-            const colConstraints: { 
-              name: string;
-              table: string;
-              cols: Array<string>; 
-            }[] = await this.db.manyOrNone(`
-SELECT *
-FROM (             
-  SELECT distinct c.conname as name,
-  (SELECT r.relname from pg_class r where r.oid = c.conrelid) as "table", 
-  (SELECT array_agg(attname::text) from pg_attribute 
-  where attrelid = c.conrelid and ARRAY[attnum] <@ c.conkey) as cols
-  -- (SELECT array_agg(attname::text) from pg_attribute 
-  -- where attrelid = c.confrelid and ARRAY[attnum] <@ c.confkey) as fcols, 
-  -- (SELECT r.relname from pg_class r where r.oid = c.confrelid) as ftable
-  FROM pg_catalog.pg_constraint c
-  INNER JOIN pg_catalog.pg_class rel
-  ON rel.oid = c.conrelid
-  INNER JOIN pg_catalog.pg_namespace nsp
-  ON nsp.oid = connamespace
-) t   
-WHERE TRUE 
-AND "table" = ${asValue(tableName)} AND cols @> ARRAY[${asValue(name)}]
-            `);
-            const existingNonMatchingConstraints = colConstraints.filter(c => c.name.startsWith(namePreffix) && c.name !== constraintName);
-            for await (const oldCons of existingNonMatchingConstraints){
-              await this.db.any(`ALTER TABLE ${asName(tableName)} DROP CONSTRAINT ${asName(oldCons.name)}`);
-            } 
-
-            return ` ${colNameEsc} ${getColTypeDef(colConf, "JSONB")}, CONSTRAINT ${asName(constraintName)} CHECK(${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${colNameEsc}, ARRAY[${asValue(name)}]))`;
-
-          } else if("enum" in colConf) {
-            if(!colConf.enum?.length) throw new Error("colConf.enum Must not be empty");
-            const type = colConf.enum.every(v => Number.isFinite(v))? "NUMERIC" : "TEXT";
-            const checks = colConf.enum.map(v => `${colNameEsc} = ${asValue(v)}`).join(" OR ");
-            return ` ${colNameEsc} ${type} ${colConf.nullable? "" : "NOT NULL"} ${"defaultValue" in colConf? ` DEFAULT ${asValue(colConf.defaultValue)}` : ""} CHECK(${checks})`;
-
-          } else {
-            throw "Unknown column config: " + JSON.stringify(colConf);
-          }
-        }
-
         const colCreateLines: string[] = [];
         const tableHandler = this.dbo[tableName];
         if (tableConf.columns) {
@@ -609,16 +521,19 @@ AND "table" = ${asValue(tableName)} AND cols @> ARRAY[${asValue(name)}]
           for await(const colName of columns) {
             const colConf = tableConf.columns![colName];
 
+
             /* Add columns to create statement */
             if (!tableHandler) {
-              colCreateLines.push(await getColDef(colName, colConf));
+              const colDef = await getColumnDefinitionQuery({ colConf, column: colName, db: this.db, table: tableName })
+              colCreateLines.push(colDef);
 
             } else if (tableHandler && !tableHandler.columns?.find(c => colName === c.name)) {
+              const colDef = await getColumnDefinitionQuery({ colConf, column: colName, db: this.db, table: tableName })
 
               queries.push(`
                 ALTER TABLE ${asName(tableName)} 
-                ADD COLUMN ${await getColDef(colName, colConf)};
-              `)
+                ADD COLUMN ${colDef};
+              `);
               if (isObject(colConf) && "references" in colConf && colConf.references) {
 
                 const { tableName: lookupTable, } = colConf.references;
@@ -695,7 +610,7 @@ AND "table" = ${asValue(tableName)} AND cols @> ARRAY[${asValue(name)}]
             SELECT event_object_table
               ,trigger_name
             FROM  information_schema.triggers
-            WHERE event_object_table = `+ "${tableName}" + `
+            WHERE event_object_table = \${tableName}
             ORDER BY event_object_table
           `,
           { tableName }, 

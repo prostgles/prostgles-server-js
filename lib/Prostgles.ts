@@ -12,7 +12,7 @@ import { SchemaWatch } from "./SchemaWatch";
 const { version } = require('../package.json');
 import AuthHandler, { Auth, SessionUser, AuthRequestParams } from "./AuthHandler"; 
 
-import TableConfigurator, { TableConfig } from "./TableConfig";
+import TableConfigurator, { TableConfig } from "./TableConfig/TableConfig";
 
 import { get } from "./utils";
 import { DboBuilder, DBHandlerServer, isPlainObject, PRGLIOSocket } from "./DboBuilder";
@@ -27,6 +27,7 @@ import { DBEventsManager } from "./DBEventsManager";
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 type DbConnectionOpts = pg.IDefaults;
+
 export const TABLE_METHODS = ["update", "find", "findOne", "insert", "delete", "upsert"] as const;
 function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts | undefined, debugQueries = false, onNotice: ProstglesInitOptions["onNotice"]): { db: DB, pgp: PGP } {
   const pgp: PGP = pgPromise({
@@ -282,7 +283,29 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
   keywords?: Keywords;
   onNotice?: (notice: AnyObject, message?: string) => void;
   fileTable?: FileTableConfig;
+  /**
+   * Creates tables and provides UI labels, autocomplete and hints for a given json structure
+   */
   tableConfig?: TableConfig;
+  tableConfigMigrations?: {
+    version: number;
+    /** Table that will contain the schema version number and the tableConfig 
+     * Defaults to schema_version
+    */
+    versionTableName?: string;
+    /**
+     * Script run before tableConfig is loaded IF an older schema_version is present
+     */
+    onMigrate: (args: {
+      db: DB;
+      oldVersion: number;
+      getConstraints: (
+        table: string, 
+        column?: string, 
+        types?: ColConstraint["type"][]
+      ) => Promise<ColConstraint[]>
+    }) => void;
+  };
 }
 
 /*
@@ -323,6 +346,7 @@ const DEFAULT_KEYWORDS = {
 
 import * as fs from 'fs';
 import { DBOFullyTyped } from "./DBSchemaBuilder";
+import { ColConstraint } from "./TableConfig/getColumnDefinitionQuery";
 export class Prostgles {
 
   opts: ProstglesInitOptions = {

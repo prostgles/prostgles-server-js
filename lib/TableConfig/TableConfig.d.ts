@@ -1,6 +1,6 @@
 import { AnyObject, TableInfo, ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE, JSONB, ColumnInfo } from "prostgles-types";
-import { JoinInfo } from "./DboBuilder";
-import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
+import { JoinInfo } from "../DboBuilder";
+import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 type ColExtraInfo = {
     min?: string | number;
     max?: string | number;
@@ -77,7 +77,7 @@ type SQLDefColumn = {
      */
     sqlDefinition?: string;
 };
-type BaseColumnTypes = {
+export type BaseColumnTypes = {
     defaultValue?: any;
     nullable?: boolean;
 };

@@ -4,7 +4,7 @@ import pg = require('pg-promise/typescript/pg-subset');
 import FileManager, { ImageOptions, LocalConfig, S3Config } from "./FileManager";
 import { SchemaWatch } from "./SchemaWatch";
 import AuthHandler, { Auth, SessionUser, AuthRequestParams } from "./AuthHandler";
-import TableConfigurator, { TableConfig } from "./TableConfig";
+import TableConfigurator, { TableConfig } from "./TableConfig/TableConfig";
 import { DboBuilder, DBHandlerServer, PRGLIOSocket } from "./DboBuilder";
 export { DBHandlerServer };
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -178,7 +178,25 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
     keywords?: Keywords;
     onNotice?: (notice: AnyObject, message?: string) => void;
     fileTable?: FileTableConfig;
+    /**
+     * Creates tables and provides UI labels, autocomplete and hints for a given json structure
+     */
     tableConfig?: TableConfig;
+    tableConfigMigrations?: {
+        version: number;
+        /** Table that will contain the schema version number and the tableConfig
+         * Defaults to schema_version
+        */
+        versionTableName?: string;
+        /**
+         * Script run before tableConfig is loaded IF an older schema_version is present
+         */
+        onMigrate: (args: {
+            db: DB;
+            oldVersion: number;
+            getConstraints: (table: string, column?: string, types?: ColConstraint["type"][]) => Promise<ColConstraint[]>;
+        }) => void;
+    };
 };
 export type OnReady = {
     dbo: DBHandlerServer;
@@ -199,6 +217,7 @@ export type InitResult = {
     restart: () => Promise<InitResult>;
 };
 import { DBOFullyTyped } from "./DBSchemaBuilder";
+import { ColConstraint } from "./TableConfig/getColumnDefinitionQuery";
 export declare class Prostgles {
     opts: ProstglesInitOptions;
     db?: DB;
