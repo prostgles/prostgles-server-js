@@ -1,5 +1,6 @@
 import { DB } from "../Prostgles";
 import { ColumnConfig } from "./TableConfig";
+import pgPromise from "pg-promise";
 type Args = {
     column: string;
     colConf: ColumnConfig;
@@ -18,6 +19,13 @@ export type ColConstraint = {
     definition: string;
     schema: string;
 };
-export declare const getColConstraints: (db: DB, table?: string, column?: string, types?: ColConstraint["type"][]) => Promise<ColConstraint[]>;
+type ColConstraintsArgs = {
+    db: DB | pgPromise.ITask<{}>;
+    table?: string;
+    column?: string;
+    types?: ColConstraint["type"][];
+};
+export declare const getColConstraintsQuery: ({ column, table, types }: Omit<ColConstraintsArgs, "db">) => string;
+export declare const getColConstraints: ({ db, column, table, types }: ColConstraintsArgs) => Promise<ColConstraint[]>;
 export {};
 //# sourceMappingURL=getColumnDefinitionQuery.d.ts.map

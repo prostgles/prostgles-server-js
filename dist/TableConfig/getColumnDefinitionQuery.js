@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getColConstraints = exports.getColumnDefinitionQuery = void 0;
+exports.getColConstraints = exports.getColConstraintsQuery = exports.getColumnDefinitionQuery = void 0;
 const prostgles_types_1 = require("prostgles-types");
 const PubSubManager_1 = require("../PubSubManager/PubSubManager");
 const validate_jsonb_schema_sql_1 = require("../JSONBValidation/validate_jsonb_schema_sql");
@@ -62,7 +62,7 @@ const getColumnDefinitionQuery = async ({ colConf, column, db, table }) => {
         const namePreffix = 'prostgles_jsonb_';
         const { val: nameEnding } = await db.one("SELECT MD5( ${table} || ${column}  || ${schema}) as val", { table: table, column, schema: jsonbSchemaStr });
         const constraintName = namePreffix + nameEnding;
-        const colConstraints = await (0, exports.getColConstraints)(db, table, column);
+        const colConstraints = await (0, exports.getColConstraints)({ db, table, column });
         const existingNonMatchingConstraints = colConstraints.filter(c => c.name.startsWith(namePreffix) && c.name !== constraintName);
         for await (const oldCons of existingNonMatchingConstraints) {
             await db.any(`ALTER TABLE ${(0, prostgles_types_1.asName)(table)} DROP CONSTRAINT ${(0, prostgles_types_1.asName)(oldCons.name)};`);
@@ -81,7 +81,7 @@ const getColumnDefinitionQuery = async ({ colConf, column, db, table }) => {
     }
 };
 exports.getColumnDefinitionQuery = getColumnDefinitionQuery;
-const getColConstraints = (db, table, column, types) => {
+const getColConstraintsQuery = ({ column, table, types }) => {
     let query = `
     SELECT *
     FROM (             
@@ -108,7 +108,11 @@ const getColConstraints = (db, table, column, types) => {
         query += `\nAND cols @> ARRAY[${(0, PubSubManager_1.asValue)(column)}]`;
     if (types?.length)
         query += `\nAND type IN (${types.map(v => (0, PubSubManager_1.asValue)(v)).join(", ")})`;
-    return db.manyOrNone(query);
+    return query;
+};
+exports.getColConstraintsQuery = getColConstraintsQuery;
+const getColConstraints = ({ db, column, table, types }) => {
+    return db.manyOrNone((0, exports.getColConstraintsQuery)({ column, table, types }));
 };
 exports.getColConstraints = getColConstraints;
 //# sourceMappingURL=getColumnDefinitionQuery.js.map

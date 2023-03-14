@@ -3,7 +3,7 @@ import { isPlainObject, JoinInfo } from "../DboBuilder";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import { asValue } from "../PubSubManager/PubSubManager";
 import { validate_jsonb_schema_sql } from "../JSONBValidation/validate_jsonb_schema_sql";
-import { getColConstraints, getColumnDefinitionQuery } from "./getColumnDefinitionQuery";
+import { ColConstraint, getColConstraints, getColumnDefinitionQuery } from "./getColumnDefinitionQuery";
 import { stringify } from "querystring";
 
 type ColExtraInfo = {
@@ -442,7 +442,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       }
 
       if(!existingVersion || existingVersion < version){
-        await onMigrate({ db: this.db, oldVersion: existingVersion, getConstraints: (table, col, types) => getColConstraints(this.db, table, col, types) })
+        await onMigrate({ db: this.db, oldVersion: existingVersion, getConstraints: (table, col, types) => getColConstraints({ db: this.db, table, column: col, types }) })
       }
     }
 
@@ -463,10 +463,12 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
         const rows = Object.keys(tableConf.isLookupTable?.values).map(id => ({ id, ...(tableConf.isLookupTable?.values[id]) }));
         if (isDropped || !this.dbo?.[tableNameRaw]) {
           const columnNames = Object.keys(rows[0]).filter(k => k !== "id");
-          queries.push(`CREATE TABLE IF NOT EXISTS ${tableName} (
-                        id  TEXT PRIMARY KEY
-                        ${columnNames.length? (", " + columnNames.map(k => asName(k) + " TEXT ").join(", ")) : ""}
-                    );`);
+          queries.push(
+            `CREATE TABLE IF NOT EXISTS ${tableName} (
+              id  TEXT PRIMARY KEY
+              ${columnNames.length? (", " + columnNames.map(k => asName(k) + " TEXT ").join(", ")) : ""}
+            );`
+          );
 
           rows.map(row => {
             const values = this.prostgles.pgp!.helpers.values(row)
@@ -487,7 +489,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     }
     queries = [];
 
-    /* Create columns */
+    /* Create/Alter columns */
     for await (const tableName of getKeys(this.config)){ 
       const tableConf = this.config![tableName];
       if ("columns" in tableConf) {
@@ -517,33 +519,60 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
           const columns = getKeys(tableConf.columns).filter(c => {
             const colDef = tableConf.columns![c];
+            /** Exclude NamedJoinColumn  */
             return typeof colDef === "string" || !("joinDef" in colDef)
           });
           
+          const columnDefs: string[] = [];
           for await(const colName of columns) {
             const colConf = tableConf.columns![colName];
 
-
-            /* Add columns to create statement */
+            /* Add column to create statement */
             if (!tableHandler) {
-              const colDef = await getColumnDefinitionQuery({ colConf, column: colName, db: this.db, table: tableName })
+              const colDef = await getColumnDefinitionQuery({ colConf, column: colName, db: this.db, table: tableName });
+              columnDefs.push(colDef);
               colCreateLines.push(colDef);
 
+            /** Alter existing column */
             } else if (tableHandler && !tableHandler.columns?.find(c => colName === c.name)) {
-              const colDef = await getColumnDefinitionQuery({ colConf, column: colName, db: this.db, table: tableName })
+              const colDef = await getColumnDefinitionQuery({ colConf, column: colName, db: this.db, table: tableName });
+              columnDefs.push(colDef);
 
               queries.push(`
                 ALTER TABLE ${asName(tableName)} 
                 ADD COLUMN ${colDef};
               `);
-              if (isObject(colConf) && "references" in colConf && colConf.references) {
+              if(isObject(colConf) && "references" in colConf && colConf.references){
 
-                const { tableName: lookupTable, } = colConf.references;
+                const { tableName: lookupTable } = colConf.references;
                 this.log(`TableConfigurator: ${tableName}(${colName})` + " referenced lookup table " + lookupTable);
               }  else {
                 this.log(`TableConfigurator: created/added column ${tableName}(${colName}) `)
               }
             }
+          }
+
+          /** Remove droped/altered constraints */
+          if(tableHandler && columnDefs.length){
+            let newConstraints: ColConstraint[] = [];
+            try {
+              await this.db.tx(async t => {
+                const { v } = await t.one("SELECT md5(random()::text) as v");
+                const randomTableName = `prostgles_constr_${v}`;
+                await t.any(`CREATE TABLE ${randomTableName} ( \n${columnDefs.join(",\n")}\n );`);
+                newConstraints = await getColConstraints({ db: t, table: randomTableName });
+                return Promise.reject("Done");
+              });
+
+            } catch(e){
+
+            }
+            const currConstraints = await getColConstraints({ db: this.db, table: tableName });
+            currConstraints.forEach(c => {
+              if(!newConstraints.some(nc => nc.type === c.type && nc.definition === c.definition && nc.cols.sort().join() === c.cols.sort().join())){
+                queries.unshift(`ALTER TABLE ${asName(tableName)} DROP CONSTRAINT ${asName(c.name)} CASCADE;`);
+              }
+            });
           }
         }
 

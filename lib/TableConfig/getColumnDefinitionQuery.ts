@@ -3,6 +3,7 @@ import { DB } from "../Prostgles";
 import { asValue } from "../PubSubManager/PubSubManager";
 import { VALIDATE_SCHEMA_FUNCNAME } from "../JSONBValidation/validate_jsonb_schema_sql";
 import { BaseColumnTypes, ColumnConfig } from "./TableConfig";
+import pgPromise from "pg-promise";
 
 type Args = {
   column: string; 
@@ -78,7 +79,7 @@ export const getColumnDefinitionQuery = async ({ colConf, column, db, table }: A
     const namePreffix = 'prostgles_jsonb_' as const;
     const { val: nameEnding } = await db.one("SELECT MD5( ${table} || ${column}  || ${schema}) as val", { table: table, column, schema: jsonbSchemaStr });
     const constraintName = namePreffix + nameEnding;
-    const colConstraints = await getColConstraints(db, table, column);
+    const colConstraints = await getColConstraints({ db, table, column });
     const existingNonMatchingConstraints = colConstraints.filter(c => c.name.startsWith(namePreffix) && c.name !== constraintName);
     for await (const oldCons of existingNonMatchingConstraints) {
       await db.any(`ALTER TABLE ${asName(table)} DROP CONSTRAINT ${asName(oldCons.name)};`);
@@ -105,7 +106,13 @@ export type ColConstraint = {
   definition: string;
   schema: string;
 }
-export const getColConstraints = (db: DB, table?: string, column?: string, types?: ColConstraint["type"][]): Promise<ColConstraint[]> => {
+type ColConstraintsArgs = {
+  db: DB | pgPromise.ITask<{}>;
+  table?: string;
+  column?: string;
+  types?: ColConstraint["type"][];
+}
+export const getColConstraintsQuery = ({ column, table, types }: Omit<ColConstraintsArgs, "db">) => {
   let query = `
     SELECT *
     FROM (             
@@ -129,5 +136,9 @@ export const getColConstraints = (db: DB, table?: string, column?: string, types
   if (table) query += `\nAND "table" = ${asValue(table)}`;
   if (column) query += `\nAND cols @> ARRAY[${asValue(column)}]`;
   if (types?.length) query += `\nAND type IN (${types.map(v => asValue(v)).join(", ")})`;
-  return db.manyOrNone(query);
+  return query;
+}
+export const getColConstraints = ({ db, column, table, types }: ColConstraintsArgs ): Promise<ColConstraint[]>  => {
+  
+  return db.manyOrNone(getColConstraintsQuery({ column, table, types }));
 }
