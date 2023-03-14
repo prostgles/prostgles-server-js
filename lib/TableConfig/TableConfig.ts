@@ -4,6 +4,7 @@ import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import { asValue } from "../PubSubManager/PubSubManager";
 import { validate_jsonb_schema_sql } from "../JSONBValidation/validate_jsonb_schema_sql";
 import { getColConstraints, getColumnDefinitionQuery } from "./getColumnDefinitionQuery";
+import { stringify } from "querystring";
 
 type ColExtraInfo = {
   min?: string | number;
@@ -428,10 +429,11 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       return _asName(v);
     }
 
+    let migrations: { version: number; table: string; } | undefined;
     if(this.prostgles.opts.tableConfigMigrations){
       const { onMigrate, version, versionTableName = "schema_version" } = this.prostgles.opts.tableConfigMigrations;
       await this.db.any(`CREATE TABLE IF NOT EXISTS ${asName(versionTableName)}(id NUMERIC PRIMARY KEY, table_config JSONB NOT NULL)`);
-
+      migrations = { version, table: versionTableName  };
       let existingVersion: number | undefined;
       try {
         existingVersion = (await this.db.oneOrNone(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`)).v;
@@ -439,7 +441,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
       }
 
-      if(existingVersion && existingVersion < version){
+      if(!existingVersion || existingVersion < version){
         await onMigrate({ db: this.db, oldVersion: existingVersion, getConstraints: (table, col, types) => getColConstraints(this.db, table, col, types) })
       }
     }
@@ -667,17 +669,24 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
     if (queries.length) {
       const q = queries.join("\n");
-      this.log("TableConfig: \n", q)
-      await this.db.multi(q).catch(err => {
+      this.log("TableConfig: \n", q);
+
+      try {
+        await this.db.multi(q);
+        if(migrations){
+          await this.db.any(`INSERT INTO ${migrations.table}(id, table_config) VALUES (${asValue(migrations.version)}, ${asValue(this.config)}) ON CONFLICT DO NOTHING;`)
+        }
+      } catch(err: any){
+        console.error("TableConfig error: ", err);
         if(err.position){
           const pos = +err.position;
           if(Number.isInteger(pos)){
             return Promise.reject(err.toString() + "\n At:" + q.slice(pos - 50, pos + 50));
           }
         }
-        console.error("TableConfig error: ", err)
         return Promise.reject(err);
-      });
+
+      }
     }
   }
 

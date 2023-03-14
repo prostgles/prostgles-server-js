@@ -193,7 +193,7 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
          */
         onMigrate: (args: {
             db: DB;
-            oldVersion: number;
+            oldVersion: number | undefined;
             getConstraints: (table: string, column?: string, types?: ColConstraint["type"][]) => Promise<ColConstraint[]>;
         }) => void;
     };

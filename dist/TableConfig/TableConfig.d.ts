@@ -260,7 +260,7 @@ export default class TableConfigurator<LANG_IDS = {
         value: any;
     }) => void;
     getJoinInfo: (sourceTable: string, targetTable: string) => JoinInfo | undefined;
-    init(): Promise<void>;
+    init(): Promise<undefined>;
     log: (...args: any[]) => void;
 }
 export {};
