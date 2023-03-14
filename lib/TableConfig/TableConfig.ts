@@ -488,7 +488,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     queries = [];
 
     /* Create columns */
-    await Promise.all(getKeys(this.config).map(async tableName => {
+    for await (const tableName of getKeys(this.config)){ 
       const tableConf = this.config![tableName];
       if ("columns" in tableConf) {
         const colCreateLines: string[] = [];
@@ -665,7 +665,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
           })
         })
       }
-    }));
+    }
 
     if (queries.length) {
       const q = queries.join("\n");
