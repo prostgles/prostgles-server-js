@@ -1,4 +1,4 @@
-import { asName, isObject, pickKeys } from "prostgles-types"; 
+import { asName, pickKeys } from "prostgles-types"; 
 import { DB } from "../Prostgles";
 import { asValue } from "../PubSubManager/PubSubManager";
 import { VALIDATE_SCHEMA_FUNCNAME } from "../JSONBValidation/validate_jsonb_schema_sql";
@@ -15,7 +15,8 @@ type Args = {
 /**
  * Column create statement for a given config
  */
-export const getColumnDefinitionQuery = async ({ colConf, column, db, table }: Args): Promise<string> => {
+export const getColumnDefinitionQuery = async ({ colConf: colConfRaw, column, db, table }: Args): Promise<string | undefined> => {
+  const colConf = typeof colConfRaw === "string"? { sqlDefinition: colConfRaw } : colConfRaw;
   const colNameEsc = asName(column);
   const getColTypeDef = (colConf: BaseColumnTypes, pgType: "TEXT" | "JSONB") => {
     const { nullable, defaultValue } = colConf;
@@ -23,23 +24,21 @@ export const getColumnDefinitionQuery = async ({ colConf, column, db, table }: A
   }
 
   const jsonbSchema =
-    isObject(colConf) ? (
       ("jsonbSchema" in colConf && colConf.jsonbSchema) ? { jsonbSchema: colConf.jsonbSchema, jsonbSchemaType: undefined } :
         ("jsonbSchemaType" in colConf && colConf.jsonbSchemaType) ? { jsonbSchema: undefined, jsonbSchemaType: colConf.jsonbSchemaType } :
-          undefined
-    ) :
-      undefined;
+          undefined; 
+  
 
-  if (isObject(colConf) && "references" in colConf && colConf.references) {
+  if ("references" in colConf && colConf.references) {
 
     const { tableName: lookupTable, columnName: lookupCol = "id" } = colConf.references;
     return ` ${colNameEsc} ${getColTypeDef(colConf.references, "TEXT")} REFERENCES ${lookupTable} (${lookupCol}) `;
 
-  } else if (typeof colConf === "string" || "sqlDefinition" in colConf && colConf.sqlDefinition) {
+  } else if ("sqlDefinition" in colConf && colConf.sqlDefinition) {
 
-    return ` ${colNameEsc} ${typeof colConf === "string" ? colConf : colConf.sqlDefinition} `;
+    return ` ${colNameEsc} ${colConf.sqlDefinition} `;
 
-  } else if (isObject(colConf) && "isText" in colConf && colConf.isText) {
+  } else if ("isText" in colConf && colConf.isText) {
     let checks = "";
     const colChecks: string[] = [];
     if (colConf.lowerCased) {
@@ -94,7 +93,8 @@ export const getColumnDefinitionQuery = async ({ colConf, column, db, table }: A
     return ` ${colNameEsc} ${type} ${colConf.nullable ? "" : "NOT NULL"} ${"defaultValue" in colConf ? ` DEFAULT ${asValue(colConf.defaultValue)}` : ""} CHECK(${checks})`;
 
   } else {
-    throw "Unknown column config: " + JSON.stringify(colConf);
+    return undefined;
+    // throw "Unknown column config: " + JSON.stringify(colConf);
   }
 }
 
@@ -141,4 +141,22 @@ export const getColConstraintsQuery = ({ column, table, types }: Omit<ColConstra
 export const getColConstraints = ({ db, column, table, types }: ColConstraintsArgs ): Promise<ColConstraint[]>  => {
   
   return db.manyOrNone(getColConstraintsQuery({ column, table, types }));
+}
+export type ColumnMinimalInfo = { 
+  table_name: string;
+  table_schema: string;
+  column_name: string;
+  column_default: string | null;
+  udt_name: string;
+  nullable: boolean; 
+};
+export const getTableColumns = ({ db, tableName }: { db: DB; tableName: string;}): Promise<ColumnMinimalInfo[]> => {
+  return db.manyOrNone(`
+    SELECT table_name, 
+      table_schema, column_name, 
+      column_default, udt_name,
+      is_nullable = 'YES' as nullable
+    FROM information_schema.columns
+    WHERE table_name = $1
+  `, [tableName]);
 }

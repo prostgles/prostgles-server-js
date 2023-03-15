@@ -6,6 +6,7 @@ const DboBuilder_1 = require("../DboBuilder");
 const PubSubManager_1 = require("../PubSubManager/PubSubManager");
 const validate_jsonb_schema_sql_1 = require("../JSONBValidation/validate_jsonb_schema_sql");
 const getColumnDefinitionQuery_1 = require("./getColumnDefinitionQuery");
+const getConstraintDefinitionQueries_1 = require("./getConstraintDefinitionQueries");
 const parseI18N = (params) => {
     const { config, lang, defaultLang, defaultValue } = params;
     if (config) {
@@ -195,6 +196,7 @@ class TableConfigurator {
         /* Create/Alter columns */
         for await (const tableName of (0, prostgles_types_1.getKeys)(this.config)) {
             const tableConf = this.config[tableName];
+            const constraintQueries = (0, getConstraintDefinitionQueries_1.getConstraintDefinitionQueries)({ tableName, tableConf: tableConf });
             if ("columns" in tableConf) {
                 const colCreateLines = [];
                 const tableHandler = this.dbo[tableName];
@@ -206,12 +208,7 @@ class TableConfigurator {
                     /** Must install validation function */
                     if (hasJSONBValidation) {
                         try {
-                            const fileContent = `
-              /* prevent duplicate key value violates unique constraint "pg_namespace_nspname_index" Key (nspname)=(prostgles) already exists.*/
-              LOCK TABLE pg_catalog.pg_namespace IN SHARE ROW EXCLUSIVE MODE;
-              CREATE SCHEMA IF NOT EXISTS prostgles;\n 
-              ${validate_jsonb_schema_sql_1.validate_jsonb_schema_sql}`;
-                            await this.db.any(fileContent);
+                            await this.db.any(validate_jsonb_schema_sql_1.validate_jsonb_schema_sql);
                         }
                         catch (err) {
                             console.error("Could not install the jsonb validation function due to error: ", err);
@@ -227,14 +224,16 @@ class TableConfigurator {
                     for await (const colName of columns) {
                         const colConf = tableConf.columns[colName];
                         /* Add column to create statement */
-                        if (!tableHandler) {
-                            const colDef = await (0, getColumnDefinitionQuery_1.getColumnDefinitionQuery)({ colConf, column: colName, db: this.db, table: tableName });
+                        const colDef = await (0, getColumnDefinitionQuery_1.getColumnDefinitionQuery)({ colConf, column: colName, db: this.db, table: tableName });
+                        if (!colDef) {
+                            // Column has only labels
+                        }
+                        else if (!tableHandler) {
                             columnDefs.push(colDef);
                             colCreateLines.push(colDef);
                             /** Alter existing column */
                         }
                         else if (tableHandler && !tableHandler.columns?.find(c => colName === c.name)) {
-                            const colDef = await (0, getColumnDefinitionQuery_1.getColumnDefinitionQuery)({ colConf, column: colName, db: this.db, table: tableName });
                             columnDefs.push(colDef);
                             queries.push(`
                 ALTER TABLE ${asName(tableName)} 
@@ -252,21 +251,44 @@ class TableConfigurator {
                     /** Remove droped/altered constraints */
                     if (tableHandler && columnDefs.length) {
                         let newConstraints = [];
+                        let newCols = [];
                         try {
                             await this.db.tx(async (t) => {
                                 const { v } = await t.one("SELECT md5(random()::text) as v");
                                 const randomTableName = `prostgles_constr_${v}`;
-                                await t.any(`CREATE TABLE ${randomTableName} ( \n${columnDefs.join(",\n")}\n );`);
+                                const columnDefsWithoutReferences = columnDefs.map(cdef => {
+                                    return cdef.slice(0, cdef.toLowerCase().indexOf(" references "));
+                                });
+                                await t.any(`CREATE TABLE ${randomTableName} ( \n${columnDefsWithoutReferences.join(",\n")}\n );\n` +
+                                    (constraintQueries ?? []).join("\n"));
                                 newConstraints = await (0, getColumnDefinitionQuery_1.getColConstraints)({ db: t, table: randomTableName });
+                                newCols = await (0, getColumnDefinitionQuery_1.getTableColumns)({ db: this.db, tableName });
                                 return Promise.reject("Done");
                             });
                         }
                         catch (e) {
                         }
+                        const ALTER_TABLE_Q = `ALTER TABLE ${asName(tableName)}`;
                         const currConstraints = await (0, getColumnDefinitionQuery_1.getColConstraints)({ db: this.db, table: tableName });
                         currConstraints.forEach(c => {
                             if (!newConstraints.some(nc => nc.type === c.type && nc.definition === c.definition && nc.cols.sort().join() === c.cols.sort().join())) {
-                                queries.unshift(`ALTER TABLE ${asName(tableName)} DROP CONSTRAINT ${asName(c.name)} CASCADE;`);
+                                queries.unshift(`${ALTER_TABLE_Q} DROP CONSTRAINT ${asName(c.name)} CASCADE;`);
+                            }
+                        });
+                        const currCols = await (0, getColumnDefinitionQuery_1.getTableColumns)({ db: this.db, tableName });
+                        currCols.forEach(c => {
+                            const newCol = newCols.find(nc => nc.column_name === c.column_name);
+                            if (!newCol) {
+                                queries.push(`${ALTER_TABLE_Q} DROP COLUMN ${asName(c.column_name)} CASCADE;`);
+                            }
+                            else if (newCol.nullable !== c.nullable) {
+                                queries.push(`${ALTER_TABLE_Q} ALTER COLUMN ${asName(c.column_name)} ${newCol.nullable ? "SET" : "DROP"} NOT NULL;`);
+                            }
+                            else if (newCol.udt_name !== c.udt_name) {
+                                queries.push(`${ALTER_TABLE_Q} ALTER COLUMN ${asName(c.column_name)} TYPE ${newCol.udt_name};`);
+                            }
+                            else if (newCol.column_default !== c.column_default) {
+                                queries.push(`${ALTER_TABLE_Q} ALTER COLUMN ${asName(c.column_name)} ${newCol.column_default === null ? "DROP DEFAULT" : `SET DEFAULT ${newCol.column_default}`};`);
                             }
                         });
                     }
@@ -280,24 +302,7 @@ class TableConfigurator {
                     this.log("TableConfigurator: Created table: \n" + queries.at(-1));
                 }
             }
-            if ("constraints" in tableConf && tableConf.constraints) {
-                const constraints = await getTableConstraings(this.db, tableName);
-                const constraintNames = (0, prostgles_types_1.getKeys)(tableConf.constraints);
-                constraintNames.map(constraintName => {
-                    const _cnstr = tableConf.constraints[constraintName];
-                    const constraintDef = typeof _cnstr === "string" ? _cnstr : `${_cnstr.type} (${_cnstr.content})`;
-                    const canDrop = (0, prostgles_types_1.isObject)(_cnstr) && _cnstr.dropIfExists;
-                    /** Drop constraints with the same name */
-                    const existingConstraint = constraints.some(c => c.conname === constraintName);
-                    if (existingConstraint) {
-                        if (canDrop)
-                            queries.push(`ALTER TABLE ${asName(tableName)} DROP CONSTRAINT ${asName(constraintName)};`);
-                    }
-                    if (!existingConstraint || canDrop) {
-                        queries.push(`ALTER TABLE ${asName(tableName)} ADD CONSTRAINT ${asName(constraintName)} ${constraintDef} ;`);
-                    }
-                });
-            }
+            queries.push(...constraintQueries ?? []);
             if ("indexes" in tableConf && tableConf.indexes) {
                 /*
                     CREATE [ UNIQUE ] INDEX [ CONCURRENTLY ] [ [ IF NOT EXISTS ] name ] ON [ ONLY ] table_name [ USING method ]

@@ -162,11 +162,11 @@ type UnionKeys<T> = T extends T ? keyof T : never;
 type StrictUnionHelper<T, TAll> = T extends any ? T & Partial<Record<Exclude<UnionKeys<TAll>, keyof T>, never>> : never;
 export type StrictUnion<T> = StrictUnionHelper<T, T>;
 export declare const CONSTRAINT_TYPES: readonly ["PRIMARY KEY", "UNIQUE", "CHECK"];
-type TableDefinition<LANG_IDS> = {
+export type TableDefinition<LANG_IDS> = {
     columns?: {
         [column_name: string]: ColumnConfig<LANG_IDS>;
     };
-    constraints?: {
+    constraints?: string[] | {
         [constraint_name: string]: string | {
             type: typeof CONSTRAINT_TYPES[number];
             dropIfExists?: boolean;

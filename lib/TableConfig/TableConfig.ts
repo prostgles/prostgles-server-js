@@ -3,8 +3,8 @@ import { isPlainObject, JoinInfo } from "../DboBuilder";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import { asValue } from "../PubSubManager/PubSubManager";
 import { validate_jsonb_schema_sql } from "../JSONBValidation/validate_jsonb_schema_sql";
-import { ColConstraint, getColConstraints, getColumnDefinitionQuery } from "./getColumnDefinitionQuery";
-import { stringify } from "querystring";
+import { ColConstraint, ColumnMinimalInfo, getColConstraints, getColumnDefinitionQuery, getTableColumns } from "./getColumnDefinitionQuery";
+import { getConstraintDefinitionQueries } from "./getConstraintDefinitionQueries";
 
 type ColExtraInfo = {
   min?: string | number;
@@ -208,33 +208,35 @@ type StrictUnionHelper<T, TAll> = T extends any ? T & Partial<Record<Exclude<Uni
 export type StrictUnion<T> = StrictUnionHelper<T, T>
 
 export const CONSTRAINT_TYPES = ["PRIMARY KEY", "UNIQUE", "CHECK"] as const; // "FOREIGN KEY", 
-type TableDefinition<LANG_IDS> = {
+export type TableDefinition<LANG_IDS> = {
   columns?: {
     [column_name: string]: ColumnConfig<LANG_IDS>
   },
-  constraints?: {
-    [constraint_name: string]: 
-    | string 
-    | { 
-        type: typeof CONSTRAINT_TYPES[number]; 
-        dropIfExists?: boolean; 
-        /**
-         * E.g.: 
-         * colname
-         * col1, col2
-         * col1 > col3
-         */
-        content: string;
-      } 
-      // & ({
-      // } 
-      // | {
-      //   type: "FOREIGN KEY",
-      //   columns: string[];
-      //   ftable: string;
-      //   fcols: string[];
-      // }
-      // )
+  constraints?: 
+    | string[] 
+    | {
+      [constraint_name: string]: 
+        | string 
+        | { 
+            type: typeof CONSTRAINT_TYPES[number]; 
+            dropIfExists?: boolean; 
+            /**
+             * E.g.: 
+             * colname
+             * col1, col2
+             * col1 > col3
+             */
+            content: string;
+          } 
+        // & ({
+        // } 
+        // | {
+        //   type: "FOREIGN KEY",
+        //   columns: string[];
+        //   ftable: string;
+        //   fcols: string[];
+        // }
+        // )
   },
 
   /**
@@ -492,6 +494,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     /* Create/Alter columns */
     for await (const tableName of getKeys(this.config)){ 
       const tableConf = this.config![tableName];
+      const constraintQueries = getConstraintDefinitionQueries({ tableName, tableConf: tableConf as any });
       if ("columns" in tableConf) {
         const colCreateLines: string[] = [];
         const tableHandler = this.dbo[tableName];
@@ -504,13 +507,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
           /** Must install validation function */
           if(hasJSONBValidation){
             try {
-              
-              const fileContent = `
-              /* prevent duplicate key value violates unique constraint "pg_namespace_nspname_index" Key (nspname)=(prostgles) already exists.*/
-              LOCK TABLE pg_catalog.pg_namespace IN SHARE ROW EXCLUSIVE MODE;
-              CREATE SCHEMA IF NOT EXISTS prostgles;\n 
-              ${validate_jsonb_schema_sql}`;
-              await this.db.any(fileContent);
+              await this.db.any(validate_jsonb_schema_sql);
             } catch(err: any){
               console.error("Could not install the jsonb validation function due to error: ", err);
               throw err;
@@ -528,14 +525,15 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
             const colConf = tableConf.columns![colName];
 
             /* Add column to create statement */
-            if (!tableHandler) {
-              const colDef = await getColumnDefinitionQuery({ colConf, column: colName, db: this.db, table: tableName });
+            const colDef = await getColumnDefinitionQuery({ colConf, column: colName, db: this.db, table: tableName });
+            if(!colDef){
+              // Column has only labels
+            } else if (!tableHandler) {
               columnDefs.push(colDef);
               colCreateLines.push(colDef);
 
             /** Alter existing column */
             } else if (tableHandler && !tableHandler.columns?.find(c => colName === c.name)) {
-              const colDef = await getColumnDefinitionQuery({ colConf, column: colName, db: this.db, table: tableName });
               columnDefs.push(colDef);
 
               queries.push(`
@@ -555,24 +553,47 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
           /** Remove droped/altered constraints */
           if(tableHandler && columnDefs.length){
             let newConstraints: ColConstraint[] = [];
+            let newCols: ColumnMinimalInfo[] = [];
             try {
               await this.db.tx(async t => {
                 const { v } = await t.one("SELECT md5(random()::text) as v");
                 const randomTableName = `prostgles_constr_${v}`;
-                await t.any(`CREATE TABLE ${randomTableName} ( \n${columnDefs.join(",\n")}\n );`);
+                const columnDefsWithoutReferences = columnDefs.map(cdef => {
+                  return cdef.slice(0, cdef.toLowerCase().indexOf(" references "));
+                });
+                await t.any(
+                    `CREATE TABLE ${randomTableName} ( \n${columnDefsWithoutReferences.join(",\n")}\n );\n` + 
+                    (constraintQueries ?? []).join("\n")
+                  );
                 newConstraints = await getColConstraints({ db: t, table: randomTableName });
+                newCols = await getTableColumns({ db: this.db, tableName });
                 return Promise.reject("Done");
               });
 
             } catch(e){
 
             }
+            const ALTER_TABLE_Q = `ALTER TABLE ${asName(tableName)}`;
             const currConstraints = await getColConstraints({ db: this.db, table: tableName });
             currConstraints.forEach(c => {
               if(!newConstraints.some(nc => nc.type === c.type && nc.definition === c.definition && nc.cols.sort().join() === c.cols.sort().join())){
-                queries.unshift(`ALTER TABLE ${asName(tableName)} DROP CONSTRAINT ${asName(c.name)} CASCADE;`);
+                queries.unshift(`${ALTER_TABLE_Q} DROP CONSTRAINT ${asName(c.name)} CASCADE;`);
               }
             });
+
+            const currCols = await getTableColumns({ db: this.db, tableName });
+            currCols.forEach(c => {
+              const newCol = newCols.find(nc => nc.column_name === c.column_name);
+              if(!newCol){
+                queries.push(`${ALTER_TABLE_Q} DROP COLUMN ${asName(c.column_name)} CASCADE;`)
+              } else if(newCol.nullable !== c.nullable){
+                queries.push(`${ALTER_TABLE_Q} ALTER COLUMN ${asName(c.column_name)} ${newCol.nullable? "SET" : "DROP"} NOT NULL;`)
+              } else if(newCol.udt_name !== c.udt_name){
+                queries.push(`${ALTER_TABLE_Q} ALTER COLUMN ${asName(c.column_name)} TYPE ${newCol.udt_name};`)
+              } else if(newCol.column_default !== c.column_default){
+                queries.push(`${ALTER_TABLE_Q} ALTER COLUMN ${asName(c.column_name)} ${newCol.column_default === null? "DROP DEFAULT" : `SET DEFAULT ${newCol.column_default}`};`)
+              }
+            })
           }
         }
 
@@ -585,23 +606,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
           this.log("TableConfigurator: Created table: \n" + queries.at(-1))
         }
       }
-      if ("constraints" in tableConf && tableConf.constraints) {
-        const constraints = await getTableConstraings(this.db, tableName);
-        const constraintNames = getKeys(tableConf.constraints);
-        constraintNames.map(constraintName => {
-          const _cnstr = tableConf.constraints![constraintName];
-          const constraintDef = typeof _cnstr === "string"? _cnstr : `${_cnstr.type} (${_cnstr.content})`;
-          const canDrop = isObject(_cnstr) && _cnstr.dropIfExists;
-          /** Drop constraints with the same name */
-          const existingConstraint = constraints.some(c => c.conname === constraintName);
-          if(existingConstraint){
-            if(canDrop) queries.push(`ALTER TABLE ${asName(tableName)} DROP CONSTRAINT ${asName(constraintName)};`);
-          }
-          if(!existingConstraint || canDrop){
-            queries.push(`ALTER TABLE ${asName(tableName)} ADD CONSTRAINT ${asName(constraintName)} ${constraintDef} ;`);
-          }
-        });
-      }
+      queries.push(...constraintQueries ?? []);
       if ("indexes" in tableConf && tableConf.indexes) {
         /*
             CREATE [ UNIQUE ] INDEX [ CONCURRENTLY ] [ [ IF NOT EXISTS ] name ] ON [ ONLY ] table_name [ USING method ]
