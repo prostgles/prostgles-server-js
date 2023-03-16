@@ -244,7 +244,7 @@ class TableConfigurator {
                 });
                 /** Add missing named constraints */
                 constraintDefs?.forEach(c => {
-                    if (c.name) {
+                    if (c.name && !currCons.some(cc => cc.name === c.name)) {
                         const fc = futureCons.find(nc => nc.name === c.name);
                         if (fc) {
                             queries.push(`${ALTER_TABLE_Q} ADD CONSTRAINT ${asName(c.name)} ${c.content};`);
@@ -252,7 +252,6 @@ class TableConfigurator {
                     }
                 });
                 /** Add remaining missing constraints */
-                // currCons = await getColConstraints({ db: this.db, table: tableName });
                 futureCons.filter(nc => !currCons.some(c => c.definition === nc.definition))
                     .forEach(c => {
                     queries.push(`${ALTER_TABLE_Q} ADD ${c.definition};`);

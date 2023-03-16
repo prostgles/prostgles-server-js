@@ -417,7 +417,7 @@ export class Prostgles {
       "onReady", "dbConnection", "dbOptions", "publishMethods", "io",
       "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect",
       "onSocketDisconnect", "sqlFilePath", "auth", "DEBUG_MODE", "watchSchema", "watchSchemaType",
-      "fileTable", "tableConfig"
+      "fileTable", "tableConfig", "tableConfigMigrations"
     ];
     const unknownParams = Object.keys(params).filter((key: string) => !(config as string[]).includes(key))
     if (unknownParams.length) {
