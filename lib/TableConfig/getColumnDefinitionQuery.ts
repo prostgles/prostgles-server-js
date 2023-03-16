@@ -4,6 +4,7 @@ import { asValue } from "../PubSubManager/PubSubManager";
 import { VALIDATE_SCHEMA_FUNCNAME } from "../JSONBValidation/validate_jsonb_schema_sql";
 import { BaseColumnTypes, ColumnConfig } from "./TableConfig";
 import pgPromise from "pg-promise";
+import { getColConstraints } from "./getConstraintDefinitionQueries";
 
 type Args = {
   column: string; 
@@ -98,50 +99,7 @@ export const getColumnDefinitionQuery = async ({ colConf: colConfRaw, column, db
   }
 }
 
-export type ColConstraint = {
-  name: string;
-  table: string;
-  type: "c" | "p" | "u" | "f";
-  cols: Array<string>;
-  definition: string;
-  schema: string;
-}
-type ColConstraintsArgs = {
-  db: DB | pgPromise.ITask<{}>;
-  table?: string;
-  column?: string;
-  types?: ColConstraint["type"][];
-}
-export const getColConstraintsQuery = ({ column, table, types }: Omit<ColConstraintsArgs, "db">) => {
-  let query = `
-    SELECT *
-    FROM (             
-      SELECT distinct c.conname as name, c.contype as type,
-        pg_get_constraintdef(c.oid) as definition, 
-        nsp.nspname as schema,
-      (SELECT r.relname from pg_class r where r.oid = c.conrelid) as "table", 
-      (SELECT array_agg(attname::text) from pg_attribute 
-      where attrelid = c.conrelid and ARRAY[attnum] <@ c.conkey) as cols
-      -- (SELECT array_agg(attname::text) from pg_attribute 
-      -- where attrelid = c.confrelid and ARRAY[attnum] <@ c.confkey) as fcols, 
-      -- (SELECT r.relname from pg_class r where r.oid = c.confrelid) as ftable
-      FROM pg_catalog.pg_constraint c
-      INNER JOIN pg_catalog.pg_class rel
-      ON rel.oid = c.conrelid
-      INNER JOIN pg_catalog.pg_namespace nsp
-      ON nsp.oid = connamespace
-    ) t   
-    WHERE TRUE 
-  `;
-  if (table) query += `\nAND "table" = ${asValue(table)}`;
-  if (column) query += `\nAND cols @> ARRAY[${asValue(column)}]`;
-  if (types?.length) query += `\nAND type IN (${types.map(v => asValue(v)).join(", ")})`;
-  return query;
-}
-export const getColConstraints = ({ db, column, table, types }: ColConstraintsArgs ): Promise<ColConstraint[]>  => {
-  
-  return db.manyOrNone(getColConstraintsQuery({ column, table, types }));
-}
+
 export type ColumnMinimalInfo = { 
   table_name: string;
   table_schema: string;
@@ -150,7 +108,7 @@ export type ColumnMinimalInfo = {
   udt_name: string;
   nullable: boolean; 
 };
-export const getTableColumns = ({ db, tableName }: { db: DB; tableName: string;}): Promise<ColumnMinimalInfo[]> => {
+export const getTableColumns = ({ db, table }: { db: DB | pgPromise.ITask<{}>; table: string;}): Promise<ColumnMinimalInfo[]> => {
   return db.manyOrNone(`
     SELECT table_name, 
       table_schema, column_name, 
@@ -158,5 +116,5 @@ export const getTableColumns = ({ db, tableName }: { db: DB; tableName: string;}
       is_nullable = 'YES' as nullable
     FROM information_schema.columns
     WHERE table_name = $1
-  `, [tableName]);
+  `, [table]);
 }

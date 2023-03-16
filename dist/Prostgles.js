@@ -393,8 +393,12 @@ class Prostgles {
                     await this.tableConfigurator.init();
                 }
                 catch (e) {
-                    console.error("TableConfigurator: ", e);
-                    throw e;
+                    if (this.opts.tableConfigMigrations?.silentFail === false) {
+                        console.error("TableConfigurator silentFail: ", e);
+                    }
+                    else {
+                        throw e;
+                    }
                 }
             }
             /* 3. Make DBO object from all tables and views */

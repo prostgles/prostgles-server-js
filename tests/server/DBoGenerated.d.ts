@@ -465,8 +465,18 @@ export type DBSchemaGenerated = {
     columns: {
       col1?: null | string;
       col2?: null | string;
-      id?: string;
-      name?: null | string;
+      id?: null | string;
+    };
+  };
+  uuid_text1: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      col1?: null | string;
+      col2?: null | string;
     };
   };
   v_items: {

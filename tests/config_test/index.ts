@@ -171,8 +171,7 @@ prostgles<DBObj>({
         // console.log(await await db.media.find());
  
         // throw items_with_one_media;
-
-        console.log(await db.uuid_text.getColumns())
+ 
 
       } catch(e){
         console.error(e)

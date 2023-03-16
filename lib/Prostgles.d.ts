@@ -183,6 +183,11 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
      */
     tableConfig?: TableConfig;
     tableConfigMigrations?: {
+        /**
+         * If false then prostgles won't start on any tableConfig error
+         * true by default
+         */
+        silentFail?: boolean;
         version: number;
         /** Table that will contain the schema version number and the tableConfig
          * Defaults to schema_version
@@ -217,7 +222,7 @@ export type InitResult = {
     restart: () => Promise<InitResult>;
 };
 import { DBOFullyTyped } from "./DBSchemaBuilder";
-import { ColConstraint } from "./TableConfig/getColumnDefinitionQuery";
+import { ColConstraint } from "./TableConfig/getConstraintDefinitionQueries";
 export declare class Prostgles {
     opts: ProstglesInitOptions;
     db?: DB;

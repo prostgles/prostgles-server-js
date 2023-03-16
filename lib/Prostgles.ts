@@ -288,6 +288,12 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
    */
   tableConfig?: TableConfig;
   tableConfigMigrations?: {
+    /**
+     * If false then prostgles won't start on any tableConfig error
+     * true by default
+     */
+    silentFail?: boolean;
+
     version: number;
     /** Table that will contain the schema version number and the tableConfig 
      * Defaults to schema_version
@@ -346,7 +352,7 @@ const DEFAULT_KEYWORDS = {
 
 import * as fs from 'fs';
 import { DBOFullyTyped } from "./DBSchemaBuilder";
-import { ColConstraint } from "./TableConfig/getColumnDefinitionQuery";
+import { ColConstraint } from "./TableConfig/getConstraintDefinitionQueries";
 export class Prostgles {
 
   opts: ProstglesInitOptions = {
@@ -612,8 +618,11 @@ export class Prostgles {
         try {
           await this.tableConfigurator.init();
         } catch (e) {
-          console.error("TableConfigurator: ", e);
-          throw e;
+          if(this.opts.tableConfigMigrations?.silentFail === false){
+            console.error("TableConfigurator silentFail: ", e);
+          } else {
+            throw e;
+          }
         }
       }
 

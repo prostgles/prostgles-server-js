@@ -7,14 +7,7 @@ CREATE TABLE IF NOT EXISTS various_nested (
     various_id INTEGER REFERENCES various(id),
     name TEXT
 );
-
-
-DROP TABLE IF EXISTS uuid_text CASCADE;
-CREATE TABLE IF NOT EXISTS uuid_text (
-	id		UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-	name	TEXT
-);
-
+ 
 DROP TABLE IF EXISTS items_m1 CASCADE;
 CREATE TABLE IF NOT EXISTS items_m1 (
 	id			SERIAL PRIMARY KEY,

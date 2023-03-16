@@ -174,7 +174,7 @@ function dd(){
 			}
 		},
 		lookup_col1: {
-			dropIfExists: true, 
+			dropIfExistsCascade: true, 
 			isLookupTable: {
 				values: {
 					a: {},
@@ -184,6 +184,7 @@ function dd(){
 		},
 		uuid_text: {
 			columns: {
+				id: "UUID",
 				col1: {
 					references: {
 						tableName: "lookup_col1",
@@ -198,6 +199,9 @@ function dd(){
 				}
 			}
 		},
+		// uuid_text: {
+		// 	columns: {id: "UUID"}
+		// },
 		rec_ref: {
 			columns: {
 				id: "SERIAL PRIMARY KEY",
