@@ -30,6 +30,7 @@ DECLARE
       "type": { "enum": ["data", "data-def"] },
       "table": "string",
       "column": "string",
+      "lookup": { "type": "any", "optional": true },
       "isArray": { "type": "boolean", "optional": true },
       "filter": { "optional": true, "type": "any" },
       "isFullRow": { "optional": true, "type": {
@@ -45,6 +46,7 @@ DECLARE
       "type": { "enum": ["schema"] },
       "object": { "enum": ["table", "column"] },
       "isArray": { "type": "boolean", "optional": true },
+      "lookup": { "type": "any", "optional": true },
       "filter": { "optional": true, "type": "any" }
     }  
   $d$;
@@ -306,7 +308,7 @@ BEGIN
 
     END LOOP;
 
-    RAISE EXCEPTION 'Could not validate against any oneOf schemas ( % ), %', v_one_of_errors, path;-- USING HINT = path, COLUMN = colname;  
+    RAISE EXCEPTION 'No oneOf schemas matching ( % ), %', v_one_of_errors, path;-- USING HINT = path, COLUMN = colname;  
 
   /* arrayOfType: { key_name: { type: "string" } } */
   ELSIF (schema ? 'arrayOf' OR schema ? 'arrayOfType') THEN
