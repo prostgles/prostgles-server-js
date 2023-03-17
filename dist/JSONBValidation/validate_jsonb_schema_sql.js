@@ -110,6 +110,12 @@ BEGIN
     END IF;
 
   ELSIF schema ? 'lookup' THEN
+
+    /* TODO: Finish validating data-def */
+    IF (schema->'lookup'->>'type' = 'data-def') THEN
+      RETURN TRUE;
+    END IF;
+
     /* Validate lookup schema */
     IF NOT ${exports.VALIDATE_SCHEMA_FUNCNAME}(
       '{ "oneOfType": [' || concat_ws(',',lookup_data_def_schema, lookup_schema_schema)  || '] }',
@@ -119,7 +125,6 @@ BEGIN
       
       RETURN FALSE;
     END IF;
-
 
     RETURN ${exports.VALIDATE_SCHEMA_FUNCNAME}(
       CASE WHEN schema->'lookup'->>'type' = 'data-def' THEN
