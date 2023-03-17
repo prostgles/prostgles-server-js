@@ -51,6 +51,15 @@ DECLARE
   $d$;
 
   extra_keys TEXT[];
+
+  /* Used for oneOf schema errors */
+  v_state   TEXT;
+  v_msg     TEXT;
+  v_detail  TEXT;
+  v_hint    TEXT;
+  v_context TEXT;
+  v_one_of_errors TEXT;
+
 BEGIN
   path = concat_ws(', ', 
     'Path: ' || array_to_string(checked_path, '.'), 
@@ -62,6 +71,9 @@ BEGIN
   IF length(jsonb_schema) = 0 THEN
     RAISE EXCEPTION 'Empty schema. %', path USING HINT = path, COLUMN = colname; 
   END IF;
+
+  /* Sometimes text comes double quoted from jsonb, e.g.: '"string"' */
+  jsonb_schema = CASE WHEN jsonb_schema::text ilike '"%"' THEN  LEFT(RIGHT(jsonb_schema::text, -1), -1) ELSE jsonb_schema END;
 
   /* 'string' */
   IF ARRAY[jsonb_schema] <@ allowed_types THEN
@@ -250,7 +262,8 @@ BEGIN
     END IF;
 
     FOR sub_schema IN
-      SELECT CASE WHEN schema ? 'oneOfType' THEN jsonb_build_object('type', value) ELSE value END as value
+      SELECT CASE WHEN schema ? 'oneOfType' THEN jsonb_build_object('type', value) ELSE value END as value, 
+        row_number() over() - 1 as idx
       FROM jsonb_array_elements(oneof)
     LOOP
 
@@ -266,10 +279,35 @@ BEGIN
 
       /* Ignore exceptions in case the last schema will match */
       EXCEPTION WHEN others THEN
+
+        GET STACKED DIAGNOSTICS
+          v_state   = returned_sqlstate,
+          v_msg     = message_text,
+          v_detail  = pg_exception_detail,
+          v_hint    = pg_exception_hint,
+          v_context = pg_exception_context;
+
+        /* Ignore duplicate errors */
+        IF v_one_of_errors IS NULL OR v_one_of_errors NOT ilike '%' || v_msg || '%' THEN
+          v_one_of_errors = concat_ws(
+            E'\n', 
+            v_one_of_errors,  
+            concat_ws(
+              ', ', 
+              'Schema index ' || sub_schema.idx::TEXT || ' error:', 
+              'state: ' || v_state, 
+              'message: ' || v_msg,
+              'detail: ' || v_detail,
+              'hint: ' || v_hint
+              -- 'context: ' || v_context
+            )
+          );
+        END IF;
       END;
+
     END LOOP;
 
-    RAISE EXCEPTION 'Could not validate against any oneOf schemas ( % ), %', oneof::TEXT, path USING HINT = path, COLUMN = colname;  
+    RAISE EXCEPTION 'Could not validate against any oneOf schemas ( % ), %', v_one_of_errors, path;-- USING HINT = path, COLUMN = colname;  
 
   /* arrayOfType: { key_name: { type: "string" } } */
   ELSIF (schema ? 'arrayOf' OR schema ? 'arrayOfType') THEN
@@ -416,5 +454,8 @@ SELECT ${exports.VALIDATE_SCHEMA_FUNCNAME}('{ "lookup": { "type": "schema", "obj
 
 SELECT ${exports.VALIDATE_SCHEMA_FUNCNAME}('{ "type": "time"}', '"22:22"');
 SELECT ${exports.VALIDATE_SCHEMA_FUNCNAME}('{ "type": "Date"}', '"2222-22-22"');
+
+
+SELECT ${exports.VALIDATE_SCHEMA_FUNCNAME}('{ "oneOf": ["number"]}','2');
 `;
 //# sourceMappingURL=validate_jsonb_schema_sql.js.map
