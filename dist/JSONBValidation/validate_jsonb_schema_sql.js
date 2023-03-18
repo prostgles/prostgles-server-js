@@ -2,7 +2,13 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.validate_jsonb_schema_sql = exports.VALIDATE_SCHEMA_FUNCNAME = void 0;
 const PubSubManager_1 = require("../PubSubManager/PubSubManager");
-const raiseException = (err) => `RAISE EXCEPTION ${err} USING HINT = path, COLUMN = colname, TABLE = tablename, CONSTRAINT = 'validate_jsonb_schema: ' || jsonb_schema;`;
+const raiseException = (err) => `
+IF (context->'silent')::BOOLEAN = TRUE THEN
+  RETURN FALSE;
+ELSE
+  RAISE EXCEPTION ${err} USING HINT = path, COLUMN = colname, TABLE = tablename, CONSTRAINT = 'validate_jsonb_schema: ' || jsonb_pretty(jsonb_schema::JSONB);
+END IF;
+`;
 exports.VALIDATE_SCHEMA_FUNCNAME = "validate_jsonb_schema";
 exports.validate_jsonb_schema_sql = `
 
@@ -16,7 +22,7 @@ DROP FUNCTION IF EXISTS ${exports.VALIDATE_SCHEMA_FUNCNAME}(jsonb_schema text, d
 CREATE OR REPLACE FUNCTION ${exports.VALIDATE_SCHEMA_FUNCNAME}(
   jsonb_schema TEXT, 
   data JSONB, 
-  context JSONB DEFAULT '{}'::JSONB, /* { table: string; column: string; } */
+  context JSONB DEFAULT '{}'::JSONB, /* { table: string; column: string; silent: boolean } */
   checked_path TEXT[] DEFAULT ARRAY[]::TEXT[]
 ) RETURNS boolean AS 
 $f$

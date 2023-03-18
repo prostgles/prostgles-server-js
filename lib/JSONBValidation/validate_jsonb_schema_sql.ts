@@ -1,7 +1,13 @@
 import { PubSubManager } from "../PubSubManager/PubSubManager";
 
 
-const raiseException = (err: string) => `RAISE EXCEPTION ${err} USING HINT = path, COLUMN = colname, TABLE = tablename, CONSTRAINT = 'validate_jsonb_schema: ' || jsonb_schema;`
+const raiseException = (err: string) => `
+IF (context->'silent')::BOOLEAN = TRUE THEN
+  RETURN FALSE;
+ELSE
+  RAISE EXCEPTION ${err} USING HINT = path, COLUMN = colname, TABLE = tablename, CONSTRAINT = 'validate_jsonb_schema: ' || jsonb_pretty(jsonb_schema::JSONB);
+END IF;
+`
 
 export const VALIDATE_SCHEMA_FUNCNAME = "validate_jsonb_schema" as const;
 export const validate_jsonb_schema_sql = `
@@ -16,7 +22,7 @@ DROP FUNCTION IF EXISTS ${VALIDATE_SCHEMA_FUNCNAME}(jsonb_schema text, data json
 CREATE OR REPLACE FUNCTION ${VALIDATE_SCHEMA_FUNCNAME}(
   jsonb_schema TEXT, 
   data JSONB, 
-  context JSONB DEFAULT '{}'::JSONB, /* { table: string; column: string; } */
+  context JSONB DEFAULT '{}'::JSONB, /* { table: string; column: string; silent: boolean } */
   checked_path TEXT[] DEFAULT ARRAY[]::TEXT[]
 ) RETURNS boolean AS 
 $f$
