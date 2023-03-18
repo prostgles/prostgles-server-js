@@ -1,3 +1,4 @@
+import { DATA_TYPES } from "prostgles-types";
 import { PubSubManager } from "../PubSubManager/PubSubManager";
 
 
@@ -10,6 +11,11 @@ END IF;
 `
 
 export const VALIDATE_SCHEMA_FUNCNAME = "validate_jsonb_schema" as const;
+export const JSONB_DATA_TYPES = [
+  ...DATA_TYPES,
+  "Lookup","Lookup[]"
+] as const;
+
 export const validate_jsonb_schema_sql = `
 
 /* 
@@ -32,7 +38,7 @@ DECLARE
   obj_key_val RECORD;
   schema JSONB;
   path text;
-  allowed_types text[] = '{any,boolean,number,integer,string,Date,time,timestamp,Lookup,boolean[],number[],integer[],string[],any[],Date[],time[],timestamp[],Lookup[]}';
+  allowed_types text[] = '{${JSONB_DATA_TYPES.join(",")}}';
   typeStr TEXT = NULL; 
   optional boolean;
   nullable boolean; 
@@ -82,7 +88,6 @@ BEGIN
     'Data: ' || data::TEXT, 
     'JSONBSchema: ' || schema::TEXT
   );
-  colname = COALESCE(checked_path[1], '');
 
   IF length(jsonb_schema) = 0 THEN
     ${raiseException(`'Empty schema. %', path`)}

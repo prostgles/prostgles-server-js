@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validate_jsonb_schema_sql = exports.VALIDATE_SCHEMA_FUNCNAME = void 0;
+exports.validate_jsonb_schema_sql = exports.JSONB_DATA_TYPES = exports.VALIDATE_SCHEMA_FUNCNAME = void 0;
+const prostgles_types_1 = require("prostgles-types");
 const PubSubManager_1 = require("../PubSubManager/PubSubManager");
 const raiseException = (err) => `
 IF (context->'silent')::BOOLEAN = TRUE THEN
@@ -10,6 +11,10 @@ ELSE
 END IF;
 `;
 exports.VALIDATE_SCHEMA_FUNCNAME = "validate_jsonb_schema";
+exports.JSONB_DATA_TYPES = [
+    ...prostgles_types_1.DATA_TYPES,
+    "Lookup", "Lookup[]"
+];
 exports.validate_jsonb_schema_sql = `
 
 /* 
@@ -32,7 +37,7 @@ DECLARE
   obj_key_val RECORD;
   schema JSONB;
   path text;
-  allowed_types text[] = '{any,boolean,number,integer,string,Date,time,timestamp,Lookup,boolean[],number[],integer[],string[],any[],Date[],time[],timestamp[],Lookup[]}';
+  allowed_types text[] = '{${exports.JSONB_DATA_TYPES.join(",")}}';
   typeStr TEXT = NULL; 
   optional boolean;
   nullable boolean; 
@@ -82,7 +87,6 @@ BEGIN
     'Data: ' || data::TEXT, 
     'JSONBSchema: ' || schema::TEXT
   );
-  colname = COALESCE(checked_path[1], '');
 
   IF length(jsonb_schema) = 0 THEN
     ${raiseException(`'Empty schema. %', path`)}
