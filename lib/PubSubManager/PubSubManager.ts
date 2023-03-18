@@ -236,7 +236,7 @@ export class PubSubManager {
 
   static SCHEMA_ALTERING_QUERIES = ['CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO'];
 
-  static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from "
+  static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from schema watch "
   prepareTriggers = async () => {
     // SELECT * FROM pg_catalog.pg_event_trigger WHERE evtname
     if (!this.appID) throw "prepareTriggers failed: this.appID missing";

@@ -343,7 +343,7 @@ export function makeErrorFromPGError(err: any, localParams?: LocalParams, view?:
   }
   const errObject = {
     ...((!localParams || !localParams.socket) ? err : {}),
-    ...pickKeys(err, ["column", "code", "table", "constraint"]),
+    ...pickKeys(err, ["column", "code", "table", "constraint", "hint"]),
     ...(err && err.toString ? { txt: err.toString() } : {}),
     code_info: sqlErrCodeToMsg(err.code)
   };

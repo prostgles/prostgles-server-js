@@ -741,7 +741,7 @@ PubSubManager.create = async (options) => {
     return await res.init();
 };
 PubSubManager.SCHEMA_ALTERING_QUERIES = ['CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO'];
-PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from ";
+PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from schema watch ";
 const parseCondition = (condition) => condition && condition.trim().length ? condition : "TRUE";
 var prostgles_types_2 = require("prostgles-types");
 Object.defineProperty(exports, "pickKeys", { enumerable: true, get: function () { return prostgles_types_2.pickKeys; } });

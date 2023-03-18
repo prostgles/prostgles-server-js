@@ -61,7 +61,7 @@ export const getColumnDefinitionQuery = async ({ colConf: colConfRaw, column, db
     }) + "::TEXT";
 
     /** Validate default value against jsonbSchema  */
-    const q = `SELECT ${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${asValue(colConf.defaultValue) + "::JSONB"}, ARRAY[${asValue(column)}]) as v`;
+    const q = `SELECT ${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${asValue(colConf.defaultValue) + "::JSONB"}, ${asValue({ table, column })}) as v`;
     if (colConf.defaultValue) {
 
       const failedDefault = (err?: any) => {
@@ -85,7 +85,7 @@ export const getColumnDefinitionQuery = async ({ colConf: colConfRaw, column, db
       await db.any(`ALTER TABLE ${asName(table)} DROP CONSTRAINT ${asName(oldCons.name)};`);
     }
 
-    return ` ${colNameEsc} ${getColTypeDef(colConf, "JSONB")}, CONSTRAINT ${asName(constraintName)} CHECK(${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${colNameEsc}, ARRAY[${asValue(column)}]))`;
+    return ` ${colNameEsc} ${getColTypeDef(colConf, "JSONB")}, CONSTRAINT ${asName(constraintName)} CHECK(${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${colNameEsc}, ${asValue({ table, column })} ))`;
 
   } else if ("enum" in colConf) {
     if (!colConf.enum?.length) throw new Error("colConf.enum Must not be empty");

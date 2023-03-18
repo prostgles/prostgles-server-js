@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.validate_jsonb_schema_sql = exports.VALIDATE_SCHEMA_FUNCNAME = void 0;
 const PubSubManager_1 = require("../PubSubManager/PubSubManager");
+const raiseException = (err) => `RAISE EXCEPTION ${err} USING HINT = path, COLUMN = colname, TABLE = tablename, CONSTRAINT = 'validate_jsonb_schema: ' || jsonb_schema;`;
 exports.VALIDATE_SCHEMA_FUNCNAME = "validate_jsonb_schema";
 exports.validate_jsonb_schema_sql = `
 
@@ -9,9 +10,15 @@ exports.validate_jsonb_schema_sql = `
 * ${PubSubManager_1.PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
 */
 
---DROP FUNCTION IF EXISTS ${exports.VALIDATE_SCHEMA_FUNCNAME}(jsonb_schema text, data jsonb, checked_path text[]);
+DROP FUNCTION IF EXISTS ${exports.VALIDATE_SCHEMA_FUNCNAME}(jsonb_schema text, data jsonb, checked_path text[]) CASCADE;
+--DROP FUNCTION IF EXISTS ${exports.VALIDATE_SCHEMA_FUNCNAME}(jsonb_schema text, data jsonb, context JSONB, checked_path text[]);
 
-CREATE OR REPLACE FUNCTION ${exports.VALIDATE_SCHEMA_FUNCNAME}(jsonb_schema TEXT, data JSONB, checked_path TEXT[] DEFAULT ARRAY[]::TEXT[]) RETURNS boolean AS 
+CREATE OR REPLACE FUNCTION ${exports.VALIDATE_SCHEMA_FUNCNAME}(
+  jsonb_schema TEXT, 
+  data JSONB, 
+  context JSONB DEFAULT '{}'::JSONB, /* { table: string; column: string; } */
+  checked_path TEXT[] DEFAULT ARRAY[]::TEXT[]
+) RETURNS boolean AS 
 $f$
 DECLARE
   sub_schema RECORD;
@@ -23,7 +30,8 @@ DECLARE
   typeStr TEXT = NULL; 
   optional boolean;
   nullable boolean; 
-  colname TEXT;
+  colname TEXT = context->>'column';
+  tablename TEXT = context->>'table';
   oneof JSONB;
   arrayof JSONB;
   lookup_data_def_schema TEXT = $d$  
@@ -71,7 +79,7 @@ BEGIN
   colname = COALESCE(checked_path[1], '');
 
   IF length(jsonb_schema) = 0 THEN
-    RAISE EXCEPTION 'Empty schema. %', path USING HINT = path, COLUMN = colname; 
+    ${raiseException(`'Empty schema. %', path`)}
   END IF;
 
   /* Sometimes text comes double quoted from jsonb, e.g.: '"string"' */
@@ -84,14 +92,14 @@ BEGIN
   ELSIF BTRIM(replace(jsonb_schema,E'\n','')) ILIKE '{%' THEN
     schema = jsonb_schema::JSONB;
   ELSE
-    RAISE EXCEPTION $$Invalid schema. Expecting 'typename' or { "type": "typename" } but received: %, %$$, jsonb_schema, path USING HINT = path, COLUMN = colname; 
+    ${raiseException(`$$Invalid schema. Expecting 'typename' or { "type": "typename" } but received: %, %$$, jsonb_schema, path`)} 
   END IF;
 
 
   nullable = COALESCE((schema->>'nullable')::BOOLEAN, FALSE);
   IF data IS NULL OR jsonb_typeof(data) = 'null' THEN
     IF NOT nullable THEN
-      RAISE EXCEPTION 'Is not nullable. %', path USING HINT = path, COLUMN = colname; 
+      ${raiseException(`'Is not nullable. %', path`)}  
     ELSE
       RETURN true;
     END IF;
@@ -102,11 +110,11 @@ BEGIN
       jsonb_typeof(schema->'enum') != 'array' OR 
       jsonb_array_length(schema->'enum') < 1 
     THEN
-      RAISE EXCEPTION 'Invalid schema enum (%) .Must be a non empty array %', schema->'enum', path USING HINT = path, COLUMN = colname; 
+      ${raiseException(`'Invalid schema enum (%) .Must be a non empty array %', schema->'enum', path`)}  
     END IF;
     
     IF NOT jsonb_build_array(data) <@ (schema->'enum') THEN
-      RAISE EXCEPTION 'Data not in allowed enum list (%), %', schema->'enum', path USING HINT = path, COLUMN = colname; 
+      ${raiseException(`'Data not in allowed enum list (%), %', schema->'enum', path`)}  
     END IF;
 
   ELSIF schema ? 'lookup' THEN
@@ -119,7 +127,8 @@ BEGIN
     /* Validate lookup schema */
     IF NOT ${exports.VALIDATE_SCHEMA_FUNCNAME}(
       '{ "oneOfType": [' || concat_ws(',',lookup_data_def_schema, lookup_schema_schema)  || '] }',
-      schema->'lookup', 
+      schema->'lookup',
+      context,
       checked_path || '.schema'::TEXT
     ) THEN
       
@@ -141,6 +150,7 @@ BEGIN
         (CASE WHEN (schema->'lookup'->'isArray')::BOOLEAN THEN 'any[]' ELSE 'any' END)
       END,
       data,
+      context,
       checked_path
     );
 
@@ -149,7 +159,7 @@ BEGIN
     IF jsonb_typeof(schema->'type') = 'string' THEN
       typeStr = schema->>'type';
       IF NOT ARRAY[typeStr] <@ allowed_types THEN
-        RAISE EXCEPTION 'Bad schema type "%", allowed types: %. %',typeStr, allowed_types, path USING HINT = path, COLUMN = colname; 
+        ${raiseException(`'Bad schema type "%", allowed types: %. %',typeStr, allowed_types, path`)}  
       END IF;
       
       /** Primitive array */
@@ -158,7 +168,7 @@ BEGIN
         typeStr = left(typeStr, -2);
 
         IF jsonb_typeof(data) != 'array' THEN
-          RAISE EXCEPTION 'Types not matching. Expecting an array. %', path USING HINT = path, COLUMN = colname;
+          ${raiseException(`'Types not matching. Expecting an array. %', path`)}  
         END IF;
 
         FOR array_element IN
@@ -170,6 +180,7 @@ BEGIN
                 jsonb_build_object('type', typeStr, 'allowedValues', schema->'allowedValues')::TEXT
               ELSE typeStr END, 
               array_element.value, 
+              context,
               checked_path || array_element.idx::TEXT
           ) THEN
             
@@ -189,7 +200,7 @@ BEGIN
           typeStr = 'string' AND jsonb_typeof(data) != typeStr OR
           typeStr = 'any' AND jsonb_typeof(data) = 'null'
         ) THEN
-          RAISE EXCEPTION 'Data type not matching. Expected: %, Actual: %, %', typeStr, jsonb_typeof(data), path USING HINT = path, COLUMN = colname; 
+          ${raiseException(`'Data type not matching. Expected: %, Actual: %, %', typeStr, jsonb_typeof(data), path`)}  
         END IF;
 
         IF schema ? 'allowedValues' AND NOT(jsonb_build_array(data) <@ (schema->'allowedValues')) THEN
@@ -197,7 +208,7 @@ BEGIN
             SELECT COUNT(distinct jsonb_typeof(value))
             FROM jsonb_array_elements(schema->'allowedValues')
           ) > 1 THEN
-            RAISE EXCEPTION 'Invalid schema. schema.allowedValues (%) contains more than one data type . %', schema->>'allowedValues', path USING HINT = path, COLUMN = colname;
+            ${raiseException(`'Invalid schema. schema.allowedValues (%) contains more than one data type . %', schema->>'allowedValues', path`)}  
           END IF;
 
           IF EXISTS(
@@ -205,10 +216,10 @@ BEGIN
             FROM jsonb_array_elements(schema->'allowedValues')
             WHERE jsonb_typeof(value) != jsonb_typeof(data)
           ) THEN
-            RAISE EXCEPTION 'Invalid schema. schema.allowedValues (%) contains contains values not matchine the schema.type %', schema->>'allowedValues', path USING HINT = path, COLUMN = colname; 
+            ${raiseException(`'Invalid schema. schema.allowedValues (%) contains contains values not matchine the schema.type %', schema->>'allowedValues', path`)}  
           END IF;
 
-          RAISE EXCEPTION 'Data not in allowedValues (%). %', schema->>'allowedValues', path USING HINT = path, COLUMN = colname; 
+          ${raiseException(`'Data not in allowedValues (%). %', schema->>'allowedValues', path`)}  
 
         END IF;
 
@@ -218,7 +229,7 @@ BEGIN
     ELSIF jsonb_typeof(schema->'type') = 'object' THEN
 
       IF jsonb_typeof(data) != 'object' THEN
-        RAISE EXCEPTION E'Expecting an object: \n %', path USING HINT = path, COLUMN = colname; 
+        ${raiseException(`E'Expecting an object: \n %', path`)}  
       END IF;
 
       extra_keys = ARRAY(SELECT k FROM (
@@ -228,8 +239,7 @@ BEGIN
       ) t);
 
       IF array_length(extra_keys, 1) > 0 THEN
-        RAISE EXCEPTION E'Object contains invalid keys: % \n %', 
-          array_to_string(extra_keys, ', '), path USING HINT = path, COLUMN = colname; 
+        ${raiseException(`E'Object contains invalid keys: % \n %', array_to_string(extra_keys, ', '), path`)}  
       END IF;
       
       FOR sub_schema IN
@@ -240,13 +250,14 @@ BEGIN
         optional = COALESCE((sub_schema.value->>'optional')::BOOLEAN, FALSE);
         IF NOT (data ? sub_schema.key) THEN
           IF NOT optional THEN
-            RAISE EXCEPTION 'Types not matching. Required property ("%") is missing. %', sub_schema.key , path USING HINT = path, COLUMN = colname; 
+            ${raiseException(`'Types not matching. Required property ("%") is missing. %', sub_schema.key , path`)}  
           END IF;
 
         ELSIF NOT ${exports.VALIDATE_SCHEMA_FUNCNAME}(
           -- sub_schema.value::TEXT, 
           CASE WHEN jsonb_typeof(sub_schema.value) = 'string' THEN TRIM(both '"' from sub_schema.value::TEXT) ELSE sub_schema.value::TEXT END,
           data->sub_schema.key, 
+          context,
           checked_path || sub_schema.key
         ) THEN
           RETURN false;
@@ -256,7 +267,7 @@ BEGIN
 
       RETURN TRUE;
     ELSE 
-      RAISE EXCEPTION 'Unexpected schema.type ( % ), %',jsonb_typeof(schema->'type'), path USING HINT = path, COLUMN = colname; 
+      ${raiseException(`'Unexpected schema.type ( % ), %',jsonb_typeof(schema->'type'), path`)}  
     END IF; 
 
   /* oneOfType: [{ key_name: { type: "string" } }] */
@@ -265,7 +276,7 @@ BEGIN
     oneof = COALESCE(schema->'oneOf', schema->'oneOfType');
 
     IF jsonb_typeof(oneof) != 'array' THEN
-      RAISE EXCEPTION 'Unexpected oneOf schema. Expecting an array of objects but received: % , %', oneof::TEXT, path USING HINT = path, COLUMN = colname; 
+      ${raiseException(`'Unexpected oneOf schema. Expecting an array of objects but received: % , %', oneof::TEXT, path`)}  
     END IF;
 
     FOR sub_schema IN
@@ -279,6 +290,7 @@ BEGIN
         IF ${exports.VALIDATE_SCHEMA_FUNCNAME}(
           sub_schema.value::TEXT, 
           data, 
+          context,
           checked_path
         ) THEN
           RETURN true;
@@ -314,7 +326,7 @@ BEGIN
 
     END LOOP;
 
-    RAISE EXCEPTION 'No oneOf schemas matching ( % ), %', v_one_of_errors, path;-- USING HINT = path, COLUMN = colname;  
+    ${raiseException(`'No oneOf schemas matching ( % ), %', v_one_of_errors, path`)}  
 
   /* arrayOfType: { key_name: { type: "string" } } */
   ELSIF (schema ? 'arrayOf' OR schema ? 'arrayOfType') THEN
@@ -322,7 +334,7 @@ BEGIN
     arrayof = COALESCE(schema->'arrayOf', schema->'arrayOfType');
 
     IF jsonb_typeof(data) != 'array' THEN
-      RAISE EXCEPTION '% is not an array.', path USING HINT = path, COLUMN = colname; 
+      ${raiseException(`'% is not an array.', path`)}  
     END IF;
 
     FOR array_element IN 
@@ -337,7 +349,9 @@ BEGIN
           (schema - 'arrayOfType' || jsonb_build_object('type', schema->'arrayOfType')) 
           END
         )::TEXT,
-        array_element.value, checked_path || array_element.idx::TEXT
+        array_element.value, 
+        context,
+        checked_path || array_element.idx::TEXT
       ) THEN
         RETURN false;
       END IF; 
@@ -350,11 +364,11 @@ BEGIN
       NOT (schema->'record') ? 'keysEnum' 
       AND NOT (schema->'record') ? 'values'
     THEN
-      RAISE EXCEPTION 'Invalid/empty record schema. Expecting a non empty record of: { keysEnum?: string[]; values?: FieldType } : %, %', schema, path USING HINT = path, COLUMN = colname; 
+      ${raiseException(`'Invalid/empty record schema. Expecting a non empty record of: { keysEnum?: string[]; values?: FieldType } : %, %', schema, path`)}  
     END IF;
 
     IF jsonb_typeof(data) != 'object' THEN
-      RAISE EXCEPTION '% is not an object.', path USING HINT = path, COLUMN = colname; 
+      ${raiseException(`'% is not an object.', path`)}  
     END IF;
 
     FOR obj_key_val IN
@@ -364,18 +378,20 @@ BEGIN
       RETURN (CASE WHEN NOT (schema->'record') ? 'keysEnum' THEN TRUE ELSE ${exports.VALIDATE_SCHEMA_FUNCNAME}( 
         jsonb_build_object('enum', schema->'record'->'keysEnum')::TEXT,
         (obj_key_val.obj)->'key', 
+        context,
         checked_path || ARRAY[(obj_key_val.obj)->>'key']
       ) END) 
       AND 
       (CASE WHEN NOT (schema->'record') ? 'values' THEN TRUE ELSE ${exports.VALIDATE_SCHEMA_FUNCNAME}(
         schema->'record'->>'values', 
         (obj_key_val.obj)->'value', 
+        context,
         checked_path || ARRAY[(obj_key_val.obj)->>'key']
       ) END);
     END LOOP;
 
   ELSE
-    RAISE EXCEPTION 'Unexpected schema: %, %', schema, path USING HINT = path, COLUMN = colname; 
+    ${raiseException(`'Unexpected schema: %, %', schema, path`)}
   END IF;
   
   RETURN true;
