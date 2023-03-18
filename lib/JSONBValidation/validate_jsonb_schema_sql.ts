@@ -42,8 +42,8 @@ DECLARE
   typeStr TEXT = NULL; 
   optional boolean;
   nullable boolean; 
-  colname TEXT = context->>'column';
-  tablename TEXT = context->>'table';
+  colname TEXT = COALESCE(context->>'column', '');
+  tablename TEXT = COALESCE(context->>'table', '');
   oneof JSONB;
   arrayof JSONB;
   lookup_data_def_schema TEXT = $d$  
@@ -250,7 +250,7 @@ BEGIN
       ) t);
 
       IF array_length(extra_keys, 1) > 0 THEN
-        ${raiseException(`E'Object contains invalid keys: % \n %', array_to_string(extra_keys, ', '), path`)}  
+        ${raiseException(`E'Object contains % invalid keys: [ % ] \n %', array_length(extra_keys)::TEXT, array_to_string(extra_keys, ', '), path`)}  
       END IF;
       
       FOR sub_schema IN
@@ -320,7 +320,7 @@ BEGIN
         /* Ignore duplicate errors */
         IF v_one_of_errors IS NULL OR v_one_of_errors NOT ilike '%' || v_msg || '%' THEN
           v_one_of_errors = concat_ws(
-            E'\n', 
+            E'\n\n', 
             v_one_of_errors,  
             concat_ws(
               ', ', 
@@ -337,7 +337,7 @@ BEGIN
 
     END LOOP;
 
-    ${raiseException(`'No oneOf schemas matching ( % ), %', v_one_of_errors, path`)}  
+    ${raiseException(`E'No oneOf schemas matching:\n  % ), %', v_one_of_errors, path`)}  
 
   /* arrayOfType: { key_name: { type: "string" } } */
   ELSIF (schema ? 'arrayOf' OR schema ? 'arrayOfType') THEN
