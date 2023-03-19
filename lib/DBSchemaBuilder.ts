@@ -1,7 +1,7 @@
 import { DBSchema, isObject, JSONB, TableHandler, ViewHandler } from "prostgles-types";
 import prostgles from ".";
 import { Auth } from "./AuthHandler";
-import { DBHandlerServer, DboBuilder, escapeTSNames, postgresToTsType } from "./DboBuilder";
+import { DBHandlerServer, DboBuilder, escapeTSNames, postgresToTsType, TableSchemaColumn } from "./DboBuilder";
 import { PublishAllOrNothing, PublishParams, PublishTableRule, PublishViewRule,  } from "./PublishParser";
 import { getJSONBSchemaTSTypes } from "./JSONBValidation/validation";
 
@@ -9,13 +9,22 @@ import { getJSONBSchemaTSTypes } from "./JSONBValidation/validation";
 export const getDBSchema = (dboBuilder: DboBuilder): string => {
   const tables: string[] = [];
 
+  const getColTypeForDBSchema = (udt_name: TableSchemaColumn["udt_name"]): string => {
+    if(udt_name === "interval"){
+      const units = [ "years", "months", "days", "hours", "minutes", "seconds", "milliseconds"];
+      
+      return `{ ${units.map(u => `${u}?: number;`).join(" ")} }`;
+    }
+
+    return postgresToTsType(udt_name);
+  }
   
   /** Tables and columns are sorted to avoid infinite loops due to changing order */
   dboBuilder.tablesOrViews?.slice(0).sort((a, b) => a.name.localeCompare(b.name)).forEach(tov => {
     const cols = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
     const getColType = (c: typeof cols[number]) => {
-      
-      let type: string = (c.is_nullable? "null | " : "") + postgresToTsType(c.udt_name) + ";"
+
+      let type: string = (c.is_nullable? "null | " : "") + getColTypeForDBSchema(c.udt_name) + ";"
       const colConf = dboBuilder.prostgles.tableConfigurator?.getColumnConfig(tov.name, c.name);
       if(colConf){
         if(isObject(colConf) && (colConf.jsonbSchema || colConf.jsonbSchemaType)){

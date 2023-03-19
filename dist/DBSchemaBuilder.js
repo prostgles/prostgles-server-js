@@ -7,11 +7,18 @@ const DboBuilder_1 = require("./DboBuilder");
 const validation_1 = require("./JSONBValidation/validation");
 const getDBSchema = (dboBuilder) => {
     const tables = [];
+    const getColTypeForDBSchema = (udt_name) => {
+        if (udt_name === "interval") {
+            const units = ["years", "months", "days", "hours", "minutes", "seconds", "milliseconds"];
+            return `{ ${units.map(u => `${u}?: number;`).join(" ")} }`;
+        }
+        return (0, DboBuilder_1.postgresToTsType)(udt_name);
+    };
     /** Tables and columns are sorted to avoid infinite loops due to changing order */
     dboBuilder.tablesOrViews?.slice(0).sort((a, b) => a.name.localeCompare(b.name)).forEach(tov => {
         const cols = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
         const getColType = (c) => {
-            let type = (c.is_nullable ? "null | " : "") + (0, DboBuilder_1.postgresToTsType)(c.udt_name) + ";";
+            let type = (c.is_nullable ? "null | " : "") + getColTypeForDBSchema(c.udt_name) + ";";
             const colConf = dboBuilder.prostgles.tableConfigurator?.getColumnConfig(tov.name, c.name);
             if (colConf) {
                 if ((0, prostgles_types_1.isObject)(colConf) && (colConf.jsonbSchema || colConf.jsonbSchemaType)) {
