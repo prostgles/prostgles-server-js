@@ -513,11 +513,6 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       if("isLookupTable" in tableConf){
         continue;
       }
- 
-      if(tableName.startsWith("rec")){
-        // eslint-disable-next-line no-debugger
-        debugger;
-      }
 
       const ALTER_TABLE_Q = `ALTER TABLE ${asName(tableName)}`;
 

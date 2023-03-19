@@ -50,7 +50,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
 
   let selItem: SelectItem | undefined;
   if(select) selItem = select.find(s => fKey === s.alias);
-  let rightF: FilterDataType = (_f as any)[fKey];
+  let rightF: FilterDataType<any> = (_f as any)[fKey];
 
   const getLeftQ = (selItm: SelectItem) => {
     if(selItm.type === "function") return selItm.getQuery();
@@ -321,10 +321,10 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       return leftQ + " NOT LIKE " + asValue(filterValue);
 
     /* MAYBE TEXT OR MAYBE ARRAY */
-    } else if(["@>", "<@", "$contains", "$containedBy", "&&", "@@"].includes(filterOperand)){
+    } else if(["@>", "<@", "$contains", "$containedBy", "$overlaps", "&&", "@@"].includes(filterOperand)){
       const operand = filterOperand === "@@"? "@@": 
           ["@>", "$contains"].includes(filterOperand)? "@>" : 
-          ["&&"].includes(filterOperand)? "&&" : 
+          ["&&", "$overlaps"].includes(filterOperand)? "&&" : 
           "<@";
 
       /* Array for sure */
