@@ -44,7 +44,7 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      added?: null | Date;
+      added?: null | string;
       id?: number;
       name: string;
       public?: null | string;
@@ -89,7 +89,7 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      added?: null | Date;
+      added?: null | string;
       id?: number;
       name?: null | string;
     };
@@ -104,7 +104,7 @@ export type DBSchemaGenerated = {
       id?: number;
       item_id?: null | number;
       name?: null | string;
-      tst?: null | Date;
+      tst?: null | string;
     };
   };
   items: {
@@ -114,7 +114,7 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      h?: null | Array<string>;
+      h?: null | string[];
       id?: number;
       name?: null | string;
     };
@@ -163,7 +163,7 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      hh?: null | Array<string>;
+      hh?: null | string[];
       id?: number;
       items_id?: null | number;
       name?: null | string;
@@ -176,7 +176,7 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      h?: null | Array<string>;
+      h?: null | string[];
       id?: number;
       name?: null | string;
     };
@@ -188,7 +188,7 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      added?: null | Date;
+      added?: null | string;
       id?: number;
       name: string;
       public?: null | string;
@@ -201,7 +201,7 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      added?: null | Date;
+      added?: null | string;
       id?: number;
       name: string;
       public?: null | string;
@@ -249,7 +249,7 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      added?: Date;
+      added?: string;
       content_length?: number;
       content_type: string;
       deleted?: null | number;
@@ -448,7 +448,7 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      added?: null | Date;
+      added?: null | string;
       age?: null | number;
       id?: number;
       is_active?: null | boolean;
@@ -497,8 +497,8 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      added?: null | Date;
-      h?: null | Array<string>;
+      added?: null | string;
+      h?: null | string[];
       id?: number;
       jsn?: null | any;
       name?: null | string;

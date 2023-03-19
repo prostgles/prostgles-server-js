@@ -14,6 +14,7 @@ export const getDBSchema = (dboBuilder: DboBuilder): string => {
   dboBuilder.tablesOrViews?.slice(0).sort((a, b) => a.name.localeCompare(b.name)).forEach(tov => {
     const cols = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
     const getColType = (c: typeof cols[number]) => {
+      
       let type: string = (c.is_nullable? "null | " : "") + postgresToTsType(c.udt_name) + ";"
       const colConf = dboBuilder.prostgles.tableConfigurator?.getColumnConfig(tov.name, c.name);
       if(colConf){
