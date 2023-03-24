@@ -3,8 +3,7 @@ import { DB } from "../Prostgles";
 import { asValue } from "../PubSubManager/PubSubManager";
 import { VALIDATE_SCHEMA_FUNCNAME } from "../JSONBValidation/validate_jsonb_schema_sql";
 import { BaseColumnTypes, ColumnConfig } from "./TableConfig";
-import pgPromise from "pg-promise";
-import { getColConstraints } from "./getConstraintDefinitionQueries";
+import pgPromise from "pg-promise"; 
 
 type Args = {
   column: string; 
@@ -75,17 +74,9 @@ export const getColumnDefinitionQuery = async ({ colConf: colConfRaw, column, db
       } catch (e) {
         throw failedDefault(e);
       }
-    }
-    const namePreffix = 'prostgles_jsonb_' as const;
-    const { val: nameEnding } = await db.one("SELECT MD5( ${table} || ${column}  || ${schema}) as val", { table: table, column, schema: jsonbSchemaStr });
-    const constraintName = namePreffix + nameEnding;
-    const colConstraints = await getColConstraints({ db, table, column });
-    const existingNonMatchingConstraints = colConstraints.filter(c => c.name.startsWith(namePreffix) && c.name !== constraintName);
-    for await (const oldCons of existingNonMatchingConstraints) {
-      await db.any(`ALTER TABLE ${asName(table)} DROP CONSTRAINT ${asName(oldCons.name)};`);
-    }
+    } 
 
-    return ` ${colNameEsc} ${getColTypeDef(colConf, "JSONB")}, CONSTRAINT ${asName(constraintName)} CHECK(${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${colNameEsc}, ${asValue({ table, column })} ))`;
+    return ` ${colNameEsc} ${getColTypeDef(colConf, "JSONB")} CHECK(${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${colNameEsc}, ${asValue({ table, column })} ))`;
 
   } else if ("enum" in colConf) {
     if (!colConf.enum?.length) throw new Error("colConf.enum Must not be empty");

@@ -4,7 +4,6 @@ exports.getTableColumns = exports.getColumnDefinitionQuery = void 0;
 const prostgles_types_1 = require("prostgles-types");
 const PubSubManager_1 = require("../PubSubManager/PubSubManager");
 const validate_jsonb_schema_sql_1 = require("../JSONBValidation/validate_jsonb_schema_sql");
-const getConstraintDefinitionQueries_1 = require("./getConstraintDefinitionQueries");
 /**
  * Column create statement for a given config
  */
@@ -60,15 +59,7 @@ const getColumnDefinitionQuery = async ({ colConf: colConfRaw, column, db, table
                 throw failedDefault(e);
             }
         }
-        const namePreffix = 'prostgles_jsonb_';
-        const { val: nameEnding } = await db.one("SELECT MD5( ${table} || ${column}  || ${schema}) as val", { table: table, column, schema: jsonbSchemaStr });
-        const constraintName = namePreffix + nameEnding;
-        const colConstraints = await (0, getConstraintDefinitionQueries_1.getColConstraints)({ db, table, column });
-        const existingNonMatchingConstraints = colConstraints.filter(c => c.name.startsWith(namePreffix) && c.name !== constraintName);
-        for await (const oldCons of existingNonMatchingConstraints) {
-            await db.any(`ALTER TABLE ${(0, prostgles_types_1.asName)(table)} DROP CONSTRAINT ${(0, prostgles_types_1.asName)(oldCons.name)};`);
-        }
-        return ` ${colNameEsc} ${getColTypeDef(colConf, "JSONB")}, CONSTRAINT ${(0, prostgles_types_1.asName)(constraintName)} CHECK(${validate_jsonb_schema_sql_1.VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${colNameEsc}, ${(0, PubSubManager_1.asValue)({ table, column })} ))`;
+        return ` ${colNameEsc} ${getColTypeDef(colConf, "JSONB")} CHECK(${validate_jsonb_schema_sql_1.VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${colNameEsc}, ${(0, PubSubManager_1.asValue)({ table, column })} ))`;
     }
     else if ("enum" in colConf) {
         if (!colConf.enum?.length)
