@@ -91,7 +91,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
     const finalSelect = tableRules?.[ACTION]?.postValidate? fullReturning : originalReturning;
     const returningSelect = this.makeReturnQuery(finalSelect);
     
-    const makeQuery = async (_row: AnyObject | undefined, isOne = false) => {
+    const makeQuery = async (_row: AnyObject | undefined) => {
       const row = { ..._row };
 
       if (!isObject(row)) {
@@ -101,10 +101,6 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
 
       const { data, allowedCols } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues });
       const _data = { ...data };
-
-      if(Array.isArray(_data) && !_data.length){
-        throw "Emprty insert. Provide data";
-      }
 
       let insertQ = "";
       if (!Array.isArray(_data) && !getKeys(_data).length || Array.isArray(_data) && !_data.length) {
@@ -130,6 +126,11 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
     }
 
     if (Array.isArray(data)) {
+
+      if(!data.length){
+        throw "Empty insert. Provide data";
+      }
+
       const queries = await Promise.all(data.map(async p => {
         const q = await makeQuery(p);
         return q;
@@ -138,7 +139,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
       query = pgp.helpers.concat(queries);
       if (returningSelect) queryType = "many";
     } else {
-      query = await makeQuery(data, true);
+      query = await makeQuery(data);
       if (returningSelect) queryType = "one";
     }
 

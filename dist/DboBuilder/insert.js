@@ -77,7 +77,7 @@ async function insert(rowOrRows, param2, param3_unused, tableRules, localParams)
         fullReturning.concat(originalReturning.filter(s => !fullReturning.some(f => f.alias === s.alias)));
         const finalSelect = tableRules?.[ACTION]?.postValidate ? fullReturning : originalReturning;
         const returningSelect = this.makeReturnQuery(finalSelect);
-        const makeQuery = async (_row, isOne = false) => {
+        const makeQuery = async (_row) => {
             const row = { ..._row };
             if (!(0, prostgles_types_1.isObject)(row)) {
                 console.trace(row);
@@ -85,9 +85,6 @@ async function insert(rowOrRows, param2, param3_unused, tableRules, localParams)
             }
             const { data, allowedCols } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues });
             const _data = { ...data };
-            if (Array.isArray(_data) && !_data.length) {
-                throw "Emprty insert. Provide data";
-            }
             let insertQ = "";
             if (!Array.isArray(_data) && !(0, prostgles_types_1.getKeys)(_data).length || Array.isArray(_data) && !_data.length) {
                 await tableRules?.[ACTION]?.validate?.(_data, this.dbTX || this.dboBuilder.dbo);
@@ -110,6 +107,9 @@ async function insert(rowOrRows, param2, param3_unused, tableRules, localParams)
             return insertResult;
         }
         if (Array.isArray(data)) {
+            if (!data.length) {
+                throw "Empty insert. Provide data";
+            }
             const queries = await Promise.all(data.map(async (p) => {
                 const q = await makeQuery(p);
                 return q;
@@ -119,7 +119,7 @@ async function insert(rowOrRows, param2, param3_unused, tableRules, localParams)
                 queryType = "many";
         }
         else {
-            query = await makeQuery(data, true);
+            query = await makeQuery(data);
             if (returningSelect)
                 queryType = "one";
         }
