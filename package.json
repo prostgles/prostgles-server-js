@@ -12,7 +12,7 @@
     "start": "tsc --watch",
     "build": "tsc",
     "lint": "eslint . --ext .ts --quiet --fix",
-    "test": "npm run lint && rm -rf ./node_modules/* && npm i && tsc && cd tests/ && ./test.sh"
+    "test": "rm -rf ./node_modules/* && npm i && npm run lint && tsc && cd tests/ && ./test.sh"
   },
   "repository": {
     "type": "git",

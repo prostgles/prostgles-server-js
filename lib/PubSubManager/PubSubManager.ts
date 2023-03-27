@@ -372,13 +372,13 @@ export class PubSubManager {
     // }
 
     return subs.flatMap(s => {
-      /* Return parentSubs to ensure throttling works */
+      /* Return parentSubs instead to ensure throttling works */
       if(s.parentSubParams){
         const parentSubs: SubscriptionParams[] = [];
         const parentChannel = s.parentSubParams.channel_name;
-        for(const tableName in getKeys(this.subs)){
-          for(const condition in getKeys(this.subs[tableName]!)){
-            this.subs[tableName]![condition]!.subs.forEach(parentSub => {
+        for(const tableName in this.subs){
+          for(const condition in this.subs[tableName]){
+            this.subs[tableName][condition].subs.forEach(parentSub => {
               if(!parentSub.parentSubParams && parentSub.channel_name === parentChannel){
                 parentSubs.push(parentSub)
               }
