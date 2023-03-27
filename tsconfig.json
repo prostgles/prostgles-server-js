@@ -15,6 +15,10 @@
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
+    
+    /** TODO */
+    "noUncheckedIndexedAccess": false,
+    
     // "outFile": "bundle.js",
     // "moduleResolution": "node"
     "keyofStringsOnly": true,

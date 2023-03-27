@@ -6,7 +6,7 @@
 
 import { Filter, LocalParams, isPlainObject, SortItem } from "../../DboBuilder";
 import { TableRule } from "../../PublishParser";
-import { SelectParams, isEmpty, asName, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, isObject, Select, JoinSelect } from "prostgles-types";
+import { SelectParams, isEmpty, asName, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, isObject, Select, JoinSelect, getKeys } from "prostgles-types";
 import { get } from "../../utils";
 import { TableHandler } from "../TableHandler";
 import { COMPUTED_FIELDS, FieldSpec, FUNCTIONS, FunctionSpec, parseFunction } from "./Functions";
@@ -57,9 +57,9 @@ export const asNameAlias = (field: string, tableAlias?: string) => {
 export const parseFunctionObject = (funcData: any): { funcName: string; args: any[] } => {
   const makeErr = (msg: string) => `Function not specified correctly. Expecting { $funcName: ["columnName",...] } object but got: ${JSON.stringify(funcData)} \n ${msg}`
   if(!isObject(funcData)) throw makeErr("");
-  const keys = Object.keys(funcData);
+  const keys = getKeys(funcData);
   if(keys.length !== 1) throw makeErr("");
-  const funcName = keys[0];
+  const funcName = keys[0]!;
   const args = funcData[funcName];
   if(!args || !Array.isArray(args)){
     throw makeErr("Arguments missing or invalid");
@@ -107,8 +107,9 @@ export class SelectItemBuilder {
     const allowedNonSelectedFields = [...this.allowedFieldsIncludingComputed, ...this.allowedOrderByFields];
 
     /** Not selected items can be part of the orderBy fields */
-    if(!(isSelected? allowedSelectedFields : allowedNonSelectedFields).includes(f)){
-      throw "Field " + f + " is invalid or dissallowed";
+    const allowedFields = isSelected? allowedSelectedFields : allowedNonSelectedFields;
+    if(!allowedFields.includes(f)){
+      throw "Field " + f + " is invalid or dissallowed. \nAllowed fields: " + allowedFields.join(", ");
     }
     return f;
   }
@@ -336,7 +337,7 @@ export async function getNewQuery(
         }
 
         j_isLeftJoin = joinKeys[0] === "$leftJoin";
-        j_table = val[joinKeys[0]];
+        j_table = val[joinKeys[0]!];
         j_alias = key;
         if(typeof j_table !== "string") {
           throw "\nIssue with select. \nJoin type must be a string table name but got -> " + JSON.stringify({ [key]: val });

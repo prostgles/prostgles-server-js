@@ -17,7 +17,7 @@ import { SelectParams, FieldFilter, asName, WAL, isEmpty, AnyObject } from "pros
 
 import { ClientExpressData, syncData } from "../SyncReplication";
 import { TableRule } from "../PublishParser";
-import { find } from "prostgles-types/dist/util";
+import { find, getKeys } from "prostgles-types/dist/util";
 import { DB_OBJ_NAMES } from "./getInitQuery";
 
 
@@ -362,10 +362,34 @@ export class PubSubManager {
   isReady() {
     if (!this.postgresNotifListenManager) throw "this.postgresNotifListenManager missing";
     return this.postgresNotifListenManager.isListening();
-  }
+  } 
 
   getSubs(table_name: string, condition: string): SubscriptionParams[] {
-    return this.subs?.[table_name]?.[condition]?.subs
+    const subs = this.subs?.[table_name]?.[condition]?.subs ?? [];
+
+    // if(!subs){
+    //   log("Subs not found:", { table_name, condition }, this.subs)
+    // }
+
+    return subs.flatMap(s => {
+      /* Return parentSubs to ensure throttling works */
+      if(s.parentSubParams){
+        const parentSubs: SubscriptionParams[] = [];
+        const parentChannel = s.parentSubParams.channel_name;
+        for(const tableName in getKeys(this.subs)){
+          for(const condition in getKeys(this.subs[tableName]!)){
+            this.subs[tableName]![condition]!.subs.forEach(parentSub => {
+              if(!parentSub.parentSubParams && parentSub.channel_name === parentChannel){
+                parentSubs.push(parentSub)
+              }
+            });
+          }
+        }
+        return parentSubs ?? s;
+      }
+
+      return s;
+    });
   }
 
   getSyncs(table_name: string, condition: string) {
@@ -388,7 +412,7 @@ export class PubSubManager {
 
     if (notifType === this.NOTIF_TYPE.schema) {
       if (this.onSchemaChange) {
-        const command = dataArr[1],
+        const command = dataArr[1]!,
           event_type = dataArr[2],
           query = dataArr[3];
 
@@ -404,27 +428,37 @@ export class PubSubManager {
       console.error("Unexpected notif type: ", notifType);
       return;
     }
-
-    const table_name = dataArr[1],
-      op_name = dataArr[2],
-      condition_ids_str = dataArr[3];
+    if(dataArr.length < 3){
+      throw "dataArr length < 3"
+    }
+    const table_name = dataArr[1]!,
+      op_name = dataArr[2]!,
+      condition_ids_str = dataArr[3]!;
 
     // const triggers = await this.db.any("SELECT * FROM prostgles.triggers WHERE table_name = $1 AND id IN ($2:csv)", [table_name, condition_ids_str.split(",").map(v => +v)]);
     // const conditions: string[] = triggers.map(t => t.condition);
 
+    /**
+     * Trigger error
+     */
     log("PG Trigger ->", dataArr.join("__"))
     if (
       condition_ids_str && condition_ids_str.startsWith("error") &&
-      this._triggers && this._triggers[table_name] && this._triggers[table_name].length
+      this._triggers && 
+      this._triggers[table_name]?.length
     ) {
       const pref = "INTERNAL ERROR";
       console.error(`${pref}: condition_ids_str: ${condition_ids_str}`)
-      this._triggers[table_name].map(c => {
+      this._triggers[table_name]!.map(c => {
         const subs = this.getSubs(table_name, c);
         subs.map(s => {
           this.pushSubData(s, pref + ". Check server logs. Schema might have changed");
         })
       });
+    
+    /**
+     * Trigger ok
+     */
     } else if (
       condition_ids_str?.split(",").length &&
       condition_ids_str?.split(",").every((c: string) => Number.isInteger(+c)) &&
@@ -433,7 +467,7 @@ export class PubSubManager {
 
 
       const idxs = condition_ids_str.split(",").map(v => +v);
-      const conditions = this._triggers[table_name].filter((c, i) => idxs.includes(i))
+      const conditions = this._triggers[table_name]!.filter((c, i) => idxs.includes(i))
 
       log("PG Trigger -> ", { table_name, op_name, condition_ids_str, conditions }, this._triggers[table_name]);
 
@@ -456,7 +490,7 @@ export class PubSubManager {
 
         /* Throttle the subscriptions */
         for (let i = 0; i < subs.length; i++) {
-          const sub = subs[i];
+          const sub = subs[i]!;
           if (
             this.dbo[sub.table_name] &&
             sub.is_ready &&
@@ -717,11 +751,11 @@ export class PubSubManager {
         };
 
       this.subs[table_name] = this.subs[table_name] ?? {};
-      this.subs[table_name][condition] = this.subs[table_name][condition] ?? { subs: [] };
-      this.subs[table_name][condition].subs = this.subs[table_name][condition].subs ?? [];
+      this.subs[table_name]![condition] = this.subs[table_name]![condition] ?? { subs: [] };
+      this.subs[table_name]![condition]!.subs = this.subs[table_name]![condition]!.subs ?? [];
 
       // console.log("1034 upsertSub", this.subs)
-      const sub_idx = this.subs[table_name][condition].subs.findIndex(s =>
+      const sub_idx = this.subs[table_name]![condition]!.subs.findIndex(s =>
         s.channel_name === channel_name &&
         (
           socket && s.socket_id === socket.id ||
@@ -729,7 +763,7 @@ export class PubSubManager {
         )
       );
       if (sub_idx < 0) {
-        this.subs[table_name][condition].subs.push(newSub);
+        this.subs[table_name]![condition]!.subs.push(newSub);
         if (socket) {
           const chnUnsub = channel_name + "unsubscribe";
           socket.removeAllListeners(chnUnsub);
@@ -739,7 +773,7 @@ export class PubSubManager {
           });
         }
       } else {
-        this.subs[table_name][condition].subs[sub_idx] = newSub;
+        this.subs[table_name]![condition]!.subs[sub_idx] = newSub;
       }
 
       if (isReadyOverride ?? is_ready) {
@@ -812,11 +846,11 @@ export class PubSubManager {
   removeLocalSub(table_name: string, condition: string, func: (items: object[]) => any) {
     const cond = parseCondition(condition);
     if (get(this.subs, [table_name, cond, "subs"])) {
-      this.subs[table_name][cond].subs.map((sub, i) => {
+      this.subs[table_name]![cond]!.subs.map((sub, i) => {
         if (
           sub.func && sub.func === func
         ) {
-          this.subs[table_name][cond].subs.splice(i, 1);
+          this.subs[table_name]![cond]!.subs.splice(i, 1);
         }
       });
     } else {
@@ -836,7 +870,7 @@ export class PubSubManager {
     });
     Object.keys(this.subs || {}).map(table_name => {
       Object.keys(this.subs[table_name] || {}).map(condition => {
-        if (this.subs[table_name][condition].subs.length) {
+        if (this.subs[table_name]![condition]!.subs.length) {
           upsert(table_name, condition);
         }
       });
@@ -852,8 +886,8 @@ export class PubSubManager {
     // console.log("onSocketDisconnected", channel_name, this.syncs)
     if (this.subs) {
       Object.keys(this.subs).map(table_name => {
-        Object.keys(this.subs[table_name]).map(condition => {
-          this.subs[table_name][condition].subs.map((sub, i) => {
+        Object.keys(this.subs[table_name]!).map(condition => {
+          this.subs[table_name]![condition]!.subs.map((sub, i) => {
 
             /**
              * If a channel name is specified then delete triggers 
@@ -862,9 +896,9 @@ export class PubSubManager {
               (socket && sub.socket_id === socket.id) &&
               (!channel_name || sub.channel_name === channel_name)
             ) {
-              this.subs[table_name][condition].subs.splice(i, 1);
-              if (!this.subs[table_name][condition].subs.length) {
-                delete this.subs[table_name][condition];
+              this.subs[table_name]![condition]!.subs.splice(i, 1);
+              if (!this.subs[table_name]![condition]!.subs.length) {
+                delete this.subs[table_name]![condition];
 
                 if (isEmpty(this.subs[table_name])) {
                   delete this.subs[table_name];
@@ -983,8 +1017,8 @@ export class PubSubManager {
       triggers.map(t => {
         this._triggers = this._triggers || {};
         this._triggers[t.table_name] = this._triggers[t.table_name] || [];
-        if (!this._triggers[t.table_name].includes(t.condition)) {
-          this._triggers[t.table_name].push(t.condition)
+        if (!this._triggers[t.table_name]?.includes(t.condition)) {
+          this._triggers[t.table_name]?.push(t.condition)
         }
       });
       log("trigger added.. ", { table_name, condition });
