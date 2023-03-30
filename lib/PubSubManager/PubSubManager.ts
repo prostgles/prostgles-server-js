@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
-import { get } from "../utils";
+import { addSync } from "./addSync";
 import { TableOrViewInfo, TableInfo, DBHandlerServer, DboBuilder, PRGLIOSocket, canEXECUTE } from "../DboBuilder";
 import { DB, isSuperUser } from "../Prostgles";
 import { initPubSubManager } from "./initPubSubManager";
@@ -13,13 +13,14 @@ import * as Bluebird from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg from 'pg-promise/typescript/pg-subset';
 
-import { SelectParams, FieldFilter, asName, WAL, isEmpty, AnyObject } from "prostgles-types";
+import { SelectParams, FieldFilter, asName, WAL, AnyObject } from "prostgles-types";
 
 import { ClientExpressData, syncData } from "../SyncReplication";
 import { TableRule } from "../PublishParser";
-import { find, getKeys } from "prostgles-types/dist/util";
+import { find } from "prostgles-types/dist/util";
 import { DB_OBJ_NAMES } from "./getInitQuery";
-
+import { addSub } from "./addSub";
+import { notifListener } from "./notifListener";
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 const pgp: PGP = pgPromise({
@@ -57,7 +58,7 @@ export type SyncParams = {
   is_syncing: boolean;
 }
 
-type AddSyncParams = {
+export type AddSyncParams = {
   socket: any;
   table_info: TableInfo;
   table_rules: TableRule;
@@ -88,11 +89,10 @@ export type ViewSubscriptionOptions = ({
   }[];
 }
 
-type SubscriptionParams = {
+export type SubscriptionParams = {
   socket_id?: string;
   channel_name: string;
-  table_name: string;
-  socket: PRGLIOSocket | undefined;
+  // table_name: string;
 
   /** 
    * If this is a view then an array with all related tables will be  
@@ -101,18 +101,19 @@ type SubscriptionParams = {
   parentSubParams: Omit<SubscriptionParams, "parentSubParams"> | undefined;
 
   table_info: TableOrViewInfo;
+  
+  /* Used as input */
   table_rules?: TableRule;
   filter: object;
   params: SelectParams;
-  func?: (data: any) => any;
+
+  func: undefined | ((data: any) => any);
+  socket: PRGLIOSocket | undefined;
+
   throttle?: number;
   last_throttled: number;
   is_throttling?: any;
-  is_ready?: boolean;
-  // subOne?: boolean;
-}
-type AddSubscriptionParams = SubscriptionParams & {
-  condition: string;
+  is_ready?: boolean; 
 }
 
 export type PubSubManagerOptions = {
@@ -120,6 +121,27 @@ export type PubSubManagerOptions = {
   wsChannelNamePrefix?: string;
   pgChannelName?: string;
   onSchemaChange?: (event: { command: string; query: string }) => void;
+}
+
+export type Subscription = Pick<SubscriptionParams, 
+  | "throttle" 
+  | "is_throttling" 
+  | "last_throttled" 
+  | "channel_name" 
+  | "is_ready" 
+  | "func" 
+  | "socket" 
+  | "socket_id"
+  | "table_info"
+  | "filter"
+  | "params"
+  | "table_rules"
+> & {
+  triggers: {
+    table_name: string;
+    condition: string;
+    is_related: boolean;
+  }[];
 }
 
 export class PubSubManager {
@@ -134,9 +156,10 @@ export class PubSubManager {
   }
   
   _triggers?: Record<string, string[]>;
-  sockets: any;
-  subs: { [ke: string]: { [ke: string]: { subs: SubscriptionParams[] } } };
-  syncs: SyncParams[];
+  sockets: AnyObject = {};
+  // subs: { [ke: string]: { [ke: string]: { subs: SubscriptionParams[] } } };
+  subs: Subscription[] = [];
+  syncs: SyncParams[] = [];
   socketChannelPreffix: string;
   onSchemaChange?: ((event: { command: string; query: string }) => void) = undefined;
 
@@ -150,10 +173,7 @@ export class PubSubManager {
     
     this.onSchemaChange = onSchemaChange;
     this.dboBuilder = dboBuilder;
-
-    this.sockets = {};
-    this.subs = {};
-    this.syncs = [];
+  
     this.socketChannelPreffix = wsChannelNamePrefix || "_psqlWS_";
 
     log("Created PubSubManager");
@@ -215,7 +235,8 @@ export class PubSubManager {
     if (this.appCheck) {
       clearInterval(this.appCheck);
     }
-    this.onSocketDisconnected(); 
+    this.subs = [];
+    this.syncs = [];
     if (!this.postgresNotifListenManager) {
       throw "this.postgresNotifListenManager missing"
     }
@@ -364,32 +385,21 @@ export class PubSubManager {
     return this.postgresNotifListenManager.isListening();
   } 
 
-  getSubs(table_name: string, condition: string): SubscriptionParams[] {
-    const subs = this.subs?.[table_name]?.[condition]?.subs ?? [];
+  getSubs(table_name: string, condition: string, client?: Pick<Subscription, "func" | "socket_id">): Subscription[] { 
+    const subs = this.subs.filter(s => find(s.triggers, { table_name, condition }));
+    if(client){
+      return subs.filter(s => client.func && s.func === client.func || client.socket_id && s.socket_id === client.socket_id);
+    }
+    return subs;
+  }
 
-    // if(!subs){
-    //   log("Subs not found:", { table_name, condition }, this.subs)
-    // }
-
-    return subs.flatMap(s => {
-      /* Return parentSubs instead to ensure throttling works */
-      if(s.parentSubParams){
-        const parentSubs: SubscriptionParams[] = [];
-        const parentChannel = s.parentSubParams.channel_name;
-        for(const tableName in this.subs){
-          for(const condition in this.subs[tableName]){
-            this.subs[tableName][condition].subs.forEach(parentSub => {
-              if(!parentSub.parentSubParams && parentSub.channel_name === parentChannel){
-                parentSubs.push(parentSub)
-              }
-            });
-          }
-        }
-        return parentSubs ?? s;
-      }
-
-      return s;
-    });
+  removeLocalSub(tableName: string, conditionRaw: string, func: (items: object[]) => any) {
+    const condition = parseCondition(conditionRaw);
+    if (this.getSubs(tableName, condition, { func }).length) {
+      this.subs = this.subs.filter(s => s.func !== func && !find(s.triggers, { tableName, condition }))
+    } else {
+      console.error("Could not unsubscribe. Subscription might not have initialised yet", { tableName, condition })
+    }
   }
 
   getSyncs(table_name: string, condition: string) {
@@ -397,141 +407,13 @@ export class PubSubManager {
       .filter((s: SyncParams) => s.table_name === table_name && s.condition === condition);
   }
 
-  /* Relay relevant data to relevant subscriptions */
-  notifListener = async (data: { payload: string }) => {
-    const str = data.payload;
-
-    if (!str) {
-      console.error("Empty notif?")
-      return;
-    }
-    const dataArr = str.split(PubSubManager.DELIMITER),
-      notifType = dataArr[0];
-
-    log(str);
-
-    if (notifType === this.NOTIF_TYPE.schema) {
-      if (this.onSchemaChange) {
-        const command = dataArr[1]!,
-          event_type = dataArr[2],
-          query = dataArr[3];
-
-        if (query) {
-          this.onSchemaChange({ command, query })
-        }
-      }
-
-      return;
-    }
-
-    if (notifType !== this.NOTIF_TYPE.data) {
-      console.error("Unexpected notif type: ", notifType);
-      return;
-    }
-    if(dataArr.length < 3){
-      throw "dataArr length < 3"
-    }
-    const table_name = dataArr[1]!,
-      op_name = dataArr[2]!,
-      condition_ids_str = dataArr[3]!;
-
-    // const triggers = await this.db.any("SELECT * FROM prostgles.triggers WHERE table_name = $1 AND id IN ($2:csv)", [table_name, condition_ids_str.split(",").map(v => +v)]);
-    // const conditions: string[] = triggers.map(t => t.condition);
-
-    /**
-     * Trigger error
-     */
-    log("PG Trigger ->", dataArr.join("__"))
-    if (
-      condition_ids_str && condition_ids_str.startsWith("error") &&
-      this._triggers && 
-      this._triggers[table_name]?.length
-    ) {
-      const pref = "INTERNAL ERROR";
-      console.error(`${pref}: condition_ids_str: ${condition_ids_str}`)
-      this._triggers[table_name]!.map(c => {
-        const subs = this.getSubs(table_name, c);
-        subs.map(s => {
-          this.pushSubData(s, pref + ". Check server logs. Schema might have changed");
-        })
-      });
-    
-    /**
-     * Trigger ok
-     */
-    } else if (
-      condition_ids_str?.split(",").length &&
-      condition_ids_str?.split(",").every((c: string) => Number.isInteger(+c)) &&
-      this._triggers?.[table_name]?.length
-    ) {
+  notifListener = notifListener.bind(this);
 
 
-      const idxs = condition_ids_str.split(",").map(v => +v);
-      const conditions = this._triggers[table_name]!.filter((c, i) => idxs.includes(i))
-
-      log("PG Trigger -> ", { table_name, op_name, condition_ids_str, conditions }, this._triggers[table_name]);
-
-      conditions.map(condition => {
-
-        const subs = this.getSubs(table_name, condition);
-        const syncs = this.getSyncs(table_name, condition);
-
-
-        syncs.map((s) => {
-          this.syncData(s, undefined, "trigger");
-        });
-
-        if (!subs) {
-
-          // console.error(`sub missing for ${table_name} ${condition}`, this.triggers);
-          // console.log(this.subs)
-          return;
-        }
-
-        /* Throttle the subscriptions */
-        for (let i = 0; i < subs.length; i++) {
-          const sub = subs[i]!;
-          if (
-            this.dbo[sub.table_name] &&
-            sub.is_ready &&
-            (sub.socket_id && this.sockets[sub.socket_id]) || sub.func
-          ) {
-            const throttle = sub.throttle || 0;
-            if (sub.last_throttled <= Date.now() - throttle) {
-
-              /* It is assumed the policy was checked before this point */
-              this.pushSubData(sub);
-              // sub.last_throttled = Date.now();
-            } else if (!sub.is_throttling) {
-
-
-              log("throttling sub")
-              sub.is_throttling = setTimeout(() => {
-                log("throttling finished. pushSubData...")
-                sub.is_throttling = null;
-                this.pushSubData(sub);
-              }, throttle);// sub.throttle);
-            }
-          }
-        }
-      });
-
-    } else {
-
-      // if(!this._triggers || !this._triggers[table_name] || !this._triggers[table_name].length){
-      //     console.warn(190, "Trigger sub not found. DROPPING TRIGGER", table_name, condition_ids_str, this._triggers);
-      //     this.dropTrigger(table_name);
-      // } else {
-      // }
-      console.warn(190, "Trigger sub issue: ", table_name, condition_ids_str, this._triggers);
-    }
-  }
-
-
-  pushSubData(sub: SubscriptionParams, err?: any) {
+  pushSubData(sub: Subscription, err?: any) {
     if (!sub) throw "pushSubData: invalid sub";
-    const { table_name, filter, params, table_rules, socket_id, channel_name, func } = sub;  //, subOne = false 
-
+    const { table_info, filter, params, table_rules, socket_id, channel_name, func } = sub;  //, subOne = false 
+    const { name: table_name } = table_info;
     sub.last_throttled = Date.now();
 
     if (err) {
@@ -579,7 +461,20 @@ export class PubSubManager {
   upsertSocket(socket: any) {
     if (socket && !this.sockets[socket.id]) {
       this.sockets[socket.id] = socket;
-      socket.on("disconnect", () => this.onSocketDisconnected(socket));
+      socket.on("disconnect", () => {
+
+        this.subs = this.subs.filter(s => {
+          return !(s.socket && s.socket.id === socket.id);
+        });    
+
+        this.syncs = this.syncs.filter(s => {
+          return !(s.socket_id && s.socket_id === socket.id);
+        });
+
+        delete this.sockets[socket.id];
+
+        return "ok";
+      });
     }
   }
 
@@ -588,275 +483,10 @@ export class PubSubManager {
     return await syncData(this, sync, clientData, source);
   }
 
-  /**
-   * Returns a sync channel
-   * A sync channel is unique per socket for each filter
-   */
-  async addSync(syncParams: AddSyncParams) {
-    const {
-      socket = null, table_info = null, table_rules, synced_field = null,
-      allow_delete = false, id_fields = [], filter = {},
-      params, condition = "", throttle = 0
-    } = syncParams || {};
-
-    const conditionParsed = parseCondition(condition);
-    if (!socket || !table_info) throw "socket or table_info missing";
-
-
-    const { name: table_name } = table_info,
-      channel_name = `${this.socketChannelPreffix}.${table_name}.${JSON.stringify(filter)}.sync`;
-
-    if (!synced_field) throw "synced_field missing from table_rules";
-
-    this.upsertSocket(socket);
-
-    const upsertSync = () => {
-      const newSync = {
-        channel_name,
-        table_name,
-        filter,
-        condition: conditionParsed,
-        synced_field,
-        id_fields,
-        allow_delete,
-        table_rules,
-        throttle: Math.max(throttle || 0, table_rules?.sync?.throttle || 0),
-        batch_size: get(table_rules, "sync.batch_size") || DEFAULT_SYNC_BATCH_SIZE,
-        last_throttled: 0,
-        socket_id: socket.id,
-        is_sync: true,
-        last_synced: 0,
-        lr: undefined,
-        table_info,
-        is_syncing: false,
-        wal: undefined,
-        socket,
-        params
-      };
-
-      /* Only a sync per socket per table per condition allowed */
-      this.syncs = this.syncs || [];
-      const existing = find(this.syncs, { socket_id: socket.id, channel_name });
-      if (!existing) {
-        this.syncs.push(newSync);
-        // console.log("Added SYNC");
-
-        socket.removeAllListeners(channel_name + "unsync");
-        socket.once(channel_name + "unsync", (_data: any, cb: BasicCallback) => {
-          this.onSocketDisconnected(socket, channel_name);
-          cb(null, { res: "ok" })
-        });
-
-        socket.removeAllListeners(channel_name);
-        socket.on(channel_name, (data: any, cb: BasicCallback) => {
-
-          if (!data) {
-            cb({ err: "Unexpected request. Need data or onSyncRequest" });
-            return;
-          }
-
-          /*
-          */
-
-          /* Server will:
-              1. Ask for last_synced  emit(onSyncRequest)
-              2. Ask for data >= server_synced    emit(onPullRequest)
-                  -> Upsert that data
-              2. Push data >= last_synced     emit(data.data)
-
-             Client will:
-              1. Send last_synced     on(onSyncRequest)
-              2. Send data >= server_synced   on(onPullRequest)
-              3. Send data on CRUD    emit(data.data | data.deleted)
-              4. Upsert data.data | deleted     on(data.data | data.deleted)
-          */
-
-          // if(data.data){
-          //     console.error("THIS SHOUKD NEVER FIRE !! NEW DATA FROM SYNC");
-          //     this.upsertClientData(newSync, data.data);
-          // } else 
-          if (data.onSyncRequest) {
-            // console.log("syncData from socket")
-            this.syncData(newSync, data.onSyncRequest, "client");
-
-            // console.log("onSyncRequest ", socket._user)
-          } else {
-            console.error("Unexpected sync request data from client: ", data)
-          }
-        });
-
-        // socket.emit(channel_name, { onSyncRequest: true }, (response) => {
-        //     console.log(response)
-        // });
-      } else {
-        console.warn("UNCLOSED DUPLICATE SYNC FOUND", existing.channel_name);
-      }
-
-      return newSync;
-    };
-
-
-    // const { min_id, max_id, count, max_synced } = params;
-
-    const _sync = upsertSync();
-
-    await this.addTrigger({ table_name, condition: conditionParsed });
-
-    return channel_name;
-  } 
+  addSync = addSync.bind(this);
   
+  addSub = addSub.bind(this);
 
-  /* Must return a channel for socket */
-  /* The distinct list of channel names must have a corresponding trigger in the database */
-  async addSub(subscriptionParams: Omit<AddSubscriptionParams, "channel_name" | "parentSubParams">) {
-    const {
-      socket, func = null, table_info = null, table_rules, filter = {},
-      params = {}, condition = "", throttle = 0,  //subOne = false, 
-      viewOptions
-    } = subscriptionParams || {};
-
-    let validated_throttle = subscriptionParams.throttle || 10;
-    if ((!socket && !func) || !table_info) throw "socket/func or table_info missing";
-
-    const pubThrottle = get(table_rules, ["subscribe", "throttle"]) || 0;
-    if (pubThrottle && Number.isInteger(pubThrottle) && pubThrottle > 0) {
-      validated_throttle = pubThrottle;
-    }
-    if (throttle && Number.isInteger(throttle) && throttle >= pubThrottle) {
-      validated_throttle = throttle;
-    }
-
-    const channel_name = `${this.socketChannelPreffix}.${table_info.name}.${JSON.stringify(filter)}.${JSON.stringify(params)}.${"m"}.sub`;
-
-    this.upsertSocket(socket);
-
-    const upsertSub = (newSubData: { table_name: string; condition: string; is_ready: boolean; parentSubParams: SubscriptionParams["parentSubParams"] }, isReadyOverride: boolean | undefined) => {
-      const { table_name, condition: _cond, is_ready = false, parentSubParams } = newSubData,
-        condition = parseCondition(_cond),
-        newSub: SubscriptionParams = {
-          socket,
-          table_name: table_info.name,
-          table_info,
-          filter,
-          params,
-          table_rules,
-          channel_name,
-          parentSubParams,
-          func: func ?? undefined,
-          socket_id: socket?.id,
-          throttle: validated_throttle,
-          is_throttling: null,
-          last_throttled: 0,
-          is_ready,
-        };
-
-      this.subs[table_name] = this.subs[table_name] ?? {};
-      this.subs[table_name]![condition] = this.subs[table_name]![condition] ?? { subs: [] };
-      this.subs[table_name]![condition]!.subs = this.subs[table_name]![condition]!.subs ?? [];
-
-      // console.log("1034 upsertSub", this.subs)
-      const sub_idx = this.subs[table_name]![condition]!.subs.findIndex(s =>
-        s.channel_name === channel_name &&
-        (
-          socket && s.socket_id === socket.id ||
-          func && s.func === func
-        )
-      );
-      if (sub_idx < 0) {
-        this.subs[table_name]![condition]!.subs.push(newSub);
-        if (socket) {
-          const chnUnsub = channel_name + "unsubscribe";
-          socket.removeAllListeners(chnUnsub);
-          socket.once(chnUnsub, (_data: any, cb: BasicCallback) => {
-            const res = this.onSocketDisconnected(socket, channel_name);
-            cb(null, { res });
-          });
-        }
-      } else {
-        this.subs[table_name]![condition]!.subs[sub_idx] = newSub;
-      }
-
-      if (isReadyOverride ?? is_ready) {
-        this.pushSubData(newSub);
-      }
-    };
-
-
-    
-    viewOptions?.relatedTables.map(async (relatedTable, relatedTableIdx) => {
-
-      const params: Omit<Parameters<typeof upsertSub>[0], "is_ready"> = {
-        table_name: relatedTable.tableName,
-        condition: relatedTable.condition,
-        parentSubParams: {
-          ...subscriptionParams,
-          channel_name
-        },
-      } 
-      
-      upsertSub({
-        ...params,
-        is_ready: false,
-        
-      }, false);
-
-      await this.addTrigger(params, viewOptions);
-
-      /** Trigger pushSubData only on last related table (if it's a view) to prevent duplicate firings */
-      const isLast = relatedTableIdx === viewOptions.relatedTables.length - 1;
-      upsertSub({
-        ...params,
-        is_ready: true
-      }, isLast && !table_info.is_view);
-
-    });
-      
-    if (table_info.is_view) {
-      if(!viewOptions?.relatedTables.length){
-        throw "PubSubManager: view parent_tables missing";
-      }
-      return channel_name;
-    }
-    
-    /* Just a table, add table + condition trigger */
-    // console.log(table_info, 202);
-
-    upsertSub({
-      table_name: table_info.name,
-      condition: parseCondition(condition),
-      parentSubParams: undefined,
-      is_ready: false
-    }, undefined);
-
-    await this.addTrigger({
-      table_name: table_info.name,
-      condition: parseCondition(condition),
-    });
-
-    upsertSub({
-      table_name: table_info.name,
-      condition: parseCondition(condition),
-      parentSubParams: undefined,
-      is_ready: true
-    }, undefined);
-
-    return channel_name;
-  }
-
-  removeLocalSub(table_name: string, condition: string, func: (items: object[]) => any) {
-    const cond = parseCondition(condition);
-    if (get(this.subs, [table_name, cond, "subs"])) {
-      this.subs[table_name]![cond]!.subs.map((sub, i) => {
-        if (
-          sub.func && sub.func === func
-        ) {
-          this.subs[table_name]![cond]!.subs.splice(i, 1);
-        }
-      });
-    } else {
-      console.error("Could not unsubscribe. Subscription might not have initialised yet")
-    }
-  }
 
   getActiveListeners = (): { table_name: string; condition: string }[] => {
     const result: { table_name: string; condition: string }[] = [];
@@ -868,70 +498,14 @@ export class PubSubManager {
     (this.syncs || []).map(s => {
       upsert(s.table_name, s.condition)
     });
-    Object.keys(this.subs || {}).map(table_name => {
-      Object.keys(this.subs[table_name] || {}).map(condition => {
-        if (this.subs[table_name]![condition]!.subs.length) {
-          upsert(table_name, condition);
-        }
+
+    this.subs.forEach(s => {
+      s.triggers.forEach(trg => {
+        upsert(trg.table_name, trg.condition);
       });
     });
 
     return result;
-  }
-
-  onSocketDisconnected(socket?: PRGLIOSocket, channel_name?: string) {
-    // process.on('warning', e => {
-    //     console.warn(e.stack)
-    // });
-    // console.log("onSocketDisconnected", channel_name, this.syncs)
-    if (this.subs) {
-      Object.keys(this.subs).map(table_name => {
-        Object.keys(this.subs[table_name]!).map(condition => {
-          this.subs[table_name]![condition]!.subs.map((sub, i) => {
-
-            /**
-             * If a channel name is specified then delete triggers 
-             */
-            if (
-              (socket && sub.socket_id === socket.id) &&
-              (!channel_name || sub.channel_name === channel_name)
-            ) {
-              this.subs[table_name]![condition]!.subs.splice(i, 1);
-              if (!this.subs[table_name]![condition]!.subs.length) {
-                delete this.subs[table_name]![condition];
-
-                if (isEmpty(this.subs[table_name])) {
-                  delete this.subs[table_name];
-                }
-              }
-            }
-          });
-        })
-      });
-    }
-
-    if (this.syncs) {
-      this.syncs = this.syncs.filter(s => {
-        const matchesSocket = Boolean(socket && s.socket_id !== socket.id)
-        if (channel_name) {
-          return matchesSocket || s.channel_name !== channel_name
-        }
-
-        return matchesSocket;
-      });
-    }
-
-    if (!socket) {
-      // Do nothing
-    } else if (!channel_name) {
-      delete this.sockets[socket.id];
-    } else {
-      socket.removeAllListeners(channel_name);
-      socket.removeAllListeners(channel_name + "unsync");
-      socket.removeAllListeners(channel_name + "unsubscribe");
-    }
-
-    return "ok";
   }
 
 
@@ -1037,6 +611,6 @@ export class PubSubManager {
 }
 
 
-const parseCondition = (condition: string): string => condition && condition.trim().length ? condition : "TRUE"
+export const parseCondition = (condition: string): string => condition && condition.trim().length ? condition : "TRUE"
 
 export { pickKeys, omitKeys } from "prostgles-types"

@@ -1,0 +1,1 @@
+{"version":3,"file":"addSub.d.ts","sourceRoot":"","sources":["../../lib/PubSubManager/addSub.ts"],"names":[],"mappings":"AAAA,OAAO,EAAiC,aAAa,EAAgB,kBAAkB,EAAE,MAAM,iBAAiB,CAAC;AAEjH,KAAK,qBAAqB,GAAG,kBAAkB,GAAG;IAChD,SAAS,EAAE,MAAM,CAAC;CACnB,CAAA;AAID,wBAAsB,MAAM,CAAC,IAAI,EAAE,aAAa,EAAE,kBAAkB,EAAE,IAAI,CAAC,qBAAqB,EAAE,cAAc,GAAG,iBAAiB,CAAC,mBA0GpI"}

@@ -29,7 +29,7 @@ export type SyncParams = {
     last_synced: number;
     is_syncing: boolean;
 };
-type AddSyncParams = {
+export type AddSyncParams = {
     socket: any;
     table_info: TableInfo;
     table_rules: TableRule;
@@ -58,11 +58,9 @@ export type ViewSubscriptionOptions = ({
         condition: string;
     }[];
 };
-type SubscriptionParams = {
+export type SubscriptionParams = {
     socket_id?: string;
     channel_name: string;
-    table_name: string;
-    socket: PRGLIOSocket | undefined;
     /**
      * If this is a view then an array with all related tables will be
      * */
@@ -72,14 +70,12 @@ type SubscriptionParams = {
     table_rules?: TableRule;
     filter: object;
     params: SelectParams;
-    func?: (data: any) => any;
+    func: undefined | ((data: any) => any);
+    socket: PRGLIOSocket | undefined;
     throttle?: number;
     last_throttled: number;
     is_throttling?: any;
     is_ready?: boolean;
-};
-type AddSubscriptionParams = SubscriptionParams & {
-    condition: string;
 };
 export type PubSubManagerOptions = {
     dboBuilder: DboBuilder;
@@ -90,20 +86,21 @@ export type PubSubManagerOptions = {
         query: string;
     }) => void;
 };
+export type Subscription = Pick<SubscriptionParams, "throttle" | "is_throttling" | "last_throttled" | "channel_name" | "is_ready" | "func" | "socket" | "socket_id" | "table_info" | "filter" | "params" | "table_rules"> & {
+    triggers: {
+        table_name: string;
+        condition: string;
+        is_related: boolean;
+    }[];
+};
 export declare class PubSubManager {
     static DELIMITER: string;
     dboBuilder: DboBuilder;
     get db(): DB;
     get dbo(): DBHandlerServer;
     _triggers?: Record<string, string[]>;
-    sockets: any;
-    subs: {
-        [ke: string]: {
-            [ke: string]: {
-                subs: SubscriptionParams[];
-            };
-        };
-    };
+    sockets: AnyObject;
+    subs: Subscription[];
     syncs: SyncParams[];
     socketChannelPreffix: string;
     onSchemaChange?: ((event: {
@@ -141,27 +138,20 @@ export declare class PubSubManager {
     static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID: string;
     prepareTriggers: () => Promise<boolean>;
     isReady(): any;
-    getSubs(table_name: string, condition: string): SubscriptionParams[];
+    getSubs(table_name: string, condition: string, client?: Pick<Subscription, "func" | "socket_id">): Subscription[];
+    removeLocalSub(tableName: string, conditionRaw: string, func: (items: object[]) => any): void;
     getSyncs(table_name: string, condition: string): SyncParams[];
-    notifListener: (data: {
-        payload: string;
-    }) => Promise<void>;
-    pushSubData(sub: SubscriptionParams, err?: any): true | Promise<unknown>;
+    notifListener: any;
+    pushSubData(sub: Subscription, err?: any): true | Promise<unknown>;
     upsertSocket(socket: any): void;
     syncTimeout?: ReturnType<typeof setTimeout>;
     syncData(sync: SyncParams, clientData: ClientExpressData | undefined, source: "trigger" | "client"): Promise<void>;
-    /**
-     * Returns a sync channel
-     * A sync channel is unique per socket for each filter
-     */
-    addSync(syncParams: AddSyncParams): Promise<string>;
-    addSub(subscriptionParams: Omit<AddSubscriptionParams, "channel_name" | "parentSubParams">): Promise<string>;
-    removeLocalSub(table_name: string, condition: string, func: (items: object[]) => any): void;
+    addSync: any;
+    addSub: any;
     getActiveListeners: () => {
         table_name: string;
         condition: string;
     }[];
-    onSocketDisconnected(socket?: PRGLIOSocket, channel_name?: string): string;
     checkIfTimescaleBug: (table_name: string) => Promise<boolean>;
     getMyTriggerQuery: () => Promise<string>;
     addingTrigger: any;
@@ -171,5 +161,6 @@ export declare class PubSubManager {
         condition: string;
     }, viewOptions?: ViewSubscriptionOptions): Promise<boolean>;
 }
+export declare const parseCondition: (condition: string) => string;
 export { pickKeys, omitKeys } from "prostgles-types";
 //# sourceMappingURL=PubSubManager.d.ts.map

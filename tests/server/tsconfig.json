@@ -11,7 +11,8 @@
     "moduleResolution": "node",
 		"declaration": true,
 		"declarationMap": true,
-		"keyofStringsOnly": true
+		"keyofStringsOnly": true,
+		"skipLibCheck": false
 	},
 	"exclude": [
 		"dist",

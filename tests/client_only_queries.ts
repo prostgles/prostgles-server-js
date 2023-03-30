@@ -146,7 +146,7 @@ export default async function client_only(db: Required<DBHandlerClient>, auth: A
 
             // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log);
     
-            sP.unsubscribe();
+            await sP.unsubscribe();
             log(Date.now() + ": sub: db.planes.update({}, { x: 20, last_updated });");
             const dLastUpdated = Math.max(...p10.map(v => +v.last_updated))
             const last_updated = Date.now();

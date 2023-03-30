@@ -371,7 +371,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
     await db.various.update!({ id: 99 }, { name: "zz3zz2" });
     await db.various.update!({ id: 99 }, { name: "zz3zz3" });
   }, { timeout: 4000 });
-
+  
   await tryRunP("subscribeOne with throttle", async (resolve, reject) => {
     await db.various.insert!({ id: 99 });
     const start = Date.now(); // name: "zz3zz" 
