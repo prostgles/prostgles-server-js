@@ -2,10 +2,16 @@ import { AnyObject, SubscribeParams, SubscriptionChannels } from "prostgles-type
 import { Filter, LocalParams } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 import { ViewHandler } from "./ViewHandler";
+type OnData = (items: AnyObject[]) => any;
 export type LocalFuncs = {
-    onData: (items: AnyObject[]) => any;
+    onData: OnData;
     onError?: (error: any) => void;
-};
+} | OnData;
+export declare const getOnDataFunc: (localFuncs: LocalFuncs | undefined) => Function | undefined;
+export declare const matchesLocalFuncs: (localFuncs1: LocalFuncs | undefined, localFuncs2: LocalFuncs | undefined) => boolean;
+export declare const parseLocalFuncs: (localFuncs1: LocalFuncs | undefined) => Extract<LocalFuncs, {
+    onData: OnData;
+}> | undefined;
 declare function subscribe(this: ViewHandler, filter: Filter, params: SubscribeParams, localFuncs: LocalFuncs): Promise<{
     unsubscribe: () => any;
 }>;

@@ -1,9 +1,23 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.subscribe = void 0;
+exports.subscribe = exports.parseLocalFuncs = exports.matchesLocalFuncs = exports.getOnDataFunc = void 0;
 const DboBuilder_1 = require("../DboBuilder");
 const PubSubManager_1 = require("../PubSubManager/PubSubManager");
 const getSubscribeRelatedTables_1 = require("./getSubscribeRelatedTables");
+const getOnDataFunc = (localFuncs) => {
+    return typeof localFuncs === "function" ? localFuncs : localFuncs?.onData;
+};
+exports.getOnDataFunc = getOnDataFunc;
+const matchesLocalFuncs = (localFuncs1, localFuncs2) => {
+    return localFuncs1 && localFuncs2 && (0, exports.getOnDataFunc)(localFuncs1) === (0, exports.getOnDataFunc)(localFuncs2);
+};
+exports.matchesLocalFuncs = matchesLocalFuncs;
+const parseLocalFuncs = (localFuncs1) => {
+    return !localFuncs1 ? undefined : typeof localFuncs1 === "function" ? {
+        onData: localFuncs1
+    } : localFuncs1;
+};
+exports.parseLocalFuncs = parseLocalFuncs;
 async function subscribe(filter, params, localFuncs, table_rules, localParams) {
     try {
         // if (this.is_view) throw "Cannot subscribe to a view";

@@ -5,16 +5,29 @@ import { omitKeys } from "../PubSubManager/PubSubManager";
 import { ViewHandler } from "./ViewHandler";
 import { getSubscribeRelatedTables } from "./getSubscribeRelatedTables";
 
+type OnData = (items: AnyObject[]) => any; 
 export type LocalFuncs = {
-  onData: (items: AnyObject[]) => any;
+  onData: OnData
   onError?: (error: any) => void;
+} | OnData;
+
+export const getOnDataFunc = (localFuncs: LocalFuncs | undefined): Function | undefined => {
+  return typeof localFuncs === "function"? localFuncs : localFuncs?.onData;
+}
+export const matchesLocalFuncs = (localFuncs1: LocalFuncs | undefined, localFuncs2: LocalFuncs | undefined) => {
+  return localFuncs1 && localFuncs2 && getOnDataFunc(localFuncs1) === getOnDataFunc(localFuncs2);
+}
+export const parseLocalFuncs = (localFuncs1: LocalFuncs | undefined): Extract<LocalFuncs, { onData: OnData }> | undefined=> {
+  return !localFuncs1? undefined : typeof localFuncs1 === "function"? {
+    onData: localFuncs1
+  } : localFuncs1;
 }
 
 async function subscribe(this: ViewHandler, filter: Filter, params: SubscribeParams, localFuncs: LocalFuncs): Promise<{ unsubscribe: () => any }> 
 async function subscribe(this: ViewHandler, filter: Filter, params: SubscribeParams, localFuncs: undefined, table_rules: TableRule | undefined, localParams: LocalParams): Promise<SubscriptionChannels>
 async function subscribe(this: ViewHandler, filter: Filter, params: SubscribeParams, localFuncs?: LocalFuncs, table_rules?: TableRule, localParams?: LocalParams): Promise<{ unsubscribe: () => any } | SubscriptionChannels> 
 {
- 
+
   try {
     // if (this.is_view) throw "Cannot subscribe to a view";
 

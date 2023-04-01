@@ -22,7 +22,7 @@ import { DB_OBJ_NAMES } from "./getInitQuery";
 import { addSub } from "./addSub";
 import { notifListener } from "./notifListener";
 import { pushSubData } from "./pushSubData";
-import { LocalFuncs } from "../DboBuilder/subscribe";
+import { getOnDataFunc, LocalFuncs, matchesLocalFuncs } from "../DboBuilder/subscribe";
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 const pgp: PGP = pgPromise({
@@ -390,7 +390,9 @@ export class PubSubManager {
   getSubs(table_name: string, condition: string, client?: Pick<Subscription, "localFuncs" | "socket_id">): Subscription[] { 
     const subs = this.subs.filter(s => find(s.triggers, { table_name, condition }));
     if(client){
-      return subs.filter(s => client.localFuncs && s.localFuncs?.onData === client.localFuncs.onData || client.socket_id && s.socket_id === client.socket_id);
+      return subs.filter(s => {
+        return matchesLocalFuncs(client.localFuncs, s.localFuncs) || client.socket_id && s.socket_id === client.socket_id
+      });
     }
     return subs;
   }
@@ -398,7 +400,7 @@ export class PubSubManager {
   removeLocalSub(tableName: string, conditionRaw: string, localFuncs: LocalFuncs) {
     const condition = parseCondition(conditionRaw);
     if (this.getSubs(tableName, condition, { localFuncs }).length) {
-      this.subs = this.subs.filter(s => s.localFuncs?.onData !== s.localFuncs?.onData && !find(s.triggers, { tableName, condition }))
+      this.subs = this.subs.filter(s => getOnDataFunc(localFuncs) !== getOnDataFunc(s.localFuncs) && !find(s.triggers, { tableName, condition }))
     } else {
       console.error("Could not unsubscribe. Subscription might not have initialised yet", { tableName, condition })
     }

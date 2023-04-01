@@ -15,7 +15,7 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
   } = subscriptionParams || {};
   const table_name = table_info.name;
 
-  if (!socket && !localFuncs?.onData) {
+  if (!socket && !localFuncs) {
     throw "socket AND func missing";
   }
   if (socket && localFuncs) {

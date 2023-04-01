@@ -1,9 +1,11 @@
+import { parseLocalFuncs } from "../DboBuilder/subscribe";
 import { log, PubSubManager, Subscription } from "./PubSubManager";
 
 export async function pushSubData(this: PubSubManager, sub: Subscription, err?: any) {
   if (!sub) throw "pushSubData: invalid sub";
 
-  const { socket_id, channel_name, localFuncs } = sub;  //, subOne = false 
+  const { socket_id, channel_name } = sub;  //, subOne = false 
+  const localFuncs = parseLocalFuncs(sub.localFuncs);
   sub.last_throttled = Date.now();
 
   if (err) {
@@ -39,6 +41,9 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
       if (socket_id && this.sockets[socket_id]) {
         this.sockets[socket_id].emit(channel_name, { err: errObj });
       } else if (localFuncs) {
+        if(!localFuncs.onError){
+          console.error("Uncaught subscription error", err);
+        }
         localFuncs.onError?.(errObj);
       }
       reject(errObj);
