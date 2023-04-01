@@ -386,13 +386,13 @@ export class PubSubManager {
     return this.postgresNotifListenManager.isListening();
   } 
 
-  getSubs(table_name: string, condition: string, client: undefined | Pick<Subscription, "localFuncs" | "socket_id">, onlyMain: undefined | boolean): Subscription[] { 
-    const subs = this.subs.filter(s => find(s.triggers, { table_name, condition, ...(onlyMain? {  is_related: false } : {}) }));
+  getSubs(table_name: string, condition: string, client: undefined | Pick<Subscription, "localFuncs" | "socket_id" | "channel_name">): Subscription[] { 
     if(client){
-      return subs.filter(s => {
-        return matchesLocalFuncs(client.localFuncs, s.localFuncs) || client.socket_id && s.socket_id === client.socket_id
+      return this.subs.filter(s => {
+        return s.channel_name === client.channel_name && (matchesLocalFuncs(client.localFuncs, s.localFuncs) || client.socket_id && s.socket_id === client.socket_id)
       });
     }
+    const subs = this.subs.filter(s => find(s.triggers, { table_name, condition }));
     return subs;
   }
 

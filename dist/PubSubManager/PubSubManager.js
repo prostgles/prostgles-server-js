@@ -279,13 +279,13 @@ class PubSubManager {
             throw "this.postgresNotifListenManager missing";
         return this.postgresNotifListenManager.isListening();
     }
-    getSubs(table_name, condition, client, onlyMain) {
-        const subs = this.subs.filter(s => (0, util_1.find)(s.triggers, { table_name, condition, ...(onlyMain ? { is_related: false } : {}) }));
+    getSubs(table_name, condition, client) {
         if (client) {
-            return subs.filter(s => {
-                return (0, subscribe_1.matchesLocalFuncs)(client.localFuncs, s.localFuncs) || client.socket_id && s.socket_id === client.socket_id;
+            return this.subs.filter(s => {
+                return s.channel_name === client.channel_name && ((0, subscribe_1.matchesLocalFuncs)(client.localFuncs, s.localFuncs) || client.socket_id && s.socket_id === client.socket_id);
             });
         }
+        const subs = this.subs.filter(s => (0, util_1.find)(s.triggers, { table_name, condition }));
         return subs;
     }
     removeLocalSub(channelName, localFuncs) {

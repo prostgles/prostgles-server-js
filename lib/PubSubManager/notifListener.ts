@@ -51,7 +51,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     const pref = "INTERNAL ERROR";
     console.error(`${pref}: condition_ids_str: ${condition_ids_str}`)
     this._triggers[table_name]!.map(c => {
-      const subs = this.getSubs(table_name, c, undefined, false);
+      const subs = this.getSubs(table_name, c, undefined);
       subs.map(s => {
         this.pushSubData(s, pref + ". Check server logs. Schema might have changed");
       })
@@ -72,7 +72,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
 
     conditions.map(condition => {
 
-      const subs = this.getSubs(table_name, condition, undefined, false);
+      const subs = this.getSubs(table_name, condition, undefined);
       const syncs = this.getSyncs(table_name, condition);
 
       log("notifListener", subs.map(s => s.channel_name), syncs.map(s => s.channel_name))
