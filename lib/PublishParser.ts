@@ -92,8 +92,8 @@ const RULE_TO_METHODS = [
     methods: RULE_METHODS.subscribe,
     no_limits: <SubscribeRule>{ throttle: 0 },
     table_only: false,
-    allowed_params: <Array<keyof SubscribeRule>>["throttle"],
-    hint: ` expecting "*" | true | { throttle: number } \n Will use "select" rules`
+    allowed_params: <Array<keyof SubscribeRule>>["throttle", "throttleOpts"],
+    hint: ` expecting "*" | true | { throttle: number; throttleOpts?: { skipFirst?: boolean; } } \n Will use "select" rules`
   }
 ] as const;
 

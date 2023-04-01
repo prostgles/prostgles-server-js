@@ -74,8 +74,8 @@ const RULE_TO_METHODS = [
         methods: prostgles_types_1.RULE_METHODS.subscribe,
         no_limits: { throttle: 0 },
         table_only: false,
-        allowed_params: ["throttle"],
-        hint: ` expecting "*" | true | { throttle: number } \n Will use "select" rules`
+        allowed_params: ["throttle", "throttleOpts"],
+        hint: ` expecting "*" | true | { throttle: number; throttleOpts?: { skipFirst?: boolean; } } \n Will use "select" rules`
     }
 ];
 const PubSubManager_1 = require("./PubSubManager/PubSubManager");
