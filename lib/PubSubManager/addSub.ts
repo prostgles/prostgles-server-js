@@ -9,16 +9,16 @@ type AddSubscriptionParams = SubscriptionParams & {
 /* The distinct list of {table_name, condition} must have a corresponding trigger in the database */
 export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSubscriptionParams, "channel_name" | "parentSubParams">): Promise<SubscriptionChannels> {
   const {
-    socket, func, table_rules, filter = {},
+    socket, localFuncs, table_rules, filter = {},
     params = {}, condition = "", throttle = 0,  //subOne = false, 
     viewOptions, table_info,
   } = subscriptionParams || {};
   const table_name = table_info.name;
 
-  if (!socket && !func) {
+  if (!socket && !localFuncs?.onData) {
     throw "socket AND func missing";
   }
-  if (socket && func) {
+  if (socket && localFuncs) {
     throw "addSub: cannot have socket AND func";
   }
 
@@ -32,20 +32,16 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
   }
 
   const channel_name = `${this.socketChannelPreffix}.${table_name}.${JSON.stringify(filter)}.${JSON.stringify(params)}.${"m"}.sub`;
-  const result: SubscriptionChannels = {
-    channelName: channel_name,
-    channelNameReady: channel_name + ".ready",
-    channelNameUnsubscribe: channel_name + ".unsubscribe"
-  }
-
-  this.upsertSocket(socket);
-
-  // const upsertSub = _upsertSub.bind(this);
+  const mainTrigger = {
+    table_name: table_name,
+    condition: parseCondition(condition),
+    is_related: false,
+  } as const;
 
   const newSub: Subscription = {
     channel_name,
     filter,
-    func,
+    localFuncs,
     params,
     last_throttled: 0,
     socket,
@@ -56,13 +52,25 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
     table_rules,
     throttle: validated_throttle,
     triggers: [
-      {
-        table_name: table_name,
-        condition: parseCondition(condition),
-        is_related: false,
-      }
+      mainTrigger
     ]
   }
+
+  const result: SubscriptionChannels = {
+    channelName: channel_name,
+    channelNameReady: channel_name + ".ready",
+    channelNameUnsubscribe: channel_name + ".unsubscribe"
+  }
+
+  const [matchingSub] = this.getSubs(mainTrigger.table_name, mainTrigger.condition, newSub);
+  if(matchingSub){
+    console.error("Trying to add a duplicate sub for: ", channel_name);
+    return result;
+  }
+
+  this.upsertSocket(socket);
+
+  // const upsertSub = _upsertSub.bind(this);
 
   if(viewOptions){
     for await(const relatedTable of viewOptions.relatedTables){
@@ -79,7 +87,7 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
 
   }
 
-  if(func){
+  if(localFuncs){
     this.pushSubData(newSub);
 
   } else if (socket) {

@@ -87,7 +87,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
           if (
             this.dbo[trg.table_name] &&
             sub.is_ready &&
-            (sub.socket_id && this.sockets[sub.socket_id]) || sub.func
+            (sub.socket_id && this.sockets[sub.socket_id]) || sub.localFuncs
           ) {
             const throttle = sub.throttle || 0;
             if (sub.last_throttled <= Date.now() - throttle) {

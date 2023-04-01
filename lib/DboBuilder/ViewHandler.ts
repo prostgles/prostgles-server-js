@@ -26,7 +26,7 @@ import { TableHandler } from "./TableHandler";
 import { asNameAlias,  getNewQuery, SelectItem, SelectItemValidated } from "./QueryBuilder/QueryBuilder";
 import { COMPUTED_FIELDS, FieldSpec } from "./QueryBuilder/Functions"; 
 import { getColumns } from "./getColumns";
-import { LocalFunc, subscribe } from "./subscribe";
+import { LocalFuncs, subscribe } from "./subscribe";
 export type JoinPaths = {
   t1: string;
   t2: string;
@@ -692,12 +692,12 @@ export class ViewHandler {
     }
   }
 
-  async subscribe(filter: Filter, params: SubscribeParams, localFunc: LocalFunc): Promise<{ unsubscribe: () => any }> 
-  async subscribe(filter: Filter, params: SubscribeParams, localFunc: undefined, table_rules: TableRule | undefined, localParams: LocalParams): Promise<string>
-  async subscribe(filter: Filter, params: SubscribeParams, localFunc?: LocalFunc, table_rules?: TableRule, localParams?: LocalParams): 
+  async subscribe(filter: Filter, params: SubscribeParams, localFuncs: LocalFuncs): Promise<{ unsubscribe: () => any }> 
+  async subscribe(filter: Filter, params: SubscribeParams, localFuncs: undefined, table_rules: TableRule | undefined, localParams: LocalParams): Promise<string>
+  async subscribe(filter: Filter, params: SubscribeParams, localFuncs?: LocalFuncs, table_rules?: TableRule, localParams?: LocalParams): 
     Promise<{ unsubscribe: () => any } | string> {
       //@ts-ignore
-      return subscribe.bind(this)(filter, params, localFunc, table_rules, localParams);
+      return subscribe.bind(this)(filter, params, localFuncs, table_rules, localParams);
   }
 
   /* This should only be called from server */

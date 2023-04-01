@@ -5,11 +5,14 @@ import { omitKeys } from "../PubSubManager/PubSubManager";
 import { ViewHandler } from "./ViewHandler";
 import { getSubscribeRelatedTables } from "./getSubscribeRelatedTables";
 
-export type LocalFunc = (items: AnyObject[]) => any;
+export type LocalFuncs = {
+  onData: (items: AnyObject[]) => any;
+  onError?: (error: any) => void;
+}
 
-async function subscribe(this: ViewHandler, filter: Filter, params: SubscribeParams, localFunc: LocalFunc): Promise<{ unsubscribe: () => any }> 
-async function subscribe(this: ViewHandler, filter: Filter, params: SubscribeParams, localFunc: undefined, table_rules: TableRule | undefined, localParams: LocalParams): Promise<SubscriptionChannels>
-async function subscribe(this: ViewHandler, filter: Filter, params: SubscribeParams, localFunc?: LocalFunc, table_rules?: TableRule, localParams?: LocalParams): Promise<{ unsubscribe: () => any } | SubscriptionChannels> 
+async function subscribe(this: ViewHandler, filter: Filter, params: SubscribeParams, localFuncs: LocalFuncs): Promise<{ unsubscribe: () => any }> 
+async function subscribe(this: ViewHandler, filter: Filter, params: SubscribeParams, localFuncs: undefined, table_rules: TableRule | undefined, localParams: LocalParams): Promise<SubscriptionChannels>
+async function subscribe(this: ViewHandler, filter: Filter, params: SubscribeParams, localFuncs?: LocalFuncs, table_rules?: TableRule, localParams?: LocalParams): Promise<{ unsubscribe: () => any } | SubscriptionChannels> 
 {
  
   try {
@@ -18,11 +21,11 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
     if (this.t) {
       throw "subscribe not allowed within transactions";
     }
-    if (!localParams && !localFunc) {
+    if (!localParams && !localFuncs) {
       throw " missing data. provide -> localFunc | localParams { socket } ";
     }
-    if (localParams?.socket && localFunc) {
-      console.error({ localParams, localFunc })
+    if (localParams?.socket && localFuncs) {
+      console.error({ localParams, localFuncs })
       throw " Cannot have localFunc AND socket ";
     }
 
@@ -61,13 +64,13 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
     } as const;
 
     const pubSubManager = await this.dboBuilder.getPubSubManager();
-    if (!localFunc) {    
+    if (!localFuncs) {    
 
       const { socket } = localParams ?? {};
       return pubSubManager.addSub({
         ...commonSubOpts,
         socket, 
-        func: undefined,
+        localFuncs: undefined,
         socket_id: socket?.id, 
       });
 
@@ -76,13 +79,13 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
       pubSubManager.addSub({ 
         ...commonSubOpts,
         socket: undefined,  
-        func: localFunc, 
+        localFuncs, 
         socket_id: undefined, 
       });
       
       const unsubscribe = async () => {
         const pubSubManager = await this.dboBuilder.getPubSubManager();
-        pubSubManager.removeLocalSub(this.name, condition, localFunc)
+        pubSubManager.removeLocalSub(this.name, condition, localFuncs)
       };
       const res: { unsubscribe: () => any } = Object.freeze({ unsubscribe })
       return res;

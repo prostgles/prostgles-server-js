@@ -5,7 +5,7 @@ import { DboBuilder, ExistsFilterConfig, Filter, JoinInfo, LocalParams, SortItem
 import { Graph } from "../shortestPath";
 import { TableRule, UpdateRule, ValidateRow } from "../PublishParser";
 import { SelectItem, SelectItemValidated } from "./QueryBuilder/QueryBuilder";
-import { LocalFunc } from "./subscribe";
+import { LocalFuncs } from "./subscribe";
 export type JoinPaths = {
     t1: string;
     t2: string;
@@ -76,10 +76,10 @@ export declare class ViewHandler {
     getValidatedRules(tableRules?: TableRule, localParams?: LocalParams): ValidatedTableRules;
     find(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]>;
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
-    subscribe(filter: Filter, params: SubscribeParams, localFunc: LocalFunc): Promise<{
+    subscribe(filter: Filter, params: SubscribeParams, localFuncs: LocalFuncs): Promise<{
         unsubscribe: () => any;
     }>;
-    subscribe(filter: Filter, params: SubscribeParams, localFunc: undefined, table_rules: TableRule | undefined, localParams: LocalParams): Promise<string>;
+    subscribe(filter: Filter, params: SubscribeParams, localFuncs: undefined, table_rules: TableRule | undefined, localParams: LocalParams): Promise<string>;
     subscribeOne(filter: Filter, params: SubscribeParams, localFunc: (item: AnyObject) => any): Promise<{
         unsubscribe: () => any;
     }>;

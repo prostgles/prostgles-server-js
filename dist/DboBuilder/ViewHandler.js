@@ -575,9 +575,9 @@ class ViewHandler {
             throw (0, DboBuilder_1.parseError)(e, `Issue with dbo.${this.name}.findOne()`);
         }
     }
-    async subscribe(filter, params, localFunc, table_rules, localParams) {
+    async subscribe(filter, params, localFuncs, table_rules, localParams) {
         //@ts-ignore
-        return subscribe_1.subscribe.bind(this)(filter, params, localFunc, table_rules, localParams);
+        return subscribe_1.subscribe.bind(this)(filter, params, localFuncs, table_rules, localParams);
     }
     subscribeOne(filter, params = {}, localFunc, table_rules, localParams) {
         //@ts-ignore

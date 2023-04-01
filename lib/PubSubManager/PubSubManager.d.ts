@@ -5,6 +5,7 @@ import { DB } from "../Prostgles";
 import { SelectParams, FieldFilter, WAL, AnyObject } from "prostgles-types";
 import { ClientExpressData } from "../SyncReplication";
 import { TableRule } from "../PublishParser";
+import { LocalFuncs } from "../DboBuilder/subscribe";
 export declare const asValue: (v: any) => string;
 export declare const DEFAULT_SYNC_BATCH_SIZE = 50;
 export declare const log: (...args: any[]) => void;
@@ -70,7 +71,7 @@ export type SubscriptionParams = {
     table_rules?: TableRule;
     filter: object;
     params: SelectParams;
-    func: undefined | ((data: any) => any);
+    localFuncs?: LocalFuncs;
     socket: PRGLIOSocket | undefined;
     throttle?: number;
     last_throttled: number;
@@ -86,7 +87,7 @@ export type PubSubManagerOptions = {
         query: string;
     }) => void;
 };
-export type Subscription = Pick<SubscriptionParams, "throttle" | "is_throttling" | "last_throttled" | "channel_name" | "is_ready" | "func" | "socket" | "socket_id" | "table_info" | "filter" | "params" | "table_rules"> & {
+export type Subscription = Pick<SubscriptionParams, "throttle" | "is_throttling" | "last_throttled" | "channel_name" | "is_ready" | "localFuncs" | "socket" | "socket_id" | "table_info" | "filter" | "params" | "table_rules"> & {
     triggers: {
         table_name: string;
         condition: string;
@@ -138,8 +139,8 @@ export declare class PubSubManager {
     static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID: string;
     prepareTriggers: () => Promise<boolean>;
     isReady(): any;
-    getSubs(table_name: string, condition: string, client?: Pick<Subscription, "func" | "socket_id">): Subscription[];
-    removeLocalSub(tableName: string, conditionRaw: string, func: (items: object[]) => any): void;
+    getSubs(table_name: string, condition: string, client?: Pick<Subscription, "localFuncs" | "socket_id">): Subscription[];
+    removeLocalSub(tableName: string, conditionRaw: string, localFuncs: LocalFuncs): void;
     getSyncs(table_name: string, condition: string): SyncParams[];
     notifListener: any;
     getSubData: (sub: Subscription) => Promise<{

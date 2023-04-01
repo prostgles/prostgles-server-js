@@ -22,6 +22,7 @@ import { DB_OBJ_NAMES } from "./getInitQuery";
 import { addSub } from "./addSub";
 import { notifListener } from "./notifListener";
 import { pushSubData } from "./pushSubData";
+import { LocalFuncs } from "../DboBuilder/subscribe";
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 const pgp: PGP = pgPromise({
@@ -108,7 +109,7 @@ export type SubscriptionParams = {
   filter: object;
   params: SelectParams;
 
-  func: undefined | ((data: any) => any);
+  localFuncs?: LocalFuncs;
   socket: PRGLIOSocket | undefined;
 
   throttle?: number;
@@ -130,7 +131,7 @@ export type Subscription = Pick<SubscriptionParams,
   | "last_throttled" 
   | "channel_name" 
   | "is_ready" 
-  | "func" 
+  | "localFuncs" 
   | "socket" 
   | "socket_id"
   | "table_info"
@@ -386,18 +387,18 @@ export class PubSubManager {
     return this.postgresNotifListenManager.isListening();
   } 
 
-  getSubs(table_name: string, condition: string, client?: Pick<Subscription, "func" | "socket_id">): Subscription[] { 
+  getSubs(table_name: string, condition: string, client?: Pick<Subscription, "localFuncs" | "socket_id">): Subscription[] { 
     const subs = this.subs.filter(s => find(s.triggers, { table_name, condition }));
     if(client){
-      return subs.filter(s => client.func && s.func === client.func || client.socket_id && s.socket_id === client.socket_id);
+      return subs.filter(s => client.localFuncs && s.localFuncs?.onData === client.localFuncs.onData || client.socket_id && s.socket_id === client.socket_id);
     }
     return subs;
   }
 
-  removeLocalSub(tableName: string, conditionRaw: string, func: (items: object[]) => any) {
+  removeLocalSub(tableName: string, conditionRaw: string, localFuncs: LocalFuncs) {
     const condition = parseCondition(conditionRaw);
-    if (this.getSubs(tableName, condition, { func }).length) {
-      this.subs = this.subs.filter(s => s.func !== func && !find(s.triggers, { tableName, condition }))
+    if (this.getSubs(tableName, condition, { localFuncs }).length) {
+      this.subs = this.subs.filter(s => s.localFuncs?.onData !== s.localFuncs?.onData && !find(s.triggers, { tableName, condition }))
     } else {
       console.error("Could not unsubscribe. Subscription might not have initialised yet", { tableName, condition })
     }

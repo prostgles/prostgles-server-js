@@ -3,7 +3,7 @@ import { log, PubSubManager, Subscription } from "./PubSubManager";
 export async function pushSubData(this: PubSubManager, sub: Subscription, err?: any) {
   if (!sub) throw "pushSubData: invalid sub";
 
-  const { socket_id, channel_name, func } = sub;  //, subOne = false 
+  const { socket_id, channel_name, localFuncs } = sub;  //, subOne = false 
   sub.last_throttled = Date.now();
 
   if (err) {
@@ -28,8 +28,8 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
         /* TO DO: confirm receiving data or server will unsubscribe
           { data }, (cb)=> { console.log(cb) });
         */
-      } else if (func) {
-        func(data);
+      } else if (localFuncs) {
+        localFuncs.onData(data);
         resolve(data);
       }
       sub.last_throttled = Date.now();
@@ -38,8 +38,8 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
       const errObj = { _err_msg: err.toString(), err };
       if (socket_id && this.sockets[socket_id]) {
         this.sockets[socket_id].emit(channel_name, { err: errObj });
-      } else if (func) {
-        func({ err: errObj });
+      } else if (localFuncs) {
+        localFuncs.onError?.(errObj);
       }
       reject(errObj);
     }

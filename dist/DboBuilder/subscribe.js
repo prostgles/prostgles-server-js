@@ -4,17 +4,17 @@ exports.subscribe = void 0;
 const DboBuilder_1 = require("../DboBuilder");
 const PubSubManager_1 = require("../PubSubManager/PubSubManager");
 const getSubscribeRelatedTables_1 = require("./getSubscribeRelatedTables");
-async function subscribe(filter, params, localFunc, table_rules, localParams) {
+async function subscribe(filter, params, localFuncs, table_rules, localParams) {
     try {
         // if (this.is_view) throw "Cannot subscribe to a view";
         if (this.t) {
             throw "subscribe not allowed within transactions";
         }
-        if (!localParams && !localFunc) {
+        if (!localParams && !localFuncs) {
             throw " missing data. provide -> localFunc | localParams { socket } ";
         }
-        if (localParams?.socket && localFunc) {
-            console.error({ localParams, localFunc });
+        if (localParams?.socket && localFuncs) {
+            console.error({ localParams, localFuncs });
             throw " Cannot have localFunc AND socket ";
         }
         const { filterFields, forcedFilter } = table_rules?.select || {}, filterOpts = await this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: undefined, localParams, tableRule: table_rules }), condition = filterOpts.where, throttle = params?.throttle || 0, selectParams = (0, PubSubManager_1.omitKeys)(params || {}, ["throttle"]);
@@ -43,12 +43,12 @@ async function subscribe(filter, params, localFunc, table_rules, localParams) {
             last_throttled: 0,
         };
         const pubSubManager = await this.dboBuilder.getPubSubManager();
-        if (!localFunc) {
+        if (!localFuncs) {
             const { socket } = localParams ?? {};
             return pubSubManager.addSub({
                 ...commonSubOpts,
                 socket,
-                func: undefined,
+                localFuncs: undefined,
                 socket_id: socket?.id,
             });
         }
@@ -56,12 +56,12 @@ async function subscribe(filter, params, localFunc, table_rules, localParams) {
             pubSubManager.addSub({
                 ...commonSubOpts,
                 socket: undefined,
-                func: localFunc,
+                localFuncs,
                 socket_id: undefined,
             });
             const unsubscribe = async () => {
                 const pubSubManager = await this.dboBuilder.getPubSubManager();
-                pubSubManager.removeLocalSub(this.name, condition, localFunc);
+                pubSubManager.removeLocalSub(this.name, condition, localFuncs);
             };
             const res = Object.freeze({ unsubscribe });
             return res;
