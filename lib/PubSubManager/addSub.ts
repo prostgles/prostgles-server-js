@@ -11,7 +11,7 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
   const {
     socket, localFuncs, table_rules, filter = {},
     params = {}, condition = "", throttle = 0,  //subOne = false, 
-    viewOptions, table_info,
+    viewOptions, table_info, throttleOpts,
   } = subscriptionParams || {};
   const table_name = table_info.name;
 
@@ -45,6 +45,7 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
     params,
     last_throttled: 0,
     socket,
+    throttleOpts,
     table_info,
     is_ready: true,
     is_throttling: false,
