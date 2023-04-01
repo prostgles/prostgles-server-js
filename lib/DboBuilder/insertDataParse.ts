@@ -65,9 +65,9 @@ export async function insertDataParse(
       }
       if (insertedCol) {
         return {
-          tableName: insertedCol.references![0].ftable!,
+          tableName: insertedCol.references![0]!.ftable!,
           col: insertedCol.name,
-          fcol: insertedCol.references![0].fcols[0]!
+          fcol: insertedCol.references![0]!.fcols[0]!
         }
       }
       return undefined;
@@ -145,11 +145,11 @@ export async function insertDataParse(
             }
           }
           const colRows = await referencedInsert(_this, dbTX, newLocalParams, colInsert.tableName, row[colInsert.col]);
-          if (!Array.isArray(colRows) || colRows.length !== 1 || [null, undefined].includes(colRows[0][colInsert.fcol])) {
+          if (!Array.isArray(colRows) || colRows.length !== 1 || [null, undefined].includes(colRows[0]![colInsert.fcol])) {
             throw new Error("Could not do nested column insert: Unexpected return " + JSON.stringify(colRows))
           }
 
-          const foreignKey = colRows[0][colInsert.fcol];
+          const foreignKey = colRows[0]![colInsert.fcol];
           rootData[colInsert.col] = foreignKey;
         }
       }
@@ -179,8 +179,8 @@ export async function insertDataParse(
         const [tbl1, tbl2, tbl3] = path;
         targetTableRules = await canInsert(this, targetTable, localParams);   //  tbl3
 
-        const cols2 = this.dboBuilder.dbo[tbl2].columns || [];
-        if (!this.dboBuilder.dbo[tbl2]) throw "Invalid/disallowed table: " + tbl2;
+        const cols2 = this.dboBuilder.dbo[tbl2!]!.columns || [];
+        if (!this.dboBuilder.dbo[tbl2!]) throw "Invalid/disallowed table: " + tbl2;
         const colsRefT1 = cols2?.filter(c => c.references?.some(rc => rc.cols.length === 1 && rc.ftable === tbl1));
 
 
@@ -196,7 +196,7 @@ export async function insertDataParse(
             childDataItems.map((d: AnyObject) => {
               const result = { ...d };
               colsRefT1.map(col => {
-                result[col.references![0].cols[0]] = fullRootResult[col.references![0].fcols[0]]
+                result[col.references![0]!.cols[0]!] = fullRootResult[col.references![0]!.fcols[0]!]
               })
               return result;
             }),
@@ -216,8 +216,8 @@ export async function insertDataParse(
 
           /* We expect tbl2 to have only 2 columns (media_id and foreign_id) */
           if (!cols2 || !(
-            cols2.filter(c => c.references?.[0].ftable === fileTable).length === 1 &&
-            cols2.filter(c => c.references?.[0].ftable === _this.name).length === 1
+            cols2.filter(c => c.references?.[0]?.ftable === fileTable).length === 1 &&
+            cols2.filter(c => c.references?.[0]?.ftable === _this.name).length === 1
           )) {
             console.log({ tbl1, tbl2, tbl3, name: _this.name, tthisName: this.name })
             throw "Second joining table (" + tbl2 + ")  not of expected format. Must contain exactly one reference column for each table (file table and target table)  ";
@@ -230,14 +230,14 @@ export async function insertDataParse(
             const tbl2Row: AnyObject = {};
 
             colsRefT3.map(col => {
-              tbl2Row[col.name] = t3Child[col.references![0].fcols[0]];
+              tbl2Row[col.name] = t3Child[col.references![0]!.fcols[0]!];
             })
             colsRefT1.map(col => {
-              tbl2Row[col.name] = fullRootResult[col.references![0].fcols[0]];
+              tbl2Row[col.name] = fullRootResult[col.references![0]!.fcols[0]!];
             })
             // console.log({ rootResult, tbl2Row, t3Child, colsRefT3, colsRefT1, t: this.t?.ctx?.start });
 
-            await childInsert(tbl2Row, tbl2);//.then(() => {});
+            await childInsert(tbl2Row, tbl2!);//.then(() => {});
           }));
 
         } else {
@@ -307,7 +307,9 @@ const referencedInsert = async (tableHandler: TableHandler, dbTX: TableHandlers 
   const thisInfo = await tableHandler.getInfo();
   await getJoinPath(tableHandler, targetTable);
 
-  if (!targetData || !dbTX?.[targetTable] || !("insert" in dbTX[targetTable])) throw new Error("childInsertErr: Table handler missing for referenced table: " + targetTable);
+  if (!targetData || !dbTX?.[targetTable] || !("insert" in dbTX[targetTable]!)) {
+    throw new Error("childInsertErr: Table handler missing for referenced table: " + targetTable);
+  }
 
   const childRules = await canInsert(tableHandler, targetTable, localParams);
 

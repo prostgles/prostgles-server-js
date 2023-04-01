@@ -214,7 +214,7 @@ const FTS_Funcs: FunctionSpec[] =
     singleColArg: true,
     numArgs: 2,
     getFields: ([column]) => [column],
-    getQuery: ({ allColumns, args, tableAlias }) => {
+    getQuery: ({ args }) => {
       const col = asName(args[0]);
       let qVal = args[1], qType = "to_tsquery";
       const _type = type? (asValue(type) + ",") : "";
@@ -226,7 +226,7 @@ const FTS_Funcs: FunctionSpec[] =
         const keys = Object.keys(qVal);
         if(!keys.length) throw "Bad arg";
         if(keys.length !==1 || !searchTypes.includes(keys[0] as any)) throw "Expecting a an object with a single key named one of: " + searchTypes.join(", ");
-        qType = keys[0];
+        qType = keys[0]!;
         qVal = asValue(qVal[qType]);
 
       /* 'search term' */

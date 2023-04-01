@@ -37,10 +37,10 @@ export class DBEventsManager {
 
     // console.log(36, { channel, payload },  Object.keys(this.notifies));
 
-    Object.keys(this.notifies)
+    getKeys(this.notifies)
       .filter(ch => ch === channel)
       .map(ch => {
-        const sub = this.notifies[ch];
+        const sub = this.notifies[ch]!;
         
         sub.sockets.map(s => {
           s.emit(sub.socketChannel, payload)
@@ -113,11 +113,11 @@ export class DBEventsManager {
       }
 
     } else {
-      if(socket && !this.notifies[notifChannel].sockets.find(s => s.id === socket.id)) {
-        this.notifies[notifChannel].sockets.push(socket);
+      if(socket && !this.notifies[notifChannel]!.sockets.find(s => s.id === socket.id)) {
+        this.notifies[notifChannel]!.sockets.push(socket);
 
       } else if(func) {
-        this.notifies[notifChannel].localFuncs.push(func);
+        this.notifies[notifChannel]!.localFuncs.push(func);
       }
     }
 
@@ -137,11 +137,12 @@ export class DBEventsManager {
   }
 
   removeNotify(channel?: string, socket?: PRGLIOSocket, func?: any){
-    if(channel && this.notifies[channel]){
+    const notifChannel = channel && this.notifies[channel]
+    if(notifChannel){
       if(socket){
-        this.notifies[channel].sockets = this.notifies[channel].sockets.filter(s => s.id !== socket.id);
+        notifChannel.sockets = notifChannel.sockets.filter(s => s.id !== socket.id);
       } else if(func){
-        this.notifies[channel].localFuncs = this.notifies[channel].localFuncs.filter(f => f !== func);
+        notifChannel.localFuncs = notifChannel.localFuncs.filter(f => f !== func);
       }
 
       /* UNLISTEN if no listeners ?? */
@@ -149,7 +150,7 @@ export class DBEventsManager {
 
     if(socket){
       getKeys(this.notifies).forEach(channel => {
-        this.notifies[channel].sockets = this.notifies[channel].sockets.filter(s => s.id !== socket.id);
+        this.notifies[channel]!.sockets = this.notifies[channel]!.sockets.filter(s => s.id !== socket.id);
       })
     }
   }

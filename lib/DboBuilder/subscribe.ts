@@ -1,4 +1,4 @@
-import { AnyObject, SubscribeParams } from "prostgles-types";
+import { AnyObject, SubscribeParams, SubscriptionChannels } from "prostgles-types";
 import { Filter, LocalParams, parseError } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 import { omitKeys } from "../PubSubManager/PubSubManager"; 
@@ -8,8 +8,8 @@ import { getSubscribeRelatedTables } from "./getSubscribeRelatedTables";
 export type LocalFunc = (items: AnyObject[]) => any;
 
 async function subscribe(this: ViewHandler, filter: Filter, params: SubscribeParams, localFunc: LocalFunc): Promise<{ unsubscribe: () => any }> 
-async function subscribe(this: ViewHandler, filter: Filter, params: SubscribeParams, localFunc: undefined, table_rules: TableRule | undefined, localParams: LocalParams): Promise<string>
-async function subscribe(this: ViewHandler, filter: Filter, params: SubscribeParams, localFunc?: LocalFunc, table_rules?: TableRule, localParams?: LocalParams): Promise<{ unsubscribe: () => any } | string> 
+async function subscribe(this: ViewHandler, filter: Filter, params: SubscribeParams, localFunc: undefined, table_rules: TableRule | undefined, localParams: LocalParams): Promise<SubscriptionChannels>
+async function subscribe(this: ViewHandler, filter: Filter, params: SubscribeParams, localFunc?: LocalFunc, table_rules?: TableRule, localParams?: LocalParams): Promise<{ unsubscribe: () => any } | SubscriptionChannels> 
 {
  
   try {
@@ -60,27 +60,26 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
       last_throttled: 0,
     } as const;
 
+    const pubSubManager = await this.dboBuilder.getPubSubManager();
     if (!localFunc) {    
 
       const { socket } = localParams ?? {};
-      const pubSubManager = await this.dboBuilder.getPubSubManager();
       return pubSubManager.addSub({
         ...commonSubOpts,
         socket, 
         func: undefined,
         socket_id: socket?.id, 
-      }).then(channelName => ({ channelName })) as any;
-      
+      });
+
     } else {
 
-      const pubSubManager = await this.dboBuilder.getPubSubManager();
       pubSubManager.addSub({ 
         ...commonSubOpts,
         socket: undefined,  
         func: localFunc, 
         socket_id: undefined, 
-      }).then(channelName => ({ channelName }));
-
+      });
+      
       const unsubscribe = async () => {
         const pubSubManager = await this.dboBuilder.getPubSubManager();
         pubSubManager.removeLocalSub(this.name, condition, localFunc)

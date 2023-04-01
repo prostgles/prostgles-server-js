@@ -77,7 +77,7 @@ class ColSet {
        * Add conversion functions for PostGIS data
        */
       let escapedVal = "";
-      if (["geometry", "geography"].includes(col.udt_name) && row[key] && isPlainObject(row[key])) {
+      if (["geometry", "geography"].includes(col.udt_name) && isObject(row[key])) {
 
         const basicFunc = (args: any[]) => {
           return args.map(arg => asValue(arg)).join(", ")
@@ -86,13 +86,14 @@ class ColSet {
         type ConvertionFunc =  { name: string; getQuery: (args: any[]) => string; }
         const convertionFuncs: ConvertionFunc[] = [
           ...[
-          "ST_GeomFromText", 
-          "ST_Point",
-          "ST_MakePoint",
-          "ST_MakePointM",
-          "ST_PointFromText",
-          "ST_GeomFromEWKT",
-          "ST_GeomFromGeoJSON"].map(name => ({
+            "ST_GeomFromText", 
+            "ST_Point",
+            "ST_MakePoint",
+            "ST_MakePointM",
+            "ST_PointFromText",
+            "ST_GeomFromEWKT",
+            "ST_GeomFromGeoJSON"
+          ].map(name => ({
             name, 
             getQuery: () => `${name}(${basicFunc(funcArgs)})`
           })),
@@ -103,7 +104,7 @@ class ColSet {
         ];
 
         const dataKeys = Object.keys(row[key]);
-        const funcName = dataKeys[0];
+        const funcName = dataKeys[0]!;
         const func = convertionFuncs.find(f => f.name === funcName); 
         const funcArgs = row[key]?.[funcName]
         if (dataKeys.length !== 1 || !func || !Array.isArray(funcArgs)) {
@@ -287,10 +288,10 @@ export class ViewHandler {
       return on.map(cond => Object.keys(cond).map(lKey => `${leftTable}.${lKey} = ${rightTable}.${cond[lKey]}`).join("\nAND ")).join(" OR ")
     }
 
-    let toOne = true;
+    // let toOne = true;
     const query = this.joins.map(({ tables, on, type }, i) => {
         if (type.split("-")[1] === "many") {
-          toOne = false;
+          // toOne = false;
         }
         const tl = `tl${startAlias + i}`,
           tr = `tr${startAlias + i}`;
@@ -347,7 +348,7 @@ export class ViewHandler {
 
     /* Make the join chain info excluding root table */
     paths = (path || jp.path).slice(1).map((t2, i, arr) => {
-      const t1 = i === 0 ? source : arr[i - 1];
+      const t1 = i === 0 ? source : arr[i - 1]!;
 
       this.joins ??= this.dboBuilder.joins;
 
@@ -359,8 +360,8 @@ export class ViewHandler {
 
       jo.on.map(cond => {
         const condArr: [string, string][] = [];
-        Object.keys(cond).map(leftKey => {
-          const rightKey = cond[leftKey];
+        getKeys(cond).map(leftKey => {
+          const rightKey = cond[leftKey]!;
 
           /* Left table is joining on keys */
           if (jo.tables[0] === t1) {
@@ -857,7 +858,7 @@ export class ViewHandler {
     const isNotExists = ["$notExists", "$notExistsJoined"].includes(eConfig.existType);
 
     const { f2, tables, isJoined } = eConfig;
-    const t2 = tables[tables.length - 1];
+    const t2 = tables.at(-1)!;
 
     tables.forEach(t => {
       if (!this.dboBuilder.dbo[t]) throw { stack: ["prepareExistCondition()"], message: `Invalid or dissallowed table: ${t}` };
@@ -874,7 +875,7 @@ export class ViewHandler {
       let joinPaths: JoinInfo["paths"] = [];
       let expectOne = true;
       tables.map((t2, depth) => {
-        const t1 = depth ? tables[depth - 1] : thisTable;
+        const t1 = (depth ? tables[depth - 1] : thisTable)!;
         let exactPaths: string[] | undefined = [t1, t2];
 
         if (!depth && eConfig.shortestJoin) exactPaths = undefined;
@@ -889,9 +890,10 @@ export class ViewHandler {
       function makeJoin(joinInfo: JoinInfo, ji: number) {
         const { paths } = joinInfo;
         const jp = paths[ji];
+        if(!jp) throw "jp undef";
 
         // let prevTable = ji? paths[ji - 1].table : jp.source;
-        const table = paths[ji].table;
+        const table = jp.table;
         const tableAlias = asName(ji < paths.length - 1 ? `jd${ji}` : table);
         const prevTableAlias = asName(ji ? `jd${ji - 1}` : thisTable);
 
@@ -1024,8 +1026,8 @@ export class ViewHandler {
       if (_orderBy && !_orderBy.find(v => typeof v !== "string")) {
         /* [string] */
         _ob = _orderBy.map(key => ({ key, asc: true }));
-      } else if (_orderBy.find(v => isPlainObject(v) && Object.keys(v).length)) {
-        _ob = _orderBy.map(v => parseOrderObj(v, true)[0]);
+      } else if (_orderBy.find(v => isObject(v) && !isEmpty(v))) {
+        _ob = _orderBy.map(v => parseOrderObj(v, true)[0]!);
       } else return throwErr();
     } else return throwErr();
 
@@ -1090,7 +1092,7 @@ export class ViewHandler {
     /* If no limit then set as the lesser of (100, maxLimit) */
     // } else 
     if (_limit !== null && !Number.isInteger(_limit) && p.select.maxLimit !== null) {
-      _limit = [100, p.select.maxLimit].filter(Number.isInteger).sort((a, b) => a - b)[0];
+      _limit = [100, p.select.maxLimit].filter(Number.isInteger).sort((a, b) => a - b)[0]!;
     } else {
 
       /* If a limit higher than maxLimit specified throw error */

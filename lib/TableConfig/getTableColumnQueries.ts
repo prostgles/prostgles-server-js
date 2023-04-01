@@ -44,7 +44,7 @@ export const getTableColumnQueries = async ({ db, tableConf, tableName, tableHan
     }
 
     const columns = getKeys(tableConf.columns).filter(c => {
-      const colDef = tableConf.columns![c];
+      const colDef = tableConf.columns![c]!;
       /** Exclude NamedJoinColumn  */
       return typeof colDef === "string" || !("joinDef" in colDef)
     }) as string[];
@@ -52,7 +52,7 @@ export const getTableColumnQueries = async ({ db, tableConf, tableName, tableHan
     const colDefs: { name: string; def: string }[] = [];
     
     for await(const colName of columns) {
-      const colConf = tableConf.columns![colName];
+      const colConf = tableConf.columns![colName]!;
 
       /* Get column definition */
       const colDef = await getColumnDefinitionQuery({ colConf, column: colName, db, table: tableName });

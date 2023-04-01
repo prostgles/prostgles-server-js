@@ -32,7 +32,7 @@ export const getConstraintDefinitionQueries = ({ tableConf, tableName }: Args): 
     } else {
       const constraintNames = getKeys(tableConf.constraints);
       return constraintNames.map(constraintName => {
-        const _cnstr = constraints[constraintName];
+        const _cnstr = constraints[constraintName]!;
         const constraintDef = typeof _cnstr === "string"? _cnstr : `${_cnstr.type} (${_cnstr.content})`;
         
         /** Drop constraints with the same name */

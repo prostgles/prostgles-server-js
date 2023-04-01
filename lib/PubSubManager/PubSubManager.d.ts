@@ -142,7 +142,14 @@ export declare class PubSubManager {
     removeLocalSub(tableName: string, conditionRaw: string, func: (items: object[]) => any): void;
     getSyncs(table_name: string, condition: string): SyncParams[];
     notifListener: any;
-    pushSubData(sub: Subscription, err?: any): true | Promise<unknown>;
+    getSubData: (sub: Subscription) => Promise<{
+        data: any[];
+        err?: undefined;
+    } | {
+        data?: undefined;
+        err: any;
+    }>;
+    pushSubData: any;
     upsertSocket(socket: any): void;
     syncTimeout?: ReturnType<typeof setTimeout>;
     syncData(sync: SyncParams, clientData: ClientExpressData | undefined, source: "trigger" | "client"): Promise<void>;

@@ -17,7 +17,7 @@ export function validate<T>(obj: T, key: keyof T, rawFieldType: JSONB.FieldType)
   if ("type" in fieldType && fieldType.type) {
     if (typeof fieldType.type !== "string") {
       getKeys(fieldType.type).forEach(subKey => {
-        validate(val, subKey as any, (fieldType.type as JSONB.ObjectType["type"])[subKey])
+        validate(val, subKey as any, (fieldType.type as JSONB.ObjectType["type"])[subKey]!)
       });
     }
     err += fieldType.type;
@@ -35,7 +35,7 @@ export function validate<T>(obj: T, key: keyof T, rawFieldType: JSONB.FieldType)
 
 export function validateSchema<S extends JSONB.ObjectType["type"]>(schema: S, obj: JSONB.GetObjectType<S>, objName?: string, optional = false) {
   if ((!schema || isEmpty(schema)) && !optional) throw new Error(`Expecting ${objName} to be defined`);
-  getKeys(schema).forEach(k => validate(obj as any, k, schema[k]));
+  getKeys(schema).forEach(k => validate(obj as any, k, schema[k]!));
 }
 
 
@@ -67,7 +67,7 @@ export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpt
       const { type } = fieldType;
       const spacing = isOneOf ? " " : "  ";
       let objDef = ` {${spacing}` + getKeys(type).map(k => {
-        const fieldType = getFieldTypeObj(type[k]);
+        const fieldType = getFieldTypeObj(type[k]!);
         return `${spacing}${k}${fieldType.optional ? "?" : ""}: ` + addSemicolonIfMissing(getFieldType(fieldType, true, undefined, depth + 1));
       }).join(" ") + `${spacing}}`;
       if(!isOneOf){

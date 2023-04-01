@@ -17,7 +17,7 @@
     "resolveJsonModule": true,
     
     /** TODO */
-    "noUncheckedIndexedAccess": false,
+    "noUncheckedIndexedAccess": true,
     
     // "outFile": "bundle.js",
     // "moduleResolution": "node"

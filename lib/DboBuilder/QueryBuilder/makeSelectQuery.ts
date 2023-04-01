@@ -66,7 +66,7 @@ export function makeSelectQuery(
 
       // console.log(JSON.stringify({i, table, on, q1, q2}, null, 2));
 
-      const prevTable = i === 0? t1Alias : (paths[i - 1].table);
+      const prevTable = i === 0? t1Alias : (paths[i - 1]!.table);
       const thisAlias = getTableJoinAliasAsName(q2.tableAlias, table);
       
       const prevAlias =  i === 0? getTableAliasAsName(q1) : getTableJoinAliasAsName(q2.tableAlias, prevTable);

@@ -41,7 +41,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
     .join(" AND ")
   }
 
-  const fKey: string = fKeys[0];
+  const fKey: string = fKeys[0]!;
 
   /* Exists filter */
   if(EXISTS_KEYS.find(k => k in _f)){

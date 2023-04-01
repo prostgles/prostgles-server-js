@@ -1,3 +1,4 @@
+import { SubscriptionChannels } from "prostgles-types";
 import { BasicCallback, parseCondition, PubSubManager, Subscription, SubscriptionParams } from "./PubSubManager";
 
 type AddSubscriptionParams = SubscriptionParams & {
@@ -6,13 +7,12 @@ type AddSubscriptionParams = SubscriptionParams & {
 
 /* Must return a channel for socket */
 /* The distinct list of {table_name, condition} must have a corresponding trigger in the database */
-export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSubscriptionParams, "channel_name" | "parentSubParams">) {
+export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSubscriptionParams, "channel_name" | "parentSubParams">): Promise<SubscriptionChannels> {
   const {
     socket, func, table_rules, filter = {},
     params = {}, condition = "", throttle = 0,  //subOne = false, 
     viewOptions, table_info,
   } = subscriptionParams || {};
-  
   const table_name = table_info.name;
 
   if (!socket && !func) {
@@ -32,6 +32,11 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
   }
 
   const channel_name = `${this.socketChannelPreffix}.${table_name}.${JSON.stringify(filter)}.${JSON.stringify(params)}.${"m"}.sub`;
+  const result: SubscriptionChannels = {
+    channelName: channel_name,
+    channelNameReady: channel_name + ".ready",
+    channelNameUnsubscribe: channel_name + ".unsubscribe"
+  }
 
   this.upsertSocket(socket);
 
@@ -74,21 +79,27 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
 
   }
 
-  setTimeout(() => {
+  if(func){
     this.pushSubData(newSub);
-  }, 1);
 
-  if (socket) {
-    const chnUnsub = channel_name + "unsubscribe";
-    socket.removeAllListeners(chnUnsub);
-    socket.once(chnUnsub, (_data: any, cb: BasicCallback) => {
+  } else if (socket) {
+    const removeListeners = () => {
+      socket.removeAllListeners(channel_name);
+      socket.removeAllListeners(result.channelNameReady);
+      socket.removeAllListeners(result.channelNameUnsubscribe);
+    }
+    removeListeners();
+
+    socket.once(result.channelNameReady, () => {
+      this.pushSubData(newSub);
+    });
+    socket.once(result.channelNameUnsubscribe, (_data: any, cb: BasicCallback) => {
       const res = "ok";// this.onSocketDisconnected({ socket, subChannel: channel_name });
       this.subs = this.subs.filter(s => {
         const isMatch = s.socket && s.socket.id === socket.id && s.channel_name === channel_name;
         return !isMatch;
       });
-      socket.removeAllListeners(channel_name);
-      socket.removeAllListeners(chnUnsub);
+      removeListeners();
       cb(null, { res });
     });
   }
@@ -100,18 +111,15 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
     if (!viewOptions?.relatedTables.length) {
       throw "PubSubManager: view parent_tables missing";
     }
-    return channel_name;
+
+  } else {
+    await this.addTrigger({
+      table_name: table_info.name,
+      condition: parseCondition(condition),
+    });
   }
 
-  /* Just a table, add table + condition trigger */
-  // console.log(table_info, 202);
-
-  await this.addTrigger({
-    table_name: table_info.name,
-    condition: parseCondition(condition),
-  });
-
-  return channel_name;
+  return result;
 }
 
 // const _upsertSub = async function(

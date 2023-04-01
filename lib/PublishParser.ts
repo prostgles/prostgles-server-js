@@ -693,6 +693,7 @@ export class PublishParser {
 
             if (table_rules && Object.keys(table_rules).length) {
               schema[tableName] = {};
+              const tableSchema = schema[tableName]!;
               let methods: MethodKey[] = [];
               let tableInfo: TableInfo | undefined;
               let tableColumns: DBSchemaTable["columns"] | undefined;
@@ -705,10 +706,10 @@ export class PublishParser {
                 if (method === "sync" && table_rules[method]) {
 
                   /* Pass sync info */
-                  schema[tableName][method] = table_rules[method];
+                  tableSchema[method] = table_rules[method];
                 } else if ((table_rules as any)[method]) {
 
-                  schema[tableName][method] = {};
+                  tableSchema[method] = {};
 
                   /* Test for issues with the common table CRUD methods () */
                   if (TABLE_METHODS.includes(method as any)) {
@@ -720,7 +721,7 @@ export class PublishParser {
 
                     } catch (e) {
                       err = "INTERNAL PUBLISH ERROR";
-                      schema[tableName][method] = { err };
+                      tableSchema[method] = { err };
 
                       throw `publish.${tableName}.${method}: \n   -> ${e}`;
                     }

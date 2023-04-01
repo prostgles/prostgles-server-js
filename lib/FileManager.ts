@@ -202,7 +202,7 @@ export default class FileManager {
       const tableConfig = config.referencedTables?.[tableName];
 
       if(tableConfig && isObject(tableConfig) && tableConfig.referenceColumns[colName]){
-        const colConfig = tableConfig.referenceColumns[colName];
+        const colConfig = tableConfig.referenceColumns[colName]!;
         if(colConfig.maxFileSizeMB){
           const actualBufferSize = Buffer.byteLength(buffer);
           if((actualBufferSize/1e6) > colConfig.maxFileSizeMB){
@@ -551,7 +551,7 @@ export default class FileManager {
       if(!this.dbo[refTable]) throw `Referenced table (${refTable}) from fileTable.referencedTables prostgles init config does not exist`;
       const cols = await (this.dbo[refTable] as TableHandler).getColumns();
 
-      const tableConfig = referencedTables[refTable];
+      const tableConfig = referencedTables[refTable]!;
       if(typeof tableConfig !== "string"){
         
         for await (const colName of getKeys(tableConfig.referenceColumns)){
@@ -595,7 +595,7 @@ export default class FileManager {
           console.error(`Could not make link table for ${refTable}. ${pKeyFields} must have exactly one primary key column. Current pkeys: ${pKeyFields.map(f => f.name)}`);
         }
   
-        const pkField = pKeyFields[0];
+        const pkField = pKeyFields[0]!;
         const refType = referencedTables[refTable];
   
         if(!this.dbo[lookupTableName]){
@@ -612,7 +612,7 @@ export default class FileManager {
           console.log(`Created ${action}`);
   
         } else {
-          const cols = await this.dbo[lookupTableName].getColumns!();
+          const cols = await this.dbo[lookupTableName]!.getColumns!();
           const badCols = cols.filter(c => !c.references);
           await Promise.all(badCols.map(async badCol => {
             console.error(
@@ -741,7 +741,7 @@ export const getFileTypeFromFilename = (fileName: string): { mime: ALLOWED_CONTE
 
   if(nameParts.length < 2) return undefined;
 
-  const nameExt = nameParts[nameParts.length - 1].toLowerCase(),
+  const nameExt = nameParts.at(-1)!.toLowerCase(),
     mime = getKeys(CONTENT_TYPE_TO_EXT).find(k => (CONTENT_TYPE_TO_EXT[k] as readonly string[]).includes(nameExt));
 
   if(!mime) return undefined;

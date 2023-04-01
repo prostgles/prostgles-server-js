@@ -346,6 +346,7 @@ class PublishParser {
                     const table_rules = await this.getTableRules({ localParams: { socket }, tableName }, clientInfo);
                     if (table_rules && Object.keys(table_rules).length) {
                         schema[tableName] = {};
+                        const tableSchema = schema[tableName];
                         let methods = [];
                         let tableInfo;
                         let tableColumns;
@@ -355,10 +356,10 @@ class PublishParser {
                         await Promise.all(methods.filter(m => m !== "select").map(async (method) => {
                             if (method === "sync" && table_rules[method]) {
                                 /* Pass sync info */
-                                schema[tableName][method] = table_rules[method];
+                                tableSchema[method] = table_rules[method];
                             }
                             else if (table_rules[method]) {
-                                schema[tableName][method] = {};
+                                tableSchema[method] = {};
                                 /* Test for issues with the common table CRUD methods () */
                                 if (Prostgles_1.TABLE_METHODS.includes(method)) {
                                     let err = null;
@@ -368,7 +369,7 @@ class PublishParser {
                                     }
                                     catch (e) {
                                         err = "INTERNAL PUBLISH ERROR";
-                                        schema[tableName][method] = { err };
+                                        tableSchema[method] = { err };
                                         throw `publish.${tableName}.${method}: \n   -> ${e}`;
                                     }
                                 }

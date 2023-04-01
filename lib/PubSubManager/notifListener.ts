@@ -18,7 +18,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     if (this.onSchemaChange) {
       const [_, command, _event_type, query] = dataArr;
 
-      if (query) {
+      if (query && command) {
         this.onSchemaChange({ command, query })
       }
     }
@@ -37,6 +37,8 @@ export async function notifListener(this: PubSubManager, data: { payload: string
 
   const [_, table_name, op_name, condition_ids_str] = dataArr;
 
+
+  if(!table_name) throw "table_name undef";
   // const triggers = await this.db.any("SELECT * FROM prostgles.triggers WHERE table_name = $1 AND id IN ($2:csv)", [table_name, condition_ids_str.split(",").map(v => +v)]);
   // const conditions: string[] = triggers.map(t => t.condition);
   log("notifListener", dataArr.join("__"))
@@ -66,14 +68,14 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     const idxs = condition_ids_str.split(",").map(v => +v);
     const conditions = this._triggers[table_name]!.filter((c, i) => idxs.includes(i))
 
-    log("notifListener", { table_name, op_name, condition_ids_str, conditions }, this._triggers[table_name]);
+    // log("notifListener", this._triggers[table_name]);
 
     conditions.map(condition => {
 
       const subs = this.getSubs(table_name, condition);
       const syncs = this.getSyncs(table_name, condition);
 
-      log("notifListener", { table_name, condition, subs, syncs })
+      log("notifListener", subs.map(s => s.channel_name), syncs.map(s => s.channel_name))
 
       syncs.map((s) => {
         this.syncData(s, undefined, "trigger");

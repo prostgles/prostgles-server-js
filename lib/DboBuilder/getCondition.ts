@@ -35,7 +35,7 @@ export async function getCondition(
   const ERR = "Invalid exists filter. \nExpecting somethibng like: \n | { $exists: { tableName.tableName2: Filter } } \n  | { $exists: { \"**.tableName3\": Filter } }\n | { path: string[]; filter: AnyObject }"
   const SP_WILDCARD = "**";
   const exists: ExistsFilterConfig[] = getKeys(filter)
-    .filter(k => EXISTS_KEYS.includes(k as EXISTS_KEY) && Object.keys(filter[k] ?? {}).length)
+    .filter((k ): k is typeof EXISTS_KEYS[number] => EXISTS_KEYS.includes(k as EXISTS_KEY) && !!Object.keys(filter[k] ?? {}).length)
     .map(key => {
 
       const isJoined = key.toLowerCase().includes("join");
@@ -49,7 +49,7 @@ export async function getCondition(
       const dataKeys = Object.keys(filterValue);
       const isDetailed = dataKeys.length === 2 && dataKeys.every(key => ["path", "filter"].includes(key));
 
-      const firstKey = dataKeys[0];
+      const firstKey = dataKeys[0]!;
 
       /**
        * Prevent some errors with table names that contain "."

@@ -144,14 +144,21 @@ export declare class PubSubManager {
     notifListener: (data: {
         payload: string;
     }) => Promise<void>;
-    pushSubData(sub: Subscription, err?: any): true | Promise<unknown>;
+    getSubData: (sub: Subscription) => Promise<{
+        data: any[];
+        err?: undefined;
+    } | {
+        data?: undefined;
+        err: any;
+    }>;
+    pushSubData: (sub: Subscription, err?: any) => Promise<unknown>;
     upsertSocket(socket: any): void;
     syncTimeout?: ReturnType<typeof setTimeout>;
     syncData(sync: SyncParams, clientData: ClientExpressData | undefined, source: "trigger" | "client"): Promise<void>;
     addSync: (syncParams: AddSyncParams) => Promise<string>;
     addSub: (subscriptionParams: Omit<SubscriptionParams & {
         condition: string;
-    }, "channel_name" | "parentSubParams">) => Promise<string>;
+    }, "channel_name" | "parentSubParams">) => Promise<import("prostgles-types").SubscriptionChannels>;
     getActiveListeners: () => {
         table_name: string;
         condition: string;

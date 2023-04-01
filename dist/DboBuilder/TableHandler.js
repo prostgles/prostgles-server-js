@@ -61,11 +61,10 @@ class TableHandler extends ViewHandler_1.ViewHandler {
     async updateBatch(data, params, tableRules, localParams) {
         try {
             const queries = await Promise.all(data.map(async ([filter, data]) => await this.update(filter, data, { ...(params || {}), returning: undefined }, tableRules, { ...(localParams || {}), returnQuery: true })));
-            const keys = (data && data.length) ? Object.keys(data[0]) : [];
             return this.db.tx(t => {
                 const _queries = queries.map(q => t.none(q));
                 return t.batch(_queries);
-            }).catch(err => (0, DboBuilder_1.makeErrorFromPGError)(err, localParams, this, keys));
+            }).catch(err => (0, DboBuilder_1.makeErrorFromPGError)(err, localParams, this, []));
         }
         catch (e) {
             if (localParams && localParams.testRule)

@@ -342,8 +342,8 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      geog?: null | any;
-      geom?: null | any;
+      geog?: null | string;
+      geom?: null | string;
       id?: string;
     };
   };

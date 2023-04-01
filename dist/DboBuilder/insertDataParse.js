@@ -164,8 +164,8 @@ async function insertDataParse(data, param2, param3_unused, tableRules, _localPa
                         throw "Only media allowed to have nested inserts more than 2 tables apart";
                     }
                     /* We expect tbl2 to have only 2 columns (media_id and foreign_id) */
-                    if (!cols2 || !(cols2.filter(c => c.references?.[0].ftable === fileTable).length === 1 &&
-                        cols2.filter(c => c.references?.[0].ftable === _this.name).length === 1)) {
+                    if (!cols2 || !(cols2.filter(c => c.references?.[0]?.ftable === fileTable).length === 1 &&
+                        cols2.filter(c => c.references?.[0]?.ftable === _this.name).length === 1)) {
                         console.log({ tbl1, tbl2, tbl3, name: _this.name, tthisName: this.name });
                         throw "Second joining table (" + tbl2 + ")  not of expected format. Must contain exactly one reference column for each table (file table and target table)  ";
                     }
@@ -235,8 +235,9 @@ const getJoinPath = async (tableHandler, targetTable) => {
 const referencedInsert = async (tableHandler, dbTX, localParams, targetTable, targetData) => {
     const thisInfo = await tableHandler.getInfo();
     await getJoinPath(tableHandler, targetTable);
-    if (!targetData || !dbTX?.[targetTable] || !("insert" in dbTX[targetTable]))
+    if (!targetData || !dbTX?.[targetTable] || !("insert" in dbTX[targetTable])) {
         throw new Error("childInsertErr: Table handler missing for referenced table: " + targetTable);
+    }
     const childRules = await canInsert(tableHandler, targetTable, localParams);
     if (thisInfo.has_media === "one" && thisInfo.media_table_name === targetTable && Array.isArray(targetData) && targetData.length > 1) {
         throw "Constraint check fail: Cannot insert more than one record into " + JSON.stringify(targetTable);

@@ -58,43 +58,43 @@ exports.getDBSchema = getDBSchema;
 /** Type checks */
 (() => {
     const ddb = 1;
-    ddb.dwad.insert;
-    ddb.dwad.delete;
+    ddb.dwad?.insert;
+    ddb.dwad?.delete;
     const d = 1;
-    d.dwad.insert;
-    d.dwad.delete;
+    d.dwad?.insert;
+    d.dwad?.delete;
     const p = 1;
-    p.dbo.dwad.insert;
-    ddb.dwad.delete;
+    p.dbo.dwad?.insert;
+    ddb.dwad?.delete;
     (0, _1.default)({
         dbConnection: 1,
         publish: async (params) => {
-            const row = await params.dbo.dwadwa.find?.({});
+            const row = await params.dbo.dwadwa?.find?.({});
             return "*";
         },
         onReady: (dbo) => {
-            dbo.tdwa.find();
+            dbo.tdwa?.find();
         }
     });
     const auth = {
         sidKeyName: "sid_token",
         getUser: async (sid, db, _db) => {
-            db.dwadaw.find;
+            db.dwadaw?.find;
             return 1;
         }
     };
     /** Test the created schema */
     const c = 1;
-    const test = c;
+    const _test = c;
     const dbt = 1;
     dbt.tx(t => {
         t.tbl1.delete();
     });
     const db = 1;
     db.tx(t => {
-        t.wadwa.find();
+        t.wadwa?.find();
     });
-    const publish = () => {
+    const _publish = () => {
         const r = {
             tbl1: {
                 select: {
@@ -133,9 +133,9 @@ exports.getDBSchema = getDBSchema;
                 }
             }
         };
-        const res1 = r;
+        const _res1 = r;
         const p = 1;
-        p.dbo.dwadaw.find();
+        p.dbo.dwadaw?.find?.();
         return res;
     };
 });

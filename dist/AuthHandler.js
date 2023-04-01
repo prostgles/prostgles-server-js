@@ -16,7 +16,7 @@ class AuthHandler {
         };
         this.matchesRoute = (route, clientFullRoute) => {
             return route && clientFullRoute && (route === clientFullRoute ||
-                clientFullRoute.startsWith(route) && ["/", "?", "#"].includes(clientFullRoute[route.length]));
+                clientFullRoute.startsWith(route) && ["/", "?", "#"].includes(clientFullRoute[route.length] ?? ""));
         };
         this.isUserRoute = (pathname) => {
             const pubRoutes = [
@@ -398,9 +398,12 @@ class AuthHandler {
         else
             throw "socket OR httpReq missing from localParams";
         function parseCookieStr(cookie_str) {
-            if (!cookie_str || typeof cookie_str !== "string")
+            if (!cookie_str || typeof cookie_str !== "string") {
                 return {};
-            return cookie_str.replace(/\s/g, '').split(";").reduce((prev, current) => {
+            }
+            return cookie_str.replace(/\s/g, '')
+                .split(";")
+                .reduce((prev, current) => {
                 const [name, value] = current.split('=');
                 prev[name] = value;
                 return prev;

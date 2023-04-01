@@ -93,26 +93,26 @@ export type PublishFullyTyped<Schema = void> = Schema extends DBSchema? (
 (() => {
 
   const ddb: DBOFullyTyped = 1 as any;
-  ddb.dwad.insert!;
-  ddb.dwad.delete!;
+  ddb.dwad?.insert;
+  ddb.dwad?.delete;
 
   const d: DBOFullyTyped<undefined> = 1 as any;
-  d.dwad.insert!;
-  d.dwad.delete!;
+  d.dwad?.insert;
+  d.dwad?.delete;
 
   const p: PublishParams = 1 as any;
-  p.dbo.dwad.insert!;
-  ddb.dwad.delete!;
+  p.dbo.dwad?.insert;
+  ddb.dwad?.delete;
 
   prostgles({
     dbConnection: 1 as any,
     publish: async (params) => {
-      const row = await params.dbo.dwadwa.find?.({});
+      const row = await params.dbo.dwadwa?.find?.({});
       
       return "*" as const
     },
     onReady: (dbo) => {
-      dbo.tdwa.find!()
+      dbo.tdwa?.find!()
     }
   });
 
@@ -120,7 +120,7 @@ export type PublishFullyTyped<Schema = void> = Schema extends DBSchema? (
   const auth: Auth = {
     sidKeyName: "sid_token",
     getUser: async (sid, db, _db) => {
-      db.dwadaw.find;
+      db.dwadaw?.find;
       return 1 as any;
     }
   }
@@ -143,7 +143,7 @@ export type PublishFullyTyped<Schema = void> = Schema extends DBSchema? (
 
   /** Test the created schema */
   const c: S = 1 as any;
-  const test: DBSchema = c;
+  const _test: DBSchema = c;
   const dbt: DBOFullyTyped<S> = 1 as any;
 
   dbt.tx!(t => {
@@ -152,10 +152,10 @@ export type PublishFullyTyped<Schema = void> = Schema extends DBSchema? (
 
   const db: DBHandlerServer = 1 as any;
   db.tx!(t => {
-    t.wadwa.find!()
+    t.wadwa?.find!()
   });
   
-  const publish = (): PublishFullyTyped<S> => {
+  const _publish = (): PublishFullyTyped<S> => {
     const r = {
       tbl1: {
         select: {
@@ -194,11 +194,11 @@ export type PublishFullyTyped<Schema = void> = Schema extends DBSchema? (
         }
       }
     }
-    const res1: PublishFullyTyped = r
+    const _res1: PublishFullyTyped = r
   
     const p: PublishParams<undefined> = 1 as any;
   
-    p.dbo.dwadaw.find!();
+    p.dbo.dwadaw?.find?.();
   
     return res;
   }

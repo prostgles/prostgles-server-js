@@ -7,7 +7,7 @@
 import * as Bluebird from "bluebird"; 
 
 import * as pgPromise from 'pg-promise';
-import { canRunSQL, runSQL } from "./DboBuilder/runSQL";
+import { runSQL } from "./DboBuilder/runSQL";
 import pg = require('pg-promise/typescript/pg-subset');
 import {
   ColumnInfo, SQLOptions,
@@ -17,10 +17,9 @@ import {
   TableInfo as TInfo,
   SQLHandler,
   AnyObject,
-  SQLResult,
-  Select,
+  SQLResult, 
   JoinMaker,
-  isObject, isDefined, getKeys, ProstglesError, _PG_geometric, EXISTS_KEY
+  isObject, getKeys, ProstglesError, _PG_geometric, EXISTS_KEY
 } from "prostgles-types";
 
 export type SortItem = {
@@ -207,13 +206,13 @@ function snakify(str: string, capitalize = false): string {
 function canBeUsedAsIsInTypescript(str: string): boolean {
   if (!str) return false;
   const isAlphaNumericOrUnderline = str.match(/^[a-z0-9_]+$/i);
-  const startsWithCharOrUnderscore = str[0].match(/^[a-z_]+$/i);
+  const startsWithCharOrUnderscore = str[0]?.match(/^[a-z_]+$/i);
   return Boolean(isAlphaNumericOrUnderline && startsWithCharOrUnderscore);
 }
 
 export function escapeTSNames(str: string, capitalize = false): string {
   let res = str;
-  res = (capitalize ? str[0].toUpperCase() : str[0]) + str.slice(1);
+  res = (capitalize ? str[0]?.toUpperCase() : str[0]) + str.slice(1);
   if (canBeUsedAsIsInTypescript(res)) return res;
   return JSON.stringify(res);
 }
@@ -226,11 +225,6 @@ export type Aggregation = {
 };
 
 export type Filter = AnyObject | { $and: Filter[] } | { $or: Filter[] };
-
-type SelectFunc = {
-  alias: string;
-  getQuery: (alias: string, tableAlias?: string) => string;
-}
 
 export type JoinInfo = {
   expectOne?: boolean,
@@ -355,8 +349,9 @@ export function makeErrorFromPGError(err: any, localParams?: LocalParams, view?:
         (!allowedKeys || allowedKeys.includes(c.name)) &&
         constraint.conkey.includes(c.ordinal_position)
       );
-      if (cols.length) {
-        errObject.column = cols[0].name;
+      const [firstCol] = cols;
+      if (firstCol) {
+        errObject.column = firstCol.name;
         errObject.columns = cols.map(c => c.name);
       }
     }
@@ -590,16 +585,16 @@ export class DboBuilder {
       this.joinGraph = {};
       this.joins.forEach(({ tables }) => {
         const _t = tables.slice().sort(),
-          t1 = _t[0],
-          t2 = _t[1];
+          t1 = _t[0]!,
+          t2 = _t[1]!;
 
         if (t1 === t2) return;
 
         this.joinGraph![t1] ??= {};
-        this.joinGraph![t1][t2] = 1;
+        this.joinGraph![t1]![t2] = 1;
 
         this.joinGraph![t2] ??= {};
-        this.joinGraph![t2][t1] = 1;
+        this.joinGraph![t2]![t1] = 1;
       });
       const tables = Array.from(new Set(this.joins.flatMap(t => t.tables)));
       this.joinPaths = [];
@@ -734,9 +729,8 @@ export class DboBuilder {
         dbTX.sql = this.runSQL;
       }
       getKeys(dbTX).map(k => {
-        dbTX[k].dbTX = dbTX;
-      });
-
+        dbTX[k]!.dbTX = dbTX;
+      }); 
       dbTX.sql = (q, args, opts, localP) => this.runSQL(q, args, opts, { tx: { dbTX, t }, ...(localP ?? {}) })
 
       return cb(dbTX, t);
@@ -1315,7 +1309,7 @@ async function getInferredJoins2(schema: TableSchema[]): Promise<Join[]> {
     tov.columns.map(col => {
       if (col.references) {
         col.references.forEach(r => {
-          const joinCols = r.cols.map((c, i) => ({ col1: c, col2: r.fcols[i] }));
+          const joinCols = r.cols.map((c, i) => ({ col1: c, col2: r.fcols[i]! }));
           let type: Join["type"] = "one-many";
           const ftablePkeys = schema.find(_tov => _tov.name === r.ftable)?.columns.filter(fcol => fcol.is_pkey);
           if (ftablePkeys?.length && ftablePkeys.every(fkey => r.fcols.includes(fkey.name))) {

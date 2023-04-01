@@ -391,9 +391,9 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       this.config &&
       sourceTable in this.config &&
       this.config[sourceTable] &&
-      "columns" in this.config[sourceTable]
+      "columns" in this.config[sourceTable]!
     ) {
-      const td = this.config[sourceTable];
+      const td = this.config[sourceTable]!;
       if ("columns" in td && td.columns?.[targetTable]) {
         const cd = td.columns[targetTable];
         if (isObject(cd) && "joinDef" in cd) {
@@ -469,7 +469,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     /* Create lookup tables */
     getKeys(this.config).map(tableNameRaw => {
       const tableName = asName(tableNameRaw);
-      const tableConf = this.config![tableNameRaw];
+      const tableConf = this.config![tableNameRaw]!;
 
       if ("isLookupTable" in tableConf && Object.keys(tableConf.isLookupTable?.values).length) {
         const { dropIfExists = false, dropIfExistsCascade = false } = tableConf;
@@ -483,7 +483,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
         const rows = Object.keys(tableConf.isLookupTable?.values).map(id => ({ id, ...(tableConf.isLookupTable?.values[id]) }));
         if (isDropped || !this.dbo?.[tableNameRaw]) {
-          const columnNames = Object.keys(rows[0]).filter(k => k !== "id");
+          const columnNames = Object.keys(rows[0]!).filter(k => k !== "id");
           queries.push(
             `CREATE TABLE IF NOT EXISTS ${tableName} (
               id  TEXT PRIMARY KEY
@@ -506,7 +506,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
     /* Create/Alter columns */
     for await (const tableName of getKeys(this.config)){ 
-      const tableConf = this.config![tableName];
+      const tableConf = this.config![tableName]!;
       const tableHandler = this.dbo[tableName];
       
       /** These have already been created */
@@ -578,7 +578,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
             replace, 
             unique, concurrently,
             using, columns, where = ""
-          } = tableConf.indexes![indexName];
+          } = tableConf.indexes![indexName]!;
           if (replace || typeof replace !== "boolean" && tableConf.replaceUniqueIndexes) {
             queries.push(`DROP INDEX IF EXISTS ${asName(indexName)};`);
           }
@@ -617,7 +617,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
         // `, {}, { returnType: "rows" }) as { proname: string }[];
 
         getKeys(triggers).forEach(triggerFuncName => {
-          const trigger = triggers[triggerFuncName];
+          const trigger = triggers[triggerFuncName]!;
 
           const funcNameParsed = asName(triggerFuncName);
           

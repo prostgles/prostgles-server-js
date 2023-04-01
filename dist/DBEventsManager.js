@@ -13,7 +13,7 @@ class DBEventsManager {
         };
         this.onNotif = ({ channel, payload }) => {
             // console.log(36, { channel, payload },  Object.keys(this.notifies));
-            Object.keys(this.notifies)
+            (0, prostgles_types_1.getKeys)(this.notifies)
                 .filter(ch => ch === channel)
                 .map(ch => {
                 const sub = this.notifies[ch];
@@ -99,12 +99,13 @@ class DBEventsManager {
         };
     }
     removeNotify(channel, socket, func) {
-        if (channel && this.notifies[channel]) {
+        const notifChannel = channel && this.notifies[channel];
+        if (notifChannel) {
             if (socket) {
-                this.notifies[channel].sockets = this.notifies[channel].sockets.filter(s => s.id !== socket.id);
+                notifChannel.sockets = notifChannel.sockets.filter(s => s.id !== socket.id);
             }
             else if (func) {
-                this.notifies[channel].localFuncs = this.notifies[channel].localFuncs.filter(f => f !== func);
+                notifChannel.localFuncs = notifChannel.localFuncs.filter(f => f !== func);
             }
             /* UNLISTEN if no listeners ?? */
         }

@@ -201,7 +201,7 @@ export default class AuthHandler {
   matchesRoute = (route: string | undefined, clientFullRoute: string) => {
     return route && clientFullRoute && (
       route === clientFullRoute ||
-      clientFullRoute.startsWith(route) && ["/", "?", "#"].includes(clientFullRoute[route.length])
+      clientFullRoute.startsWith(route) && ["/", "?", "#"].includes(clientFullRoute[route.length] ?? "")
     )
   }
 
@@ -519,12 +519,17 @@ export default class AuthHandler {
     } else throw "socket OR httpReq missing from localParams";
 
     function parseCookieStr(cookie_str: string | undefined): any {
-      if (!cookie_str || typeof cookie_str !== "string") return {}
-      return cookie_str.replace(/\s/g, '').split(";").reduce<AnyObject>((prev, current) => {
-        const [name, value] = current.split('=');
-        prev[name] = value;
-        return prev
-      }, {});
+      if (!cookie_str || typeof cookie_str !== "string") {
+        return {}
+      }
+
+      return cookie_str.replace(/\s/g, '')
+        .split(";")
+        .reduce<AnyObject>((prev, current) => {
+          const [name, value] = current.split('=');
+          prev[name!] = value;
+          return prev;
+        }, {});
     }
   }
 

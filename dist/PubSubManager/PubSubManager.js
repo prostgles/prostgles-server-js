@@ -18,6 +18,7 @@ const util_1 = require("prostgles-types/dist/util");
 const getInitQuery_1 = require("./getInitQuery");
 const addSub_1 = require("./addSub");
 const notifListener_1 = require("./notifListener");
+const pushSubData_1 = require("./pushSubData");
 const pgp = pgPromise({
     promiseLib: Bluebird
 });
@@ -199,6 +200,21 @@ class PubSubManager {
             }
         };
         this.notifListener = notifListener_1.notifListener.bind(this);
+        this.getSubData = async (sub) => {
+            const { table_info, filter, params, table_rules } = sub; //, subOne = false 
+            const { name: table_name } = table_info;
+            if (!this.dbo?.[table_name]?.find) {
+                throw new Error(`1107 this.dbo.${table_name}.find`);
+            }
+            try {
+                const data = await this.dbo?.[table_name].find(filter, params, undefined, table_rules);
+                return { data };
+            }
+            catch (err) {
+                return { err };
+            }
+        };
+        this.pushSubData = pushSubData_1.pushSubData.bind(this);
         this.addSync = addSync_1.addSync.bind(this);
         this.addSub = addSub_1.addSub.bind(this);
         this.getActiveListeners = () => {
@@ -281,52 +297,6 @@ class PubSubManager {
     getSyncs(table_name, condition) {
         return (this.syncs || [])
             .filter((s) => s.table_name === table_name && s.condition === condition);
-    }
-    pushSubData(sub, err) {
-        if (!sub)
-            throw "pushSubData: invalid sub";
-        const { table_info, filter, params, table_rules, socket_id, channel_name, func } = sub; //, subOne = false 
-        const { name: table_name } = table_info;
-        sub.last_throttled = Date.now();
-        if (err) {
-            if (socket_id) {
-                this.sockets[socket_id].emit(channel_name, { err });
-            }
-            return true;
-        }
-        return new Promise(async (resolve, reject) => {
-            /* TODO: Retire subOne -> it's redundant */
-            // this.dbo[table_name][subOne? "findOne" : "find"](filter, params, null, table_rules)
-            if (!this.dbo?.[table_name]?.find) {
-                throw new Error(`1107 this.dbo.${table_name}.find`);
-            }
-            this.dbo?.[table_name]?.find?.(filter, params, undefined, table_rules)
-                .then(data => {
-                if (socket_id && this.sockets[socket_id]) {
-                    (0, exports.log)("Pushed " + data.length + " records to sub");
-                    this.sockets[socket_id].emit(channel_name, { data }, () => {
-                        resolve(data);
-                    });
-                    /* TO DO: confirm receiving data or server will unsubscribe
-                      { data }, (cb)=> { console.log(cb) });
-                    */
-                }
-                else if (func) {
-                    func(data);
-                    resolve(data);
-                }
-                sub.last_throttled = Date.now();
-            }).catch(err => {
-                const errObj = { _err_msg: err.toString(), err };
-                if (socket_id && this.sockets[socket_id]) {
-                    this.sockets[socket_id].emit(channel_name, { err: errObj });
-                }
-                else if (func) {
-                    func({ err: errObj });
-                }
-                reject(errObj);
-            });
-        });
     }
     upsertSocket(socket) {
         if (socket && !this.sockets[socket.id]) {

@@ -804,7 +804,7 @@ export class Prostgles {
             const clientInfo = await this.authHandler.getClientInfo({ socket });
             const valid_table_command_rules = await this.publishParser.getValidatedRequestRule({ tableName, command, localParams: { socket } }, clientInfo);
             if (valid_table_command_rules) {
-              const res = await this.dbo[tableName][command]!(param1, param2, param3, valid_table_command_rules, { socket, isRemoteRequest: true });
+              const res = await this.dbo[tableName]![command]!(param1, param2, param3, valid_table_command_rules, { socket, isRemoteRequest: true });
               cb(null, res);
             } else throw `Invalid OR disallowed request: ${tableName}.${command} `;
 
@@ -837,7 +837,7 @@ export class Prostgles {
               cb("Disallowed/missing method " + JSON.stringify(method));
             } else {
               try {
-                const methodDef = methods[method];
+                const methodDef = methods[method]!;
                 const onRun = (typeof methodDef === "function" || typeof (methodDef as any).then === "function")? (methodDef as Function) : methodDef.run;
                 const res = await onRun(...params);
                 cb(null, res);
@@ -919,7 +919,7 @@ export class Prostgles {
       if (this.opts.joins) {
         const _joinTables2 = this.dboBuilder.getJoinPaths()
           .filter(jp =>
-            ![jp.t1, jp.t2].find(t => !schema[t] || !schema[t].findOne)
+            ![jp.t1, jp.t2].find(t => !schema[t] || !schema[t]?.findOne)
           ).map(jp => [jp.t1, jp.t2].sort());
         _joinTables2.map(jt => {
           if (!joinTables2.find(_jt => _jt.join() === jt.join())) {

@@ -51,12 +51,12 @@ function canBeUsedAsIsInTypescript(str) {
     if (!str)
         return false;
     const isAlphaNumericOrUnderline = str.match(/^[a-z0-9_]+$/i);
-    const startsWithCharOrUnderscore = str[0].match(/^[a-z_]+$/i);
+    const startsWithCharOrUnderscore = str[0]?.match(/^[a-z_]+$/i);
     return Boolean(isAlphaNumericOrUnderline && startsWithCharOrUnderscore);
 }
 function escapeTSNames(str, capitalize = false) {
     let res = str;
-    res = (capitalize ? str[0].toUpperCase() : str[0]) + str.slice(1);
+    res = (capitalize ? str[0]?.toUpperCase() : str[0]) + str.slice(1);
     if (canBeUsedAsIsInTypescript(res))
         return res;
     return JSON.stringify(res);
@@ -81,8 +81,9 @@ function makeErrorFromPGError(err, localParams, view, allowedKeys) {
         if (constraint) {
             const cols = view.columns.filter(c => (!allowedKeys || allowedKeys.includes(c.name)) &&
                 constraint.conkey.includes(c.ordinal_position));
-            if (cols.length) {
-                errObject.column = cols[0].name;
+            const [firstCol] = cols;
+            if (firstCol) {
+                errObject.column = firstCol.name;
                 errObject.columns = cols.map(c => c.name);
             }
         }

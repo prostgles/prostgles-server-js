@@ -15,7 +15,7 @@ async function notifListener(data) {
     if (notifType === this.NOTIF_TYPE.schema) {
         if (this.onSchemaChange) {
             const [_, command, _event_type, query] = dataArr;
-            if (query) {
+            if (query && command) {
                 this.onSchemaChange({ command, query });
             }
         }
@@ -29,6 +29,8 @@ async function notifListener(data) {
         throw "notifListener: dataArr length < 3";
     }
     const [_, table_name, op_name, condition_ids_str] = dataArr;
+    if (!table_name)
+        throw "table_name undef";
     // const triggers = await this.db.any("SELECT * FROM prostgles.triggers WHERE table_name = $1 AND id IN ($2:csv)", [table_name, condition_ids_str.split(",").map(v => +v)]);
     // const conditions: string[] = triggers.map(t => t.condition);
     (0, PubSubManager_1.log)("notifListener", dataArr.join("__"));
@@ -50,11 +52,11 @@ async function notifListener(data) {
         this._triggers?.[table_name]?.length) {
         const idxs = condition_ids_str.split(",").map(v => +v);
         const conditions = this._triggers[table_name].filter((c, i) => idxs.includes(i));
-        (0, PubSubManager_1.log)("notifListener", { table_name, op_name, condition_ids_str, conditions }, this._triggers[table_name]);
+        // log("notifListener", this._triggers[table_name]);
         conditions.map(condition => {
             const subs = this.getSubs(table_name, condition);
             const syncs = this.getSyncs(table_name, condition);
-            (0, PubSubManager_1.log)("notifListener", { table_name, condition, subs, syncs });
+            (0, PubSubManager_1.log)("notifListener", subs.map(s => s.channel_name), syncs.map(s => s.channel_name));
             syncs.map((s) => {
                 this.syncData(s, undefined, "trigger");
             });

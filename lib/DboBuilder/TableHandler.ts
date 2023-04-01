@@ -73,12 +73,12 @@ export class TableHandler extends ViewHandler {
             { ...(localParams || {}), returnQuery: true }
           )
         )
-      );
-      const keys = (data && data.length) ? Object.keys(data[0]) : [];
+      ); 
+      
       return this.db.tx(t => {
         const _queries = queries.map(q => t.none(q as unknown as string))
         return t.batch(_queries)
-      }).catch(err => makeErrorFromPGError(err, localParams, this, keys));
+      }).catch(err => makeErrorFromPGError(err, localParams, this, []));
     } catch (e) {
       if (localParams && localParams.testRule) throw e;
       throw parseError(e, `dbo.${this.name}.update()`);

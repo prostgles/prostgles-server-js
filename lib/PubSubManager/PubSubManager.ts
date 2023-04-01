@@ -21,6 +21,7 @@ import { find } from "prostgles-types/dist/util";
 import { DB_OBJ_NAMES } from "./getInitQuery";
 import { addSub } from "./addSub";
 import { notifListener } from "./notifListener";
+import { pushSubData } from "./pushSubData";
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 const pgp: PGP = pgPromise({
@@ -409,54 +410,26 @@ export class PubSubManager {
 
   notifListener = notifListener.bind(this);
 
-
-  pushSubData(sub: Subscription, err?: any) {
-    if (!sub) throw "pushSubData: invalid sub";
-    const { table_info, filter, params, table_rules, socket_id, channel_name, func } = sub;  //, subOne = false 
+  getSubData = async (sub: Subscription): Promise<
+    { data: any[]; err?: undefined; } | 
+    { data?: undefined; err: any; }
+  > => {
+    const { table_info, filter, params, table_rules } = sub;  //, subOne = false 
     const { name: table_name } = table_info;
-    sub.last_throttled = Date.now();
-
-    if (err) {
-      if (socket_id) {
-        this.sockets[socket_id].emit(channel_name, { err });
-      }
-      return true;
+    
+    if (!this.dbo?.[table_name]?.find) {
+      throw new Error(`1107 this.dbo.${table_name}.find`);
     }
 
-    return new Promise(async (resolve, reject) => {
-      /* TODO: Retire subOne -> it's redundant */
-      // this.dbo[table_name][subOne? "findOne" : "find"](filter, params, null, table_rules)
-      if (!this.dbo?.[table_name]?.find) {
-        throw new Error(`1107 this.dbo.${table_name}.find`);
-      }
+    try {
+      const data = await this.dbo?.[table_name]!.find!(filter, params, undefined, table_rules)
+      return { data };
+    } catch(err){
+      return { err };
+    }
+  } 
 
-      this.dbo?.[table_name]?.find?.(filter, params, undefined, table_rules)
-        .then(data => {
-
-          if (socket_id && this.sockets[socket_id]) {
-            log("Pushed " + data.length + " records to sub")
-            this.sockets[socket_id].emit(channel_name, { data }, () => {
-              resolve(data);
-            });
-            /* TO DO: confirm receiving data or server will unsubscribe
-              { data }, (cb)=> { console.log(cb) });
-            */
-          } else if (func) {
-            func(data);
-            resolve(data);
-          }
-          sub.last_throttled = Date.now();
-        }).catch(err => {
-          const errObj = { _err_msg: err.toString(), err };
-          if (socket_id && this.sockets[socket_id]) {
-            this.sockets[socket_id].emit(channel_name, { err: errObj });
-          } else if (func) {
-            func({ err: errObj });
-          }
-          reject(errObj)
-        });
-    });
-  }
+  pushSubData = pushSubData.bind(this);
 
   upsertSocket(socket: any) {
     if (socket && !this.sockets[socket.id]) {

@@ -45,7 +45,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
           const keys = Object.keys(forcedData);
           if (keys.length) {
             const dataCols = keys.filter(k => this.column_names.includes(k));
-            const nestedInsertCols = keys.filter(k => !this.column_names.includes(k) && this.dboBuilder.dbo[k].insert);
+            const nestedInsertCols = keys.filter(k => !this.column_names.includes(k) && this.dboBuilder.dbo[k]?.insert);
             if(nestedInsertCols.length){
               throw `Nested insert not supported for forcedData rule: ${nestedInsertCols}`;
             }
