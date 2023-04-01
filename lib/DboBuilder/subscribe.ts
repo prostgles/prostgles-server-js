@@ -45,8 +45,7 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
     const { filterFields, forcedFilter } = table_rules?.select || {},
       filterOpts = await this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: undefined, localParams, tableRule: table_rules }),
       condition = filterOpts.where,
-      throttle = params?.throttle || 0,
-      selectParams = omitKeys(params || {}, ["throttle"]);
+      { throttle = 0, throttleOpts, ...selectParams } = params;
 
     /** app_triggers condition field has an index which limits it's value. 
      * TODO: use condition md5 hash 
@@ -73,7 +72,7 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
       filter: { ...filter },
       params: { ...selectParams },
       throttle,
-      throttleOpts: selectParams.throttleOpts,
+      throttleOpts,
       last_throttled: 0,
     } as const;
 
