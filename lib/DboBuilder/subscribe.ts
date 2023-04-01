@@ -89,7 +89,7 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
 
     } else {
 
-      pubSubManager.addSub({ 
+      const { channelName } = await pubSubManager.addSub({ 
         ...commonSubOpts,
         socket: undefined,  
         localFuncs, 
@@ -98,7 +98,7 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
       
       const unsubscribe = async () => {
         const pubSubManager = await this.dboBuilder.getPubSubManager();
-        pubSubManager.removeLocalSub(this.name, condition, localFuncs)
+        pubSubManager.removeLocalSub(channelName, localFuncs)
       };
       const res: { unsubscribe: () => any } = Object.freeze({ unsubscribe })
       return res;

@@ -279,8 +279,8 @@ class PubSubManager {
             throw "this.postgresNotifListenManager missing";
         return this.postgresNotifListenManager.isListening();
     }
-    getSubs(table_name, condition, client) {
-        const subs = this.subs.filter(s => (0, util_1.find)(s.triggers, { table_name, condition }));
+    getSubs(table_name, condition, client, onlyMain) {
+        const subs = this.subs.filter(s => (0, util_1.find)(s.triggers, { table_name, condition, ...(onlyMain ? { is_related: false } : {}) }));
         if (client) {
             return subs.filter(s => {
                 return (0, subscribe_1.matchesLocalFuncs)(client.localFuncs, s.localFuncs) || client.socket_id && s.socket_id === client.socket_id;
@@ -288,13 +288,14 @@ class PubSubManager {
         }
         return subs;
     }
-    removeLocalSub(tableName, conditionRaw, localFuncs) {
-        const condition = (0, exports.parseCondition)(conditionRaw);
-        if (this.getSubs(tableName, condition, { localFuncs }).length) {
-            this.subs = this.subs.filter(s => (0, subscribe_1.getOnDataFunc)(localFuncs) !== (0, subscribe_1.getOnDataFunc)(s.localFuncs) && !(0, util_1.find)(s.triggers, { tableName, condition }));
+    removeLocalSub(channelName, localFuncs) {
+        const matchingSubIdx = this.subs.findIndex(s => s.channel_name === channelName &&
+            (0, subscribe_1.getOnDataFunc)(localFuncs) === (0, subscribe_1.getOnDataFunc)(s.localFuncs));
+        if (matchingSubIdx > -1) {
+            this.subs.splice(matchingSubIdx, 1);
         }
         else {
-            console.error("Could not unsubscribe. Subscription might not have initialised yet", { tableName, condition });
+            console.error("Could not unsubscribe. Subscription might not have initialised yet", { channelName });
         }
     }
     getSyncs(table_name, condition) {

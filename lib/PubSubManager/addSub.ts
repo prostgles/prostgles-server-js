@@ -63,7 +63,7 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
     channelNameUnsubscribe: channel_name + ".unsubscribe"
   }
 
-  const [matchingSub] = this.getSubs(mainTrigger.table_name, mainTrigger.condition, newSub);
+  const [matchingSub] = this.getSubs(mainTrigger.table_name, mainTrigger.condition, newSub, true);
   if(matchingSub){
     console.error("Trying to add a duplicate sub for: ", channel_name);
     return result;

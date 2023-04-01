@@ -94,7 +94,7 @@ export type ViewSubscriptionOptions = ({
 export type SubscriptionParams = Pick<SubscribeParams, "throttle" | "throttleOpts"> & {
   socket_id?: string;
   channel_name: string;
-  
+
   /** 
    * If this is a view then an array with all related tables will be  
    * */
@@ -386,8 +386,8 @@ export class PubSubManager {
     return this.postgresNotifListenManager.isListening();
   } 
 
-  getSubs(table_name: string, condition: string, client?: Pick<Subscription, "localFuncs" | "socket_id">): Subscription[] { 
-    const subs = this.subs.filter(s => find(s.triggers, { table_name, condition }));
+  getSubs(table_name: string, condition: string, client: undefined | Pick<Subscription, "localFuncs" | "socket_id">, onlyMain: undefined | boolean): Subscription[] { 
+    const subs = this.subs.filter(s => find(s.triggers, { table_name, condition, ...(onlyMain? {  is_related: false } : {}) }));
     if(client){
       return subs.filter(s => {
         return matchesLocalFuncs(client.localFuncs, s.localFuncs) || client.socket_id && s.socket_id === client.socket_id
@@ -396,12 +396,15 @@ export class PubSubManager {
     return subs;
   }
 
-  removeLocalSub(tableName: string, conditionRaw: string, localFuncs: LocalFuncs) {
-    const condition = parseCondition(conditionRaw);
-    if (this.getSubs(tableName, condition, { localFuncs }).length) {
-      this.subs = this.subs.filter(s => getOnDataFunc(localFuncs) !== getOnDataFunc(s.localFuncs) && !find(s.triggers, { tableName, condition }))
+  removeLocalSub(channelName: string, localFuncs: LocalFuncs) {
+    const matchingSubIdx = this.subs.findIndex(s => 
+      s.channel_name === channelName && 
+      getOnDataFunc(localFuncs) === getOnDataFunc(s.localFuncs)
+    );
+    if (matchingSubIdx > -1) {
+      this.subs.splice(matchingSubIdx, 1);
     } else {
-      console.error("Could not unsubscribe. Subscription might not have initialised yet", { tableName, condition })
+      console.error("Could not unsubscribe. Subscription might not have initialised yet", { channelName })
     }
   }
 

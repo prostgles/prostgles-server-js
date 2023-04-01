@@ -28,7 +28,7 @@ async function notifListener(data) {
     if (dataArr.length < 3) {
         throw "notifListener: dataArr length < 3";
     }
-    const [_, table_name, op_name, condition_ids_str] = dataArr;
+    const [_, table_name, _op_name, condition_ids_str] = dataArr;
     if (!table_name)
         throw "table_name undef";
     // const triggers = await this.db.any("SELECT * FROM prostgles.triggers WHERE table_name = $1 AND id IN ($2:csv)", [table_name, condition_ids_str.split(",").map(v => +v)]);
@@ -40,7 +40,7 @@ async function notifListener(data) {
         const pref = "INTERNAL ERROR";
         console.error(`${pref}: condition_ids_str: ${condition_ids_str}`);
         this._triggers[table_name].map(c => {
-            const subs = this.getSubs(table_name, c);
+            const subs = this.getSubs(table_name, c, undefined, false);
             subs.map(s => {
                 this.pushSubData(s, pref + ". Check server logs. Schema might have changed");
             });
@@ -54,7 +54,7 @@ async function notifListener(data) {
         const conditions = this._triggers[table_name].filter((c, i) => idxs.includes(i));
         // log("notifListener", this._triggers[table_name]);
         conditions.map(condition => {
-            const subs = this.getSubs(table_name, condition);
+            const subs = this.getSubs(table_name, condition, undefined, false);
             const syncs = this.getSyncs(table_name, condition);
             (0, PubSubManager_1.log)("notifListener", subs.map(s => s.channel_name), syncs.map(s => s.channel_name));
             syncs.map((s) => {
