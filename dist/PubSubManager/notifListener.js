@@ -65,18 +65,19 @@ async function notifListener(data) {
                 sub.triggers.forEach(trg => {
                     if (this.dbo[trg.table_name] &&
                         sub.is_ready &&
-                        (sub.socket_id && this.sockets[sub.socket_id]) || sub.localFuncs) {
+                        (sub.socket_id && this.sockets[sub.socket_id] || sub.localFuncs)) {
                         const throttle = sub.throttle || 0;
                         if (sub.last_throttled <= Date.now() - throttle) {
+                            sub.last_throttled = Date.now();
                             /* It is assumed the policy was checked before this point */
                             this.pushSubData(sub);
-                            // sub.last_throttled = Date.now();
                         }
                         else if (!sub.is_throttling) {
                             (0, PubSubManager_1.log)("throttling sub");
                             sub.is_throttling = setTimeout(() => {
                                 (0, PubSubManager_1.log)("throttling finished. pushSubData...");
                                 sub.is_throttling = null;
+                                sub.last_throttled = Date.now();
                                 this.pushSubData(sub);
                             }, throttle); // sub.throttle);
                         }

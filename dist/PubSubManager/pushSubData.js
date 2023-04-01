@@ -8,7 +8,6 @@ async function pushSubData(sub, err) {
         throw "pushSubData: invalid sub";
     const { socket_id, channel_name } = sub; //, subOne = false 
     const localFuncs = (0, subscribe_1.parseLocalFuncs)(sub.localFuncs);
-    sub.last_throttled = Date.now();
     if (err) {
         if (socket_id) {
             this.sockets[socket_id].emit(channel_name, { err });
@@ -32,7 +31,7 @@ async function pushSubData(sub, err) {
                 localFuncs.onData(data);
                 resolve(data);
             }
-            sub.last_throttled = Date.now();
+            // sub.last_throttled = Date.now();
         }
         else {
             const errObj = { _err_msg: err.toString(), err };

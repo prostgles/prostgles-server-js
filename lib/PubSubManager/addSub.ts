@@ -121,10 +121,7 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
     }
 
   } else {
-    await this.addTrigger({
-      table_name: table_info.name,
-      condition: parseCondition(condition),
-    });
+    await this.addTrigger(mainTrigger);
   }
 
   return result;

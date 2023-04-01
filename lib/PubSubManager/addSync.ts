@@ -36,7 +36,7 @@ export async function addSync(this: PubSubManager, syncParams: AddSyncParams) {
       table_rules,
       throttle: Math.max(throttle || 0, table_rules?.sync?.throttle || 0),
       batch_size: table_rules?.sync?.batch_size || DEFAULT_SYNC_BATCH_SIZE,
-      last_throttled: 0,
+      // last_throttled: 0,
       socket_id: socket.id,
       is_sync: true,
       last_synced: 0,

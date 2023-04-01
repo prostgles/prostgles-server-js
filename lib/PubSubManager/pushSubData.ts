@@ -6,7 +6,6 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
 
   const { socket_id, channel_name } = sub;  //, subOne = false 
   const localFuncs = parseLocalFuncs(sub.localFuncs);
-  sub.last_throttled = Date.now();
 
   if (err) {
     if (socket_id) {
@@ -34,7 +33,7 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
         localFuncs.onData(data);
         resolve(data);
       }
-      sub.last_throttled = Date.now();
+      // sub.last_throttled = Date.now();
 
     } else {
       const errObj = { _err_msg: err.toString(), err };

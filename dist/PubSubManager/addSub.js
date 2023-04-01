@@ -99,10 +99,7 @@ async function addSub(subscriptionParams) {
         }
     }
     else {
-        await this.addTrigger({
-            table_name: table_info.name,
-            condition: (0, PubSubManager_1.parseCondition)(condition),
-        });
+        await this.addTrigger(mainTrigger);
     }
     return result;
 }
