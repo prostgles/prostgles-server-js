@@ -2,7 +2,7 @@
 import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
 import { TableOrViewInfo, TableInfo, DBHandlerServer, DboBuilder, PRGLIOSocket } from "../DboBuilder";
 import { DB } from "../Prostgles";
-import { SelectParams, FieldFilter, WAL, AnyObject } from "prostgles-types";
+import { SelectParams, FieldFilter, WAL, AnyObject, SubscribeParams } from "prostgles-types";
 import { ClientExpressData } from "../SyncReplication";
 import { TableRule } from "../PublishParser";
 import { LocalFuncs } from "../DboBuilder/subscribe";
@@ -59,7 +59,7 @@ export type ViewSubscriptionOptions = ({
         condition: string;
     }[];
 };
-export type SubscriptionParams = {
+export type SubscriptionParams = Pick<SubscribeParams, "throttle" | "throttleOpts"> & {
     socket_id?: string;
     channel_name: string;
     /**
@@ -73,7 +73,6 @@ export type SubscriptionParams = {
     params: SelectParams;
     localFuncs?: LocalFuncs;
     socket: PRGLIOSocket | undefined;
-    throttle?: number;
     last_throttled: number;
     is_throttling?: any;
     is_ready?: boolean;
@@ -87,7 +86,7 @@ export type PubSubManagerOptions = {
         query: string;
     }) => void;
 };
-export type Subscription = Pick<SubscriptionParams, "throttle" | "is_throttling" | "last_throttled" | "channel_name" | "is_ready" | "localFuncs" | "socket" | "socket_id" | "table_info" | "filter" | "params" | "table_rules"> & {
+export type Subscription = Pick<SubscriptionParams, "throttle" | "is_throttling" | "last_throttled" | "throttleOpts" | "channel_name" | "is_ready" | "localFuncs" | "socket" | "socket_id" | "table_info" | "filter" | "params" | "table_rules"> & {
     triggers: {
         table_name: string;
         condition: string;
@@ -157,7 +156,24 @@ export declare class PubSubManager {
     syncTimeout?: ReturnType<typeof setTimeout>;
     syncData(sync: SyncParams, clientData: ClientExpressData | undefined, source: "trigger" | "client"): Promise<void>;
     addSync: (syncParams: AddSyncParams) => Promise<string>;
-    addSub: (subscriptionParams: Omit<SubscriptionParams & {
+    addSub: (subscriptionParams: Omit<Pick<SubscribeParams<any>, "throttle" | "throttleOpts"> & {
+        socket_id?: string | undefined;
+        channel_name: string;
+        /**
+         * If this is a view then an array with all related tables will be
+         * */
+        viewOptions?: ViewSubscriptionOptions | undefined;
+        parentSubParams: Omit<SubscriptionParams, "parentSubParams"> | undefined;
+        table_info: TableOrViewInfo;
+        table_rules?: TableRule<AnyObject, void> | undefined;
+        filter: object;
+        params: SelectParams<any>;
+        localFuncs?: LocalFuncs | undefined;
+        socket: PRGLIOSocket | undefined;
+        last_throttled: number;
+        is_throttling?: any;
+        is_ready?: boolean | undefined;
+    } & {
         condition: string;
     }, "channel_name" | "parentSubParams">) => Promise<import("prostgles-types").SubscriptionChannels>;
     getActiveListeners: () => {

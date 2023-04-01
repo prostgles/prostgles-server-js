@@ -54,6 +54,7 @@ async function subscribe(filter, params, localFuncs, table_rules, localParams) {
             filter: { ...filter },
             params: { ...selectParams },
             throttle,
+            throttleOpts: selectParams.throttleOpts,
             last_throttled: 0,
         };
         const pubSubManager = await this.dboBuilder.getPubSubManager();

@@ -13,7 +13,7 @@ import * as Bluebird from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg from 'pg-promise/typescript/pg-subset';
 
-import { SelectParams, FieldFilter, asName, WAL, AnyObject } from "prostgles-types";
+import { SelectParams, FieldFilter, asName, WAL, AnyObject, SubscribeParams } from "prostgles-types";
 
 import { ClientExpressData, syncData } from "../SyncReplication";
 import { TableRule } from "../PublishParser";
@@ -91,11 +91,10 @@ export type ViewSubscriptionOptions = ({
   }[];
 }
 
-export type SubscriptionParams = {
+export type SubscriptionParams = Pick<SubscribeParams, "throttle" | "throttleOpts"> & {
   socket_id?: string;
   channel_name: string;
-  // table_name: string;
-
+  
   /** 
    * If this is a view then an array with all related tables will be  
    * */
@@ -112,7 +111,6 @@ export type SubscriptionParams = {
   localFuncs?: LocalFuncs;
   socket: PRGLIOSocket | undefined;
 
-  throttle?: number;
   last_throttled: number;
   is_throttling?: any;
   is_ready?: boolean; 
@@ -128,7 +126,8 @@ export type PubSubManagerOptions = {
 export type Subscription = Pick<SubscriptionParams, 
   | "throttle" 
   | "is_throttling" 
-  | "last_throttled" 
+  | "last_throttled"
+  | "throttleOpts" 
   | "channel_name" 
   | "is_ready" 
   | "localFuncs" 

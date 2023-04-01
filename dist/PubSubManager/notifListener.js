@@ -66,8 +66,8 @@ async function notifListener(data) {
                     if (this.dbo[trg.table_name] &&
                         sub.is_ready &&
                         (sub.socket_id && this.sockets[sub.socket_id] || sub.localFuncs)) {
-                        const throttle = sub.throttle || 0;
-                        if (sub.last_throttled <= Date.now() - throttle) {
+                        const { throttle = 0, throttleOpts } = sub;
+                        if (!throttleOpts?.skipFirst && sub.last_throttled <= Date.now() - throttle) {
                             sub.last_throttled = Date.now();
                             /* It is assumed the policy was checked before this point */
                             this.pushSubData(sub);

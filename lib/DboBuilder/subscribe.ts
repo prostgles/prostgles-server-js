@@ -73,6 +73,7 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
       filter: { ...filter },
       params: { ...selectParams },
       throttle,
+      throttleOpts: selectParams.throttleOpts,
       last_throttled: 0,
     } as const;
 
