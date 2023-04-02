@@ -26,8 +26,10 @@ export const getFutureTableSchema = async ({ columnDefs, tableName, constraintDe
     });
     await db.tx({ mode: txMode }, async t => {
 
-      /** To prevent deadlocks we use a random table name */
-      const tableEsc = asName(tableName.slice(0, 12) + (await t.oneOrNone(`SELECT md5(now()::text) as md5`)).md5); 
+      /** To prevent deadlocks we use a random table name -> Not feasible because named constraints cannot be recreated without dropping the existing ones from actual table */
+      // const tableEsc = asName(tableName.slice(0, 12) + (await t.oneOrNone(`SELECT md5(now()::text) as md5`)).md5); 
+      
+      const tableEsc = asName(tableName);
 
       const consQueries = constraintDefs.map(c => 
         `ALTER TABLE ${tableEsc} ADD ${c.name? ` CONSTRAINT ${asName(c.name)}` : ""} ${c.content};`
