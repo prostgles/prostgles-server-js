@@ -2,6 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getFutureTableSchema = void 0;
 const prostgles_types_1 = require("prostgles-types");
+const DboBuilder_1 = require("../DboBuilder");
+const { TransactionMode, isolationLevel } = DboBuilder_1.pgp.txMode;
 const getColumnDefinitionQuery_1 = require("./getColumnDefinitionQuery");
 const getConstraintDefinitionQueries_1 = require("./getConstraintDefinitionQueries");
 const getFutureTableSchema = async ({ columnDefs, tableName, constraintDefs = [], db }) => {
@@ -9,21 +11,11 @@ const getFutureTableSchema = async ({ columnDefs, tableName, constraintDefs = []
     let cols = [];
     const ROLLBACK = "Rollback";
     try {
-        await db.tx(async (t) => {
-            // const { v } = await t.one("SELECT md5(random()::text) as v");
-            // /** TODO: create all tables in a random new schema */
-            // const randomTableName = `prostgles_constr_${v}`;
-            // /* References are removed to avoid potential issues with ftables missing */
-            // const columnDefsWithoutReferences = columnDefs.map(cdef => {
-            //   const refIdx = cdef.toLowerCase().indexOf(" references ");
-            //   if(refIdx < 0) return cdef;
-            //   return cdef.slice(0, refIdx);
-            // });
-            // const query = `CREATE TABLE ${randomTableName} ( 
-            //     ${columnDefsWithoutReferences.join(",\n")}
-            //   );
-            //   ${alterQueries}
-            // `;
+        const txMode = new TransactionMode({
+            tiLevel: isolationLevel.serializable,
+            // deferrable: true
+        });
+        await db.tx({ mode: txMode }, async (t) => {
             const tableEsc = (0, prostgles_types_1.asName)(tableName);
             const consQueries = constraintDefs.map(c => `ALTER TABLE ${tableEsc} ADD ${c.name ? ` CONSTRAINT ${(0, prostgles_types_1.asName)(c.name)}` : ""} ${c.content};`).join("\n");
             const query = `

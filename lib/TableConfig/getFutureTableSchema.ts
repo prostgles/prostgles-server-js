@@ -1,6 +1,7 @@
 import { asName } from "prostgles-types";
+import { pgp } from "../DboBuilder";
 import { DB } from "../Prostgles";
-import { log } from "../PubSubManager/PubSubManager";
+const {TransactionMode, isolationLevel} = pgp.txMode;
 import { ColumnMinimalInfo, getTableColumns } from "./getColumnDefinitionQuery";
 import { ColConstraint, ConstraintDef, getColConstraints } from "./getConstraintDefinitionQueries";
 
@@ -20,27 +21,10 @@ export const getFutureTableSchema = async ({ columnDefs, tableName, constraintDe
   let cols: ColumnMinimalInfo[] = [];
   const ROLLBACK = "Rollback";
   try {
-    await db.tx(async t => {
-      // const { v } = await t.one("SELECT md5(random()::text) as v");
-
-      // /** TODO: create all tables in a random new schema */
-      // const randomTableName = `prostgles_constr_${v}`;
-
-      // /* References are removed to avoid potential issues with ftables missing */
-      // const columnDefsWithoutReferences = columnDefs.map(cdef => {
-      //   const refIdx = cdef.toLowerCase().indexOf(" references ");
-      //   if(refIdx < 0) return cdef;
-      //   return cdef.slice(0, refIdx);
-      // });
-
-      
-
-      // const query = `CREATE TABLE ${randomTableName} ( 
-      //     ${columnDefsWithoutReferences.join(",\n")}
-      //   );
-      //   ${alterQueries}
-      // `;
-
+    const txMode = new TransactionMode({
+      tiLevel: isolationLevel.serializable
+    });
+    await db.tx({ mode: txMode }, async t => {
       const tableEsc = asName(tableName); 
 
       const consQueries = constraintDefs.map(c => 

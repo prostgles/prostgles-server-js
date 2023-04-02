@@ -2,8 +2,7 @@ import { getKeys, asName as _asName, isObject, asName } from "prostgles-types";
 import { DB, DBHandlerServer } from "../Prostgles";
 import { validate_jsonb_schema_sql } from "../JSONBValidation/validate_jsonb_schema_sql";
 import { getColumnDefinitionQuery, getTableColumns } from "./getColumnDefinitionQuery";
-import { TableConfig } from "./TableConfig";
-import { log } from "../PubSubManager/PubSubManager";
+import { TableConfig } from "./TableConfig"; 
 import { getFutureTableSchema } from "./getFutureTableSchema";
 
 type Args = {
@@ -86,7 +85,7 @@ export const getTableColumnQueries = async ({ db, tableConf, tableName, tableHan
         } else if(newCol.nullable !== c.nullable){
           alteredColQueries.push(`${ALTERQ} ALTER COLUMN ${asName(c.column_name)} ${newCol.nullable? "SET" : "DROP"} NOT NULL;`)
         } else if(newCol.udt_name !== c.udt_name){
-          alteredColQueries.push(`${ALTERQ} ALTER COLUMN ${asName(c.column_name)} TYPE ${newCol.udt_name};`)
+          alteredColQueries.push(`${ALTERQ} ALTER COLUMN ${asName(c.column_name)} TYPE ${newCol.udt_name} USING ${asName(c.column_name)}::${newCol.udt_name};`)
         } else if(newCol.column_default !== c.column_default){
           const colConfig = colDefs.find(cd => cd.name === c.column_name);
           if(["serial", "bigserial"].some(t => colConfig?.def.toLowerCase().includes(` ${t}`)) && c.column_default?.toLowerCase().includes("nextval")){
