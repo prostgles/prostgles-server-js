@@ -38,14 +38,6 @@ const getFutureTableSchema = async ({ columnDefs, tableName, constraintDefs = []
             throw e;
         }
     }
-    cols = cols.map(c => ({
-        ...c,
-        table_name: tableName
-    }));
-    constraints = constraints.map(c => ({
-        ...c,
-        table_name: tableName
-    }));
     return { cols, constraints };
 };
 exports.getFutureTableSchema = getFutureTableSchema;

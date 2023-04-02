@@ -44,6 +44,7 @@ export const getFutureTableSchema = async ({ columnDefs, tableName, constraintDe
       `;
 
       await t.any(query);
+
       constraints = await getColConstraints({ db: t, table: tableName });
       cols = await getTableColumns({ db: t, table: tableName });
  
@@ -56,15 +57,6 @@ export const getFutureTableSchema = async ({ columnDefs, tableName, constraintDe
       throw e;
     }
   }
-
-  cols = cols.map(c => ({
-    ...c,
-    table_name: tableName
-  }));
-  constraints = constraints.map(c => ({
-    ...c,
-    table_name: tableName
-  }));
-
+  
   return { cols, constraints };
 }

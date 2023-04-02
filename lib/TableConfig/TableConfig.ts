@@ -416,8 +416,14 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     return undefined;
   }
 
+  initialising = false;
   async init() {
-    
+    if(this.initialising){
+      console.trace("TableConfig initialising clash");
+      log("TableConfig initialising clash")
+      return;
+    }
+    this.initialising = true;
     let queries: string[] = [];
     const makeQuery = (q: string[]) => q.map(v => v.trim().endsWith(";")? v : `${v};`).join("\n");
     const runQueries = async (_queries = queries) => {
@@ -435,7 +441,9 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       return 1;
     }
 
-    if (!this.config || !this.prostgles.pgp) throw "config or pgp missing";
+    if (!this.config || !this.prostgles.pgp){ 
+      throw "config or pgp missing";
+    }
 
     const MAX_IDENTIFIER_LENGTH = +(await this.db.one("SHOW max_identifier_length;") as any).max_identifier_length;
     if(!Number.isFinite(MAX_IDENTIFIER_LENGTH)) throw `Could not obtain a valid max_identifier_length`;
@@ -465,7 +473,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     }
 
     /* Create lookup tables */
-    getKeys(this.config).map(tableNameRaw => {
+    getKeys(this.config).forEach(tableNameRaw => {
       const tableName = asName(tableNameRaw);
       const tableConf = this.config![tableNameRaw]!;
 
@@ -499,12 +507,11 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
     if (queries.length) { 
       await runQueries(queries);
-      await this.prostgles.refreshDBO()
+      await this.prostgles.refreshDBO();
     }
 
     /* Create/Alter columns */
-    for await (const tableName of getKeys(this.config)){ 
-      const tableConf = this.config![tableName]!;
+    for await (const [tableName, tableConf] of Object.entries(this.config)){
       const tableHandler = this.dbo[tableName];
       
       /** These have already been created */
@@ -614,8 +621,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
         //   WHERE prorettype = 2279;
         // `, {}, { returnType: "rows" }) as { proname: string }[];
 
-        getKeys(triggers).forEach(triggerFuncName => {
-          const trigger = triggers[triggerFuncName]!;
+        Object.entries(triggers).forEach(([triggerFuncName, trigger]) => {
 
           const funcNameParsed = asName(triggerFuncName);
           
@@ -664,7 +670,10 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
         if(migrations){
           await this.db.any(`INSERT INTO ${migrations.table}(id, table_config) VALUES (${asValue(migrations.version)}, ${asValue(this.config)}) ON CONFLICT DO NOTHING;`)
         }
+        this.initialising = false;
       } catch(err: any){
+        this.initialising = false;
+
         console.error("TableConfig error: ", err);
         if(err.position){
           const pos = +err.position;
@@ -673,7 +682,6 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
           }
         }
         return Promise.reject(err);
-
       }
     }
   }

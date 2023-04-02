@@ -215,8 +215,9 @@ async function isomorphic(db) {
             t1: "a",
             t2: "b"
         });
-        if (!one)
+        if (!one) {
             throw "Row missing";
+        }
     });
     await tryRun("$unnest_words", async () => {
         const res = await db.various.find({}, { returnType: "values", select: { name: "$unnest_words" } });

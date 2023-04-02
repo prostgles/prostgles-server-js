@@ -210,7 +210,9 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       t1: "a",
       t2: "b"
     });
-    if(!one) throw "Row missing"
+    if(!one) {
+      throw "Row missing";
+    }
   });
 
   await tryRun("$unnest_words", async () => {
