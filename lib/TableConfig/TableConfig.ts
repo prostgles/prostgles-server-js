@@ -4,7 +4,7 @@ import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import { asValue, log } from "../PubSubManager/PubSubManager";
 import { getTableColumnQueries } from "./getTableColumnQueries";
 import { getFutureTableSchema } from "./getFutureTableSchema";
-import { ColConstraint, ConstraintDef, getColConstraints, getConstraintDefinitionQueries } from "./getConstraintDefinitionQueries";
+import { getColConstraints, getConstraintDefinitionQueries } from "./getConstraintDefinitionQueries";
 
 type ColExtraInfo = {
   min?: string | number;
@@ -417,9 +417,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
   }
 
   async init() {
-    // if("2".length){
-    //   throw await getFutureTableSchema({ db: this.db, columnDefs: ["id text primary key"], constraintDefs: [] });
-    // }
+    
     let queries: string[] = [];
     const makeQuery = (q: string[]) => q.map(v => v.trim().endsWith(";")? v : `${v};`).join("\n");
     const runQueries = async (_queries = queries) => {

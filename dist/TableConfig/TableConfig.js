@@ -129,9 +129,6 @@ class TableConfigurator {
         this.prostgles = prostgles;
     }
     async init() {
-        // if("2".length){
-        //   throw await getFutureTableSchema({ db: this.db, columnDefs: ["id text primary key"], constraintDefs: [] });
-        // }
         let queries = [];
         const makeQuery = (q) => q.map(v => v.trim().endsWith(";") ? v : `${v};`).join("\n");
         const runQueries = async (_queries = queries) => {

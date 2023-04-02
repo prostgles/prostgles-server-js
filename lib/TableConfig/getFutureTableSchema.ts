@@ -25,7 +25,9 @@ export const getFutureTableSchema = async ({ columnDefs, tableName, constraintDe
       tiLevel: isolationLevel.serializable
     });
     await db.tx({ mode: txMode }, async t => {
-      const tableEsc = asName(tableName); 
+
+      /** To prevent deadlocks we use a random table name */
+      const tableEsc = asName(tableName.slice(0, 12) + (await t.oneOrNone(`SELECT md5(now()::text) as md5`)).md5); 
 
       const consQueries = constraintDefs.map(c => 
         `ALTER TABLE ${tableEsc} ADD ${c.name? ` CONSTRAINT ${asName(c.name)}` : ""} ${c.content};`
@@ -37,7 +39,7 @@ export const getFutureTableSchema = async ({ columnDefs, tableName, constraintDe
           ${columnDefs.join(",\n")}
         );
         ${consQueries}
-      `
+      `;
 
       await t.any(query);
       constraints = await getColConstraints({ db: t, table: tableName });
@@ -52,6 +54,15 @@ export const getFutureTableSchema = async ({ columnDefs, tableName, constraintDe
       throw e;
     }
   }
+
+  cols = cols.map(c => ({
+    ...c,
+    table_name: tableName
+  }));
+  constraints = constraints.map(c => ({
+    ...c,
+    table_name: tableName
+  }));
 
   return { cols, constraints };
 }

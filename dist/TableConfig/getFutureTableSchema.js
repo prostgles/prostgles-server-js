@@ -12,11 +12,11 @@ const getFutureTableSchema = async ({ columnDefs, tableName, constraintDefs = []
     const ROLLBACK = "Rollback";
     try {
         const txMode = new TransactionMode({
-            tiLevel: isolationLevel.serializable,
-            // deferrable: true
+            tiLevel: isolationLevel.serializable
         });
         await db.tx({ mode: txMode }, async (t) => {
-            const tableEsc = (0, prostgles_types_1.asName)(tableName);
+            /** To prevent deadlocks we use a random table name */
+            const tableEsc = (0, prostgles_types_1.asName)(tableName.slice(0, 12) + (await t.oneOrNone(`SELECT md5(now()::text) as md5`)).md5);
             const consQueries = constraintDefs.map(c => `ALTER TABLE ${tableEsc} ADD ${c.name ? ` CONSTRAINT ${(0, prostgles_types_1.asName)(c.name)}` : ""} ${c.content};`).join("\n");
             const query = `
         DROP TABLE IF EXISTS ${tableEsc} CASCADE;
@@ -37,6 +37,14 @@ const getFutureTableSchema = async ({ columnDefs, tableName, constraintDefs = []
             throw e;
         }
     }
+    cols = cols.map(c => ({
+        ...c,
+        table_name: tableName
+    }));
+    constraints = constraints.map(c => ({
+        ...c,
+        table_name: tableName
+    }));
     return { cols, constraints };
 };
 exports.getFutureTableSchema = getFutureTableSchema;
