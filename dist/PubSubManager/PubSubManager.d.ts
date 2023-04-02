@@ -138,7 +138,8 @@ export declare class PubSubManager {
     static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID: string;
     prepareTriggers: () => Promise<boolean>;
     isReady(): any;
-    getSubs(table_name: string, condition: string, client: undefined | Pick<Subscription, "localFuncs" | "socket_id" | "channel_name">): Subscription[];
+    getClientSubs(client: Pick<Subscription, "localFuncs" | "socket_id" | "channel_name">): Subscription[];
+    getTriggerSubs(table_name: string, condition: string): Subscription[];
     removeLocalSub(channelName: string, localFuncs: LocalFuncs): void;
     getSyncs(table_name: string, condition: string): SyncParams[];
     notifListener: (data: {

@@ -22,9 +22,6 @@ export const validate_jsonb_schema_sql = `
 * ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
 */
 
-DROP FUNCTION IF EXISTS ${VALIDATE_SCHEMA_FUNCNAME}(jsonb_schema text, data jsonb, checked_path text[]) CASCADE;
---DROP FUNCTION IF EXISTS ${VALIDATE_SCHEMA_FUNCNAME}(jsonb_schema text, data jsonb, context JSONB, checked_path text[]);
-
 CREATE OR REPLACE FUNCTION ${VALIDATE_SCHEMA_FUNCNAME}(
   jsonb_schema TEXT, 
   data JSONB, 
