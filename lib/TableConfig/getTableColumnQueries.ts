@@ -50,7 +50,7 @@ export const getTableColumnQueries = async ({ db, tableConf, tableName, tableHan
 
     const colDefs: { name: string; def: string }[] = [];
     
-    for await(const colName of columns) {
+    for (const colName of columns) {
       const colConf = tableConf.columns![colName]!;
 
       /* Get column definition */

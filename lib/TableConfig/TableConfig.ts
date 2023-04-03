@@ -511,7 +511,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     }
 
     /* Create/Alter columns */
-    for await (const [tableName, tableConf] of Object.entries(this.config)){
+    for (const [tableName, tableConf] of Object.entries(this.config)){
       const tableHandler = this.dbo[tableName];
       
       /** These have already been created */
@@ -525,7 +525,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
  
       if(coldef){
         queries.push(coldef.fullQuery);
-      }
+      } 
  
       /** CONSTRAINTS */
       const constraintDefs = getConstraintDefinitionQueries({ tableName, tableConf: tableConf as any });
@@ -561,10 +561,13 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
         });
 
         /** Add remaining missing constraints */ 
-        futureCons.filter(nc => !currCons.some(c =>c.definition === nc.definition))
-        .forEach(c => { 
-          queries.push(`${ALTER_TABLE_Q} ADD ${c.definition};`)
-        });
+        futureCons
+          .filter(nc => 
+            !currCons.some(c =>c.definition === nc.definition)
+          )
+          .forEach(c => { 
+            queries.push(`${ALTER_TABLE_Q} ADD ${c.definition};`)
+          });
       }
 
 
@@ -578,12 +581,18 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
               [ TABLESPACE tablespace_name ]
               [ WHERE predicate ]
         */
-        getKeys(tableConf.indexes).map(indexName => {
-          const { 
+        Object.entries(tableConf.indexes).forEach(([
+          indexName, 
+          { 
+            columns, 
+            concurrently, 
             replace, 
-            unique, concurrently,
-            using, columns, where = ""
-          } = tableConf.indexes![indexName]!;
+            unique, 
+            using, 
+            where = "" 
+          }
+        ]) => {
+
           if (replace || typeof replace !== "boolean" && tableConf.replaceUniqueIndexes) {
             queries.push(`DROP INDEX IF EXISTS ${asName(indexName)};`);
           }
