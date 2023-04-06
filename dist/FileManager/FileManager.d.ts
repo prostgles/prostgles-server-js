@@ -2,10 +2,12 @@
 /// <reference types="node" />
 import { S3 } from 'aws-sdk';
 import * as stream from 'stream';
-import { DB, DBHandlerServer, ExpressApp, Prostgles } from './Prostgles';
+import { DB, DBHandlerServer, ExpressApp, Prostgles } from '../Prostgles';
 import { ALLOWED_CONTENT_TYPE, ALLOWED_EXTENSION, ValidatedColumnInfo } from 'prostgles-types';
+import AWS from 'aws-sdk';
+export declare const HOUR: number;
 export declare const asSQLIdentifier: (name: string, db: DB) => Promise<string>;
-type OnProgress = (progress: S3.ManagedUpload.Progress) => void;
+export type OnProgress = (progress: S3.ManagedUpload.Progress) => void;
 export type ImageOptions = {
     keepMetadata?: boolean;
     compression?: 
@@ -65,8 +67,7 @@ export type UploadedItem = {
      */
     content_length: number;
 };
-import AWS from 'aws-sdk';
-export default class FileManager {
+export declare class FileManager {
     static testCredentials: (accessKeyId: string, secretAccessKey: string) => Promise<import("aws-sdk/lib/request").PromiseResult<AWS.STS.GetCallerIdentityResponse, AWS.AWSError>>;
     s3Client?: S3;
     config: S3Config | LocalConfig;
@@ -75,33 +76,33 @@ export default class FileManager {
     get dbo(): DBHandlerServer;
     get db(): DB;
     tableName?: string;
-    private fileRoute?;
+    fileRoute?: string;
     get fileRouteExpress(): string;
     private checkInterval?;
     constructor(config: FileManager["config"], imageOptions?: ImageOptions);
     getFileStream(name: string): Promise<stream.Readable>;
     deleteFile(name: string): Promise<true | import("aws-sdk/lib/request").PromiseResult<S3.DeleteObjectOutput, AWS.AWSError>>;
-    parseFile(args: {
-        file: Buffer | string;
+    parseFile: (args: {
+        file: string | Buffer;
         fileName: string;
-        colName?: string;
-        tableName?: string;
-    }): Promise<{
-        mime: string | ALLOWED_CONTENT_TYPE;
-        ext: string | ALLOWED_EXTENSION;
+        colName?: string | undefined;
+        tableName?: string | undefined;
+    }) => Promise<{
+        mime: string;
+        ext: string;
     }>;
-    getFileUrl: (name: string) => string;
+    getLocalFileUrl: (name: string) => string;
     checkFreeSpace: (folderPath: string, fileSize?: number) => Promise<void>;
-    uploadStream: (name: string, mime: string, onProgress?: OnProgress, onError?: (error: any) => void, onEnd?: (item: UploadedItem) => void, expectedSizeBytes?: number) => stream.PassThrough;
-    private upload;
+    uploadStream: (name: string, mime: string, onProgress?: OnProgress | undefined, onError?: ((error: any) => void) | undefined, onEnd?: ((item: UploadedItem) => void) | undefined, expectedSizeBytes?: number | undefined) => stream.PassThrough;
+    upload: (file: string | Buffer | stream.PassThrough, name: string, mime: string, onProgress?: OnProgress | undefined) => Promise<UploadedItem>;
     uploadAsMedia: (params: {
         item: UploadItem;
         allowedExtensions?: Array<ALLOWED_EXTENSION>;
         dissallowedExtensions?: Array<ALLOWED_EXTENSION>;
         imageOptions?: ImageOptions;
     }) => Promise<UploadedItem>;
-    getFileS3URL(fileName: string, expiresInSeconds?: number): Promise<string>;
-    private parseSQLIdentifier;
+    getFileS3URL(fileName: string, expiresInSeconds?: number): Promise<string | undefined>;
+    parseSQLIdentifier: (name: string) => Promise<string>;
     getColInfo: (args: {
         tableName: string;
         colName: string;
@@ -113,13 +114,12 @@ export declare const removeExpressRoute: (app: ExpressApp | undefined, routePath
 export declare const getFileTypeFromFilename: (fileName: string) => {
     mime: ALLOWED_CONTENT_TYPE;
     ext: ALLOWED_EXTENSION | string;
-};
+} | undefined;
 export declare const getFileType: (file: Buffer | string, fileName: string) => Promise<{
     mime: ALLOWED_CONTENT_TYPE;
     ext: ALLOWED_EXTENSION;
 }>;
 export declare function bytesToSize(bytes: number): string;
-export {};
 /**
  *
  

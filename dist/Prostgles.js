@@ -7,7 +7,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.isSuperUser = exports.Prostgles = exports.JOIN_TYPES = exports.TABLE_METHODS = void 0;
 const promise = require("bluebird");
 const pgPromise = require("pg-promise");
-const FileManager_1 = require("./FileManager");
+const FileManager_1 = require("./FileManager/FileManager");
 const { version } = require('../package.json');
 const AuthHandler_1 = require("./AuthHandler");
 const TableConfig_1 = require("./TableConfig/TableConfig");
@@ -70,9 +70,12 @@ function getDbConnection(dbConnection, options, debugQueries = false, onNotice) 
     register(1114, parseTimestamp) // timestamp without time zone
     register(1184, parseTimestampTz) // timestamp with time zone
      */
-    pgp.pg.types.setTypeParser(1114, v => v); // timestamp without time zone
-    pgp.pg.types.setTypeParser(1184, v => v); // timestamp with time zone
-    pgp.pg.types.setTypeParser(1182, v => v); // date
+    // pgp.pg.types.setTypeParser(1114, v => v); // timestamp without time zone
+    // pgp.pg.types.setTypeParser(1184, v => v); // timestamp with time zone
+    // pgp.pg.types.setTypeParser(1182, v => v); // date
+    pgp.pg.types.setTypeParser(pgp.pg.types.builtins.TIMESTAMP, v => v); // timestamp without time zone
+    pgp.pg.types.setTypeParser(pgp.pg.types.builtins.TIMESTAMPTZ, v => v); // timestamp with time zone
+    pgp.pg.types.setTypeParser(pgp.pg.types.builtins.DATE, v => v); // date
     if (options) {
         Object.assign(pgp.pg.defaults, options);
     }
@@ -170,7 +173,7 @@ class Prostgles {
                 await this.refreshDBO();
                 if (!awsS3Config && !localConfig)
                     throw "fileTable missing param: Must provide awsS3Config OR localConfig";
-                this.fileManager = new FileManager_1.default(awsS3Config || localConfig, imageOptions);
+                this.fileManager = new FileManager_1.FileManager(awsS3Config || localConfig, imageOptions);
                 try {
                     await this.fileManager.init(this);
                 }

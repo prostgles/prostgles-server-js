@@ -6,7 +6,7 @@
 import * as promise from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import FileManager, { ImageOptions, LocalConfig, S3Config } from "./FileManager";
+import { FileManager, ImageOptions, LocalConfig, S3Config } from "./FileManager/FileManager";
 import { SchemaWatch } from "./SchemaWatch";
 
 const { version } = require('../package.json');
@@ -82,9 +82,13 @@ function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts |
   register(1114, parseTimestamp) // timestamp without time zone
   register(1184, parseTimestampTz) // timestamp with time zone
    */
-  pgp.pg.types.setTypeParser(1114, v => v); // timestamp without time zone
-  pgp.pg.types.setTypeParser(1184, v => v); // timestamp with time zone
-  pgp.pg.types.setTypeParser(1182, v => v); // date
+  // pgp.pg.types.setTypeParser(1114, v => v); // timestamp without time zone
+  // pgp.pg.types.setTypeParser(1184, v => v); // timestamp with time zone
+  // pgp.pg.types.setTypeParser(1182, v => v); // date
+  pgp.pg.types.setTypeParser(pgp.pg.types.builtins.TIMESTAMP, v => v); // timestamp without time zone
+  pgp.pg.types.setTypeParser(pgp.pg.types.builtins.TIMESTAMPTZ, v => v); // timestamp with time zone
+  pgp.pg.types.setTypeParser(pgp.pg.types.builtins.DATE, v => v); // date
+  
 
   if (options) {
     Object.assign(pgp.pg.defaults, options);
@@ -641,7 +645,7 @@ export class Prostgles {
         this.authHandler = new AuthHandler(this as any);
         await this.authHandler.init();
 
-        this.publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods, this.opts.publishRawSQL, this.dbo!, this.db, this as any);
+        this.publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods as any, this.opts.publishRawSQL, this.dbo!, this.db, this as any);
         this.dboBuilder.publishParser = this.publishParser;
 
         /* 4. Set publish and auth listeners */
@@ -749,7 +753,7 @@ export class Prostgles {
 
     if (!this.dbo) throw "dbo missing";
 
-    const publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods, this.opts.publishRawSQL, this.dbo, this.db!, this as any);
+    const publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods as any, this.opts.publishRawSQL, this.dbo, this.db!, this as any);
     this.publishParser = publishParser;
 
     if (!this.opts.io) return;

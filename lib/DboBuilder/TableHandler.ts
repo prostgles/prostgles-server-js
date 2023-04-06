@@ -181,7 +181,7 @@ export class TableHandler extends ViewHandler {
   } 
 
   /* External request. Cannot sync from server */
-  async sync(filter: Filter, params: SelectParams, param3_unused: undefined, table_rules: TableRule, localParams: LocalParams) {
+  async sync(filter: Filter, params: { select?: FieldFilter }, param3_unused: undefined, table_rules: TableRule, localParams: LocalParams) {
     if (!localParams) throw "Sync not allowed within the same server code";
     const { socket } = localParams;
     if (!socket) throw "INTERNAL ERROR: socket missing";
@@ -214,7 +214,7 @@ export class TableHandler extends ViewHandler {
         throw `INTERNAL ERROR: sync field missing from publish.${this.name}.select.fields`;
       }
       const select = this.getAllowedSelectFields(
-        (params || {})?.select || "*",
+        params?.select ?? "*",
         allowedSelect,
         false
       );

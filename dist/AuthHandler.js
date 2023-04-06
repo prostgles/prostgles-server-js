@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const prostgles_types_1 = require("prostgles-types");
-const FileManager_1 = require("./FileManager");
+const FileManager_1 = require("./FileManager/FileManager");
 class AuthHandler {
     constructor(prostgles) {
         this.routes = {

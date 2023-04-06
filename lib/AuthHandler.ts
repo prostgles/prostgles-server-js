@@ -2,7 +2,7 @@ import { Express, NextFunction, Request, Response } from "express";
 import { AnyObject, AuthGuardLocation, AuthGuardLocationResponse, CHANNELS, DBSchema } from "prostgles-types";
 import { LocalParams, PRGLIOSocket } from "./DboBuilder";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
-import { removeExpressRoute } from "./FileManager";
+import { removeExpressRoute } from "./FileManager/FileManager";
 import { DB, DBHandlerServer, ExpressApp, Prostgles } from "./Prostgles";
 type Awaitable<T> = T | Promise<T>;
 type AuthSocketSchema = {

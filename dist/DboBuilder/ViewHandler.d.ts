@@ -72,7 +72,7 @@ export declare class ViewHandler {
         rule: "update";
         filter: AnyObject;
         data: AnyObject;
-    } | undefined, _param3?: undefined, tableRules?: TableRule<AnyObject, void> | undefined, localParams?: LocalParams | undefined) => Promise<import("prostgles-types").ValidatedColumnInfo[]>;
+    } | undefined, _param3?: undefined, tableRules?: TableRule | undefined, localParams?: LocalParams | undefined) => Promise<import("prostgles-types").ValidatedColumnInfo[]>;
     getValidatedRules(tableRules?: TableRule, localParams?: LocalParams): ValidatedTableRules;
     find(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]>;
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
@@ -86,7 +86,7 @@ export declare class ViewHandler {
     subscribeOne(filter: Filter, params: SubscribeParams, localFunc: undefined, table_rules: TableRule, localParams: LocalParams): Promise<string>;
     count(filter?: Filter, param2_unused?: undefined, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<number>;
     size(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<string>;
-    getAllowedSelectFields(selectParams: FieldFilter<AnyObject> | undefined, allowed_cols: FieldFilter, allow_empty?: boolean): string[];
+    getAllowedSelectFields(selectParams: FieldFilter | undefined, allowed_cols: FieldFilter, allow_empty?: boolean): string[];
     /**
      * Parses group or simple filter
      */
@@ -102,7 +102,7 @@ export declare class ViewHandler {
         allowed_colnames: string[];
         tableAlias?: string | undefined;
         localParams?: LocalParams | undefined;
-        tableRules?: TableRule<AnyObject, void> | undefined;
+        tableRules?: TableRule | undefined;
     }) => Promise<{
         exists: ExistsFilterConfig[];
         condition: string;

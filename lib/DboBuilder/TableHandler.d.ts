@@ -1,5 +1,5 @@
 import pgPromise from "pg-promise";
-import { AnyObject, DeleteParams, FieldFilter, InsertParams, Select, SelectParams, UpdateParams } from "prostgles-types";
+import { AnyObject, DeleteParams, FieldFilter, InsertParams, Select, UpdateParams } from "prostgles-types";
 import { DboBuilder, Filter, LocalParams, TableHandlers, TableSchema } from "../DboBuilder";
 import { DB } from "../Prostgles";
 import { TableRule } from "../PublishParser";
@@ -36,7 +36,9 @@ export declare class TableHandler extends ViewHandler {
     delete(filter?: Filter, params?: DeleteParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
     remove(filter: Filter, params?: UpdateParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
     upsert(filter: Filter, newData: AnyObject, params?: UpdateParams, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
-    sync(filter: Filter, params: SelectParams, param3_unused: undefined, table_rules: TableRule, localParams: LocalParams): Promise<any>;
+    sync(filter: Filter, params: {
+        select?: FieldFilter;
+    }, param3_unused: undefined, table_rules: TableRule, localParams: LocalParams): Promise<any>;
 }
 export {};
 //# sourceMappingURL=TableHandler.d.ts.map

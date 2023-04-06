@@ -1,4 +1,4 @@
-import { AnyObject, FieldFilter, isDefined, UpdateParams } from "prostgles-types";
+import { AnyObject, FieldFilter, FullFilter, isDefined, UpdateParams } from "prostgles-types";
 import { Filter, LocalParams } from "../DboBuilder";
 import { TableRule, UpdateRule, ValidateRow, ValidateUpdateRow } from "../PublishParser";
 import { TableHandler } from "./TableHandler";
@@ -100,7 +100,7 @@ export async function parseUpdateRules(
       /** Pick dynamicFields.fields if matching filter */
       let matchedRule: Required<UpdateRule>["dynamicFields"][number] | undefined;
       for await (const dfRule of tableRules.update.dynamicFields) {
-        const match = await this.findOne({ $and: [finalUpdateFilter, dfRule.filter].filter(isDefined) });
+        const match = await this.findOne({ $and: ([finalUpdateFilter, dfRule.filter]  as AnyObject[]).filter(isDefined) });
 
         if (match) {
 

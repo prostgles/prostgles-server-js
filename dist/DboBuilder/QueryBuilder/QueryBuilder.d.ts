@@ -73,24 +73,29 @@ export declare function getNewQuery(_this: TableHandler, filter: Filter, selectP
     groupBy?: boolean | undefined;
     returnType?: "values" | "value" | "row" | "statement" | undefined;
 } & {
-    select?: import("prostgles-types").AnyObject | ("" | "*" | {
+    select?: ("" | "*" | {
         "*": 1;
-    }) | {
-        [x: string]: Record<string, any[]>;
-    } | Record<string, Record<string, any>> | import("prostgles-types").DetailedJoinSelect | ({
+    } | Record<string, Record<string, any>> | import("prostgles-types").DetailedJoinSelect | {
+        [x: string]: {
+            [x: string]: any[] | readonly any[];
+        };
+    } | ({
+        [x: string]: true | 1 | (string | {
+            [x: string]: any[] | readonly any[];
+        });
+        $rowhash?: (true | 1 | (string | {
+            [x: string]: any[] | readonly any[];
+        })) | undefined;
+    } & Record<string, true | 1 | (string | {
+        [x: string]: any[] | readonly any[];
+    })>) | {
         [x: string]: string | true | 1;
-    } & {
-        [x: string]: Record<string, any[]>;
-    }) | {
-        [x: string]: string | true | 1;
+        $rowhash?: string | true | 1 | undefined;
     } | {
         [x: string]: false | 0;
-    } | {
-        [key: string]: string | true | 1 | Record<string, any[]>;
-    } | {
-        [x: string]: false | 0;
-    } | undefined;
-    orderBy?: import("prostgles-types").OrderBy<any> | undefined;
+        $rowhash?: false | 0 | undefined;
+    } | string[]) | undefined;
+    orderBy?: import("prostgles-types")._OrderBy<import("prostgles-types").AnyObject> | undefined;
 } & {
     alias?: string | undefined;
 }) | undefined, param3_unused: null | undefined, tableRules: TableRule | undefined, localParams: LocalParams | undefined, columns: ColumnInfo[]): Promise<NewQuery>;

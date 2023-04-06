@@ -104,10 +104,11 @@ export type PublishFullyTyped<Schema = void> = Schema extends DBSchema? (
   p.dbo.dwad?.insert;
   ddb.dwad?.delete;
 
+  //@ts-ignore
   prostgles({
     dbConnection: 1 as any,
     publish: async (params) => {
-      const row = await params.dbo.dwadwa?.find?.({});
+      const _rows = await params.dbo.dwadwa?.find?.({});
       
       return "*" as const
     },
@@ -117,7 +118,7 @@ export type PublishFullyTyped<Schema = void> = Schema extends DBSchema? (
   });
 
 
-  const auth: Auth = {
+  const _auth: Auth = {
     sidKeyName: "sid_token",
     getUser: async (sid, db, _db) => {
       db.dwadaw?.find;

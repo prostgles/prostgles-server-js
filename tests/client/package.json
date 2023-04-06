@@ -13,10 +13,10 @@
   "license": "ISC",
   "dependencies": {
     "@types/node": "^14.14.16",
-    "prostgles-client": "^4.0.4",
+    "prostgles-client": "^4.0.7",
     "socket.io-client": "^4.6.1"
   },
   "devDependencies": {
-    "typescript": "^4.9.5"
+    "typescript": "^5.0.3"
   }
 }

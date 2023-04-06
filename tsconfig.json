@@ -22,6 +22,7 @@
     // "outFile": "bundle.js",
     // "moduleResolution": "node"
     "keyofStringsOnly": true,
+    "ignoreDeprecations": "5.0",
     "declaration": true,
     "declarationMap": true
   },

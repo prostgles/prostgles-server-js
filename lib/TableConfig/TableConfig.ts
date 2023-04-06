@@ -460,22 +460,27 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       const { onMigrate, version, versionTableName = "schema_version" } = this.prostgles.opts.tableConfigMigrations;
       await this.db.any(`CREATE TABLE IF NOT EXISTS ${asName(versionTableName)}(id NUMERIC PRIMARY KEY, table_config JSONB NOT NULL)`);
       migrations = { version, table: versionTableName  };
-      let existingVersion: number | undefined;
+      let latestVersion: number | undefined;
       try {
-        existingVersion = (await this.db.oneOrNone(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`)).v;
+        latestVersion = (await this.db.oneOrNone(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`)).v;
       } catch(e){
 
       }
 
-      if(!existingVersion || existingVersion < version){
-        await onMigrate({ db: this.db, oldVersion: existingVersion, getConstraints: (table, col, types) => getColConstraints({ db: this.db, table, column: col, types }) })
+      if (latestVersion === version) {
+        const isLatest = (await this.db.oneOrNone(`SELECT table_config = \${table_config} as v FROM ${asName(versionTableName)} WHERE id = \${version}`, { version, table_config: this.config })).v;
+        if(isLatest){
+          return;
+        }
+      }
+      if(!latestVersion || latestVersion < version){
+        await onMigrate({ db: this.db, oldVersion: latestVersion, getConstraints: (table, col, types) => getColConstraints({ db: this.db, table, column: col, types }) })
       }
     }
 
     /* Create lookup tables */
-    getKeys(this.config).forEach(tableNameRaw => {
+    for (const [tableNameRaw, tableConf] of Object.entries(this.config)){
       const tableName = asName(tableNameRaw);
-      const tableConf = this.config![tableNameRaw]!;
 
       if ("isLookupTable" in tableConf && Object.keys(tableConf.isLookupTable?.values).length) {
         const { dropIfExists = false, dropIfExistsCascade = false } = tableConf;
@@ -503,7 +508,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
           });
         }
       }      
-    });
+    }
 
     if (queries.length) { 
       await runQueries(queries);
@@ -525,7 +530,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
  
       if(coldef){
         queries.push(coldef.fullQuery);
-      } 
+      }
  
       /** CONSTRAINTS */
       const constraintDefs = getConstraintDefinitionQueries({ tableName, tableConf: tableConf as any });

@@ -355,12 +355,12 @@ class DboBuilder {
         return this.dbo;
     }
 }
-exports.DboBuilder = DboBuilder;
 _a = DboBuilder;
 DboBuilder.create = async (prostgles) => {
     const res = new DboBuilder(prostgles);
     return await res.init();
 };
+exports.DboBuilder = DboBuilder;
 async function getConstraints(db, schema = "public", filter) {
     return db.any(`
         SELECT rel.relname, con.conkey, con.conname, con.contype

@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import FileManager, { ImageOptions, LocalConfig, S3Config } from "./FileManager";
+import { FileManager, ImageOptions, LocalConfig, S3Config } from "./FileManager/FileManager";
 import { SchemaWatch } from "./SchemaWatch";
 import AuthHandler, { Auth, SessionUser, AuthRequestParams } from "./AuthHandler";
 import TableConfigurator, { TableConfig } from "./TableConfig/TableConfig";
@@ -265,7 +265,7 @@ export declare class Prostgles {
     /**
      * Will re-create the dbo object
      */
-    refreshDBO: () => Promise<DBHandlerServer<import("./DboBuilder").TableHandlers>>;
+    refreshDBO: () => Promise<DBHandlerServer>;
     private initWatchSchema;
     initFileTable: () => Promise<void>;
     isSuperUser: boolean;

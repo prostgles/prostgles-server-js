@@ -157,7 +157,7 @@ export declare class PubSubManager {
     syncTimeout?: ReturnType<typeof setTimeout>;
     syncData(sync: SyncParams, clientData: ClientExpressData | undefined, source: "trigger" | "client"): Promise<void>;
     addSync: (syncParams: AddSyncParams) => Promise<string>;
-    addSub: (subscriptionParams: Omit<Pick<SubscribeParams<any>, "throttle" | "throttleOpts"> & {
+    addSub: (subscriptionParams: Omit<Pick<SubscribeParams, "throttle" | "throttleOpts"> & {
         socket_id?: string | undefined;
         channel_name: string;
         /**
@@ -166,9 +166,9 @@ export declare class PubSubManager {
         viewOptions?: ViewSubscriptionOptions | undefined;
         parentSubParams: Omit<SubscriptionParams, "parentSubParams"> | undefined;
         table_info: TableOrViewInfo;
-        table_rules?: TableRule<AnyObject, void> | undefined;
+        table_rules?: TableRule | undefined;
         filter: object;
-        params: SelectParams<any>;
+        params: SelectParams;
         localFuncs?: LocalFuncs | undefined;
         socket: PRGLIOSocket | undefined;
         last_throttled: number;

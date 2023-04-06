@@ -369,7 +369,6 @@ class PubSubManager {
         }
     }
 }
-exports.PubSubManager = PubSubManager;
 _a = PubSubManager;
 PubSubManager.DELIMITER = '|$prstgls$|';
 //     ,datname
@@ -396,6 +395,7 @@ PubSubManager.create = async (options) => {
 };
 PubSubManager.SCHEMA_ALTERING_QUERIES = ['CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO'];
 PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from schema watch ";
+exports.PubSubManager = PubSubManager;
 const parseCondition = (condition) => condition && condition.trim().length ? condition : "TRUE";
 exports.parseCondition = parseCondition;
 var prostgles_types_2 = require("prostgles-types");

@@ -1,5 +1,5 @@
 import pgPromise from "pg-promise";
-import { AnyObject, DeleteParams, FieldFilter, InsertParams, Select, SelectParams, UpdateParams } from "prostgles-types";
+import { AnyObject, DeleteParams, FieldFilter, InsertParams, Select, UpdateParams } from "prostgles-types";
 import { DboBuilder, Filter, LocalParams, TableHandlers, TableSchema } from "../DboBuilder";
 import { DB } from "../Prostgles";
 import { TableRule } from "../PublishParser";
@@ -23,16 +23,16 @@ export declare class TableHandler extends ViewHandler {
     constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TableHandlers, joinPaths?: JoinPaths);
     willBatch(query: string): true | undefined;
     updateBatch(data: [Filter, AnyObject][], params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
-    parseUpdateRules: (filter: Filter, newData: AnyObject, params?: UpdateParams<any> | undefined, tableRules?: TableRule<AnyObject, void> | undefined, localParams?: LocalParams | undefined) => Promise<{
+    parseUpdateRules: (filter: Filter, newData: AnyObject, params?: UpdateParams | undefined, tableRules?: TableRule | undefined, localParams?: LocalParams | undefined) => Promise<{
         fields: string[];
-        validateRow?: import("../PublishParser").ValidateRow<AnyObject, void> | undefined;
+        validateRow?: import("../PublishParser").ValidateRow | undefined;
         finalUpdateFilter: AnyObject;
         forcedData?: AnyObject | undefined;
         forcedFilter?: AnyObject | undefined;
-        returningFields: FieldFilter<AnyObject>;
-        filterFields?: FieldFilter<AnyObject> | undefined;
+        returningFields: FieldFilter;
+        filterFields?: FieldFilter | undefined;
     }>;
-    update: (filter: Filter, _newData: AnyObject, params?: UpdateParams<any> | undefined, tableRules?: TableRule<AnyObject, void> | undefined, localParams?: LocalParams | undefined) => Promise<void | AnyObject>;
+    update: (filter: Filter, _newData: AnyObject, params?: UpdateParams | undefined, tableRules?: TableRule | undefined, localParams?: LocalParams | undefined) => Promise<void | AnyObject>;
     validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues }: ValidatedParams): {
         data: any;
         allowedCols: string[];
@@ -44,7 +44,9 @@ export declare class TableHandler extends ViewHandler {
     delete(filter?: Filter, params?: DeleteParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
     remove(filter: Filter, params?: UpdateParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
     upsert(filter: Filter, newData: AnyObject, params?: UpdateParams, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
-    sync(filter: Filter, params: SelectParams, param3_unused: undefined, table_rules: TableRule, localParams: LocalParams): Promise<{
+    sync(filter: Filter, params: {
+        select?: FieldFilter;
+    }, param3_unused: undefined, table_rules: TableRule, localParams: LocalParams): Promise<{
         channelName: string;
         id_fields: string[];
         synced_field: string;

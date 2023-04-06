@@ -4,7 +4,7 @@ import { TableRule } from "../PublishParser";
 import { ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
 import { ViewHandler } from "./ViewHandler";
 type Args = {
-    selectParams: Omit<SubscribeParams<any>, "throttle">;
+    selectParams: Omit<SubscribeParams, "throttle">;
     filter: Filter;
     table_rules: TableRule<AnyObject, void> | undefined;
     localParams: LocalParams | undefined;

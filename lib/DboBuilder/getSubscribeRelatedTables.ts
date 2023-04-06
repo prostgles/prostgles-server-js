@@ -6,7 +6,7 @@ import { NewQuery } from "./QueryBuilder/QueryBuilder";
 import { ViewHandler } from "./ViewHandler";
 
 type Args = {
-  selectParams: Omit<SubscribeParams<any>, "throttle">;
+  selectParams: Omit<SubscribeParams, "throttle">;
   filter: Filter;
   table_rules: TableRule<AnyObject, void> | undefined;
   localParams: LocalParams | undefined;
