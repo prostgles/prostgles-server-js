@@ -73,22 +73,28 @@ export declare function getNewQuery(_this: TableHandler, filter: Filter, selectP
     groupBy?: boolean | undefined;
     returnType?: "values" | "value" | "row" | "statement" | undefined;
 } & {
-    select?: ("" | "*" | {
+    select?: (("" | "*" | {
         "*": 1;
-    } | Record<string, Record<string, any>> | import("prostgles-types").DetailedJoinSelect | {
+    }) | {
         [x: string]: {
             [x: string]: string | any[] | readonly any[];
         };
     } | ({
-        [x: string]: true | 1 | (string | {
+        [x: string]: string | true | 1 | {
             [x: string]: string | any[] | readonly any[];
-        });
-        $rowhash?: (true | 1 | (string | {
+        } | Record<string, true | 1 | (string | {
             [x: string]: string | any[] | readonly any[];
-        })) | undefined;
-    } & Record<string, true | 1 | (string | {
+        })> | Record<string, false | 0> | import("prostgles-types").DetailedJoinSelect;
+        $rowhash?: (string | true | 1 | {
+            [x: string]: string | any[] | readonly any[];
+        } | Record<string, true | 1 | (string | {
+            [x: string]: string | any[] | readonly any[];
+        })> | Record<string, false | 0> | import("prostgles-types").DetailedJoinSelect) | undefined;
+    } & Record<string, string | true | 1 | {
         [x: string]: string | any[] | readonly any[];
-    })>) | {
+    } | Record<string, true | 1 | (string | {
+        [x: string]: string | any[] | readonly any[];
+    })> | Record<string, false | 0> | import("prostgles-types").DetailedJoinSelect>) | {
         [x: string]: string | true | 1;
         $rowhash?: string | true | 1 | undefined;
     } | {
