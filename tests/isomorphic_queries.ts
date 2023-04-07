@@ -35,8 +35,8 @@ export function tryRunP(desc: string, func: (resolve: any, reject: any) => any, 
     }
   });
 }
-
-export default async function isomorphic(db: Required<DBHandlerServer> | Required<DBHandlerClient>) {
+ 
+  export default async function isomorphic(db: Required<DBHandlerServer> | Required<DBHandlerClient>) {
   console.log("Starting isomorphic queries");
 
   if(await db.items.count!()){
@@ -491,7 +491,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
     assert.deepStrictEqual(MonAgg, [{ added: "Dec", public: '2' }]);
 
     // Returning
-    const returningParam: Parameters<Required<typeof db.items4_pub>["insert"]>[1] = { returning: { id: 1, name: 1, public: 1 , $rowhash: 1, added_day: { "$day": ["added"] } }} ;  //   ctid: 1,
+    const returningParam = { returning: { id: 1, name: 1, public: 1 , $rowhash: 1, added_day: { "$day": ["added"] } }} as const ;  //   ctid: 1,
     let i = await db.items4_pub.insert!( { name: "abc123", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') }, returningParam);
     assert.deepStrictEqual(i, { id: 1,  name: 'abc123', public: 'public data', $rowhash: '347c26babad535aa697a794af89195fe', added_day: 'monday'  }); //  , ctid: '(0,1)'
   

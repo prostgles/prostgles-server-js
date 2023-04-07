@@ -6,23 +6,17 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PostgresNotifListenManager = void 0;
 class PostgresNotifListenManager {
+    connection;
+    db_pg;
+    notifListener;
+    db_channel_name;
+    isListening;
+    client;
+    static create = (db_pg, notifListener, db_channel_name) => {
+        const res = new PostgresNotifListenManager(db_pg, notifListener, db_channel_name, true);
+        return res.init();
+    };
     constructor(db_pg, notifListener, db_channel_name, noInit = false) {
-        this.destroyed = false;
-        this.destroy = () => {
-            if (this.connection) {
-                this.destroyed = true;
-                this.connection.done();
-                this.connection = undefined;
-            }
-        };
-        this.stopListening = () => {
-            if (this.db_channel_name) {
-                if (this.connection)
-                    this.connection.none('UNLISTEN $1~', this.db_channel_name);
-                if (this.client)
-                    this.client.query('UNLISTEN $1~', this.db_channel_name);
-            }
-        };
         if (!db_pg || !notifListener || !db_channel_name)
             throw "PostgresNotifListenManager: db_pg OR notifListener OR db_channel_name MISSING";
         this.db_pg = db_pg;
@@ -66,6 +60,22 @@ class PostgresNotifListenManager {
             console.log('PostgresNotifListenManager: Failed Initial Connection:', error);
         });
     }
+    destroyed = false;
+    destroy = () => {
+        if (this.connection) {
+            this.destroyed = true;
+            this.connection.done();
+            this.connection = undefined;
+        }
+    };
+    stopListening = () => {
+        if (this.db_channel_name) {
+            if (this.connection)
+                this.connection.none('UNLISTEN $1~', this.db_channel_name);
+            if (this.client)
+                this.client.query('UNLISTEN $1~', this.db_channel_name);
+        }
+    };
     reconnect(delay = 0, maxAttempts = 0) {
         if (!this.db_pg || !this.notifListener)
             throw "db_pg OR notifListener missing";
@@ -121,9 +131,5 @@ class PostgresNotifListenManager {
         });
     }
 }
-PostgresNotifListenManager.create = (db_pg, notifListener, db_channel_name) => {
-    const res = new PostgresNotifListenManager(db_pg, notifListener, db_channel_name, true);
-    return res.init();
-};
 exports.PostgresNotifListenManager = PostgresNotifListenManager;
 //# sourceMappingURL=PostgresNotifListenManager.js.map

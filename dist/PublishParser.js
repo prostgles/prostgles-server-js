@@ -80,6 +80,12 @@ const RULE_TO_METHODS = [
 ];
 const PubSubManager_1 = require("./PubSubManager/PubSubManager");
 class PublishParser {
+    publish;
+    publishMethods;
+    publishRawSQL;
+    dbo;
+    db;
+    prostgles;
     constructor(publish, publishMethods, publishRawSQL, dbo, db, prostgles) {
         this.publish = publish;
         this.publishMethods = publishMethods;
@@ -149,6 +155,7 @@ class PublishParser {
             throw "INTERNAL ERROR: dbo is missing";
         if (!command || !tableName)
             throw "command OR tableName are missing";
+        //@ts-ignore
         const rtm = RULE_TO_METHODS.find(rtms => rtms.methods.includes(command));
         if (!rtm) {
             throw "Invalid command: " + command;
@@ -293,7 +300,6 @@ class PublishParser {
             MY_RULES.map(r => {
                 /** THIS IS A MESS -> some methods cannot be dissallowed (unsync, unsubscribe...) */
                 r.methods.forEach(method => {
-                    var _a;
                     const isAllowed = tableRules[r.rule] && tableRules[method] === undefined;
                     if (isAllowed) {
                         if (method === "updateBatch" && !tableRules.update) {
@@ -303,7 +309,7 @@ class PublishParser {
                             // not allowed
                         }
                         else {
-                            (_a = res)[method] ?? (_a[method] = true);
+                            res[method] ??= true;
                         }
                     }
                 });

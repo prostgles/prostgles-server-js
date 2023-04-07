@@ -77,17 +77,17 @@ export declare function getNewQuery(_this: TableHandler, filter: Filter, selectP
         "*": 1;
     } | Record<string, Record<string, any>> | import("prostgles-types").DetailedJoinSelect | {
         [x: string]: {
-            [x: string]: any[] | readonly any[];
+            [x: string]: string | any[] | readonly any[];
         };
     } | ({
         [x: string]: true | 1 | (string | {
-            [x: string]: any[] | readonly any[];
+            [x: string]: string | any[] | readonly any[];
         });
         $rowhash?: (true | 1 | (string | {
-            [x: string]: any[] | readonly any[];
+            [x: string]: string | any[] | readonly any[];
         })) | undefined;
     } & Record<string, true | 1 | (string | {
-        [x: string]: any[] | readonly any[];
+        [x: string]: string | any[] | readonly any[];
     })>) | {
         [x: string]: string | true | 1;
         $rowhash?: string | true | 1 | undefined;

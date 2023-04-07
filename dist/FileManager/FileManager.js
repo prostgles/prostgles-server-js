@@ -1,5 +1,4 @@
 "use strict";
-var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.bytesToSize = exports.getFileType = exports.getFileTypeFromFilename = exports.removeExpressRoute = exports.FileManager = exports.asSQLIdentifier = exports.HOUR = void 0;
 const aws_sdk_1 = require("aws-sdk");
@@ -20,6 +19,19 @@ const asSQLIdentifier = async (name, db) => {
 };
 exports.asSQLIdentifier = asSQLIdentifier;
 class FileManager {
+    static testCredentials = async (accessKeyId, secretAccessKey) => {
+        const sts = new aws_sdk_2.default.STS();
+        aws_sdk_2.default.config.credentials = {
+            accessKeyId,
+            secretAccessKey
+        };
+        const ident = await sts.getCallerIdentity({}).promise();
+        return ident;
+    };
+    s3Client;
+    config;
+    imageOptions;
+    prostgles;
     get dbo() {
         if (!this.prostgles?.dbo) {
             // this.prostgles?.refreshDBO();
@@ -32,92 +44,13 @@ class FileManager {
             throw "this.prostgles.db missing";
         return this.prostgles.db;
     }
+    tableName;
+    fileRoute;
     get fileRouteExpress() {
         return this.fileRoute + "/:name";
     }
+    checkInterval;
     constructor(config, imageOptions) {
-        this.parseFile = parseFile_1.parseFile.bind(this);
-        this.getLocalFileUrl = (name) => this.fileRoute ? `${this.fileRoute}/${name}` : "";
-        this.checkFreeSpace = async (folderPath, fileSize = 0) => {
-            if (!this.s3Client && "localFolderPath" in this.config) {
-                const { minFreeBytes = 1.048e6 } = this.config;
-                const required = Math.max(fileSize, minFreeBytes);
-                if (required) {
-                    const diskSpace = await (0, check_disk_space_1.default)(folderPath);
-                    if (diskSpace.free < required) {
-                        const err = `There is not enough space on the server to save files.\nTotal: ${bytesToSize(diskSpace.size)} \nRemaning: ${bytesToSize(diskSpace.free)} \nRequired: ${bytesToSize(required)}`;
-                        throw new Error(err);
-                    }
-                }
-            }
-        };
-        this.uploadStream = uploadStream_1.uploadStream.bind(this);
-        this.upload = upload_1.upload.bind(this);
-        this.uploadAsMedia = async (params) => {
-            const { item, imageOptions } = params;
-            const { name, data, content_type, extension } = item;
-            if (!data)
-                throw "No file provided";
-            if (!name || typeof name !== "string")
-                throw "Expecting a string name";
-            // const type = await this.getMIME(data, name, allowedExtensions, dissallowedExtensions);
-            let _data = data;
-            /** Resize/compress/remove exif from photos */
-            if (content_type.startsWith("image") && extension.toLowerCase() !== "gif") {
-                const compression = imageOptions?.compression;
-                if (compression) {
-                    console.log("Resizing image");
-                    let opts;
-                    if ("contain" in compression) {
-                        opts = {
-                            fit: sharp.fit.contain,
-                            ...compression.contain
-                        };
-                    }
-                    else if ("inside" in compression) {
-                        opts = {
-                            fit: sharp.fit.inside,
-                            ...compression.inside
-                        };
-                    }
-                    _data = await sharp(data)
-                        .resize(opts)
-                        .withMetadata(Boolean(imageOptions?.keepMetadata))
-                        // .jpeg({ quality: 80 })
-                        .toBuffer();
-                }
-                else if (!imageOptions?.keepMetadata) {
-                    /**
-                     * Remove exif
-                     */
-                    // const metadata = await simg.metadata();
-                    // const simg = await sharp(data);
-                    _data = await sharp(data).clone().withMetadata({
-                        exif: {}
-                    })
-                        .toBuffer();
-                }
-            }
-            const res = await this.upload(_data, name, content_type);
-            return res;
-        };
-        this.parseSQLIdentifier = async (name) => (0, exports.asSQLIdentifier)(name, this.prostgles.db); //  this.prostgles.dbo.sql<"value">("select format('%I', $1)", [name], { returnType: "value" } )
-        this.getColInfo = (args) => {
-            const { colName, tableName } = args;
-            const tableConfig = this.prostgles?.opts.fileTable?.referencedTables?.[tableName];
-            const isReferencingFileTable = this.dbo[tableName]?.columns?.some(c => c.name === colName && c.references && c.references?.some(({ ftable }) => ftable === this.tableName));
-            if (isReferencingFileTable) {
-                if (tableConfig && typeof tableConfig !== "string") {
-                    return tableConfig.referenceColumns[colName];
-                }
-                return { acceptedContent: "*" };
-            }
-            return undefined;
-        };
-        this.init = initFileManager_1.initFileManager.bind(this);
-        this.destroy = () => {
-            (0, exports.removeExpressRoute)(this.prostgles?.opts.fileTable?.expressApp, [this.fileRouteExpress]);
-        };
         this.config = config;
         this.imageOptions = imageOptions;
         if ("region" in config) {
@@ -174,6 +107,71 @@ class FileManager {
         }
         return true;
     }
+    parseFile = parseFile_1.parseFile.bind(this);
+    getLocalFileUrl = (name) => this.fileRoute ? `${this.fileRoute}/${name}` : "";
+    checkFreeSpace = async (folderPath, fileSize = 0) => {
+        if (!this.s3Client && "localFolderPath" in this.config) {
+            const { minFreeBytes = 1.048e6 } = this.config;
+            const required = Math.max(fileSize, minFreeBytes);
+            if (required) {
+                const diskSpace = await (0, check_disk_space_1.default)(folderPath);
+                if (diskSpace.free < required) {
+                    const err = `There is not enough space on the server to save files.\nTotal: ${bytesToSize(diskSpace.size)} \nRemaning: ${bytesToSize(diskSpace.free)} \nRequired: ${bytesToSize(required)}`;
+                    throw new Error(err);
+                }
+            }
+        }
+    };
+    uploadStream = uploadStream_1.uploadStream.bind(this);
+    upload = upload_1.upload.bind(this);
+    uploadAsMedia = async (params) => {
+        const { item, imageOptions } = params;
+        const { name, data, content_type, extension } = item;
+        if (!data)
+            throw "No file provided";
+        if (!name || typeof name !== "string")
+            throw "Expecting a string name";
+        // const type = await this.getMIME(data, name, allowedExtensions, dissallowedExtensions);
+        let _data = data;
+        /** Resize/compress/remove exif from photos */
+        if (content_type.startsWith("image") && extension.toLowerCase() !== "gif") {
+            const compression = imageOptions?.compression;
+            if (compression) {
+                console.log("Resizing image");
+                let opts;
+                if ("contain" in compression) {
+                    opts = {
+                        fit: sharp.fit.contain,
+                        ...compression.contain
+                    };
+                }
+                else if ("inside" in compression) {
+                    opts = {
+                        fit: sharp.fit.inside,
+                        ...compression.inside
+                    };
+                }
+                _data = await sharp(data)
+                    .resize(opts)
+                    .withMetadata(Boolean(imageOptions?.keepMetadata))
+                    // .jpeg({ quality: 80 })
+                    .toBuffer();
+            }
+            else if (!imageOptions?.keepMetadata) {
+                /**
+                 * Remove exif
+                 */
+                // const metadata = await simg.metadata();
+                // const simg = await sharp(data);
+                _data = await sharp(data).clone().withMetadata({
+                    exif: {}
+                })
+                    .toBuffer();
+            }
+        }
+        const res = await this.upload(_data, name, content_type);
+        return res;
+    };
     async getFileS3URL(fileName, expiresInSeconds = 30 * 60) {
         const params = {
             Bucket: this.config.bucket,
@@ -182,17 +180,24 @@ class FileManager {
         };
         return await this.s3Client?.getSignedUrlPromise("getObject", params);
     }
-}
-_a = FileManager;
-FileManager.testCredentials = async (accessKeyId, secretAccessKey) => {
-    const sts = new aws_sdk_2.default.STS();
-    aws_sdk_2.default.config.credentials = {
-        accessKeyId,
-        secretAccessKey
+    parseSQLIdentifier = async (name) => (0, exports.asSQLIdentifier)(name, this.prostgles.db); //  this.prostgles.dbo.sql<"value">("select format('%I', $1)", [name], { returnType: "value" } )
+    getColInfo = (args) => {
+        const { colName, tableName } = args;
+        const tableConfig = this.prostgles?.opts.fileTable?.referencedTables?.[tableName];
+        const isReferencingFileTable = this.dbo[tableName]?.columns?.some(c => c.name === colName && c.references && c.references?.some(({ ftable }) => ftable === this.tableName));
+        if (isReferencingFileTable) {
+            if (tableConfig && typeof tableConfig !== "string") {
+                return tableConfig.referenceColumns[colName];
+            }
+            return { acceptedContent: "*" };
+        }
+        return undefined;
     };
-    const ident = await sts.getCallerIdentity({}).promise();
-    return ident;
-};
+    init = initFileManager_1.initFileManager.bind(this);
+    destroy = () => {
+        (0, exports.removeExpressRoute)(this.prostgles?.opts.fileTable?.expressApp, [this.fileRouteExpress]);
+    };
+}
 exports.FileManager = FileManager;
 const removeExpressRoute = (app, routePaths) => {
     const routes = app?._router?.stack;

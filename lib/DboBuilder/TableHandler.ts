@@ -21,43 +21,15 @@ type ValidatedParams = {
   fixIssues: boolean;
 }
 
-export class TableHandler extends ViewHandler {
-  io_stats: {
-    throttle_queries_per_sec: number;
-    since: number,
-    queries: number,
-    batching: string[] | null
-  }
+export class TableHandler extends ViewHandler { 
 
   constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TableHandlers, joinPaths?: JoinPaths) {
     super(db, tableOrViewInfo, dboBuilder, t, dbTX, joinPaths);
 
     this.remove = this.delete;
 
-    this.io_stats = {
-      since: Date.now(),
-      queries: 0,
-      throttle_queries_per_sec: 500,
-      batching: null
-    };
     this.is_view = false;
     this.is_media = dboBuilder.prostgles.isMedia(this.name)
-  }
-
-  /* TO DO: Maybe finished query batching */
-  willBatch(query: string) {
-    const now = Date.now();
-    if (this.io_stats.since < Date.now()) {
-      this.io_stats.since = Date.now();
-      this.io_stats.queries = 0;
-    } else {
-      this.io_stats.queries++;
-    }
-
-    if (this.io_stats.queries > this.io_stats.throttle_queries_per_sec) {
-
-      return true;
-    }
   }
 
 

@@ -14,14 +14,7 @@ type ValidatedParams = {
     fixIssues: boolean;
 };
 export declare class TableHandler extends ViewHandler {
-    io_stats: {
-        throttle_queries_per_sec: number;
-        since: number;
-        queries: number;
-        batching: string[] | null;
-    };
     constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TableHandlers, joinPaths?: JoinPaths);
-    willBatch(query: string): boolean;
     updateBatch(data: [Filter, AnyObject][], params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<any>;
     parseUpdateRules: any;
     update: any;

@@ -14,7 +14,7 @@ export const VALIDATE_SCHEMA_FUNCNAME = "validate_jsonb_schema" as const;
 export const JSONB_DATA_TYPES = [
   ...DATA_TYPES,
   "Lookup","Lookup[]"
-] as const;
+] as const; 
 
 export const validate_jsonb_schema_sql = `
 

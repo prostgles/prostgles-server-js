@@ -69,22 +69,7 @@ export type DBHandlerServer<TH = TableHandlers> =
   } & {
     tx?: TX<TH>
   }
-
-// export const getFilterFields = (f: Filter | any, $and_key: string, $or_key: string, prevFields: string[] = []): string[] => {
-//     if(Array.isArray(f)){
-//         return f.flatMap(_f => getFilterFields(_f, $and_key, $or_key, prevFields) );
-//     }
-//     if($and_key in f && Array.isArray(f[$and_key]) ){
-//         return f[$and_key].flatMap((_f: any) => getFilterFields(_f, $and_key, $or_key, prevFields) );
-//     } else if($or_key in f && Array.isArray(f[$or_key]) ){
-//         return f[$or_key].flatMap((_f: any) => getFilterFields(_f, $and_key, $or_key, prevFields) );
-//     } else if(isObject(f)){
-//         const filter: 
-//     }
-
-//     return []
-// }
-
+ 
 
 import { clone } from "./utils";
 import { FieldSpec, } from "./DboBuilder/QueryBuilder/Functions";

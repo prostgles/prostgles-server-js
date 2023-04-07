@@ -12,6 +12,7 @@ const Functions_1 = require("./QueryBuilder/Functions");
 const getColumns_1 = require("./getColumns");
 const subscribe_1 = require("./subscribe");
 class ColSet {
+    opts;
     constructor(columns, tableName) {
         this.opts = { columns, tableName, colNames: columns.map(c => c.name) };
     }
@@ -98,15 +99,26 @@ class ColSet {
     }
 }
 class ViewHandler {
+    db;
+    name;
+    escapedName;
+    columns;
+    columnsForTypes;
+    column_names;
+    tableOrViewInfo; // TableOrViewInfo;
+    colSet;
+    tsColumnDefs = [];
+    joins;
+    joinGraph;
+    joinPaths;
+    dboBuilder;
+    t;
+    dbTX;
+    is_view = true;
+    filterDef = "";
+    // pubSubManager: PubSubManager;
+    is_media = false;
     constructor(db, tableOrViewInfo, dboBuilder, t, dbTX, joinPaths) {
-        this.tsColumnDefs = [];
-        this.is_view = true;
-        this.filterDef = "";
-        // pubSubManager: PubSubManager;
-        this.is_media = false;
-        // TODO: fix renamed table trigger problem
-        this.getColumns = getColumns_1.getColumns.bind(this);
-        this.getCondition = getCondition_1.getCondition.bind(this);
         if (!db || !tableOrViewInfo)
             throw "";
         this.db = db;
@@ -258,7 +270,7 @@ class ViewHandler {
         /* Make the join chain info excluding root table */
         paths = (path || jp.path).slice(1).map((t2, i, arr) => {
             const t1 = i === 0 ? source : arr[i - 1];
-            this.joins ?? (this.joins = this.dboBuilder.joins);
+            this.joins ??= this.dboBuilder.joins;
             /* Get join options */
             const jo = this.joins.find(j => j.tables.includes(t1) && j.tables.includes(t2));
             if (!jo)
@@ -353,6 +365,8 @@ class ViewHandler {
             }
         };
     }
+    // TODO: fix renamed table trigger problem
+    getColumns = getColumns_1.getColumns.bind(this);
     getValidatedRules(tableRules, localParams) {
         if (localParams?.socket && !tableRules) {
             throw "INTERNAL ERROR: Unexpected case -> localParams && !tableRules";
@@ -794,6 +808,7 @@ class ViewHandler {
         }
         return res;
     }
+    getCondition = getCondition_1.getCondition.bind(this);
     /* This relates only to SELECT */
     prepareSortItems(orderBy, allowed_cols, tableAlias, select) {
         const throwErr = () => {

@@ -1,4 +1,4 @@
-import { AnyObject, TableSchemaForClient, DBSchemaTable, FullFilter, Method } from "prostgles-types";
+import { AnyObject, TableSchemaForClient, DBSchemaTable, FullFilter, Method, DBSchema } from "prostgles-types";
 import { AuthResult, SessionUser } from "./AuthHandler";
 import { CommonTableRules, LocalParams, PRGLIOSocket, TableOrViewInfo, TableSchemaColumn } from "./DboBuilder";
 import { Prostgles, DBHandlerServer, DB } from "./Prostgles";
@@ -34,13 +34,13 @@ export type DeleteRequestData = {
     filter: object;
     returning: FieldFilter;
 };
-export type UpdateRequestDataOne<R extends AnyObject> = {
-    filter: FullFilter<R>;
+export type UpdateRequestDataOne<R extends AnyObject, S extends DBSchema | void = void> = {
+    filter: FullFilter<R, S>;
     data: Partial<R>;
     returning: FieldFilter<R>;
 };
-export type UpdateReq<R extends AnyObject> = {
-    filter: FullFilter<R>;
+export type UpdateReq<R extends AnyObject, S extends DBSchema | void = void> = {
+    filter: FullFilter<R, S>;
     data: Partial<R>;
 };
 export type UpdateRequestDataBatch<R extends AnyObject> = {
@@ -48,11 +48,11 @@ export type UpdateRequestDataBatch<R extends AnyObject> = {
 };
 export type UpdateRequestData<R extends AnyObject = AnyObject> = UpdateRequestDataOne<R> | UpdateRequestDataBatch<R>;
 export type ValidateRow<R extends AnyObject = AnyObject, S = void> = (row: R, dbx: DBOFullyTyped<S>) => R | Promise<R>;
-export type ValidateUpdateRow<R extends AnyObject = AnyObject, S = void> = (args: {
+export type ValidateUpdateRow<R extends AnyObject = AnyObject, S extends DBSchema | void = void> = (args: {
     update: Partial<R>;
-    filter: FullFilter<R>;
+    filter: FullFilter<R, S>;
 }, dbx: DBOFullyTyped<S>) => R | Promise<R>;
-export type SelectRule<Cols extends AnyObject = AnyObject, S = void> = {
+export type SelectRule<Cols extends AnyObject = AnyObject, S extends DBSchema | void = void> = {
     /**
      * Fields allowed to be selected.
      * Tip: Use false to exclude field
@@ -107,7 +107,7 @@ export type InsertRule<Cols extends AnyObject = AnyObject, S = void> = {
      */
     postValidate?: ValidateRow<Required<Cols>, S>;
 };
-export type UpdateRule<Cols extends AnyObject = AnyObject, S = void> = {
+export type UpdateRule<Cols extends AnyObject = AnyObject, S extends DBSchema | void = void> = {
     /**
      * Fields allowed to be updated.   Tip: Use false/0 to exclude field
      */
@@ -150,7 +150,7 @@ export type UpdateRule<Cols extends AnyObject = AnyObject, S = void> = {
      */
     postValidate?: ValidateRow<Required<Cols>, S>;
 };
-export type DeleteRule<Cols extends AnyObject = AnyObject, S = void> = {
+export type DeleteRule<Cols extends AnyObject = AnyObject, S extends DBSchema | void = void> = {
     /**
      * Filter added to every query (e.g. user_id) to restrict access
      */
@@ -199,19 +199,19 @@ export type ViewRule<S extends AnyObject = AnyObject> = CommonTableRules & {
      */
     select?: SelectRule<S>;
 };
-export type TableRule<RowType extends AnyObject = AnyObject, S = void> = ViewRule<RowType> & {
+export type TableRule<RowType extends AnyObject = AnyObject, S extends DBSchema | void = void> = ViewRule<RowType> & {
     insert?: InsertRule<RowType, S>;
     update?: UpdateRule<RowType, S>;
     delete?: DeleteRule<RowType, S>;
     sync?: SyncRule<RowType>;
     subscribe?: SubscribeRule;
 };
-export type PublishViewRule<Col extends AnyObject = AnyObject, S = void> = {
+export type PublishViewRule<Col extends AnyObject = AnyObject, S extends DBSchema | void = void> = {
     select?: SelectRule<Col, S> | PublishAllOrNothing;
     getColumns?: PublishAllOrNothing;
     getInfo?: PublishAllOrNothing;
 };
-export type PublishTableRule<Col extends AnyObject = AnyObject, S = void> = PublishViewRule<Col, S> & {
+export type PublishTableRule<Col extends AnyObject = AnyObject, S extends DBSchema | void = void> = PublishViewRule<Col, S> & {
     insert?: InsertRule<Col, S> | PublishAllOrNothing;
     update?: UpdateRule<Col, S> | PublishAllOrNothing;
     delete?: DeleteRule<Col, S> | PublishAllOrNothing;

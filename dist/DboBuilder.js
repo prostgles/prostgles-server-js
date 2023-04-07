@@ -3,26 +3,12 @@
  *  Copyright (c) Stefan L. All rights reserved.
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.canEXECUTE = exports.prepareSort = exports.postgresToTsType = exports.isPlainObject = exports.DboBuilder = exports.parseError = exports.makeErrorFromPGError = exports.escapeTSNames = exports.pgp = void 0;
 const Bluebird = require("bluebird");
 const pgPromise = require("pg-promise");
 const runSQL_1 = require("./DboBuilder/runSQL");
 const prostgles_types_1 = require("prostgles-types");
-// export const getFilterFields = (f: Filter | any, $and_key: string, $or_key: string, prevFields: string[] = []): string[] => {
-//     if(Array.isArray(f)){
-//         return f.flatMap(_f => getFilterFields(_f, $and_key, $or_key, prevFields) );
-//     }
-//     if($and_key in f && Array.isArray(f[$and_key]) ){
-//         return f[$and_key].flatMap((_f: any) => getFilterFields(_f, $and_key, $or_key, prevFields) );
-//     } else if($or_key in f && Array.isArray(f[$or_key]) ){
-//         return f[$or_key].flatMap((_f: any) => getFilterFields(_f, $and_key, $or_key, prevFields) );
-//     } else if(isObject(f)){
-//         const filter: 
-//     }
-//     return []
-// }
 const utils_1 = require("./utils");
 const PubSubManager_1 = require("./PubSubManager/PubSubManager");
 const ViewHandler_1 = require("./DboBuilder/ViewHandler");
@@ -114,65 +100,58 @@ const Prostgles_1 = require("./Prostgles");
 const DBSchemaBuilder_1 = require("./DBSchemaBuilder");
 const TableHandler_1 = require("./DboBuilder/TableHandler");
 class DboBuilder {
-    constructor(prostgles) {
-        this.schema = "public";
-        this.getPubSubManager = async () => {
-            if (!this._pubSubManager) {
-                let onSchemaChange;
-                const { isSuperUs } = await PubSubManager_1.PubSubManager.canCreate(this.db);
-                if (!exports.canEXECUTE)
-                    throw "PubSubManager based subscriptions not possible: Cannot run EXECUTE statements on this connection";
-                if (this.prostgles.opts.watchSchema && this.prostgles.opts.watchSchemaType === "DDL_trigger") {
-                    if (!isSuperUs) {
-                        console.warn(`watchSchemaType "${this.prostgles.opts.watchSchemaType}" cannot be used because db user is not a superuser. Will fallback to watchSchemaType "prostgles_queries" `);
-                    }
-                    else {
-                        onSchemaChange = (event) => {
-                            this.prostgles.onSchemaChange(event);
-                        };
-                    }
+    tablesOrViews; //TableSchema           TableOrViewInfo
+    /**
+     * Used in obtaining column names for error messages
+     */
+    constraints;
+    db;
+    schema = "public";
+    // dbo: DBHandlerServer | DBHandlerServerTX;
+    dbo;
+    _pubSubManager;
+    /**
+     * Used for db.sql field type details
+     */
+    DATA_TYPES;
+    USER_TABLES;
+    USER_TABLE_COLUMNS;
+    getPubSubManager = async () => {
+        if (!this._pubSubManager) {
+            let onSchemaChange;
+            const { isSuperUs } = await PubSubManager_1.PubSubManager.canCreate(this.db);
+            if (!exports.canEXECUTE)
+                throw "PubSubManager based subscriptions not possible: Cannot run EXECUTE statements on this connection";
+            if (this.prostgles.opts.watchSchema && this.prostgles.opts.watchSchemaType === "DDL_trigger") {
+                if (!isSuperUs) {
+                    console.warn(`watchSchemaType "${this.prostgles.opts.watchSchemaType}" cannot be used because db user is not a superuser. Will fallback to watchSchemaType "prostgles_queries" `);
                 }
-                this._pubSubManager = await PubSubManager_1.PubSubManager.create({
-                    dboBuilder: this,
-                    onSchemaChange
-                });
-            }
-            if (!this._pubSubManager) {
-                console.trace("Could not create this._pubSubManager");
-                throw "Could not create this._pubSubManager";
-            }
-            return this._pubSubManager;
-        };
-        this.joinPaths = [];
-        this.init = async () => {
-            /* If watchSchema then PubSubManager must be created (if possible) */
-            await this.build();
-            if (this.prostgles.opts.watchSchema &&
-                (this.prostgles.opts.watchSchemaType === "DDL_trigger" || !this.prostgles.opts.watchSchemaType) &&
-                this.prostgles.isSuperUser) {
-                await this.getPubSubManager();
-            }
-            return this;
-        };
-        this.runSQL = async (query, params, options, localParams) => {
-            return runSQL_1.runSQL.bind(this)(query, params, options, localParams);
-        };
-        this.getTX = (cb) => {
-            return this.db.tx((t) => {
-                const dbTX = {};
-                this.tablesOrViews?.map(tov => {
-                    dbTX[tov.name] = new (tov.is_view ? ViewHandler_1.ViewHandler : TableHandler_1.TableHandler)(this.db, tov, this, t, dbTX, this.joinPaths);
-                });
-                if (!dbTX.sql) {
-                    dbTX.sql = this.runSQL;
+                else {
+                    onSchemaChange = (event) => {
+                        this.prostgles.onSchemaChange(event);
+                    };
                 }
-                (0, prostgles_types_1.getKeys)(dbTX).map(k => {
-                    dbTX[k].dbTX = dbTX;
-                });
-                dbTX.sql = (q, args, opts, localP) => this.runSQL(q, args, opts, { tx: { dbTX, t }, ...(localP ?? {}) });
-                return cb(dbTX, t);
+            }
+            this._pubSubManager = await PubSubManager_1.PubSubManager.create({
+                dboBuilder: this,
+                onSchemaChange
             });
-        };
+        }
+        if (!this._pubSubManager) {
+            console.trace("Could not create this._pubSubManager");
+            throw "Could not create this._pubSubManager";
+        }
+        return this._pubSubManager;
+    };
+    pojoDefinitions;
+    // dboDefinition?: string;
+    tsTypesDefinition;
+    joinGraph;
+    joinPaths = [];
+    prostgles;
+    publishParser;
+    onSchemaChange;
+    constructor(prostgles) {
         this.prostgles = prostgles;
         if (!this.prostgles.db)
             throw "db missing";
@@ -180,9 +159,24 @@ class DboBuilder {
         this.schema = this.prostgles.opts.schema || "public";
         this.dbo = {};
     }
+    init = async () => {
+        /* If watchSchema then PubSubManager must be created (if possible) */
+        await this.build();
+        if (this.prostgles.opts.watchSchema &&
+            (this.prostgles.opts.watchSchemaType === "DDL_trigger" || !this.prostgles.opts.watchSchemaType) &&
+            this.prostgles.isSuperUser) {
+            await this.getPubSubManager();
+        }
+        return this;
+    };
+    static create = async (prostgles) => {
+        const res = new DboBuilder(prostgles);
+        return await res.init();
+    };
     destroy() {
         this._pubSubManager?.destroy();
     }
+    _joins;
     get joins() {
         return (0, utils_1.clone)(this._joins ?? []).filter(j => j.tables[0] !== j.tables[1]);
     }
@@ -251,13 +245,12 @@ class DboBuilder {
             // Make joins graph
             this.joinGraph = {};
             this.joins.forEach(({ tables }) => {
-                var _b, _c;
                 const _t = tables.slice().sort(), t1 = _t[0], t2 = _t[1];
                 if (t1 === t2)
                     return;
-                (_b = this.joinGraph)[t1] ?? (_b[t1] = {});
+                this.joinGraph[t1] ??= {};
                 this.joinGraph[t1][t2] = 1;
-                (_c = this.joinGraph)[t2] ?? (_c[t2] = {});
+                this.joinGraph[t2] ??= {};
                 this.joinGraph[t2][t1] = 1;
             });
             const tables = Array.from(new Set(this.joins.flatMap(t => t.tables)));
@@ -292,6 +285,9 @@ class DboBuilder {
         }
         return this.joinPaths;
     }
+    runSQL = async (query, params, options, localParams) => {
+        return runSQL_1.runSQL.bind(this)(query, params, options, localParams);
+    };
     async build() {
         this.tablesOrViews = await getTablesForSchemaPostgresSQL(this);
         this.constraints = await getConstraints(this.db);
@@ -354,12 +350,23 @@ class DboBuilder {
         ].join("\n");
         return this.dbo;
     }
+    getTX = (cb) => {
+        return this.db.tx((t) => {
+            const dbTX = {};
+            this.tablesOrViews?.map(tov => {
+                dbTX[tov.name] = new (tov.is_view ? ViewHandler_1.ViewHandler : TableHandler_1.TableHandler)(this.db, tov, this, t, dbTX, this.joinPaths);
+            });
+            if (!dbTX.sql) {
+                dbTX.sql = this.runSQL;
+            }
+            (0, prostgles_types_1.getKeys)(dbTX).map(k => {
+                dbTX[k].dbTX = dbTX;
+            });
+            dbTX.sql = (q, args, opts, localP) => this.runSQL(q, args, opts, { tx: { dbTX, t }, ...(localP ?? {}) });
+            return cb(dbTX, t);
+        });
+    };
 }
-_a = DboBuilder;
-DboBuilder.create = async (prostgles) => {
-    const res = new DboBuilder(prostgles);
-    return await res.init();
-};
 exports.DboBuilder = DboBuilder;
 async function getConstraints(db, schema = "public", filter) {
     return db.any(`

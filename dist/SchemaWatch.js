@@ -4,8 +4,9 @@ exports.SchemaWatch = void 0;
 const prostgles_types_1 = require("prostgles-types");
 const DboBuilder_1 = require("./DboBuilder");
 class SchemaWatch {
+    schema_checkIntervalMillis;
+    loaded = false;
     constructor({ watchSchema, watchSchemaType, tsGeneratedTypesDir, currDbuilder, onSchemaChanged }) {
-        this.loaded = false;
         if (!watchSchema)
             return;
         if (watchSchema === "hotReloadMode" && !tsGeneratedTypesDir) {

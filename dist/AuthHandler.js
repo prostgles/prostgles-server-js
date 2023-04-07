@@ -3,216 +3,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const prostgles_types_1 = require("prostgles-types");
 const FileManager_1 = require("./FileManager/FileManager");
 class AuthHandler {
+    opts;
+    dbo;
+    db;
+    sidKeyName;
+    routes = {
+        catchAll: "*"
+    };
     constructor(prostgles) {
-        this.routes = {
-            catchAll: "*"
-        };
-        this.validateSid = (sid) => {
-            if (!sid)
-                return undefined;
-            if (typeof sid !== "string")
-                throw "sid missing or not a string";
-            return sid;
-        };
-        this.matchesRoute = (route, clientFullRoute) => {
-            return route && clientFullRoute && (route === clientFullRoute ||
-                clientFullRoute.startsWith(route) && ["/", "?", "#"].includes(clientFullRoute[route.length] ?? ""));
-        };
-        this.isUserRoute = (pathname) => {
-            const pubRoutes = [
-                ...this.opts?.expressConfig?.publicRoutes || [],
-            ];
-            if (this.routes?.login)
-                pubRoutes.push(this.routes.login);
-            if (this.routes?.logoutGetPath)
-                pubRoutes.push(this.routes.logoutGetPath);
-            if (this.routes?.magicLinks?.route)
-                pubRoutes.push(this.routes.magicLinks.route);
-            return !pubRoutes.some(publicRoute => {
-                return this.matchesRoute(publicRoute, pathname); // publicRoute === pathname || pathname.startsWith(publicRoute) && ["/", "?", "#"].includes(pathname.slice(-1));
-            });
-        };
-        this.setCookieAndGoToReturnURLIFSet = (cookie, r) => {
-            const { sid, expires } = cookie;
-            const { res, req } = r;
-            if (sid) {
-                const maxAgeOneDay = 60 * 60 * 24; // 24 hours;
-                let cookieDuration = {
-                    maxAge: maxAgeOneDay
-                };
-                if (expires && Number.isFinite(expires) && !isNaN(+new Date(expires))) {
-                    // const maxAge = (+new Date(expires)) - Date.now();
-                    cookieDuration = { expires: new Date(expires) };
-                    const days = (+cookieDuration.expires - Date.now()) / (24 * 60 * 60e3);
-                    if (days >= 400) {
-                        console.warn(`Cookie expiration higher the limit of 400 days for Chrome: ${days}days`);
-                    }
-                }
-                const cookieOpts = {
-                    ...cookieDuration,
-                    httpOnly: true,
-                    //signed: true // Indicates if the cookie should be signed
-                    secure: true,
-                    sameSite: "strict",
-                    ...(this.opts?.expressConfig?.cookieOptions || {})
-                };
-                const cookieData = sid;
-                if (!this.sidKeyName || !this.routes?.returnURL)
-                    throw "sidKeyName or returnURL missing";
-                res.cookie(this.sidKeyName, cookieData, cookieOpts);
-                const successURL = getReturnUrl(req, this.routes.returnURL) || "/";
-                res.redirect(successURL);
-            }
-            else {
-                throw ("no user or session");
-            }
-        };
-        this.getUser = async (clientReq) => {
-            if (!this.sidKeyName || !this.opts?.getUser)
-                throw "sidKeyName or this.opts.getUser missing";
-            const sid = clientReq.httpReq?.cookies?.[this.sidKeyName];
-            if (!sid)
-                return undefined;
-            try {
-                return this.throttledFunc(async () => {
-                    return this.opts.getUser(this.validateSid(sid), this.dbo, this.db, clientReq);
-                }, 50);
-            }
-            catch (err) {
-                console.error(err);
-            }
-            return undefined;
-        };
-        this.destroy = () => {
-            const app = this.opts?.expressConfig?.app;
-            const { login, logoutGetPath, magicLinks } = this.routes;
-            (0, FileManager_1.removeExpressRoute)(app, [login, logoutGetPath, magicLinks?.expressRoute]);
-        };
-        this.throttledFunc = (func, throttle = 500) => {
-            return new Promise(async (resolve, reject) => {
-                let result, error, finished = false;
-                /**
-                 * Throttle response times to prevent timing attacks
-                 */
-                const interval = setInterval(() => {
-                    if (finished) {
-                        clearInterval(interval);
-                        if (error) {
-                            reject(error);
-                        }
-                        else {
-                            resolve(result);
-                        }
-                    }
-                }, throttle);
-                try {
-                    result = await func();
-                }
-                catch (err) {
-                    console.log(err);
-                    error = err;
-                }
-                finished = true;
-            });
-        };
-        this.loginThrottled = async (params, client) => {
-            if (!this.opts?.login)
-                throw "Auth login config missing";
-            const { responseThrottle = 500 } = this.opts;
-            return this.throttledFunc(async () => {
-                const result = await this.opts?.login?.(params, this.dbo, this.db, client);
-                const err = {
-                    msg: "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number } but got: " + JSON.stringify(result)
-                };
-                if (!result)
-                    throw err;
-                if (result && (typeof result.sid !== "string" || typeof result.expires !== "number") || !result && ![undefined, null].includes(result)) {
-                    throw err;
-                }
-                if (result && result.expires < Date.now()) {
-                    throw { msg: "auth.login() is returning an expired session. Can only login with a session.expires greater than Date.now()" };
-                }
-                return result;
-            }, responseThrottle);
-        };
-        this.isValidSocketSession = (socket, session) => {
-            const hasExpired = Boolean(session && session.expires <= Date.now());
-            if (this.opts?.expressConfig?.publicRoutes && !this.opts.expressConfig?.disableSocketAuthGuard) {
-                const error = "Session has expired";
-                if (hasExpired) {
-                    if (session.onExpiration === "redirect")
-                        socket.emit(prostgles_types_1.CHANNELS.AUTHGUARD, {
-                            shouldReload: session.onExpiration === "redirect",
-                            error
-                        });
-                    throw error;
-                }
-            }
-            return Boolean(session && !hasExpired);
-        };
-        this.makeSocketAuth = async (socket) => {
-            if (!this.opts)
-                return {};
-            const auth = {};
-            if (this.opts.expressConfig?.publicRoutes && !this.opts.expressConfig?.disableSocketAuthGuard) {
-                auth.pathGuard = true;
-                socket.removeAllListeners(prostgles_types_1.CHANNELS.AUTHGUARD);
-                socket.on(prostgles_types_1.CHANNELS.AUTHGUARD, async (params, cb = (_err, _res) => { }) => {
-                    try {
-                        const { pathname, origin } = typeof params === "string" ? JSON.parse(params) : (params || {});
-                        if (pathname && typeof pathname !== "string") {
-                            console.warn("Invalid pathname provided for AuthGuardLocation: ", pathname);
-                        }
-                        /** These origins  */
-                        const IGNORED_API_ORIGINS = ["file://"];
-                        if (!IGNORED_API_ORIGINS.includes(origin) && pathname && typeof pathname === "string" && this.isUserRoute(pathname) && !(await this.getClientInfo({ socket }))?.user) {
-                            cb(null, { shouldReload: true });
-                        }
-                        else {
-                            cb(null, { shouldReload: false });
-                        }
-                    }
-                    catch (err) {
-                        console.error("AUTHGUARD err: ", err);
-                        cb(err);
-                    }
-                });
-            }
-            const { register, logout } = this.opts;
-            const login = this.loginThrottled;
-            let handlers = [
-                { func: (params, dbo, db, client) => register?.(params, dbo, db), ch: prostgles_types_1.CHANNELS.REGISTER, name: "register" },
-                { func: (params, dbo, db, client) => login(params, client), ch: prostgles_types_1.CHANNELS.LOGIN, name: "login" },
-                { func: (params, dbo, db, client) => logout?.(this.getSID({ socket }), dbo, db), ch: prostgles_types_1.CHANNELS.LOGOUT, name: "logout" }
-            ].filter(h => h.func);
-            const userData = await this.getClientInfo({ socket });
-            if (userData) {
-                auth.user = userData.clientUser;
-                handlers = handlers.filter(h => h.name === "logout");
-            }
-            handlers.map(({ func, ch, name }) => {
-                auth[name] = true;
-                socket.removeAllListeners(ch);
-                socket.on(ch, async (params, cb = (..._callback) => { }) => {
-                    try {
-                        if (!socket)
-                            throw "socket missing??!!";
-                        const id_address = socket?.conn?.remoteAddress;
-                        const user_agent = socket.handshake?.headers?.["user-agent"];
-                        const res = await func(params, this.dbo, this.db, { user_agent, id_address });
-                        if (name === "login" && res && res.sid) {
-                            /* TODO: Re-send schema to client */
-                        }
-                        cb(null, true);
-                    }
-                    catch (err) {
-                        console.error(name + " err", err);
-                        cb(err);
-                    }
-                });
-            });
-            return { auth, userData };
-        };
         this.opts = prostgles.opts.auth;
         if (prostgles.opts.auth?.expressConfig) {
             const { magicLinks, returnURL, loginRoute, logoutGetPath } = prostgles.opts.auth.expressConfig;
@@ -233,6 +31,82 @@ class AuthHandler {
         this.dbo = prostgles.dbo;
         this.db = prostgles.db;
     }
+    validateSid = (sid) => {
+        if (!sid)
+            return undefined;
+        if (typeof sid !== "string")
+            throw "sid missing or not a string";
+        return sid;
+    };
+    matchesRoute = (route, clientFullRoute) => {
+        return route && clientFullRoute && (route === clientFullRoute ||
+            clientFullRoute.startsWith(route) && ["/", "?", "#"].includes(clientFullRoute[route.length] ?? ""));
+    };
+    isUserRoute = (pathname) => {
+        const pubRoutes = [
+            ...this.opts?.expressConfig?.publicRoutes || [],
+        ];
+        if (this.routes?.login)
+            pubRoutes.push(this.routes.login);
+        if (this.routes?.logoutGetPath)
+            pubRoutes.push(this.routes.logoutGetPath);
+        if (this.routes?.magicLinks?.route)
+            pubRoutes.push(this.routes.magicLinks.route);
+        return !pubRoutes.some(publicRoute => {
+            return this.matchesRoute(publicRoute, pathname); // publicRoute === pathname || pathname.startsWith(publicRoute) && ["/", "?", "#"].includes(pathname.slice(-1));
+        });
+    };
+    setCookieAndGoToReturnURLIFSet = (cookie, r) => {
+        const { sid, expires } = cookie;
+        const { res, req } = r;
+        if (sid) {
+            const maxAgeOneDay = 60 * 60 * 24; // 24 hours;
+            let cookieDuration = {
+                maxAge: maxAgeOneDay
+            };
+            if (expires && Number.isFinite(expires) && !isNaN(+new Date(expires))) {
+                // const maxAge = (+new Date(expires)) - Date.now();
+                cookieDuration = { expires: new Date(expires) };
+                const days = (+cookieDuration.expires - Date.now()) / (24 * 60 * 60e3);
+                if (days >= 400) {
+                    console.warn(`Cookie expiration higher the limit of 400 days for Chrome: ${days}days`);
+                }
+            }
+            const cookieOpts = {
+                ...cookieDuration,
+                httpOnly: true,
+                //signed: true // Indicates if the cookie should be signed
+                secure: true,
+                sameSite: "strict",
+                ...(this.opts?.expressConfig?.cookieOptions || {})
+            };
+            const cookieData = sid;
+            if (!this.sidKeyName || !this.routes?.returnURL)
+                throw "sidKeyName or returnURL missing";
+            res.cookie(this.sidKeyName, cookieData, cookieOpts);
+            const successURL = getReturnUrl(req, this.routes.returnURL) || "/";
+            res.redirect(successURL);
+        }
+        else {
+            throw ("no user or session");
+        }
+    };
+    getUser = async (clientReq) => {
+        if (!this.sidKeyName || !this.opts?.getUser)
+            throw "sidKeyName or this.opts.getUser missing";
+        const sid = clientReq.httpReq?.cookies?.[this.sidKeyName];
+        if (!sid)
+            return undefined;
+        try {
+            return this.throttledFunc(async () => {
+                return this.opts.getUser(this.validateSid(sid), this.dbo, this.db, clientReq);
+            }, 50);
+        }
+        catch (err) {
+            console.error(err);
+        }
+        return undefined;
+    };
     async init() {
         if (!this.opts)
             return;
@@ -369,6 +243,58 @@ class AuthHandler {
             }
         }
     }
+    destroy = () => {
+        const app = this.opts?.expressConfig?.app;
+        const { login, logoutGetPath, magicLinks } = this.routes;
+        (0, FileManager_1.removeExpressRoute)(app, [login, logoutGetPath, magicLinks?.expressRoute]);
+    };
+    throttledFunc = (func, throttle = 500) => {
+        return new Promise(async (resolve, reject) => {
+            let result, error, finished = false;
+            /**
+             * Throttle response times to prevent timing attacks
+             */
+            const interval = setInterval(() => {
+                if (finished) {
+                    clearInterval(interval);
+                    if (error) {
+                        reject(error);
+                    }
+                    else {
+                        resolve(result);
+                    }
+                }
+            }, throttle);
+            try {
+                result = await func();
+            }
+            catch (err) {
+                console.log(err);
+                error = err;
+            }
+            finished = true;
+        });
+    };
+    loginThrottled = async (params, client) => {
+        if (!this.opts?.login)
+            throw "Auth login config missing";
+        const { responseThrottle = 500 } = this.opts;
+        return this.throttledFunc(async () => {
+            const result = await this.opts?.login?.(params, this.dbo, this.db, client);
+            const err = {
+                msg: "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number } but got: " + JSON.stringify(result)
+            };
+            if (!result)
+                throw err;
+            if (result && (typeof result.sid !== "string" || typeof result.expires !== "number") || !result && ![undefined, null].includes(result)) {
+                throw err;
+            }
+            if (result && result.expires < Date.now()) {
+                throw { msg: "auth.login() is returning an expired session. Can only login with a session.expires greater than Date.now()" };
+            }
+            return result;
+        }, responseThrottle);
+    };
     /**
      * Will return first sid value found in : http cookie or query params
      * Based on sid names in auth
@@ -461,6 +387,84 @@ class AuthHandler {
         }, 5);
         return res;
     }
+    isValidSocketSession = (socket, session) => {
+        const hasExpired = Boolean(session && session.expires <= Date.now());
+        if (this.opts?.expressConfig?.publicRoutes && !this.opts.expressConfig?.disableSocketAuthGuard) {
+            const error = "Session has expired";
+            if (hasExpired) {
+                if (session.onExpiration === "redirect")
+                    socket.emit(prostgles_types_1.CHANNELS.AUTHGUARD, {
+                        shouldReload: session.onExpiration === "redirect",
+                        error
+                    });
+                throw error;
+            }
+        }
+        return Boolean(session && !hasExpired);
+    };
+    makeSocketAuth = async (socket) => {
+        if (!this.opts)
+            return {};
+        const auth = {};
+        if (this.opts.expressConfig?.publicRoutes && !this.opts.expressConfig?.disableSocketAuthGuard) {
+            auth.pathGuard = true;
+            socket.removeAllListeners(prostgles_types_1.CHANNELS.AUTHGUARD);
+            socket.on(prostgles_types_1.CHANNELS.AUTHGUARD, async (params, cb = (_err, _res) => { }) => {
+                try {
+                    const { pathname, origin } = typeof params === "string" ? JSON.parse(params) : (params || {});
+                    if (pathname && typeof pathname !== "string") {
+                        console.warn("Invalid pathname provided for AuthGuardLocation: ", pathname);
+                    }
+                    /** These origins  */
+                    const IGNORED_API_ORIGINS = ["file://"];
+                    if (!IGNORED_API_ORIGINS.includes(origin) && pathname && typeof pathname === "string" && this.isUserRoute(pathname) && !(await this.getClientInfo({ socket }))?.user) {
+                        cb(null, { shouldReload: true });
+                    }
+                    else {
+                        cb(null, { shouldReload: false });
+                    }
+                }
+                catch (err) {
+                    console.error("AUTHGUARD err: ", err);
+                    cb(err);
+                }
+            });
+        }
+        const { register, logout } = this.opts;
+        const login = this.loginThrottled;
+        let handlers = [
+            { func: (params, dbo, db, client) => register?.(params, dbo, db), ch: prostgles_types_1.CHANNELS.REGISTER, name: "register" },
+            { func: (params, dbo, db, client) => login(params, client), ch: prostgles_types_1.CHANNELS.LOGIN, name: "login" },
+            { func: (params, dbo, db, client) => logout?.(this.getSID({ socket }), dbo, db), ch: prostgles_types_1.CHANNELS.LOGOUT, name: "logout" }
+        ].filter(h => h.func);
+        const userData = await this.getClientInfo({ socket });
+        if (userData) {
+            auth.user = userData.clientUser;
+            handlers = handlers.filter(h => h.name === "logout");
+        }
+        handlers.map(({ func, ch, name }) => {
+            auth[name] = true;
+            socket.removeAllListeners(ch);
+            socket.on(ch, async (params, cb = (..._callback) => { }) => {
+                try {
+                    if (!socket)
+                        throw "socket missing??!!";
+                    const id_address = socket?.conn?.remoteAddress;
+                    const user_agent = socket.handshake?.headers?.["user-agent"];
+                    const res = await func(params, this.dbo, this.db, { user_agent, id_address });
+                    if (name === "login" && res && res.sid) {
+                        /* TODO: Re-send schema to client */
+                    }
+                    cb(null, true);
+                }
+                catch (err) {
+                    console.error(name + " err", err);
+                    cb(err);
+                }
+            });
+        });
+        return { auth, userData };
+    };
 }
 exports.default = AuthHandler;
 /**

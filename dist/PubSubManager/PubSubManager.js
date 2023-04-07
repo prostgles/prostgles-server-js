@@ -3,7 +3,6 @@
  *  Copyright (c) Stefan L. All rights reserved.
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.omitKeys = exports.pickKeys = exports.parseCondition = exports.PubSubManager = exports.log = exports.DEFAULT_SYNC_BATCH_SIZE = exports.asValue = void 0;
 const addSync_1 = require("./addSync");
@@ -33,63 +32,106 @@ const log = (...args) => {
 };
 exports.log = log;
 class PubSubManager {
+    static DELIMITER = '|$prstgls$|';
+    dboBuilder;
     get db() {
         return this.dboBuilder.db;
     }
     get dbo() {
         return this.dboBuilder.dbo;
     }
+    _triggers;
+    sockets = {};
+    // subs: { [ke: string]: { [ke: string]: { subs: SubscriptionParams[] } } };
+    subs = [];
+    syncs = [];
+    socketChannelPreffix;
+    onSchemaChange = undefined;
+    postgresNotifListenManager;
     constructor(options) {
-        this.sockets = {};
-        // subs: { [ke: string]: { [ke: string]: { subs: SubscriptionParams[] } } };
+        const { wsChannelNamePrefix, onSchemaChange, dboBuilder } = options;
+        if (!dboBuilder.db || !dboBuilder.dbo) {
+            throw 'MISSING: db_pg, db';
+        }
+        this.onSchemaChange = onSchemaChange;
+        this.dboBuilder = dboBuilder;
+        this.socketChannelPreffix = wsChannelNamePrefix || "_psqlWS_";
+        (0, exports.log)("Created PubSubManager");
+    }
+    NOTIF_TYPE = {
+        data: "data_has_changed",
+        schema: "schema_has_changed"
+    };
+    NOTIF_CHANNEL = {
+        preffix: 'prostgles_',
+        getFull: (appID) => {
+            const finalAppId = appID ?? this.appID;
+            if (!finalAppId)
+                throw "No appID";
+            return this.NOTIF_CHANNEL.preffix + finalAppId;
+        }
+    };
+    /**
+     * Used facilitate concurrent prostgles connections to the same database
+     */
+    appID;
+    appCheckFrequencyMS = 10 * 1000;
+    appCheck;
+    //     ,datname
+    //     ,usename
+    //     ,client_hostname
+    //     ,client_port
+    //     ,backend_start
+    //     ,query_start
+    //     ,query
+    //     ,state
+    //     console.log(await _db.any(`
+    //         SELECT pid, application_name, state
+    //         FROM pg_stat_activity
+    //         WHERE application_name IS NOT NULL AND application_name != '' -- state = 'active';
+    //     `))
+    static canCreate = async (db) => {
+        const canExecute = await (0, DboBuilder_1.canEXECUTE)(db);
+        const isSuperUs = await (0, Prostgles_1.isSuperUser)(db);
+        return { canExecute, isSuperUs, yes: canExecute && isSuperUs };
+    };
+    static create = async (options) => {
+        const res = new PubSubManager(options);
+        return await res.init();
+    };
+    destroyed = false;
+    destroy = () => {
+        this.destroyed = true;
+        if (this.appCheck) {
+            clearInterval(this.appCheck);
+        }
         this.subs = [];
         this.syncs = [];
-        this.onSchemaChange = undefined;
-        this.NOTIF_TYPE = {
-            data: "data_has_changed",
-            schema: "schema_has_changed"
-        };
-        this.NOTIF_CHANNEL = {
-            preffix: 'prostgles_',
-            getFull: (appID) => {
-                const finalAppId = appID ?? this.appID;
-                if (!finalAppId)
-                    throw "No appID";
-                return this.NOTIF_CHANNEL.preffix + finalAppId;
-            }
-        };
-        this.appCheckFrequencyMS = 10 * 1000;
-        this.destroyed = false;
-        this.destroy = () => {
-            this.destroyed = true;
-            if (this.appCheck) {
-                clearInterval(this.appCheck);
-            }
-            this.subs = [];
-            this.syncs = [];
-            if (!this.postgresNotifListenManager) {
-                throw "this.postgresNotifListenManager missing";
-            }
-            this.postgresNotifListenManager.destroy();
-        };
-        this.canContinue = () => {
-            if (this.destroyed) {
-                console.trace("Could not start destroyed instance");
-                return false;
-            }
-            return true;
-        };
-        this.appChecking = false;
-        this.init = initPubSubManager_1.initPubSubManager.bind(this);
-        this.prepareTriggers = async () => {
-            // SELECT * FROM pg_catalog.pg_event_trigger WHERE evtname
-            if (!this.appID)
-                throw "prepareTriggers failed: this.appID missing";
-            if (this.dboBuilder.prostgles.opts.watchSchema && !(await (0, Prostgles_1.isSuperUser)(this.db))) {
-                console.warn("prostgles watchSchema requires superuser db user. Will not watch using event triggers");
-            }
-            try {
-                await this.db.any(`
+        if (!this.postgresNotifListenManager) {
+            throw "this.postgresNotifListenManager missing";
+        }
+        this.postgresNotifListenManager.destroy();
+    };
+    canContinue = () => {
+        if (this.destroyed) {
+            console.trace("Could not start destroyed instance");
+            return false;
+        }
+        return true;
+    };
+    appChecking = false;
+    init = initPubSubManager_1.initPubSubManager.bind(this);
+    static SCHEMA_ALTERING_QUERIES = ['CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO'];
+    static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from schema watch ";
+    prepareTriggers = async () => {
+        // SELECT * FROM pg_catalog.pg_event_trigger WHERE evtname
+        if (!this.appID)
+            throw "prepareTriggers failed: this.appID missing";
+        if (this.dboBuilder.prostgles.opts.watchSchema && !(await (0, Prostgles_1.isSuperUser)(this.db))) {
+            console.warn("prostgles watchSchema requires superuser db user. Will not watch using event triggers");
+        }
+        try {
+            await this.db.any(`
                 BEGIN;--  ISOLATION LEVEL SERIALIZABLE;
                 
                 /**                                 ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
@@ -190,90 +232,16 @@ class PubSubManager {
 
                 COMMIT;
             `).catch(e => {
-                    console.error("prepareTriggers failed: ", e);
-                    throw e;
-                });
-                return true;
-            }
-            catch (e) {
                 console.error("prepareTriggers failed: ", e);
                 throw e;
-            }
-        };
-        this.notifListener = notifListener_1.notifListener.bind(this);
-        this.getSubData = async (sub) => {
-            const { table_info, filter, params, table_rules } = sub; //, subOne = false 
-            const { name: table_name } = table_info;
-            if (!this.dbo?.[table_name]?.find) {
-                throw new Error(`1107 this.dbo.${table_name}.find`);
-            }
-            try {
-                const data = await this.dbo?.[table_name].find(filter, params, undefined, table_rules);
-                return { data };
-            }
-            catch (err) {
-                return { err };
-            }
-        };
-        this.pushSubData = pushSubData_1.pushSubData.bind(this);
-        this.addSync = addSync_1.addSync.bind(this);
-        this.addSub = addSub_1.addSub.bind(this);
-        this.getActiveListeners = () => {
-            const result = [];
-            const upsert = (t, c) => {
-                if (!result.find(r => r.table_name === t && r.condition === c)) {
-                    result.push({ table_name: t, condition: c });
-                }
-            };
-            (this.syncs || []).map(s => {
-                upsert(s.table_name, s.condition);
             });
-            this.subs.forEach(s => {
-                s.triggers.forEach(trg => {
-                    upsert(trg.table_name, trg.condition);
-                });
-            });
-            return result;
-        };
-        this.checkIfTimescaleBug = async (table_name) => {
-            const schema = "_timescaledb_catalog", res = await this.db.oneOrNone("SELECT EXISTS( \
-            SELECT * \
-            FROM information_schema.tables \
-            WHERE 1 = 1 \
-                AND table_schema = ${schema} \
-                AND table_name = 'hypertable' \
-        );", { schema });
-            if (res.exists) {
-                const isHyperTable = await this.db.any("SELECT * FROM " + (0, prostgles_types_1.asName)(schema) + ".hypertable WHERE table_name = ${table_name};", { table_name, schema });
-                if (isHyperTable && isHyperTable.length) {
-                    throw "Triggers do not work on timescaledb hypertables due to bug:\nhttps://github.com/timescale/timescaledb/issues/1084";
-                }
-            }
             return true;
-        };
-        /*
-            A table will only have a trigger with all conditions (for different subs)
-                conditions = ["user_id = 1"]
-                fields = ["user_id"]
-        */
-        this.getMyTriggerQuery = async () => {
-            return pgp.as.format(` 
-      SELECT * --, ROW_NUMBER() OVER(PARTITION BY table_name ORDER BY table_name, condition ) - 1 as id
-      FROM prostgles.v_triggers
-      WHERE app_id = $1
-      ORDER BY table_name, condition
-    `, [this.appID]);
-        };
-        this.addTriggerPool = undefined;
-        const { wsChannelNamePrefix, onSchemaChange, dboBuilder } = options;
-        if (!dboBuilder.db || !dboBuilder.dbo) {
-            throw 'MISSING: db_pg, db';
         }
-        this.onSchemaChange = onSchemaChange;
-        this.dboBuilder = dboBuilder;
-        this.socketChannelPreffix = wsChannelNamePrefix || "_psqlWS_";
-        (0, exports.log)("Created PubSubManager");
-    }
+        catch (e) {
+            console.error("prepareTriggers failed: ", e);
+            throw e;
+        }
+    };
     isReady() {
         if (!this.postgresNotifListenManager)
             throw "this.postgresNotifListenManager missing";
@@ -302,6 +270,22 @@ class PubSubManager {
         return (this.syncs || [])
             .filter((s) => s.table_name === table_name && s.condition === condition);
     }
+    notifListener = notifListener_1.notifListener.bind(this);
+    getSubData = async (sub) => {
+        const { table_info, filter, params, table_rules } = sub; //, subOne = false 
+        const { name: table_name } = table_info;
+        if (!this.dbo?.[table_name]?.find) {
+            throw new Error(`1107 this.dbo.${table_name}.find`);
+        }
+        try {
+            const data = await this.dbo?.[table_name].find(filter, params, undefined, table_rules);
+            return { data };
+        }
+        catch (err) {
+            return { err };
+        }
+    };
+    pushSubData = pushSubData_1.pushSubData.bind(this);
     upsertSocket(socket) {
         if (socket && !this.sockets[socket.id]) {
             this.sockets[socket.id] = socket;
@@ -317,9 +301,61 @@ class PubSubManager {
             });
         }
     }
+    syncTimeout;
     async syncData(sync, clientData, source) {
         return await (0, SyncReplication_1.syncData)(this, sync, clientData, source);
     }
+    addSync = addSync_1.addSync.bind(this);
+    addSub = addSub_1.addSub.bind(this);
+    getActiveListeners = () => {
+        const result = [];
+        const upsert = (t, c) => {
+            if (!result.find(r => r.table_name === t && r.condition === c)) {
+                result.push({ table_name: t, condition: c });
+            }
+        };
+        (this.syncs || []).map(s => {
+            upsert(s.table_name, s.condition);
+        });
+        this.subs.forEach(s => {
+            s.triggers.forEach(trg => {
+                upsert(trg.table_name, trg.condition);
+            });
+        });
+        return result;
+    };
+    checkIfTimescaleBug = async (table_name) => {
+        const schema = "_timescaledb_catalog", res = await this.db.oneOrNone("SELECT EXISTS( \
+            SELECT * \
+            FROM information_schema.tables \
+            WHERE 1 = 1 \
+                AND table_schema = ${schema} \
+                AND table_name = 'hypertable' \
+        );", { schema });
+        if (res.exists) {
+            const isHyperTable = await this.db.any("SELECT * FROM " + (0, prostgles_types_1.asName)(schema) + ".hypertable WHERE table_name = ${table_name};", { table_name, schema });
+            if (isHyperTable && isHyperTable.length) {
+                throw "Triggers do not work on timescaledb hypertables due to bug:\nhttps://github.com/timescale/timescaledb/issues/1084";
+            }
+        }
+        return true;
+    };
+    /*
+        A table will only have a trigger with all conditions (for different subs)
+            conditions = ["user_id = 1"]
+            fields = ["user_id"]
+    */
+    getMyTriggerQuery = async () => {
+        return pgp.as.format(` 
+      SELECT * --, ROW_NUMBER() OVER(PARTITION BY table_name ORDER BY table_name, condition ) - 1 as id
+      FROM prostgles.v_triggers
+      WHERE app_id = $1
+      ORDER BY table_name, condition
+    `, [this.appID]);
+    };
+    // waitingTriggers: { [key: string]: string[] } = undefined;
+    addingTrigger;
+    addTriggerPool = undefined;
     async addTrigger(params, viewOptions) {
         try {
             const { table_name } = { ...params };
@@ -369,32 +405,6 @@ class PubSubManager {
         }
     }
 }
-_a = PubSubManager;
-PubSubManager.DELIMITER = '|$prstgls$|';
-//     ,datname
-//     ,usename
-//     ,client_hostname
-//     ,client_port
-//     ,backend_start
-//     ,query_start
-//     ,query
-//     ,state
-//     console.log(await _db.any(`
-//         SELECT pid, application_name, state
-//         FROM pg_stat_activity
-//         WHERE application_name IS NOT NULL AND application_name != '' -- state = 'active';
-//     `))
-PubSubManager.canCreate = async (db) => {
-    const canExecute = await (0, DboBuilder_1.canEXECUTE)(db);
-    const isSuperUs = await (0, Prostgles_1.isSuperUser)(db);
-    return { canExecute, isSuperUs, yes: canExecute && isSuperUs };
-};
-PubSubManager.create = async (options) => {
-    const res = new PubSubManager(options);
-    return await res.init();
-};
-PubSubManager.SCHEMA_ALTERING_QUERIES = ['CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO'];
-PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from schema watch ";
 exports.PubSubManager = PubSubManager;
 const parseCondition = (condition) => condition && condition.trim().length ? condition : "TRUE";
 exports.parseCondition = parseCondition;

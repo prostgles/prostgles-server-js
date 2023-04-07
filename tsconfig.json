@@ -2,9 +2,9 @@
   // "files": ["lib/rootExport.ts"],
   "files": ["lib/index.ts"],
   "compilerOptions": {
-    "target": "ES2020",
+    "target": "es2022",
     "lib": [
-      "es2019"
+      "es2022"
     ],
     "strict": true,
     "module": "commonjs",

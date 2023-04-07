@@ -14,49 +14,9 @@ const Functions_1 = require("./QueryBuilder/Functions");
 class TableHandler extends ViewHandler_1.ViewHandler {
     constructor(db, tableOrViewInfo, dboBuilder, t, dbTX, joinPaths) {
         super(db, tableOrViewInfo, dboBuilder, t, dbTX, joinPaths);
-        this.parseUpdateRules = parseUpdateRules_1.parseUpdateRules.bind(this);
-        this.update = update_1.update.bind(this);
-        this.insertDataParse = insertDataParse_1.insertDataParse;
-        this.prepareReturning = async (returning, allowedFields) => {
-            const result = [];
-            if (returning) {
-                const sBuilder = new QueryBuilder_1.SelectItemBuilder({
-                    allFields: this.column_names.slice(0),
-                    allowedFields,
-                    allowedOrderByFields: allowedFields,
-                    computedFields: Functions_1.COMPUTED_FIELDS,
-                    functions: Functions_1.FUNCTIONS.filter(f => f.type === "function" && f.singleColArg),
-                    isView: this.is_view,
-                    columns: this.columns,
-                });
-                await sBuilder.parseUserSelect(returning);
-                return sBuilder.select;
-            }
-            return result;
-        };
         this.remove = this.delete;
-        this.io_stats = {
-            since: Date.now(),
-            queries: 0,
-            throttle_queries_per_sec: 500,
-            batching: null
-        };
         this.is_view = false;
         this.is_media = dboBuilder.prostgles.isMedia(this.name);
-    }
-    /* TO DO: Maybe finished query batching */
-    willBatch(query) {
-        const now = Date.now();
-        if (this.io_stats.since < Date.now()) {
-            this.io_stats.since = Date.now();
-            this.io_stats.queries = 0;
-        }
-        else {
-            this.io_stats.queries++;
-        }
-        if (this.io_stats.queries > this.io_stats.throttle_queries_per_sec) {
-            return true;
-        }
     }
     async updateBatch(data, params, tableRules, localParams) {
         try {
@@ -72,6 +32,8 @@ class TableHandler extends ViewHandler_1.ViewHandler {
             throw (0, DboBuilder_1.parseError)(e, `dbo.${this.name}.update()`);
         }
     }
+    parseUpdateRules = parseUpdateRules_1.parseUpdateRules.bind(this);
+    update = update_1.update.bind(this);
     validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues = false }) {
         const synced_field = (tableRules ?? {})?.sync?.synced_field;
         /* Update synced_field if sync is on and missing */
@@ -94,9 +56,27 @@ class TableHandler extends ViewHandler_1.ViewHandler {
         });
         return { data, allowedCols: this.columns.filter(c => dataKeys.includes(c.name)).map(c => c.name) };
     }
+    insertDataParse = insertDataParse_1.insertDataParse;
     async insert(rowOrRows, param2, param3_unused, tableRules, _localParams) {
         return insert_1.insert.bind(this)(rowOrRows, param2, param3_unused, tableRules, _localParams);
     }
+    prepareReturning = async (returning, allowedFields) => {
+        const result = [];
+        if (returning) {
+            const sBuilder = new QueryBuilder_1.SelectItemBuilder({
+                allFields: this.column_names.slice(0),
+                allowedFields,
+                allowedOrderByFields: allowedFields,
+                computedFields: Functions_1.COMPUTED_FIELDS,
+                functions: Functions_1.FUNCTIONS.filter(f => f.type === "function" && f.singleColArg),
+                isView: this.is_view,
+                columns: this.columns,
+            });
+            await sBuilder.parseUserSelect(returning);
+            return sBuilder.select;
+        }
+        return result;
+    };
     makeReturnQuery(items) {
         if (items?.length)
             return " RETURNING " + items.map(s => s.getQuery() + " AS " + (0, prostgles_types_1.asName)(s.alias)).join(", ");

@@ -26,6 +26,7 @@ exports.CONSTRAINT_TYPES = ["PRIMARY KEY", "UNIQUE", "CHECK"]; // "FOREIGN KEY",
  * Will be run between initSQL and fileTable
  */
 class TableConfigurator {
+    config;
     get dbo() {
         if (!this.prostgles.dbo)
             throw "this.prostgles.dbo missing";
@@ -36,99 +37,96 @@ class TableConfigurator {
             throw "this.prostgles.db missing";
         return this.prostgles.db;
     }
+    // sidKeyName: string;
+    prostgles;
     constructor(prostgles) {
-        this.getColumnConfig = (tableName, colName) => {
-            const tconf = this.config?.[tableName];
-            if (tconf && "columns" in tconf) {
-                return tconf.columns?.[colName];
-            }
-            return undefined;
+        this.config = prostgles.opts.tableConfig;
+        this.prostgles = prostgles;
+    }
+    getColumnConfig = (tableName, colName) => {
+        const tconf = this.config?.[tableName];
+        if (tconf && "columns" in tconf) {
+            return tconf.columns?.[colName];
+        }
+        return undefined;
+    };
+    getTableInfo = (params) => {
+        const tconf = this.config?.[params.tableName];
+        return {
+            label: (0, exports.parseI18N)({ config: tconf?.info?.label, lang: params.lang, defaultLang: "en", defaultValue: params.tableName })
         };
-        this.getTableInfo = (params) => {
-            const tconf = this.config?.[params.tableName];
-            return {
-                label: (0, exports.parseI18N)({ config: tconf?.info?.label, lang: params.lang, defaultLang: "en", defaultValue: params.tableName })
-            };
-        };
-        this.getColInfo = (params) => {
-            const colConf = this.getColumnConfig(params.table, params.col);
-            let result = undefined;
-            if (colConf) {
-                if ((0, prostgles_types_1.isObject)(colConf)) {
-                    const { jsonbSchema, jsonbSchemaType, info } = colConf;
-                    result = {
-                        ...(result ?? {}),
-                        ...info,
-                        ...((jsonbSchema || jsonbSchemaType) && { jsonbSchema: { nullable: colConf.nullable, ...(jsonbSchema || { type: jsonbSchemaType }) } })
-                    };
-                    /**
-                     * Get labels from TableConfig if specified
-                     */
-                    if (colConf.label) {
-                        const { lang } = params;
-                        const lbl = colConf?.label;
-                        if (["string", "object"].includes(typeof lbl)) {
-                            if (typeof lbl === "string") {
-                                result ?? (result = {});
-                                result.label = lbl;
-                            }
-                            else if (lang && (lbl?.[lang] || lbl?.en)) {
-                                result ?? (result = {});
-                                result.label = (lbl?.[lang]) || lbl?.en;
-                            }
+    };
+    getColInfo = (params) => {
+        const colConf = this.getColumnConfig(params.table, params.col);
+        let result = undefined;
+        if (colConf) {
+            if ((0, prostgles_types_1.isObject)(colConf)) {
+                const { jsonbSchema, jsonbSchemaType, info } = colConf;
+                result = {
+                    ...(result ?? {}),
+                    ...info,
+                    ...((jsonbSchema || jsonbSchemaType) && { jsonbSchema: { nullable: colConf.nullable, ...(jsonbSchema || { type: jsonbSchemaType }) } })
+                };
+                /**
+                 * Get labels from TableConfig if specified
+                 */
+                if (colConf.label) {
+                    const { lang } = params;
+                    const lbl = colConf?.label;
+                    if (["string", "object"].includes(typeof lbl)) {
+                        if (typeof lbl === "string") {
+                            result ??= {};
+                            result.label = lbl;
+                        }
+                        else if (lang && (lbl?.[lang] || lbl?.en)) {
+                            result ??= {};
+                            result.label = (lbl?.[lang]) || lbl?.en;
                         }
                     }
                 }
             }
-            return result;
-        };
-        this.checkColVal = (params) => {
-            const conf = this.getColInfo(params);
-            if (conf) {
-                const { value } = params;
-                const { min, max } = conf;
-                if (min !== undefined && value !== undefined && value < min)
-                    throw `${params.col} must be less than ${min}`;
-                if (max !== undefined && value !== undefined && value > max)
-                    throw `${params.col} must be greater than ${max}`;
-            }
-        };
-        this.getJoinInfo = (sourceTable, targetTable) => {
-            if (this.config &&
-                sourceTable in this.config &&
-                this.config[sourceTable] &&
-                "columns" in this.config[sourceTable]) {
-                const td = this.config[sourceTable];
-                if ("columns" in td && td.columns?.[targetTable]) {
-                    const cd = td.columns[targetTable];
-                    if ((0, prostgles_types_1.isObject)(cd) && "joinDef" in cd) {
-                        if (!cd.joinDef)
-                            throw "cd.joinDef missing";
-                        const { joinDef } = cd;
-                        const res = {
-                            expectOne: false,
-                            paths: joinDef.map(({ sourceTable, targetTable: table, on }) => ({
-                                source: sourceTable,
-                                target: targetTable,
-                                table,
-                                on
-                            })),
-                        };
-                        return res;
-                    }
+        }
+        return result;
+    };
+    checkColVal = (params) => {
+        const conf = this.getColInfo(params);
+        if (conf) {
+            const { value } = params;
+            const { min, max } = conf;
+            if (min !== undefined && value !== undefined && value < min)
+                throw `${params.col} must be less than ${min}`;
+            if (max !== undefined && value !== undefined && value > max)
+                throw `${params.col} must be greater than ${max}`;
+        }
+    };
+    getJoinInfo = (sourceTable, targetTable) => {
+        if (this.config &&
+            sourceTable in this.config &&
+            this.config[sourceTable] &&
+            "columns" in this.config[sourceTable]) {
+            const td = this.config[sourceTable];
+            if ("columns" in td && td.columns?.[targetTable]) {
+                const cd = td.columns[targetTable];
+                if ((0, prostgles_types_1.isObject)(cd) && "joinDef" in cd) {
+                    if (!cd.joinDef)
+                        throw "cd.joinDef missing";
+                    const { joinDef } = cd;
+                    const res = {
+                        expectOne: false,
+                        paths: joinDef.map(({ sourceTable, targetTable: table, on }) => ({
+                            source: sourceTable,
+                            target: targetTable,
+                            table,
+                            on
+                        })),
+                    };
+                    return res;
                 }
             }
-            return undefined;
-        };
-        this.initialising = false;
-        this.log = (...args) => {
-            if (this.prostgles.opts.DEBUG_MODE) {
-                console.log("TableConfig: \n", ...args);
-            }
-        };
-        this.config = prostgles.opts.tableConfig;
-        this.prostgles = prostgles;
-    }
+        }
+        return undefined;
+    };
+    initialising = false;
     async init() {
         if (this.initialising) {
             console.trace("TableConfig initialising clash");
@@ -361,6 +359,11 @@ class TableConfigurator {
             }
         }
     }
+    log = (...args) => {
+        if (this.prostgles.opts.DEBUG_MODE) {
+            console.log("TableConfig: \n", ...args);
+        }
+    };
 }
 exports.default = TableConfigurator;
 //# sourceMappingURL=TableConfig.js.map

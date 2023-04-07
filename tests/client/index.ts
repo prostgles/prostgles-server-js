@@ -2,9 +2,7 @@ import prostgles from "prostgles-client";
 import io from "socket.io-client";
 
 import isomorphic from "../isomorphic_queries";
-import client_only from "../client_only_queries";
-import { DBHandler } from "prostgles-types";
-import { DBHandlerClient } from "prostgles-client/dist/prostgles";
+import client_only from "../client_only_queries"; 
 export { DBHandlerClient, Auth } from "prostgles-client/dist/prostgles";
 
 const start = Date.now();

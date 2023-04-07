@@ -6,7 +6,6 @@
   "scripts": {
     "start": "tsc-watch --onSuccess \"node index.js\"",
     "dev": "NOSTOP=true npm start",
-    "dev2": "ts-node-dev --inspect -- index.ts ",
     "build": "rm -rf ./node_modules/* && rm -rf ./media/* && npm i && tsc",
     "test-server": "TEST_TYPE=server node --inspect index.js",
     "test-client": "TEST_TYPE=client node index.js "
@@ -20,7 +19,6 @@
     "socket.io": "^4.6.1"
   },
   "devDependencies": {
-    "ts-node-dev": "^2.0.0",
     "tsc-watch": "^4.5.0",
     "typescript": "^5.0.3"
   }

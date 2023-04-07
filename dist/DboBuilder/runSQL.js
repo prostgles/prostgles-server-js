@@ -13,8 +13,8 @@ async function runSQL(query, params, options, localParams) {
         }
     }
     /** Cache types */
-    this.DATA_TYPES ?? (this.DATA_TYPES = await this.db.any("SELECT oid, typname FROM pg_type") ?? []);
-    this.USER_TABLES ?? (this.USER_TABLES = await this.db.any(`
+    this.DATA_TYPES ??= await this.db.any("SELECT oid, typname FROM pg_type") ?? [];
+    this.USER_TABLES ??= await this.db.any(`
     SELECT relid, relname, schemaname, array_to_json(array_agg(c.column_name) FILTER (WHERE c.column_name IS NOT NULL)) as pkey_columns
     FROM pg_catalog.pg_statio_user_tables t
     LEFT JOIN (
@@ -26,13 +26,13 @@ async function runSQL(query, params, options, localParams) {
     ) c
     ON t.relid = c.table_oid
     GROUP BY relid, relname, schemaname
-  `) ?? []);
-    this.USER_TABLE_COLUMNS ?? (this.USER_TABLE_COLUMNS = await this.db.any(`
+  `) ?? [];
+    this.USER_TABLE_COLUMNS ??= await this.db.any(`
     SELECT t.relid, t.schemaname,t.relname, c.column_name, c.udt_name, c.ordinal_position
     FROM information_schema.columns c
     INNER JOIN pg_catalog.pg_statio_user_tables t
     ON  c.table_schema = t.schemaname AND c.table_name = t.relname 
-  `));
+  `);
     if (!(await (0, exports.canRunSQL)(this.prostgles, localParams)))
         throw "Not allowed to run SQL";
     const { returnType, allowListen, hasParams = true } = options || {};

@@ -12,7 +12,7 @@ import { isPlainObject } from "./DboBuilder";
 * Parse a single filter
 * Ensure only single key objects reach this point
 */
-type ParseFilterItemArgs = {  filter: FullFilter, select?: SelectItem[], tableAlias?: string, pgp: any };
+type ParseFilterItemArgs = {  filter: FullFilter<void, void>, select?: SelectItem[], tableAlias?: string, pgp: any };
 export const parseFilterItem = (args: ParseFilterItemArgs): string => {
   const { filter: _f, select, tableAlias, pgp } = args;
 
