@@ -26,6 +26,7 @@ exports.CONSTRAINT_TYPES = ["PRIMARY KEY", "UNIQUE", "CHECK"]; // "FOREIGN KEY",
  * Will be run between initSQL and fileTable
  */
 class TableConfigurator {
+    instanceId = Math.random();
     config;
     get dbo() {
         if (!this.prostgles.dbo)
@@ -169,7 +170,7 @@ class TableConfigurator {
             migrations = { version, table: versionTableName };
             let latestVersion;
             try {
-                latestVersion = (await this.db.oneOrNone(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`)).v;
+                latestVersion = Number((await this.db.oneOrNone(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`)).v);
             }
             catch (e) {
             }

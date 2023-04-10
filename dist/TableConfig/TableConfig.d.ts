@@ -237,6 +237,7 @@ export type TableConfig<LANG_IDS = {
 export default class TableConfigurator<LANG_IDS = {
     en: 1;
 }> {
+    instanceId: number;
     config?: TableConfig<LANG_IDS>;
     get dbo(): DBHandlerServer;
     get db(): DB;

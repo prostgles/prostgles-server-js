@@ -60,14 +60,14 @@ export const getColumnDefinitionQuery = async ({ colConf: colConfRaw, column, db
     }) + "::TEXT";
 
     /** Validate default value against jsonbSchema  */
-    const q = `SELECT ${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${asValue(colConf.defaultValue) + "::JSONB"}, ${asValue({ table, column })}) as v`;
+    const validationQuery = `SELECT ${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${asValue(colConf.defaultValue) + "::JSONB"}, ${asValue({ table, column })}) as v`;
     if (colConf.defaultValue) {
 
       const failedDefault = (err?: any) => {
-        return { msg: `Default value (${colConf.defaultValue}) for ${table}.${column} does not satisfy the jsonb constraint check: ${q}`, err };
+        return { msg: `Default value (${colConf.defaultValue}) for ${table}.${column} does not satisfy the jsonb constraint check: ${validationQuery}`, err };
       }
       try {
-        const row = await db.oneOrNone(q);
+        const row = await db.oneOrNone(validationQuery);
         if (!row?.v) {
           throw "Error";
         }

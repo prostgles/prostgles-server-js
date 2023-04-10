@@ -304,6 +304,8 @@ export type TableConfig<LANG_IDS = { en: 1 }> = {
  */
 export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
+  instanceId = Math.random();
+  
   config?: TableConfig<LANG_IDS>;
   get dbo(): DBHandlerServer {
     if (!this.prostgles.dbo) throw "this.prostgles.dbo missing"
@@ -462,7 +464,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       migrations = { version, table: versionTableName  };
       let latestVersion: number | undefined;
       try {
-        latestVersion = (await this.db.oneOrNone(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`)).v;
+        latestVersion = Number((await this.db.oneOrNone(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`)).v);
       } catch(e){
 
       }
