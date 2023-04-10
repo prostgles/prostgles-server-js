@@ -315,7 +315,7 @@ class Prostgles {
             await this.refreshDBO();
             if (this.opts.tableConfig) {
                 if (this.tableConfigurator?.initialising) {
-                    console.error("TableConfigurator might deadlock");
+                    console.error("TableConfigurator WILL deadlock");
                 }
                 this.tableConfigurator = new TableConfig_1.default(this);
                 try {

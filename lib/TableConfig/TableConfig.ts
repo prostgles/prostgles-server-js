@@ -420,11 +420,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
   initialising = false;
   async init() {
-    if(this.initialising){
-      console.trace("TableConfig initialising clash");
-      log("TableConfig initialising clash")
-      return;
-    }
+    
     this.initialising = true;
     let queries: string[] = [];
     const makeQuery = (q: string[]) => q.map(v => v.trim().endsWith(";")? v : `${v};`).join("\n");
@@ -461,7 +457,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     if(this.prostgles.opts.tableConfigMigrations){
       const { onMigrate, version, versionTableName = "schema_version" } = this.prostgles.opts.tableConfigMigrations;
       await this.db.any(`
-        ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
+        /* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
         CREATE TABLE IF NOT EXISTS ${asName(versionTableName)}(id NUMERIC PRIMARY KEY, table_config JSONB NOT NULL)
       `);
       migrations = { version, table: versionTableName  };
