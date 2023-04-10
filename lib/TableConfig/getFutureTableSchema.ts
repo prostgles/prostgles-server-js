@@ -11,17 +11,12 @@ type Args = {
   tableName: string;
   constraintDefs?: ConstraintDef[];
 };
-
-let lastTable = "";
+ 
 export const getFutureTableSchema = async ({ columnDefs, tableName, constraintDefs = [], db }: Args): Promise<{
   constraints: ColConstraint[];
   cols: ColumnMinimalInfo[];
-}> => {
-  if(lastTable){
-    console.trace(tableName)
-  }
-  console.time(`getFutureTableSchema ${tableName }`);
-  lastTable = tableName;
+}> => { 
+   
   let constraints: ColConstraint[] = [];
   let cols: ColumnMinimalInfo[] = [];
   const ROLLBACK = "Rollback";
@@ -63,7 +58,5 @@ export const getFutureTableSchema = async ({ columnDefs, tableName, constraintDe
     }
   }
   
-  console.timeEnd(`getFutureTableSchema ${tableName }`);
-  lastTable = "";
   return { cols, constraints };
 }

@@ -373,13 +373,7 @@ export class Prostgles {
     watchSchema: false,
     watchSchemaType: "DDL_trigger",
   };
-
-  // dbConnection: DbConnection = {
-  //     host: "localhost",
-  //     port: 5432,
-  //     application_name: "prostgles_app"
-  // };
-  // dbOptions: DbConnectionOpts;
+ 
   db?: DB;
   pgp?: PGP;
   dbo?: DBHandlerServer;
@@ -618,7 +612,10 @@ export class Prostgles {
 
       await this.refreshDBO();
       if (this.opts.tableConfig) {
-        this.tableConfigurator = new TableConfigurator(this as any);
+        if(this.tableConfigurator?.initialising){
+          console.error("TableConfigurator might deadlock");
+        }
+        this.tableConfigurator = new TableConfigurator(this);
         try {
           await this.tableConfigurator.init();
         } catch (e) {

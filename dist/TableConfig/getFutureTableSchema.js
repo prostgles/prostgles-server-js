@@ -6,13 +6,7 @@ const DboBuilder_1 = require("../DboBuilder");
 const { TransactionMode, isolationLevel } = DboBuilder_1.pgp.txMode;
 const getColumnDefinitionQuery_1 = require("./getColumnDefinitionQuery");
 const getConstraintDefinitionQueries_1 = require("./getConstraintDefinitionQueries");
-let lastTable = "";
 const getFutureTableSchema = async ({ columnDefs, tableName, constraintDefs = [], db }) => {
-    if (lastTable) {
-        console.trace(tableName);
-    }
-    console.time(`getFutureTableSchema ${tableName}`);
-    lastTable = tableName;
     let constraints = [];
     let cols = [];
     const ROLLBACK = "Rollback";
@@ -44,8 +38,6 @@ const getFutureTableSchema = async ({ columnDefs, tableName, constraintDefs = []
             throw e;
         }
     }
-    console.timeEnd(`getFutureTableSchema ${tableName}`);
-    lastTable = "";
     return { cols, constraints };
 };
 exports.getFutureTableSchema = getFutureTableSchema;

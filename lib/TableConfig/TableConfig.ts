@@ -1,7 +1,7 @@
 import { getKeys, asName as _asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE, isObject, JSONB, ColumnInfo, asName } from "prostgles-types";
 import { isPlainObject, JoinInfo } from "../DboBuilder";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
-import { asValue, log } from "../PubSubManager/PubSubManager";
+import { PubSubManager, asValue, log } from "../PubSubManager/PubSubManager";
 import { getTableColumnQueries } from "./getTableColumnQueries";
 import { getFutureTableSchema } from "./getFutureTableSchema";
 import { getColConstraints, getConstraintDefinitionQueries } from "./getConstraintDefinitionQueries";
@@ -460,7 +460,10 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     let migrations: { version: number; table: string; } | undefined;
     if(this.prostgles.opts.tableConfigMigrations){
       const { onMigrate, version, versionTableName = "schema_version" } = this.prostgles.opts.tableConfigMigrations;
-      await this.db.any(`CREATE TABLE IF NOT EXISTS ${asName(versionTableName)}(id NUMERIC PRIMARY KEY, table_config JSONB NOT NULL)`);
+      await this.db.any(`
+        ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
+        CREATE TABLE IF NOT EXISTS ${asName(versionTableName)}(id NUMERIC PRIMARY KEY, table_config JSONB NOT NULL)
+      `);
       migrations = { version, table: versionTableName  };
       let latestVersion: number | undefined;
       try {
@@ -675,7 +678,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
           })
         })
       }
-    }
+    } 
 
     if (queries.length) {
       const q = makeQuery(queries);
@@ -683,10 +686,6 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
       try {
         await runQueries(queries);
-        if(migrations){
-          await this.db.any(`INSERT INTO ${migrations.table}(id, table_config) VALUES (${asValue(migrations.version)}, ${asValue(this.config)}) ON CONFLICT DO NOTHING;`)
-        }
-        this.initialising = false;
       } catch(err: any){
         this.initialising = false;
 
@@ -697,9 +696,15 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
             return Promise.reject(err.toString() + "\n At:" + q.slice(pos - 50, pos + 50));
           }
         }
+
         return Promise.reject(err);
       }
     }
+
+    if(migrations){
+      await this.db.any(`INSERT INTO ${migrations.table}(id, table_config) VALUES (${asValue(migrations.version)}, ${asValue(this.config)}) ON CONFLICT DO NOTHING;`)
+    }
+    this.initialising = false;
   }
 
   log = (...args: any[]) => {
