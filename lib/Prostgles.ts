@@ -409,15 +409,15 @@ export class Prostgles {
     if (!params) throw "ProstglesInitOptions missing";
     if (!params.io) console.warn("io missing. WebSockets will not be set up");
 
-    // TODO: find an exact keyof T<->arr TS matching method
-    const config: Array<keyof ProstglesInitOptions> = [
-      "transactions", "joins", "tsGeneratedTypesDir",
-      "onReady", "dbConnection", "dbOptions", "publishMethods", "io",
-      "publish", "schema", "publishRawSQL", "wsChannelNamePrefix", "onSocketConnect",
-      "onSocketDisconnect", "sqlFilePath", "auth", "DEBUG_MODE", "watchSchema", "watchSchemaType",
-      "fileTable", "tableConfig", "tableConfigMigrations"
-    ];
-    const unknownParams = Object.keys(params).filter((key: string) => !(config as string[]).includes(key))
+    const config: Record<keyof ProstglesInitOptions, 1> = {
+      transactions: 1, joins: 1, tsGeneratedTypesDir: 1,
+      onReady: 1, dbConnection: 1, dbOptions: 1, publishMethods: 1, 
+      io: 1, publish: 1, schema: 1, publishRawSQL: 1, wsChannelNamePrefix: 1, 
+      onSocketConnect: 1, onSocketDisconnect: 1, sqlFilePath: 1, auth: 1, 
+      DEBUG_MODE: 1, watchSchema: 1, watchSchemaType: 1, fileTable: 1, 
+      tableConfig: 1, tableConfigMigrations: 1, keywords: 1, onNotice: 1
+    };
+    const unknownParams = Object.keys(params).filter((key: string) => !Object.keys(config).includes(key))
     if (unknownParams.length) {
       console.error(`Unrecognised ProstglesInitOptions params: ${unknownParams.join()}`);
     }

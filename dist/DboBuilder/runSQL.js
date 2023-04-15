@@ -88,10 +88,10 @@ async function runSQL(query, params, options, localParams) {
             return rows[0];
         }
         else if (returnType === "value") {
-            return Object.values(rows?.[0] || {})?.[0];
+            return Object.values(rows?.[0] ?? {})?.[0];
         }
         else if (returnType === "values") {
-            return rows.map(r => Object.values(r[0]));
+            return rows.map(r => Object.values(r ?? {})[0]);
         }
         else {
             const qres = {
