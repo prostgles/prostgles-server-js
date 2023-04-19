@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CONSTRAINT_TYPES = exports.parseI18N = void 0;
+exports.getIndexes = exports.CONSTRAINT_TYPES = exports.parseI18N = void 0;
 const prostgles_types_1 = require("prostgles-types");
 const DboBuilder_1 = require("../DboBuilder");
 const PubSubManager_1 = require("../PubSubManager/PubSubManager");
@@ -273,19 +273,22 @@ class TableConfigurator {
                       [ TABLESPACE tablespace_name ]
                       [ WHERE predicate ]
                 */
+                const currIndexes = await (0, exports.getIndexes)(this.db, tableName, "public");
                 Object.entries(tableConf.indexes).forEach(([indexName, { columns, concurrently, replace, unique, using, where = "" }]) => {
                     if (replace || typeof replace !== "boolean" && tableConf.replaceUniqueIndexes) {
                         queries.push(`DROP INDEX IF EXISTS ${asName(indexName)};`);
                     }
-                    queries.push([
-                        "CREATE",
-                        unique && "UNIQUE",
-                        concurrently && "CONCURRENTLY",
-                        `INDEX ${asName(indexName)} ON ${asName(tableName)}`,
-                        using && ("USING " + using),
-                        `(${columns})`,
-                        where && `WHERE ${where}`
-                    ].filter(v => v).join(" ") + ";");
+                    if (!currIndexes.some(idx => idx.indexname === indexName)) {
+                        queries.push([
+                            "CREATE",
+                            unique && "UNIQUE",
+                            concurrently && "CONCURRENTLY",
+                            `INDEX ${asName(indexName)} ON ${asName(tableName)}`,
+                            using && ("USING " + using),
+                            `(${columns})`,
+                            where && `WHERE ${where}`
+                        ].filter(v => v).join(" ") + ";");
+                    }
                 });
             }
             const { triggers, dropIfExists, dropIfExistsCascade } = tableConf;
@@ -371,4 +374,42 @@ class TableConfigurator {
     };
 }
 exports.default = TableConfigurator;
+const getIndexes = async (db, tableName, schema) => {
+    const indexQuery = `
+  SELECT n.nspname as schemaname,
+    c.relname as indexname,
+    pg_get_indexdef(c.oid) as indexdef,
+    format('%I', c.relname) as escaped_identifier,
+    CASE c.relkind WHEN 'r' 
+      THEN 'table' WHEN 'v' 
+      THEN 'view' WHEN 'm' 
+      THEN 'materialized view' 
+      WHEN 'i' THEN 'index' 
+      WHEN 'S' THEN 'sequence' WHEN 's' THEN 'special' 
+      WHEN 't' THEN 'TOAST table' WHEN 'f' THEN 'foreign table' 
+      WHEN 'p' THEN 'partitioned table' WHEN 'I' THEN 'partitioned index' END as "type",
+    pg_catalog.pg_get_userbyid(c.relowner) as "owner",
+    c2.relname as tablename,
+    CASE c.relpersistence WHEN 'p' THEN 'permanent' WHEN 't' THEN 'temporary' 
+    WHEN 'u' THEN 'unlogged' END as "persistence",
+    am.amname as "access_method",
+    pg_catalog.pg_size_pretty(pg_catalog.pg_table_size(c.oid)) as "size",
+    pg_catalog.obj_description(c.oid, 'pg_class') as "description"
+  FROM pg_catalog.pg_class c
+      LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+      LEFT JOIN pg_catalog.pg_am am ON am.oid = c.relam
+      LEFT JOIN pg_catalog.pg_index i ON i.indexrelid = c.oid
+      LEFT JOIN pg_catalog.pg_class c2 ON i.indrelid = c2.oid
+  WHERE c.relkind IN ('i','I','')
+        AND n.nspname <> 'pg_catalog'
+        AND n.nspname !~ '^pg_toast'
+        AND n.nspname <> 'information_schema'
+    AND pg_catalog.pg_table_is_visible(c.oid)
+  AND c2.relname = \${tableName}
+  AND n.nspname = \${schema}
+  ORDER BY 1,2;
+  `;
+    return db.any(indexQuery, { tableName, schema });
+};
+exports.getIndexes = getIndexes;
 //# sourceMappingURL=TableConfig.js.map

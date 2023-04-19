@@ -265,5 +265,19 @@ export default class TableConfigurator<LANG_IDS = {
     init(): Promise<undefined>;
     log: (...args: any[]) => void;
 }
+type PGIndex = {
+    schemaname: string;
+    indexname: string;
+    indexdef: string;
+    escaped_identifier: string;
+    type: string;
+    owner: string;
+    tablename: string;
+    persistence: string;
+    access_method: string;
+    size: string;
+    description: string | null;
+};
+export declare const getIndexes: (db: DB, tableName: string, schema: string) => Promise<PGIndex[]>;
 export {};
 //# sourceMappingURL=TableConfig.d.ts.map
