@@ -464,7 +464,7 @@ export class Prostgles {
       } else if (watchSchema === true || isObject(watchSchemaType) && "checkIntervalMillis" in watchSchemaType) {
         /* Full re-init. Sockets must reconnect */
         console.log("watchSchema: Full re-initialisation")
-        this.init(onReady);
+        this.init(onReady, query);
       }
     }
   }
@@ -548,7 +548,7 @@ export class Prostgles {
         const dbuilder = await DboBuilder.create(this);
         if (dbuilder.tsTypesDefinition !== this.dboBuilder.tsTypesDefinition) {
           await this.refreshDBO();
-          this.init(onReady);
+          this.init(onReady, "schema_checkIntervalMillis tsTypesDefinition changed");
         }
       }, this.opts.watchSchemaType.checkIntervalMillis);
       
@@ -580,7 +580,7 @@ export class Prostgles {
   schema_checkIntervalMillis?: NodeJS.Timeout;
 
 
-  async init(onReady: OnReadyCallback): Promise<InitResult> {
+  async init(onReady: OnReadyCallback, reason: string): Promise<InitResult> {
     this.loaded = false;
 
     this.initWatchSchema(onReady);
@@ -613,7 +613,7 @@ export class Prostgles {
       await this.refreshDBO();
       if (this.opts.tableConfig) {
         if(this.tableConfigurator?.initialising){
-          console.error("TableConfigurator WILL deadlock");
+          console.error("TableConfigurator WILL deadlock", { reason });
         }
         this.tableConfigurator = new TableConfigurator(this);
         try {
@@ -677,9 +677,9 @@ export class Prostgles {
         update: async (newOpts) => {
           this.opts.fileTable = newOpts.fileTable;
           await this.initFileTable();
-          await this.init(onReady);
+          await this.init(onReady, "prgl.update");
         },
-        restart: () => this.init(onReady),
+        restart: () => this.init(onReady, "prgl.restart"),
         destroy: async () => {
           console.log("destroying prgl instance")
           this.destroyed = true;

@@ -270,7 +270,7 @@ export declare class Prostgles {
     initFileTable: () => Promise<void>;
     isSuperUser: boolean;
     schema_checkIntervalMillis?: NodeJS.Timeout;
-    init(onReady: OnReadyCallback): Promise<InitResult>;
+    init(onReady: OnReadyCallback, reason: string): Promise<InitResult>;
     runSQLFile(filePath: string): Promise<any[][] | undefined>;
     connectedSockets: any[];
     setSocketEvents(): Promise<void>;

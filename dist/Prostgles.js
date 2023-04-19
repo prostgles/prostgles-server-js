@@ -183,7 +183,7 @@ class Prostgles {
             else if (watchSchema === true || (0, prostgles_types_1.isObject)(watchSchemaType) && "checkIntervalMillis" in watchSchemaType) {
                 /* Full re-init. Sockets must reconnect */
                 console.log("watchSchema: Full re-initialisation");
-                this.init(onReady);
+                this.init(onReady, query);
             }
         }
     }
@@ -263,7 +263,7 @@ class Prostgles {
                 const dbuilder = await DboBuilder_1.DboBuilder.create(this);
                 if (dbuilder.tsTypesDefinition !== this.dboBuilder.tsTypesDefinition) {
                     await this.refreshDBO();
-                    this.init(onReady);
+                    this.init(onReady, "schema_checkIntervalMillis tsTypesDefinition changed");
                 }
             }, this.opts.watchSchemaType.checkIntervalMillis);
         }
@@ -288,7 +288,7 @@ class Prostgles {
     };
     isSuperUser = false;
     schema_checkIntervalMillis;
-    async init(onReady) {
+    async init(onReady, reason) {
         this.loaded = false;
         this.initWatchSchema(onReady);
         /* 1. Connect to db */
@@ -315,7 +315,7 @@ class Prostgles {
             await this.refreshDBO();
             if (this.opts.tableConfig) {
                 if (this.tableConfigurator?.initialising) {
-                    console.error("TableConfigurator WILL deadlock");
+                    console.error("TableConfigurator WILL deadlock", { reason });
                 }
                 this.tableConfigurator = new TableConfig_1.default(this);
                 try {
@@ -370,9 +370,9 @@ class Prostgles {
                 update: async (newOpts) => {
                     this.opts.fileTable = newOpts.fileTable;
                     await this.initFileTable();
-                    await this.init(onReady);
+                    await this.init(onReady, "prgl.update");
                 },
-                restart: () => this.init(onReady),
+                restart: () => this.init(onReady, "prgl.restart"),
                 destroy: async () => {
                     console.log("destroying prgl instance");
                     this.destroyed = true;
