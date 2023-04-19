@@ -426,8 +426,9 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     let queries: string[] = [];
     const makeQuery = (q: string[]) => q.map(v => v.trim().endsWith(";")? v : `${v};`).join("\n");
     const runQueries = async (_queries = queries) => {
-      const q = `/* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ \n\n` + makeQuery(queries);
+      let q = makeQuery(queries);
       if(!_queries.length) return 0;
+      q = `/* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ \n\n` + q;
       changedSchema = true;
       this.log(q);
       log(q);

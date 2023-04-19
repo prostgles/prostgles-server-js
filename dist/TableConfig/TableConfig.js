@@ -134,9 +134,10 @@ class TableConfigurator {
         let queries = [];
         const makeQuery = (q) => q.map(v => v.trim().endsWith(";") ? v : `${v};`).join("\n");
         const runQueries = async (_queries = queries) => {
-            const q = `/* ${PubSubManager_1.PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ \n\n` + makeQuery(queries);
+            let q = makeQuery(queries);
             if (!_queries.length)
                 return 0;
+            q = `/* ${PubSubManager_1.PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ \n\n` + q;
             changedSchema = true;
             this.log(q);
             (0, PubSubManager_1.log)(q);
