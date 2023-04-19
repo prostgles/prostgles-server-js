@@ -463,7 +463,7 @@ export class Prostgles {
 
       } else if (watchSchema === true || isObject(watchSchemaType) && "checkIntervalMillis" in watchSchemaType) {
         /* Full re-init. Sockets must reconnect */
-        console.log("watchSchema: Full re-initialisation")
+        console.log("watchSchema: Full re-initialisation", { query })
         this.init(onReady, query);
       }
     }
