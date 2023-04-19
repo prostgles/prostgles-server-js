@@ -129,13 +129,15 @@ class TableConfigurator {
     };
     initialising = false;
     async init() {
+        let changedSchema = false;
         this.initialising = true;
         let queries = [];
         const makeQuery = (q) => q.map(v => v.trim().endsWith(";") ? v : `${v};`).join("\n");
         const runQueries = async (_queries = queries) => {
-            const q = makeQuery(queries);
+            const q = `/* ${PubSubManager_1.PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ \n\n` + makeQuery(queries);
             if (!_queries.length)
                 return 0;
+            changedSchema = true;
             this.log(q);
             (0, PubSubManager_1.log)(q);
             await this.db.multi(q).catch(err => {
@@ -357,6 +359,9 @@ class TableConfigurator {
             await this.db.any(`INSERT INTO ${migrations.table}(id, table_config) VALUES (${(0, PubSubManager_1.asValue)(migrations.version)}, ${(0, PubSubManager_1.asValue)(this.config)}) ON CONFLICT DO NOTHING;`);
         }
         this.initialising = false;
+        if (changedSchema) {
+            this.prostgles.init(this.prostgles.opts.onReady, "TableConfig finish");
+        }
     }
     log = (...args) => {
         if (this.prostgles.opts.DEBUG_MODE) {

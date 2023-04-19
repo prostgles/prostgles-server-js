@@ -1,4 +1,4 @@
-import { getKeys, asName as _asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE, isObject, JSONB, ColumnInfo, asName } from "prostgles-types";
+import { asName as _asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE, isObject, JSONB, ColumnInfo } from "prostgles-types";
 import { isPlainObject, JoinInfo } from "../DboBuilder";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import { PubSubManager, asValue, log } from "../PubSubManager/PubSubManager";
@@ -421,12 +421,14 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
   initialising = false;
   async init() {
     
+    let changedSchema = false;
     this.initialising = true;
     let queries: string[] = [];
     const makeQuery = (q: string[]) => q.map(v => v.trim().endsWith(";")? v : `${v};`).join("\n");
     const runQueries = async (_queries = queries) => {
-      const q = makeQuery(queries);
+      const q = `/* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ \n\n` + makeQuery(queries);
       if(!_queries.length) return 0;
+      changedSchema = true;
       this.log(q);
       log(q);
       await this.db.multi(q).catch(err => {
@@ -701,6 +703,9 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       await this.db.any(`INSERT INTO ${migrations.table}(id, table_config) VALUES (${asValue(migrations.version)}, ${asValue(this.config)}) ON CONFLICT DO NOTHING;`)
     }
     this.initialising = false;
+    if(changedSchema){
+      this.prostgles.init(this.prostgles.opts.onReady, "TableConfig finish");
+    }
   }
 
   log = (...args: any[]) => {
