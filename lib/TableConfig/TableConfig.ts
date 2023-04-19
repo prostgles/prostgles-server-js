@@ -430,7 +430,6 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       let q = makeQuery(queries);
       if(!_queries.some(q => q.trim().length)) return 0;
       q = `/* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ \n\n` + q;
-      changedSchema = true;
       this.log(q);
       log(q);
       queryHistory.push(q);
@@ -439,6 +438,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
         return Promise.reject(err);
       });
+      changedSchema = true;
       _queries = [];
       queries = [];
       return 1;
@@ -648,17 +648,22 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
           const funcNameParsed = asName(triggerFuncName);
           
-          queries.push(`
-            CREATE OR REPLACE FUNCTION ${funcNameParsed}()
-              RETURNS trigger
-              LANGUAGE plpgsql
-            AS
-            $$
-
-            ${trigger.query}
-            
-            $$;
-          `);
+          let addedFunc = false;
+          const addFuncDef = () => {
+            if(!addedFunc) return;
+            addedFunc = true;
+            queries.push(`
+              CREATE OR REPLACE FUNCTION ${funcNameParsed}()
+                RETURNS trigger
+                LANGUAGE plpgsql
+              AS
+              $$
+  
+              ${trigger.query}
+              
+              $$;
+            `);
+          }
           
           trigger.actions.forEach(action => {
             const triggerActionName = triggerFuncName+"_"+action;
@@ -669,6 +674,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
             }
 
             if(isDropped || !existingTriggers.some(t => t.trigger_name === triggerActionName)){
+              addFuncDef();
               const newTableName = action !== "delete"? "NEW TABLE AS new_table" : "";
               const oldTableName = action !== "insert"? "OLD TABLE AS old_table" : "";
               queries.push(`

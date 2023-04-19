@@ -139,7 +139,6 @@ class TableConfigurator {
             if (!_queries.some(q => q.trim().length))
                 return 0;
             q = `/* ${PubSubManager_1.PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ \n\n` + q;
-            changedSchema = true;
             this.log(q);
             (0, PubSubManager_1.log)(q);
             queryHistory.push(q);
@@ -147,6 +146,7 @@ class TableConfigurator {
                 (0, PubSubManager_1.log)({ err, q });
                 return Promise.reject(err);
             });
+            changedSchema = true;
             _queries = [];
             queries = [];
             return 1;
@@ -311,17 +311,23 @@ class TableConfigurator {
                 // `, {}, { returnType: "rows" }) as { proname: string }[];
                 Object.entries(triggers).forEach(([triggerFuncName, trigger]) => {
                     const funcNameParsed = asName(triggerFuncName);
-                    queries.push(`
-            CREATE OR REPLACE FUNCTION ${funcNameParsed}()
-              RETURNS trigger
-              LANGUAGE plpgsql
-            AS
-            $$
-
-            ${trigger.query}
-            
-            $$;
-          `);
+                    let addedFunc = false;
+                    const addFuncDef = () => {
+                        if (!addedFunc)
+                            return;
+                        addedFunc = true;
+                        queries.push(`
+              CREATE OR REPLACE FUNCTION ${funcNameParsed}()
+                RETURNS trigger
+                LANGUAGE plpgsql
+              AS
+              $$
+  
+              ${trigger.query}
+              
+              $$;
+            `);
+                    };
                     trigger.actions.forEach(action => {
                         const triggerActionName = triggerFuncName + "_" + action;
                         const triggerActionNameParsed = asName(triggerActionName);
@@ -329,6 +335,7 @@ class TableConfigurator {
                             queries.push(`DROP TRIGGER IF EXISTS ${triggerActionNameParsed} ON ${tableName};`);
                         }
                         if (isDropped || !existingTriggers.some(t => t.trigger_name === triggerActionName)) {
+                            addFuncDef();
                             const newTableName = action !== "delete" ? "NEW TABLE AS new_table" : "";
                             const oldTableName = action !== "insert" ? "OLD TABLE AS old_table" : "";
                             queries.push(`
