@@ -131,8 +131,9 @@ class TableConfigurator {
     async init() {
         let changedSchema = false;
         this.initialising = true;
+        const queryHistory = [];
         let queries = [];
-        const makeQuery = (q) => q.map(v => v.trim().endsWith(";") ? v : `${v};`).join("\n");
+        const makeQuery = (q) => q.filter(v => v.trim().length).map(v => v.trim().endsWith(";") ? v : `${v};`).join("\n");
         const runQueries = async (_queries = queries) => {
             let q = makeQuery(queries);
             if (!_queries.some(q => q.trim().length))
@@ -141,6 +142,7 @@ class TableConfigurator {
             changedSchema = true;
             this.log(q);
             (0, PubSubManager_1.log)(q);
+            queryHistory.push(q);
             await this.db.multi(q).catch(err => {
                 (0, PubSubManager_1.log)({ err, q });
                 return Promise.reject(err);

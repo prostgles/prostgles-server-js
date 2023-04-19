@@ -423,8 +423,9 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     
     let changedSchema = false;
     this.initialising = true;
+    const queryHistory = [];
     let queries: string[] = [];
-    const makeQuery = (q: string[]) => q.map(v => v.trim().endsWith(";")? v : `${v};`).join("\n");
+    const makeQuery = (q: string[]) => q.filter(v => v.trim().length).map(v => v.trim().endsWith(";")? v : `${v};`).join("\n");
     const runQueries = async (_queries = queries) => {
       let q = makeQuery(queries);
       if(!_queries.some(q => q.trim().length)) return 0;
@@ -432,6 +433,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       changedSchema = true;
       this.log(q);
       log(q);
+      queryHistory.push(q);
       await this.db.multi(q).catch(err => {
         log({ err, q });
 
