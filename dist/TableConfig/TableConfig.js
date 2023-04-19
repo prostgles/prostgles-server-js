@@ -135,7 +135,7 @@ class TableConfigurator {
         const makeQuery = (q) => q.map(v => v.trim().endsWith(";") ? v : `${v};`).join("\n");
         const runQueries = async (_queries = queries) => {
             let q = makeQuery(queries);
-            if (!_queries.length)
+            if (!_queries.some(q => q.trim().length))
                 return 0;
             q = `/* ${PubSubManager_1.PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ \n\n` + q;
             changedSchema = true;
