@@ -261,9 +261,24 @@ export default class TableConfigurator<LANG_IDS = {
         value: any;
     }) => void;
     getJoinInfo: (sourceTable: string, targetTable: string) => JoinInfo | undefined;
+    prevInitQueryHistory?: string[];
     initialising: boolean;
     init(): Promise<never>;
     log: (...args: any[]) => void;
 }
+type PGIndex = {
+    schemaname: string;
+    indexname: string;
+    indexdef: string;
+    escaped_identifier: string;
+    type: string;
+    owner: string;
+    tablename: string;
+    persistence: string;
+    access_method: string;
+    size: string;
+    description: string | null;
+};
+export declare const getIndexes: (db: DB, tableName: string, schema: string) => Promise<PGIndex[]>;
 export {};
 //# sourceMappingURL=TableConfig.d.ts.map

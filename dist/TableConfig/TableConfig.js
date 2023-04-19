@@ -316,7 +316,7 @@ class TableConfigurator {
                     const funcNameParsed = asName(triggerFuncName);
                     let addedFunc = false;
                     const addFuncDef = () => {
-                        if (!addedFunc)
+                        if (addedFunc)
                             return;
                         addedFunc = true;
                         queries.push(`

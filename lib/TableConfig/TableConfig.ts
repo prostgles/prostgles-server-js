@@ -652,7 +652,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
           
           let addedFunc = false;
           const addFuncDef = () => {
-            if(!addedFunc) return;
+            if(addedFunc) return;
             addedFunc = true;
             queries.push(`
               CREATE OR REPLACE FUNCTION ${funcNameParsed}()
