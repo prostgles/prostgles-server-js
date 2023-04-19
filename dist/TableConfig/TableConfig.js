@@ -130,6 +130,7 @@ class TableConfigurator {
     initialising = false;
     async init() {
         let changedSchema = false;
+        const failedQueries = [];
         this.initialising = true;
         const queryHistory = [];
         let queries = [];
@@ -144,6 +145,7 @@ class TableConfigurator {
             queryHistory.push(q);
             await this.db.multi(q).catch(err => {
                 (0, PubSubManager_1.log)({ err, q });
+                failedQueries.push({ query: q, error: err });
                 return Promise.reject(err);
             });
             changedSchema = true;
@@ -372,8 +374,11 @@ class TableConfigurator {
             await this.db.any(`INSERT INTO ${migrations.table}(id, table_config) VALUES (${(0, PubSubManager_1.asValue)(migrations.version)}, ${(0, PubSubManager_1.asValue)(this.config)}) ON CONFLICT DO NOTHING;`);
         }
         this.initialising = false;
-        if (changedSchema) {
+        if (changedSchema && !failedQueries.length) {
             this.prostgles.init(this.prostgles.opts.onReady, "TableConfig finish");
+        }
+        if (failedQueries.length) {
+            console.error("Table config failed queries: ", failedQueries);
         }
     }
     log = (...args) => {

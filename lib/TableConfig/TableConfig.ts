@@ -422,6 +422,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
   async init() {
     
     let changedSchema = false;
+    const failedQueries: { query: string; error: any }[] = [];
     this.initialising = true;
     const queryHistory = [];
     let queries: string[] = [];
@@ -435,7 +436,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       queryHistory.push(q);
       await this.db.multi(q).catch(err => {
         log({ err, q });
-
+        failedQueries.push({ query: q, error: err });
         return Promise.reject(err);
       });
       changedSchema = true;
@@ -715,8 +716,11 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       await this.db.any(`INSERT INTO ${migrations.table}(id, table_config) VALUES (${asValue(migrations.version)}, ${asValue(this.config)}) ON CONFLICT DO NOTHING;`)
     }
     this.initialising = false;
-    if(changedSchema){
+    if(changedSchema && !failedQueries.length){
       this.prostgles.init(this.prostgles.opts.onReady, "TableConfig finish");
+    }
+    if(failedQueries.length){
+      console.error("Table config failed queries: ", failedQueries)
     }
   }
 
