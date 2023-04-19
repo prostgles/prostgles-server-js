@@ -261,6 +261,7 @@ export default class TableConfigurator<LANG_IDS = {
         value: any;
     }) => void;
     getJoinInfo: (sourceTable: string, targetTable: string) => JoinInfo | undefined;
+    prevInitQueryHistory?: string[];
     initialising: boolean;
     init(): Promise<undefined>;
     log: (...args: any[]) => void;

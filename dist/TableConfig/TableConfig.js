@@ -127,6 +127,7 @@ class TableConfigurator {
         }
         return undefined;
     };
+    prevInitQueryHistory;
     initialising = false;
     async init() {
         let changedSchema = false;
@@ -375,7 +376,15 @@ class TableConfigurator {
         }
         this.initialising = false;
         if (changedSchema && !failedQueries.length) {
-            this.prostgles.init(this.prostgles.opts.onReady, "TableConfig finish");
+            if (!this.prevInitQueryHistory) {
+                this.prevInitQueryHistory = queryHistory;
+            }
+            else if (this.prevInitQueryHistory.join() !== queryHistory.join()) {
+                this.prostgles.init(this.prostgles.opts.onReady, "TableConfig finish");
+            }
+            else {
+                console.error("TableConfig loop bug", queryHistory);
+            }
         }
         if (failedQueries.length) {
             console.error("Table config failed queries: ", failedQueries);
