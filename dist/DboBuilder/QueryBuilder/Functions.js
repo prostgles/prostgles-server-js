@@ -303,7 +303,7 @@ PostGIS_Funcs = PostGIS_Funcs.concat([
         singleColArg: true,
         numArgs: 1,
         getFields: (args) => [args[0]],
-        getQuery: ({ allowedFields, args: [colName, ...otherArgs], tableAlias }) => {
+        getQuery: ({ args: [colName, ...otherArgs], tableAlias }) => {
             let secondArg = "";
             if (otherArgs.length)
                 secondArg = ", " + otherArgs.map(arg => asValue(arg)).join(", ");
@@ -329,7 +329,7 @@ PostGIS_Funcs = PostGIS_Funcs.concat(["ST_Extent", "ST_3DExtent", "ST_XMin_Agg",
         singleColArg: true,
         numArgs: 1,
         getFields: (args) => [args[0]],
-        getQuery: ({ allowedFields, args, tableAlias }) => {
+        getQuery: ({ args, tableAlias }) => {
             const escTabelName = (0, QueryBuilder_1.asNameAlias)(args[0], tableAlias) + "::geometry";
             if (fname.includes("Extent")) {
                 return `${fname}(${escTabelName})`;
@@ -366,7 +366,7 @@ exports.FUNCTIONS = [
         singleColArg: false,
         numArgs: MAX_COL_NUM,
         getFields: (args) => args,
-        getQuery: ({ allowedFields, args, tableAlias }) => {
+        getQuery: ({ args, tableAlias }) => {
             const q = DboBuilder_1.pgp.as.format("md5(" + args.map(fname => "COALESCE( " + (0, QueryBuilder_1.asNameAlias)(fname, tableAlias) + "::text, '' )").join(" || ") + ")");
             return q;
         }
@@ -378,7 +378,7 @@ exports.FUNCTIONS = [
         singleColArg: false,
         numArgs: MAX_COL_NUM,
         getFields: (args) => args,
-        getQuery: ({ allowedFields, args, tableAlias }) => {
+        getQuery: ({ args, tableAlias }) => {
             const q = DboBuilder_1.pgp.as.format("md5(string_agg(" + args.map(fname => "COALESCE( " + (0, QueryBuilder_1.asNameAlias)(fname, tableAlias) + "::text, '' )").join(" || ") + ", ','))");
             return q;
         }
@@ -390,7 +390,7 @@ exports.FUNCTIONS = [
         singleColArg: false,
         numArgs: MAX_COL_NUM,
         getFields: (args) => args,
-        getQuery: ({ allowedFields, args, tableAlias }) => {
+        getQuery: ({ args, tableAlias }) => {
             const q = DboBuilder_1.pgp.as.format("encode(sha256((" + args.map(fname => "COALESCE( " + (0, QueryBuilder_1.asNameAlias)(fname, tableAlias) + ", '' )").join(" || ") + ")::text::bytea), 'hex')");
             return q;
         }
@@ -402,7 +402,7 @@ exports.FUNCTIONS = [
         singleColArg: false,
         numArgs: MAX_COL_NUM,
         getFields: (args) => args,
-        getQuery: ({ allowedFields, args, tableAlias }) => {
+        getQuery: ({ args, tableAlias }) => {
             const q = DboBuilder_1.pgp.as.format("encode(sha256(string_agg(" + args.map(fname => "COALESCE( " + (0, QueryBuilder_1.asNameAlias)(fname, tableAlias) + ", '' )").join(" || ") + ", ',')::text::bytea), 'hex')");
             return q;
         }
@@ -414,7 +414,7 @@ exports.FUNCTIONS = [
         singleColArg: false,
         numArgs: MAX_COL_NUM,
         getFields: (args) => args,
-        getQuery: ({ allowedFields, args, tableAlias }) => {
+        getQuery: ({ args, tableAlias }) => {
             const q = DboBuilder_1.pgp.as.format("encode(sha512((" + args.map(fname => "COALESCE( " + (0, QueryBuilder_1.asNameAlias)(fname, tableAlias) + ", '' )").join(" || ") + ")::text::bytea), 'hex')");
             return q;
         }
@@ -426,7 +426,7 @@ exports.FUNCTIONS = [
         singleColArg: false,
         numArgs: MAX_COL_NUM,
         getFields: (args) => args,
-        getQuery: ({ allowedFields, args, tableAlias }) => {
+        getQuery: ({ args, tableAlias }) => {
             const q = DboBuilder_1.pgp.as.format("encode(sha512(string_agg(" + args.map(fname => "COALESCE( " + (0, QueryBuilder_1.asNameAlias)(fname, tableAlias) + ", '' )").join(" || ") + ", ',')::text::bytea), 'hex')");
             return q;
         }
@@ -605,14 +605,21 @@ exports.FUNCTIONS = [
         }
     })),
     /* Basic 1 arg col funcs */
-    ...["upper", "lower", "length", "reverse", "trim", "initcap", "round", "ceil", "floor", "sign", "md5"].map(funcName => ({
+    ...[
+        ...["TEXT"].flatMap(cast => [
+            "upper", "lower", "length", "reverse", "trim", "initcap"
+        ].map(funcName => ({ cast, funcName }))),
+        ...[""].flatMap(cast => [
+            "round", "ceil", "floor", "sign", "md5"
+        ].map(funcName => ({ cast, funcName }))),
+    ].map(({ funcName, cast }) => ({
         name: "$" + funcName,
         type: "function",
         numArgs: 1,
         singleColArg: true,
         getFields: (args) => [args[0]],
-        getQuery: ({ allowedFields, args, tableAlias }) => {
-            return funcName + "(" + (0, QueryBuilder_1.asNameAlias)(args[0], tableAlias) + ")";
+        getQuery: ({ args, tableAlias }) => {
+            return `${funcName}(${(0, QueryBuilder_1.asNameAlias)(args[0], tableAlias)}${cast ? `::${cast}` : ""})`;
         }
     })),
     /**

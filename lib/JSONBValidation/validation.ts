@@ -126,7 +126,7 @@ export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpt
           type = !cols? "any" : `{ ${cols.map(c => `${JSON.stringify(c.name)}: ${c.is_nullable? "null | " : "" } ${postgresToTsType(c.udt_name)}; `).join(" ")} }`
         }
       }
-      return `${fieldType.nullable ? `null |` : ""} ${type}${l.isArray? "[]" : ""}`;
+      return `${fieldType.nullable ? `null | ` : ""}${type}${l.isArray? "[]" : ""}`;
 
     } else throw "Unexpected getSchemaTSTypes: " + JSON.stringify({ fieldType, schema }, null, 2)
   } 

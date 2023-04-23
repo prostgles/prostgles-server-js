@@ -399,7 +399,7 @@ let PostGIS_Funcs: FunctionSpec[] = ([
         singleColArg: true,
         numArgs: 1,
         getFields: (args: any[]) => [args[0]],
-        getQuery: ({ allowedFields, args: [colName, ...otherArgs], tableAlias }) => { 
+        getQuery: ({ args: [colName, ...otherArgs], tableAlias }) => { 
           let secondArg = ""; 
           if(otherArgs.length) secondArg = ", " + otherArgs.map(arg => asValue(arg)).join(", ");
           const escTabelName = asNameAlias(colName, tableAlias) + "::geometry";
@@ -428,7 +428,7 @@ let PostGIS_Funcs: FunctionSpec[] = ([
         singleColArg: true,
         numArgs: 1,
         getFields: (args: any[]) => [args[0]],
-        getQuery: ({ allowedFields, args, tableAlias }) => {
+        getQuery: ({ args, tableAlias }) => {
           const escTabelName = asNameAlias(args[0], tableAlias) + "::geometry";
           if(fname.includes("Extent")){
             return `${fname}(${escTabelName})`;
@@ -471,7 +471,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: false,
     numArgs: MAX_COL_NUM,
     getFields: (args: any[]) => args,
-    getQuery: ({ allowedFields, args, tableAlias }) => {
+    getQuery: ({ args, tableAlias }) => {
       const q = pgp.as.format("md5(" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + "::text, '' )" ).join(" || ") + ")");
       return q
     }
@@ -483,7 +483,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: false,
     numArgs: MAX_COL_NUM,
     getFields: (args: any[]) => args,
-    getQuery: ({ allowedFields, args, tableAlias }) => {
+    getQuery: ({ args, tableAlias }) => {
       const q = pgp.as.format("md5(string_agg(" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + "::text, '' )" ).join(" || ") + ", ','))");
       return q
     }
@@ -496,7 +496,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: false,
     numArgs: MAX_COL_NUM,
     getFields: (args: any[]) => args,
-    getQuery: ({ allowedFields, args, tableAlias }) => {
+    getQuery: ({ args, tableAlias }) => {
       const q = pgp.as.format("encode(sha256((" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )" ).join(" || ") + ")::text::bytea), 'hex')");
       return q
     }
@@ -508,7 +508,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: false,
     numArgs: MAX_COL_NUM,
     getFields: (args: any[]) => args,
-    getQuery: ({ allowedFields, args, tableAlias }) => {
+    getQuery: ({ args, tableAlias }) => {
       const q = pgp.as.format("encode(sha256(string_agg(" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )" ).join(" || ") + ", ',')::text::bytea), 'hex')");
       return q
     }
@@ -520,7 +520,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: false,
     numArgs: MAX_COL_NUM,
     getFields: (args: any[]) => args,
-    getQuery: ({ allowedFields, args, tableAlias }) => {
+    getQuery: ({ args, tableAlias }) => {
       const q = pgp.as.format("encode(sha512((" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )" ).join(" || ") + ")::text::bytea), 'hex')");
       return q
     }
@@ -532,7 +532,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: false,
     numArgs: MAX_COL_NUM,
     getFields: (args: any[]) => args,
-    getQuery: ({ allowedFields, args, tableAlias }) => {
+    getQuery: ({ args, tableAlias }) => {
       const q = pgp.as.format("encode(sha512(string_agg(" + args.map(fname => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )" ).join(" || ") + ", ',')::text::bytea), 'hex')");
       return q
     }
@@ -728,14 +728,21 @@ export const FUNCTIONS: FunctionSpec[] = [
   } as FunctionSpec)),
 
   /* Basic 1 arg col funcs */
-  ...["upper", "lower", "length", "reverse", "trim", "initcap", "round", "ceil", "floor", "sign", "md5"].map(funcName => ({
+  ...[
+    ...["TEXT"].flatMap(cast => [
+      "upper", "lower", "length", "reverse", "trim", "initcap"
+    ].map(funcName => ({ cast, funcName }))),
+    ...[""].flatMap(cast => [
+      "round", "ceil", "floor", "sign", "md5"
+    ].map(funcName => ({ cast, funcName }))),
+  ].map(({ funcName, cast }) => ({
     name: "$" + funcName,
     type: "function",
     numArgs: 1,
     singleColArg: true,
     getFields: (args: any[]) => [args[0]],
-    getQuery: ({ allowedFields, args, tableAlias }) => {
-      return funcName + "(" + asNameAlias(args[0], tableAlias) + ")";
+    getQuery: ({ args, tableAlias }) => {
+      return `${funcName}(${asNameAlias(args[0], tableAlias)}${cast? `::${cast}`: ""})`;
     }
   } as FunctionSpec)),
 
