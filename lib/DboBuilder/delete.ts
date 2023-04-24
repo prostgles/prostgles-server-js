@@ -1,9 +1,10 @@
 import pgPromise from "pg-promise";
 import { AnyObject, asName, DeleteParams, FieldFilter } from "prostgles-types";
-import { Filter, LocalParams, makeErrorFromPGError, parseError } from "../DboBuilder";
+import { Filter, LocalParams, parseError } from "../DboBuilder";
 import { DeleteRule, TableRule } from "../PublishParser";
 import { pickKeys } from "../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler";
+import { runQueryReturnType } from "./find";
 
 export async function _delete(this: TableHandler, filter?: Filter, params?: DeleteParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any> {
   try {
@@ -40,7 +41,8 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
 
 
     if (params) {
-      const good_params = ["returning"];
+      const good_paramsObj: Record<keyof DeleteParams, 1> = { returning: 1, returnType: 1 };
+      const good_params = Object.keys(good_paramsObj);
       const bad_params = Object.keys(params).filter(k => !good_params.includes(k));
       if (bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
     }
@@ -124,7 +126,9 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
       }
     }
 
-    return dbHandler[queryType](_query).catch((err: any) => makeErrorFromPGError(err, localParams));
+    return runQueryReturnType(_query, params?.returnType, this, localParams);
+
+    // return dbHandler[queryType](_query).catch((err: any) => makeErrorFromPGError(err, localParams));
   } catch (e) {
     // console.trace(e)
     if (localParams && localParams.testRule) throw e;

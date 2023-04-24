@@ -74,7 +74,7 @@ export declare class ViewHandler {
         data: AnyObject;
     } | undefined, _param3?: undefined, tableRules?: TableRule | undefined, localParams?: LocalParams | undefined) => Promise<import("prostgles-types").ValidatedColumnInfo[]>;
     getValidatedRules(tableRules?: TableRule, localParams?: LocalParams): ValidatedTableRules;
-    find(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]>;
+    find: (filter?: Filter | undefined, selectParams?: SelectParams | undefined, param3_unused?: undefined, tableRules?: TableRule | undefined, localParams?: LocalParams | undefined) => Promise<any[]>;
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
     subscribe(filter: Filter, params: SubscribeParams, localFuncs: LocalFuncs): Promise<{
         unsubscribe: () => any;

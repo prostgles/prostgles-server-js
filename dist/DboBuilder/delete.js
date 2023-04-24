@@ -4,6 +4,7 @@ exports._delete = void 0;
 const prostgles_types_1 = require("prostgles-types");
 const DboBuilder_1 = require("../DboBuilder");
 const PubSubManager_1 = require("../PubSubManager/PubSubManager");
+const find_1 = require("./find");
 async function _delete(filter, params, param3_unused, table_rules, localParams) {
     try {
         const { returning } = params || {};
@@ -32,7 +33,8 @@ async function _delete(filter, params, param3_unused, table_rules, localParams) 
             }
         }
         if (params) {
-            const good_params = ["returning"];
+            const good_paramsObj = { returning: 1, returnType: 1 };
+            const good_params = Object.keys(good_paramsObj);
             const bad_params = Object.keys(params).filter(k => !good_params.includes(k));
             if (bad_params && bad_params.length)
                 throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
@@ -112,7 +114,8 @@ async function _delete(filter, params, param3_unused, table_rules, localParams) 
                 }
             }
         }
-        return dbHandler[queryType](_query).catch((err) => (0, DboBuilder_1.makeErrorFromPGError)(err, localParams));
+        return (0, find_1.runQueryReturnType)(_query, params?.returnType, this, localParams);
+        // return dbHandler[queryType](_query).catch((err: any) => makeErrorFromPGError(err, localParams));
     }
     catch (e) {
         // console.trace(e)

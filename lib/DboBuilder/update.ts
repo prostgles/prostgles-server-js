@@ -4,6 +4,7 @@ import { TableRule, ValidateRow } from "../PublishParser";
 import { omitKeys, pickKeys } from "../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler";
 import { isFile, uploadFile } from "./uploadFile"
+import { runQueryReturnType } from "./find";
 
 export async function update(this: TableHandler, filter: Filter, _newData: AnyObject, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<AnyObject | void> {
   const ACTION = "update";
@@ -56,9 +57,9 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
     const { returning, multi = true, onConflictDoNothing = false, fixIssues = false } = params || {};
     const { returnQuery = false } = localParams ?? {};
 
-
     if (params) {
-      const good_params = ["returning", "multi", "onConflictDoNothing", "fixIssues"];
+      const good_paramsObj: Record<keyof UpdateParams, 1> = { returning: 1, returnType: 1, fixIssues: 1, onConflictDoNothing: 1, multi: 1 };
+      const good_params = Object.keys(good_paramsObj);
       const bad_params = Object.keys(params).filter(k => !good_params.includes(k));
       if (bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
     }
@@ -126,6 +127,10 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
     }
 
     if (returnQuery) return query as unknown as void;
+
+    if(params?.returnType){
+      return runQueryReturnType(query, params.returnType, this, localParams);
+    }
 
     let result;
     if (this.t) {

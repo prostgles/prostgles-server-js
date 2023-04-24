@@ -70,7 +70,7 @@ export declare class ViewHandler {
     getInfo(lang?: string, param2?: any, param3?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<TInfo>;
     getColumns: any;
     getValidatedRules(tableRules?: TableRule, localParams?: LocalParams): ValidatedTableRules;
-    find(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]>;
+    find: any;
     findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any>;
     subscribe(filter: Filter, params: SubscribeParams, localFuncs: LocalFuncs): Promise<{
         unsubscribe: () => any;

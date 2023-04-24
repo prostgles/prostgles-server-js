@@ -5,6 +5,7 @@ const prostgles_types_1 = require("prostgles-types");
 const DboBuilder_1 = require("../DboBuilder");
 const PubSubManager_1 = require("../PubSubManager/PubSubManager");
 const uploadFile_1 = require("./uploadFile");
+const find_1 = require("./find");
 async function update(filter, _newData, params, tableRules, localParams) {
     const ACTION = "update";
     try {
@@ -51,7 +52,8 @@ async function update(filter, _newData, params, tableRules, localParams) {
         const { returning, multi = true, onConflictDoNothing = false, fixIssues = false } = params || {};
         const { returnQuery = false } = localParams ?? {};
         if (params) {
-            const good_params = ["returning", "multi", "onConflictDoNothing", "fixIssues"];
+            const good_paramsObj = { returning: 1, returnType: 1, fixIssues: 1, onConflictDoNothing: 1, multi: 1 };
+            const good_params = Object.keys(good_paramsObj);
             const bad_params = Object.keys(params).filter(k => !good_params.includes(k));
             if (bad_params && bad_params.length)
                 throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
@@ -106,6 +108,9 @@ async function update(filter, _newData, params, tableRules, localParams) {
         }
         if (returnQuery)
             return query;
+        if (params?.returnType) {
+            return (0, find_1.runQueryReturnType)(query, params.returnType, this, localParams);
+        }
         let result;
         if (this.t) {
             result = await (this.t)[qType](query).catch((err) => (0, DboBuilder_1.makeErrorFromPGError)(err, localParams, this, fields));

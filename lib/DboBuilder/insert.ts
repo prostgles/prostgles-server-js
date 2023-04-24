@@ -74,8 +74,9 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
     }
 
     if (param2) {
-      const good_params = ["returning", "multi", "onConflictDoNothing", "fixIssues"];
-      const bad_params = getKeys(param2).filter(k => !good_params.includes(k));
+      const good_paramsObj: Record<keyof InsertParams, 1> = { returning: 1, returnType: 1, fixIssues: 1, onConflictDoNothing: 1 };
+      const good_params = Object.keys(good_paramsObj);
+      const bad_params = Object.keys(param2).filter(k => !good_params.includes(k));
       if (bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
     }
 
@@ -107,6 +108,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
         await tableRules?.[ACTION]?.validate?.(_data, this.dbTX || this.dboBuilder.dbo);
         insertQ = `INSERT INTO ${asName(this.name)} DEFAULT VALUES `;
       } else {
+        //@ts-ignore
         insertQ = await this.colSet.getInsertQuery(_data, allowedCols, this.dbTX || this.dboBuilder.dbo, tableRules?.[ACTION]?.validate) // pgp.helpers.insert(_data, columnSet); 
       }
       return insertQ + conflict_query + returningSelect;
