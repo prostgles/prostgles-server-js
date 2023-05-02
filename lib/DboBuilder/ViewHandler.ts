@@ -830,7 +830,7 @@ export class ViewHandler {
 
         let j = `SELECT 1 \n` +
           `FROM ${asName(table)} ${tableAlias} \n` +
-          `WHERE ${cond} \n`;//
+          `WHERE (${cond}) \n`;//
         if (
           ji === paths.length - 1 &&
           finalFilter
