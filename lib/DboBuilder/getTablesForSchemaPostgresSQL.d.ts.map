@@ -1,0 +1,1 @@
+{"version":3,"file":"getTablesForSchemaPostgresSQL.d.ts","sourceRoot":"","sources":["getTablesForSchemaPostgresSQL.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,UAAU,EAAqB,WAAW,EAAE,MAAM,eAAe,CAAC;AAE3E,wBAAsB,6BAA6B,CAAC,EAAE,EAAE,EAAE,MAAM,EAAE,EAAE,UAAU,EAAE,MAAM,SAAW,GAAG,OAAO,CAAC,WAAW,EAAE,CAAC,CA6MzH"}
