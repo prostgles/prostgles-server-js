@@ -512,7 +512,7 @@ export class PublishParser {
     if (!tHandler) {
       throw { stack: ["getTableRules()"], message: `${tableName} could not be found in dbo` };
     }
-
+    
     const MY_RULES = RULE_TO_METHODS.filter(r => {
 
       /** Check PG User privileges */

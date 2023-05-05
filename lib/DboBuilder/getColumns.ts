@@ -26,7 +26,7 @@ export async function getColumns(
     // console.log("getColumns", this.name, this.columns.map(c => c.name))
 
 
-    let dynamicUpdateFields: string[] | undefined;
+    let dynamicUpdateFields = this.column_names;
 
     if (params && tableRules && isTableHandler(this)) {
       if (
@@ -87,14 +87,10 @@ export async function getColumns(
           select: select && Boolean(p.select?.fields?.includes(c.name)),
           orderBy: select && Boolean(p.select?.fields && p.select.orderByFields.includes(c.name)) && !nonOrderableUD_Types.includes(c.udt_name),
           filter: Boolean(p.select?.filterFields?.includes(c.name)),
-          update: update && Boolean(p.update?.fields?.includes(c.name)) && tableRules?.update?.forcedData?.[c.name] === undefined && c.is_updatable,
+          update: update && Boolean(p.update?.fields?.includes(c.name)) && tableRules?.update?.forcedData?.[c.name] === undefined && c.is_updatable && dynamicUpdateFields.includes(c.name),
           delete: _delete && Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)),
           ...(prostgles?.tableConfigurator?.getColInfo({ table: this.name, col: c.name, lang }) || {}),
           ...(fileConfig && { file: fileConfig })
-        }
-
-        if (dynamicUpdateFields) {
-          result.update = dynamicUpdateFields.includes(c.name);
         }
 
         return result;
