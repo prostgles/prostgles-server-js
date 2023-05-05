@@ -72,6 +72,7 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
             ccc.comment, 
             ccc.ordinal_position, 
             ccc.is_nullable = 'YES' as is_nullable,
+            ccc.is_updatable,
             ccc.references,
             ccc.has_default,
             ccc.column_default,
@@ -95,6 +96,8 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
             , c.column_default
             , format('%I.%I', c.table_schema, c.table_name)::regclass::oid AS table_oid
             , c.is_nullable
+              /* generated always and view columns cannot be updated */
+            , COALESCE(c.is_updatable, 'YES') = 'YES' AND COALESCE(c.is_generated, '') != 'ALWAYS' AND COALESCE(c.identity_generation, '') != 'ALWAYS' as is_updatable
             , cp.privileges
             FROM information_schema.columns c    
             LEFT JOIN (SELECT * FROM information_schema.element_types )   e  
