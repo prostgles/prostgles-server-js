@@ -668,7 +668,11 @@ export const FUNCTIONS: FunctionSpec[] = [
         throw "Not supported. prevUnit not found";
       }
 
-      const res = `(date_trunc(${asValue(prevUnit)}, ${col}) + date_part(${asValue(unit, "::text")}, ${col})::int / ${val} * interval ${asValue(val + " " + unit)})`;
+      let extractedUnit = `date_part(${asValue(unit, "::text")}, ${col})::int`;
+      if(unit === "microsecond" || unit === "millisecond"){
+        extractedUnit = `(${extractedUnit} - 1000 * floor(${extractedUnit}/1000)::int)`
+      }
+      const res = `(date_trunc(${asValue(prevUnit)}, ${col}) + floor(${extractedUnit} / ${val}) * interval ${asValue(val + " " + unit)})`;
       // console.log(res);
       return res;
     }
