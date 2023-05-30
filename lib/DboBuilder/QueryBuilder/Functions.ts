@@ -653,14 +653,22 @@ export const FUNCTIONS: FunctionSpec[] = [
     getQuery: ({ allColumns, args, tableAlias }) => {
       const col = parseUnix(args[0], tableAlias, allColumns)
       if(!val) return `date_trunc(${asValue(unit)}, ${col})`;
-      const prevInt = {
+      const PreviousUnit = {
+        year: "decade",
         month: "year",
         hour: "day",
         minute: "hour",
-        second: "minute" 
+        second: "minute",
+        millisecond: "second",
+        microsecond: "millisecond",
       };
 
-      const res = `(date_trunc(${asValue(prevInt[unit as "month"] || "hour")}, ${col}) + date_part(${asValue(unit, "::text")}, ${col})::int / ${val} * interval ${asValue(val + " " + unit)})`;
+      const prevUnit = PreviousUnit[unit as "month"];
+      if(!prevUnit){
+        throw "Not supported. prevUnit not found";
+      }
+
+      const res = `(date_trunc(${asValue(prevUnit)}, ${col}) + date_part(${asValue(unit, "::text")}, ${col})::int / ${val} * interval ${asValue(val + " " + unit)})`;
       // console.log(res);
       return res;
     }
