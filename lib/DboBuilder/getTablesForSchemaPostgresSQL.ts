@@ -1,6 +1,10 @@
 import { SQLResult } from "prostgles-types";
 import { DboBuilder, TableSchemaColumn, TableSchema } from "../DboBuilder";
 import { asValue } from "../PubSubManager/PubSubManager";
+
+console.error(`this query gets blocked by prostgles.app_triggers from PubSubManager.addTrigger: 
+
+Ensure THIS SCHEMA IS MOMOIZED IF watchSchema IS ON`);
 export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, schema = "public"): Promise<TableSchema[]> {
   const query =
     `

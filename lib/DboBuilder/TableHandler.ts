@@ -46,7 +46,10 @@ export class TableHandler extends ViewHandler {
           )
         )
       ); 
-      
+      if(this.t){
+        const _queries = queries.map(q => this.t!.none(q as unknown as string))
+        return this.t.batch(_queries)
+      }
       return this.db.tx(t => {
         const _queries = queries.map(q => t.none(q as unknown as string))
         return t.batch(_queries)

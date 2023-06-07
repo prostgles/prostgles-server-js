@@ -21,6 +21,10 @@ class TableHandler extends ViewHandler_1.ViewHandler {
     async updateBatch(data, params, tableRules, localParams) {
         try {
             const queries = await Promise.all(data.map(async ([filter, data]) => await this.update(filter, data, { ...(params || {}), returning: undefined }, tableRules, { ...(localParams || {}), returnQuery: true })));
+            if (this.t) {
+                const _queries = queries.map(q => this.t.none(q));
+                return this.t.batch(_queries);
+            }
             return this.db.tx(t => {
                 const _queries = queries.map(q => t.none(q));
                 return t.batch(_queries);
