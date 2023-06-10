@@ -18,7 +18,6 @@ import {
   TableInfo as TInfo,
   SQLHandler,
   AnyObject,
-  SQLResult, 
   JoinMaker,
   isObject, getKeys, ProstglesError, _PG_geometric, EXISTS_KEY
 } from "prostgles-types";

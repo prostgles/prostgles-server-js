@@ -32,7 +32,7 @@ export class SchemaWatchManager {
             const dbuilder = await DboBuilder.create(this as any);
             if(dbuilder.tsTypesDefinition !== this.prostgles.dboBuilder.tsTypesDefinition){
               this.prostgles.refreshDBO();
-              this.prostgles.init(this.prostgles.opts.onReady);
+              this.prostgles.init(this.prostgles.opts.onReady, "schema-watch-interval");
             }
         }, prgl.opts.watchSchemaType.checkIntervalMillis)
       }

@@ -114,7 +114,7 @@ export declare class PubSubManager {
         schema: string;
     };
     NOTIF_CHANNEL: {
-        preffix: string;
+        preffix: "prostgles_";
         getFull: (appID?: string) => string;
     };
     /**
@@ -133,6 +133,7 @@ export declare class PubSubManager {
     destroy: () => void;
     canContinue: () => boolean;
     appChecking: boolean;
+    checkedListenerTableCond?: string[];
     init: () => Promise<PubSubManager | undefined>;
     static SCHEMA_ALTERING_QUERIES: string[];
     static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID: string;

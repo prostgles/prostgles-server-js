@@ -131,7 +131,6 @@ BEGIN
           added               TIMESTAMP DEFAULT NOW(),
           application_name    TEXT,
           last_check          TIMESTAMP NOT NULL DEFAULT NOW(),
-          last_check_ended    TIMESTAMP NOT NULL DEFAULT NOW(),
           watching_schema     BOOLEAN DEFAULT FALSE,
           check_frequency_ms  INTEGER NOT NULL  
         );
@@ -150,7 +149,7 @@ BEGIN
 
           inserted        TIMESTAMP NOT NULL DEFAULT NOW(),
           last_used       TIMESTAMP NOT NULL DEFAULT NOW(),
-          PRIMARY KEY (app_id, table_name, condition) /* This unqique index limits the condition column value to be less than 'SELECT current_setting('block_size'); */
+          PRIMARY KEY (app_id, table_name, condition) /* This unique index limits the condition column value to be less than 'SELECT current_setting('block_size'); */
         );
         COMMENT ON TABLE prostgles.app_triggers IS 'Tables and conditions that are currently subscribed/synced';
 
@@ -292,7 +291,6 @@ BEGIN
                           RAISE NOTICE 'trigger dropped due to exception: % % %', err_text, err_detail, err_hint;
 
                         END IF;
-
                         
                     END IF;
                 END IF;
@@ -503,12 +501,12 @@ BEGIN
                     SELECT LEFT(COALESCE(current_query(), ''), 5000)
                     INTO curr_query;
                     
-                    FOR arw IN 
+                    FOR app IN 
                       SELECT * FROM prostgles.apps WHERE watching_schema IS TRUE
 
                     LOOP
                       PERFORM pg_notify( 
-                        ${(0, PubSubManager_1.asValue)(this.NOTIF_CHANNEL.preffix)} || arw.id, 
+                        ${(0, PubSubManager_1.asValue)(this.NOTIF_CHANNEL.preffix)} || app.id, 
                         concat_ws(
                           ${(0, PubSubManager_1.asValue)(PubSubManager_1.PubSubManager.DELIMITER)}, 
                           ${(0, PubSubManager_1.asValue)(this.NOTIF_TYPE.schema)}, tg_tag , TG_event, curr_query

@@ -185,7 +185,7 @@ export class PubSubManager {
     schema: "schema_has_changed"
   }
   NOTIF_CHANNEL = {
-    preffix: 'prostgles_',
+    preffix: 'prostgles_' as const,
     getFull: (appID?: string) => {
       const finalAppId = appID ?? this.appID;
       if (!finalAppId) throw "No appID";
@@ -253,6 +253,7 @@ export class PubSubManager {
   }
 
   appChecking = false;
+  checkedListenerTableCond?: string[];
   init = initPubSubManager.bind(this);
 
 
@@ -269,106 +270,107 @@ export class PubSubManager {
     try {
 
       await this.db.any(`
-                BEGIN;--  ISOLATION LEVEL SERIALIZABLE;
-                
-                /**                                 ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
-                 *  Drop stale triggers
-                 * */
-                DO
-                $do$
-                  DECLARE trg RECORD;
-                    q   TEXT;
-                    ev_trg_needed BOOLEAN := FALSE;
-                    ev_trg_exists BOOLEAN := FALSE;
-                    is_super_user BOOLEAN := FALSE;
-                BEGIN
-                    --SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
-                    
-                    LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
-                    EXECUTE format(
-                      $q$
+        BEGIN;--  ISOLATION LEVEL SERIALIZABLE;
+        
+        /**                                 
+         * ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
+         *  Drop stale triggers
+         * */
+        DO
+        $do$
+          DECLARE trg RECORD;
+            q   TEXT;
+            ev_trg_needed BOOLEAN := FALSE;
+            ev_trg_exists BOOLEAN := FALSE;
+            is_super_user BOOLEAN := FALSE;
+        BEGIN
+            --SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+            
+            LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
+            EXECUTE format(
+              $q$
 
-                        CREATE TEMP TABLE %1$I AS --ON COMMIT DROP AS
-                        SELECT * FROM prostgles.app_triggers;
+                CREATE TEMP TABLE %1$I AS --ON COMMIT DROP AS
+                SELECT * FROM prostgles.app_triggers;
 
-                        DELETE FROM prostgles.app_triggers;
+                DELETE FROM prostgles.app_triggers;
 
-                        INSERT INTO prostgles.app_triggers
-                        SELECT * FROM %1$I;
+                INSERT INTO prostgles.app_triggers
+                SELECT * FROM %1$I;
 
-                        DROP TABLE IF EXISTS %1$I;
-                      $q$, 
-                      ${asValue('triggers_' + this.appID)}
-                    );
-  
-                    is_super_user := EXISTS (select 1 from pg_user where usename = CURRENT_USER AND usesuper IS TRUE);
+                DROP TABLE IF EXISTS %1$I;
+              $q$, 
+              ${asValue('triggers_' + this.appID)}
+            );
 
-                    /**
-                     *  Delete stale app records
-                     * */
-                    DELETE FROM prostgles.apps
-                    WHERE last_check < NOW() - 8 * check_frequency_ms * interval '1 millisecond';
+            is_super_user := EXISTS (select 1 from pg_user where usename = CURRENT_USER AND usesuper IS TRUE);
 
-                    DELETE FROM prostgles.app_triggers
-                    WHERE app_id NOT IN (SELECT id FROM prostgles.apps);
-                    
-                    /* DROP the old buggy schema watch trigger */
-                    IF EXISTS (
-                      SELECT 1 FROM pg_catalog.pg_event_trigger
-                      WHERE evtname = 'prostgles_schema_watch_trigger'
-                    ) AND is_super_user IS TRUE 
-                    THEN
-                        DROP EVENT TRIGGER IF EXISTS prostgles_schema_watch_trigger;
-                    END IF;
+            /**
+             *  Delete stale app records, this will delete related triggers
+             * */
+            DELETE FROM prostgles.apps
+            WHERE last_check < NOW() - 8 * check_frequency_ms * interval '1 millisecond';
 
-                    ev_trg_needed := EXISTS (SELECT 1 FROM prostgles.apps WHERE watching_schema IS TRUE);
-                    ev_trg_exists := EXISTS (
-                        SELECT 1 FROM pg_catalog.pg_event_trigger
-                        WHERE evtname = ${asValue(DB_OBJ_NAMES.schema_watch_trigger)}
-                    );
+            DELETE FROM prostgles.app_triggers
+            WHERE app_id NOT IN (SELECT id FROM prostgles.apps);
+            
+            /* DROP the old buggy schema watch trigger */
+            IF EXISTS (
+              SELECT 1 FROM pg_catalog.pg_event_trigger
+              WHERE evtname = 'prostgles_schema_watch_trigger'
+            ) AND is_super_user IS TRUE 
+            THEN
+                DROP EVENT TRIGGER IF EXISTS prostgles_schema_watch_trigger;
+            END IF;
 
-                     -- RAISE NOTICE ' ev_trg_needed %, ev_trg_exists %', ev_trg_needed, ev_trg_exists;
+            ev_trg_needed := EXISTS (SELECT 1 FROM prostgles.apps WHERE watching_schema IS TRUE);
+            ev_trg_exists := EXISTS (
+                SELECT 1 FROM pg_catalog.pg_event_trigger
+                WHERE evtname = ${asValue(DB_OBJ_NAMES.schema_watch_trigger)}
+            );
 
-                    /**
-                     *  DROP stale event trigger
-                     * */
-                    IF is_super_user IS TRUE AND ev_trg_needed IS FALSE AND ev_trg_exists IS TRUE THEN
+              -- RAISE NOTICE ' ev_trg_needed %, ev_trg_exists %', ev_trg_needed, ev_trg_exists;
 
-                        SELECT format(
-                            $$ DROP EVENT TRIGGER IF EXISTS %I ; $$
-                            , ${asValue(DB_OBJ_NAMES.schema_watch_trigger)}
-                        )
-                        INTO q;
+            /**
+             *  DROP stale event trigger
+             * */
+            IF is_super_user IS TRUE AND ev_trg_needed IS FALSE AND ev_trg_exists IS TRUE THEN
 
-                        --RAISE NOTICE ' DROP EVENT TRIGGER %', q;
+                SELECT format(
+                  $$ DROP EVENT TRIGGER IF EXISTS %I ; $$
+                  , ${asValue(DB_OBJ_NAMES.schema_watch_trigger)}
+                )
+                INTO q;
 
-                        EXECUTE q;
+                --RAISE NOTICE ' DROP EVENT TRIGGER %', q;
 
-                    /**
-                     *  CREATE event trigger
-                     * */
-                    ELSIF 
-                        is_super_user IS TRUE 
-                        AND ev_trg_needed IS TRUE 
-                        AND ev_trg_exists IS FALSE 
-                    THEN
+                EXECUTE q;
 
-                        DROP EVENT TRIGGER IF EXISTS ${DB_OBJ_NAMES.schema_watch_trigger};
-                        CREATE EVENT TRIGGER ${DB_OBJ_NAMES.schema_watch_trigger} ON ddl_command_end
-                        WHEN TAG IN ('COMMENT', 'CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO')
-                        --WHEN TAG IN ('CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE TRIGGER', 'DROP TRIGGER')
-                        EXECUTE PROCEDURE ${DB_OBJ_NAMES.schema_watch_func}();
+            /**
+             *  CREATE event trigger
+             * */
+            ELSIF 
+                is_super_user IS TRUE 
+                AND ev_trg_needed IS TRUE 
+                AND ev_trg_exists IS FALSE 
+            THEN
 
-                        --RAISE NOTICE ' CREATED EVENT TRIGGER %', q;
-                    END IF;
- 
-                    
-                END
-                $do$; 
-  
+                DROP EVENT TRIGGER IF EXISTS ${DB_OBJ_NAMES.schema_watch_trigger};
+                CREATE EVENT TRIGGER ${DB_OBJ_NAMES.schema_watch_trigger} ON ddl_command_end
+                WHEN TAG IN ('COMMENT', 'CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO')
+                --WHEN TAG IN ('CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE TRIGGER', 'DROP TRIGGER')
+                EXECUTE PROCEDURE ${DB_OBJ_NAMES.schema_watch_func}();
 
-                COMMIT;
-            `).catch(e => {
+                --RAISE NOTICE ' CREATED EVENT TRIGGER %', q;
+            END IF;
+
+            
+        END
+        $do$; 
+
+
+        COMMIT;
+      `).catch(e => {
         console.error("prepareTriggers failed: ", e);
         throw e;
       });

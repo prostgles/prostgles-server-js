@@ -86,7 +86,7 @@ class PostgresNotifListenManager {
             this.client = client;
             if (!this.connection)
                 throw "Connection missing";
-            return this.connection.none('LISTEN $1~', db_channel_name)
+            return this.connection.none(`/* prostgles-server internal query used for subscriptions and schema hot reload */ \nLISTEN $1~`, db_channel_name)
                 .catch(error => {
                 console.log("PostgresNotifListenManager: unexpected error: ", error); // unlikely to ever happen
             });

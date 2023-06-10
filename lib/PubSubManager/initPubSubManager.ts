@@ -24,14 +24,45 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
       if (!this.appCheck) {
 
         this.appCheck = setInterval(async () => {
-          let appQ = "";
+          let checkForStaleTriggers = "";
           try {   //  drop owned by api
 
             this.appChecking = true;
  
             const listeners = this.getActiveListeners();
+            const checkedListenerTableCond = listeners.map(l => `${l.table_name}.${l.condition}`);
+            let dataTriggerCheckQuery = "";
+            if(this.checkedListenerTableCond?.sort().join() !== checkedListenerTableCond.sort().join()){
+              this.checkedListenerTableCond = checkedListenerTableCond;
+              dataTriggerCheckQuery = `
+                /* Delete unused triggers. Might deadlock */
+                IF EXISTS ( SELECT 1 FROM prostgles.app_triggers) 
+                    
+                THEN
 
-            appQ = `                          
+                    /* TODO: Fixed deadlocks */
+                    --LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
+
+                    /* UPDATE currently used triggers */
+                    ${!listeners.length? "" : `
+                      UPDATE prostgles.app_triggers
+                      SET last_used = CASE WHEN (table_name, condition) IN (
+                        ${listeners.map(l => ` ( ${asValue(l.table_name)}, ${asValue(l.condition)} ) `).join(", ")}
+                      ) THEN NOW() ELSE last_used END
+                      WHERE app_id = ${asValue(this.appID)};
+                    `}
+
+                    /* DELETE stale triggers for current app. Other triggers will be deleted on app startup */
+                    DELETE FROM prostgles.app_triggers
+                    WHERE app_id = ${asValue(this.appID)}
+                    AND last_used < NOW() - 4 * ${asValue(this.appCheckFrequencyMS)} * interval '1 millisecond'; -- 10 seconds at the moment
+
+                END IF;
+              
+              `
+            }
+
+            checkForStaleTriggers = `                          
               DO $$
               BEGIN
 
@@ -49,53 +80,27 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
                     )
                   THEN
  
+                      /* Last check used to remove disconnected apps */
                       UPDATE prostgles.apps 
                       SET last_check = NOW()
                       WHERE id = ${asValue(this.appID)};
 
-
-
-                      /* Delete unused triggers. Might deadlock */
-                      IF EXISTS ( SELECT 1 FROM prostgles.app_triggers) 
-                          
-                      THEN
-
-                          /* TODO: Fixed deadlocks */
-                          --LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
-
-                          /* UPDATE currently used triggers */
-                          ${!listeners.length? "" : `
-                            UPDATE prostgles.app_triggers
-                            SET last_used = CASE WHEN (table_name, condition) IN (
-                              ${listeners.map(l => ` ( ${asValue(l.table_name)}, ${asValue(l.condition)} ) `).join(", ")}
-                            ) THEN NOW() ELSE last_used END
-                            WHERE app_id = ${asValue(this.appID)};
-                          `}
-
-                          /* DELETE stale triggers for current app. Other triggers will be deleted on app startup */
-                          DELETE FROM prostgles.app_triggers
-                          WHERE app_id = ${asValue(this.appID)}
-                          AND last_used < NOW() - 4 * ${asValue(this.appCheckFrequencyMS)} * interval '1 millisecond'; -- 10 seconds at the moment
-
-                      END IF;
-
-                      UPDATE prostgles.apps 
-                      SET last_check_ended = NOW()
-                      WHERE id = ${asValue(this.appID)};
-
-
+                      ${dataTriggerCheckQuery}
                   END IF;
  
               END $$;
           `
-            await this.db.any(appQ);
+            await this.db.any(checkForStaleTriggers);
             tries = 5;
             log("updated last_check");
           } catch (e: any) {
             tries --;
 
             /** In some cases a query idles and blocks everything else. Terminate all similar queries */
-            this.db.any("SELECT state, pg_terminate_backend(pid) from pg_stat_activity WHERE query ilike ${qid} and pid <>  pg_backend_pid();", { qid: "%" + REALTIME_TRIGGER_CHECK_QUERY + "%" });
+            this.db.any(
+              "SELECT state, pg_terminate_backend(pid) from pg_stat_activity WHERE query ilike ${qid} and pid <>  pg_backend_pid();", 
+              { qid: "%" + REALTIME_TRIGGER_CHECK_QUERY + "%" }
+            );
 
             /** If no tries left
              * OR
@@ -106,7 +111,7 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
             if(tries <= 0 || e?.code === "3D000"){ //  && e.message.includes(this.db.$cn.database)
               clearInterval(this.appCheck);
             }
-            console.error("appCheck FAILED: \n", e, appQ);
+            console.error("appCheck FAILED: \n", e, checkForStaleTriggers);
           }
 
           this.appChecking = false;

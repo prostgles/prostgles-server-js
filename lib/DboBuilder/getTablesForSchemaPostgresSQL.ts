@@ -2,9 +2,7 @@ import { SQLResult } from "prostgles-types";
 import { DboBuilder, TableSchemaColumn, TableSchema } from "../DboBuilder";
 import { asValue } from "../PubSubManager/PubSubManager";
 
-console.error(`this query gets blocked by prostgles.app_triggers from PubSubManager.addTrigger: 
-
-Ensure THIS SCHEMA IS MOMOIZED IF watchSchema IS ON`);
+// TODO: Add a onSocketConnect timeout for this query. Reason: this query gets blocked by prostgles.app_triggers from PubSubManager.addTrigger in some cases (pg_dump locks that table)
 export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, schema = "public"): Promise<TableSchema[]> {
   const query =
     `
