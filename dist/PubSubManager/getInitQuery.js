@@ -170,8 +170,7 @@ BEGIN
             DECLARE err_c_ids INTEGER[]; 
             DECLARE unions TEXT := '';          
             DECLARE query TEXT := '';            
-            DECLARE app RECORD;               
-            DECLARE erw RECORD;     
+            DECLARE v_trigger RECORD;
             DECLARE has_errors BOOLEAN := FALSE;
             
             DECLARE err_text    TEXT;
@@ -259,7 +258,7 @@ BEGIN
 
                     IF (t_ids IS NOT NULL OR has_errors) THEN
 
-                        FOR nrw IN
+                        FOR v_trigger IN
                             SELECT app_id, string_agg(c_id::text, ',') as cids
                             FROM prostgles.v_triggers
                             WHERE id = ANY(t_ids) 
@@ -268,7 +267,7 @@ BEGIN
                         LOOP
                             
                             PERFORM pg_notify( 
-                              ${(0, PubSubManager_1.asValue)(this.NOTIF_CHANNEL.preffix)} || nrw.app_id , 
+                              ${(0, PubSubManager_1.asValue)(this.NOTIF_CHANNEL.preffix)} || v_trigger.app_id , 
                               LEFT(concat_ws(
                                 ${(0, PubSubManager_1.asValue)(PubSubManager_1.PubSubManager.DELIMITER)},
 
@@ -277,7 +276,7 @@ BEGIN
                                 COALESCE(TG_OP, 'MISSING'), 
                                 CASE WHEN has_errors 
                                   THEN concat_ws('; ', 'error', err_text, err_detail, err_hint, 'query: ' || query ) 
-                                  ELSE COALESCE(nrw.cids, '') 
+                                  ELSE COALESCE(v_trigger.cids, '') 
                                 END,
                                 COALESCE(current_query(), 'current_query ??')
                                 ${this.dboBuilder.prostgles.opts.DEBUG_MODE ? (", (select json_agg(t)::TEXT FROM (SELECT * from old_table) t), query") : ""}
@@ -480,7 +479,7 @@ BEGIN
         CREATE OR REPLACE FUNCTION ${exports.DB_OBJ_NAMES.schema_watch_func}() RETURNS event_trigger AS $$
             
             DECLARE curr_query TEXT := '';                                       
-            DECLARE arw RECORD;
+            DECLARE app RECORD;
             
             BEGIN
             
