@@ -1,5 +1,5 @@
 
-import { asValue, log, PubSubManager } from "./PubSubManager";
+import { asValue, PubSubManager } from "./PubSubManager";
 const { version } = require("../../package.json");
 
 export const DB_OBJ_NAMES = {
@@ -172,7 +172,7 @@ BEGIN
             DECLARE err_c_ids INTEGER[]; 
             DECLARE unions TEXT := '';          
             DECLARE query TEXT := '';            
-            DECLARE nrw RECORD;               
+            DECLARE app RECORD;               
             DECLARE erw RECORD;     
             DECLARE has_errors BOOLEAN := FALSE;
             
@@ -281,7 +281,7 @@ BEGIN
                                   THEN concat_ws('; ', 'error', err_text, err_detail, err_hint, 'query: ' || query ) 
                                   ELSE COALESCE(nrw.cids, '') 
                                 END,
-                                current_query()
+                                COALESCE(current_query(), 'current_query ??')
                                 ${this.dboBuilder.prostgles.opts.DEBUG_MODE? (", (select json_agg(t)::TEXT FROM (SELECT * from old_table) t), query") : ""}
                               ), 7999)
                             );
