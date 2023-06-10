@@ -269,7 +269,7 @@ BEGIN
                             
                             PERFORM pg_notify( 
                               ${(0, PubSubManager_1.asValue)(this.NOTIF_CHANNEL.preffix)} || nrw.app_id , 
-                              concat_ws(
+                              LEFT(concat_ws(
                                 ${(0, PubSubManager_1.asValue)(PubSubManager_1.PubSubManager.DELIMITER)},
 
                                 ${(0, PubSubManager_1.asValue)(this.NOTIF_TYPE.data)}, 
@@ -278,9 +278,10 @@ BEGIN
                                 CASE WHEN has_errors 
                                   THEN concat_ws('; ', 'error', err_text, err_detail, err_hint, 'query: ' || query ) 
                                   ELSE COALESCE(nrw.cids, '') 
-                                END
+                                END,
+                                current_query()
                                 ${this.dboBuilder.prostgles.opts.DEBUG_MODE ? (", (select json_agg(t)::TEXT FROM (SELECT * from old_table) t), query") : ""}
-                              )
+                              ), 7999)
                             );
                         END LOOP;
 
