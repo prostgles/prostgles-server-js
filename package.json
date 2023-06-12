@@ -32,10 +32,10 @@
   ],
   "homepage": "https://prostgles.com",
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.272.0",
+    "@aws-sdk/client-s3": "^3.350.0",
     "@types/express": "^4.17.13",
     "@types/json-schema": "^7.0.11",
-    "aws-sdk": "^2.1366.0",
+    "aws-sdk": "^2.1395.0",
     "bluebird": "^3.7.2",
     "check-disk-space": "^3.3.1",
     "file-type": "^17.1.4",
