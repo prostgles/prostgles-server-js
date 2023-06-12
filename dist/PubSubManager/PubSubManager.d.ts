@@ -110,8 +110,8 @@ export declare class PubSubManager {
     postgresNotifListenManager?: PostgresNotifListenManager;
     private constructor();
     NOTIF_TYPE: {
-        data: string;
-        schema: string;
+        readonly data: "data_has_changed";
+        readonly schema: "schema_has_changed";
     };
     NOTIF_CHANNEL: {
         preffix: "prostgles_";

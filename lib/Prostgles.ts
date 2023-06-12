@@ -8,6 +8,7 @@ import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import { FileManager, ImageOptions, LocalConfig, S3Config } from "./FileManager/FileManager";
 import { SchemaWatch } from "./SchemaWatch";
+import { EventTriggerTagFilter } from "./Event_Trigger_Tags";
 
 const { version } = require('../package.json');
 import AuthHandler, { Auth, SessionUser, AuthRequestParams } from "./AuthHandler"; 
@@ -27,6 +28,7 @@ import { DBEventsManager } from "./DBEventsManager";
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 type DbConnectionOpts = pg.IDefaults;
+
 
 export const TABLE_METHODS = ["update", "find", "findOne", "insert", "delete", "upsert"] as const;
 function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts | undefined, debugQueries = false, onNotice: ProstglesInitOptions["onNotice"]): { db: DB, pgp: PGP } {
@@ -271,7 +273,15 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
    * If truthy then DBoGenerated.d.ts will be updated and "onReady" will be called with new schema on both client and server
    */
   watchSchema?:
+    /**
+     * Will listen only to few events (create table/view)
+     */
     | boolean
+
+    /**
+     * Will listen to specified events (or all if "*" is specified)
+     */
+    | EventTriggerTagFilter
 
     /**
      * Will only rewrite the DBoGenerated.d.ts found in tsGeneratedTypesDir

@@ -17,12 +17,13 @@ import { SelectParams, FieldFilter, asName, WAL, AnyObject, SubscribeParams } fr
 
 import { ClientExpressData, syncData } from "../SyncReplication";
 import { TableRule } from "../PublishParser";
-import { find } from "prostgles-types/dist/util";
+import { find, getKeys, isObject } from "prostgles-types/dist/util";
 import { DB_OBJ_NAMES } from "./getInitQuery";
 import { addSub } from "./addSub";
 import { notifListener } from "./notifListener";
 import { pushSubData } from "./pushSubData";
 import { getOnDataFunc, LocalFuncs, matchesLocalFuncs } from "../DboBuilder/subscribe";
+import { EVENT_TRIGGER_TAGS, EventTriggerTag } from "../Event_Trigger_Tags";
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 const pgp: PGP = pgPromise({
@@ -183,7 +184,7 @@ export class PubSubManager {
   NOTIF_TYPE = {
     data: "data_has_changed",
     schema: "schema_has_changed"
-  }
+  } as const;
   NOTIF_CHANNEL = {
     preffix: 'prostgles_' as const,
     getFull: (appID?: string) => {
@@ -263,8 +264,20 @@ export class PubSubManager {
   prepareTriggers = async () => {
     // SELECT * FROM pg_catalog.pg_event_trigger WHERE evtname
     if (!this.appID) throw "prepareTriggers failed: this.appID missing";
-    if (this.dboBuilder.prostgles.opts.watchSchema && !(await isSuperUser(this.db))) {
+
+    const { watchSchema } = this.dboBuilder.prostgles.opts;
+    if (watchSchema && !(await isSuperUser(this.db))) {
       console.warn("prostgles watchSchema requires superuser db user. Will not watch using event triggers")
+    }
+    let EVENT_TAGS = ['COMMENT', 'CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO'];
+    if(watchSchema === "*"){
+      EVENT_TAGS = EVENT_TRIGGER_TAGS.slice(0);
+    } else if (isObject(watchSchema) && typeof watchSchema !== "function"){
+      const isInclusive = Object.values(watchSchema).every(v => v);
+
+      const watchSchemaKeys = getKeys(watchSchema);
+      if(isInclusive) EVENT_TAGS = watchSchemaKeys;
+      else EVENT_TAGS = EVENT_TRIGGER_TAGS.slice(0).filter(v => !watchSchemaKeys.includes(v));
     }
 
     try {
@@ -357,7 +370,7 @@ export class PubSubManager {
 
                 DROP EVENT TRIGGER IF EXISTS ${DB_OBJ_NAMES.schema_watch_trigger};
                 CREATE EVENT TRIGGER ${DB_OBJ_NAMES.schema_watch_trigger} ON ddl_command_end
-                WHEN TAG IN ('COMMENT', 'CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO')
+                WHEN TAG IN (\${EVENT_TAGS:csv})
                 --WHEN TAG IN ('CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE TRIGGER', 'DROP TRIGGER')
                 EXECUTE PROCEDURE ${DB_OBJ_NAMES.schema_watch_func}();
 
@@ -370,7 +383,7 @@ export class PubSubManager {
 
 
         COMMIT;
-      `).catch(e => {
+      `, { EVENT_TAGS }).catch(e => {
         console.error("prepareTriggers failed: ", e);
         throw e;
       });

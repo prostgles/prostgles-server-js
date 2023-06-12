@@ -3,6 +3,7 @@ import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import { FileManager, ImageOptions, LocalConfig, S3Config } from "./FileManager/FileManager";
 import { SchemaWatch } from "./SchemaWatch";
+import { EventTriggerTagFilter } from "./Event_Trigger_Tags";
 import AuthHandler, { Auth, SessionUser, AuthRequestParams } from "./AuthHandler";
 import TableConfigurator, { TableConfig } from "./TableConfig/TableConfig";
 import { DboBuilder, DBHandlerServer, PRGLIOSocket } from "./DboBuilder";
@@ -162,7 +163,15 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
     /**
      * If truthy then DBoGenerated.d.ts will be updated and "onReady" will be called with new schema on both client and server
      */
-    watchSchema?: boolean
+    watchSchema?: 
+    /**
+     * Will listen only to few events (create table/view)
+     */
+    boolean
+    /**
+     * Will listen to specified events (or all if "*" is specified)
+     */
+     | EventTriggerTagFilter
     /**
      * Will only rewrite the DBoGenerated.d.ts found in tsGeneratedTypesDir
      * This is meant to be used in development when server restarts on file change
