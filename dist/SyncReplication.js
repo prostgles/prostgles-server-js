@@ -144,8 +144,6 @@ const syncData = async (_this, sync, clientData, source) => {
                     updates = [];
                 }
                 if (table_rules.insert && inserts.length) {
-                    // const qs = await tbl.insert(inserts, { fixIssues: true }, null, table_rules, { returnQuery: true });
-                    // console.log("inserts", qs)
                     await tbl.insert(inserts, { fixIssues: true }, undefined, table_rules);
                 }
                 else {

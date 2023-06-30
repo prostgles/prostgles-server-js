@@ -256,12 +256,12 @@ export type PublishedResult<Schema = void> = PublishAllOrNothing | PublishFullyT
 export type Publish<Schema = void, SUser extends SessionUser = SessionUser> = PublishedResult<Schema> | ((params: PublishParams<Schema, SUser>) => Awaitable<PublishedResult<Schema>>);
 export declare class PublishParser {
     publish: any;
-    publishMethods?: PublishMethods<void, SessionUser<AnyObject, AnyObject>> | undefined;
+    publishMethods?: PublishMethods<void, SessionUser> | undefined;
     publishRawSQL?: any;
     dbo: DBHandlerServer;
     db: DB;
     prostgles: Prostgles;
-    constructor(publish: any, publishMethods: PublishMethods<void, SessionUser<AnyObject, AnyObject>> | undefined, publishRawSQL: any, dbo: DBHandlerServer, db: DB, prostgles: Prostgles);
+    constructor(publish: any, publishMethods: PublishMethods<void, SessionUser> | undefined, publishRawSQL: any, dbo: DBHandlerServer, db: DB, prostgles: Prostgles);
     getPublishParams(localParams: LocalParams, clientInfo?: AuthResult): Promise<PublishParams>;
     getAllowedMethods(socket: any, userData?: AuthResult): Promise<{
         [key: string]: Method;

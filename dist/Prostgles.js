@@ -482,7 +482,7 @@ class Prostgles {
                         const clientInfo = await this.authHandler.getClientInfo({ socket });
                         const valid_table_command_rules = await this.publishParser.getValidatedRequestRule({ tableName, command, localParams: { socket } }, clientInfo);
                         if (valid_table_command_rules) {
-                            const res = await this.dbo[tableName][command](param1, param2, param3, valid_table_command_rules, { socket, isRemoteRequest: true });
+                            const res = await this.dbo[tableName][command](param1, param2, param3, valid_table_command_rules, { socket, isRemoteRequest: { user: clientInfo?.user } });
                             cb(null, res);
                         }
                         else

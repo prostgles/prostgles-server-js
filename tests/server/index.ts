@@ -47,14 +47,19 @@ type USER = {
 	id: string; 
 	username: string; 
 	password: string; 
+  type: string;
 }
-const users: USER[] = [{ id: "1a", username: "john", password: "secret" }];
+const users: USER[] = [{ id: "1a", username: "john", password: "secret", type: "default" }];
 
 process.on('unhandledRejection', (reason, p) => {
   console.trace('Unhandled Rejection at:', p, 'reason:', reason)
   process.exit(1)
 });
-
+/**
+ * To create a superuser in linux:
+ *    sudo su - postgres
+ *    createuser api -s -P
+ */
 const dbConnection = {
 	host: process.env.POSTGRES_HOST || "localhost",
 	port: +process.env.POSTGRES_PORT || 5432,

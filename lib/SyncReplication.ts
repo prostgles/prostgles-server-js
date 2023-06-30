@@ -213,8 +213,6 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
           }
 
           if (table_rules.insert && inserts.length) {
-            // const qs = await tbl.insert(inserts, { fixIssues: true }, null, table_rules, { returnQuery: true });
-            // console.log("inserts", qs)
             await tbl.insert(inserts, { fixIssues: true }, undefined, table_rules);
           } else {
             inserts = [];

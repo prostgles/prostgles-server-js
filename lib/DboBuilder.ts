@@ -132,7 +132,7 @@ export type PRGLIOSocket = {
   /** Used for session caching */
   __prglCache?: {
     session: BasicSession;
-    user: AnyObject;
+    user: UserLike;
     clientUser: AnyObject;
   }
 
@@ -146,7 +146,9 @@ export type LocalParams = {
   httpReq?: any;
   socket?: PRGLIOSocket;
   func?: () => any;
-  isRemoteRequest?: boolean;
+  isRemoteRequest?: {
+    user?: UserLike | undefined;
+  };
   testRule?: boolean;
   tableAlias?: string;
   // subOne?: boolean;
@@ -158,7 +160,7 @@ export type LocalParams = {
 
   // localTX?: pgPromise.ITask<{}>;
 
-  returnQuery?: boolean;
+  returnQuery?: boolean | "noRLS";
   returnNewQuery?: boolean;
 
   nestedInsert?: {
@@ -374,7 +376,7 @@ export type ExistsFilterConfig = {
 };
 
 import { JOIN_TYPES } from "./Prostgles";
-import { BasicSession } from "./AuthHandler";
+import { BasicSession, UserLike } from "./AuthHandler";
 import { getDBSchema } from "./DBSchemaBuilder";
 import { TableHandler } from "./DboBuilder/TableHandler";
 
@@ -1123,4 +1125,15 @@ export const canEXECUTE = async (db: DB) => {
   }
 
   return false;
+}
+
+export const withUserRLS = (localParams: LocalParams | undefined, query: string) => {
+
+  const user = localParams?.isRemoteRequest?.user;
+  let firstQuery = `SET SESSION "prostgles.user" TO '';`;
+  if(user){
+    firstQuery = pgp.as.format(`SET SESSION "prostgles.user" TO \${user};`, { user });
+  }
+  
+  return [firstQuery, query].join("\n");
 }

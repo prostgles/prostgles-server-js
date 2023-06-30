@@ -36,11 +36,13 @@ const find = async function (filter, selectParams, param3_unused, tableRules, lo
             if (maxLimit && !Number.isInteger(maxLimit))
                 throw ` invalid publish.${this.name}.select.maxLimit -> expecting integer but got ` + maxLimit;
         }
-        const q = await (0, QueryBuilder_1.getNewQuery)(this, filter, selectParams, param3_unused, tableRules, localParams, this.columns), _query = (0, makeSelectQuery_1.makeSelectQuery)(this, q, undefined, undefined, selectParams);
+        const q = await (0, QueryBuilder_1.getNewQuery)(this, filter, selectParams, param3_unused, tableRules, localParams, this.columns);
+        const queryWithoutRLS = (0, makeSelectQuery_1.makeSelectQuery)(this, q, undefined, undefined, selectParams);
+        const queryWithRLS = (0, DboBuilder_1.withUserRLS)(localParams, queryWithoutRLS);
         // console.log(_query, JSON.stringify(q, null, 2))
         if (testRule) {
             try {
-                await this.db.any("EXPLAIN " + _query);
+                await this.db.any((0, DboBuilder_1.withUserRLS)(localParams, "EXPLAIN " + queryWithRLS));
                 return [];
             }
             catch (e) {
@@ -51,9 +53,10 @@ const find = async function (filter, selectParams, param3_unused, tableRules, lo
         /** Used for subscribe  */
         if (returnNewQuery)
             return q;
-        if (returnQuery)
-            return _query;
-        return (0, exports.runQueryReturnType)(_query, returnType, this, localParams);
+        if (returnQuery) {
+            return (returnQuery === "noRLS" ? queryWithoutRLS : queryWithRLS);
+        }
+        return (0, exports.runQueryReturnType)(queryWithRLS, returnType, this, localParams);
     }
     catch (e) {
         // console.trace(e)

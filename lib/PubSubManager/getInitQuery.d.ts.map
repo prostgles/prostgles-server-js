@@ -1,1 +1,1 @@
-{"version":3,"file":"getInitQuery.d.ts","sourceRoot":"","sources":["getInitQuery.ts"],"names":[],"mappings":"AACA,OAAO,EAAW,aAAa,EAAE,MAAM,iBAAiB,CAAC;AAGzD,eAAO,MAAM,YAAY;;;;;CAKf,CAAC;AAEX,eAAO,MAAM,YAAY,SAAwB,aAAa,KAAG,QAAQ,MAAM,CA6gB9E,CAAA"}
+{"version":3,"file":"getInitQuery.d.ts","sourceRoot":"","sources":["getInitQuery.ts"],"names":[],"mappings":"AACA,OAAO,EAAW,aAAa,EAAE,MAAM,iBAAiB,CAAC;AAGzD,eAAO,MAAM,YAAY;;;;;CAKf,CAAC;AAEX,eAAO,MAAM,YAAY,SAAwB,aAAa,KAAG,QAAQ,MAAM,CA2hB9E,CAAA"}

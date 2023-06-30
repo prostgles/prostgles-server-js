@@ -3,7 +3,7 @@ import { AnyObject, AuthGuardLocation, AuthGuardLocationResponse, CHANNELS, DBSc
 import { LocalParams, PRGLIOSocket } from "./DboBuilder";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { removeExpressRoute } from "./FileManager/FileManager";
-import { DB, DBHandlerServer, ExpressApp, Prostgles } from "./Prostgles";
+import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
 type Awaitable<T> = T | Promise<T>;
 type AuthSocketSchema = {
   user?: AnyObject;
@@ -33,7 +33,12 @@ export type BasicSession = {
   onExpiration: "redirect" | "show_error";
 };
 export type AuthClientRequest = { socket: any } | { httpReq: ExpressReq };
-export type SessionUser<ServerUser extends AnyObject = AnyObject, ClientUser extends AnyObject = AnyObject> = {
+export type UserLike = {
+  id: string;
+  type: string;
+  [key: string]: any;
+}
+export type SessionUser<ServerUser extends UserLike = UserLike, ClientUser extends AnyObject = AnyObject> = {
   /** 
    * This user will be available in all serverside prostgles options 
    * */
@@ -232,7 +237,7 @@ export default class AuthHandler {
         cookieDuration = { expires: new Date(expires) };
         const days = (+cookieDuration.expires - Date.now())/(24 * 60 * 60e3);
         if(days >= 400){
-          console.warn(`Cookie expiration higher the limit of 400 days for Chrome: ${days}days`)
+          console.warn(`Cookie expiration is higher than the Chrome 400 day limit: ${days}days`)
         }
       }
       

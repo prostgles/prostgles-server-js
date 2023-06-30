@@ -30,7 +30,12 @@ export type AuthClientRequest = {
 } | {
     httpReq: ExpressReq;
 };
-export type SessionUser<ServerUser extends AnyObject = AnyObject, ClientUser extends AnyObject = AnyObject> = {
+export type UserLike = {
+    id: string;
+    type: string;
+    [key: string]: any;
+};
+export type SessionUser<ServerUser extends UserLike = UserLike, ClientUser extends AnyObject = AnyObject> = {
     /**
      * This user will be available in all serverside prostgles options
      * */

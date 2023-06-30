@@ -4,8 +4,9 @@ exports.canCreateTables = exports.canRunSQL = exports.runSQL = void 0;
 const DboBuilder_1 = require("../DboBuilder");
 const PubSubManager_1 = require("../PubSubManager/PubSubManager");
 const pg_promise_1 = require("pg-promise");
-async function runSQL(query, params, options, localParams) {
-    if (query?.replace(/\s\s+/g, ' ').toLowerCase().includes("create extension pg_stat_statements")) {
+async function runSQL(queryWithoutRLS, params, options, localParams) {
+    const queryWithRLS = queryWithoutRLS;
+    if (queryWithRLS?.replace(/\s\s+/g, ' ').toLowerCase().includes("create extension pg_stat_statements")) {
         const { shared_preload_libraries } = await this.db.oneOrNone('SHOW shared_preload_libraries');
         if (!(shared_preload_libraries || "").includes("pg_stat_statements")) {
             throw "This query will crash the server (pg_stat_statements must be loaded via shared_preload_libraries). Need to: \n ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements' \n" +
@@ -45,17 +46,19 @@ async function runSQL(query, params, options, localParams) {
     }
     else if (returnType === "statement") {
         try {
-            return DboBuilder_1.pgp.as.format(query, params);
+            return DboBuilder_1.pgp.as.format(queryWithoutRLS, params);
         }
         catch (err) {
             throw err.toString();
         }
     }
     else if (db) {
-        let finalQuery = query + "";
-        if (returnType === "arrayMode" && !["listen ", "notify "].find(c => query.toLowerCase().trim().startsWith(c))) {
-            finalQuery = (new pg_promise_1.ParameterizedQuery({ text: hasParams ? DboBuilder_1.pgp.as.format(query, params) : query, rowMode: "array" }));
+        let finalQuery = queryWithRLS + "";
+        const isNotListenOrNotify = returnType === "arrayMode" && !["listen ", "notify "].find(c => queryWithRLS.toLowerCase().trim().startsWith(c));
+        if (isNotListenOrNotify) {
+            finalQuery = (new pg_promise_1.ParameterizedQuery({ text: hasParams ? DboBuilder_1.pgp.as.format(queryWithRLS, params) : queryWithRLS, rowMode: "array" }));
         }
+        //@ts-ignore
         const _qres = await db.result(finalQuery, hasParams ? params : undefined);
         const { fields, rows, command } = _qres;
         /**
@@ -65,12 +68,12 @@ async function runSQL(query, params, options, localParams) {
         if (watchSchema &&
             (!this.prostgles.isSuperUser || watchSchemaType === "prostgles_queries")) {
             if (["CREATE", "ALTER", "DROP"].includes(command)) {
-                this.prostgles.onSchemaChange({ command, query });
+                this.prostgles.onSchemaChange({ command, query: queryWithRLS });
             }
-            else if (query) {
-                const cleanedQuery = query.toLowerCase().replace(/\s\s+/g, ' ');
+            else if (queryWithRLS) {
+                const cleanedQuery = queryWithRLS.toLowerCase().replace(/\s\s+/g, ' ');
                 if (PubSubManager_1.PubSubManager.SCHEMA_ALTERING_QUERIES.some(q => cleanedQuery.includes(q.toLowerCase()))) {
-                    this.prostgles.onSchemaChange({ command, query });
+                    this.prostgles.onSchemaChange({ command, query: queryWithRLS });
                 }
             }
         }
@@ -79,7 +82,7 @@ async function runSQL(query, params, options, localParams) {
                 throw new Error(`Your query contains a LISTEN command. Set { allowListen: true } to get subscription hooks. Or ignore this message`);
             if (!socket)
                 throw "Only allowed with client socket";
-            return await this.prostgles.dbEventsManager?.addNotify(query, socket);
+            return await this.prostgles.dbEventsManager?.addNotify(queryWithRLS, socket);
         }
         else if (returnType === "rows") {
             return rows;

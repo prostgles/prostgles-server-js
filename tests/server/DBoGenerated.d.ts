@@ -27,16 +27,6 @@ export type DBSchemaGenerated = {
       id?: number;
     };
   };
-  credential_types: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      id: string;
-    };
-  };
   ex_j_ins: {
     is_view: false;
     select: true;
@@ -92,19 +82,6 @@ export type DBSchemaGenerated = {
       added?: null | string;
       id?: number;
       name?: null | string;
-    };
-  };
-  item_children: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      id?: number;
-      item_id?: null | number;
-      name?: null | string;
-      tst?: null | string;
     };
   };
   items: {
@@ -227,18 +204,6 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
-      id: string;
-    };
-  };
-  lookup_status: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      en?: null | string;
-      fr?: null | string;
       id: string;
     };
   };
@@ -408,26 +373,6 @@ export type DBSchemaGenerated = {
       tr1_id?: null | number;
     };
   };
-  user_statuses: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      id: string;
-    };
-  };
-  user_types: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      id: string;
-    };
-  };
   users: {
     is_view: false;
     select: true;
@@ -441,21 +386,6 @@ export type DBSchemaGenerated = {
       status: "active" | "disabled" | "pending"
     };
   };
-  usr: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      added?: null | string;
-      age?: null | number;
-      id?: number;
-      is_active?: null | boolean;
-      msg?: null | string;
-      status?: null | string;
-    };
-  };
   uuid_text: {
     is_view: false;
     select: true;
@@ -466,17 +396,6 @@ export type DBSchemaGenerated = {
       col1?: null | string;
       col2?: null | string;
       id?: null | string;
-    };
-  };
-  uuid_text1: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      col1?: null | string;
-      col2?: null | string;
     };
   };
   v_items: {

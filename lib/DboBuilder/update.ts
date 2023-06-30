@@ -1,5 +1,5 @@
 import { AnyObject, getKeys, isObject, unpatchText, UpdateParams } from "prostgles-types";
-import { Filter, isPlainObject, LocalParams, makeErrorFromPGError, Media, parseError } from "../DboBuilder";
+import { Filter, isPlainObject, LocalParams, makeErrorFromPGError, Media, parseError, withUserRLS } from "../DboBuilder";
 import { TableRule, ValidateRow } from "../PublishParser";
 import { omitKeys, pickKeys } from "../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler";
@@ -125,6 +125,7 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
       qType = multi ? "any" : "one";
       query += returningSelect;
     }
+    query = withUserRLS(localParams, query);
 
     if (returnQuery) return query as unknown as void;
 

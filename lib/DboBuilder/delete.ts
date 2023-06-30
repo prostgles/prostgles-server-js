@@ -1,6 +1,6 @@
 import pgPromise from "pg-promise";
 import { AnyObject, asName, DeleteParams, FieldFilter } from "prostgles-types";
-import { Filter, LocalParams, parseError } from "../DboBuilder";
+import { Filter, LocalParams, parseError, withUserRLS } from "../DboBuilder";
 import { DeleteRule, TableRule } from "../PublishParser";
 import { pickKeys } from "../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler";
@@ -72,6 +72,7 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
       _query += returningQuery
     }
 
+    _query = withUserRLS(localParams, _query);
     if (returnQuery) return _query;
 
     /**

@@ -35,11 +35,16 @@ const stopTest = (err) => {
     process.exit(err ? 1 : 0);
 };
 const sessions = [];
-const users = [{ id: "1a", username: "john", password: "secret" }];
+const users = [{ id: "1a", username: "john", password: "secret", type: "default" }];
 process.on('unhandledRejection', (reason, p) => {
     console.trace('Unhandled Rejection at:', p, 'reason:', reason);
     process.exit(1);
 });
+/**
+ * To create a superuser in linux:
+ *    sudo su - postgres
+ *    createuser api -s -P
+ */
 const dbConnection = {
     host: process.env.POSTGRES_HOST || "localhost",
     port: +process.env.POSTGRES_PORT || 5432,

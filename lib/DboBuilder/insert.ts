@@ -1,6 +1,6 @@
 import pgPromise from "pg-promise";
 import { AnyObject, asName, FieldFilter, get, getKeys, InsertParams, isObject } from "prostgles-types";
-import { LocalParams, makeErrorFromPGError, parseError, pgp } from "../DboBuilder";
+import { LocalParams, makeErrorFromPGError, parseError, pgp, withUserRLS } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 import { asValue, pickKeys } from "../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler";
@@ -145,6 +145,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
       if (returningSelect) queryType = "one";
     }
 
+    query = withUserRLS(localParams, query);
     if (returnQuery) return query;
     let result;
 

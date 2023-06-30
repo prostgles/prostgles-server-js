@@ -1,6 +1,6 @@
 import pgPromise from "pg-promise";
 import { AnyObject, asName, DeleteParams, FieldFilter, getKeys, InsertParams, isObject, Select, SelectParams, UpdateParams } from "prostgles-types";
-import { DboBuilder, Filter, LocalParams, makeErrorFromPGError, parseError, TableHandlers, TableSchema } from "../DboBuilder";
+import { DboBuilder, Filter, LocalParams, makeErrorFromPGError, parseError, TableHandlers, TableSchema, withUserRLS } from "../DboBuilder";
 import { DB } from "../Prostgles";
 import { SyncRule, TableRule } from "../PublishParser"; 
 import { _delete } from "./delete";
@@ -35,17 +35,21 @@ export class TableHandler extends ViewHandler {
 
   async updateBatch(data: [Filter, AnyObject][], params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<any> {
     try {
-      const queries = await Promise.all(
+      const updateQueries: string[] = await Promise.all(
         data.map(async ([filter, data]) =>
-          await this.update(
+          (await this.update(
             filter,
             data,
             { ...(params || {}), returning: undefined },
             tableRules,
-            { ...(localParams || {}), returnQuery: true }
-          )
+            { ...(localParams || {}), returnQuery: "noRLS" }
+          )) as unknown as string
         )
       ); 
+      const queries = [
+        withUserRLS(localParams, ""),
+        ...updateQueries
+      ];
       if(this.t){
         const _queries = queries.map(q => this.t!.none(q as unknown as string))
         return this.t.batch(_queries)

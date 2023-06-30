@@ -1,13 +1,13 @@
 import { AnyObject, SQLOptions, SQLResult } from "prostgles-types";
-import { DboBuilder, LocalParams, pgp, postgresToTsType } from "../DboBuilder";
+import { DboBuilder, LocalParams, pgp, postgresToTsType, withUserRLS } from "../DboBuilder";
 import { DB, Prostgles } from "../Prostgles";
 import { PubSubManager } from "../PubSubManager/PubSubManager";
 import { ParameterizedQuery as PQ } from 'pg-promise';
 
 
-export async function runSQL(this: DboBuilder, query: string, params: any, options: SQLOptions | undefined, localParams?: LocalParams) {
-
-  if(query?.replace(/\s\s+/g, ' ').toLowerCase().includes("create extension pg_stat_statements")){
+export async function runSQL(this: DboBuilder, queryWithoutRLS: string, params: any, options: SQLOptions | undefined, localParams?: LocalParams) {
+  const queryWithRLS = queryWithoutRLS;
+  if(queryWithRLS?.replace(/\s\s+/g, ' ').toLowerCase().includes("create extension pg_stat_statements")){
     const { shared_preload_libraries } = await this.db.oneOrNone('SHOW shared_preload_libraries');
     if(!(shared_preload_libraries || "").includes("pg_stat_statements")){
       throw "This query will crash the server (pg_stat_statements must be loaded via shared_preload_libraries). Need to: \n ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements' \n" +
@@ -48,17 +48,19 @@ export async function runSQL(this: DboBuilder, query: string, params: any, optio
     return await this.prostgles.dbEventsManager?.addNotice(socket);
   } else if (returnType === "statement") {
     try {
-      return pgp.as.format(query, params);
+      return pgp.as.format(queryWithoutRLS, params);
     } catch (err) {
       throw (err as any).toString();
     }
   } else if (db) {
 
-    let finalQuery = query + "";
-    if (returnType === "arrayMode" && !["listen ", "notify "].find(c => query.toLowerCase().trim().startsWith(c))) {
-      finalQuery = (new PQ({ text: hasParams ? pgp.as.format(query, params) : query, rowMode: "array" })) as any;
+    let finalQuery = queryWithRLS + "";
+    const isNotListenOrNotify = returnType === "arrayMode" && !["listen ", "notify "].find(c => queryWithRLS.toLowerCase().trim().startsWith(c))
+    if (isNotListenOrNotify) {
+      finalQuery = (new PQ({ text: hasParams ? pgp.as.format(queryWithRLS, params) : queryWithRLS, rowMode: "array" })) as any;
     }
 
+    //@ts-ignore
     const _qres = await db.result<AnyObject>(finalQuery, hasParams ? params : undefined)
     const { fields, rows, command } = _qres;
 
@@ -72,11 +74,11 @@ export async function runSQL(this: DboBuilder, query: string, params: any, optio
       (!this.prostgles.isSuperUser || watchSchemaType === "prostgles_queries")
     ) {
       if (["CREATE", "ALTER", "DROP"].includes(command)) {
-        this.prostgles.onSchemaChange({ command, query })
-      } else if (query) {
-        const cleanedQuery = query.toLowerCase().replace(/\s\s+/g, ' ');
+        this.prostgles.onSchemaChange({ command, query: queryWithRLS })
+      } else if (queryWithRLS) {
+        const cleanedQuery = queryWithRLS.toLowerCase().replace(/\s\s+/g, ' ');
         if (PubSubManager.SCHEMA_ALTERING_QUERIES.some(q => cleanedQuery.includes(q.toLowerCase()))) {
-          this.prostgles.onSchemaChange({ command, query })
+          this.prostgles.onSchemaChange({ command, query: queryWithRLS })
         }
       }
     }
@@ -84,7 +86,7 @@ export async function runSQL(this: DboBuilder, query: string, params: any, optio
     if (command === "LISTEN") {
       if (!allowListen) throw new Error(`Your query contains a LISTEN command. Set { allowListen: true } to get subscription hooks. Or ignore this message`)
       if (!socket) throw "Only allowed with client socket"
-      return await this.prostgles.dbEventsManager?.addNotify(query, socket);
+      return await this.prostgles.dbEventsManager?.addNotify(queryWithRLS, socket);
 
     } else if (returnType === "rows") {
       return rows;

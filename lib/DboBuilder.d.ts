@@ -81,7 +81,7 @@ export type PRGLIOSocket = {
     /** Used for session caching */
     __prglCache?: {
         session: BasicSession;
-        user: AnyObject;
+        user: UserLike;
         clientUser: AnyObject;
     };
     _user?: AnyObject;
@@ -92,14 +92,16 @@ export type LocalParams = {
     httpReq?: any;
     socket?: PRGLIOSocket;
     func?: () => any;
-    isRemoteRequest?: boolean;
+    isRemoteRequest?: {
+        user?: UserLike | undefined;
+    };
     testRule?: boolean;
     tableAlias?: string;
     tx?: {
         dbTX: TableHandlers;
         t: pgPromise.ITask<{}>;
     };
-    returnQuery?: boolean;
+    returnQuery?: boolean | "noRLS";
     returnNewQuery?: boolean;
     nestedInsert?: {
         depth: number;
@@ -195,7 +197,7 @@ export type ExistsFilterConfig = {
     isJoined: boolean;
     shortestJoin: boolean;
 };
-import { BasicSession } from "./AuthHandler";
+import { BasicSession, UserLike } from "./AuthHandler";
 import { TableHandler } from "./DboBuilder/TableHandler";
 export declare class DboBuilder {
     tablesOrViews?: TableSchema[];
@@ -299,5 +301,6 @@ export declare function isPlainObject(o: any): o is Record<string, any>;
 export declare function postgresToTsType(udt_data_type: PG_COLUMN_UDT_DATA_TYPE): keyof typeof TS_PG_Types;
 export declare const prepareSort: (items: SortItem[], excludeOrder?: boolean) => string;
 export declare const canEXECUTE: (db: DB) => Promise<boolean>;
+export declare const withUserRLS: (localParams: LocalParams | undefined, query: string) => string;
 export {};
 //# sourceMappingURL=DboBuilder.d.ts.map

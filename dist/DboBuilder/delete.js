@@ -62,6 +62,7 @@ async function _delete(filter, params, param3_unused, table_rules, localParams) 
             returningQuery = this.makeReturnQuery(await this.prepareReturning(returning, this.parseFieldFilter(returningFields)));
             _query += returningQuery;
         }
+        _query = (0, DboBuilder_1.withUserRLS)(localParams, _query);
         if (returnQuery)
             return _query;
         /**

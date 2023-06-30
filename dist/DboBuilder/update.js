@@ -106,6 +106,7 @@ async function update(filter, _newData, params, tableRules, localParams) {
             qType = multi ? "any" : "one";
             query += returningSelect;
         }
+        query = (0, DboBuilder_1.withUserRLS)(localParams, query);
         if (returnQuery)
             return query;
         if (params?.returnType) {

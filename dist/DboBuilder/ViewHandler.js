@@ -546,16 +546,13 @@ class ViewHandler {
         try {
             return await this.find(filter, { ...selectParams, limit: 2 }, undefined, table_rules, localParams)
                 .then(async (_allowed) => {
-                // let rules: TableRule = table_rules || {};
-                // rules.select.maxLimit = Number.MAX_SAFE_INTEGER;
-                // rules.select.fields = rules.select.fields || "*";
-                const q = await this.find(filter, { ...selectParams, limit: selectParams?.limit ?? Number.MAX_SAFE_INTEGER }, undefined, table_rules, { ...localParams, returnQuery: true });
-                const query = `
-                      SELECT sum(pg_column_size((prgl_size_query.*))) as size 
-                      FROM (
-                          ${q}
-                      ) prgl_size_query
-                  `;
+                const q = await this.find(filter, { ...selectParams, limit: selectParams?.limit ?? Number.MAX_SAFE_INTEGER }, undefined, table_rules, { ...localParams, returnQuery: "noRLS" });
+                const query = (0, DboBuilder_1.withUserRLS)(localParams, `
+              SELECT sum(pg_column_size((prgl_size_query.*))) as size 
+              FROM (
+                  ${q}
+              ) prgl_size_query
+            `);
                 return (this.t || this.db).one(query, { _psqlWS_tableName: this.name }).then(({ size }) => size || '0');
             });
         }

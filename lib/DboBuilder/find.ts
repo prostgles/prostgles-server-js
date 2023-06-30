@@ -1,6 +1,6 @@
 
 import { SelectParams, isObject } from "prostgles-types";
-import { Filter, LocalParams, makeErrorFromPGError, parseError } from "../DboBuilder";
+import { Filter, LocalParams, makeErrorFromPGError, parseError, withUserRLS } from "../DboBuilder";
 import { makeSelectQuery } from "../DboBuilder/QueryBuilder/makeSelectQuery";
 import { canRunSQL } from "../DboBuilder/runSQL";
 import { TableRule } from "../PublishParser";
@@ -38,12 +38,14 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
       if (maxLimit && !Number.isInteger(maxLimit)) throw ` invalid publish.${this.name}.select.maxLimit -> expecting integer but got ` + maxLimit;
     }
 
-    const q = await getNewQuery(this as unknown as TableHandler, filter, selectParams, param3_unused, tableRules, localParams, this.columns),
-      _query = makeSelectQuery(this as unknown as TableHandler, q, undefined, undefined, selectParams);
+    const q = await getNewQuery(this as unknown as TableHandler, filter, selectParams, param3_unused, tableRules, localParams, this.columns);
+    const queryWithoutRLS = makeSelectQuery(this as unknown as TableHandler, q, undefined, undefined, selectParams);
+
+    const queryWithRLS = withUserRLS(localParams, queryWithoutRLS);
     // console.log(_query, JSON.stringify(q, null, 2))
     if (testRule) {
       try {
-        await this.db.any("EXPLAIN " + _query);
+        await this.db.any(withUserRLS(localParams, "EXPLAIN " + queryWithRLS));
         return [];
       } catch (e) {
         console.error(e);
@@ -53,9 +55,11 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
 
     /** Used for subscribe  */
     if(returnNewQuery) return (q as unknown as any);
-    if (returnQuery) return (_query as unknown as any[]);
+    if (returnQuery) {
+      return ((returnQuery === "noRLS"? queryWithoutRLS : queryWithRLS) as unknown as any[]);
+    }
 
-    return runQueryReturnType(_query, returnType, this, localParams);
+    return runQueryReturnType(queryWithRLS, returnType, this, localParams);
 
   } catch (e) {
     // console.trace(e)

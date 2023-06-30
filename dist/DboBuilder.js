@@ -4,7 +4,7 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.canEXECUTE = exports.prepareSort = exports.postgresToTsType = exports.isPlainObject = exports.DboBuilder = exports.parseError = exports.makeErrorFromPGError = exports.escapeTSNames = exports.pgp = void 0;
+exports.withUserRLS = exports.canEXECUTE = exports.prepareSort = exports.postgresToTsType = exports.isPlainObject = exports.DboBuilder = exports.parseError = exports.makeErrorFromPGError = exports.escapeTSNames = exports.pgp = void 0;
 const Bluebird = require("bluebird");
 const pgPromise = require("pg-promise");
 const runSQL_1 = require("./DboBuilder/runSQL");
@@ -710,4 +710,13 @@ const canEXECUTE = async (db) => {
     return false;
 };
 exports.canEXECUTE = canEXECUTE;
+const withUserRLS = (localParams, query) => {
+    const user = localParams?.isRemoteRequest?.user;
+    let firstQuery = `SET SESSION "prostgles.user" TO '';`;
+    if (user) {
+        firstQuery = exports.pgp.as.format(`SET SESSION "prostgles.user" TO \${user};`, { user });
+    }
+    return [firstQuery, query].join("\n");
+};
+exports.withUserRLS = withUserRLS;
 //# sourceMappingURL=DboBuilder.js.map

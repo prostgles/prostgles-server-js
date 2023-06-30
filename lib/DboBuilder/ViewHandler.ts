@@ -15,7 +15,7 @@ import { DB, DBHandlerServer, Join } from "../Prostgles";
 import {
   DboBuilder, escapeTSNames, ExistsFilterConfig,Filter, isPlainObject,
   JoinInfo, LocalParams, parseError, pgp, postgresToTsType, SortItem,
-  TableHandlers, TableSchema, ValidatedTableRules
+  TableHandlers, TableSchema, ValidatedTableRules, withUserRLS
 } from "../DboBuilder";
 import { Graph } from "../shortestPath";
 import { TableRule, UpdateRule, ValidateRow } from "../PublishParser";
@@ -659,22 +659,22 @@ export class ViewHandler {
     try {
       return await this.find(filter, { ...selectParams, limit: 2 }, undefined, table_rules, localParams)
         .then(async _allowed => {
-          // let rules: TableRule = table_rules || {};
-          // rules.select.maxLimit = Number.MAX_SAFE_INTEGER;
-          // rules.select.fields = rules.select.fields || "*";
-
+          
           const q: string = await this.find(
             filter, { ...selectParams, limit: selectParams?.limit ?? Number.MAX_SAFE_INTEGER },
             undefined,
             table_rules,
-            { ...localParams, returnQuery: true }
+            { ...localParams, returnQuery: "noRLS" }
           ) as any;
-          const query = `
-                      SELECT sum(pg_column_size((prgl_size_query.*))) as size 
-                      FROM (
-                          ${q}
-                      ) prgl_size_query
-                  `;
+          const query = withUserRLS(
+            localParams,
+            `
+              SELECT sum(pg_column_size((prgl_size_query.*))) as size 
+              FROM (
+                  ${q}
+              ) prgl_size_query
+            `
+          );
 
           return (this.t || this.db).one(query, { _psqlWS_tableName: this.name }).then(({ size }) => size || '0');
         });

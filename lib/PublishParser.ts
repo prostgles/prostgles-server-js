@@ -373,13 +373,13 @@ export type Publish<Schema = void, SUser extends SessionUser = SessionUser> = Pu
 
 export class PublishParser {
   publish: any;
-  publishMethods?: PublishMethods<void, SessionUser<AnyObject, AnyObject>> | undefined;
+  publishMethods?: PublishMethods<void, SessionUser> | undefined;
   publishRawSQL?: any;
   dbo: DBHandlerServer;
   db: DB
   prostgles: Prostgles;
 
-  constructor(publish: any, publishMethods: PublishMethods<void, SessionUser<AnyObject, AnyObject>> | undefined, publishRawSQL: any, dbo: DBHandlerServer, db: DB, prostgles: Prostgles) {
+  constructor(publish: any, publishMethods: PublishMethods<void, SessionUser> | undefined, publishRawSQL: any, dbo: DBHandlerServer, db: DB, prostgles: Prostgles) {
     this.publish = publish;
     this.publishMethods = publishMethods;
     this.publishRawSQL = publishRawSQL;
