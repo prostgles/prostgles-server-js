@@ -11,12 +11,12 @@ import { SchemaWatch } from "./SchemaWatch";
 import { EventTriggerTagFilter } from "./Event_Trigger_Tags";
 
 const { version } = require('../package.json');
-import AuthHandler, { Auth, SessionUser, AuthRequestParams } from "./AuthHandler"; 
+import AuthHandler, { Auth, SessionUser, AuthRequestParams, UserLike } from "./AuthHandler"; 
 
 import TableConfigurator, { TableConfig } from "./TableConfig/TableConfig";
 
 import { get } from "./utils";
-import { DboBuilder, DBHandlerServer, isPlainObject, PRGLIOSocket } from "./DboBuilder";
+import { DboBuilder, DBHandlerServer, isPlainObject, PRGLIOSocket, LocalParams } from "./DboBuilder";
 import { PubSubManager, pickKeys, log } from "./PubSubManager/PubSubManager";
 export { DBHandlerServer }
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -367,6 +367,7 @@ const DEFAULT_KEYWORDS = {
 import * as fs from 'fs';
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { ColConstraint } from "./TableConfig/getConstraintDefinitionQueries";
+import { ViewHandler } from "./DboBuilder/ViewHandler";
 export class Prostgles {
 
   opts: ProstglesInitOptions = {
@@ -815,7 +816,11 @@ export class Prostgles {
             const clientInfo = await this.authHandler.getClientInfo({ socket });
             const valid_table_command_rules = await this.publishParser.getValidatedRequestRule({ tableName, command, localParams: { socket } }, clientInfo);
             if (valid_table_command_rules) {
-              const res = await this.dbo[tableName]![command]!(param1, param2, param3, valid_table_command_rules, { socket, isRemoteRequest: { user: clientInfo?.user } });
+              const sessionUser: UserLike | undefined = !clientInfo?.user? undefined : {
+                ...ViewHandler._parseFieldFilter(clientInfo.sessionFields ?? [], false, getKeys(clientInfo.user)),
+                ...pickKeys(clientInfo.user, ["id", "type"]) as UserLike,
+              }
+              const res = await this.dbo[tableName]![command]!(param1, param2, param3, valid_table_command_rules, { socket, isRemoteRequest: { user: sessionUser } });
               cb(null, res);
             } else throw `Invalid OR disallowed request: ${tableName}.${command} `;
 

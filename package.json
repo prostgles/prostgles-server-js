@@ -41,7 +41,7 @@
     "file-type": "^17.1.4",
     "pg-promise": "^11.3.0",
     "prostgles-types": "^4.0.18",
-    "sharp": "^0.31.0"
+    "sharp": "^0.32.1"
   },
   "devDependencies": {
     "@aws-sdk/types": "^3.110.0",

@@ -92,6 +92,7 @@ const DEFAULT_KEYWORDS = {
     $not: "$not"
 };
 const fs = require("fs");
+const ViewHandler_1 = require("./DboBuilder/ViewHandler");
 class Prostgles {
     opts = {
         DEBUG_MODE: false,
@@ -482,7 +483,11 @@ class Prostgles {
                         const clientInfo = await this.authHandler.getClientInfo({ socket });
                         const valid_table_command_rules = await this.publishParser.getValidatedRequestRule({ tableName, command, localParams: { socket } }, clientInfo);
                         if (valid_table_command_rules) {
-                            const res = await this.dbo[tableName][command](param1, param2, param3, valid_table_command_rules, { socket, isRemoteRequest: { user: clientInfo?.user } });
+                            const sessionUser = !clientInfo?.user ? undefined : {
+                                ...ViewHandler_1.ViewHandler._parseFieldFilter(clientInfo.sessionFields ?? [], false, (0, prostgles_types_1.getKeys)(clientInfo.user)),
+                                ...(0, PubSubManager_1.pickKeys)(clientInfo.user, ["id", "type"]),
+                            };
+                            const res = await this.dbo[tableName][command](param1, param2, param3, valid_table_command_rules, { socket, isRemoteRequest: { user: sessionUser } });
                             cb(null, res);
                         }
                         else

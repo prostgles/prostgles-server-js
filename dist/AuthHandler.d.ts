@@ -1,5 +1,5 @@
 import { Express, NextFunction, Request, Response } from "express";
-import { AnyObject } from "prostgles-types";
+import { AnyObject, FieldFilter } from "prostgles-types";
 import { LocalParams, PRGLIOSocket } from "./DboBuilder";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { DB, DBHandlerServer, Prostgles } from "./Prostgles";
@@ -38,8 +38,13 @@ export type UserLike = {
 export type SessionUser<ServerUser extends UserLike = UserLike, ClientUser extends AnyObject = AnyObject> = {
     /**
      * This user will be available in all serverside prostgles options
+     * id and type values will be available in the prostgles.user session variable in postgres
      * */
     user: ServerUser;
+    /**
+     * Controls which fields from user are available in postgres session variable
+     */
+    sessionFields?: FieldFilter<ServerUser>;
     /**
      * User data sent to the authenticated client
      */
