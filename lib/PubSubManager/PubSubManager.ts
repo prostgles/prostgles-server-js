@@ -147,7 +147,7 @@ export type Subscription = Pick<SubscriptionParams,
 }
 
 export class PubSubManager {
-  static DELIMITER = '|$prstgls$|';
+  static DELIMITER = '|$prstgls$|' as const;
 
   dboBuilder: DboBuilder;
   get db(): DB  {

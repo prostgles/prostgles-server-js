@@ -293,10 +293,9 @@ BEGIN
                                 CASE WHEN has_errors 
                                   THEN concat_ws('; ', 'error', err_text, err_detail, err_hint, 'query: ' || query ) 
                                   ELSE COALESCE(v_trigger.cids, '') 
-                                END,
-                                COALESCE(current_query(), 'current_query ??')
-                                ${this.dboBuilder.prostgles.opts.DEBUG_MODE? (", (select json_agg(t)::TEXT FROM (SELECT * from old_table) t), query") : ""}
-                              ), 7999)
+                                END
+                                ${this.dboBuilder.prostgles.opts.DEBUG_MODE? (", COALESCE(current_query(), 'current_query ??'), (select json_agg(t)::TEXT FROM (SELECT * from old_table) t), query") : ""}
+                              ), 7999/4) -- Some chars are 2bytes -> 'Ω'
                             );
                         END LOOP;
 
@@ -523,10 +522,10 @@ BEGIN
                     LOOP
                       PERFORM pg_notify( 
                         ${asValue(this.NOTIF_CHANNEL.preffix)} || app.id, 
-                        concat_ws(
+                        LEFT(concat_ws(
                           ${asValue(PubSubManager.DELIMITER)}, 
                           ${asValue(this.NOTIF_TYPE.schema)}, tg_tag , TG_event, curr_query
-                        )
+                        ), 7999/4)
                       );
                     END LOOP;
 

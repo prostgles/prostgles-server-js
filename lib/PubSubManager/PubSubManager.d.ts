@@ -94,7 +94,7 @@ export type Subscription = Pick<SubscriptionParams, "throttle" | "is_throttling"
     }[];
 };
 export declare class PubSubManager {
-    static DELIMITER: string;
+    static DELIMITER: "|$prstgls$|";
     dboBuilder: DboBuilder;
     get db(): DB;
     get dbo(): DBHandlerServer;
