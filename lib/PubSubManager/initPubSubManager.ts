@@ -65,28 +65,28 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
             checkForStaleTriggers = `                          
               DO $$
               BEGIN
+                set statement_timeout to ${Math.min(5e3, Math.round(this.appCheckFrequencyMS/2))};
+                /* 
+                  ${REALTIME_TRIGGER_CHECK_QUERY} 
+                  ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
+                */
+                /* prostgles schema must exist */
+                IF
+                  EXISTS (
+                    SELECT 1 
+                    FROM information_schema.tables 
+                    WHERE  table_schema = 'prostgles'
+                    AND    table_name   = 'apps'
+                  )
+                THEN
 
-                  /* 
-                    ${REALTIME_TRIGGER_CHECK_QUERY} 
-                    ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
-                  */
-                  /* prostgles schema must exist */
-                  IF
-                    EXISTS (
-                      SELECT 1 
-                      FROM information_schema.tables 
-                      WHERE  table_schema = 'prostgles'
-                      AND    table_name   = 'apps'
-                    )
-                  THEN
- 
-                      /* Last check used to remove disconnected apps */
-                      UPDATE prostgles.apps 
-                      SET last_check = NOW()
-                      WHERE id = ${asValue(this.appID)};
+                    /* Last check used to remove disconnected apps */
+                    UPDATE prostgles.apps 
+                    SET last_check = NOW()
+                    WHERE id = ${asValue(this.appID)};
 
-                      ${dataTriggerCheckQuery}
-                  END IF;
+                    ${dataTriggerCheckQuery}
+                END IF;
  
               END $$;
           `
