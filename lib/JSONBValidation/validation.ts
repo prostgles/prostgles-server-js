@@ -93,7 +93,8 @@ export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpt
 
     } else if (fieldType?.record) {
       const { keysEnum, values } = fieldType.record;
-      return `${fieldType.nullable ? `null |` : ""} Record<${keysEnum?.map(v => asValue(v)).join(" | ") ?? "string"}, ${!values? "any" : getFieldType(values, true, undefined, depth + 1)}>`
+      // TODO: ensure props with undefined values are not allowed in the TS type
+      return `${fieldType.nullable ? `null |` : ""} Partial<Record<${keysEnum?.map(v => asValue(v)).join(" | ") ?? "string"}, ${!values? "any" : getFieldType(values, true, undefined, depth + 1)}>>`
 
     } else if(fieldType?.lookup){
 

@@ -1130,9 +1130,10 @@ export const canEXECUTE = async (db: DB) => {
 export const withUserRLS = (localParams: LocalParams | undefined, query: string) => {
 
   const user = localParams?.isRemoteRequest?.user;
-  let firstQuery = `SET SESSION "prostgles.user" TO '';`;
+  const queryPrefix = `SET SESSION "prostgles.user" \nTO`
+  let firstQuery = `${queryPrefix} '';`;
   if(user){
-    firstQuery = pgp.as.format(`SET SESSION "prostgles.user" TO \${user};`, { user });
+    firstQuery = pgp.as.format(`${queryPrefix} \${user};`, { user });
   }
   
   return [firstQuery, query].join("\n");

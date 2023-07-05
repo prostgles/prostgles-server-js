@@ -346,7 +346,7 @@ export type DBSchemaGenerated = {
        |  {  ok: string; }
        |  {  err: string; }
        |  {  loading: {  loaded: number;  total: number; }; }
-      table_config?: null | {    referencedTables?: (  {  name: string;  minFiles: number; } )[];   recType?: null | Record<'a' | 'b',  {  bools: boolean[]; }>;  };
+      table_config?: null | {    referencedTables?: (  {  name: string;  minFiles: number; } )[];   recType?: null | Partial<Record<'a' | 'b',  {  bools: boolean[]; }>>;  };
     };
   };
   tr1: {
