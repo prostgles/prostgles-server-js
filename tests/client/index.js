@@ -40,6 +40,7 @@ try {
     });
     socket.on("start-test", (data) => {
         log("start-test", data);
+        // @ts-ignore
         (0, prostgles_client_1.default)({
             socket,
             onReconnect: (socket) => {

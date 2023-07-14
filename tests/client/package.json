@@ -14,7 +14,7 @@
   "dependencies": {
     "@types/node": "^14.14.16",
     "prostgles-client": "^4.0.15",
-    "socket.io-client": "^4.6.1"
+    "socket.io-client": "^4.7.1"
   },
   "devDependencies": {
     "typescript": "^5.0.3"

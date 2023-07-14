@@ -44,7 +44,9 @@ try {
     log("connect_failed", err)
   })
   socket.on("start-test", (data) => {
-    log("start-test", data)
+    log("start-test", data);
+
+    // @ts-ignore
     prostgles({
       socket, // or simply io()
       onReconnect: (socket) => {

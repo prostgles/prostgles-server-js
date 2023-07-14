@@ -429,6 +429,16 @@ SELECT ${exports.VALIDATE_SCHEMA_FUNCNAME}(
 );
 
 SELECT ${exports.VALIDATE_SCHEMA_FUNCNAME}(
+  '{ "record": { "keysEnum": ["a", "b"] , "values": { "enum": [1, 2] } } }', 
+  '{"a": 1 }'::JSONB
+);
+
+SELECT ${exports.VALIDATE_SCHEMA_FUNCNAME}(
+  '{ "record": { "keysEnum": ["a", "b"] , "values": { "enum": [1, 2] } } }', 
+  '{ }'::JSONB
+);
+
+SELECT ${exports.VALIDATE_SCHEMA_FUNCNAME}(
   '{ "record": { "keysEnum": ["a", "b"]    } }', 
   '{"a": 1, "b": 2 }'::JSONB
 );
