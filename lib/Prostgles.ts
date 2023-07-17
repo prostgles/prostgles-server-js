@@ -341,7 +341,12 @@ export type OnReady = {
   db: DB;
 }
 
-type OnReadyCallback<S = void> = (dbo: DBOFullyTyped<S>, db: DB) => any;
+type OnInitReason = 
+  | { type: "schema change"; query: string; command: string; } 
+  | { 
+    type: "init" | "prgl.restart" | "prgl.update" | "TableConfig"
+  }
+type OnReadyCallback<S = void> = (dbo: DBOFullyTyped<S>, db: DB, reason: OnInitReason) => any;
 
 export type InitResult = {
   db: DBOFullyTyped;
@@ -453,7 +458,7 @@ export class Prostgles {
     const { watchSchema, watchSchemaType, onReady, tsGeneratedTypesDir } = this.opts;
     if (watchSchema && this.loaded) {
       log("Schema changed");
-      const { query } = event;
+      const { query, command } = event;
       if (typeof query === "string" && query.includes(PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)) {
         log("Schema change event excluded from triggers due to EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID");
         return;
@@ -475,7 +480,7 @@ export class Prostgles {
       } else if (watchSchema || isObject(watchSchemaType) && "checkIntervalMillis" in watchSchemaType) {
         /* Full re-init. Sockets must reconnect */
         console.log("watchSchema: Full re-initialisation", { query })
-        this.init(onReady, query);
+        this.init(onReady, { type: "schema change", query, command });
       }
     }
   }
@@ -559,7 +564,7 @@ export class Prostgles {
         const dbuilder = await DboBuilder.create(this);
         if (dbuilder.tsTypesDefinition !== this.dboBuilder.tsTypesDefinition) {
           await this.refreshDBO();
-          this.init(onReady, "schema_checkIntervalMillis tsTypesDefinition changed");
+          this.init(onReady, { type: "schema change", command: "", query: "schema_checkIntervalMillis tsTypesDefinition changed" });
         }
       }, this.opts.watchSchemaType.checkIntervalMillis);
       
@@ -591,7 +596,7 @@ export class Prostgles {
   schema_checkIntervalMillis?: NodeJS.Timeout;
 
 
-  async init(onReady: OnReadyCallback, reason: string): Promise<InitResult> {
+  async init(onReady: OnReadyCallback, reason: OnInitReason): Promise<InitResult> {
     this.loaded = false;
 
     this.initWatchSchema(onReady);
@@ -673,7 +678,7 @@ export class Prostgles {
         if (this.destroyed) {
           console.trace(1)
         }
-        onReady(this.dbo as any, this.db);
+        onReady(this.dbo as any, this.db, { type: "init" });
       } catch (err) {
         console.error("Prostgles: Error within onReady: \n", err)
       }
@@ -688,9 +693,9 @@ export class Prostgles {
         update: async (newOpts) => {
           this.opts.fileTable = newOpts.fileTable;
           await this.initFileTable();
-          await this.init(onReady, "prgl.update");
+          await this.init(onReady, { type: "prgl.update"});
         }, 
-        restart: () => this.init(onReady, "prgl.restart"),
+        restart: () => this.init(onReady, { type: "prgl.restart" }),
         destroy: async () => {
           console.log("destroying prgl instance")
           this.destroyed = true;

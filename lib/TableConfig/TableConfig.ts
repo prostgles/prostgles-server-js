@@ -721,7 +721,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       if(!this.prevInitQueryHistory){
         this.prevInitQueryHistory = queryHistory;
       } else if(this.prevInitQueryHistory.join() !== queryHistory.join()){
-        this.prostgles.init(this.prostgles.opts.onReady, "TableConfig finish");
+        this.prostgles.init(this.prostgles.opts.onReady, { type: "TableConfig" });
       } else {
         console.error("TableConfig loop bug", queryHistory)
       }
