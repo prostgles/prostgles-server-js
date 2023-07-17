@@ -6,7 +6,7 @@
   "scripts": {
     "start": "tsc-watch --onSuccess \"node dist/client/index.js\"",
     "dev": "NOSTOP=true npm start",
-    "build": "rm -rf ./node_modules/* && npm i && tsc",
+    "build": "rm -rf ./node_modules/* && rm -rf ./dist/* && npm i && tsc",
     "test": "node dist/client/index.js & echo $! > ./PID.txt"
   },
   "author": "",

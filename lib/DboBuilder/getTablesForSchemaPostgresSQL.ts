@@ -63,7 +63,7 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
             ccc.references,
             ccc.has_default,
             ccc.column_default,
-            ccc.privileges
+            COALESCE(ccc.privileges, '[]'::JSON) as privileges
         ) as x) ORDER BY ccc.ordinal_position ) as columns 
         FROM (
             SELECT  c.table_schema, c.table_name, c.column_name, c.data_type, c.udt_name
