@@ -8,24 +8,9 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
     `
     SELECT 
       jsonb_build_object(
-        'insert', EXISTS (
-            SELECT 1 
-            FROM information_schema.role_table_grants rg
-            WHERE rg.table_name = t.table_name
-            AND rg.privilege_type = 'INSERT'
-        ),
-        'select', EXISTS (
-            SELECT 1 
-            FROM information_schema.role_table_grants rg
-            WHERE rg.table_name = t.table_name
-            AND rg.privilege_type = 'SELECT'
-        ),
-        'update', EXISTS (
-            SELECT 1 
-            FROM information_schema.role_table_grants rg
-            WHERE rg.table_name = t.table_name
-            AND rg.privilege_type = 'UPDATE'
-        ),
+        'insert', TRUE,
+        'select', TRUE,
+        'update', TRUE,
         'delete', EXISTS (
             SELECT 1 
             FROM information_schema.role_table_grants rg
@@ -152,11 +137,14 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
     ORDER BY schema, name
 
     `;
-  // console.log(pgp.as.format(query, { schema }), schema);
+    
   let result: TableSchema[] = await db.any(query, { schema });
 
   result = await Promise.all(result
     .map(async tbl => {
+      tbl.privileges.select = tbl.columns.some(c => c.privileges.some(p => p.privilege_type === "SELECT"));
+      tbl.privileges.insert = tbl.columns.some(c => c.privileges.some(p => p.privilege_type === "INSERT"));
+      tbl.privileges.update = tbl.columns.some(c => c.privileges.some(p => p.privilege_type === "UPDATE"));
       
       /** Get view reference cols (based on parent table) */
       let viewFCols: Pick<TableSchemaColumn, "name" | "references">[] = [];
