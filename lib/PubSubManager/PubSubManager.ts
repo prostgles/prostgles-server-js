@@ -258,7 +258,20 @@ export class PubSubManager {
   init = initPubSubManager.bind(this);
 
 
-  static SCHEMA_ALTERING_QUERIES = ['CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO'];
+  static SCHEMA_ALTERING_QUERIES = [
+    'CREATE TABLE', 
+    'ALTER TABLE', 
+    'DROP TABLE', 
+    'CREATE VIEW', 
+    'DROP VIEW', 
+    'ALTER VIEW', 
+    'CREATE TABLE AS', 
+    'SELECT INTO',
+    'REVOKE',
+    'GRANT',
+    'CREATE POLICY', 
+    'DROP POLICY', 
+  ] as const;
 
   static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from schema watch "
   prepareTriggers = async () => {

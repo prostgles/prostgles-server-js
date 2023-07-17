@@ -1,6 +1,7 @@
 import { strict as assert } from 'assert';
 
-import { DBHandlerServer} from "../dist/Prostgles";
+// import { DBHandlerServer } from "./server/node-modules/prostgles-server/dist/Prostgles";
+import { DBHandlerServer } from "./server/dist/server/index";
 import type { DBHandlerClient } from "./client/index";
 import * as fs from "fs";
 
@@ -36,7 +37,7 @@ export function tryRunP(desc: string, func: (resolve: any, reject: any) => any, 
   });
 }
  
-  export default async function isomorphic(db: Required<DBHandlerServer> | Required<DBHandlerClient>) {
+export default async function isomorphic(db: Required<DBHandlerServer> | Required<DBHandlerClient>) {
   console.log("Starting isomorphic queries");
 
   if(await db.items.count!()){
@@ -581,14 +582,15 @@ export function tryRunP(desc: string, func: (resolve: any, reject: any) => any, 
 
   });
 
-  const fileName = "sample_file.txt"
+  const fileFolder = `${__dirname}/../../server/dist/server/media/`; //isServer? `${__dirname}/../../server/dist/server/media/` : `${__dirname}/server/dist/server/media/` as const;
+  const fileName = "sample_file.txt";
   await tryRun("Local file upload", async () => {
     let str = "This is a string",
       data = Buffer.from(str, "utf-8"),
       mediaFile = { data, name: fileName }
 
     const file = await db.media.insert!(mediaFile, { returning: "*" });
-    const _data = fs.readFileSync(__dirname + "/server/media/"+file.name);
+    const _data = fs.readFileSync(fileFolder + file.name);
     assert.equal(str, _data.toString('utf8'));
 
     await tryRun("Nested insert", async () => {
@@ -603,7 +605,7 @@ export function tryRunP(desc: string, func: (resolve: any, reject: any) => any, 
           original_name: 'sample_file.txt',
         }
       );
-      // const _data = fs.readFileSync(__dirname + "/server/media/"+file.name);
+      
       assert.equal(name, "somename.txt");
     });
 
@@ -633,10 +635,10 @@ export function tryRunP(desc: string, func: (resolve: any, reject: any) => any, 
     
     const files = await db.media.find!({ original_name: file.name });
     assert.equal(files.length, 1);
-    const exists0 = fs.existsSync(__dirname + "/server/media/"+files[0].name);
+    const exists0 = fs.existsSync(fileFolder+files[0].name);
     assert.equal(exists0, true);
     await db.media.delete!({ original_name: file.name }, { returning: "*" });
-    const exists = fs.existsSync(__dirname + "/server/media/"+files[0].name);
+    const exists = fs.existsSync(fileFolder+files[0].name);
     assert.equal(exists, false);
   })
 
@@ -654,12 +656,12 @@ export function tryRunP(desc: string, func: (resolve: any, reject: any) => any, 
     await db.media.insert!(file);
     const original = await db.media.findOne!({ original_name: file.name });
     
-    const initialFileStr = fs.readFileSync(__dirname + "/server/media/" + original.name).toString('utf8');
+    const initialFileStr = fs.readFileSync(fileFolder + original.name).toString('utf8');
     assert.equal(initialStr, initialFileStr);
 
     await db.media.update!({ id: original.id }, newFile);
     
-    const newFileStr = fs.readFileSync(__dirname + "/server/media/" + original.name).toString('utf8');
+    const newFileStr = fs.readFileSync(fileFolder + original.name).toString('utf8');
     assert.equal(newStr, newFileStr);
     
     const newF = await db.media.findOne!({ id: original.id });

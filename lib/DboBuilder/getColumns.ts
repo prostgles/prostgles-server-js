@@ -23,9 +23,6 @@ export async function getColumns(
 
     if (!p.getColumns) throw "Not allowed";
 
-    // console.log("getColumns", this.name, this.columns.map(c => c.name))
-
-
     let dynamicUpdateFields = this.column_names;
 
     if (params && tableRules && isTableHandler(this)) {
@@ -64,7 +61,7 @@ export async function getColumns(
 
         const select = c.privileges.some(p => p.privilege_type === "SELECT"),
           insert = c.privileges.some(p => p.privilege_type === "INSERT"),
-          _delete = this.tableOrViewInfo.privileges.delete;// c.privileges.some(p => p.privilege_type === "DELETE");
+          _delete = this.tableOrViewInfo.privileges.delete;
         let update = c.privileges.some(p => p.privilege_type === "UPDATE");
 
         delete (c as any).privileges;
@@ -96,24 +93,10 @@ export async function getColumns(
         return result;
       }).filter(c => c.select || c.update || c.delete || c.insert)
 
-    //.sort((a, b) => a.ordinal_position - b.ordinal_position);
-
-    // const tblInfo = await this.getInfo();
-
-    // if(tblInfo && tblInfo.media_table_name && tblInfo.has_media){
-    //     const mediaRules = this.dboBuilder.dbo[tblInfo.media_table_name]?.
-    //     return columns.concat({
-    //         comment: "",
-    //         data_type: "file",
-    //         delete: false,
-    //     });
-    // }
-
     return columns;
 
   } catch (e) {
     throw parseError(e, `db.${this.name}.getColumns()`);
-    // throw "Something went wrong in " + `db.${this.name}.getColumns()`;
   }
 }
 

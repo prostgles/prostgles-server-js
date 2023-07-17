@@ -22,9 +22,10 @@ import server_only_queries from "../server_only_queries";
 import { DBSchemaGenerated } from "./DBoGenerated";
 // type DBObj = any;
 
-import { TableConfig } from '../../dist/TableConfig';
-import { DBOFullyTyped } from "../../lib/DBSchemaBuilder";
-import { PublishFullyTyped } from "../../dist/DBSchemaBuilder";
+import type { TableConfig } from 'prostgles-server/dist/TableConfig/TableConfig';
+import type { DBOFullyTyped, PublishFullyTyped } from "prostgles-server/dist/DBSchemaBuilder";
+
+export { DBHandlerServer } from "prostgles-server/dist/Prostgles";
 
 const log = (msg: string, extra?: any, trace?: boolean) => {
 	const msgs = ["(server): " + msg, extra].filter(v => v);
@@ -223,7 +224,7 @@ function dd(){
 	// ProstglesInitOptions<DBSchemaGenerated>
 	let prgl = await prostgles<DBSchemaGenerated>({
 		dbConnection,
-		sqlFilePath: path.join(__dirname+'/init.sql'),
+		sqlFilePath: path.join(__dirname+'/../../init.sql'),
 		io,
 		tsGeneratedTypesDir: path.join(__dirname + '/'),
 		// watchSchema: true,
@@ -470,14 +471,14 @@ function dd(){
 			log("prostgles onReady")
 			app.get('*', function(req, res){
 				log(req.originalUrl)
-				res.sendFile(path.join(__dirname+'/index.html'));
+				res.sendFile(path.join(__dirname, '../../index.html'));
 			});
 		
 
 			try {
 				
 				if(process.env.TEST_TYPE === "client"){
-					const clientPath = `cd ${__dirname}/../client && npm test`;
+					const clientPath = `cd ${__dirname}/../../../client && npm test`;
 					log("EXEC CLIENT PROCESS")
 					const proc = exec(clientPath, console.log);
 					log("Waiting for client...");

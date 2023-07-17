@@ -73,11 +73,11 @@ export async function runSQL(this: DboBuilder, queryWithoutRLS: string, params: 
       watchSchema &&
       (!this.prostgles.isSuperUser || watchSchemaType === "prostgles_queries")
     ) {
-      if (["CREATE", "ALTER", "DROP"].includes(command)) {
+      if (["CREATE", "ALTER", "DROP", "REVOKE", "GRANT"].includes(command)) {
         this.prostgles.onSchemaChange({ command, query: queryWithRLS })
       } else if (queryWithRLS) {
         const cleanedQuery = queryWithRLS.toLowerCase().replace(/\s\s+/g, ' ');
-        if (PubSubManager.SCHEMA_ALTERING_QUERIES.some(q => cleanedQuery.includes(q.toLowerCase()))) {
+        if (PubSubManager.SCHEMA_ALTERING_QUERIES.some(q => cleanedQuery.includes(q.toLowerCase() + " "))) {
           this.prostgles.onSchemaChange({ command, query: queryWithRLS })
         }
       }

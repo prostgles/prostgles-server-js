@@ -7,7 +7,7 @@ import * as promise from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
 import { FileManager, ImageOptions, LocalConfig, S3Config } from "./FileManager/FileManager";
-import { SchemaWatch } from "./SchemaWatch";
+import { SchemaWatch, VoidFunction } from "./SchemaWatch";
 import { EventTriggerTagFilter } from "./Event_Trigger_Tags";
 
 const { version } = require('../package.json');
@@ -354,7 +354,7 @@ export type InitResult = {
    */
   getTSSchema: () => string;
   update: (newOpts: Pick<ProstglesInitOptions, "fileTable">) => Promise<void>;
-  restart: () => Promise<InitResult>
+  restart: () => Promise<InitResult>; 
 }
 
 const DEFAULT_KEYWORDS = {
@@ -689,7 +689,7 @@ export class Prostgles {
           this.opts.fileTable = newOpts.fileTable;
           await this.initFileTable();
           await this.init(onReady, "prgl.update");
-        },
+        }, 
         restart: () => this.init(onReady, "prgl.restart"),
         destroy: async () => {
           console.log("destroying prgl instance")

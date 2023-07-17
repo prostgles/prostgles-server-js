@@ -1,3 +1,4 @@
 node_modules
 /tests/server/media
 .npmrc
+dist

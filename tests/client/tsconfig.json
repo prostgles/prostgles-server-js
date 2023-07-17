@@ -12,7 +12,8 @@
 		// "declarationMap": true,
 		"keyofStringsOnly": true,
 		"ignoreDeprecations": "5.0",
-		"skipLibCheck": false
+		"skipLibCheck": false,
+    "outDir": "dist",
 	},
 	"exclude": [
 		"dist"

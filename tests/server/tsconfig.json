@@ -13,10 +13,11 @@
 		"declarationMap": true,
 		"keyofStringsOnly": true,
 		"ignoreDeprecations": "5.0",
-		"skipLibCheck": true
+		"skipLibCheck": true,
+    "outDir": "dist",
 	},
 	"exclude": [
 		"dist",
-		"DBoGenerated.ts"
+		"DBoGenerated.d.ts"
 	]
 }

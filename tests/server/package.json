@@ -4,11 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "tsc-watch --onSuccess \"node index.js\"",
+    "start": "tsc-watch --onSuccess \"node dist/server/index.js\"",
     "dev": "NOSTOP=true npm start",
     "build": "rm -rf ./node_modules/* && rm -rf ./media/* && npm i && tsc",
-    "test-server": "TEST_TYPE=server node --inspect index.js",
-    "test-client": "TEST_TYPE=client node index.js "
+    "test-server": "TEST_TYPE=server node --inspect dist/server/index.js",
+    "test-client": "TEST_TYPE=client node dist/server/index.js "
   },
   "author": "",
   "license": "ISC",
