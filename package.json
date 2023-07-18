@@ -13,7 +13,7 @@
     "build": "tsc",
     "lint": "eslint . --ext .ts --quiet --fix",
     "test": "rm -rf ./node_modules/* && npm i && npm run lint && cd tests/ && ./test.sh",
-    "publish": "npm version patch --git-tag-version false && git add -A && git commit -m \"add OnInitReason\" && git push && npm publish"
+    "pushpublish": "npm version patch --git-tag-version false && git push && npm publish"
   },
   "repository": {
     "type": "git",
