@@ -126,7 +126,7 @@ export async function parseUpdateRules(
             allowedCols,
             this.dbTX || this.dboBuilder.dbo,
             validate ? ((row) => validate!({ update: row, filter: {} }, this.dbTX || this.dboBuilder.dbo)) : undefined
-          ) //pgp.helpers.update(data, columnSet)
+          );
           const query = updateQ + " WHERE FALSE ";
           await this.db.any("EXPLAIN " + query);
         } catch (e) {
@@ -141,15 +141,6 @@ export async function parseUpdateRules(
   /* Update all allowed fields (fields) except the forcedFilter (so that the user cannot change the forced filter values) */
   const _fields = this.parseFieldFilter(fields);
 
-  /**
-   * A forced filter must be basic
-   */
-  if (forcedFilter) {
-    const _forcedFilterKeys = Object.keys(forcedFilter);
-    const nonFields = _forcedFilterKeys.filter(key => !this.column_names.includes(key));
-    if (nonFields.length) throw "forcedFilter must be a basic filter ( { col_name: 'value' } ). Invalid filter keys: " + nonFields;
-    // const clashingFields = _forcedFilterKeys.filter(key => _fields.includes(key));
-  }
   const validateRow: ValidateRow | undefined = validate ? (row) => validate!({ update: row, filter: finalUpdateFilter }, this.dbTX || this.dboBuilder.dbo) : undefined
 
   return {
