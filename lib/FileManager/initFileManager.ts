@@ -4,7 +4,6 @@ import { TableHandler } from "../DboBuilder/TableHandler";
 import { Prostgles } from "../Prostgles";
 import { FileManager, HOUR, LocalConfig } from "./FileManager";
 import * as fs from 'fs';
-import { PubSubManager } from "../PubSubManager/PubSubManager";
 
 export async function initFileManager(this: FileManager, prg: Prostgles){
   this.prostgles = prg;
@@ -46,7 +45,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
         id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         original_name         TEXT NOT NULL,
         description           TEXT,
-        s3_url                TEXT,
+        cloud_url             TEXT,
         signed_url            TEXT,
         signed_url_expires    BIGINT,
         etag                  TEXT,
@@ -206,13 +205,13 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
           throw "Invalid media";
         }
         
-        if(this.s3Client){
+        if(this.cloudClient){
           let url = media.signed_url;
           const expires = +(media.signed_url_expires || 0);
           
           const EXPIRES = Date.now() + HOUR;
           if(!url || expires < EXPIRES){
-            url = await this.getFileS3URL(media.name, 60 * 60);
+            url = await this.getFileCloudDownloadURL(media.name, 60 * 60);
             await mediaTable.update({ name }, { signed_url: url, signed_url_expires: EXPIRES });
           }
 

@@ -6,8 +6,8 @@
 import * as promise from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg = require('pg-promise/typescript/pg-subset');
-import { FileManager, ImageOptions, LocalConfig, S3Config } from "./FileManager/FileManager";
-import { SchemaWatch, VoidFunction } from "./SchemaWatch";
+import { FileManager, ImageOptions, LocalConfig, CloudClient } from "./FileManager/FileManager";
+import { SchemaWatch } from "./SchemaWatch";
 import { EventTriggerTagFilter } from "./Event_Trigger_Tags";
 
 const { version } = require('../package.json');
@@ -186,7 +186,7 @@ export type FileTableConfig = {
    */
   fileServeRoute?: string;
 
-  awsS3Config?: S3Config;
+  cloudClient?: CloudClient;
   localConfig?: LocalConfig;
   //  {
   //     region: string; 
@@ -576,11 +576,11 @@ export class Prostgles {
   initFileTable = async () => {
 
     if (this.opts.fileTable) {
-      const { awsS3Config, localConfig, imageOptions } = this.opts.fileTable;
+      const { cloudClient, localConfig, imageOptions } = this.opts.fileTable;
       await this.refreshDBO();
-      if (!awsS3Config && !localConfig) throw "fileTable missing param: Must provide awsS3Config OR localConfig";
+      if (!cloudClient && !localConfig) throw "fileTable missing param: Must provide awsS3Config OR localConfig";
 
-      this.fileManager = new FileManager(awsS3Config || localConfig!, imageOptions);
+      this.fileManager = new FileManager(cloudClient || localConfig!, imageOptions);
 
       try {
         await this.fileManager.init(this);

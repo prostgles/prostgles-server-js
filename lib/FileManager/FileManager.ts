@@ -1,5 +1,4 @@
 
-import { S3, IAM } from 'aws-sdk'; 
 // import { PutObjectCommand, S3 } from "@aws-sdk/client-s3";
 import * as fs from 'fs';
 import * as stream from 'stream';
@@ -10,7 +9,6 @@ import checkDiskSpace from 'check-disk-space';
 import { DB, DBHandlerServer, ExpressApp, Prostgles } from '../Prostgles';
 import { ALLOWED_CONTENT_TYPE, ALLOWED_EXTENSION, CONTENT_TYPE_TO_EXT, getKeys, isDefined, ValidatedColumnInfo } from 'prostgles-types';
 
-import AWS from 'aws-sdk'; 
 import * as path from "path";
 import { initFileManager } from "./initFileManager";
 import { parseFile } from "./parseFile";
@@ -23,7 +21,7 @@ export const asSQLIdentifier = async (name: string, db: DB): Promise<string> => 
   return (await db.one("select format('%I', $1) as name", [name]))?.name
 }
 
-export type OnProgress = (progress: S3.ManagedUpload.Progress) => void
+export type OnProgress = (progress: { total: number; loaded: number; }) => void
 
 export type ImageOptions = {
   keepMetadata?: boolean;
@@ -38,11 +36,24 @@ export type ImageOptions = {
       }
 }
 
-export type S3Config = {
-  region: string;
-  bucket: string;
-  accessKeyId: string;
-  secretAccessKey: string;
+type UploadedCloudFile = { 
+  cloud_url: string; 
+  etag: string; 
+  content_length: number; 
+};
+type FileUploadArgs = {
+  fileName: string;
+  contentType: string;
+  file: string | Buffer | stream.PassThrough; 
+  onFinish: (error: any, result: UploadedCloudFile) => void;
+  onProgress?: (bytesUploaded: number) => void;
+}
+export type CloudClient = {
+  upload: (file: FileUploadArgs) => Promise<void>;
+  download: (fileName: string) => Promise<Buffer>;
+  downloadAsStream: (name: string) => Promise<stream.Readable>;
+  delete: (fileName: string) => Promise<void>;
+  getSignedUrlForDownload: (fileName: string, expiresInSeconds: number) => Promise<string>;
 }
 
 export type LocalConfig = {
@@ -74,9 +85,9 @@ export type UploadedItem = {
   etag: string;
 
   /**
-   * S3 url of the resource
+   * Cloud url of the resource
    */
-  s3_url?: string;
+  cloud_url?: string;
 
   /**
    * Total uploaded file size in bytes
@@ -86,27 +97,15 @@ export type UploadedItem = {
 
 export class FileManager {
 
-  static testCredentials = async (accessKeyId: string, secretAccessKey: string) => {
-    const sts = new AWS.STS();
-    AWS.config.credentials = {
-      accessKeyId,
-      secretAccessKey
-    }
+  cloudClient?: CloudClient;
 
-    const ident = await sts.getCallerIdentity({}).promise();
-    return ident;
-  }
-  
-  s3Client?: S3;
-
-  config: S3Config | LocalConfig;
+  config: CloudClient | LocalConfig;
   imageOptions?: ImageOptions;
 
   prostgles?: Prostgles;
   get dbo(): DBHandlerServer { 
     if(!this.prostgles?.dbo) {
-      // this.prostgles?.refreshDBO();
-      throw "this.prostgles.dbo missing"
+      throw "this.prostgles.dbo missing";
     }
     return this.prostgles.dbo 
   }
@@ -128,12 +127,8 @@ export class FileManager {
     this.config = config;
     this.imageOptions = imageOptions;
 
-    if("region" in config){
-      const { region, accessKeyId, secretAccessKey } = config;
-      this.s3Client = new S3({ 
-        region, 
-        credentials: { accessKeyId, secretAccessKey },
-      });
+    if("upload" in config){
+      this.cloudClient = config;
     }
 
     const fullConfig = this.prostgles?.opts.fileTable;
@@ -154,8 +149,8 @@ export class FileManager {
   }
 
   async getFileStream(name: string): Promise<stream.Readable> {
-    if("bucket" in this.config && this.s3Client){
-      return this.s3Client.getObject({ Key: name, Bucket: this.config.bucket }).createReadStream()
+    if(this.cloudClient){
+      return this.cloudClient.downloadAsStream(name)
     } else if("localFolderPath" in this.config){
       const filePath = path.resolve(`${this.config.localFolderPath}/${name}`);
       if(!fs.existsSync(filePath)){
@@ -166,8 +161,8 @@ export class FileManager {
   }
 
   async deleteFile(name: string) {
-    if("bucket" in this.config && this.s3Client){
-      const res = await this.s3Client?.deleteObject({ Bucket: this.config.bucket, Key: name }).promise();
+    if(this.cloudClient){
+      const res = await this.cloudClient?.delete(name);
       return res;
     } else if("localFolderPath" in this.config){
       const path = `${this.config.localFolderPath}/${name}`;
@@ -185,7 +180,7 @@ export class FileManager {
   getLocalFileUrl = (name: string) => this.fileRoute? `${this.fileRoute}/${name}` : "";
 
   checkFreeSpace = async (folderPath: string, fileSize = 0) => {
-    if(!this.s3Client && "localFolderPath" in this.config) {
+    if(!this.cloudClient && "localFolderPath" in this.config) {
       const { minFreeBytes = 1.048e6 } = this.config;
       const required = Math.max(fileSize, minFreeBytes)
       if(required){
@@ -259,13 +254,8 @@ export class FileManager {
     return res
   }
 
-  async getFileS3URL(fileName: string, expiresInSeconds: number = 30 * 60){
-    const params = {
-      Bucket: (this.config as S3Config).bucket, 
-      Key: fileName,
-      Expires: Math.round(expiresInSeconds || 30 * 60) // Error if float
-    };
-    return await this.s3Client?.getSignedUrlPromise("getObject", params);
+  async getFileCloudDownloadURL(fileName: string, expiresInSeconds: number = 30 * 60){
+    return await this.cloudClient?.getSignedUrlForDownload(fileName, expiresInSeconds);
   }
 
   parseSQLIdentifier = async (name: string ) => asSQLIdentifier(name, this.prostgles!.db!);//  this.prostgles.dbo.sql<"value">("select format('%I', $1)", [name], { returnType: "value" } )
@@ -354,25 +344,3 @@ export function bytesToSize(bytes: number) {
   const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)) + "");
   return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
 }
-
-
-/**
- *
- 
-
-    // if(content_type && typeof content_type !== "string") throw "Invalid content_type provided";
-    // if(title && typeof title !== "string") throw "Invalid title provided";
-    // let fExt = name.split(".").pop()
-    // if(content_type && name.split(".").length > 1 && fExt && fExt.length <= 4){
-    //   type = {
-    //     mime: content_type,
-    //     ext: fExt,
-    //     fileName: name,
-    //   }
-    // } else {
-    //   type = await this.getMIME(data, name);//, ["png", "jpg", "ogg", "webm", "pdf", "doc"]);
-    // }
-
-
-
- */

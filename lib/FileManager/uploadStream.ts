@@ -14,8 +14,7 @@ export function uploadStream(
 ){
   const passThrough = new stream.PassThrough();
 
-  if(!this.s3Client && "localFolderPath" in this.config) {
-    // throw new Error("S3 config missing. Can only upload streams to S3");
+  if(!this.cloudClient && "localFolderPath" in this.config) {
 
     try {
       this.checkFreeSpace(this.config.localFolderPath, expectedSizeBytes).catch(err => {
@@ -42,7 +41,7 @@ export function uploadStream(
           const now = Date.now();
           if(now - lastProgress > throttle){
             lastProgress = now;
-            onProgress?.({ loaded, total: 0 });
+            onProgress?.({ loaded, total: expectedSizeBytes ?? 0 });
           }
         });
       }
