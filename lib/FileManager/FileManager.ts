@@ -36,7 +36,7 @@ export type ImageOptions = {
       }
 }
 
-type UploadedCloudFile = { 
+export type UploadedCloudFile = { 
   cloud_url: string; 
   etag: string; 
   content_length: number; 
@@ -45,7 +45,7 @@ type FileUploadArgs = {
   fileName: string;
   contentType: string;
   file: string | Buffer | stream.PassThrough; 
-  onFinish: (error: any, result: UploadedCloudFile) => void;
+  onFinish: (...args: [error: Error, result: undefined] | [error: undefined, result: UploadedCloudFile]) => void;
   onProgress?: (bytesUploaded: number) => void;
 }
 export type CloudClient = {

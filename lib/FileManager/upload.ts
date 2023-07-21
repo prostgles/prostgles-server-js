@@ -44,11 +44,11 @@ export async function upload(
         fileName: name,
         contentType: mime,
         file,
-        onFinish: (err, { etag, cloud_url, content_length }) => {
+        onFinish: (err, uploaded) => {
           if(err){
             reject(err.toString());
           } else {
-            resolve({ url, etag, cloud_url, content_length });
+            resolve({ ...uploaded, url });
           }
         },
         onProgress: loaded => {
