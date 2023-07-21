@@ -41,7 +41,7 @@ export type UploadedCloudFile = {
   etag: string; 
   content_length: number; 
 };
-type FileUploadArgs = {
+export type FileUploadArgs = {
   fileName: string;
   contentType: string;
   file: string | Buffer | stream.PassThrough; 
@@ -50,7 +50,6 @@ type FileUploadArgs = {
 }
 export type CloudClient = {
   upload: (file: FileUploadArgs) => Promise<void>;
-  download: (fileName: string) => Promise<Buffer>;
   downloadAsStream: (name: string) => Promise<stream.Readable>;
   delete: (fileName: string) => Promise<void>;
   getSignedUrlForDownload: (fileName: string, expiresInSeconds: number) => Promise<string>;
