@@ -188,12 +188,6 @@ export type FileTableConfig = {
 
   cloudClient?: CloudClient;
   localConfig?: LocalConfig;
-  //  {
-  //     region: string; 
-  //     bucket: string; 
-  //     accessKeyId: string;
-  //     secretAccessKey: string;
-  // },
 
   /**
    * If defined the the files will not be deleted immediately
@@ -830,11 +824,8 @@ export class Prostgles {
             } else throw `Invalid OR disallowed request: ${tableName}.${command} `;
 
           } catch (err) {
-            // const _err_msg = err.toString();
-            // cb({ msg: _err_msg, err });
             console.trace(err);
-            cb(err)
-            // console.warn("runPublishedRequest ERROR: ", err, socket._user);
+            cb(err);
           }
         });
 
@@ -842,7 +833,7 @@ export class Prostgles {
           this.dbEventsManager?.removeNotice(socket);
           this.dbEventsManager?.removeNotify(undefined, socket);
           this.connectedSockets = this.connectedSockets.filter(s => s.id !== socket.id);
-          // subscriptions = subscriptions.filter(sub => sub.socket.id !== socket.id);
+          
           if (this.opts.onSocketDisconnect) {
             const getUser = async () => { return await this.authHandler?.getClientInfo({ socket }); }
             this.opts.onSocketDisconnect({ socket, dbo: dbo as any, db, getUser });
@@ -884,10 +875,6 @@ export class Prostgles {
     try {
       const { auth, userData } = await this.authHandler?.makeSocketAuth(socket) || {};
 
-      // let needType = this.publishRawSQL && typeof this.publishRawSQL === "function";
-      // let DATA_TYPES = !needType? [] : await this.db.any("SELECT oid, typname FROM pg_type");
-      // let USER_TABLES = !needType? [] :  await this.db.any("SELECT relid, relname FROM pg_catalog.pg_statio_user_tables");
-  
       const { db, publishParser } = this;
       let fullSchema: {
         schema: TableSchemaForClient;
@@ -1002,19 +989,6 @@ type SocketMethodRequest = {
   method: string;
   params: any;
 }
-
-// const ALL_PUBLISH_METHODS = ["update", "upsert", "delete", "insert", "find", "findOne", "subscribe", "unsubscribe", "sync", "unsync", "remove"];
-// const ALL_PUBLISH_METHODS = RULE_TO_METHODS.map(r => r.methods).flat();
-
-// export function flat(arr){
-//     // let res = arr.reduce((acc, val) => [ ...acc, ...val ], []);
-//     let res =  arr.reduce(function (farr, toFlatten) {
-//         return farr.concat(Array.isArray(toFlatten) ? flat(toFlatten) : toFlatten);
-//       }, []);
-
-//     return res;
-// }
-
 
 
 export async function isSuperUser(db: DB): Promise<boolean> {

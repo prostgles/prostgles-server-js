@@ -1,9 +1,8 @@
 
-// import { PutObjectCommand, S3 } from "@aws-sdk/client-s3";
 import * as fs from 'fs';
 import * as stream from 'stream';
 
-import * as sharp from "sharp";
+// import * as sharp from "sharp";
 import checkDiskSpace from 'check-disk-space';
 
 import { DB, DBHandlerServer, ExpressApp, Prostgles } from '../Prostgles';
@@ -209,44 +208,44 @@ export class FileManager {
     
     // const type = await this.getMIME(data, name, allowedExtensions, dissallowedExtensions);
 
-    let _data = data;
+    const _data = data;
     
     /** Resize/compress/remove exif from photos */
-    if(content_type.startsWith("image") && extension.toLowerCase() !== "gif"){
+    // if(content_type.startsWith("image") && extension.toLowerCase() !== "gif"){
 
-      const compression = imageOptions?.compression
-      if(compression){
-        console.log("Resizing image")
-        let opts;
-        if("contain" in compression){
-          opts = {
-            fit: sharp.fit.contain,
-            ...compression.contain
-          }
-        } else if("inside" in compression){
-          opts = {
-            fit: sharp.fit.inside,
-            ...compression.inside
-          }
-        }
-        _data = await sharp(data)
-          .resize(opts as any)
-          .withMetadata(Boolean(imageOptions?.keepMetadata) as any)
-          // .jpeg({ quality: 80 })
-          .toBuffer()
-      } else if(!imageOptions?.keepMetadata) {
-        /**
-         * Remove exif
-         */
-        // const metadata = await simg.metadata();
-        // const simg = await sharp(data);
+    //   const compression = imageOptions?.compression
+    //   if(compression){
+    //     console.log("Resizing image")
+    //     let opts;
+    //     if("contain" in compression){
+    //       opts = {
+    //         fit: sharp.fit.contain,
+    //         ...compression.contain
+    //       }
+    //     } else if("inside" in compression){
+    //       opts = {
+    //         fit: sharp.fit.inside,
+    //         ...compression.inside
+    //       }
+    //     }
+    //     _data = await sharp(data)
+    //       .resize(opts as any)
+    //       .withMetadata(Boolean(imageOptions?.keepMetadata) as any)
+    //       // .jpeg({ quality: 80 })
+    //       .toBuffer()
+    //   } else if(!imageOptions?.keepMetadata) {
+    //     /**
+    //      * Remove exif
+    //      */
+    //     // const metadata = await simg.metadata();
+    //     // const simg = await sharp(data);
 
-        _data = await sharp(data).clone().withMetadata({
-            exif: {}
-          })
-          .toBuffer()
-      }
-    }
+    //     _data = await sharp(data).clone().withMetadata({
+    //         exif: {}
+    //       })
+    //       .toBuffer()
+    //   }
+    // }
 
     const res = await this.upload(_data, name, content_type);
 
