@@ -159,7 +159,7 @@ export class PubSubManager {
   
   _triggers?: Record<string, string[]>;
   sockets: AnyObject = {};
-  // subs: { [ke: string]: { [ke: string]: { subs: SubscriptionParams[] } } };
+  
   subs: Subscription[] = [];
   syncs: SyncParams[] = [];
   socketChannelPreffix: string;
@@ -486,9 +486,7 @@ export class PubSubManager {
   }
 
   syncTimeout?: ReturnType<typeof setTimeout>;
-  async syncData(sync: SyncParams, clientData: ClientExpressData | undefined, source: "trigger" | "client") {
-    return await syncData(this, sync, clientData, source);
-  }
+  syncData = syncData.bind(this);
 
   addSync = addSync.bind(this);
   

@@ -42,7 +42,7 @@ function getNumbers(numberArr: (null | undefined | string | number)[]): number[]
   return numberArr.filter(v => v !== null && v !== undefined && Number.isFinite(+v)) as any;
 }
 
-export const syncData = async (_this: PubSubManager, sync: SyncParams, clientData: ClientExpressData | undefined, source: "trigger" | "client") => {
+export async function syncData (this: PubSubManager, sync: SyncParams, clientData: ClientExpressData | undefined, source: "trigger" | "client"){
   log("syncData", { clientData, sync: pickKeys(sync, ["filter", "last_synced", "lr", "is_syncing"]), source })
   const {
     socket_id, channel_name, table_name, filter,
@@ -50,18 +50,15 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
     synced_field, id_fields = [], batch_size,
     wal, throttle = 0
   } = sync,
-    socket = _this.sockets[socket_id];
+    socket = this.sockets[socket_id];
 
   if (!socket) {
-    console.error("Orphaned socket", { sync, clientData });
+    console.error("Sync socket missing", pickKeys(sync, ["channel_name", "table_name", "condition"]), clientData);
     return;
   }
 
   const sync_fields = [synced_field, ...id_fields.sort()],
-    orderByAsc = sync_fields.reduce((a, v) => ({ ...a, [v]: true }), {}),
-    // orderByDesc = sync_fields.reduce((a, v) => ({ ...a, [v]: false }), {}),
-    // desc_params = { orderBy: [{ [synced_field]: false }].concat(id_fields.map(f => ({ [f]: false }) )) },
-    // asc_params = { orderBy: [synced_field].concat(id_fields) },
+    orderByAsc: OrderBy = sync_fields.reduce((a, v) => ({ ...a, [v]: true }), {}),
     rowsIdsMatch = (a?: AnyObject, b?: AnyObject) => {
       return a && b && !id_fields.find(key => (a[key]).toString() !== (b[key]).toString())
     },
@@ -78,14 +75,14 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
           ...(to_synced ? { $lte: to_synced } : {})
         }
       }
-      if (_this.dbo?.[table_name]?.find === undefined || _this?.dbo?.[table_name]?.count === undefined) {
+      if (this.dbo?.[table_name]?.find === undefined || this?.dbo?.[table_name]?.count === undefined) {
         throw `dbo.${table_name}.find or .count are missing or not allowed`;
       }
 
-      const first_rows = await _this.dbo?.[table_name]?.find?.(_filter, { orderBy: (orderByAsc as OrderBy), select: sync_fields, limit, offset }, undefined, table_rules);
-      const last_rows = first_rows?.slice(-1);
+      const first_rows = await this.dbo?.[table_name]?.find?.(_filter, { orderBy: orderByAsc, select: sync_fields, limit, offset }, undefined, table_rules);
+      const last_rows = first_rows?.slice(-1); // Why not logic below?
       // const last_rows = await _this?.dbo[table_name]?.find?.(_filter, { orderBy: (orderByDesc as OrderBy), select: sync_fields, limit: 1, offset: -offset || 0 }, null, table_rules);
-      const count = await _this.dbo?.[table_name]?.count?.(_filter, undefined, undefined, table_rules);
+      const count = await this.dbo?.[table_name]?.count?.(_filter, undefined, undefined, table_rules);
 
       return { s_fr: first_rows?.[0] || null, s_lr: last_rows?.[0] || null, s_count: count }
     },
@@ -135,10 +132,10 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
         [synced_field]: { $gte: from_synced || 0 }
       };
 
-      if (!_this?.dbo?.[table_name]?.find) throw "_this?.dbo?.[table_name]?.find is missing";
+      if (!this?.dbo?.[table_name]?.find) throw "_this?.dbo?.[table_name]?.find is missing";
 
       try {
-        const res = _this?.dbo?.[table_name]?.find?.(
+        const res = this?.dbo?.[table_name]?.find?.(
           _filter,
           {
             select: params.select,
@@ -164,7 +161,7 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
         return Promise.all(deleted.map(async d => {
           const id_filter = pickKeys(d, id_fields);
           try {
-            await (_this.dbo[table_name] as TableHandler).delete(id_filter, undefined, undefined, table_rules);
+            await (this.dbo[table_name] as TableHandler).delete(id_filter, undefined, undefined, table_rules);
             return 1;
           } catch (e) {
             console.error(e)
@@ -184,7 +181,7 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
 
       // console.log("isExpress", isExpress, data);
 
-      return _this.dboBuilder.getTX(async (dbTX) => {
+      return this.dboBuilder.getTX(async (dbTX) => {
         const tbl = dbTX[table_name] as TableHandler;
         const existingData = await tbl.find(
           { $or: data.map(d => pickKeys(d, id_fields)) },
@@ -306,7 +303,7 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
             sync_fields.map(key => {
               _filter[key] = c_lr[key];
             });
-            server_row = await _this?.dbo?.[table_name]?.find?.(_filter, { select: sync_fields, limit: 1 }, undefined, table_rules);
+            server_row = await this?.dbo?.[table_name]?.find?.(_filter, { select: sync_fields, limit: 1 }, undefined, table_rules);
           }
 
           // if(rowsFullyMatch(c_lr, s_lr)){ //c_count === s_count && 
@@ -379,7 +376,7 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
           });
           await Promise.all(to_delete.map(d => {
             deleted++;
-            return (_this.dbo[table_name] as TableHandler).delete(pickKeys(d, id_fields), {}, undefined, table_rules);
+            return (this.dbo[table_name] as TableHandler).delete(pickKeys(d, id_fields), {}, undefined, table_rules);
           }));
           sData = await getServerData(min_synced, offset);
         }
@@ -414,7 +411,7 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
     /* Used to throttle and merge incomming updates */
     sync.wal = new WAL({
       id_fields, synced_field, throttle, batch_size,
-      DEBUG_MODE: _this.dboBuilder.prostgles.opts.DEBUG_MODE,
+      DEBUG_MODE: this.dboBuilder.prostgles.opts.DEBUG_MODE,
       onSendStart: () => {
         sync.is_syncing = true;
       },
@@ -444,7 +441,7 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
         /**
          * After all data was inserted request SyncInfo from client and sync again if necessary
          */
-        _this.syncData(sync, undefined, source);
+        this.syncData(sync, undefined, source);
       },
     })
   }
@@ -452,11 +449,11 @@ export const syncData = async (_this: PubSubManager, sync: SyncParams, clientDat
   /* Debounce sync requests */
   if (!sync.wal) throw "sync.wal missing";
   if (!sync.wal.isSending() && sync.is_syncing) {
-    if (!_this.syncTimeout) {
-      _this.syncTimeout = setTimeout(() => {
-        _this.syncTimeout = undefined;
+    if (!this.syncTimeout) {
+      this.syncTimeout = setTimeout(() => {
+        this.syncTimeout = undefined;
         // console.log("SYNC FROM TIMEOUT")
-        _this.syncData(sync, undefined, source);
+        this.syncData(sync, undefined, source);
       }, throttle)
     }
     // console.log("SYNC THROTTLE")
