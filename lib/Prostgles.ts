@@ -223,6 +223,33 @@ export type FileTableConfig = {
   imageOptions?: ImageOptions
 };
 
+export type EventInfo = {
+  localParams?: LocalParams;
+} & (
+{
+  type: "table";
+  tableName: string;
+  command: keyof TableHandler;
+  data: AnyObject;
+} | {
+  type: "method";
+  args: any;
+} | {
+  type: "sync";
+  tableName: string;
+  command: string;
+  data: AnyObject;
+} | {
+  type: "connect" | "disconnect";
+  data: AnyObject;
+} 
+) | {
+  type: "info";
+  command: string;
+  data: AnyObject;
+};
+export type TableEvent = Extract<EventInfo, { type: "table" }>
+
 export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUser> = {
   dbConnection: DbConnection;
   dbOptions?: DbConnectionOpts;
@@ -320,6 +347,7 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
       ) => Promise<ColConstraint[]>
     }) => void;
   };
+  onLog?: (evt: EventInfo) => Promise<void>;
 }
 
 /*
@@ -367,6 +395,7 @@ import * as fs from 'fs';
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { ColConstraint } from "./TableConfig/getConstraintDefinitionQueries";
 import { ViewHandler } from "./DboBuilder/ViewHandler";
+import { TableHandler } from "./DboBuilder/TableHandler";
 export class Prostgles {
 
   opts: ProstglesInitOptions = {
@@ -425,7 +454,7 @@ export class Prostgles {
       io: 1, publish: 1, schema: 1, publishRawSQL: 1, wsChannelNamePrefix: 1, 
       onSocketConnect: 1, onSocketDisconnect: 1, sqlFilePath: 1, auth: 1, 
       DEBUG_MODE: 1, watchSchema: 1, watchSchemaType: 1, fileTable: 1, 
-      tableConfig: 1, tableConfigMigrations: 1, keywords: 1, onNotice: 1
+      tableConfig: 1, tableConfigMigrations: 1, keywords: 1, onNotice: 1, onLog: 1
     };
     const unknownParams = Object.keys(params).filter((key: string) => !Object.keys(config).includes(key))
     if (unknownParams.length) {
@@ -787,6 +816,7 @@ export class Prostgles {
       const { dbo, db } = this;
 
       try {
+        await this.opts.onLog?.({ type: "connect", data: {}, localParams: { socket } });
         if (this.opts.onSocketConnect) {
           try {
             const getUser = async () => { return await this.authHandler?.getClientInfo({ socket }); }
@@ -830,6 +860,8 @@ export class Prostgles {
         });
 
         socket.on("disconnect", () => {
+
+          this.opts.onLog?.({ type: "connect", data: {}, localParams: { socket } });
           this.dbEventsManager?.removeNotice(socket);
           this.dbEventsManager?.removeNotify(undefined, socket);
           this.connectedSockets = this.connectedSockets.filter(s => s.id !== socket.id);

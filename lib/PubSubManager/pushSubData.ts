@@ -7,6 +7,7 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
   const { socket_id, channel_name } = sub;  //, subOne = false 
   const localFuncs = parseLocalFuncs(sub.localFuncs);
 
+  await this._log({ command: "pushSubData", tableName: sub.table_info.name, data: { sub } });
   if (err) {
     if (socket_id) {
       this.sockets[socket_id].emit(channel_name, { err });

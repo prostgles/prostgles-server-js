@@ -10,6 +10,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
   
   const ACTION = "insert";
   try {
+    await this._log({ command: "insert", localParams, data: { rowOrRows, param2 } });
 
     const { onConflictDoNothing, fixIssues = false } = param2 || {};
     const { testRule = false, returnQuery = false } = localParams || {};

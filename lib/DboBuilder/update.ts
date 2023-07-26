@@ -9,7 +9,7 @@ import { runQueryReturnType } from "./find";
 export async function update(this: TableHandler, filter: Filter, _newData: AnyObject, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<AnyObject | void> {
   const ACTION = "update";
   try {
-
+    await this._log({ command: "update", localParams, data: { filter, _newData, params } });
     /** postValidate */
     const finalDBtx = localParams?.tx?.dbTX || this.dbTX;
     if(tableRules?.[ACTION]?.postValidate){

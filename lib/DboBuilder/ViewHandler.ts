@@ -11,7 +11,7 @@ import {
   isObject, isDefined, getKeys,
   _PG_geometric, pickKeys, SubscribeParams, EXISTS_KEYS, EXISTS_KEY
 } from "prostgles-types";
-import { DB, DBHandlerServer, Join } from "../Prostgles";
+import { DB, DBHandlerServer, Join, TableEvent } from "../Prostgles";
 import {
   DboBuilder, escapeTSNames, ExistsFilterConfig,Filter, isPlainObject,
   JoinInfo, LocalParams, parseError, pgp, postgresToTsType, SortItem,
@@ -199,6 +199,10 @@ export class ViewHandler {
       this.tsColumnDefs.push(`${escapeTSNames(name)}?: ${postgresToTsType(udt_name) as string} ${is_nullable ? " | null " : ""};`);
     });
   } 
+
+  _log = ({ command, data, localParams }: Pick<TableEvent, "command" | "data" | "localParams">) => {
+    return this.dboBuilder.prostgles.opts.onLog?.({ type: "table", tableName: this.name, command, data, localParams })
+  }
 
   getRowHashSelect(allowedFields: FieldFilter, alias?: string, tableAlias?: string): string {
     let allowed_cols = this.column_names;
@@ -408,6 +412,7 @@ export class ViewHandler {
   }
 
   async getInfo(lang?: string, param2?: any, param3?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<TInfo> {
+    await this._log({ command: "getInfo", localParams, data: { lang } });
     const p = this.getValidatedRules(tableRules, localParams);
     if (!p.getInfo) throw "Not allowed";
 
@@ -602,9 +607,10 @@ export class ViewHandler {
   }
   find = find.bind(this);
   
-  findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any> {
+  async findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any> {
 
     try {
+      await this._log({ command: "find", localParams, data: { filter, selectParams } });
       const { select = "*", orderBy, offset = 0 } = selectParams || {};
       if (selectParams) {
         const good_params = ["select", "orderBy", "offset"];
@@ -641,6 +647,7 @@ export class ViewHandler {
   async count(filter?: Filter, param2_unused?: undefined, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<number> {
     filter = filter || {};
     try {
+      await this._log({ command: "count", localParams, data: { filter } });
       return await this.find(filter, { select: "", limit: 0 }, undefined, table_rules, localParams)
         .then(async _allowed => {
           const { filterFields, forcedFilter } = table_rules?.select || {};
@@ -657,6 +664,7 @@ export class ViewHandler {
   async size(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<string> {
     filter = filter || {};
     try {
+      await this._log({ command: "size", localParams, data: { filter, selectParams } });
       return await this.find(filter, { ...selectParams, limit: 2 }, undefined, table_rules, localParams)
         .then(async _allowed => {
           

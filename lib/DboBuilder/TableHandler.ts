@@ -32,9 +32,9 @@ export class TableHandler extends ViewHandler {
     this.is_media = dboBuilder.prostgles.isMedia(this.name)
   }
 
-
   async updateBatch(data: [Filter, AnyObject][], params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<any> {
     try {
+      await this._log({ command: "updateBatch", localParams, data: { data, params } });
       const updateQueries: string[] = await Promise.all(
         data.map(async ([filter, data]) =>
           (await this.update(
@@ -96,7 +96,10 @@ export class TableHandler extends ViewHandler {
   }
 
   insertDataParse = insertDataParse;
-  async insert(rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, param3_unused?: undefined, tableRules?: TableRule, _localParams?: LocalParams): Promise<any | any[] | boolean> {
+  async insert(
+    rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, 
+    param3_unused?: undefined, tableRules?: TableRule, _localParams?: LocalParams
+  ): Promise<any | any[] | boolean> {
     return insert.bind(this)(rowOrRows, param2, param3_unused, tableRules, _localParams)
   }
 
@@ -135,6 +138,7 @@ export class TableHandler extends ViewHandler {
 
   async upsert(filter: Filter, newData: AnyObject, params?: UpdateParams, table_rules?: TableRule, localParams?: LocalParams): Promise<any> {
     try {
+      await this._log({ command: "upsert", localParams, data: { filter, newData, params } });
       const _upsert = async function (tblH: TableHandler) {
         return tblH.find(filter, { select: "", limit: 1 }, undefined, table_rules, localParams)
           .then(exists => {
@@ -161,21 +165,23 @@ export class TableHandler extends ViewHandler {
 
   /* External request. Cannot sync from server */
   async sync(filter: Filter, params: { select?: FieldFilter }, param3_unused: undefined, table_rules: TableRule, localParams: LocalParams) {
-    if (!localParams) throw "Sync not allowed within the same server code";
-    const { socket } = localParams;
-    if (!socket) throw "INTERNAL ERROR: socket missing";
-
-
-    if (!table_rules || !table_rules.sync || !table_rules.select) throw "INTERNAL ERROR: sync or select rules missing";
-
-    if (this.t) throw "Sync not allowed within transactions";
-
-    const ALLOWED_PARAMS = ["select"];
-    const invalidParams = Object.keys(params || {}).filter(k => !ALLOWED_PARAMS.includes(k));
-    if (invalidParams.length) throw "Invalid or dissallowed params found: " + invalidParams.join(", ");
 
     try {
-
+      await this._log({ command: "sync", localParams, data: { filter, params } });
+      
+      if (!localParams) throw "Sync not allowed within the server code";
+      const { socket } = localParams;
+      if (!socket) throw "socket missing";
+  
+  
+      if (!table_rules || !table_rules.sync || !table_rules.select) throw "sync or select table rules missing";
+  
+      if (this.t) throw "Sync not allowed within transactions";
+  
+      const ALLOWED_PARAMS = ["select"];
+      const invalidParams = Object.keys(params || {}).filter(k => !ALLOWED_PARAMS.includes(k));
+      if (invalidParams.length) throw "Invalid or dissallowed params found: " + invalidParams.join(", ");
+  
 
       const { synced_field, allow_delete }: SyncRule = table_rules.sync;
 

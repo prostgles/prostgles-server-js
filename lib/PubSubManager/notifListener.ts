@@ -15,8 +15,10 @@ export async function notifListener(this: PubSubManager, data: { payload: string
   log(str);
 
   if (notifType === this.NOTIF_TYPE.schema) {
+
     if (this.onSchemaChange) {
       const [_, command, _event_type, query] = dataArr;
+      await this.dboBuilder.prostgles.opts.onLog?.({ type: "info", command: "schemaChangeNotif", data: { command, query } });
 
       if (query && command) {
         this.onSchemaChange({ command, query })
@@ -34,14 +36,16 @@ export async function notifListener(this: PubSubManager, data: { payload: string
   if (dataArr.length < 3) {
     throw "notifListener: dataArr length < 3"
   }
-
+  
   const [_, table_name, _op_name, condition_ids_str] = dataArr;
-
-
+  
+  
   if(!table_name) {
     throw "table_name undef";
   }
 
+  await this._log({ command: "notifListener", tableName: table_name, data: { table_name, _op_name, condition_ids_str } });
+  
   // const triggers = await this.db.any("SELECT * FROM prostgles.triggers WHERE table_name = $1 AND id IN ($2:csv)", [table_name, condition_ids_str.split(",").map(v => +v)]);
   // const conditions: string[] = triggers.map(t => t.condition);
   log("notifListener", dataArr.join("__"))
@@ -71,13 +75,12 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     const idxs = condition_ids_str.split(",").map(v => +v);
     const conditions = this._triggers[table_name]!.filter((c, i) => idxs.includes(i))
 
-    // log("notifListener", this._triggers[table_name]);
-
     conditions.map(condition => {
 
       const subs = this.getTriggerSubs(table_name, condition);
       const syncs = this.getSyncs(table_name, condition);
 
+      this._log({ command: "notifListener", tableName: table_name, data: { table_name, _op_name, condition_ids_str, subs, syncs } });
       log("notifListener", subs.map(s => s.channel_name), syncs.map(s => s.channel_name))
 
       syncs.map((s) => {

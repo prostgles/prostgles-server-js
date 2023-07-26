@@ -8,6 +8,7 @@ import { runQueryReturnType } from "./find";
 
 export async function _delete(this: TableHandler, filter?: Filter, params?: DeleteParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any> {
   try {
+    await this._log({ command: "delete", localParams, data: { filter, params } });
     const { returning } = params || {};
     filter = filter || {};
     this.checkFilter(filter);

@@ -6,7 +6,7 @@
 import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
 import { addSync } from "./addSync";
 import { TableOrViewInfo, TableInfo, DBHandlerServer, DboBuilder, PRGLIOSocket, canEXECUTE } from "../DboBuilder";
-import { DB, isSuperUser } from "../Prostgles";
+import { DB, EventInfo, isSuperUser } from "../Prostgles";
 import { initPubSubManager } from "./initPubSubManager";
 
 import * as Bluebird from "bluebird";
@@ -273,8 +273,8 @@ export class PubSubManager {
     'DROP POLICY', 
   ] as const;
 
-  static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from schema watch "
-  prepareTriggers = async () => {
+  static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from schema watch " as const;
+  prepareEventTriggers = async () => {
     // SELECT * FROM pg_catalog.pg_event_trigger WHERE evtname
     if (!this.appID) throw "prepareTriggers failed: this.appID missing";
 
@@ -485,6 +485,10 @@ export class PubSubManager {
     }
   }
 
+  _log = ({ command, tableName, data, localParams }: Omit<Extract<EventInfo, { type: "sync" }>, "type">) => {
+    return this.dboBuilder.prostgles.opts.onLog?.({ type: "sync", command, tableName, data, localParams });
+  }
+
   syncTimeout?: ReturnType<typeof setTimeout>;
   syncData = syncData.bind(this);
 
@@ -572,6 +576,7 @@ export class PubSubManager {
         cond: asValue(condition),
       };
       
+      await this._log({ command: "addTrigger", tableName: table_name, data: { condition: trgVals.cond, params }, localParams: undefined  });
       await this.db.any(`
         BEGIN WORK;
         /* ${ PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */

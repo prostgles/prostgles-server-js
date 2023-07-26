@@ -12,14 +12,14 @@ export async function addSync(this: PubSubManager, syncParams: AddSyncParams) {
     allow_delete = false, id_fields = [], filter = {},
     params, condition = "", throttle = 0
   } = syncParams || {};
-
   const conditionParsed = parseCondition(condition);
   if (!socket || !table_info) throw "socket or table_info missing";
-
-
+  
+  
   const { name: table_name } = table_info;
   const channel_name = `${this.socketChannelPreffix}.${table_name}.${JSON.stringify(filter)}.sync`;
-
+  
+  await this._log({ command: "addSync", tableName: table_name, data: { syncParams }, localParams: { socket: syncParams.socket }  });
   if (!synced_field) throw "synced_field missing from table_rules";
 
   this.upsertSocket(socket);

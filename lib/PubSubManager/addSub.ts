@@ -22,6 +22,7 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
     throw "addSub: cannot have socket AND func";
   }
 
+  await this._log({ command: "addSub", tableName: table_name, data: { subscriptionParams }, localParams: { socket: subscriptionParams.socket }  });
   let validated_throttle = subscriptionParams.throttle || 10;
   const pubThrottle = table_rules?.subscribe?.throttle || 0;
   if (pubThrottle && Number.isInteger(pubThrottle) && pubThrottle > 0) {

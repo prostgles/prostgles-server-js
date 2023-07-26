@@ -10,6 +10,7 @@ import { ViewHandler } from "./ViewHandler";
 
 export const find = async function(this: ViewHandler, filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]> {
   try {
+    await this._log({ command: "find", localParams, data: { filter, selectParams } });
     filter = filter || {};
     const allowedReturnTypes: Array<SelectParams["returnType"]> = ["row", "value", "values", "statement"]
     const { returnType } = selectParams || {};

@@ -19,6 +19,8 @@ export async function getColumns(
 ): Promise<ValidatedColumnInfo[]> {
 
   try {
+    await this._log({ command: "getColumns", localParams, data: { lang, params } });
+
     const p = this.getValidatedRules(tableRules, localParams);
 
     if (!p.getColumns) throw "Not allowed";

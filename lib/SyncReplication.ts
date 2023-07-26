@@ -43,7 +43,8 @@ function getNumbers(numberArr: (null | undefined | string | number)[]): number[]
 }
 
 export async function syncData (this: PubSubManager, sync: SyncParams, clientData: ClientExpressData | undefined, source: "trigger" | "client"){
-  log("syncData", { clientData, sync: pickKeys(sync, ["filter", "last_synced", "lr", "is_syncing"]), source })
+  log("syncData", { clientData, sync: pickKeys(sync, ["filter", "last_synced", "lr", "is_syncing"]), source });
+  await this._log({ command: "syncData", tableName: sync.table_name, data: { sync, clientData, source }, localParams: undefined });
   const {
     socket_id, channel_name, table_name, filter,
     table_rules, allow_delete = false, params,
@@ -177,9 +178,9 @@ export async function syncData (this: PubSubManager, sync: SyncParams, clientDat
     /**
      * Upserts the given client data where synced_field is higher than on server  
      */
-    upsertData = (data: AnyObject[], isExpress = false) => {
-
-      // console.log("isExpress", isExpress, data);
+    upsertData = async (data: AnyObject[]) => {
+      
+      await this._log({ command: "upsertData", tableName: sync.table_name, data: { data }, localParams: { socket } })
 
       return this.dboBuilder.getTX(async (dbTX) => {
         const tbl = dbTX[table_name] as TableHandler;
@@ -242,7 +243,7 @@ export async function syncData (this: PubSubManager, sync: SyncParams, clientDat
           if (resp && resp.ok) {
             // console.log("PUSHED to client: fr/lr", data[0], data[data.length - 1]);
             resolve({ pushed: data?.length, resp })
-
+            this._log({ command: "pushData", tableName: sync.table_name, data: { sync, data }, localParams: undefined });
           } else {
             reject(resp);
             console.error("Unexpected response");
@@ -417,7 +418,7 @@ export async function syncData (this: PubSubManager, sync: SyncParams, clientDat
       },
       onSend: async (data) => {
         // console.log("WAL upsertData START", data)
-        const res = await upsertData(data, true);
+        const res = await upsertData(data);
         // const max_incoming_synced = Math.max(...data.map(d => +d[synced_field]));
         // if(Number.isFinite(max_incoming_synced) && max_incoming_synced > +sync.last_synced){
         //     sync.last_synced = max_incoming_synced;
