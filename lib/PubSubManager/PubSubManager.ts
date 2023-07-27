@@ -474,7 +474,7 @@ export class PubSubManager {
 
         this.subs = this.subs.filter(s => {
           return !(s.socket && s.socket.id === socket.id);
-        });    
+        });
 
         this.syncs = this.syncs.filter(s => {
           return !(s.socket_id && s.socket_id === socket.id);

@@ -60,8 +60,8 @@ export namespace EventTypes {
   );
 
   export type Connection = ClientInfo & {
-    localParams?: LocalParams;
     type: "connect" | "disconnect";
+    socketId: string;
     connectedSocketIds: string[];
   };
 

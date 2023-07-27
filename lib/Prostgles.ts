@@ -792,7 +792,6 @@ export class Prostgles {
           type: "connect", 
           sid: this.authHandler?.getSID({ socket }),
           socketId: socket.id,
-          localParams: { socket },
           connectedSocketIds: this.connectedSockets.map(s => s.id)
         });
 
@@ -851,7 +850,6 @@ export class Prostgles {
             type: "disconnect", 
             sid: this.authHandler?.getSID({ socket }),
             socketId: socket.id,
-            localParams: { socket },
             connectedSocketIds: this.connectedSockets.map(s => s.id)
           });
 
