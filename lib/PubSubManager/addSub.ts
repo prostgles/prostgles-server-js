@@ -22,7 +22,6 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
     throw "addSub: cannot have socket AND func";
   }
 
-  await this._log({ command: "addSub", tableName: table_name, data: { subscriptionParams }, localParams: { socket: subscriptionParams.socket }  });
   let validated_throttle = subscriptionParams.throttle || 10;
   const pubThrottle = table_rules?.subscribe?.throttle || 0;
   if (pubThrottle && Number.isInteger(pubThrottle) && pubThrottle > 0) {
@@ -84,7 +83,7 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
 
       newSub.triggers.push(relatedSub)
   
-      await this.addTrigger(relatedSub, viewOptions);      
+      await this.addTrigger(relatedSub, viewOptions, socket);      
     }
 
   }
@@ -104,9 +103,9 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
       this.pushSubData(newSub);
     });
     socket.once(result.channelNameUnsubscribe, (_data: any, cb: BasicCallback) => {
-      const res = "ok";// this.onSocketDisconnected({ socket, subChannel: channel_name });
+      const res = "ok";
       this.subs = this.subs.filter(s => {
-        const isMatch = s.socket && s.socket.id === socket.id && s.channel_name === channel_name;
+        const isMatch = s.socket?.id === socket.id && s.channel_name === channel_name;
         return !isMatch;
       });
       removeListeners();
@@ -123,7 +122,7 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
     }
 
   } else {
-    await this.addTrigger(mainTrigger);
+    await this.addTrigger(mainTrigger, undefined, socket);
   }
 
   return result;

@@ -1,4 +1,4 @@
-import { log, PubSubManager } from "./PubSubManager";
+import { log, pickKeys, PubSubManager } from "./PubSubManager";
 
 /* Relay relevant data to relevant subscriptions */
 export async function notifListener(this: PubSubManager, data: { payload: string }) {
@@ -18,7 +18,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
 
     if (this.onSchemaChange) {
       const [_, command, _event_type, query] = dataArr;
-      await this.dboBuilder.prostgles.opts.onLog?.({ type: "info", command: "schemaChangeNotif", data: { command, query } });
+      await this.dboBuilder.prostgles.opts.onLog?.({ type: "debug", command: "schemaChangeNotif", data: { command, query } });
 
       if (query && command) {
         this.onSchemaChange({ command, query })
@@ -37,27 +37,32 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     throw "notifListener: dataArr length < 3"
   }
   
-  const [_, table_name, _op_name, condition_ids_str] = dataArr;
+  const [_, table_name, op_name, condition_ids_str] = dataArr;
+  const condition_ids = condition_ids_str?.split(",").map(v => +v);
   
   
   if(!table_name) {
     throw "table_name undef";
   }
 
-  await this._log({ command: "notifListener", tableName: table_name, data: { table_name, _op_name, condition_ids_str } });
+  const tableTriggers = this._triggers?.[table_name];
+  let state: "error" | "no-triggers" | "ok" | "invalid_condition_ids" = "ok";
   
   // const triggers = await this.db.any("SELECT * FROM prostgles.triggers WHERE table_name = $1 AND id IN ($2:csv)", [table_name, condition_ids_str.split(",").map(v => +v)]);
   // const conditions: string[] = triggers.map(t => t.condition);
-  log("notifListener", dataArr.join("__"))
+  log("notifListener", dataArr.join("__"));
 
-  /* Trigger error */
-  if (
-    condition_ids_str?.startsWith("error") &&
-    this._triggers?.[table_name]?.length
+  if(!tableTriggers?.length){
+    state = "no-triggers";
+
+    /* Trigger error */
+  } else if (
+    condition_ids_str?.startsWith("error")
   ) {
+    state = "error";
     const pref = "INTERNAL ERROR";
     console.error(`${pref}: condition_ids_str: ${condition_ids_str}`)
-    this._triggers[table_name]!.map(c => {
+    tableTriggers.map(c => {
       const subs = this.getTriggerSubs(table_name, c);
       subs.map(s => {
         this.pushSubData(s, pref + ". Check server logs. Schema might have changed");
@@ -66,21 +71,17 @@ export async function notifListener(this: PubSubManager, data: { payload: string
 
     /* Trigger ok */
   } else if (
-    condition_ids_str?.split(",").length &&
-    condition_ids_str?.split(",").every((c: string) => Number.isInteger(+c)) &&
-    this._triggers?.[table_name]?.length
+    condition_ids?.every(id => Number.isInteger(id))
   ) {
 
-
-    const idxs = condition_ids_str.split(",").map(v => +v);
-    const conditions = this._triggers[table_name]!.filter((c, i) => idxs.includes(i))
+    state = "ok";
+    const conditions = tableTriggers.filter((c, i) => condition_ids.includes(i));
 
     conditions.map(condition => {
 
       const subs = this.getTriggerSubs(table_name, condition);
       const syncs = this.getSyncs(table_name, condition);
 
-      this._log({ command: "notifListener", tableName: table_name, data: { table_name, _op_name, condition_ids_str, subs, syncs } });
       log("notifListener", subs.map(s => s.channel_name), syncs.map(s => s.channel_name))
 
       syncs.map((s) => {
@@ -119,12 +120,19 @@ export async function notifListener(this: PubSubManager, data: { payload: string
 
     /* Trigger unknown issue */
   } else {
-
-    // if(!this._triggers || !this._triggers[table_name] || !this._triggers[table_name].length){
-    //     console.warn(190, "Trigger sub not found. DROPPING TRIGGER", table_name, condition_ids_str, this._triggers);
-    //     this.dropTrigger(table_name);
-    // } else {
-    // }
-    console.warn(190, "Trigger sub issue: ", table_name, condition_ids_str, this._triggers);
+    state = "invalid_condition_ids";
   }
+
+  await this._log({ 
+    type: "sync",
+    command: "notifListener",
+    state,
+    tableName: table_name, 
+    op_name, 
+    condition_ids_str,
+    tableTriggers: this._triggers?.[table_name],
+    tableSyncs: JSON.stringify(this.syncs.filter(s => s.table_name === table_name).map(s => pickKeys(s, ["condition", "socket_id"]))),
+    connectedSocketIds: this.connectedSocketIds,
+  });
+
 }

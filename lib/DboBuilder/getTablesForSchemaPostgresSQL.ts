@@ -1,6 +1,7 @@
-import { SQLResult } from "prostgles-types";
+import { SQLResult, asName } from "prostgles-types";
 import { DboBuilder, TableSchemaColumn, TableSchema } from "../DboBuilder";
 import { asValue } from "../PubSubManager/PubSubManager";
+import { DB } from "../Prostgles";
 
 // TODO: Add a onSocketConnect timeout for this query. Reason: this query gets blocked by prostgles.app_triggers from PubSubManager.addTrigger in some cases (pg_dump locks that table)
 export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, schema = "public"): Promise<TableSchema[]> {
@@ -140,6 +141,13 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
     
   let result: TableSchema[] = await db.any(query, { schema });
 
+  let hyperTables: string[] | undefined = [];
+  try {
+    hyperTables = await getHyperTables(db);
+  } catch (error){
+    console.error(error);
+  }
+
   result = await Promise.all(result
     .map(async tbl => {
       tbl.privileges.select = tbl.columns.some(c => c.privileges.some(p => p.privilege_type === "SELECT"));
@@ -195,8 +203,29 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
       })//.slice(0).sort((a, b) => a.name.localeCompare(b.name))
       // .sort((a, b) => a.ordinal_position - b.ordinal_position)
 
+      tbl.isHyperTable = hyperTables?.includes(tbl.name);
+
       return tbl;
     }));
  
   return result;
+}
+
+/**
+ * Used to check for Timescale Bug
+ */
+const getHyperTables = async (db: DB): Promise<string[] | undefined> => {
+  const schema = "_timescaledb_catalog";
+  const res = await db.oneOrNone("SELECT EXISTS( \
+      SELECT * \
+      FROM information_schema.tables \
+      WHERE 1 = 1 \
+          AND table_schema = ${schema} \
+          AND table_name = 'hypertable' \
+    );", { schema });
+  if (res.exists) {
+    const tables: {table_name: string}[] = await db.any("SELECT table_name FROM " + asName(schema) + ".hypertable;");
+    return tables.map(t => t.table_name);
+  }
+  return undefined;
 }

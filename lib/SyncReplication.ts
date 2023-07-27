@@ -42,16 +42,29 @@ function getNumbers(numberArr: (null | undefined | string | number)[]): number[]
   return numberArr.filter(v => v !== null && v !== undefined && Number.isFinite(+v)) as any;
 }
 
+/**
+ * Server or client requested data sync
+ */
 export async function syncData (this: PubSubManager, sync: SyncParams, clientData: ClientExpressData | undefined, source: "trigger" | "client"){
-  log("syncData", { clientData, sync: pickKeys(sync, ["filter", "last_synced", "lr", "is_syncing"]), source });
-  await this._log({ command: "syncData", tableName: sync.table_name, data: { sync, clientData, source }, localParams: undefined });
+  await this._log({ 
+    type: "sync",
+    command: "syncData", 
+    tableName: sync.table_name,
+    source,
+    ...pickKeys(sync, ["socket_id", "condition", "last_synced", "is_syncing"]),
+    lr: JSON.stringify(sync.lr),
+    connectedSocketIds: this.dboBuilder.prostgles.connectedSockets.map(s => s.id),
+    localParams: undefined 
+  });
+
   const {
     socket_id, channel_name, table_name, filter,
     table_rules, allow_delete = false, params,
     synced_field, id_fields = [], batch_size,
     wal, throttle = 0
-  } = sync,
-    socket = this.sockets[socket_id];
+  } = sync;
+
+  const  socket = this.sockets[socket_id];
 
   if (!socket) {
     console.error("Sync socket missing", pickKeys(sync, ["channel_name", "table_name", "condition"]), clientData);
@@ -180,7 +193,14 @@ export async function syncData (this: PubSubManager, sync: SyncParams, clientDat
      */
     upsertData = async (data: AnyObject[]) => {
       
-      await this._log({ command: "upsertData", tableName: sync.table_name, data: { data }, localParams: { socket } })
+      await this._log({ 
+        type: "sync", 
+        command: "upsertData", 
+        tableName: sync.table_name, 
+        rows: data.length, 
+        socketId: socket_id,
+        connectedSocketIds: this.dboBuilder.prostgles.connectedSockets.map(s => s.id)
+      });
 
       return this.dboBuilder.getTX(async (dbTX) => {
         const tbl = dbTX[table_name] as TableHandler;
@@ -237,13 +257,20 @@ export async function syncData (this: PubSubManager, sync: SyncParams, clientDat
      * @param isSynced = true if 
      */
     pushData = async (data?: AnyObject[], isSynced = false, err: any = null) => {
+      await this._log({ 
+        type: "sync", 
+        command: "pushData", 
+        tableName: sync.table_name, 
+        rows: data?.length ?? 0, 
+        socketId: socket_id,
+        connectedSocketIds: this.dboBuilder.prostgles.connectedSockets.map(s => s.id)
+      });
       return new Promise((resolve, reject) => {
         socket.emit(channel_name, { data, isSynced }, (resp?: { ok: boolean }) => {
 
           if (resp && resp.ok) {
             // console.log("PUSHED to client: fr/lr", data[0], data[data.length - 1]);
             resolve({ pushed: data?.length, resp })
-            this._log({ command: "pushData", tableName: sync.table_name, data: { sync, data }, localParams: undefined });
           } else {
             reject(resp);
             console.error("Unexpected response");

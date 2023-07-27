@@ -747,7 +747,9 @@ export type TableSchema = {
     select: boolean;
     update: boolean;
     delete: boolean;
-  }
+  };
+  /** Cannot add triggers to hyperTables */
+  isHyperTable?: boolean;
 }
 
 type PGConstraint = {

@@ -11,7 +11,7 @@ import {
   isObject, isDefined, getKeys,
   _PG_geometric, pickKeys, SubscribeParams, EXISTS_KEYS, EXISTS_KEY
 } from "prostgles-types";
-import { DB, DBHandlerServer, Join, TableEvent } from "../Prostgles";
+import { DB, DBHandlerServer, Join } from "../Prostgles";
 import {
   DboBuilder, escapeTSNames, ExistsFilterConfig,Filter, isPlainObject,
   JoinInfo, LocalParams, parseError, pgp, postgresToTsType, SortItem,
@@ -26,6 +26,7 @@ import { COMPUTED_FIELDS, FieldSpec } from "./QueryBuilder/Functions";
 import { getColumns } from "./getColumns";
 import { LocalFuncs, subscribe } from "./subscribe";
 import { find } from "./find";
+import { TableEvent } from "../Logging";
 
 export type JoinPaths = {
   t1: string;

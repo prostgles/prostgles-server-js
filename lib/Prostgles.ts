@@ -16,7 +16,7 @@ import AuthHandler, { Auth, SessionUser, AuthRequestParams, UserLike } from "./A
 import TableConfigurator, { TableConfig } from "./TableConfig/TableConfig";
 
 import { get } from "./utils";
-import { DboBuilder, DBHandlerServer, isPlainObject, PRGLIOSocket, LocalParams } from "./DboBuilder";
+import { DboBuilder, DBHandlerServer, isPlainObject, PRGLIOSocket } from "./DboBuilder";
 import { PubSubManager, pickKeys, log } from "./PubSubManager/PubSubManager";
 export { DBHandlerServer }
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -223,32 +223,6 @@ export type FileTableConfig = {
   imageOptions?: ImageOptions
 };
 
-export type EventInfo = {
-  localParams?: LocalParams;
-} & (
-{
-  type: "table";
-  tableName: string;
-  command: keyof TableHandler;
-  data: AnyObject;
-} | {
-  type: "method";
-  args: any;
-} | {
-  type: "sync";
-  tableName: string;
-  command: string;
-  data: AnyObject;
-} | {
-  type: "connect" | "disconnect";
-  data: AnyObject;
-} 
-) | {
-  type: "info";
-  command: string;
-  data: AnyObject;
-};
-export type TableEvent = Extract<EventInfo, { type: "table" }>
 
 export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUser> = {
   dbConnection: DbConnection;
@@ -396,6 +370,7 @@ import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { ColConstraint } from "./TableConfig/getConstraintDefinitionQueries";
 import { ViewHandler } from "./DboBuilder/ViewHandler";
 import { TableHandler } from "./DboBuilder/TableHandler";
+import { EventInfo } from "./Logging";
 export class Prostgles {
 
   opts: ProstglesInitOptions = {
@@ -783,7 +758,7 @@ export class Prostgles {
   }
 
 
-  connectedSockets: any[] = [];
+  connectedSockets: PRGLIOSocket[] = [];
   async setSocketEvents() {
     this.checkDb();
 
@@ -812,11 +787,18 @@ export class Prostgles {
       }
       this.connectedSockets.push(socket);
 
-      if (!this.db || !this.dbo) throw new Error("db/dbo missing");
-      const { dbo, db } = this;
-
       try {
-        await this.opts.onLog?.({ type: "connect", data: {}, localParams: { socket } });
+        await this.opts.onLog?.({ 
+          type: "connect", 
+          sid: this.authHandler?.getSID({ socket }),
+          socketId: socket.id,
+          localParams: { socket },
+          connectedSocketIds: this.connectedSockets.map(s => s.id)
+        });
+
+        if (!this.db || !this.dbo) throw new Error("db/dbo missing");
+        const { dbo, db } = this;
+
         if (this.opts.onSocketConnect) {
           try {
             const getUser = async () => { return await this.authHandler?.getClientInfo({ socket }); }
@@ -861,11 +843,18 @@ export class Prostgles {
 
         socket.on("disconnect", () => {
 
-          this.opts.onLog?.({ type: "connect", data: {}, localParams: { socket } });
           this.dbEventsManager?.removeNotice(socket);
           this.dbEventsManager?.removeNotify(undefined, socket);
           this.connectedSockets = this.connectedSockets.filter(s => s.id !== socket.id);
           
+          this.opts.onLog?.({ 
+            type: "disconnect", 
+            sid: this.authHandler?.getSID({ socket }),
+            socketId: socket.id,
+            localParams: { socket },
+            connectedSocketIds: this.connectedSockets.map(s => s.id)
+          });
+
           if (this.opts.onSocketDisconnect) {
             const getUser = async () => { return await this.authHandler?.getClientInfo({ socket }); }
             this.opts.onSocketDisconnect({ socket, dbo: dbo as any, db, getUser });
@@ -976,7 +965,7 @@ export class Prostgles {
         if(isObject(method) && "run" in method){
           return {
             name: methodName,
-            ...omitKeys(method, ["run"])
+            ...omitKeys(method, ["run"]),
           }
         }
         return methodName;
@@ -1000,6 +989,7 @@ export class Prostgles {
     }
   }
 }
+
 function makeSocketError(cb: Function, err: any) {
   const err_msg = (err instanceof Error) ?
     err.toString() :

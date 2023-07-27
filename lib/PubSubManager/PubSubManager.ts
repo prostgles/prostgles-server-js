@@ -6,7 +6,7 @@
 import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
 import { addSync } from "./addSync";
 import { TableOrViewInfo, TableInfo, DBHandlerServer, DboBuilder, PRGLIOSocket, canEXECUTE } from "../DboBuilder";
-import { DB, EventInfo, isSuperUser } from "../Prostgles";
+import { DB, isSuperUser } from "../Prostgles";
 import { initPubSubManager } from "./initPubSubManager";
 
 import * as Bluebird from "bluebird";
@@ -17,13 +17,15 @@ import { SelectParams, FieldFilter, asName, WAL, AnyObject, SubscribeParams } fr
 
 import { ClientExpressData, syncData } from "../SyncReplication";
 import { TableRule } from "../PublishParser";
-import { find, getKeys, isObject } from "prostgles-types/dist/util";
+import { find, getKeys, isObject, pickKeys } from "prostgles-types/dist/util";
 import { DB_OBJ_NAMES } from "./getInitQuery";
 import { addSub } from "./addSub";
 import { notifListener } from "./notifListener";
 import { pushSubData } from "./pushSubData";
 import { getOnDataFunc, LocalFuncs, matchesLocalFuncs } from "../DboBuilder/subscribe";
 import { EVENT_TRIGGER_TAGS, EventTriggerTag } from "../Event_Trigger_Tags";
+import { EventInfo, EventTypes } from "../Logging";
+import { tryCatch } from "../utils";
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 const pgp: PGP = pgPromise({
@@ -62,7 +64,7 @@ export type SyncParams = {
 }
 
 export type AddSyncParams = {
-  socket: any;
+  socket: PRGLIOSocket;
   table_info: TableInfo;
   table_rules: TableRule;
   synced_field: string;
@@ -465,7 +467,7 @@ export class PubSubManager {
 
   pushSubData = pushSubData.bind(this);
 
-  upsertSocket(socket: any) {
+  upsertSocket(socket: PRGLIOSocket | undefined) {
     if (socket && !this.sockets[socket.id]) {
       this.sockets[socket.id] = socket;
       socket.on("disconnect", () => {
@@ -480,13 +482,27 @@ export class PubSubManager {
 
         delete this.sockets[socket.id];
 
+        this._log({ 
+          type: "sync",
+          command: "upsertSocket.disconnect",
+          tableName: "",
+          duration: 0,
+          socketId: socket.id,
+          connectedSocketIds: this.connectedSocketIds,
+          remainingSubs: JSON.stringify(this.subs.map(s => ({ tableName: s.table_info.name, triggers: s.triggers }))),
+          remainingSyncs: JSON.stringify(this.syncs.map(s => pickKeys(s, ["table_name", "condition"]))),
+        });
+
         return "ok";
       });
     }
   }
 
-  _log = ({ command, tableName, data, localParams }: Omit<Extract<EventInfo, { type: "sync" }>, "type">) => {
-    return this.dboBuilder.prostgles.opts.onLog?.({ type: "sync", command, tableName, data, localParams });
+  get connectedSocketIds() {
+    return this.dboBuilder.prostgles.connectedSockets.map(s => s.id);
+  }
+  _log = (params: EventTypes.Sync) => {
+    return this.dboBuilder.prostgles.opts.onLog?.({ ...params });
   }
 
   syncTimeout?: ReturnType<typeof setTimeout>;
@@ -517,25 +533,6 @@ export class PubSubManager {
     return result;
   }
 
-
-  checkIfTimescaleBug = async (table_name: string) => {
-    const schema = "_timescaledb_catalog",
-      res = await this.db.oneOrNone("SELECT EXISTS( \
-            SELECT * \
-            FROM information_schema.tables \
-            WHERE 1 = 1 \
-                AND table_schema = ${schema} \
-                AND table_name = 'hypertable' \
-        );", { schema });
-    if (res.exists) {
-      const isHyperTable = await this.db.any("SELECT * FROM " + asName(schema) + ".hypertable WHERE table_name = ${table_name};", { table_name, schema });
-      if (isHyperTable && isHyperTable.length) {
-        throw "Triggers do not work on timescaledb hypertables due to bug:\nhttps://github.com/timescale/timescaledb/issues/1084"
-      }
-    }
-    return true;
-  }
-
   /* 
       A table will only have a trigger with all conditions (for different subs) 
           conditions = ["user_id = 1"]
@@ -555,8 +552,9 @@ export class PubSubManager {
   // waitingTriggers: { [key: string]: string[] } = undefined;
   addingTrigger: any;
   addTriggerPool?: Record<string, string[]> = undefined;
-  async addTrigger(params: { table_name: string; condition: string; }, viewOptions?: ViewSubscriptionOptions) {
-    try {
+  async addTrigger(params: { table_name: string; condition: string; }, viewOptions: ViewSubscriptionOptions | undefined, socket: PRGLIOSocket | undefined) {
+    
+    const addedTrigger = await tryCatch(async () => {
 
       const { table_name } = { ...params }
       let { condition } = { ...params }
@@ -567,16 +565,15 @@ export class PubSubManager {
         condition = "TRUE";
       }
 
-      // console.log(1623, { app_id, addTrigger: { table_name, condition } });
-
-      await this.checkIfTimescaleBug(table_name);
+      if (this.dbo[table_name]?.tableOrViewInfo?.isHyperTable) {
+        throw "Triggers do not work on timescaledb hypertables due to bug:\nhttps://github.com/timescale/timescaledb/issues/1084"
+      }
 
       const trgVals = {
         tbl: asValue(table_name),
         cond: asValue(condition),
       };
-      
-      await this._log({ command: "addTrigger", tableName: table_name, data: { condition: trgVals.cond, params }, localParams: undefined  });
+
       await this.db.any(`
         BEGIN WORK;
         /* ${ PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
@@ -589,8 +586,6 @@ export class PubSubManager {
         COMMIT WORK;
       `);
 
-      log("addTrigger.. ", { table_name, condition });
-
       const triggers: {
         table_name: string;
         condition: string;
@@ -599,24 +594,33 @@ export class PubSubManager {
 
       this._triggers = {};
       triggers.map(t => {
-        this._triggers = this._triggers || {};
-        this._triggers[t.table_name] = this._triggers[t.table_name] || [];
+        this._triggers ??= {};
+        this._triggers[t.table_name] ??= [];
+        /** Why not also remove missing triggers?! */
         if (!this._triggers[t.table_name]?.includes(t.condition)) {
           this._triggers[t.table_name]?.push(t.condition)
         }
       });
-      log("trigger added.. ", { table_name, condition });
 
-      return true;
-      // console.log("1612", JSON.stringify(triggers, null, 2))
-      // console.log("1613",JSON.stringify(this._triggers, null, 2))
+      return trgVals;
+    });
 
+    await this._log({
+      type: "sync",
+      command: "addTrigger",
+      condition: addedTrigger.cond ?? params.condition,
+      duration: addedTrigger.duration,
+      socketId: socket?.id,
+      state: !addedTrigger.tbl? "fail" : "ok",
+      error: addedTrigger.error,
+      tableName: addedTrigger.tbl ?? params.table_name,
+      connectedSocketIds: this.dboBuilder.prostgles.connectedSockets.map(s => s.id),
+      localParams: { socket }
+    });
 
-    } catch (e) {
-      console.trace("Failed adding trigger", e);
-      // throw e
-    }
+    if(addedTrigger.error) throw addedTrigger.error;
 
+    return addedTrigger;
   }
 }
 
