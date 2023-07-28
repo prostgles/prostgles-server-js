@@ -61,6 +61,9 @@ export type TX<TH = TableHandlers> = {
 export type TableHandlers = {
   [key: string]: Partial<TableHandler> | TableHandler;
 }
+export type DbTxTableHandlers = {
+  [key: string]: Omit<Partial<TableHandler>, "dbTx"> | Omit<TableHandler, "dbTx">;
+}
 
 export type DBHandlerServer<TH = TableHandlers> =
   TH &

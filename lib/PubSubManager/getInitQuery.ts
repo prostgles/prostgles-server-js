@@ -47,12 +47,12 @@ BEGIN
       THEN
         DROP SCHEMA IF EXISTS prostgles CASCADE;
       ELSIF
-        /* There is no newer schema */
+        /* There is no newer and different schema */
         NOT EXISTS(
           SELECT 1 
           FROM prostgles.versions
-          WHERE schema_md5 <> ${asValue(schema_md5)}
-          AND version >= ${asValue(version)}
+          WHERE version >= ${asValue(version)}
+          AND schema_md5 <> ${asValue(schema_md5)}
         )
       THEN
         DROP SCHEMA IF EXISTS prostgles CASCADE;
@@ -483,11 +483,9 @@ BEGIN
                     ${asValue(this.NOTIF_TYPE.data_trigger_change)},
                     json_build_object(
                       'TG_OP',TG_OP, 
-                      'TG_TAG',TG_TAG, 
-                      'TG_event',TG_event,
                       'duration', (EXTRACT(EPOCH FROM now()) * 1000) - start_time
                     )
-                  ), 7999/4)
+                  )::TEXT, 7999/4)
                 );
 
                 RETURN NULL;
