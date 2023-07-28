@@ -489,7 +489,8 @@ BEGIN
                       ${asValue(this.NOTIF_TYPE.data_trigger_change)},
                       json_build_object(
                         'TG_OP', TG_OP, 
-                        'duration', (EXTRACT(EPOCH FROM now()) * 1000) - start_time
+                        'duration', (EXTRACT(EPOCH FROM now()) * 1000) - start_time,
+                        'query', LEFT(current_query(), 400)
                       )
                     )::TEXT, 7999/4)
                   );
