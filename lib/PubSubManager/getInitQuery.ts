@@ -343,7 +343,8 @@ BEGIN
             DECLARE query TEXT;
             DECLARE trw RECORD;           
             DECLARE app RECORD; 
-            DECLARE start_time BIGINT;            
+            DECLARE start_time BIGINT;
+            DECLARE changed_triggers_count integer;        
             
             BEGIN
                 
@@ -356,7 +357,8 @@ BEGIN
 
                     --RAISE NOTICE 'DELETE trigger_add_remove_func table: % ', ' ' || COALESCE((SELECT concat_ws(' ', string_agg(table_name, ' & '), count(*), min(inserted) ) FROM prostgles.app_triggers) , ' 0 ');
                     --RAISE NOTICE 'DELETE trigger_add_remove_func old_table:  % ', '' || COALESCE((SELECT concat_ws(' ', string_agg(table_name, ' & '), count(*), min(inserted) ) FROM old_table), ' 0 ');
-
+                    
+                    select count(*) from old_table into changed_triggers_count;
                     
                     /* Drop actual triggers if needed */
                     FOR trw IN 
@@ -378,6 +380,7 @@ BEGIN
                 /* If newly added listeners on table then CREATE table data watch triggers */
                 ELSIF TG_OP = 'INSERT' THEN
                       
+                    select count(*) from new_table into changed_triggers_count;
 
                     --RAISE NOTICE 'INSERT trigger_add_remove_func table: % ', ' ' || COALESCE((SELECT concat_ws(' ', string_agg(table_name, ' & '), count(*), min(inserted) ) FROM prostgles.triggers) , ' 0 ');
                     --RAISE NOTICE 'INSERT trigger_add_remove_func new_table:  % ', '' || COALESCE((SELECT concat_ws(' ', string_agg(table_name, ' & '), count(*), min(inserted) ) FROM new_table), ' 0 ');
@@ -479,22 +482,24 @@ BEGIN
                 END IF;
 
                 /** Notify all apps about trigger table change */
-                FOR app IN 
-                  SELECT * FROM prostgles.apps
-                LOOP
-                  PERFORM pg_notify( 
-                    ${asValue(this.NOTIF_CHANNEL.preffix)} || app.id, 
-                    LEFT(concat_ws(
-                      ${asValue(PubSubManager.DELIMITER)}, 
-                      ${asValue(this.NOTIF_TYPE.data_trigger_change)},
-                      json_build_object(
-                        'TG_OP', TG_OP, 
-                        'duration', (EXTRACT(EPOCH FROM now()) * 1000) - start_time,
-                        'query', LEFT(current_query(), 400)
-                      )
-                    )::TEXT, 7999/4)
-                  );
-                END LOOP;
+                IF changed_triggers_count > 0 THEN
+                  FOR app IN 
+                    SELECT * FROM prostgles.apps
+                  LOOP
+                    PERFORM pg_notify( 
+                      ${asValue(this.NOTIF_CHANNEL.preffix)} || app.id, 
+                      LEFT(concat_ws(
+                        ${asValue(PubSubManager.DELIMITER)}, 
+                        ${asValue(this.NOTIF_TYPE.data_trigger_change)},
+                        json_build_object(
+                          'TG_OP', TG_OP, 
+                          'duration', (EXTRACT(EPOCH FROM now()) * 1000) - start_time,
+                          'query', LEFT(current_query(), 400)
+                        )
+                      )::TEXT, 7999/4)
+                    );
+                  END LOOP;
+                END IF;
 
                 RETURN NULL;
             END;
