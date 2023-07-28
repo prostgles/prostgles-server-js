@@ -36,7 +36,7 @@ BEGIN
 
       /* The seemingly useless IF nesting is done to prevent pg evaluating the entire condition and throw a 'schema_md5 column does not exist' */
       IF
-        /* Cannot check schema version */
+        /* Backwards compatibility. Cannot check schema version */
         NOT EXISTS(
           SELECT 1 
           FROM information_schema.columns 
@@ -51,7 +51,7 @@ BEGIN
         NOT EXISTS(
           SELECT 1 
           FROM prostgles.versions
-          WHERE version >= ${asValue(version)}
+          WHERE (string_to_array(version, '.')::int[] >= string_to_array(${asValue(version)}, '.')::int[])
           AND schema_md5 <> ${asValue(schema_md5)}
         )
       THEN

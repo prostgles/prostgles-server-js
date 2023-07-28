@@ -51,7 +51,7 @@ export type Media = {
   deleted_from_storage?: string | null;
 }
 
-export type TxCB<TH = TableHandlers> = {
+export type TxCB<TH = DbTxTableHandlers> = {
   (t: TH & Pick<DBHandlerServer, "sql">, _t: pgPromise.ITask<{}>): (any | void);
 }
 export type TX<TH = TableHandlers> = {
@@ -711,7 +711,7 @@ export class DboBuilder {
 
   getTX = (cb: TxCB) => {
     return this.db.tx((t) => {
-      const dbTX: TableHandlers & Pick<DBHandlerServer, "sql"> = {};
+      const dbTX: DbTxTableHandlers & Pick<DBHandlerServer, "sql"> = {};
       this.tablesOrViews?.map(tov => {
         dbTX[tov.name] = new (tov.is_view ? ViewHandler : TableHandler)(this.db, tov, this, t, dbTX, this.joinPaths);
       });
