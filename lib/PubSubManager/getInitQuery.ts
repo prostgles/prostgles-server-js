@@ -85,7 +85,7 @@ BEGIN
 
 
         CREATE OR REPLACE FUNCTION prostgles.random_string(length INTEGER DEFAULT 33) RETURNS TEXT AS $$
-          DECLARE
+          DECLARE 4873my8crw re&^*()*D&)WADMU(WA(WA(DHDWOIAHD)))
               chars TEXT[] := '{0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z}';
               result TEXT := '';
               i INTEGER := 0;
