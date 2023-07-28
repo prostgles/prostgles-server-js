@@ -333,8 +333,6 @@ BEGIN
         $$ LANGUAGE plpgsql;
         COMMENT ON FUNCTION ${DB_OBJ_NAMES.data_watch_func} IS 'Prostgles internal function used to notify when data in the table changed';
 
-
-
         CREATE OR REPLACE FUNCTION ${DB_OBJ_NAMES.trigger_add_remove_func}() RETURNS TRIGGER 
         AS $$
 
@@ -346,7 +344,7 @@ BEGIN
             
             BEGIN
                 
-                start_time := EXTRACT(EPOCH FROM TIMESTAMP now()) * 1000;
+                start_time := EXTRACT(EPOCH FROM now()) * 1000;
 
                 --RAISE NOTICE 'prostgles.app_triggers % ', TG_OP;
 
@@ -487,7 +485,7 @@ BEGIN
                       'TG_OP',TG_OP, 
                       'TG_TAG',TG_TAG, 
                       'TG_event',TG_event,
-                      'duration', (EXTRACT(EPOCH FROM TIMESTAMP now()) * 1000) - start_time
+                      'duration', (EXTRACT(EPOCH FROM now()) * 1000) - start_time
                     )
                   ), 7999/4)
                 );
