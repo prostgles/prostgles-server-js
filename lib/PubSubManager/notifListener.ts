@@ -26,6 +26,10 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     }
 
     return;
+  } else if(notifType === this.NOTIF_TYPE.data_trigger_change) {
+    
+    await this.refreshTriggers();
+    return;
   }
 
   if (notifType !== this.NOTIF_TYPE.data) {
@@ -50,7 +54,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
   
   // const triggers = await this.db.any("SELECT * FROM prostgles.triggers WHERE table_name = $1 AND id IN ($2:csv)", [table_name, condition_ids_str.split(",").map(v => +v)]);
   // const conditions: string[] = triggers.map(t => t.condition);
-  log("notifListener", dataArr.join("__"));
+  
 
   if(!tableTriggers?.length){
     state = "no-triggers";

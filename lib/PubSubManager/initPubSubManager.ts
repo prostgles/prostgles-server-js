@@ -121,7 +121,7 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
 
     this.postgresNotifListenManager = new PostgresNotifListenManager(this.db, this.notifListener, this.NOTIF_CHANNEL.getFull());
 
-    await this.prepareEventTriggers()
+    await this.initialiseEventTriggers()
 
     return this;
 

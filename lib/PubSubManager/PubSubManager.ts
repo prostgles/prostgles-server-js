@@ -151,7 +151,34 @@ export type Subscription = Pick<SubscriptionParams,
 export class PubSubManager {
   static DELIMITER = '|$prstgls$|' as const;
 
-  dboBuilder: DboBuilder;
+  static SCHEMA_ALTERING_QUERIES = [
+    'CREATE TABLE', 
+    'ALTER TABLE', 
+    'DROP TABLE', 
+    'CREATE VIEW', 
+    'DROP VIEW', 
+    'ALTER VIEW', 
+    'CREATE TABLE AS', 
+    'SELECT INTO',
+    'REVOKE',
+    'GRANT',
+    'CREATE POLICY', 
+    'DROP POLICY', 
+  ] as const;
+
+  static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from schema watch " as const;
+
+  public static canCreate = async (db: DB) => {
+    const canExecute = await canEXECUTE(db);
+    const isSuperUs = await isSuperUser(db);
+    return { canExecute, isSuperUs, yes: canExecute && isSuperUs };
+  }
+
+  public static create = async (options: PubSubManagerOptions) => {
+    const res = new PubSubManager(options);
+    return await res.init();
+  }
+
   get db(): DB  {
     return this.dboBuilder.db;
   }
@@ -159,6 +186,7 @@ export class PubSubManager {
     return this.dboBuilder.dbo;
   }
   
+  dboBuilder: DboBuilder;
   _triggers?: Record<string, string[]>;
   sockets: AnyObject = {};
   
@@ -185,6 +213,7 @@ export class PubSubManager {
 
   NOTIF_TYPE = {
     data: "data_has_changed",
+    data_trigger_change: "data_watch_triggers_have_changed",
     schema: "schema_has_changed"
   } as const;
   NOTIF_CHANNEL = {
@@ -203,35 +232,6 @@ export class PubSubManager {
 
   appCheckFrequencyMS = 10 * 1000;
   appCheck?: ReturnType<typeof setInterval>;
-
-
-
-  //     ,datname
-  //     ,usename
-  //     ,client_hostname
-  //     ,client_port
-  //     ,backend_start
-  //     ,query_start
-  //     ,query
-  //     ,state
-
-  //     console.log(await _db.any(`
-  //         SELECT pid, application_name, state
-  //         FROM pg_stat_activity
-  //         WHERE application_name IS NOT NULL AND application_name != '' -- state = 'active';
-  //     `))
-
-  public static canCreate = async (db: DB) => {
-
-    const canExecute = await canEXECUTE(db);
-    const isSuperUs = await isSuperUser(db);
-    return { canExecute, isSuperUs, yes: canExecute && isSuperUs };
-  }
-
-  public static create = async (options: PubSubManagerOptions) => {
-    const res = new PubSubManager(options);
-    return await res.init();
-  }
 
   destroyed = false;
   destroy = () => {
@@ -259,24 +259,7 @@ export class PubSubManager {
   checkedListenerTableCond?: string[];
   init = initPubSubManager.bind(this);
 
-
-  static SCHEMA_ALTERING_QUERIES = [
-    'CREATE TABLE', 
-    'ALTER TABLE', 
-    'DROP TABLE', 
-    'CREATE VIEW', 
-    'DROP VIEW', 
-    'ALTER VIEW', 
-    'CREATE TABLE AS', 
-    'SELECT INTO',
-    'REVOKE',
-    'GRANT',
-    'CREATE POLICY', 
-    'DROP POLICY', 
-  ] as const;
-
-  static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from schema watch " as const;
-  prepareEventTriggers = async () => {
+  initialiseEventTriggers = async () => {
     // SELECT * FROM pg_catalog.pg_event_trigger WHERE evtname
     if (!this.appID) throw "prepareTriggers failed: this.appID missing";
 
@@ -314,6 +297,7 @@ export class PubSubManager {
         BEGIN
             --SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
             
+            /** Delete existing triggers without locking */
             LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
             EXECUTE format(
               $q$
@@ -533,20 +517,30 @@ export class PubSubManager {
     return result;
   }
 
-  /* 
-      A table will only have a trigger with all conditions (for different subs) 
-          conditions = ["user_id = 1"]
-          fields = ["user_id"]
-  */
+  /**
+   * Sync triggers with database
+   *  */
+  refreshTriggers = async () => {
 
-  getMyTriggerQuery = async () => {
-    return pgp.as.format(` 
-      SELECT * --, ROW_NUMBER() OVER(PARTITION BY table_name ORDER BY table_name, condition ) - 1 as id
-      FROM prostgles.v_triggers
-      WHERE app_id = $1
-      ORDER BY table_name, condition
-    `, [this.appID]
-    )
+    const triggers: {
+      table_name: string;
+      condition: string;
+    }[] = await this.db.any(` 
+        SELECT *
+        FROM prostgles.v_triggers
+        WHERE app_id = $1
+        ORDER BY table_name, condition
+      `, [this.appID]
+    );
+
+    this._triggers = {};
+    triggers.map(t => {
+      this._triggers ??= {};
+      this._triggers[t.table_name] ??= [];
+      if (!this._triggers[t.table_name]?.includes(t.condition)) {
+        this._triggers[t.table_name]?.push(t.condition)
+      }
+    });
   }
 
   // waitingTriggers: { [key: string]: string[] } = undefined;
@@ -586,21 +580,8 @@ export class PubSubManager {
         COMMIT WORK;
       `);
 
-      const triggers: {
-        table_name: string;
-        condition: string;
-      }[] = await this.db.any(await this.getMyTriggerQuery());
-
-
-      this._triggers = {};
-      triggers.map(t => {
-        this._triggers ??= {};
-        this._triggers[t.table_name] ??= [];
-        /** Why not also remove missing triggers?! */
-        if (!this._triggers[t.table_name]?.includes(t.condition)) {
-          this._triggers[t.table_name]?.push(t.condition)
-        }
-      });
+      /** This might be redundant due to trigger on app_triggers */
+      await this.refreshTriggers();
 
       return trgVals;
     });
