@@ -40,19 +40,21 @@ BEGIN
         NOT EXISTS(
           SELECT 1 
           FROM information_schema.columns 
-          WHERE  table_schema = 'prostgles'
-          AND    table_name   = 'versions'
+          WHERE table_schema = 'prostgles'
+          AND   table_name   = 'versions'
           AND   column_name   = 'schema_md5'
         )
       THEN
         DROP SCHEMA IF EXISTS prostgles CASCADE;
       ELSIF
-        /* There is no newer and different schema */
-        NOT EXISTS(
+        /* There is no newer version or same same version but different schema */
+        NOT EXISTS (
           SELECT 1 
           FROM prostgles.versions
-          WHERE (string_to_array(version, '.')::int[] >= string_to_array(${asValue(version)}, '.')::int[])
-          AND schema_md5 <> ${asValue(schema_md5)}
+          WHERE 
+            (string_to_array(version, '.')::int[] > string_to_array(${asValue(version)}, '.')::int[])
+            OR (string_to_array(version, '.')::int[] = string_to_array(${asValue(version)}, '.')::int[])
+            AND schema_md5 = ${asValue(schema_md5)}
         )
       THEN
         DROP SCHEMA IF EXISTS prostgles CASCADE;
@@ -339,7 +341,8 @@ BEGIN
             DECLARE operations TEXT[] := ARRAY['insert', 'update', 'delete'];
             DECLARE op TEXT;
             DECLARE query TEXT;
-            DECLARE trw RECORD;            
+            DECLARE trw RECORD;           
+            DECLARE app RECORD; 
             DECLARE start_time BIGINT;            
             
             BEGIN
@@ -476,17 +479,21 @@ BEGIN
                 END IF;
 
                 /** Notify all apps about trigger table change */
-                PERFORM pg_notify( 
-                  ${asValue(this.NOTIF_CHANNEL.preffix)}, 
-                  LEFT(concat_ws(
-                    ${asValue(PubSubManager.DELIMITER)}, 
-                    ${asValue(this.NOTIF_TYPE.data_trigger_change)},
-                    json_build_object(
-                      'TG_OP',TG_OP, 
-                      'duration', (EXTRACT(EPOCH FROM now()) * 1000) - start_time
-                    )
-                  )::TEXT, 7999/4)
-                );
+                FOR app IN 
+                  SELECT * FROM prostgles.apps
+                LOOP
+                  PERFORM pg_notify( 
+                    ${asValue(this.NOTIF_CHANNEL.preffix)} || app.id, 
+                    LEFT(concat_ws(
+                      ${asValue(PubSubManager.DELIMITER)}, 
+                      ${asValue(this.NOTIF_TYPE.data_trigger_change)},
+                      json_build_object(
+                        'TG_OP', TG_OP, 
+                        'duration', (EXTRACT(EPOCH FROM now()) * 1000) - start_time
+                      )
+                    )::TEXT, 7999/4)
+                  );
+                END LOOP;
 
                 RETURN NULL;
             END;
