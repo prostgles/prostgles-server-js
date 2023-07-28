@@ -475,7 +475,7 @@ BEGIN
 
                 END IF;
 
-                /** Notify all apps about trigger table change
+                /** Notify all apps about trigger table change */
                 PERFORM pg_notify( 
                   ${asValue(this.NOTIF_CHANNEL.preffix)}, 
                   LEFT(concat_ws(
