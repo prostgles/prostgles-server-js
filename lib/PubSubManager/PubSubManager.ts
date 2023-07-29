@@ -15,17 +15,16 @@ import pg from 'pg-promise/typescript/pg-subset';
 
 import { SelectParams, FieldFilter, asName, WAL, AnyObject, SubscribeParams } from "prostgles-types";
 
-import { ClientExpressData, syncData } from "../SyncReplication";
+import { syncData } from "../SyncReplication";
 import { TableRule } from "../PublishParser";
-import { find, getKeys, isObject, pickKeys } from "prostgles-types/dist/util";
+import { find, getKeys, isObject, pickKeys, tryCatch } from "prostgles-types/dist/util";
 import { DB_OBJ_NAMES } from "./getInitQuery";
 import { addSub } from "./addSub";
 import { notifListener } from "./notifListener";
 import { pushSubData } from "./pushSubData";
 import { getOnDataFunc, LocalFuncs, matchesLocalFuncs } from "../DboBuilder/subscribe";
 import { EVENT_TRIGGER_TAGS, EventTriggerTag } from "../Event_Trigger_Tags";
-import { EventInfo, EventTypes } from "../Logging";
-import { tryCatch } from "../utils";
+import { EventTypes } from "../Logging";
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 const pgp: PGP = pgPromise({
