@@ -536,7 +536,6 @@ export class Prostgles {
     const now = Date.now();
     if (this._dboBuilder) {
       await this._dboBuilder.build();
-      // this._dboBuilder.destroy();
     } else {
       this.dboBuilder = await DboBuilder.create(this);
     }

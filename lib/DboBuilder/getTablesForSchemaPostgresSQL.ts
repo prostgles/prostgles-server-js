@@ -19,6 +19,13 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
   const { sql, schemaNames } = getSchemaFilter(schema);
   const query =
     `
+    WITH pg_class_schema AS (
+      SELECT  c.*, nspname as schema
+      FROM pg_catalog.pg_class AS c
+      LEFT JOIN pg_catalog.pg_namespace AS ns
+        ON c.relnamespace = ns.oid
+    )
+
     SELECT  
     jsonb_build_object(
       'insert', TRUE,
@@ -124,21 +131,26 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
                 , jsonb_agg(row_to_json((SELECT t FROM (SELECT ftable, fcols, cols) t))) as references
               FROM (
                 SELECT 
-                  (SELECT r.relname from pg_class r where r.oid = c.conrelid) as table, 
-                  ( SELECT array_agg(attname::text) from pg_attribute 
+                  (
+                    SELECT r.relname from pg_class r where r.oid = c.conrelid
+                  ) as table, 
+                  ( 
+                    SELECT array_agg(attname::text) from pg_attribute 
                     where attrelid = c.conrelid and ARRAY[attnum] <@ c.conkey
                   ) as cols, 
-                  ( SELECT array_agg(attname::text) from pg_attribute 
+                  ( 
+                    SELECT array_agg(attname::text) from pg_attribute 
                     where attrelid = c.confrelid and ARRAY[attnum] <@ c.confkey
                   ) as fcols, 
                   (
                     --SELECT r.relname from pg_class r where r.oid = c.confrelid
-                    SELECT CASE WHEN current_schema() = table_schema 
-                      THEN format('%I', table_name) 
-                      ELSE format('%I.%I', table_schema, table_name) 
-                    END
-                    FROM information_schema.tables
-                    WHERE format('%I.%I', table_schema,  table_name)::REGCLASS::oid = c.confrelid
+                    SELECT 
+                      CASE WHEN current_schema() = r.schema 
+                        THEN format('%I', r.relname) 
+                        ELSE format('%I.%I', r.schema, r.relname) 
+                      END
+                    FROM pg_class_schema r
+                    WHERE r.oid = c.confrelid
                   ) as ftable
                 FROM pg_constraint c 
               ) ft
