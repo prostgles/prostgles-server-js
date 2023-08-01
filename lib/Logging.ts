@@ -77,7 +77,18 @@ export namespace EventTypes {
 
   export type Debug = DebugInfo & {
     type: "debug";
-    command: "initFileTable" | "runSQLFile" | "schemaChangeNotif" | "TableConfig.runQueries.start" | "TableConfig.runQueries.end";
+    command: 
+    | "initFileTable" 
+    | "runSQLFile" 
+    | "schemaChangeNotif" 
+    | "TableConfig.runQueries.start" 
+    | "TableConfig.runQueries.end" 
+    | "refreshDBO.start" 
+    | "refreshDBO.end"
+    | "tableConfigurator.init.start"
+    | "tableConfigurator.init.end"
+    | "initFileTable.start"
+    | "initFileTable.end"
     data?: AnyObject;
   }
 }

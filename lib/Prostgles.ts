@@ -532,6 +532,8 @@ export class Prostgles {
    * Will re-create the dbo object
    */
   refreshDBO = async () => {
+    await this.opts.onLog?.({ type: "debug", command: "refreshDBO.start", duration: -1 });
+    const now = Date.now();
     if (this._dboBuilder) {
       await this._dboBuilder.build();
       // this._dboBuilder.destroy();
@@ -540,6 +542,7 @@ export class Prostgles {
     }
     if (!this.dboBuilder) throw "this.dboBuilder";
     this.dbo = this.dboBuilder.dbo;
+    await this.opts.onLog?.({ type: "debug", command: "refreshDBO.end", duration: Date.now() - now })
     return this.dbo;
   }
 
@@ -641,7 +644,10 @@ export class Prostgles {
         }
         this.tableConfigurator = new TableConfigurator(this);
         try {
+          const now = Date.now();
+          await this.opts.onLog?.({ type: "debug", command: "tableConfigurator.init.start", duration: -1 });
           await this.tableConfigurator.init();
+          await this.opts.onLog?.({ type: "debug", command: "tableConfigurator.init.end", duration: Date.now() - now });
         } catch (e) {
           if(this.opts.tableConfigMigrations?.silentFail === false){
             console.error("TableConfigurator silentFail: ", e);
@@ -655,7 +661,11 @@ export class Prostgles {
       // await this.refreshDBO();
 
       /* Create media table if required */
+      
+      const now = Date.now();
+      await this.opts.onLog?.({ type: "debug", command: "initFileTable.start", duration: -1 });
       await this.initFileTable();
+      await this.opts.onLog?.({ type: "debug", command: "initFileTable.end", duration: Date.now() - now });
 
 
       if (this.opts.publish) {

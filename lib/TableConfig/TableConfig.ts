@@ -434,8 +434,6 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
         return 0;
       }
       q = `/* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ \n\n` + q;
-      this.log(q);
-      log(q);
       queryHistory.push(q);
       this.prostgles.opts.onLog?.({ type: "debug", command: "TableConfig.runQueries.start", data: { q }, duration: -1 });
       const now = Date.now();
@@ -699,7 +697,6 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
     if (queries.length) {
       const q = makeQuery(queries);
-      this.log("TableConfig >>>> ", q); 
 
       try {
         await runQueries(queries);
@@ -735,13 +732,6 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       console.error("Table config failed queries: ", failedQueries)
     }
   }
-
-  log = (...args: any[]) => {
-    if (this.prostgles.opts.DEBUG_MODE) {
-      console.log("TableConfig: \n", ...args)
-    }
-  }
-  
 }
 
 type PGIndex = {
