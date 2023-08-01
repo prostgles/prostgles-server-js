@@ -430,16 +430,21 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     const makeQuery = (q: string[]) => q.filter(v => v.trim().length).map(v => v.trim().endsWith(";")? v : `${v};`).join("\n");
     const runQueries = async (_queries = queries) => {
       let q = makeQuery(queries);
-      if(!_queries.some(q => q.trim().length)) return 0;
+      if(!_queries.some(q => q.trim().length)) {
+        return 0;
+      }
       q = `/* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ \n\n` + q;
       this.log(q);
       log(q);
       queryHistory.push(q);
+      this.prostgles.opts.onLog?.({ type: "debug", command: "TableConfig.runQueries.start", data: { q }, duration: -1 });
+      const now = Date.now();
       await this.db.multi(q).catch(err => {
         log({ err, q });
         failedQueries.push({ query: q, error: err });
         return Promise.reject(err);
       });
+      this.prostgles.opts.onLog?.({ type: "debug", command: "TableConfig.runQueries.end", duration: Date.now() - now, data: { q } });
       changedSchema = true;
       _queries = [];
       queries = [];

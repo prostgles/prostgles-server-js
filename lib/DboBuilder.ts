@@ -9,7 +9,7 @@ import * as Bluebird from "bluebird";
 import * as pgPromise from 'pg-promise';
 import { runSQL } from "./DboBuilder/runSQL";
 import pg = require('pg-promise/typescript/pg-subset');
-import { getTablesForSchemaPostgresSQL } from "./DboBuilder/getTablesForSchemaPostgresSQL";
+import { getSchemaFilter, getTablesForSchemaPostgresSQL } from "./DboBuilder/getTablesForSchemaPostgresSQL";
 import {
   ColumnInfo, SQLOptions,
   DbJoinMaker,
@@ -77,7 +77,7 @@ export type DBHandlerServer<TH = TableHandlers> =
 import { clone } from "./utils";
 import { FieldSpec, } from "./DboBuilder/QueryBuilder/Functions";
 import {
-  Join, Prostgles, DB
+  Join, Prostgles, DB, ProstglesInitOptions
 } from "./Prostgles";
 import {
   PublishParser, PublishAllOrNothing,
@@ -196,8 +196,8 @@ function snakify(str: string, capitalize = false): string {
 function canBeUsedAsIsInTypescript(str: string): boolean {
   if (!str) return false;
   const isAlphaNumericOrUnderline = str.match(/^[a-z0-9_]+$/i);
-  const startsWithCharOrUnderscoreOrDQuote = str[0]?.match(/^[a-z_]+$/i);
-  return Boolean(isAlphaNumericOrUnderline && startsWithCharOrUnderscoreOrDQuote);
+  const startsWithCharOrUnderscore = str[0]?.match(/^[a-z_]+$/i);
+  return Boolean(isAlphaNumericOrUnderline && startsWithCharOrUnderscore);
 }
 
 export function escapeTSNames(str: string, capitalize = false): string {
@@ -629,7 +629,7 @@ export class DboBuilder {
 
     this.tablesOrViews = await getTablesForSchemaPostgresSQL(this, this.prostgles.opts.schema);
 
-    this.constraints = await getConstraints(this.db);
+    this.constraints = await getConstraints(this.db, this.prostgles.opts.schema);
     await this.parseJoins();
 
     this.dbo = {};
@@ -779,17 +779,17 @@ type PGConstraint = {
   relname: string;
 };
 
-async function getConstraints(db: DB, schema = "public", filter?: { table: string; column: string; }): Promise<PGConstraint[]> {
+async function getConstraints(db: DB, schema: ProstglesInitOptions["schema"], filter?: { table: string; column: string; }): Promise<PGConstraint[]> {
+  const { sql, schemaNames } = getSchemaFilter(schema);
   return db.any(`
-        SELECT rel.relname, con.conkey, con.conname, con.contype
-        FROM pg_catalog.pg_constraint con
-            INNER JOIN pg_catalog.pg_class rel
-                ON rel.oid = con.conrelid
-            INNER JOIN pg_catalog.pg_namespace nsp
-                ON nsp.oid = connamespace
-        WHERE nsp.nspname = ${asValue(schema)}
-        ${!filter ? "" : "AND rel.relname = ${} AND "}
-    `);
+    SELECT rel.relname, con.conkey, con.conname, con.contype
+    FROM pg_catalog.pg_constraint con
+        INNER JOIN pg_catalog.pg_class rel
+            ON rel.oid = con.conrelid
+        INNER JOIN pg_catalog.pg_namespace nsp
+            ON nsp.oid = connamespace
+    WHERE nsp.nspname ${sql}
+  `, { schemaNames });
 }
 
 

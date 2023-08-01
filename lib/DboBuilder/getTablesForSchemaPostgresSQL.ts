@@ -1,14 +1,22 @@
-import { SQLResult, asName, includes } from "prostgles-types";
+import { SQLResult, asName } from "prostgles-types";
 import { DboBuilder, TableSchemaColumn, TableSchema } from "../DboBuilder";
 import { DB, ProstglesInitOptions } from "../Prostgles";
 
-// TODO: Add a onSocketConnect timeout for this query. Reason: this query gets blocked by prostgles.app_triggers from PubSubManager.addTrigger in some cases (pg_dump locks that table)
-export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, schema: ProstglesInitOptions["schema"] = { public: 1 }): Promise<TableSchema[]> {
+export const getSchemaFilter = (schema: ProstglesInitOptions["schema"] = { public: 1 }) => {
   const schemaNames = Object.keys(schema);
   const isInclusive = Object.values(schema).every(v => v);
   if(!schemaNames.length){
     throw "Must specify at least one schema";
   }
+
+  return {
+    sql: ` ${isInclusive? "" : "NOT "}IN (\${schemaNames:csv})`,
+    schemaNames,
+  }
+}
+// TODO: Add a onSocketConnect timeout for this query. Reason: this query gets blocked by prostgles.app_triggers from PubSubManager.addTrigger in some cases (pg_dump locks that table)
+export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, schema: ProstglesInitOptions["schema"]): Promise<TableSchema[]> {
+  const { sql, schemaNames } = getSchemaFilter(schema);
   const query =
     `
     SELECT  
@@ -56,7 +64,7 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
       ) materialized_views
 */
     ) tables_matviews
-    WHERE table_schema ${isInclusive? "" : "NOT"} IN (\${schemaNames:csv})
+    WHERE table_schema ${sql}
   ) t  
   LEFT join (
       SELECT table_schema, table_name

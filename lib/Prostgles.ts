@@ -21,7 +21,9 @@ import { PubSubManager, pickKeys, log } from "./PubSubManager/PubSubManager";
 export { DBHandlerServer }
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 
-import { SQLRequest, TableSchemaForClient, CHANNELS, AnyObject, ClientSchema, getKeys, DBSchemaTable, FileColumnConfig, isObject, omitKeys, tryCatch } from "prostgles-types";
+import { SQLRequest, TableSchemaForClient, CHANNELS, AnyObject, ClientSchema, getKeys, 
+  DBSchemaTable, FileColumnConfig, isObject, omitKeys, tryCatch 
+} from "prostgles-types";
 import { Publish, PublishMethods, PublishParams, PublishParser } from "./PublishParser";
 import { DBEventsManager } from "./DBEventsManager";
 
@@ -745,25 +747,26 @@ export class Prostgles {
     const res = await tryCatch(async () => {
       const fileContent = await this.getFileText(filePath);//.then(console.log);
   
-      const success = await this.db?.multi(fileContent).then((data) => {
-        console.log("Prostgles: SQL file executed successfuly \n    -> " + filePath);
-        return data;
-      }).catch((err) => {
-        const { position, length } = err,
-          lines = fileContent.split("\n");
-        let errMsg = filePath + " error: ";
-  
-        if (position && length && fileContent) {
-          const startLine = Math.max(0, fileContent.substring(0, position).split("\n").length - 2),
-            endLine = startLine + 3;
-  
-          errMsg += "\n\n";
-          errMsg += lines.slice(startLine, endLine).map((txt, i) => `${startLine + i + 1} ${i === 1 ? "->" : "  "} ${txt}`).join("\n");
-          errMsg += "\n\n";
-        }
-        console.error(errMsg, err);
-        throw err;
-      });
+      const success = await this.db?.multi(fileContent)
+        .then((data) => {
+          console.log("Prostgles: SQL file executed successfuly \n    -> " + filePath);
+          return data;
+        }).catch((err) => {
+          const { position, length } = err,
+            lines = fileContent.split("\n");
+          let errMsg = filePath + " error: ";
+    
+          if (position && length && fileContent) {
+            const startLine = Math.max(0, fileContent.substring(0, position).split("\n").length - 2),
+              endLine = startLine + 3;
+    
+            errMsg += "\n\n";
+            errMsg += lines.slice(startLine, endLine).map((txt, i) => `${startLine + i + 1} ${i === 1 ? "->" : "  "} ${txt}`).join("\n");
+            errMsg += "\n\n";
+          }
+          console.error(errMsg, err);
+          return Promise.reject(err);
+        });
       return { success }
     });
 
