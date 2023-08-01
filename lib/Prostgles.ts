@@ -594,7 +594,8 @@ export class Prostgles {
       command: "initFileTable", 
       ...res,
     });
-    if(res.error) throw res.error;
+    if(res.error !== undefined) throw res.error;
+    return res.data;
   }
 
   isSuperUser = false;
@@ -744,9 +745,9 @@ export class Prostgles {
     const res = await tryCatch(async () => {
       const fileContent = await this.getFileText(filePath);//.then(console.log);
   
-      return this.db?.multi(fileContent).then((data) => {
+      const success = await this.db?.multi(fileContent).then((data) => {
         console.log("Prostgles: SQL file executed successfuly \n    -> " + filePath);
-        return data
+        return data;
       }).catch((err) => {
         const { position, length } = err,
           lines = fileContent.split("\n");
@@ -763,11 +764,12 @@ export class Prostgles {
         console.error(errMsg, err);
         throw err;
       });
-      
+      return { success }
     });
 
     await this.opts.onLog?.({ type: "debug", command: "runSQLFile", ...res });
-    if(res.error) throw res.error;
+    if(res.error !== undefined) throw res.error;
+    return res.success;
   }
 
 

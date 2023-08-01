@@ -27,7 +27,6 @@ import { getColumns } from "./getColumns";
 import { LocalFuncs, subscribe } from "./subscribe";
 import { find } from "./find";
 import { TableEvent } from "../Logging";
-import console from "console";
 
 export type JoinPaths = {
   t1: string;
