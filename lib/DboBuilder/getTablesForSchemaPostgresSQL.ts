@@ -26,6 +26,7 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
       FROM pg_catalog.pg_class pgc
       LEFT JOIN pg_catalog.pg_namespace ns
         ON pgc.relnamespace = ns.oid
+      WHERE nspname ${sql}
     )
 
     SELECT  
