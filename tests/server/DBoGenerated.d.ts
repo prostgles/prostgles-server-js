@@ -4,8 +4,29 @@
  /* SCHEMA DEFINITON. Table names have been altered to work with Typescript */
 /* DBO Definition */
 
-
 export type DBSchemaGenerated = {
+  "\"\"\"*\"\"\"": {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      "\"*\""?: null | string;
+      id?: number;
+    };
+  };
+  "\"*\"": {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      "*"?: null | string;
+      id?: number;
+    };
+  };
   ex_j_ins: {
     is_view: false;
     select: true;
@@ -194,6 +215,7 @@ export type DBSchemaGenerated = {
     delete: true;
     columns: {
       added?: string;
+      cloud_url?: null | string;
       content_length?: number;
       content_type: string;
       deleted?: null | number;
@@ -204,7 +226,6 @@ export type DBSchemaGenerated = {
       id?: string;
       name: string;
       original_name: string;
-      s3_url?: null | string;
       signed_url?: null | string;
       signed_url_expires?: null | number;
       url: string;
@@ -255,6 +276,29 @@ export type DBSchemaGenerated = {
     columns: {
       foreign_id: number;
       media_id: string;
+    };
+  };
+  "prostgles_test.basic": {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id?: number;
+      txt?: null | string;
+    };
+  };
+  "prostgles_test.basic1": {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id?: number;
+      id_basic?: null | number;
+      txt?: null | string;
     };
   };
   rec: {

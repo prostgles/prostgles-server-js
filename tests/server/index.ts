@@ -232,6 +232,11 @@ function dd(){
     schema: { public: 1, prostgles_test: 1 },
 		// DEBUG_MODE: true,
 		// onNotice: console.log,
+    onLog: async ev => {
+      if(ev.type === "debug"){
+        log("onLog", ev);
+      }
+    },
 		tableConfig,
 		fileTable: {
 			// awsS3Config: {
