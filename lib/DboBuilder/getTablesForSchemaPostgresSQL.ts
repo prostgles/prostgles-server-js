@@ -20,10 +20,12 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
   const query =
     `
     WITH pg_class_schema AS (
-      SELECT  c.*, nspname as schema
-      FROM pg_catalog.pg_class AS c
-      LEFT JOIN pg_catalog.pg_namespace AS ns
-        ON c.relnamespace = ns.oid
+      SELECT  pgc.oid, -- must be explicitly selected on v11
+        pgc.relname,
+        nspname as schema
+      FROM pg_catalog.pg_class pgc
+      LEFT JOIN pg_catalog.pg_namespace ns
+        ON pgc.relnamespace = ns.oid
     )
 
     SELECT  
