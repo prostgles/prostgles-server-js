@@ -686,8 +686,8 @@ export class PublishParser {
           .map(async tableName => {
             if (!this.dbo[tableName]) {
               throw `Table ${tableName} does not exist
-                          Expecting one of: ${this.prostgles.dboBuilder.tablesOrViews?.map(tov => tov.name).join(", ")}
-                          DBO tables: ${Object.keys(this.dbo).filter(k => (this.dbo[k] as any).find).join(", ")}
+                          Expecting one of: ${JSON.stringify(this.prostgles.dboBuilder.tablesOrViews?.map(tov => tov.name))}
+                          DBO tables: ${JSON.stringify(Object.keys(this.dbo).filter(k => (this.dbo[k] as any).find))}
                           `;
             }
 

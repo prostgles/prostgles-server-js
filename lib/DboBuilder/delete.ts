@@ -49,7 +49,7 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
     }
 
     let queryType: keyof pgPromise.ITask<{}> = 'none';
-    let _query = "DELETE FROM " + this.escapedName;
+    let _query = `DELETE FROM ${this.escapedName} `;
     const filterOpts = (await this.prepareWhere({
       filter,
       forcedFilter,

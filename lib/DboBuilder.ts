@@ -4,7 +4,7 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import * as Bluebird from "bluebird"; 
+import * as Bluebird from "bluebird";
 
 import * as pgPromise from 'pg-promise';
 import { runSQL } from "./DboBuilder/runSQL";
@@ -12,7 +12,7 @@ import pg = require('pg-promise/typescript/pg-subset');
 import { getTablesForSchemaPostgresSQL } from "./DboBuilder/getTablesForSchemaPostgresSQL";
 import {
   ColumnInfo, SQLOptions,
-  DbJoinMaker, 
+  DbJoinMaker,
   PG_COLUMN_UDT_DATA_TYPE,
   TS_PG_Types,
   TableInfo as TInfo,
@@ -72,12 +72,12 @@ export type DBHandlerServer<TH = TableHandlers> =
   } & {
     tx?: TX<TH>
   }
- 
+
 
 import { clone } from "./utils";
 import { FieldSpec, } from "./DboBuilder/QueryBuilder/Functions";
 import {
-  Join, Prostgles, DB 
+  Join, Prostgles, DB
 } from "./Prostgles";
 import {
   PublishParser, PublishAllOrNothing,
@@ -196,8 +196,8 @@ function snakify(str: string, capitalize = false): string {
 function canBeUsedAsIsInTypescript(str: string): boolean {
   if (!str) return false;
   const isAlphaNumericOrUnderline = str.match(/^[a-z0-9_]+$/i);
-  const startsWithCharOrUnderscore = str[0]?.match(/^[a-z_]+$/i);
-  return Boolean(isAlphaNumericOrUnderline && startsWithCharOrUnderscore);
+  const startsWithCharOrUnderscoreOrDQuote = str[0]?.match(/^[a-z_]+$/i);
+  return Boolean(isAlphaNumericOrUnderline && startsWithCharOrUnderscoreOrDQuote);
 }
 
 export function escapeTSNames(str: string, capitalize = false): string {
@@ -391,7 +391,6 @@ export class DboBuilder {
   constraints?: PGConstraint[];
 
   db: DB;
-  schema = "public";
 
   // dbo: DBHandlerServer | DBHandlerServerTX;
   dbo: DBHandlerServer;
@@ -466,9 +465,7 @@ export class DboBuilder {
     this.prostgles = prostgles;
     if (!this.prostgles.db) throw "db missing"
     this.db = this.prostgles.db;
-    this.schema = this.prostgles.opts.schema || "public";
     this.dbo = {} as unknown as DBHandlerServer;
-
   }
 
   private init = async () => {
@@ -549,7 +546,7 @@ export class DboBuilder {
               const t = <string>v[0],
                 f = <string[]>v[1];
 
-                const tov = this.tablesOrViews!.find(_t => _t.name === t);
+              const tov = this.tablesOrViews!.find(_t => _t.name === t);
               if (!tov) throw "Table not found: " + t;
               const m1 = f.filter(k => !tov!.columns.map(c => c.name).includes(k))
               if (m1 && m1.length) {
@@ -630,7 +627,7 @@ export class DboBuilder {
   }
   async build(): Promise<DBHandlerServer> {
 
-    this.tablesOrViews = await getTablesForSchemaPostgresSQL(this);
+    this.tablesOrViews = await getTablesForSchemaPostgresSQL(this, this.prostgles.opts.schema);
 
     this.constraints = await getConstraints(this.db);
     await this.parseJoins();
@@ -648,7 +645,7 @@ export class DboBuilder {
                 Alternatively you can rename the table column\n`;
       }
 
-      this.dbo[tov.name] = new (tov.is_view ? ViewHandler : TableHandler)(this.db, tov, this, undefined, undefined, this.joinPaths);
+      this.dbo[tov.escaped_identifier] = new (tov.is_view ? ViewHandler : TableHandler)(this.db, tov, this, undefined, undefined, this.joinPaths);
 
       if (this.joinPaths && this.joinPaths.find(jp => [jp.t1, jp.t2].includes(tov.name))) {
 
@@ -720,7 +717,7 @@ export class DboBuilder {
       }
       getKeys(dbTX).map(k => {
         dbTX[k]!.dbTX = dbTX;
-      }); 
+      });
       dbTX.sql = (q, args, opts, localP) => this.runSQL(q, args, opts, { tx: { dbTX, t }, ...(localP ?? {}) })
 
       return cb(dbTX, t);
@@ -739,6 +736,7 @@ export type TableSchemaColumn = ColumnInfo & {
 export type TableSchema = {
   schema: string;
   name: string;
+  escaped_identifier: string;
   oid: number;
   comment: string;
   columns: TableSchemaColumn[];
@@ -790,7 +788,7 @@ async function getConstraints(db: DB, schema = "public", filter?: { table: strin
             INNER JOIN pg_catalog.pg_namespace nsp
                 ON nsp.oid = connamespace
         WHERE nsp.nspname = ${asValue(schema)}
-        ${!filter? "" : "AND rel.relname = ${} AND "}
+        ${!filter ? "" : "AND rel.relname = ${} AND "}
     `);
 }
 
@@ -1137,9 +1135,9 @@ export const withUserRLS = (localParams: LocalParams | undefined, query: string)
   const user = localParams?.isRemoteRequest?.user;
   const queryPrefix = `SET SESSION "prostgles.user" \nTO`
   let firstQuery = `${queryPrefix} '';`;
-  if(user){
+  if (user) {
     firstQuery = pgp.as.format(`${queryPrefix} \${user};`, { user });
   }
-  
+
   return [firstQuery, query].join("\n");
 }

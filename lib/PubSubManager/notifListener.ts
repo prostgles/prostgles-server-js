@@ -18,7 +18,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
 
     if (this.onSchemaChange) {
       const [_, command, _event_type, query] = dataArr;
-      await this.dboBuilder.prostgles.opts.onLog?.({ type: "debug", command: "schemaChangeNotif", data: { command, query } });
+      await this.dboBuilder.prostgles.opts.onLog?.({ type: "debug", command: "schemaChangeNotif", duration: 0, data: { command, query } });
 
       if (query && command) {
         this.onSchemaChange({ command, query })

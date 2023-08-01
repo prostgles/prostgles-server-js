@@ -27,6 +27,7 @@ import { getColumns } from "./getColumns";
 import { LocalFuncs, subscribe } from "./subscribe";
 import { find } from "./find";
 import { TableEvent } from "../Logging";
+import console from "console";
 
 export type JoinPaths = {
   t1: string;
@@ -138,14 +139,14 @@ class ColSet {
       const select = rowParts.map(r => r.escapedCol).join(", "),
         values = rowParts.map(r => r.escapedVal).join(", ");
 
-      return `INSERT INTO ${asName(this.opts.tableName)} (${select}) VALUES (${values})`;
+      return `INSERT INTO ${this.opts.tableName} (${select}) VALUES (${values})`;
     }))).join(";\n") + " ";
     return res;
   }
   async getUpdateQuery(data: any[], allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRow | undefined): Promise<string> {
     const res = (await Promise.all((Array.isArray(data) ? data : [data]).map(async d => {
       const rowParts = await this.getRow(d, allowedCols, dbTx, validate);
-      return `UPDATE ${asName(this.opts.tableName)} SET ` + rowParts.map(r => `${r.escapedCol} = ${r.escapedVal} `).join(",\n")
+      return `UPDATE ${this.opts.tableName} SET ` + rowParts.map(r => `${r.escapedCol} = ${r.escapedVal} `).join(",\n")
     }))).join(";\n") + " ";
     return res;
   }
@@ -183,8 +184,8 @@ export class ViewHandler {
     this.dbTX = dbTX;
     this.joinPaths = joinPaths;
     this.tableOrViewInfo = tableOrViewInfo;
-    this.name = tableOrViewInfo.name;
-    this.escapedName = asName(this.name);
+    this.name = tableOrViewInfo.escaped_identifier;
+    this.escapedName = tableOrViewInfo.escaped_identifier;
     this.columns = tableOrViewInfo.columns;
 
     /* cols are sorted by name to reduce .d.ts schema rewrites */

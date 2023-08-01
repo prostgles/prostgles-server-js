@@ -21,7 +21,7 @@ import { PubSubManager, pickKeys, log } from "./PubSubManager/PubSubManager";
 export { DBHandlerServer }
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 
-import { SQLRequest, TableSchemaForClient, CHANNELS, AnyObject, ClientSchema, getKeys, DBSchemaTable, FileColumnConfig, isObject, omitKeys } from "prostgles-types";
+import { SQLRequest, TableSchemaForClient, CHANNELS, AnyObject, ClientSchema, getKeys, DBSchemaTable, FileColumnConfig, isObject, omitKeys, tryCatch } from "prostgles-types";
 import { Publish, PublishMethods, PublishParams, PublishParser } from "./PublishParser";
 import { DBEventsManager } from "./DBEventsManager";
 
@@ -233,7 +233,7 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
   publishMethods?: PublishMethods<S, SUser>;
   publishRawSQL?(params: PublishParams<S, SUser>): ((boolean | "*") | Promise<(boolean | "*")>);
   joins?: Joins;
-  schema?: string;
+  schema?: Record<string, 1> | Record<string, 0>;
   sqlFilePath?: string;
   onReady: OnReadyCallback<S>;
   transactions?: string | boolean;
@@ -369,10 +369,9 @@ import * as fs from 'fs';
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { ColConstraint } from "./TableConfig/getConstraintDefinitionQueries";
 import { ViewHandler } from "./DboBuilder/ViewHandler";
-import { TableHandler } from "./DboBuilder/TableHandler";
 import { EventInfo } from "./Logging";
-export class Prostgles {
 
+export class Prostgles {
   opts: ProstglesInitOptions = {
     DEBUG_MODE: false,
     dbConnection: {
@@ -383,7 +382,6 @@ export class Prostgles {
     onReady: () => { 
       //empty 
     },
-    schema: "public",
     watchSchema: false,
     watchSchemaType: "DDL_trigger",
   };
@@ -440,9 +438,9 @@ export class Prostgles {
 
     /* set defaults */
     if (this.opts?.fileTable) {
-      this.opts.fileTable.tableName = this.opts?.fileTable?.tableName || "media";
+      this.opts.fileTable.tableName ??= "media";
     }
-    this.opts.schema = this.opts.schema || "public";
+    this.opts.schema ??= { "public": 1 };
 
     this.keywords = {
       ...DEFAULT_KEYWORDS,
@@ -572,22 +570,31 @@ export class Prostgles {
 
   /* Create media table if required */
   initFileTable = async () => {
+    const res = await tryCatch(async () => {
 
-    if (this.opts.fileTable) {
-      const { cloudClient, localConfig, imageOptions } = this.opts.fileTable;
-      await this.refreshDBO();
-      if (!cloudClient && !localConfig) throw "fileTable missing param: Must provide awsS3Config OR localConfig";
-
-      this.fileManager = new FileManager(cloudClient || localConfig!, imageOptions);
-
-      try {
-        await this.fileManager.init(this);
-      } catch (e) {
-        console.error("FileManager: ", e);
-        throw e;
+      if (this.opts.fileTable) {
+        const { cloudClient, localConfig, imageOptions } = this.opts.fileTable;
+        await this.refreshDBO();
+        if (!cloudClient && !localConfig) throw "fileTable missing param: Must provide awsS3Config OR localConfig";
+  
+        this.fileManager = new FileManager(cloudClient || localConfig!, imageOptions);
+  
+        try {
+          await this.fileManager.init(this);
+        } catch (e) {
+          console.error("FileManager: ", e);
+          throw e;
+        }
       }
-    }
-    await this.refreshDBO();
+      await this.refreshDBO();
+      return { data: {} }
+    });
+    await this.opts.onLog?.({ 
+      type: "debug", 
+      command: "initFileTable", 
+      ...res,
+    });
+    if(res.error) throw res.error;
   }
 
   isSuperUser = false;
@@ -734,27 +741,33 @@ export class Prostgles {
 
   async runSQLFile(filePath: string) {
 
-    const fileContent = await this.getFileText(filePath);//.then(console.log);
-
-    return this.db?.multi(fileContent).then((data) => {
-      console.log("Prostgles: SQL file executed successfuly \n    -> " + filePath);
-      return data
-    }).catch((err) => {
-      const { position, length } = err,
-        lines = fileContent.split("\n");
-      let errMsg = filePath + " error: ";
-
-      if (position && length && fileContent) {
-        const startLine = Math.max(0, fileContent.substring(0, position).split("\n").length - 2),
-          endLine = startLine + 3;
-
-        errMsg += "\n\n";
-        errMsg += lines.slice(startLine, endLine).map((txt, i) => `${startLine + i + 1} ${i === 1 ? "->" : "  "} ${txt}`).join("\n");
-        errMsg += "\n\n";
-      }
-      console.error(errMsg, err);
-      throw err;
+    const res = await tryCatch(async () => {
+      const fileContent = await this.getFileText(filePath);//.then(console.log);
+  
+      return this.db?.multi(fileContent).then((data) => {
+        console.log("Prostgles: SQL file executed successfuly \n    -> " + filePath);
+        return data
+      }).catch((err) => {
+        const { position, length } = err,
+          lines = fileContent.split("\n");
+        let errMsg = filePath + " error: ";
+  
+        if (position && length && fileContent) {
+          const startLine = Math.max(0, fileContent.substring(0, position).split("\n").length - 2),
+            endLine = startLine + 3;
+  
+          errMsg += "\n\n";
+          errMsg += lines.slice(startLine, endLine).map((txt, i) => `${startLine + i + 1} ${i === 1 ? "->" : "  "} ${txt}`).join("\n");
+          errMsg += "\n\n";
+        }
+        console.error(errMsg, err);
+        throw err;
+      });
+      
     });
+
+    await this.opts.onLog?.({ type: "debug", command: "runSQLFile", ...res });
+    if(res.error) throw res.error;
   }
 
 

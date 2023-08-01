@@ -8,6 +8,11 @@ type ClientInfo = {
 }
 
 export namespace EventTypes {
+  type DebugInfo = {
+    duration: number;
+    error?: any;
+  }
+
   export type Table = {
     type: "table";
     tableName: string;
@@ -70,10 +75,10 @@ export namespace EventTypes {
     args: any[];
   };
 
-  export type Debug = {
+  export type Debug = DebugInfo & {
     type: "debug";
-    command: string;
-    data: AnyObject;
+    command: "initFileTable" | "runSQLFile" | "schemaChangeNotif";
+    data?: AnyObject;
   }
 }
 

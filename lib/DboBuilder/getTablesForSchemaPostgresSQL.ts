@@ -1,13 +1,17 @@
-import { SQLResult, asName } from "prostgles-types";
+import { SQLResult, asName, includes } from "prostgles-types";
 import { DboBuilder, TableSchemaColumn, TableSchema } from "../DboBuilder";
-import { asValue } from "../PubSubManager/PubSubManager";
-import { DB } from "../Prostgles";
+import { DB, ProstglesInitOptions } from "../Prostgles";
 
 // TODO: Add a onSocketConnect timeout for this query. Reason: this query gets blocked by prostgles.app_triggers from PubSubManager.addTrigger in some cases (pg_dump locks that table)
-export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, schema = "public"): Promise<TableSchema[]> {
+export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, schema: ProstglesInitOptions["schema"] = { public: 1 }): Promise<TableSchema[]> {
+  const schemaNames = Object.keys(schema);
+  const isInclusive = Object.values(schema).every(v => v);
+  if(!schemaNames.length){
+    throw "Must specify at least one schema";
+  }
   const query =
     `
-    SELECT 
+    SELECT  
     jsonb_build_object(
       'insert', TRUE,
       'select', TRUE,
@@ -19,7 +23,12 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
           AND rg.privilege_type = 'DELETE'
       )
     ) as privileges
-    , t.table_schema as schema, t.table_name as name 
+    , t.table_schema as schema
+    , t.table_name as name
+    , CASE WHEN current_schema() = t.table_schema 
+        THEN format('%I', t.table_name) 
+        ELSE format('%I.%I', t.table_schema, t.table_name) 
+      END as escaped_identifier
     , COALESCE(cc.columns, '[]'::JSONB) as columns 
     , t.oid
     , t.is_view 
@@ -47,7 +56,7 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
       ) materialized_views
 */
     ) tables_matviews
-    WHERE table_schema = ${asValue(schema)}
+    WHERE table_schema ${isInclusive? "" : "NOT"} IN (\${schemaNames:csv})
   ) t  
   LEFT join (
       SELECT table_schema, table_name
@@ -101,15 +110,28 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
               ON c.table_name = cp.table_name AND c.column_name = cp.column_name
           LEFT JOIN (
               --SELECT *
-              SELECT "table", unnest(ft.cols) as col, jsonb_agg(row_to_json((SELECT t FROM (SELECT ftable, fcols, cols) t))) as references
+              SELECT 
+                "table"
+                , unnest(ft.cols) as col
+                , jsonb_agg(row_to_json((SELECT t FROM (SELECT ftable, fcols, cols) t))) as references
               FROM (
                 SELECT 
                   (SELECT r.relname from pg_class r where r.oid = c.conrelid) as table, 
-                  (SELECT array_agg(attname::text) from pg_attribute 
-                  where attrelid = c.conrelid and ARRAY[attnum] <@ c.conkey) as cols, 
-                  (SELECT array_agg(attname::text) from pg_attribute 
-                  where attrelid = c.confrelid and ARRAY[attnum] <@ c.confkey) as fcols, 
-                  (SELECT r.relname from pg_class r where r.oid = c.confrelid) as ftable
+                  ( SELECT array_agg(attname::text) from pg_attribute 
+                    where attrelid = c.conrelid and ARRAY[attnum] <@ c.conkey
+                  ) as cols, 
+                  ( SELECT array_agg(attname::text) from pg_attribute 
+                    where attrelid = c.confrelid and ARRAY[attnum] <@ c.confkey
+                  ) as fcols, 
+                  (
+                    --SELECT r.relname from pg_class r where r.oid = c.confrelid
+                    SELECT CASE WHEN current_schema() = table_schema 
+                      THEN format('%I', table_name) 
+                      ELSE format('%I.%I', table_schema, table_name) 
+                    END
+                    FROM information_schema.tables
+                    WHERE format('%I.%I', table_schema,  table_name)::REGCLASS::oid = c.confrelid
+                  ) as ftable
                 FROM pg_constraint c 
               ) ft
               WHERE ft.table IS NOT NULL 
@@ -139,7 +161,7 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
   ORDER BY schema, name
     `;
     
-  let result: TableSchema[] = await db.any(query, { schema });
+  let result: TableSchema[] = await db.any(query, { schemaNames });
 
   let hyperTables: string[] | undefined = [];
   try {
@@ -150,6 +172,7 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
 
   result = await Promise.all(result
     .map(async tbl => {
+      tbl.name = tbl.escaped_identifier;
       tbl.privileges.select = tbl.columns.some(c => c.privileges.some(p => p.privilege_type === "SELECT"));
       tbl.privileges.insert = tbl.columns.some(c => c.privileges.some(p => p.privilege_type === "INSERT"));
       tbl.privileges.update = tbl.columns.some(c => c.privileges.some(p => p.privilege_type === "UPDATE"));

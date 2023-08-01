@@ -229,7 +229,7 @@ function dd(){
 		tsGeneratedTypesDir: path.join(__dirname + '/'),
 		// watchSchema: true,
 		transactions: true,
-
+    schema: { public: 1, prostgles_test: 1 },
 		// DEBUG_MODE: true,
 		// onNotice: console.log,
 		tableConfig,
@@ -372,12 +372,12 @@ function dd(){
 				},
 
 				items4_pub: "*",
-				"*": {
+				[`"*"`]: {
 					select: { fields: { "*": 0 }},
 					insert: "*",
 					update: "*",
 				},
-				[`"*"`]: {
+				[`"""*"""`]: {
 					select: { fields: { [`"*"`]: 0 }},
 					insert: "*",
 					update: "*",
@@ -427,7 +427,9 @@ function dd(){
 							}
 						}]
 					}
-				}
+				},
+        "prostgles_test.basic": "*",
+        "prostgles_test.basic1": "*",
 			};
 			
 			return res;

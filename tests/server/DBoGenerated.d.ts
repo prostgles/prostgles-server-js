@@ -4,29 +4,8 @@
  /* SCHEMA DEFINITON. Table names have been altered to work with Typescript */
 /* DBO Definition */
 
+
 export type DBSchemaGenerated = {
-  "\"*\"": {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      "\"*\""?: null | string;
-      id?: number;
-    };
-  };
-  "*": {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      "*"?: null | string;
-      id?: number;
-    };
-  };
   ex_j_ins: {
     is_view: false;
     select: true;

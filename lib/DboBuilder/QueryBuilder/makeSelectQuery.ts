@@ -178,7 +178,7 @@ export function makeSelectQuery(
             }
             return s.getQuery() + " AS " + asName(s.alias)
       }).join(", ")
-    ,   `FROM ${asName(q.table)} `
+    ,   `FROM ${asName(q.table)}`
     ,   q.where
     ,   groupBy //!aggs.length? "" : `GROUP BY ${nonAggs.map(sf => asName(sf.alias)).join(", ")}`,
     ,   q.having? `HAVING ${q.having}` : ""
