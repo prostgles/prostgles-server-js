@@ -1,4 +1,5 @@
 import { SQLResult, asName } from "prostgles-types";
+import { tryCatch } from "prostgles-types/dist/util";
 import { DboBuilder, TableSchemaColumn, TableSchema } from "../DboBuilder";
 import { DB, DBorTx, ProstglesInitOptions } from "../Prostgles";
 
@@ -108,48 +109,65 @@ export const getSchemaFilter = (schema: ProstglesInitOptions["schema"] = { publi
   }
 }
 // TODO: Add a onSocketConnect timeout for this query. Reason: this query gets blocked by prostgles.app_triggers from PubSubManager.addTrigger in some cases (pg_dump locks that table)
-export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, schema: ProstglesInitOptions["schema"]): Promise<TableSchema[]> {
+export async function getTablesForSchemaPostgresSQL(
+  { db, runSQL }: DboBuilder, schema: ProstglesInitOptions["schema"]
+): Promise<{
+  result: TableSchema[];
+  durations: {
+      matv: number;
+      tvies: number;
+      fkeys: number;
+  };
+}> {
   const { sql, schemaNames } = getSchemaFilter(schema);
 
   return db.tx(async t => {
 
-    const fkeys: { 
-      oid: number;
-      ftable: string;
-      cols: string[];
-      fcols: string[];
-    }[] = await t.any(`
-    WITH pg_class_schema AS (
-      SELECT  c.oid, c.relname, nspname as schema
-          ,CASE WHEN current_schema() = nspname 
-            THEN format('%I', c.relname) 
-            ELSE format('%I.%I', nspname, c.relname) 
-          END as escaped_identifier
-      FROM pg_catalog.pg_class AS c
-      LEFT JOIN pg_catalog.pg_namespace AS ns
-        ON c.relnamespace = ns.oid
-      WHERE nspname ${sql}
-    ), fk AS (
-      SELECT conrelid as oid
-        , escaped_identifier as ftable
-        , array_agg(DISTINCT c1.attname::text) as cols
-        , array_agg(DISTINCT c2.attname::text) as fcols
-      FROM pg_catalog.pg_constraint c
-      INNER JOIN pg_class_schema pc
-        ON confrelid = pc.oid
-      LEFT JOIN pg_attribute c1
-      ON c1.attrelid = c.conrelid and ARRAY[c1.attnum] <@ c.conkey
-      LEFT JOIN pg_attribute c2
-      ON c2.attrelid = c.confrelid and ARRAY[c2.attnum] <@ c.confkey
-      WHERE contype = 'f'
-      GROUP BY conrelid, pc.escaped_identifier
-    )
-    SELECT * FROM  fk
-    `, { schemaNames });
+    const getFkeys = await tryCatch(async () => {
+
+      const fkeys: { 
+        oid: number;
+        ftable: string;
+        cols: string[];
+        fcols: string[];
+      }[] = await t.any(`
+      WITH pg_class_schema AS (
+        SELECT  c.oid, c.relname, nspname as schema
+            ,CASE WHEN current_schema() = nspname 
+              THEN format('%I', c.relname) 
+              ELSE format('%I.%I', nspname, c.relname) 
+            END as escaped_identifier
+        FROM pg_catalog.pg_class AS c
+        LEFT JOIN pg_catalog.pg_namespace AS ns
+          ON c.relnamespace = ns.oid
+        WHERE nspname ${sql}
+      ), fk AS (
+        SELECT conrelid as oid
+          , escaped_identifier as ftable
+          , array_agg(DISTINCT c1.attname::text) as cols
+          , array_agg(DISTINCT c2.attname::text) as fcols
+        FROM pg_catalog.pg_constraint c
+        INNER JOIN pg_class_schema pc
+          ON confrelid = pc.oid
+        LEFT JOIN pg_attribute c1
+        ON c1.attrelid = c.conrelid and ARRAY[c1.attnum] <@ c.conkey
+        LEFT JOIN pg_attribute c2
+        ON c2.attrelid = c.confrelid and ARRAY[c2.attnum] <@ c.confkey
+        WHERE contype = 'f'
+        GROUP BY conrelid, pc.escaped_identifier
+      )
+      SELECT * FROM  fk
+      `, { schemaNames });
+
+      return { fkeys };
+    });
+    if(getFkeys.error !== undefined){
+      throw getFkeys.error;
+    }
   
-    const badFkey = fkeys.find(r => r.fcols.includes(null as any));
+    const badFkey = getFkeys.fkeys!.find(r => r.fcols.includes(null as any));
     if(badFkey){
-      throw `Invalid table column schema. Null or empty fcols for ${JSON.stringify(fkeys)}`;
+      throw `Invalid table column schema. Null or empty fcols for ${JSON.stringify(getFkeys.fkeys)}`;
     }
     const query =
       `
@@ -258,18 +276,32 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
     GROUP BY t.table_schema, t.table_name, t.is_view, t.view_definition, vr.table_names , t.oid, cc.columns
     ORDER BY schema, name
       `;
-      
-    const tablesAndViews: TableSchema[] = await t.any(query, { schemaNames });
-    const materialViews = await getMaterialViews(t, schema);
 
-    let hyperTables: string[] | undefined = [];
-    try {
-      hyperTables = await getHyperTables(t);
-    } catch (error){
-      console.error(error);
+    const getTablesAndViews = await tryCatch(async () => {
+      const tablesAndViews: TableSchema[] = await t.any(query, { schemaNames });
+      return { tablesAndViews };
+    });
+    if(getTablesAndViews.error || !getTablesAndViews.tablesAndViews){
+      throw getTablesAndViews.error;
+    }
+      
+    const getMaterialViewsReq = await tryCatch(async () => {
+      const materialViews = await getMaterialViews(t, schema);
+      return { materialViews }
+    });
+    if(getMaterialViewsReq.error || !getMaterialViewsReq.materialViews){
+      throw getMaterialViewsReq.error;
+    }
+
+    const getHyperTablesReq = await tryCatch(async () => {
+      const hyperTables = await getHyperTables(t);
+      return { hyperTables };
+    });
+    if(getHyperTablesReq.error){
+      console.error(getHyperTablesReq.error);
     }
   
-    let result = tablesAndViews.concat(materialViews);
+    let result = getTablesAndViews.tablesAndViews.concat(getMaterialViewsReq.materialViews);
     result = await Promise.all(result
       .map(async tbl => {
         tbl.name = tbl.escaped_identifier;
@@ -277,7 +309,7 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
         tbl.privileges.insert = tbl.columns.some(c => c.privileges.some(p => p.privilege_type === "INSERT"));
         tbl.privileges.update = tbl.columns.some(c => c.privileges.some(p => p.privilege_type === "UPDATE"));
         tbl.columns = tbl.columns.map(c => {
-          const refs = fkeys.filter(fc => fc.oid === tbl.oid && fc.cols.includes(c.name));
+          const refs = getFkeys.fkeys!.filter(fc => fc.oid === tbl.oid && fc.cols.includes(c.name));
           if(refs.length) c.references = refs.map(_ref => {
             const ref = { ..._ref };
             //@ts-ignore
@@ -336,12 +368,22 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
         })//.slice(0).sort((a, b) => a.name.localeCompare(b.name))
         // .sort((a, b) => a.ordinal_position - b.ordinal_position)
   
-        tbl.isHyperTable = hyperTables?.includes(tbl.name);
+        tbl.isHyperTable = getHyperTablesReq.hyperTables?.includes(tbl.name);
   
         return tbl;
       }));
    
-    return result;
+    const res = {
+      result,
+      durations: {
+        matv: getMaterialViewsReq.duration,
+        tvies: getTablesAndViews.duration,
+        fkeys: getFkeys.duration,
+        getHyperTbls: getHyperTablesReq.duration,
+      }
+    };
+
+    return res;
   });
 }
 

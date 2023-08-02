@@ -628,7 +628,15 @@ export class DboBuilder {
   }
   async build(): Promise<DBHandlerServer> {
 
-    this.tablesOrViews = await getTablesForSchemaPostgresSQL(this, this.prostgles.opts.schema);
+    const start = Date.now();
+    const tablesOrViewsReq = await getTablesForSchemaPostgresSQL(this, this.prostgles.opts.schema);
+    await this.prostgles.opts.onLog?.({
+      type: "debug",
+      command: "DboBuilder.getTablesForSchemaPostgresSQL",
+      data: tablesOrViewsReq.durations,
+      duration: Date.now() - start,
+    })
+    this.tablesOrViews = tablesOrViewsReq.result;
 
     this.constraints = await getConstraints(this.db, this.prostgles.opts.schema);
     await this.parseJoins();
