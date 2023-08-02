@@ -63,10 +63,12 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       { name: "abc2", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
       { name: "abcd", public: "public data d", added: new Date('04 Dec 1996 00:12:00 GMT') }
     ]);
-    await db[`prostgles_test.basic1`].insert({
+    await db[`prostgles_test.basic1`].insert!({
       id_basic: { txt: "basic" },
       txt: "basic1"
     });
+    await db.sql(`REFRESH MATERIALIZED VIEW  prostgles_test.mv_basic1;`);
+    assert.deepStrictEqual(await db["prostgles_test.mv_basic1"].find!(), await db["prostgles_test.basic1"].find!())
     
     /* Ensure */
     await db[`"*"`].insert!([{ "*": "a" }, { "*": "a" }, { "*": "b" }]);

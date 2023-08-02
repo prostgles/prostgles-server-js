@@ -421,6 +421,7 @@ function dd(){
 				},
         "prostgles_test.basic": "*",
         "prostgles_test.basic1": "*",
+        "prostgles_test.mv_basic1": "*",
 			};
 			
 			return res;

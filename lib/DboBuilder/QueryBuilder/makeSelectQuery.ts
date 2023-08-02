@@ -18,7 +18,7 @@ export function makeSelectQuery(
       joins = q.joins || [],
       // aggs = q.aggs || [],
       getTableAlias = (q: NewQuery) => !q.tableAlias? q.table : `${q.tableAlias || ""}_${q.table}`,
-      getTableJoinAliasAsName = (joinAlias: string | undefined, table: string) => asName(!joinAlias? table : `${joinAlias || ""}_${table}`),
+      getTableJoinAliasAsName = (joinAlias: string | undefined, table: string) => !joinAlias? table : asName(`${joinAlias || ""}_${table}`),
       getTableAliasAsName = (q: NewQuery) => asName(getTableAlias(q));
 
   const indentLine = (numberOfSpaces: number, str: string, indentStr = "    "): string => new Array(numberOfSpaces).fill(indentStr).join("") + str;
@@ -178,7 +178,7 @@ export function makeSelectQuery(
             }
             return s.getQuery() + " AS " + asName(s.alias)
       }).join(", ")
-    ,   `FROM ${asName(q.table)}`
+    ,   `FROM ${q.table}`
     ,   q.where
     ,   groupBy //!aggs.length? "" : `GROUP BY ${nonAggs.map(sf => asName(sf.alias)).join(", ")}`,
     ,   q.having? `HAVING ${q.having}` : ""
@@ -236,7 +236,7 @@ export function makeSelectQuery(
 
         /** Apply LIMIT to joined items */
         const jsq = `json_agg(${j.jsonColName}::jsonb ORDER BY ${j.rowidSortedColName}) FILTER (WHERE ${j.limitColName} <= ${j.q.limit} AND ${j.rowidDupesColName} = 1 AND ${j.jsonColName} IS NOT NULL)`;
-        const resAlias = asName(j.q.tableAlias || j.q.table)
+        const resAlias = j.q.tableAlias? asName(j.q.tableAlias) : j.q.table
 
         /* If limit = 1 then return a single json object (first one) */
         return (j.q.limit === 1? `${jsq}->0 ` : `COALESCE(${jsq}, '[]') `) +  `  AS ${resAlias}`;
@@ -275,7 +275,7 @@ export function makeSelectQuery(
                   "-- 3. [source table] "
               ,   "SELECT "
               ,   "*, row_number() over() as ctid "
-              ,   `FROM ${asName(q.table)} `
+              ,   `FROM ${q.table} `
               ,   `${q.where} `
               ])
           ,   `) ${getTableAliasAsName(q)} `

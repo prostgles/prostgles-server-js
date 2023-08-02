@@ -193,3 +193,8 @@ CREATE TABLE IF NOT EXISTS prostgles_test.basic1 (
   id_basic  INTEGER REFERENCES prostgles_test.basic,
   txt       text
 );
+
+
+DROP MATERIALIZED VIEW IF EXISTS prostgles_test.mv_basic1;
+CREATE MATERIALIZED VIEW prostgles_test.mv_basic1 AS
+  SELECT * FROM prostgles_test.basic1;

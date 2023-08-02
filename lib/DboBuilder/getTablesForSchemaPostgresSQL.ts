@@ -1,8 +1,86 @@
 import { SQLResult, asName } from "prostgles-types";
 import { DboBuilder, TableSchemaColumn, TableSchema } from "../DboBuilder";
 import { DB, DBorTx, ProstglesInitOptions } from "../Prostgles";
-import { writeFileSync } from "fs";
-import { clone } from "../utils";
+
+const getMaterialViews = (db: DBorTx, schema: ProstglesInitOptions["schema"]) => {
+  const { sql, schemaNames } = getSchemaFilter(schema);
+
+  const query = `
+    SELECT 
+      c.oid,
+      schema,
+      escaped_identifier,
+      true as is_view,
+      true as is_mat_view,
+      obj_description(c.oid) as comment,
+      c.table_name as name,
+      definition as view_definition,
+      jsonb_build_object(
+        'insert', TRUE,
+        'select', TRUE,
+        'update', TRUE,
+        'delete', EXISTS (
+          SELECT 1 
+          FROM information_schema.role_table_grants rg
+          WHERE rg.table_name = c.table_name
+          AND rg.privilege_type = 'DELETE'
+        )
+      ) as privileges,
+      json_agg(json_build_object(
+        'name', column_name,
+        'table_oid', c.oid,
+        'is_pkey', false,
+        'data_type', data_type,
+        'udt_name', udt_name,
+        'element_udt_name',
+            CASE WHEN LEFT(udt_name, 1) = '_' 
+            THEN RIGHT(udt_name, -1) END,
+        'element_type',
+            CASE WHEN RIGHT(data_type, 2) = '[]' 
+            THEN LEFT(data_type, -2) END,
+        'is_nullable', nullable,
+        'references', null,
+        'has_default', false,
+        'column_default', null,
+        'is_updatable', false,
+        'privileges', $$[{ 
+          "privilege_type": "SELECT", 
+          "is_grantable": "YES" 
+        }]$$::jsonb
+      )) as columns
+    FROM pg_catalog.pg_matviews m
+    INNER JOIN (
+      SELECT 
+        t.oid,
+        CASE WHEN current_schema() = s.nspname 
+            THEN format('%I', t.relname) 
+            ELSE format('%I.%I', s.nspname, t.relname) 
+          END as escaped_identifier,
+        t.relname as table_name,
+        s.nspname as schema,
+        a.attname as column_name,
+        pg_catalog.format_type(a.atttypid, a.atttypmod) as data_type,
+        typname as udt_name,
+        a.attnotnull as nullable,
+        a.attnum as ordinal_position,
+        col_description(t.oid, attnum) as comment
+      FROM pg_catalog.pg_attribute a
+        JOIN pg_catalog.pg_class t on a.attrelid = t.oid
+        JOIN pg_catalog.pg_namespace s on t.relnamespace = s.oid
+        JOIN pg_catalog.pg_type pt ON pt.oid = a.atttypid
+      WHERE a.attnum > 0 
+        AND NOT a.attisdropped
+        AND relkind = 'm'
+      ORDER BY a.attnum
+    ) c
+    ON matviewname = table_name
+    AND schemaname = schema
+    WHERE schema ${sql}
+    GROUP BY c.oid, escaped_identifier, c.table_name, schema, definition
+  `;
+
+  return db.any(query, { schemaNames });
+}
 
 export const getSchemaFilter = (schema: ProstglesInitOptions["schema"] = { public: 1 }) => {
   const schemaNames = Object.keys(schema);
@@ -95,17 +173,6 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
       FROM (
         SELECT table_name, table_schema, table_type = 'VIEW' as is_view, regclass(table_schema || '.' || table_name)::oid as oid
         FROM information_schema.tables 
-  /* TODO - add support for materialized views
-        UNION ALL 
-        SELECT table_name, table_schema
-        FROM (
-          SELECT relname as table_name, nspname as table_schema, true as is_view
-          FROM pg_catalog.pg_class AS _c
-          JOIN pg_catalog.pg_namespace AS _ns
-            ON _c.relnamespace = _ns.oid 
-          WHERE relkind IN ( 'm' )
-        ) materialized_views
-  */
       ) tables_matviews
       WHERE table_schema ${sql}
     ) t  
@@ -179,10 +246,9 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
     ORDER BY schema, name
       `;
       
-    let result: TableSchema[] = await t.any(query, { schemaNames });
-    // writeFileSync(__dirname + "/old.json", JSON.stringify(await getTablesForSchemaPostgresSQLOld({ db, runSQL } as any), null, 2), "utf-8");
-    // writeFileSync(__dirname + "/new.json", JSON.stringify(result, null, 2), "utf-8");
-    // throw 2;
+    const tablesAndViews: TableSchema[] = await t.any(query, { schemaNames });
+    const materialViews = await getMaterialViews(t, schema);
+
     let hyperTables: string[] | undefined = [];
     try {
       hyperTables = await getHyperTables(t);
@@ -190,6 +256,7 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
       console.error(error);
     }
   
+    let result = tablesAndViews.concat(materialViews);
     result = await Promise.all(result
       .map(async tbl => {
         tbl.name = tbl.escaped_identifier;
