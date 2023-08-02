@@ -16,15 +16,10 @@ const getMaterialViews = (db: DBorTx, schema: ProstglesInitOptions["schema"]) =>
       c.table_name as name,
       definition as view_definition,
       jsonb_build_object(
-        'insert', TRUE,
+        'insert', FALSE,
         'select', TRUE,
-        'update', TRUE,
-        'delete', EXISTS (
-          SELECT 1 
-          FROM information_schema.role_table_grants rg
-          WHERE rg.table_name = c.table_name
-          AND rg.privilege_type = 'DELETE'
-        )
+        'update', FALSE,
+        'delete', FALSE
       ) as privileges,
       json_agg(json_build_object(
         'name', column_name,
@@ -79,6 +74,24 @@ const getMaterialViews = (db: DBorTx, schema: ProstglesInitOptions["schema"]) =>
     GROUP BY c.oid, escaped_identifier, c.table_name, schema, definition
   `;
 
+  /** TODO: check privileges 
+
+
+
+select 
+    coalesce(nullif(s[1], ''), 'public') as grantee, 
+    s[2] as privileges
+from 
+    pg_class c
+    join pg_namespace n on n.oid = relnamespace
+    join pg_roles r on r.oid = relowner,
+    unnest(coalesce(relacl::text[], format('{%s=arwdDxt/%s}', rolname, rolname)::text[])) acl, 
+    regexp_split_to_array(acl, '=|/') s
+where nspname = 'public' and relname = 'test_view';
+
+
+  */
+
   return db.any(query, { schemaNames });
 }
 
@@ -107,7 +120,7 @@ export async function getTablesForSchemaPostgresSQL({ db, runSQL }: DboBuilder, 
       fcols: string[];
     }[] = await t.any(`
     WITH pg_class_schema AS (
-      SELECT  c.*, nspname as schema
+      SELECT  c.oid, c.relname, nspname as schema
           ,CASE WHEN current_schema() = nspname 
             THEN format('%I', c.relname) 
             ELSE format('%I.%I', nspname, c.relname) 
