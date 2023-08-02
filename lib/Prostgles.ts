@@ -533,7 +533,12 @@ export class Prostgles {
    * Will re-create the dbo object
    */
   refreshDBO = async () => {
-    await this.opts.onLog?.({ type: "debug", command: "refreshDBO.start", duration: -1 });
+    await this.opts.onLog?.({ 
+      type: "debug", 
+      command: "refreshDBO.start", 
+      duration: -1, 
+      data: { work_mem: await this.db?.oneOrNone(`show work_mem;`) } 
+    });
     const now = Date.now();
     if (this._dboBuilder) {
       await this._dboBuilder.build();
