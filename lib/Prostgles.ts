@@ -28,6 +28,7 @@ import { Publish, PublishMethods, PublishParams, PublishParser } from "./Publish
 import { DBEventsManager } from "./DBEventsManager";
 
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
+export type DBorTx = DB | pgPromise.ITask<{}>
 type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 type DbConnectionOpts = pg.IDefaults;
 
@@ -756,7 +757,7 @@ export class Prostgles {
     const res = await tryCatch(async () => {
       const fileContent = await this.getFileText(filePath);//.then(console.log);
   
-      const success = await this.db?.multi(fileContent)
+      const result = await this.db?.multi(fileContent)
         .then((data) => {
           console.log("Prostgles: SQL file executed successfuly \n    -> " + filePath);
           return data;
@@ -776,7 +777,7 @@ export class Prostgles {
           console.error(errMsg, err);
           return Promise.reject(err);
         });
-      return { success }
+      return { success: result?.length }
     });
 
     await this.opts.onLog?.({ type: "debug", command: "runSQLFile", ...res });

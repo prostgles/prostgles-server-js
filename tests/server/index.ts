@@ -233,18 +233,12 @@ function dd(){
 		// DEBUG_MODE: true,
 		// onNotice: console.log,
     onLog: async ev => {
-      if(ev.type === "debug"){
+      if(ev.type === "debug" || ev.type === "connect" || ev.type === "disconnect"){
         log("onLog", ev);
       }
     },
 		tableConfig,
 		fileTable: {
-			// awsS3Config: {
-			//   accessKeyId: process.env.S3_KEY,
-			//   bucket: process.env.S3_BUCKET,
-			//   region: process.env.S3_REGION,
-			//   secretAccessKey: process.env.S3_SECRET,
-			// },
 			referencedTables: {
 				items_with_one_media: "one",
 				items_with_media: "many",
@@ -254,16 +248,8 @@ function dd(){
 			},
 			expressApp: app,
 		},
-
-		onSocketDisconnect:  ({ socket, db }) => {
-			log("onSocketDisconnect")
-			console.trace("onSocketDisconnect");
-			// const c: DBOFullyTyped<DBSchemaGenerated> = 1 as any;
-			// c["*"].
-		},
 		
 		onSocketConnect:  ({ socket, db }) => {
-			log("onSocketConnect")
 			if(clientTest){
 				log("Client connected -> CLIENT ERRORS ARE NOT LOGGED HERE!");
 				socket.emit("start-test", { server_id: Math.random() });

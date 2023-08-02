@@ -1,4 +1,4 @@
-import { asName, getKeys } from "prostgles-types";
+import { asName, getKeys, tryCatch } from "prostgles-types";
 import { canCreateTables } from "../DboBuilder/runSQL";
 import { TableHandler } from "../DboBuilder/TableHandler";
 import { Prostgles } from "../Prostgles";
@@ -21,21 +21,24 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
   // throw `this.db.tx(d => do everything in a transaction pls!!!!`;
 
   const canCreate = await canCreateTables(this.db);
-  const runQuery = (q: string): Promise<any[]> => {
-    if(!canCreate) throw "File table creation failed. Your postgres user does not have CREATE table privileges";
-    return this.db.any(`
-      ${q}
-    `);
-    /* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
+  const runQuery = async (q: string, debugInfo?: string): Promise<void> => {
+    const res = await tryCatch(async () => {
+      if(!canCreate) throw "File table creation failed. Your postgres user does not have CREATE table privileges";
+      await this.db.any(`
+        ${q}
+      `);
+      /* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
+    });
+    await this.prostgles?.opts.onLog?.({ type: "debug", command: "initFileManager.runQuery", ...res });
+    if(res.error) throw res.error;
   }
   /**
    * 1. Create media table
    */
   if(!this.dbo[tableName]){
-    
-    console.log(`Creating fileTable ${asName(tableName)} ...`);
-    await runQuery(`CREATE EXTENSION IF NOT EXISTS pgcrypto `);
-    await runQuery(`CREATE TABLE IF NOT EXISTS ${asName(tableName)} (
+    await runQuery(`
+      CREATE EXTENSION IF NOT EXISTS pgcrypto;
+      CREATE TABLE IF NOT EXISTS ${asName(tableName)} (
         name                  TEXT NOT NULL,
         extension             TEXT NOT NULL,
         content_type          TEXT NOT NULL,
@@ -53,8 +56,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
         deleted_from_storage  BIGINT,
         UNIQUE(id),
         UNIQUE(name)
-    )`);
-    console.log(`Created fileTable ${asName(tableName)}`);
+    )`, `Create fileTable ${asName(tableName)}`);
     await prg.refreshDBO();
   }
 
@@ -81,9 +83,8 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
             if(existingCol.udt_name === "uuid"){
               try {
                 const query = `ALTER TABLE ${asName(refTable)} ADD FOREIGN KEY (${asName(colName)}) REFERENCES ${asName(tableName)} (id);`;
-                console.log(`Referenced file column ${refTable} (${colName}) exists but is not referencing file table. Trying to add REFERENCE constraing...\n${query}`);
-                await runQuery(query);
-                console.log("SUCCESS: " + query);
+                const msg = `Referenced file column ${refTable} (${colName}) exists but is not referencing file table. Add REFERENCE constraint...\n${query}`;
+                await runQuery(query, msg);
               } catch(e){
                 console.error(`Could not add constraing. Err: ${e instanceof Error? e.message : JSON.stringify(e)}`)
               }
@@ -94,9 +95,8 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
         } else {
           try {
             const query = `ALTER TABLE ${asName(refTable)} ADD COLUMN ${asName(colName)} UUID REFERENCES ${asName(tableName)} (id);`
-            console.log(`Creating referenced file column ${refTable} (${colName})...\n${query}`);
-            await runQuery(query);
-            console.log("SUCCESS: " + query);
+            const msg = `Create referenced file column ${refTable} (${colName})...\n${query}`;
+            await runQuery(query, msg);
           } catch(e){
             console.error(`FAILED. Err: ${e instanceof Error? e.message : JSON.stringify(e)}`)
           }
@@ -124,20 +124,17 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
           media_id    UUID NOT NULL REFERENCES ${asName(tableName)}(id)
         )
         `;
-        console.log(`Creating ${action} ...`, lookupTableName);
+        
         await runQuery(query);
-        console.log(`Created ${action}`);
-
       } else {
         const cols = await this.dbo[lookupTableName]!.getColumns!();
         const badCols = cols.filter(c => !c.references);
         await Promise.all(badCols.map(async badCol => {
-          console.error(
-            `Prostgles: media ${lookupTableName} joining table has lost a reference constraint for column ${badCol.name}.` + 
-            ` This may have been caused by a DROP TABLE ... CASCADE.`
-          );
+          const msg =
+            `Trying to add the missing constraint back: media ${lookupTableName} joining table has lost a reference constraint for column ${badCol.name}.` + 
+            ` This may have been caused by a DROP TABLE ... CASCADE.`;
           let q = ` ALTER TABLE ${asName(lookupTableName)} ADD FOREIGN KEY (${badCol.name}) `;
-          console.log("Trying to add the missing constraint back");
+
           if(badCol.name === "foreign_id"){
             q += `REFERENCES ${asName(refTable)}(${asName(pkField.name)}) `;
           } else if(badCol.name === "media_id"){
@@ -147,9 +144,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
           if(q){
 
             try {
-              await runQuery(q)
-              console.log("Added missing constraint back");
-
+              await runQuery(q, msg);
             } catch(e){
               console.error("Failed to add missing constraint", e)
             }

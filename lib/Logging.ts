@@ -89,6 +89,7 @@ export namespace EventTypes {
     | "tableConfigurator.init.end"
     | "initFileTable.start"
     | "initFileTable.end"
+    | "initFileManager.runQuery"
     data?: AnyObject;
   }
 }

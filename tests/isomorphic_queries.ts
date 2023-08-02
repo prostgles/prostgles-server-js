@@ -194,7 +194,6 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       res, 
       expected
     );
-
     const resDynamic = await db.tr2.getColumns!("fr", { rule: "update", filter: {}, data: { t2: "a" } });
     assert.deepStrictEqual(
       resDynamic, 

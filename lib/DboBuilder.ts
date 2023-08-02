@@ -565,7 +565,8 @@ export class DboBuilder {
         if (it) throw "Incorrect join type for: " + JSON.stringify(it, null, 2) + expected_types;
 
       } catch (e) {
-        console.error("JOINS VALIDATION ERROR \n-> ", e);
+        const errMsg = ((_joins as any) === "inferred"? "INFERRED " : "") + "JOINS VALIDATION ERROR \n-> " + e;
+        throw errMsg;
       }
 
       // Make joins graph
