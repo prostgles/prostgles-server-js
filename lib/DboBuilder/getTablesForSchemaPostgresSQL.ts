@@ -312,13 +312,13 @@ export async function getTablesForSchemaPostgresSQL(
   
     let result = getTablesAndViews.tablesAndViews.concat(getMaterialViewsReq.materialViews);
     result = await Promise.all(result
-      .map(async tbl => {
-        tbl.name = tbl.escaped_identifier;
-        tbl.privileges.select = tbl.columns.some(c => c.privileges.SELECT);
-        tbl.privileges.insert = tbl.columns.some(c => c.privileges.INSERT);
-        tbl.privileges.update = tbl.columns.some(c => c.privileges.UPDATE);
-        tbl.columns = tbl.columns.map(c => {
-          const refs = getFkeys.fkeys!.filter(fc => fc.oid === tbl.oid && fc.cols.includes(c.name));
+      .map(async table => {
+        table.name = table.escaped_identifier;
+        table.privileges.select = table.columns.some(c => c.privileges.SELECT);
+        table.privileges.insert = table.columns.some(c => c.privileges.INSERT);
+        table.privileges.update = table.columns.some(c => c.privileges.UPDATE);
+        table.columns = table.columns.map(c => {
+          const refs = getFkeys.fkeys!.filter(fc => fc.oid === table.oid && fc.cols.includes(c.name));
           if(refs.length) c.references = refs.map(_ref => {
             const ref = { ..._ref };
             //@ts-ignore
@@ -330,9 +330,9 @@ export async function getTablesForSchemaPostgresSQL(
   
         /** Get view reference cols (based on parent table) */
         let viewFCols: Pick<TableSchemaColumn, "name" | "references">[] = [];
-        if(tbl.is_view){
+        if(table.is_view){
           try {
-            const view_definition = tbl.view_definition?.endsWith(";")? tbl.view_definition.slice(0, -1) : tbl.view_definition;
+            const view_definition = table.view_definition?.endsWith(";")? table.view_definition.slice(0, -1) : table.view_definition;
             const { fields } = await runSQL(`SELECT * FROM \n ( ${view_definition!} \n) t LIMIT 0`, {}, {}, undefined) as SQLResult<undefined>;
             const ftables = result.filter(r => fields.some(f => f.tableID === r.oid));
             ftables.forEach(ft => {
@@ -361,7 +361,7 @@ export async function getTablesForSchemaPostgresSQL(
           }
         }
   
-        tbl.columns = tbl.columns.map(col => {
+        table.columns = table.columns.map(col => {
           if (col.has_default) {
             /** Hide pkey default value */
             col.column_default = (col.udt_name !== "uuid" && !col.is_pkey && !col.column_default.startsWith("nextval(")) ? col.column_default : null;
@@ -374,12 +374,10 @@ export async function getTablesForSchemaPostgresSQL(
   
           return col;
   
-        })//.slice(0).sort((a, b) => a.name.localeCompare(b.name))
-        // .sort((a, b) => a.ordinal_position - b.ordinal_position)
+        });
+        table.isHyperTable = getHyperTablesReq.hyperTables?.includes(table.name);
   
-        tbl.isHyperTable = getHyperTablesReq.hyperTables?.includes(tbl.name);
-  
-        return tbl;
+        return table;
       }));
    
     const res = {

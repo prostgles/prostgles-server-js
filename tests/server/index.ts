@@ -234,7 +234,7 @@ function dd(){
 		// onNotice: console.log,
     onLog: async ev => {
       if(ev.type === "debug" || ev.type === "connect" || ev.type === "disconnect"){
-        log("onLog", ev);
+        // log("onLog", ev);
       }
     },
 		tableConfig,
