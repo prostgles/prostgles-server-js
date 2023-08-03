@@ -61,10 +61,10 @@ export async function getColumns(
 
         const label = c.comment || capitalizeFirstLetter(c.name, " ");
 
-        const select = c.privileges.some(p => p.privilege_type === "SELECT"),
-          insert = c.privileges.some(p => p.privilege_type === "INSERT"),
-          _delete = this.tableOrViewInfo.privileges.delete;
-        let update = c.privileges.some(p => p.privilege_type === "UPDATE");
+        const select = !!c.privileges.SELECT;
+        const insert = !!c.privileges.INSERT;
+        const _delete = !!this.tableOrViewInfo.privileges.delete;
+        let update = !!c.privileges.UPDATE;
 
         delete (c as any).privileges;
 

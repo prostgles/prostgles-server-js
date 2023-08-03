@@ -735,10 +735,7 @@ export class DboBuilder {
 }
 
 export type TableSchemaColumn = ColumnInfo & {
-  privileges: {
-    privilege_type: "INSERT" | "REFERENCES" | "SELECT" | "UPDATE";// | "DELETE";
-    is_grantable: "YES" | "NO"
-  }[];
+  privileges: Partial<Record<"INSERT" | "REFERENCES" | "SELECT" | "UPDATE", true>>;// | "DELETE";
 }
 
 /* UTILS */
