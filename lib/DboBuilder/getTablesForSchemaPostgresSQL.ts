@@ -227,6 +227,7 @@ export async function getTablesForSchemaPostgresSQL(
               ON c.table_name = cp.table_name AND c.column_name = cp.column_name
           ) ccc
           WHERE table_schema ${sql}
+          ORDER BY table_oid, ordinal_position
       `, { schemaNames });
 
       return { columns };
