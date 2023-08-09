@@ -152,7 +152,7 @@ export async function getTablesForSchemaPostgresSQL(
         LEFT JOIN pg_attribute c2
         ON c2.attrelid = c.confrelid and ARRAY[c2.attnum] <@ c.confkey
         WHERE contype = 'f'
-        GROUP BY conrelid, pc.escaped_identifier
+        GROUP BY conrelid,  conname, pc.escaped_identifier
       )
       SELECT * FROM  fk
       `, { schemaNames });
