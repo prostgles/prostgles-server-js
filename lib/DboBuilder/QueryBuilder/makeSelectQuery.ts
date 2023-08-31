@@ -15,135 +15,9 @@ export function makeSelectQuery(
   joinFields: string[] = [],
   selectParams: SelectParams = {},
 ): string {
-  const PREF = `prostgles`,
-    joins = q.joins || [],
-    // aggs = q.aggs || [],
-    getTableAlias = (q: NewQuery) => !q.tableAlias ? q.table : `${q.tableAlias || ""}_${q.table}`,
-    getTableJoinAliasAsName = (joinAlias: string | undefined, table: string) => !joinAlias ? table : asName(`${joinAlias || ""}_${table}`),
-    getTableAliasAsName = (q: NewQuery) => asName(getTableAlias(q));
+  const joins = q.joins || [];
 
-  const indentLine = (numberOfSpaces: number, str: string, indentStr = "    "): string => new Array(numberOfSpaces).fill(indentStr).join("") + str;
 
-  const indentLines = (numberOfSpaces: number, strArr: string[], indentStr = "    "): string[] => strArr.map(str => indentLine(numberOfSpaces, str, indentStr));
-
-  const indentLinesToString = (numberOfSpaces: number, strArr: string[], separator = " \n ", indentStr = "    ") => indentLines(numberOfSpaces, strArr, indentStr).join(separator);
-
-  const insertCommas = (strArr: string[]): string[] => strArr.map((s, i, arr) => s + (i < arr.length - 1 ? " , " : " "));
-
-  const getTableAliasPref = (q: NewQuery, str: string) => asName(`${q.tableAlias || q.table}_${PREF}_${str}`);
-
-  // const indent = (a, b) => a;
-  const joinTables = (q1: NewQuery, q2: NewQueryJoin): { t1Alias: string; t2Alias: string; query: string[]; rowidSortedColName: string; rowidDupesColName: string; jsonColName: string; limitColName: string; q: NewQuery } => {
-    const { paths } = _this.getJoins(q1.table, q2.table, q2.joinPath, true);
-
-    let rowidSortedColName = "";
-    let rowidDupesColName = "";
-    let jsonColName = "";
-    let t2Alias = "";
-    let limitColName = "";
-    const t1Alias = q.table;
-
-    const queries = paths.flatMap(({ table, on }, i): { query: string[]; prevTable: string; thisAlias: string; } => {
-      const getColName = (col: string, q: NewQuery) => {
-        if (table === q.table) {
-          const colFromSelect = q.select.find(s => s.getQuery() === asName(col));
-          if (!colFromSelect) {
-            console.error(`${col} column might be missing in user publish `);
-            throw `Could not find join column (${col}) in allowed select. Some join tables and columns might be invalid/dissallowed`
-          }
-          return colFromSelect.alias;
-        }
-
-        return col;
-      }
-
-      const getPrevColName = (col: string) => {
-        return getColName(col, q1);
-      }
-      const getThisColName = (col: string) => {
-        return getColName(col, q2);
-      }
-
-      // console.log(JSON.stringify({i, table, on, q1, q2}, null, 2));
-
-      const prevTable = i === 0 ? t1Alias : (paths[i - 1]!.table);
-      const thisAlias = getTableJoinAliasAsName(q2.tableAlias, table);
-
-      const prevAlias = i === 0 ? getTableAliasAsName(q1) : getTableJoinAliasAsName(q2.tableAlias, prevTable);
-
-      /* If root then prev table is aliased from root query. Alias from join otherwise  */
-      let iQ = [
-        asName(table) + ` ${thisAlias}`
-      ];
-
-      /* If target table then add filters, options, etc */
-      if (i === paths.length - 1) {
-
-        const targetSelect = q2.select.filter(s => s.selected).map(s => {
-          /* Rename aggs to avoid collision with join cols */
-          if (s.type === "aggregation") return asName(`agg_${s.alias}`) + " AS " + asName(s.alias);
-          return asName(s.alias);
-        }).concat(q2.joins?.map(j => asName(j.table)) ?? []).join(", ");
-
-        const leafSelect = makeSelectQuery(
-          _this,
-          q2,
-          depth + 1,
-          on.flatMap(cond => cond.map(([c1, c2]) => asName(c2))),
-          selectParams,
-        ).split("\n");
-
-        t2Alias = thisAlias;
-        rowidSortedColName = getTableAliasPref(q2, `rowid_sorted`);
-        rowidDupesColName = getTableAliasPref(q2, `dupes_rowid`);
-        limitColName = getTableAliasPref(q2, `limit`);
-        jsonColName = getTableAliasPref(q2, `json`);
-
-        iQ = [
-          "("
-          , ...indentLines(depth + 1, [
-            `-- 4. [target table] `
-            , `SELECT *,`
-            , `row_number() over() as ${rowidSortedColName},`
-            , `row_to_json((select x from (SELECT ${targetSelect}) as x)) AS ${jsonColName}`
-            , `FROM (`
-            , ...indentLines(depth + 2, leafSelect)
-            , `) ${asName(q2.table)}    `
-          ]),
-          `) ${thisAlias}`
-        ]
-      }
-
-      const getJoinCondition = (t1Alias: string, t2Alias: string, on: [string, string][][]) => {
-        return on.map(cond => cond.map(([c1, c2]) =>
-          `${t1Alias}.${asName(getPrevColName(c1))} = ${t2Alias}.${asName(getThisColName(c2))} `
-        ).join(" AND ")
-        ).join(" OR ")
-      }
-
-      const query: string[] = [
-        `${q2.isLeftJoin ? "LEFT" : "INNER"} JOIN `
-        , ...iQ
-        , `ON ${getJoinCondition(prevAlias, thisAlias, on)}`
-      ];
-      return { query, prevTable, thisAlias };
-    });
-
-    if(!jsonColName){
-      throw JSON.stringify({ msg: "q2 jsonColName missing", ...pickKeys(q2, ["table", "tableAlias"]), paths })
-    }
-
-    return { 
-      q: q2, 
-      query: queries.flatMap(q => q.query), 
-      t1Alias: q.table, 
-      t2Alias, 
-      rowidSortedColName: rowidSortedColName, 
-      jsonColName, 
-      rowidDupesColName, 
-      limitColName 
-    }
-  }
 
   const getGroupBy = (rootSelectItems: SelectItem[], groupByItems: SelectItem[]): string => {
     if (groupByItems.length) {
@@ -237,7 +111,7 @@ export function makeSelectQuery(
     rootGroupBy = `GROUP BY ${groupByItems.join(", ")} `
   }
 
-  const parsedJoins = joins.map(j => joinTables(q, j));
+  const parsedJoins = joins.map(j => joinTables(_this, {q1: q, q2: j, q, depth, selectParams }));
 
   /* Joined query */
   const joinedQuery = [
@@ -292,7 +166,7 @@ export function makeSelectQuery(
           , `${q.where} `
         ])
         , `) ${getTableAliasAsName(q)} `
-        , ...joins.flatMap((j, i) => joinTables(q, j).query)
+        , ...joins.flatMap((j, i) => joinTables(_this, { q1: q, q2: j, q , depth, selectParams }).query)
       ])
       , ") t1"
     ])
@@ -309,4 +183,133 @@ export function makeSelectQuery(
   // res = indent(res, depth);
   // console.log(res);
   return res;
+}
+
+const PREF = `prostgles` as const;
+const indentLine = (numberOfSpaces: number, str: string, indentStr = "    "): string => new Array(numberOfSpaces).fill(indentStr).join("") + str;
+const indentLines = (numberOfSpaces: number, strArr: string[], indentStr = "    "): string[] => strArr.map(str => indentLine(numberOfSpaces, str, indentStr));
+const indentLinesToString = (numberOfSpaces: number, strArr: string[], separator = " \n ", indentStr = "    ") => indentLines(numberOfSpaces, strArr, indentStr).join(separator);
+const insertCommas = (strArr: string[]): string[] => strArr.map((s, i, arr) => s + (i < arr.length - 1 ? " , " : " "));
+const getTableJoinAliasAsName = (joinAlias: string | undefined, table: string) => !joinAlias ? table : asName(`${joinAlias || ""}_${table}`);
+const getTableAlias = (q: NewQuery) => !q.tableAlias ? q.table : `${q.tableAlias || ""}_${q.table}`;
+const getTableAliasAsName = (q: NewQuery) => asName(getTableAlias(q));
+const getTableAliasPref = (q: NewQuery, str: string) => asName(`${q.tableAlias || q.table}_${PREF}_${str}`);
+
+type Args = {
+  q1: NewQuery;
+  q2: NewQueryJoin; 
+  q: NewQuery;
+  depth: number;
+  selectParams: SelectParams;
+}
+const joinTables = (_this: TableHandler, { q, q1, q2, depth, selectParams }: Args): { t1Alias: string; t2Alias: string; query: string[]; rowidSortedColName: string; rowidDupesColName: string; jsonColName: string; limitColName: string; q: NewQuery } => {
+  const { paths } = _this.getJoins(q1.table, q2.table, q2.joinPath, true);
+
+  let rowidSortedColName = "";
+  let rowidDupesColName = "";
+  let jsonColName = "";
+  let t2Alias = "";
+  let limitColName = "";
+  const t1Alias = q.table;
+
+  const queries = paths.flatMap(({ table, on }, i): { query: string[]; prevTable: string; thisAlias: string; } => {
+    const getColName = (col: string, q: NewQuery) => {
+      if (table === q.table) {
+        const colFromSelect = q.select.find(s => s.getQuery() === asName(col));
+        if (!colFromSelect) {
+          console.error(`${col} column might be missing in user publish `);
+          throw `Could not find join column (${col}) in allowed select. Some join tables and columns might be invalid/dissallowed`
+        }
+        return colFromSelect.alias;
+      }
+
+      return col;
+    }
+
+    const getPrevColName = (col: string) => {
+      return getColName(col, q1);
+    }
+    const getThisColName = (col: string) => {
+      return getColName(col, q2);
+    }
+
+    // console.log(JSON.stringify({i, table, on, q1, q2}, null, 2));
+
+    const prevTable = i === 0 ? t1Alias : (paths[i - 1]!.table);
+    const thisAlias = getTableJoinAliasAsName(q2.tableAlias, table);
+
+    const prevAlias = i === 0 ? getTableAliasAsName(q1) : getTableJoinAliasAsName(q2.tableAlias, prevTable);
+
+    /* If root then prev table is aliased from root query. Alias from join otherwise  */
+    let iQ = [
+      asName(table) + ` ${thisAlias}`
+    ];
+
+    /* If target table then add filters, options, etc */
+    if (i === paths.length - 1) {
+
+      const targetSelect = q2.select.filter(s => s.selected).map(s => {
+        /* Rename aggs to avoid collision with join cols */
+        if (s.type === "aggregation") return asName(`agg_${s.alias}`) + " AS " + asName(s.alias);
+        return asName(s.alias);
+      }).concat(q2.joins?.map(j => asName(j.table)) ?? []).join(", ");
+
+      const leafSelect = makeSelectQuery(
+        _this,
+        q2,
+        depth + 1,
+        on.flatMap(cond => cond.map(([c1, c2]) => asName(c2))),
+        selectParams,
+      ).split("\n");
+
+      t2Alias = thisAlias;
+      rowidSortedColName = getTableAliasPref(q2, `rowid_sorted`);
+      rowidDupesColName = getTableAliasPref(q2, `dupes_rowid`);
+      limitColName = getTableAliasPref(q2, `limit`);
+      jsonColName = getTableAliasPref(q2, `json`);
+
+      iQ = [
+        "("
+        , ...indentLines(depth + 1, [
+          `-- 4. [target table] `
+          , `SELECT *,`
+          , `row_number() over() as ${rowidSortedColName},`
+          , `row_to_json((select x from (SELECT ${targetSelect}) as x)) AS ${jsonColName}`
+          , `FROM (`
+          , ...indentLines(depth + 2, leafSelect)
+          , `) ${asName(q2.table)}    `
+        ]),
+        `) ${thisAlias}`
+      ]
+    }
+
+    const getJoinCondition = (t1Alias: string, t2Alias: string, on: [string, string][][]) => {
+      return on.map(cond => cond.map(([c1, c2]) =>
+        `${t1Alias}.${asName(getPrevColName(c1))} = ${t2Alias}.${asName(getThisColName(c2))} `
+      ).join(" AND ")
+      ).join(" OR ")
+    }
+
+    const query: string[] = [
+      `${q2.isLeftJoin ? "LEFT" : "INNER"} JOIN `
+      , ...iQ
+      , `ON ${getJoinCondition(prevAlias, thisAlias, on)}`
+    ];
+    return { query, prevTable, thisAlias };
+  });
+
+  if(!jsonColName){
+    throw JSON.stringify({ msg: "q2 jsonColName missing", ...pickKeys(q2, ["table", "tableAlias"]), paths })
+  }
+
+  return { 
+    q: q2, 
+    query: queries.flatMap(q => q.query), 
+    t1Alias: q.table, 
+    t2Alias, 
+    rowidSortedColName: rowidSortedColName, 
+    jsonColName, 
+    rowidDupesColName, 
+    limitColName 
+  }
 }

@@ -371,7 +371,7 @@ const DEFAULT_KEYWORDS = {
 import * as fs from 'fs';
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { ColConstraint } from "./TableConfig/getConstraintDefinitionQueries";
-import { ViewHandler } from "./DboBuilder/ViewHandler/ViewHandler";
+import { parseFieldFilter } from "./DboBuilder/ViewHandler/parseFieldFilter";
 import { EventInfo } from "./Logging";
 
 export class Prostgles {
@@ -862,7 +862,7 @@ export class Prostgles {
             const valid_table_command_rules = await this.publishParser.getValidatedRequestRule({ tableName, command, localParams: { socket } }, clientInfo);
             if (valid_table_command_rules) {
               const sessionUser: UserLike | undefined = !clientInfo?.user? undefined : {
-                ...ViewHandler._parseFieldFilter(clientInfo.sessionFields ?? [], false, getKeys(clientInfo.user)),
+                ...parseFieldFilter(clientInfo.sessionFields ?? [], false, getKeys(clientInfo.user)),
                 ...pickKeys(clientInfo.user, ["id", "type"]) as UserLike,
               }
               const res = await this.dbo[tableName]![command]!(param1, param2, param3, valid_table_command_rules, { socket, isRemoteRequest: { user: sessionUser } });

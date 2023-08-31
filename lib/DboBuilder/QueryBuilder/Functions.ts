@@ -2,6 +2,7 @@ import { asName, ColumnInfo, isEmpty, isObject, PG_COLUMN_UDT_DATA_TYPE, TextFil
 import { isPlainObject, pgp, postgresToTsType } from "../../DboBuilder";
 import { ViewHandler } from "../ViewHandler/ViewHandler";
 import { asNameAlias } from "./QueryBuilder";
+import { parseFieldFilter } from "../ViewHandler/parseFieldFilter";
 
 export const parseFunction = (funcData: { func: string | FunctionSpec, args: any[],  functions: FunctionSpec[]; allowedFields: string[]; }): FunctionSpec => {
   const { func, args, functions, allowedFields } = funcData;
@@ -864,7 +865,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     getFields: (args: any[]) => args[0],
     getQuery: ({ allowedFields, args, tableAlias, allColumns }) => {
 
-      const cols = ViewHandler._parseFieldFilter(args[0], false, allowedFields);
+      const cols = parseFieldFilter(args[0], false, allowedFields);
       let term = args[1];
       const rawTerm = args[1];
       const { edgeTruncate, noFields = false, returnType, matchCase = false } = args[2] || {};

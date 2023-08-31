@@ -78,10 +78,8 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
     return runQueryReturnType(queryWithRLS, returnType, this, localParams);
 
   } catch (e) {
-    // console.trace(e)
     if (localParams && localParams.testRule) throw e;
     throw parseError(e, `dbo.${this.name}.find()`);
-    // throw { err: parseError(e), msg: `Issue with dbo.${this.name}.find()`, args: { filter, selectParams} };
   }
 }
 

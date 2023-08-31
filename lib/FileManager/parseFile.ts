@@ -1,6 +1,7 @@
 import { ALLOWED_CONTENT_TYPE, ALLOWED_EXTENSION, CONTENT_TYPE_TO_EXT, getKeys, isObject } from "prostgles-types";
 import { ViewHandler } from "../DboBuilder/ViewHandler/ViewHandler";
 import { FileManager, getFileType, getFileTypeFromFilename } from "./FileManager";
+import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
 
 type Args = {
   file: Buffer | string;
@@ -43,20 +44,20 @@ export async function parseFile(this: FileManager, args: Args): Promise<{
           "text",
           "application",
         ];
-        const allowedContent = ViewHandler._parseFieldFilter(colConfig.acceptedContent, false, CONTENTS);
+        const allowedContent = parseFieldFilter(colConfig.acceptedContent, false, CONTENTS);
         if(!allowedContent.some(c => mime.mime.startsWith(c))){
           throw new Error(`Dissallowed content type provided: ${mime.mime.split("/")[0]}. Allowed content types: ${allowedContent} `)
         }
       } else if("acceptedContentType" in colConfig && colConfig.acceptedContentType && colConfig.acceptedContentType !== "*"){
         const mime = await getFileType(buffer, fileName);
-        const allowedContentTypes = ViewHandler._parseFieldFilter(colConfig.acceptedContentType, false, getKeys(CONTENT_TYPE_TO_EXT));
+        const allowedContentTypes = parseFieldFilter(colConfig.acceptedContentType, false, getKeys(CONTENT_TYPE_TO_EXT));
         
         if(!allowedContentTypes.some(c => c === mime.mime)){
           throw new Error(`Dissallowed MIME provided: ${mime.mime}. Allowed MIME values: ${allowedContentTypes} `)
         }
       } else if("acceptedFileTypes" in colConfig && colConfig.acceptedFileTypes && colConfig.acceptedFileTypes !== "*"){
         const mime = await getFileType(buffer, fileName);
-        const allowedExtensions = ViewHandler._parseFieldFilter(colConfig.acceptedFileTypes, false, Object.values(CONTENT_TYPE_TO_EXT).flat());
+        const allowedExtensions = parseFieldFilter(colConfig.acceptedFileTypes, false, Object.values(CONTENT_TYPE_TO_EXT).flat());
         
         if(!allowedExtensions.some(c => c === mime.ext)){
           throw new Error(`Dissallowed extension provided: ${mime.ext}. Allowed extension values: ${allowedExtensions} `)

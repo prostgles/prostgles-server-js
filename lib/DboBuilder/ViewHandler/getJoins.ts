@@ -1,9 +1,11 @@
 import { JoinPath, getKeys } from "prostgles-types";
-import { JoinPaths, ViewHandler } from "./ViewHandler";
+import { ViewHandler } from "./ViewHandler";
 import { JoinInfo } from "../../DboBuilder";
 
+/**
+ * Returns all tables and fields required to join from source table to target table
+ */
 export function getJoins(this: ViewHandler, source: string, target: string, path?: JoinPath, checkTableConfig?: boolean): JoinInfo {
-  // const paths: JoinInfo["paths"] = [];
 
   if (!this.joinPaths) throw `${source} - ${target} Join info missing or dissallowed`;
 
@@ -15,15 +17,16 @@ export function getJoins(this: ViewHandler, source: string, target: string, path
     if (tableConfigJoinInfo) return tableConfigJoinInfo;
   }
 
-  let jp: {
+  let joinInfo: {
     t1: string;
     t2: string;
     path: JoinPath;
   } | undefined;
+
   if (!path) {
     const _jp = this.joinPaths.find(j => j.t1 === source && j.t2 === target);
     if(_jp){
-      jp = {
+      joinInfo = {
         ..._jp,
         path: _jp.path.map(table => ({ table }))
       }
@@ -31,12 +34,13 @@ export function getJoins(this: ViewHandler, source: string, target: string, path
       _jp.path.map(table => ({ table }))
     }
   } else {
-    jp = {
+    joinInfo = {
       t1: source,
       t2: target,
       path
     }
   }
+
   /* Self join */
   if (source === target) {
     const tableHandler = this.dboBuilder.tablesOrViews?.find(t => t.name === source);
@@ -56,35 +60,40 @@ export function getJoins(this: ViewHandler, source: string, target: string, path
       // }
     }
   }
-  if (!jp || !this.joinPaths.find(j => path ? j.path.join() === path.join() : j.t1 === source && j.t2 === target)) {
+  if (!joinInfo || !this.joinPaths.find(j => path ? j.path.join() === path.join() : j.t1 === source && j.t2 === target)) {
     throw `Joining ${source} <-...-> ${target} dissallowed or missing`;
   }
 
   /* Make the join chain info */
-  const paths: JoinInfo["paths"] = (path || jp.path).map((t2, i, arr) => {
-    const t1 = i === 0 ? source : arr[i - 1]!.table;
+  const paths: JoinInfo["paths"] = (path || joinInfo.path).map((tablePath, i, arr) => {
+    const prevTable = arr[i - 1]!;
+    const t1 = i === 0 ? source : prevTable.table;
 
     this.joins ??= this.dboBuilder.joins;
 
     /* Get join options */
-    const jo = this.joins.find(j => j.tables.includes(t1) && j.tables.includes(t2.table));
-    if (!jo) throw `Joining ${t1} <-> ${t2} dissallowed or missing`;
+    const join = this.joins.find(j => j.tables.includes(t1) && j.tables.includes(tablePath.table));
+    if (!join) throw `Joining ${t1} <-> ${tablePath} dissallowed or missing`;
 
     const on: [string, string][][] = [];
 
-    jo.on.map(cond => {
+    join.on.map(cond => {
       const condArr: [string, string][] = [];
-      getKeys(cond).map(leftKey => {
-        const rightKey = cond[leftKey]!;
+      Object.entries(cond).forEach(([leftKey, rightKey]) => {
 
-        /* Left table is joining on keys */
-        if (jo.tables[0] === t1) {
-          condArr.push([leftKey, rightKey])
+        const checkIfOnSpecified = (fields: [l: string, r: string], isLtr: boolean) => {
+          if(tablePath.on){
+            return Object.entries(tablePath.on).some(on => (isLtr? on : on.slice(0).reverse()).join() === fields.join())
+          }
 
-          /* Left table is joining on values */
-        } else {
-          condArr.push([rightKey, leftKey])
+          return true;
+        }
 
+        /* Left table is joining on keys OR Left table is joining on values */
+        const isLtr = join.tables[0] === t1;
+        const fields: [string, string] = isLtr? [leftKey, rightKey] : [rightKey, leftKey];
+        if(checkIfOnSpecified(fields, isLtr)){
+          condArr.push(fields)
         }
       });
       on.push(condArr);
@@ -94,7 +103,7 @@ export function getJoins(this: ViewHandler, source: string, target: string, path
     return {
       source,
       target,
-      table: t2.table,
+      table: tablePath.table,
       on
     };
   });

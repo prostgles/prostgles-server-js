@@ -5,19 +5,23 @@ import { JoinPaths } from "./ViewHandler/ViewHandler";
 
 export async function parseJoins(this: DboBuilder): Promise<JoinPaths> {
   if (this.prostgles.opts.joins) {
-    let _joins = await this.prostgles.opts.joins;
-    if (!this.tablesOrViews) throw new Error("Could not create join config. this.tablesOrViews missing");
-    const inferredJoins = await getInferredJoins2(this.tablesOrViews);
-    if (_joins === "inferred") {
-      _joins = inferredJoins
-      /* If joins are specified then include inferred joins except the explicit tables */
-    } else if (Array.isArray(_joins)) {
-      const joinTables = _joins.map(j => j.tables).flat();
-      _joins = _joins.concat(inferredJoins.filter(j => !j.tables.find(t => joinTables.includes(t))))
-    } else if (_joins) {
-      throw new Error("Unexpected joins init param. Expecting 'inferred' OR joinConfig but got: " + JSON.stringify(_joins))
+
+    let joinConfig = await this.prostgles.opts.joins;
+    if (!this.tablesOrViews) {
+      throw new Error("Could not create join config. this.tablesOrViews missing");
     }
-    const joins = JSON.parse(JSON.stringify(_joins)) as Join[];
+
+    const inferredJoins = await getInferredJoins2(this.tablesOrViews);
+    if (joinConfig === "inferred") {
+      joinConfig = inferredJoins
+      /* If joins are specified then include inferred joins except the explicit tables */
+    } else if (Array.isArray(joinConfig)) {
+      const joinTables = joinConfig.map(j => j.tables).flat();
+      joinConfig = joinConfig.concat(inferredJoins.filter(j => !j.tables.find(t => joinTables.includes(t))))
+    } else if (joinConfig) {
+      throw new Error("Unexpected joins init param. Expecting 'inferred' OR joinConfig but got: " + JSON.stringify(joinConfig))
+    }
+    const joins = JSON.parse(JSON.stringify(joinConfig)) as Join[];
     this.joins = joins;
 
     // Validate joins
@@ -61,7 +65,7 @@ export async function parseJoins(this: DboBuilder): Promise<JoinPaths> {
       if (it) throw "Incorrect join type for: " + JSON.stringify(it, null, 2) + expected_types;
 
     } catch (e) {
-      const errMsg = ((_joins as any) === "inferred"? "INFERRED " : "") + "JOINS VALIDATION ERROR \n-> " + e;
+      const errMsg = ((joinConfig as any) === "inferred"? "INFERRED " : "") + "JOINS VALIDATION ERROR \n-> " + e;
       throw errMsg;
     }
 
