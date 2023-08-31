@@ -1,6 +1,6 @@
 import { asName, ColumnInfo, isEmpty, isObject, PG_COLUMN_UDT_DATA_TYPE, TextFilter_FullTextSearchFilterKeys } from "prostgles-types";
 import { isPlainObject, pgp, postgresToTsType } from "../../DboBuilder";
-import { ViewHandler } from "../ViewHandler";
+import { ViewHandler } from "../ViewHandler/ViewHandler";
 import { asNameAlias } from "./QueryBuilder";
 
 export const parseFunction = (funcData: { func: string | FunctionSpec, args: any[],  functions: FunctionSpec[]; allowedFields: string[]; }): FunctionSpec => {

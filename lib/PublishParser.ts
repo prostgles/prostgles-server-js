@@ -100,7 +100,7 @@ const RULE_TO_METHODS = [
 import { FieldFilter, SelectParams } from "prostgles-types";
 import { DEFAULT_SYNC_BATCH_SIZE } from "./PubSubManager/PubSubManager";
 import { TableHandler } from "./DboBuilder/TableHandler";
-import { ViewHandler } from "./DboBuilder/ViewHandler";
+import { ViewHandler } from "./DboBuilder/ViewHandler/ViewHandler";
 
 export type InsertRequestData = {
   data: object | object[]

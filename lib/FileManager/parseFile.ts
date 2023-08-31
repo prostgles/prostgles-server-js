@@ -1,5 +1,5 @@
 import { ALLOWED_CONTENT_TYPE, ALLOWED_EXTENSION, CONTENT_TYPE_TO_EXT, getKeys, isObject } from "prostgles-types";
-import { ViewHandler } from "../DboBuilder/ViewHandler";
+import { ViewHandler } from "../DboBuilder/ViewHandler/ViewHandler";
 import { FileManager, getFileType, getFileTypeFromFilename } from "./FileManager";
 
 type Args = {

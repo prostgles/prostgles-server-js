@@ -3,7 +3,7 @@ import { ExistsFilterConfig, Filter, LocalParams, makeErrorFromPGError } from ".
 import { TableRule } from "../PublishParser";
 import { log, ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
 import { NewQuery } from "./QueryBuilder/QueryBuilder";
-import { ViewHandler } from "./ViewHandler";
+import { ViewHandler } from "./ViewHandler/ViewHandler";
 
 type Args = {
   selectParams: Omit<SubscribeParams, "throttle">;
@@ -147,7 +147,7 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { selectParam
             filter: {
               $existsJoined: {
 
-                [[this.name, ...j.$path ?? [].slice(0).reverse()].join(".")]: nonExistsFilter
+                [[this.name, ...j.joinPath ?? [].slice(0).reverse()].join(".")]: nonExistsFilter
               }
             },
             addKeywords: false,

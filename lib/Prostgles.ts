@@ -371,7 +371,7 @@ const DEFAULT_KEYWORDS = {
 import * as fs from 'fs';
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { ColConstraint } from "./TableConfig/getConstraintDefinitionQueries";
-import { ViewHandler } from "./DboBuilder/ViewHandler";
+import { ViewHandler } from "./DboBuilder/ViewHandler/ViewHandler";
 import { EventInfo } from "./Logging";
 
 export class Prostgles {
@@ -490,7 +490,9 @@ export class Prostgles {
 
   getTSFileName() {
     const fileName = "DBoGenerated.d.ts" //`dbo_${this.schema}_types.ts`;
-    const fullPath = (this.opts.tsGeneratedTypesDir || "") + fileName;
+    const _dir = (this.opts.tsGeneratedTypesDir || "");
+    const dir = _dir.endsWith("/")? _dir : `${_dir}/`;
+    const fullPath = dir + fileName;
     return { fileName, fullPath }
   }
 

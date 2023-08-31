@@ -8,7 +8,7 @@ import { insert } from "./insert";
 import { insertDataParse } from "./insertDataParse";
 import { SelectItem, SelectItemBuilder } from "./QueryBuilder/QueryBuilder";
 import { update } from "./update";
-import { JoinPaths, ViewHandler } from "./ViewHandler";
+import { JoinPaths, ViewHandler } from "./ViewHandler/ViewHandler";
 import { parseUpdateRules } from "./parseUpdateRules";
 import { COMPUTED_FIELDS, FUNCTIONS } from "./QueryBuilder/Functions";
 

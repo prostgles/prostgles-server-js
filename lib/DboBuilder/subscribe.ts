@@ -2,7 +2,7 @@ import { AnyObject, SubscribeParams, SubscriptionChannels } from "prostgles-type
 import { Filter, LocalParams, parseError } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 import { omitKeys } from "../PubSubManager/PubSubManager"; 
-import { ViewHandler } from "./ViewHandler";
+import { ViewHandler } from "./ViewHandler/ViewHandler";
 import { getSubscribeRelatedTables } from "./getSubscribeRelatedTables";
 
 type OnData = (items: AnyObject[]) => any; 

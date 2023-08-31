@@ -5,7 +5,7 @@ import {
 import { isPlainObject, LocalParams, parseError, postgresToTsType } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 import { TableHandler } from "./TableHandler";
-import { ViewHandler } from "./ViewHandler";
+import { ViewHandler } from "./ViewHandler/ViewHandler";
 
 export const isTableHandler = (v: any): v is TableHandler => "parseUpdateRules" in v;
 

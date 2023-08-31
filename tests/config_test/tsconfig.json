@@ -9,6 +9,7 @@
 		"allowJs": true,
 		"module": "commonjs",
 		"sourceMap": true,
+    "skipLibCheck": true
 		// "rootDir": ".",
 		// "declaration": true,
 		// "declarationMap": true,

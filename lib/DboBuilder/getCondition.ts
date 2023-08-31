@@ -4,7 +4,7 @@ import { TableRule } from "../PublishParser";
 import { asValue } from "../PubSubManager/PubSubManager";
 import { FUNCTIONS, parseFunction } from "./QueryBuilder/Functions";
 import { asNameAlias, parseFunctionObject, SelectItem } from "./QueryBuilder/QueryBuilder";
-import { ViewHandler } from "./ViewHandler";
+import { ViewHandler } from "./ViewHandler/ViewHandler";
 import { parseFilterItem } from "../Filtering";
 
 
@@ -115,7 +115,7 @@ export async function getCondition(
 
   let existsCond = "";
   if (exists.length) {
-    existsCond = (await Promise.all(exists.map(async k => await this.prepareExistCondition(k, localParams)))).join(" AND ");
+    existsCond = (await Promise.all(exists.map(async k => await this.getExistsCondition(k, localParams)))).join(" AND ");
   }
 
   /* Computed field queries */

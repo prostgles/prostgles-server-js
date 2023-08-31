@@ -5,8 +5,8 @@ import { makeSelectQuery } from "../DboBuilder/QueryBuilder/makeSelectQuery";
 import { canRunSQL } from "../DboBuilder/runSQL";
 import { TableRule } from "../PublishParser";
 import { TableHandler } from "./TableHandler";
-import { getNewQuery } from "./QueryBuilder/QueryBuilder";
-import { ViewHandler } from "./ViewHandler";
+import { getNewQuery } from "./QueryBuilder/getNewQuery";
+import { ViewHandler } from "./ViewHandler/ViewHandler";
 
 export const find = async function(this: ViewHandler, filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]> {
   try {
@@ -39,8 +39,23 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
       if (maxLimit && !Number.isInteger(maxLimit)) throw ` invalid publish.${this.name}.select.maxLimit -> expecting integer but got ` + maxLimit;
     }
 
-    const q = await getNewQuery(this as unknown as TableHandler, filter, selectParams, param3_unused, tableRules, localParams, this.columns);
-    const queryWithoutRLS = makeSelectQuery(this as unknown as TableHandler, q, undefined, undefined, selectParams);
+    const q = await getNewQuery(
+      this as unknown as TableHandler, 
+      filter, 
+      selectParams, 
+      param3_unused, 
+      tableRules, 
+      localParams, 
+      this.columns
+    );
+
+    const queryWithoutRLS = makeSelectQuery(
+      this as unknown as TableHandler, 
+      q, 
+      undefined, 
+      undefined, 
+      selectParams
+    );
 
     const queryWithRLS = withUserRLS(localParams, queryWithoutRLS);
     // console.log(_query, JSON.stringify(q, null, 2))
