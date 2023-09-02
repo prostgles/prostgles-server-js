@@ -1,9 +1,8 @@
-import { AnyObject, EXISTS_KEY, EXISTS_KEYS, FieldFilter, JoinPath, asName } from "prostgles-types";
-import { ExistsFilterConfig, JoinInfo, LocalParams } from "../../DboBuilder";
+import { AnyObject, EXISTS_KEY, EXISTS_KEYS, FieldFilter, asName } from "prostgles-types";
+import { LocalParams, ExistsFilterConfig } from "../../DboBuilder";
 import { ViewHandler } from "./ViewHandler";
 import { TableRule } from "../../PublishParser";
 import { TableHandler } from "../TableHandler";
-import { parseJoinPath } from "./parseJoinPath";
 import { getTableJoinQuery } from "./getTableJoinQuery";
 
 
@@ -12,15 +11,7 @@ export async function getExistsCondition(this: ViewHandler, eConfig: ExistsFilte
   const thisTable = this.name;
   const isNotExists = ["$notExists", "$notExistsJoined"].includes(eConfig.existType);
 
-  const { targetTableFilter, tables, isJoined, shortestJoin } = eConfig;
-  const targetTable = tables.at(-1)!;
-
-  /** Check if join tables are valid */
-  tables.forEach(t => {
-    if (!this.dboBuilder.dbo[t]) {
-      throw { stack: ["prepareExistCondition()"], message: `Invalid or dissallowed table: ${t}` };
-    }
-  });
+  const { targetTableFilter } = eConfig;
 
   /* Nested $exists is not allowed */
   if (targetTableFilter && Object.keys(targetTableFilter).find(fk => EXISTS_KEYS.includes(fk as EXISTS_KEY))) {
@@ -36,6 +27,7 @@ export async function getExistsCondition(this: ViewHandler, eConfig: ExistsFilte
   if (localParams?.isRemoteRequest && !localParams?.socket && !localParams?.httpReq) {
     throw "Unexpected: localParams isRemoteRequest and missing socket/httpReq: ";
   }
+  const targetTable = eConfig.isJoined?  eConfig.parsedPath.at(-1)!.table : eConfig.targetTable;
   if ((localParams?.socket || localParams?.httpReq) && this.dboBuilder.publishParser) {
 
     t2Rules = await this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ 
@@ -65,11 +57,9 @@ export async function getExistsCondition(this: ViewHandler, eConfig: ExistsFilte
     `${finalWhere ? `WHERE ${finalWhere}` : ""}`
   ].join("\n");
 
-  if(isJoined){
-    
-    const joinPath = parseJoinPath({ rootTable: thisTable, path: shortestJoin? ["**", ...tables] : tables, viewHandler: this });
+  if(eConfig.isJoined){
     const { query } = getTableJoinQuery({
-      path: joinPath,
+      path: eConfig.parsedPath,
       aliasSufix: "jd",
       rootTableAlias: thisTable,
       type: "EXISTS",
@@ -81,50 +71,3 @@ export async function getExistsCondition(this: ViewHandler, eConfig: ExistsFilte
   return `${isNotExists ? " NOT " : " "} EXISTS ( \n${innerQuery} \n) `;
 
 }
-
-type Args = {
-  joinInfo: JoinInfo;
-  joinPathIndex?: number;
-  thisTable: string;
-  finalFilter: string;
-}
-// const getJoinQuery = (args: Args): string => {
-//   const { joinInfo, joinPathIndex = 0, thisTable, finalFilter } = args;
-
-//   const { paths } = joinInfo;
-//   const joinPath = paths[joinPathIndex];
-//   if (!joinPath) throw "joinPath undefined";
-
-//   const table = joinPath.table;
-//   const tableAlias = asName(joinPathIndex < paths.length - 1 ? `jd${joinPathIndex}` : table);
-//   const prevTableAlias = asName(joinPathIndex ? `jd${joinPathIndex - 1}` : thisTable);
-
-//   const cond = joinPath.on.map(c => {
-//     return c.map(([c1, c2]) => 
-//       `${prevTableAlias}.${asName(c1)} = ${tableAlias}.${asName(c2)}`
-//     ).join(" AND ")
-//   }).join("\n OR ");
-
-//   const isLastJoin = joinPathIndex === paths.length - 1
-//   let joinQuery = `SELECT 1 \n` +
-//     `FROM ${asName(table)} ${tableAlias} \n` +
-//     `WHERE (${cond}) \n`;
-//   if (
-//     isLastJoin &&
-//     finalFilter
-//   ) {
-//     joinQuery += `AND ${finalFilter} \n`;
-//   }
-
-//   const indent = (a: any, _b: any) => a;
-
-//   if (!isLastJoin) {
-//     joinQuery += `AND ${getJoinQuery({ 
-//       ...args,
-//       joinPathIndex: joinPathIndex + 1
-//     })} \n`
-//   }
-
-//   joinQuery = indent(joinQuery, joinPathIndex + 1);
-//   return joinQuery;
-// }

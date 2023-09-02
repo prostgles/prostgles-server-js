@@ -13,8 +13,8 @@ import {
 } from "prostgles-types";
 import { DB, DBHandlerServer, Join } from "../../Prostgles";
 import {
-  DboBuilder, escapeTSNames, ExistsFilterConfig,Filter, isPlainObject,
-  LocalParams, parseError, pgp, postgresToTsType, SortItem,
+  DboBuilder, escapeTSNames, Filter, isPlainObject,
+  LocalParams, ExistsFilterConfig, parseError, pgp, postgresToTsType, SortItem,
   TableHandlers, TableSchema, ValidatedTableRules, withUserRLS
 } from "../../DboBuilder";
 import { Graph } from "../../shortestPath";
@@ -26,9 +26,9 @@ import { getColumns } from "../getColumns";
 import { LocalFuncs, subscribe } from "../subscribe";
 import { find } from "../find";
 import { TableEvent } from "../../Logging";
-import { getJoins } from "./getJoins";
 import { getExistsCondition } from "./getExistsCondition";
 import { parseFieldFilter } from "./parseFieldFilter";
+import { ParsedJoinPath } from "./parseJoinPath";
 
 export type JoinPaths = {
   t1: string;
@@ -306,8 +306,6 @@ export class ViewHandler {
       }).join("\n");
     return { query, toOne: false }
   }
-
-  getJoins = getJoins.bind(this);
 
   checkFilter(filter: any) {
     if (filter === null || filter && !isObject(filter)) throw `invalid filter -> ${JSON.stringify(filter)} \nExpecting:    undefined | {} | { field_name: "value" } | { field: { $gt: 22 } } ... `;
@@ -628,7 +626,7 @@ export class ViewHandler {
 
     const exists: ExistsFilterConfig[] = [];
 
-    const parseFullFilter = async <O extends boolean>(f: any, parentFilter: any = null, isForcedFilterBypass: boolean): Promise<string> => {
+    const parseFullFilter = async (f: any, parentFilter: any = null, isForcedFilterBypass: boolean): Promise<string> => {
       if (!f) throw "Invalid/missing group filter provided";
       let result = "";
       const keys = getKeys(f);
@@ -656,7 +654,7 @@ export class ViewHandler {
       } else if (!group) {
 
         /** forcedFilters do not get checked against publish and are treated as server-side requests */
-        const cond = await this.getCondition({
+        const cond = await getCondition.bind(this)({
           filter: { ...f },
           select,
           allowed_colnames: isForcedFilterBypass ? this.column_names.slice(0) : this.parseFieldFilter(filterFields),
@@ -687,10 +685,6 @@ export class ViewHandler {
     if (cond && addKeywords) cond = "WHERE " + cond;
     return { where: cond || "", filter: finalFilter, exists };
   }
-
-  getExistsCondition = getExistsCondition.bind(this);
-
-  getCondition = getCondition.bind(this);
 
   /* This relates only to SELECT */
   prepareSortItems(orderBy: OrderBy | undefined, allowed_cols: string[], tableAlias: string | undefined, select: SelectItemValidated[]): SortItem[] {

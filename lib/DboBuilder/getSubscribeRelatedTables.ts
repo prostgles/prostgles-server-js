@@ -1,5 +1,5 @@
 import { AnyObject, asName, SubscribeParams } from "prostgles-types";
-import { ExistsFilterConfig, Filter, LocalParams, makeErrorFromPGError } from "../DboBuilder";
+import { Filter, LocalParams, makeErrorFromPGError, ExistsFilterConfig } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 import { log, ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
 import { NewQuery } from "./QueryBuilder/QueryBuilder";
@@ -157,15 +157,17 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { selectParam
         })
       }
     }
-    for await (const e of newQuery.whereOpts.exists) {
-      const eTable = e.tables.at(-1)!
+    for await (const e of newQuery.whereOpts.exists.filter(e => e.isJoined)) {
+      if(!e.isJoined) throw `Not possible`;
+      const eTable = e.parsedPath.at(-1)!.table;
       viewOptions.relatedTables.push({
         tableName: eTable,
         tableNameEscaped: asName(eTable),
         condition: (await this.dboBuilder.dbo[eTable]!.prepareWhere!({
           filter: {
             $existsJoined: {
-              [[this.name, ...e.tables ?? [].slice(0, -1).reverse()].join(".")]: nonExistsFilter
+              path: [{ table: this.name }, ...(e.parsedPath ?? []).slice(0, -1).reverse()],
+              filter: nonExistsFilter
             }
           },
           addKeywords: false,

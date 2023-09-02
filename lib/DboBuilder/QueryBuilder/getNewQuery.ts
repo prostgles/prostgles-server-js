@@ -5,6 +5,7 @@ import { Filter, LocalParams } from "../../DboBuilder";
 import { SelectParams, ColumnInfo, getKeys, DetailedJoinSelect, SimpleJoinSelect, JoinPath, JoinSelect } from "prostgles-types";
 import { COMPUTED_FIELDS, FUNCTIONS } from "./Functions";
 import { NewQuery, NewQueryJoin, SelectItemBuilder } from "./QueryBuilder";
+import { parseJoinPath } from "../ViewHandler/parseJoinPath";
 
 const JOIN_KEYS = ["$innerJoin", "$leftJoin"] as const;
 type ParsedJoin = 
@@ -96,7 +97,6 @@ export async function getNewQuery(
     const j_selectParams: SelectParams = {};
     let j_filter: Filter = {},
         j_isLeftJoin = true,
-        j_path: JoinPath[] | undefined,
         j_alias: string | undefined,
         j_tableRules: TableRule | undefined;
         // j_table: string | undefined;
@@ -107,16 +107,20 @@ export async function getNewQuery(
       throwErr(parsedJoin.error);
       return;
     }
+    const j_path = parseJoinPath({ 
+      rawPath: parsedJoin.type === "simple"? fTable : parsedJoin.params.table,
+      rootTable: _this.name,
+      viewHandler: _this,
+      allowMultiOrJoin: true,
+      addShortestJoinIfMissing: true,
+    })
     if(parsedJoin.params === "*"){
         j_selectParams.select = "*";
         j_alias = fTable;
-        // j_table = fTable;
-        // j_path = fTable;
     } else if(parsedJoin.type === "detailed") {
       const joinParams = parsedJoin.params;
 
       j_isLeftJoin = !!joinParams.$leftJoin;
-      j_path = typeof joinParams.table === "string"? [{ table: joinParams.table }] : joinParams.table;
       j_alias = fTable;
       
       j_selectParams.select = joinParams.select || "*";

@@ -9,6 +9,7 @@ import { isEmpty, asName, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, isObject, Select,
 
 import { COMPUTED_FIELDS, FieldSpec, FUNCTIONS, FunctionSpec, parseFunction } from "./Functions";
 import { ViewHandler } from "../ViewHandler/ViewHandler";
+import { ParsedJoinPath } from "../ViewHandler/parseJoinPath";
 
 export type SelectItem = {
   type: "column" | "function" | "aggregation" | "joinedColumn" | "computed";
@@ -45,7 +46,7 @@ export type NewQueryRoot = {
 };
 
 export type NewQueryJoin = (NewQuery & {
-  joinPath?: JoinPath[];
+  joinPath: ParsedJoinPath[];
 });
 export type NewQuery = NewQueryRoot & {
   joins?: NewQueryJoin[];

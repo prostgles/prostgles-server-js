@@ -19,7 +19,7 @@ import {
   SQLHandler,
   AnyObject,
   JoinMaker,
-  isObject, getKeys, ProstglesError, _PG_geometric, EXISTS_KEY
+  isObject, getKeys, ProstglesError, _PG_geometric, EXISTS_KEY, RawJoinPath
 } from "prostgles-types";
 import { sqlErrCodeToMsg } from "./DboBuilder/sqlErrCodeToMsg"
 
@@ -348,28 +348,31 @@ export function parseError(e: any, caller: string): ProstglesError {
 }
 
 export type ExistsFilterConfig = {
-  key: string;
+  existType: EXISTS_KEY;
   /**
    * Target table filter. target table is the last table from tables
    */
   targetTableFilter: Filter;
-  existType: EXISTS_KEY;
+
+} & ({
+  isJoined: true;
   /**
    * list of join tables in their order
-   */
-  tables: string[];
-  isJoined: boolean;
-  /**
    * If table path starts with "**" then get shortest join to first table
    * e.g.: "**.users" means finding the shortest join from root table to users table
    */
-  shortestJoin: boolean;
-};
+  path: RawJoinPath;
+  parsedPath: ParsedJoinPath[]
+} | {
+  isJoined: false;
+  targetTable: string;
+});
 
 import { parseJoins } from "./DboBuilder/parseJoins";
 import { BasicSession, UserLike } from "./AuthHandler";
 import { getDBSchema } from "./DBSchemaBuilder";
 import { TableHandler } from "./DboBuilder/TableHandler";
+import { ParsedJoinPath } from "./DboBuilder/ViewHandler/parseJoinPath";
 
 export class DboBuilder {
   tablesOrViews?: TableSchema[];   //TableSchema           TableOrViewInfo

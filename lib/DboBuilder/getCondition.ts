@@ -1,5 +1,5 @@
 import { AnyObject, EXISTS_KEY, EXISTS_KEYS, getKeys, isObject, pickKeys } from "prostgles-types";
-import { ExistsFilterConfig, LocalParams, pgp } from "../DboBuilder";
+import { LocalParams, ExistsFilterConfig, pgp } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 import { asValue } from "../PubSubManager/PubSubManager";
 import { FUNCTIONS, parseFunction } from "./QueryBuilder/Functions";
@@ -7,6 +7,7 @@ import { asNameAlias, parseFunctionObject, SelectItem } from "./QueryBuilder/Que
 import { ViewHandler } from "./ViewHandler/ViewHandler";
 import { parseFilterItem } from "../Filtering";
 import { getExistsFilters } from "./ViewHandler/getExistsFilters";
+import { getExistsCondition } from "./ViewHandler/getExistsCondition";
 
 const FILTER_FUNCS = FUNCTIONS.filter(f => f.canBeUsedForFilter);
 
@@ -53,7 +54,7 @@ export async function getCondition(
 
   let existsCond = "";
   if (existsConfigs.length) {
-    existsCond = (await Promise.all(existsConfigs.map(async existsConfig => await this.getExistsCondition(existsConfig, localParams)))).join(" AND ");
+    existsCond = (await Promise.all(existsConfigs.map(async existsConfig => await getExistsCondition.bind(this)(existsConfig, localParams)))).join(" AND ");
   }
 
   /* Computed field queries */
@@ -178,7 +179,7 @@ export async function getCondition(
       will make an exists filter
   */
 
-  const filterKeys = Object.keys(filter).filter(k => k !== complexFilterKey && !funcFilter.find(ek => ek.name === k) && !computedFields.find(cf => cf.name === k) && !existsConfigs.find(ek => ek.key === k));
+  const filterKeys = Object.keys(filter).filter(k => k !== complexFilterKey && !funcFilter.find(ek => ek.name === k) && !computedFields.find(cf => cf.name === k) && !existsConfigs.find(ek => ek.existType === k));
   // if(allowed_colnames){
   //     const aliasedColumns = (select || []).filter(s => 
   //         ["function", "computed", "column"].includes(s.type) && allowed_colnames.includes(s.alias) ||  

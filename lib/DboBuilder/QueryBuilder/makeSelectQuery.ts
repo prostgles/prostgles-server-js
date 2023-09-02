@@ -1,9 +1,10 @@
 
 import { prepareSort } from "../../DboBuilder";
-import { SelectParams, asName } from "prostgles-types";
+import { JoinPath, SelectParams, asName } from "prostgles-types";
 import { NewQuery, NewQueryJoin, SelectItem } from "./QueryBuilder";
 import { TableHandler } from "../TableHandler";
 import { pickKeys } from "../../PubSubManager/PubSubManager";
+import { ParsedJoinPath, parseJoinPath } from "../ViewHandler/parseJoinPath";
 
 /**
  * Creating the text query from the NewQuery spec
@@ -211,7 +212,7 @@ type JoinTablesResult = {
   q: NewQuery 
 };
 const joinTables = (_this: TableHandler, { q, q1, q2, depth, selectParams }: Args): JoinTablesResult => {
-  const { paths } = _this.getJoins(q1.table, q2.joinPath ?? [{ table: q2.table }], { getShortestJoin: !q2.joinPath });
+  const paths = parseJoinPath({ rootTable: q1.table, rawPath: q2.joinPath, viewHandler: _this, allowMultiOrJoin: true, addShortestJoinIfMissing: true, })
 
   let rowidSortedColName = "";
   let rowidDupesColName = "";
@@ -266,7 +267,7 @@ const joinTables = (_this: TableHandler, { q, q1, q2, depth, selectParams }: Arg
         _this,
         q2,
         depth + 1,
-        on.flatMap(cond => cond.map(([c1, c2]) => asName(c2))),
+        on.flatMap(cond => Object.entries(cond).map(([c1, c2]) => asName(c2))),
         selectParams,
       ).split("\n");
 
@@ -291,8 +292,8 @@ const joinTables = (_this: TableHandler, { q, q1, q2, depth, selectParams }: Arg
       ]
     }
 
-    const getJoinCondition = (t1Alias: string, t2Alias: string, on: [string, string][][]) => {
-      return on.map(cond => cond.map(([c1, c2]) =>
+    const getJoinCondition = (t1Alias: string, t2Alias: string, on: ParsedJoinPath["on"]) => {
+      return on.map(cond => Object.entries(cond).map(([c1, c2]) =>
         `${t1Alias}.${asName(getPrevColName(c1))} = ${t2Alias}.${asName(getThisColName(c2))} `
       ).join(" AND ")
       ).join(" OR ")
