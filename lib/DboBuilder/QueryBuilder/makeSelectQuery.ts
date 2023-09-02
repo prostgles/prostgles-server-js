@@ -17,8 +17,6 @@ export function makeSelectQuery(
 ): string {
   const joins = q.joins || [];
 
-
-
   const getGroupBy = (rootSelectItems: SelectItem[], groupByItems: SelectItem[]): string => {
     if (groupByItems.length) {
 
@@ -202,8 +200,18 @@ type Args = {
   depth: number;
   selectParams: SelectParams;
 }
-const joinTables = (_this: TableHandler, { q, q1, q2, depth, selectParams }: Args): { t1Alias: string; t2Alias: string; query: string[]; rowidSortedColName: string; rowidDupesColName: string; jsonColName: string; limitColName: string; q: NewQuery } => {
-  const { paths } = _this.getJoins(q1.table, q2.table, q2.joinPath, true);
+type JoinTablesResult = { 
+  t1Alias: string; 
+  t2Alias: string; 
+  query: string[]; 
+  rowidSortedColName: string; 
+  rowidDupesColName: string; 
+  jsonColName: string; 
+  limitColName: string; 
+  q: NewQuery 
+};
+const joinTables = (_this: TableHandler, { q, q1, q2, depth, selectParams }: Args): JoinTablesResult => {
+  const { paths } = _this.getJoins(q1.table, q2.joinPath ?? [{ table: q2.table }], { getShortestJoin: !q2.joinPath });
 
   let rowidSortedColName = "";
   let rowidDupesColName = "";
@@ -241,7 +249,7 @@ const joinTables = (_this: TableHandler, { q, q1, q2, depth, selectParams }: Arg
     const prevAlias = i === 0 ? getTableAliasAsName(q1) : getTableJoinAliasAsName(q2.tableAlias, prevTable);
 
     /* If root then prev table is aliased from root query. Alias from join otherwise  */
-    let iQ = [
+    let innerQuery = [
       asName(table) + ` ${thisAlias}`
     ];
 
@@ -268,7 +276,7 @@ const joinTables = (_this: TableHandler, { q, q1, q2, depth, selectParams }: Arg
       limitColName = getTableAliasPref(q2, `limit`);
       jsonColName = getTableAliasPref(q2, `json`);
 
-      iQ = [
+      innerQuery = [
         "("
         , ...indentLines(depth + 1, [
           `-- 4. [target table] `
@@ -292,7 +300,7 @@ const joinTables = (_this: TableHandler, { q, q1, q2, depth, selectParams }: Arg
 
     const query: string[] = [
       `${q2.isLeftJoin ? "LEFT" : "INNER"} JOIN `
-      , ...iQ
+      , ...innerQuery
       , `ON ${getJoinCondition(prevAlias, thisAlias, on)}`
     ];
     return { query, prevTable, thisAlias };

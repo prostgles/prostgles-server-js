@@ -45,7 +45,7 @@ export type NewQueryRoot = {
 };
 
 export type NewQueryJoin = (NewQuery & {
-  joinPath?: JoinPath;
+  joinPath?: JoinPath[];
 });
 export type NewQuery = NewQueryRoot & {
   joins?: NewQueryJoin[];

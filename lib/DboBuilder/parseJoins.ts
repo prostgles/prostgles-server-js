@@ -85,14 +85,14 @@ export async function parseJoins(this: DboBuilder): Promise<JoinPaths> {
       this.joinGraph![t2]![t1] = 1;
     });
     const tables = Array.from(new Set(this.joins.flatMap(t => t.tables)));
-    this.joinPaths = [];
+    this.shortestJoinPaths = [];
     tables.forEach((t1, i1) => {
       tables.forEach((t2, i2) => {
 
         /** Prevent recursion */
         if (
           t1 === t2 ||
-          this.joinPaths.some(jp => {
+          this.shortestJoinPaths.some(jp => {
             if (arrayValuesMatch([jp.t1, jp.t2], [t1, t2])) {
               const spath = findShortestPath(this.joinGraph!, t1, t2);
               if (spath && arrayValuesMatch(spath.path, jp.path)) {
@@ -107,20 +107,20 @@ export async function parseJoins(this: DboBuilder): Promise<JoinPaths> {
         const spath = findShortestPath(this.joinGraph!, t1, t2);
         if (!(spath && spath.distance < Infinity)) return;
 
-        const existing1 = this.joinPaths.find(j => j.t1 === t1 && j.t2 === t2)
+        const existing1 = this.shortestJoinPaths.find(j => j.t1 === t1 && j.t2 === t2)
         if (!existing1) {
-          this.joinPaths.push({ t1, t2, path: spath.path.slice() });
+          this.shortestJoinPaths.push({ t1, t2, path: spath.path.slice() });
         }
 
-        const existing2 = this.joinPaths.find(j => j.t2 === t1 && j.t1 === t2);
+        const existing2 = this.shortestJoinPaths.find(j => j.t2 === t1 && j.t1 === t2);
         if (!existing2) {
-          this.joinPaths.push({ t1: t2, t2: t1, path: spath.path.slice().reverse() });
+          this.shortestJoinPaths.push({ t1: t2, t2: t1, path: spath.path.slice().reverse() });
         }
       });
     });
   }
 
-  return this.joinPaths;
+  return this.shortestJoinPaths;
 }
 
 

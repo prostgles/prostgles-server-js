@@ -192,6 +192,9 @@ export type Aggregation = {
 export type Filter = AnyObject | { $and: Filter[] } | { $or: Filter[] };
 
 export type JoinInfo = {
+  /**
+   * If true then all joins involve unique columns and the result is a 1 to 1 join
+   */
   expectOne?: boolean,
   paths: {
 
@@ -346,10 +349,20 @@ export function parseError(e: any, caller: string): ProstglesError {
 
 export type ExistsFilterConfig = {
   key: string;
-  f2: Filter;
+  /**
+   * Target table filter. target table is the last table from tables
+   */
+  targetTableFilter: Filter;
   existType: EXISTS_KEY;
+  /**
+   * list of join tables in their order
+   */
   tables: string[];
   isJoined: boolean;
+  /**
+   * If table path starts with "**" then get shortest join to first table
+   * e.g.: "**.users" means finding the shortest join from root table to users table
+   */
   shortestJoin: boolean;
 };
 
@@ -429,7 +442,7 @@ export class DboBuilder {
   tsTypesDefinition?: string;
 
   joinGraph?: Graph;
-  joinPaths: JoinPaths = [];
+  shortestJoinPaths: JoinPaths = [];
 
   prostgles: Prostgles;
   publishParser?: PublishParser;
@@ -478,8 +491,8 @@ export class DboBuilder {
     this._joins = clone(j);
   }
 
-  getJoinPaths() {
-    return this.joinPaths;
+  getAllJoinPaths() {
+    return this.shortestJoinPaths;
   }
 
   parseJoins = parseJoins.bind(this);
@@ -515,9 +528,9 @@ export class DboBuilder {
                 Alternatively you can rename the table column\n`;
       }
 
-      this.dbo[tov.escaped_identifier] = new (tov.is_view ? ViewHandler : TableHandler)(this.db, tov, this, undefined, undefined, this.joinPaths);
+      this.dbo[tov.escaped_identifier] = new (tov.is_view ? ViewHandler : TableHandler)(this.db, tov, this, undefined, undefined, this.shortestJoinPaths);
 
-      if (this.joinPaths && this.joinPaths.find(jp => [jp.t1, jp.t2].includes(tov.name))) {
+      if (this.shortestJoinPaths && this.shortestJoinPaths.find(jp => [jp.t1, jp.t2].includes(tov.name))) {
 
         const table = tov.name;
 
@@ -580,7 +593,7 @@ export class DboBuilder {
     return this.db.tx((t) => {
       const dbTX: DbTxTableHandlers & Pick<DBHandlerServer, "sql"> = {};
       this.tablesOrViews?.map(tov => {
-        dbTX[tov.name] = new (tov.is_view ? ViewHandler : TableHandler)(this.db, tov, this, t, dbTX, this.joinPaths);
+        dbTX[tov.name] = new (tov.is_view ? ViewHandler : TableHandler)(this.db, tov, this, t, dbTX, this.shortestJoinPaths);
       });
       if (!dbTX.sql) {
         dbTX.sql = this.runSQL;

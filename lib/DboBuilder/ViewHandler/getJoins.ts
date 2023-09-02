@@ -1,44 +1,41 @@
-import { JoinPath, getKeys } from "prostgles-types";
+import { JoinPath } from "prostgles-types";
 import { ViewHandler } from "./ViewHandler";
 import { JoinInfo } from "../../DboBuilder";
 
+type Opts = {
+  allowMultiOrJoin?: boolean;
+  getShortestJoin?: boolean;
+}
+
 /**
  * Returns all tables and fields required to join from source table to target table
+ * Respecting the path.on condition
  */
-export function getJoins(this: ViewHandler, source: string, target: string, path?: JoinPath, checkTableConfig?: boolean): JoinInfo {
-
-  if (!this.joinPaths) throw `${source} - ${target} Join info missing or dissallowed`;
-
-  if (path && !path.length) throw `Empty join path specified for ${source} <-> ${target}`
-
-  /* Find the join path between tables */
-  if (checkTableConfig) {
-    const tableConfigJoinInfo = this.dboBuilder?.prostgles?.tableConfigurator?.getJoinInfo(source, target);
-    if (tableConfigJoinInfo) return tableConfigJoinInfo;
+export function getJoins(this: ViewHandler, source: string, path: JoinPath[], { allowMultiOrJoin = true, getShortestJoin }: Opts = {}): JoinInfo {
+  const [lastItem] = path;
+  if(!lastItem){
+    throw `Empty path`;
+  }
+  if(getShortestJoin && path.length !== 1){
+    throw `getShortestJoin requires exactly 1 path item`
+  }
+  const target = lastItem.table;
+  if (!this.joinPaths) {
+    throw `Join info missing`;
   }
 
-  let joinInfo: {
-    t1: string;
-    t2: string;
-    path: JoinPath;
-  } | undefined;
+  /* Find the join path between tables */
+  const tableConfigJoinInfo = this.dboBuilder?.prostgles?.tableConfigurator?.getJoinInfo(source, target);
+  if (tableConfigJoinInfo) return tableConfigJoinInfo;
 
-  if (!path) {
-    const _jp = this.joinPaths.find(j => j.t1 === source && j.t2 === target);
-    if(_jp){
-      joinInfo = {
-        ..._jp,
-        path: _jp.path.map(table => ({ table }))
-      }
-      
-      _jp.path.map(table => ({ table }))
-    }
-  } else {
-    joinInfo = {
-      t1: source,
-      t2: target,
-      path
-    }
+  const actualPath = getShortestJoin? 
+    this.joinPaths.find(j => j.t1 === source && j.t2 === target)?.path.map(table => ({ table, on: undefined })).slice(1) : 
+    this.joinPaths.find(j => {
+      return j.path.join() === [{ table: source }, ...path].map(p => p.table).join()
+    })? path : undefined;
+  
+  if (!actualPath) {
+    throw `Joining ${source} <-...-> ${target} dissallowed or missing`;
   }
 
   /* Self join */
@@ -60,12 +57,10 @@ export function getJoins(this: ViewHandler, source: string, target: string, path
       // }
     }
   }
-  if (!joinInfo || !this.joinPaths.find(j => path ? j.path.join() === path.join() : j.t1 === source && j.t2 === target)) {
-    throw `Joining ${source} <-...-> ${target} dissallowed or missing`;
-  }
 
   /* Make the join chain info */
-  const paths: JoinInfo["paths"] = (path || joinInfo.path).map((tablePath, i, arr) => {
+  const paths: JoinInfo["paths"] = [];
+  actualPath.forEach((tablePath, i, arr) => {
     const prevTable = arr[i - 1]!;
     const t1 = i === 0 ? source : prevTable.table;
 
@@ -73,7 +68,9 @@ export function getJoins(this: ViewHandler, source: string, target: string, path
 
     /* Get join options */
     const join = this.joins.find(j => j.tables.includes(t1) && j.tables.includes(tablePath.table));
-    if (!join) throw `Joining ${t1} <-> ${tablePath} dissallowed or missing`;
+    if (!join) {
+      throw `Joining ${t1} <-> ${tablePath} dissallowed or missing`;
+    }
 
     const on: [string, string][][] = [];
 
@@ -99,13 +96,12 @@ export function getJoins(this: ViewHandler, source: string, target: string, path
       on.push(condArr);
     })
 
-
-    return {
+    paths.push({
       source,
       target,
       table: tablePath.table,
       on
-    };
+    });
   });
   const expectOne = false;
   // paths.map(({ source, target, on }, i) => {
@@ -119,6 +115,11 @@ export function getJoins(this: ViewHandler, source: string, target: string, path
   //     expectOne = sCol.is_pkey && tCol.is_pkey
   // }
   // })
+
+  const isMultiOrJoin = paths.find(p => p.on.length > 1);
+  if(!allowMultiOrJoin && isMultiOrJoin){
+    throw `Table ${JSON.stringify(source)} can join to ${JSON.stringify(target)} through multiple constraints. Must chose one of ${JSON.stringify(isMultiOrJoin.on)}`
+  }
   return {
     paths,
     expectOne

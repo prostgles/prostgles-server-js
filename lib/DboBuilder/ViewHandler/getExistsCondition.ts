@@ -3,48 +3,29 @@ import { ExistsFilterConfig, JoinInfo, LocalParams } from "../../DboBuilder";
 import { ViewHandler } from "./ViewHandler";
 import { TableRule } from "../../PublishParser";
 import { TableHandler } from "../TableHandler";
+import { parseJoinPath } from "./parseJoinPath";
+import { getTableJoinQuery } from "./getTableJoinQuery";
+
 
 export async function getExistsCondition(this: ViewHandler, eConfig: ExistsFilterConfig, localParams: LocalParams | undefined): Promise<string> {
 
-  let res = "";
   const thisTable = this.name;
   const isNotExists = ["$notExists", "$notExistsJoined"].includes(eConfig.existType);
 
-  const { f2, tables, isJoined } = eConfig;
-  const t2 = tables.at(-1)!;
+  const { targetTableFilter, tables, isJoined, shortestJoin } = eConfig;
+  const targetTable = tables.at(-1)!;
 
+  /** Check if join tables are valid */
   tables.forEach(t => {
-    if (!this.dboBuilder.dbo[t]) throw { stack: ["prepareExistCondition()"], message: `Invalid or dissallowed table: ${t}` };
+    if (!this.dboBuilder.dbo[t]) {
+      throw { stack: ["prepareExistCondition()"], message: `Invalid or dissallowed table: ${t}` };
+    }
   });
 
-  /* Nested $exists not allowed ??! */
-  if (f2 && Object.keys(f2).find(fk => EXISTS_KEYS.includes(fk as EXISTS_KEY))) {
+  /* Nested $exists is not allowed */
+  if (targetTableFilter && Object.keys(targetTableFilter).find(fk => EXISTS_KEYS.includes(fk as EXISTS_KEY))) {
     throw { stack: ["prepareExistCondition()"], message: "Nested exists dissallowed" };
-  }
-
-  const makeTableChain = (finalFilter: string) => {
-
-    let joinPaths: JoinInfo["paths"] = [];
-    let expectOne = true;
-    tables.forEach((t2, depth) => {
-      const t1 = (depth ? tables[depth - 1] : thisTable)!;
-      let exactPaths: JoinPath | undefined = [{ table: t2 }];
-
-      if (!depth && eConfig.shortestJoin) exactPaths = undefined;
-      const jinf = this.getJoins(t1, t2, exactPaths, true);
-      expectOne = Boolean(expectOne && jinf.expectOne)
-      joinPaths = joinPaths.concat(jinf.paths);
-    });
-
-    return getJoinQuery({
-      joinInfo: { paths: joinPaths, expectOne },
-      thisTable,
-      finalFilter,
-      isNotExists,
-    });
-  }
-
-  let finalWhere = "";
+  } 
 
   let t2Rules: TableRule | undefined = undefined,
     forcedFilter: AnyObject | undefined,
@@ -52,16 +33,24 @@ export async function getExistsCondition(this: ViewHandler, eConfig: ExistsFilte
     tableAlias;
 
   /* Check if allowed to view data - forcedFilters will bypass this check through isForcedFilterBypass */
-  if (localParams?.isRemoteRequest && (!localParams?.socket && !localParams?.httpReq)) throw "Unexpected: localParams isRemoteRequest and missing socket/httpReq: ";
-  if (localParams && (localParams.socket || localParams.httpReq) && this.dboBuilder.publishParser) {
+  if (localParams?.isRemoteRequest && !localParams?.socket && !localParams?.httpReq) {
+    throw "Unexpected: localParams isRemoteRequest and missing socket/httpReq: ";
+  }
+  if ((localParams?.socket || localParams?.httpReq) && this.dboBuilder.publishParser) {
 
-    t2Rules = await this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ tableName: t2, command: "find", localParams }) as TableRule;
+    t2Rules = await this.dboBuilder.publishParser.getValidatedRequestRuleWusr({ 
+      tableName: targetTable, 
+      command: "find", 
+      localParams 
+    }) as TableRule;
+
     if (!t2Rules || !t2Rules.select) throw "Dissallowed";
     ({ forcedFilter, filterFields } = t2Rules.select);
   }
 
-  finalWhere = (await (this.dboBuilder.dbo[t2] as TableHandler).prepareWhere({
-    filter: f2,
+  const tableHandler = this.dboBuilder.dbo[targetTable] as TableHandler
+  const finalWhere = (await tableHandler.prepareWhere({
+    filter: targetTableFilter,
     forcedFilter,
     filterFields,
     addKeywords: false,
@@ -70,62 +59,72 @@ export async function getExistsCondition(this: ViewHandler, eConfig: ExistsFilte
     tableRule: t2Rules
   })).where
 
-  if (!isJoined) {
-    res = `${isNotExists ? " NOT " : " "} EXISTS (SELECT 1 \nFROM ${asName(t2)} \n${finalWhere ? `WHERE ${finalWhere}` : ""}) `
-  } else {
-    res = makeTableChain(finalWhere);
+  let innerQuery = [
+    `SELECT 1`,
+    `FROM ${asName(targetTable)}`,
+    `${finalWhere ? `WHERE ${finalWhere}` : ""}`
+  ].join("\n");
+
+  if(isJoined){
+    
+    const joinPath = parseJoinPath({ rootTable: thisTable, path: shortestJoin? ["**", ...tables] : tables, viewHandler: this });
+    const { query } = getTableJoinQuery({
+      path: joinPath,
+      aliasSufix: "jd",
+      rootTableAlias: thisTable,
+      type: "EXISTS",
+      finalWhere,
+    });
+    innerQuery = query;
   }
-  return res;
+
+  return `${isNotExists ? " NOT " : " "} EXISTS ( \n${innerQuery} \n) `;
 
 }
 
 type Args = {
   joinInfo: JoinInfo;
-  ji?: number;
+  joinPathIndex?: number;
   thisTable: string;
   finalFilter: string;
-  isNotExists: boolean;
 }
-const getJoinQuery = (args: Args): string => {
-  const { joinInfo, ji = 0, thisTable, finalFilter, isNotExists } = args;
+// const getJoinQuery = (args: Args): string => {
+//   const { joinInfo, joinPathIndex = 0, thisTable, finalFilter } = args;
 
-  const { paths } = joinInfo;
-  const jp = paths[ji];
-  if (!jp) throw "jp undef";
+//   const { paths } = joinInfo;
+//   const joinPath = paths[joinPathIndex];
+//   if (!joinPath) throw "joinPath undefined";
 
-  const table = jp.table;
-  const tableAlias = asName(ji < paths.length - 1 ? `jd${ji}` : table);
-  const prevTableAlias = asName(ji ? `jd${ji - 1}` : thisTable);
+//   const table = joinPath.table;
+//   const tableAlias = asName(joinPathIndex < paths.length - 1 ? `jd${joinPathIndex}` : table);
+//   const prevTableAlias = asName(joinPathIndex ? `jd${joinPathIndex - 1}` : thisTable);
 
-  const cond = `${jp.on.map(c => {
-    return c.map(([c1, c2]) => `${prevTableAlias}.${asName(c1)} = ${tableAlias}.${asName(c2)}`).join(" AND ")
-  }).join("\n OR ")
-    }`;
+//   const cond = joinPath.on.map(c => {
+//     return c.map(([c1, c2]) => 
+//       `${prevTableAlias}.${asName(c1)} = ${tableAlias}.${asName(c2)}`
+//     ).join(" AND ")
+//   }).join("\n OR ");
 
-  let joinQuery = `SELECT 1 \n` +
-    `FROM ${asName(table)} ${tableAlias} \n` +
-    `WHERE (${cond}) \n`;//
-  if (
-    ji === paths.length - 1 &&
-    finalFilter
-  ) {
-    joinQuery += `AND ${finalFilter} \n`;
-  }
+//   const isLastJoin = joinPathIndex === paths.length - 1
+//   let joinQuery = `SELECT 1 \n` +
+//     `FROM ${asName(table)} ${tableAlias} \n` +
+//     `WHERE (${cond}) \n`;
+//   if (
+//     isLastJoin &&
+//     finalFilter
+//   ) {
+//     joinQuery += `AND ${finalFilter} \n`;
+//   }
 
-  const indent = (a: any, _b: any) => a;
+//   const indent = (a: any, _b: any) => a;
 
-  if (ji < paths.length - 1) {
-    joinQuery += `AND ${getJoinQuery({ 
-      ...args,
-      joinInfo, 
-      ji: ji + 1
-    })} \n`
-  }
+//   if (!isLastJoin) {
+//     joinQuery += `AND ${getJoinQuery({ 
+//       ...args,
+//       joinPathIndex: joinPathIndex + 1
+//     })} \n`
+//   }
 
-  joinQuery = indent(joinQuery, ji + 1);
-
-  const result = `${isNotExists ? " NOT " : " "} EXISTS ( \n` +
-    joinQuery +
-  `) \n`;
-  return indent(result, ji);
-}
+//   joinQuery = indent(joinQuery, joinPathIndex + 1);
+//   return joinQuery;
+// }

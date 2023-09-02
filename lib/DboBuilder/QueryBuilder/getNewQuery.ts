@@ -2,7 +2,7 @@ import { get } from "../../utils";
 import { TableHandler } from "../TableHandler";
 import { TableRule } from "../../PublishParser";
 import { Filter, LocalParams } from "../../DboBuilder";
-import { SelectParams, ColumnInfo, getKeys, DetailedJoinSelect, SimpleJoinSelect, JoinPath } from "prostgles-types";
+import { SelectParams, ColumnInfo, getKeys, DetailedJoinSelect, SimpleJoinSelect, JoinPath, JoinSelect } from "prostgles-types";
 import { COMPUTED_FIELDS, FUNCTIONS } from "./Functions";
 import { NewQuery, NewQueryJoin, SelectItemBuilder } from "./QueryBuilder";
 
@@ -12,10 +12,19 @@ type ParsedJoin =
 | { type: "simple"; params: SimpleJoinSelect; }
 | { type?: undefined; error: string; };
 
-const parseJoinSelect = (joinParams: any): ParsedJoin => {
+const parseJoinSelect = (joinParams: string | JoinSelect): ParsedJoin => {
   if(!joinParams){
     return {
       error: "Empty join params"
+    }
+  }
+  if(typeof joinParams === "string"){
+    if(joinParams !== "*"){
+      throw "Join select can be * or { field: 1 }"
+    }
+    return {
+      type: "simple",
+      params: joinParams
     }
   }
   const [joinKey, ...otherKeys] = getKeys(joinParams).filter(k => JOIN_KEYS.includes(k as any));
@@ -31,16 +40,22 @@ const parseJoinSelect = (joinParams: any): ParsedJoin => {
     if(invalidParams.length) {
       throw "Invalid join params: " + invalidParams.join(", ");
     }
+    const path = joinParams[joinKey] as string | JoinPath[];
+    if(Array.isArray(path) && !path.length){
+      throw `Cannot have an empty join path/tableName ${joinKey}`
+    }
     return { 
-      ...joinParams, 
-      table: joinParams[joinKey],
-      isLeftJoin: joinKey === "$leftJoin",
+      type: "detailed",
+      params: {
+        ...(joinParams as DetailedJoinSelect), 
+        table: typeof path === "string"? path : path.at(-1)!.table,
+      },
     };
   }
 
   return {
     type: "simple",
-    params: joinParams
+    params: joinParams as SimpleJoinSelect
   }
 }
 
@@ -81,7 +96,7 @@ export async function getNewQuery(
     const j_selectParams: SelectParams = {};
     let j_filter: Filter = {},
         j_isLeftJoin = true,
-        j_path: JoinPath | undefined,
+        j_path: JoinPath[] | undefined,
         j_alias: string | undefined,
         j_tableRules: TableRule | undefined;
         // j_table: string | undefined;
@@ -101,7 +116,7 @@ export async function getNewQuery(
       const joinParams = parsedJoin.params;
 
       j_isLeftJoin = !!joinParams.$leftJoin;
-      j_path = typeof joinParams.table === "string"? undefined : joinParams.table;
+      j_path = typeof joinParams.table === "string"? [{ table: joinParams.table }] : joinParams.table;
       j_alias = fTable;
       
       j_selectParams.select = joinParams.select || "*";

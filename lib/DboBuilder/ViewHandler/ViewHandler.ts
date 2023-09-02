@@ -327,7 +327,7 @@ export class ViewHandler {
       if (joinConf) {
         has_media = typeof joinConf === "string" ? joinConf : "one";
       } else {
-        const jp = this.dboBuilder.joinPaths.find(jp => jp.t1 === this.name && jp.t2 === mediaTable);
+        const jp = this.dboBuilder.shortestJoinPaths.find(jp => jp.t1 === this.name && jp.t2 === mediaTable);
         if (jp && jp.path.length <= 3) {
           if (jp.path.length <= 2) {
             has_media = "one"

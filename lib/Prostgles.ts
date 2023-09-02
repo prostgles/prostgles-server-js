@@ -979,7 +979,7 @@ export class Prostgles {
       const { schema, tables } = fullSchema ?? { schema: {}, tables: [] };
       const joinTables2: string[][] = [];
       if (this.opts.joins) {
-        const _joinTables2 = this.dboBuilder.getJoinPaths()
+        const _joinTables2 = this.dboBuilder.getAllJoinPaths()
           .filter(jp =>
             ![jp.t1, jp.t2].find(t => !schema[t] || !schema[t]?.findOne)
           ).map(jp => [jp.t1, jp.t2].sort());
