@@ -83,7 +83,7 @@ import {
 import {
   PublishParser, PublishAllOrNothing,
 } from "./PublishParser";
-import { PubSubManager, asValue, BasicCallback, pickKeys } from "./PubSubManager/PubSubManager";
+import { PubSubManager, asValue, BasicCallback, pickKeys, omitKeys } from "./PubSubManager/PubSubManager";
 import { _delete } from "./DboBuilder/delete";
 import { JoinPaths, ViewHandler } from "./DboBuilder/ViewHandler/ViewHandler";
 
@@ -541,13 +541,13 @@ export class DboBuilder {
           isLeft = true,
           filter: Parameters<JoinMaker<AnyObject>>[0],
           select: Parameters<JoinMaker<AnyObject>>[1],
-          options: Parameters<JoinMaker<AnyObject>>[2]
+          options: Parameters<JoinMaker<AnyObject>>[2] = {}
         ): ReturnType<JoinMaker<AnyObject>> => {
           return {
-            [isLeft ? "$leftJoin" : "$innerJoin"]: table,
+            [isLeft ? "$leftJoin" : "$innerJoin"]: options.path ?? table,
             filter,
             select,
-            ...options
+            ... omitKeys(options, ["path"]),
           }
         }
         this.dbo.innerJoin = this.dbo.innerJoin || {};

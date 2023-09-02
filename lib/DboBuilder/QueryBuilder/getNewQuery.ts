@@ -2,14 +2,14 @@ import { get } from "../../utils";
 import { TableHandler } from "../TableHandler";
 import { TableRule } from "../../PublishParser";
 import { Filter, LocalParams } from "../../DboBuilder";
-import { SelectParams, ColumnInfo, getKeys, DetailedJoinSelect, SimpleJoinSelect, JoinPath, JoinSelect } from "prostgles-types";
+import { SelectParams, ColumnInfo, getKeys, DetailedJoinSelect, SimpleJoinSelect, JoinPath, JoinSelect, RawJoinPath } from "prostgles-types";
 import { COMPUTED_FIELDS, FUNCTIONS } from "./Functions";
 import { NewQuery, NewQueryJoin, SelectItemBuilder } from "./QueryBuilder";
 import { parseJoinPath } from "../ViewHandler/parseJoinPath";
 
 const JOIN_KEYS = ["$innerJoin", "$leftJoin"] as const;
 type ParsedJoin = 
-| { type: "detailed"; params: DetailedJoinSelect & { table: DetailedJoinSelect["$leftJoin"] } } 
+| { type: "detailed"; params: DetailedJoinSelect & { table: DetailedJoinSelect["$leftJoin"]; path: RawJoinPath } } 
 | { type: "simple"; params: SimpleJoinSelect; }
 | { type?: undefined; error: string; };
 
@@ -36,7 +36,7 @@ const parseJoinSelect = (joinParams: string | JoinSelect): ParsedJoin => {
   } else if(joinKey) {
 
     /* Full option join  { field_name: db.innerJoin.table_name(filter, select)  } */
-    const JOIN_PARAMS = ["select", "filter", "$path", "$condition", "offset", "limit", "orderBy"] as const;
+    const JOIN_PARAMS = ["select", "filter", "$condition", "offset", "limit", "orderBy"] as const;
     const invalidParams = Object.keys(joinParams).filter(k => ![ ...JOIN_PARAMS, ...JOIN_KEYS ].includes(k as any));
     if(invalidParams.length) {
       throw "Invalid join params: " + invalidParams.join(", ");
@@ -48,7 +48,8 @@ const parseJoinSelect = (joinParams: string | JoinSelect): ParsedJoin => {
     return { 
       type: "detailed",
       params: {
-        ...(joinParams as DetailedJoinSelect), 
+        ...(joinParams as DetailedJoinSelect),
+        path,
         table: typeof path === "string"? path : path.at(-1)!.table,
       },
     };
@@ -99,7 +100,6 @@ export async function getNewQuery(
         j_isLeftJoin = true,
         j_alias: string | undefined,
         j_tableRules: TableRule | undefined;
-        // j_table: string | undefined;
 
     const parsedJoin = parseJoinSelect(_joinParams);
 
@@ -108,7 +108,7 @@ export async function getNewQuery(
       return;
     }
     const j_path = parseJoinPath({ 
-      rawPath: parsedJoin.type === "simple"? fTable : parsedJoin.params.table,
+      rawPath: parsedJoin.type === "simple"? fTable : parsedJoin.params.path,
       rootTable: _this.name,
       viewHandler: _this,
       allowMultiOrJoin: true,

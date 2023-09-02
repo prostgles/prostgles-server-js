@@ -139,10 +139,11 @@ function getJoins(viewHandler: ViewHandler, source: string, path: JoinPath[], { 
 
         const checkIfOnSpecified = (fields: [l: string, r: string], isLtr: boolean) => {
           if(tablePath.on){
-            return tablePath.on.some(constraint => 
-              Object.entries(constraint)
-                .every(consFields => (isLtr? consFields : consFields.slice(0).reverse()).join() === fields.join())
-            );
+            return tablePath.on.some(constraint => {
+              const consFieldEntries = Object.entries(constraint)
+              
+              return consFieldEntries.every(consFields => (isLtr? consFields : consFields.slice(0).reverse()).join() === fields.join())
+            });
           }
 
           return true;

@@ -902,11 +902,36 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       name: "root_multi" 
     }, { returning: "*" });
     const itemsCount = await db.items.count!({ name: "multi" })
-    const multiItem = await db.items_multi.findOne!({ name: "root_multi" }, { select: { "*": 1, items: "*" } });
-    
     assert.equal(+itemsCount, 4);
+
+    const multiItem = await db.items_multi.findOne!({ name: "root_multi" }, { select: { "*": 1, items: "*" } });
     assert.equal(multiItem?.name, "root_multi");
     assert.equal(multiItem?.items.filter(d => d.name === "multi").length, 4);
-    
+
   });
+
+  await tryRun("Join path", async () => {
+
+    await db.items_multi.insert!({ 
+      items0_id: { name: "multi0" }, 
+      items1_id: { name: "multi1" },
+      name: "root_multi" 
+    }, { returning: "*" });
+
+    const res = await db.items_multi.find(
+      {},
+      {
+        select: {
+          "*": 1,
+          i0: db.innerJoin.items_multi(
+            { name: "multi0" }, 
+            "*", 
+            { path: [{ table: "items", on: [{ items0_id: "id" }] }] }
+          )
+        }
+      }
+    );
+    assert.equal(res.length, 1);
+    assert.equal(res[0].i0[0].name, "multi0");
+  })
 }
