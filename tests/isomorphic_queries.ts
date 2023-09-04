@@ -874,6 +874,22 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
 
   });
 
+  await tryRun("Reverse join with agg", async () => {
+    const inserted = await db.tr1.insert!({ tr2: { t1: "a", t2: "b" } }, { returning: "*" });
+
+    const idAggSelect =  {
+      ids: {
+        $array_agg: ["id"],
+      }
+    }
+    const normalJoin = await db.tr1.find!({}, { select: { "*": 1, tr2: { $innerJoin: "tr2", filter: { t1: "a" }, select: idAggSelect } } })
+    const reverseJoin = await db.tr2.find!({ t1: "a" }, { select: { "*": 1, tr1: { $innerJoin: "tr1", select: idAggSelect } } });
+    assert.deepStrictEqual(normalJoin[0], {"id": 1,"t1": null,"tr2": [{ "ids": [1] }]});
+    assert.deepStrictEqual(normalJoin[1], {"id": 2,"t1": null,"tr2": [{ "ids": [2] }]});
+    assert.deepStrictEqual(reverseJoin[0], { "id": 1, "tr1_id": 1, "t1": "a", "t2": "b", "tr1": [{ "ids": [1] }] });
+    assert.deepStrictEqual(reverseJoin[1], { "id": 2, "tr1_id": 2, "t1": "a", "t2": "b", "tr1": [{ "ids": [2] }] });
+  });
+
   await tryRun("Reference column deep nested insert", async () => {
     
     const pr = await db.items4a.insert!({ 

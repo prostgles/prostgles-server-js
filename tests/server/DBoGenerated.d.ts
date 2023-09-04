@@ -96,6 +96,31 @@ export type DBSchemaGenerated = {
       name?: null | string;
     };
   };
+  "prostgles_test.mv_basic1": {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id: number;
+      id_basic: number | null;
+      txt: string | null;
+    };
+  };
+  self_join: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id: number;
+      name: string | null;
+      my_id: number | null;
+      my_id1: number | null;
+    };
+  };
   items_multi: {
     is_view: false;
     select: true;

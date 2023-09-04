@@ -148,8 +148,10 @@ function getJoins(viewHandler: ViewHandler, source: string, path: JoinPath[], { 
     if (!join) {
       throw `Joining ${t1} <-> ${tablePath} dissallowed or missing`;
     }
+    const isLtr = join.tables[0] === t1;
+    const joinOn = isLtr? join.on : join.on.map(constraint => Object.fromEntries(Object.entries(constraint).map(([left, right]) => [right, left])));
 
-    const on = getValidOn(tablePath.on, join.on);
+    const on = getValidOn(tablePath.on, joinOn);
 
     // join.on.map(fullConstraint => {
     //   const condArr: [string, string][] = [];

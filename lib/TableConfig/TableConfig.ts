@@ -383,8 +383,8 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     if (conf) {
       const { value } = params;
       const { min, max } = conf;
-      if (min !== undefined && value !== undefined && value < min) throw `${params.col} must be less than ${min}`
-      if (max !== undefined && value !== undefined && value > max) throw `${params.col} must be greater than ${max}`
+      if (min !== undefined && value !== undefined && value < min) throw `${params.col} must be greater than ${min}`
+      if (max !== undefined && value !== undefined && value > max) throw `${params.col} must be less than ${max}`
     }
   }
 

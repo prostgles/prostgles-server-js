@@ -47,7 +47,7 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2, depth }: Args):
     const isLast = i === paths.length - 1;
     const targetQueryExtraQueries: string[] = [];
     const prevTableAlias = !i? (q1.tableAlias ?? q1.table) : `t${i-1}`;
-    const tableAlias = isLast? targetTableAlias : `t${i}`;
+    const tableAlias = asName(isLast? targetTableAlias : `t${i}`);
 
     if(isLast){
       if(q2.where){
@@ -76,7 +76,7 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2, depth }: Args):
 
     return [
       `${joinType} JOIN ${asName(path.table)} ${tableAlias}`,
-      `ON ${getJoinOnCondition(path.on, asName(prevTableAlias), asName(tableAlias))}`,
+      `ON ${getJoinOnCondition(path.on, asName(prevTableAlias), tableAlias)}`,
       ...targetQueryExtraQueries
     ]
   });
