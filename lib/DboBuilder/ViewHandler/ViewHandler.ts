@@ -1,158 +1,38 @@
-import { getCondition } from "../getCondition";
-
 import * as pgPromise from 'pg-promise';
 import {
   ColumnInfo, FieldFilter, SelectParams,
-  OrderBy,
   isEmpty,
   asName,
   TableInfo as TInfo,
   AnyObject,
-  isObject, isDefined, getKeys,
-  _PG_geometric, pickKeys, SubscribeParams, 
+  isObject, 
+  _PG_geometric, SubscribeParams, 
 } from "prostgles-types";
-import { DB, DBHandlerServer, Join } from "../../Prostgles";
+import { DB, Join } from "../../Prostgles";
 import {
-  DboBuilder, escapeTSNames, Filter, isPlainObject,
-  LocalParams, ExistsFilterConfig, parseError, pgp, postgresToTsType, SortItem,
+  DboBuilder, escapeTSNames, Filter,
+  LocalParams, parseError, postgresToTsType,
   TableHandlers, TableSchema, ValidatedTableRules, withUserRLS
 } from "../../DboBuilder";
 import { Graph } from "../../shortestPath";
-import { TableRule, UpdateRule, ValidateRow } from "../../PublishParser";
-import { asValue } from "../../PubSubManager/PubSubManager";
-import { asNameAlias,  SelectItem, SelectItemValidated } from "../QueryBuilder/QueryBuilder";
+import { TableRule, UpdateRule } from "../../PublishParser";
+import { asNameAlias } from "../QueryBuilder/QueryBuilder";
 import { COMPUTED_FIELDS, FieldSpec } from "../QueryBuilder/Functions"; 
 import { getColumns } from "../getColumns";
 import { LocalFuncs, subscribe } from "../subscribe";
 import { find } from "../find";
 import { TableEvent } from "../../Logging";
-import { getExistsCondition } from "./getExistsCondition";
 import { parseFieldFilter } from "./parseFieldFilter";
-import { ParsedJoinPath } from "./parseJoinPath";
+import { ColSet } from "./ColSet";
+import { prepareWhere } from "./prepareWhere";
+import { getInfo } from "./getInfo";
+import { validateViewRules } from "./validateViewRules";
 
 export type JoinPaths = {
   t1: string;
   t2: string;
   path: string[];
 }[];
-
-type PrepareWhereParams = {
-  filter?: Filter;
-  select?: SelectItem[];
-  forcedFilter?: AnyObject;
-  filterFields?: FieldFilter;
-  addKeywords?: boolean;
-  tableAlias?: string,
-  localParams: LocalParams | undefined,
-  tableRule: TableRule | undefined
-};
-
-class ColSet {
-  opts: {
-    columns: ColumnInfo[];
-    tableName: string;
-    colNames: string[];
-  };
-
-  constructor(columns: ColumnInfo[], tableName: string) {
-    this.opts = { columns, tableName, colNames: columns.map(c => c.name) }
-  }
-
-  private async getRow(data: any, allowedCols: string[], dbTx: DBHandlerServer, validate?: ValidateRow): Promise<{ escapedCol: string; escapedVal: string; }[]> {
-    const badCol = allowedCols.find(c => !this.opts.colNames.includes(c))
-    if (!allowedCols || badCol) {
-      throw "Missing or unexpected columns: " + badCol;
-    }
-
-    if (isEmpty(data)) throw "No data";
-
-    let row = pickKeys(data, allowedCols);
-    if (validate) {
-      row = await validate(row, dbTx);
-    }
-    const rowKeys = Object.keys(row);
-
-    return rowKeys.map(key => {
-      const col = this.opts.columns.find(c => c.name === key);
-      if (!col) throw "Unexpected missing col name";
-
-      /**
-       * Add conversion functions for PostGIS data
-       */
-      let escapedVal = "";
-      if (["geometry", "geography"].includes(col.udt_name) && isObject(row[key])) {
-
-        const basicFunc = (args: any[]) => {
-          return args.map(arg => asValue(arg)).join(", ")
-        }
-
-        type ConvertionFunc =  { name: string; getQuery: (args: any[]) => string; }
-        const convertionFuncs: ConvertionFunc[] = [
-          ...[
-            "ST_GeomFromText", 
-            "ST_Point",
-            "ST_MakePoint",
-            "ST_MakePointM",
-            "ST_PointFromText",
-            "ST_GeomFromEWKT",
-            "ST_GeomFromGeoJSON"
-          ].map(name => ({
-            name, 
-            getQuery: () => `${name}(${basicFunc(funcArgs)})`
-          })),
-          {
-            name: "to_timestamp",
-            getQuery: (args: any[]) => `to_timestamp(${asValue(args[0])}::BIGINT/1000.0)::timestamp`
-          }
-        ];
-
-        const dataKeys = Object.keys(row[key]);
-        const funcName = dataKeys[0]!;
-        const func = convertionFuncs.find(f => f.name === funcName); 
-        const funcArgs = row[key]?.[funcName]
-        if (dataKeys.length !== 1 || !func || !Array.isArray(funcArgs)) {
-          throw `Expecting only one function key (${convertionFuncs.join(", ")}) \nwith an array of arguments \n within column (${key}) data but got: ${JSON.stringify(row[key])} \nExample: { geo_col: { ST_GeomFromText: ["POINT(-71.064544 42.28787)", 4326] } }`;
-        }
-        escapedVal = func.getQuery(funcArgs);
-
-      } else {
-        /** Prevent pg-promise formatting jsonb */
-        const colIsJSON = ["json", "jsonb"].includes(col.data_type);
-        escapedVal = pgp.as.format(colIsJSON ? "$1:json" : "$1", [row[key]])
-      }
-
-      /**
-       * Cast to type to avoid array errors (they do not cast automatically)
-       */
-      escapedVal += `::${col.udt_name}`
-
-      return {
-        escapedCol: asName(key),
-        escapedVal,
-      }
-    });
-
-  }
-
-  async getInsertQuery(data: any[], allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRow | undefined): Promise<string> {
-    const res = (await Promise.all((Array.isArray(data) ? data : [data]).map(async d => {
-      const rowParts = await this.getRow(d, allowedCols, dbTx, validate);
-      const select = rowParts.map(r => r.escapedCol).join(", "),
-        values = rowParts.map(r => r.escapedVal).join(", ");
-
-      return `INSERT INTO ${this.opts.tableName} (${select}) VALUES (${values})`;
-    }))).join(";\n") + " ";
-    return res;
-  }
-  async getUpdateQuery(data: any[], allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRow | undefined): Promise<string> {
-    const res = (await Promise.all((Array.isArray(data) ? data : [data]).map(async d => {
-      const rowParts = await this.getRow(d, allowedCols, dbTx, validate);
-      return `UPDATE ${this.opts.tableName} SET ` + rowParts.map(r => `${r.escapedCol} = ${r.escapedVal} `).join(",\n")
-    }))).join(";\n") + " ";
-    return res;
-  }
-}
-
 
 export class ViewHandler {
   db: DB;
@@ -221,69 +101,7 @@ export class ViewHandler {
       `)` + (alias ? ` as ${asName(alias)}` : "");
   }
 
-  async validateViewRules(args: {
-    fields?: FieldFilter,
-    filterFields?: FieldFilter,
-    returningFields?: FieldFilter,
-    forcedFilter?: AnyObject,
-    dynamicFields?: UpdateRule["dynamicFields"],
-    rule: "update" | "select" | "insert" | "delete"
-  }) {
-    const {
-      fields,
-      filterFields,
-      returningFields,
-      forcedFilter,
-      dynamicFields,
-      rule,
-    } = args;
-
-    /* Safely test publish rules */
-    if (fields) {
-      try {
-        const _fields = this.parseFieldFilter(fields);
-        if (this.is_media && rule === "insert" && !_fields.includes("id")) {
-          throw "Must allow id insert for media table"
-        }
-      } catch (e) {
-        throw ` issue with publish.${this.name}.${rule}.fields: \nVALUE: ` + JSON.stringify(fields, null, 2) + "\nERROR: " + JSON.stringify(e, null, 2);
-      }
-    }
-    if (filterFields) {
-      try {
-        this.parseFieldFilter(filterFields);
-      } catch (e) {
-        throw ` issue with publish.${this.name}.${rule}.filterFields: \nVALUE: ` + JSON.stringify(filterFields, null, 2) + "\nERROR: " + JSON.stringify(e, null, 2);
-      }
-    }
-    if (returningFields) {
-      try {
-        this.parseFieldFilter(returningFields);
-      } catch (e) {
-        throw ` issue with publish.${this.name}.${rule}.returningFields: \nVALUE: ` + JSON.stringify(returningFields, null, 2) + "\nERROR: " + JSON.stringify(e, null, 2);
-      }
-    }
-    if (forcedFilter) {
-      try {
-        await this.find(forcedFilter, { limit: 0 });
-      } catch (e) {
-        throw ` issue with publish.${this.name}.${rule}.forcedFilter: \nVALUE: ` + JSON.stringify(forcedFilter, null, 2) + "\nERROR: " + JSON.stringify(e, null, 2);
-      }
-    }
-    if (dynamicFields) {
-      for await (const dfieldRule of dynamicFields) {
-        try {
-          const { fields, filter } = dfieldRule;
-          this.parseFieldFilter(fields);
-          await this.find(filter, { limit: 0 });
-        } catch (e) {
-          throw ` issue with publish.${this.name}.${rule}.dynamicFields: \nVALUE: ` + JSON.stringify(dfieldRule, null, 2) + "\nERROR: " + JSON.stringify(e, null, 2);
-        }
-      }
-    }
-
-    return true;
-  }
+  validateViewRules = validateViewRules.bind(this);
 
   getShortestJoin(table1: string, table2: string, startAlias: number, isInner = false): { query: string, toOne: boolean } {
     // let searchedTables = [], result; 
@@ -311,54 +129,7 @@ export class ViewHandler {
     if (filter === null || filter && !isObject(filter)) throw `invalid filter -> ${JSON.stringify(filter)} \nExpecting:    undefined | {} | { field_name: "value" } | { field: { $gt: 22 } } ... `;
   }
 
-  async getInfo(lang?: string, param2?: any, param3?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<TInfo> {
-    await this._log({ command: "getInfo", localParams, data: { lang } });
-    const p = this.getValidatedRules(tableRules, localParams);
-    if (!p.getInfo) throw "Not allowed";
-
-    let has_media: "one" | "many" | undefined = undefined;
-
-    const mediaTable = this.dboBuilder.prostgles?.opts?.fileTable?.tableName;
-
-    if (!this.is_media && mediaTable) {
-      const joinConf = this.dboBuilder.prostgles?.opts?.fileTable?.referencedTables?.[this.name]
-      if (joinConf) {
-        has_media = typeof joinConf === "string" ? joinConf : "one";
-      } else {
-        const jp = this.dboBuilder.shortestJoinPaths.find(jp => jp.t1 === this.name && jp.t2 === mediaTable);
-        if (jp && jp.path.length <= 3) {
-          if (jp.path.length <= 2) {
-            has_media = "one"
-          } else {
-            await Promise.all(jp.path.map(async tableName => {
-              const pkeyFcols = this?.dboBuilder?.dbo?.[tableName]?.columns?.filter(c => c.is_pkey).map(c => c.name);
-              const cols = this?.dboBuilder?.dbo?.[tableName]?.columns?.filter(c => c?.references?.some(({ ftable }) => jp.path.includes(ftable)));
-              if (cols && cols.length && has_media !== "many") {
-                if (cols.some(c => !pkeyFcols?.includes(c.name))) {
-                  has_media = "many"
-                } else {
-                  has_media = "one"
-                }
-              }
-            }));
-          }
-        }
-      }
-    }
-
-    return {
-      oid: this.tableOrViewInfo.oid,
-      comment: this.tableOrViewInfo.comment,
-      info: this.dboBuilder.prostgles?.tableConfigurator?.getTableInfo({ tableName: this.name, lang }),
-      is_media: this.is_media,      // this.name === this.dboBuilder.prostgles?.opts?.fileTable?.tableName
-      is_view: this.is_view,
-      has_media,
-      media_table_name: mediaTable,
-      dynamicRules: {
-        update: Boolean(tableRules?.update?.dynamicFields?.length)
-      }
-    }
-  }
+  getInfo = getInfo.bind(this)
 
   // TODO: fix renamed table trigger problem
 
@@ -615,189 +386,8 @@ export class ViewHandler {
 
   /**
    * Parses group or simple filter
-   */ 
-  async prepareWhere(params: PrepareWhereParams): Promise<{ where: string; filter: AnyObject; exists: ExistsFilterConfig[]; }> {
-    const { filter, select, forcedFilter, filterFields: ff, addKeywords = true, tableAlias, localParams, tableRule } = params;
-    const { $and: $and_key, $or: $or_key } = this.dboBuilder.prostgles.keywords;
-
-    let filterFields = ff;
-    /* Local update allow all. TODO -> FIX THIS */
-    if (!ff && !tableRule) filterFields = "*";
-
-    const exists: ExistsFilterConfig[] = [];
-
-    const parseFullFilter = async (f: any, parentFilter: any = null, isForcedFilterBypass: boolean): Promise<string> => {
-      if (!f) throw "Invalid/missing group filter provided";
-      let result = "";
-      const keys = getKeys(f);
-      if (!keys.length) {
-        return result;
-      }
-      if ((keys.includes($and_key) || keys.includes($or_key))) {
-        if (keys.length > 1) throw `\ngroup filter must contain only one array property. e.g.: { ${$and_key}: [...] } OR { ${$or_key}: [...] } `;
-        if (parentFilter && Object.keys(parentFilter).includes("")) throw "group filter ($and/$or) can only be placed at the root or within another group filter";
-      }
-
-      const { [$and_key]: $and, [$or_key]: $or } = f,
-        group: AnyObject[] = $and || $or;
-
-      if (group && group.length) {
-        const operand = $and ? " AND " : " OR ";
-        const conditions = (await Promise.all(
-            group.map(async gf => await parseFullFilter(gf, group, isForcedFilterBypass))
-          )).filter(c => c);
-          
-        if (conditions?.length) {
-          if (conditions.length === 1) return conditions.join(operand);
-          else return ` ( ${conditions.sort().join(operand)} ) `;
-        }
-      } else if (!group) {
-
-        /** forcedFilters do not get checked against publish and are treated as server-side requests */
-        const cond = await getCondition.bind(this)({
-          filter: { ...f },
-          select,
-          allowed_colnames: isForcedFilterBypass ? this.column_names.slice(0) : this.parseFieldFilter(filterFields),
-          tableAlias,
-          localParams: isForcedFilterBypass ? undefined : localParams,
-          tableRules: isForcedFilterBypass ? undefined : tableRule
-        });
-        result = cond.condition;
-        exists.push(...cond.exists);
-      }
-      return result;
-    }
-
-    if (!isPlainObject(filter)) throw "\nInvalid filter\nExpecting an object but got -> " + JSON.stringify(filter);
-
-
-    /* A forced filter condition will not check if the existsJoined filter tables have been published */
-    const forcedFilterCond = forcedFilter ? await parseFullFilter(forcedFilter, null, true) : undefined;
-    const filterCond = await parseFullFilter(filter, null, false);
-    let cond = [
-      forcedFilterCond, filterCond
-    ].filter(c => c).join(" AND ");
-
-    const finalFilter = forcedFilter ? {
-      [$and_key]: [forcedFilter, filter].filter(isDefined)
-    } : { ...filter };
-
-    if (cond && addKeywords) cond = "WHERE " + cond;
-    return { where: cond || "", filter: finalFilter, exists };
-  }
-
-  /* This relates only to SELECT */
-  prepareSortItems(orderBy: OrderBy | undefined, allowed_cols: string[], tableAlias: string | undefined, select: SelectItemValidated[]): SortItem[] {
-
-    const throwErr = () => {
-      throw "\nInvalid orderBy option -> " + JSON.stringify(orderBy) +
-      "Expecting: \
-                      { key2: false, key1: true } \
-                      { key1: 1, key2: -1 } \
-                      [{ key1: true }, { key2: false }] \
-                      [{ key: 'colName', asc: true, nulls: 'first', nullEmpty: true }]"
-    },
-      parseOrderObj = (orderBy: any, expectOne = false): { key: string, asc: boolean, nulls?: "first" | "last", nullEmpty?: boolean }[] => {
-        if (!isPlainObject(orderBy)) return throwErr();
-
-        const keys = Object.keys(orderBy);
-        if (keys.length && keys.find(k => ["key", "asc", "nulls", "nullEmpty"].includes(k))) {
-          const { key, asc, nulls, nullEmpty = false } = orderBy;
-          if (
-            !["string"].includes(typeof key) ||
-            !["boolean"].includes(typeof asc) ||
-            !["first", "last", undefined, null].includes(nulls) ||
-            !["boolean"].includes(typeof nullEmpty)
-          ) {
-            throw `Invalid orderBy option (${JSON.stringify(orderBy, null, 2)}) \n 
-                          Expecting { key: string, asc?: boolean, nulls?: 'first' | 'last' | null | undefined, nullEmpty?: boolean } `
-          }
-          return [{ key, asc, nulls, nullEmpty }];
-        }
-
-        if (expectOne && keys.length > 1) {
-          throw "\nInvalid orderBy " + JSON.stringify(orderBy) +
-          "\nEach orderBy array element cannot have more than one key";
-        }
-        /* { key2: true, key1: false } */
-        if (!Object.values(orderBy).find(v => ![true, false].includes(<any>v))) {
-          return keys.map(key => ({ key, asc: Boolean(orderBy[key]) }))
-
-          /* { key2: -1, key1: 1 } */
-        } else if (!Object.values(orderBy).find(v => ![-1, 1].includes(<any>v))) {
-          return keys.map(key => ({ key, asc: orderBy[key] === 1 }))
-
-          /* { key2: "asc", key1: "desc" } */
-        } else if (!Object.values(orderBy).find(v => !["asc", "desc"].includes(<any>v))) {
-          return keys.map(key => ({ key, asc: orderBy[key] === "asc" }))
-        } else return throwErr();
-      };
-
-    if (!orderBy) return [];
-
-    let _ob: { key: string, asc: boolean, nulls?: "first" | "last", nullEmpty?: boolean }[] = [];
-    if (isPlainObject(orderBy)) {
-      _ob = parseOrderObj(orderBy);
-    } else if (typeof orderBy === "string") {
-      /* string */
-      _ob = [{ key: orderBy, asc: true }];
-    } else if (Array.isArray(orderBy)) {
-
-      /* Order by is formed of a list of ascending field names */
-      const _orderBy = (orderBy as any[]);
-      if (_orderBy && !_orderBy.find(v => typeof v !== "string")) {
-        /* [string] */
-        _ob = _orderBy.map(key => ({ key, asc: true }));
-      } else if (_orderBy.find(v => isObject(v) && !isEmpty(v))) {
-        _ob = _orderBy.map(v => parseOrderObj(v, true)[0]!);
-      } else return throwErr();
-    } else return throwErr();
-
-    if (!_ob || !_ob.length) return [];
-
-    const validatedAggAliases = select.filter(s =>
-      s.type !== "joinedColumn" &&
-      (!s.fields.length || s.fields.every(f => allowed_cols.includes(f)))
-    ).map(s => s.alias)
-
-    const bad_param = _ob.find(({ key }) =>
-      !(validatedAggAliases || []).includes(key) &&
-      !allowed_cols.includes(key)
-    );
-    if (!bad_param) {
-      const selectedAliases = select.filter(s => s.selected).map(s => s.alias);
-      // return (excludeOrder? "" : " ORDER BY ") + (_ob.map(({ key, asc, nulls, nullEmpty = false }) => {
-      return _ob.map(({ key, asc, nulls, nullEmpty = false }) => {
-
-        /* Order by column index when possible to bypass name collision when ordering by a computed column. 
-            (Postgres will sort by existing columns wheundefined possible) 
-        */
-        const orderType = asc ? " ASC " : " DESC ";
-        const index = selectedAliases.indexOf(key) + 1;
-        const nullOrder = nulls ? ` NULLS ${nulls === "first" ? " FIRST " : " LAST "}` : "";
-        let colKey = (index > 0 && !nullEmpty) ? index : [tableAlias, key].filter(isDefined).map(asName).join(".");
-        if (nullEmpty) {
-          colKey = `nullif(trim(${colKey}::text), '')`
-        }
-
-        const res = `${colKey} ${orderType} ${nullOrder}`;
-
-        if (typeof colKey === "number") {
-          return {
-            asc,
-            fieldPosition: colKey
-          }
-        }
-
-        return {
-          fieldQuery: colKey,
-          asc,
-        }
-      })
-    } else {
-      throw "Invalid/disallowed orderBy fields or params: " + bad_param.key;
-    }
-  }
+   */
+  prepareWhere = prepareWhere.bind(this);
 
   /* This relates only to SELECT */
   prepareLimitQuery(limit = 1000, p: ValidatedTableRules): number {

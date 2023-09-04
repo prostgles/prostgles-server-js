@@ -83,6 +83,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
     // console.log(await db["*"].find())
   });
 
+
   await tryRun("getColumns definition", async () => {
     const res = await db.tr2.getColumns!("fr");
     // console.log(JSON.stringify(res, null, 2))
@@ -327,8 +328,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
         orderBy: { hIdx: -1 } 
       }
     ); 
-    // console.log(res[0])
-    // console.log(res.map(r => JSON.stringify(r)).join("\n"));//, null, 2))  
+     
     assert.deepStrictEqual(
       res[0], 
       {
@@ -765,8 +765,6 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
   await tryRun("Not Exists with exact path filter example", async () => {
     const _expect1 = await db.items.find!({ 
       $and: [
-        // { "items2": { name: "a" } },
-        // { "items2.items3": { name: "a" } },
         { $notExistsJoined: { items2: { name: "a" } } }
       ] 
     });
@@ -928,10 +926,37 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
             "*", 
             { path: [{ table: "items", on: [{ items0_id: "id" }] }] }
           )
+        },
+        orderBy: {
+          "i0.name": -1
         }
       }
     );
     assert.equal(res.length, 1);
     assert.equal(res[0].i0[0].name, "multi0");
-  })
+    assert.equal(res[0].items2_id, null);
+    assert.equal(res[0].items2_id, null);
+  });
+
+  await tryRun("Self join", async () => {
+    await db.self_join.delete();
+    const a = await db.self_join.insert({ name: "a" });
+    const a1 = await db.self_join.insert({ name: "a", my_id: { name: "b" } });
+    const a2 = await db.self_join.insert({ name: "a", my_id1: { name: "b1" } });
+
+    const one = await db.self_join.find({}, { 
+      select: { 
+        name: 1, 
+        my: {
+          $innerJoin: [{ table: "self_join", on: [{ my_id: "id" }] }],
+          filter: { name: "b" },
+          select: "*",
+          orderBy: "name"
+        }
+      } 
+    });
+    assert.equal(one.length, 1);
+    assert.equal(one[0].my.length, 1);
+    assert.equal(one[0].my[0].name, "b");
+  });
 }

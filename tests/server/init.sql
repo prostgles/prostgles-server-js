@@ -199,3 +199,11 @@ CREATE TABLE IF NOT EXISTS prostgles_test.basic1 (
 DROP MATERIALIZED VIEW IF EXISTS prostgles_test.mv_basic1;
 CREATE MATERIALIZED VIEW prostgles_test.mv_basic1 AS
   SELECT * FROM prostgles_test.basic1;
+
+DROP TABLE IF EXISTS self_join CASCADE;
+CREATE TABLE self_join (
+  id SERIAL PRIMARY KEY,
+  name TEXT,
+  my_id INTEGER REFERENCES self_join,
+  my_id1 INTEGER REFERENCES self_join
+);

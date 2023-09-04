@@ -224,7 +224,7 @@ export async function getTablesForSchemaPostgresSQL(
                 WHERE table_schema ${sql}
                 GROUP BY table_schema, table_name, column_name
               ) cp
-              ON c.table_name = cp.table_name AND c.column_name = cp.column_name
+              ON c.table_schema = cp.table_schema AND c.table_name = cp.table_name AND c.column_name = cp.column_name
           ) ccc
           WHERE table_schema ${sql}
           ORDER BY table_oid, ordinal_position

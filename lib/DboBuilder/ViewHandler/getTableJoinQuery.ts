@@ -68,8 +68,8 @@ export const getTableJoinQuery = ({ path, type, aliasSufix, rootTableAlias, fina
     targetAlias: getTableAlias(path.at(-1)!.table)
   }
 }
-export const getJoinOnCondition = (on: Record<string, string>[], leftAlias: string, rightAlias: string) => {
+export const getJoinOnCondition = (on: Record<string, string>[], leftAlias: string, rightAlias: string, getRightColName: (col: string) => string = (col) => col) => {
   return on.map(constraint => Object.entries(constraint).map(([leftCol, rightCol]) => {
-    return `${leftAlias}.${leftCol} = ${rightAlias}.${rightCol}`;
+    return `${leftAlias}.${leftCol} = ${rightAlias}.${getRightColName(rightCol)}`;
   }).join(" AND ")).join(" OR ")
 }

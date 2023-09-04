@@ -377,6 +377,7 @@ function dd(){
 				media: "*",
 				items_with_one_media: "*",
 				items_with_media: "*",
+				self_join: "*",
 				prostgles_lookup_media_items_with_one_media: "*",
 				prostgles_lookup_media_items_with_media: "*",
 				insert_rules: {

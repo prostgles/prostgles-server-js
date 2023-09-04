@@ -6,6 +6,7 @@ import { SelectParams, ColumnInfo, getKeys, DetailedJoinSelect, SimpleJoinSelect
 import { COMPUTED_FIELDS, FUNCTIONS } from "./Functions";
 import { NewQuery, NewQueryJoin, SelectItemBuilder } from "./QueryBuilder";
 import { parseJoinPath } from "../ViewHandler/parseJoinPath";
+import { prepareSortItems } from "../ViewHandler/prepareSortItems";
 
 const JOIN_KEYS = ["$innerJoin", "$leftJoin"] as const;
 type ParsedJoin = 
@@ -209,7 +210,7 @@ export async function getNewQuery(
     isLeftJoin: false,
     // having: cond.having,
     limit: _this.prepareLimitQuery(selectParams.limit, p),
-    orderByItems: _this.prepareSortItems(selectParams.orderBy, allowedOrderByFields, selectParams.alias, select),
+    orderByItems: prepareSortItems(selectParams.orderBy, allowedOrderByFields, selectParams.alias, select, joinQueries),
     offset: _this.prepareOffsetQuery(selectParams.offset)
   };
 

@@ -4,23 +4,29 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { isPlainObject, SortItem } from "../../DboBuilder";
-import { isEmpty, asName, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, isObject, Select, JoinSelect, getKeys, JoinPath } from "prostgles-types";
+import { isPlainObject, postgresToTsType, SortItem } from "../../DboBuilder";
+import { isEmpty, asName, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, isObject, Select, JoinSelect, getKeys, ValidatedColumnInfo, TS_PG_Types } from "prostgles-types";
 
 import { COMPUTED_FIELDS, FieldSpec, FUNCTIONS, FunctionSpec, parseFunction } from "./Functions";
 import { ViewHandler } from "../ViewHandler/ViewHandler";
 import { ParsedJoinPath } from "../ViewHandler/parseJoinPath";
 
 export type SelectItem = {
-  type: "column" | "function" | "aggregation" | "joinedColumn" | "computed";
   getFields: (args?: any[]) => string[] | "*";
   getQuery: (tableAlias?: string) => string;
   columnPGDataType?: string;
   column_udt_type?: PG_COLUMN_UDT_DATA_TYPE;
+  tsDataType?: ValidatedColumnInfo["tsDataType"]
   // columnName?: string; /* Must only exist if type "column" ... dissalow aliased columns? */
   alias: string;
   selected: boolean;
-};
+} & ({
+  type: "column";
+  columnName: string;
+} | {
+  type: "function" | "aggregation" | "joinedColumn" | "computed";
+  columnName?: undefined;
+});
 export type SelectItemValidated = SelectItem & { fields: string[]; }
 
 export type NewQueryRoot = {
@@ -172,10 +178,12 @@ export class SelectItemBuilder {
     const alias = selected? fieldName : ("not_selected_" + fieldName);
     this.addItem({
       type: "column",
+      columnName: fieldName,
       columnPGDataType: colDef?.data_type,
       column_udt_type: colDef?.udt_name,
+      tsDataType: colDef && postgresToTsType(colDef.udt_name),
       alias,
-      getQuery: () => asName(fieldName),
+      getQuery: (tableAlias) => asNameAlias(fieldName, tableAlias),
       getFields: () => [fieldName],
       selected
     });

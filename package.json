@@ -12,7 +12,9 @@
     "start": "tsc --watch",
     "build": "tsc",
     "lint": "eslint . --ext .ts --quiet --fix",
-    "test": "rm -rf ./node_modules/* && npm i && npm run lint && cd tests/ && ./test.sh",
+    "test-only": "cd tests/ && ./test.sh",
+    "test-quick": "cd tests/ && ./test.sh -quick",
+    "test": "rm -rf ./node_modules/* && npm i && npm run lint && npm run test-only",
     "pushpublish": "npm version patch --git-tag-version false && git push && npm publish"
   },
   "repository": {
@@ -39,7 +41,7 @@
     "check-disk-space": "^3.3.1",
     "file-type": "^17.1.4",
     "pg-promise": "^11.3.0",
-    "prostgles-types": "^4.0.35"
+    "prostgles-types": "^4.0.36"
   },
   "devDependencies": {
     "@types/bluebird": "^3.5.36",

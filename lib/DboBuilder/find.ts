@@ -1,7 +1,7 @@
 
 import { SelectParams, isObject } from "prostgles-types";
 import { Filter, LocalParams, makeErrorFromPGError, parseError, withUserRLS } from "../DboBuilder";
-import { makeSelectQuery } from "../DboBuilder/QueryBuilder/makeSelectQuery";
+import { getSelectQuery } from "./QueryBuilder/getSelectQuery";
 import { canRunSQL } from "../DboBuilder/runSQL";
 import { TableRule } from "../PublishParser";
 import { TableHandler } from "./TableHandler";
@@ -49,12 +49,11 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
       this.columns
     );
 
-    const queryWithoutRLS = makeSelectQuery(
-      this as unknown as TableHandler, 
+    const queryWithoutRLS = getSelectQuery(
+      this, 
       q, 
       undefined, 
-      undefined, 
-      selectParams
+      !!selectParams?.groupBy
     );
 
     const queryWithRLS = withUserRLS(localParams, queryWithoutRLS);

@@ -83,38 +83,56 @@ function getJoins(viewHandler: ViewHandler, source: string, path: JoinPath[], { 
     throw `Join info missing`;
   }
 
-  /* Find the join path between tables */
-  const tableConfigJoinInfo = viewHandler.dboBuilder?.prostgles?.tableConfigurator?.getJoinInfo(source, target);
-  if (tableConfigJoinInfo) return tableConfigJoinInfo;
-
-  const actualPath = getShortestJoin? 
-    viewHandler.joinPaths.find(j => j.t1 === source && j.t2 === target)?.path.map(table => ({ table, on: undefined })).slice(1) : 
-    viewHandler.joinPaths.find(j => {
-      return j.path.join() === [{ table: source }, ...path].map(p => p.table).join()
-    })? path : undefined;
-  
-  if (!actualPath) {
-    throw `Joining ${source} <-...-> ${target} dissallowed or missing`;
-  }
-
   /* Self join */
   if (source === target) {
     const tableHandler = viewHandler.dboBuilder.tablesOrViews?.find(t => t.name === source);
     if (!tableHandler) throw `Table not found for joining ${source}`;
 
     const fcols = tableHandler.columns.filter(c => c.references?.some(({ ftable }) => ftable === viewHandler.name));
-    if (fcols.length) {
-      throw "Self referencing not supported yet"
-      // return {
-      //     paths: [{
-      //         source,
-      //         target,
-      //         table: target,
-      //         on: fcols.map(fc => fc.references!.some(({ fcols }) => fcols.map(fcol => [fc.name,  fcol])))
-      //     }],
-      //     expectOne: false
-      // }
+    if(!fcols.length){
+      throw `There is no self-join foreign key relationship for table ${JSON.stringify(target)}`
     }
+    let allOnJoins: [string, string][][] = [];
+    fcols.forEach(fc => {
+      fc.references!.forEach(({ fcols, cols }) => {
+        const fieldArr = fcols.map((fcol, i) => [fcol,  cols[i]!] as [string, string]);
+        allOnJoins.push(fieldArr);
+      })
+    });
+    allOnJoins = [
+      ...allOnJoins,
+      /** Reverse as well */
+      ...allOnJoins.map(constraint => (constraint).map(([left, right]) => [right, left] as [string, string]))
+    ]
+    return {
+      paths: [{
+        source,
+        target,
+        table: target,
+        on: getValidOn(lastItem.on, allOnJoins.map(v => Object.fromEntries(v)))
+      }],
+      expectOne: false
+    }
+  }
+
+  /* Find the join path between tables */
+  const tableConfigJoinInfo = viewHandler.dboBuilder?.prostgles?.tableConfigurator?.getJoinInfo(source, target);
+  if (tableConfigJoinInfo) return tableConfigJoinInfo;
+
+  const actualPath = getShortestJoin? 
+    viewHandler.joinPaths.find(j => {
+      return j.t1 === source && j.t2 === target
+    })?.path.map(table => ({ table, on: undefined })).slice(1) : 
+    viewHandler.joinPaths.find(j => {
+      return j.path.join() === [{ table: source }, ...path].map(p => p.table).join()
+    })? path : undefined;
+
+  if(getShortestJoin && actualPath?.length && lastItem.on?.length){
+    actualPath[actualPath.length-1]!.on = lastItem.on;
+  }
+  
+  if (!actualPath) {
+    throw `Joining ${source} <-...-> ${target} dissallowed or missing`;
   }
 
   /* Make the join chain info */
@@ -131,33 +149,33 @@ function getJoins(viewHandler: ViewHandler, source: string, path: JoinPath[], { 
       throw `Joining ${t1} <-> ${tablePath} dissallowed or missing`;
     }
 
-    const on: [string, string][][] = [];
+    const on = getValidOn(tablePath.on, join.on);
 
-    join.on.map(cond => {
-      const condArr: [string, string][] = [];
-      Object.entries(cond).forEach(([leftKey, rightKey]) => {
+    // join.on.map(fullConstraint => {
+    //   const condArr: [string, string][] = [];
+    //   Object.entries(fullConstraint).forEach(([leftKey, rightKey]) => {
 
-        const checkIfOnSpecified = (fields: [l: string, r: string], isLtr: boolean) => {
-          if(tablePath.on){
-            return tablePath.on.some(constraint => {
-              const consFieldEntries = Object.entries(constraint)
+    //     const checkIfOnSpecified = (fields: [string, string], isLtr: boolean) => {
+    //       if(tablePath.on){
+    //         return tablePath.on.some(requestedConstraint => {
+    //           const consFieldEntries = Object.entries(requestedConstraint)
               
-              return consFieldEntries.every(consFields => (isLtr? consFields : consFields.slice(0).reverse()).join() === fields.join())
-            });
-          }
+    //           return consFieldEntries.every(consFields => (isLtr? consFields : consFields.slice(0).reverse()).join() === fields.join())
+    //         });
+    //       }
 
-          return true;
-        }
+    //       return true;
+    //     }
 
-        /* Left table is joining on keys OR Left table is joining on values */
-        const isLtr = join.tables[0] === t1;
-        const fields: [string, string] = isLtr? [leftKey, rightKey] : [rightKey, leftKey];
-        if(checkIfOnSpecified(fields, isLtr)){
-          condArr.push(fields)
-        }
-      });
-      on.push(condArr);
-    })
+    //     /* Left table is joining on keys OR Left table is joining on values */
+    //     const isLtr = join.tables[0] === t1;
+    //     const fields: [string, string] = isLtr? [leftKey, rightKey] : [rightKey, leftKey];
+    //     if(checkIfOnSpecified(fields, isLtr)){
+    //       condArr.push(fields)
+    //     }
+    //   });
+    //   on.push(condArr);
+    // })
 
     paths.push({
       source,
@@ -187,4 +205,28 @@ function getJoins(viewHandler: ViewHandler, source: string, path: JoinPath[], { 
     paths,
     expectOne
   };
+}
+
+
+const getValidOn = (requested: JoinPath["on"], possible: ParsedJoinPath["on"]) => {
+
+  if(!requested){
+    return possible.map(v => Object.entries(v));
+  }
+  if(!requested.length){
+    throw `Invalid requested "tablePath.on". Cannot be empty`
+  }
+  const isValid = requested.every(requestedConstraint => {
+    const requestedConsFields = Object.entries(requestedConstraint)
+    return possible.some(fullConstraint => {
+      const fullConsFields = Object.entries(fullConstraint)
+      return fullConsFields.every(fullFields => requestedConsFields.every(requestedFields => requestedFields.join() === fullFields.join()))
+    })
+  });
+
+  if(!isValid){
+    throw `Invalid path specified for join: ${JSON.stringify(requested)}. Allowed paths: ${JSON.stringify(possible)}`
+  }
+
+  return requested.map(v => Object.entries(v));
 }

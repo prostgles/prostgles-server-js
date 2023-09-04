@@ -292,9 +292,8 @@ const getJoinPath = async (tableHandler: TableHandler, targetTable: string): Pro
   path: string[];
 }> => {
 
-  const jp = tableHandler.dboBuilder.shortestJoinPaths.find(jp => jp.t1 === tableHandler.name && jp.t2 === targetTable);
+  const jp = tableHandler.dboBuilder.getShortestJoinPath(tableHandler, targetTable);
   if (!jp) {
-    console.trace(tableHandler.dboBuilder.shortestJoinPaths)
     const pref = tableHandler.dboBuilder.prostgles.opts.joins !== "inferred" ? "Joins are not inferred! " : ""
     throw new Error(`${pref}Could not find a single join path for the nested data ( sourceTable: ${tableHandler.name} targetTable: ${targetTable} ) `);
   }

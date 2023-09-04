@@ -19,7 +19,14 @@ import {
   SQLHandler,
   AnyObject,
   JoinMaker,
-  isObject, getKeys, ProstglesError, _PG_geometric, EXISTS_KEY, RawJoinPath
+  isObject, 
+  getKeys, 
+  ProstglesError, 
+  _PG_geometric, 
+  EXISTS_KEY, 
+  RawJoinPath, 
+  getJoinHandlers,
+  asName
 } from "prostgles-types";
 import { sqlErrCodeToMsg } from "./DboBuilder/sqlErrCodeToMsg"
 
@@ -27,9 +34,18 @@ export type SortItem = {
   asc: boolean;
   nulls?: "first" | "last";
   nullEmpty?: boolean;
+  key: string;
+  nested?: {
+    table: string;
+    column: string;
+    isNumeric: boolean;
+    fieldQuery: string;
+  };
 } & ({
+  type: "query";
   fieldQuery: string;
 } | {
+  type: "position";
   fieldPosition: number;
 });
 
@@ -368,11 +384,12 @@ export type ExistsFilterConfig = {
   targetTable: string;
 });
 
-import { parseJoins } from "./DboBuilder/parseJoins";
+import { prepareShortestJoinPaths } from "./DboBuilder/prepareShortestJoinPaths";
 import { BasicSession, UserLike } from "./AuthHandler";
 import { getDBSchema } from "./DBSchemaBuilder";
 import { TableHandler } from "./DboBuilder/TableHandler";
-import { ParsedJoinPath } from "./DboBuilder/ViewHandler/parseJoinPath";
+import { ParsedJoinPath, parseJoinPath } from "./DboBuilder/ViewHandler/parseJoinPath";
+import { asNameAlias } from "./DboBuilder/QueryBuilder/QueryBuilder";
 
 export class DboBuilder {
   tablesOrViews?: TableSchema[];   //TableSchema           TableOrViewInfo
@@ -445,7 +462,7 @@ export class DboBuilder {
   tsTypesDefinition?: string;
 
   joinGraph?: Graph;
-  shortestJoinPaths: JoinPaths = [];
+  private shortestJoinPaths: JoinPaths = [];
 
   prostgles: Prostgles;
   publishParser?: PublishParser;
@@ -498,7 +515,12 @@ export class DboBuilder {
     return this.shortestJoinPaths;
   }
 
-  parseJoins = parseJoins.bind(this);
+  prepareShortestJoinPaths = async () => {
+    const { joins, shortestJoinPaths, joinGraph } = await prepareShortestJoinPaths(this);
+    this.joinGraph = joinGraph;
+    this.joins = joins;
+    this.shortestJoinPaths = shortestJoinPaths;
+  }
 
   runSQL = async (query: string, params: any, options: SQLOptions | undefined, localParams?: LocalParams) => {
     return runSQL.bind(this)(query, params, options, localParams);
@@ -516,7 +538,7 @@ export class DboBuilder {
     this.tablesOrViews = tablesOrViewsReq.result;
 
     this.constraints = await getConstraints(this.db, this.prostgles.opts.schema);
-    await this.parseJoins();
+    await this.prepareShortestJoinPaths();
 
     this.dbo = {};
     this.tablesOrViews.map(tov => {
@@ -550,22 +572,16 @@ export class DboBuilder {
             ... omitKeys(options, ["path"]),
           }
         }
-        this.dbo.innerJoin = this.dbo.innerJoin || {};
-        this.dbo.leftJoin = this.dbo.leftJoin || {};
-        this.dbo.innerJoinOne = this.dbo.innerJoinOne || {};
-        this.dbo.leftJoinOne = this.dbo.leftJoinOne || {};
-        this.dbo.leftJoin[table] = (filter, select, options = {}) => {
-          return makeJoin(true, filter, select, options);
-        }
-        this.dbo.innerJoin[table] = (filter, select, options = {}) => {
-          return makeJoin(false, filter, select, options);
-        }
-        this.dbo.leftJoinOne[table] = (filter, select, options = {}) => {
-          return makeJoin(true, filter, select, { ...options, limit: 1 });
-        }
-        this.dbo.innerJoinOne[table] = (filter, select, options = {}) => {
-          return makeJoin(false, filter, select, { ...options, limit: 1 });
-        }
+        this.dbo.innerJoin ??= {};
+        this.dbo.leftJoin ??= {};
+        this.dbo.innerJoinOne ??= {};
+        this.dbo.leftJoinOne ??= {};
+
+        const joinHandlers = getJoinHandlers(table);
+        this.dbo.leftJoin[table] = joinHandlers.leftJoin;
+        this.dbo.innerJoin[table] = joinHandlers.innerJoin;
+        this.dbo.leftJoinOne[table] = joinHandlers.leftJoinOne;
+        this.dbo.innerJoinOne[table] = joinHandlers.innerJoinOne;
       }
     });
 
@@ -590,6 +606,28 @@ export class DboBuilder {
     ].join("\n");
 
     return this.dbo;
+  }
+
+  getShortestJoinPath = (viewHandler: ViewHandler, target: string): JoinPaths[number] | undefined => {
+    const source = viewHandler.name;
+    if(source === target){
+      const joinPath = parseJoinPath({
+        rawPath: target,
+        rootTable: source,
+        viewHandler
+      });
+
+      if(!joinPath) return undefined;
+
+      return {
+        t1: source,
+        t2: target,
+        path: [source]
+      }
+    }
+
+    const jp = this.shortestJoinPaths.find(jp => jp.t1 === source && jp.t2 === target);
+    return jp;
   }
 
   getTX = (cb: TxCB) => {
@@ -687,15 +725,19 @@ export function postgresToTsType(udt_data_type: PG_COLUMN_UDT_DATA_TYPE): keyof 
   }) ?? "any";
 }
 
-export const prepareSort = (items: SortItem[], excludeOrder = false): string => {
-  if (!items.length) return "";
-  return (excludeOrder ? "" : " ORDER BY ") + items.map(d => {
+export const prepareSort = (items: SortItem[]): string[] => {
+  if (!items.length) return [];
+  return ["ORDER BY " + items.map(d => {
 
     const orderType = d.asc ? " ASC " : " DESC ";
     const nullOrder = d.nulls ? ` NULLS ${d.nulls === "first" ? " FIRST " : " LAST "}` : "";
-    const colKey = "fieldQuery" in d ? d.fieldQuery : d.fieldPosition;
-    return `${colKey} ${orderType} ${nullOrder}`;
-  }).join(", ")
+    // const colKey = "fieldQuery" in d ? d.fieldQuery : d.fieldPosition;
+    // return `${colKey} ${orderType} ${nullOrder}`;
+    if(d.nested){
+      return `${d.nested.fieldQuery} ${orderType} ${nullOrder}`;
+    }
+    return `${asName(d.key)} ${orderType} ${nullOrder}`;
+  }).join(", ")]
 }
 
 export const canEXECUTE = async (db: DB) => {

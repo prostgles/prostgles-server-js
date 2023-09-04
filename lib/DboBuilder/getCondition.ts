@@ -103,6 +103,7 @@ export async function getCondition(
     ).map(f => ({
       type: f.type,
       alias: f.name,
+      columnName: f.type === "column"? f.name : undefined as any,
       getQuery: (tableAlias) => f.getQuery({
         tableAlias,
         allColumns: this.columns,

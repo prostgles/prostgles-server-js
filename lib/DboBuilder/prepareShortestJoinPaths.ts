@@ -1,17 +1,24 @@
 import { DboBuilder, TableSchema } from "../DboBuilder";
 import { JOIN_TYPES, Join } from "../Prostgles";
-import { findShortestPath } from "../shortestPath";
+import { Graph, findShortestPath } from "../shortestPath";
 import { JoinPaths } from "./ViewHandler/ViewHandler";
 
-export async function parseJoins(this: DboBuilder): Promise<JoinPaths> {
-  if (this.prostgles.opts.joins) {
 
-    let joinConfig = await this.prostgles.opts.joins;
-    if (!this.tablesOrViews) {
+type Result = {
+  joinGraph?: Graph | undefined;
+  joins: Join[];
+  shortestJoinPaths: JoinPaths;
+}
+export async function prepareShortestJoinPaths(dboBuilder: DboBuilder): Promise<Result> {
+
+  if (dboBuilder.prostgles.opts.joins) {
+
+    let joinConfig = await dboBuilder.prostgles.opts.joins;
+    if (!dboBuilder.tablesOrViews) {
       throw new Error("Could not create join config. this.tablesOrViews missing");
     }
 
-    const inferredJoins = await getInferredJoins2(this.tablesOrViews);
+    const inferredJoins = await getInferredJoins2(dboBuilder.tablesOrViews);
     if (joinConfig === "inferred") {
       joinConfig = inferredJoins
       /* If joins are specified then include inferred joins except the explicit tables */
@@ -22,11 +29,10 @@ export async function parseJoins(this: DboBuilder): Promise<JoinPaths> {
       throw new Error("Unexpected joins init param. Expecting 'inferred' OR joinConfig but got: " + JSON.stringify(joinConfig))
     }
     const joins = JSON.parse(JSON.stringify(joinConfig)) as Join[];
-    this.joins = joins;
 
     // Validate joins
     try {
-      const tovNames = this.tablesOrViews!.map(t => t.name);
+      const tovNames = dboBuilder.tablesOrViews!.map(t => t.name);
 
       // 2 find incorrect tables
       const missing = joins.flatMap(j => j.tables).find(t => !tovNames.includes(t));
@@ -46,7 +52,7 @@ export async function parseJoins(this: DboBuilder): Promise<JoinPaths> {
             const t = <string>v[0],
               f = <string[]>v[1];
 
-            const tov = this.tablesOrViews!.find(_t => _t.name === t);
+            const tov = dboBuilder.tablesOrViews!.find(_t => _t.name === t);
             if (!tov) throw "Table not found: " + t;
             const m1 = f.filter(k => !tov!.columns.map(c => c.name).includes(k))
             if (m1 && m1.length) {
@@ -70,31 +76,31 @@ export async function parseJoins(this: DboBuilder): Promise<JoinPaths> {
     }
 
     // Make joins graph
-    this.joinGraph = {};
-    this.joins.forEach(({ tables }) => {
+    const joinGraph: Graph = {};
+    joins.forEach(({ tables }) => {
       const _t = tables.slice().sort(),
         t1 = _t[0]!,
         t2 = _t[1]!;
 
       if (t1 === t2) return;
 
-      this.joinGraph![t1] ??= {};
-      this.joinGraph![t1]![t2] = 1;
+      joinGraph![t1] ??= {};
+      joinGraph![t1]![t2] = 1;
 
-      this.joinGraph![t2] ??= {};
-      this.joinGraph![t2]![t1] = 1;
+      joinGraph![t2] ??= {};
+      joinGraph![t2]![t1] = 1;
     });
-    const tables = Array.from(new Set(this.joins.flatMap(t => t.tables)));
-    this.shortestJoinPaths = [];
+    const tables = Array.from(new Set(joins.flatMap(t => t.tables)));
+    const shortestJoinPaths: JoinPaths = [];
     tables.forEach((t1, i1) => {
       tables.forEach((t2, i2) => {
 
         /** Prevent recursion */
         if (
           t1 === t2 ||
-          this.shortestJoinPaths.some(jp => {
+          shortestJoinPaths.some(jp => {
             if (arrayValuesMatch([jp.t1, jp.t2], [t1, t2])) {
-              const spath = findShortestPath(this.joinGraph!, t1, t2);
+              const spath = findShortestPath(joinGraph, t1, t2);
               if (spath && arrayValuesMatch(spath.path, jp.path)) {
                 return true;
               }
@@ -104,23 +110,29 @@ export async function parseJoins(this: DboBuilder): Promise<JoinPaths> {
           return;
         }
 
-        const spath = findShortestPath(this.joinGraph!, t1, t2);
+        const spath = findShortestPath(joinGraph, t1, t2);
         if (!(spath && spath.distance < Infinity)) return;
 
-        const existing1 = this.shortestJoinPaths.find(j => j.t1 === t1 && j.t2 === t2)
+        const existing1 = shortestJoinPaths.find(j => j.t1 === t1 && j.t2 === t2)
         if (!existing1) {
-          this.shortestJoinPaths.push({ t1, t2, path: spath.path.slice() });
+          shortestJoinPaths.push({ t1, t2, path: spath.path.slice() });
         }
 
-        const existing2 = this.shortestJoinPaths.find(j => j.t2 === t1 && j.t1 === t2);
+        const existing2 = shortestJoinPaths.find(j => j.t2 === t1 && j.t1 === t2);
         if (!existing2) {
-          this.shortestJoinPaths.push({ t1: t2, t2: t1, path: spath.path.slice().reverse() });
+          shortestJoinPaths.push({ t1: t2, t2: t1, path: spath.path.slice().reverse() });
         }
       });
     });
+    return {
+      joins, shortestJoinPaths, joinGraph
+    }
   }
 
-  return this.shortestJoinPaths;
+  return {
+    joins: [],
+    shortestJoinPaths: [],
+  };
 }
 
 
