@@ -39,7 +39,7 @@ export function getSelectQuery(
            *  1) prevent arrays with a single null element when no rows were matched 
            *  2) allow nested limit
            * */
-          let joinAggNonNullArrayElemFilter = join.targetTableJoinFields
+          const joinAggNonNullArrayElemFilter = join.targetTableJoinFields
             .map(f => `${joinAlias}.${getJoinCol(f).alias} IS NOT NULL`)
             .concat(join.limitFieldName? [`${asNameAlias(join.limitFieldName, joinAlias)} <= ${join.limit}`] : [])
             .join(" AND ");

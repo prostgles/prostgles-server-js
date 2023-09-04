@@ -141,12 +141,6 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { selectParam
     const nonExistsFilter = filterOpts.exists.length ? {} : filter;
     for await (const j of (newQuery.joins ?? [])) {
       if (!viewOptions!.relatedTables.find(rt => rt.tableName === j.table)) {
-        const [targetTablePath, ...otherTables] = (j.joinPath ?? []).slice(0).reverse();
-        if(!targetTablePath || j.table !== targetTablePath.table) throw `Not possible`;
-        const newPath: ParsedJoinPath[] = [{
-          table: this.name,
-          on: reverseJoinOn(targetTablePath.on)
-        }, ...otherTables]
         /**
          * Must shift on condition
          */
@@ -156,7 +150,7 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { selectParam
           condition: (await this.dboBuilder.dbo[j.table]!.prepareWhere!({
             filter: {
               $existsJoined: {
-                path: newPath,
+                path: reverseParsedPath(j.joinPath, this.name),
                 filter: nonExistsFilter
               }
             },
@@ -170,14 +164,14 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { selectParam
     for await (const e of newQuery.whereOpts.exists.filter(e => e.isJoined)) {
       if(!e.isJoined) throw `Not possible`;
       const targetTable = e.parsedPath.at(-1)!.table;
-      const newPath = 
+      const newPath = reverseParsedPath(e.parsedPath, this.name)
       viewOptions.relatedTables.push({
         tableName: targetTable,
         tableNameEscaped: asName(targetTable),
         condition: (await this.dboBuilder.dbo[targetTable]!.prepareWhere!({
           filter: {
             $existsJoined: {
-              path: [{ table: this.name }, ...(e.parsedPath ?? []).slice(0, -1).reverse().map(jp => ({ ...jp, on: reverseJoinOn(jp.on) }))],
+              path: newPath,
               filter: nonExistsFilter
             }
           },
@@ -193,4 +187,14 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { selectParam
   }
 
   return viewOptions;
+}
+
+const reverseParsedPath = (parsedPath: ParsedJoinPath[], table: string) => {
+  const [targetTablePath, ...otherTables] = (parsedPath ?? []).slice(0).reverse();
+  if(!targetTablePath) throw `Not possible`;
+  const newPath: ParsedJoinPath[] = [{
+    table,
+    on: reverseJoinOn(targetTablePath.on)
+  }, ...otherTables]
+  return newPath;
 }
