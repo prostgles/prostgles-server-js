@@ -149,36 +149,9 @@ function getJoins(viewHandler: ViewHandler, source: string, path: JoinPath[], { 
       throw `Joining ${t1} <-> ${tablePath} dissallowed or missing`;
     }
     const isLtr = join.tables[0] === t1;
-    const joinOn = isLtr? join.on : join.on.map(constraint => Object.fromEntries(Object.entries(constraint).map(([left, right]) => [right, left])));
+    const joinOn = isLtr? join.on : reverseJoinOn(join.on);
 
     const on = getValidOn(tablePath.on, joinOn);
-
-    // join.on.map(fullConstraint => {
-    //   const condArr: [string, string][] = [];
-    //   Object.entries(fullConstraint).forEach(([leftKey, rightKey]) => {
-
-    //     const checkIfOnSpecified = (fields: [string, string], isLtr: boolean) => {
-    //       if(tablePath.on){
-    //         return tablePath.on.some(requestedConstraint => {
-    //           const consFieldEntries = Object.entries(requestedConstraint)
-              
-    //           return consFieldEntries.every(consFields => (isLtr? consFields : consFields.slice(0).reverse()).join() === fields.join())
-    //         });
-    //       }
-
-    //       return true;
-    //     }
-
-    //     /* Left table is joining on keys OR Left table is joining on values */
-    //     const isLtr = join.tables[0] === t1;
-    //     const fields: [string, string] = isLtr? [leftKey, rightKey] : [rightKey, leftKey];
-    //     if(checkIfOnSpecified(fields, isLtr)){
-    //       condArr.push(fields)
-    //     }
-    //   });
-    //   on.push(condArr);
-    // })
-
     paths.push({
       source,
       target,
@@ -209,6 +182,16 @@ function getJoins(viewHandler: ViewHandler, source: string, path: JoinPath[], { 
   };
 }
 
+export const reverseJoinOn = (on: ParsedJoinPath["on"]) => {
+  return on.map(constraint => 
+    Object.fromEntries(
+      Object.entries(constraint)
+        .map(([left, right]) => 
+          [right, left]
+        )
+    )
+  );
+}
 
 const getValidOn = (requested: JoinPath["on"], possible: ParsedJoinPath["on"]) => {
 

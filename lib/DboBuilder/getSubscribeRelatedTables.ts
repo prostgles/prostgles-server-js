@@ -4,6 +4,7 @@ import { TableRule } from "../PublishParser";
 import { log, ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
 import { NewQuery } from "./QueryBuilder/QueryBuilder";
 import { ViewHandler } from "./ViewHandler/ViewHandler";
+import { ParsedJoinPath, reverseJoinOn } from "./ViewHandler/parseJoinPath";
 
 type Args = {
   selectParams: Omit<SubscribeParams, "throttle">;
@@ -140,33 +141,43 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { selectParam
     const nonExistsFilter = filterOpts.exists.length ? {} : filter;
     for await (const j of (newQuery.joins ?? [])) {
       if (!viewOptions!.relatedTables.find(rt => rt.tableName === j.table)) {
+        const [targetTablePath, ...otherTables] = (j.joinPath ?? []).slice(0).reverse();
+        if(!targetTablePath || j.table !== targetTablePath.table) throw `Not possible`;
+        const newPath: ParsedJoinPath[] = [{
+          table: this.name,
+          on: reverseJoinOn(targetTablePath.on)
+        }, ...otherTables]
+        /**
+         * Must shift on condition
+         */
         viewOptions.relatedTables.push({
           tableName: j.table,
           tableNameEscaped: asName(j.table),
           condition: (await this.dboBuilder.dbo[j.table]!.prepareWhere!({
             filter: {
               $existsJoined: {
-
-                [[this.name, ...j.joinPath ?? [].slice(0).reverse()].join(".")]: nonExistsFilter
+                path: newPath,
+                filter: nonExistsFilter
               }
             },
             addKeywords: false,
             localParams: undefined,
             tableRule: undefined
           })).where
-        })
+        });
       }
     }
     for await (const e of newQuery.whereOpts.exists.filter(e => e.isJoined)) {
       if(!e.isJoined) throw `Not possible`;
-      const eTable = e.parsedPath.at(-1)!.table;
+      const targetTable = e.parsedPath.at(-1)!.table;
+      const newPath = 
       viewOptions.relatedTables.push({
-        tableName: eTable,
-        tableNameEscaped: asName(eTable),
-        condition: (await this.dboBuilder.dbo[eTable]!.prepareWhere!({
+        tableName: targetTable,
+        tableNameEscaped: asName(targetTable),
+        condition: (await this.dboBuilder.dbo[targetTable]!.prepareWhere!({
           filter: {
             $existsJoined: {
-              path: [{ table: this.name }, ...(e.parsedPath ?? []).slice(0, -1).reverse()],
+              path: [{ table: this.name }, ...(e.parsedPath ?? []).slice(0, -1).reverse().map(jp => ({ ...jp, on: reverseJoinOn(jp.on) }))],
               filter: nonExistsFilter
             }
           },

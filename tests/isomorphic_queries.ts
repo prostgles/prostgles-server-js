@@ -890,6 +890,19 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
     assert.deepStrictEqual(reverseJoin[1], { "id": 2, "tr1_id": 2, "t1": "a", "t2": "b", "tr1": [{ "ids": [2] }] });
   });
 
+  await tryRun("Related table subscribe", async () => {
+    const sub = await await db.tr1.subscribe!({}, {
+      select: {
+        "*": 1,
+        tr2: "*"
+      }
+    }, rows => {
+
+    });
+
+    await sub.unsubscribe();
+  });
+
   await tryRun("Reference column deep nested insert", async () => {
     
     const pr = await db.items4a.insert!({ 
