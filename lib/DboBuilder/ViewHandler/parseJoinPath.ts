@@ -202,11 +202,7 @@ const getValidOn = (requested: JoinPath["on"], possible: ParsedJoinPath["on"]) =
     throw `Invalid requested "tablePath.on". Cannot be empty`
   }
   const isValid = requested.every(requestedConstraint => {
-    const requestedConsFields = Object.entries(requestedConstraint)
-    return possible.some(fullConstraint => {
-      const fullConsFields = Object.entries(fullConstraint)
-      return fullConsFields.every(fullFields => requestedConsFields.every(requestedFields => requestedFields.join() === fullFields.join()))
-    })
+    return possible.some(possibleConstraint => conditionsMatch(possibleConstraint, requestedConstraint));
   });
 
   if(!isValid){
@@ -214,4 +210,10 @@ const getValidOn = (requested: JoinPath["on"], possible: ParsedJoinPath["on"]) =
   }
 
   return requested.map(v => Object.entries(v));
+}
+
+const conditionsMatch = (c1: Record<string, string>, c2: Record<string, string>) => {
+  const keys1 = Object.keys(c1);
+  const keys2 = Object.keys(c2);
+  return keys1.sort().join() === keys2.sort().join() && keys1.every(key => c1[key] === c2[key]);
 }
