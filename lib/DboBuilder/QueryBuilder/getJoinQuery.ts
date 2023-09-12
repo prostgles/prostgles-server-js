@@ -24,9 +24,11 @@ export const getJoinCol = (colName: string) => {
 }
 
 const getJoinTable = (tableName: string, pathIndex: number, isLastTableAlias: string | undefined) => {
+  const rawAlias = isLastTableAlias ?? `p${pathIndex}__${tableName}`; 
   return {
     name: asName(tableName),
-    alias: asName(isLastTableAlias ?? `p${pathIndex}__${tableName}`),
+    alias: asName(rawAlias),
+    rawAlias,
   }
 }
 
@@ -51,7 +53,7 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2, depth }: Args):
   const firstJoinTableJoinFields = firstJoinTablePath.on.flatMap(condObj => Object.entries(condObj).map(([source, target]) => target));
   const { rootSelectItems, limitFieldName } = getSelectFields({ 
     q: q2, 
-    firstJoinTableAlias: getJoinTable(firstJoinTablePath.table, 0, paths.length === 1? targetTableAliasRaw : undefined).alias, 
+    firstJoinTableAlias: getJoinTable(firstJoinTablePath.table, 0, paths.length === 1? targetTableAliasRaw : undefined).rawAlias, 
     _joinFields: firstJoinTableJoinFields 
   });
 
@@ -143,7 +145,7 @@ const getSelectFields = ({ q, firstJoinTableAlias, _joinFields }: GetSelectField
       getQuery: (tableAlias) => asNameAlias(f, tableAlias),
       selected: false,
       isJoinCol: true,
-      query: `${firstJoinTableAlias}.${getJoinCol(f).rootSelect}`,
+      query: `${asName(firstJoinTableAlias)}.${getJoinCol(f).rootSelect}`,
     })));
 
   if(limitFieldName){
@@ -154,7 +156,7 @@ const getSelectFields = ({ q, firstJoinTableAlias, _joinFields }: GetSelectField
       alias: limitFieldName,
       getFields: () => [],
       getQuery,
-      query: getQuery(targetTableAlias),
+      query: getQuery(firstJoinTableAlias),
       isJoinCol: false,
     })
   }
