@@ -21,7 +21,14 @@ export function getSelectQuery(
   const rootSelect = q.select.filter(s => s.selected).map(s => [s.getQuery(rootTableAlias), " AS ", asName(s.alias)].join(""));
 
   const parsedJoins = q.joins?.flatMap(q2 => {
-    const parsed = getJoinQuery(viewHandler, { q1: { ...q, tableAlias: rootTableAlias }, q2, depth: depth + 1, selectParamsGroupBy: shouldGroupBy });
+    const parsed = getJoinQuery(
+      viewHandler, { 
+        q1: { ...q, tableAlias: rootTableAlias }, 
+        q2: { ...q2 }, 
+        depth: depth + 1, 
+        selectParamsGroupBy: shouldGroupBy 
+      }
+    );
     return {
       ...q2,
       ...parsed

@@ -22,7 +22,7 @@ export const getTableJoinQuery = ({ path, type, aliasSufix, rootTableAlias, fina
     const tableAlias = getTableAlias(table);
     const prevTableAlias = i === 0? rootTableAlias : getTableAlias(path[i-1]!.table);
 
-    const onCondition = getJoinOnCondition(on, prevTableAlias, tableAlias);
+    const onCondition = getJoinOnCondition({ on, leftAlias: prevTableAlias, rightAlias: tableAlias });
 
     const isExists = type === "EXISTS"
     const joinType = isExists? "INNER" : type;
@@ -34,11 +34,11 @@ export const getTableJoinQuery = ({ path, type, aliasSufix, rootTableAlias, fina
      * first path joins to target table through inner joins
      */
     const whereJoinCondition = (isLast && isExists) ? 
-      `WHERE (${getJoinOnCondition(
-      firstPath.on, 
-      rootTableAlias, 
-      getTableAlias(firstPath.table)
-    )})` : "";
+      `WHERE (${getJoinOnCondition({
+      on: firstPath.on, 
+      leftAlias: rootTableAlias, 
+      rightAlias: getTableAlias(firstPath.table)
+    })})` : "";
 
     const tableSelect = (isExists && isLast)? [
       `(`, 
@@ -68,8 +68,16 @@ export const getTableJoinQuery = ({ path, type, aliasSufix, rootTableAlias, fina
     targetAlias: getTableAlias(path.at(-1)!.table)
   }
 }
-export const getJoinOnCondition = (on: Record<string, string>[], leftAlias: string, rightAlias: string, getRightColName: (col: string) => string = (col) => col) => {
+
+type GetJoinOnConditionArgs = {
+  on: Record<string, string>[];
+  leftAlias: string; 
+  rightAlias: string;
+  getLeftColName?: (col: string) => string;
+  getRightColName?: (col: string) => string;
+}
+export const getJoinOnCondition = ({ on, leftAlias, rightAlias, getLeftColName = asName, getRightColName = asName }: GetJoinOnConditionArgs ) => {
   return on.map(constraint => Object.entries(constraint).map(([leftCol, rightCol]) => {
-    return `${leftAlias}.${leftCol} = ${rightAlias}.${getRightColName(rightCol)}`;
+    return `${leftAlias}.${getLeftColName(leftCol)} = ${rightAlias}.${getRightColName(rightCol)}`;
   }).join(" AND ")).join(" OR ")
 }

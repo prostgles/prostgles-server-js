@@ -16,18 +16,26 @@ type Args = {
  * Rename all join columns to prevent name clash
  */
 export const getJoinCol = (colName: string) => {
-  const alias = asName("prgl_join_col_" + colName);
+  const alias = asName("prgl_join_col__" + colName);
   return {
     alias,
     rootSelect: `${asName(colName)} AS ${alias}`,
   }
 }
+
+const getJoinTable = (tableName: string, pathIndex: number, isLastTableAlias: string | undefined) => {
+  return {
+    name: asName(tableName),
+    alias: asName(isLastTableAlias ?? `p${pathIndex}__${tableName}`),
+  }
+}
+
 /**
   Returns join query:
 
   LEFT JOIN (
     SELECT [target table select + join fields]
-    FROM first_join
+    FROM first_join/target_table
     JOIN ..next_joins ON ...
     JOIN target_table
   ) target_table
@@ -36,18 +44,28 @@ export const getJoinCol = (colName: string) => {
 export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2, depth }: Args): { queryLines: string[]; targetTableJoinFields: string[]; limitFieldName?: string; } => {
   const paths = parseJoinPath({ rootTable: q1.table, rawPath: q2.joinPath, viewHandler: viewHandler, allowMultiOrJoin: true, addShortestJoinIfMissing: true, })
 
-  const targetTableAlias = (q2.tableAlias || q2.table);
+  const targetTableAliasRaw = q2.tableAlias || q2.table;
+  const targetTableAlias = asName(targetTableAliasRaw);
   
-  const targetTableJoinFields = paths.at(-1)!.on.flatMap(condObj => Object.entries(condObj).map(([source, target]) => target));
-  const { rootSelectItems, limitFieldName } = getSelectFields(q2, targetTableJoinFields);
+  const firstJoinTablePath = paths[0]!;
+  const firstJoinTableJoinFields = firstJoinTablePath.on.flatMap(condObj => Object.entries(condObj).map(([source, target]) => target));
+  const { rootSelectItems, limitFieldName } = getSelectFields({ 
+    q: q2, 
+    firstJoinTableAlias: getJoinTable(firstJoinTablePath.table, 0, paths.length === 1? targetTableAliasRaw : undefined).alias, 
+    _joinFields: firstJoinTableJoinFields 
+  });
 
   const joinType = q2.isLeftJoin? "LEFT" : "INNER";
   const innerQuery = paths.flatMap((path, i) => {
     
     const isLast = i === paths.length - 1;
     const targetQueryExtraQueries: string[] = [];
-    const prevTableAlias = !i? (q1.tableAlias ?? q1.table) : `t${i-1}`;
-    const tableAlias = asName(isLast? targetTableAlias : `t${i}`);
+    // const prevTableAlias = !i? (q1.tableAlias ?? q1.table) : `t${i-1}`;
+    // const tableAlias = isLast? targetTableAlias : asName(`t${i}`);
+
+    const prevTable = getJoinTable(!i? (q1.tableAlias ?? q1.table) : paths[i-1]!.table, i-1, undefined);
+    // const tableAlias = isLast? targetTableAlias : asName(path.table);
+    const table = getJoinTable(path.table, i, isLast? targetTableAliasRaw : undefined);
 
     if(isLast){
       if(q2.where){
@@ -69,14 +87,14 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2, depth }: Args):
         `SELECT `,
         `  /* Join fields + select */`, 
         `  ${rootSelectItems.map(s => s.query)}`,
-        `FROM ${asName(path.table)} ${tableAlias}`,
+        `FROM ${table.name} ${table.alias}`,
         ...targetQueryExtraQueries
       ]
     }
 
     return [
-      `${joinType} JOIN ${asName(path.table)} ${tableAlias}`,
-      `ON ${getJoinOnCondition(path.on, asName(prevTableAlias), tableAlias)}`,
+      `${joinType} JOIN ${table.name} ${table.alias}`,
+      `ON ${getJoinOnCondition({ on: path.on, leftAlias: prevTable.alias, rightAlias: table.alias})}`,
       ...targetQueryExtraQueries
     ]
   });
@@ -84,19 +102,29 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2, depth }: Args):
   const queryLines = [
     `${joinType} JOIN (`,
     ...indentLines(innerQuery, 2),
-    `) ${asName(targetTableAlias)}`,
-    `ON ${getJoinOnCondition(paths.at(-1)!.on, asName(q1.tableAlias || q1.table), asName(targetTableAlias), (col) => getJoinCol(col).alias)}`
+    `) ${targetTableAlias}`,
+    `ON ${getJoinOnCondition({ 
+      on: firstJoinTablePath.on, 
+      leftAlias: asName(q1.tableAlias || q1.table), 
+      rightAlias: targetTableAlias, 
+      getRightColName: (col) => getJoinCol(col).alias
+    })}`
   ];
 
   return {
     queryLines,
     limitFieldName,
-    targetTableJoinFields,
+    targetTableJoinFields: firstJoinTableJoinFields,
   }
 }
 
 
-const getSelectFields = (q: NewQueryJoin | NewQuery, _joinFields: string[]) => {
+type GetSelectFieldsArgs = {
+  q: NewQueryJoin | NewQuery;
+  firstJoinTableAlias: string;
+  _joinFields: string[];
+}
+const getSelectFields = ({ q, firstJoinTableAlias, _joinFields }: GetSelectFieldsArgs) => {
   const targetTableAlias = (q.tableAlias || q.table);
   const limitFieldName = q.limit? "prostgles_nested_limit" : undefined;
   const requiredJoinFields = Array.from(new Set(_joinFields))
@@ -115,7 +143,7 @@ const getSelectFields = (q: NewQueryJoin | NewQuery, _joinFields: string[]) => {
       getQuery: (tableAlias) => asNameAlias(f, tableAlias),
       selected: false,
       isJoinCol: true,
-      query: `${asName(targetTableAlias)}.${getJoinCol(f).rootSelect}`,
+      query: `${firstJoinTableAlias}.${getJoinCol(f).rootSelect}`,
     })));
 
   if(limitFieldName){
