@@ -31,7 +31,7 @@ const getJoinTable = (tableName: string, pathIndex: number, isLastTableAlias: st
 }
 
 /**
-  Returns join query:
+  Returns join query. All inner join tables will be prefixed with path index unless it's the final target table which is aliased using the q2 tableAlias
 
   LEFT JOIN (
     SELECT [target table select + join fields]

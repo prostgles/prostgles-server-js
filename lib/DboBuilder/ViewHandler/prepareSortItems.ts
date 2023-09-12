@@ -65,6 +65,8 @@ export const prepareSortItems = (
         key,
         type: "query",
         asc,
+        nulls,
+        nullEmpty,
         nested: {
           table: tableAlias ?? table,
           column: selectItem.alias,
