@@ -88,7 +88,7 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2, depth }: Args):
       return [
         `SELECT `,
         `  /* Join fields + select */`, 
-        `  ${rootSelectItems.map(s => s.query)}`,
+        ...indentLines(rootSelectItems.map(s => s.query), { appendCommas: true }),
         `FROM ${table.name} ${table.alias}`,
         ...targetQueryExtraQueries
       ]
@@ -103,7 +103,7 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2, depth }: Args):
 
   const queryLines = [
     `${joinType} JOIN (`,
-    ...indentLines(innerQuery, 2),
+    ...indentLines(innerQuery),
     `) ${targetTableAlias}`,
     `ON ${getJoinOnCondition({ 
       on: firstJoinTablePath.on, 

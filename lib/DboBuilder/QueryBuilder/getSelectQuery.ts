@@ -34,26 +34,29 @@ export function getSelectQuery(
       ...parsed
     }
   }) ?? [];
+
+  const selectItems = rootSelect.concat(
+    parsedJoins?.map(join => {
+      const joinAlias = join.tableAlias || join.table
+      const selectedFields = join.select.filter(s => s.selected).map(s => asNameAlias(s.alias, joinAlias));
+      /** Used to ensure the json array object has named properties */
+      const jsonAggSelect = `SELECT x FROM (SELECT ${selectedFields}) as x`;
+      /** Used to: 
+       *  1) prevent arrays with a single null element when no rows were matched 
+       *  2) allow nested limit
+       * */
+      const joinAggNonNullArrayElemFilter = join.targetTableJoinFields
+        .map(f => `${joinAlias}.${getJoinCol(f).alias} IS NOT NULL`)
+        .concat(join.limitFieldName? [`${asNameAlias(join.limitFieldName, joinAlias)} <= ${join.limit}`] : [])
+        .join(" AND ");
+        
+      const nestedOrderBy = join.orderByItems.length? `ORDER BY ${join.orderByItems.map(o => asNameAlias(o.key, joinAlias))}` : ""
+      return (`COALESCE(json_agg((${jsonAggSelect}) ${nestedOrderBy}) FILTER (WHERE ${joinAggNonNullArrayElemFilter}), '[]'::JSON) as ${joinAlias}`);
+    }) ?? []);
   
   const query = [
-      `SELECT ${rootSelect.concat(
-        parsedJoins?.map(join => {
-          const joinAlias = join.tableAlias || join.table
-          const selectedFields = join.select.filter(s => s.selected).map(s => asNameAlias(s.alias, joinAlias));
-          /** Used to ensure the json array object has named properties */
-          const jsonAggSelect = `SELECT x FROM (SELECT ${selectedFields}) as x`;
-          /** Used to: 
-           *  1) prevent arrays with a single null element when no rows were matched 
-           *  2) allow nested limit
-           * */
-          const joinAggNonNullArrayElemFilter = join.targetTableJoinFields
-            .map(f => `${joinAlias}.${getJoinCol(f).alias} IS NOT NULL`)
-            .concat(join.limitFieldName? [`${asNameAlias(join.limitFieldName, joinAlias)} <= ${join.limit}`] : [])
-            .join(" AND ");
-            
-          const nestedOrderBy = join.orderByItems.length? `ORDER BY ${join.orderByItems.map(o => asNameAlias(o.key, joinAlias))}` : ""
-          return (`COALESCE(json_agg((${jsonAggSelect}) ${nestedOrderBy}) FILTER (WHERE ${joinAggNonNullArrayElemFilter}), '[]'::JSON) as ${joinAlias}`);
-        }) ?? [])}`
+    `SELECT`
+    ,...indentLines(selectItems, { appendCommas: true })
     , `FROM ( `
     , `  SELECT * `
     , `  FROM ${q.table}`
@@ -71,8 +74,24 @@ export function getSelectQuery(
 }
 
 const indentLine = (numberOfSpaces: number, str: string, indentStr = "    "): string => new Array(numberOfSpaces).fill(indentStr).join("") + str;
-export const indentLines = (strArr: (string | undefined | null)[],  numberOfSpaces = 0,indentStr = " "): string[] => strArr.filter(v => v).map(str => indentLine(numberOfSpaces, str as string, indentStr));
-const indentLinesToString = (strArr: (string | undefined | null)[], numberOfSpaces = 0, separator = " \n ", indentStr = " ") => indentLines(strArr, numberOfSpaces, indentStr).join(separator);
+type IndentLinesOpts = {
+  numberOfSpaces?: number;
+  indentStr?: string;
+  appendCommas?: boolean;
+}
+export const indentLines = (strArr: (string | undefined | null)[],  { numberOfSpaces = 2, indentStr = " ", appendCommas = false }: IndentLinesOpts = {}): string[] => {
+  const nonEmptyLines = strArr
+    .filter(v => v);
+
+  return nonEmptyLines.map((str, idx) => {
+      const res = indentLine(numberOfSpaces, str as string, indentStr);
+      if(appendCommas && idx < nonEmptyLines.length - 1){
+        return `${res},`;
+      }
+      return res;
+    });
+}
+const indentLinesToString = (strArr: (string | undefined | null)[], numberOfSpaces = 0, separator = " \n ", indentStr = " ") => indentLines(strArr, { numberOfSpaces, indentStr }).join(separator);
 const getTableAlias = (q: NewQuery) => !q.tableAlias ? q.table : `${q.tableAlias || ""}_${q.table}`;
 export const getTableAliasAsName = (q: NewQuery) => asName(getTableAlias(q));
 

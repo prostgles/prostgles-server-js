@@ -891,7 +891,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
   });
 
   await tryRun("Related table subscribe", async () => {
-    const sub = await await db.tr1.subscribe!({}, {
+    const sub = await db.tr1.subscribe!({}, {
       select: {
         "*": 1,
         tr2: "*"
@@ -902,6 +902,26 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
 
     await sub.unsubscribe();
   });
+
+  await tryRun("Nested sort by computed col", async () => {
+    const getSorted = (asc = false) => db.tr1.find!({}, {
+      select: {
+        "*": 1,
+        tr2: {
+          maxId: { $max: ["id"] }
+        }
+      },
+      orderBy: {
+        "tr2.maxId": asc
+      }
+    })
+    const sortedAsc = await getSorted(true);
+    const sortedDesc = await getSorted(false);
+    assert.deepStrictEqual(
+      sortedAsc.map(d => d.tr2[0].maxId).slice(0).reverse(),
+      sortedDesc.map(d => d.tr2[0].maxId)
+    );
+  })
 
   await tryRun("Reference column deep nested insert", async () => {
     

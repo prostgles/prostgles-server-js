@@ -1,6 +1,6 @@
 import { OrderBy, asName, isDefined, isEmpty, isObject } from "prostgles-types/dist";
 import { SortItem } from "../../DboBuilder";
-import { NewQueryJoin, SelectItemValidated } from "../QueryBuilder/QueryBuilder";
+import { NewQueryJoin, SelectItemValidated, asNameAlias } from "../QueryBuilder/QueryBuilder";
 import { asValue } from "../../PubSubManager/PubSubManager";
 
 /* This relates only to SELECT */
@@ -60,7 +60,7 @@ export const prepareSortItems = (
     const nestedField = sortableNestedColumns.find(f => f.key === key);
     if (nestedField) {
       const { tableAlias, table, selectItem } = nestedField;
-      const fieldQuery = `${asc? "MIN" : "MAX"}(${tableAlias ?? table}.${selectItem.alias})`;
+      const fieldQuery = `${asc? "MIN" : "MAX"}(${asNameAlias(selectItem.alias, tableAlias ?? table)})`;
       return {
         key,
         type: "query",
