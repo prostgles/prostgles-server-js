@@ -725,7 +725,7 @@ export function postgresToTsType(udt_data_type: PG_COLUMN_UDT_DATA_TYPE): keyof 
   }) ?? "any";
 }
 
-export const prepareSort = (items: SortItem[]): string[] => {
+export const prepareSort = (items: SortItem[], tableAlias?: string): string[] => {
   if (!items.length) return [];
   return ["ORDER BY " + items.map(d => {
 
@@ -736,7 +736,7 @@ export const prepareSort = (items: SortItem[]): string[] => {
     if(d.nested){
       return `${d.nested.fieldQuery} ${orderType} ${nullOrder}`;
     }
-    return `${asName(d.key)} ${orderType} ${nullOrder}`;
+    return `${asNameAlias(d.key, tableAlias)} ${orderType} ${nullOrder}`;
   }).join(", ")]
 }
 

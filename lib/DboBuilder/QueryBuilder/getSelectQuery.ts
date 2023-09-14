@@ -50,7 +50,7 @@ export function getSelectQuery(
         .concat(join.limitFieldName? [`${asNameAlias(join.limitFieldName, joinAlias)} <= ${join.limit}`] : [])
         .join(" AND ");
         
-      const nestedOrderBy = join.orderByItems.length? `ORDER BY ${join.orderByItems.map(o => asNameAlias(o.key, joinAlias))}` : ""
+      const nestedOrderBy = join.orderByItems.length? prepareSort(join.orderByItems, joinAlias).join(", ") : ""
       return (`COALESCE(json_agg((${jsonAggSelect}) ${nestedOrderBy}) FILTER (WHERE ${joinAggNonNullArrayElemFilter}), '[]'::JSON) as ${joinAlias}`);
     }) ?? []);
   
