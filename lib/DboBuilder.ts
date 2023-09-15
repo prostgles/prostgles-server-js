@@ -731,8 +731,6 @@ export const prepareSort = (items: SortItem[], tableAlias?: string): string[] =>
 
     const orderType = d.asc ? " ASC " : " DESC ";
     const nullOrder = d.nulls ? ` NULLS ${d.nulls === "first" ? " FIRST " : " LAST "}` : "";
-    // const colKey = "fieldQuery" in d ? d.fieldQuery : d.fieldPosition;
-    // return `${colKey} ${orderType} ${nullOrder}`;
     if(d.nested){
       return `${d.nested.fieldQuery} ${orderType} ${nullOrder}`;
     }

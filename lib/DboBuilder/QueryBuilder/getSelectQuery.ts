@@ -46,12 +46,12 @@ export function getSelectQuery(
        *  2) allow nested limit
        * */
       const joinAggNonNullArrayElemFilter = join.targetTableJoinFields
-        .map(f => `${joinAlias}.${getJoinCol(f).alias} IS NOT NULL`)
+        .map(f => `${asName(joinAlias)}.${getJoinCol(f).alias} IS NOT NULL`)
         .concat(join.limitFieldName? [`${asNameAlias(join.limitFieldName, joinAlias)} <= ${join.limit}`] : [])
         .join(" AND ");
         
       const nestedOrderBy = join.orderByItems.length? prepareSort(join.orderByItems, joinAlias).join(", ") : ""
-      return (`COALESCE(json_agg((${jsonAggSelect}) ${nestedOrderBy}) FILTER (WHERE ${joinAggNonNullArrayElemFilter}), '[]'::JSON) as ${joinAlias}`);
+      return (`COALESCE(json_agg((${jsonAggSelect}) ${nestedOrderBy}) FILTER (WHERE ${joinAggNonNullArrayElemFilter}), '[]'::JSON) as ${asName(joinAlias)}`);
     }) ?? []);
   
   const query = [
