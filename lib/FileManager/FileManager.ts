@@ -252,7 +252,8 @@ export class FileManager {
     return res
   }
 
-  async getFileCloudDownloadURL(fileName: string, expiresInSeconds: number = 30 * 60){
+  async getFileCloudDownloadURL(fileName: string, expiresInSecondsRaw: number = 30 * 60){
+    const expiresInSeconds = Math.max(1, Math.round(expiresInSecondsRaw));
     return await this.cloudClient?.getSignedUrlForDownload(fileName, expiresInSeconds);
   }
 
