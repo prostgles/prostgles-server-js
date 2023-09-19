@@ -1,4 +1,4 @@
-import { JoinPath, asName } from "prostgles-types";
+import { asName } from "prostgles-types";
 import { ParsedJoinPath } from "./parseJoinPath";
 
 type getTableJoinsArgs = {
@@ -18,7 +18,7 @@ export const getTableJoinQuery = ({ path, type, aliasSufix, rootTableAlias, fina
 
   const query = path.map(({ table, on }, i) => {
     if(!on) throw "on missing";
-    const tableName = asName(table);
+    const tableName = table;
     const tableAlias = getTableAlias(table);
     const prevTableAlias = i === 0? rootTableAlias : getTableAlias(path[i-1]!.table);
 

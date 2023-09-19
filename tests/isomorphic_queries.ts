@@ -937,7 +937,16 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
         '"id2"': 1,
         'id2 max': 1,
       }]
-    }])
+    }]);
+
+    const exists = await db[`"""quoted0"""`].find({
+      $existsJoined: {
+        path: ['"""quoted1"""', '"""quoted2"""'],
+        filter: {
+          '"id2"': 1,
+        }
+      }
+    }, { select: "*" });
   })
 
   await tryRun("Reverse join with agg", async () => {
