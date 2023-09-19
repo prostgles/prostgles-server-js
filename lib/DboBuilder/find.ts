@@ -46,7 +46,6 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
       param3_unused, 
       tableRules, 
       localParams, 
-      this.columns
     );
 
     const queryWithoutRLS = getSelectQuery(

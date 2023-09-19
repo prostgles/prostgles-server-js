@@ -921,6 +921,21 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       sortedAsc.map(d => d.tr2[0].maxId).slice(0).reverse(),
       sortedDesc.map(d => d.tr2[0].maxId)
     );
+  });
+
+  await tryRun("Nested function on different than source column getNewQuery name bug fix", async () => {
+    const res = await db.tr1.find!({}, {
+      select: {
+        "*": 1,
+        tr2: {
+          sign: { $sign: ["tr1_id"] }
+        }
+      },
+      orderBy: {
+        id: true
+      }
+    });
+    assert.deepStrictEqual(res.map(row => [row.id, row.tr2[0]!.sign]), [[1,1], [2, 1]]);
   })
 
   await tryRun("Reference column deep nested insert", async () => {

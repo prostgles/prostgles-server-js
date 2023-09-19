@@ -69,8 +69,8 @@ export async function getNewQuery(
   param3_unused = null, 
   tableRules: TableRule | undefined, 
   localParams: LocalParams | undefined,
-  columns: ColumnInfo[],
 ): Promise<NewQuery> {
+  const { columns } = _this;
 
   if(localParams?.isRemoteRequest && !tableRules?.select?.fields){
     throw `INTERNAL ERROR: publish.${_this.name}.select.fields rule missing`;
@@ -149,7 +149,8 @@ export async function getNewQuery(
       j_tableRules = await _this.dboBuilder.publishParser?.getValidatedRequestRuleWusr({ tableName: jTable, command: "find", localParams });
     }
     
-    if(isLocal || j_tableRules){
+    const isAllowedAccessToTable = isLocal || j_tableRules;
+    if(isAllowedAccessToTable){
 
       const joinQuery: NewQuery = await getNewQuery(
           _thisJoinedTable,
@@ -158,7 +159,6 @@ export async function getNewQuery(
           param3_unused, 
           j_tableRules, 
           localParams,
-          columns
         );
       joinQuery.isLeftJoin = j_isLeftJoin;
       joinQuery.tableAlias = j_alias;
