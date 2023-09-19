@@ -160,6 +160,24 @@ CREATE TABLE IF NOT EXISTS """*""" (
 
 DROP TABLE IF EXISTS hehe CASCADE;
 
+DROP TABLE IF EXISTS """quoted0""" CASCADE;
+DROP TABLE IF EXISTS """quoted1""" CASCADE;
+DROP TABLE IF EXISTS """quoted2""" CASCADE;
+CREATE TABLE IF NOT EXISTS """quoted2""" (
+	"""id2"""			    SERIAL PRIMARY KEY,
+	"""text_col2"""    TEXT DEFAULT 'quoted2'
+);
+CREATE TABLE IF NOT EXISTS """quoted1""" (
+	"""id1"""			SERIAL PRIMARY KEY,
+  """quoted2_id"""  INTEGER REFERENCES """quoted2""",
+	"""text_col1"""   TEXT DEFAULT 'quoted1'
+);
+CREATE TABLE IF NOT EXISTS """quoted0""" (
+	"""id0"""			    SERIAL PRIMARY KEY,
+  """quoted1_id""" INTEGER REFERENCES """quoted1""",
+	"""text_col0"""  TEXT DEFAULT 'quoted0'
+);
+
 
 DROP TABLE IF EXISTS tr1 CASCADE;
 CREATE TABLE IF NOT EXISTS tr1 (

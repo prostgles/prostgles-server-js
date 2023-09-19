@@ -874,6 +874,72 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
 
   });
 
+  await tryRun("Join escaped table names with quotes", async () => {
+    await db[`"""quoted0"""`].insert({
+      [`"text_col0"`]: "0",
+      [`"quoted1_id"`]: {
+        [`"text_col1"`]: "1",
+        [`"quoted2_id"`]: {
+          [`"text_col2"`]: "2",
+        }
+      }
+    });
+
+    const res = await db[`"""quoted0"""`].find({
+      [`"text_col0"`]: "0",
+    }, { 
+      select: {
+        "*": 1,
+        [`"""quoted2"""`]: {
+          [`"text_col2"`]: 1,
+          [`"id2"`]: "$min",
+          [`id2 max`]: { "$max": [`"id2"`] },
+        }
+      }
+    });
+
+    assert.deepStrictEqual(res[0], {
+      '"""quoted2"""': [
+        {
+          '"text_col2"': '2',
+          'id2 max': 1,
+          '"id2"': 1,
+        }
+      ],
+      '"id0"': 1,
+      '"quoted1_id"': 1,
+      '"text_col0"': '0'
+    });
+
+
+    const aliasedQuotedJoin = await db[`"""quoted0"""`].find({
+      [`"text_col0"`]: "0",
+    }, { 
+      select: {
+        "*": 1,
+        '"ali as"': {
+          $leftJoin: '"""quoted2"""',
+          select: {
+            '"text_col2"': { $left: ['"text_col2"', 2] },
+            '"id2"': "$min",
+            'id2 max': { "$max": [`"id2"`] },
+          }
+        }
+      }
+    });
+
+    assert.deepStrictEqual(aliasedQuotedJoin, [{
+      '"id0"': 1,
+      '"quoted1_id"': 1,
+      '"text_col0"': '0',
+      '"ali as"': [{
+        '"text_col2"': '2',
+        '"id2"': 1,
+        'id2 max': 1,
+      }]
+    }])
+  })
+
   await tryRun("Reverse join with agg", async () => {
     const inserted = await db.tr1.insert!({ tr2: { t1: "a", t2: "b" } }, { returning: "*" });
 

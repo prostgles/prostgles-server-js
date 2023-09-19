@@ -226,7 +226,7 @@ function dd(){
 		dbConnection,
 		sqlFilePath: path.join(__dirname+'/../../init.sql'),
 		io,
-		tsGeneratedTypesDir: path.join(__dirname + '/'),
+		tsGeneratedTypesDir: path.join(__dirname + '/../../'),
 		// watchSchema: true,
 		transactions: true,
     schema: { public: 1, prostgles_test: 1 },
@@ -423,6 +423,9 @@ function dd(){
         "prostgles_test.basic": "*",
         "prostgles_test.basic1": "*",
         "prostgles_test.mv_basic1": "*",
+        [`"""quoted0"""`]: "*",
+        [`"""quoted1"""`]: "*",
+        [`"""quoted2"""`]: "*",
 			};
 			
 			return res;

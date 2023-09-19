@@ -14,6 +14,42 @@ export type DBSchemaGenerated = {
     columns: {
       "\"*\""?: null | string;
       id?: number;
+      qq?: null | string;
+    };
+  };
+  "\"\"\"quoted0\"\"\"": {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      "\"id0\""?: number;
+      "\"quoted1_id\""?: null | number;
+      "\"text_col0\""?: null | string;
+    };
+  };
+  "\"\"\"quoted1\"\"\"": {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      "\"id1\""?: number;
+      "\"quoted2_id\""?: null | number;
+      "\"text_col1\""?: null | string;
+    };
+  };
+  "\"\"\"quoted2\"\"\"": {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      "\"id2\""?: number;
+      "\"text_col2\""?: null | string;
     };
   };
   "\"*\"": {
@@ -96,29 +132,15 @@ export type DBSchemaGenerated = {
       name?: null | string;
     };
   };
-  "prostgles_test.mv_basic1": {
+  items_m1: {
     is_view: false;
     select: true;
     insert: true;
     update: true;
     delete: true;
     columns: {
-      id: number;
-      id_basic: number | null;
-      txt: string | null;
-    };
-  };
-  self_join: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      id: number;
-      name: string | null;
-      my_id: number | null;
-      my_id1: number | null;
+      id?: number;
+      name: string;
     };
   };
   items_multi: {
@@ -267,6 +289,16 @@ export type DBSchemaGenerated = {
       obj?: null | any;
     };
   };
+  pg_attribute: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id?: number;
+    };
+  };
   planes: {
     is_view: false;
     select: true;
@@ -303,6 +335,17 @@ export type DBSchemaGenerated = {
       media_id: string;
     };
   };
+  prostgles_lookup_media_various: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      foreign_id: number;
+      media_id: string;
+    };
+  };
   "prostgles_test.basic": {
     is_view: false;
     select: true;
@@ -326,6 +369,31 @@ export type DBSchemaGenerated = {
       txt?: null | string;
     };
   };
+  "prostgles_test.mv_basic1": {
+    is_view: true;
+    select: true;
+    insert: false;
+    update: false;
+    delete: false;
+    columns: {
+      id: number;
+      id_basic: number;
+      txt: string;
+    };
+  };
+  "prostgles_test.self_join": {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id?: number;
+      my_id?: null | number;
+      my_id1?: null | number;
+      name?: null | string;
+    };
+  };
   rec: {
     is_view: false;
     select: true;
@@ -346,6 +414,19 @@ export type DBSchemaGenerated = {
     delete: true;
     columns: {
       id?: number;
+    };
+  };
+  self_join: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id?: number;
+      my_id?: null | number;
+      my_id1?: null | number;
+      name?: null | string;
     };
   };
   shapes: {
@@ -470,6 +551,17 @@ export type DBSchemaGenerated = {
       jsn?: null | any;
       name?: null | string;
       tsv?: null | string;
+    };
+  };
+  various_nested: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      name?: null | string;
+      various_id?: null | number;
     };
   };
   

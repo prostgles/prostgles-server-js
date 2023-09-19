@@ -24,9 +24,10 @@ export const getJoinCol = (colName: string) => {
 }
 
 const getJoinTable = (tableName: string, pathIndex: number, isLastTableAlias: string | undefined) => {
-  const rawAlias = isLastTableAlias ?? `p${pathIndex}__${tableName}`; 
+  const rawAlias = isLastTableAlias ?? `p${pathIndex}  ${tableName}`; 
   return {
-    name: asName(tableName),
+    // name: asName(tableName), /** table names are already escaped */
+    name: tableName,
     alias: asName(rawAlias),
     rawAlias,
   }
@@ -65,7 +66,7 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2, depth }: Args):
     // const prevTableAlias = !i? (q1.tableAlias ?? q1.table) : `t${i-1}`;
     // const tableAlias = isLast? targetTableAlias : asName(`t${i}`);
 
-    const prevTable = getJoinTable(!i? (q1.tableAlias ?? q1.table) : paths[i-1]!.table, i-1, undefined);
+    const prevTable = getJoinTable(!i? (q1.tableAlias? asName(q1.tableAlias) : q1.table) : paths[i-1]!.table, i-1, undefined);
     // const tableAlias = isLast? targetTableAlias : asName(path.table);
     const table = getJoinTable(path.table, i, isLast? targetTableAliasRaw : undefined);
 
