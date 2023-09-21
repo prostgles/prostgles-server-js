@@ -60,7 +60,7 @@ export const prepareSortItems = (
     const nestedField = sortableNestedColumns.find(f => f.key === key);
     if (nestedField) {
       const { tableAlias, table, selectItem } = nestedField;
-      const fieldQuery = `${asc? "MIN" : "MAX"}(${asNameAlias(selectItem.alias, tableAlias ?? table)})`;
+      const fieldQuery = `${asc? "MIN" : "MAX"}(${asNameAlias(selectItem.alias, tableAlias ?? table)}${["uuid", "xml"].includes(selectItem.column_udt_type ?? "")? "::TEXT" : ""})`;
       return {
         key,
         type: "query",

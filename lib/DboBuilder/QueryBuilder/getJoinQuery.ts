@@ -85,7 +85,8 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2, depth }: Args):
       }
     }
 
-    if(!i){
+    const isFirst = !i;
+    if(isFirst){
       return [
         `SELECT `,
         `  /* Join fields + select */`, 
@@ -96,7 +97,7 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2, depth }: Args):
     }
 
     return [
-      `${joinType} JOIN ${table.name} ${table.alias}`,
+      `INNER JOIN ${table.name} ${table.alias}`,
       `ON ${getJoinOnCondition({ on: path.on, leftAlias: prevTable.alias, rightAlias: table.alias})}`,
       ...targetQueryExtraQueries
     ]
@@ -163,3 +164,52 @@ const getSelectFields = ({ q, firstJoinTableAlias, _joinFields }: GetSelectField
   }
   return { rootSelectItems, limitFieldName };
 }
+
+/** Multiple joins where some are one to many will lead to duplicates in all other nested columns */
+const removeMultiJoinDupes = {
+  /**
+   * 1) add a "prostgles_cartesian_rowid" to each join before last SELECT clause: 
+    ROW_NUMBER() OVER( PARTITION BY all_join_cols_up_to_here (what about multi col joins??) ) as prostgles_cartesian_rowid
+   */
+  addJoinSelectCartesianRowid: ({ joinIndex, totalJoins, selectQueries, allAliasedJoinColsUpToHere }: { joinIndex: number; totalJoins: number; selectQueries: string[]; allAliasedJoinColsUpToHere: string[] }) => {
+    if(joinIndex < totalJoins - 1){
+      return [
+        ...selectQueries,
+        /* (what about multi col joins??) */
+        `ROW_NUMBER() OVER( PARTITION BY ${allAliasedJoinColsUpToHere} ) as prostgles_cartesian_rowid`
+      ]
+    }
+
+    return selectQueries;
+  },
+  /**
+   * 3) add this condition to the WHERE clause of each join (ensure any existing OR conditions will not break it)
+    AND (the join condition)
+    <this to each join after first:
+    AND (prostgles_cartesian_rowid IS NULL OR prostgles_cartesian_rowid = 1)
+   */
+  addJoinWhereClause: ({ where, joinCondition, joinIndex }: { where: string; joinIndex: number; joinCondition: string; }) => {
+    return `${!where? "WHERE " : where} AND (${joinCondition})${joinIndex? ` AND (prostgles_cartesian_rowid IS NULL OR prostgles_cartesian_rowid = 1)` : ""}`
+  }
+}
+
+/**
+ * 
+ * TODO
+console.error(`
+2) add lateral to all joins
+4) Each join innerQuery must be nested to allow the nested LIMIT:
+  root_table
+  LEFT JOIN (
+    SELECT *
+    FROM (
+      SELECT ..., ROW_NUMBER() OVER( PARTITION BY my_join_cols ) as prostgles_nested_limit
+      ...innerJoinQuery
+    ) t
+    WHERE t.prostgles_nested_limit < <desired limit>
+  )
+`);
+ * 
+ * 
+ * 
+ */
