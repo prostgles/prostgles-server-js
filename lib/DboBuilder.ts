@@ -37,9 +37,10 @@ export type SortItem = {
   key: string;
   nested?: {
     table: string;
-    column: string;
+    selectItemAlias: string;
     isNumeric: boolean;
-    fieldQuery: string;
+    wrapperQuerySortItem: string;
+    joinAlias: string;
   };
 } & ({
   type: "query";
@@ -725,14 +726,14 @@ export function postgresToTsType(udt_data_type: PG_COLUMN_UDT_DATA_TYPE): keyof 
   }) ?? "any";
 }
 
-export const prepareSort = (items: SortItem[], tableAlias?: string): string[] => {
+export const prepareOrderByQuery = (items: SortItem[], tableAlias?: string): string[] => {
   if (!items.length) return [];
   return ["ORDER BY " + items.map(d => {
 
     const orderType = d.asc ? " ASC " : " DESC ";
     const nullOrder = d.nulls ? ` NULLS ${d.nulls === "first" ? " FIRST " : " LAST "}` : "";
-    if(d.nested){
-      return `${d.nested.fieldQuery} ${orderType} ${nullOrder}`;
+    if(d.type === "query" && d.nested){
+      return d.fieldQuery;
     }
     return `${asNameAlias(d.key, tableAlias)} ${orderType} ${nullOrder}`;
   }).join(", ")]

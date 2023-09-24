@@ -164,12 +164,14 @@ export async function getNewQuery(
       joinQuery.tableAlias = j_alias;
       joinQueries.push({
         ...joinQuery,
-        joinPath: j_path
+        joinPath: j_path,
+        joinAlias: joinQuery.tableAlias ?? joinQuery.table,
       });
     }
   })
 
   /**
+   * Is this still needed?!!!
    * Add non selected columns
    * This ensures all fields are available for orderBy in case of nested select
    * */
@@ -180,9 +182,6 @@ export async function getNewQuery(
   });
 
   const select = sBuilder.select;
-  // const validatedAggAliases = select
-  //   .filter(s => s.type !== "joinedColumn")
-  //   .map(s => s.alias);
     
   const filterOpts = await _this.prepareWhere({
     filter, 
@@ -216,5 +215,10 @@ export async function getNewQuery(
 
   // console.log(resQuery);
   // console.log(buildJoinQuery(_this, resQuery));
+
+  if(resQuery.select.some(s => s.type === "aggregation") && resQuery.joins?.length){
+    throw `Root query aggregation AND nested joins not allowed`;
+  }
+
   return resQuery;
 }

@@ -1,7 +1,6 @@
 import { OrderBy, asName, isDefined, isEmpty, isObject } from "prostgles-types/dist";
 import { SortItem } from "../../DboBuilder";
 import { NewQueryJoin, SelectItemValidated, asNameAlias } from "../QueryBuilder/QueryBuilder";
-import { asValue } from "../../PubSubManager/PubSubManager";
 
 /* This relates only to SELECT */
 export const prepareSortItems = (
@@ -39,11 +38,15 @@ export const prepareSortItems = (
     (!s.fields.length || s.fields.every(f => allowed_cols.includes(f)))
   ).map(s => s.alias)
 
-  const sortableNestedColumns = joinQueries.flatMap(jq => jq.select.map(selectItem => ({
-    ...jq,
-    selectItem,
-    key: `${jq.tableAlias ?? jq.table}.${selectItem.alias}`
-  })));
+  const sortableNestedColumns = joinQueries.flatMap(jq => jq.select.map(selectItem => {
+    const joinAlias = jq.tableAlias ?? jq.table;
+    return {
+      ...jq,
+      selectItem,
+      joinAlias,
+      key: `${joinAlias}.${selectItem.alias}`
+    }
+  }));
   const bad_param = orderBy.find(({ key }) =>
     !sortableNestedColumns.some(v => v.key === key) &&
     !validatedAggAliases.includes(key) &&
@@ -59,8 +62,14 @@ export const prepareSortItems = (
 
     const nestedField = sortableNestedColumns.find(f => f.key === key);
     if (nestedField) {
-      const { tableAlias, table, selectItem } = nestedField;
-      const fieldQuery = `${asc? "MIN" : "MAX"}(${asNameAlias(selectItem.alias, tableAlias ?? table)}${["uuid", "xml"].includes(selectItem.column_udt_type ?? "")? "::TEXT" : ""})`;
+      const { table, selectItem, joinAlias } = nestedField;
+      
+      const comparableDataTypeCast = ["uuid", "xml"].includes(selectItem.column_udt_type ?? "")? "::TEXT" : "";
+      if(nulls === "first"){
+        throw "Nested nulls sorting not supported";
+      }
+      const sortItemAlias = asName(`prostgles_nested_sort_${selectItem.alias}`)
+      
       return {
         key,
         type: "query",
@@ -68,19 +77,19 @@ export const prepareSortItems = (
         nulls,
         nullEmpty,
         nested: {
-          table: tableAlias ?? table,
-          column: selectItem.alias,
+          table,
+          joinAlias,
+          selectItemAlias: selectItem.alias,
           isNumeric: selectItem.tsDataType === "number",
-          fieldQuery
+          wrapperQuerySortItem: `${asc? "MIN" : "MAX"}(${asNameAlias(selectItem.alias, joinAlias)}${comparableDataTypeCast}) as ${sortItemAlias}`,
         },
-        fieldQuery
+        fieldQuery: `${asName(joinAlias)}.${sortItemAlias + (asc? "" : " DESC")}`,
       }
     }
     /* Order by column index when possible to bypass name collision when ordering by a computed column. 
         (Postgres will sort by existing columns wheundefined possible) 
     */
-    // const orderType = asc ? " ASC " : " DESC ";
-    // const nullOrder = nulls ? ` NULLS ${nulls === "first" ? " FIRST " : " LAST "}` : "";
+   
     const index = selectedAliases.indexOf(key) + 1;
     let colKey = (index > 0 && !nullEmpty) ? index : [tableAlias, key].filter(isDefined).map(asName).join(".");
     if (nullEmpty) {

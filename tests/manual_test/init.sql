@@ -66,9 +66,6 @@ INSERT INTO item_children(name) VALUES ('a'), ('b'),('a'), ('b'),('a'), ('b'),('
 
 
 
-
-
-
 DROP TABLE IF EXISTS lookup_status CASCADE ;
 CREATE TABLE lookup_status(
   id text PRIMARY KEY,

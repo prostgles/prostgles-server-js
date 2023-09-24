@@ -426,6 +426,8 @@ function dd(){
         [`"""quoted0"""`]: "*",
         [`"""quoted1"""`]: "*",
         [`"""quoted2"""`]: "*",
+        symbols: "*",
+        trades: "*",
 			};
 			
 			return res;

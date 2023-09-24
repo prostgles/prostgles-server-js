@@ -122,9 +122,9 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
      * If media it will: upload file and continue insert
      * If nested insert it will: make separate inserts and not continue main insert
      */
-    const insRes = await this.insertDataParse(rowOrRows, param2, param3_unused, tableRules, localParams);
-    const { data, insertResult } = insRes;
-    if ("insertResult" in insRes) {
+    const mediaOrNestedInsert = await this.insertDataParse(rowOrRows, param2, param3_unused, tableRules, localParams);
+    const { data, insertResult } = mediaOrNestedInsert;
+    if ("insertResult" in mediaOrNestedInsert) {
       return insertResult;
     }
 

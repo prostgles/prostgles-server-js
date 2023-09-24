@@ -455,6 +455,16 @@ export type DBSchemaGenerated = {
       srtext?: null | string;
     };
   };
+  symbols: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id: string;
+    };
+  };
   tjson: {
     is_view: false;
     select: true;
@@ -500,6 +510,18 @@ export type DBSchemaGenerated = {
       t1?: null | string;
       t2?: null | string;
       tr1_id?: null | number;
+    };
+  };
+  trades: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id?: number;
+      price: number;
+      symbol: string;
     };
   };
   users: {

@@ -1098,4 +1098,69 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
     assert.equal(one[0].my.length, 1);
     assert.equal(one[0].my[0].name, "b");
   });
+
+
+  await tryRun("One to many multi join duplicate row bug fix", async () => {
+    await db.symbols.insert([
+      { 
+        id: "btc", 
+        trades: [
+          { price: 1 },
+          { price: 3 },
+          { price: 2 },
+        ] 
+      },{ 
+        id: "eth", 
+        trades: [
+          { price: .1 },
+          { price: .3 },
+          { price: .2 },
+        ] 
+      },{
+        id: "abc"
+      }
+    ]);
+
+    const res = await db.symbols.find({}, {
+      select: {
+        id: 1,
+        trades: "*",
+        tradesAlso: {
+          $leftJoin: "trades",
+          select: "*",
+        },
+      }
+    });
+    assert.equal(res.length, 3);
+    res.forEach(row => {
+      assert(typeof row.id, "number");
+      assert(typeof row.price, "number");
+      assert(typeof row.symbol, "string");
+      assert.deepStrictEqual(row.trades, row.tradesAlso);
+      if(row.id !== "abc"){
+        assert.equal(row.trades.length, 3)
+      }
+    });
+
+    const resSortedInnerJoin = await db.symbols.find({}, {
+      select: {
+        id: 1,
+        trades: {
+          $innerJoin: "trades",
+          select: "*",
+          orderBy: { price: -1 },
+        },
+        tradesAlso: {
+          $innerJoin: "trades",
+          select: "*",
+          orderBy: { price: 1 },
+        },
+      }
+    });
+    assert.equal(resSortedInnerJoin.length, 2);
+    resSortedInnerJoin.forEach(row => {
+      assert.deepStrictEqual(row.trades.slice(0).reverse(), row.tradesAlso);
+      assert.notEqual(row.id, "abc");
+    });
+  });
 }

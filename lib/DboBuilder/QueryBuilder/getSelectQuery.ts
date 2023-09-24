@@ -1,9 +1,15 @@
 
-import { prepareSort } from "../../DboBuilder";
+import { prepareOrderByQuery } from "../../DboBuilder";
 import { isDefined, asName } from "prostgles-types";
-import { NewQuery, asNameAlias } from "./QueryBuilder";
+import { NewQuery } from "./QueryBuilder";
 import { ViewHandler } from "../ViewHandler/ViewHandler";
-import { getJoinCol, getJoinQuery } from "./getJoinQuery";
+import { getJoinQuery } from "./getJoinQuery"; 
+
+/**
+ * Used to prevent single row nested results in case of OR join conditions
+ */
+export const ROOT_TABLE_ROW_NUM_ID = "prostgles_root_table_row_id" as const;
+export const ROOT_TABLE_ALIAS = 'prostgles_root_table_alias' as const;
 
 /**
  * Creating the text query from the NewQuery spec
@@ -16,17 +22,16 @@ export function getSelectQuery(
   selectParamsGroupBy: boolean,
 ): string {
 
-  const shouldGroupBy = selectParamsGroupBy || !!q.joins?.length;
-  const rootTableAlias = 'prostgles_root_table_alias';
-  const rootSelect = q.select.filter(s => s.selected).map(s => [s.getQuery(rootTableAlias), " AS ", asName(s.alias)].join(""));
+  const rootSelect = q.select.filter(s => s.selected).map(s => [s.getQuery(ROOT_TABLE_ALIAS), " AS ", asName(s.alias)].join(""));
 
   const parsedJoins = q.joins?.flatMap(q2 => {
     const parsed = getJoinQuery(
-      viewHandler, { 
-        q1: { ...q, tableAlias: rootTableAlias }, 
+      viewHandler, 
+      { 
+        q1: { ...q, tableAlias: ROOT_TABLE_ALIAS }, 
         q2: { ...q2 }, 
         depth: depth + 1, 
-        selectParamsGroupBy: shouldGroupBy 
+        selectParamsGroupBy 
       }
     );
     return {
@@ -37,34 +42,21 @@ export function getSelectQuery(
 
   const selectItems = rootSelect.concat(
     parsedJoins?.map(join => {
-      const joinAlias = join.tableAlias || join.table
-      const selectedFields = join.select.filter(s => s.selected).map(s => asNameAlias(s.alias, joinAlias));
-      /** Used to ensure the json array object has named properties */
-      const jsonAggSelect = `SELECT x FROM (SELECT ${selectedFields}) as x`;
-      /** Used to: 
-       *  1) prevent arrays with a single null element when no rows were matched 
-       *  2) allow nested limit
-       * */
-      const joinAggNonNullArrayElemFilter = join.targetTableJoinFields
-        .map(f => `${asName(joinAlias)}.${getJoinCol(f).alias} IS NOT NULL`)
-        .concat(join.limitFieldName? [`${asNameAlias(join.limitFieldName, joinAlias)} <= ${join.limit}`] : [])
-        .join(" AND ");
-        
-      const nestedOrderBy = join.orderByItems.length? prepareSort(join.orderByItems, joinAlias).join(", ") : ""
-      return (`COALESCE(json_agg((${jsonAggSelect}) ${nestedOrderBy}) FILTER (WHERE ${joinAggNonNullArrayElemFilter}), '[]'::JSON) as ${asName(joinAlias)}`);
+      const { joinAlias } = join;
+      return `COALESCE(${asName(joinAlias)}.${join.resultAlias}, '[]') as ${asName(joinAlias)}`
     }) ?? []);
   
   const query = [
     `SELECT`
     ,...indentLines(selectItems, { appendCommas: true })
     , `FROM ( `
-    , `  SELECT * `
+    , `  SELECT * ${parsedJoins.length? `, ROW_NUMBER() OVER() as ${ROOT_TABLE_ROW_NUM_ID}` : ""}`
     , `  FROM ${q.table}`
     , `  ${q.where}`
-    , `) ${rootTableAlias}`
+    , `) ${ROOT_TABLE_ALIAS}`
     , ...parsedJoins.flatMap(j => j.queryLines)
     , ...getRootGroupBy(q, selectParamsGroupBy)
-    , ...prepareSort(q.orderByItems)
+    , ...prepareOrderByQuery(q.orderByItems)
     , ...(q.having ? [`HAVING ${q.having} `] : [])
     , ...(depth ? [] : [`LIMIT ${q.limit || 0}`])
     , ...(q.offset? [`OFFSET ${q.offset || 0}`] : [])
@@ -101,15 +93,15 @@ export const getRootGroupBy = (q: NewQuery, selectParamsGroupBy?: boolean) => {
   const aggs = q.select.filter(s => s.selected && s.type === "aggregation");
   const nonAggs = q.select.filter(s => s.selected && s.type !== "aggregation");
   
-  if ((selectParamsGroupBy || aggs.length || q.joins && q.joins.length) && nonAggs.length) {
+  if ((selectParamsGroupBy || aggs.length) && nonAggs.length) {
     
     /** Add ORDER BY items not included in root select */
     const orderByItems: string[] = [];
-    q.orderByItems.forEach(sortItem => {
-      if (!sortItem.nested && "fieldQuery" in sortItem && !orderByItems.includes(sortItem.fieldQuery)) {
-        orderByItems.push(sortItem.fieldQuery);
-      }
-    });
+    // q.orderByItems.forEach(sortItem => {
+    //   if (!sortItem.nested && "fieldQuery" in sortItem && !orderByItems.includes(sortItem.fieldQuery)) {
+    //     orderByItems.push(sortItem.fieldQuery);
+    //   }
+    // });
 
     return [`GROUP BY ${q.select.map((s, i)=> s.selected && s.type !== "aggregation"? `${i+1}` : undefined).concat(orderByItems).filter(isDefined).join(", ")} `]
   }

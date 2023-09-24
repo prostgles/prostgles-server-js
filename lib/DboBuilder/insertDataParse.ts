@@ -6,7 +6,7 @@ import { TableHandler } from "./TableHandler";
 import { uploadFile } from "./uploadFile";
 
 /**
- * Used for doing referenced inserts within a single transaction
+ * Referenced inserts within a single transaction
  */
 export async function insertDataParse(
   this: TableHandler,
@@ -38,6 +38,13 @@ export async function insertDataParse(
     return false;
   });
   const ALLOWED_COL_TYPES: PG_COLUMN_UDT_DATA_TYPE[] = ["int2", "int4", "int8", "numeric", "uuid", "text", "varchar", "char"];
+  /**
+   * Insert through the reference column. e.g.:
+   *  {
+   *    root_field: "data",
+   *    fkey_column: { ...referenced_table_data }
+   *  }
+   */
   const getColumnInserts = (d: AnyObject) => getKeys(d)
     .filter(k => d[k] && isObject(d[k]))
     .map(k => {
@@ -82,14 +89,14 @@ export async function insertDataParse(
    * If true then will do the full insert within this function
    * Nested insert is not allowed for the file table 
    * */
-  const isNestedInsert = this.is_media ? false : (isMultiInsert ? data : [data]).some(d => getExtraKeys(d).length || getColumnInserts(d).length);
+  const hasNestedInserts = this.is_media ? false : (isMultiInsert ? data : [data]).some(d => getExtraKeys(d).length || getColumnInserts(d).length);
 
   /**
    * Make sure nested insert uses a transaction
    */
   const dbTX = localParams?.tx?.dbTX || this.dbTX;
   const t = localParams?.tx?.t || this.t;
-  if (isNestedInsert && (!dbTX || !t)) {
+  if (hasNestedInserts && (!dbTX || !t)) {
     return {
       insertResult: await this.dboBuilder.getTX((dbTX, _t) =>
         (dbTX[this.name] as TableHandler).insert(
@@ -119,7 +126,7 @@ export async function insertDataParse(
       return uploadFile.bind(this)(row, validate, localParams)
 
       /* Potentially a nested join */
-    } else if (extraKeys.length || colInserts.length) {
+    } else if (hasNestedInserts) {
 
       /* Ensure we're using the same transaction */
       const _this = this.t ? this : dbTX![this.name] as TableHandler;
@@ -272,7 +279,7 @@ export async function insertDataParse(
   // if(validate && !isNestedInsert){
   //     result = isMultiInsert? await Promise.all(_data.map(async d => await validate({ ...d }))) : await validate({ ..._data[0] });
   // }
-  const res = isNestedInsert ?
+  const res = hasNestedInserts ?
     { insertResult: result } :
     { data: result };
 

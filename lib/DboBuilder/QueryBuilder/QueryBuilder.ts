@@ -53,6 +53,7 @@ export type NewQueryRoot = {
 
 export type NewQueryJoin = (NewQuery & {
   joinPath: ParsedJoinPath[];
+  joinAlias: string;
 });
 export type NewQuery = NewQueryRoot & {
   joins?: NewQueryJoin[];
