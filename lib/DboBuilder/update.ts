@@ -117,7 +117,7 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
     const fullReturning = await this.prepareReturning(returning, this.parseFieldFilter("*"));
     /** Used for postValidate. Add any missing computed returning from original query */
     fullReturning.concat(originalReturning.filter(s => !fullReturning.some(f => f.alias === s.alias)));
-    const finalSelect = tableRules?.insert?.postValidate? fullReturning : originalReturning;
+    const finalSelect = tableRules?.[ACTION]?.postValidate? fullReturning : originalReturning;
     const returningSelect = this.makeReturnQuery(finalSelect);
 
     let qType: "none" | "any" | "one" = "none";
