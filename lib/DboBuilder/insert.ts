@@ -85,7 +85,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
 
     /** TODO: use WITH inserted as (query) SELECT jsonb_agg(inserted.*) as validateReturn, userReturning */
     const originalReturning = await this.prepareReturning(returning, this.parseFieldFilter(returningFields))
-    const fullReturning = await this.prepareReturning(returning, this.parseFieldFilter("*"));
+    const fullReturning = await this.prepareReturning("*", this.parseFieldFilter("*"));
 
     /** Used for postValidate. Add any missing computed returning from original query */
     fullReturning.concat(originalReturning.filter(s => !fullReturning.some(f => f.alias === s.alias)));
