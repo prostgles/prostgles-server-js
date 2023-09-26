@@ -52,7 +52,7 @@ export function getSelectQuery(
     , `FROM ( `
     , `  SELECT * ${parsedJoins.some(j => j.isOrJoin)? `, ROW_NUMBER() OVER() as ${ROOT_TABLE_ROW_NUM_ID}` : ""}`
     , `  FROM ${q.table}`
-    , `  ${q.where}`
+    , ...(q.where? [`  ${q.where}`] : [])
     , `) ${ROOT_TABLE_ALIAS}`
     , ...parsedJoins.flatMap(j => j.queryLines)
     , ...getRootGroupBy(q, selectParamsGroupBy)
