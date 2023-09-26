@@ -16,7 +16,7 @@ import AuthHandler, { Auth, SessionUser, AuthRequestParams, UserLike } from "./A
 import TableConfigurator, { TableConfig } from "./TableConfig/TableConfig";
 
 import { get } from "./utils";
-import { DboBuilder, DBHandlerServer, isPlainObject, PRGLIOSocket } from "./DboBuilder";
+import { DboBuilder, DBHandlerServer, isPlainObject, PRGLIOSocket, LocalParams } from "./DboBuilder";
 import { PubSubManager, pickKeys, log } from "./PubSubManager/PubSubManager";
 export { DBHandlerServer }
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -373,6 +373,7 @@ import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { ColConstraint } from "./TableConfig/getConstraintDefinitionQueries";
 import { parseFieldFilter } from "./DboBuilder/ViewHandler/parseFieldFilter";
 import { EventInfo } from "./Logging";
+import { canRunSQL } from "./DboBuilder/runSQL";
 
 export class Prostgles {
   opts: ProstglesInitOptions = {
@@ -865,7 +866,14 @@ export class Prostgles {
                 ...parseFieldFilter(clientInfo.sessionFields ?? [], false, getKeys(clientInfo.user)),
                 ...pickKeys(clientInfo.user, ["id", "type"]) as UserLike,
               }
-              const res = await this.dbo[tableName]![command]!(param1, param2, param3, valid_table_command_rules, { socket, isRemoteRequest: { user: sessionUser } });
+              const localParams: LocalParams = { socket, isRemoteRequest: { user: sessionUser } }
+              if(param3 && (param3 as LocalParams).returnQuery){
+                const isAllowed = await canRunSQL(this, localParams);
+                if(isAllowed){
+                  localParams.returnQuery = (param3 as LocalParams).returnQuery;
+                }
+              }
+              const res = await this.dbo[tableName]![command]!(param1, param2, param3, valid_table_command_rules, localParams);
               cb(null, res);
             } else throw `Invalid OR disallowed request: ${tableName}.${command} `;
 
