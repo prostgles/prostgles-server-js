@@ -50,7 +50,7 @@ export function getSelectQuery(
     `SELECT`
     ,...indentLines(selectItems, { appendCommas: true })
     , `FROM ( `
-    , `  SELECT * ${parsedJoins.length? `, ROW_NUMBER() OVER() as ${ROOT_TABLE_ROW_NUM_ID}` : ""}`
+    , `  SELECT * ${parsedJoins.some(j => j.isOrJoin)? `, ROW_NUMBER() OVER() as ${ROOT_TABLE_ROW_NUM_ID}` : ""}`
     , `  FROM ${q.table}`
     , `  ${q.where}`
     , `) ${ROOT_TABLE_ALIAS}`

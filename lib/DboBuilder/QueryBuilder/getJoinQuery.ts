@@ -44,6 +44,7 @@ type GetJoinQueryResult = {
   resultAlias: string;
   queryLines: string[]; 
   firstJoinTableJoinFields: string[];
+  isOrJoin: boolean;
 }
 
 /**
@@ -79,6 +80,7 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2, depth }: Args):
 
   const joinType = q2.isLeftJoin? "LEFT" : "INNER";
 
+  const isOrJoin = firstJoinTablePath.on.length > 1;
   const joinCondition = getJoinOnCondition({ 
     on: firstJoinTablePath.on, 
     leftAlias: asName(q1.tableAlias || q1.table), 
@@ -94,33 +96,38 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2, depth }: Args):
   
   const { innerQuery } = getInnerJoinQuery({ paths, q1, q2, rootSelectItems, targetTableAliasRaw });
 
-  // const requiredJoinFields = joinFields.map(field => getJoinCol(field).alias);
+  const requiredJoinFields = joinFields.map(field => getJoinCol(field).alias);
   /**
    * Used to prevent duplicates in case of OR filters
    */
   const rootTableIdField = `${ROOT_TABLE_ALIAS}.${ROOT_TABLE_ROW_NUM_ID}`;
   const wrappingQuery = [
     `SELECT `,
-      // ...indentLines([...requiredJoinFields, jsonAgg, ...rootNestedSort.map(d => d.nested!.wrapperQuerySortItem)], { appendCommas: true }),
-      ...indentLines([rootTableIdField, jsonAgg, ...rootNestedSort.map(d => d.nested!.wrapperQuerySortItem)], { appendCommas: true }),
+      ...indentLines([
+        ...(isOrJoin? [rootTableIdField]: requiredJoinFields), 
+        jsonAgg, 
+        ...rootNestedSort.map(d => d.nested!.wrapperQuerySortItem)
+      ], { appendCommas: true }),
     `FROM (`,
     ...indentLines(innerQuery),
     `) ${targetTableAlias}`,
     `WHERE ${joinCondition}`,
-    `GROUP BY ${rootTableIdField}`
+    `GROUP BY ${isOrJoin? rootTableIdField : requiredJoinFields}`,
   ];
 
   const queryLines = [
     `${joinType} JOIN LATERAL (`,
     ...indentLines(wrappingQuery),
     `) ${targetTableAlias}`,
-    // `ON ${joinCondition}`
-    `ON ${targetTableAlias}.${ROOT_TABLE_ROW_NUM_ID} = ${rootTableIdField}`
+    isOrJoin? 
+      `ON ${targetTableAlias}.${ROOT_TABLE_ROW_NUM_ID} = ${rootTableIdField}` :
+      `ON ${joinCondition}`
   ];
 
   return {
     resultAlias: JSON_AGG_FIELD_NAME,
     queryLines,
+    isOrJoin,
     firstJoinTableJoinFields: firstJoinTableJoinFields,
   }
 }

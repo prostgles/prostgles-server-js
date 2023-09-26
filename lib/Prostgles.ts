@@ -871,6 +871,8 @@ export class Prostgles {
                 const isAllowed = await canRunSQL(this, localParams);
                 if(isAllowed){
                   localParams.returnQuery = (param3 as LocalParams).returnQuery;
+                } else {
+                  throw "Must be allowed to run sql to use returnQuery"
                 }
               }
               const res = await this.dbo[tableName]![command]!(param1, param2, param3, valid_table_command_rules, localParams);
