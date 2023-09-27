@@ -42,9 +42,12 @@ const getJoinTable = (tableName: string, pathIndex: number, isLastTableAlias: st
 
 type GetJoinQueryResult = {
   resultAlias: string;
-  queryLines: string[]; 
+  // queryLines: string[]; 
   firstJoinTableJoinFields: string[];
   isOrJoin: boolean;
+  type: "cte";
+  joinLines: string[];
+  cteLines: string[];
 }
 
 /**
@@ -105,30 +108,56 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2, depth }: Args):
     `SELECT `,
       ...indentLines([
         ...(isOrJoin? [rootTableIdField]: requiredJoinFields), 
+        // ...requiredJoinFields, 
         jsonAgg, 
         ...rootNestedSort.map(d => d.nested!.wrapperQuerySortItem)
       ], { appendCommas: true }),
     `FROM (`,
     ...indentLines(innerQuery),
     `) ${targetTableAlias}`,
-    `WHERE ${joinCondition}`,
+    ...(isOrJoin? [
+    `LEFT JOIN ${q1.table} ${ROOT_TABLE_ALIAS}`,
+    `ON ${joinCondition}`
+    ] : []),
+    // `WHERE ${joinCondition}`,
     `GROUP BY ${isOrJoin? rootTableIdField : requiredJoinFields}`,
+    // `GROUP BY ${requiredJoinFields}`,
   ];
 
-  const queryLines = [
-    `${joinType} JOIN LATERAL (`,
+  // const queryLines = [
+  //   `${joinType} JOIN LATERAL (`,
+  //   ...indentLines(wrappingQuery),
+  //   `) ${targetTableAlias}`,
+  //   isOrJoin? 
+  //     `ON ${targetTableAlias}.${ROOT_TABLE_ROW_NUM_ID} = ${rootTableIdField}` :
+  //     `ON ${joinCondition}`
+  // ];
+
+  /**
+   * This is done to prevent join cte names clashing with actual table names
+   */
+  const targetTableAliasTempRename = asName(`${targetTableAlias}_prostgles_join_temp_rename`)
+  const cteLines = [
+    `${targetTableAliasTempRename} AS (`,
     ...indentLines(wrappingQuery),
-    `) ${targetTableAlias}`,
+    `)`
+  ];
+
+  const joinLines = [
+    `${joinType} JOIN ( SELECT * FROM ${targetTableAliasTempRename} ) as ${targetTableAlias}`,
     isOrJoin? 
       `ON ${targetTableAlias}.${ROOT_TABLE_ROW_NUM_ID} = ${rootTableIdField}` :
       `ON ${joinCondition}`
   ];
 
   return {
+    type: "cte",
     resultAlias: JSON_AGG_FIELD_NAME,
-    queryLines,
+    // queryLines,
+    joinLines,
+    cteLines,
     isOrJoin,
-    firstJoinTableJoinFields: firstJoinTableJoinFields,
+    firstJoinTableJoinFields,
   }
 }
 

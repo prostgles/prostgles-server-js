@@ -45,16 +45,43 @@ export function getSelectQuery(
       const { joinAlias } = join;
       return `COALESCE(${asName(joinAlias)}.${join.resultAlias}, '[]') as ${asName(joinAlias)}`
     }) ?? []);
+
+  /** OR joins cannot be easily aggregated to one-many with the root table. Must group by root table id */
+  const hasOrJoins = parsedJoins.some(j => j.isOrJoin)
   
+  let joinCtes = !parsedJoins.length? [] : [
+    ...parsedJoins.flatMap((j, i) => {
+      const needsComma = parsedJoins.length > 1 && i < parsedJoins.length -1;
+      return j.cteLines.concat(needsComma? [","] : []);
+    })
+  ];
+
+  
+  if(hasOrJoins){
+    const pkey = viewHandler.columns.find(c => c.is_pkey);
+    joinCtes = [
+      `${q.table} AS (`,
+      `  SELECT *, ${pkey? asName(pkey.name): "ROW_NUMBER() OVER()"} as ${ROOT_TABLE_ROW_NUM_ID}`,
+      `  FROM ${q.table}`,
+      `),`,
+      ...joinCtes
+    ]
+  }
+
+  if(joinCtes.length){
+    joinCtes.unshift(`WITH `)
+  }
+
   const query = [
+    ...joinCtes,
     `SELECT`
     ,...indentLines(selectItems, { appendCommas: true })
     , `FROM ( `
-    , `  SELECT * ${parsedJoins.some(j => j.isOrJoin)? `, ROW_NUMBER() OVER() as ${ROOT_TABLE_ROW_NUM_ID}` : ""}`
+    , `  SELECT *`
     , `  FROM ${q.table}`
     , ...(q.where? [`  ${q.where}`] : [])
     , `) ${ROOT_TABLE_ALIAS}`
-    , ...parsedJoins.flatMap(j => j.queryLines)
+    , ...parsedJoins.flatMap(j => j.joinLines)
     , ...getRootGroupBy(q, selectParamsGroupBy)
     , ...prepareOrderByQuery(q.orderByItems)
     , ...(q.having ? [`HAVING ${q.having} `] : [])

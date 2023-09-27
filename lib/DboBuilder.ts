@@ -560,19 +560,6 @@ export class DboBuilder {
 
         const table = tov.name;
 
-        const makeJoin = (
-          isLeft = true,
-          filter: Parameters<JoinMaker<AnyObject>>[0],
-          select: Parameters<JoinMaker<AnyObject>>[1],
-          options: Parameters<JoinMaker<AnyObject>>[2] = {}
-        ): ReturnType<JoinMaker<AnyObject>> => {
-          return {
-            [isLeft ? "$leftJoin" : "$innerJoin"]: options.path ?? table,
-            filter,
-            select,
-            ... omitKeys(options, ["path"]),
-          }
-        }
         this.dbo.innerJoin ??= {};
         this.dbo.leftJoin ??= {};
         this.dbo.innerJoinOne ??= {};
