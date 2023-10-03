@@ -101,6 +101,8 @@ export const prepareSortItems = (
         key,
         type: "position",
         asc,
+        nulls,
+        nullEmpty,
         fieldPosition: colKey
       }
     }
@@ -109,6 +111,8 @@ export const prepareSortItems = (
       key,
       type: "query",
       fieldQuery: colKey,
+      nulls,
+      nullEmpty,
       asc,
     }
   });

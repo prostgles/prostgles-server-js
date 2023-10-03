@@ -190,7 +190,6 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { selectParam
 }
 
 /**
- * TODO: ADD TESTS!
  * result = [
  *  { table, on: parsedPath[0] }
  *  ...parsedPath.map(p => ({ table: p.table, on: reversedOn(parsedPath[i+1].on) }))
