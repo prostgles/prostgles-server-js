@@ -50,6 +50,7 @@ export const testPublishTypes = () => {
       various: "*",
       tr1: "*",
       tr2: "*",
+      tr3: "*",
       planes: {
         select: "*",
         update: "*",

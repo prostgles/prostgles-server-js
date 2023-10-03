@@ -1,4 +1,4 @@
-import { AnyObject, asName, SubscribeParams } from "prostgles-types";
+import { AnyObject, asName, isDefined, SubscribeParams } from "prostgles-types";
 import { Filter, LocalParams, makeErrorFromPGError, ExistsFilterConfig } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 import { log, ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
@@ -189,12 +189,24 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { selectParam
   return viewOptions;
 }
 
+/**
+ * TODO: ADD TESTS!
+ * result = [
+ *  { table, on: parsedPath[0] }
+ *  ...parsedPath.map(p => ({ table: p.table, on: reversedOn(parsedPath[i+1].on) }))
+ * ]
+ */
 const reverseParsedPath = (parsedPath: ParsedJoinPath[], table: string) => {
-  const [targetTablePath, ...otherTables] = (parsedPath ?? []).slice(0).reverse();
-  if(!targetTablePath) throw `Not possible`;
-  const newPath: ParsedJoinPath[] = [{
-    table,
-    on: reverseJoinOn(targetTablePath.on)
-  }, ...otherTables]
-  return newPath;
+  const newPPath: ParsedJoinPath[] = [
+    { table, on: [{}] },
+    ...(parsedPath ?? [])
+  ]
+  return newPPath.map((pp, i) => {
+    const nextPath = newPPath[i+1];
+    if(!nextPath) return undefined;
+    return {
+      table: pp.table,
+      on: reverseJoinOn(nextPath.on)
+    }
+  }).filter(isDefined).reverse();
 }

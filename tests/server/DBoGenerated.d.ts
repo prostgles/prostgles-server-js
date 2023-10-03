@@ -512,6 +512,18 @@ export type DBSchemaGenerated = {
       tr1_id?: null | number;
     };
   };
+  tr3: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id?: number;
+      t2?: null | string;
+      tr2_id?: null | number;
+    };
+  };
   trades: {
     is_view: false;
     select: true;

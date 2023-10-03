@@ -969,7 +969,8 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
     const sub = await db.tr1.subscribe!({}, {
       select: {
         "*": 1,
-        tr2: "*"
+        tr2: "*",
+        tr3: "*",
       }
     }, rows => {
 

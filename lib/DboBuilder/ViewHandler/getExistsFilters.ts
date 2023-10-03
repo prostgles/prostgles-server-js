@@ -6,7 +6,7 @@ import { parseJoinPath } from "./parseJoinPath";
 export const getExistsFilters = (filter: any, viewHandler: ViewHandler): ExistsFilterConfig[] => {
 
   /* Exists join filter */
-  const ERR = "Invalid exists filter. \nExpecting somethibng like: \n | { $exists: { tableName.tableName2: Filter } } \n  | { $exists: { \"**.tableName3\": Filter } }\n | { path: string[]; filter: AnyObject }"
+  const ERR = "Invalid exists filter. \nExpecting something like: \n | { $exists: { tableName.tableName2: Filter } } \n  | { $exists: { \"**.tableName3\": Filter } }\n | { path: string[]; filter: AnyObject }"
   const existsConfigs: ExistsFilterConfig[] = getKeys(filter)
     .filter((k ): k is typeof EXISTS_KEYS[number] => EXISTS_KEYS.includes(k as EXISTS_KEY) && !!Object.keys(filter[k] ?? {}).length)
     .map(key => {
@@ -53,7 +53,7 @@ export const getExistsFilters = (filter: any, viewHandler: ViewHandler): ExistsF
       const [path, targetTableFilter] = isDetailed? [filterValue.path, filterValue.filter] : [(firstKeyIsATable? [firstKey] : firstKey.split(".")), filterValue[firstKey]];
 
       if (!path.length) {
-        throw ERR + "\nBut got: " + filterValue;
+        throw ERR + "\nBut got: " + JSON.stringify(filterValue);
       }
       
       return {
