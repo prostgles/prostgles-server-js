@@ -83,7 +83,7 @@ export const prepareSortItems = (
           isNumeric: selectItem.tsDataType === "number",
           wrapperQuerySortItem: `${asc? "MIN" : "MAX"}(${asNameAlias(selectItem.alias, joinAlias)}${comparableDataTypeCast}) as ${sortItemAlias}`,
         },
-        fieldQuery: `${asName(joinAlias)}.${sortItemAlias + (asc? "" : " DESC")}`,
+        fieldQuery: `${asName(joinAlias)}.${sortItemAlias + (asc? "" : " DESC")} ${nulls? `NULLS ${nulls === "last"? "LAST" : "FIRST" }` : ""}`,
       }
     }
     /* Order by column index when possible to bypass name collision when ordering by a computed column. 
