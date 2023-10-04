@@ -1,8 +1,7 @@
 import { asName, ColumnInfo, isEmpty, isObject, PG_COLUMN_UDT_DATA_TYPE, TextFilter_FullTextSearchFilterKeys } from "prostgles-types";
 import { isPlainObject, pgp, postgresToTsType } from "../../DboBuilder";
-import { ViewHandler } from "../ViewHandler/ViewHandler";
-import { asNameAlias } from "./QueryBuilder";
 import { parseFieldFilter } from "../ViewHandler/parseFieldFilter";
+import { asNameAlias } from "./QueryBuilder";
 
 export const parseFunction = (funcData: { func: string | FunctionSpec, args: any[],  functions: FunctionSpec[]; allowedFields: string[]; }): FunctionSpec => {
   const { func, args, functions, allowedFields } = funcData;
@@ -114,15 +113,27 @@ export type FunctionSpec = {
 const MAX_COL_NUM = 1600;
 const asValue = (v: any, castAs = "") => pgp.as.format("$1" + castAs, [v]);
 
-const parseUnix = (colName: string, tableAlias: string | undefined,  allColumns: ColumnInfo[]) => {
+const parseUnix = (colName: string, tableAlias: string | undefined,  allColumns: ColumnInfo[], opts: { timeZone: boolean | string } | undefined) => {
+  let tz = "";
+  if(opts){
+    const { timeZone } = opts ?? {};
+    if(timeZone && typeof timeZone !== "string" && typeof timeZone !== "boolean"){
+      throw `Bad timeZone value. timeZone can be boolean or string`;
+    }
+    if(timeZone === true){
+      tz = "::TIMESTAMPTZ";
+    } else if(typeof timeZone === "string"){
+      tz = ` AT TIME ZONE ${asValue(timeZone)}`;
+    }
+  }
   const col = allColumns.find(c => c.name === colName);
   if(!col) throw `Unexpected: column ${colName} not found`;
   const escapedName =  asNameAlias(colName, tableAlias);
   if(col.udt_name === "int8"){
-    return `to_timestamp(${escapedName}/1000.0)`
+    return `to_timestamp(${escapedName}/1000.0)${tz}`
   }
 
-  return escapedName;
+  return `${escapedName}${tz}`;
 }
 
 const JSON_Funcs: FunctionSpec[] = [
@@ -647,12 +658,13 @@ export const FUNCTIONS: FunctionSpec[] = [
   ]).map(({ val, unit }) => ({
     name: "$date_trunc_" + (val || "") + unit,
     type: "function",
-    description: ` :[column_name] -> round down timestamp to closest ${val || ""} ${unit} `,
+    description: ` :[column_name, opts?: { timeZone: true | 'TZ Name' }] -> round down timestamp to closest ${val || ""} ${unit} `,
     singleColArg: true,
-    numArgs: 1,
+    numArgs: 2,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allColumns, args, tableAlias }) => {
-      const col = parseUnix(args[0], tableAlias, allColumns)
+      /** Timestamp added to ensure filters work correctly (psql will loose the string value timezone when comparing to a non tz column) */
+      const col = parseUnix(args[0], tableAlias, allColumns, args[1]);
       if(!val) return `date_trunc(${asValue(unit)}, ${col})`;
       const PreviousUnit = {
         year: "decade",
@@ -683,12 +695,12 @@ export const FUNCTIONS: FunctionSpec[] = [
   ...["date_trunc", "date_part"].map(funcName => ({
     name: "$" + funcName,
     type: "function",
-    numArgs: 2,
-    description: ` :[unit<string>, column_name] -> ` + (funcName === "date_trunc"? ` round down timestamp to closest unit value. ` : ` extract date unit as float8. ` ) + ` E.g. ['hour', col] `,
+    numArgs: 3,
+    description: ` :[unit<string>, column_name, opts?: { timeZone: true | string }] -> ` + (funcName === "date_trunc"? ` round down timestamp to closest unit value. ` : ` extract date unit as float8. ` ) + ` E.g. ['hour', col] `,
     singleColArg: false,
     getFields: (args: any[]) => [args[1]],
     getQuery: ({ allColumns, args, tableAlias }) => {
-      return `${funcName}(${asValue(args[0])}, ${parseUnix(args[1], tableAlias, allColumns)})`;
+      return `${funcName}(${asValue(args[0])}, ${parseUnix(args[1], tableAlias, allColumns, args[2])})`;
     }
   } as FunctionSpec)),
 
@@ -731,12 +743,12 @@ export const FUNCTIONS: FunctionSpec[] = [
   ].map(([funcName, txt]) => ({
     name: "$" + funcName,
     type: "function",
-    description: ` :[column_name] -> get timestamp formated as ` + txt,
+    description: ` :[column_name, opts?: { timeZone: true | string }] -> get timestamp formated as ` + txt,
     singleColArg: true,
     numArgs: 1,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allColumns, args, tableAlias }) => {
-      return pgp.as.format("trim(to_char(" + parseUnix(args[0], tableAlias, allColumns) + ", $2))", [args[0], txt]);
+      return pgp.as.format("trim(to_char(" + parseUnix(args[0], tableAlias, allColumns, args[1]) + ", $2))", [args[0], txt]);
     }
   } as FunctionSpec)),
 
@@ -766,7 +778,7 @@ export const FUNCTIONS: FunctionSpec[] = [
   ...["age", "ageNow", "difference"].map(funcName => ({
     name: "$" + funcName,
     type: "function",
-    numArgs: 1,
+    numArgs: 2,
     singleColArg: true,
     getFields: (args: any[]) => args.slice(0, 2).filter(a => typeof a === "string"), // Filtered because the second arg is optional
     getQuery: ({ allowedFields, args, tableAlias, allColumns }) => {
@@ -777,8 +789,9 @@ export const FUNCTIONS: FunctionSpec[] = [
       if(funcName === "difference" && validColCount !== 2) throw new Error("Must have two column names")
       if(![1,2].includes(validColCount)) throw new Error("Must have one or two column names")
       const [leftField, rightField] = args as [string, string];
-      const leftQ = parseUnix(leftField, tableAlias, allColumns);
-      let rightQ = rightField? parseUnix(rightField, tableAlias, allColumns) : "";
+      const tzOpts = args[2];
+      const leftQ = parseUnix(leftField, tableAlias, allColumns, tzOpts);
+      let rightQ = rightField? parseUnix(rightField, tableAlias, allColumns, tzOpts) : "";
       let query = "";
       if(funcName === "ageNow" && validColCount === 1){
         query = `age(now(), ${leftQ})`;
