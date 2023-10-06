@@ -315,16 +315,25 @@ export class ViewHandler {
       return this.subscribe(filter, { ...params, limit: 2 }, func, table_rules, localParams);
   }
 
-  async count(filter?: Filter, param2_unused?: undefined, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<number> {
+  async count(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<number> {
     filter = filter || {};
     try {
       await this._log({ command: "count", localParams, data: { filter } });
       return await this.find(filter, { select: "", limit: 0 }, undefined, table_rules, localParams)
-        .then(async _allowed => {
-          const { filterFields, forcedFilter } = table_rules?.select || {};
-          const where = (await this.prepareWhere({ filter, forcedFilter, filterFields, addKeywords: true, localParams, tableRule: table_rules })).where;
-          const query = "SELECT COUNT(*) FROM " + this.escapedName + " " + where;
-          return (this.t || this.db).one(query, { _psqlWS_tableName: this.name }).then(({ count }) => +count);
+        .then(async _allowed => {          
+          const q: string = await this.find(
+            filter, { ...selectParams, limit: selectParams?.limit ?? Number.MAX_SAFE_INTEGER },
+            undefined,
+            table_rules,
+            { ...localParams, returnQuery: "noRLS" }
+            ) as any;
+            const query = [
+              withUserRLS(localParams, ""),
+              "SELECT COUNT(*) FROM (",
+              q,
+              ") t"
+            ].join("\n");
+          return (this.t || this.db).one(query).then(({ count }) => +count);
         });
     } catch (e) {
       if (localParams && localParams.testRule) throw e;
@@ -347,15 +356,15 @@ export class ViewHandler {
           ) as any;
           const query = withUserRLS(
             localParams,
-            `
+            `${withUserRLS(localParams, "")}
               SELECT sum(pg_column_size((prgl_size_query.*))) as size 
               FROM (
-                  ${q}
+                ${q}
               ) prgl_size_query
             `
           );
 
-          return (this.t || this.db).one(query, { _psqlWS_tableName: this.name }).then(({ size }) => size || '0');
+          return (this.t || this.db).one(query).then(({ size }) => size || '0');
         });
     } catch (e) {
       if (localParams && localParams.testRule) throw e;
