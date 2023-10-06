@@ -4,8 +4,7 @@
 
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/prostgles/prostgles-server-js/blob/master/LICENSE)
 [![npm version](https://img.shields.io/npm/v/prostgles-server.svg?style=flat)](https://www.npmjs.com/package/prostgles-server)
-![tests](https://github.com/prostgles/prostgles-server-js/workflows/tests/badge.svg?branch=master)
-![tests](https://github.com/github/docs/actions/workflows/main.yml/badge.svg)
+![Tests](https://github.com/prostgles/prostgles-server-js/actions/workflows/main.yml/badge.svg)
 
 ### New: JSONB schema runtime validation and TS types   
 <img src="https://prostgles.com/tsdef2.png" width="600px" style="max-width: 90vw; " />  
