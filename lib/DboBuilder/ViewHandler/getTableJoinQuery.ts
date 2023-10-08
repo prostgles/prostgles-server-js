@@ -28,6 +28,7 @@ export const getTableJoinQuery = ({ path, type, aliasSufix, rootTableAlias, fina
     const joinType = isExists? "INNER" : type;
     const keyword = `${joinType} JOIN`;
     const isLast = i === path.length - 1;
+    const isFirst = !i;
 
     /**
      * rootTable joins to first path
@@ -37,17 +38,18 @@ export const getTableJoinQuery = ({ path, type, aliasSufix, rootTableAlias, fina
       `WHERE (${getJoinOnCondition({
       on: firstPath.on, 
       leftAlias: rootTableAlias, 
+      getLeftColName: asName,
       rightAlias: getTableAlias(firstPath.table)
     })})` : "";
 
     const tableSelect = (isExists && isLast)? [
       `(`, 
-      `SELECT *`,
-      `FROM ${tableName}`,
-      (finalWhere? `WHERE ${finalWhere}` : ""),
+      ` SELECT *`,
+      ` FROM ${tableName}`,
+      (finalWhere? `  WHERE ${finalWhere}` : ""),
       `)`
     ].filter(v=>v).join("\n") : tableName;
-    if(isExists && !i){
+    if(isExists && isFirst){
       return [
         `SELECT 1`,
         `FROM ${tableSelect} ${tableAlias}`,
@@ -56,7 +58,7 @@ export const getTableJoinQuery = ({ path, type, aliasSufix, rootTableAlias, fina
     }
 
     return [
-      `${keyword} ${tableName} ${tableAlias}`,
+      `${keyword} ${tableSelect} ${tableAlias}`,
       ` ON ${onCondition}`,
       whereJoinCondition
     ].filter(v=>v).join("\n");

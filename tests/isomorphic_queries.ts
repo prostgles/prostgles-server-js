@@ -748,6 +748,13 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       ]
     });
     assert.equal(expect2.length, 2, "$existsJoined query failed");
+    const expectNothing = await db.items.find!({ 
+      $and: [
+        { $existsJoined: { "**.items3": { name: "nothing" } } },
+        { $existsJoined: { items2: { name: "a" } } }
+      ]
+    });
+    assert.equal(expectNothing.length, 0, "$existsJoined query failed");
   });
      
 
