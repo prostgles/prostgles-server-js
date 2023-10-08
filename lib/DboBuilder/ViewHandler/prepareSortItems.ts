@@ -65,9 +65,6 @@ export const prepareSortItems = (
       const { table, selectItem, joinAlias } = nestedField;
       
       const comparableDataTypeCast = ["uuid", "xml"].includes(selectItem.column_udt_type ?? "")? "::TEXT" : "";
-      if(nulls === "first"){
-        throw "Nested nulls sorting not supported";
-      }
       const sortItemAlias = asName(`prostgles_nested_sort_${selectItem.alias}`)
       
       return {

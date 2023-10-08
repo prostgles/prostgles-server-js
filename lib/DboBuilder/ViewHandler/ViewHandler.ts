@@ -27,6 +27,7 @@ import { ColSet } from "./ColSet";
 import { prepareWhere } from "./prepareWhere";
 import { getInfo } from "./getInfo";
 import { validateViewRules } from "./validateViewRules";
+import { omitKeys } from "../../PubSubManager/PubSubManager";
 
 export type JoinPaths = {
   t1: string;
@@ -315,14 +316,15 @@ export class ViewHandler {
       return this.subscribe(filter, { ...params, limit: 2 }, func, table_rules, localParams);
   }
 
-  async count(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<number> {
-    filter = filter || {};
+  async count(_filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<number> {
+    const filter = _filter || {};
     try {
       await this._log({ command: "count", localParams, data: { filter } });
       return await this.find(filter, { select: "", limit: 0 }, undefined, table_rules, localParams)
         .then(async _allowed => {          
           const q: string = await this.find(
-            filter, { ...selectParams, limit: selectParams?.limit ?? Number.MAX_SAFE_INTEGER },
+            filter, 
+            selectParams,
             undefined,
             table_rules,
             { ...localParams, returnQuery: "noRLS" }
@@ -341,8 +343,8 @@ export class ViewHandler {
     }
   }
 
-  async size(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<string> {
-    filter = filter || {};
+  async size(_filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<string> {
+    const filter = _filter || {};
     try {
       await this._log({ command: "size", localParams, data: { filter, selectParams } });
       return await this.find(filter, { ...selectParams, limit: 2 }, undefined, table_rules, localParams)
