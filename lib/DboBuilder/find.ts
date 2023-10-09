@@ -41,7 +41,7 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
     }
 
     const _selectParams = selectParams ?? {}
-    const selectParamsLimitCheck = localParams?.bypassLimit && !Number.isFinite(_selectParams.limit)? omitKeys(_selectParams, ["limit"]) : _selectParams
+    const selectParamsLimitCheck = localParams?.bypassLimit && !Number.isFinite(_selectParams.limit)? { ..._selectParams, limit: null } : { limit: 1000, ..._selectParams }
     const q = await getNewQuery(
       this as unknown as TableHandler, 
       filter, 
