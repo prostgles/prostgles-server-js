@@ -85,7 +85,7 @@ export function getSelectQuery(
     , ...getRootGroupBy(q, selectParamsGroupBy)
     , ...prepareOrderByQuery(q.orderByItems)
     , ...(q.having ? [`HAVING ${q.having} `] : [])
-    , ...(depth ? [] : [`LIMIT ${q.limit || 0}`])
+    , ...(depth || q.limit === null ? [] : [`LIMIT ${q.limit || 0}`])
     , ...(q.offset? [`OFFSET ${q.offset || 0}`] : [])
   ];
 

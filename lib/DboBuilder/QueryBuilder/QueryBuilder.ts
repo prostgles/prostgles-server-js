@@ -45,7 +45,7 @@ export type NewQueryRoot = {
   whereOpts: Awaited<ReturnType<ViewHandler["prepareWhere"]>>;
   orderByItems: SortItem[];
   having: string;
-  limit: number;
+  limit: number | null;
   offset: number;
   isLeftJoin: boolean;
   tableAlias?: string;

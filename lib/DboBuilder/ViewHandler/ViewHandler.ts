@@ -185,7 +185,7 @@ export class ViewHandler {
         if (!tableRules.select.fields) return throwFieldsErr("select");
 
         let maxLimit: number | null = null;
-        if (tableRules.select.maxLimit !== undefined && tableRules.select.maxLimit !== maxLimit) {
+        if (!localParams?.bypassLimit && tableRules.select.maxLimit !== undefined && tableRules.select.maxLimit !== maxLimit) {
           const ml = tableRules.select.maxLimit;
           if (ml !== null && (!Number.isInteger(ml) || ml < 0)) throw ` Invalid publish.${this.name}.select.maxLimit -> expecting   a positive integer OR null    but got ` + ml;
           maxLimit = ml;
@@ -401,25 +401,20 @@ export class ViewHandler {
   prepareWhere = prepareWhere.bind(this);
 
   /* This relates only to SELECT */
-  prepareLimitQuery(limit = 1000, p: ValidatedTableRules): number {
+  prepareLimitQuery(limit: number | null | undefined = null, p: ValidatedTableRules): number | null {
 
     if (limit !== undefined && limit !== null && !Number.isInteger(limit)) {
       throw "Unexpected LIMIT. Must be null or an integer";
     }
 
     let _limit = limit;
-
-    // if(_limit === undefined && p.select.maxLimit === null){
-    //     _limit = 1000;
-
     /* If no limit then set as the lesser of (100, maxLimit) */
-    // } else 
     if (_limit !== null && !Number.isInteger(_limit) && p.select.maxLimit !== null) {
       _limit = [100, p.select.maxLimit].filter(Number.isInteger).sort((a, b) => a - b)[0]!;
     } else {
 
       /* If a limit higher than maxLimit specified throw error */
-      if (Number.isInteger(p.select.maxLimit) && _limit > p.select.maxLimit!) {
+      if (Number.isInteger(p.select.maxLimit) && _limit !== null && _limit > p.select.maxLimit!) {
         throw `Unexpected LIMIT ${_limit}. Must be less than the published maxLimit: ` + p.select.maxLimit;
       }
     }
