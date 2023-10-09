@@ -7,6 +7,7 @@ import { TableRule } from "../PublishParser";
 import { TableHandler } from "./TableHandler";
 import { getNewQuery } from "./QueryBuilder/getNewQuery";
 import { ViewHandler } from "./ViewHandler/ViewHandler";
+import { omitKeys, pickKeys } from "../PubSubManager/PubSubManager";
 
 export const find = async function(this: ViewHandler, filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]> {
   try {
@@ -18,7 +19,7 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
       throw `returnType (${returnType}) can only be ${allowedReturnTypes.join(" OR ")}`
     }
 
-    const { testRule = false, returnQuery = false, returnNewQuery } = localParams || {};
+    const { testRule = false, returnQuery = false, returnNewQuery, bypassLimit = false } = localParams || {};
 
     if (testRule) return [];
     if (selectParams) {
@@ -39,10 +40,12 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
       if (maxLimit && !Number.isInteger(maxLimit)) throw ` invalid publish.${this.name}.select.maxLimit -> expecting integer but got ` + maxLimit;
     }
 
+    const _selectParams = selectParams ?? {}
+    const selectParamsLimitCheck = localParams?.bypassLimit && !Number.isFinite(_selectParams.limit)? omitKeys(_selectParams, ["limit"]) : _selectParams
     const q = await getNewQuery(
       this as unknown as TableHandler, 
       filter, 
-      selectParams, 
+      selectParamsLimitCheck, 
       param3_unused, 
       tableRules, 
       localParams, 
@@ -52,7 +55,7 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
       this, 
       q, 
       undefined, 
-      !!selectParams?.groupBy
+      !!selectParamsLimitCheck?.groupBy
     );
 
     const queryWithRLS = withUserRLS(localParams, queryWithoutRLS);

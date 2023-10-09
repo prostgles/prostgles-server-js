@@ -38,7 +38,6 @@ export const getTableJoinQuery = ({ path, type, aliasSufix, rootTableAlias, fina
       `WHERE (${getJoinOnCondition({
       on: firstPath.on, 
       leftAlias: rootTableAlias, 
-      getLeftColName: asName,
       rightAlias: getTableAlias(firstPath.table)
     })})` : "";
 

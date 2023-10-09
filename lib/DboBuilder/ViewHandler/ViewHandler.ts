@@ -327,7 +327,7 @@ export class ViewHandler {
             selectParams,
             undefined,
             table_rules,
-            { ...localParams, returnQuery: "noRLS" }
+            { ...localParams, returnQuery: "noRLS", bypassLimit: true }
             ) as any;
             const query = [
               withUserRLS(localParams, ""),
@@ -354,7 +354,7 @@ export class ViewHandler {
             filter, { ...selectParams, limit: selectParams?.limit ?? Number.MAX_SAFE_INTEGER },
             undefined,
             table_rules,
-            { ...localParams, returnQuery: "noRLS" }
+            { ...localParams, returnQuery: "noRLS", bypassLimit: true }
           ) as any;
           const query = withUserRLS(
             localParams,

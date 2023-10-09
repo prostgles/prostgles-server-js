@@ -183,6 +183,8 @@ export type LocalParams = {
 
   returnQuery?: boolean | "noRLS";
   returnNewQuery?: boolean;
+  /** Used for count/size queries */
+  bypassLimit?: boolean;
 
   nestedInsert?: {
     depth: number;
