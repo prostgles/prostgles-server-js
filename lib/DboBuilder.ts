@@ -130,8 +130,12 @@ export type TableOrViewInfo = TableInfo & ViewInfo & {
 export type PRGLIOSocket = {
   readonly id: string;
 
-  readonly handshake?: {
+  readonly handshake: {
     query?: Record<string, string>;
+    /**
+     * IP Address
+     */
+    address: string;
     headers?: AnyObject & { cookie?: string; };  //  e.g.: "some_arg=dwdaw; otherarg=23232"
     auth?: Record<string, any>;
   }
@@ -148,6 +152,7 @@ export type PRGLIOSocket = {
 
   readonly request: {
     url: string;
+    connection: { remoteAddress: string; }
   }
 
   /** Used for session caching */

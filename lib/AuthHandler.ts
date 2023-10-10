@@ -18,7 +18,9 @@ type ExpressRes = Response;
 
 type LoginClientInfo = {
   ip_address: string;
-  user_agent?: string | undefined;
+  ip_address_remote: string | undefined;
+  x_real_ip: string | undefined;
+  user_agent: string | undefined;
 }
 
 export type BasicSession = {
@@ -32,7 +34,7 @@ export type BasicSession = {
   /** On expired */
   onExpiration: "redirect" | "show_error";
 };
-export type AuthClientRequest = { socket: any } | { httpReq: ExpressReq };
+export type AuthClientRequest = { socket: PRGLIOSocket } | { httpReq: ExpressReq };
 export type UserLike = {
   id: string;
   type: string;
@@ -60,6 +62,27 @@ export type AuthResult<SU = SessionUser> = SU & { sid: string; } | {
   sid?: string;
 } | undefined
 
+const getLoginClientInfo = (req: AuthClientRequest): AuthClientRequest & LoginClientInfo => {
+  if("httpReq" in req){
+    const ip_address = req.httpReq.ip;
+    const user_agent = req.httpReq.headers["user-agent"];
+    return { 
+      ...req, 
+      ip_address,
+      ip_address_remote: req.httpReq.connection.remoteAddress,
+      x_real_ip: req.httpReq.headers['x-real-ip'] as any,
+      user_agent,
+    };
+  } else {
+    return {
+      ...req,
+      ip_address: req.socket.handshake.address,
+      ip_address_remote: req.socket.request.connection.remoteAddress,
+      x_real_ip: req.socket.handshake.headers?.["x-real-ip"],
+      user_agent: req.socket.handshake.headers?.['user-agent'],
+    }
+  }
+}
 
 export type AuthRequestParams<S, SUser extends SessionUser> = { db: DB, dbo: DBOFullyTyped<S>; getUser: () => Promise<AuthResult<SUser>> }
 
@@ -147,7 +170,7 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
   /**
    * undefined sid is allowed to enable public users
    */
-  getUser: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB, client: AuthClientRequest) => Awaitable<AuthResult<SUser>>;
+  getUser: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB, client: AuthClientRequest & LoginClientInfo) => Awaitable<AuthResult<SUser>>;
 
   register?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession> | BasicSession;
   login?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB, client: LoginClientInfo) => Awaitable<BasicSession> | BasicSession;
@@ -273,7 +296,7 @@ export default class AuthHandler {
     try {
       return this.throttledFunc(async () => {
 
-        return this.opts!.getUser(this.validateSid(sid), this.dbo as any, this.db, clientReq);
+        return this.opts!.getUser(this.validateSid(sid), this.dbo as any, this.db, getLoginClientInfo(clientReq));
       }, 50)
     } catch (err) {
       console.error(err);
@@ -329,9 +352,7 @@ export default class AuthHandler {
           } else {
             try {
               const session = await this.throttledFunc(async () => {
-                const ip_address = req.ip;
-                const user_agent = req.headers["user-agent"];
-                return check(id, this.dbo as any, this.db, { ip_address, user_agent });
+                return check(id, this.dbo as any, this.db, getLoginClientInfo({ httpReq: req }));
               });
               if (!session) {
                 res.status(404).json({ msg: "Invalid magic-link" });
@@ -352,10 +373,7 @@ export default class AuthHandler {
 
         app.post(loginRoute, async (req: ExpressReq, res: ExpressRes) => {
           try {
-            const ip_address = req.ip;
-            const user_agent = req.headers["user-agent"];
-
-            const { sid, expires } = await this.loginThrottled(req.body || {}, { ip_address, user_agent }) || {};
+            const { sid, expires } = await this.loginThrottled(req.body || {}, getLoginClientInfo({ httpReq: req })) || {};
 
             if (sid) {
 
@@ -571,10 +589,10 @@ export default class AuthHandler {
 
       if (getUser && localParams && (localParams.httpReq || localParams.socket)) {
         const sid = this.getSID(localParams);
-        const clientReq = localParams.httpReq? { httpReq: localParams.httpReq } : { socket: localParams.socket };
+        const clientReq = localParams.httpReq? { httpReq: localParams.httpReq } : { socket: localParams.socket! };
         let user, clientUser;
         if(sid){
-          const res = await getUser(sid, this.dbo as any, this.db, clientReq) as any;
+          const res = await getUser(sid, this.dbo as any, this.db, getLoginClientInfo(clientReq)) as any;
           user = res?.user;
           clientUser = res?.clientUser;
         }
