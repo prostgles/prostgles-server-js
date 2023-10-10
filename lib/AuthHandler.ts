@@ -16,7 +16,7 @@ type AuthSocketSchema = {
 type ExpressReq = Request;
 type ExpressRes = Response;
 
-type LoginClientInfo = {
+export type LoginClientInfo = {
   ip_address: string;
   ip_address_remote: string | undefined;
   x_real_ip: string | undefined;
