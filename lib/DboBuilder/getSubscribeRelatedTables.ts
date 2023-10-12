@@ -1,10 +1,9 @@
-import { AnyObject, asName, isDefined, SubscribeParams } from "prostgles-types";
-import { Filter, LocalParams, makeErrorFromPGError, ExistsFilterConfig } from "../DboBuilder";
+import { AnyObject, asName, reverseParsedPath, SubscribeParams } from "prostgles-types";
+import { ExistsFilterConfig, Filter, LocalParams, makeErrorFromPGError } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 import { log, ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
 import { NewQuery } from "./QueryBuilder/QueryBuilder";
 import { ViewHandler } from "./ViewHandler/ViewHandler";
-import { ParsedJoinPath, reverseJoinOn } from "./ViewHandler/parseJoinPath";
 
 type Args = {
   selectParams: Omit<SubscribeParams, "throttle">;
@@ -187,25 +186,4 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { selectParam
   }
 
   return viewOptions;
-}
-
-/**
- * result = [
- *  { table, on: parsedPath[0] }
- *  ...parsedPath.map(p => ({ table: p.table, on: reversedOn(parsedPath[i+1].on) }))
- * ]
- */
-const reverseParsedPath = (parsedPath: ParsedJoinPath[], table: string) => {
-  const newPPath: ParsedJoinPath[] = [
-    { table, on: [{}] },
-    ...(parsedPath ?? [])
-  ]
-  return newPPath.map((pp, i) => {
-    const nextPath = newPPath[i+1];
-    if(!nextPath) return undefined;
-    return {
-      table: pp.table,
-      on: reverseJoinOn(nextPath.on)
-    }
-  }).filter(isDefined).reverse();
 }

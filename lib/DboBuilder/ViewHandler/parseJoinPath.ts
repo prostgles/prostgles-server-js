@@ -1,4 +1,4 @@
-import { JoinPath, RawJoinPath } from "prostgles-types";
+import { JoinPath, RawJoinPath, reverseJoinOn } from "prostgles-types";
 import { ViewHandler } from "./ViewHandler";
 
 type parseJoinPathArgs = {
@@ -180,17 +180,6 @@ function getJoins(viewHandler: ViewHandler, source: string, path: JoinPath[], { 
     paths,
     expectOne
   };
-}
-
-export const reverseJoinOn = (on: ParsedJoinPath["on"]) => {
-  return on.map(constraint => 
-    Object.fromEntries(
-      Object.entries(constraint)
-        .map(([left, right]) => 
-          [right, left]
-        )
-    )
-  );
 }
 
 const getValidOn = (requested: JoinPath["on"], possible: ParsedJoinPath["on"]) => {
