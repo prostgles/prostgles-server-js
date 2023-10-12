@@ -1047,7 +1047,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: false,
     getFields: args => args,
     getQuery: ({ args, tableAlias }) => {
-      return `jsonb_build_object(${args.flatMap(arg => [asName(arg), asNameAlias(arg, tableAlias)]).join(", ")})`;
+      return `jsonb_build_object(${args.flatMap(arg => [asValue(arg), asNameAlias(arg, tableAlias)]).join(", ")})`;
     }
   },
 
