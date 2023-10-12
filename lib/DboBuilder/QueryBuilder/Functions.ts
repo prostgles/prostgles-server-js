@@ -1030,14 +1030,26 @@ export const FUNCTIONS: FunctionSpec[] = [
     numArgs: 1,
     singleColArg: true,
     getFields: (args: any[]) => [args[0]],
-    getQuery: ({ allowedFields, args, tableAlias }) => {
+    getQuery: ({ args, tableAlias }) => {
       let extraArgs = "";
       if(args.length > 1){
         extraArgs  = pgp.as.format(", $1:csv", args.slice(1))
       }
       return aggName + "(" + asNameAlias(args[0], tableAlias) + `${extraArgs})`;
     }
-  } as FunctionSpec)),
+  } satisfies FunctionSpec)),
+
+  {
+    name: "$jsonb_build_object",
+    type: "function",
+    numArgs: 22,
+    minCols: 1,
+    singleColArg: false,
+    getFields: args => args,
+    getQuery: ({ args, tableAlias }) => {
+      return `jsonb_build_object(${args.flatMap(arg => [asName(arg), asNameAlias(arg, tableAlias)]).join(", ")})`;
+    }
+  },
 
   /* More aggs */
   {
