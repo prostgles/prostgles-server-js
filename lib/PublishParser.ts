@@ -446,8 +446,26 @@ export class PublishParser {
     return _publish;
   }
   async getValidatedRequestRuleWusr({ tableName, command, localParams }: DboTableCommand): Promise<TableRule> {
+    
     const clientInfo = await this.prostgles.authHandler!.getClientInfo(localParams);
-    return await this.getValidatedRequestRule({ tableName, command, localParams }, clientInfo);
+    const rules = await this.getValidatedRequestRule({ tableName, command, localParams }, clientInfo);
+    /**
+     * Allow inserting into files table from a referencedColumn
+     */
+    if(command === "insert" && localParams.nestedInsert){
+      const { referencingColumn, previousTable } = localParams.nestedInsert
+      const table = this.dbo[tableName];
+      const fileRef = this.prostgles.opts.fileTable?.referencedTables?.[previousTable];
+      if(table?.is_media && referencingColumn && isObject(fileRef) && isObject(fileRef.referenceColumns) && fileRef.referenceColumns[referencingColumn]){
+        return {
+          ...rules,
+          insert: {
+            fields: "*"
+          },
+        }
+      }
+    }
+    return rules;
   }
 
   async getValidatedRequestRule({ tableName, command, localParams }: DboTableCommand, clientInfo?: AuthResult): Promise<TableRule> {

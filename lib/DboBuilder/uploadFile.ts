@@ -10,7 +10,7 @@ export const isFile = (row: AnyObject) => {
 export async function uploadFile(this: TableHandler, row: AnyObject, validate: ValidateRow | undefined, localParams: LocalParams | undefined, mediaId?: string): Promise<Media> {
   if (!this.dboBuilder.prostgles?.fileManager) throw "fileManager not set up";
 
-  if (!isFile(row)) throw "Expecting only two properties for file upload: { name: string; data: File | string | Buffer }; but got: " + getKeys(row).map(k => `${k}: ${typeof data[k]}`).join(", ");
+  if (!isFile(row)) throw "Expecting only two properties for file upload: { name: string; data: File | string | Buffer }; but got: " + Object.entries(row).map(([k, v]) => `${k}: ${typeof v}`).join(", ");
   const { data, name } = row;
 
   const media_id = mediaId ?? (await this.db.oneOrNone("SELECT gen_random_uuid() as name")).name;
