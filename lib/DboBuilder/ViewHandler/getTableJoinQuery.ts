@@ -2,25 +2,25 @@ import { asName } from "prostgles-types";
 import { ParsedJoinPath } from "./parseJoinPath";
 
 type getTableJoinsArgs = {
-  aliasSufix: string;
   rootTableAlias: string;
   type: "INNER" | "LEFT" | "EXISTS";
   finalWhere?: string;
   path: ParsedJoinPath[];
 }
-export const getTableJoinQuery = ({ path, type, aliasSufix, rootTableAlias, finalWhere }: getTableJoinsArgs): { targetAlias: string; query: string } => {
+export const getTableJoinQuery = ({ path, type, rootTableAlias, finalWhere }: getTableJoinsArgs): { targetAlias: string; query: string } => {
 
   const [firstPath] = path;
   if(!firstPath){
     throw `Cannot create join query for empty path`;
   }
-  const getTableAlias = (table: string) => asName(`${aliasSufix}_${table}`);
+  const aliasSufix = "jd";
+  const getTableAlias = (table: string, pathIndex: number) => asName(`${aliasSufix}_${pathIndex}_${table}`);
 
   const query = path.map(({ table, on }, i) => {
     if(!on) throw "on missing";
     const tableName = table;
-    const tableAlias = getTableAlias(table);
-    const prevTableAlias = i === 0? rootTableAlias : getTableAlias(path[i-1]!.table);
+    const tableAlias = getTableAlias(table, i);
+    const prevTableAlias = i === 0? rootTableAlias : getTableAlias(path[i-1]!.table, i-1);
 
     const onCondition = getJoinOnCondition({ on, leftAlias: prevTableAlias, rightAlias: tableAlias });
 
@@ -38,7 +38,7 @@ export const getTableJoinQuery = ({ path, type, aliasSufix, rootTableAlias, fina
       `WHERE (${getJoinOnCondition({
       on: firstPath.on, 
       leftAlias: rootTableAlias, 
-      rightAlias: getTableAlias(firstPath.table)
+      rightAlias: getTableAlias(firstPath.table, 0)
     })})` : "";
 
     const tableSelect = (isExists && isLast)? [
@@ -66,7 +66,7 @@ export const getTableJoinQuery = ({ path, type, aliasSufix, rootTableAlias, fina
 
   return {
     query,
-    targetAlias: getTableAlias(path.at(-1)!.table)
+    targetAlias: getTableAlias(path.at(-1)!.table, path.length - 1)
   }
 }
 

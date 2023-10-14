@@ -60,7 +60,6 @@ export async function getExistsCondition(this: ViewHandler, eConfig: ExistsFilte
   if(eConfig.isJoined){
     const { query } = getTableJoinQuery({
       path: eConfig.parsedPath,
-      aliasSufix: "jd",
       rootTableAlias: thisTable,
       type: "EXISTS",
       finalWhere,

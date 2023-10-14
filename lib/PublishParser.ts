@@ -1,7 +1,7 @@
 import { getKeys, RULE_METHODS, AnyObject, get, TableSchemaForClient, DBSchemaTable, MethodKey, TableInfo, FullFilter, isObject, Method, DBSchema } from "prostgles-types";
 import { AuthResult, SessionUser } from "./AuthHandler";
 import { CommonTableRules, Filter, isPlainObject, LocalParams, PRGLIOSocket, TableOrViewInfo, TableSchemaColumn } from "./DboBuilder";
-import { Prostgles, DBHandlerServer, DB, TABLE_METHODS } from "./Prostgles";
+import { Prostgles, DBHandlerServer, DB, TABLE_METHODS, ProstglesInitOptions } from "./Prostgles";
 import type { DBOFullyTyped, PublishFullyTyped } from "./DBSchemaBuilder";
 
 export type PublishMethods<S = void, SUser extends SessionUser = SessionUser> = (params: PublishParams<S, SUser>) => { [key: string]: Method } | Promise<{ [key: string]: Method } | null>;
@@ -101,6 +101,7 @@ import { FieldFilter, SelectParams } from "prostgles-types";
 import { DEFAULT_SYNC_BATCH_SIZE } from "./PubSubManager/PubSubManager";
 import { TableHandler } from "./DboBuilder/TableHandler";
 import { ViewHandler } from "./DboBuilder/ViewHandler/ViewHandler";
+import { parseFieldFilter } from "./DboBuilder/ViewHandler/parseFieldFilter";
 
 export type InsertRequestData = {
   data: object | object[]
@@ -796,4 +797,64 @@ function applyParamsIfFunc(maybeFunc: any, ...params: any): any {
   }
 
   return maybeFunc;
+}
+
+export async function getFileTableRules (this: PublishParser, socket: PRGLIOSocket, clientInfo: AuthResult | undefined) {
+  const opts = this.prostgles.opts;
+  const forcedDeleteFilters: FullFilter<AnyObject, void>[] = [];
+  const forcedSelectFilters: FullFilter<AnyObject, void>[] = [];
+  if(opts.fileTable?.referencedTables){
+    Object.entries(opts.fileTable.referencedTables).forEach(async ([tableName, refCols]) => {
+      if(isObject(refCols)){
+        const table_rules = await this.getTableRules({ localParams: { socket }, tableName }, clientInfo);
+        if(table_rules){
+          Object.keys(refCols).map(column => {
+
+            if(table_rules.delete){
+              forcedDeleteFilters.push({
+                $existsJoined: {
+                  path: [{ table: tableName, on: [{ [column]: "id" }] }],
+                  filter: table_rules.delete.forcedFilter ?? {},
+                }
+              })
+            }
+            if(table_rules.select){
+              const parsedFields = parseFieldFilter(table_rules.select.fields, false, [column]);
+              /** Must be allowed to view this column */
+              if(parsedFields.includes(column as any)){
+                forcedSelectFilters.push({
+                  $existsJoined: {
+                    path: [{ table: tableName, on: [{ [column]: "id" }] }],
+                    filter: table_rules.select.forcedFilter ?? {},
+                  }
+                });
+              }
+            }
+
+          })
+        }
+      }
+    })
+  }
+
+
+  const fileTableRule: TableRule = {};
+  if(forcedSelectFilters.length){
+    fileTableRule.select = {
+      fields: "*",
+      forcedFilter: {
+        $or: forcedSelectFilters
+      }
+    }
+  }
+  if(forcedDeleteFilters.length){
+    fileTableRule.delete = {
+      filterFields: "*",
+      forcedFilter: {
+        $or: forcedSelectFilters
+      }
+    }
+  }
+
+  return fileTableRule;
 }

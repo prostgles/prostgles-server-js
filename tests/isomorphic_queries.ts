@@ -946,7 +946,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       }]
     }]);
 
-    const exists = await db[`"""quoted0"""`].find({
+    const exists1 = await db[`"""quoted0"""`].find({
       $existsJoined: {
         path: ['"""quoted1"""', '"""quoted2"""'],
         filter: {
@@ -954,6 +954,16 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
         }
       }
     }, { select: "*" });
+    /** Duplicated tables */
+    const exists2 = await db[`"""quoted0"""`].find({
+      $existsJoined: {
+        path: ['"""quoted1"""', '"""quoted2"""','"""quoted1"""', '"""quoted2"""'],
+        filter: {
+          '"id2"': 1,
+        }
+      }
+    }, { select: "*" });
+    assert.deepStrictEqual(exists1, exists2)
   })
 
   await tryRun("Reverse join with agg", async () => {
