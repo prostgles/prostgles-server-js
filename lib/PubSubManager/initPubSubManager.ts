@@ -62,10 +62,12 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
               `
             }
 
+            const queryIdentifier = "prostgles query used to keep track of which prgl backend clients are still connected"
             checkForStaleTriggers = `                          
               DO $$
               BEGIN
                 /* 
+                  ${queryIdentifier}
                   ${REALTIME_TRIGGER_CHECK_QUERY} 
                   ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
                 */
@@ -92,6 +94,7 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
             const queryTimeoutMillis = Math.min(5e3, Math.round(this.appCheckFrequencyMS/2));
             this.db.any(`    
               /* 
+                ${queryIdentifier}
                 ${REALTIME_TRIGGER_CHECK_QUERY} 
                 ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
               */
@@ -101,9 +104,9 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
                 SELECT pg_cancel_backend(pid)
                 FROM pg_catalog.pg_stat_activity
                 WHERE pid <> pg_backend_pid()
-                AND query = \${checkForStaleTriggers};
+                AND query = \${queryIdentifier};
               END $$;
-            `, { queryTimeoutMillis, checkForStaleTriggers })
+            `, { queryTimeoutMillis, queryIdentifier })
             await this.db.any(checkForStaleTriggers);
             tries = 5;
             log("updated last_check");
