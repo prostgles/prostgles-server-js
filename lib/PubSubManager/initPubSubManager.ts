@@ -101,7 +101,7 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
               DO $$ 
               BEGIN
                 PERFORM pg_sleep(\${queryTimeoutMillis}/1e3);
-                SELECT pg_cancel_backend(pid)
+                PERFORM pg_cancel_backend(pid)
                 FROM pg_catalog.pg_stat_activity
                 WHERE pid <> pg_backend_pid()
                 AND query = \${queryIdentifier};
