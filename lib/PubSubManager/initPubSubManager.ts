@@ -65,7 +65,6 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
             checkForStaleTriggers = `                          
               DO $$
               BEGIN
-                set statement_timeout to ${Math.min(5e3, Math.round(this.appCheckFrequencyMS/2))};
                 /* 
                   ${REALTIME_TRIGGER_CHECK_QUERY} 
                   ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
@@ -88,8 +87,26 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
                     ${dataTriggerCheckQuery}
                 END IF;
  
+              END $$;`
+
+            const queryTimeoutMillis = Math.min(5e3, Math.round(this.appCheckFrequencyMS/2));
+            this.db.any(`                     
+              DO $$
+              BEGIN
+                /* 
+                  ${REALTIME_TRIGGER_CHECK_QUERY} 
+                  ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
+                */
+                DO $$ 
+                BEGIN
+                  PERFORM pg_sleep(\${queryTimeoutMillis}/1e3);
+                  SELECT pg_cancel_backend(pid)
+                  FROM pg_catalog.pg_stat_activity
+                  WHERE pid <> pg_backend_pid()
+                  AND query = \${checkForStaleTriggers};
+                END $$;
               END $$;
-          `
+            `, { queryTimeoutMillis, checkForStaleTriggers })
             await this.db.any(checkForStaleTriggers);
             tries = 5;
             log("updated last_check");
