@@ -90,21 +90,18 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
               END $$;`
 
             const queryTimeoutMillis = Math.min(5e3, Math.round(this.appCheckFrequencyMS/2));
-            this.db.any(`                     
-              DO $$
+            this.db.any(`    
+              /* 
+                ${REALTIME_TRIGGER_CHECK_QUERY} 
+                ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
+              */
+              DO $$ 
               BEGIN
-                /* 
-                  ${REALTIME_TRIGGER_CHECK_QUERY} 
-                  ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
-                */
-                DO $$ 
-                BEGIN
-                  PERFORM pg_sleep(\${queryTimeoutMillis}/1e3);
-                  SELECT pg_cancel_backend(pid)
-                  FROM pg_catalog.pg_stat_activity
-                  WHERE pid <> pg_backend_pid()
-                  AND query = \${checkForStaleTriggers};
-                END $$;
+                PERFORM pg_sleep(\${queryTimeoutMillis}/1e3);
+                SELECT pg_cancel_backend(pid)
+                FROM pg_catalog.pg_stat_activity
+                WHERE pid <> pg_backend_pid()
+                AND query = \${checkForStaleTriggers};
               END $$;
             `, { queryTimeoutMillis, checkForStaleTriggers })
             await this.db.any(checkForStaleTriggers);
