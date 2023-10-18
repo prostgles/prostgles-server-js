@@ -82,6 +82,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
     }
 
     if (!rowOrRows) rowOrRows = {}; //throw "Provide data in param1";
+    const { postValidate, checkFilter, validate } = tableRules?.[ACTION] ?? {};
 
     /** TODO: use WITH inserted as (query) SELECT jsonb_agg(inserted.*) as validateReturn, userReturning */
     const originalReturning = await this.prepareReturning(returning, this.parseFieldFilter(returningFields))
@@ -106,7 +107,7 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
 
       let insertQ = "";
       if (!Array.isArray(_data) && !getKeys(_data).length || Array.isArray(_data) && !_data.length) {
-        await tableRules?.[ACTION]?.validate?.(_data, this.dbTX || this.dboBuilder.dbo);
+        await validate?.(_data, this.dbTX || this.dboBuilder.dbo);
         insertQ = `INSERT INTO ${asName(this.name)} DEFAULT VALUES `;
       } else {
         //@ts-ignore
@@ -163,12 +164,38 @@ export async function insert(this: TableHandler, rowOrRows: (AnyObject | AnyObje
       result = await this.db.tx(t => (t as any)[queryType](query)).catch(err => makeErrorFromPGError(err, localParams, this, allowedFieldKeys));
     }
 
-    if(tableRules?.[ACTION]?.postValidate){
+    if(checkFilter){
+      const { where: checkCondition } = await this.prepareWhere({
+        filter: {},
+        forcedFilter: checkFilter,
+        filterFields: "*",
+        localParams,
+        tableRule: tableRules
+      });
+      const query = `
+        WITH prostgles_inserted AS (
+          INSERT INTO dwadwa 
+          .....
+          RETURNING *
+        )
+        SELECT *
+        FROM prostgles_inserted
+        WHERE ${checkCondition};
+      `;
+      const failingRows = await (tx || this.db).any(query);
+      if(failingRows){
+        throw `The following rows did not pass the checkFilter condition: ${JSON.stringify(failingRows)}`;
+      }
+    }
+
+    if(postValidate){
       if(!finalDBtx) throw new Error("Unexpected: no dbTX for postValidate");
+
       const rows = Array.isArray(result)? result : [result];
       for await (const row of rows){
-        await tableRules?.[ACTION]?.postValidate(row ?? {}, finalDBtx)
+        await postValidate(row ?? {}, finalDBtx)
       }
+      
 
       /* We used a full returning for postValidate. Now we must filter out dissallowed columns  */
       if(returning){

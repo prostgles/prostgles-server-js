@@ -168,17 +168,28 @@ export type SelectRule<Cols extends AnyObject = AnyObject, S extends DBSchema | 
   validate?(args: SelectRequestData): SelectRequestData | Promise<SelectRequestData>;
 
 }
-export type InsertRule<Cols extends AnyObject = AnyObject, S = void> = {
+
+export type CommonInsertUpdateRule<Cols extends AnyObject = AnyObject, S extends DBSchema | void = void> = {
+
+  /**
+   * Filter that the new records must match or the update/insert will fail
+   * Similar to a policy WITH CHECK clause 
+   */
+  checkFilter?: SelectRule<Cols, S>["forcedFilter"];
+
+  /**
+   * Data to include and overwrite on each update/insert
+   * These fields cannot be updated by the user
+   */
+  forcedData?: Partial<Cols>;
+}
+
+export type InsertRule<Cols extends AnyObject = AnyObject, S extends DBSchema | void = void> = CommonInsertUpdateRule<Cols, S> & {
 
   /**
    * Fields allowed to be inserted.   Tip: Use false to exclude field
    */
   fields: SelectRule<Cols>["fields"]
-
-  /**
-   * Data to include/overwrite on each insert
-   */
-  forcedData?: Partial<Cols>;
 
   /**
    * Fields user can view after inserting
@@ -201,7 +212,9 @@ export type InsertRule<Cols extends AnyObject = AnyObject, S = void> = {
    */
   postValidate?: ValidateRow<Required<Cols>, S>;
 }
-export type UpdateRule<Cols extends AnyObject = AnyObject, S extends DBSchema | void = void> = {
+
+
+export type UpdateRule<Cols extends AnyObject = AnyObject, S extends DBSchema | void = void> = CommonInsertUpdateRule<Cols, S> & {
 
   /**
    * Fields allowed to be updated.   Tip: Use false/0 to exclude field
@@ -225,11 +238,6 @@ export type UpdateRule<Cols extends AnyObject = AnyObject, S extends DBSchema | 
    * This filter cannot be updated
    */
   forcedFilter?: SelectRule<Cols, S>["forcedFilter"]
-
-  /**
-   * Data to include/overwrite on each updatDBe
-   */
-  forcedData?: InsertRule<Cols, S>["forcedData"]
 
   /**
    * Fields user can use to find the updates
@@ -803,6 +811,7 @@ export async function getFileTableRules (this: PublishParser, socket: PRGLIOSock
   const opts = this.prostgles.opts;
   const forcedDeleteFilters: FullFilter<AnyObject, void>[] = [];
   const forcedSelectFilters: FullFilter<AnyObject, void>[] = [];
+  const allowedInserts: { table: string; column: string }[] = [];
   if(opts.fileTable?.referencedTables){
     Object.entries(opts.fileTable.referencedTables).forEach(async ([tableName, refCols]) => {
       if(isObject(refCols)){
@@ -830,7 +839,13 @@ export async function getFileTableRules (this: PublishParser, socket: PRGLIOSock
                 });
               }
             }
-
+            if(table_rules.insert){
+              const parsedFields = parseFieldFilter(table_rules.insert.fields, false, [column]);
+              /** Must be allowed to view this column */
+              if(parsedFields.includes(column as any)){
+                allowedInserts.push({ table: tableName, column });
+              }
+            }
           })
         }
       }
@@ -856,5 +871,11 @@ export async function getFileTableRules (this: PublishParser, socket: PRGLIOSock
     }
   }
 
-  return fileTableRule;
+  if(allowedInserts.length){
+    fileTableRule.insert = {
+      fields: "*",
+    }
+  }
+
+  return { rules: fileTableRule, allowedInserts };
 }
