@@ -1,5 +1,5 @@
-import { ColumnInfo, asName, isEmpty, isObject, pickKeys } from "prostgles-types/dist";
-import { ValidateRow } from "../../PublishParser";
+import { AnyObject, ColumnInfo, asName, isEmpty, isObject, pickKeys } from "prostgles-types/dist";
+import { ValidateRow, ValidateRowBasic } from "../../PublishParser";
 import { DBHandlerServer } from "../../Prostgles";
 import { asValue } from "../../PubSubManager/PubSubManager";
 import { pgp } from "../../DboBuilder";
@@ -16,13 +16,15 @@ export class ColSet {
     this.opts = { columns, tableName, colNames: columns.map(c => c.name) }
   }
 
-  private async getRow(data: any, allowedCols: string[], dbTx: DBHandlerServer, validate?: ValidateRow): Promise<{ escapedCol: string; escapedVal: string; }[]> {
+  private async getRow(data: any, allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRow | undefined, command: "update" | "insert"): Promise<{ escapedCol: string; escapedVal: string; }[]> {
     const badCol = allowedCols.find(c => !this.opts.colNames.includes(c))
     if (!allowedCols || badCol) {
       throw "Missing or unexpected columns: " + badCol;
     }
 
-    if (isEmpty(data)) throw "No data";
+    if (command === "update" && isEmpty(data)) {
+      throw "No data provided for update";
+    }
 
     let row = pickKeys(data, allowedCols);
     if (validate) {
@@ -92,19 +94,25 @@ export class ColSet {
 
   }
 
-  async getInsertQuery(data: any[], allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRow | undefined): Promise<string> {
-    const res = (await Promise.all((Array.isArray(data) ? data : [data]).map(async d => {
-      const rowParts = await this.getRow(d, allowedCols, dbTx, validate);
-      const select = rowParts.map(r => r.escapedCol).join(", "),
-        values = rowParts.map(r => r.escapedVal).join(", ");
+  async getInsertQuery(data: AnyObject[], allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRowBasic | undefined) {
+    const inserts = (await Promise.all(data.map(async d => {
+      const rowParts = await this.getRow(d, allowedCols, dbTx, validate, "insert");
+      // const columns = rowParts.map(r => r.escapedCol).join(", "),
+      //   values = rowParts.map(r => r.escapedVal).join(", ");
 
-      return `INSERT INTO ${this.opts.tableName} (${select}) VALUES (${values})`;
-    }))).join(";\n") + " ";
-    return res;
+      // const insertQuery = `INSERT INTO ${this.opts.tableName} (${columns}) VALUES (${values})`;
+      // return { insertQuery, rowParts }
+      return Object.fromEntries(rowParts.map(rp => [rp.escapedCol, rp.escapedVal]));
+    })));
+    const uniqueColumns = Array.from(new Set(inserts.flatMap(row => Object.keys(row))))
+    const values = inserts.map(row => `(${uniqueColumns.map(colName => row[colName] ?? 'DEFAULT')})`).join(",\n");
+    // return { query, inserts };
+    const whatToInsert = !uniqueColumns.length? "DEFAULT VALUES" : `(${uniqueColumns}) VALUES ${values}`
+    return `INSERT INTO ${this.opts.tableName} ${whatToInsert} `;
   }
-  async getUpdateQuery(data: any[], allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRow | undefined): Promise<string> {
+  async getUpdateQuery(data: AnyObject | AnyObject[], allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRowBasic | undefined): Promise<string> {
     const res = (await Promise.all((Array.isArray(data) ? data : [data]).map(async d => {
-      const rowParts = await this.getRow(d, allowedCols, dbTx, validate);
+      const rowParts = await this.getRow(d, allowedCols, dbTx, validate, "update");
       return `UPDATE ${this.opts.tableName} SET ` + rowParts.map(r => `${r.escapedCol} = ${r.escapedVal} `).join(",\n")
     }))).join(";\n") + " ";
     return res;

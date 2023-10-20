@@ -1,7 +1,7 @@
 
 import { PubSubManager, SyncParams, pickKeys, omitKeys, log } from "./PubSubManager/PubSubManager";
 import { OrderBy, WAL, AnyObject, SyncBatchParams } from "prostgles-types";
-import { TableHandler } from "./DboBuilder/TableHandler";
+import { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
 
 export type ClientSyncInfo = Partial<{
   c_fr: AnyObject;
@@ -216,7 +216,8 @@ export async function syncData (this: PubSubManager, sync: SyncParams, clientDat
         let inserts = data.filter(d => !existingData.find(ed => rowsIdsMatch(ed, d)));
         let updates = data.filter(d => existingData.find(ed => rowsIdsMatch(ed, d) && +ed[synced_field] < +d[synced_field]));
         try {
-          if (!table_rules) throw "table_rules missing"
+          if (!table_rules) throw "table_rules missing";
+          
           if (table_rules.update && updates.length) {
             const updateData: [any, any][] = [];
             await Promise.all(updates.map(upd => {

@@ -2,7 +2,7 @@ import { AnyObject, getKeys, InsertParams, isDefined, isObject, PG_COLUMN_UDT_DA
 import { LocalParams, TableHandlers } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 import { omitKeys } from "../PubSubManager/PubSubManager";
-import { TableHandler } from "./TableHandler";
+import { TableHandler } from "./TableHandler/TableHandler";
 import { uploadFile } from "./uploadFile";
 
 /**
@@ -94,8 +94,8 @@ export async function insertDataParse(
   /**
    * Make sure nested insert uses a transaction
    */
-  const dbTX = localParams?.tx?.dbTX || this.dbTX;
-  const t = localParams?.tx?.t || this.t;
+  const dbTX = localParams?.tx?.dbTX || this.tx?.dbTX;
+  const t = localParams?.tx?.t || this.tx?.t;
   if (hasNestedInserts && (!dbTX || !t)) {
     return {
       insertResult: await this.dboBuilder.getTX((dbTX, _t) =>
@@ -110,12 +110,11 @@ export async function insertDataParse(
     }
   }
 
-  const preValidate = tableRules?.insert?.preValidate,
-    validate = tableRules?.insert?.validate;
+  const { preValidate, validate } = tableRules?.insert ?? {};
 
   const _data = await Promise.all((isMultiInsert ? data : [data]).map(async row => {
     if (preValidate) {
-      row = await preValidate(row, this.dbTX || this.dboBuilder.dbo);
+      row = await preValidate(row, this.tx?.dbTX || this.dboBuilder.dbo);
     }
 
     const extraKeys = getExtraKeys(row);
@@ -125,11 +124,11 @@ export async function insertDataParse(
     if (this.is_media) {
       return uploadFile.bind(this)(row, validate, localParams)
 
-      /* Potentially a nested join */
+    /* Potentially a nested join */
     } else if (hasNestedInserts) {
 
       /* Ensure we're using the same transaction */
-      const _this = this.t ? this : dbTX![this.name] as TableHandler;
+      const _this = this.tx ? this : dbTX![this.name] as TableHandler;
 
       const omitedKeys = extraKeys.concat(colInserts.map(c => c.col));
 

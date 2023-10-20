@@ -2,7 +2,7 @@ import { AnyObject, EXISTS_KEY, EXISTS_KEYS, FieldFilter, asName } from "prostgl
 import { LocalParams, ExistsFilterConfig } from "../../DboBuilder";
 import { ViewHandler } from "./ViewHandler";
 import { TableRule } from "../../PublishParser";
-import { TableHandler } from "../TableHandler";
+import { TableHandler } from "../TableHandler/TableHandler";
 import { getTableJoinQuery } from "./getTableJoinQuery";
 
 

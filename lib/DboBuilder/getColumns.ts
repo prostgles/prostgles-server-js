@@ -4,7 +4,7 @@ import {
 } from "prostgles-types";
 import { isPlainObject, LocalParams, parseError, postgresToTsType } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
-import { TableHandler } from "./TableHandler";
+import { TableHandler } from "./TableHandler/TableHandler";
 import { ViewHandler } from "./ViewHandler/ViewHandler";
 
 export const isTableHandler = (v: any): v is TableHandler => "parseUpdateRules" in v;

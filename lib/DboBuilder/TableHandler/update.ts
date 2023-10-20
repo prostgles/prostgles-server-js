@@ -1,18 +1,19 @@
 import { AnyObject, getKeys, isObject, unpatchText, UpdateParams } from "prostgles-types";
-import { Filter, isPlainObject, LocalParams, makeErrorFromPGError, Media, parseError, withUserRLS } from "../DboBuilder";
-import { TableRule, ValidateRow } from "../PublishParser";
-import { omitKeys, pickKeys } from "../PubSubManager/PubSubManager";
+import { Filter, isPlainObject, LocalParams, Media, parseError, withUserRLS } from "../../DboBuilder";
+import { TableRule, ValidateRow } from "../../PublishParser";
+import { omitKeys } from "../../PubSubManager/PubSubManager";
+import { isFile, uploadFile } from "../uploadFile";
+import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
 import { TableHandler } from "./TableHandler";
-import { isFile, uploadFile } from "./uploadFile"
-import { runQueryReturnType } from "./find";
 
 export async function update(this: TableHandler, filter: Filter, _newData: AnyObject, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<AnyObject | void> {
   const ACTION = "update";
   try {
     await this._log({ command: "update", localParams, data: { filter, _newData, params } });
     /** postValidate */
-    const finalDBtx = localParams?.tx?.dbTX || this.dbTX;
-    if(tableRules?.[ACTION]?.postValidate){
+    const finalDBtx = this.getFinalDBtx(localParams);
+    const rule = tableRules?.[ACTION]
+    if(rule?.postValidate){
       if(!finalDBtx){
         return this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.[ACTION]?.(filter, _newData, params, tableRules, localParams))
       }
@@ -30,7 +31,7 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
         const fileManager = this.dboBuilder.prostgles.fileManager
         if(!fileManager) throw new Error("fileManager missing");
         const validate: ValidateRow | undefined = tableRules?.[ACTION]?.validate? async (row) => {
-          return tableRules?.[ACTION]?.validate!({ update: row, filter }, this.dbTX || this.dboBuilder.dbo)
+          return tableRules?.[ACTION]?.validate!({ update: row, filter }, this.tx?.dbTX || this.dboBuilder.dbo)
         } : undefined;
 
         const existingFile: Media | undefined = await (localParams?.tx?.dbTX?.[this.name] as TableHandler || this).findOne({ id: existingMediaId });
@@ -54,7 +55,7 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
     const { fields, validateRow, forcedData,  returningFields, forcedFilter, filterFields } = parsedRules;
 
 
-    const { returning, multi = true, onConflictDoNothing = false, fixIssues = false } = params || {};
+    const { onConflictDoNothing = false, fixIssues = false } = params || {};
     const { returnQuery = false } = localParams ?? {};
 
     if (params) {
@@ -101,8 +102,8 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
     const nData = { ...data };
     
 
-    let query = await this.colSet.getUpdateQuery(nData, allowedCols, this.dbTX || this.dboBuilder.dbo, validateRow)
-    query += (await this.prepareWhere({
+    let query = await this.colSet.getUpdateQuery(nData, allowedCols, this.getFinalDbo(localParams), validateRow)
+    query += "\n" + (await this.prepareWhere({
       filter,
       forcedFilter,
       filterFields,
@@ -111,60 +112,36 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
     })).where;
     if (onConflictDoNothing) query += " ON CONFLICT DO NOTHING ";
 
-
-    /** postValidate */
-    const originalReturning = await this.prepareReturning(returning, this.parseFieldFilter(returningFields))
-    const fullReturning = await this.prepareReturning("*", this.parseFieldFilter("*"));
-    /** Used for postValidate. Add any missing computed returning from original query */
-    fullReturning.concat(originalReturning.filter(s => !fullReturning.some(f => f.alias === s.alias)));
-    const finalSelect = tableRules?.[ACTION]?.postValidate? fullReturning : originalReturning;
-    const returningSelect = this.makeReturnQuery(finalSelect);
-
-    let qType: "none" | "any" | "one" = "none";
-    if (returningSelect) {
-      qType = multi ? "any" : "one";
-      query += returningSelect;
-    }
+    const queryWithoutUserRLS = query;
     query = withUserRLS(localParams, query);
 
     if (returnQuery) return query as unknown as void;
 
-    if(params?.returnType){
-      return runQueryReturnType(query, params.returnType, this, localParams);
-    }
+    return runInsertUpdateQuery({
+      tableHandler: this,
+      data: undefined,
+      fields,
+      localParams,
+      params,
+      queryWithoutUserRLS,
+      returningFields,
+      rule,
+      type: "update"
+    });
 
-    let result;
-    if (this.t) {
-      result = await (this.t)[qType](query).catch((err: any) => makeErrorFromPGError(err, localParams, this, fields));
-    } else {
-      result = await this.db.tx(t => (t as any)[qType](query)).catch(err => makeErrorFromPGError(err, localParams, this, fields));
-    }
+    // if(params?.returnType){
+    //   return runQueryReturnType(query, params.returnType, this, localParams);
+    // }
+
+    // let result;
+    // if (this.tx) {
+    //   result = await (this.tx.t)[qType](query).catch((err: any) => makeErrorFromPGError(err, localParams, this, fields));
+    // } else {
+    //   result = await this.db.tx(t => (t as any)[qType](query)).catch(err => makeErrorFromPGError(err, localParams, this, fields));
+    // }
     
-    /** TODO: Delete old file at the end in case new file update fails */
-    // await oldFileDelete();
-
-    /** postValidate */
-    if(tableRules?.[ACTION]?.postValidate){
-      if(!finalDBtx) throw new Error("Unexpected: no dbTX for postValidate");
-      const rows = Array.isArray(result)? result : [result];
-      for await (const row of rows){
-        await tableRules?.[ACTION]?.postValidate(row ?? {}, finalDBtx)
-      }
-
-      /* We used a full returning for postValidate. Now we must filter out dissallowed columns  */
-      if(returningSelect){
-        if(Array.isArray(result)){
-          return result.map(row => {
-            pickKeys(row, originalReturning.map(s => s.alias))
-          });
-        }
-        return pickKeys(result, originalReturning.map(s => s.alias))
-      }
-
-      return undefined;
-    }
-
-    return result;
+    // /** TODO: Delete old file at the end in case new file update fails */
+    // // await oldFileDelete();
 
   } catch (e) {
     if (localParams && localParams.testRule) throw e;

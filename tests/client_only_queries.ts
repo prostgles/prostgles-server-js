@@ -243,10 +243,13 @@ export default async function client_only(db: Required<DBHandlerClient>, auth: A
       try {
         await db.insert_rules.insert!({ name: "notfail" }, { returning: "*" });
         await db.insert_rules.insert!({ name: "fail" }, { returning: "*" });
+        await db.insert_rules.insert!({ name: "fail-check" }, { returning: "*" });
+        throw "post insert checks should have failed";
       } catch(err){
 
       }
       assert.equal(0, +(await db.insert_rules.count!({ name: "fail" })), "postValidation failed");
+      assert.equal(0, +(await db.insert_rules.count!({ name: "fail-check" })), "checkFilter failed");
       assert.equal(1, +(await db.insert_rules.count!({ name: "notfail" })), "postValidation failed");
     });
 

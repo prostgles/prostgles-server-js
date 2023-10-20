@@ -132,17 +132,6 @@ export type DBSchemaGenerated = {
       name?: null | string;
     };
   };
-  items_m1: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      id?: number;
-      name: string;
-    };
-  };
   items_multi: {
     is_view: false;
     select: true;
@@ -289,16 +278,6 @@ export type DBSchemaGenerated = {
       obj?: null | any;
     };
   };
-  pg_attribute: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      id?: number;
-    };
-  };
   planes: {
     is_view: false;
     select: true;
@@ -325,17 +304,6 @@ export type DBSchemaGenerated = {
     };
   };
   prostgles_lookup_media_items_with_one_media: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      foreign_id: number;
-      media_id: string;
-    };
-  };
-  prostgles_lookup_media_various: {
     is_view: false;
     select: true;
     insert: true;
@@ -379,19 +347,6 @@ export type DBSchemaGenerated = {
       id: number;
       id_basic: number;
       txt: string;
-    };
-  };
-  "prostgles_test.self_join": {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      id?: number;
-      my_id?: null | number;
-      my_id1?: null | number;
-      name?: null | string;
     };
   };
   rec: {
@@ -585,17 +540,6 @@ export type DBSchemaGenerated = {
       jsn?: null | any;
       name?: null | string;
       tsv?: null | string;
-    };
-  };
-  various_nested: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      name?: null | string;
-      various_id?: null | number;
     };
   };
   

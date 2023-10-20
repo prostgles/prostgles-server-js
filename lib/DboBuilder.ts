@@ -7,28 +7,26 @@
 import * as Bluebird from "bluebird";
 
 import * as pgPromise from 'pg-promise';
-import { runSQL } from "./DboBuilder/runSQL";
-import pg = require('pg-promise/typescript/pg-subset');
-import { getSchemaFilter, getTablesForSchemaPostgresSQL } from "./DboBuilder/getTablesForSchemaPostgresSQL";
 import {
-  ColumnInfo, SQLOptions,
-  DbJoinMaker,
-  PG_COLUMN_UDT_DATA_TYPE,
-  TS_PG_Types,
-  TableInfo as TInfo,
-  SQLHandler,
   AnyObject,
-  JoinMaker,
-  isObject, 
-  getKeys, 
-  ProstglesError, 
-  _PG_geometric, 
-  EXISTS_KEY, 
-  RawJoinPath, 
+  ColumnInfo,
+  DbJoinMaker,
+  EXISTS_KEY,
+  PG_COLUMN_UDT_DATA_TYPE,
+  ProstglesError,
+  RawJoinPath,
+  SQLHandler,
+  SQLOptions,
+  TableInfo as TInfo,
+  TS_PG_Types,
   getJoinHandlers,
-  asName
+  getKeys,
+  isObject
 } from "prostgles-types";
-import { sqlErrCodeToMsg } from "./DboBuilder/sqlErrCodeToMsg"
+import { getSchemaFilter, getTablesForSchemaPostgresSQL } from "./DboBuilder/getTablesForSchemaPostgresSQL";
+import { runSQL } from "./DboBuilder/runSQL";
+import { sqlErrCodeToMsg } from "./DboBuilder/sqlErrCodeToMsg";
+import pg = require('pg-promise/typescript/pg-subset');
 
 export type SortItem = {
   asc: boolean;
@@ -92,17 +90,19 @@ export type DBHandlerServer<TH = TableHandlers> =
   }
 
 
-import { clone } from "./utils";
 import { FieldSpec, } from "./DboBuilder/QueryBuilder/Functions";
-import {
-  Join, Prostgles, DB, ProstglesInitOptions
-} from "./Prostgles";
-import {
-  PublishParser, PublishAllOrNothing,
-} from "./PublishParser";
-import { PubSubManager, asValue, BasicCallback, pickKeys, omitKeys } from "./PubSubManager/PubSubManager";
-import { _delete } from "./DboBuilder/delete";
 import { JoinPaths, ViewHandler } from "./DboBuilder/ViewHandler/ViewHandler";
+import {
+  DB,
+  Join, Prostgles,
+  ProstglesInitOptions
+} from "./Prostgles";
+import { BasicCallback, PubSubManager, pickKeys } from "./PubSubManager/PubSubManager";
+import {
+  PublishAllOrNothing,
+  PublishParser,
+} from "./PublishParser";
+import { clone } from "./utils";
 
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -392,12 +392,12 @@ export type ExistsFilterConfig = {
   targetTable: string;
 });
 
-import { prepareShortestJoinPaths } from "./DboBuilder/prepareShortestJoinPaths";
 import { BasicSession, UserLike } from "./AuthHandler";
 import { getDBSchema } from "./DBSchemaBuilder";
-import { TableHandler } from "./DboBuilder/TableHandler";
-import { ParsedJoinPath, parseJoinPath } from "./DboBuilder/ViewHandler/parseJoinPath";
 import { asNameAlias } from "./DboBuilder/QueryBuilder/QueryBuilder";
+import { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
+import { ParsedJoinPath, parseJoinPath } from "./DboBuilder/ViewHandler/parseJoinPath";
+import { prepareShortestJoinPaths } from "./DboBuilder/prepareShortestJoinPaths";
 
 export class DboBuilder {
   tablesOrViews?: TableSchema[];   //TableSchema           TableOrViewInfo
@@ -561,7 +561,7 @@ export class DboBuilder {
                 Alternatively you can rename the table column\n`;
       }
 
-      this.dbo[tov.escaped_identifier] = new (tov.is_view ? ViewHandler : TableHandler)(this.db, tov, this, undefined, undefined, this.shortestJoinPaths);
+      this.dbo[tov.escaped_identifier] = new (tov.is_view ? ViewHandler : TableHandler)(this.db, tov, this, undefined, this.shortestJoinPaths);
 
       if (this.shortestJoinPaths && this.shortestJoinPaths.find(jp => [jp.t1, jp.t2].includes(tov.name))) {
 
@@ -626,17 +626,14 @@ export class DboBuilder {
   }
 
   getTX = (cb: TxCB) => {
-    return this.db.tx((t) => {
+    return this.db.tx(t => {
       const dbTX: DbTxTableHandlers & Pick<DBHandlerServer, "sql"> = {};
       this.tablesOrViews?.map(tov => {
-        dbTX[tov.name] = new (tov.is_view ? ViewHandler : TableHandler)(this.db, tov, this, t, dbTX, this.shortestJoinPaths);
+        dbTX[tov.name] = new (tov.is_view ? ViewHandler : TableHandler)(this.db, tov, this, { t, dbTX }, this.shortestJoinPaths);
       });
-      if (!dbTX.sql) {
-        dbTX.sql = this.runSQL;
-      }
-      getKeys(dbTX).map(k => {
-        dbTX[k]!.dbTX = dbTX;
-      });
+      // ???? getKeys(dbTX).map(k => {
+      //   dbTX[k]!.dbTX = dbTX;
+      // });
       dbTX.sql = (q, args, opts, localP) => this.runSQL(q, args, opts, { tx: { dbTX, t }, ...(localP ?? {}) })
 
       return cb(dbTX, t);

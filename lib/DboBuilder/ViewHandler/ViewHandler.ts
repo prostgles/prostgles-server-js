@@ -1,33 +1,35 @@
 import * as pgPromise from 'pg-promise';
 import {
-  ColumnInfo, FieldFilter, SelectParams,
-  isEmpty,
-  asName,
-  TableInfo as TInfo,
   AnyObject,
-  isObject, 
-  _PG_geometric, SubscribeParams, 
+  ColumnInfo, FieldFilter, SelectParams,
+  SubscribeParams,
+  asName,
+  isEmpty,
+  isObject
 } from "prostgles-types";
-import { DB, Join } from "../../Prostgles";
 import {
-  DboBuilder, escapeTSNames, Filter,
-  LocalParams, parseError, postgresToTsType,
-  TableHandlers, TableSchema, ValidatedTableRules, withUserRLS
+  DboBuilder,
+  Filter,
+  LocalParams,
+  TableHandlers, TableSchema, ValidatedTableRules,
+  escapeTSNames,
+  parseError, postgresToTsType,
+  withUserRLS
 } from "../../DboBuilder";
+import { TableEvent } from "../../Logging";
+import { DB, Join } from "../../Prostgles";
+import { TableRule } from "../../PublishParser";
 import { Graph } from "../../shortestPath";
-import { TableRule, UpdateRule } from "../../PublishParser";
+import { COMPUTED_FIELDS, FieldSpec } from "../QueryBuilder/Functions";
 import { asNameAlias } from "../QueryBuilder/QueryBuilder";
-import { COMPUTED_FIELDS, FieldSpec } from "../QueryBuilder/Functions"; 
+import { find } from "../find";
 import { getColumns } from "../getColumns";
 import { LocalFuncs, subscribe } from "../subscribe";
-import { find } from "../find";
-import { TableEvent } from "../../Logging";
-import { parseFieldFilter } from "./parseFieldFilter";
 import { ColSet } from "./ColSet";
-import { prepareWhere } from "./prepareWhere";
 import { getInfo } from "./getInfo";
+import { parseFieldFilter } from "./parseFieldFilter";
+import { prepareWhere } from "./prepareWhere";
 import { validateViewRules } from "./validateViewRules";
-import { omitKeys } from "../../PubSubManager/PubSubManager";
 
 export type JoinPaths = {
   t1: string;
@@ -50,20 +52,24 @@ export class ViewHandler {
   joinPaths?: JoinPaths;
   dboBuilder: DboBuilder;
 
-  t?: pgPromise.ITask<{}>;
-  dbTX?: TableHandlers;
+  tx?: {
+    t: pgPromise.ITask<{}>;
+    dbTX: TableHandlers;
+  }
+  get dbHandler() {
+    return this.tx?.t ?? this.db;
+  }
 
   is_view = true;
   filterDef = "";
 
   // pubSubManager: PubSubManager;
   is_media = false;
-  constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TableHandlers, joinPaths?: JoinPaths) {
+  constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, tx?: { t: pgPromise.ITask<{}>, dbTX: TableHandlers }, joinPaths?: JoinPaths) {
     if (!db || !tableOrViewInfo) throw "";
 
     this.db = db;
-    this.t = t;
-    this.dbTX = dbTX;
+    this.tx = tx;
     this.joinPaths = joinPaths;
     this.tableOrViewInfo = tableOrViewInfo;
     this.name = tableOrViewInfo.escaped_identifier;
@@ -335,7 +341,7 @@ export class ViewHandler {
               q,
               ") t"
             ].join("\n");
-          return (this.t || this.db).one(query).then(({ count }) => +count);
+          return (this.tx?.t || this.db).one(query).then(({ count }) => +count);
         });
     } catch (e) {
       if (localParams && localParams.testRule) throw e;
@@ -366,7 +372,7 @@ export class ViewHandler {
             `
           );
 
-          return (this.t || this.db).one(query).then(({ size }) => size || '0');
+          return (this.tx?.t || this.db).one(query).then(({ size }) => size || '0');
         });
     } catch (e) {
       if (localParams && localParams.testRule) throw e;
@@ -460,9 +466,11 @@ export class ViewHandler {
   * @param {Object} forcedData - set/override property
   * @param {string[]} allowed_cols - allowed columns (excluding forcedData) from table rules
   */
-  prepareFieldValues(obj: Record<string, any> = {}, forcedData: object = {}, allowed_cols: FieldFilter | undefined, fixIssues = false): AnyObject {
+  prepareFieldValues(obj: AnyObject = {}, forcedData: AnyObject = {}, allowed_cols: FieldFilter | undefined, removeDisallowedColumns = false): AnyObject {
     const column_names = this.column_names.slice(0);
-    if (!column_names || !column_names.length) throw "table column_names mising";
+    if (!column_names?.length) {
+      throw "table column_names mising";
+    }
     let _allowed_cols = column_names.slice(0);
     const _obj = { ...obj };
 
@@ -472,7 +480,7 @@ export class ViewHandler {
     let final_filter = { ..._obj };
     const filter_keys: Array<keyof typeof final_filter> = Object.keys(final_filter);
 
-    if (fixIssues && filter_keys.length) {
+    if (removeDisallowedColumns && filter_keys.length) {
       final_filter = {};
       filter_keys
         .filter(col => _allowed_cols.includes(col))

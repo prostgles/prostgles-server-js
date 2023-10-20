@@ -1,7 +1,7 @@
-import { AnyObject, FieldFilter, FullFilter, isDefined, UpdateParams } from "prostgles-types";
+import { AnyObject, FieldFilter, isDefined, UpdateParams } from "prostgles-types";
 import { Filter, LocalParams } from "../DboBuilder";
-import { TableRule, UpdateRule, ValidateRow, ValidateUpdateRow } from "../PublishParser";
-import { TableHandler } from "./TableHandler";
+import { TableRule, UpdateRule, ValidateRow, ValidateUpdateRowBasic } from "../PublishParser";
+import { TableHandler } from "./TableHandler/TableHandler";
 
 /**
  * 1) Check if publish is valid
@@ -33,7 +33,7 @@ export async function parseUpdateRules(
 
   let forcedFilter: AnyObject | undefined = {},
     forcedData: AnyObject | undefined = {},
-    validate: ValidateUpdateRow | undefined,
+    validate: ValidateUpdateRowBasic | undefined,
     returningFields: FieldFilter = "*",
     filterFields: FieldFilter | undefined = "*",
     fields: FieldFilter = "*";
@@ -124,8 +124,8 @@ export async function parseUpdateRules(
           const updateQ = await this.colSet.getUpdateQuery(
             data,
             allowedCols,
-            this.dbTX || this.dboBuilder.dbo,
-            validate ? ((row) => validate!({ update: row, filter: {} }, this.dbTX || this.dboBuilder.dbo)) : undefined
+            this.tx?.dbTX || this.dboBuilder.dbo,
+            validate ? ((row) => validate!({ update: row, filter: {} }, this.tx?.dbTX || this.dboBuilder.dbo)) : undefined
           );
           const query = updateQ + " WHERE FALSE ";
           await this.db.any("EXPLAIN " + query);
@@ -141,7 +141,7 @@ export async function parseUpdateRules(
   /* Update all allowed fields (fields) except the forcedFilter (so that the user cannot change the forced filter values) */
   const _fields = this.parseFieldFilter(fields);
 
-  const validateRow: ValidateRow | undefined = validate ? (row) => validate!({ update: row, filter: finalUpdateFilter }, this.dbTX || this.dboBuilder.dbo) : undefined
+  const validateRow: ValidateRow | undefined = validate ? (row) => validate!({ update: row, filter: finalUpdateFilter }, this.tx?.dbTX || this.dboBuilder.dbo) : undefined
 
   return {
     fields: _fields,

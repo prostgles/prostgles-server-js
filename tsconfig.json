@@ -1,5 +1,4 @@
 {
-  // "files": ["lib/rootExport.ts"],
   "files": ["lib/index.ts"],
   "compilerOptions": {
     "target": "es2022",
@@ -8,19 +7,13 @@
     ],
     "strict": true,
     "module": "commonjs",
-    // "removeComments": true,
     "sourceMap": true,
     "rootDir": "./lib",
     "outDir": "dist",
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
-    
-    /** TODO */
     "noUncheckedIndexedAccess": true,
-    
-    // "outFile": "bundle.js",
-    // "moduleResolution": "node"
     "keyofStringsOnly": true,
     "ignoreDeprecations": "5.0",
     "declaration": true,

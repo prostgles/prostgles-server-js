@@ -24,6 +24,7 @@ import { DBSchemaGenerated } from "./DBoGenerated";
 
 import type { TableConfig } from 'prostgles-server/dist/TableConfig/TableConfig';
 import type { DBOFullyTyped, PublishFullyTyped } from "prostgles-server/dist/DBSchemaBuilder";
+import { DBHandlerServer } from 'prostgles-server/dist/Prostgles';
 
 export { DBHandlerServer } from "prostgles-server/dist/Prostgles";
 
@@ -64,19 +65,16 @@ process.on('unhandledRejection', (reason, p) => {
 const dbConnection = {
 	host: process.env.POSTGRES_HOST || "localhost",
 	port: +process.env.POSTGRES_PORT || 5432,
-	database: process.env.POSTGRES_DB || "postgres",
+	database: process.env.POSTGRES_DB || "prostgles_server_tests",
 	user: process.env.POSTGRES_USER || "api",
 	password:  process.env.POSTGRES_PASSWORD || "api",
-	// user: "usr",
-	// password:  "usr",
 };
 
 function dd(){
 	
 	const dbo: DBOFullyTyped<{ tbl: { is_view: true; columns: { col1: { type: number } } }}> = 1 as any
 	if(!dbo) return;
-	dbo.tbl.find
-
+	dbo.tbl.find;
 }
 
 (async () => {
@@ -389,6 +387,9 @@ function dd(){
 						validate: async (row) => {
 							if(row.name === "a") row.name = "b"
 							return row
+						},
+						checkFilter: {
+							"name.<>": "fail-check"
 						},
 						postValidate: async (row, dboTx) => {
 							/** Records must exist in this transaction */

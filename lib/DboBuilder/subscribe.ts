@@ -30,9 +30,8 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
 
   try {
     await this._log({ command: "subscribe", localParams, data: { filter, params } });
-    // if (this.is_view) throw "Cannot subscribe to a view";
 
-    if (this.t) {
+    if (this.tx) {
       throw "subscribe not allowed within transactions";
     }
     if (!localParams && !localFuncs) {

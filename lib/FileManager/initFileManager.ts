@@ -1,6 +1,6 @@
 import { asName, getKeys, tryCatch } from "prostgles-types";
 import { canCreateTables } from "../DboBuilder/runSQL";
-import { TableHandler } from "../DboBuilder/TableHandler";
+import { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { Prostgles } from "../Prostgles";
 import { FileManager, HOUR, LocalConfig } from "./FileManager";
 import * as fs from 'fs';

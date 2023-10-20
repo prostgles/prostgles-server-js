@@ -3,7 +3,7 @@ import { AnyObject, asName, DeleteParams, FieldFilter } from "prostgles-types";
 import { Filter, LocalParams, parseError, withUserRLS } from "../DboBuilder";
 import { DeleteRule, TableRule } from "../PublishParser";
 import { pickKeys } from "../PubSubManager/PubSubManager";
-import { TableHandler } from "./TableHandler";
+import { TableHandler } from "./TableHandler/TableHandler";
 import { runQueryReturnType } from "./find";
 
 export async function _delete(this: TableHandler, filter?: Filter, params?: DeleteParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any> {
@@ -12,8 +12,6 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
     const { returning } = params || {};
     filter = filter || {};
     this.checkFilter(filter);
-
-    // table_rules = table_rules || {};
 
     let forcedFilter: AnyObject | undefined = {},
       filterFields: FieldFilter | undefined = "*",
@@ -79,15 +77,14 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
     /**
      * Delete file
      */
-    const dbHandler = (this.t || this.db)
     if (this.is_media) {
       if (!this.dboBuilder.prostgles.fileManager) throw new Error("fileManager missing")
       if (this.dboBuilder.prostgles.opts.fileTable?.delayedDelete) {
-        return dbHandler[queryType](`UPDATE ${asName(this.name)} SET deleted = now() ${filterOpts.where} ${returningQuery};`)
+        return this.dbHandler[queryType](`UPDATE ${asName(this.name)} SET deleted = now() ${filterOpts.where} ${returningQuery};`)
       } else {
 
         const txDelete = async (tbl: TableHandler) => {
-          if (!tbl.t) throw new Error("Missing transaction object t");
+          if (!tbl.tx) throw new Error("Missing transaction object tx");
           let files: { id: string; name: string }[] = [];
           const totalFiles = await tbl.count(filterOpts.filter);
           do {
@@ -99,7 +96,7 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
           if (!fileManager) throw new Error("fileManager missing");
 
           for await (const file of files) {
-            await tbl.t?.any(`DELETE FROM ${asName(this.name)} WHERE id = ` + "${id}", file);
+            await tbl.tx.t.any(`DELETE FROM ${asName(this.name)} WHERE id = \${id}`, file);
           }
           /** If any table delete fails then do not delete files */
           for await (const file of files) {
@@ -117,7 +114,7 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
 
         if (localParams?.tx?.dbTX) {
           return txDelete(localParams.tx.dbTX[this.name] as TableHandler)
-        } else if (this.t) {
+        } else if (this.tx) {
           return txDelete(this)
         } else {
 
@@ -130,9 +127,7 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
 
     return runQueryReturnType(_query, params?.returnType, this, localParams);
 
-    // return dbHandler[queryType](_query).catch((err: any) => makeErrorFromPGError(err, localParams));
   } catch (e) {
-    // console.trace(e)
     if (localParams && localParams.testRule) throw e;
     throw parseError(e, `dbo.${this.name}.delete(${JSON.stringify(filter || {}, null, 2)}, ${JSON.stringify(params || {}, null, 2)})`);
   }

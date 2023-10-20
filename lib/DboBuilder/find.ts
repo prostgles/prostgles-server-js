@@ -5,7 +5,7 @@ import { canRunSQL } from "../DboBuilder/runSQL";
 import { TableRule } from "../PublishParser";
 import { getNewQuery } from "./QueryBuilder/getNewQuery";
 import { getSelectQuery } from "./QueryBuilder/getSelectQuery";
-import { TableHandler } from "./TableHandler";
+import { TableHandler } from "./TableHandler/TableHandler";
 import { ViewHandler } from "./ViewHandler/ViewHandler";
 
 export const find = async function(this: ViewHandler, filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]> {
@@ -93,11 +93,11 @@ export const runQueryReturnType = async (query: string, returnType: SelectParams
     return query as unknown as any[];
 
   } else if (["row", "value"].includes(returnType!)) {
-    return (handler.t || handler.db).oneOrNone(query).then(data => {
+    return handler.dbHandler.oneOrNone(query).then(data => {
       return (data && returnType === "value") ? Object.values(data)[0] : data;
     }).catch(err => makeErrorFromPGError(err, localParams, this));
   } else {
-    return (handler.t || handler.db).any(query).then(data => {
+    return handler.dbHandler.any(query).then(data => {
       if (returnType === "values") {
         return data.map(d => Object.values(d)[0]);
       }

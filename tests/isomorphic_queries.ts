@@ -1,7 +1,6 @@
 import { strict as assert } from 'assert';
 
-// import { DBHandlerServer } from "./server/node-modules/prostgles-server/dist/Prostgles";
-import { DBHandlerServer } from "./server/dist/server/index";
+import type { DBHandlerServer } from "./server/dist/server/index";
 import type { DBHandlerClient } from "./client/index";
 import * as fs from "fs";
 
@@ -80,13 +79,11 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       { name: "abc81 here", added: new Date('04 Dec 1997 00:12:00 GMT'), jsn: { "a": { "b": 2 } }  }
     ])
 
-    // console.log(await db["*"].find())
   });
 
 
   await tryRun("getColumns definition", async () => {
     const res = await db.tr2.getColumns!("fr");
-    // console.log(JSON.stringify(res, null, 2))
     const expected =  [
         {
           "label": "Id",
@@ -882,7 +879,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
   });
 
   await tryRun("Join escaped table names with quotes", async () => {
-    await db[`"""quoted0"""`].insert({
+    await db[`"""quoted0"""`].insert!({
       [`"text_col0"`]: "0",
       [`"quoted1_id"`]: {
         [`"text_col1"`]: "1",
@@ -892,7 +889,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       }
     });
 
-    const res = await db[`"""quoted0"""`].find({
+    const res = await db[`"""quoted0"""`].find!({
       [`"text_col0"`]: "0",
     }, { 
       select: {
@@ -919,7 +916,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
     });
 
 
-    const aliasedQuotedJoin = await db[`"""quoted0"""`].find({
+    const aliasedQuotedJoin = await db[`"""quoted0"""`].find!({
       [`"text_col0"`]: "0",
     }, { 
       select: {
@@ -946,7 +943,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       }]
     }]);
 
-    const exists1 = await db[`"""quoted0"""`].find({
+    const exists1 = await db[`"""quoted0"""`].find!({
       $existsJoined: {
         path: ['"""quoted1"""', '"""quoted2"""'],
         filter: {
@@ -955,7 +952,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       }
     }, { select: "*" });
     /** Duplicated tables */
-    const exists2 = await db[`"""quoted0"""`].find({
+    const exists2 = await db[`"""quoted0"""`].find!({
       $existsJoined: {
         path: ['"""quoted1"""', '"""quoted2"""','"""quoted1"""', '"""quoted2"""'],
         filter: {
@@ -989,7 +986,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
         tr2: "*",
         tr3: "*",
       }
-    }, rows => {
+    },  _rows => {
 
     });
 
@@ -1073,7 +1070,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       name: "root_multi" 
     }, { returning: "*" });
 
-    const res = await db.items_multi.find(
+    const res = await db.items_multi.find!(
       {},
       {
         select: {
@@ -1096,12 +1093,12 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
   });
 
   await tryRun("Self join", async () => {
-    await db.self_join.delete();
-    const a = await db.self_join.insert({ name: "a" });
-    const a1 = await db.self_join.insert({ name: "a", my_id: { name: "b" } });
-    const a2 = await db.self_join.insert({ name: "a", my_id1: { name: "b1" } });
+    await db.self_join.delete!();
+    const a = await db.self_join.insert!({ name: "a" });
+    const a1 = await db.self_join.insert!({ name: "a", my_id: { name: "b" } });
+    const a2 = await db.self_join.insert!({ name: "a", my_id1: { name: "b1" } });
 
-    const one = await db.self_join.find({}, { 
+    const one = await db.self_join.find!({}, { 
       select: { 
         name: 1, 
         my: {
@@ -1119,7 +1116,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
 
 
   await tryRun("One to many multi join duplicate row bug fix", async () => {
-    await db.symbols.insert([
+    await db.symbols.insert!([
       { 
         id: "btc", 
         trades: [
@@ -1139,7 +1136,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       }
     ]);
 
-    const res = await db.symbols.find({}, {
+    const res = await db.symbols.find!({}, {
       select: {
         id: 1,
         trades: "*",
@@ -1160,7 +1157,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       }
     });
 
-    const resSortedInnerJoin = await db.symbols.find({}, {
+    const resSortedInnerJoin = await db.symbols.find!({}, {
       select: {
         id: 1,
         trades: {

@@ -1,7 +1,7 @@
-import { getKeys, RULE_METHODS, AnyObject, get, TableSchemaForClient, DBSchemaTable, MethodKey, TableInfo, FullFilter, isObject, Method, DBSchema } from "prostgles-types";
+import { getKeys, RULE_METHODS, AnyObject, TableSchemaForClient, DBSchemaTable, MethodKey, TableInfo, FullFilter, isObject, Method, DBSchema } from "prostgles-types";
 import { AuthResult, SessionUser } from "./AuthHandler";
 import { CommonTableRules, Filter, isPlainObject, LocalParams, PRGLIOSocket, TableOrViewInfo, TableSchemaColumn } from "./DboBuilder";
-import { Prostgles, DBHandlerServer, DB, TABLE_METHODS, ProstglesInitOptions } from "./Prostgles";
+import { Prostgles, DBHandlerServer, DB, TABLE_METHODS } from "./Prostgles";
 import type { DBOFullyTyped, PublishFullyTyped } from "./DBSchemaBuilder";
 
 export type PublishMethods<S = void, SUser extends SessionUser = SessionUser> = (params: PublishParams<S, SUser>) => { [key: string]: Method } | Promise<{ [key: string]: Method } | null>;
@@ -47,7 +47,7 @@ const RULE_TO_METHODS = [
     methods: RULE_METHODS.insert,
     no_limits: <SelectRule>{ fields: "*" },
     table_only: true,
-    allowed_params: <Array<keyof InsertRule>>["fields", "forcedData", "returningFields", "validate", "preValidate", "postValidate"],
+    allowed_params: { checkFilter: 1, fields: 1, forcedData: 1, postValidate: 1, preValidate: 1, returningFields: 1, validate: 1 } satisfies Record<keyof InsertRule, 1>,
     hint: ` expecting "*" | true | { fields: string | string[] | {}  }`
   },
   {
@@ -56,7 +56,7 @@ const RULE_TO_METHODS = [
     methods: RULE_METHODS.update,
     no_limits: <UpdateRule>{ fields: "*", filterFields: "*", returningFields: "*" },
     table_only: true,
-    allowed_params: <Array<keyof UpdateRule>>["fields", "filterFields", "forcedFilter", "forcedData", "returningFields", "validate", "postValidate", "dynamicFields"],
+    allowed_params: { checkFilter: 1, dynamicFields: 1, fields: 1, filterFields: 1, forcedData: 1, forcedFilter: 1, postValidate: 1, returningFields: 1, validate: 1, } satisfies Record<keyof UpdateRule, 1>,
     hint: ` expecting "*" | true | { fields: string | string[] | {}  }`
   },
   {
@@ -65,7 +65,7 @@ const RULE_TO_METHODS = [
     methods: RULE_METHODS.select,
     no_limits: <SelectRule>{ fields: "*", filterFields: "*" },
     table_only: false,
-    allowed_params: <Array<keyof SelectRule>>["fields", "filterFields", "forcedFilter", "validate", "maxLimit", "orderByFields"],
+    allowed_params: { fields: 1, filterFields: 1, forcedFilter: 1, maxLimit: 1, orderByFields: 1, validate: 1 } satisfies Record<keyof SelectRule, 1>,
     hint: ` expecting "*" | true | { fields: ( string | string[] | {} )  }`
   },
   {
@@ -74,7 +74,7 @@ const RULE_TO_METHODS = [
     methods: RULE_METHODS.delete,
     no_limits: <DeleteRule>{ filterFields: "*" },
     table_only: true,
-    allowed_params: <Array<keyof DeleteRule>>["filterFields", "forcedFilter", "returningFields", "validate"],
+    allowed_params: { returningFields: 1, validate: 1, filterFields: 1, forcedFilter: 1 } satisfies Record<keyof DeleteRule, 1>,
     hint: ` expecting "*" | true | { filterFields: ( string | string[] | {} ) } \n Will use "select", "update", "delete" and "insert" rules`
   },
   {
@@ -83,7 +83,7 @@ const RULE_TO_METHODS = [
     methods: RULE_METHODS.sync,
     no_limits: null,
     table_only: true,
-    allowed_params: <Array<keyof SyncRule>>["id_fields", "synced_field", "sync_type", "allow_delete", "throttle", "batch_size"],
+    allowed_params: { allow_delete: 1, batch_size: 1, id_fields: 1, synced_field: 1, throttle: 1 } satisfies Record<keyof SyncRule, 1>,
     hint: ` expecting "*" | true | { id_fields: string[], synced_field: string }`
   },
   {
@@ -92,14 +92,14 @@ const RULE_TO_METHODS = [
     methods: RULE_METHODS.subscribe,
     no_limits: <SubscribeRule>{ throttle: 0 },
     table_only: false,
-    allowed_params: <Array<keyof SubscribeRule>>["throttle", "throttleOpts"],
+    allowed_params: { throttle: 1 } satisfies Record<keyof SubscribeRule, 1>,
     hint: ` expecting "*" | true | { throttle: number; throttleOpts?: { skipFirst?: boolean; } } \n Will use "select" rules`
   }
 ] as const;
 
 import { FieldFilter, SelectParams } from "prostgles-types";
 import { DEFAULT_SYNC_BATCH_SIZE } from "./PubSubManager/PubSubManager";
-import { TableHandler } from "./DboBuilder/TableHandler";
+import { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
 import { ViewHandler } from "./DboBuilder/ViewHandler/ViewHandler";
 import { parseFieldFilter } from "./DboBuilder/ViewHandler/parseFieldFilter";
 
@@ -130,7 +130,9 @@ export type UpdateRequestDataBatch<R extends AnyObject> = {
 export type UpdateRequestData<R extends AnyObject = AnyObject> = UpdateRequestDataOne<R> | UpdateRequestDataBatch<R>;
 
 export type ValidateRow<R extends AnyObject = AnyObject, S = void> = (row: R, dbx: DBOFullyTyped<S>) => R | Promise<R>;
+export type ValidateRowBasic = (row: AnyObject, dbx: DBHandlerServer) => AnyObject | Promise<AnyObject>;
 export type ValidateUpdateRow<R extends AnyObject = AnyObject, S extends DBSchema | void = void> = (args: { update: Partial<R>, filter: FullFilter<R, S> }, dbx: DBOFullyTyped<S>) => R | Promise<R>;
+export type ValidateUpdateRowBasic = (args: { update: Partial<AnyObject>, filter: Filter }, dbx: DBHandlerServer) => AnyObject | Promise<AnyObject>;
 
 
 export type SelectRule<Cols extends AnyObject = AnyObject, S extends DBSchema | void = void> = {
@@ -612,10 +614,11 @@ export class PublishParser {
           /* Check RULES for invalid params */
           /* Methods do not have params -> They use them from rules */
           if (method === rm.rule && isObject(rule)) {
-            const method_params = getKeys(rule);
-            const iparam = method_params.find(p => !rm?.allowed_params.includes(<never>p));
+            const method_params = Object.keys(rule);
+            const allowed_params = Object.keys(rm?.allowed_params)
+            const iparam = method_params.find(p => !allowed_params.includes(p));
             if (iparam) {
-              throw `Invalid setting in publish.${tableName}.${method} -> ${iparam}. \n Expecting any of: ${rm.allowed_params.join(", ")}`;
+              throw `Invalid setting in publish.${tableName}.${method} -> ${iparam}. \n Expecting any of: ${allowed_params.join(", ")}`;
             }
           }
 

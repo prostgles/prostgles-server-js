@@ -1,5 +1,5 @@
 import { get } from "../../utils";
-import { TableHandler } from "../TableHandler";
+import { TableHandler } from "../TableHandler/TableHandler";
 import { TableRule } from "../../PublishParser";
 import { Filter, LocalParams } from "../../DboBuilder";
 import { SelectParams, ColumnInfo, getKeys, DetailedJoinSelect, SimpleJoinSelect, JoinPath, JoinSelect, RawJoinPath } from "prostgles-types";

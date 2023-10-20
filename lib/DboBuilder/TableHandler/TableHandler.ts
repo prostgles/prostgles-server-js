@@ -1,16 +1,16 @@
 import pgPromise from "pg-promise";
-import { AnyObject, asName, DeleteParams, FieldFilter, getKeys, InsertParams, isObject, Select, SelectParams, UpdateParams } from "prostgles-types";
-import { DboBuilder, Filter, LocalParams, makeErrorFromPGError, parseError, TableHandlers, TableSchema, withUserRLS } from "../DboBuilder";
-import { DB } from "../Prostgles";
-import { SyncRule, TableRule } from "../PublishParser"; 
-import { _delete } from "./delete";
+import { AnyObject, asName, DeleteParams, FieldFilter, getKeys, InsertParams, isObject, Select, UpdateParams } from "prostgles-types";
+import { DboBuilder, Filter, LocalParams, parseError, TableHandlers, TableSchema } from "../../DboBuilder";
+import { DB } from "../../Prostgles";
+import { SyncRule, TableRule } from "../../PublishParser";
+import { _delete } from "../delete";
+import { parseUpdateRules } from "../parseUpdateRules";
+import { COMPUTED_FIELDS, FUNCTIONS } from "../QueryBuilder/Functions";
+import { SelectItem, SelectItemBuilder } from "../QueryBuilder/QueryBuilder";
+import { JoinPaths, ViewHandler } from "../ViewHandler/ViewHandler";
 import { insert } from "./insert";
-import { insertDataParse } from "./insertDataParse";
-import { SelectItem, SelectItemBuilder } from "./QueryBuilder/QueryBuilder";
 import { update } from "./update";
-import { JoinPaths, ViewHandler } from "./ViewHandler/ViewHandler";
-import { parseUpdateRules } from "./parseUpdateRules";
-import { COMPUTED_FIELDS, FUNCTIONS } from "./QueryBuilder/Functions";
+import { updateBatch } from "./updateBatch";
 
 
 type ValidatedParams = {
@@ -23,8 +23,8 @@ type ValidatedParams = {
 
 export class TableHandler extends ViewHandler { 
 
-  constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, t?: pgPromise.ITask<{}>, dbTX?: TableHandlers, joinPaths?: JoinPaths) {
-    super(db, tableOrViewInfo, dboBuilder, t, dbTX, joinPaths);
+  constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, tx?: {t: pgPromise.ITask<{}>, dbTX: TableHandlers}, joinPaths?: JoinPaths) {
+    super(db, tableOrViewInfo, dboBuilder, tx, joinPaths);
 
     this.remove = this.delete;
 
@@ -32,43 +32,20 @@ export class TableHandler extends ViewHandler {
     this.is_media = dboBuilder.prostgles.isMedia(this.name)
   }
 
-  async updateBatch(data: [Filter, AnyObject][], params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<any> {
-    try {
-      await this._log({ command: "updateBatch", localParams, data: { data, params } });
-      const updateQueries: string[] = await Promise.all(
-        data.map(async ([filter, data]) =>
-          (await this.update(
-            filter,
-            data,
-            { ...(params || {}), returning: undefined },
-            tableRules,
-            { ...(localParams || {}), returnQuery: "noRLS" }
-          )) as unknown as string
-        )
-      ); 
-      const queries = [
-        withUserRLS(localParams, ""),
-        ...updateQueries
-      ];
-      if(this.t){
-        const _queries = queries.map(q => this.t!.none(q as unknown as string))
-        return this.t.batch(_queries)
-      }
-      return this.db.tx(t => {
-        const _queries = queries.map(q => t.none(q as unknown as string))
-        return t.batch(_queries)
-      }).catch(err => makeErrorFromPGError(err, localParams, this, []));
-    } catch (e) {
-      if (localParams && localParams.testRule) throw e;
-      throw parseError(e, `dbo.${this.name}.update()`);
-    }
+  getFinalDBtx = (localParams: LocalParams | undefined) => {
+    return localParams?.tx?.dbTX ?? this.tx?.dbTX;
   }
+  getFinalDbo = (localParams: LocalParams | undefined) => {
+    return this.getFinalDBtx(localParams) ?? this.dboBuilder.dbo;
+  }
+
 
   parseUpdateRules = parseUpdateRules.bind(this);
   
   update = update.bind(this);
+  updateBatch = updateBatch.bind(this);
 
-  validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues = false }: ValidatedParams): { data: any; allowedCols: string[] } {
+  validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues = false }: ValidatedParams) {
     const synced_field = (tableRules ?? {})?.sync?.synced_field;
 
     /* Update synced_field if sync is on and missing */
@@ -94,8 +71,7 @@ export class TableHandler extends ViewHandler {
 
     return { data, allowedCols: this.columns.filter(c => dataKeys.includes(c.name)).map(c => c.name) }
   }
-
-  insertDataParse = insertDataParse;
+  
   async insert(
     rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, 
     param3_unused?: undefined, tableRules?: TableRule, _localParams?: LocalParams
@@ -124,7 +100,7 @@ export class TableHandler extends ViewHandler {
   }
 
   makeReturnQuery(items?: SelectItem[]) {
-    if (items?.length) return " RETURNING " + items.map(s => s.getQuery() + " AS " + asName(s.alias)).join(", ");
+    if (items?.length) return " RETURNING " + getSelectItemQuery(items);
     return "";
   }
 
@@ -151,7 +127,7 @@ export class TableHandler extends ViewHandler {
       }
 
       /* Do it within a transaction to ensure consisency */
-      if (!this.t) {
+      if (!this.tx) {
         return this.dboBuilder.getTX(dbTX => _upsert(dbTX[this.name] as TableHandler))
       } else {
         return _upsert(this);
@@ -176,7 +152,7 @@ export class TableHandler extends ViewHandler {
   
       if (!table_rules || !table_rules.sync || !table_rules.select) throw "sync or select table rules missing";
   
-      if (this.t) throw "Sync not allowed within transactions";
+      if (this.tx) throw "Sync not allowed within transactions";
   
       const ALLOWED_PARAMS = ["select"];
       const invalidParams = Object.keys(params || {}).filter(k => !ALLOWED_PARAMS.includes(k));
@@ -264,3 +240,5 @@ export class TableHandler extends ViewHandler {
   }
 
 }
+
+export const getSelectItemQuery = (items: SelectItem[]) => items.map(s => s.getQuery() + " AS " + asName(s.alias)).join(", ")

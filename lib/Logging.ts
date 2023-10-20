@@ -1,6 +1,6 @@
 import { AnyObject } from "prostgles-types";
 import { LocalParams } from "./DboBuilder";
-import { TableHandler } from "./DboBuilder/TableHandler";
+import { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
 
 type ClientInfo = {
   socketId: string;
