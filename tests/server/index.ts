@@ -389,7 +389,7 @@ function dd(){
 							return row
 						},
 						checkFilter: {
-							"name.<>": "fail-check"
+							$and: [{"name.<>": "fail-check"}]
 						},
 						postValidate: async (row, dboTx) => {
 							/** Records must exist in this transaction */
