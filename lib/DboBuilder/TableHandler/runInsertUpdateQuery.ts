@@ -1,7 +1,6 @@
 import { AnyObject, asName, FieldFilter, InsertParams, UpdateParams } from "prostgles-types";
 import { LocalParams, makeErrorFromPGError, withUserRLS } from "../../DboBuilder";
 import { InsertRule, UpdateRule } from "../../PublishParser";
-import { getCondition } from "../getCondition";
 import { getSelectItemQuery, TableHandler } from "./TableHandler";
 
 type RunInsertUpdateQueryArgs = {
@@ -93,7 +92,7 @@ export const runInsertUpdateQuery = async ({ tableHandler, queryWithoutUserRLS, 
   }
 
   if(checkFilter && result.failed_check?.length){
-    throw `The following rows did not pass the checkFilter condition: ${JSON.stringify(result.failed_check)}`;
+    throw { message: `New data failed the check condition`, failed: result.failed_check };
   }
 
   const finalDBtx = tableHandler.getFinalDBtx(localParams);
