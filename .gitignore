@@ -1,4 +1,4 @@
 node_modules
 .npmrc
 dist
-/**/PID.txt
+tests/client/PID.txt
