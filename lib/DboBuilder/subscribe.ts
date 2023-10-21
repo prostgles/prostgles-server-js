@@ -43,7 +43,7 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
     }
 
     const { filterFields, forcedFilter } = table_rules?.select || {},
-      filterOpts = await this.prepareWhere({ filter, forcedFilter, addKeywords: false, filterFields, tableAlias: undefined, localParams, tableRule: table_rules }),
+      filterOpts = await this.prepareWhere({ filter, forcedFilter, addWhere: false, filterFields, tableAlias: undefined, localParams, tableRule: table_rules }),
       condition = filterOpts.where,
       { throttle = 0, throttleOpts, ...selectParams } = params;
 

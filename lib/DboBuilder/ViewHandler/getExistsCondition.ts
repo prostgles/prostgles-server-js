@@ -45,7 +45,7 @@ export async function getExistsCondition(this: ViewHandler, eConfig: ExistsFilte
     filter: targetTableFilter,
     forcedFilter,
     filterFields,
-    addKeywords: false,
+    addWhere: false,
     tableAlias,
     localParams,
     tableRule: t2Rules

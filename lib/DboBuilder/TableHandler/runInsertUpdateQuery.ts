@@ -23,17 +23,19 @@ type RunInsertUpdateQueryArgs = {
 });
 
 export const runInsertUpdateQuery = async ({ tableHandler, queryWithoutUserRLS, rule, localParams, fields, returningFields, params, data, type }: RunInsertUpdateQueryArgs) => {
-  const { name, column_names } = tableHandler;
+  const { name } = tableHandler;
 
   const returningSelectItems = await tableHandler.prepareReturning(params?.returning, tableHandler.parseFieldFilter(returningFields))
   const { checkFilter, postValidate } = rule ?? {};
   let checkCondition = "WHERE FALSE";
   if(checkFilter){
-    const checkCond = await getCondition.bind(tableHandler)({
-      allowed_colnames: column_names.slice(0),
+    const checkCond = await tableHandler.prepareWhere({
+      localParams: undefined,
+      tableRule: undefined,
       filter: checkFilter,
+      addWhere: false,
     });
-    checkCondition = `WHERE NOT (${checkCond.condition})`;
+    checkCondition = `WHERE NOT (${checkCond.where})`;
   }
   const hasReturning = !!returningSelectItems.length;
   const userRLS = withUserRLS(localParams, "");

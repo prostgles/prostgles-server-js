@@ -153,7 +153,7 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { selectParam
                 filter: nonExistsFilter
               }
             },
-            addKeywords: false,
+            addWhere: false,
             localParams: undefined,
             tableRule: undefined
           })).where
@@ -174,7 +174,7 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { selectParam
               filter: nonExistsFilter
             }
           },
-          addKeywords: false,
+          addWhere: false,
           localParams: undefined,
           tableRule: undefined
         })).where

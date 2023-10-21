@@ -10,14 +10,14 @@ type PrepareWhereParams = {
   select?: SelectItem[];
   forcedFilter?: AnyObject;
   filterFields?: FieldFilter;
-  addKeywords?: boolean;
+  addWhere?: boolean;
   tableAlias?: string,
   localParams: LocalParams | undefined,
   tableRule: TableRule | undefined
 };
 
 export async function prepareWhere(this: ViewHandler, params: PrepareWhereParams): Promise<{ where: string; filter: AnyObject; exists: ExistsFilterConfig[]; }> {
-  const { filter, select, forcedFilter, filterFields: ff, addKeywords = true, tableAlias, localParams, tableRule } = params;
+  const { filter, select, forcedFilter, filterFields: ff, addWhere: addKeywords = true, tableAlias, localParams, tableRule } = params;
   const { $and: $and_key, $or: $or_key } = this.dboBuilder.prostgles.keywords;
 
   let filterFields = ff;
@@ -28,6 +28,7 @@ export async function prepareWhere(this: ViewHandler, params: PrepareWhereParams
 
   const parseFullFilter = async (f: any, parentFilter: any = null, isForcedFilterBypass: boolean): Promise<string> => {
     if (!f) throw "Invalid/missing group filter provided";
+    if (!isObject(f)) throw "\nInvalid filter\nExpecting an object but got -> " + JSON.stringify(f);
     let result = "";
     const keys = getKeys(f);
     if (!keys.length) {
@@ -68,7 +69,6 @@ export async function prepareWhere(this: ViewHandler, params: PrepareWhereParams
     return result;
   }
 
-  if (!isObject(filter)) throw "\nInvalid filter\nExpecting an object but got -> " + JSON.stringify(filter);
 
 
   /* A forced filter condition will not check if the existsJoined filter tables have been published */
@@ -82,6 +82,8 @@ export async function prepareWhere(this: ViewHandler, params: PrepareWhereParams
     [$and_key]: [forcedFilter, filter].filter(isDefined)
   } : { ...filter };
 
-  if (cond && addKeywords) cond = "WHERE " + cond;
+  if (cond && addKeywords) {
+    cond = `WHERE ${cond}`;
+  }
   return { where: cond || "", filter: finalFilter, exists };
 }
