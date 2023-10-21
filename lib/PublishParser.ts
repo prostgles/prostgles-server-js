@@ -664,7 +664,7 @@ export class PublishParser {
           const isAllowed = tableRules[r.rule] && (tableRules as any)[method] === undefined;
           if (isAllowed) {
 
-            if (method === "updateBatch" && !tableRules.update) {
+            if (method === "updateBatch" && (!tableRules.update || tableRules.update.checkFilter || tableRules.update.postValidate)) {
               // not allowed
 
             } else if (method === "upsert" && (!tableRules.update || !tableRules.insert)) {

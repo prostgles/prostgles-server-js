@@ -7,6 +7,10 @@ import { TableHandler } from "./TableHandler";
 export async function updateBatch(this: TableHandler, updates: [Filter, AnyObject][], params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<any> {
   try {
     await this._log({ command: "updateBatch", localParams, data: { data: updates, params } });
+    const { checkFilter, postValidate } = tableRules?.update ?? {};
+    if(checkFilter || postValidate){
+      throw `updateBatch not allowed for tables with checkFilter or postValidate rules`
+    }
     const updateQueries: string[] = await Promise.all(
       updates.map(async ([filter, data]) => {
         const query = (await this.update(
