@@ -201,6 +201,12 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
     );
   });
 
+  await tryRun("returnType", async () => {
+
+    const whereStatement = await db.tr1.find!({ t1: "a"  }, { returnType: "statement-where" });
+
+    assert.equal(whereStatement, `"t1" = 'a'`);
+  })
 
   await tryRun("Table config triggers", async () => {
     const tr1 = await db.tr1.insert!({  })

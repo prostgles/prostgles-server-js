@@ -1,14 +1,9 @@
 import { DBHandlerServer } from "../dist/DboBuilder";
-import { strict as assert } from 'assert';
 
 export default async function f(db: DBHandlerServer){
 
   /** Self reference recursion bug */
   await db.rec.findOne!({ id: 1 }, { select: { "*": 1, rec_ref: "*" } })
-
-  const whereStatement = await db.rec.find!({ id: 1  }, undefined, undefined, undefined, { returnQuery: "where-condition" });
-
-  assert.equal(whereStatement, `"id" = 1`);
 
   /* Transaction example */
   await db.tx!(async t => {

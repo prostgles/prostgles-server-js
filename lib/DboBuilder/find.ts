@@ -7,12 +7,13 @@ import { getNewQuery } from "./QueryBuilder/getNewQuery";
 import { getSelectQuery } from "./QueryBuilder/getSelectQuery";
 import { TableHandler } from "./TableHandler/TableHandler";
 import { ViewHandler } from "./ViewHandler/ViewHandler";
+import { NewQuery } from "./QueryBuilder/QueryBuilder";
 
-export const find = async function(this: ViewHandler, filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]> {
+export const find = async function(this: ViewHandler, filter?: Filter, selectParams?: SelectParams, _?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]> {
   try {
     await this._log({ command: "find", localParams, data: { filter, selectParams } });
     filter = filter || {};
-    const allowedReturnTypes: Array<SelectParams["returnType"]> = ["row", "value", "values", "statement"]
+    const allowedReturnTypes = Object.keys({ row: 1, statement: 1, value: 1, values: 1, "statement-no-rls": 1, "statement-where": 1 } satisfies Record<Required<SelectParams>["returnType"], 1>);
     const { returnType } = selectParams || {};
     if (returnType && !allowedReturnTypes.includes(returnType)) {
       throw `returnType (${returnType}) can only be ${allowedReturnTypes.join(" OR ")}`
@@ -22,7 +23,10 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
 
     if (testRule) return [];
     if (selectParams) {
-      const good_params: Array<keyof SelectParams> = ["select", "orderBy", "offset", "limit", "returnType", "groupBy"];
+      const good_params = Object.keys({ 
+        "select": 1, "orderBy": 1, "offset": 1, "limit": 1, "returnType": 1, "groupBy": 1 
+      } satisfies Record<keyof SelectParams, 1>);
+      
       const bad_params = Object.keys(selectParams).filter(k => !good_params.includes(k as any));
       if (bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
     }
@@ -41,18 +45,18 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
 
     const _selectParams = selectParams ?? {}
     const selectParamsLimitCheck = localParams?.bypassLimit && !Number.isFinite(_selectParams.limit)? { ..._selectParams, limit: null } : { limit: 1000, ..._selectParams }
-    const q = await getNewQuery(
-      this as unknown as TableHandler, 
+    const newQuery = await getNewQuery(
+      this, 
       filter, 
       selectParamsLimitCheck, 
-      param3_unused, 
+      _, 
       tableRules, 
       localParams, 
     );
 
     const queryWithoutRLS = getSelectQuery(
       this, 
-      q, 
+      newQuery, 
       undefined, 
       !!selectParamsLimitCheck?.groupBy
     );
@@ -69,15 +73,22 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
     }
 
     /** Used for subscribe  */
-    if(localParams?.returnNewQuery) return (q as unknown as any);
+    if(localParams?.returnNewQuery) return (newQuery as unknown as any);
     if (localParams?.returnQuery) {
       if(localParams?.returnQuery === "where-condition"){
-        return q.whereOpts.condition as any;
+        return newQuery.whereOpts.condition as any;
       }
       return ((localParams?.returnQuery === "noRLS"? queryWithoutRLS : queryWithRLS) as unknown as any[]);
     }
 
-    return runQueryReturnType(queryWithRLS, returnType, this, localParams);
+    return runQueryReturnType({ 
+      queryWithoutRLS, 
+      queryWithRLS, 
+      returnType, 
+      handler: this, 
+      localParams,
+      newQuery,
+    });
 
   } catch (e) {
     if (localParams && localParams.testRule) throw e;
@@ -85,25 +96,44 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
   }
 }
 
+type RunQueryReturnTypeArgs = {
+  queryWithRLS: string;
+  queryWithoutRLS: string;
+  returnType: SelectParams["returnType"]; 
+  handler: ViewHandler | TableHandler; 
+  localParams: LocalParams | undefined;
+  newQuery: NewQuery | undefined;
+};
 
-export const runQueryReturnType = async (query: string, returnType: SelectParams["returnType"], handler: ViewHandler | TableHandler, localParams: LocalParams | undefined) => {
+export const runQueryReturnType = async ({ newQuery, handler, localParams, queryWithRLS, queryWithoutRLS, returnType,}: RunQueryReturnTypeArgs) => {
 
-  if (returnType === "statement") {
-    if (!(await canRunSQL(handler.dboBuilder.prostgles, localParams))) {
-      throw `Not allowed:  {returnType: "statement"} requires sql privileges `
-    }
-    return query as unknown as any[];
+  const query = queryWithRLS;
+  const sqlTypes = ["statement", "statement-no-rls", "statement-where"];
+  if(!returnType || returnType === "values"){
 
-  } else if (["row", "value"].includes(returnType!)) {
-    return handler.dbHandler.oneOrNone(query).then(data => {
-      return (data && returnType === "value") ? Object.values(data)[0] : data;
-    }).catch(err => makeErrorFromPGError(err, localParams, this));
-  } else {
     return handler.dbHandler.any(query).then(data => {
       if (returnType === "values") {
         return data.map(d => Object.values(d)[0]);
       }
       return data;
+    }).catch(err => makeErrorFromPGError(err, localParams, this));
+
+  } else if (sqlTypes.some(v => v === returnType)) {
+    if (!(await canRunSQL(handler.dboBuilder.prostgles, localParams))) {
+      throw `Not allowed:  {returnType: ${JSON.stringify(returnType)}} requires execute sql privileges `
+    }
+    if(returnType === "statement-no-rls"){
+      return queryWithoutRLS as any;
+    }
+    if(returnType === "statement-where"){
+      if(!newQuery) throw `returnType ${returnType} not possible for this command type`;
+      return newQuery.whereOpts.condition as any;
+    }
+    return query as unknown as any[];
+
+  } else if (["row", "value"].includes(returnType)) {
+    return handler.dbHandler.oneOrNone(query).then(data => {
+      return (data && returnType === "value") ? Object.values(data)[0] : data;
     }).catch(err => makeErrorFromPGError(err, localParams, this));
   }
 }

@@ -1,12 +1,12 @@
-import { get } from "../../utils";
-import { TableHandler } from "../TableHandler/TableHandler";
-import { TableRule } from "../../PublishParser";
+import { DetailedJoinSelect, JoinPath, JoinSelect, RawJoinPath, SelectParams, SimpleJoinSelect, getKeys } from "prostgles-types";
 import { Filter, LocalParams } from "../../DboBuilder";
-import { SelectParams, ColumnInfo, getKeys, DetailedJoinSelect, SimpleJoinSelect, JoinPath, JoinSelect, RawJoinPath } from "prostgles-types";
-import { COMPUTED_FIELDS, FUNCTIONS } from "./Functions";
-import { NewQuery, NewQueryJoin, SelectItemBuilder } from "./QueryBuilder";
+import { TableRule } from "../../PublishParser";
+import { get } from "../../utils";
+import { ViewHandler } from "../ViewHandler/ViewHandler";
 import { parseJoinPath } from "../ViewHandler/parseJoinPath";
 import { prepareSortItems } from "../ViewHandler/prepareSortItems";
+import { COMPUTED_FIELDS, FUNCTIONS } from "./Functions";
+import { NewQuery, NewQueryJoin, SelectItemBuilder } from "./QueryBuilder";
 
 const JOIN_KEYS = ["$innerJoin", "$leftJoin"] as const;
 type ParsedJoin = 
@@ -63,7 +63,7 @@ const parseJoinSelect = (joinParams: string | JoinSelect): ParsedJoin => {
 }
 
 export async function getNewQuery(
-  _this: TableHandler,
+  _this: ViewHandler,
   filter: Filter, 
   selectParams: (SelectParams & { alias?: string })  = {}, 
   param3_unused = null, 

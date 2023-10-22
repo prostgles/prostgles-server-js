@@ -47,7 +47,7 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
     }
 
     let queryType: keyof pgPromise.ITask<{}> = 'none';
-    let _query = `DELETE FROM ${this.escapedName} `;
+    let queryWithoutRLS = `DELETE FROM ${this.escapedName} `;
     const filterOpts = (await this.prepareWhere({
       filter,
       forcedFilter,
@@ -55,7 +55,7 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
       localParams,
       tableRule: table_rules
     }))
-    _query += filterOpts.where;
+    queryWithoutRLS += filterOpts.where;
     if (validate) {
       const _filter = filterOpts.filter;
       await validate(_filter);
@@ -68,67 +68,94 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
         throw "Returning dissallowed";
       }
       returningQuery = this.makeReturnQuery(await this.prepareReturning(returning, this.parseFieldFilter(returningFields)));
-      _query += returningQuery
+      queryWithoutRLS += returningQuery
     }
 
-    _query = withUserRLS(localParams, _query);
-    if (returnQuery) return _query;
+    const queryWithRLS = withUserRLS(localParams, queryWithoutRLS);
+    if (returnQuery) return queryWithRLS;
 
     /**
      * Delete file
      */
     if (this.is_media) {
-      if (!this.dboBuilder.prostgles.fileManager) throw new Error("fileManager missing")
-      if (this.dboBuilder.prostgles.opts.fileTable?.delayedDelete) {
-        return this.dbHandler[queryType](`UPDATE ${asName(this.name)} SET deleted = now() ${filterOpts.where} ${returningQuery};`)
-      } else {
-
-        const txDelete = async (tbl: TableHandler) => {
-          if (!tbl.tx) throw new Error("Missing transaction object tx");
-          let files: { id: string; name: string }[] = [];
-          const totalFiles = await tbl.count(filterOpts.filter);
-          do {
-            const batch = await tbl.find(filterOpts.filter, { limit: 100, offset: files.length });
-            files = files.concat(batch);
-          } while(files.length < totalFiles)
-          
-          const fileManager = tbl.dboBuilder.prostgles.fileManager
-          if (!fileManager) throw new Error("fileManager missing");
-
-          for await (const file of files) {
-            await tbl.tx.t.any(`DELETE FROM ${asName(this.name)} WHERE id = \${id}`, file);
-          }
-          /** If any table delete fails then do not delete files */
-          for await (const file of files) {
-            await fileManager.deleteFile(file.name);
-            /** TODO: Keep track of deleted files in case of failure */
-            // await tbl.t?.any(`UPDATE ${asName(this.name)} SET deleted = NOW(), deleted_from_storage = NOW()  WHERE id = ` + "${id}", file);
-          }
-
-          if (returning) {
-            return files.map(f => pickKeys(f, ["id", "name"]));
-          }
-
-          return undefined;
-        }
-
-        if (localParams?.tx?.dbTX) {
-          return txDelete(localParams.tx.dbTX[this.name] as TableHandler)
-        } else if (this.tx) {
-          return txDelete(this)
-        } else {
-
-          return this.dboBuilder.getTX(tx => {
-            return txDelete(tx[this.name] as TableHandler)
-          })
-        }
-      }
+      return onDeleteFromFileTable.bind(this)({ 
+        localParams, 
+        queryType, 
+        returningQuery: returnQuery? returnQuery : undefined,
+        filterOpts,
+      });
     }
 
-    return runQueryReturnType(_query, params?.returnType, this, localParams);
+    return runQueryReturnType({ 
+      queryWithoutRLS,
+      queryWithRLS,
+      newQuery: undefined, 
+      returnType: params?.returnType, 
+      handler: this, 
+      localParams
+    });
 
   } catch (e) {
     if (localParams && localParams.testRule) throw e;
     throw parseError(e, `dbo.${this.name}.delete(${JSON.stringify(filter || {}, null, 2)}, ${JSON.stringify(params || {}, null, 2)})`);
   }
 } 
+
+
+type OnDeleteFromFileTableArgs = {
+  localParams: LocalParams | undefined;
+  queryType: "one" | "none" | "many" | "any";
+  returningQuery: undefined | string;
+  filterOpts: {
+    where: string;
+    filter: AnyObject;
+  }
+}
+async function onDeleteFromFileTable(this: TableHandler, { localParams, queryType, returningQuery, filterOpts }: OnDeleteFromFileTableArgs){
+
+  if (!this.dboBuilder.prostgles.fileManager) throw new Error("fileManager missing")
+  if (this.dboBuilder.prostgles.opts.fileTable?.delayedDelete) {
+    return this.dbHandler[queryType](`UPDATE ${asName(this.name)} SET deleted = now() ${filterOpts.where} ${returningQuery ?? ""};`)
+  } else {
+
+    const txDelete = async (tbl: TableHandler) => {
+      if (!tbl.tx) throw new Error("Missing transaction object tx");
+      let files: { id: string; name: string }[] = [];
+      const totalFiles = await tbl.count(filterOpts.filter);
+      do {
+        const batch = await tbl.find(filterOpts.filter, { limit: 100, offset: files.length });
+        files = files.concat(batch);
+      } while(files.length < totalFiles)
+      
+      const fileManager = tbl.dboBuilder.prostgles.fileManager
+      if (!fileManager) throw new Error("fileManager missing");
+
+      for await (const file of files) {
+        await tbl.tx.t.any(`DELETE FROM ${asName(this.name)} WHERE id = \${id}`, file);
+      }
+      /** If any table delete fails then do not delete files */
+      for await (const file of files) {
+        await fileManager.deleteFile(file.name);
+        /** TODO: Keep track of deleted files in case of failure */
+        // await tbl.t?.any(`UPDATE ${asName(this.name)} SET deleted = NOW(), deleted_from_storage = NOW()  WHERE id = ` + "${id}", file);
+      }
+
+      if (returningQuery) {
+        return files.map(f => pickKeys(f, ["id", "name"]));
+      }
+
+      return undefined;
+    }
+
+    if (localParams?.tx?.dbTX) {
+      return txDelete(localParams.tx.dbTX[this.name] as TableHandler)
+    } else if (this.tx) {
+      return txDelete(this)
+    } else {
+
+      return this.dboBuilder.getTX(tx => {
+        return txDelete(tx[this.name] as TableHandler)
+      })
+    }
+  }
+}
