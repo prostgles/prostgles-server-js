@@ -76,6 +76,30 @@ export type DBSchemaGenerated = {
       public?: null | string;
     };
   };
+  files: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      added?: string;
+      cloud_url?: null | string;
+      content_length?: number;
+      content_type: string;
+      deleted?: null | number;
+      deleted_from_storage?: null | number;
+      description?: null | string;
+      etag?: null | string;
+      extension: string;
+      id?: string;
+      name: string;
+      original_name: string;
+      signed_url?: null | string;
+      signed_url_expires?: null | number;
+      url: string;
+    };
+  };
   geography_columns: {
     is_view: true;
     select: true;

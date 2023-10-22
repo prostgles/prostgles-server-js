@@ -186,7 +186,7 @@ export type LocalParams = {
 
   // localTX?: pgPromise.ITask<{}>;
 
-  returnQuery?: boolean | "noRLS";
+  returnQuery?: boolean | "noRLS" | "where-condition";
   returnNewQuery?: boolean;
   /** Used for count/size queries */
   bypassLimit?: boolean;

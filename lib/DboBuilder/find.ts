@@ -18,7 +18,7 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
       throw `returnType (${returnType}) can only be ${allowedReturnTypes.join(" OR ")}`
     }
 
-    const { testRule = false, returnQuery = false, returnNewQuery, bypassLimit = false } = localParams || {};
+    const { testRule = false } = localParams || {};
 
     if (testRule) return [];
     if (selectParams) {
@@ -58,7 +58,6 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
     );
 
     const queryWithRLS = withUserRLS(localParams, queryWithoutRLS);
-    // console.log(_query, JSON.stringify(q, null, 2))
     if (testRule) {
       try {
         await this.db.any(withUserRLS(localParams, "EXPLAIN " + queryWithRLS));
@@ -70,9 +69,12 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
     }
 
     /** Used for subscribe  */
-    if(returnNewQuery) return (q as unknown as any);
-    if (returnQuery) {
-      return ((returnQuery === "noRLS"? queryWithoutRLS : queryWithRLS) as unknown as any[]);
+    if(localParams?.returnNewQuery) return (q as unknown as any);
+    if (localParams?.returnQuery) {
+      if(localParams?.returnQuery === "where-condition"){
+        return q.whereOpts.condition as any;
+      }
+      return ((localParams?.returnQuery === "noRLS"? queryWithoutRLS : queryWithRLS) as unknown as any[]);
     }
 
     return runQueryReturnType(queryWithRLS, returnType, this, localParams);

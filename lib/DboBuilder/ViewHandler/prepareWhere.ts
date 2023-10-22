@@ -16,7 +16,7 @@ type PrepareWhereParams = {
   tableRule: TableRule | undefined
 };
 
-export async function prepareWhere(this: ViewHandler, params: PrepareWhereParams): Promise<{ where: string; filter: AnyObject; exists: ExistsFilterConfig[]; }> {
+export async function prepareWhere(this: ViewHandler, params: PrepareWhereParams): Promise<{ condition: string; where: string; filter: AnyObject; exists: ExistsFilterConfig[]; }> {
   const { filter, select, forcedFilter, filterFields: ff, addWhere: addKeywords = true, tableAlias, localParams, tableRule } = params;
   const { $and: $and_key, $or: $or_key } = this.dboBuilder.prostgles.keywords;
 
@@ -82,8 +82,9 @@ export async function prepareWhere(this: ViewHandler, params: PrepareWhereParams
     [$and_key]: [forcedFilter, filter].filter(isDefined)
   } : { ...filter };
 
+  const condition = cond;
   if (cond && addKeywords) {
     cond = `WHERE ${cond}`;
   }
-  return { where: cond || "", filter: finalFilter, exists };
+  return { condition, where: cond || "", filter: finalFilter, exists };
 }

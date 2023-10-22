@@ -493,10 +493,10 @@ function dd(){
 					
 				} else if(process.env.TEST_TYPE === "server"){
 
+					await server_only_queries(db as any);
+					log("Server-only query tests successful");
 					await isomorphic(db as any);
 					log("Server isomorphic tests successful");
-					await server_only_queries(db);
-					log("Server-only query tests successful");
 
 					stopTest()
 				} else {
