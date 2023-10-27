@@ -752,10 +752,12 @@ export class PublishParser {
         await Promise.all(tableNames
           .map(async tableName => {
             if (!this.dbo[tableName]) {
-              throw `Table ${tableName} does not exist
-                          Expecting one of: ${JSON.stringify(this.prostgles.dboBuilder.tablesOrViews?.map(tov => tov.name))}
-                          DBO tables: ${JSON.stringify(Object.keys(this.dbo).filter(k => (this.dbo[k] as any).find))}
-                          `;
+              const errMsg = [
+                `Table ${tableName} does not exist`,
+                `Expecting one of: ${JSON.stringify(this.prostgles.dboBuilder.tablesOrViews?.map(tov => tov.name))}`,
+                `DBO tables: ${JSON.stringify(Object.keys(this.dbo).filter(k => (this.dbo[k] as any).find))}`,
+              ].join("\n");
+              throw errMsg;
             }
 
             const table_rules = await this.getTableRules({ localParams: { socket }, tableName }, clientInfo);
@@ -859,10 +861,10 @@ export async function getFileTableRules (this: PublishParser, fileTableName: str
   const forcedDeleteFilters: FullFilter<AnyObject, void>[] = [];
   const forcedSelectFilters: FullFilter<AnyObject, void>[] = [];
   const allowedNestedInserts: { table: string; column: string }[] = [];
-  // const fileTablePublishRules = await this.getTableRules({ localParams, tableName: fileTableName  }, clientInfo);
   if(opts.fileTable?.referencedTables){
-    Object.entries(opts.fileTable.referencedTables).forEach(async ([tableName, refCols]) => {
-      if(isObject(refCols)){
+    Object.entries(opts.fileTable.referencedTables).forEach(async ([tableName, colopts]) => {
+      if(isObject(colopts) && typeof colopts !== "string"){
+        const refCols = Object.keys(colopts.referenceColumns);
         const table_rules = await this.getTableRules({ localParams, tableName }, clientInfo);
         if(table_rules){
           Object.keys(refCols).map(column => {
