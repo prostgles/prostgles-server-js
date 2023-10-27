@@ -23,15 +23,16 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
     if(this.is_media && isFile(newData) && (!tableRules || tableRules.update)){
       const existingMediaId: string = !(!filter || !isObject(filter) || getKeys(filter).join() !== "id" || typeof (filter as any).id !== "string")? (filter as any).id : undefined
       if(!existingMediaId){
-        throw new Error(`Updating the file table with file data can only be done by providing a single id filter. E.g. { id: "9ea4e23c-2b1a-4e33-8ec0-c15919bb45ec"} `);
+        throw new Error(`Updating the file table with file data can only be done by providing a single id filter. E.g. { id: "9ea4e23c-2b1a-4e33-8ec0-c15919bb45ec" } `);
       }
       if(localParams?.testRule){
         newData = {};
       } else {
         const fileManager = this.dboBuilder.prostgles.fileManager
         if(!fileManager) throw new Error("fileManager missing");
+        if(!localParams) throw new Error("localParams missing");
         const validate: ValidateRow | undefined = tableRules?.[ACTION]?.validate? async (row) => {
-          return tableRules?.[ACTION]?.validate!({ update: row, filter }, this.tx?.dbTX || this.dboBuilder.dbo)
+          return tableRules?.[ACTION]?.validate!({ update: row, filter, dbx:  this.tx?.dbTX || this.dboBuilder.dbo, localParams })
         } : undefined;
 
         const existingFile: Media | undefined = await (localParams?.tx?.dbTX?.[this.name] as TableHandler || this).findOne({ id: existingMediaId });
@@ -40,7 +41,7 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
 
         // oldFileDelete = () => fileManager.deleteFile(existingFile!.name!)
         await fileManager.deleteFile(existingFile!.name!); //oldFileDelete();
-        const newFile = await uploadFile.bind(this)(newData, validate, localParams, existingFile.id)
+        const newFile = await uploadFile.bind(this)({ row: newData, validate, localParams, mediaId: existingFile.id })
         newData = omitKeys(newFile, ["id"]);
       }
     } else if(this.is_media && isObject(newData) && typeof newData.name === "string"){
@@ -102,7 +103,7 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
     const nData = { ...data };
     
 
-    let query = await this.colSet.getUpdateQuery(nData, allowedCols, this.getFinalDbo(localParams), validateRow)
+    let query = await this.colSet.getUpdateQuery(nData, allowedCols, this.getFinalDbo(localParams), validateRow, localParams)
     query += "\n" + (await this.prepareWhere({
       filter,
       forcedFilter,

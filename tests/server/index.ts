@@ -384,14 +384,14 @@ function dd(){
 					insert: {
 						fields: "*",
 						returningFields: { name: 1 },
-						validate: async (row) => {
+						validate: async ({ row }) => {
 							if(row.name === "a") row.name = "b"
 							return row
 						},
 						checkFilter: {
 							$and: [{"name.<>": "fail-check"}]
 						},
-						postValidate: async (row, dboTx) => {
+						postValidate: async ({ row, dbx: dboTx}) => {
 							/** Records must exist in this transaction */
 							log(JSON.stringify(row))
 							const exists = await dboTx.sql("SELECT * FROM insert_rules WHERE id = ${id}", row, { returnType: "row" });
@@ -465,9 +465,7 @@ function dd(){
 					{ items3_id: "id" },
 				],
 				type: "many-many"
-			}
-
-			
+			}			
 		],
 		onReady: async (db, _db) => {
 			log("prostgles onReady")

@@ -3,7 +3,6 @@ import { LocalParams, TableHandlers } from "../DboBuilder";
 import { TableRule } from "../PublishParser";
 import { omitKeys } from "../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler/TableHandler";
-import { uploadFile } from "./uploadFile";
 
 /**
  * Referenced inserts within a single transaction
@@ -94,7 +93,7 @@ export async function insertDataParse(
   /**
    * Make sure nested insert uses a transaction
    */
-  const dbTX = localParams?.tx?.dbTX || this.tx?.dbTX;
+  const dbTX = this.getFinalDBtx(localParams);
   const t = localParams?.tx?.t || this.tx?.t;
   if (hasNestedInserts && (!dbTX || !t)) {
     return {
@@ -112,20 +111,24 @@ export async function insertDataParse(
 
   const { preValidate, validate } = tableRules?.insert ?? {};
 
-  const _data = await Promise.all((isMultiInsert ? data : [data]).map(async row => {
+  const _data = await Promise.all((isMultiInsert ? data : [data]).map(async _row => {
+    const { tableConfigurator } = this.dboBuilder.prostgles;
+    if(!tableConfigurator) throw "tableConfigurator missing";
+    let row = await tableConfigurator.getPreInsertRow(this, { dbx: this.getFinalDbo(localParams), preValidate, validate, localParams, row: _row })
     if (preValidate) {
-      row = await preValidate(row, this.tx?.dbTX || this.dboBuilder.dbo);
+      row = await preValidate({ row, dbx: this.tx?.dbTX || this.dboBuilder.dbo, localParams });
     }
 
     const extraKeys = getExtraKeys(row);
     const colInserts = getColumnInserts(row);
 
     /* Upload file then continue insert */
-    if (this.is_media) {
-      return uploadFile.bind(this)(row, validate, localParams)
+    // if (this.is_media) {
+    //   return uploadFile.bind(this)(row, validate, localParams)
 
+    // } else 
     /* Potentially a nested join */
-    } else if (hasNestedInserts) {
+    if (hasNestedInserts) {
 
       /* Ensure we're using the same transaction */
       const _this = this.tx ? this : dbTX![this.name] as TableHandler;

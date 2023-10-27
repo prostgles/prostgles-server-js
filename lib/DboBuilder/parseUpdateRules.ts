@@ -1,6 +1,6 @@
 import { AnyObject, FieldFilter, isDefined, UpdateParams } from "prostgles-types";
 import { Filter, LocalParams } from "../DboBuilder";
-import { TableRule, UpdateRule, ValidateRow, ValidateUpdateRowBasic } from "../PublishParser";
+import { TableRule, UpdateRule, ValidateRow, ValidateRowBasic, ValidateUpdateRowBasic } from "../PublishParser";
 import { TableHandler } from "./TableHandler/TableHandler";
 
 /**
@@ -121,11 +121,17 @@ export async function parseUpdateRules(
       if (forcedData) {
         try {
           const { data, allowedCols } = this.validateNewData({ row: forcedData, forcedData: undefined, allowedFields: "*", tableRules, fixIssues: false });
+          let updateValidate: ValidateRowBasic | undefined;
+          if(validate){
+            if(!localParams) throw "localParams missing";
+            updateValidate = (args) => validate!({ update: args.row, filter: {}, dbx: this.getFinalDbo(localParams), localParams })
+          }
           const updateQ = await this.colSet.getUpdateQuery(
             data,
             allowedCols,
             this.tx?.dbTX || this.dboBuilder.dbo,
-            validate ? ((row) => validate!({ update: row, filter: {} }, this.tx?.dbTX || this.dboBuilder.dbo)) : undefined
+            updateValidate,
+            localParams
           );
           const query = updateQ + " WHERE FALSE ";
           await this.db.any("EXPLAIN " + query);
@@ -141,7 +147,11 @@ export async function parseUpdateRules(
   /* Update all allowed fields (fields) except the forcedFilter (so that the user cannot change the forced filter values) */
   const _fields = this.parseFieldFilter(fields);
 
-  const validateRow: ValidateRow | undefined = validate ? (row) => validate!({ update: row, filter: finalUpdateFilter }, this.tx?.dbTX || this.dboBuilder.dbo) : undefined
+  let validateRow: ValidateRow | undefined;
+  if(validate){
+    if(!localParams) throw "localParams missing";
+    validateRow = ({ row }) => validate!({ update: row, filter: finalUpdateFilter, localParams, dbx: this.getFinalDbo(localParams) });
+  }
 
   return {
     fields: _fields,

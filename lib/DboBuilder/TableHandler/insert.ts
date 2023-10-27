@@ -13,13 +13,13 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
     await this._log({ command: "insert", localParams, data: { rowOrRows, param2: insertParams } });
 
     const { fixIssues = false } = insertParams || {};
-    const { returnQuery = false } = localParams || {};
+    const { returnQuery = false, nestedInsert } = localParams || {};
  
     const finalDBtx = this.getFinalDBtx(localParams);
     const rule = tableRules?.[ACTION];
-    const { postValidate, checkFilter, validate } = rule ?? {};
+    const { postValidate, checkFilter, validate, allowedNestedInserts } = rule ?? {};
 
-    /** Post validate and checkFilter require a transaction dbo handler */
+    /** Post validate and checkFilter require a transaction dbo handler because they happen after the insert */
     if(postValidate || checkFilter){
       if(!finalDBtx){
         return this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.[ACTION]?.(rowOrRows, insertParams, param3_unused, tableRules, localParams))
@@ -31,6 +31,11 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
       return true;
     }
 
+    if(allowedNestedInserts){
+      if(!nestedInsert || !allowedNestedInserts.some(d => d.table === nestedInsert?.previousTable && d.column === nestedInsert.referencingColumn)){
+        throw `Direct inserts not allowed. Only nested inserts from these tables: ${JSON.stringify(nestedInsert)} `
+      }
+    }
     const { conflict_query } = validateInsertParams(insertParams);
 
 
@@ -60,7 +65,7 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
       const validatedRows = validatedData.map(d => d.validatedRow);
       const allowedCols = Array.from( new Set(validatedData.flatMap(d => d.allowedCols)));
       const dbTx = finalDBtx || this.dboBuilder.dbo
-      const query = await this.colSet.getInsertQuery(validatedRows, allowedCols, dbTx, validate);
+      const query = await this.colSet.getInsertQuery(validatedRows, allowedCols, dbTx, validate, localParams);
       return query + conflict_query;
     };
     

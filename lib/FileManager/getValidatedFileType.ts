@@ -1,7 +1,6 @@
 import { ALLOWED_CONTENT_TYPE, ALLOWED_EXTENSION, CONTENT_TYPE_TO_EXT, getKeys, isObject } from "prostgles-types";
-import { ViewHandler } from "../DboBuilder/ViewHandler/ViewHandler";
-import { FileManager, getFileType, getFileTypeFromFilename } from "./FileManager";
 import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
+import { FileManager, getFileType, getFileTypeFromFilename } from "./FileManager";
 
 type Args = {
   file: Buffer | string;
@@ -9,7 +8,7 @@ type Args = {
   colName?: string;
   tableName?: string;
 };
-export async function parseFile(this: FileManager, args: Args): Promise<{
+export async function getValidatedFileType(this: FileManager, args: Args): Promise<{
   mime: string | ALLOWED_CONTENT_TYPE;
   ext: string | ALLOWED_EXTENSION;
 

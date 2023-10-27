@@ -47,7 +47,7 @@ const RULE_TO_METHODS = [
     methods: RULE_METHODS.insert,
     no_limits: <SelectRule>{ fields: "*" },
     table_only: true,
-    allowed_params: { checkFilter: 1, fields: 1, forcedData: 1, postValidate: 1, preValidate: 1, returningFields: 1, validate: 1 } satisfies Record<keyof InsertRule, 1>,
+    allowed_params: { checkFilter: 1, fields: 1, forcedData: 1, postValidate: 1, preValidate: 1, returningFields: 1, validate: 1, allowedNestedInserts: 1 } satisfies Record<keyof InsertRule, 1>,
     hint: ` expecting "*" | true | { fields: string | string[] | {}  }`
   },
   {
@@ -129,10 +129,21 @@ export type UpdateRequestDataBatch<R extends AnyObject> = {
 }
 export type UpdateRequestData<R extends AnyObject = AnyObject> = UpdateRequestDataOne<R> | UpdateRequestDataBatch<R>;
 
-export type ValidateRow<R extends AnyObject = AnyObject, S = void> = (row: R, dbx: DBOFullyTyped<S>) => R | Promise<R>;
-export type ValidateRowBasic = (row: AnyObject, dbx: DBHandlerServer) => AnyObject | Promise<AnyObject>;
-export type ValidateUpdateRow<R extends AnyObject = AnyObject, S extends DBSchema | void = void> = (args: { update: Partial<R>, filter: FullFilter<R, S> }, dbx: DBOFullyTyped<S>) => R | Promise<R>;
-export type ValidateUpdateRowBasic = (args: { update: Partial<AnyObject>, filter: Filter }, dbx: DBHandlerServer) => AnyObject | Promise<AnyObject>;
+export type ValidateRowArgs<R = AnyObject, DBX = DBHandlerServer> = {
+  row: R;
+  dbx: DBX;
+  localParams: LocalParams;
+}
+export type ValidateUpdateRowArgs<U = Partial<AnyObject>, F = Filter, DBX = DBHandlerServer> = {
+  update: U;
+  filter: F;
+  dbx: DBX;
+  localParams: LocalParams;
+}
+export type ValidateRow<R extends AnyObject = AnyObject, S = void> = (args: ValidateRowArgs<R, DBOFullyTyped<S>>) => R | Promise<R>;
+export type ValidateRowBasic = (args: ValidateRowArgs) => AnyObject | Promise<AnyObject>;
+export type ValidateUpdateRow<R extends AnyObject = AnyObject, S extends DBSchema | void = void> = (args: ValidateUpdateRowArgs<Partial<R>, FullFilter<R, S>, DBOFullyTyped<S>>) => R | Promise<R>;
+export type ValidateUpdateRowBasic = (args: ValidateUpdateRowArgs) => AnyObject | Promise<AnyObject>;
 
 
 export type SelectRule<Cols extends AnyObject = AnyObject, S extends DBSchema | void = void> = {
@@ -213,6 +224,15 @@ export type InsertRule<Cols extends AnyObject = AnyObject, S extends DBSchema | 
    * Happens in the same transaction so upon throwing an error the record will be deleted (not committed)
    */
   postValidate?: ValidateRow<Required<Cols>, S>;
+
+  /**
+   * If defined then only nested inserts from these tables are allowed
+   * Direct inserts will fail
+   */
+  allowedNestedInserts?: {
+    table: string;
+    column: string;
+  }[];
 }
 
 
@@ -521,7 +541,17 @@ export class PublishParser {
     } else throw { stack: ["getValidatedRequestRule()"], message: `Invalid or disallowed command: ${tableName}.${command}` };
   }
 
-  async getTableRules({ tableName, localParams }: DboTable, clientInfo?: AuthResult): Promise<ParsedPublishTable | undefined> {
+  async getTableRules(args: DboTable, clientInfo?: AuthResult): Promise<ParsedPublishTable | undefined> {
+
+    if(this.dbo[args.tableName]?.is_media){
+      const fileTablePublishRules = await this.getTableRulesWithoutFileTable(args, clientInfo)
+      const { allowedInserts, rules } = await getFileTableRules.bind(this)(args.tableName, fileTablePublishRules, args.localParams, clientInfo);
+      return rules;
+    }
+
+    return this.getTableRulesWithoutFileTable(args, clientInfo)
+  }
+  async getTableRulesWithoutFileTable({ tableName, localParams }: DboTable, clientInfo?: AuthResult): Promise<ParsedPublishTable | undefined> {
 
     if (!localParams || !tableName) throw { stack: ["getTableRules()"], message: "publish OR socket OR dbo OR tableName are missing" };
 
@@ -810,15 +840,23 @@ function applyParamsIfFunc(maybeFunc: any, ...params: any): any {
   return maybeFunc;
 }
 
-export async function getFileTableRules (this: PublishParser, socket: PRGLIOSocket, clientInfo: AuthResult | undefined) {
+/**
+ * Permissions for referencedTables columns are propagated to the file table (even if file table has no permissions)
+ * Select on a referenced column allows selecting from file table any records that join the referenced table and the select filters
+ * Insert on a referenced column allows inserting a file (according to any file type/size rules) only if it is a nested from that table 
+ * Update on a referenced column allows updating a file (delete and insert) only if it is a nested update from that table 
+ * Delete on a referenced column table allows deleting any referenced file 
+ */ 
+export async function getFileTableRules (this: PublishParser, fileTableName: string, fileTablePublishRules: ParsedPublishTable | undefined, localParams: LocalParams, clientInfo: AuthResult | undefined) {
   const opts = this.prostgles.opts;
   const forcedDeleteFilters: FullFilter<AnyObject, void>[] = [];
   const forcedSelectFilters: FullFilter<AnyObject, void>[] = [];
-  const allowedInserts: { table: string; column: string }[] = [];
+  const allowedNestedInserts: { table: string; column: string }[] = [];
+  // const fileTablePublishRules = await this.getTableRules({ localParams, tableName: fileTableName  }, clientInfo);
   if(opts.fileTable?.referencedTables){
     Object.entries(opts.fileTable.referencedTables).forEach(async ([tableName, refCols]) => {
       if(isObject(refCols)){
-        const table_rules = await this.getTableRules({ localParams: { socket }, tableName }, clientInfo);
+        const table_rules = await this.getTableRules({ localParams, tableName }, clientInfo);
         if(table_rules){
           Object.keys(refCols).map(column => {
 
@@ -846,7 +884,7 @@ export async function getFileTableRules (this: PublishParser, socket: PRGLIOSock
               const parsedFields = parseFieldFilter(table_rules.insert.fields, false, [column]);
               /** Must be allowed to view this column */
               if(parsedFields.includes(column as any)){
-                allowedInserts.push({ table: tableName, column });
+                allowedNestedInserts.push({ table: tableName, column });
               }
             }
           })
@@ -856,29 +894,44 @@ export async function getFileTableRules (this: PublishParser, socket: PRGLIOSock
   }
 
 
-  const fileTableRule: TableRule = {};
-  if(forcedSelectFilters.length){
+  const fileTableRule: ParsedPublishTable = {
+    ...fileTablePublishRules,
+  };
+  if(forcedSelectFilters.length || fileTablePublishRules?.select){
     fileTableRule.select = {
       fields: "*",
+      ...fileTablePublishRules?.select,
       forcedFilter: {
-        $or: forcedSelectFilters
+        $or: forcedSelectFilters.concat(fileTablePublishRules?.select?.forcedFilter ?? []),
       }
     }
   }
-  if(forcedDeleteFilters.length){
+  if(forcedDeleteFilters.length || fileTablePublishRules?.delete){
     fileTableRule.delete = {
       filterFields: "*",
+      ...fileTablePublishRules?.delete,
       forcedFilter: {
-        $or: forcedSelectFilters
+        $or: forcedDeleteFilters.concat(fileTablePublishRules?.delete?.forcedFilter ?? []),
       }
     }
   }
 
-  if(allowedInserts.length){
+  if(allowedNestedInserts.length || fileTablePublishRules?.insert){
     fileTableRule.insert = {
       fields: "*",
+      ...fileTablePublishRules?.insert,
+      // preValidate: async ({ dbx, localParams, row: _row }) => {
+      //   const row = (await fileTablePublishRules?.insert?.preValidate?.({ dbx, localParams, row: _row })) ?? _row;
+      //   /** If direct insert not allowed ensure only referenced inserts are allowed */
+      //   const { nestedInsert } = localParams
+      //   if(!fileTablePublishRules?.insert && (!nestedInsert || !allowedNestedInserts.some(ai => ai.table === nestedInsert?.previousTable && ai.column === nestedInsert.referencingColumn))){
+      //     throw "Only nested inserts allowed from these tables: " + allowedNestedInserts.map(d => d.table);
+      //   }
+      //   return row;
+      // },
+      allowedNestedInserts: fileTablePublishRules?.insert? undefined : allowedNestedInserts,
     }
   }
 
-  return { rules: fileTableRule, allowedInserts };
+  return { rules: fileTableRule, allowedInserts: allowedNestedInserts };
 }

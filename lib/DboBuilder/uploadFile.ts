@@ -7,7 +7,17 @@ export const isFile = (row: AnyObject) => {
   return Boolean(row && isObject(row) && getKeys(row).sort().join() === ["name", "data"].sort().join() && row.data && (typeof row.data === "string" || Buffer.isBuffer(row.data)) && typeof row.name === "string")
 }
 
-export async function uploadFile(this: TableHandler, row: AnyObject, validate: ValidateRowBasic | undefined, localParams: LocalParams | undefined, mediaId?: string): Promise<Media> {
+type UploadFileArgs = {
+  row: AnyObject;
+  validate: ValidateRowBasic | undefined; 
+  localParams: LocalParams | undefined;
+  /**
+   * Used to update an existing file
+   */
+  mediaId?: string;
+}
+
+export async function uploadFile(this: TableHandler, { row, localParams, validate, mediaId }: UploadFileArgs): Promise<Media> {
   if (!this.dboBuilder.prostgles?.fileManager) throw "fileManager not set up";
 
   if (!isFile(row)) throw "Expecting only two properties for file upload: { name: string; data: File | string | Buffer }; but got: " + Object.entries(row).map(([k, v]) => `${k}: ${typeof v}`).join(", ");
@@ -15,7 +25,7 @@ export async function uploadFile(this: TableHandler, row: AnyObject, validate: V
 
   const media_id = mediaId ?? (await this.db.oneOrNone("SELECT gen_random_uuid() as name")).name;
   const nestedInsert = localParams?.nestedInsert;
-  const type = await this.dboBuilder.prostgles.fileManager.parseFile({  file: data, fileName: name, tableName: nestedInsert?.previousTable, colName: nestedInsert?.referencingColumn });
+  const type = await this.dboBuilder.prostgles.fileManager.getValidatedFileType({  file: data, fileName: name, tableName: nestedInsert?.previousTable, colName: nestedInsert?.referencingColumn });
   const media_name = `${media_id}.${type.ext}`;
   const parsedMediaKeys = ["id", "name", "original_name", "extension", "content_type"] as const
   const media: Required<Pick<Media, typeof parsedMediaKeys[number]>> = {
@@ -27,7 +37,8 @@ export async function uploadFile(this: TableHandler, row: AnyObject, validate: V
   }
 
   if (validate) {
-    const parsedMedia = await validate(media, this.tx?.dbTX || this.dboBuilder.dbo);
+    if(!localParams) throw "localParams missing";
+    const parsedMedia = await validate({ row: media, dbx: this.getFinalDbo(localParams), localParams });
     const missingKeys = parsedMediaKeys.filter(k => !parsedMedia[k])
     if(missingKeys.length){
       throw `Some keys are missing from file insert validation: ${missingKeys}`;
@@ -49,9 +60,10 @@ export async function uploadFile(this: TableHandler, row: AnyObject, validate: V
     // }
   });
 
-  return {
+  const mediaRow = {
     ...media,
     ..._media,
   };
 
+  return mediaRow;
 }

@@ -10,7 +10,7 @@ import { ALLOWED_CONTENT_TYPE, ALLOWED_EXTENSION, CONTENT_TYPE_TO_EXT, getKeys, 
 
 import * as path from "path";
 import { initFileManager } from "./initFileManager";
-import { parseFile } from "./parseFile";
+import { getValidatedFileType } from "./getValidatedFileType";
 import { upload } from "./upload";
 import { uploadStream } from "./uploadStream";
 
@@ -173,7 +173,7 @@ export class FileManager {
     return true
   }
 
-  parseFile = parseFile.bind(this);
+  getValidatedFileType = getValidatedFileType.bind(this);
 
   getLocalFileUrl = (name: string) => this.fileRoute? `${this.fileRoute}/${name}` : "";
 

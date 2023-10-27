@@ -2,7 +2,7 @@ import { AnyObject, ColumnInfo, asName, isEmpty, isObject, pickKeys } from "pros
 import { ValidateRow, ValidateRowBasic } from "../../PublishParser";
 import { DBHandlerServer } from "../../Prostgles";
 import { asValue } from "../../PubSubManager/PubSubManager";
-import { pgp } from "../../DboBuilder";
+import { LocalParams, pgp } from "../../DboBuilder";
 
 
 export class ColSet {
@@ -16,7 +16,7 @@ export class ColSet {
     this.opts = { columns, tableName, colNames: columns.map(c => c.name) }
   }
 
-  private async getRow(data: any, allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRow | undefined, command: "update" | "insert"): Promise<{ escapedCol: string; escapedVal: string; }[]> {
+  private async getRow(data: any, allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRow | undefined, command: "update" | "insert", localParams: LocalParams | undefined): Promise<{ escapedCol: string; escapedVal: string; }[]> {
     const badCol = allowedCols.find(c => !this.opts.colNames.includes(c))
     if (!allowedCols || badCol) {
       throw "Missing or unexpected columns: " + badCol;
@@ -28,7 +28,8 @@ export class ColSet {
 
     let row = pickKeys(data, allowedCols);
     if (validate) {
-      row = await validate(row, dbTx);
+      if(!localParams) throw "localParams missing"
+      row = await validate({ row, dbx: dbTx, localParams });
     }
     const rowKeys = Object.keys(row);
 
@@ -94,9 +95,9 @@ export class ColSet {
 
   }
 
-  async getInsertQuery(data: AnyObject[], allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRowBasic | undefined) {
+  async getInsertQuery(data: AnyObject[], allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRowBasic | undefined, localParams: LocalParams | undefined) {
     const inserts = (await Promise.all(data.map(async d => {
-      const rowParts = await this.getRow(d, allowedCols, dbTx, validate, "insert");
+      const rowParts = await this.getRow(d, allowedCols, dbTx, validate, "insert", localParams);
       // const columns = rowParts.map(r => r.escapedCol).join(", "),
       //   values = rowParts.map(r => r.escapedVal).join(", ");
 
@@ -110,9 +111,9 @@ export class ColSet {
     const whatToInsert = !uniqueColumns.length? "DEFAULT VALUES" : `(${uniqueColumns}) VALUES ${values}`
     return `INSERT INTO ${this.opts.tableName} ${whatToInsert} `;
   }
-  async getUpdateQuery(data: AnyObject | AnyObject[], allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRowBasic | undefined): Promise<string> {
+  async getUpdateQuery(data: AnyObject | AnyObject[], allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRowBasic | undefined, localParams: LocalParams | undefined): Promise<string> {
     const res = (await Promise.all((Array.isArray(data) ? data : [data]).map(async d => {
-      const rowParts = await this.getRow(d, allowedCols, dbTx, validate, "update");
+      const rowParts = await this.getRow(d, allowedCols, dbTx, validate, "update", localParams);
       return `UPDATE ${this.opts.tableName} SET ` + rowParts.map(r => `${r.escapedCol} = ${r.escapedVal} `).join(",\n")
     }))).join(";\n") + " ";
     return res;

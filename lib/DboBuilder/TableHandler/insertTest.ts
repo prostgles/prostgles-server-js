@@ -33,7 +33,6 @@ export async function insertTest(this: TableHandler, { localParams, tableRules }
 
     /* Safely test publish rules */
     if (testRule) {
-      // if(this.is_media && tableRules.insert.preValidate) throw "Media table cannot have a preValidate. It already is used internally by prostgles for file upload";
       await this.validateViewRules({ fields, returningFields, forcedFilter: forcedData, rule: "insert" });
       if(checkFilter){
         try {

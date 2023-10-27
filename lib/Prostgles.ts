@@ -646,7 +646,7 @@ export class Prostgles {
     try {
 
       await this.refreshDBO();
-      if (this.opts.tableConfig) {
+      // if (this.opts.tableConfig) {
         if(this.tableConfigurator?.initialising){
           console.error("TableConfigurator WILL deadlock", { reason });
         }
@@ -663,7 +663,7 @@ export class Prostgles {
             throw e;
           }
         }
-      }
+      // }
 
       /* 3. Make DBO object from all tables and views */
       // await this.refreshDBO();

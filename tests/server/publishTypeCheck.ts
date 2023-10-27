@@ -93,7 +93,7 @@ export const testPublishTypes = () => {
         insert: {
           fields: "*",
           returningFields: { name: 1 },
-          validate: async (row) => {
+          validate: async ({ row }) => {
             if(row.name === "a") row.name = "b"
             return row
           }

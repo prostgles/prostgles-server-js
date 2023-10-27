@@ -98,10 +98,11 @@ export const runInsertUpdateQuery = async ({ tableHandler, queryWithoutUserRLS, 
   const finalDBtx = tableHandler.getFinalDBtx(localParams);
   if(postValidate){
     if(!finalDBtx) throw new Error("Unexpected: no dbTX for postValidate");
+    if(!localParams) throw new Error("Unexpected: no localParams for postValidate");
 
     const rows = result.modified ?? [];
     for await (const row of rows){
-      await postValidate(row ?? {}, finalDBtx)
+      await postValidate({ row: row ?? {}, dbx: finalDBtx, localParams })
     }
   }
 

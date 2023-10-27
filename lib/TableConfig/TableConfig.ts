@@ -5,6 +5,9 @@ import { PubSubManager, asValue, log } from "../PubSubManager/PubSubManager";
 import { getTableColumnQueries } from "./getTableColumnQueries";
 import { getFutureTableSchema } from "./getFutureTableSchema";
 import { getColConstraints, getConstraintDefinitionQueries } from "./getConstraintDefinitionQueries";
+import { InsertRule, ValidateRowArgs } from "../PublishParser";
+import { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
+import { uploadFile } from "../DboBuilder/uploadFile";
 
 type ColExtraInfo = {
   min?: string | number;
@@ -41,6 +44,13 @@ type BaseTableDefinition<LANG_IDS = AnyObject> = {
   }
   dropIfExistsCascade?: boolean;
   dropIfExists?: boolean;
+  hooks?: {
+    /**
+     * Hook used to run custom logic before inserting a row. 
+     * The returned row must satisfy the table schema
+     */
+    getPreInsertRow?: (args: ValidateRowArgs) => Promise<{ row: AnyObject; onInserted: Promise<void>; }>;
+  };
   triggers?: {
     [triggerName: string]: {
       /**
@@ -292,6 +302,11 @@ export type TableDefinition<LANG_IDS> = {
   }
 }
 
+type GetPreInsertRowArgs = ValidateRowArgs & {
+  preValidate: InsertRule["preValidate"];
+  validate: InsertRule["validate"];
+}
+
 /**
  * Helper utility to create lookup tables for TEXT columns
  */
@@ -314,8 +329,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
   get db(): DB {
     if (!this.prostgles.db) throw "this.prostgles.db missing"
     return this.prostgles.db
-  } 
-  // sidKeyName: string;
+  }  
   prostgles: Prostgles
 
   constructor(prostgles: Prostgles) {
@@ -416,6 +430,18 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       }
     }
     return undefined;
+  }
+
+  getPreInsertRow = async (tableHandler: TableHandler, args: GetPreInsertRowArgs): Promise<AnyObject> => {
+    const tableHook = this.config?.[tableHandler.name]?.hooks?.getPreInsertRow;
+    if(tableHandler.is_media){
+      return uploadFile.bind(tableHandler)(args) as Promise<AnyObject>;
+    } 
+    if(tableHook){
+      return tableHook(args)
+    }
+
+    return args.row;
   }
 
   prevInitQueryHistory?: string[];
