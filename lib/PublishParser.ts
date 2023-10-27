@@ -867,7 +867,7 @@ export async function getFileTableRules (this: PublishParser, fileTableName: str
         const refCols = Object.keys(colopts.referenceColumns);
         const table_rules = await this.getTableRules({ localParams, tableName }, clientInfo);
         if(table_rules){
-          Object.keys(refCols).map(column => {
+          refCols.map(column => {
 
             if(table_rules.delete){
               forcedDeleteFilters.push({
