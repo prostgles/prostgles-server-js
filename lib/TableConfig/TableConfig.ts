@@ -333,7 +333,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
   prostgles: Prostgles
 
   constructor(prostgles: Prostgles) {
-    this.config = prostgles.opts.tableConfig as any;
+    this.config = (prostgles.opts.tableConfig as any) ?? {};
     this.prostgles = prostgles;
   }
 
