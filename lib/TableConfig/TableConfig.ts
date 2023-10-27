@@ -321,7 +321,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
   instanceId = Math.random();
   
-  config?: TableConfig<LANG_IDS>;
+  config: TableConfig<LANG_IDS> = {};
   get dbo(): DBHandlerServer {
     if (!this.prostgles.dbo) throw "this.prostgles.dbo missing"
     return this.prostgles.dbo
@@ -475,8 +475,8 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       return 1;
     }
 
-    if (!this.config || !this.prostgles.pgp){ 
-      throw "config or pgp missing";
+    if (!this.prostgles.pgp){ 
+      throw "pgp missing";
     }
 
     const MAX_IDENTIFIER_LENGTH = +(await this.db.one("SHOW max_identifier_length;") as any).max_identifier_length;
