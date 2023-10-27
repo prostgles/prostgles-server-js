@@ -122,11 +122,6 @@ export async function insertDataParse(
     const extraKeys = getExtraKeys(row);
     const colInserts = getColumnInserts(row);
 
-    /* Upload file then continue insert */
-    // if (this.is_media) {
-    //   return uploadFile.bind(this)(row, validate, localParams)
-
-    // } else 
     /* Potentially a nested join */
     if (hasNestedInserts) {
 
@@ -278,9 +273,6 @@ export async function insertDataParse(
   }));
 
   const result = isMultiInsert ? _data : _data[0];
-  // if(validate && !isNestedInsert){
-  //     result = isMultiInsert? await Promise.all(_data.map(async d => await validate({ ...d }))) : await validate({ ..._data[0] });
-  // }
   const res = hasNestedInserts ?
     { insertResult: result } :
     { data: result };
