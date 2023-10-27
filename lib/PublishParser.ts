@@ -742,6 +742,13 @@ export class PublishParser {
 
         const tableNames = Object.keys(_publish).filter(k => !txKey || txKey !== k);
 
+        const fileTableName = this.prostgles.fileManager?.tableName;
+        if(fileTableName && this.dbo[fileTableName]?.is_media && !tableNames.includes(fileTableName)){
+          const isReferenced = this.prostgles.dboBuilder.tablesOrViews?.some(t => t.columns.some(c => c.references?.some(r => r.ftable === fileTableName)))
+          if(isReferenced){
+            tableNames.push(fileTableName);
+          }
+        }
         await Promise.all(tableNames
           .map(async tableName => {
             if (!this.dbo[tableName]) {
