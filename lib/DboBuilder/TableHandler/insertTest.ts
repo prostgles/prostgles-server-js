@@ -1,6 +1,6 @@
 import { AnyObject, asName, FieldFilter, FullFilter } from "prostgles-types";
 import { LocalParams, pgp } from "../../DboBuilder";
-import { TableRule } from "../../PublishParser";
+import { TableRule } from "../../PublishParser/PublishParser";
 import { asValue } from "../../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler";
 

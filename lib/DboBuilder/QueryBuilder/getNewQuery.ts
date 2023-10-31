@@ -1,6 +1,6 @@
 import { DetailedJoinSelect, JoinPath, JoinSelect, RawJoinPath, SelectParams, SimpleJoinSelect, getKeys } from "prostgles-types";
 import { Filter, LocalParams } from "../../DboBuilder";
-import { TableRule } from "../../PublishParser";
+import { TableRule } from "../../PublishParser/PublishParser";
 import { get } from "../../utils";
 import { ViewHandler } from "../ViewHandler/ViewHandler";
 import { parseJoinPath } from "../ViewHandler/parseJoinPath";

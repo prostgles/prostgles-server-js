@@ -1,6 +1,6 @@
 import { AnyObject, getKeys, InsertParams, isDefined, isObject, PG_COLUMN_UDT_DATA_TYPE } from "prostgles-types";
 import { LocalParams, TableHandlers } from "../DboBuilder";
-import { TableRule } from "../PublishParser";
+import { TableRule } from "../PublishParser/PublishParser";
 import { omitKeys } from "../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler/TableHandler";
 
@@ -73,7 +73,8 @@ export async function insertDataParse(
         return {
           tableName: insertedCol.references![0]!.ftable!,
           col: insertedCol.name,
-          fcol: insertedCol.references![0]!.fcols[0]!
+          fcol: insertedCol.references![0]!.fcols[0]!,
+          singleInsert: !Array.isArray(d[insertedCol.name])
         }
       }
       return undefined;
@@ -136,9 +137,13 @@ export async function insertDataParse(
       let insertedChildren: AnyObject[];
       let targetTableRules: TableRule;
 
+      const colInsertsResult = colInserts.map(ci => ({
+        ...ci,
+        inserted: undefined as AnyObject[] | undefined
+      }));
       /** Insert referenced first and then populate root data with referenced keys */
       if (colInserts.length) {
-        for await (const colInsert of colInserts) {
+        for await (const colInsert of colInsertsResult) {
           const newLocalParams: LocalParams = {
             ...(localParams ?? {}),
             nestedInsert: {
@@ -152,6 +157,7 @@ export async function insertDataParse(
           if (!Array.isArray(colRows) || colRows.length !== 1 || [null, undefined].includes(colRows[0]![colInsert.fcol])) {
             throw new Error("Could not do nested column insert: Unexpected return " + JSON.stringify(colRows))
           }
+          colInsert.inserted = colRows;
 
           const foreignKey = colRows[0]![colInsert.fcol];
           rootData[colInsert.col] = foreignKey;
@@ -165,7 +171,9 @@ export async function insertDataParse(
         returnData = {}
         const returningItems = await this.prepareReturning(returning, this.parseFieldFilter(tableRules?.insert?.returningFields));
         returningItems.filter(s => s.selected).map(rs => {
-          returnData![rs.alias] = fullRootResult[rs.alias];
+          const colInsertResult = colInsertsResult.find(({ col }) => col === rs.columnName);
+          const inserted = colInsertResult?.singleInsert? colInsertResult.inserted?.[0] : colInsertResult?.inserted;
+          returnData![rs.alias] = inserted ?? fullRootResult[rs.alias];
         })
       }
 
@@ -177,9 +185,9 @@ export async function insertDataParse(
           return referencedInsert(this, dbTX, localParams, tableName, cdata);
         }
 
-        const jp = await getJoinPath(this, targetTable);
+        const joinPath = await getJoinPath(this, targetTable);
 
-        const { path } = jp;
+        const { path } = joinPath;
         const [tbl1, tbl2, tbl3] = path;
         targetTableRules = await canInsert(this, targetTable, localParams);   //  tbl3
 
@@ -193,9 +201,10 @@ export async function insertDataParse(
         } else if (path.length === 2) {
           if (targetTable !== tbl2) throw "Did not expect this";
 
-          if (!colsRefT1.length) throw `Target table ${tbl2} does not reference any columns from the root table ${this.name}. Cannot do nested insert`;
-
-          // console.log(childDataItems, JSON.stringify(colsRefT1, null, 2))
+          if (!colsRefT1.length) {
+            throw `Target table ${tbl2} does not reference any columns from the root table ${this.name}. Cannot insert nested data`;
+          }
+ 
           insertedChildren = await childInsert(
             childDataItems.map((d: AnyObject) => {
               const result = { ...d };
@@ -205,8 +214,7 @@ export async function insertDataParse(
               return result;
             }),
             targetTable
-          );
-          // console.log({ insertedChildren })
+          ); 
 
         } else if (path.length === 3) {
           if (targetTable !== tbl3) throw "Did not expect this";

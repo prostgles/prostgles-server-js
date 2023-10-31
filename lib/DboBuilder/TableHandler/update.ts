@@ -1,6 +1,6 @@
 import { AnyObject, getKeys, isObject, unpatchText, UpdateParams } from "prostgles-types";
 import { Filter, isPlainObject, LocalParams, Media, parseError, withUserRLS } from "../../DboBuilder";
-import { TableRule, ValidateRow } from "../../PublishParser";
+import { TableRule, ValidateRow } from "../../PublishParser/PublishParser";
 import { omitKeys } from "../../PubSubManager/PubSubManager";
 import { isFile, uploadFile } from "../uploadFile";
 import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
@@ -30,9 +30,9 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
       } else {
         const fileManager = this.dboBuilder.prostgles.fileManager
         if(!fileManager) throw new Error("fileManager missing");
-        if(!localParams) throw new Error("localParams missing");
-        const validate: ValidateRow | undefined = tableRules?.[ACTION]?.validate? async (row) => {
-          return tableRules?.[ACTION]?.validate!({ update: row, filter, dbx:  this.tx?.dbTX || this.dboBuilder.dbo, localParams })
+        if(rule?.validate && !localParams) throw new Error("localParams missing");
+        const validate: ValidateRow | undefined = rule?.validate? async (row) => {
+          return rule.validate!({ update: row, filter, dbx:  this.tx?.dbTX || this.dboBuilder.dbo, localParams: localParams! })
         } : undefined;
 
         const existingFile: Media | undefined = await (localParams?.tx?.dbTX?.[this.name] as TableHandler || this).findOne({ id: existingMediaId });

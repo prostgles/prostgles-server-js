@@ -2,7 +2,7 @@ import { AnyObject, FieldFilter, getKeys, isDefined, isObject } from "prostgles-
 import { ViewHandler } from "./ViewHandler";
 import { ExistsFilterConfig, Filter, LocalParams } from "../../DboBuilder";
 import { SelectItem } from "../QueryBuilder/QueryBuilder";
-import { TableRule } from "../../PublishParser";
+import { TableRule } from "../../PublishParser/PublishParser";
 import { getCondition } from "../getCondition";
 
 type PrepareWhereParams = {

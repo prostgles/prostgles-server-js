@@ -122,30 +122,7 @@ export type DBSchemaGenerated = {
       items3_id?: null | number;
       name?: null | string;
     };
-  };
-  items_with_media: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      id?: number;
-      name?: null | string;
-    };
-  };
-  items_with_one_media: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      id?: number;
-      items_m1_id?: null | number;
-      name: string;
-    };
-  };
+  }; 
   items2: {
     is_view: false;
     select: true;

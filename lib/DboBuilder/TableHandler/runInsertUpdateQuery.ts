@@ -1,6 +1,6 @@
 import { AnyObject, asName, FieldFilter, InsertParams, UpdateParams } from "prostgles-types";
 import { LocalParams, makeErrorFromPGError, withUserRLS } from "../../DboBuilder";
-import { InsertRule, UpdateRule } from "../../PublishParser";
+import { InsertRule, UpdateRule } from "../../PublishParser/PublishParser";
 import { getSelectItemQuery, TableHandler } from "./TableHandler";
 
 type RunInsertUpdateQueryArgs = {

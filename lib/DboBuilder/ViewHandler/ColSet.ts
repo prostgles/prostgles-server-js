@@ -1,5 +1,5 @@
 import { AnyObject, ColumnInfo, asName, isEmpty, isObject, pickKeys } from "prostgles-types/dist";
-import { ValidateRow, ValidateRowBasic } from "../../PublishParser";
+import { ValidateRow, ValidateRowBasic } from "../../PublishParser/PublishParser";
 import { DBHandlerServer } from "../../Prostgles";
 import { asValue } from "../../PubSubManager/PubSubManager";
 import { LocalParams, pgp } from "../../DboBuilder";

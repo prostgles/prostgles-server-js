@@ -16,7 +16,7 @@ import pg from 'pg-promise/typescript/pg-subset';
 import { SelectParams, FieldFilter, asName, WAL, AnyObject, SubscribeParams } from "prostgles-types";
 
 import { syncData } from "../SyncReplication";
-import { TableRule } from "../PublishParser";
+import { TableRule } from "../PublishParser/PublishParser";
 import { find, getKeys, isObject, pickKeys, tryCatch } from "prostgles-types/dist/util";
 import { DB_OBJ_NAMES } from "./getInitQuery";
 import { addSub } from "./addSub";

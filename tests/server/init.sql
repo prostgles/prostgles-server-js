@@ -8,38 +8,13 @@ CREATE TABLE IF NOT EXISTS shapes (
 	geom 	GEOMETRY
 );
 
-DROP TABLE IF EXISTS prostgles_lookup_media_items_m1;
-DROP TABLE IF EXISTS prostgles_lookup_media_items_with_media;
-DROP TABLE IF EXISTS prostgles_lookup_media_items_with_one_media;
- 
-
-DROP TABLE IF EXISTS media CASCADE;
-
-DROP TABLE IF EXISTS items_with_one_media CASCADE;
-CREATE TABLE IF NOT EXISTS items_with_one_media (
-	id		SERIAL PRIMARY KEY,
-	name	TEXT
-);
-
 DROP TABLE IF EXISTS insert_rules CASCADE;
 CREATE TABLE IF NOT EXISTS insert_rules (
 	id		SERIAL PRIMARY KEY,
 	name	TEXT,
 	added		TIMESTAMP DEFAULT NOW()
 );
-
-DROP TABLE IF EXISTS items_with_media CASCADE;
-CREATE TABLE IF NOT EXISTS items_with_media (
-	id		SERIAL PRIMARY KEY,
-	name	TEXT
-);
-
--- DROP TABLE IF EXISTS items_with_media_cols CASCADE;
--- CREATE TABLE IF NOT EXISTS items_with_media_cols (
--- 	id		SERIAL PRIMARY KEY,
--- 	"desc" TEXT,
--- 	file_id UUID REFERENCES media(id)
--- );
+ 
 
 
 DROP TABLE IF EXISTS various CASCADE;
@@ -246,3 +221,4 @@ CREATE TABLE IF NOT EXISTS trades (
   price NUMERIC NOT NULL
 ); 
 
+-- DROP TABLE media CASCADE;

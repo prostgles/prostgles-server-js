@@ -76,6 +76,30 @@ export type DBSchemaGenerated = {
       public?: null | string;
     };
   };
+  files: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      added?: string;
+      cloud_url?: null | string;
+      content_length?: number;
+      content_type: string;
+      deleted?: null | number;
+      deleted_from_storage?: null | number;
+      description?: null | string;
+      etag?: null | string;
+      extension: string;
+      id?: string;
+      name: string;
+      original_name: string;
+      signed_url?: null | string;
+      signed_url_expires?: null | number;
+      url: string;
+    };
+  };
   geography_columns: {
     is_view: true;
     select: true;
@@ -144,28 +168,6 @@ export type DBSchemaGenerated = {
       items1_id?: null | number;
       items2_id?: null | number;
       items3_id?: null | number;
-      name?: null | string;
-    };
-  };
-  items_with_media: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      id?: number;
-      name?: null | string;
-    };
-  };
-  items_with_one_media: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      id?: number;
       name?: null | string;
     };
   };
@@ -243,30 +245,6 @@ export type DBSchemaGenerated = {
       id: string;
     };
   };
-  media: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      added?: string;
-      cloud_url?: null | string;
-      content_length?: number;
-      content_type: string;
-      deleted?: null | number;
-      deleted_from_storage?: null | number;
-      description?: null | string;
-      etag?: null | string;
-      extension: string;
-      id?: string;
-      name: string;
-      original_name: string;
-      signed_url?: null | string;
-      signed_url_expires?: null | number;
-      url: string;
-    };
-  };
   obj_table: {
     is_view: false;
     select: true;
@@ -290,28 +268,6 @@ export type DBSchemaGenerated = {
       last_updated: number;
       x?: null | number;
       y?: null | number;
-    };
-  };
-  prostgles_lookup_media_items_with_media: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      foreign_id?: null | number;
-      media_id: string;
-    };
-  };
-  prostgles_lookup_media_items_with_one_media: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      foreign_id: number;
-      media_id: string;
     };
   };
   "prostgles_test.basic": {
@@ -502,6 +458,19 @@ export type DBSchemaGenerated = {
       id?: number;
       preferences: {    showIntro?: boolean;   theme?: 'light' | 'dark' | 'auto';   others: any[];  };
       status: "active" | "disabled" | "pending"
+    };
+  };
+  users_public_info: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      avatar?: null | string;
+      id?: number;
+      name?: null | string;
+      sid?: null | string;
     };
   };
   uuid_text: {

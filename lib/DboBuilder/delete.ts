@@ -1,7 +1,7 @@
 import pgPromise from "pg-promise";
 import { AnyObject, asName, DeleteParams, FieldFilter } from "prostgles-types";
 import { Filter, LocalParams, parseError, withUserRLS } from "../DboBuilder";
-import { DeleteRule, TableRule } from "../PublishParser";
+import { DeleteRule, TableRule } from "../PublishParser/PublishParser";
 import { pickKeys } from "../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler/TableHandler";
 import { runQueryReturnType } from "./find";

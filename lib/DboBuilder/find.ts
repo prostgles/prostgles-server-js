@@ -2,7 +2,7 @@
 import { SelectParams, isObject } from "prostgles-types";
 import { Filter, LocalParams, makeErrorFromPGError, parseError, withUserRLS } from "../DboBuilder";
 import { canRunSQL } from "../DboBuilder/runSQL";
-import { TableRule } from "../PublishParser";
+import { TableRule } from "../PublishParser/PublishParser";
 import { getNewQuery } from "./QueryBuilder/getNewQuery";
 import { getSelectQuery } from "./QueryBuilder/getSelectQuery";
 import { TableHandler } from "./TableHandler/TableHandler";

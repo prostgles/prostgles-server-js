@@ -5,7 +5,7 @@ import { PubSubManager, asValue, log } from "../PubSubManager/PubSubManager";
 import { getTableColumnQueries } from "./getTableColumnQueries";
 import { getFutureTableSchema } from "./getFutureTableSchema";
 import { getColConstraints, getConstraintDefinitionQueries } from "./getConstraintDefinitionQueries";
-import { InsertRule, ValidateRowArgs } from "../PublishParser";
+import { InsertRule, ValidateRowArgs } from "../PublishParser/PublishParser";
 import { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { uploadFile } from "../DboBuilder/uploadFile";
 

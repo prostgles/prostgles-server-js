@@ -8,7 +8,7 @@
     "resolveJsonModule": true,
 		"allowJs": true,
 		"module": "commonjs",
-    "moduleResolution": "node",
+    "moduleResolution": "Node10",
 		"declaration": true,
 		"declarationMap": true,
 		"keyofStringsOnly": true,

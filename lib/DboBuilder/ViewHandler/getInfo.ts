@@ -2,7 +2,7 @@ import {
   TableInfo as TInfo,
  } from "prostgles-types/dist";
 import { LocalParams } from "../../DboBuilder";
-import { TableRule } from "../../PublishParser";
+import { TableRule } from "../../PublishParser/PublishParser";
 import { ViewHandler } from "./ViewHandler";
 
 export async function getInfo(this: ViewHandler, lang?: string, param2?: any, param3?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<TInfo> {

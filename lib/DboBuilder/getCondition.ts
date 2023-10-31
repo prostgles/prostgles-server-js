@@ -2,7 +2,7 @@ import { AnyObject, isObject, pickKeys } from "prostgles-types";
 import { ExistsFilterConfig, LocalParams, pgp } from "../DboBuilder";
 import { parseFilterItem } from "../Filtering";
 import { asValue } from "../PubSubManager/PubSubManager";
-import { TableRule } from "../PublishParser";
+import { TableRule } from "../PublishParser/PublishParser";
 import { FUNCTIONS, parseFunction } from "./QueryBuilder/Functions";
 import { SelectItem, asNameAlias, parseFunctionObject } from "./QueryBuilder/QueryBuilder";
 import { ViewHandler } from "./ViewHandler/ViewHandler";

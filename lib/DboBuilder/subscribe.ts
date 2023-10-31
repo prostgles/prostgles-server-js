@@ -1,6 +1,6 @@
 import { AnyObject, SubscribeParams, SubscriptionChannels } from "prostgles-types";
 import { Filter, LocalParams, parseError } from "../DboBuilder";
-import { TableRule } from "../PublishParser";
+import { TableRule } from "../PublishParser/PublishParser";
 import { omitKeys } from "../PubSubManager/PubSubManager"; 
 import { ViewHandler } from "./ViewHandler/ViewHandler";
 import { getSubscribeRelatedTables } from "./getSubscribeRelatedTables";

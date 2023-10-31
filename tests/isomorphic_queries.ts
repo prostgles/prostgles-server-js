@@ -11,36 +11,34 @@ export async function tryRun(desc: string, func: () => any, log?: Function){
     console.error(desc + " FAILED:", err);
     log?.("FAIL: ", err);
     console.trace(err)
-    setTimeout(() => {
-      throw err;
-
-    }, 2000)
+    await tout(50);
+    throw err;
   }
 }
 export function tryRunP(desc: string, func: (resolve: any, reject: any) => any, opts?: { log?: Function; timeout?: number; }){
   return new Promise(async (rv, rj) => {
-    const tout = Number.isFinite(opts?.timeout)? setTimeout(() => {
+    const testTimeout = Number.isFinite(opts?.timeout)? setTimeout(() => {
       const errMsg = `${desc} failed. Reason: Timout reached: ${opts!.timeout}ms`;
       opts?.log?.(errMsg);
       rj(errMsg);
     }, opts!.timeout) : undefined
     try {
       await func(rv, rj);
-      clearTimeout(tout);
+      clearTimeout(testTimeout);
     } catch(err: any){
       opts?.log?.(`${desc} failed: ` + JSON.stringify(err));
-      setTimeout(() => {
-        throw err;
-      }, 1000)
+      await tout(50);
+      throw err;    
     }
   });
 }
  
-export default async function isomorphic(db: Required<DBHandlerServer> | Required<DBHandlerClient>) {
-  console.log("Starting isomorphic queries");
-
-  if(await db.items.count!()){
-    console.log("DELETING items");
+export default async function isomorphic(db: Required<DBHandlerServer> | Required<DBHandlerClient>, log: (msg: string, extra?: any) => void) {
+  log("Starting isomorphic queries");
+ 
+  const itemsCount = await db.items.count!()
+  if(itemsCount){
+    log("DELETING items");
     
     /* Access controlled */
     await db.items4.delete!({ });
@@ -50,17 +48,22 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
     await db.items2.delete!({ });
     await db.items.delete!({ });
   }
+  await db.sql(`TRUNCATE items  RESTART IDENTITY CASCADE;`)
  
   
   await tryRun("Prepare data", async () => {
-    await db.items.insert!([{ name: "a" }, { name: "a" }, { name: "b" }]);
-    console.log(await db.items.find!())
-    await db.items2.insert!([{ name: "a", items_id: 1 }]);
+    const res = await db.items.insert!([{ name: "a" }, { name: "a" }, { name: "b" }], { returning: "*" }); 
+    assert.equal(res.length, 3);
+    const added1 = '04 Dec 1995 00:12:00';
+    const added2 = '04 Dec 1996 00:12:00';
+    const added3 = '04 Dec 1997 00:12:00';
+
+    await db.items2.insert!([{ name: "a", items_id: res[0]!.id }]);
     await db.items3.insert!([{ name: "a" }, { name: "za123" }]);
     await db.items4.insert!([
-      { name: "abc1", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
-      { name: "abc2", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
-      { name: "abcd", public: "public data d", added: new Date('04 Dec 1996 00:12:00 GMT') }
+      { name: "abc1", public: "public data",    added: added1 },
+      { name: "abc2", public: "public data",    added: added1 },
+      { name: "abcd", public: "public data d",  added: added2 }
     ]);
     await db[`prostgles_test.basic1`].insert!({
       id_basic: { txt: "basic" },
@@ -74,14 +77,90 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
     await db[`"""*"""`].insert!([{ [`"*"`]: "a" }, { [`"*"`]: "a" }, { [`"*"`]: "b" }]);
 
     await db.various.insert!([
-      { name: "abc9",  added: new Date('04 Dec 1995 00:12:00 GMT'), jsn: { "a": { "b": 2 } }  },
-      { name: "abc1",  added: new Date('04 Dec 1996 00:12:00 GMT'), jsn: { "a": { "b": 3 } }  },
-      { name: "abc81 here", added: new Date('04 Dec 1997 00:12:00 GMT'), jsn: { "a": { "b": 2 } }  }
-    ])
+      { name: "abc9",  added: added1, jsn: { "a": { "b": 2 } }  },
+      { name: "abc1",  added: added2, jsn: { "a": { "b": 3 } }  },
+      { name: "abc81 here", added: added3, jsn: { "a": { "b": 2 } }  }
+    ]);
+     
+    await db.sql("TRUNCATE files CASCADE");
+  });
 
+  const fileFolder = `${__dirname}/../../server/dist/server/media/`;
+  const fileName = "sample_file.txt";
+  await tryRun("Local file upload", async () => {
+    let str = "This is a string",
+      data = Buffer.from(str, "utf-8"),
+      mediaFile = { data, name: fileName }
+
+    const file = await db.files.insert!(mediaFile, { returning: "*" });
+    const _data = fs.readFileSync(fileFolder + file.name);
+    assert.equal(str, _data.toString('utf8'));
+
+    await tryRun("Nested insert", async () => {
+  
+      const { name, avatar: { extension, content_type, original_name } } = await db.users_public_info.insert!({ name: "somename.txt", avatar: mediaFile }, { returning: "*" });
+      
+      assert.deepStrictEqual(
+        { extension, content_type, original_name },
+        {
+          extension: 'txt',
+          content_type: 'text/plain',
+          original_name: 'sample_file.txt',
+        }
+      );
+      
+      assert.equal(name, "somename.txt");
+    });
+ 
   });
 
 
+  await tryRun("Local file delete", async () => {
+    const file = { 
+      data: Buffer.from("str", "utf-8"), 
+      name: "will delete.txt" 
+    }
+    await db.files.insert!(file);
+    
+    const files = await db.files.find!({ original_name: file.name });
+    const allFiles = await db.files.find!({ });
+    log(JSON.stringify(allFiles))
+    assert.equal(files.length, 1);
+    const exists0 = fs.existsSync(fileFolder+files[0].name);
+    assert.equal(exists0, true);
+    await db.files.delete!({ original_name: file.name }, { returning: "*" });
+    const exists = fs.existsSync(fileFolder+files[0].name);
+    assert.equal(exists, false);
+  })
+
+  await tryRun("Local file update", async () => {
+    const initialStr = "str";
+    const newStr = "str new";
+    const file = { 
+      data: Buffer.from(initialStr, "utf-8"), 
+      name: "will update.txt" 
+    }
+    const newFile = { 
+      data: Buffer.from(newStr, "utf-8"), 
+      name: "will update new.txt" 
+    }
+    await db.files.insert!(file);
+    const originals = await db.files.find!({ original_name: file.name });
+    assert.equal(originals.length, 1);
+    const [original] = originals;
+    const initialFileStr = fs.readFileSync(fileFolder + original.name).toString('utf8');
+    assert.equal(initialStr, initialFileStr);
+
+    await db.files.update!({ id: original.id }, newFile);
+    
+    const newFileStr = fs.readFileSync(fileFolder + original.name).toString('utf8');
+    assert.equal(newStr, newFileStr);
+    
+    const newF = await db.files.findOne!({ id: original.id });
+
+    assert.equal(newF.original_name, newFile.name)
+  });
+  
   await tryRun("getColumns definition", async () => {
     const res = await db.tr2.getColumns!("fr");
     const expected =  [
@@ -271,10 +350,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       ["a", "a", "b"]
     );
 
-  })
-
-  // add getInfo and getCols tests
-  // console.log(await db.items.getInfo(), await db.items.getColumns())
+  });
 
   /**
    * TODO -> ADD ALL FILTER TYPES
@@ -289,8 +365,8 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       { select: { 
         h: { "$ts_headline_simple": ["name", { plainto_tsquery: "abc81" }] },
         hh: { "$ts_headline": ["name", "abc81"] } ,
-        added: "$date_trunc_2hour",
-        addedY: { "$date_trunc_5minute": ["added"] }
+        added: "$year",
+        addedY: { "$date": ["added"] }
       }});
     // console.log(d);
     await db.various.findOne!(
@@ -298,20 +374,19 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       { select: { 
         h: { "$ts_headline_simple": ["name", { plainto_tsquery: "abc81" }] },
         hh: { "$ts_headline": ["name", "abc81"] } ,
-        added: "$date_trunc_2hour",
-        addedY: { "$date_trunc_5millisecond": ["added"] }
+        added: "$year",
+        addedY: { "$date": ["added"] }
       }});
       
-    /* Dates become strings after reaching client.
+    /*
+    * Dates become strings after reaching client.
     * Serialize col dataTypes and then recast ??
     */
     assert.deepStrictEqual(JSON.parse(JSON.stringify(d)), {
       h: '<b>abc81</b> here',
       hh: '<b>abc81</b> here',
-      added: '1997-12-04 00:00:00',
-      addedY: '1997-12-04 00:10:00',
-      // added: new Date('1997-12-04T00:00:00.000Z'),
-      // addedY: new Date('1997-12-04T00:10:00.000Z'),
+      added: '1997',
+      addedY: '1997-12-04',
     });
   });
 
@@ -443,16 +518,13 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
   await tryRun("Between filtering", async () => {
     const res = await db.various.count!({ 
       added: { $between: [
-        new Date('06 Dec 1995 00:12:00 GMT'),
-        new Date('03 Dec 1997 00:12:00 GMT')
+        '06 Dec 1995 00:12:00',
+        '03 Dec 1997 00:12:00'
       ] } });
     assert.equal(res, 1)
   });
   await tryRun("In filtering", async () => {
-    const res = await db.various.count!({ 
-      added: { $in: [
-        new Date('04 Dec 1996 00:12:00 GMT')
-      ] } });
+    const res = await db.various.count!({ added: { $in: ['04 Dec 1996 00:12:00'] } });
     assert.equal(res, 1)
   });
 
@@ -505,7 +577,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
 
     // Returning
     const returningParam = { returning: { id: 1, name: 1, public: 1 , $rowhash: 1, added_day: { "$day": ["added"] } }} as const ;  //   ctid: 1,
-    let i = await db.items4_pub.insert!( { name: "abc123", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') }, returningParam);
+    let i = await db.items4_pub.insert!( { name: "abc123", public: "public data", added: '04 Dec 1995 00:12:00' }, returningParam);
     assert.deepStrictEqual(i, { id: 1,  name: 'abc123', public: 'public data', $rowhash: '347c26babad535aa697a794af89195fe', added_day: 'monday'  }); //  , ctid: '(0,1)'
   
     let u = await db.items4_pub.update! ({ name: "abc123" }, { public: "public data2" }, returningParam);
@@ -590,92 +662,6 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
 
   });
 
-  const fileFolder = `${__dirname}/../../server/dist/server/media/`; //isServer? `${__dirname}/../../server/dist/server/media/` : `${__dirname}/server/dist/server/media/` as const;
-  const fileName = "sample_file.txt";
-  await tryRun("Local file upload", async () => {
-    let str = "This is a string",
-      data = Buffer.from(str, "utf-8"),
-      mediaFile = { data, name: fileName }
-
-    const file = await db.media.insert!(mediaFile, { returning: "*" });
-    const _data = fs.readFileSync(fileFolder + file.name);
-    assert.equal(str, _data.toString('utf8'));
-
-    await tryRun("Nested insert", async () => {
-  
-      const { name, media: { extension, content_type, original_name } } = await db.items_with_one_media.insert!({ name: "somename.txt", media: mediaFile }, { returning: "*" });
-      
-      assert.deepStrictEqual(
-        { extension, content_type, original_name },
-        {
-          extension: 'txt',
-          content_type: 'text/plain',
-          original_name: 'sample_file.txt',
-        }
-      );
-      
-      assert.equal(name, "somename.txt");
-    });
-
-    // await tryRun("Media col insert", async () => {
-  
-    //   const resp = await db.items_with_media_cols.insert({ desc: "description", file_id: mediaFile }, { returning: "*" });
-      
-    //   assert.equal(
-    //     +(await db.items_with_media_cols.count(resp)),
-    //     1
-    //   );
-      
-    //   assert.equal(
-    //     +(await db.media.count({ original_name: 'sample_file.txt', id: resp.file_id })), 
-    //     1
-    //   );
-    // });
-  });
-
-
-  await tryRun("Local file delete", async () => {
-    const file = { 
-      data: Buffer.from("str", "utf-8"), 
-      name: "will delete.txt" 
-    }
-    await db.media.insert!(file);
-    
-    const files = await db.media.find!({ original_name: file.name });
-    assert.equal(files.length, 1);
-    const exists0 = fs.existsSync(fileFolder+files[0].name);
-    assert.equal(exists0, true);
-    await db.media.delete!({ original_name: file.name }, { returning: "*" });
-    const exists = fs.existsSync(fileFolder+files[0].name);
-    assert.equal(exists, false);
-  })
-
-  await tryRun("Local file update", async () => {
-    const initialStr = "str";
-    const newStr = "str new";
-    const file = { 
-      data: Buffer.from(initialStr, "utf-8"), 
-      name: "will update.txt" 
-    }
-    const newFile = { 
-      data: Buffer.from(newStr, "utf-8"), 
-      name: "will update new.txt" 
-    }
-    await db.media.insert!(file);
-    const original = await db.media.findOne!({ original_name: file.name });
-    
-    const initialFileStr = fs.readFileSync(fileFolder + original.name).toString('utf8');
-    assert.equal(initialStr, initialFileStr);
-
-    await db.media.update!({ id: original.id }, newFile);
-    
-    const newFileStr = fs.readFileSync(fileFolder + original.name).toString('utf8');
-    assert.equal(newStr, newFileStr);
-    
-    const newF = await db.media.findOne!({ id: original.id });
-
-    assert.equal(newF.original_name, newFile.name)
-  });
 
   await tryRun("jsonbSchema validation", async () => {
     
@@ -707,13 +693,12 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
   });
 
   
-  await tryRun("Exists filter example", async () => {
+  await tryRun("find and findOne", async () => {
   
-    const fo = await db.items.findOne!(),
-      f = await db.items.find!();
-      
-    assert.deepStrictEqual(fo,    { h: null, id: 1, name: 'a' }, "findOne query failed" );
-    assert.deepStrictEqual(f[0],  { h: null, id: 1, name: 'a' }, "findOne query failed" );
+    const fo = await db.items.findOne!();
+    const f = await db.items.find!();
+    assert.deepStrictEqual(fo,    { h: null, id: 1, name: 'a' });
+    assert.deepStrictEqual(f[0],  { h: null, id: 1, name: 'a' });
   });
 
   await tryRun("Result size", async () => {
@@ -1183,5 +1168,14 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       assert.deepStrictEqual(row.trades.slice(0).reverse(), row.tradesAlso);
       assert.notEqual(row.id, "abc");
     });
+  });
+}
+
+
+const tout = (t = 3000) => {
+  return new Promise(async (resolve, reject) => {
+    setTimeout(() => {
+      resolve(true)
+    },t)
   });
 }

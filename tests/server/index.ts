@@ -6,8 +6,10 @@ const app = express();
 const http = require('http').createServer(app);
 const { exec } = require('child_process');
 import { testPublishTypes } from "./publishTypeCheck";
-
+import { testPublish } from "./testPublish";
 import { testDboTypes } from "./dboTypeCheck";
+import { testTableConfig } from "./testTableConfig";
+
 testDboTypes();
 testPublishTypes();
 
@@ -20,15 +22,11 @@ import isomorphic from "../isomorphic_queries";
 import server_only_queries from "../server_only_queries";
 
 import { DBSchemaGenerated } from "./DBoGenerated";
-// type DBObj = any;
 
-import type { TableConfig } from 'prostgles-server/dist/TableConfig/TableConfig';
-import type { DBOFullyTyped, PublishFullyTyped } from "prostgles-server/dist/DBSchemaBuilder";
-import { DBHandlerServer } from 'prostgles-server/dist/Prostgles';
+import type { DBOFullyTyped } from "prostgles-server/dist/DBSchemaBuilder"; 
+export type { DBHandlerServer } from "prostgles-server/dist/Prostgles";
 
-export { DBHandlerServer } from "prostgles-server/dist/Prostgles";
-
-const log = (msg: string, extra?: any, trace?: boolean) => {
+export const log = (msg: string, extra?: any, trace?: boolean) => {
 	const msgs = ["(server): " + msg, extra].filter(v => v);
 	if(trace){
 		console.trace(...msgs);
@@ -45,7 +43,7 @@ const stopTest = (err?) => {
 }
 
 const sessions: { id: string, user_id: string }[] = [];
-type USER = { 
+type USER = {
 	id: string; 
 	username: string; 
 	password: string; 
@@ -81,144 +79,6 @@ function dd(){
 
 
 	log("created prostgles")
-	const tableConfig: TableConfig<{ en: 1, fr: 1 }> = {
-
-		tr2: {
-			// dropIfExists: true,
-			columns: {
-				t1: { label: { fr: "fr_t1" }, info: { hint: "hint...", min: "a", max: "b" } },
-				t2: { label: { en: "en_t2" } },
-			},
-			triggers: {
-				atLeastOneA: {
-					actions: ["delete", "update"],
-					forEach: "statement",
-					type: "after",
-					query: `
-						DECLARE
-						x_rec record;
-						BEGIN
-
-							IF NOT EXISTS(SELECT * FROM tr2 WHERE t1 = 'a' AND t2 = 'b') THEN
-								RAISE EXCEPTION 'Must have at least one row with t1 = a AND t2 = b';
-							END IF;
-
-							RETURN NULL;
-						END;
-					`
-				}
-			}
-		},
-		users: {
-			dropIfExists: true,
-      columns: {
-        id:           { sqlDefinition: `SERIAL PRIMARY KEY ` },
-        email:        { sqlDefinition: `TEXT NOT NULL` },
-        status:       { enum: ["active", "disabled", "pending"] },
-        preferences:  { 
-          jsonbSchemaType: { 
-            showIntro:  { type: "boolean", optional: true },
-            theme:      { enum: ["light", "dark", "auto"], optional: true },
-						others: 		{ type: "any[]" }
-          } 
-        },
-      }
-    },
-		tjson: {
-			dropIfExists: true,
-			columns: {
-				json: { jsonbSchemaType: { 
-						a: { type: "boolean" },
-						arr: { enum: ["1", "2", "3"] },
-						arr1: { enum: [1, 2, 3] },
-						arr2: { type: "integer[]" },
-						arrStr: { type: "string[]", optional: true, nullable: true },
-						o: { optional: true, nullable: true, oneOfType: [
-							{ o1: "integer" }, 
-							{ o2:  "boolean" }
-						] },
-					}  
-				},
-				colOneOf: { enum: ["a", "b", "c"] },
-				status:  {
-					nullable: true, 
-					jsonbSchema: {
-						oneOfType: [
-							{ ok: { type: "string" } },
-							{ err: { type: "string" } },
-							{ 
-								loading: { type: { 
-									loaded: { type: "number" },
-									total: { type: "number" } 
-									} 
-								} 
-							}
-						]
-					}
-				},
-				jsonOneOf: { 
-					nullable: true, 
-					jsonbSchema: { 
-						oneOfType: [
-							{ command: { enum: ["a"] } },
-							{ 
-								command: { enum: ["b"] },
-								option: { type: "integer[]" }
-							}
-						]
-					}
-				},
-				table_config:	{ nullable: true, jsonbSchemaType: {
-          	referencedTables: { optional: true, arrayOfType: { name: "string", minFiles: "number" } },
-						recType: {
-							nullable: true, optional: true, record: { keysEnum: ["a", "b"], values: { type: { bools: "boolean[]" } } }
-						}
-					}
-				}
-			}
-		},
-		lookup_col1: {
-			dropIfExistsCascade: true, 
-			isLookupTable: {
-				values: {
-					a: {},
-					b: {}
-				},
-			}
-		},
-		uuid_text: {
-			columns: {
-				id: "UUID",
-				col1: {
-					references: {
-						tableName: "lookup_col1",
-						nullable: true,
-					}
-				},
-				col2: {
-					references: {
-						tableName: "lookup_col1",
-						nullable: true,
-					}
-				}
-			}
-		},
-		// uuid_text: {
-		// 	columns: {id: "UUID"}
-		// },
-		rec_ref: {
-			columns: {
-				id: "SERIAL PRIMARY KEY",
-			}
-		},
-		rec: {
-			columns: {
-				id: "SERIAL PRIMARY KEY",
-				parent_id: "INTEGER REFERENCES rec",
-				recf: "INTEGER REFERENCES rec_ref",
-			}
-		}
-	} 
 	// ProstglesInitOptions<DBSchemaGenerated>
 	let prgl = await prostgles<DBSchemaGenerated>({
 		dbConnection,
@@ -235,49 +95,32 @@ function dd(){
         // log("onLog", ev);
       }
     },
-		tableConfig,
+		tableConfig: testTableConfig,
 		fileTable: {
-			referencedTables: {
-				items_with_one_media: "one",
-				items_with_media: "many",
+			referencedTables: {  
+				users_public_info: {
+					type: "column",
+					referenceColumns: {
+						avatar: {
+							acceptedContent: "*"
+						}
+					}
+				}
 			},
 			localConfig: {
 			  localFolderPath: path.join(__dirname+'/media'),
 			},
 			expressApp: app,
+			tableName: "files",
 		},
 		
 		onSocketConnect:  ({ socket, db }) => {
 			if(clientTest){
-				log("Client connected -> CLIENT ERRORS ARE NOT LOGGED HERE!");
+				log("Client connected -> console does not work. use log function");
 				socket.emit("start-test", { server_id: Math.random() });
 				socket.on("stop-test", async (err, cb) => {
 					cb();
-					if(!err){
-						console.log("Client test successful!")
-					}
-
-					// console.log("Destroying prgl");
-					// await db.items.subscribe({}, {}, () => {});
-
-					// await prgl.destroy();
-					// console.log("Recreating prgl")
-					// prgl = await prostgles({
-					// 	dbConnection,
-					// 	onReady: async (dbo) => {
-					// 		console.warn("onReady", await dbo.items.count())
-					// 		// await tout(2)
-					// 		await prgl.destroy();
-					// 		console.log("Recreating prgl")
-					// 		prgl = await prostgles({
-					// 			dbConnection,
-					// 			onReady: async (dbo) => {
-					// 				console.warn("onReady", await dbo.items.count())
-					// 			}
-					// 		});
-					// 	}
-					// });
-
+					console.log("Client test " + (!err? "successful" : "failed"));
 					stopTest(err);
 				});
 			}
@@ -324,116 +167,7 @@ function dd(){
 				get: () => 222
 			}
 		},
-		publish: async ({ user }) => {
-			const res: PublishFullyTyped<DBSchemaGenerated> =  {
-				shapes: "*",
-				items: "*",
-				items2: "*",
-				items3: "*",
-				items4a: "*",
-				tjson: "*",
-				// items_with_media_cols: "*",
-				items_multi: "*",
-				v_items: "*",
-				various: "*",
-				tr1: "*",
-				tr2: "*",
-				tr3: "*",
-				planes: {
-					select: "*",
-					update: "*",
-					insert: "*",
-					delete: "*",
-					sync: {
-						id_fields: ["id"],
-						synced_field: "last_updated"
-					}
-				},
-
-				items4: {
-					select: user? "*" : {
-						fields: { name: 0 },
-						orderByFields: { added: 1 },
-						forcedFilter: { name: "abc" }
-					},
-					insert: "*",
-					update: "*",
-					delete: "*"
-				},
-
-				items4_pub: "*",
-				[`"*"`]: {
-					select: { fields: { "*": 0 }},
-					insert: "*",
-					update: "*",
-				},
-				[`"""*"""`]: {
-					select: { fields: { [`"*"`]: 0 }},
-					insert: "*",
-					update: "*",
-				},
-				obj_table: "*",
-				media: "*",
-				items_with_one_media: "*",
-				items_with_media: "*",
-				self_join: "*",
-				prostgles_lookup_media_items_with_one_media: "*",
-				prostgles_lookup_media_items_with_media: "*",
-				insert_rules: {
-					select: "*",
-					insert: {
-						fields: "*",
-						returningFields: { name: 1 },
-						validate: async ({ row }) => {
-							if(row.name === "a") row.name = "b"
-							return row
-						},
-						checkFilter: {
-							$and: [{"name.<>": "fail-check"}]
-						},
-						postValidate: async ({ row, dbx: dboTx}) => {
-							/** Records must exist in this transaction */
-							log(JSON.stringify(row))
-							const exists = await dboTx.sql("SELECT * FROM insert_rules WHERE id = ${id}", row, { returnType: "row" });
-							const existsd = await dboTx.insert_rules.findOne({ id: row.id });
-							if(row.id !== exists.id || row.id !== existsd.id){
-								console.error("postValidate failed");
-								// process.exit(1) 
-							}
-							if(row.name === "fail") throw "Failed";
-							return undefined
-						}
-					}
-				},
-				uuid_text: {
-					insert: {
-						fields: "*",
-						forcedData: {
-							id: 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e'
-						}
-					},
-					update: {
-						fields: [],
-						dynamicFields: [{
-							fields: { id: 1 },
-							filter: {
-								id: 'c81089e1-c4c1-45d7-a73d-e2d613cb7c3e'
-							}
-						}]
-					}
-				},
-        "prostgles_test.basic": "*",
-        "prostgles_test.basic1": "*",
-        "prostgles_test.mv_basic1": "*",
-        [`"""quoted0"""`]: "*",
-        [`"""quoted1"""`]: "*",
-        [`"""quoted2"""`]: "*",
-        symbols: "*",
-        trades: "*",
-			};
-			
-			return res;
-		},
+		publish: testPublish,
 		// joins: "inferred",
 		joins: [
 			{ 
@@ -479,7 +213,7 @@ function dd(){
 				
 				if(process.env.TEST_TYPE === "client"){
 					const clientPath = `cd ${__dirname}/../../../client && npm test`;
-					log("EXEC CLIENT PROCESS")
+					log("EXEC CLIENT PROCESS");
 					const proc = exec(clientPath, console.log);
 					log("Waiting for client...");
 					proc.stdout.on('data', function(data) {
@@ -493,37 +227,11 @@ function dd(){
 
 					await server_only_queries(db as any);
 					log("Server-only query tests successful");
-					await isomorphic(db as any);
+					await isomorphic(db as any, log);
 					log("Server isomorphic tests successful");
 
 					stopTest()
-				} else {
-					// await db.items4.delete();
-					// await db.items4.insert([
-					// 	{ name: "abc", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
-					// 	{ name: "abc", public: "public data", added: new Date('04 Dec 1995 00:12:00 GMT') },
-					// 	{ name: "abcd", public: "public data d", added: new Date('04 Dec 1996 00:12:00 GMT') }
-					// ]);
-
-					// const v1 = await db.items.insert([{ name: "a" }, { name: "z" }, { name: "b" }]);
-					// await db.items2.insert([{ name: "a", items_id: 1 }]);
-					// await db.items2.insert([{ name: "a", items_id: 1 }]);
-					// await db.items2.insert([{ name: "b", items_id: 2 }]);
-					// await db.items2.insert([{ name: "b", items_id: 2 }]);
-					// await db.items2.insert([{ name: "b", items_id: 2 }]);
-					// await db.items3.insert([{ name: "a" }, { name: "za123" }]);
-					// const MonAgg = await db.items.find({}, { select: { 
-					// 	name: 1,
-					// 	items2: { count: { $count: ["id"] } } ,
-					// } });
-					// console.log(JSON.stringify(MonAgg, null, 2));
-
-					// await _db.any("DROP TABLE IF EXISTS tt; ")
-					// await _db.any("DROP TABLE IF EXISTS tt; CREATE TABLE tt(id serial);")
-					// await _db.any("DROP EXTENSION IF EXISTS pgcrypto; CREATE EXTENSION pgcrypto;")
-					// console.log(await db.items4.findOne({}, { select: { public: { "$ts_headline": ["public", "public"] } } }))
-				}
-
+				} 
 			} catch(err) {
 				console.trace(err)
 				if(process.env.TEST_TYPE){

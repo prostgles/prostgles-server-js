@@ -2,7 +2,7 @@ import { DBSchema, isObject, JSONB, TableHandler, ViewHandler } from "prostgles-
 import prostgles from ".";
 import { Auth } from "./AuthHandler";
 import { DBHandlerServer, DboBuilder, escapeTSNames, postgresToTsType, TableSchemaColumn } from "./DboBuilder";
-import { PublishAllOrNothing, PublishParams, PublishTableRule, PublishViewRule,  } from "./PublishParser";
+import { PublishAllOrNothing, PublishParams, PublishTableRule, PublishViewRule,  } from "./PublishParser/PublishParser";
 import { getJSONBSchemaTSTypes } from "./JSONBValidation/validation";
 
 

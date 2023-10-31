@@ -84,11 +84,7 @@ export const testPublishTypes = () => {
         update: "*",
       },
       obj_table: "*",
-      media: "*",
-      items_with_one_media: "*",
-      items_with_media: "*",
-      prostgles_lookup_media_items_with_one_media: "*",
-      prostgles_lookup_media_items_with_media: "*",
+      media: "*", 
       insert_rules: {
         insert: {
           fields: "*",

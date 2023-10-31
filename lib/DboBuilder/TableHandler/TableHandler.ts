@@ -2,7 +2,7 @@ import pgPromise from "pg-promise";
 import { AnyObject, asName, DeleteParams, FieldFilter, getKeys, InsertParams, isObject, Select, UpdateParams } from "prostgles-types";
 import { DboBuilder, Filter, LocalParams, parseError, TableHandlers, TableSchema } from "../../DboBuilder";
 import { DB } from "../../Prostgles";
-import { SyncRule, TableRule } from "../../PublishParser";
+import { SyncRule, TableRule } from "../../PublishParser/PublishParser";
 import { _delete } from "../delete";
 import { parseUpdateRules } from "../parseUpdateRules";
 import { COMPUTED_FIELDS, FUNCTIONS } from "../QueryBuilder/Functions";

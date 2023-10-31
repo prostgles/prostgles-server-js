@@ -7,9 +7,7 @@ import * as fs from 'fs';
 
 export async function initFileManager(this: FileManager, prg: Prostgles){
   this.prostgles = prg;
-  
-  // const { dbo, db, opts } = prg;
-  
+
   const { fileTable } = prg.opts;
   if(!fileTable) throw "fileTable missing";
   const { tableName = "media", referencedTables = {} } = fileTable;
@@ -18,18 +16,13 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
   const maxBfSizeMB = (prg.opts.io?.engine?.opts?.maxHttpBufferSize || 1e6)/1e6;
   console.log(`Prostgles: Initiated file manager. Max allowed file size: ${maxBfSizeMB}MB (maxHttpBufferSize = 1e6). To increase this set maxHttpBufferSize in socket.io server init options`);
 
-  // throw `this.db.tx(d => do everything in a transaction pls!!!!`;
-
   const canCreate = await canCreateTables(this.db);
-  const runQuery = async (q: string, debugInfo?: string): Promise<void> => {
+  const runQuery = async (q: string, debugInfo: string): Promise<void> => {
     const res = await tryCatch(async () => {
       if(!canCreate) throw "File table creation failed. Your postgres user does not have CREATE table privileges";
-      await this.db.any(`
-        ${q}
-      `);
-      /* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
+      await this.db.any(q);
     });
-    await this.prostgles?.opts.onLog?.({ type: "debug", command: "initFileManager.runQuery", ...res });
+    await this.prostgles?.opts.onLog?.({ type: "debug", command: "initFileManager.runQuery", ...res, data: { debugInfo } });
     if(res.error) throw res.error;
   }
   /**
@@ -71,88 +64,36 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
     const cols = await (this.dbo[refTable] as TableHandler).getColumns();
 
     const tableConfig = referencedTables[refTable]!;
-    if(typeof tableConfig !== "string"){
-      
-      for (const colName of getKeys(tableConfig.referenceColumns)){
-        
-        const existingCol = cols.find(c => c.name === colName);
-        if(existingCol){
-          if(existingCol.references?.some(({ ftable }) => ftable === tableName)){
-            // All ok
-          } else {
-            if(existingCol.udt_name === "uuid"){
-              try {
-                const query = `ALTER TABLE ${asName(refTable)} ADD FOREIGN KEY (${asName(colName)}) REFERENCES ${asName(tableName)} (id);`;
-                const msg = `Referenced file column ${refTable} (${colName}) exists but is not referencing file table. Add REFERENCE constraint...\n${query}`;
-                await runQuery(query, msg);
-              } catch(e){
-                console.error(`Could not add constraing. Err: ${e instanceof Error? e.message : JSON.stringify(e)}`)
-              }
-            } else {
-              console.error(`Referenced file column ${refTable} (${colName}) exists but is not of required type (UUID). Choose a different column name or ALTER the existing column to match the type and the data found in file table ${tableName}(id)`);
-            }
-          }
+
+    for (const colName of getKeys(tableConfig.referenceColumns)){
+      const existingCol = cols.find(c => c.name === colName);
+      if(existingCol){
+        if(existingCol.references?.some(({ ftable }) => ftable === tableName)){
+          // All ok
         } else {
-          try {
-            const query = `ALTER TABLE ${asName(refTable)} ADD COLUMN ${asName(colName)} UUID REFERENCES ${asName(tableName)} (id);`
-            const msg = `Create referenced file column ${refTable} (${colName})...\n${query}`;
-            await runQuery(query, msg);
-          } catch(e){
-            console.error(`FAILED. Err: ${e instanceof Error? e.message : JSON.stringify(e)}`)
+          if(existingCol.udt_name === "uuid"){
+            try {
+              const query = `ALTER TABLE ${asName(refTable)} ADD FOREIGN KEY (${asName(colName)}) REFERENCES ${asName(tableName)} (id);`;
+              const msg = `Referenced file column ${refTable} (${colName}) exists but is not referencing file table. Add REFERENCE constraint...\n${query}`;
+              await runQuery(query, msg);
+            } catch(e){
+              console.error(`Could not add constraing. Err: ${e instanceof Error? e.message : JSON.stringify(e)}`)
+            }
+          } else {
+            console.error(`Referenced file column ${refTable} (${colName}) exists but is not of required type (UUID). Choose a different column name or ALTER the existing column to match the type and the data found in file table ${tableName}(id)`);
           }
         }
-        
-      }
-    } else {
-
-      const lookupTableName = await this.parseSQLIdentifier(`prostgles_lookup_${tableName}_${refTable}`);
-      const pKeyFields = cols.filter(f => f.is_pkey);
-
-      if(pKeyFields.length !== 1) {
-        console.error(`Could not make link table for ${refTable}. ${pKeyFields} must have exactly one primary key column. Current pkeys: ${pKeyFields.map(f => f.name)}`);
-      }
-
-      const pkField = pKeyFields[0]!;
-      const refType = referencedTables[refTable];
-
-      if(!this.dbo[lookupTableName]){
-        // if(!(await dbo[lookupTableName].count())) await db.any(`DROP TABLE IF EXISTS  ${lookupTableName};`);
-        const action = ` (${tableName} <-> ${refTable}) join table ${lookupTableName}`; //  PRIMARY KEY
-        const query = `        
-        CREATE TABLE ${lookupTableName} (
-          foreign_id  ${pkField.udt_name} ${refType === "one"? " PRIMARY KEY " : ""} REFERENCES ${asName(refTable)}(${asName(pkField.name)}),
-          media_id    UUID NOT NULL REFERENCES ${asName(tableName)}(id)
-        )
-        `;
-        
-        await runQuery(query);
       } else {
-        const cols = await this.dbo[lookupTableName]!.getColumns!();
-        const badCols = cols.filter(c => !c.references);
-        await Promise.all(badCols.map(async badCol => {
-          const msg =
-            `Trying to add the missing constraint back: media ${lookupTableName} joining table has lost a reference constraint for column ${badCol.name}.` + 
-            ` This may have been caused by a DROP TABLE ... CASCADE.`;
-          let q = ` ALTER TABLE ${asName(lookupTableName)} ADD FOREIGN KEY (${badCol.name}) `;
-
-          if(badCol.name === "foreign_id"){
-            q += `REFERENCES ${asName(refTable)}(${asName(pkField.name)}) `;
-          } else if(badCol.name === "media_id"){
-            q += `REFERENCES ${asName(tableName)}(id) `;
-          }
-
-          if(q){
-
-            try {
-              await runQuery(q, msg);
-            } catch(e){
-              console.error("Failed to add missing constraint", e)
-            }
-          }
-
-        }));
+        try {
+          const query = `ALTER TABLE ${asName(refTable)} ADD COLUMN ${asName(colName)} UUID REFERENCES ${asName(tableName)} (id);`
+          const msg = `Create referenced file column ${refTable} (${colName})...\n${query}`;
+          await runQuery(query, msg);
+        } catch(e){
+          console.error(`FAILED. Err: ${e instanceof Error? e.message : JSON.stringify(e)}`)
+        }
       }
-    }
+      
+    } 
 
 
     await prg.refreshDBO();

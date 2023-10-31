@@ -1,6 +1,6 @@
 import { AnyObject, asName, reverseParsedPath, SubscribeParams } from "prostgles-types";
 import { ExistsFilterConfig, Filter, LocalParams, makeErrorFromPGError } from "../DboBuilder";
-import { TableRule } from "../PublishParser";
+import { TableRule } from "../PublishParser/PublishParser";
 import { log, ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
 import { NewQuery } from "./QueryBuilder/QueryBuilder";
 import { ViewHandler } from "./ViewHandler/ViewHandler";

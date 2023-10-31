@@ -24,18 +24,6 @@ prostgles({
 		
 		return "*";
 	},
-	joins: [
-		{ 
-			tables: ["items", "items2"],
-			on: { name: "name" },
-			type: "many-many"
-		},
-		{ 
-			tables: ["items2", "items3"],
-			on: { name: "name" },
-			type: "many-many"
-		}
-	],
 	onReady: async (dbo: DBObj, db) => {
 
 		try {

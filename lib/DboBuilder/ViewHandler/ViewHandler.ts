@@ -18,7 +18,7 @@ import {
 } from "../../DboBuilder";
 import { TableEvent } from "../../Logging";
 import { DB, Join } from "../../Prostgles";
-import { TableRule } from "../../PublishParser";
+import { TableRule } from "../../PublishParser/PublishParser";
 import { Graph } from "../../shortestPath";
 import { COMPUTED_FIELDS, FieldSpec } from "../QueryBuilder/Functions";
 import { asNameAlias } from "../QueryBuilder/QueryBuilder";

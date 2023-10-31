@@ -1,6 +1,6 @@
 import { AnyObject, UpdateParams } from "prostgles-types";
 import { Filter, LocalParams, makeErrorFromPGError, parseError, withUserRLS } from "../../DboBuilder";
-import { TableRule } from "../../PublishParser";
+import { TableRule } from "../../PublishParser/PublishParser";
 import { TableHandler } from "./TableHandler";
 
 

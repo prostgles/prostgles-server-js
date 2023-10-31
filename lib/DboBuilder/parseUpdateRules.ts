@@ -1,6 +1,6 @@
 import { AnyObject, FieldFilter, isDefined, UpdateParams } from "prostgles-types";
 import { Filter, LocalParams } from "../DboBuilder";
-import { TableRule, UpdateRule, ValidateRow, ValidateRowBasic, ValidateUpdateRowBasic } from "../PublishParser";
+import { TableRule, UpdateRule, ValidateRow, ValidateRowBasic, ValidateUpdateRowBasic } from "../PublishParser/PublishParser";
 import { TableHandler } from "./TableHandler/TableHandler";
 
 /**

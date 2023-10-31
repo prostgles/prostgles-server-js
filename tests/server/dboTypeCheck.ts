@@ -1,7 +1,7 @@
 import type { DBOFullyTyped } from "prostgles-server/dist/DBSchemaBuilder";
 import type { DBHandlerServer } from "prostgles-server/dist/DboBuilder";
 import { DBSchemaGenerated } from "./DBoGenerated";
-import { Publish } from "prostgles-server/dist/PublishParser";
+import { Publish } from "../../dist/PublishParser/PublishParser";
 
 export const testDboTypes =  () => {
   (async () => {

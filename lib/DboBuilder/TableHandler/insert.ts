@@ -1,6 +1,6 @@
 import { AnyObject, InsertParams, isObject } from "prostgles-types";
 import { LocalParams, parseError, withUserRLS } from "../../DboBuilder";
-import { TableRule } from "../../PublishParser";
+import { TableRule } from "../../PublishParser/PublishParser";
 import { insertDataParse } from "../insertDataParse";
 import { insertTest } from "./insertTest";
 import { TableHandler } from "./TableHandler";
@@ -33,7 +33,7 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
 
     if(allowedNestedInserts){
       if(!nestedInsert || !allowedNestedInserts.some(d => d.table === nestedInsert?.previousTable && d.column === nestedInsert.referencingColumn)){
-        throw `Direct inserts not allowed. Only nested inserts from these tables: ${JSON.stringify(nestedInsert)} `
+        throw `Direct inserts not allowed. Only nested inserts from these tables: ${JSON.stringify(allowedNestedInserts)} `
       }
     }
     const { conflict_query } = validateInsertParams(insertParams);
@@ -76,11 +76,9 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
         throw "Empty insert. Provide data";
       }
 
-      query = await getInsertQuery(data);
-      // if (returningQuery) queryType = "many";
+      query = await getInsertQuery(data); 
     } else {
-      query = await getInsertQuery([data ?? {}]);
-      // if (returningQuery) queryType = "one";
+      query = await getInsertQuery([data ?? {}]); 
     }
 
     const queryWithoutUserRLS = query;

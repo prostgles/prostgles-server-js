@@ -10,13 +10,14 @@
     "sourceMap": true,
     "rootDir": "./lib",
     "outDir": "dist",
-    "moduleResolution": "node",
+    "moduleResolution": "Node10",
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "noUncheckedIndexedAccess": true,
     "keyofStringsOnly": true,
     "ignoreDeprecations": "5.0",
     "declaration": true,
+    "skipLibCheck": true,
     "declarationMap": true
   },
   "exclude": [

@@ -48,24 +48,25 @@ export type SortItem = {
   fieldPosition: number;
 });
 
-export type ParsedMedia = Required<Pick<Media, "extension" | "content_type">>;
 
 export type Media = {
-  "id"?: string;
-  "title"?: string;
-  "extension"?: string;
-  "content_type"?: string;
-  "content_length"?: number;
-  "url"?: string;
-  "added"?: Date;
-  "signed_url"?: string;
-  "signed_url_expires"?: number;
-  "name"?: string;
-  "original_name"?: string;
-  "etag"?: string;
+  id?: string;
+  title?: string;
+  extension?: string;
+  content_type?: string;
+  content_length?: number;
+  url?: string;
+  added?: Date;
+  signed_url?: string;
+  signed_url_expires?: number;
+  name?: string;
+  original_name?: string;
+  etag?: string;
   deleted?: string | null;
   deleted_from_storage?: string | null;
-}
+};
+
+export type ParsedMedia = Required<Pick<Media, "extension" | "content_type">>;
 
 export type TxCB<TH = DbTxTableHandlers> = {
   (t: TH & Pick<DBHandlerServer, "sql">, _t: pgPromise.ITask<{}>): (any | void);
@@ -101,7 +102,7 @@ import { BasicCallback, PubSubManager, pickKeys } from "./PubSubManager/PubSubMa
 import {
   PublishAllOrNothing,
   PublishParser,
-} from "./PublishParser";
+} from "./PublishParser/PublishParser";
 import { clone } from "./utils";
 
 
@@ -142,7 +143,7 @@ export type PRGLIOSocket = {
 
   readonly on: (channel: string, params: any, cb?: (err: any, res?: any) => void) => Promise<void>;
 
-  readonly emit: (channel: string, message: any, cb?: BasicCallback) => any;
+  readonly emit: (channel: string, message?: any, cb?: BasicCallback) => any;
 
   readonly once: (channel: string, cb: (_data: any, cb: BasicCallback) => void) => void;
 
@@ -323,8 +324,7 @@ export type ValidatedTableRules = CommonTableRules & {
 
 /* DEBUG CLIENT ERRORS HERE */
 export function makeErrorFromPGError(err: any, localParams?: LocalParams, view?: ViewHandler, allowedKeys?: string[]) {
-  // console.trace(err)
-  if (process.env.TEST_TYPE || process.env.PRGL_DEBUG) {
+  if (process.env.PRGL_DEBUG) {
     console.trace(err)
   }
   const errObject = {

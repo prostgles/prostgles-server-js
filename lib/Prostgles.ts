@@ -24,7 +24,7 @@ export type PGP = pgPromise.IMain<{}, pg.IClient>;
 import { SQLRequest, TableSchemaForClient, CHANNELS, AnyObject, ClientSchema, getKeys, 
   DBSchemaTable, FileColumnConfig, isObject, omitKeys, tryCatch 
 } from "prostgles-types";
-import { Publish, PublishMethods, PublishParams, PublishParser } from "./PublishParser";
+import { Publish, PublishMethods, PublishParams, PublishParser } from "./PublishParser/PublishParser";
 import { DBEventsManager } from "./DBEventsManager";
 
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
@@ -208,17 +208,11 @@ export type FileTableConfig = {
     checkIntervalHours?: number; 
   }
   expressApp: ExpressApp;
-  referencedTables?: { // minFiles: number; maxFiles: number; 
+  referencedTables?: {
     [tableName: string]:
-      | "one" | "many"
 
       /** 
-       * If defined then will try to create (if necessary) a column in the files table which will reference this table's primary key (must have one) 
-       * */ 
-      // | { type: "lookup_table"; minFilesPerRow: number; maxFilesPerRow: number; maxFileSizeMB: number; }
-
-      /** 
-       * If defined then will try to create (if necessary) this column which will reference files_table(id) 
+       * If defined then will try to create (if necessary) these columns which will reference files_table(id) 
        * Prostgles UI will use these hints (obtained through tableHandler.getInfo())
        * */ 
       | { type: "column", referenceColumns: Record<string, FileColumnConfig> }
@@ -807,7 +801,7 @@ export class Prostgles {
 
     /* Already initialised. Only reconnect sockets */
     if (this.connectedSockets.length) {
-      this.connectedSockets.forEach((s: any) => {
+      this.connectedSockets.forEach(s => {
         s.emit(CHANNELS.SCHEMA_CHANGED);
         this.pushSocketSchema(s);
       });
@@ -815,6 +809,7 @@ export class Prostgles {
     }
 
     /* Initialise */
+    this.opts.io.removeAllListeners('connection');
     this.opts.io.on('connection', async (socket: PRGLIOSocket) => {
       if (this.destroyed) {
         console.log("Socket connected to destroyed instance");
@@ -880,7 +875,6 @@ export class Prostgles {
             } else throw `Invalid OR disallowed request: ${tableName}.${command} `;
 
           } catch (err) {
-            console.trace(err);
             cb(err);
           }
         });
@@ -934,7 +928,7 @@ export class Prostgles {
     });
   }
 
-  pushSocketSchema = async (socket: any) => {
+  pushSocketSchema = async (socket: PRGLIOSocket) => {
 
     try {
       const { auth, userData } = await this.authHandler?.makeSocketAuth(socket) || {};
