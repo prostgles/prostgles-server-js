@@ -32,7 +32,7 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
     }
 
     if(allowedNestedInserts){
-      if(!nestedInsert || !allowedNestedInserts.some(d => d.table === nestedInsert?.previousTable && d.column === nestedInsert.referencingColumn)){
+      if(!nestedInsert || !allowedNestedInserts.some(ai => ai.table === nestedInsert?.previousTable && ai.column === nestedInsert.referencingColumn)){
         throw `Direct inserts not allowed. Only nested inserts from these tables: ${JSON.stringify(allowedNestedInserts)} `
       }
     }
@@ -97,7 +97,7 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
       data: rowOrRows,
       fields,
       params: insertParams,
-      type: "insert"
+      type: "insert",
     });
     
   } catch (e) {

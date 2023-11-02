@@ -14,14 +14,16 @@ type RunInsertUpdateQueryArgs = {
   params: InsertParams | undefined
   rule: InsertRule | undefined;
   data: AnyObject | AnyObject[];
+  nestedInsertsResultsObj?: undefined;
 } | {
   type: "update";
+  nestedInsertsResultsObj: Record<string, any>;
   params: UpdateParams | undefined
   rule: UpdateRule | undefined;
   data: undefined;
 });
 
-export const runInsertUpdateQuery = async ({ tableHandler, queryWithoutUserRLS, rule, localParams, fields, returningFields, params, data, type }: RunInsertUpdateQueryArgs) => {
+export const runInsertUpdateQuery = async ({ tableHandler, queryWithoutUserRLS, rule, localParams, fields, returningFields, params, data, type, nestedInsertsResultsObj }: RunInsertUpdateQueryArgs) => {
   const { name } = tableHandler;
 
   const returningSelectItems = await tableHandler.prepareReturning(params?.returning, tableHandler.parseFieldFilter(returningFields))
@@ -123,5 +125,7 @@ export const runInsertUpdateQuery = async ({ tableHandler, queryWithoutUserRLS, 
 
   if(!hasReturning) return undefined;
 
-  return returnMany? (result.modified_returning ?? []) : result.modified_returning?.[0];
+  const modified_returning = result.modified_returning?.map(d => ({ ...d, ...nestedInsertsResultsObj }))
+
+  return returnMany? modified_returning : modified_returning?.[0];
 }

@@ -36,49 +36,6 @@ export async function insertDataParse(
     }
     return false;
   });
-  const ALLOWED_COL_TYPES: PG_COLUMN_UDT_DATA_TYPE[] = ["int2", "int4", "int8", "numeric", "uuid", "text", "varchar", "char"];
-  /**
-   * Insert through the reference column. e.g.:
-   *  {
-   *    root_field: "data",
-   *    fkey_column: { ...referenced_table_data }
-   *  }
-   */
-  const getColumnInserts = (d: AnyObject) => getKeys(d)
-    .filter(k => d[k] && isObject(d[k]))
-    .map(k => {
-      const insertedCol = this.columns.find(c =>
-        c.name === k &&
-        ALLOWED_COL_TYPES.includes(c.udt_name)
-      );
-      const referencesMultipleTables = insertedCol?.references?.length !== 1;
-      const referencesMultipleColumns = insertedCol?.references?.some(refs => refs.fcols.length !== 1);
-      if (insertedCol && (
-        referencesMultipleTables ||
-        referencesMultipleColumns ||
-        this.columns.some(c =>
-          // c.name !== insertedCol.name && // a bit reduntant: Cannot have one col reference two columns
-          c.references?.some(({ ftable, fcols }) =>
-            insertedCol.references?.some(inserted =>
-              ftable === inserted.ftable && // same ftable
-              fcols[0] !== inserted.fcols[0] // different fcols
-            )
-          )
-        )
-      )
-      ) {
-        throw "A reference column insert is not possible for multiple column relationships ";
-      }
-      if (insertedCol) {
-        return {
-          tableName: insertedCol.references![0]!.ftable!,
-          col: insertedCol.name,
-          fcol: insertedCol.references![0]!.fcols[0]!,
-          singleInsert: !Array.isArray(d[insertedCol.name])
-        }
-      }
-      return undefined;
-    }).filter(isDefined);
 
 
   /**
@@ -89,7 +46,7 @@ export async function insertDataParse(
    * If true then will do the full insert within this function
    * Nested insert is not allowed for the file table 
    * */
-  const hasNestedInserts = this.is_media ? false : (isMultiInsert ? data : [data]).some(d => getExtraKeys(d).length || getColumnInserts(d).length);
+  const hasNestedInserts = this.is_media ? false : (isMultiInsert ? data : [data]).some(d => getExtraKeys(d).length || getReferenceColumnInserts.bind(this)(d).length);
 
   /**
    * Make sure nested insert uses a transaction
@@ -121,7 +78,7 @@ export async function insertDataParse(
     }
 
     const extraKeys = getExtraKeys(row);
-    const colInserts = getColumnInserts(row);
+    const colInserts = getReferenceColumnInserts.bind(this)(row);
 
     /* Potentially a nested join */
     if (hasNestedInserts) {
@@ -189,7 +146,7 @@ export async function insertDataParse(
 
         const { path } = joinPath;
         const [tbl1, tbl2, tbl3] = path;
-        targetTableRules = await canInsert(this, targetTable, localParams);   //  tbl3
+        targetTableRules = await getInsertTableRules(this, targetTable, localParams);   //  tbl3
 
         const cols2 = this.dboBuilder.dbo[tbl2!]!.columns || [];
         if (!this.dboBuilder.dbo[tbl2!]) throw "Invalid/disallowed table: " + tbl2;
@@ -289,7 +246,7 @@ export async function insertDataParse(
 }
 
 /* Must be allowed to insert into referenced table */
-const canInsert = async (tableHandler: TableHandler, targetTable: string, localParams: LocalParams) => {
+export const getInsertTableRules = async (tableHandler: TableHandler, targetTable: string, localParams: LocalParams) => {
   const childRules = await tableHandler.dboBuilder.publishParser?.getValidatedRequestRuleWusr({ tableName: targetTable, command: "insert", localParams });
   if (!childRules || !childRules.insert) throw "Dissallowed nested insert into table " + childRules;
   return childRules;
@@ -319,7 +276,7 @@ const referencedInsert = async (tableHandler: TableHandler, dbTX: TableHandlers 
     throw new Error("childInsertErr: Table handler missing for referenced table: " + targetTable);
   }
 
-  const childRules = await canInsert(tableHandler, targetTable, localParams);
+  const childRules = await getInsertTableRules(tableHandler, targetTable, localParams);
 
   if (thisInfo.has_media === "one" && thisInfo.media_table_name === targetTable && Array.isArray(targetData) && targetData.length > 1) {
     throw "Constraint check fail: Cannot insert more than one record into " + JSON.stringify(targetTable);
@@ -336,4 +293,54 @@ const referencedInsert = async (tableHandler: TableHandler, dbTX: TableHandlers 
       )
   );
 
+}
+
+
+// const ALLOWED_COL_TYPES: PG_COLUMN_UDT_DATA_TYPE[] = ["int2", "int4", "int8", "numeric", "uuid", "text", "varchar", "char"];
+/**
+ * Insert through the reference column. e.g.:
+ *  {
+ *    root_field: "data",
+ *    fkey_column: { ...referenced_table_data }
+ *  }
+ */
+export const getReferenceColumnInserts = function(this: TableHandler, parentRow: AnyObject, expectSingleInsert = false){ 
+  return getKeys(parentRow)
+    .map(k => {
+      if(parentRow[k] && isObject(parentRow[k])){
+        const insertedRefCol = this.columns.find(c => c.name === k);
+        if(insertedRefCol?.references?.length){
+          return {
+            insertedRefCol,
+            insertedRefColRef: insertedRefCol.references!
+          }
+        }
+      }
+    
+      return undefined;
+    })
+    .filter(isDefined)
+    .map(({ insertedRefCol, insertedRefColRef }) => {
+
+      if(insertedRefColRef.length !== 1){
+        throw "Cannot do a nested insert on column that references multiple tables"
+      }
+      
+      const referencesMultipleColumns = insertedRefColRef?.some(refs => refs.fcols.length !== 1);
+      if(referencesMultipleColumns){
+        throw "Cannot do a nested insert on multi-column foreign key reference"
+      }
+
+      const singleInsert = !Array.isArray(parentRow[insertedRefCol.name]);
+      if(expectSingleInsert && !singleInsert){
+        throw "Expected singleInsert";
+      }
+      return {
+        tableName: insertedRefCol.references![0]!.ftable!,
+        col: insertedRefCol.name,
+        fcol: insertedRefCol.references![0]!.fcols[0]!,
+        singleInsert,
+        data: parentRow[insertedRefCol.name],
+      }
+    }).filter(isDefined);
 }

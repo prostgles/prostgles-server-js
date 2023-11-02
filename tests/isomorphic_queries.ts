@@ -123,8 +123,6 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
     await db.files.insert!(file);
     
     const files = await db.files.find!({ original_name: file.name });
-    const allFiles = await db.files.find!({ });
-    log(JSON.stringify(allFiles))
     assert.equal(files.length, 1);
     const exists0 = fs.existsSync(fileFolder+files[0].name);
     assert.equal(exists0, true);
@@ -687,8 +685,7 @@ export default async function isomorphic(db: Required<DBHandlerServer> | Require
       await db.tjson.insert!({ colOneOf: "a", json: { a: true, arr: "22"} });
       throw "Should have failed"
     } catch(e){
-      console.log("Perfect fail")
-      // Perfect
+      // Expected
     }
   });
 

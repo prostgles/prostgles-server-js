@@ -54,13 +54,13 @@ export async function parseUpdateRules(
       throw ` Invalid update rule fo r ${this.name}. fields missing `;
     }
     finalUpdateFilter = (await this.prepareWhere({ filter, forcedFilter, filterFields, localParams, tableRule: tableRules })).filter;
-    if (forcedFilter) {
-      const match = await this.findOne(finalUpdateFilter);
-      const requiredItem = await this.findOne(filter);
-      if (!match && requiredItem) {
-        fields = [];
-      }
-    }
+    // if (forcedFilter) {
+    //   const match = await this.findOne(finalUpdateFilter);
+    //   const requiredItem = await this.findOne(filter);
+    //   if (!match && requiredItem) {
+    //     fields = [];
+    //   }
+    // }
     if (tableRules.update.dynamicFields?.length) {
 
       /**

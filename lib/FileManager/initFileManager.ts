@@ -10,7 +10,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
 
   const { fileTable } = prg.opts;
   if(!fileTable) throw "fileTable missing";
-  const { tableName = "media", referencedTables = {} } = fileTable;
+  const { tableName = "files", referencedTables = {} } = fileTable;
   this.tableName = tableName;
 
   const maxBfSizeMB = (prg.opts.io?.engine?.opts?.maxHttpBufferSize || 1e6)/1e6;
@@ -65,7 +65,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
 
     const tableConfig = referencedTables[refTable]!;
 
-    for (const colName of getKeys(tableConfig.referenceColumns)){
+    for (const [colName, colConfig] of Object.entries(tableConfig.referenceColumns)){
       const existingCol = cols.find(c => c.name === colName);
       if(existingCol){
         if(existingCol.references?.some(({ ftable }) => ftable === tableName)){
@@ -73,7 +73,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
         } else {
           if(existingCol.udt_name === "uuid"){
             try {
-              const query = `ALTER TABLE ${asName(refTable)} ADD FOREIGN KEY (${asName(colName)}) REFERENCES ${asName(tableName)} (id);`;
+              const query = `ALTER TABLE ${asName(refTable)} ADD FOREIGN KEY (${asName(colName)}) REFERENCES ${asName(tableName)} (id) ;`;
               const msg = `Referenced file column ${refTable} (${colName}) exists but is not referencing file table. Add REFERENCE constraint...\n${query}`;
               await runQuery(query, msg);
             } catch(e){

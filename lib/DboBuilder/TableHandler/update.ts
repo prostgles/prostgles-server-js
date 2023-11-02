@@ -1,10 +1,10 @@
-import { AnyObject, getKeys, isObject, unpatchText, UpdateParams } from "prostgles-types";
-import { Filter, isPlainObject, LocalParams, Media, parseError, withUserRLS } from "../../DboBuilder";
-import { TableRule, ValidateRow } from "../../PublishParser/PublishParser";
-import { omitKeys } from "../../PubSubManager/PubSubManager";
-import { isFile, uploadFile } from "../uploadFile";
+import { AnyObject, unpatchText, UpdateParams } from "prostgles-types";
+import { Filter, isPlainObject, LocalParams, parseError, withUserRLS } from "../../DboBuilder";
+import { TableRule } from "../../PublishParser/PublishParser";
+import { getInsertTableRules, getReferenceColumnInserts } from "../insertDataParse";
 import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
 import { TableHandler } from "./TableHandler";
+import { updateFile } from "./updateFile";
 
 export async function update(this: TableHandler, filter: Filter, _newData: AnyObject, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<AnyObject | void> {
   const ACTION = "update";
@@ -12,40 +12,15 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
     await this._log({ command: "update", localParams, data: { filter, _newData, params } });
     /** postValidate */
     const finalDBtx = this.getFinalDBtx(localParams);
+    const wrapInTx = () => this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.[ACTION]?.(filter, _newData, params, tableRules, localParams))
     const rule = tableRules?.[ACTION]
-    if(rule?.postValidate){
-      if(!finalDBtx){
-        return this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.[ACTION]?.(filter, _newData, params, tableRules, localParams))
-      }
+    if(rule?.postValidate && !finalDBtx){
+      return wrapInTx();
     }
 
     let newData = _newData;
-    if(this.is_media && isFile(newData) && (!tableRules || tableRules.update)){
-      const existingMediaId: string = !(!filter || !isObject(filter) || getKeys(filter).join() !== "id" || typeof (filter as any).id !== "string")? (filter as any).id : undefined
-      if(!existingMediaId){
-        throw new Error(`Updating the file table with file data can only be done by providing a single id filter. E.g. { id: "9ea4e23c-2b1a-4e33-8ec0-c15919bb45ec" } `);
-      }
-      if(localParams?.testRule){
-        newData = {};
-      } else {
-        const fileManager = this.dboBuilder.prostgles.fileManager
-        if(!fileManager) throw new Error("fileManager missing");
-        if(rule?.validate && !localParams) throw new Error("localParams missing");
-        const validate: ValidateRow | undefined = rule?.validate? async (row) => {
-          return rule.validate!({ update: row, filter, dbx:  this.tx?.dbTX || this.dboBuilder.dbo, localParams: localParams! })
-        } : undefined;
-
-        const existingFile: Media | undefined = await (localParams?.tx?.dbTX?.[this.name] as TableHandler || this).findOne({ id: existingMediaId });
-         
-        if(!existingFile?.name) throw new Error("Existing file record not found");
-
-        // oldFileDelete = () => fileManager.deleteFile(existingFile!.name!)
-        await fileManager.deleteFile(existingFile!.name!); //oldFileDelete();
-        const newFile = await uploadFile.bind(this)({ row: newData, validate, localParams, mediaId: existingFile.id })
-        newData = omitKeys(newFile, ["id"]);
-      }
-    } else if(this.is_media && isObject(newData) && typeof newData.name === "string"){
-      throw new Error("Cannot update the 'name' field of the file. It is used in interacting with the file")
+    if(this.is_media){
+      ({ newData } = await updateFile.bind(this)({ newData, filter, localParams, tableRules }));
     }
 
     const parsedRules = await this.parseUpdateRules(filter, newData, params, tableRules, localParams)
@@ -54,8 +29,6 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
     }
 
     const { fields, validateRow, forcedData,  returningFields, forcedFilter, filterFields } = parsedRules;
-
-
     const { onConflictDoNothing = false, fixIssues = false } = params || {};
     const { returnQuery = false } = localParams ?? {};
 
@@ -85,7 +58,7 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
       }
     });
 
-    if (patchedTextData && patchedTextData.length) {
+    if (patchedTextData?.length) {
       if (tableRules && !tableRules.select) throw "Select needs to be permitted to patch data";
       const rows = await this.find(filter, { select: patchedTextData.reduce((a, v) => ({ ...a, [v.fieldName]: 1 }), {}) }, undefined, tableRules);
 
@@ -94,23 +67,46 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
       }
       patchedTextData.map(p => {
         data[p.fieldName] = unpatchText(rows[0][p.fieldName], p);
-      })
-
-      // https://w3resource.com/PostgreSQL/overlay-function.p hp
-      //  overlay(coalesce(status, '') placing 'hom' from 2 for 0)
+      });
     }
 
     const nData = { ...data };
-    
-
-    let query = await this.colSet.getUpdateQuery(nData, allowedCols, this.getFinalDbo(localParams), validateRow, localParams)
-    query += "\n" + (await this.prepareWhere({
+    const updateFilter = await this.prepareWhere({
       filter,
       forcedFilter,
       filterFields,
       localParams,
       tableRule: tableRules
-    })).where;
+    })
+
+    const nestedInserts = getReferenceColumnInserts.bind(this)(nData, true);
+    const nestedInsertsResultsObj: Record<string, any> = {};
+    if(nestedInserts.length){
+      const updateCount = await this.count(updateFilter.filter);
+      if(+updateCount > 1){
+        throw "Cannot do a nestedInsert from an update that targets more than 1 row";
+      }
+      if(!finalDBtx){
+        return wrapInTx();
+      }
+      await Promise.all(nestedInserts.map(async nestedInsert => {
+        const nesedTableHandler = finalDBtx[nestedInsert.tableName] as TableHandler | undefined;
+        if(!nesedTableHandler) throw `nestedInsert Tablehandler not found for ${nestedInsert.tableName}`;
+        const refTableRules = !localParams? undefined : await getInsertTableRules(this, nestedInsert.tableName, localParams);
+        const nestedLocalParams: LocalParams = { ...localParams, nestedInsert: { depth: 1, previousData: nData, previousTable: this.name, referencingColumn: nestedInsert.col } }
+        const nestedInsertResult = await nesedTableHandler.insert(nestedInsert.data, { returning: "*" }, undefined, refTableRules, nestedLocalParams);
+        nestedInsertsResultsObj[nestedInsert.col] = nestedInsertResult;
+
+        nData[nestedInsert.col] = nestedInsertResult[nestedInsert.fcol];
+        return {
+          ...nestedInsert,
+          result: nestedInsertResult,
+        }
+      }));
+    }
+
+    let query = await this.colSet.getUpdateQuery(nData, allowedCols, this.getFinalDbo(localParams), validateRow, localParams)
+    query += "\n" + updateFilter.where;
     if (onConflictDoNothing) query += " ON CONFLICT DO NOTHING ";
 
     const queryWithoutUserRLS = query;
@@ -127,22 +123,9 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
       queryWithoutUserRLS,
       returningFields,
       rule,
-      type: "update"
+      type: "update",
+      nestedInsertsResultsObj
     });
-
-    // if(params?.returnType){
-    //   return runQueryReturnType(query, params.returnType, this, localParams);
-    // }
-
-    // let result;
-    // if (this.tx) {
-    //   result = await (this.tx.t)[qType](query).catch((err: any) => makeErrorFromPGError(err, localParams, this, fields));
-    // } else {
-    //   result = await this.db.tx(t => (t as any)[qType](query)).catch(err => makeErrorFromPGError(err, localParams, this, fields));
-    // }
-    
-    // /** TODO: Delete old file at the end in case new file update fails */
-    // // await oldFileDelete();
 
   } catch (e) {
     if (localParams && localParams.testRule) throw e;

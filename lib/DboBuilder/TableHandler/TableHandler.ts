@@ -3,7 +3,7 @@ import { AnyObject, asName, DeleteParams, FieldFilter, getKeys, InsertParams, is
 import { DboBuilder, Filter, LocalParams, parseError, TableHandlers, TableSchema } from "../../DboBuilder";
 import { DB } from "../../Prostgles";
 import { SyncRule, TableRule } from "../../PublishParser/PublishParser";
-import { _delete } from "../delete";
+import { _delete } from "./delete";
 import { parseUpdateRules } from "../parseUpdateRules";
 import { COMPUTED_FIELDS, FUNCTIONS } from "../QueryBuilder/Functions";
 import { SelectItem, SelectItemBuilder } from "../QueryBuilder/QueryBuilder";
