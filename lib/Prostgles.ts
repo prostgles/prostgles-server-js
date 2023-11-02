@@ -592,6 +592,9 @@ export class Prostgles {
           console.error("FileManager: ", e);
           throw e;
         }
+      } else {
+        await this.fileManager?.destroy();
+        this.fileManager = undefined;
       }
       await this.refreshDBO();
       return { data: {} }
