@@ -269,7 +269,7 @@ const getJoinPath = async (tableHandler: TableHandler, targetTable: string): Pro
 const referencedInsert = async (tableHandler: TableHandler, dbTX: TableHandlers | undefined, localParams: LocalParams, targetTable: string, targetData: AnyObject | AnyObject[]): Promise<AnyObject[]> => {
 
 
-  const thisInfo = await tableHandler.getInfo();
+  // const thisInfo = await tableHandler.getInfo();
   await getJoinPath(tableHandler, targetTable);
 
   if (!targetData || !dbTX?.[targetTable] || !("insert" in dbTX[targetTable]!)) {
@@ -278,9 +278,9 @@ const referencedInsert = async (tableHandler: TableHandler, dbTX: TableHandlers 
 
   const childRules = await getInsertTableRules(tableHandler, targetTable, localParams);
 
-  if (thisInfo.has_media === "one" && thisInfo.media_table_name === targetTable && Array.isArray(targetData) && targetData.length > 1) {
-    throw "Constraint check fail: Cannot insert more than one record into " + JSON.stringify(targetTable);
-  }
+  // if (thisInfo.has_media === "one" && thisInfo.media_table_name === targetTable && Array.isArray(targetData) && targetData.length > 1) {
+  //   throw "Constraint check fail: Cannot insert more than one record into " + JSON.stringify(targetTable);
+  // }
   return Promise.all(
     (Array.isArray(targetData) ? targetData : [targetData])
       .map(m => (dbTX![targetTable] as TableHandler)

@@ -1,5 +1,5 @@
 import { 
-  TableInfo as TInfo,
+  TableInfo as TInfo, pickKeys,
  } from "prostgles-types/dist";
 import { LocalParams } from "../../DboBuilder";
 import { TableRule } from "../../PublishParser/PublishParser";
@@ -44,10 +44,11 @@ export async function getInfo(this: ViewHandler, lang?: string, param2?: any, pa
     oid: this.tableOrViewInfo.oid,
     comment: this.tableOrViewInfo.comment,
     info: this.dboBuilder.prostgles?.tableConfigurator?.getTableInfo({ tableName: this.name, lang }),
-    is_media: this.is_media,      // this.name === this.dboBuilder.prostgles?.opts?.fileTable?.tableName
-    is_view: this.is_view,
-    has_media,
-    media_table_name: mediaTable,
+    isFileTable: !this.is_media? undefined : {
+      allowedNestedInserts: tableRules?.insert?.allowedNestedInserts
+    },
+    isView: this.is_view,
+    fileTableName: mediaTable,
     dynamicRules: {
       update: Boolean(tableRules?.update?.dynamicFields?.length)
     }

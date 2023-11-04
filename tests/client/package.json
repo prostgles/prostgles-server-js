@@ -7,13 +7,13 @@
     "start": "tsc-watch --onSuccess \"node dist/client/index.js\"",
     "dev": "NOSTOP=true npm start",
     "build": "rm -rf ./node_modules/* && rm -rf ./dist/* && npm i && tsc",
-    "test": "node dist/client/index.js & echo $! > ./PID.txt"
+    "test": "node dist/client/index.js"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@types/node": "^14.14.16",
-    "prostgles-client": "^4.0.31",
+    "prostgles-client": "^4.0.32",
     "socket.io-client": "^4.7.1"
   },
   "devDependencies": {
