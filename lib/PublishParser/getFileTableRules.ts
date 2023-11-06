@@ -23,14 +23,15 @@ export async function getFileTableRules (this: PublishParser, fileTableName: str
     if(!refCols.length) return undefined;
     return {
       tableName: t.name,
-      columns: refCols.map(c => c.name), 
+      fileColumns: refCols.map(c => c.name),
+      allColumns: t.columns.map(c => c.name),
     }
   }).filter(isDefined)
   if(referencedColumns?.length){
-    for await (const { tableName, columns } of referencedColumns){
+    for await (const { tableName, fileColumns, allColumns } of referencedColumns){
       const table_rules = await this.getTableRules({ localParams, tableName }, clientInfo);
       if(table_rules){
-        columns.map(column => {
+        fileColumns.map(column => {
           const path = [{ table: tableName, on: [{ id: column }] }];
           if(table_rules.delete){
             forcedDeleteFilters.push({
@@ -41,7 +42,7 @@ export async function getFileTableRules (this: PublishParser, fileTableName: str
             })
           }
           if(table_rules.select){
-            const parsedFields = parseFieldFilter(table_rules.select.fields, false, [column]);
+            const parsedFields = parseFieldFilter(table_rules.select.fields, false, allColumns);
             /** Must be allowed to view this column */
             if(parsedFields.includes(column as any)){
               forcedSelectFilters.push({
@@ -53,14 +54,14 @@ export async function getFileTableRules (this: PublishParser, fileTableName: str
             }
           }
           if(table_rules.insert){
-            const parsedFields = parseFieldFilter(table_rules.insert.fields, false, [column]);
+            const parsedFields = parseFieldFilter(table_rules.insert.fields, false, allColumns);
             /** Must be allowed to view this column */
             if(parsedFields.includes(column as any)){
               allowedNestedInserts.push({ table: tableName, column });
             }
           }
           if(table_rules.update){
-            const parsedFields = parseFieldFilter(table_rules.update.fields, false, [column]);
+            const parsedFields = parseFieldFilter(table_rules.update.fields, false, allColumns);
             /** Must be allowed to view this column */
             if(parsedFields.includes(column as any)){
               forcedUpdateFilters.push({
