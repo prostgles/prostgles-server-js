@@ -1,4 +1,4 @@
-import { AnyObject, FullFilter, isObject } from "prostgles-types";
+import { AnyObject, FullFilter, isDefined, isObject } from "prostgles-types";
 import { AuthResult } from "../AuthHandler";
 import { LocalParams } from "../DboBuilder";
 import { PublishParser } from "./PublishParser";
@@ -14,61 +14,64 @@ import { ParsedPublishTable, UpdateRule } from "./publishTypesAndUtils";
  * Delete on a referenced column table allows deleting any referenced file 
  */ 
 export async function getFileTableRules (this: PublishParser, fileTableName: string, fileTablePublishRules: ParsedPublishTable | undefined, localParams: LocalParams, clientInfo: AuthResult | undefined) {
-  const opts = this.prostgles.opts;
   const forcedDeleteFilters: FullFilter<AnyObject, void>[] = [];
   const forcedSelectFilters: FullFilter<AnyObject, void>[] = [];
   const forcedUpdateFilters: FullFilter<AnyObject, void>[] = []; 
   const allowedNestedInserts: { table: string; column: string }[] = [];
-  if(opts.fileTable?.referencedTables){
-    const entries = Object.entries(opts.fileTable.referencedTables);
-    for (const [tableName, colopts] of entries){
-      if(isObject(colopts) && typeof colopts !== "string"){
-        const refCols = Object.keys(colopts.referenceColumns);
-        const table_rules = await this.getTableRules({ localParams, tableName }, clientInfo);
-        if(table_rules){
-          refCols.map(column => {
-            const path = [{ table: tableName, on: [{ id: column }] }];
-            if(table_rules.delete){
-              forcedDeleteFilters.push({
+  const referencedColumns = this.prostgles.dboBuilder.tablesOrViews?.flatMap(t => {
+    const refCols = !t.is_view? t.columns.filter(c => c.references?.some(r => r.ftable === fileTableName)) : undefined;
+    if(!refCols) return undefined;
+    return {
+      tableName: t.name,
+      columns: refCols.map(c => c.name), 
+    }
+  }).filter(isDefined)
+  if(referencedColumns?.length){
+    for (const { tableName, columns } of referencedColumns){
+      const table_rules = await this.getTableRules({ localParams, tableName }, clientInfo);
+      if(table_rules){
+        columns.map(column => {
+          const path = [{ table: tableName, on: [{ id: column }] }];
+          if(table_rules.delete){
+            forcedDeleteFilters.push({
+              $existsJoined: {
+                path,
+                filter: table_rules.delete.forcedFilter ?? {},
+              }
+            })
+          }
+          if(table_rules.select){
+            const parsedFields = parseFieldFilter(table_rules.select.fields, false, [column]);
+            /** Must be allowed to view this column */
+            if(parsedFields.includes(column as any)){
+              forcedSelectFilters.push({
                 $existsJoined: {
                   path,
-                  filter: table_rules.delete.forcedFilter ?? {},
+                  filter: table_rules.select.forcedFilter ?? {},
                 }
-              })
+              });
             }
-            if(table_rules.select){
-              const parsedFields = parseFieldFilter(table_rules.select.fields, false, [column]);
-              /** Must be allowed to view this column */
-              if(parsedFields.includes(column as any)){
-                forcedSelectFilters.push({
-                  $existsJoined: {
-                    path,
-                    filter: table_rules.select.forcedFilter ?? {},
-                  }
-                });
-              }
+          }
+          if(table_rules.insert){
+            const parsedFields = parseFieldFilter(table_rules.insert.fields, false, [column]);
+            /** Must be allowed to view this column */
+            if(parsedFields.includes(column as any)){
+              allowedNestedInserts.push({ table: tableName, column });
             }
-            if(table_rules.insert){
-              const parsedFields = parseFieldFilter(table_rules.insert.fields, false, [column]);
-              /** Must be allowed to view this column */
-              if(parsedFields.includes(column as any)){
-                allowedNestedInserts.push({ table: tableName, column });
-              }
+          }
+          if(table_rules.update){
+            const parsedFields = parseFieldFilter(table_rules.update.fields, false, [column]);
+            /** Must be allowed to view this column */
+            if(parsedFields.includes(column as any)){
+              forcedUpdateFilters.push({
+                $existsJoined: {
+                  path,
+                  filter: table_rules.update.forcedFilter ?? {},
+                }
+              });
             }
-            if(table_rules.update){
-              const parsedFields = parseFieldFilter(table_rules.update.fields, false, [column]);
-              /** Must be allowed to view this column */
-              if(parsedFields.includes(column as any)){
-                forcedUpdateFilters.push({
-                  $existsJoined: {
-                    path,
-                    filter: table_rules.update.forcedFilter ?? {},
-                  }
-                });
-              }
-            }
-          })
-        }
+          }
+        })
       }
     }
   }

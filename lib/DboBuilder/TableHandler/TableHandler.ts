@@ -193,7 +193,6 @@ export class TableHandler extends ViewHandler {
           const { filterFields, forcedFilter } = table_rules?.select || {};
           const condition = (await this.prepareWhere({ filter, forcedFilter, filterFields, addWhere: false, localParams, tableRule: table_rules })).where;
 
-          // let final_filter = getFindFilter(filter, table_rules);
           const pubSubManager = await this.dboBuilder.getPubSubManager();
           return pubSubManager.addSync({
             table_info: this.tableOrViewInfo,
