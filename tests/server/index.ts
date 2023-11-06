@@ -75,6 +75,7 @@ function dd(){
 	dbo.tbl.find;
 }
 
+
 (async () => {
 
 
@@ -116,13 +117,20 @@ function dd(){
 		
 		onSocketConnect:  ({ socket, db }) => {
 			if(clientTest){
-				log("Client connected -> console does not work. use log function");
+				log("Client connected -> console does not work. use log function. socket.id:", socket.id);
 				socket.emit("start-test", { server_id: Math.random() });
 				socket.on("stop-test", async (err, cb) => {
 					cb();
 					console.log("Client test " + (!err? "successful" : "failed"));
 					stopTest(err);
 				});
+			}
+			
+		},
+
+    onSocketDisconnect:  ({ socket, db }) => {
+			if(clientTest){
+				log("Client disconnected. socket.id:", socket.id);
 			}
 			
 		},

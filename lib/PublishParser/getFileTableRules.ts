@@ -18,17 +18,17 @@ export async function getFileTableRules (this: PublishParser, fileTableName: str
   const forcedSelectFilters: FullFilter<AnyObject, void>[] = [];
   const forcedUpdateFilters: FullFilter<AnyObject, void>[] = []; 
   const allowedNestedInserts: { table: string; column: string }[] = [];
-  const referencedColumns = this.prostgles.dboBuilder.tablesOrViews?.filter(t => !t.is_view && t.name !== fileTableName).flatMap(t => {
+  const referencedColumns = this.prostgles.dboBuilder.tablesOrViews?.filter(t => !t.is_view && t.name !== fileTableName).map(t => {
     const refCols = t.columns.filter(c => c.references?.some(r => r.ftable === fileTableName));
-    if(!refCols) return undefined;
+    if(!refCols.length) return undefined;
     return {
       tableName: t.name,
       columns: refCols.map(c => c.name), 
     }
   }).filter(isDefined)
   if(referencedColumns?.length){
-    for (const { tableName, columns } of referencedColumns){
-      const table_rules = columns.length? await this.getTableRules({ localParams, tableName }, clientInfo) : undefined;
+    for await (const { tableName, columns } of referencedColumns){
+      const table_rules = await this.getTableRules({ localParams, tableName }, clientInfo);
       if(table_rules){
         columns.map(column => {
           const path = [{ table: tableName, on: [{ id: column }] }];
