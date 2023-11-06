@@ -1,8 +1,8 @@
-import { AnyObject, FullFilter, isDefined, isObject } from "prostgles-types";
+import { AnyObject, FullFilter, isDefined } from "prostgles-types";
 import { AuthResult } from "../AuthHandler";
 import { LocalParams } from "../DboBuilder";
-import { PublishParser } from "./PublishParser";
 import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
+import { PublishParser } from "./PublishParser";
 import { ParsedPublishTable, UpdateRule } from "./publishTypesAndUtils";
 
 /**
@@ -18,8 +18,8 @@ export async function getFileTableRules (this: PublishParser, fileTableName: str
   const forcedSelectFilters: FullFilter<AnyObject, void>[] = [];
   const forcedUpdateFilters: FullFilter<AnyObject, void>[] = []; 
   const allowedNestedInserts: { table: string; column: string }[] = [];
-  const referencedColumns = this.prostgles.dboBuilder.tablesOrViews?.flatMap(t => {
-    const refCols = !t.is_view? t.columns.filter(c => c.references?.some(r => r.ftable === fileTableName)) : undefined;
+  const referencedColumns = this.prostgles.dboBuilder.tablesOrViews?.filter(t => !t.is_view && t.name !== fileTableName).flatMap(t => {
+    const refCols = t.columns.filter(c => c.references?.some(r => r.ftable === fileTableName));
     if(!refCols) return undefined;
     return {
       tableName: t.name,
@@ -28,7 +28,7 @@ export async function getFileTableRules (this: PublishParser, fileTableName: str
   }).filter(isDefined)
   if(referencedColumns?.length){
     for (const { tableName, columns } of referencedColumns){
-      const table_rules = await this.getTableRules({ localParams, tableName }, clientInfo);
+      const table_rules = columns.length? await this.getTableRules({ localParams, tableName }, clientInfo) : undefined;
       if(table_rules){
         columns.map(column => {
           const path = [{ table: tableName, on: [{ id: column }] }];
