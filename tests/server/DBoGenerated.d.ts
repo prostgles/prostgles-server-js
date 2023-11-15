@@ -171,6 +171,28 @@ export type DBSchemaGenerated = {
       name?: null | string;
     };
   };
+  items_with_media: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id?: number;
+      name?: null | string;
+    };
+  };
+  items_with_one_media: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id?: number;
+      name?: null | string;
+    };
+  };
   items2: {
     is_view: false;
     select: true;
@@ -245,6 +267,30 @@ export type DBSchemaGenerated = {
       id: string;
     };
   };
+  media: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      added?: string;
+      cloud_url?: null | string;
+      content_length?: number;
+      content_type: string;
+      deleted?: null | number;
+      deleted_from_storage?: null | number;
+      description?: null | string;
+      etag?: null | string;
+      extension: string;
+      id?: string;
+      name: string;
+      original_name: string;
+      signed_url?: null | string;
+      signed_url_expires?: null | number;
+      url: string;
+    };
+  };
   obj_table: {
     is_view: false;
     select: true;
@@ -268,6 +314,28 @@ export type DBSchemaGenerated = {
       last_updated: number;
       x?: null | number;
       y?: null | number;
+    };
+  };
+  prostgles_lookup_media_items_with_media: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      foreign_id?: null | number;
+      media_id: string;
+    };
+  };
+  prostgles_lookup_media_items_with_one_media: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      foreign_id: number;
+      media_id: string;
     };
   };
   "prostgles_test.basic": {
