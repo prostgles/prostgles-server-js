@@ -137,8 +137,9 @@ export type ValidateUpdateRowArgs<U = Partial<AnyObject>, F = Filter, DBX = DBHa
   localParams: LocalParams;
 }
 export type ValidateRow<R extends AnyObject = AnyObject, S = void> = (args: ValidateRowArgs<R, DBOFullyTyped<S>>) => R | Promise<R>;
+export type PostValidateRow<R extends AnyObject = AnyObject, S = void> = (args: ValidateRowArgs<R, DBOFullyTyped<S>>) => void | Promise<void>;
 export type ValidateRowBasic = (args: ValidateRowArgs) => AnyObject | Promise<AnyObject>;
-export type ValidateUpdateRow<R extends AnyObject = AnyObject, S extends DBSchema | void = void> = (args: ValidateUpdateRowArgs<Partial<R>, FullFilter<R, S>, DBOFullyTyped<S>>) => R | Promise<R>;
+export type ValidateUpdateRow<R extends AnyObject = AnyObject, S extends DBSchema | void = void> = (args: ValidateUpdateRowArgs<Partial<R>, FullFilter<R, S>, DBOFullyTyped<S>>) => Partial<R> | Promise<Partial<R>>;
 export type ValidateUpdateRowBasic = (args: ValidateUpdateRowArgs) => AnyObject | Promise<AnyObject>;
 
 
@@ -219,7 +220,7 @@ export type InsertRule<Cols extends AnyObject = AnyObject, S extends DBSchema | 
    * Validation logic to check/update data after the insert. 
    * Happens in the same transaction so upon throwing an error the record will be deleted (not committed)
    */
-  postValidate?: ValidateRow<Required<Cols>, S>;
+  postValidate?: PostValidateRow<Required<Cols>, S>;
 
   /**
    * If defined then only nested inserts from these tables are allowed
@@ -276,7 +277,7 @@ export type UpdateRule<Cols extends AnyObject = AnyObject, S extends DBSchema | 
    * Validation logic to check/update data after the insert. 
    * Happens in the same transaction so upon throwing an error the record will be deleted (not committed)
    */
-  postValidate?: ValidateRow<Required<Cols>, S>;
+  postValidate?: PostValidateRow<Required<Cols>, S>;
 };
 
 export type DeleteRule<Cols extends AnyObject = AnyObject, S extends DBSchema | void = void> = {
