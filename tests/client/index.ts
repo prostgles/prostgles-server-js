@@ -3,16 +3,19 @@ import io from "socket.io-client";
 
 import isomorphic from "../isomorphic_queries";
 import client_only from "../client_only_queries"; 
+import client_rest_api from "../client_rest_api"; 
 import client_files from "../client_files"; 
 import { InitOptions } from "prostgles-client/dist/prostgles";
 export { DBHandlerClient, Auth } from "prostgles-client/dist/prostgles";
 
 const start = Date.now();
-const log = (msg: string, extra?: any) => {
+const log = (msgOrObj: any, extra?: any) => {
+  const msg = msgOrObj && typeof msgOrObj === "object"? JSON.stringify(msgOrObj) : msgOrObj;
   console.log(...[`(client) t+ ${(Date.now() - start)}ms ` + msg, extra].filter(v => v));
 }
 log("Started client...");
 
+const { TEST_NAME } = process.env;
 
 type ClientTestSpec = {
   onRun: InitOptions["onReady"]
@@ -21,25 +24,23 @@ type ClientTestSpec = {
 const tests: Record<string, ClientTestSpec> = {
   main: {
     onRun: async (db, methods, tableSchema, auth) => {
-
-      log("Starting Client isomorphic tests");
-      await isomorphic(db as any, log);
-      log("Client isomorphic tests successful");
-
-      await client_only(db as any, auth, log, methods, tableSchema);
-      log("Client-only replication tests successful");
-
+      await isomorphic(db, log);
+      await client_only(db, auth, log, methods, tableSchema, TEST_NAME);
     },
   },
   files: {
     onRun: async (db, methods, tableSchema, auth) => {
-      await client_files(db as any, auth, log, methods, tableSchema)
+      await client_files(db, auth, log, methods, tableSchema)
     },
 
   },
+  rest_api: {
+    onRun: async (db, methods, tableSchema, auth) => {
+      await client_rest_api(db, auth, log, methods, tableSchema, TEST_NAME);
+    }
+  },
 };
 
-const { TEST_NAME } = process.env;
 const test = tests[TEST_NAME];
 if(!test){
   throw `Invalid TEST_NAME env var provided (${TEST_NAME}). Expecting one of: ${Object.keys(tests)}`;
@@ -48,11 +49,16 @@ if(!test){
 const url = process.env.PRGL_CLIENT_URL || "http://127.0.0.1:3001";
 const path = process.env.PRGL_CLIENT_PATH || "/teztz/s";
 const socket = io(url, { path, query: { token: TEST_NAME }  });  
-const stopTest = (err?) => {
-  if(err) log("Stopping client due to error: " + JSON.stringify(err));
+const stopTest = (args?: { err: any; }) => {
+  const { err } = args ?? {};
+  if(args) {
+    log(`TEST_NAME: ${TEST_NAME} Error: ${JSON.stringify(err)}`, err);
+  } else {
+    log(`TEST_NAME: ${TEST_NAME} Finished OK`);
+  }
 
   setTimeout(() => {
-    socket.emit("stop-test", !err? err : { err: err.toString(), error: err }, cb => {
+    socket.emit("stop-test", !args? undefined : { err: (err ?? "Unknown").toString(), error: err }, cb => {
 
       log("Stopping client...");
       if(err) console.trace(err);
@@ -66,7 +72,6 @@ const stopTest = (err?) => {
 };
   
 try {
-  /* TODO find out why connection does not happen on rare occasions*/
   socket.on("connected", () => {
     log("Client connected.")
   });
@@ -77,25 +82,22 @@ try {
     log("connect_failed", err)
   })
   socket.on("start-test", (data) => {
-    log("start-test " + TEST_NAME, data);
-
-    // @ts-ignore
+ 
+    //@ts-ignore
     prostgles({
-      socket, // or simply io()
+      socket,
       onReconnect: (socket) => {
-        log("Reconnected")          
+        log("Reconnected");
       },
       onReady: async (db, methods, tableSchema, auth, isReconnect) => {
-        log(`TEST_NAME: ${TEST_NAME}, onReady.auth`, auth)
+        log(`TEST_NAME: ${TEST_NAME} Started`)
         try {
           await test.onRun(db, methods, tableSchema, auth, isReconnect);
   
           stopTest();
 
         } catch (err){
-          console.trace(err)
-          stopTest(err);
-          // throw err;
+          stopTest({ err });
         }
       }
     }); 

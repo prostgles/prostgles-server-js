@@ -170,7 +170,7 @@ export type PRGLIOSocket = {
 };
 
 export type LocalParams = {
-  httpReq?: any;
+  httpReq?: ExpressReq;
   socket?: PRGLIOSocket;
   func?: () => any;
   isRemoteRequest?: {
@@ -352,7 +352,7 @@ export function makeErrorFromPGError(err: any, localParams?: LocalParams, view?:
 }
 
 /**
- * Ensure the error is an Object and has 
+ * Ensure the error is a serializable Object  
  */
 export function parseError(e: any, caller: string): ProstglesError {
 
@@ -392,7 +392,7 @@ export type ExistsFilterConfig = {
   targetTable: string;
 });
 
-import { BasicSession, UserLike } from "./AuthHandler";
+import { BasicSession, ExpressReq, UserLike } from "./AuthHandler";
 import { getDBSchema } from "./DBSchemaBuilder";
 import { asNameAlias } from "./DboBuilder/QueryBuilder/QueryBuilder";
 import { TableHandler } from "./DboBuilder/TableHandler/TableHandler";

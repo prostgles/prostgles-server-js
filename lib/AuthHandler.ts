@@ -13,8 +13,8 @@ type AuthSocketSchema = {
   pathGuard?: boolean;
 };
 
-type ExpressReq = Request;
-type ExpressRes = Response;
+export type ExpressReq = Request;
+export type ExpressRes = Response;
 
 export type LoginClientInfo = {
   ip_address: string;
@@ -185,6 +185,7 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
 }
 
 export default class AuthHandler {
+  protected prostgles: Prostgles;
   protected opts?: Auth;
   dbo: DBHandlerServer;
   db: DB;
@@ -204,6 +205,7 @@ export default class AuthHandler {
   }
 
   constructor(prostgles: Prostgles) {
+    this.prostgles = prostgles;
     this.opts = prostgles.opts.auth as any;
     if (prostgles.opts.auth?.expressConfig) {
       const { magicLinks, returnURL, loginRoute, logoutGetPath } = prostgles.opts.auth.expressConfig;
@@ -410,12 +412,17 @@ export default class AuthHandler {
         if (Array.isArray(publicRoutes)) {
 
           /* Redirect if not logged in and requesting non public content */
-          app.get(this.routes.catchAll, async (req: ExpressReq, res: ExpressRes) => {
+          app.get(this.routes.catchAll, async (req: ExpressReq, res: ExpressRes, next) => {
             const clientReq: AuthClientRequest = { httpReq: req }
             const getUser = this.getUser;
+            if(this.prostgles.restApi){
+              if(Object.values(this.prostgles.restApi.routes).some(restRoute => this.matchesRoute(restRoute.split("/:")[0], req.path))){
+                next();
+                return;
+              }
+            }
             try {
               const returnURL = getReturnUrl(req, this.routes.returnURL)
-
 
               /**
                * Requesting a User route
@@ -518,10 +525,11 @@ export default class AuthHandler {
 
 
   /**
-   * Will return first sid value found in : http cookie or query params
+   * Will return first sid value found in:
+   *  Bearer header 
+   *  http cookie 
+   *  query params
    * Based on sid names in auth
-   * @param localParams 
-   * @returns string
    */
   getSID(localParams: LocalParams): string | undefined {
     if (!this.opts) return undefined;
@@ -542,7 +550,15 @@ export default class AuthHandler {
       return this.validateSid(rawSid);
 
     } else if (localParams.httpReq) {
-      return this.validateSid(localParams.httpReq?.cookies?.[sidKeyName]);
+      const [tokenType, base64Token] = localParams.httpReq.headers.authorization?.split(' ') ?? [];
+      let bearerSid: string | undefined;
+      if(tokenType && base64Token){
+        if(tokenType.trim() !== "Bearer"){
+          throw "Only Bearer Authorization header allowed";
+        }
+        bearerSid = Buffer.from(base64Token, 'base64').toString();
+      }
+      return this.validateSid(bearerSid ?? localParams.httpReq?.cookies?.[sidKeyName]);
 
     } else throw "socket OR httpReq missing from localParams";
 

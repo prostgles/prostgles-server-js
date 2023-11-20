@@ -1,4 +1,3 @@
-import { AnyObject } from "prostgles-types";
 
 export { get } from "prostgles-types";
 export const clone = <T extends any[] | Record<string, any>>(obj: T): T => {
@@ -8,3 +7,9 @@ export const clone = <T extends any[] | Record<string, any>>(obj: T): T => {
   
   return JSON.parse(JSON.stringify(obj));
 }
+
+export const sleep = function (ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+} 

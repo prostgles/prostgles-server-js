@@ -1,11 +1,21 @@
 
 import { Publish, PublishTableRule } from "prostgles-server/dist/PublishParser/PublishParser";
-import { DBSchemaGenerated } from "./DBoGenerated";
-// type DBObj = any;
-
+import { DBSchemaGenerated } from "./DBoGenerated"; 
 import type { PublishFullyTyped } from "prostgles-server/dist/DBSchemaBuilder"; 
 
 export const testPublish: Publish<DBSchemaGenerated> = async ({ user, sid }) => {
+  if(sid === "noAuth"){
+    return {
+      planes: {
+        select: { fields: { last_updated: 0 } }
+      }
+    }
+  }
+  if(sid === "rest_api"){
+    return {
+      planes: "*"
+    }
+  }
   const users_public_info =  {
     select: {
       fields: "*",
@@ -23,7 +33,8 @@ export const testPublish: Publish<DBSchemaGenerated> = async ({ user, sid }) => 
       fields: "*",
       forcedFilter: { sid },
     },
-  } satisfies PublishTableRule<DBSchemaGenerated["users_public_info"]["columns"], DBSchemaGenerated>
+  } satisfies PublishTableRule<DBSchemaGenerated["users_public_info"]["columns"], DBSchemaGenerated>;
+
   if(sid === "files"){
     return {
       users_public_info
@@ -43,7 +54,7 @@ export const testPublish: Publish<DBSchemaGenerated> = async ({ user, sid }) => 
     tr2: "*",
     tr3: "*",
     planes: {
-      select: "*",
+      select: sid === "client_only"? { fields: { last_updated: false } } : "*",
       update: "*",
       insert: "*",
       delete: "*",
@@ -76,7 +87,7 @@ export const testPublish: Publish<DBSchemaGenerated> = async ({ user, sid }) => 
       update: "*",
     },
     obj_table: "*",
-    files: sid !== "files"? "*" : false,
+    files: "*",
     users_public_info,
     self_join: "*",  
     insert_rules: {

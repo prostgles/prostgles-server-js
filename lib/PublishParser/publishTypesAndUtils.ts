@@ -373,9 +373,6 @@ export type ParsedPublishTable = {
   subscribeOne?: SubscribeRule;
 }
 
-// export type Publish = {
-//     tablesOrViews: {[key:string]: TableRule | ViewRule | "*" }
-// }
 export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
   sid?: string;
   dbo: DBOFullyTyped<S>;

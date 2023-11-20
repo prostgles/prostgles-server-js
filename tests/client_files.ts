@@ -5,7 +5,7 @@ import { tryRun } from './isomorphic_queries';
 import { strict as assert } from 'assert';
 import fs from "fs";
 
-export default async function client_files(db: Required<DBHandlerClient>, auth: Auth, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[]){
+export default async function client_files(db: DBHandlerClient, auth: Auth, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[]){
    
   const fileFolder = `${__dirname}/../../server/dist/server/media/`;
   const getFiles = () => db.sql("SELECT id, original_name FROM files", { }, { returnType: "rows" })

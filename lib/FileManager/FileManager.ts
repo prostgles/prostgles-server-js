@@ -5,7 +5,7 @@ import * as stream from 'stream';
 // import * as sharp from "sharp";
 import checkDiskSpace from 'check-disk-space';
 
-import { DB, DBHandlerServer, ExpressApp, Prostgles } from '../Prostgles';
+import { DB, DBHandlerServer, Prostgles } from '../Prostgles';
 import { ALLOWED_CONTENT_TYPE, ALLOWED_EXTENSION, CONTENT_TYPE_TO_EXT, getKeys, isDefined, ValidatedColumnInfo } from 'prostgles-types';
 
 import * as path from "path";
@@ -13,6 +13,7 @@ import { initFileManager } from "./initFileManager";
 import { getValidatedFileType } from "./getValidatedFileType";
 import { upload } from "./upload";
 import { uploadStream } from "./uploadStream";
+import { ExpressApp } from "../RestApi";
 
 export const HOUR = 3600 * 1000;
 

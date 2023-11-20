@@ -33,7 +33,7 @@ export function tryRunP(desc: string, func: (resolve: any, reject: any) => any, 
   });
 }
  
-export default async function isomorphic(db: Required<DBHandlerServer> | Required<DBHandlerClient>, log: (msg: string, extra?: any) => void) {
+export default async function isomorphic(db: Required<DBHandlerServer> | DBHandlerClient, log: (msg: string, extra?: any) => void) {
   log("Starting isomorphic queries");
  
   const itemsCount = await db.items.count!()

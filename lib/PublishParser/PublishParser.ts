@@ -42,10 +42,10 @@ export class PublishParser {
     }
   }
 
-  async getAllowedMethods(socket: any, userData?: AuthResult): Promise<{ [key: string]: Method; }> {
+  async getAllowedMethods(reqInfo: Pick<LocalParams, "httpReq" | "socket">, userData?: AuthResult): Promise<{ [key: string]: Method; }> {
     const methods: { [key: string]: Method; } = {};
 
-    const publishParams = await this.getPublishParams({ socket }, userData);
+    const publishParams = await this.getPublishParams(reqInfo, userData);
     const _methods = await applyParamsIfFunc(this.publishMethods, publishParams);
 
     if (_methods && Object.keys(_methods).length) {

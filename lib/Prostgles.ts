@@ -3,107 +3,41 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import * as promise from "bluebird";
 import * as pgPromise from 'pg-promise';
-import pg = require('pg-promise/typescript/pg-subset');
-import { FileManager, ImageOptions, LocalConfig, CloudClient } from "./FileManager/FileManager";
-import { SchemaWatch } from "./SchemaWatch";
+import AuthHandler, { Auth, AuthRequestParams, SessionUser } from "./AuthHandler";
 import { EventTriggerTagFilter } from "./Event_Trigger_Tags";
-
+import { CloudClient, FileManager, ImageOptions, LocalConfig } from "./FileManager/FileManager";
+import { SchemaWatch } from "./SchemaWatch";
+import { DbConnection, DbConnectionOpts, OnInitReason, OnReadyCallback, OnReadyCallbackBasic, initProstgles } from "./initProstgles";
+import { clientCanRunSqlRequest, runClientMethod, runClientRequest, runClientSqlRequest } from "./runClientRequest";
+import pg = require('pg-promise/typescript/pg-subset');
 const { version } = require('../package.json');
-import AuthHandler, { Auth, SessionUser, AuthRequestParams, UserLike } from "./AuthHandler"; 
 
+import { ExpressApp, RestApi, RestApiConfig } from "./RestApi";
 import TableConfigurator, { TableConfig } from "./TableConfig/TableConfig";
-
-import { get } from "./utils";
-import { DboBuilder, DBHandlerServer, isPlainObject, PRGLIOSocket, LocalParams } from "./DboBuilder";
-import { PubSubManager, pickKeys, log } from "./PubSubManager/PubSubManager";
-export { DBHandlerServer }
+ 
+import { DBHandlerServer, DboBuilder, PRGLIOSocket, isPlainObject } from "./DboBuilder";
+import { PubSubManager, log } from "./PubSubManager/PubSubManager";
+export { DBHandlerServer };
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 
-import { SQLRequest, TableSchemaForClient, CHANNELS, AnyObject, ClientSchema, getKeys, 
-  DBSchemaTable, FileColumnConfig, isObject, omitKeys, tryCatch 
+import {
+  AnyObject,
+  CHANNELS,
+  ClientSchema,
+  DBSchemaTable, FileColumnConfig,
+  SQLRequest, TableSchemaForClient,
+  getKeys,
+  isObject, omitKeys, tryCatch
 } from "prostgles-types";
-import { Publish, PublishMethods, PublishParams, PublishParser } from "./PublishParser/PublishParser";
 import { DBEventsManager } from "./DBEventsManager";
+import { Publish, PublishMethods, PublishParams, PublishParser } from "./PublishParser/PublishParser";
 
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 export type DBorTx = DB | pgPromise.ITask<{}>
-type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
-type DbConnectionOpts = pg.IDefaults;
 
 
 export const TABLE_METHODS = ["update", "find", "findOne", "insert", "delete", "upsert"] as const;
-function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts | undefined, debugQueries = false, onNotice: ProstglesInitOptions["onNotice"]): { db: DB, pgp: PGP } {
-  const pgp: PGP = pgPromise({
-
-    promiseLib: promise,
-    ...(debugQueries ? {
-      query: function (ctx) {
-        console.log({ 
-          ...pickKeys(ctx, ["params", "query"]),
-        });
-      },
-      error: (error, ctx) => {
-        console.log({ 
-          ...pickKeys(ctx, ["params", "query"]),
-          error 
-        });        
-      }
-    } : {}),
-    ...((onNotice || debugQueries) ? {
-      connect: function ({ client, dc, useCount }) {
-        const isFresh = !useCount;
-        if (isFresh && !client.listeners('notice').length) {
-          client.on('notice', function (msg) {
-            if (onNotice) {
-              onNotice(msg, get(msg, "message"));
-            } else {
-              console.log("notice: %j", get(msg, "message"));
-            }
-          });
-        }
-        if (isFresh && !client.listeners('error').length) {
-          client.on('error', function (msg) {
-            if (onNotice) {
-              onNotice(msg, get(msg, "message"));
-            } else {
-              console.log("error: %j", get(msg, "message"));
-            }
-          });
-        }
-      },
-    } : {})
-  });
-  pgp.pg.defaults.max = 70;
-
-  // /* Casts count/sum/max to bigint. Needs rework to remove casting "+count" and other issues; */
-  // pgp.pg.types.setTypeParser(20, BigInt);
-
-  /**
-   * Prevent timestamp casting to ensure we don't lose the microseconds.
-   * This is needed to ensure the filters work as expected for a given row
-   * 
-  register(1114, parseTimestamp) // timestamp without time zone
-  register(1184, parseTimestampTz) // timestamp with time zone
-   */
-  // pgp.pg.types.setTypeParser(1114, v => v); // timestamp without time zone
-  // pgp.pg.types.setTypeParser(1184, v => v); // timestamp with time zone
-  // pgp.pg.types.setTypeParser(1182, v => v); // date
-  pgp.pg.types.setTypeParser(pgp.pg.types.builtins.TIMESTAMP, v => v); // timestamp without time zone
-  pgp.pg.types.setTypeParser(pgp.pg.types.builtins.TIMESTAMPTZ, v => v); // timestamp with time zone
-  pgp.pg.types.setTypeParser(pgp.pg.types.builtins.DATE, v => v); // date
-  
-
-  if (options) {
-    Object.assign(pgp.pg.defaults, options);
-  }
-
-  return {
-    db: pgp(dbConnection),
-    pgp
-  };
-}
 
 export const JOIN_TYPES = ["one-many", "many-one", "one-one", "many-many"] as const;
 export type Join = {
@@ -134,36 +68,6 @@ export type DeepPartial<T> = {
 //         }
 //     }>;
 // }
-
-export type ExpressApp = {
-  get: (
-    routePath: string,
-    cb: (
-      req: {
-        params: { name: string },
-        cookies: { sid: string }
-      },
-      res: {
-        redirect: (redirectUrl: string) => any;
-        contentType: (type: string) => void;
-        sendFile: (fileName: string, opts?: { root: string }) => any;
-        status: (code: number) => {
-          json: (response: AnyObject) => any;
-        }
-      }
-    ) => any
-  ) => any;
-  _router?: { 
-    stack?: {
-      handle: Function;
-      path: undefined,
-      keys?: any[];
-      route?: { 
-        path?: string;
-      }
-    }[]
-  }
-};
 
 /**
  * Allows uploading and downloading files.
@@ -289,6 +193,7 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
   keywords?: Keywords;
   onNotice?: (notice: AnyObject, message?: string) => void;
   fileTable?: FileTableConfig;
+  restApi?: RestApiConfig;
   /**
    * Creates tables and provides UI labels, autocomplete and hints for a given json structure
    */
@@ -334,27 +239,6 @@ export type OnReady = {
   db: DB;
 }
 
-type OnInitReason = 
-  | { type: "schema change"; query: string; command: string; } 
-  | { 
-    type: "init" | "prgl.restart" | "prgl.update" | "TableConfig"
-  }
-type OnReadyCallback<S = void> = (dbo: DBOFullyTyped<S>, db: DB, reason: OnInitReason) => any;
-
-export type InitResult = {
-  db: DBOFullyTyped;
-  _db: DB;
-  pgp: PGP;
-  io?: any;
-  destroy: () => Promise<boolean>;
-  /**
-   * Generated database public schema TS types for all tables and views
-   */
-  getTSSchema: () => string;
-  update: (newOpts: Pick<ProstglesInitOptions, "fileTable">) => Promise<void>;
-  restart: () => Promise<InitResult>; 
-}
-
 const DEFAULT_KEYWORDS = {
   $filter: "$filter",
   $and: "$and",
@@ -363,11 +247,8 @@ const DEFAULT_KEYWORDS = {
 };
 
 import * as fs from 'fs';
-import { DBOFullyTyped } from "./DBSchemaBuilder";
-import { ColConstraint } from "./TableConfig/getConstraintDefinitionQueries";
-import { parseFieldFilter } from "./DboBuilder/ViewHandler/parseFieldFilter";
 import { EventInfo } from "./Logging";
-import { canRunSQL } from "./DboBuilder/runSQL";
+import { ColConstraint } from "./TableConfig/getConstraintDefinitionQueries";
 
 export class Prostgles {
   opts: ProstglesInitOptions = {
@@ -402,12 +283,13 @@ export class Prostgles {
   schemaWatch?: SchemaWatch;
 
   keywords = DEFAULT_KEYWORDS;
-  private loaded = false;
+  loaded = false;
 
   dbEventsManager?: DBEventsManager;
 
 
   fileManager?: FileManager;
+  restApi?: RestApi;
 
   tableConfigurator?: TableConfigurator;
 
@@ -425,7 +307,7 @@ export class Prostgles {
       io: 1, publish: 1, schema: 1, publishRawSQL: 1, wsChannelNamePrefix: 1, 
       onSocketConnect: 1, onSocketDisconnect: 1, sqlFilePath: 1, auth: 1, 
       DEBUG_MODE: 1, watchSchema: 1, watchSchemaType: 1, fileTable: 1, 
-      tableConfig: 1, tableConfigMigrations: 1, keywords: 1, onNotice: 1, onLog: 1
+      tableConfig: 1, tableConfigMigrations: 1, keywords: 1, onNotice: 1, onLog: 1, restApi: 1
     };
     const unknownParams = Object.keys(params).filter((key: string) => !Object.keys(config).includes(key))
     if (unknownParams.length) {
@@ -548,7 +430,7 @@ export class Prostgles {
     return this.dbo;
   }
 
-  private initWatchSchema = (onReady: OnReadyCallback) => {
+  initWatchSchema = (onReady: OnReadyCallbackBasic) => {
 
     if (this.opts.watchSchema === "hotReloadMode" && !this.opts.tsGeneratedTypesDir) {
       throw "tsGeneratedTypesDir option is needed for watchSchema: hotReloadMode to work ";
@@ -567,12 +449,22 @@ export class Prostgles {
         const dbuilder = await DboBuilder.create(this);
         if (dbuilder.tsTypesDefinition !== this.dboBuilder.tsTypesDefinition) {
           await this.refreshDBO();
-          this.init(onReady, { type: "schema change", command: "", query: "schema_checkIntervalMillis tsTypesDefinition changed" });
+          const reason: OnInitReason = { type: "schema change", command: "", query: "schema_checkIntervalMillis tsTypesDefinition changed" }
+          this.init(onReady, reason);
         }
       }, this.opts.watchSchemaType.checkIntervalMillis);
       
     }
 
+  }
+
+  initRestApi = async () => {
+    if (this.opts.restApi) {
+      this.restApi = new RestApi({ prostgles: this, ...this.opts.restApi });
+    } else {
+      this.restApi?.destroy();
+      this.restApi = undefined;
+    }
   }
 
   /* Create media table if required */
@@ -611,151 +503,7 @@ export class Prostgles {
   isSuperUser = false;
   schema_checkIntervalMillis?: NodeJS.Timeout;
 
-
-  async init(onReady: OnReadyCallback, reason: OnInitReason): Promise<InitResult> {
-    this.loaded = false;
-
-    this.initWatchSchema(onReady);
-
-    /* 1. Connect to db */
-    if (!this.db) {
-      const { db, pgp } = getDbConnection(this.opts.dbConnection, this.opts.dbOptions, this.opts.DEBUG_MODE,
-        notice => {
-          if (this.opts.onNotice) this.opts.onNotice(notice);
-          if (this.dbEventsManager) {
-            this.dbEventsManager.onNotice(notice)
-          }
-        }
-      );
-      this.db = db;
-      this.pgp = pgp;
-      this.isSuperUser = await isSuperUser(db);
-    }
-    this.checkDb();
-    const db = this.db!;
-    const pgp = this.pgp!;
-
-    /* 2. Execute any SQL file if provided */
-    if (this.opts.sqlFilePath) {
-      await this.runSQLFile(this.opts.sqlFilePath);
-    }
-
-    try {
-
-      await this.refreshDBO();
-      // if (this.opts.tableConfig) {
-        if(this.tableConfigurator?.initialising){
-          console.error("TableConfigurator WILL deadlock", { reason });
-        }
-        this.tableConfigurator = new TableConfigurator(this);
-        try {
-          const now = Date.now();
-          await this.opts.onLog?.({ type: "debug", command: "tableConfigurator.init.start", duration: -1 });
-          await this.tableConfigurator.init();
-          await this.opts.onLog?.({ type: "debug", command: "tableConfigurator.init.end", duration: Date.now() - now });
-        } catch (e) {
-          if(this.opts.tableConfigMigrations?.silentFail === false){
-            console.error("TableConfigurator silentFail: ", e);
-          } else {
-            throw e;
-          }
-        }
-      // }
-
-      /* 3. Make DBO object from all tables and views */
-      // await this.refreshDBO();
-
-      /* Create media table if required */
-      
-      const now = Date.now();
-      await this.opts.onLog?.({ type: "debug", command: "initFileTable.start", duration: -1 });
-      await this.initFileTable();
-      await this.opts.onLog?.({ type: "debug", command: "initFileTable.end", duration: Date.now() - now });
-
-
-      if (this.opts.publish) {
-
-        if (!this.opts.io) console.warn("IO missing. Publish has no effect without io");
-
-        /* 3.9 Check auth config */
-        this.authHandler = new AuthHandler(this as any);
-        await this.authHandler.init();
-
-        this.publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods as any, this.opts.publishRawSQL, this.dbo!, this.db, this as any);
-        this.dboBuilder.publishParser = this.publishParser;
-
-        /* 4. Set publish and auth listeners */
-        await this.setSocketEvents();
-
-      } else if (this.opts.auth) {
-        throw "Auth config does not work without publish";
-      }
-
-      this.dbEventsManager = new DBEventsManager(db, pgp);
-
-
-      this.writeDBSchema();
-
-      /* 5. Finish init and provide DBO object */
-      try {
-        if (this.destroyed) {
-          console.trace(1)
-        }
-        onReady(this.dbo as any, this.db, { type: "init" });
-      } catch (err) {
-        console.error("Prostgles: Error within onReady: \n", err)
-      }
-
-      this.loaded = true;
-      return {
-        db: this.dbo! as any,
-        _db: db,
-        pgp,
-        io: this.opts.io,
-        getTSSchema: this.getTSFileContent,
-        update: async (newOpts) => {
-          this.opts.fileTable = newOpts.fileTable;
-          await this.initFileTable();
-          await this.init(onReady, { type: "prgl.update"});
-        }, 
-        restart: () => this.init(onReady, { type: "prgl.restart" }),
-        destroy: async () => {
-          console.log("destroying prgl instance")
-          this.destroyed = true;
-          if (this.opts.io) {
-            this.opts.io.on("connection", () => {
-              console.log("Socket connected to destroyed instance")
-            });
-
-            /** Try to close IO without stopping http server */
-            if(this.opts.io.sockets.constructor.name === "Namespace"){
-              for (const socket of this.opts.io.sockets.sockets.values()) {
-                socket._onclose("server shutting down");
-              }
-            }
-            if(this.opts.io.engine.constructor.name === 'Server'){
-              this.opts.io.engine.close();
-            }
-            // if (typeof this.opts.io.close === "function") {
-            //   this.opts.io.close();
-            //   console.log("this.io.close")
-            // }
-          }
-          this.fileManager?.destroy();
-          this.dboBuilder?.destroy();
-          this.authHandler?.destroy();
-          this.dbo = undefined;
-          this.db = undefined;
-          await db.$pool.end();
-          await sleep(1000);
-          return true;
-        }
-      };
-    } catch (e: any) {
-      console.trace(e)
-      throw "init issues: " + e.toString();
-    }
-  }
+  init = initProstgles.bind(this);
 
   async runSQLFile(filePath: string) {
 
@@ -844,42 +592,14 @@ export class Prostgles {
           }
         }
 
-
-        /*  RUN Client request from Publish.
-            Checks request against publish and if OK run it with relevant publish functions. Local (server) requests do not check the policy 
-        */
         socket.removeAllListeners(CHANNELS.DEFAULT)
-        socket.on(CHANNELS.DEFAULT, async ({ tableName, command, param1, param2, param3 }: SocketRequestParams, cb = (..._callback: any[]) => { /* Empty */}) => {
-
-          try { /* Channel name will only include client-sent params so we ignore table_rules enforced params */
-            if (!socket || !this.authHandler || !this.publishParser || !this.dbo) {
-              console.error("socket or authhandler missing??!!")
-              throw "socket or authhandler missing??!!";
-            }
-
-            const clientInfo = await this.authHandler.getClientInfo({ socket });
-            const valid_table_command_rules = await this.publishParser.getValidatedRequestRule({ tableName, command, localParams: { socket } }, clientInfo);
-            if (valid_table_command_rules) {
-              const sessionUser: UserLike | undefined = !clientInfo?.user? undefined : {
-                ...parseFieldFilter(clientInfo.sessionFields ?? [], false, getKeys(clientInfo.user)),
-                ...pickKeys(clientInfo.user, ["id", "type"]) as UserLike,
-              }
-              const localParams: LocalParams = { socket, isRemoteRequest: { user: sessionUser } }
-              if(param3 && (param3 as LocalParams).returnQuery){
-                const isAllowed = await canRunSQL(this, localParams);
-                if(isAllowed){
-                  localParams.returnQuery = (param3 as LocalParams).returnQuery;
-                } else {
-                  throw "Must be allowed to run sql to use returnQuery"
-                }
-              }
-              const res = await this.dbo[tableName]![command]!(param1, param2, param3, valid_table_command_rules, localParams);
-              cb(null, res);
-            } else throw `Invalid OR disallowed request: ${tableName}.${command} `;
-
-          } catch (err) {
-            cb(err);
-          }
+        socket.on(CHANNELS.DEFAULT, async (args: SocketRequestParams, cb = (..._callback: any[]) => { /* Empty */}) => {
+          runClientRequest.bind(this)({  ...args, type: "socket", socket })
+            .then(res => {
+              cb(null, res)
+            }).catch(err => {
+              cb(err);
+            });
         });
 
         socket.on("disconnect", () => {
@@ -903,25 +623,16 @@ export class Prostgles {
 
         socket.removeAllListeners(CHANNELS.METHOD)
         socket.on(CHANNELS.METHOD, async ({ method, params }: SocketMethodRequest, cb = (..._callback: any) => { /* Empty */ }) => {
-          try {
-            const methods = await this.publishParser?.getAllowedMethods(socket);
-
-            if (!methods || !methods[method]) {
-              cb("Disallowed/missing method " + JSON.stringify(method));
-            } else {
-              try {
-                const methodDef = methods[method]!;
-                const onRun = (typeof methodDef === "function" || typeof (methodDef as any).then === "function")? (methodDef as Function) : methodDef.run;
-                const res = await onRun(...params);
-                cb(null, res);
-              } catch (err) {
-                makeSocketError(cb, err);
-              }
-            }
-          } catch (err) {
-            makeSocketError(cb, err);
-            console.warn("method ERROR: ", err, socket._user);
-          }
+          runClientMethod.bind(this)({
+            type: "socket",
+            socket,
+            method,
+            params
+          }) .then(res => {
+            cb(null, res)
+          }).catch(err => {
+            makeSocketError(cb, err)
+          });
         });
 
         this.pushSocketSchema(socket);
@@ -957,23 +668,17 @@ export class Prostgles {
       */
   
       if (this.opts.publishRawSQL && typeof this.opts.publishRawSQL === "function") {
-        const canRunSQL = async () => {
-          const publishParams = await this.publishParser?.getPublishParams({ socket })
-          const res = await this.opts.publishRawSQL?.(publishParams as any);
-          return Boolean(res && typeof res === "boolean" || res === "*");
-        }
+        const { allowed } = await clientCanRunSqlRequest.bind(this)({ type: "socket", socket });
   
-        if (await canRunSQL()) {
+        if (allowed) {
           socket.removeAllListeners(CHANNELS.SQL)
           socket.on(CHANNELS.SQL, async ({ query, params, options }: SQLRequest, cb = (..._callback: any) => { /* Empty */ }) => {
   
-            if (!this.dbo?.sql) throw "Internal error: sql handler missing";
-  
-            this.dbo.sql(query, params, options, { socket }).then(res => {
-              cb(null, res)
+            runClientSqlRequest.bind(this)({ type: "socket", socket, query, args: params, options }).then(res => {
+              cb(null, res);
             }).catch(err => {
               makeSocketError(cb, err);
-            })
+            });
           });
           if (db) {
             // let allTablesViews = await db.any(STEP2_GET_ALL_TABLES_AND_COLUMNS);
@@ -997,7 +702,7 @@ export class Prostgles {
         });
       }
   
-      const methods = await publishParser?.getAllowedMethods(socket, userData);
+      const methods = await publishParser?.getAllowedMethods({ socket }, userData);
 
       const methodSchema: ClientSchema["methods"] = !methods? [] : getKeys(methods).map(methodName => {
         const method = methods[methodName];
@@ -1029,15 +734,17 @@ export class Prostgles {
     }
   }
 }
-
-function makeSocketError(cb: Function, err: any) {
+const getSerializableError = (err: any) => {
   const err_msg = (err instanceof Error) ?
     err.toString() :
     isPlainObject(err) ?
       JSON.stringify(err, null, 2) :
       (err as any).toString(),
     e = { err_msg, err };
-  cb(e);
+  return e;
+}
+function makeSocketError(cb: Function, err: any) {
+  cb(getSerializableError(err));
 }
 
 type SocketRequestParams = {
@@ -1056,10 +763,3 @@ type SocketMethodRequest = {
 export async function isSuperUser(db: DB): Promise<boolean> {
   return db.oneOrNone("select usesuper from pg_user where usename = CURRENT_USER;").then(r => r.usesuper);
 }
-
-
-function sleep(ms: number) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-} 

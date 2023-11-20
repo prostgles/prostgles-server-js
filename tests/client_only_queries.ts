@@ -1,16 +1,13 @@
 import { strict as assert } from 'assert';
-
 import type { DBHandlerClient, Auth } from "./client/index";
-// import { DBSchemaTable, isDefined } from "./client/node_modules/prostgles-types/dist";
 import { DBSchemaTable, isDefined } from "prostgles-types";
 import { tryRun, tryRunP } from './isomorphic_queries';
 
-export default async function client_only(db: Required<DBHandlerClient>, auth: Auth, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[]){
-  
+export default async function client_only(db: DBHandlerClient, auth: Auth, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[], token: string){
   /**
-   * onReady(dbo, methodsObj, tableSchema, _auth)
    * tableSchema must contan an array of all tables and their columns that have getInfo and getColumns allowed
    */
+  
   await tryRun("Check tableSchema", async () => {
     const dbTables = Object.keys(db).map(k => {
       const h = db[k];
@@ -22,8 +19,8 @@ export default async function client_only(db: Required<DBHandlerClient>, auth: A
     if(missingscTbl) throw `${missingscTbl} is missing from db`;
 
     await Promise.all(tableSchema.map(async tbl => {
-      const cols = await db[tbl.name]?.getColumns!();
-      const info = await db[tbl.name]?.getInfo!();
+      const cols = await db[tbl.name]?.getColumns?.();
+      const info = await db[tbl.name]?.getInfo?.(); 
       assert.deepStrictEqual(tbl.columns, cols);
       assert.deepStrictEqual(tbl.info, info);
     }))

@@ -1,11 +1,11 @@
 import { AnyObject, SQLOptions, SQLResult } from "prostgles-types";
-import { DboBuilder, LocalParams, pgp, postgresToTsType, withUserRLS } from "../DboBuilder";
+import { DboBuilder, LocalParams, pgp, postgresToTsType } from "../DboBuilder";
 import { DB, Prostgles } from "../Prostgles";
 import { PubSubManager } from "../PubSubManager/PubSubManager";
 import { ParameterizedQuery as PQ } from 'pg-promise';
 
 
-export async function runSQL(this: DboBuilder, queryWithoutRLS: string, params: any, options: SQLOptions | undefined, localParams?: LocalParams) {
+export async function runSQL(this: DboBuilder, queryWithoutRLS: string, args: undefined | AnyObject | any[], options: SQLOptions | undefined, localParams?: LocalParams) {
   const queryWithRLS = queryWithoutRLS;
   if(queryWithRLS?.replace(/\s\s+/g, ' ').toLowerCase().includes("create extension pg_stat_statements")){
     const { shared_preload_libraries } = await this.db.oneOrNone('SHOW shared_preload_libraries');
@@ -48,7 +48,7 @@ export async function runSQL(this: DboBuilder, queryWithoutRLS: string, params: 
     return await this.prostgles.dbEventsManager?.addNotice(socket);
   } else if (returnType === "statement") {
     try {
-      return pgp.as.format(queryWithoutRLS, params);
+      return pgp.as.format(queryWithoutRLS, args);
     } catch (err) {
       throw (err as any).toString();
     }
@@ -57,11 +57,11 @@ export async function runSQL(this: DboBuilder, queryWithoutRLS: string, params: 
     let finalQuery = queryWithRLS + "";
     const isNotListenOrNotify = returnType === "arrayMode" && !["listen ", "notify "].find(c => queryWithRLS.toLowerCase().trim().startsWith(c))
     if (isNotListenOrNotify) {
-      finalQuery = (new PQ({ text: hasParams ? pgp.as.format(queryWithRLS, params) : queryWithRLS, rowMode: "array" })) as any;
+      finalQuery = (new PQ({ text: hasParams ? pgp.as.format(queryWithRLS, args) : queryWithRLS, rowMode: "array" })) as any;
     }
 
     //@ts-ignore
-    const _qres = await db.result<AnyObject>(finalQuery, hasParams ? params : undefined)
+    const _qres = await db.result<AnyObject>(finalQuery, hasParams ? args : undefined)
     const { fields, rows, command } = _qres;
 
     /**
