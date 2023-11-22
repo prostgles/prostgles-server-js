@@ -1,20 +1,29 @@
 import { DBSchemaTable, MethodKey, TableInfo, TableSchemaForClient, getKeys, pickKeys } from "prostgles-types";
-import { AuthResult } from "../AuthHandler";
+import { AuthResult, ExpressReq } from "../AuthHandler";
 import { PRGLIOSocket } from "../DboBuilder";
 import { PublishObject, PublishParser } from "./PublishParser"
 import { TABLE_METHODS } from "../Prostgles";
 
-export async function getSchemaFromPublish(this: PublishParser, socket: PRGLIOSocket, userData?: AuthResult): Promise<{ schema: TableSchemaForClient; tables: DBSchemaTable[] }> {
+type Args = ({
+  socket: PRGLIOSocket;
+  httpReq?: undefined;
+} | {
+  httpReq: ExpressReq;
+  socket?: undefined;
+}) & {
+  userData: AuthResult | undefined;
+}
+export async function getSchemaFromPublish(this: PublishParser, { userData, ...clientReq }: Args): Promise<{ schema: TableSchemaForClient; tables: DBSchemaTable[] }> {
   const schema: TableSchemaForClient = {};
   const tables: DBSchemaTable[] = []
 
   try {
     /* Publish tables and views based on socket */
-    const clientInfo = userData ?? await this.prostgles.authHandler?.getClientInfo({ socket });
+    const clientInfo = userData ?? await this.prostgles.authHandler?.getClientInfo(clientReq);
 
     let _publish: PublishObject | undefined;
     try {
-      _publish = await this.getPublish({ socket }, clientInfo);
+      _publish = await this.getPublish(clientReq, clientInfo);
     } catch(err){
       console.error("Error within then Publish function ", err)
       throw err;
@@ -46,7 +55,7 @@ export async function getSchemaFromPublish(this: PublishParser, socket: PRGLIOSo
             throw errMsg;
           }
 
-          const table_rules = await this.getTableRules({ localParams: { socket }, tableName }, clientInfo);
+          const table_rules = await this.getTableRules({ localParams: clientReq, tableName }, clientInfo);
 
           if (table_rules && Object.keys(table_rules).length) {
             schema[tableName] = {};
@@ -74,8 +83,8 @@ export async function getSchemaFromPublish(this: PublishParser, socket: PRGLIOSo
 
                   let err = null;
                   try {
-                    const valid_table_command_rules = await this.getValidatedRequestRule({ tableName, command: method, localParams: { socket } }, clientInfo);
-                    await (this.dbo[tableName] as any)[method]({}, {}, {}, valid_table_command_rules, { socket, isRemoteRequest: true, testRule: true });
+                    const valid_table_command_rules = await this.getValidatedRequestRule({ tableName, command: method, localParams: clientReq }, clientInfo);
+                    await (this.dbo[tableName] as any)[method]({}, {}, {}, valid_table_command_rules, { ...clientReq, isRemoteRequest: true, testRule: true });
 
                   } catch (e) {
                     err = "INTERNAL PUBLISH ERROR";
@@ -87,8 +96,8 @@ export async function getSchemaFromPublish(this: PublishParser, socket: PRGLIOSo
 
 
                 if (method === "getInfo" || method === "getColumns") {
-                  const tableRules = await this.getValidatedRequestRule({ tableName, command: method, localParams: { socket } }, clientInfo);
-                  const res = await (this.dbo[tableName] as any)[method](undefined, undefined, undefined, tableRules, { socket, isRemoteRequest: true });
+                  const tableRules = await this.getValidatedRequestRule({ tableName, command: method, localParams: clientReq }, clientInfo);
+                  const res = await (this.dbo[tableName] as any)[method](undefined, undefined, undefined, tableRules, { ...clientReq, isRemoteRequest: true });
                   if (method === "getInfo") {
                     tableInfo = res;
                   } else if (method === "getColumns") {

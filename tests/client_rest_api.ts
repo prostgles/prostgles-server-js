@@ -57,6 +57,8 @@ export default async function client_rest_api(db: DBHandlerClient, auth: Auth, l
     const sqlRes = await sqlRest("select 1 as a", {}, { returnType: "rows" });
     assert.deepStrictEqual(sqlRes, [{ a: 1 }]);
 
+    const restTableSchema = await post({ path: "schema" });
+    assert.deepStrictEqual(tableSchema, restTableSchema.tableSchema);
     await Promise.all(tableSchema.map(async tbl => {
       const cols = await db[tbl.name]?.getColumns?.();
       const info = await db[tbl.name]?.getInfo?.();

@@ -30,6 +30,7 @@ export class RestApi {
     db: string;
     sql: string;
     methods: string;
+    schema: string;
   }
   expressApp: Express;
   constructor({ expressApp, routePrefix, prostgles }: RestApiConfig & { prostgles: Prostgles; }){
@@ -38,11 +39,13 @@ export class RestApi {
       db: `${routePrefix}/db/:tableName/:command`,
       sql: `${routePrefix}/db/sql`,
       methods: `${routePrefix}/methods/:method`,
+      schema: `${routePrefix}/schema`,
     };
     this.expressApp = expressApp;
     expressApp.post(this.routes.db, jsonParser, this.onPost);
     expressApp.post(this.routes.sql, jsonParser, this.onPostSql);
     expressApp.post(this.routes.methods, jsonParser, this.onPostMethod);
+    expressApp.post(this.routes.schema, jsonParser, this.onPostSchema);
   }
 
   destroy = () => {
@@ -62,6 +65,15 @@ export class RestApi {
       res.json(data);
     } catch(rawError){
       const error = parseError(rawError, "onPostMethod")
+      res.status(400).json({ error });
+    }
+  }
+  onPostSchema = async (req: ExpressReq, res: ExpressRes) => {
+    try {
+      const data = await this.prostgles.getClientSchema({ httpReq: req });
+      res.json(data);
+    } catch(rawError){ 
+      const error = parseError(rawError, "onPostSchema")
       res.status(400).json({ error });
     }
   }
