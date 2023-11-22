@@ -80,11 +80,8 @@ prostgles<DBSchemaGenerated>({
 	sqlFilePath: path.join(__dirname+'/../../init.sql'),
 	io,
 	tsGeneratedTypesDir: path.join(__dirname + '/../../'),
-	// watchSchema: true,
 	transactions: true,
 	schema: { public: 1, prostgles_test: 1 },
-	// DEBUG_MODE: true,
-	// onNotice: console.log,
 	onLog: async ev => {
 		if(ev.type === "debug" || ev.type === "connect" || ev.type === "disconnect"){
 			// log("onLog", ev);
