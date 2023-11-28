@@ -545,7 +545,14 @@ export class Prostgles {
 
     if (!this.dbo) throw "dbo missing";
 
-    const publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods as any, this.opts.publishRawSQL, this.dbo, this.db!, this as any);
+    const publishParser = new PublishParser(
+      this.opts.publish, 
+      this.opts.publishMethods, 
+      this.opts.publishRawSQL, 
+      this.dbo, 
+      this.db!, 
+      this
+    );
     this.publishParser = publishParser;
 
     if (!this.opts.io) return;
@@ -575,7 +582,7 @@ export class Prostgles {
     this.connectedSockets.push(socket);
 
     try {
-      await this.opts.onLog?.({ 
+      await this.opts.onLog?.({
         type: "connect", 
         sid: this.authHandler?.getSID({ socket }),
         socketId: socket.id,

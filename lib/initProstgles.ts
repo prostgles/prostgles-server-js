@@ -69,27 +69,22 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
   try {
 
     await this.refreshDBO();
-    // if (this.opts.tableConfig) {
-      if(this.tableConfigurator?.initialising){
-        console.error("TableConfigurator WILL deadlock", { reason });
+    if(this.tableConfigurator?.initialising){
+      console.error("TableConfigurator WILL deadlock", { reason });
+    }
+    this.tableConfigurator = new TableConfigurator(this);
+    try {
+      const now = Date.now();
+      await this.opts.onLog?.({ type: "debug", command: "tableConfigurator.init.start", duration: -1 });
+      await this.tableConfigurator.init();
+      await this.opts.onLog?.({ type: "debug", command: "tableConfigurator.init.end", duration: Date.now() - now });
+    } catch (e) {
+      if(this.opts.tableConfigMigrations?.silentFail === false){
+        console.error("TableConfigurator silentFail: ", e);
+      } else {
+        throw e;
       }
-      this.tableConfigurator = new TableConfigurator(this);
-      try {
-        const now = Date.now();
-        await this.opts.onLog?.({ type: "debug", command: "tableConfigurator.init.start", duration: -1 });
-        await this.tableConfigurator.init();
-        await this.opts.onLog?.({ type: "debug", command: "tableConfigurator.init.end", duration: Date.now() - now });
-      } catch (e) {
-        if(this.opts.tableConfigMigrations?.silentFail === false){
-          console.error("TableConfigurator silentFail: ", e);
-        } else {
-          throw e;
-        }
-      }
-    // }
-
-    /* 3. Make DBO object from all tables and views */
-    // await this.refreshDBO();
+    }
 
     /* Create media table if required */
     
