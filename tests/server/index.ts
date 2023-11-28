@@ -59,6 +59,7 @@ process.on('unhandledRejection', (reason, p) => {
  * To create a superuser in linux:
  *    sudo su - postgres
  *    createuser api -s -P
+ *    createdb prostgles_server_tests -O api
  */
 const dbConnection = {
 	host: process.env.POSTGRES_HOST || "localhost",

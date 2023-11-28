@@ -270,28 +270,6 @@ export type DBSchemaGenerated = {
       y?: null | number;
     };
   };
-  prostgles_lookup_media_items_with_media: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      foreign_id?: null | number;
-      media_id: string;
-    };
-  };
-  prostgles_lookup_media_items_with_one_media: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
-    columns: {
-      foreign_id: number;
-      media_id: string;
-    };
-  };
   "prostgles_test.basic": {
     is_view: false;
     select: true;

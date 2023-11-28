@@ -87,7 +87,6 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
     }
 
     /* Create media table if required */
-    
     const now = Date.now();
     await this.opts.onLog?.({ type: "debug", command: "initFileTable.start", duration: -1 });
     await this.initFileTable();
