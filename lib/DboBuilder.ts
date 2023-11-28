@@ -132,7 +132,7 @@ export type PRGLIOSocket = {
   readonly id: string;
 
   readonly handshake: {
-    query?: Record<string, string>;
+    query?: Record<string, string | string[] | undefined>;
     /**
      * IP Address
      */
@@ -141,7 +141,7 @@ export type PRGLIOSocket = {
     auth?: Record<string, any>;
   }
 
-  readonly on: (channel: string, params: any, cb?: (err: any, res?: any) => void) => Promise<void>;
+  readonly on: (channel: string, params: any, cb?: (err: any, res?: any) => void) => any;// Promise<void>;
 
   readonly emit: (channel: string, message?: any, cb?: BasicCallback) => any;
 
@@ -152,8 +152,8 @@ export type PRGLIOSocket = {
   readonly disconnect: () => void;
 
   readonly request: {
-    url: string;
-    connection: { remoteAddress: string; }
+    url?: string;
+    connection: { remoteAddress?: string; }
   }
 
   /** Used for session caching */
@@ -398,6 +398,8 @@ import { asNameAlias } from "./DboBuilder/QueryBuilder/QueryBuilder";
 import { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
 import { ParsedJoinPath, parseJoinPath } from "./DboBuilder/ViewHandler/parseJoinPath";
 import { prepareShortestJoinPaths } from "./DboBuilder/prepareShortestJoinPaths";
+import { Socket } from "socket.io";
+import { DefaultEventsMap } from "socket.io/dist/typed-events";
 
 export class DboBuilder {
   tablesOrViews?: TableSchema[];   //TableSchema           TableOrViewInfo

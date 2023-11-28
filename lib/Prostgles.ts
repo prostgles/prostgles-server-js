@@ -46,7 +46,7 @@ export type Join = {
   type: typeof JOIN_TYPES[number];
 };
 export type Joins = Join[] | "inferred";
-
+import type { Server } from "socket.io";
 
 
 type Keywords = {
@@ -129,7 +129,7 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
   dbConnection: DbConnection;
   dbOptions?: DbConnectionOpts;
   tsGeneratedTypesDir?: string;
-  io?: any;
+  io?: Server;
   publish?: Publish<S, SUser>;
   publishMethods?: PublishMethods<S, SUser>;
   publishRawSQL?(params: PublishParams<S, SUser>): ((boolean | "*") | Promise<(boolean | "*")>);
@@ -561,85 +561,89 @@ export class Prostgles {
 
     /* Initialise */
     this.opts.io.removeAllListeners('connection');
-    this.opts.io.on('connection', async (socket: PRGLIOSocket) => {
-      if (this.destroyed) {
-        console.log("Socket connected to destroyed instance");
-        socket.disconnect();
-        return
-      }
-      this.connectedSockets.push(socket);
+    this.opts.io.on('connection', this.onSocketConnected);
+    /** In some cases io will re-init with already connected sockets */
+    this.opts.io?.sockets.sockets.forEach(socket => this.onSocketConnected(socket))
+  }
 
-      try {
-        await this.opts.onLog?.({ 
-          type: "connect", 
+  onSocketConnected = async (socket: PRGLIOSocket) => {
+    if (this.destroyed) {
+      console.log("Socket connected to destroyed instance");
+      socket.disconnect();
+      return
+    }
+    this.connectedSockets.push(socket);
+
+    try {
+      await this.opts.onLog?.({ 
+        type: "connect", 
+        sid: this.authHandler?.getSID({ socket }),
+        socketId: socket.id,
+        connectedSocketIds: this.connectedSockets.map(s => s.id)
+      });
+
+      if (!this.db || !this.dbo) throw new Error("db/dbo missing");
+      const { dbo, db } = this;
+
+      if (this.opts.onSocketConnect) {
+        try {
+          const getUser = async () => { return await this.authHandler?.getClientInfo({ socket }); }
+          await this.opts.onSocketConnect({ socket, dbo: dbo as any, db, getUser });
+        } catch(error) {
+          const connectionError = error instanceof Error? error.message : typeof error === "string"? error : JSON.stringify(error);
+          socket.emit(CHANNELS.CONNECTION, { connectionError });
+          socket.disconnect();
+          return;
+        }
+      }
+
+      socket.removeAllListeners(CHANNELS.DEFAULT)
+      socket.on(CHANNELS.DEFAULT, async (args: SocketRequestParams, cb = (..._callback: any[]) => { /* Empty */}) => {
+        runClientRequest.bind(this)({  ...args, type: "socket", socket })
+          .then(res => {
+            cb(null, res)
+          }).catch(err => {
+            cb(err);
+          });
+      });
+
+      socket.on("disconnect", () => {
+
+        this.dbEventsManager?.removeNotice(socket);
+        this.dbEventsManager?.removeNotify(undefined, socket);
+        this.connectedSockets = this.connectedSockets.filter(s => s.id !== socket.id);
+        
+        this.opts.onLog?.({ 
+          type: "disconnect", 
           sid: this.authHandler?.getSID({ socket }),
           socketId: socket.id,
           connectedSocketIds: this.connectedSockets.map(s => s.id)
         });
 
-        if (!this.db || !this.dbo) throw new Error("db/dbo missing");
-        const { dbo, db } = this;
-
-        if (this.opts.onSocketConnect) {
-          try {
-            const getUser = async () => { return await this.authHandler?.getClientInfo({ socket }); }
-            await this.opts.onSocketConnect({ socket, dbo: dbo as any, db, getUser });
-          } catch(error) {
-            const connectionError = error instanceof Error? error.message : typeof error === "string"? error : JSON.stringify(error);
-            socket.emit(CHANNELS.CONNECTION, { connectionError });
-            socket.disconnect();
-            return;
-          }
+        if (this.opts.onSocketDisconnect) {
+          const getUser = async () => { return await this.authHandler?.getClientInfo({ socket }); }
+          this.opts.onSocketDisconnect({ socket, dbo: dbo as any, db, getUser });
         }
+      });
 
-        socket.removeAllListeners(CHANNELS.DEFAULT)
-        socket.on(CHANNELS.DEFAULT, async (args: SocketRequestParams, cb = (..._callback: any[]) => { /* Empty */}) => {
-          runClientRequest.bind(this)({  ...args, type: "socket", socket })
-            .then(res => {
-              cb(null, res)
-            }).catch(err => {
-              cb(err);
-            });
+      socket.removeAllListeners(CHANNELS.METHOD)
+      socket.on(CHANNELS.METHOD, async ({ method, params }: SocketMethodRequest, cb = (..._callback: any) => { /* Empty */ }) => {
+        runClientMethod.bind(this)({
+          type: "socket",
+          socket,
+          method,
+          params
+        }) .then(res => {
+          cb(null, res)
+        }).catch(err => {
+          makeSocketError(cb, err)
         });
+      });
 
-        socket.on("disconnect", () => {
-
-          this.dbEventsManager?.removeNotice(socket);
-          this.dbEventsManager?.removeNotify(undefined, socket);
-          this.connectedSockets = this.connectedSockets.filter(s => s.id !== socket.id);
-          
-          this.opts.onLog?.({ 
-            type: "disconnect", 
-            sid: this.authHandler?.getSID({ socket }),
-            socketId: socket.id,
-            connectedSocketIds: this.connectedSockets.map(s => s.id)
-          });
-
-          if (this.opts.onSocketDisconnect) {
-            const getUser = async () => { return await this.authHandler?.getClientInfo({ socket }); }
-            this.opts.onSocketDisconnect({ socket, dbo: dbo as any, db, getUser });
-          }
-        });
-
-        socket.removeAllListeners(CHANNELS.METHOD)
-        socket.on(CHANNELS.METHOD, async ({ method, params }: SocketMethodRequest, cb = (..._callback: any) => { /* Empty */ }) => {
-          runClientMethod.bind(this)({
-            type: "socket",
-            socket,
-            method,
-            params
-          }) .then(res => {
-            cb(null, res)
-          }).catch(err => {
-            makeSocketError(cb, err)
-          });
-        });
-
-        this.pushSocketSchema(socket);
-      } catch (e) {
-        console.trace("setSocketEvents: ", e)
-      }
-    });
+      this.pushSocketSchema(socket);
+    } catch (e) {
+      console.trace("setSocketEvents: ", e)
+    }
   }
 
   getClientSchema = async (clientReq: Pick<LocalParams, "socket" | "httpReq">) => {
