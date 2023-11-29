@@ -7,7 +7,7 @@ import { PublishParser } from "./PublishParser/PublishParser";
 import { DBEventsManager } from "./DBEventsManager";
 import { sleep } from "./utils";
 import pg from "pg-promise/typescript/pg-subset";
-import { pickKeys } from "prostgles-types";
+import { isEmpty, pickKeys } from "prostgles-types";
 import * as pgPromise from "pg-promise";
 
 export type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
@@ -128,18 +128,24 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
 
     this.loaded = true;
     return {
-      db: this.dbo! as any,
+      db: this.dbo!,
       _db: db,
       pgp,
       io: this.opts.io,
       getTSSchema: this.getTSFileContent,
       update: async (newOpts) => {
-        this.opts.fileTable = newOpts.fileTable;
-        this.opts.restApi = newOpts.restApi;
-        await this.initFileTable();
-        await this.initRestApi();
-        await this.init(onReady, { type: "prgl.update"});
-      }, 
+        if("fileTable" in newOpts){
+          this.opts.fileTable = newOpts.fileTable;
+          await this.initFileTable();
+        }
+        if("restApi" in newOpts){
+          this.opts.restApi = newOpts.restApi;
+          await this.initRestApi();
+        }
+        if(!isEmpty(newOpts)){
+          await this.init(onReady, { type: "prgl.update"});
+        }
+      },
       restart: () => this.init(onReady, { type: "prgl.restart" }),
       destroy: async () => {
         console.log("destroying prgl instance")

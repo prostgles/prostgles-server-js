@@ -1,15 +1,17 @@
-import { asName, getKeys, tryCatch } from "prostgles-types";
-import { canCreateTables } from "../DboBuilder/runSQL";
+import * as fs from 'fs';
+import { asName, tryCatch } from "prostgles-types";
 import { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
+import { canCreateTables } from "../DboBuilder/runSQL";
 import { Prostgles } from "../Prostgles";
 import { FileManager, HOUR, LocalConfig } from "./FileManager";
-import * as fs from 'fs';
 
 export async function initFileManager(this: FileManager, prg: Prostgles){
   this.prostgles = prg;
 
   const { fileTable } = prg.opts;
-  if(!fileTable) throw "fileTable missing";
+  if(!fileTable) {
+    throw "fileTable missing";
+  }
   const { tableName = "files", referencedTables = {} } = fileTable;
   this.tableName = tableName;
 

@@ -133,6 +133,7 @@ export const canRunSQL = async (prostgles: Prostgles, localParams?: LocalParams)
 
   const { socket } = localParams;
   const publishParams = await prostgles.publishParser!.getPublishParams({ socket });
+  //@ts-ignore
   const res = await prostgles.opts.publishRawSQL?.(publishParams);
   return Boolean(res && typeof res === "boolean" || res === "*");
 }
