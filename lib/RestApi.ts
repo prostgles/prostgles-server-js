@@ -3,7 +3,7 @@ import { ExpressReq, ExpressRes } from "./AuthHandler";
 import { runClientMethod, runClientRequest, runClientSqlRequest } from "./runClientRequest";
 import { Express } from "express";
 import * as bodyParser from "body-parser";
-import { parseError } from "./DboBuilder";
+import { parseError } from "./DboBuilder/DboBuilder";
 const jsonParser = bodyParser.json();
 
 export type ExpressApp = {

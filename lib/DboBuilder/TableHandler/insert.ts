@@ -1,5 +1,5 @@
 import { AnyObject, InsertParams, isObject } from "prostgles-types";
-import { LocalParams, parseError, withUserRLS } from "../../DboBuilder";
+import { LocalParams, parseError, withUserRLS } from "../DboBuilder";
 import { TableRule } from "../../PublishParser/PublishParser";
 import { insertDataParse } from "../insertDataParse";
 import { insertTest } from "./insertTest";

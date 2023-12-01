@@ -1,9 +1,10 @@
 import { DBSchema, isObject, JSONB, TableHandler, ViewHandler } from "prostgles-types";
 import prostgles from ".";
 import { Auth } from "./AuthHandler";
-import { DBHandlerServer, DboBuilder, escapeTSNames, postgresToTsType, TableSchemaColumn } from "./DboBuilder";
+import { DBHandlerServer, DboBuilder, escapeTSNames, postgresToTsType } from "./DboBuilder/DboBuilder";
 import { PublishAllOrNothing, PublishParams, PublishTableRule, PublishViewRule,  } from "./PublishParser/PublishParser";
 import { getJSONBSchemaTSTypes } from "./JSONBValidation/validation";
+import { TableSchemaColumn } from "./DboBuilder/DboBuilderTypes";
 
 
 export const getDBSchema = (dboBuilder: DboBuilder): string => {

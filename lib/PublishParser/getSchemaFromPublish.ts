@@ -1,6 +1,6 @@
 import { DBSchemaTable, MethodKey, TableInfo, TableSchemaForClient, getKeys, pickKeys } from "prostgles-types";
 import { AuthResult, ExpressReq } from "../AuthHandler";
-import { PRGLIOSocket } from "../DboBuilder";
+import { PRGLIOSocket } from "../DboBuilder/DboBuilder";
 import { PublishObject, PublishParser } from "./PublishParser"
 import { TABLE_METHODS } from "../Prostgles";
 

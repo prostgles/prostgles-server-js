@@ -1,5 +1,5 @@
 import { AnyObject, getKeys, isObject } from "prostgles-types";
-import { LocalParams, Media } from "../../DboBuilder";
+import { LocalParams, Media } from "../DboBuilder";
 import { TableRule, ValidateRow } from "../../PublishParser/PublishParser";
 import { omitKeys } from "../../PubSubManager/PubSubManager";
 import { isFile, uploadFile } from "../uploadFile";

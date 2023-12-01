@@ -1,5 +1,5 @@
 import { AnyObject, unpatchText, UpdateParams } from "prostgles-types";
-import { Filter, isPlainObject, LocalParams, parseError, withUserRLS } from "../../DboBuilder";
+import { Filter, isPlainObject, LocalParams, parseError, withUserRLS } from "../DboBuilder";
 import { TableRule } from "../../PublishParser/PublishParser";
 import { getInsertTableRules, getReferenceColumnInserts } from "../insertDataParse";
 import { runInsertUpdateQuery } from "./runInsertUpdateQuery";

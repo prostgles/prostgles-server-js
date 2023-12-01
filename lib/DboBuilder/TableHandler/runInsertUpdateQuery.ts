@@ -1,5 +1,5 @@
 import { AnyObject, asName, FieldFilter, InsertParams, UpdateParams } from "prostgles-types";
-import { LocalParams, makeErrorFromPGError, withUserRLS } from "../../DboBuilder";
+import { LocalParams, getClientErrorFromPGError, withUserRLS } from "../DboBuilder";
 import { InsertRule, UpdateRule } from "../../PublishParser/PublishParser";
 import { getSelectItemQuery, TableHandler } from "./TableHandler";
 
@@ -88,9 +88,9 @@ export const runInsertUpdateQuery = async ({ tableHandler, queryWithoutUserRLS, 
 
   const tx = localParams?.tx?.t || tableHandler.tx?.t;
   if (tx) {
-    result = await tx[queryType](query).catch((err: any) => makeErrorFromPGError(err, localParams, tableHandler, allowedFieldKeys));
+    result = await tx[queryType](query).catch((err: any) => getClientErrorFromPGError(err, localParams, tableHandler, allowedFieldKeys));
   } else {
-    result = await tableHandler.db.tx(t => (t as any)[queryType](query)).catch(err => makeErrorFromPGError(err, localParams, tableHandler, allowedFieldKeys));
+    result = await tableHandler.db.tx(t => (t as any)[queryType](query)).catch(err => getClientErrorFromPGError(err, localParams, tableHandler, allowedFieldKeys));
   }
 
   if(checkFilter && result.failed_check?.length){

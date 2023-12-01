@@ -1,5 +1,5 @@
 import { OrderBy, asName, isDefined, isEmpty, isObject } from "prostgles-types/dist";
-import { SortItem } from "../../DboBuilder";
+import { SortItem } from "../DboBuilder";
 import { NewQueryJoin, SelectItemValidated, asNameAlias } from "../QueryBuilder/QueryBuilder";
 
 /* This relates only to SELECT */

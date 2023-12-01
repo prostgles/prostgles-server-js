@@ -1,5 +1,5 @@
 import { isObject } from "prostgles-types";
-import { DboBuilder } from "./DboBuilder";
+import { DboBuilder } from "./DboBuilder/DboBuilder";
 import { ProstglesInitOptions } from "./Prostgles";
 export type VoidFunction = () => void;
 

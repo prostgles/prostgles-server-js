@@ -1,5 +1,5 @@
 import { AnyObject, EXISTS_KEY, EXISTS_KEYS, FieldFilter, asName } from "prostgles-types";
-import { LocalParams, ExistsFilterConfig } from "../../DboBuilder";
+import { LocalParams, ExistsFilterConfig } from "../DboBuilder";
 import { ViewHandler } from "./ViewHandler";
 import { TableRule } from "../../PublishParser/PublishParser";
 import { TableHandler } from "../TableHandler/TableHandler";

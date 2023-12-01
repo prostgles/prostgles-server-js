@@ -6,7 +6,7 @@ import {
   GeomFilterKeys, GeomFilter_Funcs, 
   TextFilter_FullTextSearchFilterKeys, CompareFilterKeys, isObject, TextFilterKeys, JsonbFilterKeys, CompareInFilterKeys 
 } from "prostgles-types";
-import { isPlainObject } from "./DboBuilder";
+import { isPlainObject } from "./DboBuilder/DboBuilder";
 
 /**
 * Parse a single filter

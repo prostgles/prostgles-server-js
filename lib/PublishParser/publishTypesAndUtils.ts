@@ -1,7 +1,7 @@
 import { AnyObject, DBSchema, FullFilter, Method, RULE_METHODS } from "prostgles-types";
 import { SessionUser } from "../AuthHandler";
 import type { DBOFullyTyped, PublishFullyTyped } from "../DBSchemaBuilder";
-import { CommonTableRules, Filter, LocalParams, PRGLIOSocket, TableOrViewInfo, TableSchemaColumn } from "../DboBuilder";
+import { CommonTableRules, Filter, LocalParams, PRGLIOSocket, TableOrViewInfo } from "../DboBuilder/DboBuilder";
 import { DB, DBHandlerServer } from "../Prostgles";
 
 export type PublishMethods<S = void, SUser extends SessionUser = SessionUser> = (params: PublishParams<S, SUser>) => { [key: string]: Method } | Promise<{ [key: string]: Method } | null>;
@@ -98,6 +98,7 @@ export const RULE_TO_METHODS = [
 ] as const;
 
 import { FieldFilter, SelectParams } from "prostgles-types";
+import { TableSchemaColumn } from "../DboBuilder/DboBuilderTypes";
 
 export type InsertRequestData = {
   data: object | object[]

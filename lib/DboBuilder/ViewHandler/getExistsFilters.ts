@@ -1,5 +1,5 @@
 import { EXISTS_KEY, EXISTS_KEYS, getKeys } from "prostgles-types";
-import { ExistsFilterConfig } from "../../DboBuilder";
+import { ExistsFilterConfig } from "../DboBuilder";
 import { ViewHandler } from "./ViewHandler";
 import { parseJoinPath } from "./parseJoinPath";
 

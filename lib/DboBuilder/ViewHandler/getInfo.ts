@@ -1,7 +1,7 @@
 import { 
   TableInfo as TInfo, pickKeys,
  } from "prostgles-types/dist";
-import { LocalParams } from "../../DboBuilder";
+import { LocalParams } from "../DboBuilder";
 import { TableRule } from "../../PublishParser/PublishParser";
 import { ViewHandler } from "./ViewHandler";
 

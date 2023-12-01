@@ -2,7 +2,7 @@ import {
   AnyObject, PG_COLUMN_UDT_DATA_TYPE, 
   ValidatedColumnInfo, _PG_geometric 
 } from "prostgles-types";
-import { isPlainObject, LocalParams, parseError, postgresToTsType } from "../DboBuilder";
+import { isPlainObject, LocalParams, parseError, postgresToTsType } from "./DboBuilder";
 import { TableRule } from "../PublishParser/PublishParser";
 import { TableHandler } from "./TableHandler/TableHandler";
 import { ViewHandler } from "./ViewHandler/ViewHandler";

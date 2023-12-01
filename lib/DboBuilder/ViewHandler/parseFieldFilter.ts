@@ -1,5 +1,5 @@
 import { FieldFilter, getKeys } from "prostgles-types";
-import { isPlainObject } from "../../DboBuilder";
+import { isPlainObject } from "../DboBuilder";
 
 /** 
 * Filter string array

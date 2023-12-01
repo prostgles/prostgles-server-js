@@ -1,6 +1,6 @@
 import { Method, getKeys, isObject } from "prostgles-types";
 import { AuthResult, SessionUser } from "../AuthHandler";
-import { LocalParams } from "../DboBuilder";
+import { LocalParams } from "../DboBuilder/DboBuilder";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import { getFileTableRules } from "./getFileTableRules";
 import { getSchemaFromPublish } from "./getSchemaFromPublish";

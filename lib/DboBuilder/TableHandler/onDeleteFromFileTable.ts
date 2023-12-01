@@ -1,5 +1,5 @@
 import { AnyObject, asName } from "prostgles-types";
-import { LocalParams } from "../../DboBuilder";
+import { LocalParams } from "../DboBuilder";
 import { pickKeys } from "../../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler";
 

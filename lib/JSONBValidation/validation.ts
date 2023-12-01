@@ -1,5 +1,5 @@
 import { getKeys, isEmpty, isObject, JSONB, TableSchema } from "prostgles-types";
-import { postgresToTsType } from "../DboBuilder";
+import { postgresToTsType } from "../DboBuilder/DboBuilder";
 import { asValue } from "../PubSubManager/PubSubManager";
 
 

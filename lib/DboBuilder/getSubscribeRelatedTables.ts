@@ -1,5 +1,5 @@
 import { AnyObject, asName, reverseParsedPath, SubscribeParams } from "prostgles-types";
-import { ExistsFilterConfig, Filter, LocalParams, makeErrorFromPGError } from "../DboBuilder";
+import { ExistsFilterConfig, Filter, LocalParams, getClientErrorFromPGError } from "./DboBuilder";
 import { TableRule } from "../PublishParser/PublishParser";
 import { log, ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
 import { NewQuery } from "./QueryBuilder/QueryBuilder";
@@ -32,7 +32,7 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { selectParam
       def = def.slice(0, -1);
     }
     if (!def || typeof def !== "string") {
-      throw makeErrorFromPGError("Could get view definition");
+      throw getClientErrorFromPGError("Could get view definition");
     }
     const { fields } = await this.dboBuilder.dbo.sql!(`SELECT * FROM ( \n ${def} \n ) prostgles_subscribe_view_definition LIMIT 0`, {});
     const tableColumns = fields.filter(f => f.tableName && f.columnName);

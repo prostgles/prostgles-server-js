@@ -4,7 +4,7 @@ import { NewQuery, NewQueryJoin, SelectItem, asNameAlias } from "./QueryBuilder"
 import { ROOT_TABLE_ALIAS, ROOT_TABLE_ROW_NUM_ID, indentLines } from "./getSelectQuery";
 import { ViewHandler } from "../ViewHandler/ViewHandler";
 import { getJoinOnCondition } from "../ViewHandler/getTableJoinQuery";
-import { prepareOrderByQuery } from "../../DboBuilder";
+import { prepareOrderByQuery } from "../DboBuilder";
 
 type Args = {
   q1: NewQuery;

@@ -1,5 +1,5 @@
 import { AnyObject, isObject, pickKeys } from "prostgles-types";
-import { ExistsFilterConfig, LocalParams, pgp } from "../DboBuilder";
+import { ExistsFilterConfig, LocalParams, pgp } from "./DboBuilder";
 import { parseFilterItem } from "../Filtering";
 import { asValue } from "../PubSubManager/PubSubManager";
 import { TableRule } from "../PublishParser/PublishParser";

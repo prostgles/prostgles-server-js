@@ -1,6 +1,6 @@
 import { AnyObject, FullFilter, isDefined } from "prostgles-types";
 import { AuthResult } from "../AuthHandler";
-import { LocalParams } from "../DboBuilder";
+import { LocalParams } from "../DboBuilder/DboBuilder";
 import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
 import { PublishParser } from "./PublishParser";
 import { ParsedPublishTable, UpdateRule } from "./publishTypesAndUtils";

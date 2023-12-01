@@ -1,7 +1,7 @@
 import { PostgresNotifListenManager, PrglNotifListener } from "./PostgresNotifListenManager";
 import { DB, PGP } from "./Prostgles";
 import { getKeys, CHANNELS } from "prostgles-types";
-import { PRGLIOSocket } from "./DboBuilder";
+import { PRGLIOSocket } from "./DboBuilder/DboBuilder";
 
 export class DBEventsManager {
 
@@ -129,7 +129,6 @@ export class DBEventsManager {
     }
 
     return {
-      // unsubscribe: () => this.removeNotify(notifChannel, socket, func),
       socketChannel,
       socketUnsubChannel,
       notifChannel,

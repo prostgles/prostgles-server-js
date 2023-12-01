@@ -1,6 +1,6 @@
 
 import { SelectParams, isObject } from "prostgles-types";
-import { Filter, LocalParams, makeErrorFromPGError, parseError, withUserRLS } from "../DboBuilder";
+import { Filter, LocalParams, getClientErrorFromPGError, parseError, withUserRLS } from "./DboBuilder";
 import { canRunSQL } from "../DboBuilder/runSQL";
 import { TableRule } from "../PublishParser/PublishParser";
 import { getNewQuery } from "./QueryBuilder/getNewQuery";
@@ -116,7 +116,7 @@ export const runQueryReturnType = async ({ newQuery, handler, localParams, query
         return data.map(d => Object.values(d)[0]);
       }
       return data;
-    }).catch(err => makeErrorFromPGError(err, localParams, this));
+    }).catch(err => getClientErrorFromPGError(err, localParams, this));
 
   } else if (sqlTypes.some(v => v === returnType)) {
     if (!(await canRunSQL(handler.dboBuilder.prostgles, localParams))) {
@@ -134,6 +134,6 @@ export const runQueryReturnType = async ({ newQuery, handler, localParams, query
   } else if (["row", "value"].includes(returnType)) {
     return handler.dbHandler.oneOrNone(query).then(data => {
       return (data && returnType === "value") ? Object.values(data)[0] : data;
-    }).catch(err => makeErrorFromPGError(err, localParams, this));
+    }).catch(err => getClientErrorFromPGError(err, localParams, this));
   }
 }

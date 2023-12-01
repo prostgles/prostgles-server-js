@@ -1,5 +1,5 @@
 import { AnyObject, SQLOptions, SQLResult } from "prostgles-types";
-import { DboBuilder, LocalParams, pgp, postgresToTsType } from "../DboBuilder";
+import { DboBuilder, LocalParams, pgp, postgresToTsType } from "./DboBuilder";
 import { DB, Prostgles } from "../Prostgles";
 import { PubSubManager } from "../PubSubManager/PubSubManager";
 import { ParameterizedQuery as PQ } from 'pg-promise';
@@ -15,50 +15,37 @@ export async function runSQL(this: DboBuilder, queryWithoutRLS: string, args: un
     }
   }
 
-  /** Cache types */
-  this.DATA_TYPES ??= await this.db.any("SELECT oid, typname FROM pg_type") ?? [];
-  this.USER_TABLES ??= await this.db.any(`
-    SELECT relid, relname, schemaname, array_to_json(array_agg(c.column_name) FILTER (WHERE c.column_name IS NOT NULL)) as pkey_columns
-    FROM pg_catalog.pg_statio_user_tables t
-    LEFT JOIN (
-      SELECT a.attname as column_name, i.indrelid as table_oid
-      FROM   pg_index i
-      JOIN   pg_attribute a ON a.attrelid = i.indrelid
-        AND a.attnum = ANY(i.indkey)
-      WHERE i.indisprimary
-    ) c
-    ON t.relid = c.table_oid
-    GROUP BY relid, relname, schemaname
-  `) ?? [];
-  this.USER_TABLE_COLUMNS ??= await this.db.any(`
-    SELECT t.relid, t.schemaname,t.relname, c.column_name, c.udt_name, c.ordinal_position
-    FROM information_schema.columns c
-    INNER JOIN pg_catalog.pg_statio_user_tables t
-    ON  c.table_schema = t.schemaname AND c.table_name = t.relname 
-  `);
+  await cacheDBTypes.bind(this)();
 
   if (!(await canRunSQL(this.prostgles, localParams))) throw "Not allowed to run SQL";
 
-  const { returnType, allowListen, hasParams = true }: SQLOptions = options || ({} as any);
+  const { returnType, allowListen, hasParams = true }: SQLOptions = options || ({} as SQLOptions);
   const { socket } = localParams || {};
 
+  let finalQuery = queryWithRLS + "";
+  const isNotListenOrNotify = returnType === "arrayMode" && !["listen ", "notify "].find(c => queryWithRLS.toLowerCase().trim().startsWith(c))
+  if (isNotListenOrNotify) {
+    finalQuery = (new PQ({ text: hasParams ? pgp.as.format(queryWithRLS, args) : queryWithRLS, rowMode: "array" })) as any;
+  }
+
   const db = localParams?.tx?.t || this.db;
-  if (returnType === "noticeSubscription") {
+  if (returnType === "stream") {
+    if (!socket) throw "Only allowed with client socket";
+    const streamInfo = await this.queryStreamer.create({ socket, query: finalQuery });
+    return streamInfo;
+
+  } else if (returnType === "noticeSubscription") {
     if (!socket) throw "Only allowed with client socket"
     return await this.prostgles.dbEventsManager?.addNotice(socket);
+
   } else if (returnType === "statement") {
     try {
       return pgp.as.format(queryWithoutRLS, args);
     } catch (err) {
       throw (err as any).toString();
     }
+    
   } else if (db) {
-
-    let finalQuery = queryWithRLS + "";
-    const isNotListenOrNotify = returnType === "arrayMode" && !["listen ", "notify "].find(c => queryWithRLS.toLowerCase().trim().startsWith(c))
-    if (isNotListenOrNotify) {
-      finalQuery = (new PQ({ text: hasParams ? pgp.as.format(queryWithRLS, args) : queryWithRLS, rowMode: "array" })) as any;
-    }
 
     //@ts-ignore
     const _qres = await db.result<AnyObject>(finalQuery, hasParams ? args : undefined)
@@ -126,6 +113,29 @@ export async function runSQL(this: DboBuilder, queryWithoutRLS: string, args: un
     }
 
   } else console.error("db missing");
+}
+
+export async function cacheDBTypes(this: DboBuilder) {
+  this.DATA_TYPES ??= await this.db.any("SELECT oid, typname FROM pg_type") ?? [];
+  this.USER_TABLES ??= await this.db.any(`
+    SELECT relid, relname, schemaname, array_to_json(array_agg(c.column_name) FILTER (WHERE c.column_name IS NOT NULL)) as pkey_columns
+    FROM pg_catalog.pg_statio_user_tables t
+    LEFT JOIN (
+      SELECT a.attname as column_name, i.indrelid as table_oid
+      FROM   pg_index i
+      JOIN   pg_attribute a ON a.attrelid = i.indrelid
+        AND a.attnum = ANY(i.indkey)
+      WHERE i.indisprimary
+    ) c
+    ON t.relid = c.table_oid
+    GROUP BY relid, relname, schemaname
+  `) ?? [];
+  this.USER_TABLE_COLUMNS ??= await this.db.any(`
+    SELECT t.relid, t.schemaname,t.relname, c.column_name, c.udt_name, c.ordinal_position
+    FROM information_schema.columns c
+    INNER JOIN pg_catalog.pg_statio_user_tables t
+    ON  c.table_schema = t.schemaname AND c.table_name = t.relname 
+  `);
 }
 
 export const canRunSQL = async (prostgles: Prostgles, localParams?: LocalParams): Promise<boolean> => {

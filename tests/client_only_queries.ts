@@ -4,10 +4,27 @@ import { DBSchemaTable, isDefined } from "prostgles-types";
 import { tryRun, tryRunP } from './isomorphic_queries';
 
 export default async function client_only(db: DBHandlerClient, auth: Auth, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[], token: string){
+  await Promise.all([1e3, 1e2].map(async (numberOfRows) => {
+    await tryRunP("SQL Stream", async (resolve) => {
+      const res = await db.sql!(`SELECT v.* FROM generate_series(1, ${numberOfRows}) v`, {}, { returnType: "stream" });
+      let rows: any[] = [];      
+      const listener = async (batchRows) => { 
+        rows = rows.concat(batchRows);
+        if(rows.length === numberOfRows){
+          resolve("ok");
+          stop();
+        }
+      };
+      const startHandler = await res.start(listener);
+      const { stop } = startHandler;
+    });
+  }));
+
+
+  
   /**
    * tableSchema must contan an array of all tables and their columns that have getInfo and getColumns allowed
-   */
-  
+   */  
   await tryRun("Check tableSchema", async () => {
     const dbTables = Object.keys(db).map(k => {
       const h = db[k];

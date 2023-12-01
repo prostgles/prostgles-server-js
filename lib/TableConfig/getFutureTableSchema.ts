@@ -1,5 +1,5 @@
 import { asName } from "prostgles-types";
-import { pgp } from "../DboBuilder";
+import { pgp } from "../DboBuilder/DboBuilder";
 import { DB } from "../Prostgles";
 const {TransactionMode, isolationLevel} = pgp.txMode;
 import { ColumnMinimalInfo, getTableColumns } from "./getColumnDefinitionQuery";

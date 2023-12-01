@@ -1,5 +1,5 @@
 import { asName as _asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE, isObject, JSONB, ColumnInfo } from "prostgles-types";
-import { isPlainObject, JoinInfo } from "../DboBuilder";
+import { isPlainObject, JoinInfo } from "../DboBuilder/DboBuilder";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import { PubSubManager, asValue, log } from "../PubSubManager/PubSubManager";
 import { getTableColumnQueries } from "./getTableColumnQueries";

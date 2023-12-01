@@ -2,7 +2,7 @@ import { AnyObject, ColumnInfo, asName, isEmpty, isObject, pickKeys } from "pros
 import { ValidateRow, ValidateRowBasic } from "../../PublishParser/PublishParser";
 import { DBHandlerServer } from "../../Prostgles";
 import { asValue } from "../../PubSubManager/PubSubManager";
-import { LocalParams, pgp } from "../../DboBuilder";
+import { LocalParams, pgp } from "../DboBuilder";
 
 
 export class ColSet {

@@ -18,7 +18,7 @@
     "ignoreDeprecations": "5.0",
     "declaration": true,
     "skipLibCheck": true,
-    "declarationMap": true
+    "declarationMap": true,
   },
   "exclude": [
     "dist"

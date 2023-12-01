@@ -4,12 +4,12 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { isPlainObject, postgresToTsType, SortItem } from "../../DboBuilder";
-import { isEmpty, asName, ColumnInfo, PG_COLUMN_UDT_DATA_TYPE, isObject, Select, JoinSelect, getKeys, ValidatedColumnInfo, TS_PG_Types } from "prostgles-types";
+import { asName, ColumnInfo, getKeys, isEmpty, isObject, JoinSelect, PG_COLUMN_UDT_DATA_TYPE, Select, ValidatedColumnInfo } from "prostgles-types";
+import { isPlainObject, postgresToTsType, SortItem } from "../DboBuilder";
 
-import { COMPUTED_FIELDS, FieldSpec, FUNCTIONS, FunctionSpec, parseFunction } from "./Functions";
-import { ViewHandler } from "../ViewHandler/ViewHandler";
 import { ParsedJoinPath } from "../ViewHandler/parseJoinPath";
+import { ViewHandler } from "../ViewHandler/ViewHandler";
+import { COMPUTED_FIELDS, FieldSpec, FunctionSpec, parseFunction } from "./Functions";
 
 export type SelectItem = {
   getFields: (args?: any[]) => string[] | "*";
@@ -17,7 +17,6 @@ export type SelectItem = {
   columnPGDataType?: string;
   column_udt_type?: PG_COLUMN_UDT_DATA_TYPE;
   tsDataType?: ValidatedColumnInfo["tsDataType"]
-  // columnName?: string; /* Must only exist if type "column" ... dissalow aliased columns? */
   alias: string;
   selected: boolean;
 } & ({
@@ -246,11 +245,8 @@ export class SelectItemBuilder {
               (typeof val === "string" && val !== "*") ||
               isPlainObject(val) && Object.keys(val).length === 1 && Array.isArray(Object.values(val)[0]) // !isPlainObject(Object.values(val)[0])
             ){
-              // if(!Array.isArray(Object.values(val)[0])){
-              //   throw `Could not parse selected item: ${JSON.stringify(val)}\nFunction arguments must be in an array`;
-              // }
 
-              let funcName, args;
+              let funcName: string | undefined, args: any[] | undefined;
               if(typeof val === "string") {
                 /* Shorthand notation -> it is expected that the key is the column name used as the only argument */
                 try {

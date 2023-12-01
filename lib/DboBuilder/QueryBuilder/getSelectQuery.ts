@@ -1,5 +1,5 @@
 
-import { prepareOrderByQuery } from "../../DboBuilder";
+import { prepareOrderByQuery } from "../DboBuilder";
 import { isDefined, asName } from "prostgles-types";
 import { NewQuery } from "./QueryBuilder";
 import { ViewHandler } from "../ViewHandler/ViewHandler";

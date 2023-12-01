@@ -11,11 +11,11 @@ import {
   DboBuilder,
   Filter,
   LocalParams,
-  TableHandlers, TableSchema, ValidatedTableRules,
+  TableHandlers, ValidatedTableRules,
   escapeTSNames,
   parseError, postgresToTsType,
   withUserRLS
-} from "../../DboBuilder";
+} from "../DboBuilder";
 import { TableEvent } from "../../Logging";
 import { DB, Join } from "../../Prostgles";
 import { TableRule } from "../../PublishParser/PublishParser";
@@ -30,6 +30,7 @@ import { getInfo } from "./getInfo";
 import { parseFieldFilter } from "./parseFieldFilter";
 import { prepareWhere } from "./prepareWhere";
 import { validateViewRules } from "./validateViewRules";
+import { TableSchema } from '../DboBuilderTypes';
 
 export type JoinPaths = {
   t1: string;
@@ -62,8 +63,6 @@ export class ViewHandler {
 
   is_view = true;
   filterDef = "";
-
-  // pubSubManager: PubSubManager;
   is_media = false;
   constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, tx?: { t: pgPromise.ITask<{}>, dbTX: TableHandlers }, joinPaths?: JoinPaths) {
     if (!db || !tableOrViewInfo) throw "";

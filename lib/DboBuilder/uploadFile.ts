@@ -1,5 +1,5 @@
 import { AnyObject, getKeys, isObject } from "prostgles-types";
-import { LocalParams, Media } from "../DboBuilder";
+import { LocalParams, Media } from "./DboBuilder";
 import { ValidateRowBasic } from "../PublishParser/PublishParser";
 import { TableHandler } from "./TableHandler/TableHandler";
 

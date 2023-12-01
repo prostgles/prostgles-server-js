@@ -59,7 +59,7 @@ export const parseJoinPath = ({ rawPath, rootTable, viewHandler, allowMultiOrJoi
   return result;
 }
 
-import { JoinInfo } from "../../DboBuilder";
+import { JoinInfo } from "../DboBuilder";
 
 type Opts = {
   allowMultiOrJoin?: boolean;

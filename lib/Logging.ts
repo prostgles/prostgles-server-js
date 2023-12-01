@@ -1,5 +1,5 @@
 import { AnyObject } from "prostgles-types";
-import { LocalParams } from "./DboBuilder";
+import { LocalParams } from "./DboBuilder/DboBuilder";
 import { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
 
 type ClientInfo = {

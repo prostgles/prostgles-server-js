@@ -1,5 +1,5 @@
 import { AnyObject, UpdateParams } from "prostgles-types";
-import { Filter, LocalParams, makeErrorFromPGError, parseError, withUserRLS } from "../../DboBuilder";
+import { Filter, LocalParams, getClientErrorFromPGError, parseError, withUserRLS } from "../DboBuilder";
 import { TableRule } from "../../PublishParser/PublishParser";
 import { TableHandler } from "./TableHandler";
 
@@ -35,7 +35,7 @@ export async function updateBatch(this: TableHandler, updates: [Filter, AnyObjec
     }
     return this.db.tx(t => {
       return t.none(queries.join(";\n"));
-    }).catch(err => makeErrorFromPGError(err, localParams, this, []));
+    }).catch(err => getClientErrorFromPGError(err, localParams, this, []));
   } catch (e) {
     if (localParams && localParams.testRule) throw e;
     throw parseError(e, `dbo.${this.name}.update()`);

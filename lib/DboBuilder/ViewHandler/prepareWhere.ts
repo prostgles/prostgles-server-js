@@ -1,6 +1,6 @@
 import { AnyObject, FieldFilter, getKeys, isDefined, isObject } from "prostgles-types/dist";
 import { ViewHandler } from "./ViewHandler";
-import { ExistsFilterConfig, Filter, LocalParams } from "../../DboBuilder";
+import { ExistsFilterConfig, Filter, LocalParams } from "../DboBuilder";
 import { SelectItem } from "../QueryBuilder/QueryBuilder";
 import { TableRule } from "../../PublishParser/PublishParser";
 import { getCondition } from "../getCondition";

@@ -1,5 +1,5 @@
 import { asName, ColumnInfo, isEmpty, isObject, PG_COLUMN_UDT_DATA_TYPE, TextFilter_FullTextSearchFilterKeys } from "prostgles-types";
-import { isPlainObject, pgp, postgresToTsType } from "../../DboBuilder";
+import { isPlainObject, pgp, postgresToTsType } from "../DboBuilder";
 import { parseFieldFilter } from "../ViewHandler/parseFieldFilter";
 import { asNameAlias } from "./QueryBuilder";
 

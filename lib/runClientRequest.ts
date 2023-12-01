@@ -1,6 +1,6 @@
 import { AnyObject, TableHandler, getKeys, pickKeys } from "prostgles-types";
 import { Prostgles } from "./Prostgles";
-import { LocalParams, PRGLIOSocket } from "./DboBuilder";
+import { LocalParams, PRGLIOSocket } from "./DboBuilder/DboBuilder";
 import { ExpressReq, UserLike } from "./AuthHandler";
 import { parseFieldFilter } from "./DboBuilder/ViewHandler/parseFieldFilter";
 import { canRunSQL } from "./DboBuilder/runSQL";

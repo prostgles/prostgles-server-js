@@ -1,6 +1,6 @@
 import { Express, NextFunction, Request, Response } from "express";
 import { AnyObject, AuthGuardLocation, AuthGuardLocationResponse, CHANNELS, FieldFilter } from "prostgles-types";
-import { LocalParams, PRGLIOSocket } from "./DboBuilder";
+import { LocalParams, PRGLIOSocket } from "./DboBuilder/DboBuilder";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { removeExpressRoute } from "./FileManager/FileManager";
 import { DB, DBHandlerServer, Prostgles } from "./Prostgles";

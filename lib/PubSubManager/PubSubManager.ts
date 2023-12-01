@@ -5,7 +5,7 @@
 
 import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
 import { addSync } from "./addSync";
-import { TableOrViewInfo, TableInfo, DBHandlerServer, DboBuilder, PRGLIOSocket, canEXECUTE } from "../DboBuilder";
+import { TableOrViewInfo, TableInfo, DBHandlerServer, DboBuilder, PRGLIOSocket, canEXECUTE } from "../DboBuilder/DboBuilder";
 import { DB, isSuperUser } from "../Prostgles";
 import { initPubSubManager } from "./initPubSubManager";
 

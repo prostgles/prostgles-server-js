@@ -16,7 +16,7 @@ const { version } = require('../package.json');
 import { ExpressApp, RestApi, RestApiConfig } from "./RestApi";
 import TableConfigurator, { TableConfig } from "./TableConfig/TableConfig";
  
-import { DBHandlerServer, DboBuilder, LocalParams, PRGLIOSocket, isPlainObject } from "./DboBuilder";
+import { DBHandlerServer, DboBuilder, LocalParams, PRGLIOSocket, isPlainObject } from "./DboBuilder/DboBuilder";
 import { PubSubManager, log } from "./PubSubManager/PubSubManager";
 export { DBHandlerServer };
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
