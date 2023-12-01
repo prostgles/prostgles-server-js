@@ -1,7 +1,7 @@
 import { strict as assert } from 'assert';
 import type { DBHandlerClient, Auth } from "./client/index";
 import { DBSchemaTable, isDefined } from "prostgles-types";
-import { tryRun, tryRunP } from './isomorphic_queries';
+import { tryRun, tryRunP } from './isomorphic_queries'; 
 
 export default async function client_only(db: DBHandlerClient, auth: Auth, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[], token: string){
   await Promise.all([1e3, 1e2].map(async (numberOfRows) => {
@@ -19,7 +19,21 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       const { stop } = startHandler;
     });
   }));
-
+  await tryRunP("SQL Stream value", async (resolve, reject) => {
+    const res = await db.sql!(`SELECT 'ok'`, {}, { returnType: "stream" });
+    let rows: any[] = [];      
+    const listener = async (batchRows) => { 
+      rows = rows.concat(batchRows);
+      try {
+        assert.equal(batchRows[0], { v: "ok" });
+      } catch(err){
+        reject(err);
+        stop();
+      }
+    };
+    const startHandler = await res.start(listener);
+    const { stop } = startHandler;
+  });
 
   
   /**
