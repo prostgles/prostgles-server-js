@@ -19,20 +19,34 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       const { stop } = startHandler;
     });
   }));
-  await tryRunP("SQL Stream value", async (resolve, reject) => {
-    const res = await db.sql!(`SELECT 'ok'`, {}, { returnType: "stream" });
-    let rows: any[] = [];      
-    const listener = async (batchRows) => { 
-      rows = rows.concat(batchRows);
-      try {
-        assert.equal(batchRows[0], { v: "ok" });
-      } catch(err){
-        reject(err);
-        stop();
-      }
-    };
-    const startHandler = await res.start(listener);
-    const { stop } = startHandler;
+  await tryRunP("SQL Stream parallel execution + parameters", async (resolve, reject) => {
+    const getExpected = (val: string) => new Promise(async (resolve, reject) => {
+      const res = await db.sql!("SELECT ${val} as val", { val }, { returnType: "stream" });
+      let rows: any[] = [];      
+      const listener = async (batchRows) => { 
+        rows = rows.concat(batchRows);
+        try {
+          assert.deepStrictEqual(batchRows[0], { val });
+          assert.equal(batchRows.length, 1);
+          resolve(1);
+        } catch(err){
+          reject(err);
+          stop();
+        }
+      };
+      const startHandler = await res.start(listener);
+      const { stop } = startHandler;
+    });
+    let resolved = 0;
+    const expected = ["a", "b", "c"];
+    expected.forEach((val) => {
+      getExpected(val).then(() => {
+        resolved++;
+        if(resolved === expected.length){
+          resolve("ok");
+        }
+      }).catch(reject);
+    })
   });
 
   

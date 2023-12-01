@@ -31,7 +31,7 @@ export async function runSQL(this: DboBuilder, queryWithoutRLS: string, args: un
   const db = localParams?.tx?.t || this.db;
   if (returnType === "stream") {
     if (!socket) throw "Only allowed with client socket";
-    const streamInfo = await this.queryStreamer.create({ socket, query: finalQuery });
+    const streamInfo = await this.queryStreamer.create({ socket, query: pgp.as.format(queryWithRLS, args) });
     return streamInfo;
 
   } else if (returnType === "noticeSubscription") {
