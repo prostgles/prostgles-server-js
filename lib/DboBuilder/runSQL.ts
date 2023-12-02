@@ -3,6 +3,7 @@ import { DboBuilder, LocalParams, pgp, postgresToTsType } from "./DboBuilder";
 import { DB, Prostgles } from "../Prostgles";
 import { PubSubManager } from "../PubSubManager/PubSubManager";
 import { ParameterizedQuery as PQ } from 'pg-promise';
+import pg from "pg-promise/typescript/pg-subset";
 
 
 export async function runSQL(this: DboBuilder, queryWithoutRLS: string, args: undefined | AnyObject | any[], options: SQLOptions | undefined, localParams?: LocalParams) {
@@ -31,7 +32,7 @@ export async function runSQL(this: DboBuilder, queryWithoutRLS: string, args: un
   const db = localParams?.tx?.t || this.db;
   if (returnType === "stream") {
     if (!socket) throw "Only allowed with client socket";
-    const streamInfo = await this.queryStreamer.create({ socket, query: pgp.as.format(queryWithRLS, args) });
+    const streamInfo = await this.queryStreamer.create({ socket, query: pgp.as.format(queryWithRLS, args), options });
     return streamInfo;
 
   } else if (returnType === "noticeSubscription") {
@@ -92,22 +93,7 @@ export async function runSQL(this: DboBuilder, queryWithoutRLS: string, args: un
       const qres: SQLResult<typeof returnType> = {
         duration: 0,
         ..._qres,
-        fields: fields?.map(f => {
-          const dataType = this.DATA_TYPES!.find(dt => +dt.oid === +f.dataTypeID)?.typname ?? "text",
-            table = this.USER_TABLES!.find(t => +t.relid === +f.tableID),
-            column = this.USER_TABLE_COLUMNS!.find(c => +c.relid === +f.tableID && c.ordinal_position === f.columnID),
-            tsDataType = postgresToTsType(dataType);
-
-          return {
-            ...f,
-            tsDataType,
-            dataType,
-            udt_name: dataType,
-            tableName: table?.relname,
-            tableSchema: table?.schemaname,
-            columnName: column?.column_name
-          }
-        }) ?? []
+        fields: getDetailedFieldInfo.bind(this)(fields),
       };
       return qres;
     }
@@ -136,6 +122,25 @@ export async function cacheDBTypes(this: DboBuilder) {
     INNER JOIN pg_catalog.pg_statio_user_tables t
     ON  c.table_schema = t.schemaname AND c.table_name = t.relname 
   `);
+}
+
+export function getDetailedFieldInfo(this: DboBuilder, fields: pg.IColumn[]) {
+  return fields?.map(f => {
+    const dataType = this.DATA_TYPES!.find(dt => +dt.oid === +f.dataTypeID)?.typname ?? "text",
+      table = this.USER_TABLES!.find(t => +t.relid === +f.tableID),
+      column = this.USER_TABLE_COLUMNS!.find(c => +c.relid === +f.tableID && c.ordinal_position === f.columnID),
+      tsDataType = postgresToTsType(dataType);
+
+    return {
+      ...f,
+      tsDataType,
+      dataType,
+      udt_name: dataType,
+      tableName: table?.relname,
+      tableSchema: table?.schemaname,
+      columnName: column?.column_name
+    }
+  }) ?? [];
 }
 
 export const canRunSQL = async (prostgles: Prostgles, localParams?: LocalParams): Promise<boolean> => {

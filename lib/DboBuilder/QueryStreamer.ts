@@ -1,12 +1,16 @@
 import { DB } from "../initProstgles";
 // import { Pool } from "pg";
 import { QueryIterablePool } from 'pg-iterator';
+import { CHANNELS, SQLOptions, SocketSQLStreamPacket, SocketSQLStreamServer } from "prostgles-types";
 import { PRGLIOSocket } from "./DboBuilderTypes";
-import { CHANNELS, SocketSQLStreamServer } from "prostgles-types";
+import { getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
+import { getDetailedFieldInfo } from "./runSQL";
+import { DboBuilder } from "./DboBuilder";
 
 type ClientStreamedRequest = {
   socket: PRGLIOSocket;
   query: string;
+  options: SQLOptions | undefined;
   persistConnection?: boolean;
 
 }
@@ -25,10 +29,12 @@ const getSetShortSocketId = (socketId: string) => {
 
 export class QueryStreamer {
   db: DB;
+  dboBuilder: DboBuilder;
   socketQueries: Record<string, Record<string, StreamedQuery>> = {};
 
-  constructor(db: DB) {
-    this.db = db;
+  constructor(dboBuilder: DboBuilder) {
+    this.dboBuilder = dboBuilder;
+    this.db = dboBuilder.db;
   }
 
   create = async (query: ClientStreamedRequest): Promise<SocketSQLStreamServer> => {
@@ -48,26 +54,62 @@ export class QueryStreamer {
       ...query,
       iterablePool: undefined,
     };
-    
-    let batchRows: any[] = [];
-    const batchSize = 1000;
+    const { options } = query
     const startStream = async () => {
       const socketQuery = this.socketQueries[socketId]?.[id];
       if(!socketQuery){
         throw "socket query not found";
       }
-      const iterablePool = new QueryIterablePool(this.db.$pool as any);
+      // this.db.connect().then(client => { client.query({ rowMode: "array", text: "" })  }).catch(err => { console.log(err) });
+      const iterablePool = new QueryIterablePool(this.db.$pool as any, { rowMode: "array" });
       const iterable = iterablePool.query(query.query);
       socketQuery.iterablePool = iterablePool;
+      // const connectionId = await iterablePool.query(`SELECT pg_backend_pid()`);
       (async () => {
-        for await (const u of iterable) {
-          batchRows.push(u);
-          if (batchRows.length >= batchSize) {
-            socket.emit(channel, batchRows);
-            batchRows = [];
+        let emittedPackets = 0;
+        let batchRows: any[] = [];
+        let finished = false;
+        const batchSize = 1000;
+        const emit = (type: "rows" | "error" | "ended", rawError?: any) => {
+          let packet: SocketSQLStreamPacket | undefined;
+          const ended = type === "ended";
+          if(finished) return
+          finished = finished || ended;
+          if(type === "error"){
+            const error = getSerializedClientErrorFromPGError(rawError);
+            packet = { type: "error", error };
+          } else if (!emittedPackets) {
+            const fields = getDetailedFieldInfo.bind(this.dboBuilder)(iterablePool.fields as any);
+            packet = { type: "start", rows: batchRows, fields, ended };
+          } else {
+            packet = { type: "rows", rows: batchRows, ended };
           }
+          socket.emit(channel, packet);
+          if(ended){
+            iterablePool.release();
+          }
+          emittedPackets++;
         }
-        socket.emit(channel, batchRows);
+        try {
+          for await (const u of iterable) {
+            batchRows.push(u);
+            if(options?.streamLimit) {
+              if(batchRows.length >= options.streamLimit){
+                emit("ended");
+                break;
+              }
+            }
+            if (batchRows.length >= batchSize) {
+              emit("rows");
+              batchRows = [];
+            }
+          }
+          emit("ended");
+
+
+        } catch(err){
+          emit("error", err);
+        }
       })();
     }
 

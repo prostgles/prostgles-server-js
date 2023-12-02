@@ -118,14 +118,12 @@ export class DboBuilder {
     if (!this.prostgles.db) throw "db missing"
     this.db = this.prostgles.db;
     this.dbo = {} as unknown as DBHandlerServer;
-    this.queryStreamer = new QueryStreamer(this.db);
-    // this.queryStreamer.startQuery({ id: "1", query: "", onData: console.log as any });
+    this.queryStreamer = new QueryStreamer(this);
   }
 
   private init = async () => {
 
-
-    /* If watchSchema then PubSubManager must be created (if possible) */
+    /* If watchSchema is enabled then PubSubManager must be created (if possible) */
     await this.build();
     if (
       this.prostgles.opts.watchSchema &&

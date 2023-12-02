@@ -1,8 +1,7 @@
 import { strict as assert } from 'assert';
-
+import * as fs from "fs";
 import type { DBHandlerServer } from "./server/dist/server/index";
 import type { DBHandlerClient } from "./client/index";
-import * as fs from "fs";
 
 export async function tryRun(desc: string, func: () => any, log?: Function){
   try {
@@ -27,6 +26,7 @@ export function tryRunP(desc: string, func: (resolve: any, reject: any) => any, 
       clearTimeout(testTimeout);
     } catch(err: any){
       opts?.log?.(`${desc} failed: ` + JSON.stringify(err));
+      rj(err);
       await tout(50);
       throw err;    
     }
@@ -48,10 +48,11 @@ export default async function isomorphic(db: Required<DBHandlerServer> | DBHandl
     await db.items2.delete!({ });
     await db.items.delete!({ });
   }
-  await db.sql(`TRUNCATE items  RESTART IDENTITY CASCADE;`)
+  await db.sql!(`TRUNCATE items  RESTART IDENTITY CASCADE;`)
  
   
   await tryRun("Prepare data", async () => {
+    if(!db.sql) throw "db.sql missing";
     const res = await db.items.insert!([{ name: "a" }, { name: "a" }, { name: "b" }], { returning: "*" }); 
     assert.equal(res.length, 3);
     const added1 = '04 Dec 1995 00:12:00';
@@ -445,7 +446,6 @@ export default async function isomorphic(db: Required<DBHandlerServer> | DBHandl
 
   await tryRunP("subscribe", async (resolve, reject) => {
     await db.various.insert!({ id: 99 });
-    console.log("subscribing")
     const sub = await db.various.subscribe!({ id: 99  }, {  }, async items => {
       const item = items[0];
       

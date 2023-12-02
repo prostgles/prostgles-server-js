@@ -29,7 +29,8 @@ export function escapeTSNames(str: string, capitalize = false): string {
   return JSON.stringify(res);
 }
 
-export function getClientErrorFromPGError(err: any, localParams?: LocalParams, view?: ViewHandler, allowedKeys?: string[]) {
+export function getSerializedClientErrorFromPGError(rawError: any, localParams?: LocalParams, view?: ViewHandler, allowedKeys?: string[]) {
+  const err = rawError instanceof Error ? JSON.parse(JSON.stringify(rawError, Object.getOwnPropertyNames(rawError))) : rawError
   if (process.env.PRGL_DEBUG) {
     console.trace(err)
   }
@@ -54,7 +55,10 @@ export function getClientErrorFromPGError(err: any, localParams?: LocalParams, v
       }
     }
   }
-  return Promise.reject(errObject);
+  return errObject;
+}
+export function getClientErrorFromPGError(rawError: any, localParams?: LocalParams, view?: ViewHandler, allowedKeys?: string[]) {
+  return Promise.reject(getSerializedClientErrorFromPGError(rawError, localParams, view, allowedKeys));
 }
 
 /**

@@ -1,41 +1,42 @@
 import { strict as assert } from 'assert';
 import type { DBHandlerClient, Auth } from "./client/index";
-import { DBSchemaTable, isDefined } from "prostgles-types";
+import { DBSchemaTable, SocketSQLStreamPacket, isDefined } from "prostgles-types";
 import { tryRun, tryRunP } from './isomorphic_queries'; 
+import { reject } from 'bluebird';
 
 export default async function client_only(db: DBHandlerClient, auth: Auth, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[], token: string){
   await Promise.all([1e3, 1e2].map(async (numberOfRows) => {
     await tryRunP("SQL Stream", async (resolve) => {
       const res = await db.sql!(`SELECT v.* FROM generate_series(1, ${numberOfRows}) v`, {}, { returnType: "stream" });
       let rows: any[] = [];      
-      const listener = async (batchRows) => { 
-        rows = rows.concat(batchRows);
-        if(rows.length === numberOfRows){
-          resolve("ok");
-          stop();
+      const listener = async (packet: SocketSQLStreamPacket) => { 
+        if(packet.type === "error"){
+          reject(packet.error);
+        } else {
+          rows = rows.concat(packet.rows);
+          if(packet.ended){
+            assert.equal(rows.length, numberOfRows);
+            resolve("ok");
+          }
         }
       };
       const startHandler = await res.start(listener);
-      const { stop } = startHandler;
     });
   }));
   await tryRunP("SQL Stream parallel execution + parameters", async (resolve, reject) => {
     const getExpected = (val: string) => new Promise(async (resolve, reject) => {
       const res = await db.sql!("SELECT ${val} as val", { val }, { returnType: "stream" });
-      let rows: any[] = [];      
-      const listener = async (batchRows) => { 
-        rows = rows.concat(batchRows);
+      const listener = async (packet: SocketSQLStreamPacket) => { 
         try {
-          assert.deepStrictEqual(batchRows[0], { val });
-          assert.equal(batchRows.length, 1);
+          assert.equal(packet.type, "start");
+          assert.equal(packet.ended, true);
+          assert.deepStrictEqual(packet.rows, [[val]]);
           resolve(1);
         } catch(err){
           reject(err);
-          stop();
         }
       };
       const startHandler = await res.start(listener);
-      const { stop } = startHandler;
     });
     let resolved = 0;
     const expected = ["a", "b", "c"];
@@ -48,6 +49,92 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       }).catch(reject);
     })
   });
+  await tryRunP("SQL Stream query error", async (resolve, reject) => {
+    const res = await db.sql!("SELECT * FROM not_existing_table", {}, { returnType: "stream" });
+    const listener = async (packet: SocketSQLStreamPacket) => { 
+      try {
+        assert.equal(packet.type, "error");
+        assert.equal(packet.error.message, 'relation "not_existing_table" does not exist');
+        resolve("ok");
+      } catch(err){
+        reject(err);
+      }
+    };
+    const startHandler = await res.start(listener);
+  });
+  await tryRunP("SQL Stream streamLimit", async (resolve, reject) => {
+    const generate_series = "SELECT * FROM generate_series(1, 100)";
+    const res = await db.sql!(generate_series, {}, { returnType: "stream", streamLimit: 10 });
+    const listener = async (packet: SocketSQLStreamPacket) => { 
+      if(packet.type === "error"){
+        reject(packet.error);
+      } else {
+        assert.equal(packet.type, "start");
+        assert.equal(packet.ended, true);
+        assert.equal(packet.rows.length, 10);
+
+        const normalSql = await db.sql!(generate_series, {});
+
+        /** fields the same as on normal sql request */
+        assert.deepStrictEqual(packet.fields, normalSql.fields);
+
+        /** result is rowMode=array */
+        assert.equal(Array.isArray(packet.rows), true);
+        assert.equal(Array.isArray(packet.rows[0]), true);
+
+        assert.deepStrictEqual(packet.rows.flat(), Array.from({ length: 10 }, (_, i) => i + 1).flat());
+        resolve("ok");
+      }
+    };
+    const startHandler = await res.start(listener);
+  });
+
+  await tryRunP("SQL Stream table fields are the same as on default request", async (resolve, reject) => {
+    await db.sql!("INSERT INTO planes (last_updated) VALUES (56789);", {});
+    const res = await db.sql!("SELECT * FROM planes", {}, { returnType: "stream" });
+    const listener = async (packet: SocketSQLStreamPacket) => { 
+      if(packet.type === "error"){
+        reject(packet.error);
+      } else {
+        assert.equal(packet.type, "start");
+        assert.equal(packet.ended, true);
+        assert.equal(packet.rows.length, 1);
+        const normalSql = await db.sql!("SELECT * FROM planes LIMIT 1", {});
+        await db.sql!("DELETE FROM planes", {}); 
+        assert.deepStrictEqual(packet.fields, normalSql.fields);
+        assert.equal(packet.fields.length > 0, true);
+        resolve("ok");
+      }
+    };
+    const startHandler = await res.start(listener);
+  });
+  // await tryRunP("SQL Stream ensure the connection is never released (same pg_backend_pid is the same for subsequent) queries when using persistConnectionId", async (resolve, reject) => {
+  //   const res = await db.sql!("SELECT pg_backend_pid()", {}, { returnType: "stream", persistConnectionId: true });
+  //   const listener = async (packet: SocketSQLStreamPacket) => { 
+  //     if(packet.type === "error"){
+  //       reject(packet.error);
+  //     } else {
+  //       assert.equal(packet.type, "start");
+  //       assert.equal(packet.ended, true);
+  //       assert.equal(packet.rows.length, 1);
+  //       const pid = packet.rows[0].pg_backend_pid;
+  //       const res2 = await db.sql!("SELECT pg_backend_pid()", {}, { returnType: "stream", persistConnectionId: true });
+  //       const listener2 = async (packet: SocketSQLStreamPacket) => { 
+  //         if(packet.type === "error"){
+  //           reject(packet.error);
+  //         } else {
+  //           assert.equal(packet.type, "start");
+  //           assert.equal(packet.ended, true);
+  //           assert.equal(packet.rows.length, 1);
+  //           assert.equal(packet.rows[0].pg_backend_pid, pid);
+  //           resolve("ok");
+  //         }
+  //       };
+  //       const startHandler2 = await res2.start(listener2);
+  //     }
+  //   };
+  //   const startHandler = await res.start(listener);
+  // });
 
   
   /**
@@ -72,7 +159,6 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
   });
 
   const testRealtime = () => {
-
     return new Promise(async (resolve, reject) => {
       try {
 
@@ -82,6 +168,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
   
       /* RAWSQL */
       await tryRun("SQL Full result", async () => {
+        if(!db.sql) throw "db.sql missing";
         const sqlStatement = await db.sql("SELECT $1", [1], { returnType: "statement" });
         assert.equal(sqlStatement, "SELECT 1", "db.sql statement query failed");
 
@@ -113,6 +200,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       });
 
       await tryRunP("sql LISTEN NOTIFY events", async (resolve, reject) => {
+        if(!db.sql) throw "db.sql missing";
         
         try {
           
@@ -134,6 +222,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       });
 
       await tryRunP("sql NOTICE events", async (resolve, reject) => {
+        if(!db.sql) throw "db.sql missing";
         
         const sub = await db.sql("", {}, { returnType: "noticeSubscription" });
         
