@@ -47,8 +47,6 @@ export class QueryStreamer {
       throw `Must stop existing query ${id} first`;
     }
 
-    // const pool = new Pool(this.db.$cn as any);
-
     this.socketQueries[socketId] ??= {}
     this.socketQueries[socketId]![id] ??= {
       ...query,
@@ -70,10 +68,11 @@ export class QueryStreamer {
         let batchRows: any[] = [];
         let finished = false;
         const batchSize = 1000;
+
         const emit = (type: "rows" | "error" | "ended", rawError?: any) => {
           let packet: SocketSQLStreamPacket | undefined;
           const ended = type === "ended";
-          if(finished) return
+          if(finished) return;
           finished = finished || ended;
           if(type === "error"){
             const error = getSerializedClientErrorFromPGError(rawError);
@@ -90,6 +89,7 @@ export class QueryStreamer {
           }
           emittedPackets++;
         }
+
         try {
           for await (const u of iterable) {
             batchRows.push(u);
