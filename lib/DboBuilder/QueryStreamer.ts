@@ -1,6 +1,6 @@
 import { DB } from "../initProstgles";
 import * as pg from "pg";
-import { AnyObject, CHANNELS, SQLOptions, SocketSQLStreamPacket, SocketSQLStreamServer } from "prostgles-types";
+import { CHANNELS, SQLOptions, SocketSQLStreamPacket, SocketSQLStreamServer } from "prostgles-types";
 import { PRGLIOSocket } from "./DboBuilderTypes";
 import { getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
 import { getDetailedFieldInfo, watchSchemaFallback } from "./runSQL";
@@ -20,6 +20,7 @@ type ClientStreamedRequest = {
 type StreamedQuery = ClientStreamedRequest & {
   stream: QueryStreamType | undefined;
   poolClient: pg.PoolClient | undefined;
+  onError: ((error: any) => void);
 }
 
 const shortSocketIds: Record<string, number> = {};
@@ -40,8 +41,20 @@ export class QueryStreamer {
   constructor(dboBuilder: DboBuilder) {
     this.dboBuilder = dboBuilder;
     this.db = dboBuilder.db;
-    this.pool = new pg.Pool( typeof this.db.$cn === "string"? { connectionString: this.db.$cn } : this.db.$cn as any);
-    this.adminPool = new pg.Pool( typeof this.db.$cn === "string"? { connectionString: this.db.$cn } : this.db.$cn as any);
+    const connectionInfo = typeof this.db.$cn === "string"? { connectionString: this.db.$cn } : this.db.$cn as any;
+    const onPoolError = (err: Error, _client: pg.PoolClient) => {
+      console.error(err.message);
+    }
+    this.pool = new pg.Pool({ ...connectionInfo, max: 50 }).on("error", (error) => {
+      // if(error.message !== "Connection terminated") return;
+      Object.entries(this.socketQueries).forEach(([socketId, queries]) => {
+        Object.entries(queries).forEach(([id, query]) => {
+          query.onError?.({ message: error.message });
+          delete this.socketQueries[socketId]?.[id];
+        });
+      });
+    });
+    this.adminPool = new pg.Pool(connectionInfo).on("error", onPoolError);
   }
 
   create = async (query: ClientStreamedRequest): Promise<SocketSQLStreamServer> => {
@@ -54,12 +67,23 @@ export class QueryStreamer {
       throw `Must stop existing query ${id} first`;
     }
 
-    this.socketQueries[socketId] ??= {}
-    this.socketQueries[socketId]![id] ??= {
+    this.socketQueries[socketId] ??= {};
+    let errored = false;
+    const socketQuery = {
       ...query,
       poolClient: undefined,
       stream: undefined,
+      onError: (rawError: any) => {
+        if(errored) return;
+        errored = true;
+
+        const errorWithoutQuery = getSerializedClientErrorFromPGError(rawError, { type: "sql" });
+        // For some reason query is not present on the error object from sql stream mode
+        const error = { ...errorWithoutQuery, query: query.query };
+        socket.emit(channel, { type: "error", error } satisfies SocketSQLStreamPacket);
+      },
     };
+    this.socketQueries[socketId]![id] ??= socketQuery;
     const { options } = query
     let processID = -1;
     const startStream = async () => {
@@ -74,18 +98,13 @@ export class QueryStreamer {
         const batchSize = 10000;
         let stream: QueryStreamType;
         let poolClient: pg.PoolClient;
-        const emit = (type: "rows" | "error" | "ended", rawError: any | undefined, stream: QueryStreamType | undefined) => {
+        const emit = (type: "rows" | "ended", stream: QueryStreamType | undefined) => {
           const result = stream?._result as { command: string; fields: any[] } | undefined;
           let packet: SocketSQLStreamPacket | undefined;
           const ended = type === "ended";
           if(finished) return;
           finished = finished || ended;
-          if(type === "error"){
-            const errorWithoutQuery = getSerializedClientErrorFromPGError(rawError, { type: "sql" });
-            // For some reason query is not present on the error object from sql stream mode
-            const error = { ...errorWithoutQuery, query: query.query };
-            packet = { type: "error", error };
-          } else if (!emittedPackets) {
+          if (!emittedPackets) {
             if(!result?.fields) throw "No fields";
             const fields = getDetailedFieldInfo.bind(this.dboBuilder)(result.fields as any);
             packet = { type: "start", rows: batchRows, fields, ended, processId: processID };
@@ -115,20 +134,20 @@ export class QueryStreamer {
               batchRows.push(data);
               if(options?.streamLimit) {
                 if(batchRows.length >= options.streamLimit){
-                  emit("ended", undefined, stream);
+                  emit("ended", stream);
                 }
               }
               if (batchRows.length >= batchSize) {
-                emit("rows", undefined, stream);
+                emit("rows", stream);
                 batchRows = [];
               }
             });
             stream.on('error', error => {
-              emit("error", error, stream);
+              socketQuery.onError(error);
             });
             
             stream.on('end', () => {
-              emit("ended", undefined, stream);
+              emit("ended", stream);
               // release the client when the stream is finished
               if(!options?.persistStreamConnection){
                 delete this.socketQueries[socketId]?.[id];
@@ -137,19 +156,20 @@ export class QueryStreamer {
             })
           });
         } catch(err){
-          emit("error", err, undefined);
+          socketQuery.onError(err);
         }
       })();
     }
 
-    const stop = (_data: any, cb: BasicCallback) => {
+    const stop = (opts: { terminate?: boolean; } | undefined, cb: BasicCallback) => {
       // Must kill query if not ended
       const { stream, poolClient } = this.socketQueries[socketId]?.[id] ?? {};
       if(!stream || !poolClient) return;
       this.adminPool.connect(async (err, client, done) => {
         if (err) return cb(null, err);
         if (!client) return cb(null, "No client");
-        client.query(`SELECT pg_cancel_backend(pid) FROM pg_stat_activity WHERE pid = $1`, [processID], (err) => {
+        const stopFunction = opts?.terminate? "pg_terminate_backend" : "pg_cancel_backend";
+        client.query(`SELECT ${stopFunction}(pid) FROM pg_stat_activity WHERE pid = $1`, [processID], (err) => {
           if(err) {
             cb(null, err);
             console.error(err);
@@ -181,7 +201,7 @@ export class QueryStreamer {
     /** If not started in 5 seconds then assume this will never happen */
     setTimeout(() => {
       if(started) return;
-      stop(null, () => { 
+      stop({}, () => { 
         // empty 
       });
     }, 5e3);

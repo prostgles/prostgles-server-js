@@ -134,6 +134,34 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       startHandler.stop().catch(reject);
     }, 1000);
   }); 
+  // await tryRunP("SQL Stream stop with terminate kills the query", async (resolve, reject) => {
+  //   const totalRows = 5e6;
+  //   const query = `SELECT * FROM generate_series(1, ${totalRows})`;
+  //   const res = await db.sql!(query, {}, { returnType: "stream" });
+  //   const rowsReceived: any[] = [];
+  //   const listener = async (packet: SocketSQLStreamPacket) => { 
+  //     if(packet.type === "error"){
+  //       const queryState = await db.sql!("SELECT * FROM pg_stat_activity WHERE query = $1", [query], { returnType: "rows" });
+  //       assert.equal(queryState.length, 1);
+  //       assert.equal(queryState[0].state, "idle");
+  //       assert.equal(packet.error.message, "canceling statement due to user request");
+  //       resolve("ok");
+  //     } else {
+  //       try {
+  //         rowsReceived.push(...packet.rows);
+  //         console.log(rowsReceived.length)
+  //         assert.equal(packet.ended, false);
+  //         assert.equal(rowsReceived.length < totalRows, true);
+  //       } catch(error){
+  //         reject(error);
+  //       }
+  //     }
+  //   };
+  //   const startHandler = await res.start(listener);
+  //   setTimeout(() => {
+  //     startHandler.stop(true).catch(reject);
+  //   }, 22);
+  // }); 
 
   // await tryRunP("SQL Stream ensure the connection is never released (same pg_backend_pid is the same for subsequent) queries when using persistConnectionId", async (resolve, reject) => {
   //   const res = await db.sql!("SELECT pg_backend_pid()", {}, { returnType: "stream", persistConnectionId: true });

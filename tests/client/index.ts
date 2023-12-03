@@ -92,13 +92,17 @@ try {
       onReady: async (db, methods, tableSchema, auth, isReconnect) => {
         log(`TEST_NAME: ${TEST_NAME} Started`)
         try {
-          // if(typeof window !== "undefined"){
-          //   window.onerror = function myErrorHandler(errorMsg, url, lineNumber) {
-          //     console.error("Error occured: " + errorMsg);
-          //     stopTest({ err: errorMsg });
-          //     return false;
-          //   }
-          // }
+          if(typeof window !== "undefined"){
+            const onLog = (...args: any[]) => {
+              socket.emit("log", args.map(v => typeof v === "object"? JSON.stringify(v) : v).join(" "));
+            }
+            window.onerror = function myErrorHandler(errorMsg, url, lineNumber) {
+              console.error("Error occured: " + errorMsg);
+              stopTest({ err: errorMsg });
+              return false;
+            }
+            console.log = onLog;
+          }
           await test.onRun(db, methods, tableSchema, auth, isReconnect);
   
           stopTest();
