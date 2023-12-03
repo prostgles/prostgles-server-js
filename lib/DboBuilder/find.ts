@@ -116,7 +116,7 @@ export const runQueryReturnType = async ({ newQuery, handler, localParams, query
         return data.map(d => Object.values(d)[0]);
       }
       return data;
-    }).catch(err => getClientErrorFromPGError(err, localParams, this));
+    }).catch(err => getClientErrorFromPGError(err, { type: "tableMethod", localParams, view: handler, }));
 
   } else if (sqlTypes.some(v => v === returnType)) {
     if (!(await canRunSQL(handler.dboBuilder.prostgles, localParams))) {
@@ -134,6 +134,6 @@ export const runQueryReturnType = async ({ newQuery, handler, localParams, query
   } else if (["row", "value"].includes(returnType)) {
     return handler.dbHandler.oneOrNone(query).then(data => {
       return (data && returnType === "value") ? Object.values(data)[0] : data;
-    }).catch(err => getClientErrorFromPGError(err, localParams, this));
+    }).catch(err => getClientErrorFromPGError(err,  { type: "tableMethod", localParams, view: handler, }));
   }
 }

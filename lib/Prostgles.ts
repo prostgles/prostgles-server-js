@@ -16,7 +16,7 @@ const { version } = require('../package.json');
 import { ExpressApp, RestApi, RestApiConfig } from "./RestApi";
 import TableConfigurator, { TableConfig } from "./TableConfig/TableConfig";
  
-import { DBHandlerServer, DboBuilder, LocalParams, PRGLIOSocket, isPlainObject } from "./DboBuilder/DboBuilder";
+import { DBHandlerServer, DboBuilder, LocalParams, PRGLIOSocket, getErrorAsObject, isPlainObject } from "./DboBuilder/DboBuilder";
 import { PubSubManager, log } from "./PubSubManager/PubSubManager";
 export { DBHandlerServer };
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -745,17 +745,8 @@ export class Prostgles {
   }
 }
 
-const getSerializableError = (err: any) => {
-  const err_msg = (err instanceof Error) ?
-    err.toString() :
-    isPlainObject(err) ?
-      JSON.stringify(err, null, 2) :
-      (err as any).toString(),
-    e = { err_msg, err };
-  return e;
-}
 function makeSocketError(cb: Function, err: any) {
-  cb(getSerializableError(err));
+  cb(getErrorAsObject(err));
 }
 
 type SocketRequestParams = {

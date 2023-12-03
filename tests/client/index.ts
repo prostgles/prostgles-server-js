@@ -92,6 +92,13 @@ try {
       onReady: async (db, methods, tableSchema, auth, isReconnect) => {
         log(`TEST_NAME: ${TEST_NAME} Started`)
         try {
+          // if(typeof window !== "undefined"){
+          //   window.onerror = function myErrorHandler(errorMsg, url, lineNumber) {
+          //     console.error("Error occured: " + errorMsg);
+          //     stopTest({ err: errorMsg });
+          //     return false;
+          //   }
+          // }
           await test.onRun(db, methods, tableSchema, auth, isReconnect);
   
           stopTest();

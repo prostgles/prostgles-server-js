@@ -35,7 +35,7 @@ export async function updateBatch(this: TableHandler, updates: [Filter, AnyObjec
     }
     return this.db.tx(t => {
       return t.none(queries.join(";\n"));
-    }).catch(err => getClientErrorFromPGError(err, localParams, this, []));
+    }).catch(err => getClientErrorFromPGError(err, { type: "tableMethod", localParams, view: this, allowedKeys: []}));
   } catch (e) {
     if (localParams && localParams.testRule) throw e;
     throw parseError(e, `dbo.${this.name}.update()`);

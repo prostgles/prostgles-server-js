@@ -88,9 +88,9 @@ export const runInsertUpdateQuery = async ({ tableHandler, queryWithoutUserRLS, 
 
   const tx = localParams?.tx?.t || tableHandler.tx?.t;
   if (tx) {
-    result = await tx[queryType](query).catch((err: any) => getClientErrorFromPGError(err, localParams, tableHandler, allowedFieldKeys));
+    result = await tx[queryType](query).catch((err: any) => getClientErrorFromPGError(err, { type: "tableMethod", localParams, view: tableHandler, allowedKeys: allowedFieldKeys }));
   } else {
-    result = await tableHandler.db.tx(t => (t as any)[queryType](query)).catch(err => getClientErrorFromPGError(err, localParams, tableHandler, allowedFieldKeys));
+    result = await tableHandler.db.tx(t => (t as any)[queryType](query)).catch(err => getClientErrorFromPGError(err, { type: "tableMethod", localParams, view: tableHandler, allowedKeys: allowedFieldKeys }));
   }
 
   if(checkFilter && result.failed_check?.length){

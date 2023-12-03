@@ -1,8 +1,8 @@
-import { AnyObject, SQLOptions, SQLResult } from "prostgles-types";
+import { AnyObject, SQLOptions, SQLResult, SQLResultInfo } from "prostgles-types";
 import { DboBuilder, LocalParams, pgp, postgresToTsType } from "./DboBuilder";
 import { DB, Prostgles } from "../Prostgles";
 import { PubSubManager } from "../PubSubManager/PubSubManager";
-import { ParameterizedQuery as PQ } from 'pg-promise';
+import { ParameterizedQuery as PQ, ParameterizedQuery } from 'pg-promise';
 import pg from "pg-promise/typescript/pg-subset";
 
 
@@ -18,19 +18,17 @@ export async function runSQL(this: DboBuilder, queryWithoutRLS: string, args: un
 
   await cacheDBTypes.bind(this)();
 
-  if (!(await canRunSQL(this.prostgles, localParams))) throw "Not allowed to run SQL";
+  if (!(await canRunSQL(this.prostgles, localParams))) {
+    throw "Not allowed to run SQL";
+  }
 
   const { returnType, allowListen, hasParams = true }: SQLOptions = options || ({} as SQLOptions);
   const { socket } = localParams || {};
 
-  let finalQuery = queryWithRLS + "";
-  const isNotListenOrNotify = returnType === "arrayMode" && !["listen ", "notify "].find(c => queryWithRLS.toLowerCase().trim().startsWith(c))
-  if (isNotListenOrNotify) {
-    finalQuery = (new PQ({ text: hasParams ? pgp.as.format(queryWithRLS, args) : queryWithRLS, rowMode: "array" })) as any;
-  }
 
   const db = localParams?.tx?.t || this.db;
   if (returnType === "stream") {
+    if(localParams?.tx) throw "Cannot use stream with localParams transaction";
     if (!socket) throw "Only allowed with client socket";
     const streamInfo = await this.queryStreamer.create({ socket, query: pgp.as.format(queryWithRLS, args), options });
     return streamInfo;
@@ -46,59 +44,83 @@ export async function runSQL(this: DboBuilder, queryWithoutRLS: string, args: un
       throw (err as any).toString();
     }
     
-  } else if (db) {
+  }
+  
+  if (!db) {
+    throw "db is missing"
+  }
 
-    //@ts-ignore
-    const _qres = await db.result<AnyObject>(finalQuery, hasParams ? args : undefined)
-    const { fields, rows, command } = _qres;
+  let finalQuery: string | ParameterizedQuery = queryWithRLS + "";
+  const isNotListenOrNotify = (returnType === "arrayMode") && !["listen ", "notify "].find(c => queryWithoutRLS.toLowerCase().trim().startsWith(c))
+  if (isNotListenOrNotify) {
+    finalQuery = new PQ({ 
+      rowMode: "array",
+      text: hasParams ? pgp.as.format(queryWithRLS, args) : queryWithRLS, 
+    });
+  }
 
-    /**
-     * Fallback for watchSchema in case not superuser and cannot add db event listener
-     */
-    const { watchSchema, watchSchemaType } = this.prostgles?.opts || {};
+  const queryResult = await db.result<AnyObject>(finalQuery, hasParams ? args : undefined)
+  const { fields, rows } = queryResult;
 
-    if (
-      watchSchema &&
-      (!this.prostgles.isSuperUser || watchSchemaType === "prostgles_queries")
-    ) {
-      if (["CREATE", "ALTER", "DROP", "REVOKE", "GRANT"].includes(command)) {
-        this.prostgles.onSchemaChange({ command, query: queryWithRLS })
-      } else if (queryWithRLS) {
-        const cleanedQuery = queryWithRLS.toLowerCase().replace(/\s\s+/g, ' ');
-        if (PubSubManager.SCHEMA_ALTERING_QUERIES.some(q => cleanedQuery.includes(q.toLowerCase() + " "))) {
-          this.prostgles.onSchemaChange({ command, query: queryWithRLS })
-        }
+  const listenHandlers = await onSQLResult.bind(this)(queryWithoutRLS, queryResult, allowListen, localParams);
+  if(listenHandlers) {
+    return listenHandlers;
+  }
+
+  if (returnType === "rows") {
+    return rows;
+
+  } else if (returnType === "row") {
+    return rows[0];
+
+  } else if (returnType === "value") {
+    return Object.values(rows?.[0] ?? {})?.[0];
+
+  } else if (returnType === "values") {
+    return rows.map(r => Object.values(r ?? {})[0]);
+
+  } else {
+
+    const qres: SQLResult<typeof returnType> = {
+      duration: 0,
+      ...queryResult,
+      fields: getDetailedFieldInfo.bind(this)(fields),
+    };
+    return qres;
+  }
+}
+
+const onSQLResult = async function(this: DboBuilder, queryWithoutRLS: string, { command }: Omit<SQLResultInfo, "duration">, allowListen: boolean | undefined, localParams?: LocalParams) {
+
+  watchSchemaFallback.bind(this)({ queryWithoutRLS, command });
+
+  if (command === "LISTEN") {
+    const { socket } = localParams || {};
+    if (!allowListen) throw new Error(`Your query contains a LISTEN command. Set { allowListen: true } to get subscription hooks. Or ignore this message`)
+    if (!socket) throw "Only allowed with client socket"
+    return await this.prostgles.dbEventsManager?.addNotify(queryWithoutRLS, socket);
+  }
+}
+
+/**
+ * Fallback for watchSchema in case of not a superuser (cannot add db event listener)
+ */
+export const watchSchemaFallback = async function(this: DboBuilder, { queryWithoutRLS, command }: { queryWithoutRLS: string; command: string; }){
+
+  const { watchSchema, watchSchemaType } = this.prostgles?.opts || {};
+  if (
+    watchSchema &&
+    (!this.prostgles.isSuperUser || watchSchemaType === "prostgles_queries")
+  ) {
+    if (["CREATE", "ALTER", "DROP", "REVOKE", "GRANT"].includes(command)) {
+      this.prostgles.onSchemaChange({ command, query: queryWithoutRLS })
+    } else if (queryWithoutRLS) {
+      const cleanedQuery = queryWithoutRLS.toLowerCase().replace(/\s\s+/g, ' ');
+      if (PubSubManager.SCHEMA_ALTERING_QUERIES.some(q => cleanedQuery.includes(q.toLowerCase() + " "))) {
+        this.prostgles.onSchemaChange({ command, query: queryWithoutRLS })
       }
     }
-
-    if (command === "LISTEN") {
-      if (!allowListen) throw new Error(`Your query contains a LISTEN command. Set { allowListen: true } to get subscription hooks. Or ignore this message`)
-      if (!socket) throw "Only allowed with client socket"
-      return await this.prostgles.dbEventsManager?.addNotify(queryWithRLS, socket);
-
-    } else if (returnType === "rows") {
-      return rows;
-
-    } else if (returnType === "row") {
-      return rows[0];
-
-    } else if (returnType === "value") {
-      return Object.values(rows?.[0] ?? {})?.[0];
-
-    } else if (returnType === "values") {
-      return rows.map(r => Object.values(r ?? {})[0]);
-
-    } else {
-
-      const qres: SQLResult<typeof returnType> = {
-        duration: 0,
-        ..._qres,
-        fields: getDetailedFieldInfo.bind(this)(fields),
-      };
-      return qres;
-    }
-
-  } else console.error("db missing");
+  }
 }
 
 export async function cacheDBTypes(this: DboBuilder) {
@@ -159,4 +181,4 @@ export const canRunSQL = async (prostgles: Prostgles, localParams?: LocalParams)
 
 export const canCreateTables = async (db: DB): Promise<boolean> => {
   return db.any(`SELECT has_database_privilege(current_database(), 'create') as yes`).then(rows => rows?.[0].yes === true)
-} 
+}

@@ -20,7 +20,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
           }
         }
       };
-      const startHandler = await res.start(listener);
+      await res.start(listener);
     });
   }));
   await tryRunP("SQL Stream parallel execution + parameters", async (resolve, reject) => {
@@ -36,7 +36,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
           reject(err);
         }
       };
-      const startHandler = await res.start(listener);
+      await res.start(listener);
     });
     let resolved = 0;
     const expected = ["a", "b", "c"];
@@ -49,18 +49,21 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       }).catch(reject);
     })
   });
-  await tryRunP("SQL Stream query error", async (resolve, reject) => {
-    const res = await db.sql!("SELECT * FROM not_existing_table", {}, { returnType: "stream" });
+  await tryRunP("SQL Stream query error structure matches default sql run error", async (resolve, reject) => {
+    const badQuery = "SELECT * FROM not_existing_table"
+    const res = await db.sql!(badQuery, {}, { returnType: "stream" });
     const listener = async (packet: SocketSQLStreamPacket) => { 
       try {
+        const normalSqlError = await db.sql!(badQuery, {}).catch(err => err);
         assert.equal(packet.type, "error");
         assert.equal(packet.error.message, 'relation "not_existing_table" does not exist');
+        assert.deepEqual(packet.error, normalSqlError);
         resolve("ok");
       } catch(err){
         reject(err);
       }
     };
-    const startHandler = await res.start(listener);
+    await res.start(listener);
   });
   await tryRunP("SQL Stream streamLimit", async (resolve, reject) => {
     const generate_series = "SELECT * FROM generate_series(1, 100)";
@@ -86,7 +89,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
         resolve("ok");
       }
     };
-    const startHandler = await res.start(listener);
+    await res.start(listener);
   });
 
   await tryRunP("SQL Stream table fields are the same as on default request", async (resolve, reject) => {
@@ -106,8 +109,32 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
         resolve("ok");
       }
     };
-    const startHandler = await res.start(listener);
+    await res.start(listener);
   });
+
+  await tryRunP("SQL Stream stop kills the query", async (resolve, reject) => {
+    const query = "SELECT * FROM pg_sleep(5)"
+    const res = await db.sql!(query, {}, { returnType: "stream" });
+    const listener = async (packet: SocketSQLStreamPacket) => { 
+      if(packet.type === "error"){
+        const queryState = await db.sql!("SELECT * FROM pg_stat_activity WHERE query = $1", [query], { returnType: "rows" });
+        assert.equal(queryState.length, 1);
+        assert.equal(queryState[0].state, "idle");
+        assert.equal(packet.error.message, "canceling statement due to user request");
+        resolve("ok");
+      } else {
+        assert.equal(packet.type, "start");
+        assert.equal(packet.ended, true);
+        assert.deepStrictEqual(packet.rows, []);
+        reject("ok");
+      }
+    };
+    const startHandler = await res.start(listener);
+    setTimeout(() => {
+      startHandler.stop().catch(reject);
+    }, 1000);
+  }); 
+
   // await tryRunP("SQL Stream ensure the connection is never released (same pg_backend_pid is the same for subsequent) queries when using persistConnectionId", async (resolve, reject) => {
   //   const res = await db.sql!("SELECT pg_backend_pid()", {}, { returnType: "stream", persistConnectionId: true });
   //   const listener = async (packet: SocketSQLStreamPacket) => { 

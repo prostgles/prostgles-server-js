@@ -32,7 +32,7 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { selectParam
       def = def.slice(0, -1);
     }
     if (!def || typeof def !== "string") {
-      throw getClientErrorFromPGError("Could get view definition");
+      throw getClientErrorFromPGError("Could get view definition", { type: "tableMethod", localParams, view: this,  });
     }
     const { fields } = await this.dboBuilder.dbo.sql!(`SELECT * FROM ( \n ${def} \n ) prostgles_subscribe_view_definition LIMIT 0`, {});
     const tableColumns = fields.filter(f => f.tableName && f.columnName);

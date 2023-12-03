@@ -9,7 +9,8 @@ import {
   ProstglesError,
   TS_PG_Types,
   getKeys,
-  isObject
+  isObject,
+  omitKeys
 } from "prostgles-types";
 import {
   DB,
@@ -29,16 +30,50 @@ export function escapeTSNames(str: string, capitalize = false): string {
   return JSON.stringify(res);
 }
 
-export function getSerializedClientErrorFromPGError(rawError: any, localParams?: LocalParams, view?: ViewHandler, allowedKeys?: string[]) {
-  const err = rawError instanceof Error ? JSON.parse(JSON.stringify(rawError, Object.getOwnPropertyNames(rawError))) : rawError
+export const getErrorAsObject = (rawError: any, includeStack = false) => {
+  if(["string", "boolean", "number"].includes(typeof rawError)){
+    return { message: rawError };
+  }
+  if(rawError instanceof Error){
+    const result = JSON.parse(JSON.stringify(rawError, Object.getOwnPropertyNames(rawError)));
+    if(!includeStack){
+      return omitKeys(result, ["stack"]);
+    }
+    return result;
+  }
+  
+  return rawError;
+}
+
+type GetSerializedClientErrorFromPGErrorArgs = {
+  type: "sql";
+} | {
+  type: "tableMethod";
+  localParams: LocalParams | undefined;
+  view: ViewHandler;
+  allowedKeys?: string[];
+}
+export function getSerializedClientErrorFromPGError(rawError: any, args: GetSerializedClientErrorFromPGErrorArgs) {
+  const err = getErrorAsObject(rawError);
   if (process.env.PRGL_DEBUG) {
     console.trace(err)
   }
+  const fullError = {
+    ...err,
+    ...(err?.message ? { txt: err.message } : {}),
+    code_info: sqlErrCodeToMsg(err.code),
+  }
+
+  if(args.type === "sql"){
+    return fullError;
+  }
+
+  const { localParams, view, allowedKeys } = args;
+
   const errObject = {
     ...((!localParams || !localParams.socket) ? err : {}),
     ...pickKeys(err, ["column", "code", "table", "constraint", "hint"]),
-    ...(err && err.toString ? { txt: err.toString() } : {}),
-    code_info: sqlErrCodeToMsg(err.code)
+    fullError
   };
   if (view?.dboBuilder?.constraints && errObject.constraint && !errObject.column) {
     const constraint = view.dboBuilder.constraints
@@ -57,8 +92,8 @@ export function getSerializedClientErrorFromPGError(rawError: any, localParams?:
   }
   return errObject;
 }
-export function getClientErrorFromPGError(rawError: any, localParams?: LocalParams, view?: ViewHandler, allowedKeys?: string[]) {
-  return Promise.reject(getSerializedClientErrorFromPGError(rawError, localParams, view, allowedKeys));
+export function getClientErrorFromPGError(rawError: any, args: GetSerializedClientErrorFromPGErrorArgs) {
+  return Promise.reject(getSerializedClientErrorFromPGError(rawError, args));
 }
 
 /**

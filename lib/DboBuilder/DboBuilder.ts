@@ -25,7 +25,7 @@ import { QueryStreamer } from "./QueryStreamer";
 import { TableHandler } from "./TableHandler/TableHandler";
 import { JoinPaths, ViewHandler } from "./ViewHandler/ViewHandler";
 import { parseJoinPath } from "./ViewHandler/parseJoinPath";
-import { PGConstraint, canEXECUTE, getConstraints } from "./dboBuilderUtils";
+import { PGConstraint, canEXECUTE, getConstraints, getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
 import { getTablesForSchemaPostgresSQL } from "./getTablesForSchemaPostgresSQL";
 import { prepareShortestJoinPaths } from "./prepareShortestJoinPaths";
 import { runSQL } from "./runSQL";
@@ -167,7 +167,7 @@ export class DboBuilder {
   }
 
   runSQL = async (query: string, params: any, options: SQLOptions | undefined, localParams?: LocalParams) => {
-    return runSQL.bind(this)(query, params, options, localParams);
+    return runSQL.bind(this)(query, params, options, localParams).catch(error => Promise.reject(getSerializedClientErrorFromPGError(error, { type: "sql" })));
   }
   async build(): Promise<DBHandlerServer> {
 

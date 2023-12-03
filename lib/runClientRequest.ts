@@ -1,9 +1,9 @@
 import { AnyObject, TableHandler, getKeys, pickKeys } from "prostgles-types";
-import { Prostgles } from "./Prostgles";
-import { LocalParams, PRGLIOSocket } from "./DboBuilder/DboBuilder";
 import { ExpressReq, UserLike } from "./AuthHandler";
+import { LocalParams, PRGLIOSocket } from "./DboBuilder/DboBuilder";
 import { parseFieldFilter } from "./DboBuilder/ViewHandler/parseFieldFilter";
 import { canRunSQL } from "./DboBuilder/runSQL";
+import { Prostgles } from "./Prostgles";
  
 type ReqInfo = {
   type: "socket";
@@ -14,6 +14,11 @@ type ReqInfo = {
   httpReq: ExpressReq;
   socket?: undefined;
 }
+type ReqInfoClient = {
+  socket: PRGLIOSocket;
+} | {
+  httpReq: ExpressReq;
+}
 type Args = ReqInfo & {
   tableName: string; 
   command: string;
@@ -23,6 +28,12 @@ type Args = ReqInfo & {
 };
 const SOCKET_ONLY_COMMANDS = ["subscribe", "subscribeOne", "sync"];
 
+const getReqInfoClient = (reqInfo: ReqInfo): ReqInfoClient => {
+  if(reqInfo.type === "socket"){
+    return { socket: reqInfo.socket };
+  }
+  return { httpReq: reqInfo.httpReq };
+}
 export const runClientRequest = async function(this: Prostgles, args: Args){
   /* Channel name will only include client-sent params so we ignore table_rules enforced params */
   if ((args.type === "socket" && !args.socket) || (args.type === "http" && !args.httpReq) || !this.authHandler || !this.publishParser || !this.dbo) {
@@ -34,7 +45,7 @@ export const runClientRequest = async function(this: Prostgles, args: Args){
   if(args.type !== "socket" && SOCKET_ONLY_COMMANDS.includes(command)){
     throw "The following commands cannot be completed over a non-websocket connection: " + SOCKET_ONLY_COMMANDS;
   }
-  const reqInfo = pickKeys(args, ["httpReq", "socket"]);
+  const reqInfo = getReqInfoClient(args);
   const clientInfo = await this.authHandler.getClientInfo(args);
   const valid_table_command_rules = await this.publishParser.getValidatedRequestRule({ tableName, command, localParams: reqInfo }, clientInfo);
   if (valid_table_command_rules) {
@@ -63,7 +74,7 @@ export const runClientRequest = async function(this: Prostgles, args: Args){
 }
 
 export const clientCanRunSqlRequest = async function(this: Prostgles, args: ReqInfo){
-  const reqInfo = pickKeys(args, ["httpReq", "socket"]);
+  const reqInfo = getReqInfoClient(args);
   if(!this.opts.publishRawSQL || typeof this.opts.publishRawSQL !== "function"){
     return { allowed: false, reqInfo }
   } 
@@ -92,7 +103,7 @@ export const runClientSqlRequest = async function(this: Prostgles, params: ArgsS
   }
   if (!this.dbo?.sql) throw "Internal error: sql handler missing";
   const { query, args, options } = params;
-  return this.dbo.sql(query, args, options, reqInfo as any);
+  return this.dbo.sql(query, args, options, reqInfo);
 }
 
 
@@ -103,7 +114,7 @@ type ArgsMethod = ReqInfo & {
 }
 export const runClientMethod = async function(this: Prostgles, reqArgs: ArgsMethod){
 
-  const reqInfo = pickKeys(reqArgs, ["httpReq", "socket"]);
+  const reqInfo = getReqInfoClient(reqArgs);
   const { method, params = [] } = reqArgs;
   const methods = await this.publishParser?.getAllowedMethods(reqInfo);
 
