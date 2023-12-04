@@ -619,7 +619,7 @@ export class Prostgles {
         this.dbEventsManager?.removeNotice(socket);
         this.dbEventsManager?.removeNotify(undefined, socket);
         this.connectedSockets = this.connectedSockets.filter(s => s.id !== socket.id);
-        
+        this.dboBuilder.queryStreamer.onDisconnect(socket.id);
         this.opts.onLog?.({ 
           type: "disconnect", 
           sid: this.authHandler?.getSID({ socket }),
