@@ -162,6 +162,24 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
     };
     await res.start(listener);
   });
+  await tryRunP("SQL Stream works for multiple statements", async (resolve, reject) => {
+    const res = await db.sql!("SELECT * FROM planes; SELECT 1 as a", {}, { returnType: "stream" });
+    const listener = async (packet: SocketSQLStreamPacket) => { 
+      if(packet.type === "error"){
+        reject(packet.error);
+      } else {
+        assert.equal(packet.type, "data");
+        assert.equal(packet.ended, true);
+        assert.equal(packet.rows.length, 1);
+        const normalSql = await db.sql!("SELECT 1 as a", {});
+        await db.sql!("DELETE FROM planes", {}); 
+        assert.deepStrictEqual(packet.fields, normalSql.fields);
+        assert.equal(packet.fields.length > 0, true);
+        resolve("ok");
+      }
+    };
+    await res.start(listener);
+  });
 
   // await tryRunP("SQL Stream ensure the connection is never released (same pg_backend_pid is the same for subsequent) queries when using persistConnectionId", async (resolve, reject) => {
   //   const res = await db.sql!("SELECT pg_backend_pid()", {}, { returnType: "stream", persistConnectionId: true });

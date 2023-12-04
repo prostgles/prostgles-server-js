@@ -1,12 +1,13 @@
 import { DB } from "../initProstgles";
 import * as pg from "pg";
-import { CHANNELS, SQLOptions, SocketSQLStreamPacket, SocketSQLStreamServer } from "prostgles-types";
+import { CHANNELS, SQLOptions, SocketSQLStreamPacket, SocketSQLStreamServer, omitKeys } from "prostgles-types";
 import { PRGLIOSocket } from "./DboBuilderTypes";
 import { getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
 import { getDetailedFieldInfo, watchSchemaFallback } from "./runSQL";
 import { DboBuilder } from "./DboBuilder";
 import QueryStreamType from 'pg-query-stream';
 import { BasicCallback } from "../PubSubManager/PubSubManager";
+import e from "express";
 const QueryStream: typeof QueryStreamType = require('pg-query-stream');
 
 
@@ -108,18 +109,18 @@ export class QueryStreamer {
       let finished = false;
       const batchSize = 10000;
       let stream: QueryStreamType; 
-      const emit = (type: "rows" | "ended", stream: QueryStreamType | undefined) => {
-        const result = stream?._result as { command: string; fields: any[] } | undefined;
+      type Info = { command: string; fields: any[]; rowCount: number; duration: number; }
+      const emit = (type: "rows" | "ended", streamResult: Info | undefined) => {
         const ended = type === "ended";
         if(finished) return;
         finished = finished || ended;
-        if(!result?.fields) throw "No fields";
-        const fields = getDetailedFieldInfo.bind(this.dboBuilder)(result.fields as any);
-        const packet: SocketSQLStreamPacket = { type: "data", rows: batchRows, fields, ended, processId: processID };
+        if(!streamResult?.fields) throw "No fields";
+        const fields = getDetailedFieldInfo.bind(this.dboBuilder)(streamResult.fields as any);
+        const packet: SocketSQLStreamPacket = { type: "data", rows: batchRows, fields, info: streamResult, ended, processId: processID };
         socket.emit(channel, packet);
         if(ended){
-          if(!result) throw "No result info";
-          watchSchemaFallback.bind(this.dboBuilder)({ queryWithoutRLS: query.query, command: result.command });
+          if(!streamResult) throw "No result info";
+          watchSchemaFallback.bind(this.dboBuilder)({ queryWithoutRLS: query.query, command: streamResult.command });
         }
       }
       const client = this.getConnection(err => {
@@ -129,27 +130,37 @@ export class QueryStreamer {
       try {
         await client.connect();  
         processID = (client as any).processID
-        const queryStream = new QueryStream(query.query, [], { batchSize: 1e6, highWaterMark: 1e6, rowMode: "array" });
+        const queryStream = new QueryStream(query.query, undefined, { batchSize: 1e6, highWaterMark: 1e6, rowMode: "array" });
         stream = client.query(queryStream);
         this.socketQueries[socketId]![id]!.client = client;
         this.socketQueries[socketId]![id]!.stream = stream;
+        const getStreamResult = () => omitKeys(stream._result, ["rows"]) as Info;
         stream.on('data', async (data) => {
           batchRows.push(data);
           if(options?.streamLimit) {
             if(batchRows.length >= options.streamLimit){
-              emit("ended", stream);
+              emit("ended", getStreamResult());
             }
           }
           if (batchRows.length >= batchSize) {
-            emit("rows", stream);
+            emit("rows", getStreamResult());
             batchRows = [];
           }
         });
         stream.on('error', error => {
-          socketQuery.onError(error);
+          if(error.message === "cannot insert multiple commands into a prepared statement") {
+            this.dboBuilder.dbo.sql!(query.query, {}, { returnType: "arrayMode", hasParams: false }).then(res => {
+              batchRows.push(res.rows);
+              emit("ended", res);
+            }).catch(newError => {
+              socketQuery.onError(newError);
+            });
+          } else {
+            socketQuery.onError(error);
+          }
         });
         stream.on('end', () => {
-          emit("ended", stream);
+          emit("ended", getStreamResult());
           // release the client when the stream is finished AND connection is not persisted
           if(!options?.persistStreamConnection){
             delete this.socketQueries[socketId]?.[id];
