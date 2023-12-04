@@ -7,7 +7,6 @@ import { getDetailedFieldInfo, watchSchemaFallback } from "./runSQL";
 import { DboBuilder } from "./DboBuilder";
 import QueryStreamType from 'pg-query-stream';
 import { BasicCallback } from "../PubSubManager/PubSubManager";
-import e from "express";
 const QueryStream: typeof QueryStreamType = require('pg-query-stream');
 
 
@@ -46,6 +45,7 @@ export class QueryStreamer {
       this.adminClient.connect();
     }    
     this.adminClient = this.getConnection((error) => {
+      if(error.message?.includes("database") && error.message?.includes("does not exist")) return;
       console.log("Admin client error. Reconnecting...", error);
       setAdminClient();
     }, { keepAlive: true });
