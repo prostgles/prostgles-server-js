@@ -36,18 +36,37 @@ export class QueryStreamer {
   db: DB;
   dboBuilder: DboBuilder;
   socketQueries: Record<string, Record<string, StreamedQuery>> = {};
+  adminClient: pg.Client;
   constructor(dboBuilder: DboBuilder) {
     this.dboBuilder = dboBuilder;
     this.db = dboBuilder.db;
+    const setAdminClient = () => {
+      this.adminClient = this.getConnection(undefined, { keepAlive: true });
+      this.adminClient.connect();
+    }    
+    this.adminClient = this.getConnection((error) => {
+      console.log("Admin client error. Reconnecting...", error);
+      setAdminClient();
+    }, { keepAlive: true });
+    this.adminClient.connect();
   }
 
-  getConnection = (onError: ((err: any) => void) | undefined) => {
+  getConnection = (onError: ((err: any) => void) | undefined, extraOptions?: pg.ClientConfig) => {
     const connectionInfo = typeof this.db.$cn === "string"? { connectionString: this.db.$cn } : this.db.$cn as any;
-    const client = new pg.Client(connectionInfo);
+    const client = new pg.Client({ ...connectionInfo, ...extraOptions });
     client.on("error", (err) => { 
       onError?.(err);
     });
     return client;
+  }
+
+  onDisconnect = (socketId: string) => {
+    const socketQueries = this.socketQueries[socketId];
+    if(!socketQueries) return;
+    Object.values(socketQueries).forEach(({ client }) => {
+      client?.end();
+    });
+    delete this.socketQueries[socketId];
   }
 
   create = async (query: ClientStreamedRequest): Promise<SocketSQLStreamServer> => {
@@ -88,8 +107,7 @@ export class QueryStreamer {
       let batchRows: any[] = [];
       let finished = false;
       const batchSize = 10000;
-      let stream: QueryStreamType;
-      let poolClient: pg.Client;
+      let stream: QueryStreamType; 
       const emit = (type: "rows" | "ended", stream: QueryStreamType | undefined) => {
         const result = stream?._result as { command: string; fields: any[] } | undefined;
         const ended = type === "ended";
@@ -109,12 +127,11 @@ export class QueryStreamer {
         client.end();
       });
       try {
-        await client.connect(); 
-        poolClient = client;
+        await client.connect();  
         processID = (client as any).processID
         const queryStream = new QueryStream(query.query, [], { batchSize: 1e6, highWaterMark: 1e6, rowMode: "array" });
         stream = client.query(queryStream);
-        this.socketQueries[socketId]![id]!.client = poolClient;
+        this.socketQueries[socketId]![id]!.client = client;
         this.socketQueries[socketId]![id]!.stream = stream;
         stream.on('data', async (data) => {
           batchRows.push(data);
@@ -131,7 +148,6 @@ export class QueryStreamer {
         stream.on('error', error => {
           socketQuery.onError(error);
         });
-        
         stream.on('end', () => {
           emit("ended", stream);
           // release the client when the stream is finished AND connection is not persisted
@@ -149,19 +165,14 @@ export class QueryStreamer {
     const stop = async (opts: { terminate?: boolean; } | undefined, cb: BasicCallback) => {
       const { stream, client: queryClient } = this.socketQueries[socketId]?.[id] ?? {};
       if(!stream || !queryClient) return;
-      const client = this.getConnection(undefined);
       try {
-        await client.connect(); 
-        if (!client) return cb(null, "No client");
         const stopFunction = opts?.terminate? "pg_terminate_backend" : "pg_cancel_backend";
-        const rows = await client.query(`SELECT ${stopFunction}(pid), pid, state, query FROM pg_stat_activity WHERE pid = $1 AND query = $2`, [processID, query.query]);
+        const rows = await this.adminClient.query(`SELECT ${stopFunction}(pid), pid, state, query FROM pg_stat_activity WHERE pid = $1 AND query = $2`, [processID, query.query]);
         socket.removeAllListeners(unsubChannel);
         socket.removeAllListeners(channel);
         cb({ processID, info: rows.rows[0] });
       } catch (error){
         cb(null, error);
-      } finally {
-        await client.end();
       }
     }
 
