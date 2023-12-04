@@ -5,6 +5,57 @@ import { tryRun, tryRunP } from './isomorphic_queries';
 import { reject } from 'bluebird';
 
 export default async function client_only(db: DBHandlerClient, auth: Auth, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[], token: string){
+
+  await tryRunP("SQL Stream stop kills the query", async (resolve, reject) => {
+    const query = "SELECT * FROM pg_sleep(5)"
+    const res = await db.sql!(query, {}, { returnType: "stream" });
+    const listener = async (packet: SocketSQLStreamPacket) => { 
+      if(packet.type === "error"){
+        const queryState = await db.sql!("SELECT * FROM pg_stat_activity WHERE query = $1", [query], { returnType: "rows" });
+        assert.equal(queryState.length, 1);
+        assert.equal(queryState[0].state, "idle");
+        assert.equal(packet.error.message, "canceling statement due to user request");
+        resolve("ok");
+      } else {
+        assert.equal(packet.type, "start");
+        assert.equal(packet.ended, true);
+        assert.deepStrictEqual(packet.rows, []);
+        reject("ok");
+      }
+    };
+    const startHandler = await res.start(listener);
+    setTimeout(() => {
+      startHandler.stop().catch(reject);
+    }, 1000);
+  }); 
+
+  await tryRunP("SQL Stream stop with terminate kills the query", async (resolve, reject) => {
+    const totalRows = 5e6;
+    const query = `SELECT * FROM generate_series(1, ${totalRows})`;
+    const res = await db.sql!(query, {}, { returnType: "stream" });
+    const rowsReceived: any[] = [];
+    const listener = async (packet: SocketSQLStreamPacket) => { 
+      if(packet.type === "error"){
+        const queryState = await db.sql!("SELECT * FROM pg_stat_activity WHERE query = $1", [query], { returnType: "rows" });
+        assert.equal(queryState.length, 0);
+        resolve("ok");
+      } else {
+        try {
+          rowsReceived.push(...packet.rows);
+          console.log(rowsReceived.length)
+          assert.equal(packet.ended, false);
+          assert.equal(rowsReceived.length < totalRows, true);
+        } catch(error){
+          reject(error);
+        }
+      }
+    };
+    const startHandler = await res.start(listener);
+    setTimeout(() => {
+      startHandler.stop(true).catch(reject);
+    }, 22);
+  }); 
+
   await Promise.all([1e3, 1e2].map(async (numberOfRows) => {
     await tryRunP("SQL Stream", async (resolve) => {
       const res = await db.sql!(`SELECT v.* FROM generate_series(1, ${numberOfRows}) v`, {}, { returnType: "stream" });
@@ -111,57 +162,6 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
     };
     await res.start(listener);
   });
-
-  await tryRunP("SQL Stream stop kills the query", async (resolve, reject) => {
-    const query = "SELECT * FROM pg_sleep(5)"
-    const res = await db.sql!(query, {}, { returnType: "stream" });
-    const listener = async (packet: SocketSQLStreamPacket) => { 
-      if(packet.type === "error"){
-        const queryState = await db.sql!("SELECT * FROM pg_stat_activity WHERE query = $1", [query], { returnType: "rows" });
-        assert.equal(queryState.length, 1);
-        assert.equal(queryState[0].state, "idle");
-        assert.equal(packet.error.message, "canceling statement due to user request");
-        resolve("ok");
-      } else {
-        assert.equal(packet.type, "start");
-        assert.equal(packet.ended, true);
-        assert.deepStrictEqual(packet.rows, []);
-        reject("ok");
-      }
-    };
-    const startHandler = await res.start(listener);
-    setTimeout(() => {
-      startHandler.stop().catch(reject);
-    }, 1000);
-  }); 
-  // await tryRunP("SQL Stream stop with terminate kills the query", async (resolve, reject) => {
-  //   const totalRows = 5e6;
-  //   const query = `SELECT * FROM generate_series(1, ${totalRows})`;
-  //   const res = await db.sql!(query, {}, { returnType: "stream" });
-  //   const rowsReceived: any[] = [];
-  //   const listener = async (packet: SocketSQLStreamPacket) => { 
-  //     if(packet.type === "error"){
-  //       const queryState = await db.sql!("SELECT * FROM pg_stat_activity WHERE query = $1", [query], { returnType: "rows" });
-  //       assert.equal(queryState.length, 1);
-  //       assert.equal(queryState[0].state, "idle");
-  //       assert.equal(packet.error.message, "canceling statement due to user request");
-  //       resolve("ok");
-  //     } else {
-  //       try {
-  //         rowsReceived.push(...packet.rows);
-  //         console.log(rowsReceived.length)
-  //         assert.equal(packet.ended, false);
-  //         assert.equal(rowsReceived.length < totalRows, true);
-  //       } catch(error){
-  //         reject(error);
-  //       }
-  //     }
-  //   };
-  //   const startHandler = await res.start(listener);
-  //   setTimeout(() => {
-  //     startHandler.stop(true).catch(reject);
-  //   }, 22);
-  // }); 
 
   // await tryRunP("SQL Stream ensure the connection is never released (same pg_backend_pid is the same for subsequent) queries when using persistConnectionId", async (resolve, reject) => {
   //   const res = await db.sql!("SELECT pg_backend_pid()", {}, { returnType: "stream", persistConnectionId: true });

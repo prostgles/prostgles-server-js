@@ -19,7 +19,7 @@ type ClientStreamedRequest = {
 }
 type StreamedQuery = ClientStreamedRequest & {
   stream: QueryStreamType | undefined;
-  poolClient: pg.PoolClient | undefined;
+  client: pg.Client | undefined;
   onError: ((error: any) => void);
 }
 
@@ -36,25 +36,18 @@ export class QueryStreamer {
   db: DB;
   dboBuilder: DboBuilder;
   socketQueries: Record<string, Record<string, StreamedQuery>> = {};
-  pool: pg.Pool;
-  adminPool: pg.Pool;
   constructor(dboBuilder: DboBuilder) {
     this.dboBuilder = dboBuilder;
     this.db = dboBuilder.db;
+  }
+
+  getConnection = (onError: ((err: any) => void) | undefined) => {
     const connectionInfo = typeof this.db.$cn === "string"? { connectionString: this.db.$cn } : this.db.$cn as any;
-    const onPoolError = (err: Error, _client: pg.PoolClient) => {
-      console.error(err.message);
-    }
-    this.pool = new pg.Pool({ ...connectionInfo, max: 50 }).on("error", (error) => {
-      // if(error.message !== "Connection terminated") return;
-      Object.entries(this.socketQueries).forEach(([socketId, queries]) => {
-        Object.entries(queries).forEach(([id, query]) => {
-          query.onError?.({ message: error.message });
-          delete this.socketQueries[socketId]?.[id];
-        });
-      });
+    const client = new pg.Client(connectionInfo);
+    client.on("error", (err) => { 
+      onError?.(err);
     });
-    this.adminPool = new pg.Pool(connectionInfo).on("error", onPoolError);
+    return client;
   }
 
   create = async (query: ClientStreamedRequest): Promise<SocketSQLStreamServer> => {
@@ -71,7 +64,7 @@ export class QueryStreamer {
     let errored = false;
     const socketQuery = {
       ...query,
-      poolClient: undefined,
+      client: undefined,
       stream: undefined,
       onError: (rawError: any) => {
         if(errored) return;
@@ -86,101 +79,97 @@ export class QueryStreamer {
     this.socketQueries[socketId]![id] ??= socketQuery;
     const { options } = query
     let processID = -1;
+
     const startStream = async () => {
       const socketQuery = this.socketQueries[socketId]?.[id];
       if(!socketQuery){
         throw "socket query not found";
+      } 
+      let emittedPackets = 0;
+      let batchRows: any[] = [];
+      let finished = false;
+      const batchSize = 10000;
+      let stream: QueryStreamType;
+      let poolClient: pg.Client;
+      const emit = (type: "rows" | "ended", stream: QueryStreamType | undefined) => {
+        const result = stream?._result as { command: string; fields: any[] } | undefined;
+        let packet: SocketSQLStreamPacket | undefined;
+        const ended = type === "ended";
+        if(finished) return;
+        finished = finished || ended;
+        if (!emittedPackets) {
+          if(!result?.fields) throw "No fields";
+          const fields = getDetailedFieldInfo.bind(this.dboBuilder)(result.fields as any);
+          packet = { type: "start", rows: batchRows, fields, ended, processId: processID };
+        } else {
+          packet = { type: "rows", rows: batchRows, ended };
+        }
+        socket.emit(channel, packet);
+        if(ended){
+          if(!result) throw "No result info";
+          watchSchemaFallback.bind(this.dboBuilder)({ queryWithoutRLS: query.query, command: result.command });
+        }
+        emittedPackets++;
       }
-      (async () => {
-        let emittedPackets = 0;
-        let batchRows: any[] = [];
-        let finished = false;
-        const batchSize = 10000;
-        let stream: QueryStreamType;
-        let poolClient: pg.PoolClient;
-        const emit = (type: "rows" | "ended", stream: QueryStreamType | undefined) => {
-          const result = stream?._result as { command: string; fields: any[] } | undefined;
-          let packet: SocketSQLStreamPacket | undefined;
-          const ended = type === "ended";
-          if(finished) return;
-          finished = finished || ended;
-          if (!emittedPackets) {
-            if(!result?.fields) throw "No fields";
-            const fields = getDetailedFieldInfo.bind(this.dboBuilder)(result.fields as any);
-            packet = { type: "start", rows: batchRows, fields, ended, processId: processID };
-          } else {
-            packet = { type: "rows", rows: batchRows, ended };
-          }
-          socket.emit(channel, packet);
-          if(ended){
-            if(!result) throw "No result info";
-            watchSchemaFallback.bind(this.dboBuilder)({ queryWithoutRLS: query.query, command: result.command });
-          }
-          emittedPackets++;
-        }
-
-        try {
-
-          await this.pool.connect((err, client, done) => {
-            if (err) throw err;
-            if (!client) throw "No client";
-            poolClient = client;
-            processID = (client as any).processID
-            const queryStream = new QueryStream(query.query, [], { batchSize, rowMode: "array" });
-            stream = client.query(queryStream);
-            this.socketQueries[socketId]![id]!.poolClient = poolClient;
-            this.socketQueries[socketId]![id]!.stream = stream;
-            stream.on('data', async (data) => {
-              batchRows.push(data);
-              if(options?.streamLimit) {
-                if(batchRows.length >= options.streamLimit){
-                  emit("ended", stream);
-                }
-              }
-              if (batchRows.length >= batchSize) {
-                emit("rows", stream);
-                batchRows = [];
-              }
-            });
-            stream.on('error', error => {
-              socketQuery.onError(error);
-            });
-            
-            stream.on('end', () => {
+      const client = this.getConnection(err => {
+        socketQuery.onError(err);
+        client.end();
+      });
+      try {
+        await client.connect(); 
+        poolClient = client;
+        processID = (client as any).processID
+        const queryStream = new QueryStream(query.query, [], { batchSize: 1e6, highWaterMark: 1e6, rowMode: "array" });
+        stream = client.query(queryStream);
+        this.socketQueries[socketId]![id]!.client = poolClient;
+        this.socketQueries[socketId]![id]!.stream = stream;
+        stream.on('data', async (data) => {
+          batchRows.push(data);
+          if(options?.streamLimit) {
+            if(batchRows.length >= options.streamLimit){
               emit("ended", stream);
-              // release the client when the stream is finished
-              if(!options?.persistStreamConnection){
-                delete this.socketQueries[socketId]?.[id];
-                done();
-              }
-            })
-          });
-        } catch(err){
-          socketQuery.onError(err);
-        }
-      })();
+            }
+          }
+          if (batchRows.length >= batchSize) {
+            emit("rows", stream);
+            batchRows = [];
+          }
+        });
+        stream.on('error', error => {
+          socketQuery.onError(error);
+        });
+        
+        stream.on('end', () => {
+          emit("ended", stream);
+          // release the client when the stream is finished AND connection is not persisted
+          if(!options?.persistStreamConnection){
+            delete this.socketQueries[socketId]?.[id];
+            client.end();
+          }
+        });
+      } catch(err){
+        socketQuery.onError(err);
+        await client.end();
+      }
     }
 
-    const stop = (opts: { terminate?: boolean; } | undefined, cb: BasicCallback) => {
-      // Must kill query if not ended
-      const { stream, poolClient } = this.socketQueries[socketId]?.[id] ?? {};
+    const stop = async (opts: { terminate?: boolean; } | undefined, cb: BasicCallback) => {
+      const { stream, client: poolClient } = this.socketQueries[socketId]?.[id] ?? {};
       if(!stream || !poolClient) return;
-      this.adminPool.connect(async (err, client, done) => {
-        if (err) return cb(null, err);
+      const client = this.getConnection(undefined);
+      try {
+        await client.connect(); 
         if (!client) return cb(null, "No client");
         const stopFunction = opts?.terminate? "pg_terminate_backend" : "pg_cancel_backend";
-        client.query(`SELECT ${stopFunction}(pid) FROM pg_stat_activity WHERE pid = $1`, [processID], (err) => {
-          if(err) {
-            cb(null, err);
-            console.error(err);
-          }
-          delete this.socketQueries[socketId]?.[id];
-          poolClient.release();
-          socket.removeAllListeners(unsubChannel);
-          socket.removeAllListeners(channel);
-          done();
-        });
-      });
+        const rows = await client.query(`SELECT ${stopFunction}(pid), pid, state, query FROM pg_stat_activity WHERE pid = $1 AND query = $2`, [processID, query.query]);
+        socket.removeAllListeners(unsubChannel);
+        socket.removeAllListeners(channel);
+        cb({ processID, info: rows.rows[0] });
+      } catch (error){
+        cb(null, error);
+      } finally {
+        await client.end();
+      }
     }
 
     socket.removeAllListeners(unsubChannel);
