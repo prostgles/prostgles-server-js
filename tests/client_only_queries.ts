@@ -17,7 +17,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
         assert.equal(packet.error.message, "canceling statement due to user request");
         resolve("ok");
       } else {
-        assert.equal(packet.type, "start");
+        assert.equal(packet.type, "data");
         assert.equal(packet.ended, true);
         assert.deepStrictEqual(packet.rows, []);
         reject("ok");
@@ -79,7 +79,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       const res = await db.sql!("SELECT ${val} as val", { val }, { returnType: "stream" });
       const listener = async (packet: SocketSQLStreamPacket) => { 
         try {
-          assert.equal(packet.type, "start");
+          assert.equal(packet.type, "data");
           assert.equal(packet.ended, true);
           assert.deepStrictEqual(packet.rows, [[val]]);
           resolve(1);
@@ -123,7 +123,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       if(packet.type === "error"){
         reject(packet.error);
       } else {
-        assert.equal(packet.type, "start");
+        assert.equal(packet.type, "data");
         assert.equal(packet.ended, true);
         assert.equal(packet.rows.length, 10);
 
@@ -150,7 +150,7 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       if(packet.type === "error"){
         reject(packet.error);
       } else {
-        assert.equal(packet.type, "start");
+        assert.equal(packet.type, "data");
         assert.equal(packet.ended, true);
         assert.equal(packet.rows.length, 1);
         const normalSql = await db.sql!("SELECT * FROM planes LIMIT 1", {});

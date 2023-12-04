@@ -85,7 +85,6 @@ export class QueryStreamer {
       if(!socketQuery){
         throw "socket query not found";
       } 
-      let emittedPackets = 0;
       let batchRows: any[] = [];
       let finished = false;
       const batchSize = 10000;
@@ -93,23 +92,17 @@ export class QueryStreamer {
       let poolClient: pg.Client;
       const emit = (type: "rows" | "ended", stream: QueryStreamType | undefined) => {
         const result = stream?._result as { command: string; fields: any[] } | undefined;
-        let packet: SocketSQLStreamPacket | undefined;
         const ended = type === "ended";
         if(finished) return;
         finished = finished || ended;
-        if (!emittedPackets) {
-          if(!result?.fields) throw "No fields";
-          const fields = getDetailedFieldInfo.bind(this.dboBuilder)(result.fields as any);
-          packet = { type: "start", rows: batchRows, fields, ended, processId: processID };
-        } else {
-          packet = { type: "rows", rows: batchRows, ended };
-        }
+        if(!result?.fields) throw "No fields";
+        const fields = getDetailedFieldInfo.bind(this.dboBuilder)(result.fields as any);
+        const packet: SocketSQLStreamPacket = { type: "data", rows: batchRows, fields, ended, processId: processID };
         socket.emit(channel, packet);
         if(ended){
           if(!result) throw "No result info";
           watchSchemaFallback.bind(this.dboBuilder)({ queryWithoutRLS: query.query, command: result.command });
         }
-        emittedPackets++;
       }
       const client = this.getConnection(err => {
         socketQuery.onError(err);
@@ -154,8 +147,8 @@ export class QueryStreamer {
     }
 
     const stop = async (opts: { terminate?: boolean; } | undefined, cb: BasicCallback) => {
-      const { stream, client: poolClient } = this.socketQueries[socketId]?.[id] ?? {};
-      if(!stream || !poolClient) return;
+      const { stream, client: queryClient } = this.socketQueries[socketId]?.[id] ?? {};
+      if(!stream || !queryClient) return;
       const client = this.getConnection(undefined);
       try {
         await client.connect(); 
@@ -177,7 +170,11 @@ export class QueryStreamer {
 
     let started = false;
     socket.removeAllListeners(channel);
-    socket.once(channel, async (_data, cb) => {
+    socket.on(channel, async (_data: { query: string; params: any } | undefined, cb: BasicCallback) => {
+      if(started){
+        // TODO
+        return cb(null, "Already started");
+      }
       started = true;
       try {
         await startStream();
