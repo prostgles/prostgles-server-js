@@ -160,7 +160,8 @@ export class QueryStreamer {
           }
         });
         stream.on('end', () => {
-          emit("ended", getStreamResult());
+          const streamResult = getStreamResult();
+          emit("ended", streamResult);
           // release the client when the stream is finished AND connection is not persisted
           if(!options?.persistStreamConnection){
             delete this.socketQueries[socketId]?.[id];
