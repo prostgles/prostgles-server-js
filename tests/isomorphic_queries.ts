@@ -959,8 +959,8 @@ export default async function isomorphic(db: Required<DBHandlerServer> | DBHandl
         $array_agg: ["id"],
       }
     }
-    const normalJoin = await db.tr1.find!({}, { select: { "*": 1, tr2: { $innerJoin: "tr2", filter: { t1: "a" }, select: idAggSelect } } })
-    const reverseJoin = await db.tr2.find!({ t1: "a" }, { select: { "*": 1, tr1: { $innerJoin: "tr1", select: idAggSelect } } });
+    const normalJoin = await db.tr1.find!({}, { orderBy: { id: true }, select: { "*": 1, tr2: { $innerJoin: "tr2", filter: { t1: "a" }, select: idAggSelect } } })
+    const reverseJoin = await db.tr2.find!({ t1: "a" }, { orderBy: { id: true }, select: { "*": 1, tr1: { $innerJoin: "tr1", select: idAggSelect } } });
     assert.deepStrictEqual(normalJoin[0], {"id": 1,"t1": null,"tr2": [{ "ids": [1] }]});
     assert.deepStrictEqual(normalJoin[1], {"id": 2,"t1": null,"tr2": [{ "ids": [2] }]});
     assert.deepStrictEqual(reverseJoin[0], { "id": 1, "tr1_id": 1, "t1": "a", "t2": "b", "tr1": [{ "ids": [1] }] });
