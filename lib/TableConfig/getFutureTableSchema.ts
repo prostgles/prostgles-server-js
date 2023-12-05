@@ -49,11 +49,13 @@ export const getFutureTableSchema = async ({ columnDefs, tableName, constraintDe
       cols = await getTableColumns({ db: t, table: tableName });
  
       /** Rollback */
-      return Promise.reject(ROLLBACK);
+      return Promise.reject(new Error(ROLLBACK));
     });
 
-  } catch(e){
-    if(e !== ROLLBACK) {
+  } catch(e: any){
+    if(e instanceof Error && e.message === ROLLBACK) {
+      // Ignore
+    } else {
       throw e;
     }
   }
