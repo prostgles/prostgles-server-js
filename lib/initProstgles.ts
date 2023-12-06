@@ -34,7 +34,7 @@ export type InitResult = {
    * Generated database public schema TS types for all tables and views
    */
   getTSSchema: () => string;
-  update: (newOpts: Pick<ProstglesInitOptions, "fileTable" | "restApi">) => Promise<void>;
+  update: (newOpts: Pick<ProstglesInitOptions, "fileTable" | "restApi" | "tableConfig">) => Promise<void>;
   restart: () => Promise<InitResult>; 
 }
 
@@ -69,22 +69,8 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
   try {
 
     await this.refreshDBO();
-    if(this.tableConfigurator?.initialising){
-      console.error("TableConfigurator WILL deadlock", { reason });
-    }
-    this.tableConfigurator = new TableConfigurator(this);
-    try {
-      const now = Date.now();
-      await this.opts.onLog?.({ type: "debug", command: "tableConfigurator.init.start", duration: -1 });
-      await this.tableConfigurator.init();
-      await this.opts.onLog?.({ type: "debug", command: "tableConfigurator.init.end", duration: Date.now() - now });
-    } catch (e) {
-      if(this.opts.tableConfigMigrations?.silentFail === false){
-        console.error("TableConfigurator silentFail: ", e);
-      } else {
-        throw e;
-      }
-    }
+    await this.initTableConfig(reason);
+    await this.initFileTable();
 
     /* Create media table if required */
     const now = Date.now();
@@ -141,6 +127,11 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
         if("restApi" in newOpts){
           this.opts.restApi = newOpts.restApi;
           await this.initRestApi();
+        }
+        if("tableConfig" in newOpts){
+          this.opts.tableConfig = newOpts.tableConfig;
+          await this.initTableConfig({ type: "prgl.update" });
+          await this.refreshDBO();
         }
         if(!isEmpty(newOpts)){
           await this.init(onReady, { type: "prgl.update"});

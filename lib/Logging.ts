@@ -79,6 +79,7 @@ export namespace EventTypes {
     type: "debug";
     command: 
     | "initFileTable" 
+    | "initTableConfig"
     | "runSQLFile" 
     | "schemaChangeNotif" 
     | "TableConfig.runQueries.start" 

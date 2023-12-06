@@ -16,7 +16,7 @@ const { version } = require('../package.json');
 import { ExpressApp, RestApi, RestApiConfig } from "./RestApi";
 import TableConfigurator, { TableConfig } from "./TableConfig/TableConfig";
  
-import { DBHandlerServer, DboBuilder, LocalParams, PRGLIOSocket, getErrorAsObject, isPlainObject } from "./DboBuilder/DboBuilder";
+import { DBHandlerServer, DboBuilder, LocalParams, PRGLIOSocket, getErrorAsObject } from "./DboBuilder/DboBuilder";
 import { PubSubManager, log } from "./PubSubManager/PubSubManager";
 export { DBHandlerServer };
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -465,6 +465,31 @@ export class Prostgles {
       this.restApi?.destroy();
       this.restApi = undefined;
     }
+  }
+
+  initTableConfig = async (reason: OnInitReason) => {
+    const res = await tryCatch(async () => {
+
+      if(this.tableConfigurator?.initialising){
+        console.error("TableConfigurator WILL deadlock", { reason });
+      }
+      this.tableConfigurator = new TableConfigurator(this);
+      try {
+        const now = Date.now();
+        await this.opts.onLog?.({ type: "debug", command: "tableConfigurator.init.start", duration: -1 });
+        await this.tableConfigurator.init();
+        await this.opts.onLog?.({ type: "debug", command: "tableConfigurator.init.end", duration: Date.now() - now });
+      } catch (e) {
+        if(this.opts.tableConfigMigrations?.silentFail === false){
+          console.error("TableConfigurator silentFail: ", e);
+        } else {
+          throw e;
+        }
+      }
+    });
+    await this.opts.onLog?.({ type: "debug", command: "initTableConfig", ...res });
+    if(res.error !== undefined) throw res.error;
+    return res.data;
   }
 
   /* Create media table if required */
