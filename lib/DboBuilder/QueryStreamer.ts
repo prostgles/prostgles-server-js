@@ -131,7 +131,9 @@ export class QueryStreamer {
       });
       this.socketQueries[socketId]![id]!.client = currentClient;
       try {
-        await currentClient.connect();  
+        if(!client){
+          await currentClient.connect();  
+        }
         processID = (currentClient as any).processID
         const queryStream = new QueryStream(query.query, undefined, { batchSize: 1e6, highWaterMark: 1e6, rowMode: "array" });
         stream = currentClient.query(queryStream);
