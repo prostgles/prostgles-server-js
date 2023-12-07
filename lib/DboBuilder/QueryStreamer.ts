@@ -1,12 +1,12 @@
-import { DB } from "../initProstgles";
 import * as pg from "pg";
-import { CHANNELS, SQLOptions, SocketSQLStreamPacket, SocketSQLStreamServer, omitKeys } from "prostgles-types";
-import { PRGLIOSocket } from "./DboBuilderTypes";
-import { getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
-import { getDetailedFieldInfo, watchSchemaFallback } from "./runSQL";
-import { DboBuilder } from "./DboBuilder";
 import QueryStreamType from 'pg-query-stream';
+import { CHANNELS, SQLOptions, SocketSQLStreamPacket, SocketSQLStreamServer, omitKeys } from "prostgles-types";
 import { BasicCallback } from "../PubSubManager/PubSubManager";
+import { DB } from "../initProstgles";
+import { DboBuilder } from "./DboBuilder";
+import { PRGLIOSocket } from "./DboBuilderTypes";
+import { getErrorAsObject, getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
+import { getDetailedFieldInfo, watchSchemaFallback } from "./runSQL";
 const QueryStream: typeof QueryStreamType = require('pg-query-stream');
 
 
@@ -22,6 +22,7 @@ type StreamedQuery = ClientStreamedRequest & {
   client: pg.Client | undefined;
   onError: ((error: any) => void);
 }
+type Info = { command: string; fields: any[]; rowCount: number; duration: number; }
 
 const shortSocketIds: Record<string, number> = {};
 const getSetShortSocketId = (socketId: string) => {
@@ -84,6 +85,7 @@ export class QueryStreamer {
     let errored = false;
     const socketQuery = {
       ...query,
+      id,
       client: undefined,
       stream: undefined,
       onError: (rawError: any) => {
@@ -97,19 +99,19 @@ export class QueryStreamer {
       },
     };
     this.socketQueries[socketId]![id] ??= socketQuery;
-    const { options } = query
     let processID = -1;
+    let streamState: "started" | "ended" | undefined;
 
-    const startStream = async () => {
+    const startStream = async (client: pg.Client | undefined, query: ClientStreamedRequest) => {
       const socketQuery = this.socketQueries[socketId]?.[id];
       if(!socketQuery){
         throw "socket query not found";
       } 
+      
       let batchRows: any[] = [];
       let finished = false;
       const batchSize = 10000;
       let stream: QueryStreamType; 
-      type Info = { command: string; fields: any[]; rowCount: number; duration: number; }
       const emit = (type: "rows" | "ended", streamResult: Info | undefined) => {
         const ended = type === "ended";
         if(finished) return;
@@ -123,22 +125,22 @@ export class QueryStreamer {
           watchSchemaFallback.bind(this.dboBuilder)({ queryWithoutRLS: query.query, command: streamResult.command });
         }
       }
-      const client = this.getConnection(err => {
+      const currentClient = client ?? this.getConnection(err => {
         socketQuery.onError(err);
-        client.end();
+        currentClient.end();
       });
+      this.socketQueries[socketId]![id]!.client = currentClient;
       try {
-        await client.connect();  
-        processID = (client as any).processID
+        await currentClient.connect();  
+        processID = (currentClient as any).processID
         const queryStream = new QueryStream(query.query, undefined, { batchSize: 1e6, highWaterMark: 1e6, rowMode: "array" });
-        stream = client.query(queryStream);
-        this.socketQueries[socketId]![id]!.client = client;
+        stream = currentClient.query(queryStream);
         this.socketQueries[socketId]![id]!.stream = stream;
         const getStreamResult = () => omitKeys(stream._result, ["rows"]) as Info;
         stream.on('data', async (data) => {
           batchRows.push(data);
-          if(options?.streamLimit) {
-            if(batchRows.length >= options.streamLimit){
+          if(query.options?.streamLimit) {
+            if(batchRows.length >= query.options.streamLimit){
               emit("ended", getStreamResult());
             }
           }
@@ -161,27 +163,32 @@ export class QueryStreamer {
         });
         stream.on('end', () => {
           const streamResult = getStreamResult();
+          streamState = "ended";
           emit("ended", streamResult);
           // release the client when the stream is finished AND connection is not persisted
-          if(!options?.persistStreamConnection){
+          if(!query.options?.persistStreamConnection){
             delete this.socketQueries[socketId]?.[id];
-            client.end();
+            currentClient.end();
           }
         });
       } catch(err){
         socketQuery.onError(err);
-        await client.end();
+        await currentClient.end();
       }
     }
 
+    const cleanup = () => {
+      socket.removeAllListeners(unsubChannel);
+      socket.removeAllListeners(channel);
+      delete this.socketQueries[socketId]?.[id];
+    }
     const stop = async (opts: { terminate?: boolean; } | undefined, cb: BasicCallback) => {
-      const { stream, client: queryClient } = this.socketQueries[socketId]?.[id] ?? {};
-      if(!stream || !queryClient) return;
+      const { client: queryClient } = this.socketQueries[socketId]?.[id] ?? {};
+      if(!queryClient) return;
       try {
         const stopFunction = opts?.terminate? "pg_terminate_backend" : "pg_cancel_backend";
         const rows = await this.adminClient.query(`SELECT ${stopFunction}(pid), pid, state, query FROM pg_stat_activity WHERE pid = $1 AND query = $2`, [processID, query.query]);
-        socket.removeAllListeners(unsubChannel);
-        socket.removeAllListeners(channel);
+        cleanup()
         cb({ processID, info: rows.rows[0] });
       } catch (error){
         cb(null, error);
@@ -191,28 +198,36 @@ export class QueryStreamer {
     socket.removeAllListeners(unsubChannel);
     socket.once(unsubChannel, stop);
 
-    let started = false;
+    let runCount = 0;
     socket.removeAllListeners(channel);
     socket.on(channel, async (_data: { query: string; params: any } | undefined, cb: BasicCallback) => {
-      if(started){
+      if(streamState === "started"){
         // TODO
         return cb(null, "Already started");
       }
-      started = true;
+      streamState = "started";
       try {
-        await startStream();
+        /* Query for persisted connection */
+        if(runCount){
+          const persistedClient = this.socketQueries[socketId]?.[id];
+          if(!persistedClient) throw "Persisted query client not found"; 
+
+          await startStream(persistedClient.client, { ...query, query: _data!.query! });
+        } else {
+          await startStream(undefined, query);
+        }
         cb();
       } catch(err){
-        cb(null, err ?? "Something went wrong");
+        console.error(err)
+        cb(null, getErrorAsObject(err) ?? "Something went wrong");
       }
+      runCount++;
     });
 
     /** If not started in 5 seconds then assume this will never happen */
     setTimeout(() => {
-      if(started) return;
-      stop({}, () => { 
-        // empty 
-      });
+      if(streamState) return;
+      cleanup();
     }, 5e3);
 
     return {

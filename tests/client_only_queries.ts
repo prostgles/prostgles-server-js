@@ -182,28 +182,25 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
   });
 
   // await tryRunP("SQL Stream ensure the connection is never released (same pg_backend_pid is the same for subsequent) queries when using persistConnectionId", async (resolve, reject) => {
-  //   const res = await db.sql!("SELECT pg_backend_pid()", {}, { returnType: "stream", persistConnectionId: true });
+  //   const query = "SELECT pg_backend_pid()";
+  //   const res = await db.sql!(query, {}, { returnType: "stream", persistConnectionId: true });
+  //   const pids: number[] = [];
   //   const listener = async (packet: SocketSQLStreamPacket) => { 
   //     if(packet.type === "error"){
   //       reject(packet.error);
   //     } else {
-  //       assert.equal(packet.type, "start");
+  //       assert.equal(packet.type, "data");
   //       assert.equal(packet.ended, true);
   //       assert.equal(packet.rows.length, 1);
   //       const pid = packet.rows[0].pg_backend_pid;
-  //       const res2 = await db.sql!("SELECT pg_backend_pid()", {}, { returnType: "stream", persistConnectionId: true });
-  //       const listener2 = async (packet: SocketSQLStreamPacket) => { 
-  //         if(packet.type === "error"){
-  //           reject(packet.error);
-  //         } else {
-  //           assert.equal(packet.type, "start");
-  //           assert.equal(packet.ended, true);
-  //           assert.equal(packet.rows.length, 1);
-  //           assert.equal(packet.rows[0].pg_backend_pid, pid);
-  //           resolve("ok");
-  //         }
-  //       };
-  //       const startHandler2 = await res2.start(listener2);
+  //       pids.push(pid);
+  //       if(pids.length === 1){
+  //         startHandler.run(query)
+  //       }
+  //       if(pids.length === 2){
+  //         assert.equal(pids[0], pids[1]);
+  //         resolve("ok");
+  //       }
   //     }
   //   };
   //   const startHandler = await res.start(listener);
