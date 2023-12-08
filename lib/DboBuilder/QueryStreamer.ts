@@ -100,7 +100,7 @@ export class QueryStreamer {
     };
     this.socketQueries[socketId]![id] ??= socketQuery;
     let processID = -1;
-    let streamState: "started" | "ended" | undefined;
+    let streamState: "started" | "ended" | "errored" | undefined;
 
     const startStream = async (client: pg.Client | undefined, query: ClientStreamedRequest) => {
       const socketQuery = this.socketQueries[socketId]?.[id];
@@ -152,6 +152,7 @@ export class QueryStreamer {
           }
         });
         stream.on('error', error => {
+          streamState = "errored";
           if(error.message === "cannot insert multiple commands into a prepared statement") {
             this.dboBuilder.dbo.sql!(query.query, {}, { returnType: "arrayMode", hasParams: false }).then(res => {
               batchRows.push(res.rows);
