@@ -132,7 +132,7 @@ export class QueryStreamer {
       this.socketQueries[socketId]![id]!.client = currentClient;
       try {
         if(!client){
-          await currentClient.connect();  
+          await currentClient.connect();
         }
         processID = (currentClient as any).processID
         const queryStream = new QueryStream(query.query, undefined, { batchSize: 1e6, highWaterMark: 1e6, rowMode: "array" });
@@ -167,11 +167,12 @@ export class QueryStreamer {
           const streamResult = getStreamResult();
           streamState = "ended";
           emit("ended", streamResult);
-          // release the client when the stream is finished AND connection is not persisted
-          if(!query.options?.persistStreamConnection){
-            delete this.socketQueries[socketId]?.[id];
-            currentClient.end();
+
+          if(query.options?.persistStreamConnection){
+            return;
           }
+          delete this.socketQueries[socketId]?.[id];
+          currentClient.end();
         });
       } catch(err){
         socketQuery.onError(err);
@@ -189,7 +190,7 @@ export class QueryStreamer {
       if(!queryClient) return;
       try {
         const stopFunction = opts?.terminate? "pg_terminate_backend" : "pg_cancel_backend";
-        const rows = await this.adminClient.query(`SELECT ${stopFunction}(pid), pid, state, query FROM pg_stat_activity WHERE pid = $1 AND query = $2`, [processID, query.query]);
+        const rows = await this.adminClient.query(`SELECT ${stopFunction}(pid), pid, state, query FROM pg_stat_activity WHERE pid = $1`, [processID]);
         cleanup()
         cb({ processID, info: rows.rows[0] });
       } catch (error){
@@ -204,12 +205,11 @@ export class QueryStreamer {
     socket.removeAllListeners(channel);
     socket.on(channel, async (_data: { query: string; params: any } | undefined, cb: BasicCallback) => {
       if(streamState === "started"){
-        // TODO
         return cb(null, "Already started");
       }
       streamState = "started";
       try {
-        /* Query for persisted connection */
+        /* Persisted connection query */
         if(runCount){
           const persistedClient = this.socketQueries[socketId]?.[id];
           if(!persistedClient) throw "Persisted query client not found"; 
@@ -226,7 +226,7 @@ export class QueryStreamer {
       runCount++;
     });
 
-    /** If not started in 5 seconds then assume this will never happen */
+    /** If not started within 5 seconds then assume it will never happen */
     setTimeout(() => {
       if(streamState) return;
       cleanup();
