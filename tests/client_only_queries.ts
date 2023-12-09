@@ -6,6 +6,38 @@ import { reject } from 'bluebird';
 
 export default async function client_only(db: DBHandlerClient, auth: Auth, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[], token: string){
 
+  await tryRunP("SQL Stream persistedConnection with streamLimit works for subsequent queries", async (resolve, reject) => {
+    const query = "SELECT * FROM generate_series(1, 100)";
+    let results: any[] = [];
+    const streamLimit = 10;
+    const res = await db.sql!(query, {}, { returnType: "stream", persistStreamConnection: true, streamLimit });
+    const listener = async (packet: SocketSQLStreamPacket) => { 
+      try {
+
+        if(packet.type === "error"){
+          reject(packet.error);
+        } else {
+          results = results.concat(packet.rows);
+          if(results.length === streamLimit){
+            assert.equal(packet.type, "data");
+            assert.equal(packet.ended, true);
+            assert.equal(packet.rows.length, 10);
+            startHandler.run(`SELECT '${query}' as query`).catch(reject);
+          } else {
+            assert.equal(packet.type, "data");
+            assert.equal(packet.ended, true);
+            assert.equal(packet.rows.length, 1);
+            assert.equal(packet.rows[0][0], query);
+            resolve("ok");
+          }
+        }
+      } catch(err){
+        reject(err);
+      }
+    };
+    const startHandler = await res.start(listener);
+  });
+
   await tryRunP("SQL Stream ensure the connection is never released (same pg_backend_pid is the same for subsequent) when using persistConnectionId", async (resolve, reject) => {
     const query = "SELECT pg_backend_pid()";
     const res = await db.sql!(query, {}, { returnType: "stream", persistStreamConnection: true });

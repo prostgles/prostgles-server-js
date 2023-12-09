@@ -161,6 +161,7 @@ export class QueryStreamer {
               delete this.socketQueries[socketId]?.[id];
               currentClient.end();
             }
+            cursor.close();
           } catch(error: any){
             streamState = "errored";
             if(error.message === "cannot insert multiple commands into a prepared statement") {
