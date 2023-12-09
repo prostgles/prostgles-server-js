@@ -6,6 +6,31 @@ import { reject } from 'bluebird';
 
 export default async function client_only(db: DBHandlerClient, auth: Auth, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[], token: string){
 
+  await tryRunP("SQL Stream ensure the connection is never released (same pg_backend_pid is the same for subsequent) when using persistConnectionId", async (resolve, reject) => {
+    const query = "SELECT pg_backend_pid()";
+    const res = await db.sql!(query, {}, { returnType: "stream", persistStreamConnection: true });
+    const pids: number[] = [];
+    const listener = async (packet: SocketSQLStreamPacket) => {
+      if(packet.type === "error"){
+        reject(packet.error);
+      } else {
+        assert.equal(packet.type, "data");
+        assert.equal(packet.ended, true);
+        assert.equal(packet.rows.length, 1);
+        const pid = packet.rows[0][0];
+        pids.push(pid);
+        if(pids.length === 1){
+          startHandler.run(query).catch(reject);
+        }
+        if(pids.length === 2){
+          assert.equal(pids[0], pids[1]);
+          resolve("ok");
+        }
+      }
+    };
+    const startHandler = await res.start(listener);
+  });
+
   await tryRunP("SQL Stream stop kills the query", async (resolve, reject) => {
     const query = "SELECT * FROM pg_sleep(5)";
     const res = await db.sql!(query, {}, { returnType: "stream" });
@@ -195,31 +220,6 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
     };
     await res.start(listener);
   });
-
-  // await tryRunP("SQL Stream ensure the connection is never released (same pg_backend_pid is the same for subsequent) queries when using persistConnectionId", async (resolve, reject) => {
-  //   const query = "SELECT pg_backend_pid()";
-  //   const res = await db.sql!(query, {}, { returnType: "stream", persistConnectionId: true });
-  //   const pids: number[] = [];
-  //   const listener = async (packet: SocketSQLStreamPacket) => { 
-  //     if(packet.type === "error"){
-  //       reject(packet.error);
-  //     } else {
-  //       assert.equal(packet.type, "data");
-  //       assert.equal(packet.ended, true);
-  //       assert.equal(packet.rows.length, 1);
-  //       const pid = packet.rows[0].pg_backend_pid;
-  //       pids.push(pid);
-  //       if(pids.length === 1){
-  //         startHandler.run(query)
-  //       }
-  //       if(pids.length === 2){
-  //         assert.equal(pids[0], pids[1]);
-  //         resolve("ok");
-  //       }
-  //     }
-  //   };
-  //   const startHandler = await res.start(listener);
-  // });
 
   
   /**
