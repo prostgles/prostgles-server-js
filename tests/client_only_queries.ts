@@ -7,7 +7,7 @@ import { reject } from 'bluebird';
 export default async function client_only(db: DBHandlerClient, auth: Auth, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[], token: string){
 
   await tryRunP("SQL Stream stop kills the query", async (resolve, reject) => {
-    const query = "SELECT * FROM pg_sleep(5)"
+    const query = "SELECT * FROM pg_sleep(5)";
     const res = await db.sql!(query, {}, { returnType: "stream" });
     const listener = async (packet: SocketSQLStreamPacket) => { 
       if(packet.type === "error"){
@@ -19,8 +19,8 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       } else {
         assert.equal(packet.type, "data");
         assert.equal(packet.ended, true);
-        assert.deepStrictEqual(packet.rows, []);
-        reject("ok");
+        assert.deepStrictEqual(packet.rows, [['']]);
+        reject("SQL Stream stop kills the query");
       }
     };
     const startHandler = await res.start(listener);
@@ -28,6 +28,21 @@ export default async function client_only(db: DBHandlerClient, auth: Auth, log: 
       startHandler.stop().catch(reject);
     }, 1000);
   }); 
+
+  await tryRunP("SQL Stream limit works", async (resolve, reject) => {
+    const res = await db.sql!("SELECT * FROM generate_series(1, 1e5)", {}, { returnType: "stream", streamLimit: 10 });
+    const listener = async (packet: SocketSQLStreamPacket) => { 
+      if(packet.type === "error"){
+        reject(packet.error);
+      } else {
+        assert.equal(packet.type, "data");
+        assert.equal(packet.ended, true);
+        assert.equal(packet.rows.length, 10);
+        resolve("ok");
+      }
+    };
+    await res.start(listener);
+  });
 
   await tryRunP("SQL Stream stop with terminate kills the query", async (resolve, reject) => {
     const totalRows = 5e6;

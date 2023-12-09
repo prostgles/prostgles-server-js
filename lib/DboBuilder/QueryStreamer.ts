@@ -1,28 +1,31 @@
 import * as pg from "pg";
-import QueryStreamType from 'pg-query-stream';
-import { CHANNELS, SQLOptions, SocketSQLStreamPacket, SocketSQLStreamServer, omitKeys } from "prostgles-types";
+import { CHANNELS, SQLOptions, SocketSQLStreamPacket, SocketSQLStreamServer, omitKeys, pickKeys } from "prostgles-types";
 import { BasicCallback } from "../PubSubManager/PubSubManager";
 import { DB } from "../initProstgles";
 import { DboBuilder } from "./DboBuilder";
 import { PRGLIOSocket } from "./DboBuilderTypes";
 import { getErrorAsObject, getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
 import { getDetailedFieldInfo, watchSchemaFallback } from "./runSQL";
-const QueryStream: typeof QueryStreamType = require('pg-query-stream');
-
+import CursorType from 'pg-cursor'
+const Cursor: typeof CursorType = require('pg-cursor');
 
 type ClientStreamedRequest = {
   socket: PRGLIOSocket;
   query: string;
   options: SQLOptions | undefined;
   persistConnection?: boolean;
-
 }
 type StreamedQuery = ClientStreamedRequest & {
-  stream: QueryStreamType | undefined;
+  cursor: CursorType | undefined;
   client: pg.Client | undefined;
   onError: ((error: any) => void);
 }
-type Info = { command: string; fields: any[]; rowCount: number; duration: number; }
+type Info = { 
+  command: string; 
+  fields: any[]; 
+  rowCount: number; 
+  duration: number; 
+};
 
 const shortSocketIds: Record<string, number> = {};
 const getSetShortSocketId = (socketId: string) => {
@@ -87,7 +90,7 @@ export class QueryStreamer {
       ...query,
       id,
       client: undefined,
-      stream: undefined,
+      cursor: undefined,
       onError: (rawError: any) => {
         if(errored) return;
         errored = true;
@@ -108,22 +111,17 @@ export class QueryStreamer {
         throw "socket query not found";
       } 
       
-      let batchRows: any[] = [];
-      let finished = false;
-      const batchSize = 10000;
-      let stream: QueryStreamType; 
-      const emit = (type: "rows" | "ended", streamResult: Info | undefined) => {
-        const ended = type === "ended";
-        if(finished) return;
-        finished = finished || ended;
-        if(!streamResult?.fields) throw "No fields";
-        const fields = getDetailedFieldInfo.bind(this.dboBuilder)(streamResult.fields as any);
-        const packet: SocketSQLStreamPacket = { type: "data", rows: batchRows, fields, info: streamResult, ended, processId: processID };
+      /** Only send fields on first request */
+      let fieldsWereSent = false;
+      const emit = ({ reachedEnd, rows, info }: { reachedEnd: true; rows: any[]; info: Info } | { reachedEnd: false; rows: any[]; info: Omit<Info, "command"> }) => {
+        if(!info?.fields) throw "No fields";
+        const fields = getDetailedFieldInfo.bind(this.dboBuilder)(info.fields as any);
+        const packet: SocketSQLStreamPacket = { type: "data", rows, fields: fieldsWereSent? undefined : fields, info: reachedEnd? info : undefined, ended: reachedEnd, processId: processID };
         socket.emit(channel, packet);
-        if(ended){
-          if(!streamResult) throw "No result info";
-          watchSchemaFallback.bind(this.dboBuilder)({ queryWithoutRLS: query.query, command: streamResult.command });
+        if(reachedEnd){
+          watchSchemaFallback.bind(this.dboBuilder)({ queryWithoutRLS: query.query, command: info.command });
         }
+        fieldsWereSent = true;
       }
       const currentClient = client ?? this.getConnection(err => {
         socketQuery.onError(err);
@@ -134,47 +132,48 @@ export class QueryStreamer {
         if(!client){
           await currentClient.connect();
         }
-        processID = (currentClient as any).processID
-        const queryStream = new QueryStream(query.query, undefined, { batchSize: 1e6, highWaterMark: 1e6, rowMode: "array" });
-        stream = currentClient.query(queryStream);
-        this.socketQueries[socketId]![id]!.stream = stream;
-        const getStreamResult = () => omitKeys(stream._result, ["rows"]) as Info;
-        stream.on('data', async (data) => {
-          batchRows.push(data);
-          if(query.options?.streamLimit) {
-            if(batchRows.length >= query.options.streamLimit){
-              emit("ended", getStreamResult());
-            }
-          }
-          if (batchRows.length >= batchSize) {
-            emit("rows", getStreamResult());
-            batchRows = [];
-          }
-        });
-        stream.on('error', error => {
-          streamState = "errored";
-          if(error.message === "cannot insert multiple commands into a prepared statement") {
-            this.dboBuilder.dbo.sql!(query.query, {}, { returnType: "arrayMode", hasParams: false }).then(res => {
-              batchRows.push(res.rows);
-              emit("ended", res);
-            }).catch(newError => {
-              socketQuery.onError(newError);
-            });
-          } else {
-            socketQuery.onError(error);
-          }
-        });
-        stream.on('end', () => {
-          const streamResult = getStreamResult();
-          streamState = "ended";
-          emit("ended", streamResult);
+        processID = (currentClient as any).processID;
 
-          if(query.options?.persistStreamConnection){
-            return;
-          }
-          delete this.socketQueries[socketId]?.[id];
-          currentClient.end();
-        });
+        if(query.options?.streamLimit && (!Number.isInteger(query.options.streamLimit) || query.options.streamLimit < 0)){
+          throw "streamLimit must be a positive integer";
+        }
+        const batchSize = query.options?.streamLimit? Math.min(1e3, query.options?.streamLimit) : 1e3;
+        const cursor = currentClient.query(new Cursor(query.query, undefined, { rowMode: "array" }));
+        this.socketQueries[socketId]![id]!.cursor = cursor;
+        let streamLimitReached = false;
+        let reachedEnd = false;
+        (async () => {
+          try {
+            let rowChunk: any[] = [];
+            let rowsSent = 0;
+            do {
+              rowChunk = await cursor.read(batchSize);
+              const info = pickKeys((cursor as any)._result, ["fields", "rowCount", "command", "duration"]) as Info;
+              rowsSent += rowChunk.length;
+              streamLimitReached = Boolean(query.options?.streamLimit && rowsSent >= query.options.streamLimit);
+              reachedEnd = rowChunk.length < batchSize;
+              emit({ info, rows: rowChunk, reachedEnd: reachedEnd || streamLimitReached });
+            } while (!reachedEnd && !streamLimitReached);
+            
+            streamState = "ended"; 
+  
+            if(!query.options?.persistStreamConnection){
+              delete this.socketQueries[socketId]?.[id];
+              currentClient.end();
+            }
+          } catch(error: any){
+            streamState = "errored";
+            if(error.message === "cannot insert multiple commands into a prepared statement") {
+              this.dboBuilder.dbo.sql!(query.query, {}, { returnType: "arrayMode", hasParams: false }).then(res => {
+                emit({ info: omitKeys(res, ["rows"]), reachedEnd: true, rows: res.rows});
+              }).catch(newError => {
+                socketQuery.onError(newError);
+              });
+            } else {
+              socketQuery.onError(error);
+            }
+          } 
+        })()
       } catch(err){
         socketQuery.onError(err);
         await currentClient.end();
