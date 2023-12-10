@@ -317,9 +317,11 @@ export async function getTablesForSchemaPostgresSQL(
     result = await Promise.all(result
       .map(async table => {
         table.name = table.escaped_identifier;
-        table.privileges.select = table.columns.some(c => c.privileges.SELECT);
-        table.privileges.insert = table.columns.some(c => c.privileges.INSERT);
-        table.privileges.update = table.columns.some(c => c.privileges.UPDATE);
+        /** This is used to prevent bug of table schema not sent */
+        const allowAllIfNoColumns = !table.columns?.length? true : undefined;
+        table.privileges.select = allowAllIfNoColumns ?? table.columns.some(c => c.privileges.SELECT);
+        table.privileges.insert = allowAllIfNoColumns ?? table.columns.some(c => c.privileges.INSERT);
+        table.privileges.update = allowAllIfNoColumns ?? table.columns.some(c => c.privileges.UPDATE);
         table.columns = table.columns.map(c => {
           const refs = getFkeys.fkeys!.filter(fc => fc.oid === table.oid && fc.cols.includes(c.name));
           if(refs.length) c.references = refs.map(_ref => {

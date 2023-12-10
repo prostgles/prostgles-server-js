@@ -192,7 +192,7 @@ export class QueryStreamer {
       try {
         const stopFunction = opts?.terminate? "pg_terminate_backend" : "pg_cancel_backend";
         const rows = await this.adminClient.query(`SELECT ${stopFunction}(pid), pid, state, query FROM pg_stat_activity WHERE pid = $1`, [processID]);
-        cleanup()
+        cleanup();
         cb({ processID, info: rows.rows[0] });
       } catch (error){
         cb(null, error);
