@@ -102,6 +102,9 @@ export class SelectItemBuilder {
     this.columns = params.columns;
     this.allowedFieldsIncludingComputed = this.allowedFields.concat(this.computedFields? this.computedFields.map(cf => cf.name) : []);
     if(!this.allowedFields.length){
+      if(!this.columns.length){
+        throw "This view/table has no columns. Cannot select anything";
+      }
       throw "allowedFields empty/missing";
     }
 

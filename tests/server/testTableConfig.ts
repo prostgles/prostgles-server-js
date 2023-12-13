@@ -132,9 +132,14 @@ export const testTableConfig: TableConfig<{ en: 1, fr: 1 }> = {
       }
     }
   },
-  // uuid_text: {
-  // 	columns: {id: "UUID"}
-  // },
+  api_table: {
+    columns: {
+      id: "SERIAL PRIMARY KEY",
+    },
+    onMount: async ({ _db, dbo }) => {
+      await _db.any(`ALTER TABLE api_table ADD COLUMN col1 TEXT`);
+    }
+  },
   rec_ref: {
     columns: {
       id: "SERIAL PRIMARY KEY",

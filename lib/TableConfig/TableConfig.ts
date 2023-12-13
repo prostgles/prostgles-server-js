@@ -1,13 +1,10 @@
 import { asName as _asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE, isObject, JSONB, ColumnInfo } from "prostgles-types";
 import { isPlainObject, JoinInfo } from "../DboBuilder/DboBuilder";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
-import { PubSubManager, asValue, log } from "../PubSubManager/PubSubManager";
-import { getTableColumnQueries } from "./getTableColumnQueries";
-import { getFutureTableSchema } from "./getFutureTableSchema";
-import { getColConstraints, getConstraintDefinitionQueries } from "./getConstraintDefinitionQueries";
 import { InsertRule, ValidateRowArgs } from "../PublishParser/PublishParser";
 import { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { uploadFile } from "../DboBuilder/uploadFile";
+import { initTableConfig } from "./initTableConfig";
 
 type ColExtraInfo = {
   min?: string | number;
@@ -19,7 +16,7 @@ export type I18N_Config<LANG_IDS> = {
   [lang_id in keyof LANG_IDS]: string;
 }
 
-export const parseI18N = <LANG_IDS, Def extends string | undefined>(params: { 
+export const parseI18N = <LANG_IDS, Def extends string | undefined>(params: {
   config?: I18N_Config<LANG_IDS> | string; 
   lang?: keyof LANG_IDS | string; 
   defaultLang: keyof LANG_IDS | string;
@@ -164,16 +161,12 @@ type MediaColumn = ({
     }
   ));
 
-type ReferencedColumn = {
-
+type ReferencedColumn = { 
   /**
    * Will create a lookup table that this column will reference
    */
   references?: BaseColumnTypes & {
-
-
     tableName: string;
-
     /**
      * Defaults to id
      */
@@ -219,6 +212,7 @@ export type StrictUnion<T> = StrictUnionHelper<T, T>
 
 export const CONSTRAINT_TYPES = ["PRIMARY KEY", "UNIQUE", "CHECK"] as const; // "FOREIGN KEY", 
 export type TableDefinition<LANG_IDS> = {
+  onMount?: (params: { dbo: DBHandlerServer; _db: DB }) => Promise<void | { onUnmount: () => void; }>;
   columns?: {
     [column_name: string]: ColumnConfig<LANG_IDS>
   },
@@ -337,6 +331,22 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     this.prostgles = prostgles;
   }
 
+  tableOnMounts: Record<string, { onUnmount: () => void; }> = {};
+  setTableOnMounts = async () => {
+    for await(const { onUnmount } of Object.values(this.tableOnMounts)){
+      await onUnmount();
+    }
+    this.tableOnMounts = {};
+    for (const [tableName, tableConfig] of Object.entries(this.config)) {
+      if("onMount" in tableConfig && tableConfig.onMount){
+        const cleanup = await tableConfig.onMount({ dbo: this.dbo, _db: this.db });
+        if(cleanup){
+          this.tableOnMounts[tableName] = cleanup;
+        }
+      }
+    }
+  }
+
   getColumnConfig = (tableName: string, colName: string): ColumnConfig | undefined => {
     const tconf = this.config?.[tableName];
     if (tconf && "columns" in tconf) {
@@ -446,370 +456,5 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
   prevInitQueryHistory?: string[];
   initialising = false;
-  async init() {
-    
-    let changedSchema = false;
-    const failedQueries: { query: string; error: any }[] = [];
-    this.initialising = true;
-    const queryHistory: string[] = [];
-    let queries: string[] = [];
-    const makeQuery = (q: string[]) => q.filter(v => v.trim().length).map(v => v.trim().endsWith(";")? v : `${v};`).join("\n");
-    const runQueries = async (_queries = queries) => {
-      let q = makeQuery(queries);
-      if(!_queries.some(q => q.trim().length)) {
-        return 0;
-      }
-      q = `/* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ \n\n` + q;
-      queryHistory.push(q);
-      this.prostgles.opts.onLog?.({ type: "debug", command: "TableConfig.runQueries.start", data: { q }, duration: -1 });
-      const now = Date.now();
-      await this.db.multi(q).catch(err => {
-        log({ err, q });
-        failedQueries.push({ query: q, error: err });
-        return Promise.reject(err);
-      });
-      this.prostgles.opts.onLog?.({ type: "debug", command: "TableConfig.runQueries.end", duration: Date.now() - now, data: { q } });
-      changedSchema = true;
-      _queries = [];
-      queries = [];
-      return 1;
-    }
-
-    if (!this.prostgles.pgp){ 
-      throw "pgp missing";
-    }
-
-    const MAX_IDENTIFIER_LENGTH = +(await this.db.one("SHOW max_identifier_length;") as any).max_identifier_length;
-    if(!Number.isFinite(MAX_IDENTIFIER_LENGTH)) throw `Could not obtain a valid max_identifier_length`;
-    const asName = (v: string) => {
-      if(v.length > MAX_IDENTIFIER_LENGTH - 1){
-        throw `The identifier name provided (${v}) is longer than the allowed limit (max_identifier_length - 1 = ${MAX_IDENTIFIER_LENGTH -1} characters )\n Longest allowed: ${_asName(v.slice(0, MAX_IDENTIFIER_LENGTH - 1))} `
-      }
-
-      return _asName(v);
-    }
-
-    let migrations: { version: number; table: string; } | undefined;
-    if(this.prostgles.opts.tableConfigMigrations){
-      const { onMigrate, version, versionTableName = "schema_version" } = this.prostgles.opts.tableConfigMigrations;
-      await this.db.any(`
-        /* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
-        CREATE TABLE IF NOT EXISTS ${asName(versionTableName)}(id NUMERIC PRIMARY KEY, table_config JSONB NOT NULL)
-      `);
-      migrations = { version, table: versionTableName  };
-      let latestVersion: number | undefined;
-      try {
-        latestVersion = Number((await this.db.oneOrNone(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`)).v);
-      } catch(e){
-
-      }
-
-      if (latestVersion === version) {
-        const isLatest = (await this.db.oneOrNone(`SELECT table_config = \${table_config} as v FROM ${asName(versionTableName)} WHERE id = \${version}`, { version, table_config: this.config })).v;
-        if(isLatest){
-          return;
-        }
-      }
-      if(!latestVersion || latestVersion < version){
-        await onMigrate({ db: this.db, oldVersion: latestVersion, getConstraints: (table, col, types) => getColConstraints({ db: this.db, table, column: col, types }) })
-      }
-    }
-
-    /* Create lookup tables */
-    for (const [tableNameRaw, tableConf] of Object.entries(this.config)){
-      const tableName = asName(tableNameRaw);
-
-      if ("isLookupTable" in tableConf && Object.keys(tableConf.isLookupTable?.values).length) {
-        const { dropIfExists = false, dropIfExistsCascade = false } = tableConf;
-        const isDropped = dropIfExists || dropIfExistsCascade;
-  
-        if (dropIfExistsCascade) {
-          queries.push(`DROP TABLE IF EXISTS ${tableName} CASCADE;`);
-        } else if (dropIfExists) {
-          queries.push(`DROP TABLE IF EXISTS ${tableName};`);
-        }
-
-        const rows = Object.keys(tableConf.isLookupTable?.values).map(id => ({ id, ...(tableConf.isLookupTable?.values[id]) }));
-        if (isDropped || !this.dbo?.[tableNameRaw]) {
-          const columnNames = Object.keys(rows[0]!).filter(k => k !== "id");
-          queries.push(
-            `CREATE TABLE IF NOT EXISTS ${tableName} (
-              id  TEXT PRIMARY KEY
-              ${columnNames.length? (", " + columnNames.map(k => asName(k) + " TEXT ").join(", ")) : ""}
-            );`
-          );
-
-          rows.map(row => {
-            const values = this.prostgles.pgp!.helpers.values(row)
-            queries.push(this.prostgles.pgp!.as.format(`INSERT INTO ${tableName}  (${["id", ...columnNames].map(t => asName(t)).join(", ")})  ` + " VALUES ${values:raw} ;", { values }))
-          });
-        }
-      }      
-    }
-
-    if (queries.length) { 
-      await runQueries(queries);
-      await this.prostgles.refreshDBO();
-    }
-
-    /* Create/Alter columns */
-    for (const [tableName, tableConf] of Object.entries(this.config)){
-      const tableHandler = this.dbo[tableName];
-      
-      /** These have already been created */
-      if("isLookupTable" in tableConf){
-        continue;
-      }
-
-      const ALTER_TABLE_Q = `ALTER TABLE ${asName(tableName)}`;
-
-      const coldef = await getTableColumnQueries({ db: this.db, tableConf: tableConf as any, tableHandler: tableHandler as any, tableName  });
- 
-      if(coldef){
-        queries.push(coldef.fullQuery);
-      }
- 
-      /** CONSTRAINTS */
-      const constraintDefs = getConstraintDefinitionQueries({ tableName, tableConf: tableConf as any });
-      if(coldef?.isCreate){
-        queries.push(...constraintDefs?.map(c => c.alterQuery) ?? []);
-      
-      } else if(coldef) {
-        const fullSchema = await getFutureTableSchema({ db: this.db, tableName,  columnDefs: coldef.columnDefs, constraintDefs });
-        const futureCons = fullSchema.constraints.map(nc => ({
-          ...nc,
-          isNamed: constraintDefs?.some(c => c.name === nc.name)
-        }));
-
-        /** Run this first to ensure any dropped cols drop their constraints as well */
-        await runQueries(queries);
-        const currCons = await getColConstraints({ db: this.db, table: tableName });
-
-        /** Drop removed/modified */
-        currCons.forEach(c => {
-          if(!futureCons.some(nc => nc.definition === c.definition  && (!nc.isNamed || nc.name === c.name))){
-            queries.push(`${ALTER_TABLE_Q} DROP CONSTRAINT ${asName(c.name)};`)
-          }
-        });
-        
-        /** Add missing named constraints */
-        constraintDefs?.forEach(c => {
-          if(c.name && !currCons.some(cc => cc.name === c.name)){
-            const fc = futureCons.find(nc => nc.name === c.name);
-            if(fc){
-              queries.push(`${ALTER_TABLE_Q} ADD CONSTRAINT ${asName(c.name)} ${c.content};`);
-            }
-          }
-        });
-
-        /** Add remaining missing constraints */ 
-        futureCons
-          .filter(nc => 
-            !currCons.some(c =>c.definition === nc.definition)
-          )
-          .forEach(c => { 
-            queries.push(`${ALTER_TABLE_Q} ADD ${c.definition};`)
-          });
-      }
-
-
-      if ("indexes" in tableConf && tableConf.indexes) {
-        /*
-            CREATE [ UNIQUE ] INDEX [ CONCURRENTLY ] [ [ IF NOT EXISTS ] name ] ON [ ONLY ] table_name [ USING method ]
-              ( { column_name | ( expression ) } [ COLLATE collation ] [ opclass [ ( opclass_parameter = value [, ... ] ) ] ] [ ASC | DESC ] [ NULLS { FIRST | LAST } ] [, ...] )
-              [ INCLUDE ( column_name [, ...] ) ]
-              [ NULLS [ NOT ] DISTINCT ]
-              [ WITH ( storage_parameter [= value] [, ... ] ) ]
-              [ TABLESPACE tablespace_name ]
-              [ WHERE predicate ]
-        */
-        const currIndexes = await getIndexes(this.db, tableName, "public");
-        Object.entries(tableConf.indexes).forEach(([
-          indexName, 
-          { 
-            columns, 
-            concurrently, 
-            replace, 
-            unique, 
-            using, 
-            where = "" 
-          }
-        ]) => {
-
-          if (replace || typeof replace !== "boolean" && tableConf.replaceUniqueIndexes) {
-            queries.push(`DROP INDEX IF EXISTS ${asName(indexName)};`);
-          }
-          if(!currIndexes.some(idx => idx.indexname === indexName)){
-            queries.push([
-              "CREATE",
-              unique && "UNIQUE",
-              concurrently && "CONCURRENTLY",
-              `INDEX ${asName(indexName)} ON ${asName(tableName)}`,
-              using && ("USING " + using),
-              `(${columns})`,
-              where && `WHERE ${where}`
-            ].filter(v => v).join(" ") + ";");
-          }
-        });
-      }
-
-      const { triggers, dropIfExists, dropIfExistsCascade } = tableConf;
-      if(triggers){
-        const isDropped = dropIfExists || dropIfExistsCascade;
-
-        const existingTriggers = await this.dbo.sql!(`
-            SELECT event_object_table
-              ,trigger_name
-            FROM  information_schema.triggers
-            WHERE event_object_table = \${tableName}
-            ORDER BY event_object_table
-          `,
-          { tableName }, 
-          { returnType: "rows" }
-        ) as { trigger_name: string }[];
-
-        // const existingTriggerFuncs = await this.dbo.sql!(`
-        //   SELECT p.oid,proname,prosrc,u.usename
-        //   FROM  pg_proc p  
-        //   JOIN  pg_user u ON u.usesysid = p.proowner  
-        //   WHERE prorettype = 2279;
-        // `, {}, { returnType: "rows" }) as { proname: string }[];
-
-        Object.entries(triggers).forEach(([triggerFuncName, trigger]) => {
-
-          const funcNameParsed = asName(triggerFuncName);
-          
-          let addedFunc = false;
-          const addFuncDef = () => {
-            if(addedFunc) return;
-            addedFunc = true;
-            queries.push(`
-              CREATE OR REPLACE FUNCTION ${funcNameParsed}()
-                RETURNS trigger
-                LANGUAGE plpgsql
-              AS
-              $$
-  
-              ${trigger.query}
-              
-              $$;
-            `);
-          }
-          
-          trigger.actions.forEach(action => {
-            const triggerActionName = triggerFuncName+"_"+action;
-            
-            const triggerActionNameParsed = asName(triggerActionName)
-            if(isDropped){
-              queries.push(`DROP TRIGGER IF EXISTS ${triggerActionNameParsed} ON ${tableName};`)
-            }
-
-            if(isDropped || !existingTriggers.some(t => t.trigger_name === triggerActionName)){
-              addFuncDef();
-              const newTableName = action !== "delete"? "NEW TABLE AS new_table" : "";
-              const oldTableName = action !== "insert"? "OLD TABLE AS old_table" : "";
-              queries.push(`
-                CREATE TRIGGER ${triggerActionNameParsed}
-                ${trigger.type} ${action} ON ${tableName}
-                REFERENCING ${newTableName} ${oldTableName}
-                FOR EACH ${trigger.forEach}
-                EXECUTE PROCEDURE ${funcNameParsed}();
-              `);
-            }
-          })
-        })
-      }
-    } 
-
-    if (queries.length) {
-      const q = makeQuery(queries);
-
-      try {
-        await runQueries(queries);
-      } catch(err: any){
-        this.initialising = false;
-
-        console.error("TableConfig error: ", err);
-        if(err.position){
-          const pos = +err.position;
-          if(Number.isInteger(pos)){
-            return Promise.reject(err.toString() + "\n At:" + q.slice(pos - 50, pos + 50));
-          }
-        }
-
-        return Promise.reject(err);
-      }
-    }
-
-    if(migrations){
-      await this.db.any(`INSERT INTO ${migrations.table}(id, table_config) VALUES (${asValue(migrations.version)}, ${asValue(this.config)}) ON CONFLICT DO NOTHING;`)
-    }
-    this.initialising = false;
-    if(changedSchema && !failedQueries.length){
-      if(!this.prevInitQueryHistory){
-        this.prevInitQueryHistory = queryHistory;
-      } else if(this.prevInitQueryHistory.join() !== queryHistory.join()){
-        this.prostgles.init(this.prostgles.opts.onReady, { type: "TableConfig" });
-      } else {
-        console.error("TableConfig loop bug", queryHistory)
-      }
-    }
-    if(failedQueries.length){
-      console.error("Table config failed queries: ", failedQueries)
-    }
-  }
+  init = initTableConfig.bind(this);
 }
-
-type PGIndex = {
-  schemaname: string;
-  indexname: string;
-  indexdef: string;
-  escaped_identifier: string;
-  type: string;
-  owner: string;
-  tablename: string;
-  persistence: string;
-  access_method: string;
-  size: string;
-  description: string | null; 
-};
-export const getIndexes = async (db: DB, tableName: string, schema: string): Promise<PGIndex[]> => {
-
-
-  
-  const indexQuery =`
-  SELECT n.nspname as schemaname,
-    c.relname as indexname,
-    pg_get_indexdef(c.oid) as indexdef,
-    format('%I', c.relname) as escaped_identifier,
-    CASE c.relkind WHEN 'r' 
-      THEN 'table' WHEN 'v' 
-      THEN 'view' WHEN 'm' 
-      THEN 'materialized view' 
-      WHEN 'i' THEN 'index' 
-      WHEN 'S' THEN 'sequence' WHEN 's' THEN 'special' 
-      WHEN 't' THEN 'TOAST table' WHEN 'f' THEN 'foreign table' 
-      WHEN 'p' THEN 'partitioned table' WHEN 'I' THEN 'partitioned index' END as "type",
-    pg_catalog.pg_get_userbyid(c.relowner) as "owner",
-    c2.relname as tablename,
-    CASE c.relpersistence WHEN 'p' THEN 'permanent' WHEN 't' THEN 'temporary' 
-    WHEN 'u' THEN 'unlogged' END as "persistence",
-    am.amname as "access_method",
-    pg_catalog.pg_size_pretty(pg_catalog.pg_table_size(c.oid)) as "size",
-    pg_catalog.obj_description(c.oid, 'pg_class') as "description"
-  FROM pg_catalog.pg_class c
-      LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-      LEFT JOIN pg_catalog.pg_am am ON am.oid = c.relam
-      LEFT JOIN pg_catalog.pg_index i ON i.indexrelid = c.oid
-      LEFT JOIN pg_catalog.pg_class c2 ON i.indrelid = c2.oid
-  WHERE c.relkind IN ('i','I','')
-        AND n.nspname <> 'pg_catalog'
-        AND n.nspname !~ '^pg_toast'
-        AND n.nspname <> 'information_schema'
-    AND pg_catalog.pg_table_is_visible(c.oid)
-  AND c2.relname = \${tableName}
-  AND n.nspname = \${schema}
-  ORDER BY 1,2;
-  `
-  return db.any(indexQuery, { tableName, schema });
-};

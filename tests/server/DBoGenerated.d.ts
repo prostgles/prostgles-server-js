@@ -63,6 +63,17 @@ export type DBSchemaGenerated = {
       id?: number;
     };
   };
+  api_table: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      col1?: null | string;
+      id?: number;
+    };
+  };
   ex_j_ins: {
     is_view: false;
     select: true;

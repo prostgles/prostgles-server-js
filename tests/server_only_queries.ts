@@ -17,4 +17,8 @@ export default async function f(db: DBHandlerServer){
   const expect1 = await db.items.count!({ name: "tx_" });
   if(expect1 !== 1) throw "db.tx failed";
 
+  /** TableConfig onMount works */
+  await db.api_table.findOne!({ id: 1 });
+  const newRow = await db.api_table.insert!({ }, { returning: "*" });
+  if(newRow.col1 !== null) throw "api_table onMount failed";
 }
