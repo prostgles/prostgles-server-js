@@ -473,6 +473,7 @@ export class Prostgles {
       if(this.tableConfigurator?.initialising){
         console.error("TableConfigurator WILL deadlock", { reason });
       }
+      await this.tableConfigurator?.destroy();
       this.tableConfigurator = new TableConfigurator(this);
       try {
         const now = Date.now();

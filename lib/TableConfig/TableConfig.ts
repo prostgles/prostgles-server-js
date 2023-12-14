@@ -331,11 +331,14 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     this.prostgles = prostgles;
   }
 
-  tableOnMounts: Record<string, { onUnmount: () => void; }> = {};
-  setTableOnMounts = async () => {
+  destroy = async () => {
     for await(const { onUnmount } of Object.values(this.tableOnMounts)){
       await onUnmount();
     }
+  }
+
+  tableOnMounts: Record<string, { onUnmount: () => void; }> = {};
+  setTableOnMounts = async () => {
     this.tableOnMounts = {};
     for (const [tableName, tableConfig] of Object.entries(this.config)) {
       if("onMount" in tableConfig && tableConfig.onMount){
