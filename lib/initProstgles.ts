@@ -70,12 +70,6 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
     await this.refreshDBO();
     await this.initTableConfig(reason);
     await this.initFileTable();
-
-    /* Create media table if required */
-    const now = Date.now();
-    await this.opts.onLog?.({ type: "debug", command: "initFileTable.start", duration: -1 });
-    await this.initFileTable();
-    await this.opts.onLog?.({ type: "debug", command: "initFileTable.end", duration: Date.now() - now });
     await this.initRestApi();
 
     if (this.opts.publish) {

@@ -319,5 +319,6 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
     console.error("Table config failed queries: ", failedQueries)
   }
 
+  await this.prostgles.refreshDBO();
   this.setTableOnMounts();
 }
