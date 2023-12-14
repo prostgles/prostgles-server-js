@@ -1,14 +1,13 @@
-import { DBOFullyTyped } from "./DBSchemaBuilder";
-import { DBHandlerServer, Prostgles, ProstglesInitOptions, isSuperUser } from "./Prostgles";
 import * as promise from "bluebird";
-import TableConfigurator from "./TableConfig/TableConfig";
-import AuthHandler from "./AuthHandler";
-import { PublishParser } from "./PublishParser/PublishParser";
-import { DBEventsManager } from "./DBEventsManager";
-import { sleep } from "./utils";
+import * as pgPromise from "pg-promise";
 import pg from "pg-promise/typescript/pg-subset";
 import { isEmpty, pickKeys } from "prostgles-types";
-import * as pgPromise from "pg-promise";
+import AuthHandler from "./AuthHandler";
+import { DBEventsManager } from "./DBEventsManager";
+import { DBOFullyTyped } from "./DBSchemaBuilder";
+import { DBHandlerServer, Prostgles, ProstglesInitOptions, isSuperUser } from "./Prostgles";
+import { PublishParser } from "./PublishParser/PublishParser";
+import { sleep } from "./utils";
 
 export type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 export type DbConnectionOpts = pg.IDefaults;
@@ -163,6 +162,7 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
         this.fileManager?.destroy();
         this.dboBuilder?.destroy();
         this.authHandler?.destroy();
+        await this.tableConfigurator?.destroy();
         this.dbo = undefined;
         this.db = undefined;
         await db.$pool.end();
