@@ -210,7 +210,7 @@ type UnionKeys<T> = T extends T ? keyof T : never;
 type StrictUnionHelper<T, TAll> = T extends any ? T & Partial<Record<Exclude<UnionKeys<TAll>, keyof T>, never>> : never;
 export type StrictUnion<T> = StrictUnionHelper<T, T>
 
-export const CONSTRAINT_TYPES = ["PRIMARY KEY", "UNIQUE", "CHECK"] as const; // "FOREIGN KEY", 
+export const CONSTRAINT_TYPES = ["PRIMARY KEY", "UNIQUE", "CHECK"] as const; 
 export type TableDefinition<LANG_IDS> = {
   onMount?: (params: { dbo: DBHandlerServer; _db: DB }) => Promise<void | { onUnmount: () => void; }>;
   columns?: {
@@ -333,7 +333,11 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
   destroy = async () => {
     for await(const { onUnmount } of Object.values(this.tableOnMounts)){
-      await onUnmount();
+      try {
+        await onUnmount();
+      } catch (error) {
+        console.error(error);
+      }
     }
   }
 
