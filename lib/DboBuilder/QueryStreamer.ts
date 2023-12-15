@@ -7,6 +7,7 @@ import { PRGLIOSocket } from "./DboBuilderTypes";
 import { getErrorAsObject, getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
 import { getDetailedFieldInfo, watchSchemaFallback } from "./runSQL";
 import CursorType from 'pg-cursor'
+import { VoidFunction } from "../SchemaWatch";
 const Cursor: typeof CursorType = require('pg-cursor');
 
 type ClientStreamedRequest = {
@@ -18,6 +19,7 @@ type ClientStreamedRequest = {
 type StreamedQuery = ClientStreamedRequest & {
   cursor: CursorType | undefined;
   client: pg.Client | undefined;
+  stop?: VoidFunction;
   onError: ((error: any) => void);
 }
 type Info = { 
@@ -68,7 +70,9 @@ export class QueryStreamer {
   onDisconnect = (socketId: string) => {
     const socketQueries = this.socketQueries[socketId];
     if(!socketQueries) return;
-    Object.values(socketQueries).forEach(({ client }) => {
+    Object.values(socketQueries).forEach(({ client, stop }) => {
+      stop?.();
+      /** end does not stop active query?! */
       client?.end();
     });
     delete this.socketQueries[socketId];
@@ -203,6 +207,7 @@ export class QueryStreamer {
         cb(null, error);
       }
     }
+    this.socketQueries[socketId]![id]!.stop = () => stop({ terminate: true }, () => { /* Empty */ });
 
     socket.removeAllListeners(unsubChannel);
     socket.once(unsubChannel, stop);
