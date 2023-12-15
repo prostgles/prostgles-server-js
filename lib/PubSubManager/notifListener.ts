@@ -93,31 +93,30 @@ export async function notifListener(this: PubSubManager, data: { payload: string
       });
 
       /* Throttle the subscriptions */
-      subs.forEach(sub => {
-        sub.triggers.forEach(trg => {
-          if (
-            this.dbo[trg.table_name] &&
-            sub.is_ready &&
-            (sub.socket_id && this.sockets[sub.socket_id] || sub.localFuncs)
-          ) {
-            const { throttle = 0, throttleOpts } = sub;
-            if (!throttleOpts?.skipFirst && sub.last_throttled <= Date.now() - throttle) {
-              sub.last_throttled = Date.now();
-  
-              /* It is assumed the policy was checked before this point */
-              this.pushSubData(sub);
-            } else if (!sub.is_throttling) {
-  
-              log("throttling sub")
-              sub.is_throttling = setTimeout(() => {
-                log("throttling finished. pushSubData...")
-                sub.is_throttling = null;
-                sub.last_throttled = Date.now();
-                this.pushSubData(sub);
-              }, throttle);// sub.throttle);
-            }
-          }
-        });
+      const activeAndReadySubs = subs.filter(sub => 
+        sub.triggers.some(trg => 
+          this.dbo[trg.table_name] &&
+          sub.is_ready &&
+          (sub.socket_id && this.sockets[sub.socket_id] || sub.localFuncs)
+        )
+      );
+      activeAndReadySubs.forEach(sub => {
+        const { throttle = 0, throttleOpts } = sub;
+        if (!throttleOpts?.skipFirst && sub.last_throttled <= Date.now() - throttle) {
+          sub.last_throttled = Date.now();
+
+          /* It is assumed the policy was checked before this point */
+          this.pushSubData(sub);
+        } else if (!sub.is_throttling) {
+
+          log("throttling sub")
+          sub.is_throttling = setTimeout(() => {
+            log("throttling finished. pushSubData...")
+            sub.is_throttling = null;
+            sub.last_throttled = Date.now();
+            this.pushSubData(sub);
+          }, throttle);
+        }
       });
 
     });
