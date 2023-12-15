@@ -189,6 +189,11 @@ export class QueryStreamer {
     const stop = async (opts: { terminate?: boolean; } | undefined, cb: BasicCallback) => {
       const { client: queryClient } = this.socketQueries[socketId]?.[id] ?? {};
       if(!queryClient) return;
+      if(opts?.terminate){
+        setTimeout(() => {
+          queryClient.end();
+        }, 4e3);
+      }
       try {
         const stopFunction = opts?.terminate? "pg_terminate_backend" : "pg_cancel_backend";
         const rows = await this.adminClient.query(`SELECT ${stopFunction}(pid), pid, state, query FROM pg_stat_activity WHERE pid = $1`, [processID]);
