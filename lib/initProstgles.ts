@@ -30,10 +30,10 @@ type OnReadyParamsCommon = {
   tables: DbTableInfo[];
   reason: OnInitReason;
 }
-type OnReadyParamsBasic = OnReadyParamsCommon & {
+export type OnReadyParamsBasic = OnReadyParamsCommon & {
   dbo: DBHandlerServer; 
 }
-type OnReadyParams<S> = OnReadyParamsCommon & {
+export type OnReadyParams<S> = OnReadyParamsCommon & {
   dbo: DBOFullyTyped<S>; 
 }
 
