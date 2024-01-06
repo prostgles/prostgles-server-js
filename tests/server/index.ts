@@ -214,7 +214,7 @@ prostgles<DBSchemaGenerated>({
 			type: "many-many"
 		}			
 	],
-	onReady: async (db, _db) => {
+	onReady: async ({ dbo, db }) => {
 		log("prostgles onReady");
 
 		try {
@@ -232,9 +232,9 @@ prostgles<DBSchemaGenerated>({
 				
 			} else if(process.env.TEST_TYPE === "server"){
 
-				await server_only_queries(db as any);
+				await server_only_queries(dbo as any);
 				log("Server-only query tests successful");
-				await isomorphic(db as any, log);
+				await isomorphic(dbo as any, log);
 				log("Server isomorphic tests successful");
 
 				stopTest()
@@ -242,7 +242,7 @@ prostgles<DBSchemaGenerated>({
 		} catch(err) {
 			console.trace(err)
 			if(process.env.TEST_TYPE){
-				stopTest(err)
+				stopTest(err ?? "Error")
 			}
 		}
 		

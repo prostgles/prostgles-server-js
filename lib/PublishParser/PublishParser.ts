@@ -34,11 +34,7 @@ export class PublishParser {
       dbo: this.dbo,
       db: this.db,
       socket: localParams.socket!,
-      tables: (this.prostgles.dboBuilder.tablesOrViews ?? []).map(({ name, columns }) => ({
-        name,
-        columns,
-        info: this.dbo[name]!.tableOrViewInfo!
-      }))
+      tables: this.prostgles.dboBuilder.tables,
     }
   }
 

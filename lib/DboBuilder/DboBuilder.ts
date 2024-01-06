@@ -16,6 +16,7 @@ import {
 } from "../Prostgles";
 import { PubSubManager } from "../PubSubManager/PubSubManager";
 import {
+  DbTableInfo,
   PublishParser
 } from "../PublishParser/PublishParser";
 import { Graph } from "../shortestPath";
@@ -73,6 +74,14 @@ export class DboBuilder {
   USER_TABLE_COLUMNS: TableOidColumnInfo[] | undefined;
   
   queryStreamer: QueryStreamer;
+
+  get tables(): DbTableInfo[] {
+    return (this.tablesOrViews ?? []).map(({ name, columns }) => ({
+      name,
+      columns,
+      info: this.dbo[name]!.tableOrViewInfo!
+    }));
+  }
 
   getPubSubManager = async (): Promise<PubSubManager> => {
     if (!this._pubSubManager) {

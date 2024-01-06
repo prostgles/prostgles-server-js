@@ -113,7 +113,7 @@ export type PublishFullyTyped<Schema = void> = Schema extends DBSchema? (
       
       return "*" as const
     },
-    onReady: (dbo) => {
+    onReady: ({ dbo }) => {
       dbo.tdwa?.find!()
     }
   });

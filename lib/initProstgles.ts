@@ -6,7 +6,7 @@ import AuthHandler from "./AuthHandler";
 import { DBEventsManager } from "./DBEventsManager";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { DBHandlerServer, Prostgles, ProstglesInitOptions, isSuperUser } from "./Prostgles";
-import { PublishParser } from "./PublishParser/PublishParser";
+import { DbTableInfo, PublishParser } from "./PublishParser/PublishParser";
 import { sleep } from "./utils";
 
 export type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
@@ -16,12 +16,29 @@ export type PGP = pgPromise.IMain<{}, pg.IClient>;
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 
 export type OnInitReason = 
-  | { type: "schema change"; query: string; command: string; } 
+  | { 
+    type: "schema change"; 
+    query: string; 
+    command: string; 
+  } 
   | { 
     type: "init" | "prgl.restart" | "prgl.update" | "TableConfig"
-  }
-export type OnReadyCallback<S = void> = (dbo: DBOFullyTyped<S>, db: DB, reason: OnInitReason) => any;
-export type OnReadyCallbackBasic = (dbo: DBHandlerServer, db: DB, reason: OnInitReason) => any;
+  };
+
+type OnReadyParamsCommon = {
+  db: DB;
+  tables: DbTableInfo[];
+  reason: OnInitReason;
+}
+type OnReadyParamsBasic = OnReadyParamsCommon & {
+  dbo: DBHandlerServer; 
+}
+type OnReadyParams<S> = OnReadyParamsCommon & {
+  dbo: DBOFullyTyped<S>; 
+}
+
+export type OnReadyCallback<S = void> = (params: OnReadyParams<S>) => any;
+export type OnReadyCallbackBasic = (params: OnReadyParamsBasic) => any;
 
 export type InitResult = {
   db: DBOFullyTyped;
@@ -100,7 +117,12 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
       if (this.destroyed) {
         console.trace(1)
       }
-      onReady(this.dbo as any, this.db, { type: "init" });
+      onReady({
+        dbo: this.dbo as any, 
+        db: this.db, 
+        tables: this.dboBuilder.tables,
+        reason: { type: "init" }
+      });
     } catch (err) {
       console.error("Prostgles: Error within onReady: \n", err)
     }
@@ -147,11 +169,7 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
           }
           if(this.opts.io.engine.constructor.name === 'Server'){
             this.opts.io.engine.close();
-          }
-          // if (typeof this.opts.io.close === "function") {
-          //   this.opts.io.close();
-          //   console.log("this.io.close")
-          // }
+          } 
         }
         this.fileManager?.destroy();
         this.dboBuilder?.destroy();

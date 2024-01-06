@@ -373,18 +373,18 @@ export type ParsedPublishTable = {
   subscribe?: SubscribeRule;
   subscribeOne?: SubscribeRule;
 }
-
+export type DbTableInfo = {
+  name: string;
+  info: TableOrViewInfo;
+  columns: TableSchemaColumn[];
+}
 export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
   sid?: string;
   dbo: DBOFullyTyped<S>;
   db: DB;
   user?: SUser["user"];
   socket: PRGLIOSocket;
-  tables: {
-    name: string;
-    info: TableOrViewInfo;
-    columns: TableSchemaColumn[];
-  }[];
+  tables: DbTableInfo[];
 }
 export type RequestParams = { dbo?: DBHandlerServer, socket?: any };
 export type PublishAllOrNothing = true | "*" | false | null;

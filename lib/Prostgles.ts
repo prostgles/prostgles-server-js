@@ -373,7 +373,7 @@ export class Prostgles {
     return { fileName, fullPath }
   }
 
-  private getFileText(fullPath: string, format = "utf8"): Promise<string> {
+  private getFileText(fullPath: string, _format = "utf8"): Promise<string> {
     return new Promise((resolve, reject) => {
       fs.readFile(fullPath, 'utf8', function (err, data) {
         if (err) reject(err);
