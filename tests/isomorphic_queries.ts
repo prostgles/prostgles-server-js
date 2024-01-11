@@ -86,6 +86,16 @@ export default async function isomorphic(db: Required<DBHandlerServer> | DBHandl
     await db.sql("TRUNCATE files CASCADE");
   });
 
+  await tryRun("onConflict do update", async () => {
+    const initial = await db.items4.insert!({ id: -99, name: "onConflict", public: "onConflict" }, { returning: "*" });
+    const updated = await db.items4.insert!({ id: -99, name: "onConflict", public: "onConflict2" }, { onConflict: "DoUpdate", returning: "*" });
+    assert.equal(initial.id, -99);
+    assert.equal(initial.public, "onConflict");
+    assert.equal(updated.id, -99);
+    assert.equal(updated.public, "onConflict2");
+    await db.items4.delete!({ id: -99 });
+  });
+
   const fileFolder = `${__dirname}/../../server/dist/server/media/`;
   const fileName = "sample_file.txt";
   await tryRun("Local file upload", async () => {

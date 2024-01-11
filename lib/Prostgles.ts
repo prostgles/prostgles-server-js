@@ -299,7 +299,6 @@ export class Prostgles {
 
   constructor(params: ProstglesInitOptions) {
     if (!params) throw "ProstglesInitOptions missing";
-    if (!params.io) console.warn("io missing. WebSockets will not be set up");
 
     const config: Record<keyof ProstglesInitOptions, 1> = {
       transactions: 1, joins: 1, tsGeneratedTypesDir: 1,

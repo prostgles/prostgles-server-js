@@ -36,8 +36,7 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
         throw `Direct inserts not allowed. Only nested inserts from these tables: ${JSON.stringify(allowedNestedInserts)} `
       }
     }
-    const { conflict_query } = validateInsertParams(insertParams);
-
+    validateInsertParams(insertParams);
 
     /**
      * If media it will: upload file and continue insert
@@ -49,6 +48,7 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
       return insertResult;
     }
 
+    const pkeyNames = this.columns.filter(c => c.is_pkey).map(c => c.name);
     const getInsertQuery = async (_rows: AnyObject[]) => {
       const validatedData = await Promise.all(_rows.map(async _row => {
 
@@ -66,6 +66,16 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
       const allowedCols = Array.from( new Set(validatedData.flatMap(d => d.allowedCols)));
       const dbTx = finalDBtx || this.dboBuilder.dbo
       const query = await this.colSet.getInsertQuery(validatedRows, allowedCols, dbTx, validate, localParams);
+
+      const { onConflict } = insertParams ?? {};
+      let conflict_query = "";
+      if (onConflict === "DoNothing") {
+        conflict_query = " ON CONFLICT DO NOTHING ";
+      } else if(onConflict === "DoUpdate"){
+        if(!pkeyNames.length) throw "Cannot do DoUpdate on a table without a primary key";
+        const nonPkeyCols = allowedCols.filter(c => !pkeyNames.includes(c));
+        conflict_query = ` ON CONFLICT (${pkeyNames.join(", ")}) DO UPDATE SET ${nonPkeyCols.map(k => `${k} = EXCLUDED.${k}`).join(", ")}`;
+      }
       return query + conflict_query;
     };
     
@@ -108,10 +118,9 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
 
 const validateInsertParams = (params: InsertParams | undefined) => {
 
-  const { onConflictDoNothing, returnType, returning } = params ?? {};
-  let conflict_query = "";
-  if (typeof onConflictDoNothing === "boolean" && onConflictDoNothing) {
-    conflict_query = " ON CONFLICT DO NOTHING ";
+  const { onConflict, returnType, returning } = params ?? {};
+  if(![undefined, "DoNothing", "DoUpdate"].includes(onConflict)){
+    throw `Invalid onConflict: ${onConflict}. Expecting one of: DoNothing, DoUpdate`;
   }
 
   const allowedReturnTypes: InsertParams["returnType"][] = ["row", "value", "values", "statement", undefined]
@@ -124,14 +133,11 @@ const validateInsertParams = (params: InsertParams | undefined) => {
   }
 
   if (params) {
-    const good_paramsObj: Record<keyof InsertParams, 1> = { returning: 1, returnType: 1, fixIssues: 1, onConflictDoNothing: 1 };
+    const good_paramsObj: Record<keyof InsertParams, 1> = { returning: 1, returnType: 1, fixIssues: 1, onConflict: 1 };
     const good_params = Object.keys(good_paramsObj);
     const bad_params = Object.keys(params).filter(k => !good_params.includes(k));
     if (bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
   }
-
-  return { conflict_query }
-
 }
 
 // const removeBuffers = (o: any) => {
