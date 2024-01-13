@@ -72,8 +72,13 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
       if (onConflict === "DoNothing") {
         conflict_query = " ON CONFLICT DO NOTHING ";
       } else if(onConflict === "DoUpdate"){
-        if(!pkeyNames.length) throw "Cannot do DoUpdate on a table without a primary key";
+        if(!pkeyNames.length) {
+          throw "Cannot do DoUpdate on a table without a primary key";
+        }
         const nonPkeyCols = allowedCols.filter(c => !pkeyNames.includes(c));
+        if(!nonPkeyCols.length){
+          throw "Cannot on conflict DoUpdate on a table with only primary key columns";
+        }
         conflict_query = ` ON CONFLICT (${pkeyNames.join(", ")}) DO UPDATE SET ${nonPkeyCols.map(k => `${k} = EXCLUDED.${k}`).join(", ")}`;
       }
       return query + conflict_query;
