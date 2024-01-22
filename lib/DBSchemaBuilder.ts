@@ -1,4 +1,4 @@
-import { DbJoinMaker, DBSchema, isObject, JSONB, SQLHandler, TableHandler, ViewHandler } from "prostgles-types";
+import { AnyObject, DbJoinMaker, DBSchema, isObject, JSONB, SQLHandler, TableHandler, ViewHandler } from "prostgles-types";
 import prostgles from ".";
 import { Auth } from "./AuthHandler";
 import { DboBuilder, escapeTSNames, postgresToTsType } from "./DboBuilder/DboBuilder";
@@ -65,13 +65,16 @@ export type DBSchemaGenerated = {
 `;
 }
 
+type ServerViewHandler<T extends AnyObject = AnyObject> = ViewHandler<T> & { is_view: boolean; }
+type ServerTableHandler<T extends AnyObject = AnyObject> = TableHandler<T> & { is_view: boolean; }
+
 export type DBTableHandlersFromSchema<Schema = void> = Schema extends DBSchema? { 
   [tov_name in keyof Schema]: Schema[tov_name]["is_view"] extends true? 
-    ViewHandler<Schema[tov_name]["columns"]> : 
-    TableHandler<Schema[tov_name]["columns"]>
+    ServerViewHandler<Schema[tov_name]["columns"]> : 
+    ServerTableHandler<Schema[tov_name]["columns"]>
 } : Record<string, Partial<TableHandler>>;
 
-export type DBHandlerServerExtra<TH = Record<string, Partial<TableHandler>>, WithTransactions = true> = {
+export type DBHandlerServerExtra<TH = Record<string, Partial<ServerTableHandler>>, WithTransactions = true> = {
   sql: SQLHandler;
 } & Partial<DbJoinMaker> & (
   WithTransactions extends true? { tx: TX<TH> } :
