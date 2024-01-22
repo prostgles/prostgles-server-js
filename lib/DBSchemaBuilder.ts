@@ -72,7 +72,7 @@ export type DBTableHandlersFromSchema<Schema = void> = Schema extends DBSchema? 
   [tov_name in keyof Schema]: Schema[tov_name]["is_view"] extends true? 
     ServerViewHandler<Schema[tov_name]["columns"]> : 
     ServerTableHandler<Schema[tov_name]["columns"]>
-} : Record<string, Partial<TableHandler>>;
+} : Record<string, Partial<ServerTableHandler>>;
 
 export type DBHandlerServerExtra<TH = Record<string, Partial<ServerTableHandler>>, WithTransactions = true> = {
   sql: SQLHandler;
