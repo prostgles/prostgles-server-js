@@ -93,10 +93,11 @@ export const testPublish: Publish<DBSchemaGenerated> = async ({ user, sid }) => 
     insert_rules: {
       select: "*",
       insert: {
-        fields: "*",
+        fields: { added: 0 },
         returningFields: { name: 1 },
         validate: async ({ row }) => {
-          if(row.name === "a") row.name = "b"
+          if(row.name === "a") row.name = "b";
+          row.added = (new Date()).toUTCString();
           return row
         },
         checkFilter: {

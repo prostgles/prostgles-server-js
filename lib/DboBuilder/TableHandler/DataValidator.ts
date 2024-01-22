@@ -168,15 +168,17 @@ const getValidatedRowFieldData = async ({ allowedCols, rows, validationOptions, 
     rows.map(async nonvalidatedRow => {
 
       let row = pickKeys(nonvalidatedRow, allowedCols);
+      const initialRowKeys = Object.keys(row);
       if (validationOptions.validate) {
         if(!validationOptions.localParams){
           throw "localParams missing for validate";
         }
         row = await validationOptions.validate({ row, dbx: dbTx, localParams: validationOptions.localParams });
       }
+      const keysAddedDuringValidate = Object.keys(row).filter(newKey => !initialRowKeys.includes(newKey));
 
       const getColumn = (fieldName: string) => {
-        if (!allowedCols.includes(fieldName)) {
+        if (!allowedCols.concat(keysAddedDuringValidate).includes(fieldName)) {
           throw `Unexpected/Dissallowed column name: ${fieldName}`;
         }
         const column = tableHandler.columns.find(c => c.name === fieldName);
