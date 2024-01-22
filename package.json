@@ -1,6 +1,6 @@
 {
   "name": "prostgles-server",
-  "version": "4.2.4",
+  "version": "4.2.5",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -46,7 +46,7 @@
     "pg-cursor": "^2.10.3",
     "pg-promise": "^11.5.4",
     "prostgles-client": "^4.0.53",
-    "prostgles-types": "^4.0.68"
+    "prostgles-types": "^4.0.70"
   },
   "devDependencies": {
     "@types/bluebird": "^3.5.36",
@@ -58,6 +58,6 @@
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
     "eslint": "^8.51.0",
-    "typescript": "^5.2.2"
+    "typescript": "^5.3.3"
   }
 }

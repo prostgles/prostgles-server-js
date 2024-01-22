@@ -1,10 +1,11 @@
-import { AnyObject, unpatchText, UpdateParams } from "prostgles-types";
-import { Filter, isPlainObject, LocalParams, parseError, withUserRLS } from "../DboBuilder";
+import { AnyObject, UpdateParams } from "prostgles-types";
 import { TableRule } from "../../PublishParser/PublishParser";
-import { getInsertTableRules, getReferenceColumnInserts } from "../insertDataParse";
+import { Filter, LocalParams, parseError, withUserRLS } from "../DboBuilder";
+import { getInsertTableRules, getReferenceColumnInserts } from "../insertNestedRecords";
 import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
 import { TableHandler } from "./TableHandler";
 import { updateFile } from "./updateFile";
+import { prepareNewData } from "./DataValidator";
 
 export async function update(this: TableHandler, filter: Filter, _newData: AnyObject, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<AnyObject | void> {
   const ACTION = "update";
@@ -23,9 +24,13 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
       ({ newData } = await updateFile.bind(this)({ newData, filter, localParams, tableRules }));
     }
 
-    const parsedRules = await this.parseUpdateRules(filter, newData, params, tableRules, localParams)
+    const parsedRules = await this.parseUpdateRules(filter, params, tableRules, localParams)
     if (localParams?.testRule) {
       return parsedRules;
+    }
+
+    if (!newData || !Object.keys(newData).length) {
+      throw "no update data provided\nEXPECTING db.table.update(filter, updateData, options)";
     }
 
     const { fields, validateRow, forcedData,  returningFields, forcedFilter, filterFields } = parsedRules;
@@ -39,38 +44,16 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
       if (bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
     }
 
-    const { data, allowedCols } = this.validateNewData({ row: newData, forcedData, allowedFields: fields, tableRules, fixIssues });
-
-    /* Patch data */
-    const patchedTextData: {
-      fieldName: string;
-      from: number;
-      to: number;
-      text: string;
-      md5: string
-    }[] = [];
-    this.columns.map(c => {
-      const d = data[c.name];
-      if (c.data_type === "text" && d && isPlainObject(d) && !["from", "to"].find(key => typeof d[key] !== "number")) {
-        const unrecProps = Object.keys(d).filter(k => !["from", "to", "text", "md5"].includes(k));
-        if (unrecProps.length) throw "Unrecognised params in textPatch field: " + unrecProps.join(", ");
-        patchedTextData.push({ ...d, fieldName: c.name } as (typeof patchedTextData)[number]);
-      }
+    const { data, allowedCols } = await prepareNewData({ 
+      row: newData, 
+      forcedData, 
+      allowedFields: fields, 
+      tableRules, 
+      fixIssues,
+      tableConfigurator: this.dboBuilder.prostgles.tableConfigurator,
+      tableHandler: this, 
     });
 
-    if (patchedTextData?.length) {
-      if (tableRules && !tableRules.select) throw "Select needs to be permitted to patch data";
-      const rows = await this.find(filter, { select: patchedTextData.reduce((a, v) => ({ ...a, [v.fieldName]: 1 }), {}) }, undefined, tableRules);
-
-      if (rows.length !== 1) {
-        throw "Cannot patch data within a filter that affects more/less than 1 row";
-      }
-      patchedTextData.map(p => {
-        data[p.fieldName] = unpatchText(rows[0][p.fieldName], p);
-      });
-    }
-
-    const nData = { ...data };
     const updateFilter = await this.prepareWhere({
       filter,
       forcedFilter,
@@ -78,8 +61,12 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
       localParams,
       tableRule: tableRules
     })
-
-    const nestedInserts = getReferenceColumnInserts.bind(this)(nData, true);
+    
+    /**
+     * Nested inserts
+     */
+    const nData = { ...data };
+    const nestedInserts = getReferenceColumnInserts(this, nData, true);
     const nestedInsertsResultsObj: Record<string, any> = {};
     if(nestedInserts.length){
       const updateCount = await this.count(updateFilter.filter);
@@ -105,7 +92,8 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
       }));
     }
 
-    let query = await this.colSet.getUpdateQuery(nData, allowedCols, this.getFinalDbo(localParams), validateRow, localParams)
+    // let query = await this.colSet.getUpdateQuery(nData, allowedCols, this.getFinalDbo(localParams), validateRow, localParams)
+    let query = (await this.dataValidator.parse({ command: "update", rows: [nData], allowedCols, dbTx: this.getFinalDbo(localParams), validationOptions: { validate: validateRow, localParams }})).getQuery()
     query += "\n" + updateFilter.where;
     if (onConflict === "DoNothing") query += " ON CONFLICT DO NOTHING ";
     if(onConflict === "DoUpdate"){

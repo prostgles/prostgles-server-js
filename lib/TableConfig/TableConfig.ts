@@ -1,5 +1,5 @@
 import { asName as _asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE, isObject, JSONB, ColumnInfo } from "prostgles-types";
-import { isPlainObject, JoinInfo } from "../DboBuilder/DboBuilder";
+import { isPlainObject, JoinInfo, LocalParams } from "../DboBuilder/DboBuilder";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import { InsertRule, ValidateRowArgs } from "../PublishParser/PublishParser";
 import { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
@@ -46,7 +46,7 @@ type BaseTableDefinition<LANG_IDS = AnyObject> = {
      * Hook used to run custom logic before inserting a row. 
      * The returned row must satisfy the table schema
      */
-    getPreInsertRow?: (args: ValidateRowArgs) => Promise<{ row: AnyObject; onInserted: Promise<void>; }>;
+    getPreInsertRow?: (args: GetPreInsertRowArgs) => Promise<{ row: AnyObject; onInserted: Promise<void>; }>;
   };
   triggers?: {
     [triggerName: string]: {
@@ -296,9 +296,10 @@ export type TableDefinition<LANG_IDS> = {
   }
 }
 
-type GetPreInsertRowArgs = ValidateRowArgs & {
-  preValidate: InsertRule["preValidate"];
+type GetPreInsertRowArgs = Omit<ValidateRowArgs, "localParams"> & {
+  // preValidate: InsertRule["preValidate"];
   validate: InsertRule["validate"];
+  localParams: LocalParams | undefined;
 }
 
 /**
@@ -449,7 +450,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     return undefined;
   }
 
-  getPreInsertRow = async (tableHandler: TableHandler, args: GetPreInsertRowArgs): Promise<AnyObject> => {
+  getPreInsertRow = async (tableHandler: TableHandler, args: Pick<GetPreInsertRowArgs, "localParams" | "row" | "validate" | "dbx">): Promise<AnyObject> => {
     const tableHook = this.config?.[tableHandler.name]?.hooks?.getPreInsertRow;
     if(tableHandler.is_media){
       return uploadFile.bind(tableHandler)(args) as Promise<AnyObject>;
@@ -464,4 +465,4 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
   prevInitQueryHistory?: string[];
   initialising = false;
   init = initTableConfig.bind(this);
-}
+} 

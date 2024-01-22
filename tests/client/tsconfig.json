@@ -12,7 +12,7 @@
 		// "declarationMap": true,
 		"keyofStringsOnly": true,
 		"ignoreDeprecations": "5.0",
-		"skipLibCheck": false,
+		"skipLibCheck": true,
     "outDir": "dist",
 	},
 	"exclude": [

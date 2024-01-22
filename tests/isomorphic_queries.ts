@@ -1,6 +1,6 @@
 import { strict as assert } from 'assert';
 import * as fs from "fs";
-import type { DBHandlerServer } from "./server/dist/server/index";
+import { DBOFullyTyped } from "../dist/DBSchemaBuilder";
 import type { DBHandlerClient } from "./client/index";
 
 export async function tryRun(desc: string, func: () => any, log?: Function){
@@ -32,8 +32,8 @@ export function tryRunP(desc: string, func: (resolve: any, reject: any) => any, 
     }
   });
 }
- 
-export default async function isomorphic(db: Required<DBHandlerServer> | DBHandlerClient, log: (msg: string, extra?: any) => void) {
+
+export default async function isomorphic(db: DBOFullyTyped | DBHandlerClient, log: (msg: string, extra?: any) => void) {
   log("Starting isomorphic queries");
  
   const itemsCount = await db.items.count!()
@@ -85,6 +85,12 @@ export default async function isomorphic(db: Required<DBHandlerServer> | DBHandl
      
     await db.sql("TRUNCATE files CASCADE");
   });
+  const json = { a: true, arr: "2", arr1: 3, arr2: [1], arrStr: ["1123.string"] }
+  await tryRun("merge json", async () => { 
+    const inserted = await db.tjson.insert!({ colOneOf: "a", json }, { returning: "*" });
+    const res = await db.tjson.update!({ colOneOf: "a" },{ json: { $merge: [{ a: false }] } }, { returning: "*" });
+    assert.deepStrictEqual(res[0].json, { ...json, a: false });
+  });
 
   await tryRun("onConflict do update", async () => {
     const initial = await db.items4.insert!({ id: -99, name: "onConflict", public: "onConflict" }, { returning: "*" });
@@ -109,8 +115,9 @@ export default async function isomorphic(db: Required<DBHandlerServer> | DBHandl
 
     await tryRun("Nested insert", async () => {
   
-      const { name, avatar: { extension, content_type, original_name } } = await db.users_public_info.insert!({ name: "somename.txt", avatar: mediaFile }, { returning: "*" });
-      
+      const nestedInsert = await db.users_public_info.insert!({ name: "somename.txt", avatar: mediaFile }, { returning: "*" });
+      const { name, avatar } = nestedInsert;
+      const  { extension, content_type, original_name } = avatar;
       assert.deepStrictEqual(
         { extension, content_type, original_name },
         {
@@ -612,8 +619,8 @@ export default async function isomorphic(db: Required<DBHandlerServer> | DBHandl
 
   await tryRun("Postgis examples", async () => {
     await db.shapes.delete!();
-    const p1 = { ST_GeomFromText: ["POINT(-1 1)", 4326] },
-      p2 = { ST_GeomFromText: ["POINT(-2 2)", 4326] };
+    const p1 = { $ST_GeomFromText: ["POINT(-1 1)", 4326] },
+      p2 = { $ST_GeomFromText: ["POINT(-2 2)", 4326] };
     await db.shapes.insert!([
       { geom: p1, geog: p1 },
       { geom: p2, geog: p2  },
@@ -687,7 +694,6 @@ export default async function isomorphic(db: Required<DBHandlerServer> | DBHandl
   },
      */
   
-    const json = { a: true, arr: "2", arr1: 3, arr2: [1], arrStr: ["1123.string"] }
     const fo = await db.tjson.insert!({ colOneOf: "a", json }, { returning: "*"});
     // assert.deepStrictEqual(fo.json, json);
     await db.tjson.insert!({ colOneOf: "a", json: {...json, o: { o1: 2 } } })
@@ -1147,8 +1153,8 @@ export default async function isomorphic(db: Required<DBHandlerServer> | DBHandl
     assert.equal(res.length, 3);
     res.forEach(row => {
       assert(typeof row.id, "number");
-      assert(typeof row.price, "number");
-      assert(typeof row.symbol, "string");
+      assert(typeof (row as any).price, "number");
+      assert(typeof (row as any).symbol, "string");
       assert.deepStrictEqual(row.trades, row.tradesAlso);
       if(row.id !== "abc"){
         assert.equal(row.trades.length, 3)

@@ -355,7 +355,7 @@ export class Prostgles {
       } else if (watchSchema || isObject(watchSchemaType) && "checkIntervalMillis" in watchSchemaType) {
         /* Full re-init. Sockets must reconnect */
         console.log("watchSchema: Full re-initialisation", { query })
-        this.init(onReady, { type: "schema change", query, command });
+        this.init(onReady as any, { type: "schema change", query, command });
       }
     }
   }

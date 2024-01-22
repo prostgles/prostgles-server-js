@@ -218,6 +218,7 @@ export class DboBuilder {
         this.dbo.leftJoinOne ??= {};
 
         const joinHandlers = getJoinHandlers(table);
+        //@ts-ignore
         this.dbo.leftJoin[table] = joinHandlers.leftJoin;
         this.dbo.innerJoin[table] = joinHandlers.innerJoin;
         this.dbo.leftJoinOne[table] = joinHandlers.leftJoinOne;

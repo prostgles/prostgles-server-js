@@ -1,10 +1,10 @@
-import { DBSchema, isObject, JSONB, TableHandler, ViewHandler } from "prostgles-types";
+import { DbJoinMaker, DBSchema, isObject, JSONB, SQLHandler, TableHandler, ViewHandler } from "prostgles-types";
 import prostgles from ".";
 import { Auth } from "./AuthHandler";
-import { DBHandlerServer, DboBuilder, escapeTSNames, postgresToTsType } from "./DboBuilder/DboBuilder";
+import { DboBuilder, escapeTSNames, postgresToTsType } from "./DboBuilder/DboBuilder";
 import { PublishAllOrNothing, PublishParams, PublishTableRule, PublishViewRule,  } from "./PublishParser/PublishParser";
 import { getJSONBSchemaTSTypes } from "./JSONBValidation/validation";
-import { TableSchemaColumn } from "./DboBuilder/DboBuilderTypes";
+import { DBHandlerServer, TableSchemaColumn, TX } from "./DboBuilder/DboBuilderTypes";
 
 
 export const getDBSchema = (dboBuilder: DboBuilder): string => {
@@ -41,6 +41,10 @@ export const getDBSchema = (dboBuilder: DboBuilder): string => {
           type = types.join(" | ");
         }
       }
+      /**
+       * Columns that are nullable or have default values can be ommitted from an insert
+       * Non nullable columns with default values cannot containt null values in an insert so they must contain a valid value or be omitted
+       */
       return `${escapeTSNames(c.name)}${c.is_nullable || c.has_default? "?" : ""}: ${type}`
     }
 tables.push(`${escapeTSNames(tov.name)}: {
@@ -61,16 +65,23 @@ export type DBSchemaGenerated = {
 `;
 }
 
-type DBTableHandlersFromSchema<Schema = void> = Schema extends DBSchema? { 
+export type DBTableHandlersFromSchema<Schema = void> = Schema extends DBSchema? { 
   [tov_name in keyof Schema]: Schema[tov_name]["is_view"] extends true? 
     ViewHandler<Schema[tov_name]["columns"]> : 
     TableHandler<Schema[tov_name]["columns"]>
-} : Record<string, TableHandler>;
+} : Record<string, Partial<TableHandler>>;
 
-export type DBOFullyTyped<Schema = void> = Schema extends DBSchema? (
-    DBTableHandlersFromSchema<Schema> & Pick<DBHandlerServer<DBTableHandlersFromSchema<Schema>>, "tx" | "sql">
-  ) : 
-  DBHandlerServer;
+export type DBHandlerServerExtra<TH = Record<string, Partial<TableHandler>>, WithTransactions = true> = {
+  sql: SQLHandler;
+} & Partial<DbJoinMaker> & (
+  WithTransactions extends true? { tx: TX<TH> } :
+  Record<string, never>
+);
+// export type DBOFullyTyped<Schema = void> = Schema extends DBSchema? (
+//     DBTableHandlersFromSchema<Schema> & DBHandlerServerExtra<DBTableHandlersFromSchema<Schema>>
+//   ) : 
+//   DBHandlerServer;
+export type DBOFullyTyped<Schema = void> = DBTableHandlersFromSchema<Schema> & DBHandlerServerExtra<DBTableHandlersFromSchema<Schema>>
 
 export type PublishFullyTyped<Schema = void> = Schema extends DBSchema? (
   | PublishAllOrNothing 
@@ -113,8 +124,12 @@ export type PublishFullyTyped<Schema = void> = Schema extends DBSchema? (
       
       return "*" as const
     },
+    transactions: true,
     onReady: ({ dbo }) => {
-      dbo.tdwa?.find!()
+      dbo.tdwa?.find!();
+      dbo.tx?.(t => {
+        t.dwa?.find!();
+      })
     }
   });
 

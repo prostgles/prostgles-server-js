@@ -139,6 +139,7 @@ export type ValidateUpdateRowArgs<U = Partial<AnyObject>, F = Filter, DBX = DBHa
 }
 export type ValidateRow<R extends AnyObject = AnyObject, S = void> = (args: ValidateRowArgs<R, DBOFullyTyped<S>>) => R | Promise<R>;
 export type PostValidateRow<R extends AnyObject = AnyObject, S = void> = (args: ValidateRowArgs<R, DBOFullyTyped<S>>) => void | Promise<void>;
+export type PostValidateRowBasic = (args: ValidateRowArgs) => void | Promise<void>;
 export type ValidateRowBasic = (args: ValidateRowArgs) => AnyObject | Promise<AnyObject>;
 export type ValidateUpdateRow<R extends AnyObject = AnyObject, S extends DBSchema | void = void> = (args: ValidateUpdateRowArgs<Partial<R>, FullFilter<R, S>, DBOFullyTyped<S>>) => Partial<R> | Promise<Partial<R>>;
 export type ValidateUpdateRowBasic = (args: ValidateUpdateRowArgs) => AnyObject | Promise<AnyObject>;
@@ -210,18 +211,18 @@ export type InsertRule<Cols extends AnyObject = AnyObject, S extends DBSchema | 
   /**
    * Validation logic to check/update data for each request. Happens before publish rule checks (for fields, forcedData/forcedFilter)
    */
-  preValidate?: ValidateRow<Cols, S>;
+  preValidate?: S extends DBSchema? ValidateRow<Cols, S> : ValidateRowBasic;
 
   /**
    * Validation logic to check/update data for each request. Happens after publish rule checks (for fields, forcedData/forcedFilter)
    */
-  validate?: ValidateRow<Cols, S>;
+  validate?: S extends DBSchema? ValidateRow<Cols, S> : ValidateRowBasic;
 
   /**
    * Validation logic to check/update data after the insert. 
    * Happens in the same transaction so upon throwing an error the record will be deleted (not committed)
    */
-  postValidate?: PostValidateRow<Required<Cols>, S>;
+  postValidate?: S extends DBSchema? PostValidateRow<Required<Cols>, S> : PostValidateRowBasic;
 
   /**
    * If defined then only nested inserts from these tables are allowed
@@ -272,13 +273,13 @@ export type UpdateRule<Cols extends AnyObject = AnyObject, S extends DBSchema | 
   /**
    * Validation logic to check/update data for each request
    */
-  validate?: ValidateUpdateRow<Cols, S>;
+  validate?: S extends DBSchema? ValidateUpdateRow<Cols, S> : ValidateUpdateRowBasic;
 
   /**
    * Validation logic to check/update data after the insert. 
    * Happens in the same transaction so upon throwing an error the record will be deleted (not committed)
    */
-  postValidate?: PostValidateRow<Required<Cols>, S>;
+  postValidate?: S extends DBSchema? PostValidateRow<Required<Cols>, S> : PostValidateRowBasic;
 };
 
 export type DeleteRule<Cols extends AnyObject = AnyObject, S extends DBSchema | void = void> = {

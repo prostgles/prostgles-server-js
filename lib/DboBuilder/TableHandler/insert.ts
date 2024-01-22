@@ -1,10 +1,12 @@
 import { AnyObject, InsertParams, isObject } from "prostgles-types";
 import { LocalParams, parseError, withUserRLS } from "../DboBuilder";
-import { TableRule } from "../../PublishParser/PublishParser";
-import { insertDataParse } from "../insertDataParse";
+import { TableRule, ValidateRowBasic } from "../../PublishParser/PublishParser";
+import { insertNestedRecords } from "../insertNestedRecords";
 import { insertTest } from "./insertTest";
 import { TableHandler } from "./TableHandler";
 import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
+import { prepareNewData } from "./DataValidator";
+import { DBOFullyTyped } from "../../DBSchemaBuilder";
 
 export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObject[] = {}, insertParams?: InsertParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any | any[] | boolean> {
   
@@ -38,11 +40,26 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
     }
     validateInsertParams(insertParams);
 
+    const isMultiInsert = Array.isArray(rowOrRows);
+    const preValidatedRows = await Promise.all((isMultiInsert? rowOrRows : [rowOrRows]).map(async nonValidated => {
+      const { preValidate, validate } = tableRules?.insert ?? {};
+      const { tableConfigurator } = this.dboBuilder.prostgles;
+      if(!tableConfigurator) throw "tableConfigurator missing";
+      let row = await tableConfigurator.getPreInsertRow(this, { dbx: this.getFinalDbo(localParams), validate, localParams, row: nonValidated })
+      if (preValidate) {
+        if(!localParams) throw "localParams missing for insert preValidate";
+        row = await preValidate({ row, dbx: (this.tx?.dbTX || this.dboBuilder.dbo) as any, localParams });
+      }
+
+      return row;
+    }));
+    const preValidatedrowOrRows = isMultiInsert? preValidatedRows : preValidatedRows[0]!;
+
     /**
      * If media it will: upload file and continue insert
      * If nested insert it will: make separate inserts and not continue main insert
      */
-    const mediaOrNestedInsert = await insertDataParse.bind(this)(rowOrRows, insertParams, param3_unused, tableRules, localParams);
+    const mediaOrNestedInsert = await insertNestedRecords.bind(this)({ data: preValidatedrowOrRows, param2: insertParams, tableRules, localParams });
     const { data, insertResult } = mediaOrNestedInsert;
     if ("insertResult" in mediaOrNestedInsert) {
       return insertResult;
@@ -55,18 +72,26 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
         const row = { ..._row };
 
         if (!isObject(row)) {
-          console.trace(row)
-          throw "\ninvalid insert data provided -> " + JSON.stringify(row);
+          throw "\nInvalid insert data provided. Expected an object but received: " + JSON.stringify(row);
         }
   
-        const { data: validatedRow, allowedCols } = this.validateNewData({ row, forcedData, allowedFields: fields, tableRules, fixIssues });
+        const { data: validatedRow, allowedCols } = await prepareNewData({ 
+          row, 
+          forcedData, 
+          allowedFields: fields, 
+          tableRules, 
+          fixIssues, 
+          tableConfigurator: this.dboBuilder.prostgles.tableConfigurator, 
+          tableHandler: this, 
+        });
         return { validatedRow, allowedCols };
       }));
       const validatedRows = validatedData.map(d => d.validatedRow);
-      const allowedCols = Array.from( new Set(validatedData.flatMap(d => d.allowedCols)));
-      const dbTx = finalDBtx || this.dboBuilder.dbo
-      const query = await this.colSet.getInsertQuery(validatedRows, allowedCols, dbTx, validate, localParams);
-
+      const allowedCols = Array.from(new Set(validatedData.flatMap(d => d.allowedCols)));
+      const dbTx = finalDBtx || this.dboBuilder.dbo;
+      const validationOptions = { validate: validate as ValidateRowBasic, localParams };
+      // const query = await this.colSet.getInsertQuery(validatedRows, allowedCols, dbTx, validate, localParams);
+      const query = (await this.dataValidator.parse({ command: "insert", rows: validatedRows, allowedCols, dbTx, validationOptions })).getQuery();
       const { onConflict } = insertParams ?? {};
       let conflict_query = "";
       if (onConflict === "DoNothing") {
@@ -105,14 +130,16 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
     }
 
     return runInsertUpdateQuery({
-      rule, localParams, 
+      rule, 
+      localParams, 
       queryWithoutUserRLS, 
       tableHandler: this, 
       returningFields, 
-      data: rowOrRows,
+      data: preValidatedrowOrRows,
       fields,
       params: insertParams,
       type: "insert",
+      isMultiInsert,
     });
     
   } catch (e) {

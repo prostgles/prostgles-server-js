@@ -100,11 +100,27 @@ export type TX<TH = TableHandlers> = {
 }
 
 export type TableHandlers = {
-  [key: string]: Partial<TableHandler> | TableHandler;
+  [key: string]: Partial<TableHandler>;
 }
 export type DbTxTableHandlers = {
   [key: string]: Omit<Partial<TableHandler>, "dbTx"> | Omit<TableHandler, "dbTx">;
 }
+
+
+export type DBHandlerServerExtra<TH = TableHandlers, WithTransactions = true> = {
+  sql: SQLHandler;
+} & (
+  WithTransactions extends true? { tx: TX<TH> } :
+  Record<string, never>
+);
+
+// export type DBHandlerServer<TH = TableHandlers> =
+//   TH &
+//   Partial<DbJoinMaker> & {
+//     sql?: SQLHandler
+//   } & {
+//     tx?: TX<TH>
+//   }
 
 export type DBHandlerServer<TH = TableHandlers> =
   TH &

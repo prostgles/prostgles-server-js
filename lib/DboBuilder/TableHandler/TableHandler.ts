@@ -1,34 +1,40 @@
 import pgPromise from "pg-promise";
-import { AnyObject, asName, DeleteParams, FieldFilter, getKeys, InsertParams, isObject, Select, UpdateParams } from "prostgles-types";
-import { DboBuilder, Filter, LocalParams, parseError, TableHandlers } from "../DboBuilder";
-import type { TableSchema } from "../DboBuilderTypes";
+import { AnyObject, asName, DeleteParams, FieldFilter, InsertParams, Select, UpdateParams } from "prostgles-types";
 import { DB } from "../../Prostgles";
 import { SyncRule, TableRule } from "../../PublishParser/PublishParser";
-import { _delete } from "./delete";
+import TableConfigurator from "../../TableConfig/TableConfig";
+import { DboBuilder, Filter, LocalParams, parseError, TableHandlers } from "../DboBuilder";
+import type { TableSchema } from "../DboBuilderTypes";
 import { parseUpdateRules } from "../parseUpdateRules";
 import { COMPUTED_FIELDS, FUNCTIONS } from "../QueryBuilder/Functions";
 import { SelectItem, SelectItemBuilder } from "../QueryBuilder/QueryBuilder";
 import { JoinPaths, ViewHandler } from "../ViewHandler/ViewHandler";
+import { DataValidator } from "./DataValidator";
+import { _delete } from "./delete";
 import { insert } from "./insert";
 import { update } from "./update";
 import { updateBatch } from "./updateBatch";
 
 
-type ValidatedParams = {
+export type ValidatedParams = {
   row: AnyObject;
   forcedData?: AnyObject;
   allowedFields?: FieldFilter;
   tableRules?: TableRule;
   fixIssues: boolean;
+  tableConfigurator: TableConfigurator | undefined;
+  tableHandler: TableHandler;
 }
 
 export class TableHandler extends ViewHandler { 
 
+  dataValidator: DataValidator;
   constructor(db: DB, tableOrViewInfo: TableSchema, dboBuilder: DboBuilder, tx?: {t: pgPromise.ITask<{}>, dbTX: TableHandlers}, joinPaths?: JoinPaths) {
     super(db, tableOrViewInfo, dboBuilder, tx, joinPaths);
 
     this.remove = this.delete;
 
+    this.dataValidator = new DataValidator(this);
     this.is_view = false;
     this.is_media = dboBuilder.prostgles.isMedia(this.name)
   }
@@ -40,43 +46,18 @@ export class TableHandler extends ViewHandler {
     return this.getFinalDBtx(localParams) ?? this.dboBuilder.dbo;
   }
 
-
   parseUpdateRules = parseUpdateRules.bind(this);
   
   update = update.bind(this);
   updateBatch = updateBatch.bind(this);
-
-  validateNewData({ row, forcedData, allowedFields, tableRules, fixIssues = false }: ValidatedParams) {
-    const synced_field = (tableRules ?? {})?.sync?.synced_field;
-
-    /* Update synced_field if sync is on and missing */
-    if (synced_field && !row[synced_field]) {
-      row[synced_field] = Date.now();
-    }
-
-    const data = this.prepareFieldValues(row, forcedData, allowedFields, fixIssues);
-    const dataKeys = getKeys(data);
-
-    dataKeys.map(col => {
-      this.dboBuilder.prostgles?.tableConfigurator?.checkColVal({ table: this.name, col, value: data[col] });
-      const colConfig = this.dboBuilder.prostgles?.tableConfigurator?.getColumnConfig(this.name, col);
-      if (colConfig && isObject(colConfig) && "isText" in colConfig && data[col]) {
-        if (colConfig.lowerCased) {
-          data[col] = data[col].toString().toLowerCase()
-        }
-        if (colConfig.trimmed) {
-          data[col] = data[col].toString().trim()
-        }
-      }
-    })
-
-    return { data, allowedCols: this.columns.filter(c => dataKeys.includes(c.name)).map(c => c.name) }
-  }
   
   async insert(
-    rowOrRows: (AnyObject | AnyObject[]), param2?: InsertParams, 
-    param3_unused?: undefined, tableRules?: TableRule, _localParams?: LocalParams
-  ): Promise<any | any[] | boolean> {
+    rowOrRows: AnyObject | AnyObject[], 
+    param2?: InsertParams, 
+    param3_unused?: undefined, 
+    tableRules?: TableRule, 
+    _localParams?: LocalParams
+    ): Promise<any | any[] | boolean> {
     return insert.bind(this)(rowOrRows, param2, param3_unused, tableRules, _localParams)
   }
 

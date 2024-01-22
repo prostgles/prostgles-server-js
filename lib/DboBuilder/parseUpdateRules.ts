@@ -1,7 +1,8 @@
 import { AnyObject, FieldFilter, isDefined, UpdateParams } from "prostgles-types";
 import { Filter, LocalParams } from "./DboBuilder";
-import { TableRule, UpdateRule, ValidateRow, ValidateRowBasic, ValidateUpdateRowBasic } from "../PublishParser/PublishParser";
+import { TableRule, UpdateRule, ValidateRowBasic, ValidateUpdateRowBasic } from "../PublishParser/PublishParser";
 import { TableHandler } from "./TableHandler/TableHandler";
+import { prepareNewData } from "./TableHandler/DataValidator";
 
 /**
  * 1) Check if publish is valid
@@ -10,13 +11,12 @@ import { TableHandler } from "./TableHandler/TableHandler";
 export async function parseUpdateRules(
   this: TableHandler,
   filter: Filter,
-  newData: AnyObject,
   params?: UpdateParams,
   tableRules?: TableRule,
   localParams?: LocalParams
 ): Promise<{
   fields: string[];
-  validateRow?: ValidateRow;
+  validateRow?: ValidateRowBasic;
   finalUpdateFilter: AnyObject;
   forcedData?: AnyObject;
   forcedFilter?: AnyObject;
@@ -25,9 +25,6 @@ export async function parseUpdateRules(
 }> {
   const { testRule = false } = localParams ?? {};
   if (!testRule) {
-    if (!newData || !Object.keys(newData).length) {
-      throw "no update data provided\nEXPECTING db.table.update(filter, updateData, options)";
-    }
     this.checkFilter(filter);
   }
 
@@ -54,15 +51,7 @@ export async function parseUpdateRules(
       throw ` Invalid update rule fo r ${this.name}. fields missing `;
     }
     finalUpdateFilter = (await this.prepareWhere({ filter, forcedFilter, filterFields, localParams, tableRule: tableRules })).filter;
-    // if (forcedFilter) {
-    //   const match = await this.findOne(finalUpdateFilter);
-    //   const requiredItem = await this.findOne(filter);
-    //   if (!match && requiredItem) {
-    //     fields = [];
-    //   }
-    // }
     if (tableRules.update.dynamicFields?.length) {
-
       /**
        * dynamicFields.fields used to allow a custom list of fields for specific records
        * dynamicFields.filter cannot overlap each other
@@ -120,19 +109,30 @@ export async function parseUpdateRules(
       await this.validateViewRules({ fields, filterFields, returningFields, forcedFilter, dynamicFields: tableRules.update.dynamicFields, rule: "update" });
       if (forcedData) {
         try {
-          const { data, allowedCols } = this.validateNewData({ row: forcedData, forcedData: undefined, allowedFields: "*", tableRules, fixIssues: false });
+          const { data, allowedCols } = await prepareNewData({ 
+            row: forcedData, 
+            forcedData: undefined, 
+            allowedFields: "*", 
+            tableRules, 
+            fixIssues: false, 
+            tableConfigurator: this.dboBuilder.prostgles.tableConfigurator,
+            tableHandler: this,
+          });
           let updateValidate: ValidateRowBasic | undefined;
           if(validate){
             if(!localParams) throw "localParams missing";
             updateValidate = (args) => validate!({ update: args.row, filter: {}, dbx: this.getFinalDbo(localParams), localParams })
           }
-          const updateQ = await this.colSet.getUpdateQuery(
-            data,
+          const updateQ = (await this.dataValidator.parse({
+            command: "update",
+            rows: [data],
             allowedCols,
-            this.tx?.dbTX || this.dboBuilder.dbo,
-            updateValidate,
-            localParams
-          );
+            dbTx: this.tx?.dbTX || this.dboBuilder.dbo,
+            validationOptions: { 
+              validate: updateValidate,
+              localParams,
+            }
+          })).getQuery();
           const query = updateQ + " WHERE FALSE ";
           await this.db.any("EXPLAIN " + query);
         } catch (e) {
@@ -147,7 +147,7 @@ export async function parseUpdateRules(
   /* Update all allowed fields (fields) except the forcedFilter (so that the user cannot change the forced filter values) */
   const _fields = this.parseFieldFilter(fields);
 
-  let validateRow: ValidateRow | undefined;
+  let validateRow: ValidateRowBasic | undefined;
   if(validate){
     if(!localParams) throw "localParams missing";
     validateRow = ({ row }) => validate!({ update: row, filter: finalUpdateFilter, localParams, dbx: this.getFinalDbo(localParams) });

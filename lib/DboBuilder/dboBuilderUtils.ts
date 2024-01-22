@@ -154,7 +154,10 @@ export const getConstraints = async (db: DB, schema: ProstglesInitOptions["schem
   `, { schemaNames });
 }
 
-
+/**
+ * @deprecated
+ * use isObject
+ */
 export function isPlainObject(o: any): o is Record<string, any> {
   return Object(o) === o && Object.getPrototypeOf(o) === Object.prototype;
 }

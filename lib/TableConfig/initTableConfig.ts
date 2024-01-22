@@ -310,7 +310,7 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
     if (!this.prevInitQueryHistory) {
       this.prevInitQueryHistory = queryHistory;
     } else if (this.prevInitQueryHistory.join() !== queryHistory.join()) {
-      this.prostgles.init(this.prostgles.opts.onReady, { type: "TableConfig" });
+      this.prostgles.init(this.prostgles.opts.onReady as any, { type: "TableConfig" });
     } else {
       console.error("TableConfig loop bug", queryHistory)
     }

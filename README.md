@@ -35,7 +35,7 @@ prostgles({
     user: process.env.PG_USER,
     password: process.env.PG_PASS
   },
-  onReady: async (dbo) => {
+  onReady: async ({ dbo }) => {
   
     const posts = await dbo.posts.find(
       { title: { $ilike: "%car%" } }, 

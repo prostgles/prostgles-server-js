@@ -1,36 +1,43 @@
-import { AnyObject, getKeys, InsertParams, isDefined, isObject, PG_COLUMN_UDT_DATA_TYPE } from "prostgles-types";
+import { AnyObject, getKeys, InsertParams, isDefined, isObject } from "prostgles-types";
 import { LocalParams, TableHandlers } from "./DboBuilder";
 import { TableRule } from "../PublishParser/PublishParser";
 import { omitKeys } from "../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler/TableHandler";
 
+type InsertNestedRecordsArgs = {
+  data: (AnyObject | AnyObject[]);
+  param2?: InsertParams;
+  tableRules?: TableRule;
+  localParams?: LocalParams;
+};
+
 /**
  * Referenced inserts within a single transaction
  */
-export async function insertDataParse(
+export async function insertNestedRecords(
   this: TableHandler,
-  data: (AnyObject | AnyObject[]),
-  param2?: InsertParams,
-  param3_unused?: undefined,
-  tableRules?: TableRule,
-  _localParams?: LocalParams
+  {
+    data,
+    param2, 
+    tableRules,
+    localParams = {},
+  }: InsertNestedRecordsArgs
 ): Promise<{
   data?: AnyObject | AnyObject[];
   insertResult?: AnyObject | AnyObject[];
-}> {
-  const localParams = _localParams || {};
+}> { 
   const MEDIA_COL_NAMES = ["data", "name"];
 
-  const isMultiInsert = Array.isArray(data);
-  const getExtraKeys = (d: AnyObject) => getKeys(d).filter(k => {
+  const getExtraKeys = (row: AnyObject) => getKeys(row).filter(fieldName => {
     /* If media then use file insert columns */
     if (this.is_media) {
-      return !this.column_names.concat(MEDIA_COL_NAMES).includes(k)
-    } else if (!this.columns.find(c => c.name === k)) {
-      if (!isObject(d[k]) && !Array.isArray(d[k])) {
-        throw new Error("Invalid/Dissalowed field in data: " + k)
-      } else if (!this.dboBuilder.dbo[k]) {
-        throw new Error("Invalid/Dissalowed nested insert table name in data: " + k)
+      return !this.column_names.concat(MEDIA_COL_NAMES).includes(fieldName)
+    } else if (!this.columns.find(c => c.name === fieldName)) {
+      if (!isObject(row[fieldName]) && !Array.isArray(row[fieldName])) {
+        throw new Error("Invalid/Dissalowed field in data: " + fieldName)
+      } else if (!this.dboBuilder.dbo[fieldName]) {
+        return false;
+        // throw new Error("Invalid/Dissalowed nested insert table name in data: " + fieldName)
       }
       return true;
     }
@@ -46,7 +53,8 @@ export async function insertDataParse(
    * If true then will do the full insert within this function
    * Nested insert is not allowed for the file table 
    * */
-  const hasNestedInserts = this.is_media ? false : (isMultiInsert ? data : [data]).some(d => getExtraKeys(d).length || getReferenceColumnInserts.bind(this)(d).length);
+  const isMultiInsert = Array.isArray(data);
+  const hasNestedInserts = this.is_media ? false : (isMultiInsert ? data : [data]).some(d => getExtraKeys(d).length || getReferenceColumnInserts(this, d).length);
 
   /**
    * Make sure nested insert uses a transaction
@@ -59,36 +67,34 @@ export async function insertDataParse(
         (dbTX[this.name] as TableHandler).insert(
           data,
           param2,
-          param3_unused,
+          undefined,
           tableRules,
           { tx: { dbTX, t: _t }, ...localParams }
         )
       )
     }
   }
+ 
 
-  const { preValidate, validate } = tableRules?.insert ?? {};
-
-  const _data = await Promise.all((isMultiInsert ? data : [data]).map(async _row => {
-    const { tableConfigurator } = this.dboBuilder.prostgles;
-    if(!tableConfigurator) throw "tableConfigurator missing";
-    let row = await tableConfigurator.getPreInsertRow(this, { dbx: this.getFinalDbo(localParams), preValidate, validate, localParams, row: _row })
-    if (preValidate) {
-      row = await preValidate({ row, dbx: this.tx?.dbTX || this.dboBuilder.dbo, localParams });
-    }
-
-    const extraKeys = getExtraKeys(row);
-    const colInserts = getReferenceColumnInserts.bind(this)(row);
+  const _data = await Promise.all((isMultiInsert ? data : [data]).map(async row => {
+    // const { preValidate, validate } = tableRules?.insert ?? {};
+    // const { tableConfigurator } = this.dboBuilder.prostgles;
+    // if(!tableConfigurator) throw "tableConfigurator missing";
+    // let row = await tableConfigurator.getPreInsertRow(this, { dbx: this.getFinalDbo(localParams), validate, localParams, row: _row })
+    // if (preValidate) {
+    //   row = await preValidate({ row, dbx: this.tx?.dbTX || this.dboBuilder.dbo, localParams });
+    // }
 
     /* Potentially a nested join */
     if (hasNestedInserts) {
-
+      const extraKeys = getExtraKeys(row);
+      const colInserts = getReferenceColumnInserts(this, row);
+      
       /* Ensure we're using the same transaction */
       const _this = this.tx ? this : dbTX![this.name] as TableHandler;
 
       const omitedKeys = extraKeys.concat(colInserts.map(c => c.col));
 
-      // let rootData = isMultiInsert? data.map(d => omitKeys(d, omitedKeys)) : omitKeys(data, omitedKeys);
       const rootData: AnyObject = omitKeys(row, omitedKeys);
 
       let insertedChildren: AnyObject[];
@@ -204,7 +210,6 @@ export async function insertDataParse(
             colsRefT1.map(col => {
               tbl2Row[col.name] = fullRootResult[col.references![0]!.fcols[0]!];
             })
-            // console.log({ rootResult, tbl2Row, t3Child, colsRefT3, colsRefT1, t: this.t?.ctx?.start });
 
             await childInsert(tbl2Row, tbl2!);//.then(() => {});
           }));
@@ -286,17 +291,21 @@ const referencedInsert = async (tableHandler: TableHandler, dbTX: TableHandlers 
       .map(m => (dbTX![targetTable] as TableHandler)
         .insert(m, { returning: "*" }, undefined, childRules, localParams)
         .catch(e => {
-          console.trace({ childInsertErr: e })
-          return Promise.reject(e);
-          // return Promise.reject({ childInsertErr: e });
+          return Promise.reject(e); 
         })
       )
   );
 
 }
 
+type ReferenceColumnInsert<ExpectSingleInsert> = {
+  tableName: string;
+  col: string;
+  fcol: string;
+  singleInsert: boolean;
+  data: ExpectSingleInsert extends true? AnyObject : (AnyObject | AnyObject[]);
+}
 
-// const ALLOWED_COL_TYPES: PG_COLUMN_UDT_DATA_TYPE[] = ["int2", "int4", "int8", "numeric", "uuid", "text", "varchar", "char"];
 /**
  * Insert through the reference column. e.g.:
  *  {
@@ -304,16 +313,15 @@ const referencedInsert = async (tableHandler: TableHandler, dbTX: TableHandlers 
  *    fkey_column: { ...referenced_table_data }
  *  }
  */
-export const getReferenceColumnInserts = function(this: TableHandler, parentRow: AnyObject, expectSingleInsert = false){ 
-  return getKeys(parentRow)
-    .map(k => {
-      if(parentRow[k] && isObject(parentRow[k])){
-        const insertedRefCol = this.columns.find(c => c.name === k);
-        if(insertedRefCol?.references?.length){
-          return {
-            insertedRefCol,
-            insertedRefColRef: insertedRefCol.references!
-          }
+export const getReferenceColumnInserts = <ExpectSingleInsert extends boolean>(tableHandler: TableHandler, parentRow: AnyObject, expectSingleInsert?: ExpectSingleInsert): ReferenceColumnInsert<ExpectSingleInsert>[] => { 
+  return Object.entries(parentRow)
+    .map(([insertedFieldName, insertedFieldValue]) => {
+      if(insertedFieldValue && isObject(insertedFieldValue)){
+        const insertedRefCol = tableHandler.columns.find(c => c.name === insertedFieldName && c.references?.length);
+        if(!insertedRefCol) return undefined;
+        return {
+          insertedRefCol,
+          insertedRefColRef: insertedRefCol.references!
         }
       }
     
@@ -335,12 +343,13 @@ export const getReferenceColumnInserts = function(this: TableHandler, parentRow:
       if(expectSingleInsert && !singleInsert){
         throw "Expected singleInsert";
       }
-      return {
+      const res = {
         tableName: insertedRefCol.references![0]!.ftable!,
         col: insertedRefCol.name,
         fcol: insertedRefCol.references![0]!.fcols[0]!,
         singleInsert,
         data: parentRow[insertedRefCol.name],
       }
+      return res;
     }).filter(isDefined);
 }

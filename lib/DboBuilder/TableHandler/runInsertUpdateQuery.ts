@@ -2,6 +2,7 @@ import { AnyObject, asName, FieldFilter, InsertParams, UpdateParams } from "pros
 import { LocalParams, getClientErrorFromPGError, withUserRLS } from "../DboBuilder";
 import { InsertRule, UpdateRule } from "../../PublishParser/PublishParser";
 import { getSelectItemQuery, TableHandler } from "./TableHandler";
+import { DBOFullyTyped } from "../../DBSchemaBuilder";
 
 type RunInsertUpdateQueryArgs = {
   tableHandler: TableHandler;
@@ -14,6 +15,7 @@ type RunInsertUpdateQueryArgs = {
   params: InsertParams | undefined
   rule: InsertRule | undefined;
   data: AnyObject | AnyObject[];
+  isMultiInsert: boolean;
   nestedInsertsResultsObj?: undefined;
 } | {
   type: "update";
@@ -23,7 +25,8 @@ type RunInsertUpdateQueryArgs = {
   data: undefined;
 });
 
-export const runInsertUpdateQuery = async ({ tableHandler, queryWithoutUserRLS, rule, localParams, fields, returningFields, params, data, type, nestedInsertsResultsObj }: RunInsertUpdateQueryArgs) => {
+export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
+  const { tableHandler, queryWithoutUserRLS, rule, localParams, fields, returningFields, params, nestedInsertsResultsObj } = args;
   const { name } = tableHandler;
 
   const returningSelectItems = await tableHandler.prepareReturning(params?.returning, tableHandler.parseFieldFilter(returningFields))
@@ -104,13 +107,13 @@ export const runInsertUpdateQuery = async ({ tableHandler, queryWithoutUserRLS, 
 
     const rows = result.modified ?? [];
     for await (const row of rows){
-      await postValidate({ row: row ?? {}, dbx: finalDBtx, localParams })
+      await postValidate({ row: row ?? {}, dbx: finalDBtx as any, localParams })
     }
   }
 
   let returnMany = false;
-  if(type === "update"){
-    const { multi = true } = params || {};
+  if(args.type === "update"){
+    const { multi = true } = args.params || {};
     if(!multi && result.row_count && +result.row_count > 1){
       throw `More than 1 row modified: ${result.row_count} rows affected`;
     }
@@ -120,7 +123,7 @@ export const runInsertUpdateQuery = async ({ tableHandler, queryWithoutUserRLS, 
     }
 
   } else {
-    returnMany = Array.isArray(data)
+    returnMany = args.isMultiInsert
   }
 
   if(!hasReturning) return undefined;

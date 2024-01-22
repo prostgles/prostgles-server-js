@@ -129,7 +129,7 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
 
     this.loaded = true;
     return {
-      db: this.dbo!,
+      db: this.dbo! as any,
       _db: db,
       pgp,
       io: this.opts.io,

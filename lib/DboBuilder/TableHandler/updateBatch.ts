@@ -12,18 +12,18 @@ export async function updateBatch(this: TableHandler, updates: [Filter, AnyObjec
       throw `updateBatch not allowed for tables with checkFilter or postValidate rules`
     }
     const updateQueries: string[] = await Promise.all(
-      updates.map(async ([filter, data]) => {
+      updates.map(async ([filter, data]) => { 
         const query = (await this.update(
           filter,
           data,
-          { ...(params || {}), returning: undefined },
+          { ...(params ?? {}), returning: undefined },
           tableRules,
-          { ...(localParams || {}), returnQuery: "noRLS" }
+          { ...(localParams ?? {}), returnQuery: "noRLS" }
         )) as unknown as string;
 
         return query;
       })
-    ); 
+    );
     const queries = [
       withUserRLS(localParams, ""),
       ...updateQueries

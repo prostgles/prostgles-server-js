@@ -31,7 +31,7 @@ export class PublishParser {
     if (!this.dbo) throw "dbo missing"
     return {
       ...(clientInfo || await this.prostgles.authHandler?.getClientInfo(localParams)),
-      dbo: this.dbo,
+      dbo: this.dbo as any,
       db: this.db,
       socket: localParams.socket!,
       tables: this.prostgles.dboBuilder.tables,

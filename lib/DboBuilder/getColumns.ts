@@ -1,6 +1,6 @@
 import { 
   AnyObject, PG_COLUMN_UDT_DATA_TYPE, 
-  ValidatedColumnInfo, _PG_geometric 
+  ValidatedColumnInfo, _PG_geometric, isObject 
 } from "prostgles-types";
 import { isPlainObject, LocalParams, parseError, postgresToTsType } from "./DboBuilder";
 import { TableRule } from "../PublishParser/PublishParser";
@@ -29,19 +29,18 @@ export async function getColumns(
 
     if (params && tableRules && isTableHandler(this)) {
       if (
-        !isPlainObject(params) || 
-        (params.data && !isPlainObject(params.data)) || 
-        !isPlainObject(params.filter) || 
+        !isObject(params) || 
+        !isObject(params.filter) || 
         params.rule !== "update"
       ) {
-        throw "params must be { rule: 'update', filter: object, data?: object } but got: " + JSON.stringify(params);
+        throw "params must be { rule: 'update', filter: object } but received: " + JSON.stringify(params);
       }
 
       if (!tableRules?.update) {
         dynamicUpdateFields = [];
       } else {
-        const { data, filter } = params;
-        const updateRules = await this.parseUpdateRules(filter, data, undefined, tableRules, localParams);
+        const { filter } = params;
+        const updateRules = await this.parseUpdateRules(filter, undefined, tableRules, localParams);
         dynamicUpdateFields = updateRules.fields;
       }
     }

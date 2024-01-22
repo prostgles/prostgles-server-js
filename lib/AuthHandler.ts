@@ -336,7 +336,7 @@ export default class AuthHandler {
             res, 
             next, 
             getUser: () => this.getUser({ httpReq: req }) as any,
-            dbo: this.dbo, 
+            dbo: this.dbo as DBOFullyTyped, 
             db: this.db,
           })
         })
@@ -449,7 +449,7 @@ export default class AuthHandler {
                 return;
               }
 
-              onGetRequestOK?.(req, res, { getUser: () => getUser(clientReq), dbo: this.dbo, db: this.db })
+              onGetRequestOK?.(req, res, { getUser: () => getUser(clientReq), dbo: this.dbo as DBOFullyTyped, db: this.db })
 
             } catch (error) {
               console.error(error);
@@ -505,7 +505,7 @@ export default class AuthHandler {
     const { responseThrottle = 500 } = this.opts;
 
     return this.throttledFunc(async () => {
-      const result = await this.opts?.login?.(params, this.dbo, this.db, client);
+      const result = await this.opts?.login?.(params, this.dbo as DBOFullyTyped, this.db, client);
       const err = {
         msg: "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number } but got: " + JSON.stringify(result) 
       }

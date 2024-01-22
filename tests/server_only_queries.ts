@@ -20,5 +20,7 @@ export default async function f(db: DBHandlerServer){
   /** TableConfig onMount works */
   await db.api_table.findOne!({ id: 1 });
   const newRow = await db.api_table.insert!({ }, { returning: "*" });
-  if(newRow.col1 !== null) throw "api_table onMount failed";
+  if(newRow.col1 !== null) {
+    throw "api_table onMount failed: col1 missing. Got: " + JSON.stringify(newRow);
+  }
 }

@@ -25,7 +25,6 @@ import { asNameAlias } from "../QueryBuilder/QueryBuilder";
 import { find } from "../find";
 import { getColumns } from "../getColumns";
 import { LocalFuncs, subscribe } from "../subscribe";
-import { ColSet } from "./ColSet";
 import { getInfo } from "./getInfo";
 import { parseFieldFilter } from "./parseFieldFilter";
 import { prepareWhere } from "./prepareWhere";
@@ -46,7 +45,6 @@ export class ViewHandler {
   columnsForTypes: ColumnInfo[];
   column_names: string[];
   tableOrViewInfo: TableSchema;// TableOrViewInfo;
-  colSet: ColSet;
   tsColumnDefs: string[] = [];
   joins: Join[];
   joinGraph?: Graph;
@@ -74,16 +72,13 @@ export class ViewHandler {
     this.name = tableOrViewInfo.escaped_identifier;
     this.escapedName = tableOrViewInfo.escaped_identifier;
     this.columns = tableOrViewInfo.columns;
-
     /* cols are sorted by name to reduce .d.ts schema rewrites */
     this.columnsForTypes = tableOrViewInfo.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
 
     this.column_names = tableOrViewInfo.columns.map(c => c.name);
  
     this.dboBuilder = dboBuilder;
-    this.joins = this.dboBuilder.joins ?? [];
- 
-    this.colSet = new ColSet(this.columns, this.name); 
+    this.joins = this.dboBuilder.joins ?? []; 
     this.columnsForTypes.map(({ name, udt_name, is_nullable }) => {
       this.tsColumnDefs.push(`${escapeTSNames(name)}?: ${postgresToTsType(udt_name) as string} ${is_nullable ? " | null " : ""};`);
     });
@@ -456,54 +451,8 @@ export class ViewHandler {
     return result;
   }
 
-  /** 
-  * Prepare and validate field object:   
-  * @example ({ item_id: 1 }, { user_id: 32 }) => { item_id: 1, user_id: 32 }
-  * OR
-  * ({ a: 1 }, { b: 32 }, ["c", "d"]) => throw "a field is not allowed"
-  * @param {Object} obj - initial data
-  * @param {Object} forcedData - set/override property
-  * @param {string[]} allowed_cols - allowed columns (excluding forcedData) from table rules
-  */
-  prepareFieldValues(obj: AnyObject = {}, forcedData: AnyObject = {}, allowed_cols: FieldFilter | undefined, removeDisallowedColumns = false): AnyObject {
-    const column_names = this.column_names.slice(0);
-    if (!column_names?.length) {
-      throw "table column_names mising";
-    }
-    let _allowed_cols = column_names.slice(0);
-    const _obj = { ...obj };
-
-    if (allowed_cols) {
-      _allowed_cols = this.parseFieldFilter(allowed_cols, false);
-    }
-    let final_filter = { ..._obj };
-    const filter_keys: Array<keyof typeof final_filter> = Object.keys(final_filter);
-
-    if (removeDisallowedColumns && filter_keys.length) {
-      final_filter = {};
-      filter_keys
-        .filter(col => _allowed_cols.includes(col))
-        .map(col => {
-          final_filter[col] = _obj[col];
-        });
-    }
-
-    /* If has keys check against allowed_cols */
-    if (final_filter && Object.keys(final_filter).length && _allowed_cols) {
-      validateObj(final_filter, _allowed_cols)
-    }
-
-    if (forcedData && Object.keys(forcedData).length) {
-      final_filter = { ...final_filter, ...forcedData };
-    }
-
-    validateObj(final_filter, column_names.slice(0));
-    return final_filter;
-  }
-
-
   parseFieldFilter(fieldParams: FieldFilter = "*", allow_empty = true, allowed_cols?: string[]): string[] {
-    return parseFieldFilter(fieldParams, allow_empty, allowed_cols || this.column_names.slice(0))
+    return parseFieldFilter(fieldParams, allow_empty, allowed_cols ?? this.column_names.slice(0))
   }
 
 }
@@ -512,7 +461,7 @@ export class ViewHandler {
 /** 
 * Throw error if illegal keys found in object
 */
-function validateObj<T extends Record<string, any>>(obj: T, allowedKeys: string[]): T {
+export const validateObj = <T extends Record<string, any>>(obj: T, allowedKeys: string[]): T => {
   if (obj && Object.keys(obj).length) {
     const invalid_keys = Object.keys(obj).filter(k => !allowedKeys.includes(k));
     if (invalid_keys.length) {
