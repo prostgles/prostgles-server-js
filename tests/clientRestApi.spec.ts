@@ -74,7 +74,6 @@ export const clientRestApi = async(db: DBHandlerClient, auth: Auth, log: (...arg
 
       const two22 = await sqlMethods("get", {});
       assert.equal(two22, 222);
-      throw "not ok"
     });
 
 
