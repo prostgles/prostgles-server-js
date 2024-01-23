@@ -1,10 +1,10 @@
 import prostgles from "prostgles-client";
 import io from "socket.io-client";
 
-import isomorphic from "../isomorphic_queries";
-import client_only from "../client_only_queries"; 
-import client_rest_api from "../client_rest_api"; 
-import client_files from "../client_files"; 
+import { isomorphicQueries } from "../isomorphicQueries.spec";
+import { clientOnlyQueries } from "../clientOnlyQueries.spec"; 
+import { clientRestApi } from "../clientRestApi.spec"; 
+import { clientFileTests } from "../clientFileTests.spec"; 
 import { InitOptions } from "prostgles-client/dist/prostgles";
 export { DBHandlerClient, Auth } from "prostgles-client/dist/prostgles";
 
@@ -24,19 +24,19 @@ type ClientTestSpec = {
 const tests: Record<string, ClientTestSpec> = {
   main: {
     onRun: async (db, methods, tableSchema, auth) => {
-      await isomorphic(db, log);
-      await client_only(db, auth, log, methods, tableSchema, TEST_NAME);
+      await isomorphicQueries(db, log);
+      await clientOnlyQueries(db, auth, log, methods, tableSchema, TEST_NAME);
     },
   },
   files: {
     onRun: async (db, methods, tableSchema, auth) => {
-      await client_files(db, auth, log, methods, tableSchema)
+      await clientFileTests(db, auth, log, methods, tableSchema)
     },
 
   },
   rest_api: {
     onRun: async (db, methods, tableSchema, auth) => {
-      await client_rest_api(db, auth, log, methods, tableSchema, TEST_NAME);
+      await clientRestApi(db, auth, log, methods, tableSchema, TEST_NAME);
     }
   },
 };

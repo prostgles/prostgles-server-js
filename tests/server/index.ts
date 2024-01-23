@@ -13,17 +13,18 @@ import { testTableConfig } from "./testTableConfig";
 testDboTypes();
 testPublishTypes();
 
-const clientTest = (process.env.TEST_TYPE === "client");
-const io = !clientTest? undefined : require("socket.io")(http, { path: "/teztz/s" });
+const isClientTest = (process.env.TEST_TYPE === "client");
+const io = !isClientTest? undefined : require("socket.io")(http, { path: "/teztz/s" });
 
 http.listen(3001);
 
-import isomorphic from "../isomorphic_queries";
-import server_only_queries from "../server_only_queries";
+import { isomorphicQueries } from "../isomorphicQueries.spec";
+import { serverOnlyQueries } from "../serverOnlyQueries.spec";
 
 import { DBSchemaGenerated } from "./DBoGenerated";
 
 import type { DBOFullyTyped } from "prostgles-server/dist/DBSchemaBuilder"; 
+import { spawn } from "child_process";
 export type { DBHandlerServer } from "prostgles-server/dist/Prostgles";
 
 export const log = (msg: string, extra?: any, trace?: boolean) => {
@@ -112,7 +113,7 @@ prostgles<DBSchemaGenerated>({
 	},
 	
 	onSocketConnect:  ({ socket, db }) => {
-		if(clientTest){
+		if(isClientTest){
 			log("Client connected -> console does not work. use log function. socket.id:", socket.id);
 			socket.emit("start-test", { server_id: Math.random() });
 			socket.on("log", async (data, cb) => { 
@@ -128,7 +129,7 @@ prostgles<DBSchemaGenerated>({
 	},
 
 	onSocketDisconnect:  ({ socket, db }) => {
-		if(clientTest){
+		if(isClientTest){
 			log("Client disconnected. socket.id:", socket.id);
 		}
 		
@@ -219,22 +220,24 @@ prostgles<DBSchemaGenerated>({
 
 		try {
 			
-			if(process.env.TEST_TYPE === "client"){
-				const clientPath = `cd ${__dirname}/../../../client && npm test`;
-				const proc = exec(clientPath, console.log);
+			if(isClientTest){
+				const execPath = path.resolve(`${__dirname}/../../../client`);
+				spawn("npm", ["run", "test"], { cwd: execPath, stdio: "inherit" });
+				// const clientPath = `cd ${__dirname}/../../../client && npm test`;
+				// const proc = exec(clientPath, console.log);
 				log("Waiting for client...");
-				proc.stdout.on('data', function(data) {
-					console.log(data); 
-				});
-				proc.stderr.on('data', function(data) {
-					console.error(data); 
-				});
+				// proc.stdout.on('data', function(data) {
+				// 	console.log(data); 
+				// });
+				// proc.stderr.on('data', function(data) {
+				// 	console.error(data); 
+				// });
 				
 			} else if(process.env.TEST_TYPE === "server"){
 
-				await server_only_queries(dbo as any);
+				await serverOnlyQueries(dbo as any);
 				log("Server-only query tests successful");
-				await isomorphic(dbo as any, log);
+				await isomorphicQueries(dbo as any, log);
 				log("Server isomorphic tests successful");
 
 				stopTest()
