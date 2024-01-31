@@ -129,7 +129,7 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
       console.log(this.tx?.t.ctx?.start, "insert in " + this.name, data);
     }
 
-    return runInsertUpdateQuery({
+    return await runInsertUpdateQuery({
       rule, 
       localParams, 
       queryWithoutUserRLS, 

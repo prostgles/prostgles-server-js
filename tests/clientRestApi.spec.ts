@@ -41,17 +41,17 @@ export const clientRestApi = async(db: DBHandlerClient, auth: Auth, log: (...arg
     await test("Rest api test", async () => {
       const dataFilter = { id: 123123123, last_updated: Date.now() };
       const dataFilter1 = { id: 123123124, last_updated: Date.now() };
-      await db.planes.insert(dataFilter);
-      const item = await db.planes.findOne(dataFilter);
+      await db.planes.insert?.(dataFilter);
+      const item = await db.planes.findOne?.(dataFilter);
       const itemR = await dbRest("planes", "findOne", dataFilter);
       const itemRNA = await dbRestNoAuth("planes", "findOne", dataFilter); 
       assert.deepStrictEqual(item, itemR);
-      const { last_updated, ...allowedData } = item;
+      const { last_updated, ...allowedData } = item!;
       assert.deepStrictEqual(allowedData, itemRNA);
       
       await dbRest("planes", "insert", dataFilter1);
       const filter = { "id.>=": dataFilter.id }
-      const count = await db.planes.count(filter)
+      const count = await db.planes.count?.(filter)
       const restCount = await dbRest("planes", "count", filter);
       assert.equal(count, 2);
       assert.equal(restCount, 2);

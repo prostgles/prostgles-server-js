@@ -58,14 +58,13 @@ export function getSerializedClientErrorFromPGError(rawError: any, args: GetSeri
   if (process.env.PRGL_DEBUG) {
     console.trace(err)
   }
-  const fullError = {
-    ...err,
-    ...(err?.message ? { txt: err.message } : {}),
-    code_info: sqlErrCodeToMsg(err.code),
-  }
 
   if(args.type === "sql"){
-    return fullError;
+    return {
+      ...err,
+      ...(err?.message ? { txt: err.message } : {}),
+      code_info: sqlErrCodeToMsg(err.code),
+    }
   }
 
   const { localParams, view, allowedKeys } = args;
@@ -73,7 +72,6 @@ export function getSerializedClientErrorFromPGError(rawError: any, args: GetSeri
   const errObject = {
     ...((!localParams || !localParams.socket) ? err : {}),
     ...pickKeys(err, ["column", "code", "table", "constraint", "hint"]),
-    fullError
   };
   if (view?.dboBuilder?.constraints && errObject.constraint && !errObject.column) {
     const constraint = view.dboBuilder.constraints
