@@ -3,11 +3,12 @@ import * as fs from "fs";
 import { DBOFullyTyped } from "../dist/DBSchemaBuilder";
 import type { DBHandlerClient } from "./client/index";
 import { test, describe } from "node:test";
+import { pickKeys } from "prostgles-types";
 
 
 export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log: (msg: string, extra?: any) => void) => {
   log("Starting isomorphic queries");
-
+  const isServer = !!(db.items as any).dboBuilder;
   await describe("Isomorphic queries", async () => {
     await test("Deleting stale data", async () => {
       const itemsCount = await db.items.count!()
@@ -24,6 +25,26 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
       }
       await db.sql!(`TRUNCATE items  RESTART IDENTITY CASCADE;`)
 
+    });
+
+    await test("Insert error structure", async () => {
+      const err = await db.items.insert!({ h: "a" }).catch(err => err);
+      const clientOnlyError = {
+        detail: 'Array value must start with "{" or dimension information.',
+        message: 'malformed array literal: "a"',
+        code: '22P02',
+        name: 'error',
+        severity: 'ERROR',
+        stack: [
+          'dbo.items.insert()'
+        ]
+      }
+      if(isServer){
+        assert.deepStrictEqual(pickKeys(err, Object.keys(clientOnlyError)), clientOnlyError);
+        assert.equal(typeof err.query, "string");
+      } else {
+        assert.deepStrictEqual(err, clientOnlyError);
+      }
     });
 
     await test("Prepare data", async () => {

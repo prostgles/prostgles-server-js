@@ -71,7 +71,7 @@ export function getSerializedClientErrorFromPGError(rawError: any, args: GetSeri
 
   const errObject = {
     ...((!localParams || !localParams.socket) ? err : {}),
-    ...pickKeys(err, ["column", "code", "table", "constraint", "hint"]),
+    ...pickKeys(err, ["column", "code", "table", "constraint", "hint", "severity", "message", "name", "detail"]),
   };
   if (view?.dboBuilder?.constraints && errObject.constraint && !errObject.column) {
     const constraint = view.dboBuilder.constraints
