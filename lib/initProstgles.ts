@@ -121,7 +121,7 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
         dbo: this.dbo as any, 
         db: this.db, 
         tables: this.dboBuilder.tables,
-        reason: { type: "init" }
+        reason
       });
     } catch (err) {
       console.error("Prostgles: Error within onReady: \n", err)
