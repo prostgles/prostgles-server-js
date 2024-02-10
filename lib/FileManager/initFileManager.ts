@@ -128,7 +128,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
         const { name } = req.params;
         if(typeof name !== "string" || !name) throw "Invalid media name";
   
-        const media = await mediaTable.findOne({ name }, { select: { id: 1, name: 1, signed_url: 1, signed_url_expires: 1, content_type: 1 } }, { httpReq: req } as any);
+        const media = await mediaTable.findOne({ $or: [{ name }, { id: name }] }, { select: { id: 1, name: 1, signed_url: 1, signed_url_expires: 1, content_type: 1 } }, { httpReq: req } as any);
   
         if(!media) {
           /**
