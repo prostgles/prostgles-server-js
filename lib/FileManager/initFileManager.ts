@@ -4,6 +4,7 @@ import { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { canCreateTables } from "../DboBuilder/runSQL";
 import { Prostgles } from "../Prostgles";
 import { FileManager, HOUR, LocalConfig } from "./FileManager";
+import { runClientRequest } from "../runClientRequest";
 
 export async function initFileManager(this: FileManager, prg: Prostgles){
   this.prostgles = prg;
@@ -127,9 +128,12 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
 
         const { name } = req.params;
         if(typeof name !== "string" || !name) throw "Invalid media name";
-  
-        const media = await mediaTable.findOne({ $or: [{ name }, { id: name }] }, { select: { id: 1, name: 1, signed_url: 1, signed_url_expires: 1, content_type: 1 } }, { httpReq: req } as any);
-  
+        if(!this.prostgles) throw "Prostgles instance missing";
+        const id = name.slice(0, 36);
+        const selectParams = { select: { id: 1, name: 1, signed_url: 1, signed_url_expires: 1, content_type: 1 } }
+        const media = await runClientRequest.bind(this.prostgles)({ type: "http", httpReq: req, command: "findOne", tableName, param1: { id }, param2: selectParams, param3: undefined });
+        // const media = await mediaTable.findOne({ id }, selectParams, { httpReq: req } as any);
+        
         if(!media) {
           /**
            * Redirect to login !??
