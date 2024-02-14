@@ -87,13 +87,17 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
           }
         }
       } else {
-        try {
-          const query = `ALTER TABLE ${asName(refTable)} ADD COLUMN ${asName(colName)} UUID REFERENCES ${asName(tableName)} (id);`
-          const msg = `Create referenced file column ${refTable} (${colName})...\n${query}`;
-          await runQuery(query, msg);
-        } catch(e){
-          console.error(`FAILED. Err: ${e instanceof Error? e.message : JSON.stringify(e)}`)
-        }
+        const query = `ALTER TABLE ${asName(refTable)} ADD COLUMN ${asName(colName)} UUID REFERENCES ${asName(tableName)} (id);`
+        // const createColumn = async () => {
+        //   try {
+        //     const msg = `Create referenced file column ${refTable} (${colName})...\n${query}`;
+        //     await runQuery(query, msg);
+        //   } catch(e){
+        //     console.error(`FAILED. Err: ${e instanceof Error? e.message : JSON.stringify(e)}`)
+        //   }
+        // }
+        // await createColumn();
+        console.error(`Referenced file column ${refTable} (${colName}) does not exist. Create it using this query:\n${query}`);
       }
       
     } 
@@ -131,8 +135,15 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
         if(!this.prostgles) throw "Prostgles instance missing";
         const id = name.slice(0, 36);
         const selectParams = { select: { id: 1, name: 1, signed_url: 1, signed_url_expires: 1, content_type: 1 } }
-        const media = await runClientRequest.bind(this.prostgles)({ type: "http", httpReq: req, command: "findOne", tableName, param1: { id }, param2: selectParams, param3: undefined });
-        // const media = await mediaTable.findOne({ id }, selectParams, { httpReq: req } as any);
+        const media = await runClientRequest.bind(this.prostgles)({ 
+          type: "http", 
+          httpReq: req, 
+          command: "findOne", 
+          tableName, 
+          param1: { id }, 
+          param2: selectParams, 
+          param3: undefined 
+        });
         
         if(!media) {
           /**
@@ -170,7 +181,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
 
       } catch(e){
         console.log(e)
-        res.status(404).json({ err: "Invalid/missing media" });
+        res.status(404).json({ err: "Invalid/disallowed file" });
       }
     });
   }
