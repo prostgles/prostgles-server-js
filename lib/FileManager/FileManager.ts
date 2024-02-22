@@ -264,11 +264,12 @@ export class FileManager {
     const { colName, tableName } = args;
     const tableConfig = this.prostgles?.opts.fileTable?.referencedTables?.[tableName];
     const isReferencingFileTable = this.dbo[tableName]?.columns?.some(c => c.name === colName && c.references && c.references?.some(({ ftable }) => ftable === this.tableName ));
+    const allowAllFiles = { acceptedContent: "*" } as const;
     if(isReferencingFileTable){
       if(tableConfig && typeof tableConfig !== "string"){
-        return tableConfig.referenceColumns[colName];
+        return tableConfig.referenceColumns[colName] ?? allowAllFiles;
       }
-      return { acceptedContent: "*" };
+      return allowAllFiles;
     }
     return undefined;
   }
