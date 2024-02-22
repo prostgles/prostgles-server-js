@@ -1,4 +1,4 @@
-import { AnyObject, InsertParams, isObject } from "prostgles-types";
+import { AnyObject, InsertParams, asName, isObject } from "prostgles-types";
 import { LocalParams, parseError, withUserRLS } from "../DboBuilder";
 import { TableRule, ValidateRowBasic } from "../../PublishParser/PublishParser";
 import { insertNestedRecords } from "../insertNestedRecords";
@@ -100,7 +100,7 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
         if(!pkeyNames.length) {
           throw "Cannot do DoUpdate on a table without a primary key";
         }
-        const nonPkeyCols = allowedCols.filter(c => !pkeyNames.includes(c));
+        const nonPkeyCols = allowedCols.filter(c => !pkeyNames.includes(c)).map(v => asName(v));
         if(!nonPkeyCols.length){
           throw "Cannot on conflict DoUpdate on a table with only primary key columns";
         }

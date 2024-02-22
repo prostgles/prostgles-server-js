@@ -328,7 +328,7 @@ const convertionFuncs: ConvertionFunc[] = [
     getQuery: ({ args }) => `to_timestamp(${asValue(args[0])}::BIGINT/1000.0)::timestamp`
   }, {
     name: "merge",
-    description: "Merge the provided jsonb objects into the existing column value",
+    description: "Merge the provided jsonb objects into the existing column value, ensuring that a null source value will be coalesced with provided values",
     onlyAllowedFor: "update",
     getQuery: ({ args, column }) => {
       if (!args.length) throw "merge function requires at least one argument";
