@@ -91,16 +91,21 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
       }
 
       const rows = Object.entries(tableConf.isLookupTable?.values).map(([id, otherColumns])=> ({ id, ...otherColumns }));
-      if (isDropped || !this.dbo?.[tableNameRaw]) {
-        const columnNames = Object.keys(rows[0]!).filter(k => k !== "id");
+      const lookupTableHandler = this.dbo?.[tableNameRaw];
+      const columnNames = Object.keys(rows[0]!).filter(k => k !== "id");
+      if (isDropped || !lookupTableHandler) {
         queries.push(
           `CREATE TABLE IF NOT EXISTS ${tableName} (
             id  TEXT PRIMARY KEY
             ${columnNames.length ? (", " + columnNames.map(k => asName(k) + " TEXT ").join(", ")) : ""}
           );`
         );
-
-        rows.map(row => {
+      }
+      if(rows.length){
+        const existingValues: { id: any }[] = await this.db.any(`SELECT id FROM ${tableName} WHERE id IN (${rows.map(r => asValue(r.id)).join(", ")});`);
+        rows
+        .filter(r => !existingValues.some(ev => ev.id === r.id))
+        .map(row => {
           const values = this.prostgles.pgp!.helpers.values(row)
           queries.push(this.prostgles.pgp!.as.format(`INSERT INTO ${tableName}  (${["id", ...columnNames].map(t => asName(t)).join(", ")})  ` + " VALUES ${values:raw} ;", { values }))
         });
