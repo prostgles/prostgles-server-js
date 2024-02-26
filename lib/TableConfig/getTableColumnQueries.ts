@@ -9,7 +9,7 @@ type Args = {
   db: DB;
   tableConf: TableConfig[string];
   tableName: string;
-  tableHandler: DBHandlerServer[string];
+  tableHandler: DBHandlerServer[string] | undefined;
 }
 
 export const getTableColumnQueries = async ({ db, tableConf, tableName, tableHandler }: Args): Promise<undefined | {

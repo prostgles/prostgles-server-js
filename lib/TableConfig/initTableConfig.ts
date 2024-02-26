@@ -90,14 +90,14 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
         queries.push(`DROP TABLE IF EXISTS ${tableName};`);
       }
 
-      const rows = Object.keys(tableConf.isLookupTable?.values).map(id => ({ id, ...(tableConf.isLookupTable?.values[id]) }));
+      const rows = Object.entries(tableConf.isLookupTable?.values).map(([id, otherColumns])=> ({ id, ...otherColumns }));
       if (isDropped || !this.dbo?.[tableNameRaw]) {
         const columnNames = Object.keys(rows[0]!).filter(k => k !== "id");
         queries.push(
           `CREATE TABLE IF NOT EXISTS ${tableName} (
-              id  TEXT PRIMARY KEY
-              ${columnNames.length ? (", " + columnNames.map(k => asName(k) + " TEXT ").join(", ")) : ""}
-            );`
+            id  TEXT PRIMARY KEY
+            ${columnNames.length ? (", " + columnNames.map(k => asName(k) + " TEXT ").join(", ")) : ""}
+          );`
         );
 
         rows.map(row => {
@@ -117,21 +117,17 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
   for (const [tableName, tableConf] of Object.entries(this.config)) {
     const tableHandler = this.dbo[tableName];
 
-    /** These have already been created */
-    if ("isLookupTable" in tableConf) {
-      continue;
-    }
-
     const ALTER_TABLE_Q = `ALTER TABLE ${asName(tableName)}`;
 
-    const coldef = await getTableColumnQueries({ db: this.db, tableConf: tableConf as any, tableHandler: tableHandler as any, tableName });
+    /* isLookupTable table has already been created */
+    const coldef = "isLookupTable" in tableConf? undefined : await getTableColumnQueries({ db: this.db, tableConf, tableHandler, tableName });
 
     if (coldef) {
       queries.push(coldef.fullQuery);
     }
 
     /** CONSTRAINTS */
-    const constraintDefs = getConstraintDefinitionQueries({ tableName, tableConf: tableConf as any });
+    const constraintDefs = getConstraintDefinitionQueries({ tableName, tableConf });
     if (coldef?.isCreate) {
       queries.push(...constraintDefs?.map(c => c.alterQuery) ?? []);
 
