@@ -21,7 +21,7 @@ export type LoginClientInfo = {
   ip_address_remote: string | undefined;
   x_real_ip: string | undefined;
   user_agent: string | undefined;
-}
+};
 
 export type BasicSession = {
 
@@ -62,7 +62,7 @@ export type AuthResult<SU = SessionUser> = SU & { sid: string; } | {
   sid?: string;
 } | undefined
 
-const getLoginClientInfo = (req: AuthClientRequest): AuthClientRequest & LoginClientInfo => {
+export const getLoginClientInfo = (req: AuthClientRequest): AuthClientRequest & LoginClientInfo => {
   if("httpReq" in req){
     const ip_address = req.httpReq.ip;
     const user_agent = req.httpReq.headers["user-agent"];
