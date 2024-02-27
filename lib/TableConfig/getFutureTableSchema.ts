@@ -1,7 +1,6 @@
 import { asName } from "prostgles-types";
 import { pgp } from "../DboBuilder/DboBuilder";
 import { DB } from "../Prostgles";
-const {TransactionMode, isolationLevel} = pgp.txMode;
 import { ColumnMinimalInfo, getTableColumns } from "./getColumnDefinitionQuery";
 import { ColConstraint, ConstraintDef, getColConstraints } from "./getConstraintDefinitionQueries";
 
@@ -16,6 +15,7 @@ export const getFutureTableSchema = async ({ columnDefs, tableName, constraintDe
   constraints: ColConstraint[];
   cols: ColumnMinimalInfo[];
 }> => { 
+  const { TransactionMode, isolationLevel } = pgp.txMode;
    
   let constraints: ColConstraint[] = [];
   let cols: ColumnMinimalInfo[] = [];
