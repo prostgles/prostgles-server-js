@@ -106,8 +106,9 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
         rows
         .filter(r => !existingValues.some(ev => ev.id === r.id))
         .map(row => {
-          const values = this.prostgles.pgp!.helpers.values(row)
-          queries.push(this.prostgles.pgp!.as.format(`INSERT INTO ${tableName}  (${["id", ...columnNames].map(t => asName(t)).join(", ")})  ` + " VALUES ${values:raw} ;", { values }))
+          const allColumns =  ["id", ...columnNames]
+          const values = allColumns.map(key => (row as any)[key]);
+          queries.push(this.prostgles.pgp!.as.format(`INSERT INTO ${tableName}  (${allColumns.map(t => asName(t)).join(", ")})  ` + " VALUES (${values:csv});", { values }))
         });
       }
     }

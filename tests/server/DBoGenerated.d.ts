@@ -253,6 +253,7 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
+      description?: null | string;
       id: string;
     };
   };

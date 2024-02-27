@@ -110,7 +110,7 @@ export const testTableConfig: TableConfig<{ en: 1, fr: 1 }> = {
     dropIfExistsCascade: true, 
     isLookupTable: {
       values: {
-        a: {},
+        a: { description: "desc" },
         b: {}
       },
     }
