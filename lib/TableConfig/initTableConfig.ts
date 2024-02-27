@@ -102,7 +102,7 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
         );
       }
       if(rows.length){
-        const existingValues: { id: any }[] = await this.db.any(`SELECT id FROM ${tableName} WHERE id IN (${rows.map(r => asValue(r.id)).join(", ")});`);
+        const existingValues: { id: any }[] = !lookupTableHandler? [] : await this.db.any(`SELECT id FROM ${tableName} WHERE id IN (${rows.map(r => asValue(r.id)).join(", ")});`);
         rows
         .filter(r => !existingValues.some(ev => ev.id === r.id))
         .map(row => {
