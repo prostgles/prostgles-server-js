@@ -26,7 +26,9 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
       await this.db.any(q);
     });
     await this.prostgles?.opts.onLog?.({ type: "debug", command: "initFileManager.runQuery", ...res, data: { debugInfo } });
-    if(res.error) throw res.error;
+    if(res.error) {
+      throw res.error;
+    }
   }
   /**
    * 1. Create media table

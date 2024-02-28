@@ -507,7 +507,7 @@ export class Prostgles {
           await this.fileManager.init(this);
         } catch (e) {
           console.error("FileManager: ", e);
-          throw e;
+          this.fileManager = undefined;
         }
       } else {
         await this.fileManager?.destroy();
