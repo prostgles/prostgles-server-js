@@ -1,12 +1,19 @@
 
 
-import { SelectItem } from "./DboBuilder/QueryBuilder/QueryBuilder";
-import { 
-  isEmpty, getKeys, FullFilter, EXISTS_KEYS, FilterDataType, 
-  GeomFilterKeys, GeomFilter_Funcs, 
-  TextFilter_FullTextSearchFilterKeys, CompareFilterKeys, isObject, TextFilterKeys, JsonbFilterKeys, CompareInFilterKeys 
+import {
+  CompareFilterKeys,
+  CompareInFilterKeys,
+  EXISTS_KEYS, FilterDataType,
+  FullFilter,
+  GeomFilterKeys, GeomFilter_Funcs,
+  JsonbFilterKeys,
+  TextFilterKeys,
+  TextFilter_FullTextSearchFilterKeys,
+  getKeys,
+  isEmpty,
+  isObject
 } from "prostgles-types";
-import { isPlainObject } from "./DboBuilder/DboBuilder";
+import { SelectItem } from "./DboBuilder/QueryBuilder/QueryBuilder";
 
 /**
 * Parse a single filter
@@ -178,24 +185,25 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
 
   if(!leftQ) mErr("Internal error: leftQ missing?!");
 
-  /* Matching sel item */
-  if(isPlainObject(rightF)){
-    const parseRightVal = (val: any, expect: "csv" | "array" | null = null) => {
-      const checkIfArr = () => {
-        if(!Array.isArray(val)) return mErr("This type of filter/column expects an Array of items");
-      }
-      if(expect === "csv"){
-        checkIfArr();
-        return pgp.as.format("($1:csv)", [val]);
-
-      } else if(expect === "array" || selItem && selItem.columnPGDataType && selItem.columnPGDataType === "ARRAY"){
-        checkIfArr();        
-        return pgp.as.format(" ARRAY[$1:csv]", [val]);
-
-      }
-
-      return asValue(val);
+  const parseRightVal = (val: any, expect: "csv" | "array" | "json" | "jsonb" | null = null) => {
+    const checkIfArr = () => {
+      if(!Array.isArray(val)) return mErr("This type of filter/column expects an Array of items");
     }
+    if(expect === "csv" || expect?.startsWith("json")){
+      checkIfArr();
+      return pgp.as.format(`($1:${expect})`, [val]);
+
+    } else if(expect === "array" || selItem && selItem.columnPGDataType && selItem.columnPGDataType === "ARRAY"){
+      checkIfArr();        
+      return pgp.as.format(" ARRAY[$1:csv]", [val]);
+
+    }
+
+    return asValue(val);
+  }
+
+  /* Matching sel item */
+  if(isObject(rightF)){
 
     const OPERANDS = [
       ...TextFilterKeys,
@@ -356,7 +364,15 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
     if(rightF === null){
       return leftQ + " IS NULL ";
     } else {
-      return leftQ + " = " + asValue(rightF);
+
+      /**
+       * Ensure that when comparing an array to a json column, the array is cast to json
+       */
+      let valueStr = asValue(rightF);
+      if(selItem?.column_udt_type?.startsWith("json") && Array.isArray(rightF)){
+        valueStr = pgp.as.format(`$1::jsonb`, [JSON.stringify(rightF)]);
+      } 
+      return `${leftQ} = ${valueStr}`;
     }
   }
 }

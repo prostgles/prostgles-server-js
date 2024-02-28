@@ -89,6 +89,11 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
       assert.deepStrictEqual(res[0].json, { ...json, a: false });
     });
 
+    await test("json array converted to pg array filter bug", async () => { 
+      const result = await db.tjson.find!({ json: [2] });
+      assert.deepStrictEqual(result, []);
+    });
+
     await test("onConflict do update", async () => {
       const initial = await db.items4.insert!({ id: -99, name: "onConflict", public: "onConflict" }, { returning: "*" });
       const updated = await db.items4.insert!({ id: -99, name: "onConflict", public: "onConflict2" }, { onConflict: "DoUpdate", returning: "*" });
