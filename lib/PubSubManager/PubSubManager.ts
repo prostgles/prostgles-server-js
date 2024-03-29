@@ -265,13 +265,13 @@ export class PubSubManager {
     if (watchSchema && !(await isSuperUser(this.db))) {
       console.warn("prostgles watchSchema requires superuser db user. Will not watch using event triggers")
     }
-    let EVENT_TAGS = ['COMMENT', 'CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO'];
+    let EVENT_TAG_LIST: typeof EVENT_TRIGGER_TAGS[number][] = ['COMMENT', 'CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO', 'CREATE POLICY'];
     if(watchSchema === "*"){
-      EVENT_TAGS = EVENT_TRIGGER_TAGS.slice(0);
+      EVENT_TAG_LIST = EVENT_TRIGGER_TAGS.slice(0);
     } else if (isObject(watchSchema) && typeof watchSchema !== "function"){
       const watchSchemaKeys = getKeys(watchSchema);
       const isInclusive = Object.values(watchSchema).every(v => v);
-      EVENT_TAGS = EVENT_TRIGGER_TAGS
+      EVENT_TAG_LIST = EVENT_TRIGGER_TAGS
         .slice(0)
         .filter(v => {
           const matches = watchSchemaKeys.includes(v);
@@ -343,7 +343,11 @@ export class PubSubManager {
             );
 
             /* DROP stale event trigger */
-            IF is_super_user IS TRUE AND ev_trg_needed IS FALSE AND ev_trg_exists IS TRUE THEN
+            IF 
+              is_super_user IS TRUE 
+              AND ev_trg_needed IS FALSE 
+              AND ev_trg_exists IS TRUE 
+            THEN
 
                 SELECT format(
                   $$ DROP EVENT TRIGGER IF EXISTS %I ; $$
@@ -361,7 +365,7 @@ export class PubSubManager {
 
                 DROP EVENT TRIGGER IF EXISTS ${DB_OBJ_NAMES.schema_watch_trigger};
                 CREATE EVENT TRIGGER ${DB_OBJ_NAMES.schema_watch_trigger} ON ddl_command_end
-                WHEN TAG IN (\${EVENT_TAGS:csv})
+                WHEN TAG IN (\${EVENT_TAG_LIST:csv})
                 EXECUTE PROCEDURE ${DB_OBJ_NAMES.schema_watch_func}();
 
             END IF;
@@ -372,7 +376,7 @@ export class PubSubManager {
 
 
         COMMIT;
-      `, { EVENT_TAGS }).catch(e => {
+      `, { EVENT_TAG_LIST }).catch(e => {
         console.error("prepareTriggers failed: ", e);
         throw e;
       });
