@@ -153,7 +153,7 @@ BEGIN
           added               TIMESTAMP DEFAULT NOW(),
           application_name    TEXT,
           last_check          TIMESTAMP NOT NULL DEFAULT NOW(),
-          watching_schema     BOOLEAN DEFAULT FALSE,
+          watching_schema_tag_names     _TEXT,
           check_frequency_ms  INTEGER NOT NULL  
         );
         COMMENT ON TABLE prostgles.apps IS 'Keep track of prostgles server apps connected to db to combine common triggers. Heartbeat used due to no logout triggers in postgres';
@@ -546,7 +546,8 @@ BEGIN
                     INTO curr_query;
                     
                     FOR app IN 
-                      SELECT * FROM prostgles.apps WHERE watching_schema IS TRUE
+                      SELECT * FROM prostgles.apps 
+                      WHERE tg_tag = ANY(watching_schema_tag_names)
                     LOOP
                       PERFORM pg_notify( 
                         ${asValue(this.NOTIF_CHANNEL.preffix)} || app.id, 

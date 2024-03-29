@@ -333,13 +333,16 @@ export class PubSubManager {
               WHERE evtname = 'prostgles_schema_watch_trigger'
             ) AND is_super_user IS TRUE 
             THEN
-                DROP EVENT TRIGGER IF EXISTS prostgles_schema_watch_trigger;
+              DROP EVENT TRIGGER IF EXISTS prostgles_schema_watch_trigger;
             END IF;
 
-            ev_trg_needed := EXISTS (SELECT 1 FROM prostgles.apps WHERE watching_schema IS TRUE);
+            ev_trg_needed := EXISTS (
+              SELECT 1 FROM prostgles.apps 
+              WHERE watching_schema_tag_names IS NOT NULL
+            );
             ev_trg_exists := EXISTS (
-                SELECT 1 FROM pg_catalog.pg_event_trigger
-                WHERE evtname = ${asValue(DB_OBJ_NAMES.schema_watch_trigger)}
+              SELECT 1 FROM pg_catalog.pg_event_trigger
+              WHERE evtname = ${asValue(DB_OBJ_NAMES.schema_watch_trigger)}
             );
 
             /* DROP stale event trigger */

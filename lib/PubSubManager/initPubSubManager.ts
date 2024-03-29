@@ -1,7 +1,34 @@
+import { getKeys, isObject } from "prostgles-types";
 import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
 import { asValue, log, PubSubManager } from "./PubSubManager";
 const REALTIME_TRIGGER_CHECK_QUERY = "prostgles-server internal query used to manage realtime triggers" as const;  
 import { getInitQuery } from "./getInitQuery";
+import { ProstglesInitOptions } from "../Prostgles";
+import { EVENT_TRIGGER_TAGS } from "../Event_Trigger_Tags";
+
+const getWatchSchemaTagList = (watchSchema: ProstglesInitOptions["watchSchema"]) => {
+  if(!watchSchema) return undefined;
+
+  if(watchSchema === "*"){
+    return EVENT_TRIGGER_TAGS.slice(0);
+  } 
+  if (isObject(watchSchema) && typeof watchSchema !== "function"){
+    const watchSchemaKeys = getKeys(watchSchema);
+    const isInclusive = Object.values(watchSchema).every(v => v);
+    return EVENT_TRIGGER_TAGS
+      .slice(0)
+      .filter(v => {
+        const matches = watchSchemaKeys.includes(v);
+        return isInclusive? matches : !matches;
+      });
+  }
+
+  const coreTags: typeof EVENT_TRIGGER_TAGS[number][] = [
+    'COMMENT', 'CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 
+    'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO', 'CREATE POLICY'
+  ];
+  return coreTags;
+}
 
 export async function initPubSubManager(this: PubSubManager): Promise<PubSubManager | undefined> {
   if (!this.canContinue()) return undefined;
@@ -9,15 +36,23 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
   let tries = 5;
   try {
 
-    await this.db.any(await getInitQuery.bind(this)());
+    const initQuery = await getInitQuery.bind(this)()
+    await this.db.any(initQuery);
     if (!this.canContinue()) return;
 
 
     /* Prepare App id */
     if (!this.appID) {
+      const check_frequency_ms = this.appCheckFrequencyMS;
+      const watching_schema_tag_names = this.onSchemaChange? getWatchSchemaTagList(this.dboBuilder.prostgles.opts.watchSchema) : null;
       const raw = await this.db.one(
-        "INSERT INTO prostgles.apps (check_frequency_ms, watching_schema, application_name) VALUES($1, $2, current_setting('application_name')) RETURNING *; "
-        , [this.appCheckFrequencyMS, Boolean(this.onSchemaChange)]
+        "INSERT INTO prostgles.apps (check_frequency_ms, watching_schema_tag_names, application_name) \
+        VALUES($1, $2, current_setting('application_name')) \
+        RETURNING *; "
+        , [
+          check_frequency_ms,
+          watching_schema_tag_names
+        ]
       );
       this.appID = raw.id;
 
