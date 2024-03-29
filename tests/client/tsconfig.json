@@ -1,5 +1,5 @@
 {
-	"files": ["./index.ts"],
+	"files": ["index.ts"],
 	"compilerOptions": {
 		"target": "es2022",
 		"lib": [ "es2022", "DOM" ],

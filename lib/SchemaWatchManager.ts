@@ -1,6 +1,6 @@
 // import PubSubManager from "./PubSubManager";
 import { DboBuilder, isPlainObject } from "./DboBuilder";
-import { Prostgles, ProstglesInitOptions } from "./Prostgles";
+import { Prostgles } from "./Prostgles";
 
 /**
  * Prostgles creates an internal schema object that is used in providing core functionality: handles to explore and edit data within the database

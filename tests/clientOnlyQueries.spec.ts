@@ -1,5 +1,5 @@
 import { strict as assert } from 'assert';
-import type { DBHandlerClient, Auth } from "./client/index";
+import type { DBHandlerClient, Auth } from "./client";
 import { DBSchemaTable, SocketSQLStreamPacket, isDefined } from "prostgles-types";
 import { tryRun, tryRunP } from './isomorphicQueries.spec'; 
 import { reject } from 'bluebird';

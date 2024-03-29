@@ -1,6 +1,6 @@
 
 import { DBSchemaTable } from "prostgles-types";
-import type { Auth, DBHandlerClient } from "./client/index";
+import type { Auth, DBHandlerClient } from "./client";
 import { tryRun } from './isomorphicQueries.spec';
 import { strict as assert } from 'assert';
 import fs from "fs";

@@ -113,6 +113,7 @@ prostgles<DBSchemaGenerated>({
 	},
 	
 	onSocketConnect:  ({ socket, db }) => {
+		console.log("onSocketConnect", socket.id)
 		if(isClientTest){
 			log("Client connected -> console does not work. use log function. socket.id:", socket.id);
 			socket.emit("start-test", { server_id: Math.random() });
@@ -222,16 +223,19 @@ prostgles<DBSchemaGenerated>({
 			
 			if(isClientTest){
 				const execPath = path.resolve(`${__dirname}/../../../client`);
-				spawn("npm", ["run", "test"], { cwd: execPath, stdio: "inherit" });
-				// const clientPath = `cd ${__dirname}/../../../client && npm test`;
+				/** For some reason the below doesn't work anymore */
+				// const proc = spawn("npm", ["run", "test"], { cwd: execPath, stdio: "inherit" });
+				
+				spawn("node", ["dist/client/index.js"], { cwd: execPath, stdio: "inherit" });
+				// const clientPath = `cd ${__dirname}/../../../clientz && npm test`;
 				// const proc = exec(clientPath, console.log);
-				log("Waiting for client...");
-				// proc.stdout.on('data', function(data) {
+				// proc.stdout?.on('data', function(data) {
 				// 	console.log(data); 
 				// });
-				// proc.stderr.on('data', function(data) {
+				// proc.stderr?.on('data', function(data) {
 				// 	console.error(data); 
 				// });
+				log("Waiting for client...");
 				
 			} else if(process.env.TEST_TYPE === "server"){
 

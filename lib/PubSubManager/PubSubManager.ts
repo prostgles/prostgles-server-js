@@ -259,7 +259,6 @@ export class PubSubManager {
   init = initPubSubManager.bind(this);
 
   initialiseEventTriggers = async () => {
-    // SELECT * FROM pg_catalog.pg_event_trigger WHERE evtname
     if (!this.appID) throw "prepareTriggers failed: this.appID missing";
 
     const { watchSchema } = this.dboBuilder.prostgles.opts;
@@ -270,11 +269,14 @@ export class PubSubManager {
     if(watchSchema === "*"){
       EVENT_TAGS = EVENT_TRIGGER_TAGS.slice(0);
     } else if (isObject(watchSchema) && typeof watchSchema !== "function"){
-      const isInclusive = Object.values(watchSchema).every(v => v);
-
       const watchSchemaKeys = getKeys(watchSchema);
-      if(isInclusive) EVENT_TAGS = watchSchemaKeys;
-      else EVENT_TAGS = EVENT_TRIGGER_TAGS.slice(0).filter(v => !watchSchemaKeys.includes(v));
+      const isInclusive = Object.values(watchSchema).every(v => v);
+      EVENT_TAGS = EVENT_TRIGGER_TAGS
+        .slice(0)
+        .filter(v => {
+          const matches = watchSchemaKeys.includes(v);
+          return isInclusive? matches : !matches;
+        });
     }
 
     try {
@@ -340,11 +342,7 @@ export class PubSubManager {
                 WHERE evtname = ${asValue(DB_OBJ_NAMES.schema_watch_trigger)}
             );
 
-              -- RAISE NOTICE ' ev_trg_needed %, ev_trg_exists %', ev_trg_needed, ev_trg_exists;
-
-            /**
-             *  DROP stale event trigger
-             * */
+            /* DROP stale event trigger */
             IF is_super_user IS TRUE AND ev_trg_needed IS FALSE AND ev_trg_exists IS TRUE THEN
 
                 SELECT format(
@@ -352,14 +350,9 @@ export class PubSubManager {
                   , ${asValue(DB_OBJ_NAMES.schema_watch_trigger)}
                 )
                 INTO q;
-
-                --RAISE NOTICE ' DROP EVENT TRIGGER %', q;
-
                 EXECUTE q;
 
-            /**
-             *  CREATE event trigger
-             * */
+            /* CREATE event trigger */
             ELSIF 
                 is_super_user IS TRUE 
                 AND ev_trg_needed IS TRUE 
@@ -369,10 +362,8 @@ export class PubSubManager {
                 DROP EVENT TRIGGER IF EXISTS ${DB_OBJ_NAMES.schema_watch_trigger};
                 CREATE EVENT TRIGGER ${DB_OBJ_NAMES.schema_watch_trigger} ON ddl_command_end
                 WHEN TAG IN (\${EVENT_TAGS:csv})
-                --WHEN TAG IN ('CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE TRIGGER', 'DROP TRIGGER')
                 EXECUTE PROCEDURE ${DB_OBJ_NAMES.schema_watch_func}();
 
-                --RAISE NOTICE ' CREATED EVENT TRIGGER %', q;
             END IF;
 
             

@@ -1,7 +1,7 @@
 import { strict as assert } from 'assert';
 import * as fs from "fs";
 import { DBOFullyTyped } from "../dist/DBSchemaBuilder";
-import type { DBHandlerClient } from "./client/index";
+import type { DBHandlerClient } from "./client";
 import { test, describe } from "node:test";
 import { pickKeys } from "prostgles-types";
 

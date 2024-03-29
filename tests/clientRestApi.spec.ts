@@ -1,5 +1,5 @@
 import { strict as assert } from 'assert';
-import type { DBHandlerClient, Auth } from "./client/index";
+import type { DBHandlerClient, Auth } from "./client";
 import { DBSchemaTable } from "prostgles-types";
 import { describe, test } from "node:test";
 
