@@ -1,9 +1,9 @@
-import { AnyObject, SQLOptions, SQLResult, SQLResultInfo } from "prostgles-types";
-import { DboBuilder, LocalParams, pgp, postgresToTsType } from "./DboBuilder";
-import { DB, Prostgles } from "../Prostgles";
-import { PubSubManager } from "../PubSubManager/PubSubManager";
 import { ParameterizedQuery as PQ, ParameterizedQuery } from 'pg-promise';
 import pg from "pg-promise/typescript/pg-subset";
+import { AnyObject, SQLOptions, SQLResult, SQLResultInfo } from "prostgles-types";
+import { EVENT_TRIGGER_TAGS } from "../Event_Trigger_Tags";
+import { DB, Prostgles } from "../Prostgles";
+import { DboBuilder, LocalParams, pgp, postgresToTsType } from "./DboBuilder";
 
 
 export async function runSQL(this: DboBuilder, queryWithoutRLS: string, args: undefined | AnyObject | any[], options: SQLOptions | undefined, localParams?: LocalParams) {
@@ -117,7 +117,7 @@ export const watchSchemaFallback = async function(this: DboBuilder, { queryWitho
       this.prostgles.onSchemaChange({ command, query: queryWithoutRLS })
     } else if (queryWithoutRLS) {
       const cleanedQuery = queryWithoutRLS.toLowerCase().replace(/\s\s+/g, ' ');
-      if (PubSubManager.SCHEMA_ALTERING_QUERIES.some(q => cleanedQuery.includes(q.toLowerCase() + " "))) {
+      if (EVENT_TRIGGER_TAGS.some(q => cleanedQuery.includes(q.toLowerCase() + " "))) {
         this.prostgles.onSchemaChange({ command, query: queryWithoutRLS })
       }
     }

@@ -3,28 +3,28 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { DBHandlerServer, DboBuilder, PRGLIOSocket, TableInfo, TableOrViewInfo, canEXECUTE } from "../DboBuilder/DboBuilder";
 import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
-import { addSync } from "./addSync";
-import { TableOrViewInfo, TableInfo, DBHandlerServer, DboBuilder, PRGLIOSocket, canEXECUTE } from "../DboBuilder/DboBuilder";
 import { DB, isSuperUser } from "../Prostgles";
+import { addSync } from "./addSync";
 import { initPubSubManager } from "./initPubSubManager";
 
 import * as Bluebird from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg from 'pg-promise/typescript/pg-subset';
 
-import { SelectParams, FieldFilter, asName, WAL, AnyObject, SubscribeParams } from "prostgles-types";
+import { AnyObject, FieldFilter, SelectParams, SubscribeParams, WAL } from "prostgles-types";
 
-import { syncData } from "../SyncReplication";
+import { find, pickKeys, tryCatch } from "prostgles-types/dist/util";
+import { LocalFuncs, getOnDataFunc, matchesLocalFuncs } from "../DboBuilder/subscribe";
+import { EVENT_TRIGGER_TAGS } from "../Event_Trigger_Tags";
+import { EventTypes } from "../Logging";
 import { TableRule } from "../PublishParser/PublishParser";
-import { find, getKeys, isObject, pickKeys, tryCatch } from "prostgles-types/dist/util";
-import { DB_OBJ_NAMES } from "./getInitQuery";
+import { syncData } from "../SyncReplication";
 import { addSub } from "./addSub";
+import { DB_OBJ_NAMES } from "./getInitQuery";
 import { notifListener } from "./notifListener";
 import { pushSubData } from "./pushSubData";
-import { getOnDataFunc, LocalFuncs, matchesLocalFuncs } from "../DboBuilder/subscribe";
-import { EVENT_TRIGGER_TAGS, EventTriggerTag } from "../Event_Trigger_Tags";
-import { EventTypes } from "../Logging";
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 const pgp: PGP = pgPromise({
@@ -150,21 +150,6 @@ export type Subscription = Pick<SubscriptionParams,
 export class PubSubManager {
   static DELIMITER = '|$prstgls$|' as const;
 
-  static SCHEMA_ALTERING_QUERIES = [
-    'CREATE TABLE', 
-    'ALTER TABLE', 
-    'DROP TABLE', 
-    'CREATE VIEW', 
-    'DROP VIEW', 
-    'ALTER VIEW', 
-    'CREATE TABLE AS', 
-    'SELECT INTO',
-    'REVOKE',
-    'GRANT',
-    'CREATE POLICY', 
-    'DROP POLICY', 
-  ] as const;
-
   static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from schema watch " as const;
 
   public static canCreate = async (db: DB) => {
@@ -265,19 +250,6 @@ export class PubSubManager {
     if (watchSchema && !(await isSuperUser(this.db))) {
       console.warn("prostgles watchSchema requires superuser db user. Will not watch using event triggers")
     }
-    let EVENT_TAG_LIST: typeof EVENT_TRIGGER_TAGS[number][] = ['COMMENT', 'CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO', 'CREATE POLICY'];
-    if(watchSchema === "*"){
-      EVENT_TAG_LIST = EVENT_TRIGGER_TAGS.slice(0);
-    } else if (isObject(watchSchema) && typeof watchSchema !== "function"){
-      const watchSchemaKeys = getKeys(watchSchema);
-      const isInclusive = Object.values(watchSchema).every(v => v);
-      EVENT_TAG_LIST = EVENT_TRIGGER_TAGS
-        .slice(0)
-        .filter(v => {
-          const matches = watchSchemaKeys.includes(v);
-          return isInclusive? matches : !matches;
-        });
-    }
 
     try {
 
@@ -368,7 +340,7 @@ export class PubSubManager {
 
                 DROP EVENT TRIGGER IF EXISTS ${DB_OBJ_NAMES.schema_watch_trigger};
                 CREATE EVENT TRIGGER ${DB_OBJ_NAMES.schema_watch_trigger} ON ddl_command_end
-                WHEN TAG IN (\${EVENT_TAG_LIST:csv})
+                WHEN TAG IN (\${EVENT_TRIGGER_TAGS:csv})
                 EXECUTE PROCEDURE ${DB_OBJ_NAMES.schema_watch_func}();
 
             END IF;
@@ -379,7 +351,7 @@ export class PubSubManager {
 
 
         COMMIT;
-      `, { EVENT_TAG_LIST });
+      `, { EVENT_TRIGGER_TAGS });
       
       await this.db.any(query)
       .catch(e => {
@@ -608,4 +580,4 @@ export class PubSubManager {
 
 export const parseCondition = (condition: string): string => condition && condition.trim().length ? condition : "TRUE"
 
-export { pickKeys, omitKeys } from "prostgles-types"
+export { omitKeys, pickKeys } from "prostgles-types";
