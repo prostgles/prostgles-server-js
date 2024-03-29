@@ -281,7 +281,7 @@ export class PubSubManager {
 
     try {
 
-      await this.db.any(`
+      const query = pgp.as.format(`
         BEGIN;--  ISOLATION LEVEL SERIALIZABLE;
         
         /**                                 
@@ -376,7 +376,10 @@ export class PubSubManager {
 
 
         COMMIT;
-      `, { EVENT_TAG_LIST }).catch(e => {
+      `, { EVENT_TAG_LIST });
+      
+      await this.db.any(query)
+      .catch(e => {
         console.error("prepareTriggers failed: ", e);
         throw e;
       });
