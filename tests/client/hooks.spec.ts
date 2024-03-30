@@ -5,8 +5,8 @@ import type { DBHandlerClient } from "./index";
 const jsdom = require("jsdom");
 const { JSDOM } = jsdom;
 const { window } = new JSDOM(`<!DOCTYPE html>`);
-global.document = window.document;
 global.window = window;
+global.document = window.document;
 
 const expectValues = (result: { current: any; }, expectedValues: any[]) => {
   let step = 0;
