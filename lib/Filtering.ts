@@ -244,13 +244,9 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
        * geom && st_makeenvelope(funcArgs)
        */
       const filterValueKeys = Object.keys(filterValue);
-      // if(!filterValueKeys.length || filterValueKeys.length !== 1){
-      //   return mErr("Bad filter. Expecting a nested object with one key only but got: " + JSON.stringify(filterValue, null, 2));
-      // }
       funcName = filterValueKeys[0] as any;
       if(ALLOWED_FUNCS.includes(funcName as any)){
         funcArgs = filterValue[funcName as any];
-        // return mErr(`Bad filter. Nested function ${funcName} could not be found. Expecting one of: ${ALLOWED_FUNCS}`);
       } else {
         funcName = undefined;
       }

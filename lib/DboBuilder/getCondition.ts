@@ -81,7 +81,7 @@ export async function getCondition(
   });
 
   let allowedSelect: SelectItem[] = [];
-  /* Select aliases take precedence over col names. This is to ensure filters work correctly and even on computed cols*/
+  /* Select aliases take precedence over col names. This is to ensure filters work correctly even on computed cols*/
   if (select) {
     /* Allow filtering by selected fields/funcs */
     allowedSelect = select.filter(s => {
@@ -96,23 +96,24 @@ export async function getCondition(
   }
 
   /* Add remaining allowed fields */
+  const remainingNonSelectedColumns: SelectItem[] = p.allColumns.filter(c =>
+    allowed_colnames.includes(c.name) &&
+    !allowedSelect.find(s => s.alias === c.name)
+  ).map(f => ({
+    type: f.type,
+    alias: f.name,
+    columnName: f.type === "column"? f.name : undefined as any,
+    getQuery: (tableAlias) => f.getQuery({
+      tableAlias,
+      allColumns: this.columns,
+      allowedFields: allowed_colnames
+    }),
+    selected: false,
+    getFields: () => [f.name],
+    column_udt_type: f.type === "column" ? this.columns.find(c => c.name === f.name)?.udt_name : undefined
+  }))
   allowedSelect = allowedSelect.concat(
-    p.allColumns.filter(c =>
-      allowed_colnames.includes(c.name) &&
-      !allowedSelect.find(s => s.alias === c.name)
-    ).map(f => ({
-      type: f.type,
-      alias: f.name,
-      columnName: f.type === "column"? f.name : undefined as any,
-      getQuery: (tableAlias) => f.getQuery({
-        tableAlias,
-        allColumns: this.columns,
-        allowedFields: allowed_colnames
-      }),
-      selected: false,
-      getFields: () => [f.name],
-      column_udt_type: f.type === "column" ? this.columns.find(c => c.name === f.name)?.udt_name : undefined
-    }))
+    remainingNonSelectedColumns
   );
 
   /* Parse complex filters
@@ -180,15 +181,14 @@ export async function getCondition(
       will make an exists filter
   */
 
-  const filterKeys = Object.keys(filter).filter(k => k !== complexFilterKey && !funcFilter.find(ek => ek.name === k) && !computedFields.find(cf => cf.name === k) && !existsConfigs.find(ek => ek.existType === k));
-  // if(allowed_colnames){
-  //     const aliasedColumns = (select || []).filter(s => 
-  //         ["function", "computed", "column"].includes(s.type) && allowed_colnames.includes(s.alias) ||  
-  //         s.getFields().find(f => allowed_colnames.includes(f))
-  //     ).map(s => s.alias);
-  //     const validCols = [...allowed_colnames, ...aliasedColumns];
+  const filterKeys = Object.keys(filter)
+    .filter(k => 
+      k !== complexFilterKey && 
+      !funcFilter.find(ek => ek.name === k) && 
+      !computedFields.find(cf => cf.name === k) && 
+      !existsConfigs.find(ek => ek.existType === k)
+    );
 
-  // }
   const validFieldNames = allowedSelect.map(s => s.alias);
   const invalidColumn = filterKeys
     .find(fName => !validFieldNames.find(c =>
@@ -202,7 +202,9 @@ export async function getCondition(
     ));
 
   if (invalidColumn) {
-    throw `Table: ${this.name} -> disallowed/inexistent columns in filter: ${invalidColumn} \n  Expecting one of: ${allowedSelect.map(s => s.type === "column" ? s.getQuery() : s.alias).join(", ")}`;
+    const allowedCols = allowedSelect.map(s => s.type === "column" ? s.getQuery() : s.alias).join(", ");
+    const errMessage = `Table: ${this.name} -> disallowed/inexistent columns in filter: ${invalidColumn} \n  Expecting one of: ${allowedCols}`;
+    throw errMessage;
   }
 
   /* TODO: Allow filter funcs */

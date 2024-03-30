@@ -1,7 +1,7 @@
 import { AnyObject, asName, reverseParsedPath, SubscribeParams } from "prostgles-types";
-import { ExistsFilterConfig, Filter, LocalParams, getClientErrorFromPGError } from "./DboBuilder";
 import { TableRule } from "../PublishParser/PublishParser";
 import { log, ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
+import { Filter, getClientErrorFromPGError, LocalParams } from "./DboBuilder";
 import { NewQuery } from "./QueryBuilder/QueryBuilder";
 import { ViewHandler } from "./ViewHandler/ViewHandler";
 
@@ -10,17 +10,14 @@ type Args = {
   filter: Filter;
   table_rules: TableRule<AnyObject, void> | undefined;
   localParams: LocalParams | undefined;
-  condition: string;
-  filterOpts: {
-    where: string;
-    filter: AnyObject;
-    exists: ExistsFilterConfig[];
-  };
+  newQuery: NewQuery;
 }
-export async function getSubscribeRelatedTables(this: ViewHandler, { selectParams, filter, localParams, table_rules, condition, filterOpts }: Args){
+export async function getSubscribeRelatedTables(this: ViewHandler, { selectParams, filter, localParams, table_rules, newQuery }: Args){
 
   let viewOptions: ViewSubscriptionOptions | undefined = undefined;
+  const { condition } = newQuery.whereOpts;
   if (this.is_view) {
+    /** TODO: this needs to be memoized on schema fetch */
     const viewName = this.name;
     const viewNameEscaped = this.escapedName;
     const { current_schema } = await this.db.oneOrNone("SELECT current_schema")
@@ -129,7 +126,6 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { selectParam
 
     /** Any joined table used within select or filter must also be added a trigger for this recordset */
   } else {
-    const newQuery = await this.find(filter, { ...selectParams, limit: 0 }, undefined, table_rules, { ...localParams, returnNewQuery: true }) as unknown as NewQuery;
     viewOptions = {
       type: "table",
       relatedTables: []
@@ -137,7 +133,7 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { selectParam
     /**
      * Avoid nested exists error. Will affect performance
      */
-    const nonExistsFilter = filterOpts.exists.length ? {} : filter;
+    const nonExistsFilter = newQuery.whereOpts.exists.length ? {} : filter;
     for await (const j of (newQuery.joins ?? [])) {
       if (!viewOptions!.relatedTables.find(rt => rt.tableName === j.table)) {
         /**

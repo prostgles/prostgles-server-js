@@ -1,7 +1,6 @@
 import { DetailedJoinSelect, JoinPath, JoinSelect, RawJoinPath, SelectParams, SimpleJoinSelect, getKeys } from "prostgles-types";
 import { Filter, LocalParams } from "../DboBuilder";
 import { TableRule } from "../../PublishParser/PublishParser";
-import { get } from "../../utils";
 import { ViewHandler } from "../ViewHandler/ViewHandler";
 import { parseJoinPath } from "../ViewHandler/parseJoinPath";
 import { prepareSortItems } from "../ViewHandler/prepareSortItems";
@@ -78,7 +77,6 @@ export async function getNewQuery(
 
   const allowedOrderByFields = !tableRules? _this.column_names.slice(0) : _this.parseFieldFilter(tableRules?.select?.orderByFields ?? tableRules?.select?.fields);
   const allowedSelectFields = !tableRules? _this.column_names.slice(0) :  _this.parseFieldFilter(tableRules?.select?.fields);
-
 
   const joinQueries: NewQueryJoin[] = [];
 
@@ -186,14 +184,14 @@ export async function getNewQuery(
   const filterOpts = await _this.prepareWhere({
     filter, 
     select, 
-    forcedFilter: get(tableRules, "select.forcedFilter"), 
-    filterFields: get(tableRules, "select.filterFields"), 
+    forcedFilter: tableRules?.select?.forcedFilter, 
+    filterFields: tableRules?.select?.filterFields, 
     tableAlias: selectParams.alias, 
     localParams,
     tableRule: tableRules
   });
   const where = filterOpts.where;
-  const p = _this.getValidatedRules(tableRules, localParams);
+  const validatedRules = _this.getValidatedRules(tableRules, localParams);
 
   const resQuery: NewQuery = {
     /** Why was this the case? */
@@ -207,14 +205,10 @@ export async function getNewQuery(
     whereOpts: filterOpts,
     having: "",
     isLeftJoin: false,
-    // having: cond.having,
-    limit: _this.prepareLimitQuery(selectParams.limit, p),
+    limit: _this.prepareLimitQuery(selectParams.limit, validatedRules),
     orderByItems: prepareSortItems(selectParams.orderBy, allowedOrderByFields, selectParams.alias, select, joinQueries),
     offset: _this.prepareOffsetQuery(selectParams.offset)
   };
-
-  // console.log(resQuery);
-  // console.log(buildJoinQuery(_this, resQuery));
 
   if(resQuery.select.some(s => s.type === "aggregation") && resQuery.joins?.length){
     throw `Root query aggregation AND nested joins not allowed`;

@@ -109,7 +109,7 @@ export function parseError(e: any, caller: string): ProstglesError {
   const result: ProstglesError = {
     ...errorObject,
     message,
-    stack,
+    // stack,
   }
   return result;
 }

@@ -27,7 +27,7 @@ export type SelectItem = {
   columnName?: undefined;
 });
 export type SelectItemValidated = SelectItem & { fields: string[]; }
-
+export type WhereOptions = Awaited<ReturnType<ViewHandler["prepareWhere"]>>;
 export type NewQueryRoot = {
   /**
    * All fields from the table will be in nested SELECT and GROUP BY to allow order/filter by fields not in select 
@@ -41,7 +41,7 @@ export type NewQueryRoot = {
 
   table: string;
   where: string;
-  whereOpts: Awaited<ReturnType<ViewHandler["prepareWhere"]>>;
+  whereOpts: WhereOptions;
   orderByItems: SortItem[];
   having: string;
   limit: number | null;
@@ -246,7 +246,7 @@ export class SelectItemBuilder {
             */  
             if(
               (typeof val === "string" && val !== "*") ||
-              isPlainObject(val) && Object.keys(val).length === 1 && Array.isArray(Object.values(val)[0]) // !isPlainObject(Object.values(val)[0])
+              isPlainObject(val) && Object.keys(val).length === 1 && Array.isArray(Object.values(val)[0])
             ){
 
               let funcName: string | undefined, args: any[] | undefined;

@@ -7,6 +7,7 @@ import { clientRestApi } from "../clientRestApi.spec";
 import { clientFileTests } from "../clientFileTests.spec"; 
 import { InitOptions } from "prostgles-client/dist/prostgles";
 export { DBHandlerClient, Auth } from "prostgles-client/dist/prostgles";
+import { clientHooks } from "./hooks.spec";
 
 const start = Date.now();
 const log = (msgOrObj: any, extra?: any) => {
@@ -26,19 +27,19 @@ const tests: Record<string, ClientTestSpec> = {
     onRun: async (db, methods, tableSchema, auth) => {
       await isomorphicQueries(db, log);
       await clientOnlyQueries(db, auth, log, methods, tableSchema, TEST_NAME);
+      await clientHooks(db);
     },
   },
   files: {
     onRun: async (db, methods, tableSchema, auth) => {
       await clientFileTests(db, auth, log, methods, tableSchema)
     },
-
   },
   rest_api: {
     onRun: async (db, methods, tableSchema, auth) => {
       await clientRestApi(db, auth, log, methods, tableSchema, TEST_NAME);
     }
-  },
+  }
 };
 
 const test = tests[TEST_NAME];

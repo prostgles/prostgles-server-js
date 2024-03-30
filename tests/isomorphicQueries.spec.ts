@@ -35,9 +35,6 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
         code: '22P02',
         name: 'error',
         severity: 'ERROR',
-        stack: [
-          'dbo.items.insert()'
-        ]
       }
       if(isServer){
         assert.deepStrictEqual(pickKeys(err, Object.keys(clientOnlyError)), clientOnlyError);

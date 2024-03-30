@@ -1,7 +1,7 @@
 import { AnyObject, SubscribeParams, SubscriptionChannels } from "prostgles-types";
-import { Filter, LocalParams, parseError } from "./DboBuilder";
 import { TableRule } from "../PublishParser/PublishParser";
-import { omitKeys } from "../PubSubManager/PubSubManager"; 
+import { Filter, LocalParams, parseError } from "./DboBuilder";
+import { NewQuery } from "./QueryBuilder/QueryBuilder";
 import { ViewHandler } from "./ViewHandler/ViewHandler";
 import { getSubscribeRelatedTables } from "./getSubscribeRelatedTables";
 
@@ -42,10 +42,10 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
       throw " Cannot have localFunc AND socket ";
     }
 
-    const { filterFields, forcedFilter } = table_rules?.select || {},
-      filterOpts = await this.prepareWhere({ filter, forcedFilter, addWhere: false, filterFields, tableAlias: undefined, localParams, tableRule: table_rules }),
-      condition = filterOpts.where,
-      { throttle = 0, throttleOpts, ...selectParams } = params;
+    const { throttle = 0, throttleOpts, ...selectParams } = params;
+
+    /** Ensure request is valid */
+    await this.find(filter, { ...selectParams, limit: 0 }, undefined, table_rules, localParams);   
 
     /** app_triggers condition field has an index which limits it's value. 
      * TODO: use condition md5 hash 
@@ -58,16 +58,18 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
       throw "Subscribe not possible. Must be superuser to add triggers 1856";
     }
 
-    /** Ensure request is valid */
-    await this.find(filter, { ...selectParams, limit: 0 }, undefined, table_rules, localParams);
-
-    const viewOptions = await getSubscribeRelatedTables.bind(this)({ filter, selectParams, table_rules, localParams, condition, filterOpts })
+    const newQuery: NewQuery = await this.find(filter, { ...selectParams, limit: 0 }, undefined, table_rules, { ...localParams, returnNewQuery: true }) as any;
+    const viewOptions = await getSubscribeRelatedTables.bind(this)({ 
+      filter, selectParams, 
+      table_rules, localParams, 
+      newQuery
+    });
 
     const commonSubOpts = {
       table_info: this.tableOrViewInfo,
       viewOptions,
       table_rules,
-      condition,
+      condition: newQuery.whereOpts.condition,
       table_name: this.name,
       filter: { ...filter },
       params: { ...selectParams },
@@ -109,4 +111,4 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
   }
 }
 
-export { subscribe }
+export { subscribe };
