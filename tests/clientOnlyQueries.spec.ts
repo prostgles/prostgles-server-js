@@ -559,9 +559,33 @@ export const clientOnlyQueries = async (db: DBHandlerClient, auth: Auth, log: (.
       await testRealtime();
     });
 
-    // auth.login({ username: "john", password: "secret" });
-
-    // await tout();
+    /* Bug: 
+        doing a 
+          some_table.sync({}, { handlesOnData: true }, console.log);
+        will make all subsequent 
+          some_table.sync({}, { handlesOnData: false }, console.log);
+        return no data items
+    */
+    await test("sync handlesOnData true -> false no data bug", { skip: isUser }, async () => {
+      
+      let sync1Planes = [];
+      let sync2Planes = [];
+      const sync1 = await db.planes.sync!({}, { handlesOnData: true }, async (planes1, deltas) => {
+        sync1Planes = planes1;
+        log("sync handlesOnData true", planes1.length);
+      });
+      await tout(1000);
+      const sync2 = await db.planes.sync!({}, { handlesOnData: false }, (planes2, deltas) => {
+        sync2Planes = planes2;
+      });
+      await tout(1000);
+      if(sync1Planes.length !== sync2Planes.length || sync1Planes.length === 0) {
+        throw `sync2Planes.length !== 100: ${sync1Planes.length} vs ${sync2Planes.length}`;
+      }
+      await sync1.$unsync();
+      await sync2.$unsync();
+    });
+    
 
     // User data
     await test("Security rules example", { skip: !isUser }, async () => {
