@@ -14,6 +14,7 @@ npm run build
 #npm run test-server 2>&1 ./server.log
 npm run test-server && \
 TEST_NAME="main"        npm run test-client && \
+# TEST_NAME="hooks"       npm run test-client && \
 TEST_NAME="files"       npm run test-client && \
 TEST_NAME="rest_api"    npm run test-client
 

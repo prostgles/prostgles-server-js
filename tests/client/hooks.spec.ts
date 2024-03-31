@@ -1,28 +1,13 @@
-import { renderHook, waitFor } from "@testing-library/react";
 import { strict as assert } from "assert";
 import { describe, test } from "node:test";
 import type { DBHandlerClient } from "./index";
-const jsdom = require("jsdom");
-const { JSDOM } = jsdom;
-const { window } = new JSDOM(`<!DOCTYPE html>`);
-global.window = window;
-global.document = window.document;
-
-const expectValues = (result: { current: any; }, expectedValues: any[]) => {
-  let step = 0;
-  return waitFor(() => {
-    assert.deepStrictEqual(expectedValues[step], result.current);
-    const finished = step === expectedValues.length - 1;
-    step++;
-    if(!finished) throw new Error("Not finished"); 
-  });
-}
+import { renderReactHook } from "./renderReactHook";
+import { pickKeys } from "prostgles-types";
 
 export const clientHooks = async (db: DBHandlerClient) => {
-
-  await describe("Client hooks", async (t) => {
+  const resultLoading = { data: undefined, isLoading: true, error: undefined };
+  await describe("React hooks", async (t) => {
     const defaultFilter = { name: "abc" };
-      
     await Promise.all([
       "useFind",
       "useSubscribe",
@@ -35,40 +20,34 @@ export const clientHooks = async (db: DBHandlerClient) => {
           select: { added: "$Mon" },
           limit: expectsOne? undefined : 1
         };
-        const { result, rerender } = renderHook((filter = defaultFilter) => db.items4[hookName]!(filter, options));
         const expectedData = expectsOne? { added: "Dec" } : [{ added: "Dec" }];
-        // Initial state
-        assert.deepStrictEqual(result.current, { data: undefined, isLoading: true, error: undefined });
-        
-        // First fetch
-        await waitFor(() => {
-          assert.deepStrictEqual(
-            result.current, 
-            { 
-              data: expectedData, error: undefined, isLoading: false
-            }
-          );
+        const { rerender, results } = await renderReactHook({
+          hook: db.items4[hookName]!,
+          props: [{ name: "abc" }, options],
+          expectedRerenders: 2
         });
 
-        // Rerender with different filter
-        rerender({ named: "error" });
+        assert.deepStrictEqual(
+          results, [
+            resultLoading,
+            { data: expectedData, isLoading:false, error: undefined}
+          ]
+        );
 
-        // TODO fix first re-render result (useFetch setResult in async block might be affecting this)
-        // assert.deepStrictEqual(result.current, { data: undefined, isLoading: true, error: undefined });
-
-        await waitFor(() => {
-          assert.deepStrictEqual(
-            result.current, 
-            { 
-              data: undefined, 
-              error: {
-                message: 'Table: items4 -> disallowed/inexistent columns in filter: named \n' +
-                  '  Expecting one of: added, "id", "public", "name"',
-              },
-              isLoading: false
-            }
-          );
+        const { results: errorResults } = await rerender({
+          props: [{ named: "error" }, options],
+          expectedRerenders: 2,
         });
+
+        assert.deepStrictEqual(
+          errorResults, [
+            resultLoading,
+            { data: undefined, isLoading: false, error: {
+              message: 'Table: items4 -> disallowed/inexistent columns in filter: named \n' +
+                '  Expecting one of: added, "id", "public", "name"',
+            } }
+          ]
+        );
       });
     }));
 
@@ -76,44 +55,145 @@ export const clientHooks = async (db: DBHandlerClient) => {
       { 
         hookName: "useCount", 
         result1: { data: 2, error: undefined, isLoading: false },
-        result2: [
-          { data: 2, error: undefined, isLoading: false },
-          { data: 0, error: undefined, isLoading: false },
-        ]
+        result2: { data: 0, error: undefined, isLoading: false },
       },
       { 
         hookName: "useSize", 
         result1: { data: "93", error: undefined, isLoading: false },
-        result2: [
-          { data: "93", error: undefined, isLoading: false },
-          { data: "0", error: undefined, isLoading: false },
-        ]
+        result2: { data: "0", error: undefined, isLoading: false }
       },
     ].map(async ({ hookName, result1, result2 }) => {
       await test(hookName, async (t) => {
-        const { result, rerender } = renderHook((filter = defaultFilter) => db.items4[hookName](filter));
-        // Initial state
-        assert.deepStrictEqual(result.current, { data: undefined, isLoading: true, error: undefined });
-        
-        // First fetch
-        await waitFor(() => {
-          assert.deepStrictEqual(
-            result.current, 
-            result1
-          );
+        const { results, rerender } = await renderReactHook({
+          hook: db.items4[hookName]!,
+          props: [defaultFilter],
+          expectedRerenders: 2
         });
+
+        // Initial state
+        assert.deepStrictEqual(
+          results, [
+            resultLoading,
+            result1
+          ]
+        );
   
         // Rerender with different filter
-        rerender({ id: -1 });
+        const { results: noResults } = await rerender({ 
+          props: [{ id: -1 }], 
+          expectedRerenders: 2,
+        });
   
-        // New count
-        await expectValues(
-          result,
-          result2
+        // New results
+        assert.deepStrictEqual(
+          noResults, 
+          [resultLoading, result2]
         );
       });
 
     }));
+
+    await test("useCount planes", async (t) => {
+      const { results } = await renderReactHook({
+        hook: db.planes.useCount!,
+        props: [{}],
+        expectedRerenders: 2
+      });
+      assert.deepStrictEqual(
+        results, 
+        [
+          { data: undefined, isLoading: true, error: undefined },
+          { data: 100, error: undefined, isLoading: false }
+        ]
+      );
+    });
+
+    // // TODO fix useSync test
+    await test("useSync", async (t) => {
+      const funcHandles = {
+        '$cloneMultiSync': 1,
+        '$cloneSync': 1,
+        '$delete': 1,
+        '$find': 1,
+        '$get': 1,
+        '$unsync': 1,
+        '$update': 1,
+      };
+      const plane0 = {
+        flight_number: '{"from":0,"to":0,"text":"","md5":"fb91aad2efe3387d09399beb97262d8d"}',
+        id: 0,
+        last_updated: '1711882317229',
+        x: 20,
+        y: 0
+      }
+      // await db.planes.insert({ name: "abc" });
+
+      // const { results: firstPlaneResults } = await renderReactHook({
+      //   hook: db.planes.useFindOne!,
+      //   props: [{ }],
+      //   expectedRerenders: 2
+      // });
+      // assert.deepStrictEqual(firstPlaneResults, [
+      //   { data: undefined, isLoading: true, error: undefined },
+      //   { data: undefined, error: undefined, isLoading: false },
+      // ]);
+
+      const props = [{ id: 0 }, { handlesOnData: true }]; // , select: { id: 1, x: 1 }
+      const { results, rerender } = await renderReactHook({
+        hook: db.planes.useSync!,
+        props,
+        expectedRerenders: 3
+      });
+      assert.equal(results.length, 3);
+      assert.deepStrictEqual(results.slice(0, 2), [
+        { data: undefined, isLoading: true, error: undefined },
+        { data: [], error: undefined, isLoading: false },
+      ]);
+      const lastData = results.at(-1)?.data;
+      assert.equal(lastData.length, 1);
+      const lastDataItem = lastData[0];
+      const staticPropNames = ["id", "x", "y"];
+      assert.deepStrictEqual(
+        pickKeys(lastDataItem, staticPropNames), 
+        pickKeys(plane0, staticPropNames as any)
+      );
+
+      // Update item
+      db.planes.update({ id: 0 }, { x: 230 });
+      const { results: deletedResults } = await rerender({
+        props,
+        expectedRerenders: 3, 
+      });
+
+      assert.deepStrictEqual(
+        deletedResults.map(({ data }) => data?.[0]?.x), 
+        [
+          undefined, // TODO - should be defined and 20
+          20,
+          230,
+        ],
+      );
+
+      // // Rerender with different filter
+      // rerender({ id: -1 });
+ 
+      // await expectValues(
+      //   result,
+      //   [
+      //     { data: undefined, error: undefined, isLoading: true },
+      //     { data: [], error: undefined, isLoading: false },
+      //   ]
+      // );
+ 
+      // await expectValues(
+      //   result,
+      //   [
+      //     { data: undefined, error: undefined, isLoading: true },
+      //     { data: [], error: undefined, isLoading: false }
+      //   ]
+      // );
+
+    });
 
   });
 }

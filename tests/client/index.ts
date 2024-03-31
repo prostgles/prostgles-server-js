@@ -30,6 +30,11 @@ const tests: Record<string, ClientTestSpec> = {
       await clientHooks(db);
     },
   },
+  // hooks: {
+  //   onRun: async (db) => {
+  //     await clientHooks(db);
+  //   },
+  // },
   files: {
     onRun: async (db, methods, tableSchema, auth) => {
       await clientFileTests(db, auth, log, methods, tableSchema)
