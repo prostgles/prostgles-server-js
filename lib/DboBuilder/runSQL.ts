@@ -106,21 +106,23 @@ const onSQLResult = async function(this: DboBuilder, queryWithoutRLS: string, { 
  * Fallback for watchSchema in case of not a superuser (cannot add db event listener)
  */
 export const watchSchemaFallback = async function(this: DboBuilder, { queryWithoutRLS, command }: { queryWithoutRLS: string; command: string; }){
-  const SCHEMA_ALTERING_COMMANDS = ["CREATE", "ALTER", "DROP", "REVOKE", "GRANT"];
+  const SCHEMA_ALTERING_COMMANDS = EVENT_TRIGGER_TAGS;// ["CREATE", "ALTER", "DROP", "REVOKE", "GRANT"];
   const isNotPickedUpByDDLTrigger = ["REVOKE", "GRANT"].includes(command);
   const { watchSchema, watchSchemaType } = this.prostgles?.opts || {};
   if (
     watchSchema &&
     (!this.prostgles.isSuperUser || watchSchemaType === "prostgles_queries" || isNotPickedUpByDDLTrigger)
   ) {
-    if (SCHEMA_ALTERING_COMMANDS.includes(command)) {
+    if (SCHEMA_ALTERING_COMMANDS.includes(command as any)) {
       this.prostgles.onSchemaChange({ command, query: queryWithoutRLS })
-    } else if (queryWithoutRLS) {
-      const cleanedQuery = queryWithoutRLS.toLowerCase().replace(/\s\s+/g, ' ');
-      if (EVENT_TRIGGER_TAGS.some(q => cleanedQuery.includes(q.toLowerCase() + " "))) {
-        this.prostgles.onSchemaChange({ command, query: queryWithoutRLS })
-      }
     }
+    // This seems too unrealiable
+    // else if (queryWithoutRLS) {
+    //   const cleanedQuery = queryWithoutRLS.toLowerCase().replace(/\s\s+/g, ' ');
+    //   if (EVENT_TRIGGER_TAGS.some(q => cleanedQuery.includes(q.toLowerCase() + " "))) {
+    //     this.prostgles.onSchemaChange({ command, query: queryWithoutRLS })
+    //   }
+    // }
   }
 }
 

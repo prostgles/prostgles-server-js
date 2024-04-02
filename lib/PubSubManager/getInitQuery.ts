@@ -546,7 +546,8 @@ BEGIN
                     INTO curr_query;
                     
                     FOR app IN 
-                      SELECT * FROM prostgles.apps 
+                      SELECT * 
+                      FROM prostgles.apps 
                       WHERE tg_tag = ANY(watching_schema_tag_names)
                     LOOP
                       PERFORM pg_notify( 
