@@ -77,6 +77,19 @@ prostgles({
 });
 ```
 
+react.tsx
+```js
+
+const App = () => {
+  const { isLoading, dbo } = useProstglesClient();
+  if(isLoading) return null;
+  return <>
+    Database tables: {Object.keys(dbo)}
+  </>
+}
+
+```
+
 ./public/index.html
 ```html
  
@@ -95,7 +108,7 @@ prostgles({
 
       prostgles({
         socket: io(), 
-        onReady: async (dbo, dbsMethods, schemaTables, auth) => {
+        onReady: async ({ dbo, dbsMethods, schemaTables, auth }) => {
 
         }
       });

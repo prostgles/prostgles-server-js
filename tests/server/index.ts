@@ -15,6 +15,7 @@ testPublishTypes();
 
 const isClientTest = (process.env.TEST_TYPE === "client");
 const io = !isClientTest? undefined : require("socket.io")(http, { path: "/teztz/s" });
+const ioWatchSchema = !isClientTest? undefined : require("socket.io")(http, { path: "/teztz/sWatchSchema" });
 
 http.listen(3001);
 
@@ -77,181 +78,201 @@ function dd(){
 	dbo.tbl.find;
 }
 
-prostgles<DBSchemaGenerated>({
-	dbConnection,
-	sqlFilePath: path.join(__dirname+'/../../init.sql'),
-	io,
-	tsGeneratedTypesDir: path.join(__dirname + '/../../'),
-	transactions: true,
-	schema: { public: 1, prostgles_test: 1 },
-	onLog: async ev => {
-		if(ev.type === "debug" || ev.type === "connect" || ev.type === "disconnect"){
-			// log("onLog", ev);
-		}
-	},
-	tableConfig: testTableConfig,
-	fileTable: {
-		referencedTables: {  
-			users_public_info: {
-				type: "column",
-				referenceColumns: {
-					avatar: {
-						acceptedContent: "*"
-					}
-				}
-			}
-		},
-		localConfig: {
-			localFolderPath: path.join(__dirname+'/media'),
-		},
-		expressApp: app,
-		tableName: "files",
-	},
-	restApi: {
-		expressApp: app,
-		routePrefix: "/api"
-	},
+(async () => {
 	
-	onSocketConnect:  ({ socket, db }) => {
-		console.log("onSocketConnect", socket.id)
-		if(isClientTest){
-			log("Client connected -> console does not work. use log function. socket.id:", socket.id);
-			socket.emit("start-test", { server_id: Math.random() });
-			socket.on("log", async (data, cb) => { 
-				console.log("Client log ", data);
-			});
-			socket.on("stop-test", async (err, cb) => {
-				cb();
-				console.log("Client test " + (!err? "successful" : "failed"));
-				stopTest(err);
-			});
-		}
-		
-	},
 
-	onSocketDisconnect:  ({ socket, db }) => {
-		if(isClientTest){
-			log("Client disconnected. socket.id:", socket.id);
-		}
-		
-	},
-	
-	publishRawSQL: async (params) => {
-		return true;// Boolean(user && user.type === "admin")
-	},
-	auth: {
-		sidKeyName: "token",
-		getUser: async (sid) => {
-			if(sid){
-				const s = sessions.find(s => s.id === sid);
-				if(s) {
-					const user = users.find(u => s && s.user_id === u.id);
-					if(user) {
-						return { sid: s.id, user, clientUser: { sid: s.id, uid: user.id } }
+	if(isClientTest && process.env.TEST_NAME === "useProstgles"){
+		await prostgles<DBSchemaGenerated>({
+			dbConnection,
+			io: ioWatchSchema,
+			transactions: true,
+			schema: { public: 1, prostgles_test: 1 },
+			onReady: async ({ dbo, db }) => {},
+			publish: "*",
+			watchSchema: true,
+		});
+	}
+
+	prostgles<DBSchemaGenerated>({
+		dbConnection,
+		sqlFilePath: path.join(__dirname+'/../../init.sql'),
+		io,
+		tsGeneratedTypesDir: path.join(__dirname + '/../../'),
+		transactions: true,
+		schema: { public: 1, prostgles_test: 1 },
+		onLog: async ev => {
+			if(ev.type === "debug" || ev.type === "connect" || ev.type === "disconnect"){
+				// log("onLog", ev);
+			}
+		},
+		tableConfig: testTableConfig,
+		fileTable: {
+			referencedTables: {  
+				users_public_info: {
+					type: "column",
+					referenceColumns: {
+						avatar: {
+							acceptedContent: "*"
+						}
 					}
 				}
-			}
-			return undefined;
-		},
-		login: async ({ username, password } = {}) => {
-			const u = users.find(u => u.username === username && u.password === password);
-			if(!u) throw "something went wrong: " + JSON.stringify({ username, password });
-			let s = sessions.find(s => s.user_id === u.id)
-			if(!s){
-				s = { id: "SID" + Date.now(), user_id: u.id }
-				sessions.push(s)
-			}
-			log("Logged in!")
-			return { sid: s.id, expires: Infinity, onExpiration: "redirect" }
-		},
-		cacheSession: {
-			getSession: async (sid) => { 
-				const s = sessions.find(s => s.id === sid); 
-				return s? { sid: s.id, expires: Infinity, onExpiration: "redirect" }  : undefined
-			}
-		},
-		expressConfig: {
-			app,
-			onGetRequestOK(req, res, params) {
-				log(req.originalUrl)
-				res.sendFile(path.join(__dirname, '../../index.html'));
 			},
-		}
-	},
-	publishMethods: async (params) => {
-		return {
-			get: () => 222
-		}
-	},
-	publish: testPublish, 
-	joins: [
-		{ 
-			tables: ["items", "items2"],
-			on: [{ name: "name" }],
-			type: "many-many"
+			localConfig: {
+				localFolderPath: path.join(__dirname+'/media'),
+			},
+			expressApp: app,
+			tableName: "files",
 		},
-		{ 
-			tables: ["items2", "items3"],
-			on: [{ name: "name" }],
-			type: "many-many"
+		restApi: {
+			expressApp: app,
+			routePrefix: "/api"
 		},
-		{ 
-			tables: ["items4a", "items"],
-			on: [{ items_id: "id" }],
-			type: "many-many"
-		},
-		{ 
-			tables: ["items4a", "items2"],
-			on: [{ items2_id: "id" }],
-			type: "many-many"
-		},
-		{ 
-			tables: ["items_multi", "items"],
-			on: [
-				{ items0_id: "id" },
-				{ items1_id: "id" },
-				{ items2_id: "id" },
-				{ items3_id: "id" },
-			],
-			type: "many-many"
-		}			
-	],
-	onReady: async ({ dbo, db }) => {
-		log("prostgles onReady");
-
-		try {
-			
-			if(isClientTest){
-				const execPath = path.resolve(`${__dirname}/../../../client`);
-				/** For some reason the below doesn't work anymore */
-				// const proc = spawn("npm", ["run", "test"], { cwd: execPath, stdio: "inherit" });
-				
-				spawn("node", ["dist/client/index.js"], { cwd: execPath, stdio: "inherit" });
-				// const clientPath = `cd ${__dirname}/../../../clientz && npm test`;
-				// const proc = exec(clientPath, console.log);
-				// proc.stdout?.on('data', function(data) {
-				// 	console.log(data); 
-				// });
-				// proc.stderr?.on('data', function(data) {
-				// 	console.error(data); 
-				// });
-				log("Waiting for client...");
-				
-			} else if(process.env.TEST_TYPE === "server"){
-
-				await serverOnlyQueries(dbo as any);
-				log("Server-only query tests successful");
-				await isomorphicQueries(dbo as any, log);
-				log("Server isomorphic tests successful");
-
-				stopTest()
-			} 
-		} catch(err) {
-			console.trace(err)
-			if(process.env.TEST_TYPE){
-				stopTest(err ?? "Error")
-			}
-		}
 		
-	},
-});
+		onSocketConnect:  ({ socket, db }) => {
+			console.log("onSocketConnect", socket.id)
+			if(isClientTest){
+				log("Client connected -> console does not work. use log function. socket.id:", socket.id);
+				socket.emit("start-test", { server_id: Math.random() });
+				socket.on("log", async (data, cb) => { 
+					console.log("Client log ", data);
+				});
+				socket.on("stop-test", async (err, cb) => {
+					cb();
+					console.log("Client test " + (!err? "successful" : "failed"));
+					stopTest(err);
+				});
+			}
+			
+		},
+
+		onSocketDisconnect:  ({ socket, db }) => {
+			if(isClientTest){
+				log("Client disconnected. socket.id:", socket.id);
+			}
+			
+		},
+		
+		publishRawSQL: async (params) => {
+			return true;// Boolean(user && user.type === "admin")
+		},
+		auth: {
+			sidKeyName: "token",
+			getUser: async (sid) => {
+				if(sid){
+					const s = sessions.find(s => s.id === sid);
+					if(s) {
+						const user = users.find(u => s && s.user_id === u.id);
+						if(user) {
+							return { sid: s.id, user, clientUser: { sid: s.id, uid: user.id } }
+						}
+					}
+				}
+				return undefined;
+			},
+			login: async ({ username, password } = {}) => {
+				const u = users.find(u => u.username === username && u.password === password);
+				if(!u) throw "something went wrong: " + JSON.stringify({ username, password });
+				let s = sessions.find(s => s.user_id === u.id)
+				if(!s){
+					s = { id: "SID" + Date.now(), user_id: u.id }
+					sessions.push(s)
+				}
+				log("Logged in!")
+				return { sid: s.id, expires: Infinity, onExpiration: "redirect" }
+			},
+			cacheSession: {
+				getSession: async (sid) => { 
+					const s = sessions.find(s => s.id === sid); 
+					return s? { sid: s.id, expires: Infinity, onExpiration: "redirect" }  : undefined
+				}
+			},
+			expressConfig: {
+				app,
+				onGetRequestOK(req, res, params) {
+					log(req.originalUrl)
+					res.sendFile(path.join(__dirname, '../../index.html'));
+				},
+			}
+		},
+		publishMethods: async (params) => {
+			return {
+				get: () => 222
+			}
+		},
+		publish: testPublish, 
+		joins: [
+			{ 
+				tables: ["items", "items2"],
+				on: [{ name: "name" }],
+				type: "many-many"
+			},
+			{ 
+				tables: ["items2", "items3"],
+				on: [{ name: "name" }],
+				type: "many-many"
+			},
+			{ 
+				tables: ["items4a", "items"],
+				on: [{ items_id: "id" }],
+				type: "many-many"
+			},
+			{ 
+				tables: ["items4a", "items2"],
+				on: [{ items2_id: "id" }],
+				type: "many-many"
+			},
+			{ 
+				tables: ["items_multi", "items"],
+				on: [
+					{ items0_id: "id" },
+					{ items1_id: "id" },
+					{ items2_id: "id" },
+					{ items3_id: "id" },
+				],
+				type: "many-many"
+			}			
+		],
+		onReady: async ({ dbo, db }) => {
+			log("prostgles onReady");
+
+			try {
+				
+				if(isClientTest){
+					const execPath = path.resolve(`${__dirname}/../../../client`);
+					/** For some reason the below doesn't work anymore */
+					// const proc = spawn("npm", ["run", "test"], { cwd: execPath, stdio: "inherit" });
+					
+					spawn("node", [
+						// "--inspect-brk", 
+						"dist/client/index.js"
+					], { cwd: execPath, stdio: "inherit" });
+
+					// const clientPath = `cd ${__dirname}/../../../clientz && npm test`;
+					// const proc = exec(clientPath, console.log);
+					// proc.stdout?.on('data', function(data) {
+					// 	console.log(data); 
+					// });
+					// proc.stderr?.on('data', function(data) {
+					// 	console.error(data); 
+					// });
+					log("Waiting for client...");
+					
+				} else if(process.env.TEST_TYPE === "server"){
+
+					await serverOnlyQueries(dbo as any);
+					log("Server-only query tests successful");
+					await isomorphicQueries(dbo as any, log);
+					log("Server isomorphic tests successful");
+
+					stopTest()
+				} 
+			} catch(err) {
+				console.trace(err)
+				if(process.env.TEST_TYPE){
+					stopTest(err ?? "Error")
+				}
+			}
+			
+		},
+	});
+})();

@@ -19,12 +19,15 @@ global.document = window.document;
 import React from "react";
 import { createRoot } from "react-dom/client";
 
-
+// TODO: add  hook result types
 type RenderHookArgs = {
 	hook: (...args: any[]) => any;
 	props: any[];
 	onResult?: (result: any) => void;
 	expectedRerenders: number;
+	/**
+	 * Time to wait for the expected rerenders
+	 */
 	timeout?: number;
 	/**
 	 * Time to wait after the last render to resolve the promise
@@ -99,7 +102,7 @@ export const renderReactHook = (rootArgs: RenderHookArgs): Promise<RenderResult>
 				if(isRerender){
 					reject(new Error("Unmounted before expected rerenders"));
 				}
-			} 
+			}
 		});
 		setTimeout(() => {
 			if(!resolved){

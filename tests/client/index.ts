@@ -5,9 +5,11 @@ import { isomorphicQueries } from "../isomorphicQueries.spec";
 import { clientOnlyQueries } from "../clientOnlyQueries.spec"; 
 import { clientRestApi } from "../clientRestApi.spec"; 
 import { clientFileTests } from "../clientFileTests.spec"; 
-import { InitOptions } from "prostgles-client/dist/prostgles";
+import type { Auth, DBHandlerClient, MethodHandler } from "prostgles-client/dist/prostgles";
 export { DBHandlerClient, Auth } from "prostgles-client/dist/prostgles";
 import { clientHooks } from "./hooks.spec";
+import { useProstglesTest } from "./useProstgles.spec";
+import { DBSchemaTable } from "prostgles-types";
 
 const start = Date.now();
 const log = (msgOrObj: any, extra?: any) => {
@@ -17,33 +19,39 @@ const log = (msgOrObj: any, extra?: any) => {
 log("Started client...");
 
 const { TEST_NAME } = process.env;
+const url = "http://127.0.0.1:3001";
+const path = "/teztz/s";
+const pathWatchSchema = "/teztz/sWatchSchema";
+const getSocketOptions = (watchSchema = false) => ({
+  uri: url,
+  path: watchSchema? pathWatchSchema : path, 
+  query: { token: TEST_NAME },
+});
+const { uri, ...socketOpts } = getSocketOptions();
+const socket = io(uri, socketOpts);
 
-type ClientTestSpec = {
-  onRun: InitOptions["onReady"]
-};
+type ClientTestSpecV2 = (args: {
+  db: DBHandlerClient<void>;
+  methods: MethodHandler;
+  tableSchema: DBSchemaTable[];
+  isReconnect?: boolean;
+  auth: Auth;
+}) => Promise<void>;
 
-const tests: Record<string, ClientTestSpec> = {
-  main: {
-    onRun: async (db, methods, tableSchema, auth) => {
-      await isomorphicQueries(db, log);
-      await clientOnlyQueries(db, auth, log, methods, tableSchema, TEST_NAME);
-      await clientHooks(db);
-    },
+const tests: Record<string, ClientTestSpecV2> = {
+  main:  async ({ db, methods, tableSchema, auth }) => {
+    await isomorphicQueries(db, log);
+    await clientOnlyQueries(db, auth, log, methods, tableSchema, TEST_NAME);
+    await clientHooks(db, getSocketOptions);
   },
-  // hooks: {
-  //   onRun: async (db) => {
-  //     await clientHooks(db);
-  //   },
-  // },
-  files: {
-    onRun: async (db, methods, tableSchema, auth) => {
-      await clientFileTests(db, auth, log, methods, tableSchema)
-    },
+  useProstgles: async ({ db }) => {
+    await useProstglesTest(db, getSocketOptions);
   },
-  rest_api: {
-    onRun: async (db, methods, tableSchema, auth) => {
-      await clientRestApi(db, auth, log, methods, tableSchema, TEST_NAME);
-    }
+  files: async ({ db, methods, tableSchema, auth }) => {
+    await clientFileTests(db, auth, log, methods, tableSchema)
+  }, 
+  rest_api: async ({ db, methods, tableSchema, auth }) => {
+    await clientRestApi(db, auth, log, methods, tableSchema, TEST_NAME); 
   }
 };
 
@@ -52,9 +60,6 @@ if(!test){
   throw `Invalid TEST_NAME env var provided (${TEST_NAME}). Expecting one of: ${Object.keys(tests)}`;
 }
 
-const url = process.env.PRGL_CLIENT_URL || "http://127.0.0.1:3001";
-const path = process.env.PRGL_CLIENT_PATH || "/teztz/s";
-const socket = io(url, { path, query: { token: TEST_NAME }  });  
 const stopTest = (args?: { err: any; }) => {
   const { err } = args ?? {};
   if(args) {
@@ -109,7 +114,7 @@ try {
             }
             console.log = onLog;
           }
-          await test.onRun(db, methods, tableSchema, auth, isReconnect);
+          await test({ db, methods, tableSchema, auth, isReconnect });
   
           stopTest();
 

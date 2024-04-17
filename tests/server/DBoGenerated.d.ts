@@ -257,6 +257,15 @@ export type DBSchemaGenerated = {
       id: string;
     };
   };
+  newly_created_table: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+    };
+  };
   obj_table: {
     is_view: false;
     select: true;
@@ -523,5 +532,4 @@ export type DBSchemaGenerated = {
       tsv?: null | string;
     };
   };
-  
 }

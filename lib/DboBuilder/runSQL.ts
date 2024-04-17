@@ -116,13 +116,6 @@ export const watchSchemaFallback = async function(this: DboBuilder, { queryWitho
     if (SCHEMA_ALTERING_COMMANDS.includes(command as any)) {
       this.prostgles.onSchemaChange({ command, query: queryWithoutRLS })
     }
-    // This seems too unrealiable
-    // else if (queryWithoutRLS) {
-    //   const cleanedQuery = queryWithoutRLS.toLowerCase().replace(/\s\s+/g, ' ');
-    //   if (EVENT_TRIGGER_TAGS.some(q => cleanedQuery.includes(q.toLowerCase() + " "))) {
-    //     this.prostgles.onSchemaChange({ command, query: queryWithoutRLS })
-    //   }
-    // }
   }
 }
 
