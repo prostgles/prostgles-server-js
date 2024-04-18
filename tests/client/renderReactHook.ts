@@ -19,15 +19,14 @@ global.document = window.document;
 import React from "react";
 import { createRoot } from "react-dom/client";
 
+type Hook = (...args: any[]) => any;
+
 // TODO: add  hook result types
 type RenderHookArgs = {
-	hook: (...args: any[]) => any;
+	hook: Hook;
 	props: any[];
 	onResult?: (result: any) => void;
 	expectedRerenders: number;
-	/**
-	 * Time to wait for the expected rerenders
-	 */
 	timeout?: number;
 	/**
 	 * Time to wait after the last render to resolve the promise
@@ -38,7 +37,7 @@ type RenderHookArgs = {
 
 let testedHook: Function;
 const root = createRoot(window.document.getElementById('root'));
-const reactRender = ({ hook, props, onResult, onUnmount }: Pick<Required<RenderHookArgs>, "hook" | "props" | "onResult"> & { onUnmount: ()=>void; }) => {
+const reactRender = ({ hook, props, onResult, onUnmount }: Pick<Required<RenderHookArgs>, "hook" | "props" | "onResult"> & { onUnmount: () => void; }) => {
 	const BasicComponent = ({ props }) => {
 		const result = hook(...props);
 		React.useEffect(() => {
@@ -64,6 +63,67 @@ const resetBasicComponent = () => {
 	root.render(
 		React.createElement(OtherBasicComponent, { props: {} }, null)
 	);
+}
+type OnEnd<H extends Hook> = (results: ReturnType<H>[]) => Promise<void> | void;
+export const renderReactHookManual = async <H extends Hook>(rootArgs: {
+	hook: H;
+	initialProps: Parameters<H>;
+	onUnmount?: () => void;
+	/**
+	 * Time to wait after the last render to resolve the promise
+	 * default: 250
+	 */
+	renderDuration?: number;
+	onEnd?: OnEnd<H>;
+}): Promise<{
+	setProps: (props: Parameters<H>, opts: { waitFor?: number; onEnd?: OnEnd<H>; }) => void;
+	getResults: () => ReturnType<H>[];
+}> => {
+	const { hook, onUnmount, renderDuration = 250, onEnd } = rootArgs;
+	let lastRenderWaitTimeout: NodeJS.Timeout | null = null;
+	let didResolve = false;
+	let setProps: (props: any[]) => void;
+	resetBasicComponent();
+	return new Promise((resolve, reject) => {
+		const results = [];
+		const onRender = (result) => {
+			results.push(result);
+			if(didResolve) return;
+			clearTimeout(lastRenderWaitTimeout);
+			lastRenderWaitTimeout = setTimeout(async () => {
+	
+				if(!setProps) {
+					reject("setProps not set");
+					return;
+				}
+				await onEnd?.(results);
+				didResolve = true;
+				return resolve({
+					setProps: async (props, { waitFor = 250, onEnd } = {}) => {
+						setProps(props);
+						await tout(waitFor);
+						await onEnd?.(results);
+					},
+					getResults: () => results
+				});
+			}, renderDuration);
+		}
+		const BasicComponent = ({ props: initialProps }) => {
+			const [props, _setProps] = React.useState(initialProps);
+			setProps = _setProps;
+			const result = hook(...props);
+			React.useEffect(() => {
+				return () => {
+					onUnmount?.();
+				};
+			}, []);
+			onRender(result);
+			return React.createElement('h1', null, `Hello`);
+		}
+		root.render(
+			React.createElement(BasicComponent, { props: rootArgs.initialProps }, null)
+		);
+	});
 }
 
 export const renderReactHook = (rootArgs: RenderHookArgs): Promise<RenderResult> => {
@@ -111,3 +171,5 @@ export const renderReactHook = (rootArgs: RenderHookArgs): Promise<RenderResult>
 		}, timeout);
 	});
 }
+
+export const tout = (ms: number) => new Promise(res => setTimeout(res, ms));

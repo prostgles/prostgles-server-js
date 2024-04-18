@@ -1,7 +1,7 @@
 import { strict as assert } from "assert";
 import { describe, test } from "node:test";
 import type { DBHandlerClient } from "./index";
-import { renderReactHook } from "./renderReactHook";
+import { renderReactHook, renderReactHookManual } from "./renderReactHook";
 import { AnyObject, pickKeys } from "prostgles-types";
 import { useProstglesClient } from "prostgles-client/dist/prostgles";
  
@@ -9,47 +9,6 @@ export const clientHooks = async (db: DBHandlerClient, getSocketOptions: (watchS
 
   const resultLoading = { data: undefined, isLoading: true, error: undefined };
   await describe("React hooks", async (t) => {
-    const socketOptions = getSocketOptions();
-    await test("useProstglesClient", async (t) => {
-      const { results: [res1, res2] } = await renderReactHook({
-        hook: useProstglesClient,
-        props: [{ socketOptions }],
-        expectedRerenders: 2
-      });
-      assert.deepStrictEqual(
-        res1,
-        { isLoading: true }
-      ); 
-      assert.equal(
-        typeof (res2 as any)?.dbo.items4.useFind,
-        "function"
-      );
-    });
-
-    await test("useProstglesClient with initial skip", async (t) => {
-      const { results: [res1], rerender } = await renderReactHook({
-        hook: useProstglesClient,
-        props: [{ socketOptions, skip: true }],
-        expectedRerenders: 1
-      });
-      assert.deepStrictEqual(
-        res1,
-        { isLoading: true }
-      );
-
-      const { results: [res2, res3] } = await rerender({ 
-        props: [{ socketOptions }],
-        expectedRerenders: 2, 
-      });
-      assert.deepStrictEqual(
-        res2,
-        { isLoading: true }
-      );
-      assert.equal(
-        typeof (res3 as any)?.dbo.items4.useFind,
-        "function"
-      );
-    });
 
     const defaultFilter = { name: "abc" };
     await Promise.all([

@@ -264,6 +264,7 @@ export type DBSchemaGenerated = {
     update: true;
     delete: true;
     columns: {
+      id?: null | number;
     };
   };
   obj_table: {
@@ -532,4 +533,5 @@ export type DBSchemaGenerated = {
       tsv?: null | string;
     };
   };
+  
 }
