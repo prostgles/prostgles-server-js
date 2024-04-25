@@ -4,8 +4,9 @@ import { OnSchemaChangeCallback } from "../Prostgles";
 import { PubSubManager, log } from "../PubSubManager/PubSubManager";
 import { ValidatedWatchSchemaType, getValidatedWatchSchemaType } from "./getValidatedWatchSchemaType";
 const COMMAND_FIRST_KEYWORDS = EVENT_TRIGGER_TAGS
-  .map(tag => tag.split(" ")[0]!).filter(tag => tag !== "SELECT")
-  .concat("SELECT INTO");
+  .map(tag => tag.split(" ")[0]!)
+  .filter(tag => tag !== "SELECT"); /** SELECT INTO is not easily detectable with pg-node (command = "SELECT")  */
+
 const DB_FALLBACK_COMMANDS = Array.from(new Set(COMMAND_FIRST_KEYWORDS));
 
 export type VoidFunction = () => void;

@@ -166,7 +166,7 @@ export const renderReactHook = (rootArgs: RenderHookArgs): Promise<RenderResult>
 		});
 		setTimeout(() => {
 			if(!resolved){
-				reject(new Error(`Expected ${expectedRerenders} rerenders, got ${results.length}`));
+				reject(new Error(`Expected ${expectedRerenders} rerenders, got ${results.length}:\n${JSON.stringify(results)}`));
 			}
 		}, timeout);
 	});

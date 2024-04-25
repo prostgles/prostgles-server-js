@@ -7,7 +7,7 @@ export type ValidatedWatchSchemaType =
 | { watchType: "prostgles_queries"; onChange?: OnSchemaChangeCallback; isFallbackFromDDL: boolean; }
 
 export const getValidatedWatchSchemaType = (dboBuilder: DboBuilder): ValidatedWatchSchemaType => {
-  const {watchSchema, watchSchemaType, tsGeneratedTypesDir} = dboBuilder.prostgles.opts;
+  const {watchSchema, watchSchemaType, tsGeneratedTypesDir, disableRealtime } = dboBuilder.prostgles.opts;
   if(!watchSchema) return { watchType: "NONE" };
   
   if (watchSchema === "hotReloadMode" && !tsGeneratedTypesDir) {
@@ -17,12 +17,12 @@ export const getValidatedWatchSchemaType = (dboBuilder: DboBuilder): ValidatedWa
   const onChange = typeof watchSchema === "function"? watchSchema : undefined;
 
   if(watchSchemaType === "DDL_trigger" || !watchSchemaType){
-    if(!dboBuilder.prostgles.isSuperUser){
+    if(!dboBuilder.prostgles.isSuperUser || disableRealtime){
 
       if(watchSchemaType === "DDL_trigger"){
         console.error(`watchSchemaType "DDL_trigger" cannot be used because db user is not a superuser. Will fallback to watchSchemaType "prostgles_queries" `)
       } else {
-        console.warn(`watchSchema fallback to watchSchemaType "prostgles_queries" due to non-superuser`)
+        console.warn(`watchSchema fallback to watchSchemaType "prostgles_queries" due to ${disableRealtime? "disableRealtime setting" : "non-superuser"}`)
       }
       return {
         watchType: "prostgles_queries",

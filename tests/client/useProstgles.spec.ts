@@ -7,6 +7,7 @@ import { renderReactHook, renderReactHookManual } from "./renderReactHook";
 
 export const newly_created_table = "newly_created_table";
 export const useProstglesTest = async (db: DBHandlerClient, getSocketOptions: (watchSchema?: boolean) => AnyObject) => {
+  await db.sql(`DROP TABLE IF EXISTS ${newly_created_table};`);
   await describe("useProstgles hook", async (t) => {
     const socketOptions = getSocketOptions();
     await test("useProstglesClient", async (t) => {
@@ -23,10 +24,13 @@ export const useProstglesTest = async (db: DBHandlerClient, getSocketOptions: (w
         typeof (res2 as any)?.dbo.items4.useFind,
         "function"
       );
+      assert.equal(
+        typeof (res2 as any)?.dbo[newly_created_table],
+        "undefined"
+      );
     });
     
     await test("useProstglesClient with schema reload", async (t) => {
-      await db.sql(`DROP TABLE IF EXISTS ${newly_created_table}; DROP TABLE IF EXISTS will_delete;`);
       await db.sql(`select pg_sleep(1)`);
       let rerenders = 0
       const { results: [res1, res2, res3], rerender } = await renderReactHook({
