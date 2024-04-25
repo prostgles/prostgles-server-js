@@ -1,9 +1,8 @@
 import { strict as assert } from "assert";
 import { describe, test } from "node:test";
-import type { DBHandlerClient } from "./index";
-import { renderReactHook, renderReactHookManual } from "./renderReactHook";
 import { AnyObject, pickKeys } from "prostgles-types";
-import { useProstglesClient } from "prostgles-client/dist/prostgles";
+import type { DBHandlerClient } from "./index";
+import { renderReactHook } from "./renderReactHook";
  
 export const clientHooks = async (db: DBHandlerClient, getSocketOptions: (watchSchema?: boolean) => AnyObject) => {
 

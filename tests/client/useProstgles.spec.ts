@@ -5,6 +5,7 @@ import { AnyObject } from "prostgles-types";
 import type { DBHandlerClient } from "./index";
 import { renderReactHook, renderReactHookManual } from "./renderReactHook";
 
+export const newly_created_table = "newly_created_table";
 export const useProstglesTest = async (db: DBHandlerClient, getSocketOptions: (watchSchema?: boolean) => AnyObject) => {
   await describe("useProstgles hook", async (t) => {
     const socketOptions = getSocketOptions();
@@ -24,9 +25,8 @@ export const useProstglesTest = async (db: DBHandlerClient, getSocketOptions: (w
       );
     });
     
-    const newTableName = "newly_created_table";
     await test("useProstglesClient with schema reload", async (t) => {
-      await db.sql(`DROP TABLE IF EXISTS ${newTableName}; DROP TABLE IF EXISTS will_delete;`);
+      await db.sql(`DROP TABLE IF EXISTS ${newly_created_table}; DROP TABLE IF EXISTS will_delete;`);
       await db.sql(`select pg_sleep(1)`);
       let rerenders = 0
       const { results: [res1, res2, res3], rerender } = await renderReactHook({
@@ -37,7 +37,7 @@ export const useProstglesTest = async (db: DBHandlerClient, getSocketOptions: (w
           rerenders++;
           if(rerenders < 2) return;
           rerenders = -2;
-          db.sql(`CREATE TABLE ${newTableName}(id integer);`);
+          db.sql(`CREATE TABLE ${newly_created_table}(id integer);`);
         }
       });
       assert.deepStrictEqual(
@@ -49,15 +49,15 @@ export const useProstglesTest = async (db: DBHandlerClient, getSocketOptions: (w
         false
       );
       assert.equal(
-        typeof (res2 as any)?.dbo[newTableName]?.useFind,
+        typeof (res2 as any)?.dbo[newly_created_table]?.useFind,
         "undefined"
       );
       assert.equal(
-        typeof (res3 as any)?.dbo[newTableName].useFind,
+        typeof (res3 as any)?.dbo[newly_created_table].useFind,
         "function"
       );
 
-      const count = await (res3 as any)?.dbo[newTableName].count();
+      const count = await (res3 as any)?.dbo[newly_created_table].count();
       assert.equal(count, 0);
     });
 
@@ -80,7 +80,7 @@ export const useProstglesTest = async (db: DBHandlerClient, getSocketOptions: (w
           assert.equal(res3.isLoading, false);
           if("error" in res3) throw res3.error;
           assert.equal(
-            typeof res3.dbo[newTableName]?.useFind,
+            typeof res3.dbo[newly_created_table]?.useFind,
             "undefined"
           );
         }
@@ -98,10 +98,10 @@ export const useProstglesTest = async (db: DBHandlerClient, getSocketOptions: (w
           assert.equal(count, 0);
  
           assert.equal(
-            typeof res5.dbo[newTableName].useFind,
+            typeof res5.dbo[newly_created_table].useFind,
             "function"
           );
-          const count0 = await res5.dbo[newTableName].count();
+          const count0 = await res5.dbo[newly_created_table].count();
           assert.equal(count0, 0);
         }
       });

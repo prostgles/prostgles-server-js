@@ -1,13 +1,13 @@
 import * as pg from "pg";
+import CursorType from 'pg-cursor';
 import { CHANNELS, SQLOptions, SocketSQLStreamPacket, SocketSQLStreamServer, omitKeys, pickKeys } from "prostgles-types";
 import { BasicCallback } from "../PubSubManager/PubSubManager";
+import { VoidFunction } from "../SchemaWatch/SchemaWatch";
 import { DB } from "../initProstgles";
 import { DboBuilder } from "./DboBuilder";
 import { PRGLIOSocket } from "./DboBuilderTypes";
 import { getErrorAsObject, getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
 import { getDetailedFieldInfo } from "./runSQL";
-import CursorType from 'pg-cursor'
-import { VoidFunction, watchSchemaFallback } from "../SchemaWatch/SchemaWatch";
 const Cursor: typeof CursorType = require('pg-cursor');
 
 type ClientStreamedRequest = {
@@ -123,7 +123,7 @@ export class QueryStreamer {
         const packet: SocketSQLStreamPacket = { type: "data", rows, fields: fieldsWereSent? undefined : fields, info: reachedEnd? info : undefined, ended: reachedEnd, processId: processID };
         socket.emit(channel, packet);
         if(reachedEnd){
-          watchSchemaFallback.bind(this.dboBuilder)({ queryWithoutRLS: query.query, command: info.command });
+          this.dboBuilder.prostgles.schemaWatch?.onSchemaChangeFallback?.({ command: info.command, query: query.query });
         }
         fieldsWereSent = true;
       }

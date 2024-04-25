@@ -3,7 +3,6 @@ import pg from "pg-promise/typescript/pg-subset";
 import { AnyObject, SQLOptions, SQLResult, SQLResultInfo } from "prostgles-types";
 import { DB, Prostgles } from "../Prostgles";
 import { DboBuilder, LocalParams, pgp, postgresToTsType } from "./DboBuilder";
-import { watchSchemaFallback } from "../SchemaWatch/SchemaWatch";
 
 
 export async function runSQL(this: DboBuilder, queryWithoutRLS: string, args: undefined | AnyObject | any[], options: SQLOptions | undefined, localParams?: LocalParams) {
@@ -92,7 +91,7 @@ export async function runSQL(this: DboBuilder, queryWithoutRLS: string, args: un
 
 const onSQLResult = async function(this: DboBuilder, queryWithoutRLS: string, { command }: Omit<SQLResultInfo, "duration">, allowListen: boolean | undefined, localParams?: LocalParams) {
 
-  watchSchemaFallback.bind(this)({ queryWithoutRLS, command });
+  this.prostgles.schemaWatch?.onSchemaChangeFallback?.({ command, query: queryWithoutRLS });
 
   if (command === "LISTEN") {
     const { socket } = localParams || {};

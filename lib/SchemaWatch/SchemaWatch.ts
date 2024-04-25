@@ -25,6 +25,19 @@ export class SchemaWatch {
     }
     return instance;
   }
+
+  /**
+   * Fallback for watchSchema in case of not a superuser (cannot add db event listener)
+   */
+  onSchemaChangeFallback: OnSchemaChangeCallback = async ({ command, query }) => {
+    if(
+      this.type.watchType !== "prostgles_queries" || 
+      !this.onSchemaChange || 
+      !EVENT_TRIGGER_TAGS.includes(command as any)
+    ) return;
+
+    this.onSchemaChange({ command, query })
+  }
   
   onSchemaChange: OnSchemaChangeCallback | undefined = async (event) => {
     if(this.type.watchType === "NONE") return;
@@ -58,22 +71,4 @@ export class SchemaWatch {
       }
     }
   };
-}
-
-
-/**
- * Fallback for watchSchema in case of not a superuser (cannot add db event listener)
- */
-export const watchSchemaFallback = async function(this: DboBuilder, { queryWithoutRLS, command }: { queryWithoutRLS: string; command: string; }){
-  const SCHEMA_ALTERING_COMMANDS = EVENT_TRIGGER_TAGS;// ["CREATE", "ALTER", "DROP", "REVOKE", "GRANT"];
-  const isNotPickedUpByDDLTrigger = ["REVOKE", "GRANT"].includes(command);
-  const { watchSchema, watchSchemaType } = this.prostgles?.opts || {};
-  if (
-    watchSchema &&
-    (!this.prostgles.isSuperUser || watchSchemaType === "prostgles_queries" || isNotPickedUpByDDLTrigger)
-  ) {
-    if (SCHEMA_ALTERING_COMMANDS.includes(command as any)) {
-      this.prostgles.schemaWatch?.onSchemaChange?.({ command, query: queryWithoutRLS })
-    }
-  }
 }

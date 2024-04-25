@@ -8,7 +8,7 @@ import { clientFileTests } from "../clientFileTests.spec";
 import type { Auth, DBHandlerClient, MethodHandler } from "prostgles-client/dist/prostgles";
 export { DBHandlerClient, Auth } from "prostgles-client/dist/prostgles";
 import { clientHooks } from "./hooks.spec";
-import { useProstglesTest } from "./useProstgles.spec";
+import { newly_created_table, useProstglesTest } from "./useProstgles.spec";
 import { DBSchemaTable } from "prostgles-types";
 
 const start = Date.now();
@@ -40,6 +40,7 @@ type ClientTestSpecV2 = (args: {
 
 const tests: Record<string, ClientTestSpecV2> = {
   main:  async ({ db, methods, tableSchema, auth }) => {
+    await db.sql(`DROP TABLE IF EXISTS ${newly_created_table}`);
     await isomorphicQueries(db, log);
     await clientOnlyQueries(db, auth, log, methods, tableSchema, TEST_NAME);
     await clientHooks(db, getSocketOptions);
