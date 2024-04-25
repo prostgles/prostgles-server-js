@@ -8,7 +8,7 @@ import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { DBHandlerServer, Prostgles, ProstglesInitOptions, getIsSuperUser } from "./Prostgles";
 import { DbTableInfo, PublishParser } from "./PublishParser/PublishParser";
 import { sleep } from "./utils";
-import { SchemaWatch } from "./SchemaWatch";
+import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 
 export type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 export type DbConnectionOpts = pg.IDefaults;

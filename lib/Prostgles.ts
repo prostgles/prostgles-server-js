@@ -7,7 +7,7 @@ import * as pgPromise from 'pg-promise';
 import AuthHandler, { Auth, AuthRequestParams, SessionUser } from "./AuthHandler";
 import { EventTriggerTagFilter } from "./Event_Trigger_Tags";
 import { CloudClient, FileManager, ImageOptions, LocalConfig } from "./FileManager/FileManager";
-import { SchemaWatch } from "./SchemaWatch";
+import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { DbConnection, DbConnectionOpts, OnInitReason, OnReadyCallback, OnReadyCallbackBasic, initProstgles } from "./initProstgles";
 import { clientCanRunSqlRequest, runClientMethod, runClientRequest, runClientSqlRequest } from "./runClientRequest";
 import pg = require('pg-promise/typescript/pg-subset');
@@ -327,37 +327,6 @@ export class Prostgles {
   }
 
   destroyed = false;
-
-  // async onSchemaChange(event: { command: string; query: string }) {
-  //   const { watchSchema, onReady, tsGeneratedTypesDir } = this.opts;
-  //   if (watchSchema && this.loaded) {
-  //     log("Schema changed");
-  //     const { query, command } = event;
-  //     if (typeof query === "string" && query.includes(PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)) {
-  //       log("Schema change event excluded from triggers due to EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID");
-  //       return;
-  //     }
-
-  //     if (typeof watchSchema === "function") {
-  //       /* Only call the provided func */
-  //       watchSchema(event);
-
-  //     } else if (watchSchema === "hotReloadMode") {
-  //       if (tsGeneratedTypesDir) {
-  //         /* Hot reload integration. Will only touch tsGeneratedTypesDir */
-  //         console.log("watchSchema: Re-writing TS schema");
-
-  //         await this.refreshDBO();
-  //         this.writeDBSchema(true);
-  //       }
-
-  //     } else if (watchSchema) {
-  //       /* Full re-init. Sockets must reconnect */
-  //       console.log("watchSchema: Full re-initialisation", { query })
-  //       this.init(onReady as any, { type: "schema change", query, command });
-  //     }
-  //   }
-  // }
 
   checkDb() {
     if (!this.db || !this.db.connect) throw "something went wrong getting a db connection";

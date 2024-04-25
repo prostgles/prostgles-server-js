@@ -6,7 +6,7 @@ import { getFileTableRules } from "./getFileTableRules";
 import { getSchemaFromPublish } from "./getSchemaFromPublish";
 import { getTableRulesWithoutFileTable } from "./getTableRulesWithoutFileTable";
 import { DboTable, DboTableCommand, ParsedPublishTable, PublishMethods, PublishObject, PublishParams, RULE_TO_METHODS, TableRule } from "./publishTypesAndUtils";
-import { VoidFunction } from "../SchemaWatch";
+import { VoidFunction } from "../SchemaWatch/SchemaWatch";
 
 export class PublishParser {
   publish: any;

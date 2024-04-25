@@ -1,5 +1,5 @@
 import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
-import { getWatchSchemaTagList } from "../SchemaWatch";
+import { getWatchSchemaTagList } from "../SchemaWatch/getWatchSchemaTagList";
 import { asValue, log, NOTIF_CHANNEL, PubSubManager } from "./PubSubManager";
 const REALTIME_TRIGGER_CHECK_QUERY = "prostgles-server internal query used to manage realtime triggers" as const;  
 import { getInitQuery } from "./getInitQuery";
@@ -13,7 +13,6 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
     const initQuery = await getInitQuery.bind(this)()
     await this.db.any(initQuery);
     if (!this.getIsDestroyed()) return;
-
 
     /* Prepare App id */
     if (!this.appID) {

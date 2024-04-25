@@ -7,7 +7,7 @@ import { PRGLIOSocket } from "./DboBuilderTypes";
 import { getErrorAsObject, getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
 import { getDetailedFieldInfo } from "./runSQL";
 import CursorType from 'pg-cursor'
-import { VoidFunction, watchSchemaFallback } from "../SchemaWatch";
+import { VoidFunction, watchSchemaFallback } from "../SchemaWatch/SchemaWatch";
 const Cursor: typeof CursorType = require('pg-cursor');
 
 type ClientStreamedRequest = {

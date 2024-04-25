@@ -281,52 +281,7 @@ export class PubSubManager {
             DELETE FROM prostgles.app_triggers
             WHERE app_id NOT IN (SELECT id FROM prostgles.apps);
             
-            /* DROP the old buggy schema watch trigger */
-            IF EXISTS (
-              SELECT 1 FROM pg_catalog.pg_event_trigger
-              WHERE evtname = 'prostgles_schema_watch_trigger'
-            ) AND is_super_user IS TRUE 
-            THEN
-              DROP EVENT TRIGGER IF EXISTS prostgles_schema_watch_trigger;
-            END IF;
-
-            ev_trg_needed := EXISTS (
-              SELECT 1 FROM prostgles.apps 
-              WHERE watching_schema_tag_names IS NOT NULL
-            );
-            ev_trg_exists := EXISTS (
-              SELECT 1 FROM pg_catalog.pg_event_trigger
-              WHERE evtname = ${asValue(DB_OBJ_NAMES.schema_watch_trigger)}
-            );
-
-            /* DROP stale event trigger */
-            IF 
-              is_super_user IS TRUE 
-              AND ev_trg_needed IS FALSE 
-              AND ev_trg_exists IS TRUE 
-            THEN
-
-                SELECT format(
-                  $$ DROP EVENT TRIGGER IF EXISTS %I ; $$
-                  , ${asValue(DB_OBJ_NAMES.schema_watch_trigger)}
-                )
-                INTO q;
-                EXECUTE q;
-
-            /* CREATE event trigger */
-            ELSIF 
-                is_super_user IS TRUE 
-                AND ev_trg_needed IS TRUE 
-                AND ev_trg_exists IS FALSE 
-            THEN
-
-                DROP EVENT TRIGGER IF EXISTS ${DB_OBJ_NAMES.schema_watch_trigger};
-                CREATE EVENT TRIGGER ${DB_OBJ_NAMES.schema_watch_trigger} ON ddl_command_end
-                WHEN TAG IN (\${EVENT_TRIGGER_TAGS:csv})
-                EXECUTE PROCEDURE ${DB_OBJ_NAMES.schema_watch_func}();
-
-            END IF;
-
+            ${SCHEMA_WATCH_EVENT_TRIGGER_QUERY}
             
         END
         $do$; 
@@ -553,6 +508,54 @@ export class PubSubManager {
     return addedTrigger;
   }
 }
+
+const SCHEMA_WATCH_EVENT_TRIGGER_QUERY = `
+  /* DROP the old buggy schema watch trigger */
+  IF EXISTS (
+    SELECT 1 FROM pg_catalog.pg_event_trigger
+    WHERE evtname = 'prostgles_schema_watch_trigger'
+  ) AND is_super_user IS TRUE 
+  THEN
+    DROP EVENT TRIGGER IF EXISTS prostgles_schema_watch_trigger;
+  END IF;
+
+  ev_trg_needed := EXISTS (
+    SELECT 1 FROM prostgles.apps 
+    WHERE watching_schema_tag_names IS NOT NULL
+  );
+  ev_trg_exists := EXISTS (
+    SELECT 1 FROM pg_catalog.pg_event_trigger
+    WHERE evtname = ${asValue(DB_OBJ_NAMES.schema_watch_trigger)}
+  );
+
+  /* DROP stale event trigger */
+  IF 
+    is_super_user IS TRUE 
+    AND ev_trg_needed IS FALSE 
+    AND ev_trg_exists IS TRUE 
+  THEN
+
+      SELECT format(
+        $$ DROP EVENT TRIGGER IF EXISTS %I ; $$
+        , ${asValue(DB_OBJ_NAMES.schema_watch_trigger)}
+      )
+      INTO q;
+      EXECUTE q;
+
+  /* CREATE event trigger */
+  ELSIF 
+      is_super_user IS TRUE 
+      AND ev_trg_needed IS TRUE 
+      AND ev_trg_exists IS FALSE 
+  THEN
+
+      DROP EVENT TRIGGER IF EXISTS ${DB_OBJ_NAMES.schema_watch_trigger};
+      CREATE EVENT TRIGGER ${DB_OBJ_NAMES.schema_watch_trigger} ON ddl_command_end
+      WHEN TAG IN (\${EVENT_TRIGGER_TAGS:csv})
+      EXECUTE PROCEDURE ${DB_OBJ_NAMES.schema_watch_func}();
+
+  END IF;
+`
 
 export const NOTIF_TYPE = {
   data: "data_has_changed",

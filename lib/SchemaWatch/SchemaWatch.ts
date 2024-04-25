@@ -1,8 +1,8 @@
-import type { DboBuilder } from "./DboBuilder/DboBuilder";
-import { EVENT_TRIGGER_TAGS } from "./Event_Trigger_Tags";
-import { OnSchemaChangeCallback, ProstglesInitOptions } from "./Prostgles";
-import { getKeys, isObject } from "prostgles-types";
-import { PubSubManager, log } from "./PubSubManager/PubSubManager";
+import type { DboBuilder } from "../DboBuilder/DboBuilder";
+import { EVENT_TRIGGER_TAGS } from "../Event_Trigger_Tags";
+import { OnSchemaChangeCallback } from "../Prostgles";
+import { PubSubManager, log } from "../PubSubManager/PubSubManager";
+import { ValidatedWatchSchemaType, getValidatedWatchSchemaType } from "./getValidatedWatchSchemaType";
 
 export type VoidFunction = () => void;
 
@@ -59,74 +59,6 @@ export class SchemaWatch {
     }
   };
 }
-
-type ValidatedWatchSchemaType = 
-| { watchType: "NONE" }
-| { watchType: "DDL_trigger"; onChange?: OnSchemaChangeCallback; }
-| { watchType: "prostgles_queries"; onChange?: OnSchemaChangeCallback; isFallbackFromDDL: boolean; }
-
-const getValidatedWatchSchemaType = (dboBuilder: DboBuilder): ValidatedWatchSchemaType => {
-  const {watchSchema, watchSchemaType, tsGeneratedTypesDir} = dboBuilder.prostgles.opts;
-  if(!watchSchema) return { watchType: "NONE" };
-  
-  if (watchSchema === "hotReloadMode" && !tsGeneratedTypesDir) {
-    throw "tsGeneratedTypesDir option is needed for watchSchema: hotReloadMode to work ";
-  }
-
-  const onChange = typeof watchSchema === "function"? watchSchema : undefined;
-
-  if(watchSchemaType === "DDL_trigger" || !watchSchemaType){
-    if(!dboBuilder.prostgles.isSuperUser){
-
-      if(watchSchemaType === "DDL_trigger"){
-        console.error(`watchSchemaType "DDL_trigger" cannot be used because db user is not a superuser. Will fallback to watchSchemaType "prostgles_queries" `)
-      } else {
-        console.warn(`watchSchema fallback to watchSchemaType "prostgles_queries" due to non-superuser`)
-      }
-      return {
-        watchType: "prostgles_queries",
-        onChange,
-        isFallbackFromDDL: true
-      }
-    }
-
-    return {
-      watchType: "DDL_trigger",
-      onChange
-    };
-  }
-  
-  return {
-    watchType: watchSchemaType,
-    isFallbackFromDDL: false,
-    onChange
-  }
-}
-
-export const getWatchSchemaTagList = (watchSchema: ProstglesInitOptions["watchSchema"]) => {
-  if(!watchSchema) return undefined;
-
-  if(watchSchema === "*"){
-    return EVENT_TRIGGER_TAGS.slice(0);
-  } 
-  if (isObject(watchSchema) && typeof watchSchema !== "function"){
-    const watchSchemaKeys = getKeys(watchSchema);
-    const isInclusive = Object.values(watchSchema).every(v => v);
-    return EVENT_TRIGGER_TAGS
-      .slice(0)
-      .filter(v => {
-        const matches = watchSchemaKeys.includes(v);
-        return isInclusive? matches : !matches;
-      });
-  }
-
-  const coreTags: typeof EVENT_TRIGGER_TAGS[number][] = [
-    'COMMENT', 'CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 
-    'DROP VIEW', 'ALTER VIEW', 'CREATE TABLE AS', 'SELECT INTO', 'CREATE POLICY'
-  ];
-  return coreTags;
-}
-
 
 
 /**
