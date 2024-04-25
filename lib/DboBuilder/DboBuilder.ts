@@ -26,10 +26,11 @@ import { QueryStreamer } from "./QueryStreamer";
 import { TableHandler } from "./TableHandler/TableHandler";
 import { JoinPaths, ViewHandler } from "./ViewHandler/ViewHandler";
 import { parseJoinPath } from "./ViewHandler/parseJoinPath";
-import { PGConstraint, canEXECUTE, getConstraints, getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
+import { PGConstraint, getCanExecute, getConstraints, getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
 import { getTablesForSchemaPostgresSQL } from "./getTablesForSchemaPostgresSQL";
 import { prepareShortestJoinPaths } from "./prepareShortestJoinPaths";
 import { runSQL } from "./runSQL";
+import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
 
 export * from "./DboBuilderTypes";
 export * from "./dboBuilderUtils";
@@ -64,7 +65,11 @@ export class DboBuilder {
   db: DB;
 
   dbo: DBHandlerServer;
-  _pubSubManager?: PubSubManager;
+
+  /**
+   * Undefined if cannot create table triggers
+   */
+  private _pubSubManager?: PubSubManager;
 
   /**
    * Used for db.sql field type details
@@ -85,24 +90,12 @@ export class DboBuilder {
 
   getPubSubManager = async (): Promise<PubSubManager> => {
     if (!this._pubSubManager) {
-      let onSchemaChange;
 
-      const { isSuperUs } = await PubSubManager.canCreate(this.db);
-      if (!canEXECUTE) throw "PubSubManager based subscriptions not possible: Cannot run EXECUTE statements on this connection";
-
-      if (this.prostgles.opts.watchSchema && this.prostgles.opts.watchSchemaType === "DDL_trigger") {
-        if (!isSuperUs) {
-          console.warn(`watchSchemaType "${this.prostgles.opts.watchSchemaType}" cannot be used because db user is not a superuser. Will fallback to watchSchemaType "prostgles_queries" `)
-        } else {
-          onSchemaChange = (event: { command: string; query: string }) => {
-            this.prostgles.onSchemaChange(event)
-          }
-        }
-      }
+      const canExecute = await getCanExecute(this.db)
+      if (!canExecute) throw "PubSubManager based subscriptions not possible: Cannot run EXECUTE statements on this connection";
 
       this._pubSubManager = await PubSubManager.create({
         dboBuilder: this,
-        onSchemaChange
       });
     }
     if (!this._pubSubManager) {
@@ -132,12 +125,10 @@ export class DboBuilder {
 
   private init = async () => {
 
-    /* If watchSchema is enabled then PubSubManager must be created (if possible) */
     await this.build();
+    /* If watchSchema is enabled then PubSubManager must be created (if possible) because it creates the event trigger */
     if (
-      this.prostgles.opts.watchSchema &&
-      (this.prostgles.opts.watchSchemaType === "DDL_trigger" || !this.prostgles.opts.watchSchemaType) &&
-      this.prostgles.isSuperUser
+      this.prostgles.schemaWatch?.type.watchType === "DDL_trigger"
     ) {
       await this.getPubSubManager()
     }

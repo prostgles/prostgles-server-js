@@ -3,9 +3,9 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { DBHandlerServer, DboBuilder, PRGLIOSocket, TableInfo, TableOrViewInfo, canEXECUTE } from "../DboBuilder/DboBuilder";
+import { DBHandlerServer, DboBuilder, PRGLIOSocket, TableInfo, TableOrViewInfo, getCanExecute } from "../DboBuilder/DboBuilder";
 import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
-import { DB, isSuperUser } from "../Prostgles";
+import { DB, getIsSuperUser } from "../Prostgles";
 import { addSync } from "./addSync";
 import { initPubSubManager } from "./initPubSubManager";
 
@@ -122,7 +122,6 @@ export type PubSubManagerOptions = {
   dboBuilder: DboBuilder; 
   wsChannelNamePrefix?: string;
   pgChannelName?: string;
-  onSchemaChange?: (event: { command: string; query: string }) => void;
 }
 
 export type Subscription = Pick<SubscriptionParams, 
@@ -147,20 +146,24 @@ export type Subscription = Pick<SubscriptionParams,
   }[];
 }
 
+/**
+ * Used to facilitate table subscribe and sync
+ */
 export class PubSubManager {
   static DELIMITER = '|$prstgls$|' as const;
 
   static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from schema watch " as const;
 
   public static canCreate = async (db: DB) => {
-    const canExecute = await canEXECUTE(db);
-    const isSuperUs = await isSuperUser(db);
+    const canExecute = await getCanExecute(db);
+    const isSuperUs = await getIsSuperUser(db);
     return { canExecute, isSuperUs, yes: canExecute && isSuperUs };
   }
 
   public static create = async (options: PubSubManagerOptions) => {
-    const res = new PubSubManager(options);
-    return await res.init();
+    const instance = new PubSubManager(options);
+    const result = await initPubSubManager.bind(instance)();
+    return result;
   }
 
   get db(): DB  {
@@ -177,36 +180,19 @@ export class PubSubManager {
   subs: Subscription[] = [];
   syncs: SyncParams[] = [];
   socketChannelPreffix: string;
-  onSchemaChange?: ((event: { command: string; query: string }) => void) = undefined;
-
   postgresNotifListenManager?: PostgresNotifListenManager;
 
   private constructor(options: PubSubManagerOptions) {
-    const { wsChannelNamePrefix, onSchemaChange, dboBuilder } = options;
+    const { wsChannelNamePrefix, dboBuilder } = options;
     if (!dboBuilder.db || !dboBuilder.dbo) {
       throw 'MISSING: db_pg, db';
     }
     
-    this.onSchemaChange = onSchemaChange;
     this.dboBuilder = dboBuilder;
   
     this.socketChannelPreffix = wsChannelNamePrefix || "_psqlWS_";
 
     log("Created PubSubManager");
-  }
-
-  NOTIF_TYPE = {
-    data: "data_has_changed",
-    data_trigger_change: "data_watch_triggers_have_changed",
-    schema: "schema_has_changed"
-  } as const;
-  NOTIF_CHANNEL = {
-    preffix: 'prostgles_' as const,
-    getFull: (appID?: string) => {
-      const finalAppId = appID ?? this.appID;
-      if (!finalAppId) throw "No appID";
-      return this.NOTIF_CHANNEL.preffix + finalAppId;
-    }
   }
 
   /**
@@ -225,13 +211,10 @@ export class PubSubManager {
     }
     this.subs = [];
     this.syncs = [];
-    if (!this.postgresNotifListenManager) {
-      throw "this.postgresNotifListenManager missing"
-    }
-    this.postgresNotifListenManager.destroy();
+    this.postgresNotifListenManager?.destroy();
   }
 
-  canContinue = () => {
+  getIsDestroyed = () => {
     if (this.destroyed) {
       console.trace("Could not start destroyed instance");
       return false
@@ -241,13 +224,12 @@ export class PubSubManager {
 
   appChecking = false;
   checkedListenerTableCond?: string[];
-  init = initPubSubManager.bind(this);
 
   initialiseEventTriggers = async () => {
     if (!this.appID) throw "prepareTriggers failed: this.appID missing";
 
     const { watchSchema } = this.dboBuilder.prostgles.opts;
-    if (watchSchema && !(await isSuperUser(this.db))) {
+    if (watchSchema && !(await getIsSuperUser(this.db))) {
       console.warn("prostgles watchSchema requires superuser db user. Will not watch using event triggers")
     }
 
@@ -366,11 +348,6 @@ export class PubSubManager {
       throw e;
     }
   }
-
-  isReady() {
-    if (!this.postgresNotifListenManager) throw "this.postgresNotifListenManager missing";
-    return this.postgresNotifListenManager.isListening();
-  } 
 
   getClientSubs(client: Pick<Subscription, "localFuncs" | "socket_id" | "channel_name">): Subscription[] { 
     return this.subs.filter(s => {
@@ -577,6 +554,18 @@ export class PubSubManager {
   }
 }
 
+export const NOTIF_TYPE = {
+  data: "data_has_changed",
+  data_trigger_change: "data_watch_triggers_have_changed",
+  schema: "schema_has_changed"
+} as const;
+export const NOTIF_CHANNEL = {
+  preffix: 'prostgles_' as const,
+  getFull: (appID: string | undefined) => {
+    if (!appID) throw "No appID";
+    return NOTIF_CHANNEL.preffix + appID;
+  }
+}
 
 export const parseCondition = (condition: string): string => condition && condition.trim().length ? condition : "TRUE"
 

@@ -1,9 +1,9 @@
 import { ParameterizedQuery as PQ, ParameterizedQuery } from 'pg-promise';
 import pg from "pg-promise/typescript/pg-subset";
 import { AnyObject, SQLOptions, SQLResult, SQLResultInfo } from "prostgles-types";
-import { EVENT_TRIGGER_TAGS } from "../Event_Trigger_Tags";
 import { DB, Prostgles } from "../Prostgles";
 import { DboBuilder, LocalParams, pgp, postgresToTsType } from "./DboBuilder";
+import { watchSchemaFallback } from "../SchemaWatch";
 
 
 export async function runSQL(this: DboBuilder, queryWithoutRLS: string, args: undefined | AnyObject | any[], options: SQLOptions | undefined, localParams?: LocalParams) {
@@ -99,23 +99,6 @@ const onSQLResult = async function(this: DboBuilder, queryWithoutRLS: string, { 
     if (!allowListen) throw new Error(`Your query contains a LISTEN command. Set { allowListen: true } to get subscription hooks. Or ignore this message`)
     if (!socket) throw "Only allowed with client socket"
     return await this.prostgles.dbEventsManager?.addNotify(queryWithoutRLS, socket);
-  }
-}
-
-/**
- * Fallback for watchSchema in case of not a superuser (cannot add db event listener)
- */
-export const watchSchemaFallback = async function(this: DboBuilder, { queryWithoutRLS, command }: { queryWithoutRLS: string; command: string; }){
-  const SCHEMA_ALTERING_COMMANDS = EVENT_TRIGGER_TAGS;// ["CREATE", "ALTER", "DROP", "REVOKE", "GRANT"];
-  const isNotPickedUpByDDLTrigger = ["REVOKE", "GRANT"].includes(command);
-  const { watchSchema, watchSchemaType } = this.prostgles?.opts || {};
-  if (
-    watchSchema &&
-    (!this.prostgles.isSuperUser || watchSchemaType === "prostgles_queries" || isNotPickedUpByDDLTrigger)
-  ) {
-    if (SCHEMA_ALTERING_COMMANDS.includes(command as any)) {
-      this.prostgles.onSchemaChange({ command, query: queryWithoutRLS })
-    }
   }
 }
 

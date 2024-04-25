@@ -45,7 +45,7 @@ export class PostgresNotifListenManager {
     return this;
   }
 
-  isReady() {
+  get isReady() {
     return this.isListening;
   }
 

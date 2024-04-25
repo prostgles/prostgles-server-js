@@ -1,4 +1,4 @@
-import { log, pickKeys, PubSubManager } from "./PubSubManager";
+import { log, NOTIF_TYPE, pickKeys, PubSubManager } from "./PubSubManager";
 
 /* Relay relevant data to relevant subscriptions */
 export async function notifListener(this: PubSubManager, data: { payload: string }) {
@@ -14,25 +14,25 @@ export async function notifListener(this: PubSubManager, data: { payload: string
 
   log(str);
 
-  if (notifType === this.NOTIF_TYPE.schema) {
+  if (notifType === NOTIF_TYPE.schema) {
 
-    if (this.onSchemaChange) {
+    if (this.dboBuilder.prostgles.schemaWatch?.onSchemaChange) {
       const [_, command, _event_type, query] = dataArr;
       await this.dboBuilder.prostgles.opts.onLog?.({ type: "debug", command: "schemaChangeNotif", duration: 0, data: { command, query } });
 
       if (query && command) {
-        this.onSchemaChange({ command, query })
+        this.dboBuilder.prostgles.schemaWatch.onSchemaChange({ command, query })
       }
     }
 
     return;
-  } else if(notifType === this.NOTIF_TYPE.data_trigger_change) {
+  } else if(notifType === NOTIF_TYPE.data_trigger_change) {
     
     await this.refreshTriggers();
     return;
   }
 
-  if (notifType !== this.NOTIF_TYPE.data) {
+  if (notifType !== NOTIF_TYPE.data) {
     console.error("Unexpected notif type: ", notifType);
     return;
   }

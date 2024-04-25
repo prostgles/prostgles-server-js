@@ -124,6 +124,7 @@ export type FileTableConfig = {
   imageOptions?: ImageOptions
 };
 
+export type OnSchemaChangeCallback = ((event: { command: string; query: string }) => void);
 
 export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUser> = {
   dbConnection: DbConnection;
@@ -161,11 +162,6 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
   | "prostgles_queries"
 
   /**
-   * Schema checked for changes every 'checkIntervalMillis" milliseconds
-   */
-  | { checkIntervalMillis: number };
-
-  /**
    * If truthy then DBoGenerated.d.ts will be updated and "onReady" will be called with new schema on both client and server
    */
   watchSchema?:
@@ -188,7 +184,7 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
     /**
      * Function called when schema changes. Nothing else triggered
      */
-    | ((event: { command: string; query: string }) => void)
+    | OnSchemaChangeCallback;
 
   keywords?: Keywords;
   onNotice?: (notice: AnyObject, message?: string) => void;
@@ -270,7 +266,10 @@ export class Prostgles {
   dbo?: DBHandlerServer;
   _dboBuilder?: DboBuilder;
   get dboBuilder(): DboBuilder {
-    if (!this._dboBuilder) throw "get dboBuilder: it's undefined"
+    if (!this._dboBuilder) {
+      console.trace(1)
+      throw "get dboBuilder: it's undefined";
+    }
     return this._dboBuilder;
   }
   set dboBuilder(d: DboBuilder) {
@@ -329,36 +328,36 @@ export class Prostgles {
 
   destroyed = false;
 
-  async onSchemaChange(event: { command: string; query: string }) {
-    const { watchSchema, watchSchemaType, onReady, tsGeneratedTypesDir } = this.opts;
-    if (watchSchema && this.loaded) {
-      log("Schema changed");
-      const { query, command } = event;
-      if (typeof query === "string" && query.includes(PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)) {
-        log("Schema change event excluded from triggers due to EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID");
-        return;
-      }
+  // async onSchemaChange(event: { command: string; query: string }) {
+  //   const { watchSchema, onReady, tsGeneratedTypesDir } = this.opts;
+  //   if (watchSchema && this.loaded) {
+  //     log("Schema changed");
+  //     const { query, command } = event;
+  //     if (typeof query === "string" && query.includes(PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)) {
+  //       log("Schema change event excluded from triggers due to EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID");
+  //       return;
+  //     }
 
-      if (typeof watchSchema === "function") {
-        /* Only call the provided func */
-        watchSchema(event);
+  //     if (typeof watchSchema === "function") {
+  //       /* Only call the provided func */
+  //       watchSchema(event);
 
-      } else if (watchSchema === "hotReloadMode") {
-        if (tsGeneratedTypesDir) {
-          /* Hot reload integration. Will only touch tsGeneratedTypesDir */
-          console.log("watchSchema: Re-writing TS schema");
+  //     } else if (watchSchema === "hotReloadMode") {
+  //       if (tsGeneratedTypesDir) {
+  //         /* Hot reload integration. Will only touch tsGeneratedTypesDir */
+  //         console.log("watchSchema: Re-writing TS schema");
 
-          await this.refreshDBO();
-          this.writeDBSchema(true);
-        }
+  //         await this.refreshDBO();
+  //         this.writeDBSchema(true);
+  //       }
 
-      } else if (watchSchema || isObject(watchSchemaType) && "checkIntervalMillis" in watchSchemaType) {
-        /* Full re-init. Sockets must reconnect */
-        console.log("watchSchema: Full re-initialisation", { query })
-        this.init(onReady as any, { type: "schema change", query, command });
-      }
-    }
-  }
+  //     } else if (watchSchema) {
+  //       /* Full re-init. Sockets must reconnect */
+  //       console.log("watchSchema: Full re-initialisation", { query })
+  //       this.init(onReady as any, { type: "schema change", query, command });
+  //     }
+  //   }
+  // }
 
   checkDb() {
     if (!this.db || !this.db.connect) throw "something went wrong getting a db connection";
@@ -427,34 +426,6 @@ export class Prostgles {
     this.dbo = this.dboBuilder.dbo;
     await this.opts.onLog?.({ type: "debug", command: "refreshDBO.end", duration: Date.now() - now })
     return this.dbo;
-  }
-
-  initWatchSchema = (onReady: OnReadyCallbackBasic) => {
-
-    if (this.opts.watchSchema === "hotReloadMode" && !this.opts.tsGeneratedTypesDir) {
-      throw "tsGeneratedTypesDir option is needed for watchSchema: hotReloadMode to work ";
-    } else if (
-      this.opts.watchSchema &&
-      typeof this.opts.watchSchemaType === "object" &&
-      "checkIntervalMillis" in this.opts.watchSchemaType &&
-      typeof this.opts.watchSchemaType.checkIntervalMillis === "number"
-    ) {
-
-      if (this.schema_checkIntervalMillis) {
-        clearInterval(this.schema_checkIntervalMillis);
-      }
-      this.schema_checkIntervalMillis = setInterval(async () => {
-        if(!this.loaded) return;
-        const dbuilder = await DboBuilder.create(this);
-        if (dbuilder.tsTypesDefinition !== this.dboBuilder.tsTypesDefinition) {
-          await this.refreshDBO();
-          const reason: OnInitReason = { type: "schema change", command: "", query: "schema_checkIntervalMillis tsTypesDefinition changed" }
-          this.init(onReady, reason);
-        }
-      }, this.opts.watchSchemaType.checkIntervalMillis);
-      
-    }
-
   }
 
   initRestApi = async () => {
@@ -526,7 +497,6 @@ export class Prostgles {
   }
 
   isSuperUser = false;
-  schema_checkIntervalMillis?: NodeJS.Timeout;
 
   init = initProstgles.bind(this);
 
@@ -787,6 +757,6 @@ type SocketMethodRequest = {
 }
 
 
-export async function isSuperUser(db: DB): Promise<boolean> {
+export async function getIsSuperUser(db: DB): Promise<boolean> {
   return db.oneOrNone("select usesuper from pg_user where usename = CURRENT_USER;").then(r => r.usesuper);
 }

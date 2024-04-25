@@ -180,7 +180,7 @@ export const prepareOrderByQuery = (items: SortItem[], tableAlias?: string): str
   }).join(", ")]
 }
 
-export const canEXECUTE = async (db: DB) => {
+export const getCanExecute = async (db: DB) => {
 
   try {
     await db.any(`DO $$ BEGIN  EXECUTE 'select 1'; END $$;`);

@@ -5,9 +5,10 @@ import { isEmpty, pickKeys } from "prostgles-types";
 import AuthHandler from "./AuthHandler";
 import { DBEventsManager } from "./DBEventsManager";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
-import { DBHandlerServer, Prostgles, ProstglesInitOptions, isSuperUser } from "./Prostgles";
+import { DBHandlerServer, Prostgles, ProstglesInitOptions, getIsSuperUser } from "./Prostgles";
 import { DbTableInfo, PublishParser } from "./PublishParser/PublishParser";
 import { sleep } from "./utils";
+import { SchemaWatch } from "./SchemaWatch";
 
 export type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 export type DbConnectionOpts = pg.IDefaults;
@@ -57,8 +58,6 @@ export type InitResult = {
 export const initProstgles = async function(this: Prostgles, onReady: OnReadyCallbackBasic, reason: OnInitReason): Promise<InitResult> {
   this.loaded = false;
 
-  this.initWatchSchema(onReady);
-
   /* 1. Connect to db */
   if (!this.db) {
     const { db, pgp } = getDbConnection(this.opts.dbConnection, this.opts.dbOptions, this.opts.DEBUG_MODE,
@@ -71,9 +70,10 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
     );
     this.db = db;
     this.pgp = pgp;
-    this.isSuperUser = await isSuperUser(db);
+    this.isSuperUser = await getIsSuperUser(db);
   }
   this.checkDb();
+
   const db = this.db!;
   const pgp = this.pgp!;
 
@@ -88,6 +88,8 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
     await this.initTableConfig(reason);
     await this.initFileTable();
     await this.initRestApi();
+
+    this.schemaWatch = await SchemaWatch.create(this.dboBuilder);
 
     if (this.opts.publish) {
 

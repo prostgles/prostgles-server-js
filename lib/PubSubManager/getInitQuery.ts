@@ -1,5 +1,5 @@
 
-import { asValue, PubSubManager } from "./PubSubManager";
+import { asValue, NOTIF_CHANNEL, NOTIF_TYPE, PubSubManager } from "./PubSubManager";
 const { version } = require("../../package.json");
 
 export const DB_OBJ_NAMES = {
@@ -289,11 +289,11 @@ BEGIN
                         LOOP
                             
                             PERFORM pg_notify( 
-                              ${asValue(this.NOTIF_CHANNEL.preffix)} || v_trigger.app_id , 
+                              ${asValue(NOTIF_CHANNEL.preffix)} || v_trigger.app_id , 
                               LEFT(concat_ws(
                                 ${asValue(PubSubManager.DELIMITER)},
 
-                                ${asValue(this.NOTIF_TYPE.data)}, 
+                                ${asValue(NOTIF_TYPE.data)}, 
                                 COALESCE(TG_TABLE_NAME, 'MISSING'), 
                                 COALESCE(TG_OP, 'MISSING'), 
                                 CASE WHEN has_errors 
@@ -487,10 +487,10 @@ BEGIN
                     SELECT * FROM prostgles.apps
                   LOOP
                     PERFORM pg_notify( 
-                      ${asValue(this.NOTIF_CHANNEL.preffix)} || app.id, 
+                      ${asValue(NOTIF_CHANNEL.preffix)} || app.id, 
                       LEFT(concat_ws(
                         ${asValue(PubSubManager.DELIMITER)}, 
-                        ${asValue(this.NOTIF_TYPE.data_trigger_change)},
+                        ${asValue(NOTIF_TYPE.data_trigger_change)},
                         json_build_object(
                           'TG_OP', TG_OP, 
                           'duration', (EXTRACT(EPOCH FROM now()) * 1000) - start_time,
@@ -551,10 +551,10 @@ BEGIN
                       WHERE tg_tag = ANY(watching_schema_tag_names)
                     LOOP
                       PERFORM pg_notify( 
-                        ${asValue(this.NOTIF_CHANNEL.preffix)} || app.id, 
+                        ${asValue(NOTIF_CHANNEL.preffix)} || app.id, 
                         LEFT(concat_ws(
                           ${asValue(PubSubManager.DELIMITER)}, 
-                          ${asValue(this.NOTIF_TYPE.schema)}, tg_tag , TG_event, curr_query
+                          ${asValue(NOTIF_TYPE.schema)}, tg_tag , TG_event, curr_query
                         ), 7999/4)
                       );
                     END LOOP;

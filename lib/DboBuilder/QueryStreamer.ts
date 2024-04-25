@@ -5,9 +5,9 @@ import { DB } from "../initProstgles";
 import { DboBuilder } from "./DboBuilder";
 import { PRGLIOSocket } from "./DboBuilderTypes";
 import { getErrorAsObject, getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
-import { getDetailedFieldInfo, watchSchemaFallback } from "./runSQL";
+import { getDetailedFieldInfo } from "./runSQL";
 import CursorType from 'pg-cursor'
-import { VoidFunction } from "../SchemaWatch";
+import { VoidFunction, watchSchemaFallback } from "../SchemaWatch";
 const Cursor: typeof CursorType = require('pg-cursor');
 
 type ClientStreamedRequest = {
