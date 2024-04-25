@@ -130,6 +130,7 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
   dbConnection: DbConnection;
   dbOptions?: DbConnectionOpts;
   tsGeneratedTypesDir?: string;
+  disableRealtime?: boolean;
   io?: Server;
   publish?: Publish<S, SUser>;
   publishMethods?: PublishMethods<S, SUser>;
@@ -300,7 +301,7 @@ export class Prostgles {
     if (!params) throw "ProstglesInitOptions missing";
 
     const config: Record<keyof ProstglesInitOptions, 1> = {
-      transactions: 1, joins: 1, tsGeneratedTypesDir: 1,
+      transactions: 1, joins: 1, tsGeneratedTypesDir: 1, disableRealtime: 1,
       onReady: 1, dbConnection: 1, dbOptions: 1, publishMethods: 1, 
       io: 1, publish: 1, schema: 1, publishRawSQL: 1, wsChannelNamePrefix: 1, 
       onSocketConnect: 1, onSocketDisconnect: 1, sqlFilePath: 1, auth: 1, 

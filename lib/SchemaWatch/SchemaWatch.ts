@@ -3,6 +3,10 @@ import { EVENT_TRIGGER_TAGS } from "../Event_Trigger_Tags";
 import { OnSchemaChangeCallback } from "../Prostgles";
 import { PubSubManager, log } from "../PubSubManager/PubSubManager";
 import { ValidatedWatchSchemaType, getValidatedWatchSchemaType } from "./getValidatedWatchSchemaType";
+const COMMAND_FIRST_KEYWORDS = EVENT_TRIGGER_TAGS
+  .map(tag => tag.split(" ")[0]!).filter(tag => tag !== "SELECT")
+  .concat("SELECT INTO");
+const DB_FALLBACK_COMMANDS = Array.from(new Set(COMMAND_FIRST_KEYWORDS));
 
 export type VoidFunction = () => void;
 
@@ -15,6 +19,10 @@ export class SchemaWatch {
     this.type = getValidatedWatchSchemaType(dboBuilder);
     if(this.type.watchType === "NONE") {
       this.onSchemaChange = undefined;
+      this.onSchemaChangeFallback = undefined;
+    }
+    if(this.type.watchType === "DDL_trigger") {
+      this.onSchemaChangeFallback = undefined;
     }
   }
 
@@ -29,18 +37,18 @@ export class SchemaWatch {
   /**
    * Fallback for watchSchema in case of not a superuser (cannot add db event listener)
    */
-  onSchemaChangeFallback: OnSchemaChangeCallback = async ({ command, query }) => {
+  onSchemaChangeFallback: OnSchemaChangeCallback | undefined = async ({ command, query }) => {
+    
     if(
       this.type.watchType !== "prostgles_queries" || 
       !this.onSchemaChange || 
-      !EVENT_TRIGGER_TAGS.includes(command as any)
+      !DB_FALLBACK_COMMANDS.includes(command)
     ) return;
 
     this.onSchemaChange({ command, query })
   }
   
   onSchemaChange: OnSchemaChangeCallback | undefined = async (event) => {
-    if(this.type.watchType === "NONE") return;
     
     const { watchSchema, onReady, tsGeneratedTypesDir } = this.dboBuilder.prostgles.opts;
     if (watchSchema && this.dboBuilder.prostgles.loaded) {
