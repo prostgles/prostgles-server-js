@@ -75,20 +75,22 @@ export const renderReactHookManual = async <H extends Hook>(rootArgs: {
 	 */
 	renderDuration?: number;
 	onEnd?: OnEnd<H>;
+	onRender?: OnEnd<H>;
 }): Promise<{
 	setProps: (props: Parameters<H>, opts: { waitFor?: number; onEnd?: OnEnd<H>; }) => void;
 	getResults: () => ReturnType<H>[];
 }> => {
-	const { hook, onUnmount, renderDuration = 250, onEnd } = rootArgs;
+	const { hook, onUnmount, renderDuration = 250, onEnd, onRender } = rootArgs;
 	let lastRenderWaitTimeout: NodeJS.Timeout | null = null;
 	let didResolve = false;
 	let setProps: (props: any[]) => void;
 	resetBasicComponent();
 	return new Promise((resolve, reject) => {
 		const results = [];
-		const onRender = (result) => {
+		const onCompRender = (result) => {
 			results.push(result);
 			if(didResolve) return;
+			onRender?.(results);
 			clearTimeout(lastRenderWaitTimeout);
 			lastRenderWaitTimeout = setTimeout(async () => {
 	
@@ -117,7 +119,7 @@ export const renderReactHookManual = async <H extends Hook>(rootArgs: {
 					onUnmount?.();
 				};
 			}, []);
-			onRender(result);
+			onCompRender(result);
 			return React.createElement('h1', null, `Hello`);
 		}
 		root.render(

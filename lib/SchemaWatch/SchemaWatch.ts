@@ -30,7 +30,8 @@ export class SchemaWatch {
   static create = async (dboBuilder: DboBuilder) => {
     const instance = new SchemaWatch(dboBuilder);
     if(instance.type.watchType === "DDL_trigger") {
-      await dboBuilder.getPubSubManager()
+      await dboBuilder.getPubSubManager();
+      // TODO finish createSchemaWatchEventTrigger to ensure the query is not used in NOTIFY and exclude happens inside Postgres
     }
     return instance;
   }
@@ -40,6 +41,10 @@ export class SchemaWatch {
    */
   onSchemaChangeFallback: OnSchemaChangeCallback | undefined = async ({ command, query }) => {
     
+    if (typeof query === "string" && query.includes(PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)) {
+      log("Schema change event excluded from triggers due to EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID");
+      return;
+    }
     if(
       this.type.watchType !== "prostgles_queries" || 
       !this.onSchemaChange || 
@@ -55,10 +60,6 @@ export class SchemaWatch {
     if (watchSchema && this.dboBuilder.prostgles.loaded) {
       log("Schema changed");
       const { query, command } = event;
-      if (typeof query === "string" && query.includes(PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)) {
-        log("Schema change event excluded from triggers due to EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID");
-        return;
-      }
 
       if (typeof watchSchema === "function") {
         /* Only call the provided func */

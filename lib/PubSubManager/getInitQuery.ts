@@ -494,7 +494,7 @@ BEGIN
                         json_build_object(
                           'TG_OP', TG_OP, 
                           'duration', (EXTRACT(EPOCH FROM now()) * 1000) - start_time,
-                          'query', LEFT(current_query(), 400)
+                          'query', ${this.dboBuilder.prostgles.opts.DEBUG_MODE? 'LEFT(current_query(), 400)' : "'Only shown in debug mode'"}
                         )
                       )::TEXT, 7999/4)
                     );
@@ -526,8 +526,6 @@ BEGIN
             DECLARE app RECORD;
             
             BEGIN
-            
-                --RAISE NOTICE 'SCHEMA_WATCH: %', tg_tag;
     
                 /* 
                   This event trigger will outlive a prostgles app instance. 
@@ -549,12 +547,16 @@ BEGIN
                       SELECT * 
                       FROM prostgles.apps 
                       WHERE tg_tag = ANY(watching_schema_tag_names)
+                      AND curr_query NOT ILIKE '%${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}%'
                     LOOP
                       PERFORM pg_notify( 
                         ${asValue(NOTIF_CHANNEL.preffix)} || app.id, 
                         LEFT(concat_ws(
                           ${asValue(PubSubManager.DELIMITER)}, 
-                          ${asValue(NOTIF_TYPE.schema)}, tg_tag , TG_event, curr_query
+                          ${asValue(NOTIF_TYPE.schema)}, 
+                          tg_tag , 
+                          TG_event, 
+                          ${this.dboBuilder.prostgles.opts.DEBUG_MODE? 'curr_query' : "'Only shown in debug mode'"}
                         ), 7999/4)
                       );
                     END LOOP;

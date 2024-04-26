@@ -32,37 +32,41 @@ export const useProstglesTest = async (db: DBHandlerClient, getSocketOptions: (w
     
     await test("useProstglesClient with schema reload", async (t) => {
       await db.sql(`select pg_sleep(1)`);
-      let rerenders = 0
-      const { results: [res1, res2, res3], rerender } = await renderReactHook({
+      await renderReactHookManual({
         hook: useProstglesClient,
-        props: [{ socketOptions: getSocketOptions(true) }],
-        expectedRerenders: 3,
-        onResult: () => {
-          rerenders++;
-          if(rerenders < 2) return;
-          rerenders = -2;
+        initialProps: [{ socketOptions: getSocketOptions(true) }],
+        renderDuration: 1000,
+        onRender: async (results) => {
+          if(results.length !== 1) return;
           db.sql(`CREATE TABLE ${newly_created_table}(id integer);`);
+        },
+        onEnd: async (results) => {
+          const [res1, res2, res3] = results;
+          assert.equal(
+            results.length, 3
+          );
+          assert.deepStrictEqual(
+            res1,
+            { isLoading: true }
+          );
+          assert.equal(
+            res2.isLoading,
+            false
+          );
+          assert.equal(
+            typeof (res2 as any)?.dbo[newly_created_table]?.useFind,
+            "undefined"
+          );
+          assert.equal(
+            typeof (res3 as any)?.dbo[newly_created_table].useFind,
+            "function"
+          );
+    
+          const count = await (res3 as any)?.dbo[newly_created_table].count();
+          assert.equal(count, 0);
+
         }
       });
-      assert.deepStrictEqual(
-        res1,
-        { isLoading: true }
-      );
-      assert.equal(
-        res2.isLoading,
-        false
-      );
-      assert.equal(
-        typeof (res2 as any)?.dbo[newly_created_table]?.useFind,
-        "undefined"
-      );
-      assert.equal(
-        typeof (res3 as any)?.dbo[newly_created_table].useFind,
-        "function"
-      );
-
-      const count = await (res3 as any)?.dbo[newly_created_table].count();
-      assert.equal(count, 0);
     });
 
     await test("useProstglesClient with initial skip", async (t) => {
