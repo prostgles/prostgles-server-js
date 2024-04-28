@@ -1,5 +1,5 @@
 import { DetailedJoinSelect, JoinPath, JoinSelect, RawJoinPath, SelectParams, SimpleJoinSelect, getKeys } from "prostgles-types";
-import { Filter, LocalParams } from "../DboBuilder";
+import { Filter, LocalParams, ValidatedTableRules } from "../DboBuilder";
 import { TableRule } from "../../PublishParser/PublishParser";
 import { ViewHandler } from "../ViewHandler/ViewHandler";
 import { parseJoinPath } from "../ViewHandler/parseJoinPath";
@@ -9,6 +9,16 @@ import { NewQuery, NewQueryJoin, SelectItemBuilder } from "./QueryBuilder";
 import { prepareHaving } from "./prepareHaving";
 
 const JOIN_KEYS = ["$innerJoin", "$leftJoin"] as const;
+const JOIN_PARAM_KEYS = getKeys({ 
+  $condition: 1, 
+  filter: 1, 
+  having: 1, 
+  limit: 1, 
+  offset: 1, 
+  orderBy: 1, 
+  select: 1 
+} satisfies Record<keyof Omit<DetailedJoinSelect, typeof JOIN_KEYS[number]>, 1>);
+
 type ParsedJoin = 
 | { type: "detailed"; params: DetailedJoinSelect & { table: DetailedJoinSelect["$leftJoin"]; path: RawJoinPath } } 
 | { type: "simple"; params: SimpleJoinSelect; }
@@ -37,8 +47,7 @@ const parseJoinSelect = (joinParams: string | JoinSelect): ParsedJoin => {
   } else if(joinKey) {
 
     /* Full option join  { field_name: db.innerJoin.table_name(filter, select)  } */
-    const JOIN_PARAMS = ["select", "filter", "$condition", "offset", "limit", "orderBy"] as const;
-    const invalidParams = Object.keys(joinParams).filter(k => ![ ...JOIN_PARAMS, ...JOIN_KEYS ].includes(k as any));
+    const invalidParams = Object.keys(joinParams).filter(k => ![ ...JOIN_PARAM_KEYS, ...JOIN_KEYS ].includes(k as any));
     if(invalidParams.length) {
       throw "Invalid join params: " + invalidParams.join(", ");
     }
@@ -98,8 +107,8 @@ export async function getNewQuery(
     const j_selectParams: SelectParams = {};
     let j_filter: Filter = {},
         j_isLeftJoin = true,
-        j_alias: string | undefined,
         j_tableRules: TableRule | undefined;
+    const j_alias = fTable;
 
     const parsedJoin = parseJoinSelect(_joinParams);
 
@@ -113,24 +122,23 @@ export async function getNewQuery(
       viewHandler: _this,
       allowMultiOrJoin: true,
       addShortestJoinIfMissing: true,
-    })
+    });
+
     if(parsedJoin.params === "*"){
         j_selectParams.select = "*";
-        j_alias = fTable;
     } else if(parsedJoin.type === "detailed") {
       const joinParams = parsedJoin.params;
 
       j_isLeftJoin = !!joinParams.$leftJoin;
-      j_alias = fTable;
       
       j_selectParams.select = joinParams.select || "*";
       j_filter = joinParams.filter || {};
       j_selectParams.limit = joinParams.limit;
       j_selectParams.offset = joinParams.offset;
       j_selectParams.orderBy = joinParams.orderBy;
+      j_selectParams.having = joinParams.having;
     } else {
       j_selectParams.select = parsedJoin.params;
-      j_alias = fTable;
     }
     
     const jTable = parsedJoin.type === "simple"? fTable : (typeof j_path === "string"? j_path : j_path?.at(-1)?.table);
@@ -196,9 +204,6 @@ export async function getNewQuery(
   const validatedRules = _this.getValidatedRules(tableRules, localParams);
 
   const resQuery: NewQuery = {
-    /** Why was this the case? */
-    // allFields: allowedSelectFields,
-
     allFields: _this.column_names.slice(0),
     select,
     table: _this.name,
@@ -212,14 +217,50 @@ export async function getNewQuery(
       filterFieldNames: tableRules ? _this.parseFieldFilter(tableRules?.select?.filterFields) : _this.column_names.slice(0),
     }),
     isLeftJoin: false,
-    limit: _this.prepareLimitQuery(selectParams.limit, validatedRules),
-    orderByItems: prepareSortItems(selectParams.orderBy, allowedOrderByFields, selectParams.alias, select, joinQueries),
-    offset: _this.prepareOffsetQuery(selectParams.offset)
+    limit: prepareLimitQuery(selectParams.limit, validatedRules),
+    orderByItems: prepareSortItems(
+      selectParams.orderBy, 
+      allowedOrderByFields, 
+      selectParams.alias, 
+      select, 
+      joinQueries
+    ),
+    offset: prepareOffsetQuery(selectParams.offset)
   };
 
   if(resQuery.select.some(s => s.type === "aggregation") && resQuery.joins?.length){
-    throw `Root query aggregation AND nested joins not allowed`;
+    throw new Error(`Root query aggregation AND nested joins not allowed`);
   }
 
   return resQuery;
+}
+
+const prepareOffsetQuery = (offset?: number) => {
+  if (Number.isInteger(offset)) {
+    return offset!;
+  }
+
+  return 0;
+}
+
+const prepareLimitQuery = (limit: number | null | undefined = null, p: ValidatedTableRules): number | null => {
+
+  if (limit !== undefined && limit !== null && !Number.isInteger(limit)) {
+    throw "Unexpected LIMIT. Must be null or an integer";
+  }
+
+  let _limit = limit;
+  /* If no limit then set as the lesser of (100, maxLimit) */
+  if (_limit !== null && !Number.isInteger(_limit) && p.select.maxLimit !== null) {
+    _limit = [100, p.select.maxLimit].filter(Number.isInteger).sort((a, b) => a - b)[0]!;
+  } else {
+
+    /* If a limit higher than maxLimit specified throw error */
+    if (Number.isInteger(p.select.maxLimit) && _limit !== null && _limit > p.select.maxLimit!) {
+      throw `Unexpected LIMIT ${_limit}. Must be less than the published maxLimit: ` + p.select.maxLimit;
+    }
+  }
+
+
+  return _limit;
 }

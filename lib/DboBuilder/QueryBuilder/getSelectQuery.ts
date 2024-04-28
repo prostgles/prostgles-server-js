@@ -30,7 +30,6 @@ export function getSelectQuery(
       { 
         q1: { ...q, tableAlias: ROOT_TABLE_ALIAS }, 
         q2: { ...q2 }, 
-        depth: depth + 1, 
         selectParamsGroupBy 
       }
     );

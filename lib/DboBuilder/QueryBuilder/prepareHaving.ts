@@ -11,8 +11,8 @@ type Args = {
 }
 export const prepareHaving = ({ having, select, tableAlias, filterFieldNames }: Args) => {
   if(!having || isEmpty(having)) return "";
-  const selectedItem = select
-    .find(s => s.alias);
+  // const selectedItem = select
+  //   .find(s => s.alias);
   const havingStr = parseFilterItem({
     filter: having,
     select,

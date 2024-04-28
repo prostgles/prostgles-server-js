@@ -9,7 +9,6 @@ import { prepareOrderByQuery } from "../DboBuilder";
 type Args = {
   q1: NewQuery;
   q2: NewQueryJoin;
-  depth: number;
   selectParamsGroupBy: boolean;
 }
 
@@ -61,7 +60,7 @@ type GetJoinQueryResult = {
   ) target_table
   ON ...condition
  */
-export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2, depth }: Args): GetJoinQueryResult => {
+export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoinQueryResult => {
   const paths = parseJoinPath({ 
     rootTable: q1.table, 
     rawPath: q2.joinPath, 
@@ -108,7 +107,6 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2, depth }: Args):
     `SELECT `,
       ...indentLines([
         ...(isOrJoin? [rootTableIdField]: requiredJoinFields), 
-        // ...requiredJoinFields, 
         jsonAgg, 
         ...rootNestedSort.map(d => d.nested!.wrapperQuerySortItem)
       ], { appendCommas: true }),
@@ -119,20 +117,9 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2, depth }: Args):
     `LEFT JOIN ${q1.table} ${ROOT_TABLE_ALIAS}`,
     `ON ${joinCondition}`
     ] : []),
-    // `WHERE ${joinCondition}`,
     `GROUP BY ${isOrJoin? rootTableIdField : requiredJoinFields}`,
-    // `GROUP BY ${requiredJoinFields}`,
-  ];
-
-  // const queryLines = [
-  //   `${joinType} JOIN LATERAL (`,
-  //   ...indentLines(wrappingQuery),
-  //   `) ${targetTableAlias}`,
-  //   isOrJoin? 
-  //     `ON ${targetTableAlias}.${ROOT_TABLE_ROW_NUM_ID} = ${rootTableIdField}` :
-  //     `ON ${joinCondition}`
-  // ];
-
+  ]; 
+  
   /**
    * This is done to prevent join cte names clashing with actual table names
    */
@@ -194,6 +181,9 @@ const getInnerJoinQuery = ({ paths, q1, q2, targetTableAliasRaw, rootSelectItems
         if(groupByFields.length){
           targetQueryExtraQueries.push(`GROUP BY ${groupByFields}`)
         }
+        if(q2.having){
+          targetQueryExtraQueries.push(`HAVING ${q2.having}`)
+        }
       }
     }
 
@@ -210,7 +200,11 @@ const getInnerJoinQuery = ({ paths, q1, q2, targetTableAliasRaw, rootSelectItems
 
     return [
       `INNER JOIN ${table.name} ${table.alias}`,
-      `ON ${getJoinOnCondition({ on: path.on, leftAlias: prevTable.alias, rightAlias: table.alias})}`,
+      `ON ${getJoinOnCondition({ 
+        on: path.on, 
+        leftAlias: prevTable.alias, 
+        rightAlias: table.alias,
+      })}`,
       ...targetQueryExtraQueries
     ]
   });

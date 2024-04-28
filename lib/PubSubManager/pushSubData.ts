@@ -1,4 +1,4 @@
-import { parseLocalFuncs } from "../DboBuilder/subscribe";
+import { parseLocalFuncs } from "../DboBuilder/ViewHandler/subscribe";
 import { log, PubSubManager, Subscription } from "./PubSubManager";
 
 export async function pushSubData(this: PubSubManager, sub: Subscription, err?: any) {

@@ -1,9 +1,9 @@
 import { AnyObject, SubscribeParams, SubscriptionChannels } from "prostgles-types";
-import { TableRule } from "../PublishParser/PublishParser";
-import { Filter, LocalParams, parseError } from "./DboBuilder";
-import { NewQuery } from "./QueryBuilder/QueryBuilder";
-import { ViewHandler } from "./ViewHandler/ViewHandler";
-import { getSubscribeRelatedTables } from "./getSubscribeRelatedTables";
+import { TableRule } from "../../PublishParser/PublishParser";
+import { Filter, LocalParams, parseError } from "../DboBuilder";
+import { NewQuery } from "../QueryBuilder/QueryBuilder";
+import { ViewHandler } from "./ViewHandler";
+import { getSubscribeRelatedTables } from "../getSubscribeRelatedTables";
 
 type OnData = (items: AnyObject[]) => any; 
 export type LocalFuncs = {

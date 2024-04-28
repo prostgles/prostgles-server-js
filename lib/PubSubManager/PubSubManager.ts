@@ -16,7 +16,7 @@ import pg from 'pg-promise/typescript/pg-subset';
 import { AnyObject, FieldFilter, SelectParams, SubscribeParams, WAL } from "prostgles-types";
 
 import { find, pickKeys, tryCatch } from "prostgles-types/dist/util";
-import { LocalFuncs, getOnDataFunc, matchesLocalFuncs } from "../DboBuilder/subscribe";
+import { LocalFuncs, getOnDataFunc, matchesLocalFuncs } from "../DboBuilder/ViewHandler/subscribe";
 import { EVENT_TRIGGER_TAGS } from "../Event_Trigger_Tags";
 import { EventTypes } from "../Logging";
 import { TableRule } from "../PublishParser/PublishParser";

@@ -7,29 +7,30 @@ import {
   isEmpty,
   isObject
 } from "prostgles-types";
+import { TableEvent } from "../../Logging";
+import { DB, Join } from "../../Prostgles";
+import { TableRule } from "../../PublishParser/PublishParser";
+import { Graph } from "../../shortestPath";
 import {
   DboBuilder,
   Filter,
   LocalParams,
   TableHandlers, ValidatedTableRules,
   escapeTSNames,
-  parseError, postgresToTsType,
-  withUserRLS
+  parseError, postgresToTsType
 } from "../DboBuilder";
-import { TableEvent } from "../../Logging";
-import { DB, Join } from "../../Prostgles";
-import { TableRule } from "../../PublishParser/PublishParser";
-import { Graph } from "../../shortestPath";
+import { TableSchema } from '../DboBuilderTypes';
 import { COMPUTED_FIELDS, FieldSpec } from "../QueryBuilder/Functions";
 import { asNameAlias } from "../QueryBuilder/QueryBuilder";
-import { find } from "../find";
 import { getColumns } from "../getColumns";
-import { LocalFuncs, subscribe } from "../subscribe";
+import { count } from "./count";
+import { find } from "./find";
 import { getInfo } from "./getInfo";
 import { parseFieldFilter } from "./parseFieldFilter";
 import { prepareWhere } from "./prepareWhere";
+import { size } from "./size";
+import { LocalFuncs, subscribe } from "./subscribe";
 import { validateViewRules } from "./validateViewRules";
-import { TableSchema } from '../DboBuilderTypes';
 
 export type JoinPaths = {
   t1: string;
@@ -44,7 +45,7 @@ export class ViewHandler {
   columns: TableSchema["columns"];
   columnsForTypes: ColumnInfo[];
   column_names: string[];
-  tableOrViewInfo: TableSchema;// TableOrViewInfo;
+  tableOrViewInfo: TableSchema;
   tsColumnDefs: string[] = [];
   joins: Join[];
   joinGraph?: Graph;
@@ -104,12 +105,7 @@ export class ViewHandler {
 
   validateViewRules = validateViewRules.bind(this);
 
-  getShortestJoin(table1: string, table2: string, startAlias: number, isInner = false): { query: string, toOne: boolean } {
-    // let searchedTables = [], result; 
-    // while (!result && searchedTables.length <= this.joins.length * 2){
-
-    // }
-
+  getShortestJoin(table1: string, table2: string, startAlias: number, isInner = false): { query: string, toOne: boolean } { 
     const getJoinCondition = (on: Record<string, string>[], leftTable: string, rightTable: string) => {
       return on.map(cond => Object.keys(cond).map(lKey => `${leftTable}.${lKey} = ${rightTable}.${cond[lKey]}`).join("\nAND ")).join(" OR ")
     }
@@ -132,8 +128,6 @@ export class ViewHandler {
 
   getInfo = getInfo.bind(this)
 
-  // TODO: fix renamed table trigger problem
-
   getColumns = getColumns.bind(this);
 
   getValidatedRules(tableRules?: TableRule, localParams?: LocalParams): ValidatedTableRules {
@@ -141,7 +135,6 @@ export class ViewHandler {
     if (localParams?.socket && !tableRules) {
       throw "INTERNAL ERROR: Unexpected case -> localParams && !tableRules";
     }
-
 
     /* Computed fields are allowed only if select is allowed */
     const allColumns: FieldSpec[] = this.column_names.slice(0).map(fieldName => ({
@@ -312,63 +305,8 @@ export class ViewHandler {
       return this.subscribe(filter, { ...params, limit: 2 }, func, table_rules, localParams);
   }
 
-  async count(_filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<number> {
-    const filter = _filter || {};
-    try {
-      await this._log({ command: "count", localParams, data: { filter } });
-      return await this.find(filter, { select: "", limit: 0 }, undefined, table_rules, localParams)
-        .then(async _allowed => {          
-          const q: string = await this.find(
-            filter, 
-            selectParams,
-            undefined,
-            table_rules,
-            { ...localParams, returnQuery: "noRLS", bypassLimit: true }
-            ) as any;
-            const query = [
-              withUserRLS(localParams, ""),
-              "SELECT COUNT(*) FROM (",
-              q,
-              ") t"
-            ].join("\n");
-          return (this.tx?.t || this.db).one(query).then(({ count }) => +count);
-        });
-    } catch (e) {
-      if (localParams && localParams.testRule) throw e;
-      throw parseError(e, `dbo.${this.name}.count()`)
-    }
-  }
-
-  async size(_filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<string> {
-    const filter = _filter || {};
-    try {
-      await this._log({ command: "size", localParams, data: { filter, selectParams } });
-      return await this.find(filter, { ...selectParams, limit: 2 }, undefined, table_rules, localParams)
-        .then(async _allowed => {
-          
-          const q: string = await this.find(
-            filter, { ...selectParams, limit: selectParams?.limit ?? Number.MAX_SAFE_INTEGER },
-            undefined,
-            table_rules,
-            { ...localParams, returnQuery: "noRLS", bypassLimit: true }
-          ) as any;
-          const query = withUserRLS(
-            localParams,
-            `${withUserRLS(localParams, "")}
-              SELECT sum(pg_column_size((prgl_size_query.*))) as size 
-              FROM (
-                ${q}
-              ) prgl_size_query
-            `
-          );
-
-          return (this.tx?.t || this.db).one(query).then(({ size }) => size || '0');
-        });
-    } catch (e) {
-      if (localParams && localParams.testRule) throw e;
-      throw parseError(e, `dbo.${this.name}.size()`);
-    }
-  }
+  count = count.bind(this);
+  size = size.bind(this);
 
   getAllowedSelectFields(selectParams: FieldFilter = "*", allowed_cols: FieldFilter, allow_empty = true): string[] {
     const all_columns = this.column_names.slice(0);
@@ -394,40 +332,7 @@ export class ViewHandler {
   /**
    * Parses group or simple filter
    */
-  prepareWhere = prepareWhere.bind(this);
-
-  /* This relates only to SELECT */
-  prepareLimitQuery(limit: number | null | undefined = null, p: ValidatedTableRules): number | null {
-
-    if (limit !== undefined && limit !== null && !Number.isInteger(limit)) {
-      throw "Unexpected LIMIT. Must be null or an integer";
-    }
-
-    let _limit = limit;
-    /* If no limit then set as the lesser of (100, maxLimit) */
-    if (_limit !== null && !Number.isInteger(_limit) && p.select.maxLimit !== null) {
-      _limit = [100, p.select.maxLimit].filter(Number.isInteger).sort((a, b) => a - b)[0]!;
-    } else {
-
-      /* If a limit higher than maxLimit specified throw error */
-      if (Number.isInteger(p.select.maxLimit) && _limit !== null && _limit > p.select.maxLimit!) {
-        throw `Unexpected LIMIT ${_limit}. Must be less than the published maxLimit: ` + p.select.maxLimit;
-      }
-    }
-
-
-    return _limit;
-  }
-
-  /* This relates only to SELECT */
-  prepareOffsetQuery(offset?: number): number {
-    if (Number.isInteger(offset)) {
-      return offset!;
-    }
-
-    return 0;
-  }
-
+  prepareWhere = prepareWhere.bind(this); 
 
   intersectColumns(allowedFields: FieldFilter, dissallowedFields: FieldFilter, fixIssues = false): string[] {
     let result: string[] = [];

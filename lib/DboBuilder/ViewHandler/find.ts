@@ -1,13 +1,13 @@
 
 import { SelectParams, isObject } from "prostgles-types";
-import { Filter, LocalParams, getClientErrorFromPGError, parseError, withUserRLS } from "./DboBuilder";
-import { canRunSQL } from "../DboBuilder/runSQL";
-import { TableRule } from "../PublishParser/PublishParser";
-import { getNewQuery } from "./QueryBuilder/getNewQuery";
-import { getSelectQuery } from "./QueryBuilder/getSelectQuery";
-import { TableHandler } from "./TableHandler/TableHandler";
-import { ViewHandler } from "./ViewHandler/ViewHandler";
-import { NewQuery } from "./QueryBuilder/QueryBuilder";
+import { Filter, LocalParams, getClientErrorFromPGError, parseError, withUserRLS } from "../DboBuilder";
+import { canRunSQL } from "../runSQL";
+import { TableRule } from "../../PublishParser/PublishParser";
+import { getNewQuery } from "../QueryBuilder/getNewQuery";
+import { getSelectQuery } from "../QueryBuilder/getSelectQuery";
+import { TableHandler } from "../TableHandler/TableHandler";
+import { ViewHandler } from "./ViewHandler";
+import { NewQuery } from "../QueryBuilder/QueryBuilder";
 
 export const find = async function(this: ViewHandler, filter?: Filter, selectParams?: SelectParams, _?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]> {
   try {

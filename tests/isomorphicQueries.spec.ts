@@ -15,7 +15,7 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
   const isServer = !!(db.items as any).dboBuilder;
   await describe("Isomorphic queries", async () => {
     await test("Deleting stale data", async () => {
-      const itemsCount = await db.items.count!()
+      const itemsCount = await db.items.count?.()
       if(itemsCount){
         log("DELETING items");
         
@@ -27,8 +27,7 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
         await db.items2.delete!({ });
         await db.items.delete!({ });
       }
-      await db.sql!(`TRUNCATE items  RESTART IDENTITY CASCADE;`)
-
+      await db.sql!(`TRUNCATE items RESTART IDENTITY CASCADE;`);
     });
 
     await test("Insert error structure", async () => {
@@ -83,32 +82,6 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
       await db.sql("TRUNCATE files CASCADE");
     });
 
-    await test("Having clause", async () => {
-      const res = await db.items.find!({}, { select: { name: 1, c: { $countAll: [] } }, having: { c: 2 } });
-      assert.deepStrictEqual(res, [{
-        c: '2',
-        name: 'a'
-       }]);
-    });
-    await test("Nested join having clause", async () => {
-      const res = await db.items.find!(
-        {}, 
-        { 
-          select: { 
-            name: 1, 
-            itms2: {
-              $leftJoin: "items2",
-            },
-            // c: { $countAll: [] },
-          }, 
-          // having: { c: 2 } 
-        }
-      );
-      assert.deepStrictEqual(res, [{
-        c: '2',
-        name: 'a'
-       }]);
-    });
     
     const json = { a: true, arr: "2", arr1: 3, arr2: [1], arrStr: ["1123.string"] }
     await test("merge json", async () => { 
@@ -1210,6 +1183,51 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
         assert.notEqual(row.id, "abc");
       });
     });
+  });
+
+  await test("Having clause", async () => {
+    // await db.items.insert!([{ name: "a" }, { name: "a" }]);
+    const res = await db.items.find!(
+      {}, 
+      { 
+        select: { name: 1, c: { $countAll: [] } 
+      }, 
+      having: { 
+        c: 4, 
+      } 
+    });
+    assert.deepStrictEqual(res, [{
+      c: '4',
+      name: 'multi'
+    }]);
+  });
+  await test("Nested join having clause", async () => {
+    const res = await db.items.find!(
+      {}, 
+      { 
+        select: { 
+          name: 1, 
+          itms2: {
+            $innerJoin: "items2",
+            select: {
+              name: 1,
+              c: { $countAll: [] }
+            },
+            having: { c: 1 } 
+          },
+        }, 
+      }
+    );
+    assert.deepStrictEqual(res, [
+      {
+        name: 'a',
+        itms2: [{ c: 1, name: 'a' }],
+      },
+      {
+        name: 'a',
+        itms2: [{ c: 1, name: 'a' }],
+      }
+    ]);
   });
  
 }
