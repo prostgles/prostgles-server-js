@@ -89,7 +89,26 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
         c: '2',
         name: 'a'
        }]);
-    })
+    });
+    await test("Nested join having clause", async () => {
+      const res = await db.items.find!(
+        {}, 
+        { 
+          select: { 
+            name: 1, 
+            itms2: {
+              $leftJoin: "items2",
+            },
+            // c: { $countAll: [] },
+          }, 
+          // having: { c: 2 } 
+        }
+      );
+      assert.deepStrictEqual(res, [{
+        c: '2',
+        name: 'a'
+       }]);
+    });
     
     const json = { a: true, arr: "2", arr1: 3, arr2: [1], arrStr: ["1123.string"] }
     await test("merge json", async () => { 
