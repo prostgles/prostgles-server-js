@@ -13,7 +13,11 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
   try {
     await this._log({ command: "find", localParams, data: { filter, selectParams } });
     filter = filter || {};
-    const allowedReturnTypes = Object.keys({ row: 1, statement: 1, value: 1, values: 1, "statement-no-rls": 1, "statement-where": 1 } satisfies Record<Required<SelectParams>["returnType"], 1>);
+    const allowedReturnTypes = Object.keys({ 
+      row: 1, statement: 1, value: 1, values: 1, 
+      "statement-no-rls": 1, "statement-where": 1,
+    } satisfies Record<Required<SelectParams>["returnType"], 1>);
+
     const { returnType } = selectParams || {};
     if (returnType && !allowedReturnTypes.includes(returnType)) {
       throw `returnType (${returnType}) can only be ${allowedReturnTypes.join(" OR ")}`
@@ -23,12 +27,13 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
 
     if (testRule) return [];
     if (selectParams) {
-      const good_params = Object.keys({ 
-        "select": 1, "orderBy": 1, "offset": 1, "limit": 1, "returnType": 1, "groupBy": 1 
+      const validParamNames = Object.keys({ 
+        "select": 1, "orderBy": 1, "offset": 1, "limit": 1, 
+        "returnType": 1, "groupBy": 1, "having": 1
       } satisfies Record<keyof SelectParams, 1>);
       
-      const bad_params = Object.keys(selectParams).filter(k => !good_params.includes(k as any));
-      if (bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
+      const invalidParams = Object.keys(selectParams).filter(k => !validParamNames.includes(k as any));
+      if (invalidParams && invalidParams.length) throw "Invalid params: " + invalidParams.join(", ") + " \n Expecting: " + validParamNames.join(", ");
     }
 
     /* Validate publish */
@@ -38,9 +43,15 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
       const fields = tableRules.select.fields; 
       const maxLimit = tableRules.select.maxLimit;
 
-      if (<any>tableRules.select !== "*" && typeof tableRules.select !== "boolean" && !isObject(tableRules.select)) throw `\nINVALID publish.${this.name}.select\nExpecting any of: "*" | { fields: "*" } | true | false`
-      if (!fields) throw ` invalid ${this.name}.select rule -> fields (required) setting missing.\nExpecting any of: "*" | { col_name: false } | { col1: true, col2: true }`;
-      if (maxLimit && !Number.isInteger(maxLimit)) throw ` invalid publish.${this.name}.select.maxLimit -> expecting integer but got ` + maxLimit;
+      if (<any>tableRules.select !== "*" && typeof tableRules.select !== "boolean" && !isObject(tableRules.select)) {
+        throw `\nInvalid publish.${this.name}.select\nExpecting any of: "*" | { fields: "*" } | true | false`;
+      }
+      if (!fields) {
+        throw ` invalid ${this.name}.select rule -> fields (required) setting missing.\nExpecting any of: "*" | { col_name: false } | { col1: true, col2: true }`;
+      }
+      if (maxLimit && !Number.isInteger(maxLimit)) {
+        throw ` invalid publish.${this.name}.select.maxLimit -> expecting integer but got ` + maxLimit;
+      }
     }
 
     const _selectParams = selectParams ?? {}
@@ -68,7 +79,7 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
         return [];
       } catch (e) {
         console.error(e);
-        throw `INTERNAL ERROR: Publish config is not valid for publish.${this.name}.select `
+        throw `Internal error: publish config is not valid for publish.${this.name}.select `
       }
     }
 

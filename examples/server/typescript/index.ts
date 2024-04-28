@@ -6,8 +6,6 @@ const http = require('http').createServer(app);
 const io = require("socket.io")(http);
 http.listen(3001);
 
-import { DBObj } from "./DBoGenerated";
-
 prostgles({
 	dbConnection: {
 		host: "localhost",

@@ -6,6 +6,7 @@ import { parseJoinPath } from "../ViewHandler/parseJoinPath";
 import { prepareSortItems } from "../ViewHandler/prepareSortItems";
 import { COMPUTED_FIELDS, FUNCTIONS } from "./Functions";
 import { NewQuery, NewQueryJoin, SelectItemBuilder } from "./QueryBuilder";
+import { prepareHaving } from "./prepareHaving";
 
 const JOIN_KEYS = ["$innerJoin", "$leftJoin"] as const;
 type ParsedJoin = 
@@ -181,12 +182,13 @@ export async function getNewQuery(
 
   const select = sBuilder.select;
     
+  const tableAlias = selectParams.alias;
   const filterOpts = await _this.prepareWhere({
     filter, 
     select, 
     forcedFilter: tableRules?.select?.forcedFilter, 
     filterFields: tableRules?.select?.filterFields, 
-    tableAlias: selectParams.alias, 
+    tableAlias, 
     localParams,
     tableRule: tableRules
   });
@@ -203,7 +205,12 @@ export async function getNewQuery(
     joins: joinQueries,
     where,
     whereOpts: filterOpts,
-    having: "",
+    having: prepareHaving({ 
+      having: selectParams.having, 
+      select, 
+      tableAlias,
+      filterFieldNames: tableRules ? _this.parseFieldFilter(tableRules?.select?.filterFields) : _this.column_names.slice(0),
+    }),
     isLeftJoin: false,
     limit: _this.prepareLimitQuery(selectParams.limit, validatedRules),
     orderByItems: prepareSortItems(selectParams.orderBy, allowedOrderByFields, selectParams.alias, select, joinQueries),

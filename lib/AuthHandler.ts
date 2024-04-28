@@ -65,6 +65,7 @@ export type AuthResult<SU = SessionUser> = SU & { sid: string; } | {
 export const getLoginClientInfo = (req: AuthClientRequest): AuthClientRequest & LoginClientInfo => {
   if("httpReq" in req){
     const ip_address = req.httpReq.ip;
+    if(!ip_address) throw new Error("ip_address missing from req.httpReq");
     const user_agent = req.httpReq.headers["user-agent"];
     return { 
       ...req, 

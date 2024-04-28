@@ -14,6 +14,7 @@ import { _delete } from "./delete";
 import { insert } from "./insert";
 import { update } from "./update";
 import { updateBatch } from "./updateBatch";
+import { upsert } from "./upsert";
 
 
 export type ValidatedParams = {
@@ -94,32 +95,7 @@ export class TableHandler extends ViewHandler {
     return this.delete(filter, params, param3_unused, tableRules, localParams);
   }
 
-  async upsert(filter: Filter, newData: AnyObject, params?: UpdateParams, table_rules?: TableRule, localParams?: LocalParams): Promise<any> {
-    try {
-      await this._log({ command: "upsert", localParams, data: { filter, newData, params } });
-      const _upsert = async function (tblH: TableHandler) {
-        return tblH.find(filter, { select: "", limit: 1 }, undefined, table_rules, localParams)
-          .then(exists => {
-            if (exists && exists.length) {
-              return tblH.update(filter, newData, params, table_rules, localParams);
-            } else {
-              return tblH.insert({ ...newData, ...filter }, params, undefined, table_rules, localParams);
-            }
-          });
-      }
-
-      /* Do it within a transaction to ensure consisency */
-      if (!this.tx) {
-        return this.dboBuilder.getTX(dbTX => _upsert(dbTX[this.name] as TableHandler))
-      } else {
-        return _upsert(this);
-      }
-
-    } catch (e) {
-      if (localParams && localParams.testRule) throw e;
-      throw parseError(e, `dbo.${this.name}.upsert()`);
-    }
-  } 
+  upsert = upsert.bind(this); 
 
   /* External request. Cannot sync from server */
   async sync(filter: Filter, params: { select?: FieldFilter }, param3_unused: undefined, table_rules: TableRule, localParams: LocalParams) {

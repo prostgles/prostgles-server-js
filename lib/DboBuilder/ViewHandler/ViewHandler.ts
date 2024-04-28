@@ -180,7 +180,6 @@ export class ViewHandler {
         getInfo: tableRules?.getColumns ?? true,
       } as ValidatedTableRules;
 
-      /* SELECT */
       if (tableRules.select) {
         if (!tableRules.select.fields) return throwFieldsErr("select");
 
@@ -201,7 +200,6 @@ export class ViewHandler {
         };
       }
 
-      /* UPDATE */
       if (tableRules.update) {
         if (!tableRules.update.fields) return throwFieldsErr("update");
 
@@ -214,7 +212,6 @@ export class ViewHandler {
         }
       }
 
-      /* INSERT */
       if (tableRules.insert) {
         if (!tableRules.insert.fields) return throwFieldsErr("insert");
 
@@ -225,7 +222,6 @@ export class ViewHandler {
         }
       }
 
-      /* DELETE */
       if (tableRules.delete) {
         if (!tableRules.delete.filterFields) return throwFieldsErr("delete", "filterFields");
 
@@ -243,34 +239,34 @@ export class ViewHandler {
 
       return res;
     } else {
-      const all_cols = this.column_names.slice(0);
+      const allCols = this.column_names.slice(0);
       return {
         allColumns,
         getColumns: true,
         getInfo: true,
         select: {
-          fields: all_cols,
-          filterFields: all_cols,
-          orderByFields: all_cols,
+          fields: allCols,
+          filterFields: allCols,
+          orderByFields: allCols,
           forcedFilter: {},
           maxLimit: null,
         },
         update: {
-          fields: all_cols,
-          filterFields: all_cols,
+          fields: allCols,
+          filterFields: allCols,
           forcedFilter: {},
           forcedData: {},
-          returningFields: all_cols
+          returningFields: allCols
         },
         insert: {
-          fields: all_cols,
+          fields: allCols,
           forcedData: {},
-          returningFields: all_cols
+          returningFields: allCols
         },
         delete: {
-          filterFields: all_cols,
+          filterFields: allCols,
           forcedFilter: {},
-          returningFields: all_cols
+          returningFields: allCols
         }
       };
 

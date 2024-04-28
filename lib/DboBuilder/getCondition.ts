@@ -57,7 +57,7 @@ export async function getCondition(
     existsCond = (await Promise.all(existsConfigs.map(async existsConfig => await getExistsCondition.bind(this)(existsConfig, localParams)))).join(" AND ");
   }
 
-  /* Computed field queries */
+  /* Computed field queries ($rowhash) */
   const p = this.getValidatedRules(tableRules, localParams);
   const computedFields = p.allColumns.filter(c => c.type === "computed");
   const computedColConditions: string[] = [];
@@ -85,8 +85,8 @@ export async function getCondition(
   if (select) {
     /* Allow filtering by selected fields/funcs */
     allowedSelect = select.filter(s => {
-      /*  */
       if (["function", "computed", "column"].includes(s.type)) {
+        /*  */
         if (s.type !== "column" || allowed_colnames.includes(s.alias)) {
           return true;
         }
@@ -202,6 +202,10 @@ export async function getCondition(
     ));
 
   if (invalidColumn) {
+    const selItem = select?.find(s => s.alias === invalidColumn);
+    if(selItem?.type === "aggregation"){
+      throw new Error(`Filtering by ${invalidColumn} is not allowed. Aggregations cannot be filtered. Use HAVING clause instead.`);
+    }
     const allowedCols = allowedSelect.map(s => s.type === "column" ? s.getQuery() : s.alias).join(", ");
     const errMessage = `Table: ${this.name} -> disallowed/inexistent columns in filter: ${invalidColumn} \n  Expecting one of: ${allowedCols}`;
     throw errMessage;
@@ -214,8 +218,8 @@ export async function getCondition(
   const q = parseFilterItem({
     filter: f,
     tableAlias,
-    pgp,
-    select: allowedSelect
+    select: allowedSelect,
+    allowedColumnNames: !tableRules? this.column_names.slice(0) : this.parseFieldFilter(tableRules.select?.filterFields ?? tableRules.select?.fields),
   });
 
   let templates: string[] = [q].filter(q => q);

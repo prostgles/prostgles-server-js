@@ -3,7 +3,7 @@
 import {
   CompareFilterKeys,
   CompareInFilterKeys,
-  EXISTS_KEYS, FilterDataType,
+  FilterDataType,
   FullFilter,
   GeomFilterKeys, GeomFilter_Funcs,
   JsonbFilterKeys,
@@ -14,14 +14,21 @@ import {
   isObject
 } from "prostgles-types";
 import { SelectItem } from "./DboBuilder/QueryBuilder/QueryBuilder";
+import { pgp } from "./DboBuilder/DboBuilderTypes";
 
 /**
 * Parse a single filter
 * Ensure only single key objects reach this point
 */
-type ParseFilterItemArgs = {  filter: FullFilter<void, void>, select?: SelectItem[], tableAlias?: string, pgp: any };
+type ParseFilterItemArgs = { 
+  filter: FullFilter<void, void>; 
+  select: SelectItem[] | undefined;
+  tableAlias: string | undefined;
+  allowedColumnNames: string[];
+};
+
 export const parseFilterItem = (args: ParseFilterItemArgs): string => {
-  const { filter: _f, select, tableAlias, pgp } = args;
+  const { filter: _f, select, tableAlias, allowedColumnNames } = args;
 
   if(!_f || isEmpty(_f)) return "";
 
@@ -42,7 +49,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       filter: { [fk]: _f[fk] },
       select, 
       tableAlias,
-      pgp,
+      allowedColumnNames,
     }))
     .sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
     .join(" AND ")
@@ -50,17 +57,24 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
 
   const fKey: string = fKeys[0]!;
 
-  /* Exists filter */
-  if(EXISTS_KEYS.find(k => k in _f)){
-    // parseExistsFilter()
-  }
-
   let selItem: SelectItem | undefined;
-  if(select) selItem = select.find(s => fKey === s.alias);
+  if(select) {
+    selItem = select.find(s => fKey === s.alias);
+  }
   let rightF: FilterDataType<any> = (_f as any)[fKey];
 
+  const validateSelectedItemFilter = (selectedItem: SelectItem | undefined) => {
+    const fields = selectedItem?.getFields();
+    if(Array.isArray(fields) && fields.length > 1) {
+      const dissallowedFields = fields.filter(fname => !allowedColumnNames.includes(fname));
+      if(dissallowedFields.length){
+        throw new Error(`Invalid/disallowed columns found in filter: ${dissallowedFields}`)
+      }
+    }
+  }
   const getLeftQ = (selItm: SelectItem) => {
-    if(selItm.type === "function") return selItm.getQuery();
+    validateSelectedItemFilter(selItem);
+    if(selItm.type === "function" || selItm.type === "aggregation") return selItm.getQuery();
     return selItm.getQuery(tableAlias);
   }
 
@@ -81,6 +95,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       selItem = select.find(s => 
         dot_notation_delims.find(delimiter => fKey.startsWith(s.alias + delimiter))
       );
+      validateSelectedItemFilter(selItem);
     }
     if(!selItem) {
       return mErr("Bad filter. Could not match to a column or alias or dot notation: "); 
@@ -135,7 +150,6 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
           nextSep =  undefined;
         }
 
-        // console.log({ currSep, nextSep })
         leftQ += currSep.sep + asValue(remainingStr.slice(currSep.idx + currSep.sep.length, nextIdx));
         currSep = nextSep;
       }
@@ -175,7 +189,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       
       rightF = res;
     } else {
-      console.trace(141, select, selItem, remainingStr)
+      // console.trace(141, select, selItem, remainingStr)
       mErr("Bad filter. Could not find the valid col name or alias or col json path")
     }
 

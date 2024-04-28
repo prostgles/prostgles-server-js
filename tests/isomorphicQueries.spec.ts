@@ -2,7 +2,11 @@ import { strict as assert } from 'assert';
 import * as fs from "fs";
 import { DBOFullyTyped } from "../dist/DBSchemaBuilder";
 import type { DBHandlerClient } from "./client";
-import { test, describe } from "node:test";
+import { 
+  test, 
+  //@ts-ignore
+  describe 
+} from "node:test";
 import { pickKeys } from "prostgles-types";
 
 
@@ -78,12 +82,20 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
        
       await db.sql("TRUNCATE files CASCADE");
     });
+
+    await test("Having clause", async () => {
+      const res = await db.items.find!({}, { select: { name: 1, c: { $countAll: [] } }, having: { c: 2 } });
+      assert.deepStrictEqual(res, [{
+        c: '2',
+        name: 'a'
+       }]);
+    })
     
     const json = { a: true, arr: "2", arr1: 3, arr2: [1], arrStr: ["1123.string"] }
     await test("merge json", async () => { 
       const inserted = await db.tjson.insert!({ colOneOf: "a", json }, { returning: "*" });
       const res = await db.tjson.update!({ colOneOf: "a" },{ json: { $merge: [{ a: false }] } }, { returning: "*" });
-      assert.deepStrictEqual(res[0].json, { ...json, a: false });
+      assert.deepStrictEqual(res?.[0].json, { ...json, a: false });
     });
 
     await test("json array converted to pg array filter bug", async () => { 
@@ -172,7 +184,7 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
       
       const newF = await db.files.findOne!({ id: original.id });
 
-      assert.equal(newF.original_name, newFile.name)
+      assert.equal(newF?.original_name, newFile.name)
     });
     
     await test("getColumns definition", async () => {
@@ -528,8 +540,8 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
     await test("template_string function", async () => {
       const res = await db.various.findOne!({ name: 'abc9' }, { select: { tstr: { $template_string: ["{name} is hehe"] } } });
       const res2 = await db.various.findOne!({ name: 'abc9' }, { select: { tstr: { $template_string: ["is hehe"] } } });
-      assert.equal(res.tstr, "abc9 is hehe")
-      assert.equal(res2.tstr, "is hehe")
+      assert.equal(res?.tstr, "abc9 is hehe")
+      assert.equal(res2?.tstr, "is hehe")
     });
 
     await test("Between filtering", async () => {
@@ -577,8 +589,8 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
     await test("Function example", async () => {
     
       const f = await db.items4.findOne!({}, { select: { public: 1, p_5: { $left: ["public", 3] } } });
-      assert.equal(f.p_5.length, 3);
-      assert.equal(f.p_5, f.public.substr(0, 3));
+      assert.equal(f?.p_5.length, 3);
+      assert.equal(f?.p_5, f.public.substr(0, 3));
 
       // Nested function
       const fg = await db.items2.findOne!({}, { select: { id: 1, name: 1, items3: { name: "$upper" } } });// { $upper: ["public"] } } });
@@ -816,7 +828,7 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
         select: {
           "*": 1,
           items2: "*",
-          items2j: db.leftJoin.items2({}, "*")
+          items2j: db.leftJoin?.items2({}, "*")
         }
       });
       
@@ -848,7 +860,7 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
     /* $rowhash -> Custom column that returms md5(ctid + allowed select columns). Used in joins & CRUD to bypass PKey details */
     await test("$rowhash example", async () => {
       const rowhash = await db.items.findOne!({}, { select: { $rowhash: 1, "*": 1 }});
-      const f = { $rowhash: rowhash.$rowhash };
+      const f = { $rowhash: rowhash?.$rowhash };
       const rowhashView = await db.v_items.findOne!({}, { select: { $rowhash: 1 }});
       const rh1 = await db.items.findOne!({ $rowhash: rowhash?.$rowhash }, { select: { $rowhash: 1 }});
       const rhView = await db.v_items.findOne!({ $rowhash: rowhashView?.$rowhash }, { select: { $rowhash: 1 }});
@@ -1076,7 +1088,7 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
         {
           select: {
             "*": 1,
-            i0: db.innerJoin.items_multi(
+            i0: db.innerJoin?.items_multi(
               { name: "multi0" }, 
               "*", 
               { path: [{ table: "items", on: [{ items0_id: "id" }] }] }

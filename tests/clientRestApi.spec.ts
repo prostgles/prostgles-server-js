@@ -7,36 +7,11 @@ export const clientRestApi = async(db: DBHandlerClient, auth: Auth, log: (...arg
   
   await describe("clientRestApi", async () => {
       
-    const post = async ({ path, noAuth }: { path: string; noAuth?: boolean}, ...params: any[]) => {
-      const headers = new Headers({
-        'Authorization': `Bearer ${Buffer.from(noAuth? "noAuth" : token, "utf-8").toString("base64")}`, 
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      });
-      const res = await fetch(`http://127.0.0.1:3001/api/${path}`, { 
-          method: "POST", 
-          headers,
-          body: !params?.length? undefined : JSON.stringify(params) 
-        });
-      const resBodyJson = await res.text()
-        .then(text => { 
-          try {
-            return JSON.parse(text);
-          } catch {
-            return text;
-          }
-        });
-
-      if(res.status !== 200){
-        return Promise.reject(resBodyJson);
-      }
-      return resBodyJson;
-    }
-    const rest = async ({ tableName, command, noAuth }: { tableName: string; command: string; noAuth?: boolean; }, ...params: any[]) => post({ path: `db/${tableName}/${command}`, noAuth }, ...(params ?? []))
+    const rest = async ({ tableName, command, noAuth }: { tableName: string; command: string; noAuth?: boolean; }, ...params: any[]) => post({ path: `db/${tableName}/${command}`, noAuth, token }, ...(params ?? []))
     const dbRest = (tableName: string, command: string, ...params: any[]) => rest({ tableName, command }, ...(params ?? []))
     const dbRestNoAuth = (tableName: string, command: string, ...params: any[]) => rest({ tableName, command, noAuth: true }, ...(params ?? []));
-    const sqlRest = (query: string, ...params: any[]) => post({ path: `db/sql` }, query, ...(params ?? []))
-    const sqlMethods = (methodName: string, ...params: any[]) => post({ path: `methods/${methodName}` }, ...(params ?? []))
+    const sqlRest = (query: string, ...params: any[]) => post({ path: `db/sql`, token }, query, ...(params ?? []))
+    const sqlMethods = (methodName: string, ...params: any[]) => post({ path: `methods/${methodName}`, token }, ...(params ?? []))
 
     await test("Rest api test", async () => {
       const dataFilter = { id: 123123123, last_updated: Date.now() };
@@ -59,7 +34,7 @@ export const clientRestApi = async(db: DBHandlerClient, auth: Auth, log: (...arg
       const sqlRes = await sqlRest("select 1 as a", {}, { returnType: "rows" });
       assert.deepStrictEqual(sqlRes, [{ a: 1 }]);
 
-      const restTableSchema = await post({ path: "schema" });
+      const restTableSchema = await post({ path: "schema", token });
       assert.deepStrictEqual(tableSchema, restTableSchema.tableSchema);
       await Promise.all(tableSchema.map(async tbl => {
         const cols = await db[tbl.name]?.getColumns?.();
@@ -78,4 +53,30 @@ export const clientRestApi = async(db: DBHandlerClient, auth: Auth, log: (...arg
 
 
   });
+}
+
+const post = async ({ path, noAuth, token }: { path: string; token: string; noAuth?: boolean}, ...params: any[]) => {
+  const headers = new Headers({
+    'Authorization': `Bearer ${Buffer.from(noAuth? "noAuth" : token, "utf-8").toString("base64")}`, 
+    'Accept': 'application/json',
+    'Content-Type': 'application/json'
+  });
+  const res = await fetch(`http://127.0.0.1:3001/api/${path}`, { 
+      method: "POST", 
+      headers,
+      body: !params?.length? undefined : JSON.stringify(params) 
+    });
+  const resBodyJson = await res.text()
+    .then(text => { 
+      try {
+        return JSON.parse(text);
+      } catch {
+        return text;
+      }
+    });
+
+  if(res.status !== 200){
+    return Promise.reject(resBodyJson);
+  }
+  return resBodyJson;
 }
