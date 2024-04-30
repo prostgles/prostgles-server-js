@@ -216,7 +216,7 @@ export class QueryStreamer {
     socket.removeAllListeners(channel);
     socket.on(channel, async (_data: { query: string; params: any } | undefined, cb: BasicCallback) => {
       if(streamState === "started"){
-        return cb(null, "Already started");
+        return cb(processID, "Already started");
       }
       streamState = "started";
       try {
@@ -229,10 +229,10 @@ export class QueryStreamer {
         } else {
           await startStream(undefined, query);
         }
-        cb();
+        cb(processID);
       } catch(err){
         console.error(err)
-        cb(null, getErrorAsObject(err) ?? "Something went wrong");
+        cb(processID, getErrorAsObject(err) ?? "Something went wrong");
       }
       runCount++;
     });
@@ -245,7 +245,7 @@ export class QueryStreamer {
 
     return {
       channel,
-      unsubChannel
+      unsubChannel,
     }
   }
 }
