@@ -1,6 +1,6 @@
 {
   "name": "prostgles-server",
-  "version": "4.2.49",
+  "version": "4.2.50",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -43,7 +43,7 @@
     "pg-cursor": "^2.10.5",
     "pg-promise": "^11.6.0",
     "prostgles-client": "^4.0.53",
-    "prostgles-types": "^4.0.78"
+    "prostgles-types": "^4.0.79"
   },
   "devDependencies": {
     "@types/bluebird": "^3.5.36",

@@ -96,10 +96,10 @@ export type DBSchemaGenerated = {
     columns: {
       added?: string;
       cloud_url?: null | string;
-      content_length?: number;
+      content_length?: string;
       content_type: string;
-      deleted?: null | number;
-      deleted_from_storage?: null | number;
+      deleted?: null | string;
+      deleted_from_storage?: null | string;
       description?: null | string;
       etag?: null | string;
       extension: string;
@@ -107,7 +107,7 @@ export type DBSchemaGenerated = {
       name: string;
       original_name: string;
       signed_url?: null | string;
-      signed_url_expires?: null | number;
+      signed_url_expires?: null | string;
       url: string;
     };
   };
@@ -287,7 +287,7 @@ export type DBSchemaGenerated = {
     columns: {
       flight_number?: null | string;
       id?: number;
-      last_updated: number;
+      last_updated: string;
       x?: null | number;
       y?: null | number;
     };
@@ -465,7 +465,7 @@ export type DBSchemaGenerated = {
     delete: true;
     columns: {
       id?: number;
-      price: number;
+      price: string;
       symbol: string;
     };
   };
