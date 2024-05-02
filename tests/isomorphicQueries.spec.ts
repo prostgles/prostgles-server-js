@@ -553,17 +553,26 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
       const res = await db.items.find!({}, { select: { name: 1 }, orderBy: [{ key: "name", asc: false, nulls: "first", nullEmpty: true }] });
       assert.deepStrictEqual(res, [{ name: 'b'}, { name: 'a'}, { name: 'a'}]);
     });
-
     await test("Order by aliased func", async () => {
       const res = await db.items.find!({ }, { select: { uname: { $upper: ["name"] }, count: { $countAll: [] } }, orderBy: { uname: -1 }});
       assert.deepStrictEqual(res, [{ uname: 'B', count: '1'}, { uname: 'A', count: '2'} ])
     });
-
+    await test("Filter by aliased func", async () => {
+      const res = await db.items.find!({ uname: 'B' }, { select: { uname: { $upper: ["name"] }, count: { $countAll: [] } } });
+      assert.deepStrictEqual(res, [{ uname: 'B', count: '1'}])
+    });
+    await test("Count with Filter by aliased func ", async () => {
+      const res = await db.items.count!({ uname: 'A' }, { select: { uname: { $upper: ["name"] } } });
+      assert.deepStrictEqual(res, 2)
+    });
+    await test("Count with Aggregate and Filter by aliased func ", async () => {
+      const res = await db.items.count!({ uname: 'A' }, { select: { uname: { $upper: ["name"] }, count: { $countAll: [] } } });
+      assert.deepStrictEqual(res, 1)
+    });
     await test("Order by aggregation", async () => {
       const res = await db.items.find!({ }, { select: { name: 1, count: { $countAll: [] } }, orderBy: { count: -1 }});
       assert.deepStrictEqual(res, [  { name: 'a', count: '2'} , { name: 'b', count: '1'} ])
     });
-
     await test("Order by colliding alias name", async () => {
       const res = await db.items.find!({ }, { select: { name: { $countAll: [] }, n: { $left: ["name", 1]} }, orderBy: { name: -1 }});
       assert.deepStrictEqual(res, [  { name: '2', n: 'a' } , { name: '1', n: 'b'} ])
