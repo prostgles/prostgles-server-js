@@ -569,6 +569,16 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
       const res = await db.items.count!({ uname: 'A' }, { select: { uname: { $upper: ["name"] }, count: { $countAll: [] } } });
       assert.deepStrictEqual(res, 1)
     });
+    await test("Count with complex filter ", async () => {
+      const res = await db.items.count!({ 
+        $filter: [
+          { $upper: ["name"] },
+          "$in",
+          ["A"]
+        ]
+      });
+      assert.deepStrictEqual(res, 2)
+    });
     await test("Order by aggregation", async () => {
       const res = await db.items.find!({ }, { select: { name: 1, count: { $countAll: [] } }, orderBy: { count: -1 }});
       assert.deepStrictEqual(res, [  { name: 'a', count: '2'} , { name: 'b', count: '1'} ])

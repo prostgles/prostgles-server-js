@@ -1,8 +1,9 @@
 import { AnyObject, isObject } from "prostgles-types";
-import { FILTER_OPERANDS, parseFilterRightValue } from "../../Filtering";
+import { FILTER_OPERANDS, FILTER_OPERAND_TO_SQL_OPERAND, parseFilterRightValue } from "../../Filtering";
 import { FUNCTIONS, parseFunction } from "../QueryBuilder/Functions";
 import { asNameAlias, parseFunctionObject } from "../QueryBuilder/QueryBuilder";
 import { TableSchemaColumn } from "../DboBuilderTypes";
+import { asValue } from "../../PubSubManager/PubSubManager";
 
 const allowedComparators = FILTER_OPERANDS; //[">", "<", "=", "<=", ">=", "<>", "!="]
 type Args = {
@@ -54,28 +55,41 @@ export const parseComplexFilter = ({
   if (!Array.isArray(complexFilter)) {
     throw `Invalid $filter. Must contain an array of at least element but got: ${JSON.stringify(complexFilter)} `
   } 
-
   const [leftFilter, comparator, rightFilterOrValue] = complexFilter;
 
   const leftVal = getFuncQuery(leftFilter);
   let result = leftVal;
   if (comparator) {
-    if (!allowedComparators.includes(comparator)) {
+    if (typeof comparator !== "string" || !allowedComparators.includes(comparator as any)) {
       throw `Invalid $filter. comparator ${JSON.stringify(comparator)} is not valid. Expecting one of: ${allowedComparators}`;
     }
     if (!rightFilterOrValue) {
       throw "Invalid $filter. Expecting a value or function after the comparator";
     }
-    const rightVal = isObject(rightFilterOrValue) ? 
+    const maybeValidComparator = comparator as keyof typeof FILTER_OPERAND_TO_SQL_OPERAND;
+    const sqlOperand = FILTER_OPERAND_TO_SQL_OPERAND[maybeValidComparator];
+    if(!sqlOperand){
+      throw `Invalid $filter. comparator ${comparator} is not valid. Expecting one of: ${allowedComparators}`;
+    }
+
+    let rightVal = isObject(rightFilterOrValue) ? 
       getFuncQuery(rightFilterOrValue) : 
       parseFilterRightValue(rightFilterOrValue, {
         selectItem: undefined, 
-        expect: ["$in", "$nin"].includes(comparator)? "array" : undefined 
+        expect: ["$in", "$nin"].includes(comparator)? "csv" : undefined 
       });
+    if(maybeValidComparator === "$between" || maybeValidComparator === "$notBetween"){
+      
+      if(!Array.isArray(rightVal) || rightVal.length !== 2){
+        throw "Between filter expects an array of two values";
+      }
+      rightVal = asValue(rightVal[0]) + " AND " + asValue(rightVal[1]);
+    }
     if (leftVal === rightVal){ 
       throw "Invalid $filter. Cannot compare two identical function signatures: " + JSON.stringify(leftFilter);
     }
-    result += ` ${comparator} ${rightVal}`;
+      
+    result += ` ${sqlOperand} ${rightVal}`;
   }
 
   return result;

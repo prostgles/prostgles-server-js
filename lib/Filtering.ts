@@ -1,6 +1,7 @@
 
 
 import {
+  BetweenFilterKeys,
   CompareFilterKeys,
   CompareInFilterKeys,
   FilterDataType,
@@ -21,8 +22,32 @@ export const FILTER_OPERANDS = [
   ...TextFilterKeys,
   ...JsonbFilterKeys,
   ...CompareFilterKeys,
+  ...BetweenFilterKeys,
   ...CompareInFilterKeys
 ] as const;
+
+export const FILTER_OPERAND_TO_SQL_OPERAND = Object.fromEntries(
+  FILTER_OPERANDS.map(filterOperand => {
+    let sqlOperand = filterOperand as string;
+    if (filterOperand === "$eq") sqlOperand = "=";
+    else if (filterOperand === "$gt") sqlOperand = ">";
+    else if (filterOperand === "$gte") sqlOperand = ">=";
+    else if (filterOperand === "$lt") sqlOperand = "<";
+    else if (filterOperand === "$lte") sqlOperand = "<=";
+    else if (filterOperand === "$ne") sqlOperand = "<>";
+    else if (filterOperand === "$like") sqlOperand = "LIKE";
+    else if (filterOperand === "$ilike") sqlOperand = "ILIKE";
+    else if (filterOperand === "$nlike") sqlOperand = "NOT LIKE";
+    else if (filterOperand === "$nilike") sqlOperand = "NOT ILIKE";
+    else if (filterOperand === "$in") sqlOperand = "IN";
+    else if (filterOperand === "$nin") sqlOperand = "NOT IN";
+    else if (filterOperand === "$between") sqlOperand = "BETWEEN";
+    else if (filterOperand === "$notBetween") sqlOperand = "NOT BETWEEN";
+    else if (filterOperand === "$isDistinctFrom") sqlOperand = "IS DISTINCT FROM";
+    else if (filterOperand === "$isNotDistinctFrom") sqlOperand = "IS NOT DISTINCT FROM";
+    return [filterOperand, sqlOperand];
+  })
+) as Record<typeof FILTER_OPERANDS[number], string>;
 
 /**
 * Parse a single filter
