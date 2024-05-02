@@ -42,6 +42,7 @@ export async function getExistsCondition(this: ViewHandler, eConfig: ExistsFilte
 
   const tableHandler = this.dboBuilder.dbo[targetTable] as TableHandler
   const finalWhere = (await tableHandler.prepareWhere({
+    select: undefined,
     filter: targetTableFilter,
     forcedFilter,
     filterFields,

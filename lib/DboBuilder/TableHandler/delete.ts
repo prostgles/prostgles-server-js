@@ -38,7 +38,6 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
       }
     }
 
-
     if (params) {
       const good_paramsObj: Record<keyof DeleteParams, 1> = { returning: 1, returnType: 1 };
       const good_params = Object.keys(good_paramsObj);
@@ -49,6 +48,7 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
     let queryType: keyof pgPromise.ITask<{}> = 'none';
     let queryWithoutRLS = `DELETE FROM ${this.escapedName} `;
     const filterOpts = (await this.prepareWhere({
+      select: undefined,
       filter,
       forcedFilter,
       filterFields,

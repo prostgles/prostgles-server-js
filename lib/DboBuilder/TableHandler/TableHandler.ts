@@ -149,7 +149,7 @@ export class TableHandler extends ViewHandler {
         .then(async _isValid => {
 
           const { filterFields, forcedFilter } = table_rules?.select || {};
-          const condition = (await this.prepareWhere({ filter, forcedFilter, filterFields, addWhere: false, localParams, tableRule: table_rules })).where;
+          const condition = (await this.prepareWhere({ select: undefined, filter, forcedFilter, filterFields, addWhere: false, localParams, tableRule: table_rules })).where;
 
           const pubSubManager = await this.dboBuilder.getPubSubManager();
           return pubSubManager.addSync({

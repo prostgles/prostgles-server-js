@@ -50,7 +50,14 @@ export async function parseUpdateRules(
     if (!fields) {
       throw ` Invalid update rule fo r ${this.name}. fields missing `;
     }
-    finalUpdateFilter = (await this.prepareWhere({ filter, forcedFilter, filterFields, localParams, tableRule: tableRules })).filter;
+    finalUpdateFilter = (await this.prepareWhere({ 
+      select: undefined,
+      filter, 
+      forcedFilter, 
+      filterFields, 
+      localParams, 
+      tableRule: tableRules 
+    })).filter;
     if (tableRules.update.dynamicFields?.length) {
       /**
        * dynamicFields.fields used to allow a custom list of fields for specific records
@@ -63,9 +70,24 @@ export async function parseUpdateRules(
           /**
            * Validated filter and fields
            */
-          const condition = await this.prepareWhere({ filterFields: this.column_names, filter: dfRule.filter, localParams, tableRule: tableRules }); 
-          if (!condition.where) throw "dynamicFields.filter cannot be empty: " + JSON.stringify(dfRule);
-          await this.validateViewRules({ fields: dfRule.fields, filterFields, returningFields, forcedFilter, dynamicFields: tableRules.update.dynamicFields, rule: "update" });
+          const condition = await this.prepareWhere({
+            select: undefined, 
+            filterFields: this.column_names, 
+            filter: dfRule.filter, 
+            localParams, 
+            tableRule: tableRules 
+          });
+          if (!condition.where) {
+            throw "dynamicFields.filter cannot be empty: " + JSON.stringify(dfRule);
+          }
+          await this.validateViewRules({ 
+            fields: dfRule.fields, 
+            filterFields, 
+            returningFields, 
+            forcedFilter, 
+            dynamicFields: tableRules.update.dynamicFields, 
+            rule: "update" 
+          });
 
 
           await this.find(dfRule.filter, { limit: 0 });

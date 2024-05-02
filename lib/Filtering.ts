@@ -16,6 +16,14 @@ import {
 import { SelectItem } from "./DboBuilder/QueryBuilder/QueryBuilder";
 import { pgp } from "./DboBuilder/DboBuilderTypes";
 
+
+export const FILTER_OPERANDS = [
+  ...TextFilterKeys,
+  ...JsonbFilterKeys,
+  ...CompareFilterKeys,
+  ...CompareInFilterKeys
+] as const;
+
 /**
 * Parse a single filter
 * Ensure only single key objects reach this point
@@ -199,35 +207,19 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
 
   if(!leftQ) mErr("Internal error: leftQ missing?!");
 
-  const parseRightVal = (val: any, expect: "csv" | "array" | "json" | "jsonb" | null = null) => {
-    const checkIfArr = () => {
-      if(!Array.isArray(val)) return mErr("This type of filter/column expects an Array of items");
+  const parseRightVal = (val: any, expect?: "csv" | "array" | "json" | "jsonb") => {
+    try {
+      return parseFilterRightValue(val, { selectItem: selItem, expect });
+    } catch(e: any){
+      return mErr(e);
     }
-    if(expect === "csv" || expect?.startsWith("json")){
-      checkIfArr();
-      return pgp.as.format(`($1:${expect})`, [val]);
-
-    } else if(expect === "array" || selItem && selItem.columnPGDataType && selItem.columnPGDataType === "ARRAY"){
-      checkIfArr();        
-      return pgp.as.format(" ARRAY[$1:csv]", [val]);
-
-    }
-
-    return asValue(val);
   }
 
   /* Matching sel item */
   if(isObject(rightF)){
 
-    const OPERANDS = [
-      ...TextFilterKeys,
-      ...JsonbFilterKeys,
-      ...CompareFilterKeys,
-      ...CompareInFilterKeys
-    ] as const;
-
     const filterKeys = Object.keys(rightF);
-    let filterOperand: typeof OPERANDS[number] = filterKeys[0] as any;
+    let filterOperand: typeof FILTER_OPERANDS[number] = filterKeys[0] as any;
 
     /** JSON cannot be compared so we'll cast it to TEXT */
     if(selItem?.column_udt_type === "json" || TextFilterKeys.includes(filterOperand as any)){
@@ -235,7 +227,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
     }
 
     /** It's an object key which means it's an equality comparison against a json object */
-    if(selItem?.column_udt_type?.startsWith("json") && !OPERANDS.includes(filterOperand)){
+    if(selItem?.column_udt_type?.startsWith("json") && !FILTER_OPERANDS.includes(filterOperand)){
       return leftQ + " = " + parseRightVal(rightF);
     }    
 
@@ -315,9 +307,9 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
         return " TRUE ";
       }
 
-      const _fVal: any[] = filterValue.filter((v: any) => v !== null);
+      const nonNullFilterValues: any[] = filterValue.filter((v: any) => v !== null);
       let c1 = "", c2 = "";
-      if(_fVal.length) c1 = leftQ + " NOT IN " + parseRightVal(_fVal, "csv");
+      if(nonNullFilterValues.length) c1 = leftQ + " NOT IN " + parseRightVal(nonNullFilterValues, "csv");
       if(filterValue.includes(null)) c2 = ` ${leftQ} IS NOT NULL `;
       return [c1, c2].filter(c => c).join(" AND ");
 
@@ -387,6 +379,29 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
   }
 }
 
+type ParseRightValOpts = {
+  expect?: "csv" | "array" | "json" | "jsonb";
+  selectItem: SelectItem | undefined;
+}
+export const parseFilterRightValue = (val: any, { expect, selectItem }: ParseRightValOpts) => {
+  const asValue = (v: any) => pgp.as.format("$1", [v]);
+  const checkIfArr = () => {
+    if(!Array.isArray(val)) {
+      throw "This type of filter/column expects an Array of items";
+    }
+  }
+  if(expect === "csv" || expect?.startsWith("json")){
+    checkIfArr();
+    return pgp.as.format(`($1:${expect})`, [val]);
+
+  } else if(expect === "array" || selectItem?.columnPGDataType === "ARRAY"){
+    checkIfArr();        
+    return pgp.as.format(" ARRAY[$1:csv]", [val]);
+
+  }
+
+  return asValue(val);
+}
 
 // ensure pgp is not NULL!!!
 // const asValue = v => v;// pgp.as.value;

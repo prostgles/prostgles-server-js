@@ -1,6 +1,6 @@
 import { AnyObject, isObject, pickKeys } from "prostgles-types";
 import { ExistsFilterConfig, LocalParams, pgp } from "./DboBuilder";
-import { parseFilterItem } from "../Filtering";
+import { FILTER_OPERANDS, parseFilterItem } from "../Filtering";
 import { asValue } from "../PubSubManager/PubSubManager";
 import { TableRule } from "../PublishParser/PublishParser";
 import { FUNCTIONS, parseFunction } from "./QueryBuilder/Functions";
@@ -8,6 +8,7 @@ import { SelectItem, asNameAlias, parseFunctionObject } from "./QueryBuilder/Que
 import { ViewHandler } from "./ViewHandler/ViewHandler";
 import { getExistsCondition } from "./ViewHandler/getExistsCondition";
 import { getExistsFilters } from "./ViewHandler/getExistsFilters";
+import { parseComplexFilter } from "./ViewHandler/parseComplexFilter";
 
 const FILTER_FUNCS = FUNCTIONS.filter(f => f.canBeUsedForFilter);
 
@@ -21,7 +22,7 @@ export async function getCondition(
   this: ViewHandler, 
   params: { 
     filter: any, 
-    select?: SelectItem[], 
+    select: SelectItem[] | undefined, 
     allowed_colnames: string[], 
     tableAlias?: string, 
     localParams?: LocalParams, 
@@ -115,66 +116,19 @@ export async function getCondition(
   allowedSelect = allowedSelect.concat(
     remainingNonSelectedColumns
   );
-
-  /* Parse complex filters
-    { 
-      $filter: [
-        { $func: [...] }, 
-        "=", 
-        value | { $func: [..] }
-      ] 
-    } 
-  */
   const complexFilters: string[] = [];
   const complexFilterKey = "$filter";
-  const allowedComparators = [">", "<", "=", "<=", ">=", "<>", "!="]
   if (complexFilterKey in filter) {
 
-    /**
-     * { $funcName: [arg1, arg2] }
-     * { $column: "column_name" }
-     */
-    const getFuncQuery = (funcData: AnyObject): string => {
-      if(isObject(funcData) && "$column" in funcData){
-        const column = funcData["$column"]
-        if(typeof column !== "string"){
-          throw `expecting: \n  { $column: "column_name" } received:\n ${JSON.stringify(funcData)}`;
-        }
-        if(!allowed_colnames.includes(column)){
-          throw `Dissallowed or Invalid column ${column}. Allowed columns: ${allowed_colnames}`;
-        }
-        return asNameAlias(column, tableAlias)
-      }
-      const { funcName, args } = parseFunctionObject(funcData);
-      const funcDef = parseFunction({ func: funcName, args, functions: FUNCTIONS, allowedFields: allowed_colnames });
-      return funcDef.getQuery({ args, tableAlias, allColumns: this.columns, allowedFields: allowed_colnames });
-    }
-
-    const complexFilter = filter[complexFilterKey];
-    if (!Array.isArray(complexFilter)) {
-      throw `Invalid $filter. Must contain an array of at least element but got: ${JSON.stringify(complexFilter)} `
-    } 
-
-    const [leftFilter, comparator, rightFilterOrValue] = complexFilter;
-
-    const leftVal = getFuncQuery(leftFilter);
-    let result = leftVal;
-    if (comparator) {
-      if (!allowedComparators.includes(comparator)) {
-        throw `Invalid $filter. comparator ${JSON.stringify(comparator)} is not valid. Expecting one of: ${allowedComparators}`;
-      }
-      if (!rightFilterOrValue) {
-        throw "Invalid $filter. Expecting a value or function after the comparator";
-      }
-      const rightVal = isObject(rightFilterOrValue) ? getFuncQuery(rightFilterOrValue) : asValue(rightFilterOrValue);
-      if (leftVal === rightVal){ 
-        throw "Invalid $filter. Cannot compare two identical function signatures: " + JSON.stringify(leftFilter);
-      }
-      result += ` ${comparator} ${rightVal}`;
-    }
-    complexFilters.push(result);
+    const complexFilterCondition = parseComplexFilter({
+      filter,
+      complexFilterKey,
+      tableAlias,
+      allowed_colnames,
+      columns: this.columns,
+    });
+    complexFilters.push(complexFilterCondition);
   }
-
 
   /* Parse join filters
       { $joinFilter: { $ST_DWithin: [table.col, foreignTable.col, distance] } 

@@ -55,6 +55,7 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
     });
 
     const updateFilter = await this.prepareWhere({
+      select: undefined,
       filter,
       forcedFilter,
       filterFields,

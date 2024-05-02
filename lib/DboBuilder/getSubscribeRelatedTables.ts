@@ -12,7 +12,7 @@ type Args = {
   localParams: LocalParams | undefined;
   newQuery: NewQuery;
 }
-export async function getSubscribeRelatedTables(this: ViewHandler, { selectParams, filter, localParams, table_rules, newQuery }: Args){
+export async function getSubscribeRelatedTables(this: ViewHandler, { filter, localParams, newQuery }: Args){
 
   let viewOptions: ViewSubscriptionOptions | undefined = undefined;
   const { condition } = newQuery.whereOpts;
@@ -143,6 +143,7 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { selectParam
           tableName: j.table,
           tableNameEscaped: asName(j.table),
           condition: (await this.dboBuilder.dbo[j.table]!.prepareWhere!({
+            select: undefined,
             filter: {
               $existsJoined: {
                 path: reverseParsedPath(j.joinPath, this.name),
@@ -164,6 +165,7 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { selectParam
         tableName: targetTable,
         tableNameEscaped: asName(targetTable),
         condition: (await this.dboBuilder.dbo[targetTable]!.prepareWhere!({
+          select: undefined,
           filter: {
             $existsJoined: {
               path: newPath,

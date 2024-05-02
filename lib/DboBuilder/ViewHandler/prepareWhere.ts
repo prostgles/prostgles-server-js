@@ -7,7 +7,7 @@ import { getCondition } from "../getCondition";
 
 type PrepareWhereParams = {
   filter?: Filter;
-  select?: SelectItem[];
+  select: SelectItem[] | undefined;
   forcedFilter?: AnyObject;
   filterFields?: FieldFilter;
   addWhere?: boolean;
@@ -68,8 +68,6 @@ export async function prepareWhere(this: ViewHandler, params: PrepareWhereParams
     }
     return result;
   }
-
-
 
   /* A forced filter condition will not check if the existsJoined filter tables have been published */
   const forcedFilterCond = forcedFilter ? await parseFullFilter(forcedFilter, null, true) : undefined;

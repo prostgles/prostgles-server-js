@@ -34,6 +34,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
   let checkCondition = "WHERE FALSE";
   if(checkFilter){
     const checkCond = await tableHandler.prepareWhere({
+      select: undefined,
       localParams: undefined,
       tableRule: undefined,
       filter: checkFilter,
