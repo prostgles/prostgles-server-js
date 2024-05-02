@@ -131,11 +131,10 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       validateSelectedItemFilter(selItem);
     }
     if(!selItem) {
-      return mErr("Bad filter. Could not match to a column or alias or dot notation: "); 
+      return mErr("Bad filter. Could not match to a column or alias or dot notation" + select?.map(s => s.alias)); 
     }
 
     let remainingStr = fKey.slice(selItem.alias.length);
-
 
     /* Is json path spec */
     if(remainingStr.startsWith("->")){

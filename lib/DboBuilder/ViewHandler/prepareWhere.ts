@@ -5,7 +5,7 @@ import { SelectItem } from "../QueryBuilder/QueryBuilder";
 import { TableRule } from "../../PublishParser/PublishParser";
 import { getCondition } from "../getCondition";
 
-type PrepareWhereParams = {
+export type PrepareWhereParams = {
   filter?: Filter;
   select: SelectItem[] | undefined;
   forcedFilter?: AnyObject;
@@ -13,7 +13,8 @@ type PrepareWhereParams = {
   addWhere?: boolean;
   tableAlias?: string,
   localParams: LocalParams | undefined,
-  tableRule: TableRule | undefined
+  tableRule: TableRule | undefined,
+  isHaving?: boolean;
 };
 
 export async function prepareWhere(this: ViewHandler, params: PrepareWhereParams): Promise<{ condition: string; where: string; filter: AnyObject; exists: ExistsFilterConfig[]; }> {
@@ -61,7 +62,8 @@ export async function prepareWhere(this: ViewHandler, params: PrepareWhereParams
         allowed_colnames: isForcedFilterBypass ? this.column_names.slice(0) : this.parseFieldFilter(filterFields),
         tableAlias,
         localParams: isForcedFilterBypass ? undefined : localParams,
-        tableRules: isForcedFilterBypass ? undefined : tableRule
+        tableRules: isForcedFilterBypass ? undefined : tableRule,
+        isHaving: params.isHaving,
       });
       result = cond.condition;
       exists.push(...cond.exists);

@@ -1205,14 +1205,33 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
   });
 
   await test("Having clause", async () => {
-    // await db.items.insert!([{ name: "a" }, { name: "a" }]);
     const res = await db.items.find!(
       {}, 
       { 
         select: { name: 1, c: { $countAll: [] } 
       }, 
-      having: { 
+      having: {
         c: 4, 
+      }
+    });
+    assert.deepStrictEqual(res, [{
+      c: '4',
+      name: 'multi'
+    }]);
+  });
+
+  await test("Having clause with complex filter", async () => {
+    const res = await db.items.find!(
+      {}, 
+      { 
+        select: { name: 1, c: { $countAll: [] } 
+      }, 
+      having: {
+        $filter: [
+          { $countAll: [] },
+          "=",
+          4
+        ], 
       } 
     });
     assert.deepStrictEqual(res, [{

@@ -7,6 +7,7 @@ import { prepareSortItems } from "../ViewHandler/prepareSortItems";
 import { COMPUTED_FIELDS, FUNCTIONS } from "./Functions";
 import { NewQuery, NewQueryJoin, SelectItemBuilder } from "./QueryBuilder";
 import { prepareHaving } from "./prepareHaving";
+import { PrepareWhereParams } from "../ViewHandler/prepareWhere";
 
 const JOIN_KEYS = ["$innerJoin", "$leftJoin"] as const;
 const JOIN_PARAM_KEYS = getKeys({ 
@@ -191,15 +192,25 @@ export async function getNewQuery(
   const select = sBuilder.select;
     
   const tableAlias = selectParams.alias;
-  const filterOpts = await _this.prepareWhere({
+  const commonWhereParams: PrepareWhereParams = {
     filter, 
     select, 
     forcedFilter: tableRules?.select?.forcedFilter, 
     filterFields: tableRules?.select?.filterFields, 
     tableAlias, 
     localParams,
-    tableRule: tableRules
+    tableRule: tableRules,
+    isHaving: false,
+  }
+  const filterOpts = await _this.prepareWhere({
+    ...commonWhereParams,
+    isHaving: false,
   });
+  const havingOpts = selectParams.having? await _this.prepareWhere({
+    ...commonWhereParams,
+    filter: selectParams.having,
+    isHaving: true,
+  }) : undefined;
   const where = filterOpts.where;
   const validatedRules = _this.getValidatedRules(tableRules, localParams);
 
@@ -210,12 +221,7 @@ export async function getNewQuery(
     joins: joinQueries,
     where,
     whereOpts: filterOpts,
-    having: prepareHaving({ 
-      having: selectParams.having, 
-      select, 
-      tableAlias,
-      filterFieldNames: tableRules ? _this.parseFieldFilter(tableRules?.select?.filterFields) : _this.column_names.slice(0),
-    }),
+    having: havingOpts?.condition ?? "",
     isLeftJoin: false,
     limit: prepareLimitQuery(selectParams.limit, validatedRules),
     orderByItems: prepareSortItems(

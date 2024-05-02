@@ -1,10 +1,9 @@
-import { AnyObject, isObject, pickKeys } from "prostgles-types";
-import { ExistsFilterConfig, LocalParams, pgp } from "./DboBuilder";
-import { FILTER_OPERANDS, parseFilterItem } from "../Filtering";
-import { asValue } from "../PubSubManager/PubSubManager";
+import { pickKeys } from "prostgles-types";
+import { parseFilterItem } from "../Filtering";
 import { TableRule } from "../PublishParser/PublishParser";
-import { FUNCTIONS, parseFunction } from "./QueryBuilder/Functions";
-import { SelectItem, asNameAlias, parseFunctionObject } from "./QueryBuilder/QueryBuilder";
+import { ExistsFilterConfig, LocalParams, pgp } from "./DboBuilder";
+import { FUNCTIONS } from "./QueryBuilder/Functions";
+import { SelectItem } from "./QueryBuilder/QueryBuilder";
 import { ViewHandler } from "./ViewHandler/ViewHandler";
 import { getExistsCondition } from "./ViewHandler/getExistsCondition";
 import { getExistsFilters } from "./ViewHandler/getExistsFilters";
@@ -26,10 +25,11 @@ export async function getCondition(
     allowed_colnames: string[], 
     tableAlias?: string, 
     localParams?: LocalParams, 
-    tableRules?: TableRule 
+    tableRules?: TableRule,
+    isHaving?: boolean,
   },
 ): Promise<{ exists: ExistsFilterConfig[]; condition: string }> {
-  const { filter: rawFilter, select, allowed_colnames, tableAlias, localParams, tableRules } = params;
+  const { filter: rawFilter, select, allowed_colnames, tableAlias, localParams, tableRules, isHaving } = params;
  
   const filter = { ... (rawFilter as any) } as any;
 
@@ -86,8 +86,8 @@ export async function getCondition(
   if (select) {
     /* Allow filtering by selected fields/funcs */
     allowedSelect = select.filter(s => {
-      if (["function", "computed", "column"].includes(s.type)) {
-        /*  */
+      if (["function", "computed", "column"].includes(s.type) || isHaving && s.type === "aggregation") {
+        /** Selected computed cols are allowed for filtering without checking. Why not allow all?! */
         if (s.type !== "column" || allowed_colnames.includes(s.alias)) {
           return true;
         }
@@ -157,15 +157,24 @@ export async function getCondition(
 
   if (invalidColumn) {
     const selItem = select?.find(s => s.alias === invalidColumn);
+    let isComplexFilter = false;
     if(selItem?.type === "aggregation"){
-      throw new Error(`Filtering by ${invalidColumn} is not allowed. Aggregations cannot be filtered. Use HAVING clause instead.`);
+      if(!params.isHaving){
+        throw new Error(`Filtering by ${invalidColumn} is not allowed. Aggregations cannot be filtered. Use HAVING clause instead.`);
+      } else {
+        isComplexFilter = true;
+      }
     }
-    const allowedCols = allowedSelect.map(s => s.type === "column" ? s.getQuery() : s.alias).join(", ");
-    const errMessage = `Table: ${this.name} -> disallowed/inexistent columns in filter: ${invalidColumn} \n  Expecting one of: ${allowedCols}`;
-    throw errMessage;
+
+    if(!isComplexFilter){
+      const allowedCols = allowedSelect.map(s => s.type === "column" ? s.getQuery() : s.alias).join(", ");
+      const errMessage = `Table: ${this.name} -> disallowed/inexistent columns in filter: ${invalidColumn} \n  Expecting one of: ${allowedCols}`;
+      throw errMessage;
+    }
   }
 
   /* TODO: Allow filter funcs */
+  // see isComplexFilter above where they are allowed
   // const singleFuncs = FUNCTIONS.filter(f => f.singleColArg);
 
   const f = pickKeys(filter, filterKeys);
