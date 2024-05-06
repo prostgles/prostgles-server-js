@@ -318,12 +318,14 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
         return " FALSE ";
       }
 
-      const _fVal: any[] = filterValue.filter((v: any) => v !== null);
+      const filterNonNullValues: any[] = filterValue.filter((v: any) => v !== null);
       let c1 = "", c2 = "";
-      if(_fVal.length) {
-        c1 = leftQ + " IN " + parseRightVal(_fVal, "csv");
+      if(filterNonNullValues.length) {
+        c1 = leftQ + " IN " + parseRightVal(filterNonNullValues, "csv");
       }
-      if(filterValue.includes(null)) c2 = ` ${leftQ} IS NULL `;
+      if(filterValue.includes(null)) {
+        c2 = ` ${leftQ} IS NULL `;
+      }
       return [c1, c2].filter(c => c).join(" OR ");
 
     } else if(["$nin"].includes(filterOperand)){

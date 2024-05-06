@@ -37,6 +37,7 @@ const getMaterialViews = (db: DBorTx, schema: ProstglesInitOptions["schema"]) =>
             CASE WHEN RIGHT(data_type, 2) = '[]' 
             THEN LEFT(data_type, -2) END,
         'is_nullable', nullable,
+        'is_generated', true,
         'references', null,
         'has_default', false,
         'column_default', null,
@@ -184,6 +185,7 @@ export async function getTablesForSchemaPostgresSQL(
               ccc.ordinal_position, 
               ccc.is_nullable = 'YES' as is_nullable,
               ccc.is_updatable,
+              ccc.is_generated,
               null as references,
               ccc.has_default,
               ccc.column_default
@@ -199,6 +201,7 @@ export async function getTablesForSchemaPostgresSQL(
             , COALESCE(c.column_default IS NOT NULL OR c.identity_generation = 'ALWAYS', false) as has_default
             , c.column_default
             , c.is_nullable
+            , CASE WHEN c.is_generated = 'ALWAYS' THEN true ELSE false END as is_generated
               /* generated always and view columns cannot be updated */
             , COALESCE(c.is_updatable, 'YES') = 'YES' AND COALESCE(c.is_generated, '') != 'ALWAYS' AND COALESCE(c.identity_generation, '') != 'ALWAYS' as is_updatable
             , cp.privileges

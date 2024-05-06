@@ -194,6 +194,7 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
             "column_default": null,
             "comment": null,
             "ordinal_position": 1,
+            "is_generated": false,
             "is_nullable": false,
             "references": null,
             "has_default": true,
@@ -217,6 +218,7 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
             "column_default": null,
             "comment": null,
             "ordinal_position": 2,
+            "is_generated": false,
             "is_nullable": true,
             "references": [{
               "ftable": "tr1",
@@ -251,6 +253,7 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
             "column_default": null,
             "comment": null,
             "ordinal_position": 3,
+            "is_generated": false,
             "is_nullable": true,
             "references": null,
             "has_default": false,
@@ -274,6 +277,7 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
             "column_default": null,
             "comment": null,
             "ordinal_position": 4,
+            "is_generated": false,
             "is_nullable": true,
             "references": null,
             "has_default": false,
@@ -1086,7 +1090,7 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
 
     });
 
-    await test("Join path", async () => {
+    await test("Join path with order by nested", async () => {
 
       await db.items_multi.insert!({ 
         items0_id: { name: "multi0" }, 
