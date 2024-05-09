@@ -268,17 +268,15 @@ export class ViewHandler {
   }
   find = find.bind(this);
   
-  async findOne(filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any> {
+  async findOne(filter?: Filter, selectParams?: SelectParams, _param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any> {
 
     try {
       await this._log({ command: "find", localParams, data: { filter, selectParams } });
-      const { select = "*", orderBy, offset = 0 } = selectParams || {};
-      if (selectParams) {
-        const good_params = ["select", "orderBy", "offset"];
-        const bad_params = Object.keys(selectParams).filter(k => !good_params.includes(k));
-        if (bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
+      const { limit, ...params } = selectParams ?? {};
+      if (limit) {
+        throw "limit not allowed in findOne()";
       }
-      return this.find(filter, { select, orderBy, limit: 1, offset, returnType: "row" }, undefined, table_rules, localParams);
+      return this.find(filter, { ...params, limit: 1, returnType: "row" }, undefined, table_rules, localParams);
     } catch (e) {
       if (localParams && localParams.testRule) throw e;
       throw parseError(e, `Issue with dbo.${this.name}.findOne()`);

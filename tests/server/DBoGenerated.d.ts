@@ -246,6 +246,18 @@ export type DBSchemaGenerated = {
       name?: null | string;
     };
   };
+  logs: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      created_at?: string;
+      id?: string;
+      request?: null | any;
+    };
+  };
   lookup_col1: {
     is_view: false;
     select: true;
@@ -290,6 +302,19 @@ export type DBSchemaGenerated = {
       last_updated: string;
       x?: null | number;
       y?: null | number;
+    };
+  };
+  plans: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id: string;
+      info?: null | any;
+      name: string;
+      price?: null | string;
     };
   };
   "prostgles_test.basic": {
@@ -386,6 +411,17 @@ export type DBSchemaGenerated = {
       proj4text?: null | string;
       srid: number;
       srtext?: null | string;
+    };
+  };
+  subscriptions: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      created_at?: string;
+      plan_id: string;
     };
   };
   symbols: {
