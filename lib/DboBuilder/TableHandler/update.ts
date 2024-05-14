@@ -1,6 +1,6 @@
 import { AnyObject, UpdateParams } from "prostgles-types";
 import { TableRule } from "../../PublishParser/PublishParser";
-import { Filter, LocalParams, parseError, withUserRLS } from "../DboBuilder";
+import { Filter, LocalParams, getErrorAsObject, parseError, withUserRLS } from "../DboBuilder";
 import { getInsertTableRules, getReferenceColumnInserts } from "../insertNestedRecords";
 import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
 import { TableHandler } from "./TableHandler";
@@ -9,8 +9,8 @@ import { prepareNewData } from "./DataValidator";
 
 export async function update(this: TableHandler, filter: Filter, _newData: AnyObject, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<AnyObject | void> {
   const ACTION = "update";
+  const start = Date.now();
   try {
-    await this._log({ command: "update", localParams, data: { filter, _newData, params } });
     /** postValidate */
     const finalDBtx = this.getFinalDBtx(localParams);
     const wrapInTx = () => this.dboBuilder.getTX(_dbtx => _dbtx[this.name]?.[ACTION]?.(filter, _newData, params, tableRules, localParams))
@@ -105,7 +105,7 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
 
     if (returnQuery) return query as unknown as void;
 
-    return runInsertUpdateQuery({
+    const result = await runInsertUpdateQuery({
       tableHandler: this,
       data: undefined,
       fields,
@@ -117,8 +117,10 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
       type: "update",
       nestedInsertsResultsObj
     });
-
+    await this._log({ command: "update", localParams, data: { filter, _newData, params }, duration: Date.now() - start });
+    return result;
   } catch (e) {
+    await this._log({ command: "update", localParams, data: { filter, _newData, params }, duration: Date.now() - start, error: getErrorAsObject(e) });
     if (localParams && localParams.testRule) throw e;
     throw parseError(e, `dbo.${this.name}.${ACTION}(${JSON.stringify(filter || {}, null, 2)}, ${Array.isArray(_newData)? "[{...}]": "{...}"}, ${JSON.stringify(params || {}, null, 2)})`)
   }

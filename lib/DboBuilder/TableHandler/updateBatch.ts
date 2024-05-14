@@ -1,12 +1,12 @@
 import { AnyObject, UpdateParams } from "prostgles-types";
-import { Filter, LocalParams, getClientErrorFromPGError, parseError, withUserRLS } from "../DboBuilder";
+import { Filter, LocalParams, getClientErrorFromPGError, getErrorAsObject, parseError, withUserRLS } from "../DboBuilder";
 import { TableRule } from "../../PublishParser/PublishParser";
 import { TableHandler } from "./TableHandler";
 
 
 export async function updateBatch(this: TableHandler, updates: [Filter, AnyObject][], params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<any> {
+  const start = Date.now();
   try {
-    await this._log({ command: "updateBatch", localParams, data: { data: updates, params } });
     const { checkFilter, postValidate } = tableRules?.update ?? {};
     if(checkFilter || postValidate){
       throw `updateBatch not allowed for tables with checkFilter or postValidate rules`
@@ -31,12 +31,19 @@ export async function updateBatch(this: TableHandler, updates: [Filter, AnyObjec
     
     const t = localParams?.tx?.t ?? this.tx?.t;
     if(t){
-      return t.none(queries.join(";\n"))
+      const result = await t.none(queries.join(";\n"));
+      await this._log({ command: "updateBatch", localParams, data: { data: updates, params }, duration: Date.now() - start });
+      return result;
     }
-    return this.db.tx(t => {
-      return t.none(queries.join(";\n"));
-    }).catch(err => getClientErrorFromPGError(err, { type: "tableMethod", localParams, view: this, allowedKeys: []}));
+    const result = await this.db.tx(t => {
+        return t.none(queries.join(";\n"));
+      })
+      .catch(err => getClientErrorFromPGError(err, { type: "tableMethod", localParams, view: this, allowedKeys: []}));
+
+    await this._log({ command: "updateBatch", localParams, data: { data: updates, params }, duration: Date.now() - start });
+    return result;
   } catch (e) {
+    await this._log({ command: "updateBatch", localParams, data: { data: updates, params }, duration: Date.now() - start, error: getErrorAsObject(e) });
     if (localParams && localParams.testRule) throw e;
     throw parseError(e, `dbo.${this.name}.update()`);
   }

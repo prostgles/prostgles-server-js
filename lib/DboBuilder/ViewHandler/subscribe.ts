@@ -1,6 +1,6 @@
 import { AnyObject, SubscribeParams, SubscriptionChannels } from "prostgles-types";
 import { TableRule } from "../../PublishParser/PublishParser";
-import { Filter, LocalParams, parseError } from "../DboBuilder";
+import { Filter, LocalParams, getErrorAsObject, parseError } from "../DboBuilder";
 import { NewQuery } from "../QueryBuilder/QueryBuilder";
 import { ViewHandler } from "./ViewHandler";
 import { getSubscribeRelatedTables } from "../getSubscribeRelatedTables";
@@ -27,9 +27,8 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
 async function subscribe(this: ViewHandler, filter: Filter, params: SubscribeParams, localFuncs: undefined, table_rules: TableRule | undefined, localParams: LocalParams): Promise<SubscriptionChannels>
 async function subscribe(this: ViewHandler, filter: Filter, params: SubscribeParams, localFuncs?: LocalFuncs, table_rules?: TableRule, localParams?: LocalParams): Promise<{ unsubscribe: () => any } | SubscriptionChannels> 
 {
-
+  const start = Date.now();
   try {
-    await this._log({ command: "subscribe", localParams, data: { filter, params } });
 
     if (this.tx) {
       throw "subscribe not allowed within transactions";
@@ -82,13 +81,15 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
     if (!localFuncs) {    
 
       const { socket } = localParams ?? {};
-      return pubSubManager.addSub({
+      const result = await pubSubManager.addSub({
         ...commonSubOpts,
         socket, 
         localFuncs: undefined,
         socket_id: socket?.id, 
       });
 
+      await this._log({ command: "subscribe", localParams, data: { filter, params }, duration: Date.now() - start });
+      return result;
     } else {
 
       const { channelName } = await pubSubManager.addSub({ 
@@ -102,10 +103,12 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
         const pubSubManager = await this.dboBuilder.getPubSubManager();
         pubSubManager.removeLocalSub(channelName, localFuncs)
       };
+      await this._log({ command: "subscribe", localParams, data: { filter, params }, duration: Date.now() - start });
       const res: { unsubscribe: () => any } = Object.freeze({ unsubscribe })
       return res;
     }
   } catch (e) {
+    await this._log({ command: "subscribe", localParams, data: { filter, params }, duration: Date.now() - start, error: getErrorAsObject(e) });
     if (localParams && localParams.testRule) throw e;
     throw parseError(e, `dbo.${this.name}.subscribe()`);
   }

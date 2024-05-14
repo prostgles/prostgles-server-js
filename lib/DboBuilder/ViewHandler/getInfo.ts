@@ -1,17 +1,20 @@
-import { 
-  TableInfo as TInfo, pickKeys,
- } from "prostgles-types/dist";
-import { LocalParams } from "../DboBuilder";
+import {
+  TableInfo as TInfo
+} from "prostgles-types/dist";
 import { TableRule } from "../../PublishParser/PublishParser";
+import { LocalParams } from "../DboBuilder";
 import { ViewHandler } from "./ViewHandler";
 
 export async function getInfo(this: ViewHandler, lang?: string, param2?: any, param3?: any, tableRules?: TableRule, localParams?: LocalParams): Promise<TInfo> {
-  await this._log({ command: "getInfo", localParams, data: { lang } });
   const p = this.getValidatedRules(tableRules, localParams);
-  if (!p.getInfo) throw "Not allowed";
+  if (!p.getInfo) {
+    await this._log({ command: "getInfo", localParams, data: { lang }, duration: 0, error: "Not allowed" });
+    throw "Not allowed";
+  }
 
   const fileTableName = this.dboBuilder.prostgles?.opts?.fileTable?.tableName;
 
+  await this._log({ command: "getInfo", localParams, data: { lang }, duration: 0 });
   return {
     oid: this.tableOrViewInfo.oid,
     comment: this.tableOrViewInfo.comment,

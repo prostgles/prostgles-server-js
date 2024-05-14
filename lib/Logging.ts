@@ -19,6 +19,8 @@ export namespace EventTypes {
     command: keyof TableHandler;
     data: AnyObject;
     localParams: LocalParams | undefined;
+    duration: number;
+    error?: any;
   };
 
   export type Sync = {

@@ -1,14 +1,14 @@
 import pgPromise from "pg-promise";
 import { AnyObject, DeleteParams, FieldFilter } from "prostgles-types";
-import { Filter, LocalParams, parseError, withUserRLS } from "../DboBuilder";
+import { Filter, LocalParams, getErrorAsObject, parseError, withUserRLS } from "../DboBuilder";
 import { DeleteRule, TableRule } from "../../PublishParser/PublishParser";
 import { runQueryReturnType } from "../ViewHandler/find";
 import { TableHandler } from "./TableHandler";
 import { onDeleteFromFileTable } from "./onDeleteFromFileTable";
 
 export async function _delete(this: TableHandler, filter?: Filter, params?: DeleteParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any> {
+  const start = Date.now();
   try {
-    await this._log({ command: "delete", localParams, data: { filter, params } });
     const { returning } = params || {};
     filter = filter || {};
     this.checkFilter(filter);
@@ -86,15 +86,17 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
      * Delete file
      */
     if (this.is_media) {
-      return onDeleteFromFileTable.bind(this)({ 
+      const result = await onDeleteFromFileTable.bind(this)({ 
         localParams, 
         queryType, 
         returningQuery: returnQuery? returnQuery : undefined,
         filterOpts,
       });
+      await this._log({ command: "delete", localParams, data: { filter, params }, duration: Date.now() - start });
+      return result;
     }
 
-    return runQueryReturnType({ 
+    const result = await runQueryReturnType({ 
       queryWithoutRLS,
       queryWithRLS,
       newQuery: undefined, 
@@ -102,8 +104,11 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
       handler: this, 
       localParams
     });
+    await this._log({ command: "delete", localParams, data: { filter, params }, duration: Date.now() - start });
+    return result;
 
   } catch (e) {
+    await this._log({ command: "delete", localParams, data: { filter, params }, duration: Date.now() - start, error: getErrorAsObject(e) });
     if (localParams && localParams.testRule) throw e;
     throw parseError(e, `dbo.${this.name}.delete(${JSON.stringify(filter || {}, null, 2)}, ${JSON.stringify(params || {}, null, 2)})`);
   }

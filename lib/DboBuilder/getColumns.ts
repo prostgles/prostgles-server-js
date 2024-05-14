@@ -1,9 +1,9 @@
-import { 
-  AnyObject, PG_COLUMN_UDT_DATA_TYPE, 
-  ValidatedColumnInfo, _PG_geometric, isObject 
+import {
+  AnyObject, PG_COLUMN_UDT_DATA_TYPE,
+  ValidatedColumnInfo, _PG_geometric, isObject
 } from "prostgles-types";
-import { isPlainObject, LocalParams, parseError, postgresToTsType } from "./DboBuilder";
 import { TableRule } from "../PublishParser/PublishParser";
+import { LocalParams, getErrorAsObject, parseError, postgresToTsType } from "./DboBuilder";
 import { TableHandler } from "./TableHandler/TableHandler";
 import { ViewHandler } from "./ViewHandler/ViewHandler";
 
@@ -17,9 +17,8 @@ export async function getColumns(
   tableRules?: TableRule,
   localParams?: LocalParams
 ): Promise<ValidatedColumnInfo[]> {
-
+  const start = Date.now();
   try {
-    await this._log({ command: "getColumns", localParams, data: { lang, params } });
 
     const p = this.getValidatedRules(tableRules, localParams);
 
@@ -94,9 +93,11 @@ export async function getColumns(
         return result;
       }).filter(c => c.select || c.update || c.delete || c.insert)
 
+    await this._log({ command: "getColumns", localParams, data: { lang, params }, duration: Date.now() - start });
     return columns;
 
   } catch (e) {
+    await this._log({ command: "getColumns", localParams, data: { lang, params }, duration: Date.now() - start, error: getErrorAsObject(e) });
     throw parseError(e, `db.${this.name}.getColumns()`);
   }
 }

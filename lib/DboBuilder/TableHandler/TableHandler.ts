@@ -3,7 +3,7 @@ import { AnyObject, asName, DeleteParams, FieldFilter, InsertParams, Select, Upd
 import { DB } from "../../Prostgles";
 import { SyncRule, TableRule } from "../../PublishParser/PublishParser";
 import TableConfigurator from "../../TableConfig/TableConfig";
-import { DboBuilder, Filter, LocalParams, parseError, TableHandlers } from "../DboBuilder";
+import { DboBuilder, Filter, getErrorAsObject, LocalParams, parseError, TableHandlers } from "../DboBuilder";
 import type { TableSchema } from "../DboBuilderTypes";
 import { parseUpdateRules } from "../parseUpdateRules";
 import { COMPUTED_FIELDS, FUNCTIONS } from "../QueryBuilder/Functions";
@@ -99,9 +99,8 @@ export class TableHandler extends ViewHandler {
 
   /* External request. Cannot sync from server */
   async sync(filter: Filter, params: { select?: FieldFilter }, param3_unused: undefined, table_rules: TableRule, localParams: LocalParams) {
-
+    const start = Date.now();
     try {
-      await this._log({ command: "sync", localParams, data: { filter, params } });
       
       if (!localParams) throw "Sync not allowed within the server code";
       const { socket } = localParams;
@@ -145,7 +144,7 @@ export class TableHandler extends ViewHandler {
       });
 
       /* Step 1: parse command and params */
-      return this.find(filter, { select, limit: 0 }, undefined, table_rules, localParams)
+      const result = await this.find(filter, { select, limit: 0 }, undefined, table_rules, localParams)
         .then(async _isValid => {
 
           const { filterFields, forcedFilter } = table_rules?.select || {};
@@ -163,8 +162,10 @@ export class TableHandler extends ViewHandler {
             params: { select }
           }).then(channelName => ({ channelName, id_fields, synced_field }));
         });
-
+      await this._log({ command: "sync", localParams, data: { filter, params }, duration: Date.now() - start });
+      return result;
     } catch (e) {
+      await this._log({ command: "sync", localParams, data: { filter, params }, duration: Date.now() - start, error: getErrorAsObject(e) });
       if (localParams && localParams.testRule) throw e;
       throw parseError(e, `dbo.${this.name}.sync()`);
     }

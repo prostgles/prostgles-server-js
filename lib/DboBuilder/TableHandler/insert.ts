@@ -1,18 +1,17 @@
 import { AnyObject, InsertParams, asName, isObject } from "prostgles-types";
-import { LocalParams, parseError, withUserRLS } from "../DboBuilder";
 import { TableRule, ValidateRowBasic } from "../../PublishParser/PublishParser";
+import { LocalParams, getErrorAsObject, parseError, withUserRLS } from "../DboBuilder";
 import { insertNestedRecords } from "../insertNestedRecords";
-import { insertTest } from "./insertTest";
-import { TableHandler } from "./TableHandler";
-import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
 import { prepareNewData } from "./DataValidator";
-import { DBOFullyTyped } from "../../DBSchemaBuilder";
+import { TableHandler } from "./TableHandler";
+import { insertTest } from "./insertTest";
+import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
 
 export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObject[] = {}, insertParams?: InsertParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any | any[] | boolean> {
   
   const ACTION = "insert";
+  const start = Date.now();
   try {
-    await this._log({ command: "insert", localParams, data: { rowOrRows, param2: insertParams } });
 
     const { fixIssues = false } = insertParams || {};
     const { returnQuery = false, nestedInsert } = localParams || {};
@@ -129,7 +128,7 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
       console.log(this.tx?.t.ctx?.start, "insert in " + this.name, data);
     }
 
-    return await runInsertUpdateQuery({
+    const result = await runInsertUpdateQuery({
       rule, 
       localParams, 
       queryWithoutUserRLS, 
@@ -141,8 +140,10 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
       type: "insert",
       isMultiInsert,
     });
-    
+    await this._log({ command: "insert", localParams, data: { rowOrRows, param2: insertParams }, duration: Date.now() - start });
+    return result;
   } catch (e) {
+    await this._log({ command: "insert", localParams, data: { rowOrRows, param2: insertParams }, duration: Date.now() - start, error: getErrorAsObject(e) });
     if (localParams?.testRule) throw e;
     throw parseError(e, `dbo.${this.name}.${ACTION}()`)
   }

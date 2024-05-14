@@ -705,7 +705,7 @@ export class Prostgles {
       socket.emit(CHANNELS.SCHEMA, clientSchema);
 
     } catch (err) {
-      socket.emit(CHANNELS.SCHEMA, { err });
+      socket.emit(CHANNELS.SCHEMA, { err: getErrorAsObject(err) });
     }
   }
 }

@@ -1,6 +1,6 @@
 
 import { SelectParams, isObject } from "prostgles-types";
-import { Filter, LocalParams, getClientErrorFromPGError, parseError, withUserRLS } from "../DboBuilder";
+import { Filter, LocalParams, getClientErrorFromPGError, getErrorAsObject, parseError, withUserRLS } from "../DboBuilder";
 import { canRunSQL } from "../runSQL";
 import { TableRule } from "../../PublishParser/PublishParser";
 import { getNewQuery } from "../QueryBuilder/getNewQuery";
@@ -10,8 +10,9 @@ import { ViewHandler } from "./ViewHandler";
 import { NewQuery } from "../QueryBuilder/QueryBuilder";
 
 export const find = async function(this: ViewHandler, filter?: Filter, selectParams?: SelectParams, _?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]> {
+  const start = Date.now();
+  const command = selectParams?.limit === 1 && selectParams?.returnType === "row"? "findOne" : "find";
   try {
-    await this._log({ command: "find", localParams, data: { filter, selectParams } });
     filter = filter || {};
     const allowedReturnTypes = Object.keys({ 
       row: 1, statement: 1, value: 1, values: 1, 
@@ -92,7 +93,7 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
       return ((localParams?.returnQuery === "noRLS"? queryWithoutRLS : queryWithRLS) as unknown as any[]);
     }
 
-    return runQueryReturnType({ 
+    const result = await runQueryReturnType({ 
       queryWithoutRLS, 
       queryWithRLS, 
       returnType, 
@@ -101,7 +102,10 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
       newQuery,
     });
 
+    await this._log({ command, localParams, data: { filter, selectParams }, duration: Date.now() - start });
+    return result;
   } catch (e) {
+    this._log({ command, localParams, data: { filter, selectParams }, duration: Date.now() - start, error: getErrorAsObject(e) });
     if (localParams && localParams.testRule) throw e;
     throw parseError(e, `dbo.${this.name}.find()`);
   }

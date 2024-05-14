@@ -85,8 +85,8 @@ export class ViewHandler {
     });
   } 
 
-  _log = ({ command, data, localParams }: Pick<TableEvent, "command" | "data" | "localParams">) => {
-    return this.dboBuilder.prostgles.opts.onLog?.({ type: "table", tableName: this.name, command, data, localParams })
+  _log = ({ command, data, localParams, duration, error }: Pick<TableEvent, "command" | "data" | "localParams"> & { duration: number; error?: any; }) => {
+    return this.dboBuilder.prostgles.opts.onLog?.({ type: "table", tableName: this.name, command, data, localParams, duration, error });
   }
 
   getRowHashSelect(allowedFields: FieldFilter, alias?: string, tableAlias?: string): string {
@@ -271,12 +271,14 @@ export class ViewHandler {
   async findOne(filter?: Filter, selectParams?: SelectParams, _param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any> {
 
     try {
-      await this._log({ command: "find", localParams, data: { filter, selectParams } });
       const { limit, ...params } = selectParams ?? {};
       if (limit) {
         throw "limit not allowed in findOne()";
       }
-      return this.find(filter, { ...params, limit: 1, returnType: "row" }, undefined, table_rules, localParams);
+      const start = Date.now();
+      const result = await this.find(filter, { ...params, limit: 1, returnType: "row" }, undefined, table_rules, localParams);
+      await this._log({ command: "find", localParams, data: { filter, selectParams }, duration: Date.now() - start });
+      return result;
     } catch (e) {
       if (localParams && localParams.testRule) throw e;
       throw parseError(e, `Issue with dbo.${this.name}.findOne()`);
