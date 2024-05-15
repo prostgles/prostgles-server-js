@@ -209,7 +209,8 @@ export type LocalParams = {
     t: pgPromise.ITask<{}>;
   }
 
-  // localTX?: pgPromise.ITask<{}>;
+  /** Used to exclude certain logs */
+  noLog?: boolean;
 
   returnQuery?: boolean | "noRLS" | "where-condition";
   returnNewQuery?: boolean;

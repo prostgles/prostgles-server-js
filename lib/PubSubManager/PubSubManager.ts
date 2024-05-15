@@ -43,6 +43,7 @@ export type BasicCallback = (err?: any, res?: any) => void
 
 export type SyncParams = {
   socket_id: string;
+  sid: string | undefined;
   channel_name: string;
   table_name: string;
   table_rules?: TableRule;
@@ -375,6 +376,7 @@ export class PubSubManager {
           command: "upsertSocket.disconnect",
           tableName: "",
           duration: 0,
+          sid: this.dboBuilder.prostgles.authHandler?.getSIDNoError({ socket }),
           socketId: socket.id,
           connectedSocketIds: this.connectedSocketIds,
           remainingSubs: JSON.stringify(this.subs.map(s => ({ tableName: s.table_info.name, triggers: s.triggers }))),
@@ -498,6 +500,7 @@ export class PubSubManager {
       socketId: socket?.id,
       state: !addedTrigger.tbl? "fail" : "ok",
       error: addedTrigger.error,
+      sid: this.dboBuilder.prostgles.authHandler?.getSIDNoError({ socket }),
       tableName: addedTrigger.tbl ?? params.table_name,
       connectedSocketIds: this.dboBuilder.prostgles.connectedSockets.map(s => s.id),
       localParams: { socket }

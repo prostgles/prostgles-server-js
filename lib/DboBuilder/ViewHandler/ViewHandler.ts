@@ -86,7 +86,14 @@ export class ViewHandler {
   } 
 
   _log = ({ command, data, localParams, duration, error }: Pick<TableEvent, "command" | "data" | "localParams"> & { duration: number; error?: any; }) => {
-    return this.dboBuilder.prostgles.opts.onLog?.({ type: "table", tableName: this.name, command, data, localParams, duration, error });
+    if(localParams?.noLog){
+      if(localParams?.socket || localParams.httpReq) {
+        throw new Error("noLog option is not allowed from a remote client");
+      }
+      return;
+    }
+    const sid = this.dboBuilder.prostgles.authHandler?.getSIDNoError(localParams);
+    return this.dboBuilder.prostgles.opts.onLog?.({ type: "table", sid, socketId: localParams?.socket?.id, tableName: this.name, command, data, localParams, duration, error });
   }
 
   getRowHashSelect(allowedFields: FieldFilter, alias?: string, tableAlias?: string): string {

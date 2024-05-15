@@ -1,6 +1,5 @@
 import { find, tryCatch } from "prostgles-types/dist/util";
-import { BasicCallback, parseCondition, PubSubManager } from "./PubSubManager";
-import { AddSyncParams, DEFAULT_SYNC_BATCH_SIZE } from "./PubSubManager";
+import { AddSyncParams, BasicCallback, DEFAULT_SYNC_BATCH_SIZE, PubSubManager, parseCondition } from "./PubSubManager";
 
 /**
  * Returns a sync channel
@@ -8,6 +7,7 @@ import { AddSyncParams, DEFAULT_SYNC_BATCH_SIZE } from "./PubSubManager";
  */
 export async function addSync(this: PubSubManager, syncParams: AddSyncParams) {
 
+  const sid = this.dboBuilder.prostgles.authHandler?.getSIDNoError({ socket: syncParams.socket });
   const res = await tryCatch(async () => {
 
     const {
@@ -17,7 +17,6 @@ export async function addSync(this: PubSubManager, syncParams: AddSyncParams) {
     } = syncParams || {} as AddSyncParams;
     const conditionParsed = parseCondition(condition);
     if (!socket || !table_info) throw "socket or table_info missing";
-    
     
     const { name: table_name } = table_info;
     const channel_name = `${this.socketChannelPreffix}.${table_name}.${JSON.stringify(filter)}.sync`;
@@ -33,12 +32,12 @@ export async function addSync(this: PubSubManager, syncParams: AddSyncParams) {
         filter,
         condition: conditionParsed,
         synced_field,
+        sid,
         id_fields,
         allow_delete,
         table_rules,
         throttle: Math.max(throttle || 0, table_rules?.sync?.throttle || 0),
         batch_size: table_rules?.sync?.batch_size || DEFAULT_SYNC_BATCH_SIZE,
-        // last_throttled: 0,
         socket_id: socket.id,
         is_sync: true,
         last_synced: 0,
@@ -65,7 +64,9 @@ export async function addSync(this: PubSubManager, syncParams: AddSyncParams) {
             socketId: socket.id, 
             tableName: table_name, 
             condition,
-            connectedSocketIds: this.connectedSocketIds,  
+            sid,
+            connectedSocketIds: this.connectedSocketIds,
+            duration: -1,
           });
           socket.removeAllListeners(channel_name);
           socket.removeAllListeners(unsyncChn);
@@ -100,32 +101,20 @@ export async function addSync(this: PubSubManager, syncParams: AddSyncParams) {
               4. Upsert data.data | deleted     on(data.data | data.deleted)
           */
 
-          // if(data.data){
-          //     console.error("THIS SHOUKD NEVER FIRE !! NEW DATA FROM SYNC");
-          //     this.upsertClientData(newSync, data.data);
-          // } else 
           if (data.onSyncRequest) {
-            // console.log("syncData from socket")
             this.syncData(newSync, data.onSyncRequest, "client");
 
-            // console.log("onSyncRequest ", socket._user)
           } else {
             console.error("Unexpected sync request data from client: ", data)
           }
         });
 
-        // socket.emit(channel_name, { onSyncRequest: true }, (response) => {
-        //     console.log(response)
-        // });
       } else {
         console.warn("UNCLOSED DUPLICATE SYNC FOUND", existing.channel_name);
       }
 
       return newSync;
     };
-
-
-    // const { min_id, max_id, count, max_synced } = params;
 
     upsertSync();
 
@@ -143,6 +132,7 @@ export async function addSync(this: PubSubManager, syncParams: AddSyncParams) {
     connectedSocketIds: this.connectedSocketIds,
     duration: res.duration,
     error: res.error,
+    sid,
   });
 
   if(res.error !== undefined) throw res.error;

@@ -3,7 +3,7 @@ import { LocalParams } from "./DboBuilder/DboBuilder";
 import { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
 
 type ClientInfo = {
-  socketId: string;
+  socketId: string | undefined;
   sid: string | undefined;
 }
 
@@ -13,32 +13,21 @@ export namespace EventTypes {
     error?: any;
   }
 
-  export type Table = {
+  export type Table = ClientInfo & DebugInfo & {
     type: "table";
     tableName: string;
     command: keyof TableHandler;
     data: AnyObject;
     localParams: LocalParams | undefined;
-    duration: number;
-    error?: any;
   };
 
-  export type Sync = {
+  type SyncOneClient = ClientInfo & DebugInfo & {
     type: "sync";
     tableName: string;
     localParams?: LocalParams;
     connectedSocketIds: string[];
-    duration?: number;
-    error?: any;
   } & (
     {
-      command: "notifListener";
-      op_name: string | undefined;
-      condition_ids_str: string | undefined;
-      tableTriggers: string[] | undefined;
-      tableSyncs: string;
-      state: "ok" | "error" | "no-triggers" | "invalid_condition_ids";
-    } | {
       command: "syncData";
       source: "client" | "trigger";
       connectedSocketIds: string[];
@@ -65,16 +54,36 @@ export namespace EventTypes {
       connectedSocketIds: string[];
     }
   );
+  export type SyncMultiClient = {
+    type: "sync";
+    tableName: string;
+    localParams?: LocalParams;
+    connectedSocketIds: string[];
+  } & (
+    {
+      command: "notifListener";
+      op_name: string | undefined;
+      condition_ids_str: string | undefined;
+      tableTriggers: string[] | undefined;
+      tableSyncs: string;
+      state: "ok" | "error" | "no-triggers" | "invalid_condition_ids";
+    }
+  );
 
-  export type Connection = ClientInfo & {
+  export type Sync = SyncOneClient | SyncMultiClient;
+
+  export type Connection = (ClientInfo & {
     type: "connect" | "disconnect";
     socketId: string;
     connectedSocketIds: string[];
-  };
+  }) | (ClientInfo & DebugInfo & {
+    type: "connect.getClientSchema";
+  });
 
-  export type Method = {
+  export type Method = ClientInfo & DebugInfo & {
     type: "method";
     args: any[];
+    localParams: LocalParams;
   };
 
   export type Debug = DebugInfo & {
@@ -102,6 +111,7 @@ export type EventInfo =
   | EventTypes.Table
   | EventTypes.Method
   | EventTypes.Sync 
+  | EventTypes.SyncMultiClient 
   | EventTypes.Connection
   | EventTypes.Debug;
 

@@ -50,11 +50,14 @@ export async function syncData (this: PubSubManager, sync: SyncParams, clientDat
     type: "sync",
     command: "syncData", 
     tableName: sync.table_name,
+    sid: sync.sid,
     source,
     ...pickKeys(sync, ["socket_id", "condition", "last_synced", "is_syncing"]),
     lr: JSON.stringify(sync.lr),
     connectedSocketIds: this.dboBuilder.prostgles.connectedSockets.map(s => s.id),
-    localParams: undefined 
+    localParams: undefined,
+    duration: -1,
+    socketId: sync.socket_id
   });
 
   const {
@@ -193,16 +196,8 @@ export async function syncData (this: PubSubManager, sync: SyncParams, clientDat
      */
     upsertData = async (data: AnyObject[]) => {
       
-      await this._log({ 
-        type: "sync", 
-        command: "upsertData", 
-        tableName: sync.table_name, 
-        rows: data.length, 
-        socketId: socket_id,
-        connectedSocketIds: this.dboBuilder.prostgles.connectedSockets.map(s => s.id)
-      });
-
-      return this.dboBuilder.getTX(async (dbTX) => {
+      const start = Date.now();
+      const result = await this.dboBuilder.getTX(async (dbTX) => {
         const tbl = dbTX[table_name] as TableHandler;
         const existingData = await tbl.find(
           { $or: data.map(d => pickKeys(d, id_fields)) },
@@ -247,10 +242,23 @@ export async function syncData (this: PubSubManager, sync: SyncParams, clientDat
         log(`upsertData: inserted( ${inserts.length} )    updated( ${updates.length} )     total( ${data.length} ) \n last insert ${JSON.stringify(inserts.at(-1))} \n last update ${JSON.stringify(updates.at(-1))}`);
         return { inserted: inserts.length, updated: updates.length, total: data.length };
       })
-        .catch(err => {
-          console.trace("Something went wrong with syncing to server: \n ->", err, data.length, id_fields);
-          return Promise.reject("Something went wrong with syncing to server: ")
-        });
+      .catch(err => {
+        console.trace("Something went wrong with syncing to server: \n ->", err, data.length, id_fields);
+        return Promise.reject("Something went wrong with syncing to server: ")
+      });
+
+      await this._log({ 
+        type: "sync", 
+        command: "upsertData", 
+        tableName: sync.table_name, 
+        rows: data.length, 
+        socketId: socket_id,
+        sid: sync.sid,
+        duration: Date.now() - start,
+        connectedSocketIds: this.dboBuilder.prostgles.connectedSockets.map(s => s.id)
+      });
+
+      return result;
     },
 
     /**
@@ -258,15 +266,8 @@ export async function syncData (this: PubSubManager, sync: SyncParams, clientDat
      * @param isSynced = true if 
      */
     pushData = async (data?: AnyObject[], isSynced = false, err: any = null) => {
-      await this._log({ 
-        type: "sync", 
-        command: "pushData", 
-        tableName: sync.table_name, 
-        rows: data?.length ?? 0, 
-        socketId: socket_id,
-        connectedSocketIds: this.dboBuilder.prostgles.connectedSockets.map(s => s.id)
-      });
-      return new Promise((resolve, reject) => {
+      const start = Date.now();
+      const result = await new Promise((resolve, reject) => {
         socket.emit(channel_name, { data, isSynced }, (resp?: { ok: boolean }) => {
 
           if (resp && resp.ok) {
@@ -278,6 +279,19 @@ export async function syncData (this: PubSubManager, sync: SyncParams, clientDat
           }
         });
       });
+
+      await this._log({ 
+        type: "sync", 
+        command: "pushData", 
+        tableName: sync.table_name, 
+        rows: data?.length ?? 0, 
+        socketId: socket_id,
+        duration: Date.now() - start,
+        sid: sync.sid,
+        connectedSocketIds: this.dboBuilder.prostgles.connectedSockets.map(s => s.id)
+      });
+
+      return result;
     },
 
     /**

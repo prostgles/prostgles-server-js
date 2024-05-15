@@ -578,6 +578,18 @@ export default class AuthHandler {
     }
   }
 
+  /**
+   * Used for logging
+   */
+  getSIDNoError = (localParams: LocalParams | undefined): string | undefined => {
+    if(!localParams) return undefined;
+    try {
+      return this.getSID(localParams);
+    } catch (err) {
+      return undefined;
+    }
+  }
+
   async getClientInfo(localParams: Pick<LocalParams, "socket" | "httpReq">): Promise<AuthResult> {
     if (!this.opts) return {};
 

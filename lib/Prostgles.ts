@@ -384,9 +384,9 @@ export class Prostgles {
       type: "debug", 
       command: "refreshDBO.start", 
       duration: -1, 
-      data: { work_mem: await this.db?.oneOrNone(`show work_mem;`) } 
+      data: { } 
     });
-    const now = Date.now();
+    const start = Date.now();
     if (this._dboBuilder) {
       await this._dboBuilder.build();
     } else {
@@ -394,7 +394,7 @@ export class Prostgles {
     }
     if (!this.dboBuilder) throw "this.dboBuilder";
     this.dbo = this.dboBuilder.dbo;
-    await this.opts.onLog?.({ type: "debug", command: "refreshDBO.end", duration: Date.now() - now })
+    await this.opts.onLog?.({ type: "debug", command: "refreshDBO.end", duration: Date.now() - start })
     return this.dbo;
   }
 
@@ -429,7 +429,7 @@ export class Prostgles {
       }
     });
     await this.opts.onLog?.({ type: "debug", command: "initTableConfig", ...res });
-    if(res.error !== undefined) throw res.error;
+    if(res.hasError) throw res.error;
     return res.data;
   }
 
@@ -619,70 +619,91 @@ export class Prostgles {
   }
 
   getClientSchema = async (clientReq: Pick<LocalParams, "socket" | "httpReq">) => {
-    const clientInfo = clientReq.socket? { type: "socket" as const, socket: clientReq.socket } : clientReq.httpReq? { type: "http" as const, httpReq: clientReq.httpReq } : undefined;
-    if(!clientInfo) throw "Invalid client";
-    if(!this.authHandler) throw "this.authHandler missing";
-    const userData = await this.authHandler.getClientInfo(clientInfo); 
-    const { publishParser } = this;
-    let fullSchema: {
-      schema: TableSchemaForClient;
-      tables: DBSchemaTable[];
-    } | undefined;
-    let publishValidationError;
 
-    try {
-      if (!publishParser) throw "publishParser undefined";
-      fullSchema = await publishParser.getSchemaFromPublish({ ...clientInfo, userData });
-    } catch (e) {
-      publishValidationError = "Server Error: PUBLISH VALIDATION ERROR";
-      console.error(`\nProstgles PUBLISH VALIDATION ERROR (after socket connected):\n    ->`, e);
-    }
-    let rawSQL = false;
-    if (this.opts.publishRawSQL && typeof this.opts.publishRawSQL === "function") {
-      const { allowed } = await clientCanRunSqlRequest.bind(this)(clientInfo);
-      rawSQL = allowed;
-    }
+    const result = await tryCatch(async () => {
 
-    const { schema, tables } = fullSchema ?? { schema: {}, tables: [] };
-    const joinTables2: string[][] = [];
-    if (this.opts.joins) {
-      const _joinTables2 = this.dboBuilder.getAllJoinPaths()
-        .filter(jp =>
-          ![jp.t1, jp.t2].find(t => !schema[t] || !schema[t]?.findOne)
-        ).map(jp => [jp.t1, jp.t2].sort());
-      _joinTables2.map(jt => {
-        if (!joinTables2.find(_jt => _jt.join() === jt.join())) {
-          joinTables2.push(jt);
-        }
-      });
-    }
+      const clientInfo = clientReq.socket? { type: "socket" as const, socket: clientReq.socket } : clientReq.httpReq? { type: "http" as const, httpReq: clientReq.httpReq } : undefined;
+      if(!clientInfo) throw "Invalid client";
+      if(!this.authHandler) throw "this.authHandler missing";
+      const userData = await this.authHandler.getClientInfo(clientInfo); 
 
-    const methods = await publishParser?.getAllowedMethods(clientInfo, userData);
+      const { publishParser } = this;
+      let fullSchema: {
+        schema: TableSchemaForClient;
+        tables: DBSchemaTable[];
+      } | undefined;
+      let publishValidationError;
 
-    const methodSchema: ClientSchema["methods"] = !methods? [] : getKeys(methods).map(methodName => {
-      const method = methods[methodName];
-
-      if(isObject(method) && "run" in method){
-        return {
-          name: methodName,
-          ...omitKeys(method, ["run"]),
-        }
+      try {
+        if (!publishParser) throw "publishParser undefined";
+        fullSchema = await publishParser.getSchemaFromPublish({ ...clientInfo, userData });
+      } catch (e) {
+        publishValidationError = e;
+        console.error(`\nProstgles Publish validation failed (after socket connected):\n    ->`, e);
       }
-      return methodName;
-    });
+      let rawSQL = false;
+      if (this.opts.publishRawSQL && typeof this.opts.publishRawSQL === "function") {
+        const { allowed } = await clientCanRunSqlRequest.bind(this)(clientInfo);
+        rawSQL = allowed;
+      }
 
-    const { auth } = clientReq.socket? await this.authHandler.makeSocketAuth(clientReq.socket) : { auth: {} };
-    const clientSchema: ClientSchema = {
-      schema,
-      methods: methodSchema, 
-      tableSchema: tables,
-      rawSQL,
-      joinTables: joinTables2,
-      auth,
-      version,
-      err: publishValidationError
-    }
-    return clientSchema;
+      const { schema, tables } = fullSchema ?? { schema: {}, tables: [] };
+      const joinTables2: string[][] = [];
+      if (this.opts.joins) {
+        const _joinTables2 = this.dboBuilder.getAllJoinPaths()
+          .filter(jp =>
+            ![jp.t1, jp.t2].find(t => !schema[t] || !schema[t]?.findOne)
+          ).map(jp => [jp.t1, jp.t2].sort());
+        _joinTables2.map(jt => {
+          if (!joinTables2.find(_jt => _jt.join() === jt.join())) {
+            joinTables2.push(jt);
+          }
+        });
+      }
+
+      const methods = await publishParser?.getAllowedMethods(clientInfo, userData);
+
+      const methodSchema: ClientSchema["methods"] = !methods? [] : getKeys(methods).map(methodName => {
+        const method = methods[methodName];
+
+        if(isObject(method) && "run" in method){
+          return {
+            name: methodName,
+            ...omitKeys(method, ["run"]),
+          }
+        }
+        return methodName;
+      });
+
+      const { auth } = clientReq.socket? await this.authHandler.makeSocketAuth(clientReq.socket) : { auth: {} };
+      
+      const clientSchema: ClientSchema = {
+        schema,
+        methods: methodSchema, 
+        tableSchema: tables,
+        rawSQL,
+        joinTables: joinTables2,
+        auth,
+        version,
+        err: publishValidationError? "Server Error: User publish validation failed." : undefined
+      };
+      
+      return {
+        publishValidationError,
+        clientSchema,
+        userData
+      }
+    });
+    const sid = result.userData?.sid ?? this.authHandler?.getSIDNoError(clientReq);
+    await this.opts.onLog?.({ 
+      type: "connect.getClientSchema",
+      duration: result.duration,
+      sid,
+      socketId: clientReq.socket?.id,
+      error: result.error || result.publishValidationError,
+    });
+    if(result.hasError) throw result.error;
+    return result.clientSchema;
   }
 
   pushSocketSchema = async (socket: PRGLIOSocket) => {
