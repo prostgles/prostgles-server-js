@@ -2,7 +2,7 @@ import * as promise from "bluebird";
 import * as pgPromise from "pg-promise";
 import pg from "pg-promise/typescript/pg-subset";
 import { isEmpty, pickKeys } from "prostgles-types";
-import AuthHandler from "./AuthHandler";
+import { AuthHandler } from "./AuthHandler";
 import { DBEventsManager } from "./DBEventsManager";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { DBHandlerServer, Prostgles, ProstglesInitOptions, getIsSuperUser } from "./Prostgles";

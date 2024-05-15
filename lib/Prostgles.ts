@@ -4,11 +4,11 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as pgPromise from 'pg-promise';
-import AuthHandler, { Auth, AuthRequestParams, SessionUser } from "./AuthHandler";
+import { Auth, AuthHandler, AuthRequestParams, SessionUser } from "./AuthHandler";
 import { EventTriggerTagFilter } from "./Event_Trigger_Tags";
 import { CloudClient, FileManager, ImageOptions, LocalConfig } from "./FileManager/FileManager";
 import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
-import { DbConnection, DbConnectionOpts, OnInitReason, OnReadyCallback, OnReadyCallbackBasic, initProstgles } from "./initProstgles";
+import { DbConnection, DbConnectionOpts, OnInitReason, OnReadyCallback, initProstgles } from "./initProstgles";
 import { clientCanRunSqlRequest, runClientMethod, runClientRequest, runClientSqlRequest } from "./runClientRequest";
 import pg = require('pg-promise/typescript/pg-subset');
 const { version } = require('../package.json');
@@ -17,7 +17,6 @@ import { ExpressApp, RestApi, RestApiConfig } from "./RestApi";
 import TableConfigurator, { TableConfig } from "./TableConfig/TableConfig";
  
 import { DBHandlerServer, DboBuilder, LocalParams, PRGLIOSocket, getErrorAsObject } from "./DboBuilder/DboBuilder";
-import { PubSubManager, log } from "./PubSubManager/PubSubManager";
 export { DBHandlerServer };
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 
@@ -30,6 +29,7 @@ import {
   getKeys,
   isObject, omitKeys, tryCatch
 } from "prostgles-types";
+import type { Server } from "socket.io";
 import { DBEventsManager } from "./DBEventsManager";
 import { Publish, PublishMethods, PublishParams, PublishParser } from "./PublishParser/PublishParser";
 
@@ -46,7 +46,6 @@ export type Join = {
   type: typeof JOIN_TYPES[number];
 };
 export type Joins = Join[] | "inferred";
-import type { Server } from "socket.io";
 
 
 type Keywords = {
@@ -626,7 +625,6 @@ export class Prostgles {
       if(!clientInfo) throw "Invalid client";
       if(!this.authHandler) throw "this.authHandler missing";
       const userData = await this.authHandler.getClientInfo(clientInfo); 
-
       const { publishParser } = this;
       let fullSchema: {
         schema: TableSchemaForClient;

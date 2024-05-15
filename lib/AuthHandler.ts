@@ -185,7 +185,7 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
   }
 }
 
-export default class AuthHandler {
+export class AuthHandler {
   protected prostgles: Prostgles;
   protected opts?: Auth;
   dbo: DBHandlerServer;
@@ -292,13 +292,14 @@ export default class AuthHandler {
   }
 
   getUser = async (clientReq: { httpReq: ExpressReq; }): Promise<AuthResult> => {
-    if(!this.sidKeyName || !this.opts?.getUser) throw "sidKeyName or this.opts.getUser missing"
+    if(!this.sidKeyName || !this.opts?.getUser) {
+      throw "sidKeyName or this.opts.getUser missing";
+    }
     const sid = clientReq.httpReq?.cookies?.[this.sidKeyName];
     if (!sid) return undefined;
 
     try {
       return this.throttledFunc(async () => {
-
         return this.opts!.getUser(this.validateSid(sid), this.dbo as any, this.db, getLoginClientInfo(clientReq));
       }, 50)
     } catch (err) {
@@ -376,8 +377,15 @@ export default class AuthHandler {
 
         app.post(loginRoute, async (req: ExpressReq, res: ExpressRes) => {
           try {
+            const start = Date.now();
             const { sid, expires } = await this.loginThrottled(req.body || {}, getLoginClientInfo({ httpReq: req })) || {};
-
+            await this.prostgles.opts.onLog?.({
+              type: "auth",
+              command: "login",
+              duration: Date.now() - start,
+              sid,
+              socketId: undefined,
+            })
             if (sid) {
 
               this.setCookieAndGoToReturnURLIFSet({ sid, expires }, { req, res });
@@ -390,7 +398,6 @@ export default class AuthHandler {
             res.status(404).json({ err });
           }
 
-
         });
 
         if (this.routes.logoutGetPath && this.opts.logout) {
@@ -399,7 +406,6 @@ export default class AuthHandler {
             if (sid) {
               try {
                 await this.throttledFunc(() => {
-
                   return this.opts!.logout!(req?.cookies?.[sidKeyName], this.dbo as any, this.db);
                 })
               } catch (err) {
@@ -612,6 +618,7 @@ export default class AuthHandler {
       } 
     }
 
+    const authStart = Date.now();
     const res = await this.throttledFunc(async () => {
 
       const { getUser } = this.opts ?? {};
@@ -643,6 +650,13 @@ export default class AuthHandler {
       return {};
     }, 5);
 
+    await this.prostgles.opts.onLog?.({ 
+      type: "auth", 
+      command: "getClientInfo", 
+      duration: Date.now() - authStart,
+      sid: res.sid,
+      socketId: localParams.socket?.id,
+    });
     return res;
   }
 

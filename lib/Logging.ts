@@ -85,6 +85,12 @@ export namespace EventTypes {
     args: any[];
     localParams: LocalParams;
   };
+  export type Auth = ClientInfo & DebugInfo & {
+    type: "auth";
+  } & (
+  | { command: "getClientInfo"; } 
+  | { command: "login"; } 
+  );
 
   export type Debug = DebugInfo & {
     type: "debug";
@@ -108,6 +114,7 @@ export namespace EventTypes {
 }
 
 export type EventInfo =
+  | EventTypes.Auth
   | EventTypes.Table
   | EventTypes.Method
   | EventTypes.Sync 
