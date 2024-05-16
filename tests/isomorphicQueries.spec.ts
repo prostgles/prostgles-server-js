@@ -993,7 +993,6 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
 
     await test("subscribe to escaped table name", async () => {
       await tryRunP("subscribe to escaped table name", async (resolve, reject) => {
-        // await tout(11000);
         const filter = { [`"text_col0"`]: "0" }
         let runs = 0;
         const sub = await db[`"""quoted0"""`].subscribe!(filter, {  }, async items => {
@@ -1001,7 +1000,6 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
           if(item && item[`"text_col0"`] === "0"){
             if(!runs){
               db[`"""quoted0"""`].update!(filter, filter);
-              log(JSON.stringify(items))
             }
             runs++;
             if(runs < 2){

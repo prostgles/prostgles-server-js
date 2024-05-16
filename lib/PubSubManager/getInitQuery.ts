@@ -205,9 +205,9 @@ BEGIN
 
             BEGIN
 
-            --PERFORM pg_notify('debug', concat_ws(' ', 'TABLE', TG_TABLE_NAME, TG_OP));
+                --PERFORM pg_notify('debug', concat_ws(' ', 'TABLE', TG_TABLE_NAME, TG_OP));
             
-                escaped_table := format(TG_TABLE_NAME, '%I');
+                escaped_table := format('%I', TG_TABLE_NAME);
 
                 SELECT string_agg(
                   format(
