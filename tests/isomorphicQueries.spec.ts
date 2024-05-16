@@ -991,28 +991,28 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
       assert.deepStrictEqual(exists1, exists2)
     });
 
-    // await test("subscribe to escaped table name", async () => {
-    //   await tryRunP("subscribe to escaped table name", async (resolve, reject) => {
-    //     // await tout(11000);
-    //     const filter = { [`"text_col0"`]: "0" }
-    //     let runs = 0;
-    //     const sub = await db[`"""quoted0"""`].subscribe!(filter, {  }, async items => {
-    //       const item = items[0];
-    //       if(item && item[`"text_col0"`] === "0"){
-    //         if(!runs){
-    //           db[`"""quoted0"""`].update!(filter, filter);
-    //           log(JSON.stringify(items))
-    //         }
-    //         runs++;
-    //         if(runs < 2){
-    //           return;
-    //         }
-    //         await sub.unsubscribe();
-    //         resolve(true);
-    //       }
-    //     });
-    //   });
-    // });
+    await test("subscribe to escaped table name", async () => {
+      await tryRunP("subscribe to escaped table name", async (resolve, reject) => {
+        // await tout(11000);
+        const filter = { [`"text_col0"`]: "0" }
+        let runs = 0;
+        const sub = await db[`"""quoted0"""`].subscribe!(filter, {  }, async items => {
+          const item = items[0];
+          if(item && item[`"text_col0"`] === "0"){
+            if(!runs){
+              db[`"""quoted0"""`].update!(filter, filter);
+              log(JSON.stringify(items))
+            }
+            runs++;
+            if(runs < 2){
+              return;
+            }
+            await sub.unsubscribe();
+            resolve(true);
+          }
+        });
+      });
+    });
 
     await test("Reverse join with agg", async () => {
       const inserted = await db.tr1.insert!({ tr2: { t1: "a", t2: "b" } }, { returning: "*" });

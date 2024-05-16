@@ -201,9 +201,13 @@ BEGIN
                     
             DECLARE view_def_query TEXT := '';   
 
+            DECLARE escaped_table  TEXT;
+
             BEGIN
 
-                --PERFORM pg_notify('debug', concat_ws(' ', 'TABLE', TG_TABLE_NAME, TG_OP));
+            --PERFORM pg_notify('debug', concat_ws(' ', 'TABLE', TG_TABLE_NAME, TG_OP));
+            
+                escaped_table := format(TG_TABLE_NAME, '%I');
 
                 SELECT string_agg(
                   format(
@@ -222,7 +226,7 @@ BEGIN
                 ) 
                 INTO unions
                 FROM prostgles.v_triggers
-                WHERE table_name = format(TG_TABLE_NAME, '%I');
+                WHERE table_name = escaped_table;
 
 
                 /* unions = 'old_table union new_table' or any one of the tables */
@@ -244,7 +248,7 @@ BEGIN
                         FROM (
                           SELECT DISTINCT related_view_name, related_view_def 
                           FROM prostgles.v_triggers
-                          WHERE table_name = format(TG_TABLE_NAME, '%I')
+                          WHERE table_name = escaped_table
                           AND related_view_name IS NOT NULL
                           AND related_view_def  IS NOT NULL
                         ) t
@@ -297,7 +301,7 @@ BEGIN
                                 ${asValue(PubSubManager.DELIMITER)},
 
                                 ${asValue(NOTIF_TYPE.data)}, 
-                                COALESCE(TG_TABLE_NAME, 'MISSING'), 
+                                COALESCE(escaped_table, 'MISSING'), 
                                 COALESCE(TG_OP, 'MISSING'), 
                                 CASE WHEN has_errors 
                                   THEN concat_ws('; ', 'error', err_text, err_detail, err_hint, 'query: ' || query ) 
@@ -387,11 +391,10 @@ BEGIN
                 /* If newly added listeners on table then CREATE table data watch triggers */
                 ELSIF TG_OP = 'INSERT' THEN
                       
-                    select count(*) from new_table into changed_triggers_count;
-
-                    --RAISE NOTICE 'INSERT trigger_add_remove_func table: % ', ' ' || COALESCE((SELECT concat_ws(' ', string_agg(table_name, ' & '), count(*), min(inserted) ) FROM prostgles.triggers) , ' 0 ');
-                    --RAISE NOTICE 'INSERT trigger_add_remove_func new_table:  % ', '' || COALESCE((SELECT concat_ws(' ', string_agg(table_name, ' & '), count(*), min(inserted) ) FROM new_table), ' 0 ');
-
+                    SELECT count(*) 
+                    FROM new_table 
+                    INTO changed_triggers_count;
+ 
                     /* Loop through newly added tables to add data watch triggers */
                     FOR trw IN  
 
