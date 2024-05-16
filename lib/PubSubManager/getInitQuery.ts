@@ -203,13 +203,15 @@ BEGIN
 
             BEGIN
 
-                -- PERFORM pg_notify('debug', concat_ws(' ', 'TABLE', TG_TABLE_NAME, TG_OP));
+                --PERFORM pg_notify('debug', concat_ws(' ', 'TABLE', TG_TABLE_NAME, TG_OP));
 
                 SELECT string_agg(
                   format(
                     $c$ 
                       SELECT CASE WHEN EXISTS( 
-                        SELECT 1 FROM %I WHERE %s 
+                        SELECT 1 
+                        FROM %s 
+                        WHERE %s 
                       ) THEN %s::text END AS t_ids 
                     $c$, 
                     table_name, 
@@ -220,7 +222,7 @@ BEGIN
                 ) 
                 INTO unions
                 FROM prostgles.v_triggers
-                WHERE table_name = TG_TABLE_NAME;
+                WHERE table_name = format(TG_TABLE_NAME, '%I');
 
 
                 /* unions = 'old_table union new_table' or any one of the tables */
@@ -242,7 +244,7 @@ BEGIN
                         FROM (
                           SELECT DISTINCT related_view_name, related_view_def 
                           FROM prostgles.v_triggers
-                          WHERE table_name = TG_TABLE_NAME
+                          WHERE table_name = format(TG_TABLE_NAME, '%I')
                           AND related_view_name IS NOT NULL
                           AND related_view_def  IS NOT NULL
                         ) t
@@ -254,7 +256,8 @@ BEGIN
                             FROM ( 
                               %s 
                             ) t
-                        $c$, unions
+                        $c$, 
+                        unions
                       )
                     INTO query; 
 
@@ -356,12 +359,18 @@ BEGIN
                         SELECT DISTINCT table_name 
                         FROM old_table ot
                         WHERE NOT EXISTS (
-                          SELECT 1 FROM prostgles.app_triggers t 
+                          SELECT 1 
+                          FROM prostgles.app_triggers t 
                           WHERE t.table_name = ot.table_name
                         )
                         AND EXISTS (
-                          SELECT trigger_name from information_schema.triggers 
-                          WHERE trigger_name = 'your_trigger_name'
+                          SELECT trigger_name 
+                          FROM information_schema.triggers 
+                          WHERE trigger_name IN (
+                            concat_ws('_', 'prostgles_triggers', table_name, 'insert'),
+                            concat_ws('_', 'prostgles_triggers', table_name, 'update'),
+                            concat_ws('_', 'prostgles_triggers', table_name, 'delete')
+                          )
                         )
                     LOOP
 
@@ -370,7 +379,7 @@ BEGIN
                             trg_name := concat_ws('_', 'prostgles_triggers', trw.table_name, op);
                             
                             --EXECUTE format(' DROP TRIGGER IF EXISTS %I ON %s ;' , trg_name, trw.table_name);
-                            EXECUTE format(' ALTER TABLE %s DISABLE TRIGGER %I ;', trg_name, trw.table_name);
+                            EXECUTE format(' ALTER TABLE %s DISABLE TRIGGER %I ;', trw.table_name, trg_name);
                         END LOOP;
                                       
                     END LOOP;
@@ -397,13 +406,14 @@ BEGIN
                             AND   t.inserted   < nt.inserted    -- exclude current record (this is an after trigger). Turn into before trigger?
                         )
 
-                        /* Table is valid */
+                        /* Table is valid 
                         AND  EXISTS (
                             SELECT 1 
                             FROM information_schema.tables 
                             WHERE  table_schema = 'public'
                             AND    table_name   = nt.table_name
                         )
+                        */
                     LOOP
 
                         IF (
@@ -447,7 +457,7 @@ BEGIN
                               $q$ 
                                   DROP TRIGGER IF EXISTS %1$I ON %2$s;
                                   CREATE TRIGGER %1$I
-                                  AFTER DELETE ON %2$I
+                                  AFTER DELETE ON %2$s
                                   REFERENCING OLD TABLE AS old_table
                                   FOR EACH STATEMENT EXECUTE PROCEDURE ${DB_OBJ_NAMES.data_watch_func}();
                                   COMMENT ON TRIGGER %1$I ON %2$s IS 'Prostgles internal trigger used to notify when data in the table changed';

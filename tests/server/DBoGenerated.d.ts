@@ -505,6 +505,16 @@ export type DBSchemaGenerated = {
       symbol: string;
     };
   };
+  unions: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      string_agg?: null | string;
+    };
+  };
   users: {
     is_view: false;
     select: true;
