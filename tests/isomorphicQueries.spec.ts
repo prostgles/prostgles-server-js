@@ -7,7 +7,7 @@ import {
   //@ts-ignore
   describe 
 } from "node:test";
-import { pickKeys } from "prostgles-types";
+import { SubscriptionHandler, pickKeys } from "prostgles-types";
 
 
 export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log: (msg: string, extra?: any) => void) => {
@@ -466,6 +466,27 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
       assert.equal(+res, 1)
     });
 
+
+    const testToEnsureTriggersAreDisabled = async (sub: SubscriptionHandler, table_name: string) => {
+      const getTableTriggers = async (table_name: string) => {
+          return await db.sql?.(`
+          SELECT tgname, tgenabled = 'O' as enabled 
+          FROM pg_catalog.pg_trigger 
+          WHERE tgname like format('prostgles_triggers_%s_', \${table_name}) || '%'
+        `, 
+          { table_name }, 
+          { returnType: "rows" }
+        ) as { tgname: string; enabled: boolean; }[];
+      }
+      await sub.unsubscribe();
+      let validTriggers = await getTableTriggers(table_name)
+      assert.equal(validTriggers.filter(t => t.enabled).length, 3);
+      await db.sql?.(`DELETE FROM prostgles.app_triggers`, []); //  WHERE table_name = $1
+      validTriggers = await getTableTriggers(table_name)
+      assert.equal(validTriggers.length, 3);
+      assert.equal(validTriggers.filter(t => t.enabled).length, 0);
+    }
+
     await test("subscribe", async () => {
       await tryRunP("subscribe", async (resolve, reject) => {
         await db.various.insert!({ id: 99 });
@@ -474,7 +495,7 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
           
           if(item && item.name === "zz3zz3"){
             await db.various.delete!({ name: "zz3zz3" });
-            await sub.unsubscribe();
+            await testToEnsureTriggersAreDisabled(sub, "various");
             resolve(true)
           }
         });
@@ -490,9 +511,6 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
         await db.various.insert!({ id: 99 });
         const start = Date.now(); // name: "zz3zz" 
         const sub = await db.various.subscribeOne!({ id: 99  }, { throttle: 1700 }, async item => {
-          // const item = items[0]
-          // console.log(item)
-
           const now = Date.now();
           if(item && item.name === "zz3zz2" &&  now - start > 1600 &&  now - start < 1800){
             await db.various.delete!({ name: "zz3zz2" });
@@ -1005,7 +1023,7 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
             if(runs < 2){
               return;
             }
-            await sub.unsubscribe();
+            await testToEnsureTriggersAreDisabled(sub, `"""quoted0"""`);
             resolve(true);
           }
         });

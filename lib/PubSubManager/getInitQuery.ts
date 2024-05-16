@@ -244,7 +244,7 @@ BEGIN
                       ) 
                       || 
                       COALESCE((
-                        SELECT ', ' || string_agg(format(E' %I AS ( \n %s \n ) ', related_view_name, related_view_def), ', ')
+                        SELECT ', ' || string_agg(format(E' %s AS ( \n %s \n ) ', related_view_name, related_view_def), ', ')
                         FROM (
                           SELECT DISTINCT related_view_name, related_view_def 
                           FROM prostgles.v_triggers
@@ -356,7 +356,9 @@ BEGIN
                     --RAISE NOTICE 'DELETE trigger_add_remove_func table: % ', ' ' || COALESCE((SELECT concat_ws(' ', string_agg(table_name, ' & '), count(*), min(inserted) ) FROM prostgles.app_triggers) , ' 0 ');
                     --RAISE NOTICE 'DELETE trigger_add_remove_func old_table:  % ', '' || COALESCE((SELECT concat_ws(' ', string_agg(table_name, ' & '), count(*), min(inserted) ) FROM old_table), ' 0 ');
                     
-                    select count(*) from old_table into changed_triggers_count;
+                    SELECT count(*) 
+                    FROM old_table 
+                    INTO changed_triggers_count;
                     
                     /* Disable actual triggers if needed */
                     FOR trw IN 
@@ -427,7 +429,7 @@ BEGIN
                             'prostgles_triggers_' || trw.table_name || '_update',
                             'prostgles_triggers_' || trw.table_name || '_delete'
                           )
-                        ) = 3 AND false
+                        ) = 3
                         THEN
                           query := concat_ws(E'\n', 
                             format(' ALTER TABLE %s ENABLE TRIGGER %I ;', trw.table_name, 'prostgles_triggers_' || trw.table_name || '_insert'),
