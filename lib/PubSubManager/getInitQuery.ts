@@ -318,17 +318,7 @@ BEGIN
 
 
                 RETURN NULL;
-                
-        /*
-            EXCEPTION WHEN OTHERS THEN 
-                DELETE FROM prostgles.app_triggers; -- delete all or will need to loop through all conditions to find issue;
-                RAISE NOTICE 'trigger dropped due to exception';
-                ${"--EXCEPTION_WHEN_COLUMN_WAS_RENAMED_THEN_DROP_TRIGGER"};
-            
-                
-
-                RETURN NULL; 
-        */
+               
             END;
 
         --COMMIT;
@@ -341,6 +331,7 @@ BEGIN
             DECLARE operations TEXT[] := ARRAY['insert', 'update', 'delete'];
             DECLARE op TEXT;
             DECLARE query TEXT;
+            DECLARE trg_name TEXT;
             DECLARE trw RECORD;           
             DECLARE app RECORD; 
             DECLARE start_time BIGINT;
@@ -352,7 +343,7 @@ BEGIN
 
                 --RAISE NOTICE 'prostgles.app_triggers % ', TG_OP;
 
-                /* If no other listeners (app_triggers) left on table then DROP actual table data watch triggers */
+                /* If no other listeners (app_triggers) left on table then DISABLE actual table data watch triggers */
                 IF TG_OP = 'DELETE' THEN
 
                     --RAISE NOTICE 'DELETE trigger_add_remove_func table: % ', ' ' || COALESCE((SELECT concat_ws(' ', string_agg(table_name, ' & '), count(*), min(inserted) ) FROM prostgles.app_triggers) , ' 0 ');
@@ -360,19 +351,26 @@ BEGIN
                     
                     select count(*) from old_table into changed_triggers_count;
                     
-                    /* Drop actual triggers if needed */
+                    /* Disable actual triggers if needed */
                     FOR trw IN 
-                        SELECT DISTINCT table_name FROM old_table ot
+                        SELECT DISTINCT table_name 
+                        FROM old_table ot
                         WHERE NOT EXISTS (
-                            SELECT 1 FROM prostgles.app_triggers t 
-                            WHERE t.table_name = ot.table_name
-                        ) 
+                          SELECT 1 FROM prostgles.app_triggers t 
+                          WHERE t.table_name = ot.table_name
+                        )
+                        AND EXISTS (
+                          SELECT trigger_name from information_schema.triggers 
+                          WHERE trigger_name = 'your_trigger_name'
+                        )
                     LOOP
 
                         FOREACH op IN ARRAY operations
                         LOOP 
-                            --RAISE NOTICE ' DROP DATA TRIGGER FOR:  % ', trw.table_name;
-                            EXECUTE format(' DROP TRIGGER IF EXISTS %I ON %I ;' , 'prostgles_triggers_' || trw.table_name || '_' || op, trw.table_name);
+                            trg_name := concat_ws('_', 'prostgles_triggers', trw.table_name, op);
+                            
+                            --EXECUTE format(' DROP TRIGGER IF EXISTS %I ON %s ;' , trg_name, trw.table_name);
+                            EXECUTE format(' ALTER TABLE %s DISABLE TRIGGER %I ;', trg_name, trw.table_name);
                         END LOOP;
                                       
                     END LOOP;
@@ -407,47 +405,57 @@ BEGIN
                             AND    table_name   = nt.table_name
                         )
                     LOOP
-                      
-                        /*
-                            RAISE NOTICE ' CREATE DATA TRIGGER FOR:  % TABLE EXISTS?', trw.table_name, SELECT EXISTS (
-                                SELECT 1 
-                                FROM information_schema.tables 
-                                WHERE  table_schema = 'public'
-                                AND    table_name   = nt.table_name
-                            );
-                        */
 
-                        query := format(
-                            $q$ 
-                                DROP TRIGGER IF EXISTS %1$I ON %2$I;
-                                CREATE TRIGGER %1$I
-                                AFTER INSERT ON %2$I
-                                REFERENCING NEW TABLE AS new_table
-                                FOR EACH STATEMENT EXECUTE PROCEDURE ${DB_OBJ_NAMES.data_watch_func}();
-                                COMMENT ON TRIGGER %1$I ON %2$I IS 'Prostgles internal trigger used to notify when data in the table changed';
-                            $q$,  
-                            'prostgles_triggers_' || trw.table_name || '_insert', trw.table_name                                                
-                        ) || format(
-                            $q$ 
-                                DROP TRIGGER IF EXISTS %1$I ON %2$I;
-                                CREATE TRIGGER %1$I
-                                AFTER UPDATE ON %2$I
-                                REFERENCING OLD TABLE AS old_table NEW TABLE AS new_table
-                                FOR EACH STATEMENT EXECUTE PROCEDURE ${DB_OBJ_NAMES.data_watch_func}();
-                                COMMENT ON TRIGGER %1$I ON %2$I IS 'Prostgles internal trigger used to notify when data in the table changed';
-                            $q$,  
-                            'prostgles_triggers_' || trw.table_name || '_update', trw.table_name   
-                        ) || format(
-                            $q$ 
-                                DROP TRIGGER IF EXISTS %1$I ON %2$I;
-                                CREATE TRIGGER %1$I
-                                AFTER DELETE ON %2$I
-                                REFERENCING OLD TABLE AS old_table
-                                FOR EACH STATEMENT EXECUTE PROCEDURE ${DB_OBJ_NAMES.data_watch_func}();
-                                COMMENT ON TRIGGER %1$I ON %2$I IS 'Prostgles internal trigger used to notify when data in the table changed';
-                            $q$,
-                            'prostgles_triggers_' || trw.table_name || '_delete', trw.table_name  
-                        );
+                        IF (
+                          SELECT COUNT(*) 
+                          FROM information_schema.triggers
+                          WHERE trigger_name IN (
+                            'prostgles_triggers_' || trw.table_name || '_insert',
+                            'prostgles_triggers_' || trw.table_name || '_update',
+                            'prostgles_triggers_' || trw.table_name || '_delete'
+                          )
+                        ) = 3 AND false
+                        THEN
+                          query := concat_ws(E'\n', 
+                            format(' ALTER TABLE %s ENABLE TRIGGER %I ;', trw.table_name, 'prostgles_triggers_' || trw.table_name || '_insert'),
+                            format(' ALTER TABLE %s ENABLE TRIGGER %I ;', trw.table_name, 'prostgles_triggers_' || trw.table_name || '_update'),
+                            format(' ALTER TABLE %s ENABLE TRIGGER %I ;', trw.table_name, 'prostgles_triggers_' || trw.table_name || '_delete')
+                          );
+                        ELSE 
+
+                          query := format(
+                              $q$ 
+                                  DROP TRIGGER IF EXISTS %1$I ON %2$s;
+                                  CREATE TRIGGER %1$I
+                                  AFTER INSERT ON %2$s
+                                  REFERENCING NEW TABLE AS new_table
+                                  FOR EACH STATEMENT EXECUTE PROCEDURE ${DB_OBJ_NAMES.data_watch_func}();
+                                  COMMENT ON TRIGGER %1$I ON %2$s IS 'Prostgles internal trigger used to notify when data in the table changed';
+                              $q$,  
+                              'prostgles_triggers_' || trw.table_name || '_insert', trw.table_name                                                
+                          ) || format(
+                              $q$ 
+                                  DROP TRIGGER IF EXISTS %1$I ON %2$s;
+                                  CREATE TRIGGER %1$I
+                                  AFTER UPDATE ON %2$s
+                                  REFERENCING OLD TABLE AS old_table NEW TABLE AS new_table
+                                  FOR EACH STATEMENT EXECUTE PROCEDURE ${DB_OBJ_NAMES.data_watch_func}();
+                                  COMMENT ON TRIGGER %1$I ON %2$s IS 'Prostgles internal trigger used to notify when data in the table changed';
+                              $q$,  
+                              'prostgles_triggers_' || trw.table_name || '_update', trw.table_name   
+                          ) || format(
+                              $q$ 
+                                  DROP TRIGGER IF EXISTS %1$I ON %2$s;
+                                  CREATE TRIGGER %1$I
+                                  AFTER DELETE ON %2$I
+                                  REFERENCING OLD TABLE AS old_table
+                                  FOR EACH STATEMENT EXECUTE PROCEDURE ${DB_OBJ_NAMES.data_watch_func}();
+                                  COMMENT ON TRIGGER %1$I ON %2$s IS 'Prostgles internal trigger used to notify when data in the table changed';
+                              $q$,
+                              'prostgles_triggers_' || trw.table_name || '_delete', trw.table_name  
+                          );
+                        END IF;
+
 
                         --RAISE NOTICE ' % ', query;
 
@@ -457,20 +465,10 @@ BEGIN
                                 DO $e$ 
                                 BEGIN
                                     /* ${ PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
-                                    IF EXISTS (
-                                        SELECT 1 
-                                        FROM information_schema.tables 
-                                        WHERE  table_schema = 'public'
-                                        AND    table_name   = %L
-                                    ) THEN
-
-                                        %s
-
-                                    END IF;
+                                    %s
 
                                 END $e$;
                             $q$,
-                            trw.table_name,
                             query
                         ) ;
                         

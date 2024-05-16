@@ -474,7 +474,7 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
           
           if(item && item.name === "zz3zz3"){
             await db.various.delete!({ name: "zz3zz3" });
-            sub.unsubscribe();
+            await sub.unsubscribe();
             resolve(true)
           }
         });
@@ -989,7 +989,23 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
         }
       }, { select: "*" });
       assert.deepStrictEqual(exists1, exists2)
-    })
+    });
+
+    await test("subscribe to escaped table name", async () => {
+      await tryRunP("subscribe to escaped table name", async (resolve, reject) => {
+        let sub;
+        sub = await db[`"""quoted0"""`].subscribe!({ [`"text_col0"`]: "0" }, {  }, async items => {
+          const item = items[0];
+          
+          if(item && item[`"text_col0"`] === "0"){
+            setTimeout(async () => {
+              await sub.unsubscribe();
+              resolve(true);
+            }, 50);
+          }
+        });
+      });
+    });
 
     await test("Reverse join with agg", async () => {
       const inserted = await db.tr1.insert!({ tr2: { t1: "a", t2: "b" } }, { returning: "*" });
