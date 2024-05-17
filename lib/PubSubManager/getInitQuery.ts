@@ -580,6 +580,9 @@ BEGIN
         $$ LANGUAGE plpgsql;
         COMMENT ON FUNCTION ${DB_OBJ_NAMES.schema_watch_func} IS 'Prostgles internal function used to notify when schema has changed';
 
+    ELSE 
+                      
+      DELETE FROM prostgles.app_triggers;
     END IF;
 
 END

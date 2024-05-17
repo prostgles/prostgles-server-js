@@ -17,6 +17,7 @@ export namespace EventTypes {
     type: "table";
     tableName: string;
     command: keyof TableHandler;
+    txInfo: AnyObject | undefined;
     data: AnyObject;
     localParams: LocalParams | undefined;
   };

@@ -262,15 +262,23 @@ export class DboBuilder {
     return jp;
   }
 
-  getTX = (cb: TxCB) => {
-    return this.db.tx(t => {
-      const dbTX: DbTxTableHandlers & Pick<DBHandlerServer, "sql"> = {};
-      this.tablesOrViews?.map(tov => {
-        dbTX[tov.name] = new (tov.is_view ? ViewHandler : TableHandler)(this.db, tov, this, { t, dbTX }, this.shortestJoinPaths);
+  getTX = async (cb: TxCB) => {
+    try {
+      const transaction = await this.db.tx(t => {
+        const dbTX: DbTxTableHandlers & Pick<DBHandlerServer, "sql"> = {};
+        this.tablesOrViews?.map(tov => {
+          dbTX[tov.name] = new (tov.is_view ? ViewHandler : TableHandler)(this.db, tov, this, { t, dbTX }, this.shortestJoinPaths);
+        });
+        dbTX.sql = (q, args, opts, localP) => this.runSQL(q, args, opts, { tx: { dbTX, t }, ...(localP ?? {}) })
+  
+        return cb(dbTX, t);
       });
-      dbTX.sql = (q, args, opts, localP) => this.runSQL(q, args, opts, { tx: { dbTX, t }, ...(localP ?? {}) })
+  
+      return transaction;
 
-      return cb(dbTX, t);
-    });
+    } catch (e) {
+      console.error("Error in getTX", e);
+      throw e;
+    }
   }
 }

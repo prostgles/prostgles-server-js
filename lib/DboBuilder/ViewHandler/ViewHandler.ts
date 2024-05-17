@@ -93,7 +93,18 @@ export class ViewHandler {
       return;
     }
     const sid = this.dboBuilder.prostgles.authHandler?.getSIDNoError(localParams);
-    return this.dboBuilder.prostgles.opts.onLog?.({ type: "table", sid, socketId: localParams?.socket?.id, tableName: this.name, command, data, localParams, duration, error });
+    return this.dboBuilder.prostgles.opts.onLog?.({ 
+      type: "table", 
+      command, 
+      duration, 
+      error,
+      txInfo: this.tx?.t.ctx,
+      sid, 
+      socketId: localParams?.socket?.id, 
+      tableName: this.name, 
+      data, 
+      localParams, 
+    });
   }
 
   getRowHashSelect(allowedFields: FieldFilter, alias?: string, tableAlias?: string): string {
