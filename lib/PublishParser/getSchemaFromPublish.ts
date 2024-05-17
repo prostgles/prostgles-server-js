@@ -84,7 +84,9 @@ export async function getSchemaFromPublish(this: PublishParser, { userData, ...c
                   let err = null;
                   try {
                     const valid_table_command_rules = await this.getValidatedRequestRule({ tableName, command: method, localParams: clientReq }, clientInfo);
-                    await (this.dbo[tableName] as any)[method]({}, {}, {}, valid_table_command_rules, { ...clientReq, isRemoteRequest: true, testRule: true });
+                    if(this.prostgles.opts.testRulesOnConnect){
+                      await (this.dbo[tableName] as any)[method]({}, {}, {}, valid_table_command_rules, { ...clientReq, isRemoteRequest: true, testRule: true });
+                    }
 
                   } catch (e) {
                     err = "INTERNAL PUBLISH ERROR";
@@ -93,7 +95,6 @@ export async function getSchemaFromPublish(this: PublishParser, { userData, ...c
                     throw `publish.${tableName}.${method}: \n   -> ${e}`;
                   }
                 }
-
 
                 if (method === "getInfo" || method === "getColumns") {
                   const tableRules = await this.getValidatedRequestRule({ tableName, command: method, localParams: clientReq }, clientInfo);

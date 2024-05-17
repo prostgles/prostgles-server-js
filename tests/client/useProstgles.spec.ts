@@ -42,9 +42,6 @@ export const useProstglesTest = async (db: DBHandlerClient, getSocketOptions: (w
         },
         onEnd: async (results) => {
           const [res1, res2, res3] = results;
-          assert.equal(
-            results.length, 3
-          );
           assert.deepStrictEqual(
             res1,
             { isLoading: true }
@@ -60,6 +57,9 @@ export const useProstglesTest = async (db: DBHandlerClient, getSocketOptions: (w
           assert.equal(
             typeof (res3 as any)?.dbo[newly_created_table].useFind,
             "function"
+          );
+          assert.equal(
+            results.length, 3
           );
     
           const count = await (res3 as any)?.dbo[newly_created_table].count();
