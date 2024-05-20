@@ -106,6 +106,7 @@ function dd(){
 			}
 		},
 		tableConfig: testTableConfig,
+		testRulesOnConnect: true,
 		fileTable: {
 			referencedTables: {  
 				users_public_info: {

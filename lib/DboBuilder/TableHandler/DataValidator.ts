@@ -201,8 +201,8 @@ const getValidatedRowFieldData = async ({ allowedCols, rows, validationOptions, 
           //   } satisfies RowFieldData;
           // }
 
-          const keys = Object.keys(fieldValue);
-          const func = keys.length === 1?  convertionFuncs.some(f => `$${f.name}` === keys[0]) : undefined;
+          const [firstKey, ...otherkeys] = Object.keys(fieldValue);
+          const func = firstKey && !otherkeys.length?  convertionFuncs.some(f => `$${f.name}` === firstKey) : undefined;
           if(func){
             const { funcName, args } = parseFunctionObject(fieldValue);
             return {

@@ -285,11 +285,14 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
     /** st_makeenvelope */
     if(GeomFilterKeys.includes(filterOperand as any) && funcName && GeomFilter_Funcs.includes(funcName as any)){
       
-      /** If leftQ is geography then this err can happen: 'Antipodal (180 degrees long) edge detected!' */
-      // Disabled due to bad performance
-      // if(funcName.toLowerCase() === "st_makeenvelope") {
-      //   leftQ += "::geometry";
-      // }
+      /** 
+       * If leftQ is geography then:
+       * - err can happen: 'Antipodal (180 degrees long) edge detected!' 
+       * - inacurrate results at large envelopes due to the curvature of the earth
+      */
+      if(funcName.toLowerCase() === "st_makeenvelope") {
+        leftQ += "::geometry";
+      }
 
       return `${leftQ} ${filterOperand} ${funcName}${parseRightVal(funcArgs, "csv")}`;
 
