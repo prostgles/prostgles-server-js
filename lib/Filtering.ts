@@ -289,6 +289,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
        * If leftQ is geography then:
        * - err can happen: 'Antipodal (180 degrees long) edge detected!' 
        * - inacurrate results at large envelopes due to the curvature of the earth
+       * https://gis.stackexchange.com/questions/78816/maximum-size-on-the-bounding-box-with-st-makeenvelope-and-and-geography-colum
       */
       if(funcName.toLowerCase() === "st_makeenvelope") {
         leftQ += "::geometry";
