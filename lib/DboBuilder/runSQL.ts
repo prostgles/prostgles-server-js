@@ -1,4 +1,4 @@
-import { ParameterizedQuery as PQ, ParameterizedQuery } from 'pg-promise';
+import pgPromise, { ParameterizedQuery as PQ, ParameterizedQuery } from 'pg-promise';
 import pg from "pg-promise/typescript/pg-subset";
 import { AnyObject, SQLOptions, SQLResult, SQLResultInfo } from "prostgles-types";
 import { DB, Prostgles } from "../Prostgles";
@@ -58,7 +58,22 @@ export async function runSQL(this: DboBuilder, queryWithoutRLS: string, args: un
     });
   }
 
-  const queryResult = await db.result<AnyObject>(finalQuery, hasParams ? args : undefined)
+  const params = hasParams ? args : undefined;
+  let queryResult: pgPromise.IResultExt<AnyObject> | undefined;
+  
+  if(returnType === "default-with-rollback"){
+    const ROLLBACK = "Rollback";
+    await db.tx(async t => {
+      queryResult = await t.result<AnyObject>(finalQuery, params);
+      /** Rollback */
+      return Promise.reject(new Error(ROLLBACK));
+    }).catch(e => {
+      if(!(e instanceof Error && e.message === ROLLBACK)) throw e;
+    });
+  }  else {
+    queryResult = await db.result<AnyObject>(finalQuery, params);
+  }
+  if(!queryResult) throw "No query result";
   const { fields, rows } = queryResult;
 
   const listenHandlers = await onSQLResult.bind(this)(queryWithoutRLS, queryResult, allowListen, localParams);

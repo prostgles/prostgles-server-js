@@ -359,7 +359,15 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
         resV,
         ["a", "b"]
       );
-    })
+    });
+
+    await test("sql returntype default-with-rollback", async () => {
+      const item = { name: "a" };
+      const res = await db.sql!("delete from items2 returning name; ", {}, { returnType: "default-with-rollback" });
+      assert.deepEqual(res.rows, [item]);
+      const count = await db.items2.count!();
+      assert.equal(count, 1);
+    });
 
     /**
      * returnType "value"
