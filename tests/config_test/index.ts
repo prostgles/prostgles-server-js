@@ -1,7 +1,6 @@
 
 
 /* Dashboard */
-import path from 'path';
 import express from 'express';
 
 process.on('unhandledRejection', (reason, p) => {
@@ -13,18 +12,9 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 const _http = require("http");
-const http = _http.createServer(app);
-const io = require("socket.io")(http, { 
-  path: "/teztz/s",
-  // maxHttpBufferSize: 1e8, // 100Mb
-});
+const http = _http.createServer(app); 
 http.listen(process.env.NPORT || 3000);
-
-const log = (msg: string, extra?: any) => {
-  console.log(...["(server): " + msg, extra].filter(v => v));
-}
-
-
+ 
 
 
 // import WebSocket from 'ws';
