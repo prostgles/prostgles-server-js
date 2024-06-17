@@ -1,13 +1,12 @@
-import { DetailedJoinSelect, JoinPath, JoinSelect, RawJoinPath, SelectParams, SimpleJoinSelect, getKeys } from "prostgles-types";
-import { Filter, LocalParams, ValidatedTableRules } from "../DboBuilder";
+import { DetailedJoinSelect, JoinPath, JoinSelect, RawJoinPath, SelectParams, SimpleJoinSelect, getKeys, isEmpty, omitKeys } from "prostgles-types";
 import { TableRule } from "../../PublishParser/PublishParser";
+import { Filter, LocalParams, ValidatedTableRules } from "../DboBuilder";
 import { ViewHandler } from "../ViewHandler/ViewHandler";
 import { parseJoinPath } from "../ViewHandler/parseJoinPath";
 import { prepareSortItems } from "../ViewHandler/prepareSortItems";
+import { PrepareWhereParams } from "../ViewHandler/prepareWhere";
 import { COMPUTED_FIELDS, FUNCTIONS } from "./Functions";
 import { NewQuery, NewQueryJoin, SelectItemBuilder } from "./QueryBuilder";
-import { prepareHaving } from "./prepareHaving";
-import { PrepareWhereParams } from "../ViewHandler/prepareWhere";
 
 const JOIN_KEYS = ["$innerJoin", "$leftJoin"] as const;
 const JOIN_PARAM_KEYS = getKeys({ 
@@ -206,8 +205,8 @@ export async function getNewQuery(
     ...commonWhereParams,
     isHaving: false,
   });
-  const havingOpts = selectParams.having? await _this.prepareWhere({
-    ...commonWhereParams,
+  const havingOpts = !isEmpty(selectParams.having)? await _this.prepareWhere({
+    ...omitKeys(commonWhereParams, ["forcedFilter"]),
     filter: selectParams.having,
     isHaving: true,
   }) : undefined;

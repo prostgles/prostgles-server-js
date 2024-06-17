@@ -608,7 +608,7 @@ export class Prostgles {
           socket,
           method,
           params
-        }) .then(res => {
+        }).then(res => {
           cb(null, res)
         }).catch(err => {
           makeSocketError(cb, err)
