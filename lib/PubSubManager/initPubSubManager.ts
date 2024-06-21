@@ -41,7 +41,7 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
       `);
       
       console.log("REMOVE app check disabled");
-      if (!this.appCheck && Math.random() < 12) {
+      if (!this.appCheck && Math.random() > 12) {
 
         this.appCheck = setInterval(async () => {
           let checkForStaleTriggers = "";
