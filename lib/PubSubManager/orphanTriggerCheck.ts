@@ -40,6 +40,13 @@ export const getAppCheckQuery = () => `
       NULLIF(current_setting('${LAST_CHECKED_SETTING_NAME}', true), '') IS NULL
       OR current_setting('${LAST_CHECKED_SETTING_NAME}', true)::timestamp < NOW() - INTERVAL '1 minute'
     )
+    /* Ensure we don't check in paralel */
+    AND NOT EXISTS (
+      SELECT 1
+      FROM pg_catalog.pg_stat_activity s
+      WHERE s.query ilike '%${queryIdentifier}%'
+      AND s.state = 'active'
+    )
   THEN
     EXECUTE format('SET LOCAL ${LAST_CHECKED_SETTING_NAME} TO %L', now());
     --USED FOR DEBUG REMOVE
@@ -68,12 +75,3 @@ export const getAppCheckQuery = () => `
     END IF;
   END IF;
 `;
-
-
-    // /* Ensure we don't check in paralel */
-    // AND NOT EXISTS (
-    //   SELECT 1
-    //   FROM pg_catalog.pg_stat_activity
-    //   WHERE query ilike '%${queryIdentifier}%'
-    //   AND state = 'active'
-    // )
