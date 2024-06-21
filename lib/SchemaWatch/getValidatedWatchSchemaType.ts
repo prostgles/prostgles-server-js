@@ -1,5 +1,5 @@
 import type { DboBuilder } from "../DboBuilder/DboBuilder";
-import { OnSchemaChangeCallback } from "../Prostgles";
+import { OnSchemaChangeCallback } from "./SchemaWatch";
 
 export type ValidatedWatchSchemaType = 
 | { watchType: "NONE" }

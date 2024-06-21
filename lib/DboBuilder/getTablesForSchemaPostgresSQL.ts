@@ -1,9 +1,10 @@
 import { SQLResult, asName } from "prostgles-types";
 import { omitKeys, tryCatch } from "prostgles-types/dist/util";
 import { DboBuilder } from "../DboBuilder/DboBuilder";
-import { DBorTx, ProstglesInitOptions } from "../Prostgles";
+import { DBorTx } from "../Prostgles";
 import { clone } from "../utils";
 import { TableSchema, TableSchemaColumn } from "./DboBuilderTypes";
+import { ProstglesInitOptions } from "../ProstglesTypes";
 
 const getMaterialViews = (db: DBorTx, schema: ProstglesInitOptions["schema"]) => {
   const { sql, schemaNames } = getSchemaFilter(schema);
@@ -109,7 +110,8 @@ export const getSchemaFilter = (schema: ProstglesInitOptions["schema"] = { publi
   }
 }
 
-// TODO: Add a onSocketConnect timeout for this query. Reason: this query gets blocked by prostgles.app_triggers from PubSubManager.addTrigger in some cases (pg_dump locks that table)
+// TODO: Add a onSocketConnect timeout for this query. 
+// Reason: this query gets blocked by prostgles.app_triggers from PubSubManager.addTrigger in some cases (pg_dump locks that table)
 export async function getTablesForSchemaPostgresSQL(
   { db, runSQL }: DboBuilder, 
   schema: ProstglesInitOptions["schema"]

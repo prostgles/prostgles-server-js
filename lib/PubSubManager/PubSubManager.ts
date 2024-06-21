@@ -167,6 +167,10 @@ export class PubSubManager {
     return result;
   }
 
+  appInfoWasInserted = false;
+  get appId() {
+    return this.dboBuilder.prostgles.appId;
+  }
   get db(): DB  {
     return this.dboBuilder.db;
   }
@@ -195,12 +199,6 @@ export class PubSubManager {
 
     log("Created PubSubManager");
   }
-
-  /**
-   * Used facilitate concurrent prostgles connections to the same database
-   */
-  appID?: string;
-
   appCheckFrequencyMS = 10 * 1000;
   appCheck?: ReturnType<typeof setInterval>;
 
@@ -227,8 +225,6 @@ export class PubSubManager {
   checkedListenerTableCond?: string[];
 
   initialiseEventTriggers = async () => {
-    if (!this.appID) throw "prepareTriggers failed: this.appID missing";
-
     const { watchSchema } = this.dboBuilder.prostgles.opts;
     if (watchSchema && !(await getIsSuperUser(this.db))) {
       console.warn("prostgles watchSchema requires superuser db user. Will not watch using event triggers")
@@ -268,7 +264,7 @@ export class PubSubManager {
 
                 DROP TABLE IF EXISTS %1$I;
               $q$, 
-              ${asValue('triggers_' + this.appID)}
+              ${asValue('triggers_' + this.appId)}
             );
 
             is_super_user := EXISTS (select 1 from pg_user where usename = CURRENT_USER AND usesuper IS TRUE);
@@ -402,15 +398,14 @@ export class PubSubManager {
   
   addSub = addSub.bind(this);
 
-
   getActiveListeners = (): { table_name: string; condition: string }[] => {
-    const result: { table_name: string; condition: string }[] = [];
+    const activeListeners: { table_name: string; condition: string }[] = [];
     const upsert = (t: string, c: string) => {
-      if (!result.find(r => r.table_name === t && r.condition === c)) {
-        result.push({ table_name: t, condition: c });
+      if (!activeListeners.find(r => r.table_name === t && r.condition === c)) {
+        activeListeners.push({ table_name: t, condition: c });
       }
     }
-    (this.syncs || []).map(s => {
+    (this.syncs ?? []).map(s => {
       upsert(s.table_name, s.condition)
     });
 
@@ -420,7 +415,7 @@ export class PubSubManager {
       });
     });
 
-    return result;
+    return activeListeners;
   }
 
   /**
@@ -436,7 +431,7 @@ export class PubSubManager {
         FROM prostgles.v_triggers
         WHERE app_id = $1
         ORDER BY table_name, condition
-      `, [this.appID]
+      `, [this.dboBuilder.prostgles.appId]
     );
 
     this._triggers = {};
@@ -459,7 +454,6 @@ export class PubSubManager {
       const { table_name } = { ...params }
       let { condition } = { ...params }
       if (!table_name) throw "MISSING table_name";
-      if (!this.appID) throw "MISSING appID";
 
       if (!condition || !condition.trim().length) {
         condition = "TRUE";
@@ -479,8 +473,20 @@ export class PubSubManager {
         /* ${ PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
         LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
 
-        INSERT INTO prostgles.app_triggers (table_name, condition, app_id, related_view_name, related_view_def) 
-          VALUES (${trgVals.tbl}, ${trgVals.cond}, ${asValue(this.appID)}, ${asValue(viewOptions?.viewName ?? null)}, ${asValue(viewOptions?.definition ?? null)})
+        INSERT INTO prostgles.app_triggers (
+          table_name, 
+          condition, 
+          app_id, 
+          related_view_name, 
+          related_view_def
+        ) 
+        VALUES (
+          ${trgVals.tbl}, 
+          ${trgVals.cond}, 
+          ${asValue(this.appId)}, 
+          ${asValue(viewOptions?.viewName ?? null)}, 
+          ${asValue(viewOptions?.definition ?? null)}
+        )
         ON CONFLICT DO NOTHING;
               
         COMMIT WORK;

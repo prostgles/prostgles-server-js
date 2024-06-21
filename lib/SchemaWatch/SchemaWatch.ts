@@ -1,6 +1,5 @@
 import type { DboBuilder } from "../DboBuilder/DboBuilder";
 import { EVENT_TRIGGER_TAGS } from "../Event_Trigger_Tags";
-import { OnSchemaChangeCallback } from "../Prostgles";
 import { PubSubManager, log } from "../PubSubManager/PubSubManager";
 import { ValidatedWatchSchemaType, getValidatedWatchSchemaType } from "./getValidatedWatchSchemaType";
 const COMMAND_FIRST_KEYWORDS = EVENT_TRIGGER_TAGS
@@ -10,6 +9,8 @@ const COMMAND_FIRST_KEYWORDS = EVENT_TRIGGER_TAGS
 const DB_FALLBACK_COMMANDS = Array.from(new Set(COMMAND_FIRST_KEYWORDS));
 
 export type VoidFunction = () => void;
+
+export type OnSchemaChangeCallback = ((event: { command: string; query: string }) => void);
 
 export class SchemaWatch {
 

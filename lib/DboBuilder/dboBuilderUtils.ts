@@ -14,7 +14,6 @@ import {
 } from "prostgles-types";
 import {
   DB,
-  ProstglesInitOptions
 } from "../Prostgles";
 import { pickKeys } from "../PubSubManager/PubSubManager";
 import { LocalParams, SortItem, pgp } from "./DboBuilderTypes";
@@ -23,6 +22,7 @@ import { ViewHandler } from "./ViewHandler/ViewHandler";
 import { getSchemaFilter } from "./getTablesForSchemaPostgresSQL";
 
 import { sqlErrCodeToMsg } from "./sqlErrCodeToMsg";
+import { ProstglesInitOptions } from "../ProstglesTypes";
 export function escapeTSNames(str: string, capitalize = false): string {
   let res = str;
   res = (capitalize ? str[0]?.toUpperCase() : str[0]) + str.slice(1);

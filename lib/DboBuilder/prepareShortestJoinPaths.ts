@@ -1,5 +1,5 @@
 import { DboBuilder } from "../DboBuilder/DboBuilder";
-import { JOIN_TYPES, Join } from "../Prostgles";
+import { JOIN_TYPES, Join } from "../ProstglesTypes";
 import { Graph, findShortestPath } from "../shortestPath";
 import { TableSchema } from "./DboBuilderTypes";
 import { JoinPaths } from "./ViewHandler/ViewHandler";

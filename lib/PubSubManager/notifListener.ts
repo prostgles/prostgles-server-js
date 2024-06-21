@@ -80,6 +80,21 @@ export async function notifListener(this: PubSubManager, data: { payload: string
 
     state = "ok";
     const conditions = tableTriggers.filter((c, i) => condition_ids.includes(i));
+    const orphanedConditions = condition_ids.filter((condId) => typeof tableTriggers.at(condId) !== "string" );
+    if(orphanedConditions.length){
+      this.db
+        .any(" \
+          DELETE FROM prostgles.app_triggers \
+          WHERE table_name = $1 \
+          AND id IN ($2:csv) \
+          AND app_id = $3 \
+          ", 
+          [table_name, orphanedConditions, this.appId]
+        )
+        .catch(e => {
+          console.error("Error deleting orphaned triggers", e);
+        });
+    }
 
     conditions.map(condition => {
 

@@ -8,7 +8,7 @@ import {
   isObject
 } from "prostgles-types";
 import { TableEvent } from "../../Logging";
-import { DB, Join } from "../../Prostgles";
+import { DB } from "../../Prostgles";
 import { TableRule } from "../../PublishParser/PublishParser";
 import { Graph } from "../../shortestPath";
 import {
@@ -31,6 +31,7 @@ import { prepareWhere } from "./prepareWhere";
 import { size } from "./size";
 import { LocalFuncs, subscribe } from "./subscribe";
 import { validateViewRules } from "./validateViewRules";
+import { Join } from "../../ProstglesTypes";
 
 export type JoinPaths = {
   t1: string;

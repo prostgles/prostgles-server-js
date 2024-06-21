@@ -11,8 +11,7 @@ import {
 } from "prostgles-types";
 import { getDBSchema } from "../DBSchemaBuilder";
 import {
-  DB,
-  Join, Prostgles
+  DB, Prostgles
 } from "../Prostgles";
 import { PubSubManager } from "../PubSubManager/PubSubManager";
 import {
@@ -30,7 +29,7 @@ import { PGConstraint, getCanExecute, getConstraints, getSerializedClientErrorFr
 import { getTablesForSchemaPostgresSQL } from "./getTablesForSchemaPostgresSQL";
 import { prepareShortestJoinPaths } from "./prepareShortestJoinPaths";
 import { runSQL } from "./runSQL";
-import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
+import { Join } from "../ProstglesTypes";
 
 export * from "./DboBuilderTypes";
 export * from "./dboBuilderUtils";

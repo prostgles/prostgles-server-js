@@ -487,11 +487,11 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
         ) as { tgname: string; enabled: boolean; }[];
       }
       await sub.unsubscribe();
-      let validTriggers = await getTableTriggers(table_name)
-      assert.equal(validTriggers.filter(t => t.enabled).length, 3);
+      let validTriggers = await getTableTriggers(table_name);
+      assert.equal(validTriggers.filter(t => t.enabled).length, 3, '3 Triggers should be enabled');
       await db.sql?.(`DELETE FROM prostgles.app_triggers`, []); //  WHERE table_name = $1
-      validTriggers = await getTableTriggers(table_name)
-      assert.equal(validTriggers.length, 3);
+      validTriggers = await getTableTriggers(table_name);
+      assert.equal(validTriggers.length, 3, '3 Triggers should exist but be disabled');
       assert.equal(validTriggers.filter(t => t.enabled).length, 0);
     }
 

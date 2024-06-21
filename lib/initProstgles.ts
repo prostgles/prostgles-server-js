@@ -5,10 +5,11 @@ import { isEmpty, pickKeys } from "prostgles-types";
 import { AuthHandler } from "./AuthHandler";
 import { DBEventsManager } from "./DBEventsManager";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
-import { DBHandlerServer, Prostgles, ProstglesInitOptions, getIsSuperUser } from "./Prostgles";
+import { DBHandlerServer, Prostgles, getIsSuperUser } from "./Prostgles";
 import { DbTableInfo, PublishParser } from "./PublishParser/PublishParser";
 import { sleep } from "./utils";
 import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
+import { ProstglesInitOptions } from "./ProstglesTypes";
 
 export type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 export type DbConnectionOpts = pg.IDefaults;
@@ -58,9 +59,31 @@ export type InitResult = {
 export const initProstgles = async function(this: Prostgles, onReady: OnReadyCallbackBasic, reason: OnInitReason): Promise<InitResult> {
   this.loaded = false;
 
-  /* 1. Connect to db */
   if (!this.db) {
-    const { db, pgp } = getDbConnection(this.opts.dbConnection, this.opts.dbOptions, this.opts.DEBUG_MODE,
+    let existingAppName = "";
+    let connString = "";
+    if(typeof this.opts.dbConnection === "string"){
+      connString = this.opts.dbConnection;
+    } else if(this.opts.dbConnection.connectionString){
+      connString = this.opts.dbConnection.connectionString;
+    } else {
+      existingAppName = this.opts.dbConnection.application_name ?? "";
+    }
+
+    if(connString){
+      try {
+        const url = new URL(connString);
+        existingAppName = url.searchParams.get("application_name") ?? url.searchParams.get("ApplicationName") ?? "";
+      } catch (e) {
+
+      }
+    }
+
+    const conObj = typeof this.opts.dbConnection === "string" ? { connectionString: this.opts.dbConnection } : this.opts.dbConnection 
+    const application_name = `prostgles ${this.appId} ${existingAppName}`;
+
+    /* 1. Connect to db */
+    const { db, pgp } = getDbConnection({ ...conObj, application_name }, this.opts.dbOptions, this.opts.DEBUG_MODE,
       notice => {
         if (this.opts.onNotice) this.opts.onNotice(notice);
         if (this.dbEventsManager) {

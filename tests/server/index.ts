@@ -124,6 +124,7 @@ function dd(){
 			expressApp: app,
 			tableName: "files",
 		},
+		// DEBUG_MODE: true,
 		restApi: {
 			expressApp: app,
 			routePrefix: "/api"

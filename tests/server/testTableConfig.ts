@@ -133,6 +133,7 @@ export const testTableConfig: TableConfig<{ en: 1, fr: 1 }> = {
     }
   },
   api_table: {
+    dropIfExists: true,
     columns: {
       id: "SERIAL PRIMARY KEY",
     },

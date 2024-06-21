@@ -1,7 +1,7 @@
 import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
 import { getWatchSchemaTagList } from "../SchemaWatch/getWatchSchemaTagList";
 import { asValue, log, NOTIF_CHANNEL, PubSubManager } from "./PubSubManager";
-const REALTIME_TRIGGER_CHECK_QUERY = "prostgles-server internal query used to manage realtime triggers" as const;  
+export const REALTIME_TRIGGER_CHECK_QUERY = "prostgles-server internal query used to manage realtime triggers" as const;  
 import { getInitQuery } from "./getInitQuery";
 
 export async function initPubSubManager(this: PubSubManager): Promise<PubSubManager | undefined> {
@@ -15,25 +15,37 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
     if (!this.getIsDestroyed()) return;
 
     /* Prepare App id */
-    if (!this.appID) {
+    if (!this.appInfoWasInserted) {
+      this.appInfoWasInserted = true;
       const check_frequency_ms = this.appCheckFrequencyMS;
       const watching_schema_tag_names = this.dboBuilder.prostgles.schemaWatch?.type.watchType !== "NONE" ? getWatchSchemaTagList(this.dboBuilder.prostgles.opts.watchSchema) : null;
-      const raw = await this.db.one(
-        "INSERT INTO prostgles.apps (check_frequency_ms, watching_schema_tag_names, application_name) \
-        VALUES($1, $2, current_setting('application_name')) \
+      await this.db.one(
+        "INSERT INTO prostgles.apps (id, check_frequency_ms, watching_schema_tag_names, application_name) \
+        VALUES($1, $2, $3, current_setting('application_name')) \
         RETURNING *; "
         , [
+          this.appId,
           check_frequency_ms,
           watching_schema_tag_names
         ]
       );
-      this.appID = raw.id;
 
-      if (!this.appCheck) {
+      const appRecord = await this.db.one("SELECT * FROM prostgles.apps WHERE id = $1", [this.appId]);
+      if (!appRecord || !appRecord.application_name?.includes(this.appId)) {
+        throw `initPubSubManager error: App record with application_name containing appId (${this.appId}) not found`;
+      }
+
+      await this.db.any(`
+        DELETE FROM prostgles.app_triggers
+        WHERE app_id = ${asValue(this.appId)}
+      `);
+      
+      console.log("REMOVE app check disabled");
+      if (!this.appCheck && Math.random() < 12) {
 
         this.appCheck = setInterval(async () => {
           let checkForStaleTriggers = "";
-          try {   //  drop owned by api
+          try {
 
             this.appChecking = true;
  
@@ -43,7 +55,7 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
               SET last_used = CASE WHEN (table_name, condition) IN (
                 ${listeners.map(l => ` ( ${asValue(l.table_name)}, ${asValue(l.condition)} ) `).join(", ")}
               ) THEN NOW() ELSE last_used END
-              WHERE app_id = ${asValue(this.appID)};
+              WHERE app_id = ${asValue(this.appId)};
             `;
 
             const checkedListenerTableCond = listeners.map(l => `${l.table_name}.${l.condition}`);
@@ -62,10 +74,11 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
                     /* UPDATE currently used triggers */
                     ${updateCurrentlyUsedTriggersQuery}
 
-                    /* DELETE stale triggers for current app. Other triggers will be deleted on app startup */
-                    DELETE FROM prostgles.app_triggers
-                    WHERE app_id = ${asValue(this.appID)}
-                    AND last_used < NOW() - 4 * ${asValue(this.appCheckFrequencyMS)} * interval '1 millisecond'; -- 10 seconds at the moment
+                    /* DELETE stale triggers for current app. Other triggers will be deleted on app startup 
+                      DELETE FROM prostgles.app_triggers
+                      WHERE app_id = ${asValue(this.appId)}
+                      AND last_used < NOW() - 4 * ${asValue(this.appCheckFrequencyMS)} * interval '1 millisecond'; -- 10 seconds at the moment
+                    */
 
                 END IF;
               
@@ -94,7 +107,7 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
                     /* Last check used to remove disconnected apps */
                     UPDATE prostgles.apps 
                     SET last_check = NOW()
-                    WHERE id = ${asValue(this.appID)};
+                    WHERE id = ${asValue(this.appId)};
 
                     ${dataTriggerCheckQuery}
                 END IF;
@@ -106,7 +119,7 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
               this.db.any(`    
               /* 
                 ${queryIdentifier}
-                ${REALTIME_TRIGGER_CHECK_QUERY} 
+                ${REALTIME_TRIGGER_CHECK_QUERY}
                 ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
               */
               DO $$ 
@@ -129,8 +142,10 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
 
             /** In some cases a query idles and blocks everything else. Terminate all similar queries */
             this.db.any(
-              "SELECT state, pg_terminate_backend(pid) from pg_stat_activity WHERE query ilike ${qid} and pid <>  pg_backend_pid();", 
-              { qid: "%" + REALTIME_TRIGGER_CHECK_QUERY + "%" }
+              "SELECT state, pg_terminate_backend(pid) from pg_stat_activity \
+               WHERE query ilike ${qid} \
+               AND pid <> pg_backend_pid();", 
+              { qid: `%${REALTIME_TRIGGER_CHECK_QUERY}%` }
             );
 
             /** If no tries left
@@ -150,7 +165,7 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
       }
     }
 
-    this.postgresNotifListenManager = new PostgresNotifListenManager(this.db, this.notifListener, NOTIF_CHANNEL.getFull(this.appID));
+    this.postgresNotifListenManager = new PostgresNotifListenManager(this.db, this.notifListener, NOTIF_CHANNEL.getFull(this.appId));
 
     await this.initialiseEventTriggers();
 

@@ -1,5 +1,6 @@
 import { SessionUser } from "./AuthHandler";
-import { Prostgles, ProstglesInitOptions } from "./Prostgles";
+import { Prostgles } from "./Prostgles";
+import { ProstglesInitOptions } from "./ProstglesTypes";
 
 function prostgles<S = void, SUser extends SessionUser = SessionUser>(params: ProstglesInitOptions<S, SUser>){
 

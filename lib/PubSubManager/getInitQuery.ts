@@ -1,6 +1,7 @@
 
 import { asValue, NOTIF_CHANNEL, NOTIF_TYPE, PubSubManager } from "./PubSubManager";
 const { version } = require("../../package.json");
+import { getAppCheckQuery } from "./orphanTriggerCheck";
 
 export const DB_OBJ_NAMES = {
   trigger_add_remove_func: "prostgles.trigger_add_remove_func",
@@ -279,7 +280,6 @@ BEGIN
                         err_detail = PG_EXCEPTION_DETAIL,
                         err_hint = PG_EXCEPTION_HINT;
 
-
                     END;
 
                     --RAISE NOTICE 'has_errors: % ', has_errors;
@@ -323,6 +323,7 @@ BEGIN
                     END IF;
                 END IF;
 
+                ${getAppCheckQuery()}
 
                 RETURN NULL;
                
@@ -573,6 +574,8 @@ BEGIN
                         ), 7999/4)
                       );
                     END LOOP;
+
+                    ${getAppCheckQuery()}
 
                 END IF;
 
