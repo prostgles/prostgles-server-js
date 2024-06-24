@@ -329,7 +329,6 @@ BEGIN
                
             END;
 
-        --COMMIT;
         $$ LANGUAGE plpgsql;
         COMMENT ON FUNCTION ${DB_OBJ_NAMES.data_watch_func} IS 'Prostgles internal function used to notify when data in the table changed';
 
@@ -384,8 +383,7 @@ BEGIN
                         FOREACH op IN ARRAY operations
                         LOOP 
                             trg_name := concat_ws('_', 'prostgles_triggers', trw.table_name, op);
-                            
-                            --EXECUTE format(' DROP TRIGGER IF EXISTS %I ON %s ;' , trg_name, trw.table_name);
+                             
                             EXECUTE format(' ALTER TABLE %s DISABLE TRIGGER %I ;', trw.table_name, trg_name);
                         END LOOP;
                                       

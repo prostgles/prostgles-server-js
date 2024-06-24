@@ -16,9 +16,7 @@ const connectedApplicationNamesQuery = `
     FROM pg_catalog.pg_stat_activity
     WHERE pid = pg_backend_pid()
   )
-`;
-
-const LAST_CHECKED_SETTING_NAME = 'prostgles.last_checked';
+`; 
 
 /** It is a function to prevent undefined EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID */
 export const getAppCheckQuery = () => `
@@ -35,11 +33,6 @@ export const getAppCheckQuery = () => `
       WHERE  table_schema = 'prostgles'
       AND    table_name   = 'apps'
     )
-    /* Ensure we don't check too often */
-    AND (
-      NULLIF(current_setting('${LAST_CHECKED_SETTING_NAME}', true), '') IS NULL
-      OR current_setting('${LAST_CHECKED_SETTING_NAME}', true)::timestamp < NOW() - INTERVAL '1 minute'
-    )
     /* Ensure we don't check in paralel */
     AND NOT EXISTS (
       SELECT 1
@@ -47,10 +40,7 @@ export const getAppCheckQuery = () => `
       WHERE s.query ilike '%${queryIdentifier}%'
       AND s.state = 'active'
     )
-  THEN
-    EXECUTE format('SET LOCAL ${LAST_CHECKED_SETTING_NAME} TO %L', now());
-    --USED FOR DEBUG REMOVE
-    PERFORM pg_notify('prostgles', current_setting('${LAST_CHECKED_SETTING_NAME}', true));
+  THEN 
 
     IF EXISTS (
       ${connectedApplicationNamesQuery}
