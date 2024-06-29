@@ -1,16 +1,48 @@
+import { isDefined, isObject } from "prostgles-types";
 import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
 import { getWatchSchemaTagList } from "../SchemaWatch/getWatchSchemaTagList";
 import { NOTIF_CHANNEL, PubSubManager, asValue } from "./PubSubManager";
-import { getInitQuery } from "./getInitQuery";
+import { getPubSubManagerInitQuery } from "./getInitQuery";
 export const REALTIME_TRIGGER_CHECK_QUERY = "prostgles-server internal query used to manage realtime triggers" as const;  
+
+export const tout = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 export async function initPubSubManager(this: PubSubManager): Promise<PubSubManager | undefined> {
   if (!this.getIsDestroyed()) return undefined;
 
   try {
 
-    const initQuery = await getInitQuery.bind(this)()
-    await this.db.any(initQuery);
+    const initQuery = await getPubSubManagerInitQuery.bind(this)();
+
+    /**
+     * High database activity might cause deadlocks.
+     * Must retry
+    */
+    let didDeadlock = false;
+    let tries = 3;
+    let error: any;
+    while (isDefined(initQuery) && tries > 0) {
+      try {
+        /** Try to reduce race condition deadlocks due to multiple clients connecting at the same time */
+        await tout(Math.random());
+
+        await this.db.any(initQuery);
+        error = undefined;
+        tries = 0;
+      } catch (e: any) {
+        if(!didDeadlock && isObject(e) && e.code === "40P01"){
+          didDeadlock = true;
+          tries = 5;
+          console.error("Deadlock detected. Retrying...");
+        }
+        error = e;
+        tries --;
+      }
+    }
+    if(error){
+      throw error;
+    }
+
     if (!this.getIsDestroyed()) return;
 
     /* Prepare App id */

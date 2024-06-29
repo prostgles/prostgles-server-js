@@ -1,4 +1,6 @@
 
+import { tryCatch } from "prostgles-types";
+import { pgp } from "../DboBuilder/DboBuilderTypes";
 import { asValue, NOTIF_CHANNEL, NOTIF_TYPE, PubSubManager } from "./PubSubManager";
 const { version } = require("../../package.json");
 import { getAppCheckQuery } from "./orphanTriggerCheck";
@@ -10,14 +12,23 @@ export const DB_OBJ_NAMES = {
   schema_watch_trigger: "prostgles_schema_watch_trigger_new"
 } as const;
 
-export const getInitQuery = async function(this: PubSubManager): Promise<string> { 
+const PROSTGLES_SCHEMA_EXISTS_QUERY = `
+  SELECT 1 
+  FROM information_schema.columns 
+  WHERE table_schema = 'prostgles'
+  AND   table_name   = 'versions'
+  AND   column_name   = 'schema_md5'
+`;
+const PROSTGLES_SCHEMA_VERSION_OK_QUERY = `
+  SELECT 1 
+  FROM prostgles.versions
+  WHERE (string_to_array(version, '.')::int[] > string_to_array(\${version}, '.')::int[])
+  OR (string_to_array(version, '.')::int[] = string_to_array(\${version}, '.')::int[])
+  AND schema_md5 = \${schema_md5}
+`;
 
-  const getQuery = async (withoutHash = false): Promise<string> => {
-    const { schema_md5 = "none" } = withoutHash? {} : await this.db.oneOrNone("SELECT md5($1) as schema_md5", [await getQuery(true)]);
-    
-    return `
-
-BEGIN; --  ISOLATION LEVEL SERIALIZABLE;-- TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+const getInitQuery = (debugMode: boolean | undefined) => `
+BEGIN; -- TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 
 --SET  TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 
@@ -29,9 +40,6 @@ DO
 $do$
 BEGIN
 
-    /* Reduce deadlocks */
-    PERFORM pg_sleep(random());
-
     /* Drop older version.  */
     IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'prostgles') THEN
 
@@ -39,23 +47,14 @@ BEGIN
       IF
         /* Backwards compatibility. Cannot check schema version */
         NOT EXISTS(
-          SELECT 1 
-          FROM information_schema.columns 
-          WHERE table_schema = 'prostgles'
-          AND   table_name   = 'versions'
-          AND   column_name   = 'schema_md5'
+          ${PROSTGLES_SCHEMA_EXISTS_QUERY}
         )
       THEN
         DROP SCHEMA IF EXISTS prostgles CASCADE;
       ELSIF
         /* There is no newer version or same same version but different schema */
         NOT EXISTS (
-          SELECT 1 
-          FROM prostgles.versions
-          WHERE 
-            (string_to_array(version, '.')::int[] > string_to_array(${asValue(version)}, '.')::int[])
-            OR (string_to_array(version, '.')::int[] = string_to_array(${asValue(version)}, '.')::int[])
-            AND schema_md5 = ${asValue(schema_md5)}
+          ${PROSTGLES_SCHEMA_VERSION_OK_QUERY}
         )
       THEN
         DROP SCHEMA IF EXISTS prostgles CASCADE;
@@ -83,7 +82,7 @@ BEGIN
         COMMENT ON TABLE prostgles.versions IS 'Stores the prostgles schema creation query hash and package version number to identify when a newer schema needs to be re-created';
 
         INSERT INTO prostgles.versions(version, schema_md5) 
-        VALUES(${asValue(version)}, ${asValue(schema_md5)}) 
+        VALUES(${asValue(version)}, \${schema_md5}) 
         ON CONFLICT DO NOTHING;
 
 
@@ -307,7 +306,7 @@ BEGIN
                                   THEN concat_ws('; ', 'error', err_text, err_detail, err_hint, 'query: ' || query ) 
                                   ELSE COALESCE(v_trigger.cids, '') 
                                 END
-                                ${this.dboBuilder.prostgles.opts.DEBUG_MODE? (", COALESCE(current_query(), 'current_query ??'), ' ', query") : ""}
+                                ${debugMode? (", COALESCE(current_query(), 'current_query ??'), ' ', query") : ""}
                               ), 7999/4) -- Some chars are 2bytes -> 'Ω'
                             );
                         END LOOP;
@@ -506,7 +505,7 @@ BEGIN
                         json_build_object(
                           'TG_OP', TG_OP, 
                           'duration', (EXTRACT(EPOCH FROM now()) * 1000) - start_time,
-                          'query', ${this.dboBuilder.prostgles.opts.DEBUG_MODE? 'LEFT(current_query(), 400)' : "'Only shown in debug mode'"}
+                          'query', ${debugMode? 'LEFT(current_query(), 400)' : "'Only shown in debug mode'"}
                         )
                       )::TEXT, 7999/4)
                     );
@@ -568,7 +567,7 @@ BEGIN
                           ${asValue(NOTIF_TYPE.schema)}, 
                           tg_tag , 
                           TG_event, 
-                          ${this.dboBuilder.prostgles.opts.DEBUG_MODE? 'curr_query' : "'Only shown in debug mode'"}
+                          ${debugMode? 'curr_query' : "'Only shown in debug mode'"}
                         ), 7999/4)
                       );
                     END LOOP;
@@ -589,11 +588,31 @@ BEGIN
 END
 $do$;
 
-
 COMMIT;
-`};
+`
 
-  const res = getQuery();
+/**
+ * Initialize the prostgles schema and functions needed for realtime data and schema changes
+ * undefined returned if the database contains the apropriate prostgles schema
+ */
+export const getPubSubManagerInitQuery = async function(this: PubSubManager): Promise<string | undefined> { 
+
+  const initQuery = getInitQuery(this.dboBuilder.prostgles.opts.DEBUG_MODE);
+  const { schema_md5 = "none" } = await this.db.oneOrNone("SELECT md5($1) as schema_md5", [initQuery.trim()]);
+  const query = pgp.as.format(initQuery, { schema_md5, version });
+  const existingSchema = await this.db.any(PROSTGLES_SCHEMA_EXISTS_QUERY);
+  if(!existingSchema.length){
+    return query;
+  }
+  const { existingSchemaVersions } = await tryCatch(async () => {
+    const existingSchemaVersions = await this.db.any(PROSTGLES_SCHEMA_VERSION_OK_QUERY, { schema_md5, version });
+    return {
+      existingSchemaVersions
+    }
+  });
+  if(!existingSchemaVersions?.length){
+    return query;
+  }
   
-  return res;
+  return undefined;
 }
