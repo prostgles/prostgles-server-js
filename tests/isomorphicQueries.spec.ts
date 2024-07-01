@@ -1023,13 +1023,26 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
       await tryRunP("subscribe to escaped table name", async (resolve, reject) => {
         const filter = { [`"text_col0"`]: "0" }
         let runs = 0;
+        setTimeout(() => {
+          /** Used for debugging. Might not be necessary anymore */
+          if(runs < 2){
+            const appName = db.sql?.(`
+              SELECT application_name
+              FROM pg_catalog.pg_stat_activity
+              WHERE pid = pg_backend_pid()
+            `, [], { returnType: "rows" });
+            const apps = db.sql?.(`SELECT * FROM prostgles.apps`, [], { returnType: "rows" });
+            const app_triggers = db.sql?.(`SELECT * FROM prostgles.app_triggers`, [], { returnType: "rows" });
+            log(JSON.stringify({appName, apps, app_triggers}));
+          }
+        }, 2000);
         const sub = await db[`"""quoted0"""`].subscribe!(filter, {  }, async items => {
           const item = items[0];
           if(item && item[`"text_col0"`] === "0"){
-            if(!runs){
+            runs++;
+            if(runs === 1){
               db[`"""quoted0"""`].update!(filter, filter);
             }
-            runs++;
             if(runs < 2){
               return;
             }
