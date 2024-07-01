@@ -14,11 +14,11 @@
   "license": "ISC",
   "dependencies": {
     "express": "^4.19.2",
-    "prostgles-server": "file:../..",
-    "socket.io": "^4.7.5"
+    "prostgles-server": "file:../.."
   },
   "devDependencies": {
     "@types/node": "^20.9.2",
+    "socket.io": "^4.7.5",
     "tsc-watch": "^4.5.0",
     "typescript": "^5.3.3"
   }

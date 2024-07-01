@@ -1,6 +1,6 @@
 {
   "name": "prostgles-server",
-  "version": "4.2.79",
+  "version": "4.2.80",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -40,8 +40,8 @@
     "check-disk-space": "^3.4.0",
     "file-type": "^18.5.0",
     "pg": "^8.11.5",
-    "pg-cursor": "^2.10.5",
-    "pg-promise": "^11.6.0",
+    "pg-cursor": "^2.11.0",
+    "pg-promise": "^11.8.0",
     "prostgles-client": "^4.0.53",
     "prostgles-types": "^4.0.87"
   },

@@ -22,7 +22,7 @@ import { EventTypes } from "../Logging";
 import { TableRule } from "../PublishParser/PublishParser";
 import { syncData } from "../SyncReplication";
 import { addSub } from "./addSub";
-import { DB_OBJ_NAMES } from "./getInitQuery";
+import { DB_OBJ_NAMES } from "./getPubSubManagerInitQuery";
 import { notifListener } from "./notifListener";
 import { pushSubData } from "./pushSubData";
 

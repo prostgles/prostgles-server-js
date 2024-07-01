@@ -8,6 +8,33 @@ import { describe, test } from "node:test";
 export const clientOnlyQueries = async (db: DBHandlerClient, auth: Auth, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[], token: string) => {
 
   await describe("Client only queries", async (t) => {
+
+    await test("SQL Stream more than 1k records", async ( ) => {
+      const expectedRowCount = 2e3;
+      await tryRunP("", async (resolve, reject) => {
+        let rows: any[] = [];
+        const res = await db.sql!(`SELECT * FROM generate_series(1, ${expectedRowCount})`, {}, { returnType: "stream" });
+        const listener = async (packet: SocketSQLStreamPacket) => { 
+          if(packet.type === "error"){
+            reject(packet.error);
+          } else {
+            if(packet.rows){
+              rows = [
+                ...rows,
+                ...packet.rows
+              ]
+            }
+            if(packet.ended){
+              assert.equal(packet.ended, true);
+              assert.equal(rows.length, expectedRowCount);
+              resolve("ok");
+            }
+          }
+        };
+        await res.start(listener);
+      });
+    });
+
     await test("SQL Stream persistedConnection with streamLimit works for subsequent queries", async () => {
       await tryRunP("", async (resolve, reject) => {
         const query = "SELECT * FROM generate_series(1, 100)";

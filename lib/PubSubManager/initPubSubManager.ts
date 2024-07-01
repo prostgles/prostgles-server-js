@@ -2,7 +2,7 @@ import { isDefined, isObject } from "prostgles-types";
 import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
 import { getWatchSchemaTagList } from "../SchemaWatch/getWatchSchemaTagList";
 import { NOTIF_CHANNEL, PubSubManager, asValue } from "./PubSubManager";
-import { getPubSubManagerInitQuery } from "./getInitQuery";
+import { getPubSubManagerInitQuery } from "./getPubSubManagerInitQuery";
 export const REALTIME_TRIGGER_CHECK_QUERY = "prostgles-server internal query used to manage realtime triggers" as const;  
 
 export const tout = (ms: number) => new Promise(res => setTimeout(res, ms));
