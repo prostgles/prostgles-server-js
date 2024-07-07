@@ -5,6 +5,7 @@ import { canCreateTables } from "../DboBuilder/runSQL";
 import { Prostgles } from "../Prostgles";
 import { FileManager, HOUR, LocalConfig } from "./FileManager";
 import { runClientRequest } from "../runClientRequest";
+import { HTTPCODES } from "../AuthHandler";
 
 export async function initFileManager(this: FileManager, prg: Prostgles){
   this.prostgles = prg;
@@ -183,7 +184,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
 
       } catch(e){
         console.log(e)
-        res.status(404).json({ err: "Invalid/disallowed file" });
+        res.status(HTTPCODES.BAD_REQUEST).json({ err: "Invalid/disallowed file" });
       }
     });
   }

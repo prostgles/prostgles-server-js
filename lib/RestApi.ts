@@ -1,5 +1,5 @@
 import { Prostgles } from "./Prostgles";
-import { ExpressReq, ExpressRes } from "./AuthHandler";
+import { ExpressReq, ExpressRes, HTTPCODES } from "./AuthHandler";
 import { runClientMethod, runClientRequest, runClientSqlRequest } from "./runClientRequest";
 import { Express } from "express";
 import * as bodyParser from "body-parser";
@@ -96,7 +96,7 @@ export class RestApi {
       return;
     }
     if(!command || typeof command !== "string"){
-      res.status(404).json({ error: "command missing" });
+      res.status(HTTPCODES.BAD_REQUEST).json({ error: "command missing" });
       return;
     }
 

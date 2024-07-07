@@ -60,7 +60,13 @@ export type AuthResult<SU = SessionUser> = SU & { sid: string; } | {
   user?: undefined; 
   clientUser?: undefined; 
   sid?: string;
-} | undefined
+} | undefined;
+
+export const HTTPCODES = { 
+  AUTH_ERROR: 401,
+  NOT_FOUND: 404,
+  BAD_REQUEST: 400,
+};
 
 export const getLoginClientInfo = (req: AuthClientRequest): AuthClientRequest & LoginClientInfo => {
   if("httpReq" in req){
@@ -352,20 +358,20 @@ export class AuthHandler {
           const { id } = req.params ?? {};
 
           if (typeof id !== "string" || !id) {
-            res.status(404).json({ msg: "Invalid magic-link id. Expecting a string" });
+            res.status(HTTPCODES.BAD_REQUEST).json({ msg: "Invalid magic-link id. Expecting a string" });
           } else {
             try {
               const session = await this.throttledFunc(async () => {
                 return check(id, this.dbo as any, this.db, getLoginClientInfo({ httpReq: req }));
               });
               if (!session) {
-                res.status(404).json({ msg: "Invalid magic-link" });
+                res.status(HTTPCODES.AUTH_ERROR).json({ msg: "Invalid magic-link" });
               } else {
                 this.setCookieAndGoToReturnURLIFSet(session, { req, res });
               }
 
             } catch (e) {
-              res.status(404).json({ msg: e });
+              res.status(HTTPCODES.AUTH_ERROR).json({ msg: e });
             }
           }
         });
@@ -395,7 +401,7 @@ export class AuthHandler {
             }
           } catch (err) {
             console.log(err)
-            res.status(404).json({ err });
+            res.status(HTTPCODES.AUTH_ERROR).json({ err });
           }
 
         });
@@ -460,7 +466,7 @@ export class AuthHandler {
 
             } catch (error) {
               console.error(error);
-              res.status(404).json({ msg: "Something went wrong when processing your request" });
+              res.status(HTTPCODES.AUTH_ERROR).json({ msg: "Something went wrong when processing your request" });
             }
 
           });
