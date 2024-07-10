@@ -9,7 +9,8 @@ export const DB_OBJ_NAMES = {
   trigger_add_remove_func: "prostgles.trigger_add_remove_func",
   data_watch_func: "prostgles.prostgles_trigger_function",
   schema_watch_func: "prostgles.schema_watch_func",
-  schema_watch_trigger: "prostgles_schema_watch_trigger_new"
+  schema_watch_trigger: "prostgles_schema_watch_trigger_new",
+  schema_watch_trigger_drop: "prostgles_schema_watch_trigger_new_drop"
 } as const;
 
 const PROSTGLES_SCHEMA_EXISTS_QUERY = `
@@ -535,15 +536,30 @@ BEGIN
             
             DECLARE curr_query TEXT := '';                                       
             DECLARE app RECORD;
+            DECLARE objects_changed BOOLEAN := false;   
             
             BEGIN
+
+                IF TG_event = 'ddl_command_end' THEN
+                  objects_changed := EXISTS (
+                    SELECT * 
+                    FROM pg_event_trigger_ddl_commands()
+                  );
+                END IF;
+                IF TG_event = 'sql_drop' THEN
+                  objects_changed := EXISTS (
+                    SELECT * 
+                    FROM pg_event_trigger_dropped_objects()
+                  );
+                END IF;
     
                 /* 
                   This event trigger will outlive a prostgles app instance. 
                   Must ensure it only fires if an app instance is running  
                 */
                 IF
-                  EXISTS (
+                  objects_changed 
+                  AND EXISTS (
                     SELECT 1 
                     FROM information_schema.tables 
                     WHERE  table_schema = 'prostgles'

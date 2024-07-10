@@ -545,8 +545,12 @@ const SCHEMA_WATCH_EVENT_TRIGGER_QUERY = `
   THEN
 
       SELECT format(
-        $$ DROP EVENT TRIGGER IF EXISTS %I ; $$
+        $$ 
+          DROP EVENT TRIGGER IF EXISTS %I ; 
+          DROP EVENT TRIGGER IF EXISTS %I ; 
+        $$
         , ${asValue(DB_OBJ_NAMES.schema_watch_trigger)}
+        , ${asValue(DB_OBJ_NAMES.schema_watch_trigger_drop)}
       )
       INTO q;
       EXECUTE q;
@@ -559,8 +563,15 @@ const SCHEMA_WATCH_EVENT_TRIGGER_QUERY = `
   THEN
 
       DROP EVENT TRIGGER IF EXISTS ${DB_OBJ_NAMES.schema_watch_trigger};
-      CREATE EVENT TRIGGER ${DB_OBJ_NAMES.schema_watch_trigger} ON ddl_command_end
+      CREATE EVENT TRIGGER ${DB_OBJ_NAMES.schema_watch_trigger} 
+      ON ddl_command_end
       WHEN TAG IN (\${EVENT_TRIGGER_TAGS:csv})
+      EXECUTE PROCEDURE ${DB_OBJ_NAMES.schema_watch_func}();
+
+      DROP EVENT TRIGGER IF EXISTS ${DB_OBJ_NAMES.schema_watch_trigger_drop};
+      CREATE EVENT TRIGGER ${DB_OBJ_NAMES.schema_watch_trigger_drop} 
+      ON sql_drop
+      --WHEN TAG IN (\${EVENT_TRIGGER_TAGS:csv})
       EXECUTE PROCEDURE ${DB_OBJ_NAMES.schema_watch_func}();
 
   END IF;
