@@ -488,7 +488,7 @@ export class AuthHandler {
       let result: any, error: any, finished = false;
 
       /**
-       * Throttle response times to prevent timing attacks
+       * Throttle reject response times to prevent timing attacks
        */
       const interval = setInterval(() => {
         if (finished) {
@@ -504,6 +504,8 @@ export class AuthHandler {
 
       try {
         result = await func();
+        resolve(result);
+        clearInterval(interval);
       } catch (err) {
         console.log(err)
         error = err;
