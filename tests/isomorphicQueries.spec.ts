@@ -1023,17 +1023,17 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
       await tryRunP("subscribe to escaped table name", async (resolve, reject) => {
         const filter = { [`"text_col0"`]: "0" }
         let runs = 0;
-        setTimeout(() => {
-          /** Used for debugging. Might not be necessary anymore */
+        setTimeout(async () => {
+          /** Used for debugging */
           if(runs < 2){
-            const appName = db.sql?.(`
+            const appName = await db.sql?.(`
               SELECT application_name
               FROM pg_catalog.pg_stat_activity
               WHERE pid = pg_backend_pid()
             `, [], { returnType: "rows" });
-            const apps = db.sql?.(`SELECT * FROM prostgles.apps`, [], { returnType: "rows" });
-            const app_triggers = db.sql?.(`SELECT * FROM prostgles.app_triggers`, [], { returnType: "rows" });
-            log(JSON.stringify({appName, apps, app_triggers}));
+            const apps = await db.sql?.(`SELECT * FROM prostgles.apps`, [], { returnType: "value" });
+            const app_triggers = await db.sql?.(`SELECT * FROM prostgles.app_triggers`, [], { returnType: "rows" });
+            log(JSON.stringify({ appName, apps, app_triggers }));
           }
         }, 2000);
         const sub = await db[`"""quoted0"""`].subscribe!(filter, {  }, async items => {
@@ -1046,10 +1046,14 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
             if(runs < 2){
               return;
             }
-            await testToEnsureTriggersAreDisabled(sub, `"""quoted0"""`);
-            resolve(true);
+            try {
+              await testToEnsureTriggersAreDisabled(sub, `"""quoted0"""`)
+              resolve(true);
+            } catch(e){
+              reject(e);
+            }
           }
-        });
+        }).catch(reject);
       });
     });
 
