@@ -8,6 +8,7 @@ import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
 import { DB, getIsSuperUser } from "../Prostgles";
 import { addSync } from "./addSync";
 import { initPubSubManager } from "./initPubSubManager";
+import * as crypto from "crypto";
 
 import * as Bluebird from "bluebird";
 import * as pgPromise from 'pg-promise';
@@ -466,6 +467,9 @@ export class PubSubManager {
       const trgVals = {
         tbl: asValue(table_name),
         cond: asValue(condition),
+        condHash: asValue(
+          crypto.createHash('md5').update(condition).digest('hex')
+        )
       };
 
       await this.db.any(`
@@ -476,13 +480,15 @@ export class PubSubManager {
         INSERT INTO prostgles.app_triggers (
           table_name, 
           condition, 
+          condition_hash, 
           app_id, 
           related_view_name, 
           related_view_def
         ) 
         VALUES (
           ${trgVals.tbl}, 
-          ${trgVals.cond}, 
+          ${trgVals.cond},
+          ${trgVals.condHash},
           ${asValue(this.appId)}, 
           ${asValue(viewOptions?.viewName ?? null)}, 
           ${asValue(viewOptions?.definition ?? null)}

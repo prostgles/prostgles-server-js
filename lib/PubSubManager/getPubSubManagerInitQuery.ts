@@ -163,6 +163,7 @@ BEGIN
           app_id          TEXT NOT NULL,
           table_name      TEXT NOT NULL,
           condition       TEXT NOT NULL,
+          condition_hash  TEXT NOT NULL,
 
           /* The view from the root subscription, found in the condition.
               We need this because old_table/new_table data is not reflected in the view inside the AFTER trigger
@@ -172,7 +173,7 @@ BEGIN
 
           inserted        TIMESTAMP NOT NULL DEFAULT NOW(),
           last_used       TIMESTAMP NOT NULL DEFAULT NOW(),
-          PRIMARY KEY (app_id, table_name, condition) /* This unique index limits the condition column value to be less than 'SELECT current_setting('block_size'); */
+          PRIMARY KEY (app_id, table_name, condition_hash)
         );
         COMMENT ON TABLE prostgles.app_triggers IS 'Tables and conditions that are currently subscribed/synced';
 

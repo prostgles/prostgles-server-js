@@ -46,13 +46,6 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
     /** Ensure request is valid */
     await this.find(filter, { ...selectParams, limit: 0 }, undefined, table_rules, localParams);   
 
-    /** app_triggers condition field has an index which limits it's value. 
-     * TODO: use condition md5 hash 
-     * */
-    const filterSize = JSON.stringify(filter || {}).length;
-    if (filterSize * 4 > 2704) {
-      throw "filter too big. Might exceed the btree version 4 maximum 2704. Use a primary key or a $rowhash filter instead"
-    }
     if (!this.dboBuilder.prostgles.isSuperUser) {
       throw "Subscribe not possible. Must be superuser to add triggers 1856";
     }

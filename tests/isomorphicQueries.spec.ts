@@ -1033,7 +1033,7 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
             `, [], { returnType: "rows" });
             const apps = await db.sql?.(`SELECT * FROM prostgles.apps`, [], { returnType: "value" });
             const app_triggers = await db.sql?.(`SELECT * FROM prostgles.app_triggers`, [], { returnType: "rows" });
-            log(JSON.stringify({ appName, apps, app_triggers }));
+            log(JSON.stringify({ appName, apps, app_triggers }, null, 2));
           }
         }, 2000);
         const sub = await db[`"""quoted0"""`].subscribe!(filter, {  }, async items => {
@@ -1054,6 +1054,20 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
             }
           }
         }).catch(reject);
+      });
+    });
+    const testName = "subscribe using a filter bigger than block_size"
+    await test(testName, async () => {
+      await tryRunP(testName, async (resolve, reject) => {
+        const sub = await db[`"""quoted0"""`].subscribe!({ [`"text_col0"`]: "0".repeat(2e3) }, {  }, async items => {
+
+          setTimeout(async () => {
+            if(!sub) return
+            await sub.unsubscribe();
+            resolve(true);
+          }, 10);
+        });
+
       });
     });
 
