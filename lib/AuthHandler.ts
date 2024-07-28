@@ -477,13 +477,12 @@ export class AuthHandler {
 
   getReturnUrl = (req: ExpressReq) => {
     const { returnUrlParamName } = this.routes;
-    if (req?.query && returnUrlParamName) {
+    if (returnUrlParamName && req?.query?.[returnUrlParamName]) {
       const returnURL = decodeURIComponent(req?.query?.[returnUrlParamName] as string);
       
       return getSafeReturnURL(returnURL, returnUrlParamName);
     }
     return null;
-
   }
 
   destroy = () => {
