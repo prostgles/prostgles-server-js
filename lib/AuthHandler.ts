@@ -66,6 +66,7 @@ export const HTTPCODES = {
   AUTH_ERROR: 401,
   NOT_FOUND: 404,
   BAD_REQUEST: 400,
+  INTERNAL_SERVER_ERROR: 500,
 };
 
 export const getLoginClientInfo = (req: AuthClientRequest): AuthClientRequest & LoginClientInfo => {
@@ -157,7 +158,7 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
      * Name of get url parameter used in redirecting user after successful login. 
      * Defaults to "returnURL"
      */
-    returnURL?: string;
+    returnUrlParamName?: string;
 
     magicLinks?: {
 
@@ -200,7 +201,7 @@ export class AuthHandler {
 
   routes: {
     login?: string;
-    returnURL?: string;
+    returnUrlParamName?: string;
     logoutGetPath?: string;
     magicLinks?: {
       route: string;
@@ -215,19 +216,18 @@ export class AuthHandler {
     this.prostgles = prostgles;
     this.opts = prostgles.opts.auth as any;
     if (prostgles.opts.auth?.expressConfig) {
-      const { magicLinks, returnURL, loginRoute, logoutGetPath } = prostgles.opts.auth.expressConfig;
+      const { magicLinks, returnUrlParamName, loginRoute, logoutGetPath } = prostgles.opts.auth.expressConfig;
       const magicLinksRoute = magicLinks?.route || "/magic-link"
       this.routes = {
         magicLinks: magicLinks? {
           expressRoute: `${magicLinksRoute}/:id`,
           route: magicLinksRoute
         } : undefined,
-        returnURL: returnURL || "returnURL",
+        returnUrlParamName: returnUrlParamName || "returnURL",
         login: loginRoute || "/login",
         logoutGetPath: logoutGetPath || "/logout",
         catchAll: "*"
       }
-      
     }
     if(!prostgles.dbo || !prostgles.db) throw "dbo or db missing";
     this.dbo = prostgles.dbo;
@@ -256,7 +256,7 @@ export class AuthHandler {
     if (this.routes?.magicLinks?.route) pubRoutes.push(this.routes.magicLinks.route);
 
     return !pubRoutes.some(publicRoute => {
-      return this.matchesRoute(publicRoute, pathname); // publicRoute === pathname || pathname.startsWith(publicRoute) && ["/", "?", "#"].includes(pathname.slice(-1));
+      return this.matchesRoute(publicRoute, pathname);
     });
   }
 
@@ -287,9 +287,9 @@ export class AuthHandler {
         ...(this.opts?.expressConfig?.cookieOptions || {}) 
       };
       const cookieData = sid;
-      if(!this.sidKeyName || !this.routes?.returnURL) throw "sidKeyName or returnURL missing"
+      if(!this.sidKeyName || !this.routes?.returnUrlParamName) throw "sidKeyName or returnURL missing"
       res.cookie(this.sidKeyName, cookieData, cookieOpts);
-      const successURL = getReturnUrl(req, this.routes.returnURL) || "/";
+      const successURL = this.getReturnUrl(req) || "/";
       res.redirect(successURL);
 
     } else {
@@ -435,7 +435,7 @@ export class AuthHandler {
               }
             }
             try {
-              const returnURL = getReturnUrl(req, this.routes.returnURL)
+              const returnURL = this.getReturnUrl(req);
 
               /**
                * Requesting a User route
@@ -473,6 +473,17 @@ export class AuthHandler {
         }
       }
     }
+  }
+
+  getReturnUrl = (req: ExpressReq) => {
+    const { returnUrlParamName } = this.routes;
+    if (req?.query && returnUrlParamName) {
+      const returnURL = decodeURIComponent(req?.query?.[returnUrlParamName] as string);
+      
+      return getSafeReturnURL(returnURL, returnUrlParamName);
+    }
+    return null;
+
   }
 
   destroy = () => {
@@ -768,12 +779,36 @@ export class AuthHandler {
   }
 }
 
-/**
- * AUTH
- */
-function getReturnUrl(req: ExpressReq, name?: string) {
-  if (req?.query?.returnURL && name) {
-    return decodeURIComponent(req?.query?.[name] as string);
+export const getSafeReturnURL = (returnURL: string, returnUrlParamName: string) => {
+  /** Dissalow redirect to other domains */
+  if(returnURL) {
+    const allowedOrigin = "https://localhost";
+    const { origin, pathname, search, searchParams } = new URL(returnURL, allowedOrigin);
+    if(
+      origin !== allowedOrigin ||
+      returnURL !== `${pathname}${search}` ||
+      searchParams.get(returnUrlParamName)
+    ){
+      console.error(`Unsafe returnUrl: ${returnURL}. Redirecting to /`);
+      return "/";
+    }
+
+    return returnURL;
   }
-  return null;
+}
+
+const issue = ([
+  ["https://localhost", "/"],
+  ["//localhost.bad.com", "/"],
+  ["//localhost.com", "/"],
+  ["/localhost/com", "/localhost/com"],
+  ["/localhost/com?here=there", "/localhost/com?here=there"],
+  ["/localhost/com?returnUrl=there", "/"],
+  ["//http://localhost.com", "/"],
+  ["//abc.com", "/"],
+  ["///abc.com", "/"],
+] as const).find(([returnURL, expected]) => getSafeReturnURL(returnURL, "returnUrl") !== expected);
+
+if(issue){
+  throw new Error(`getSafeReturnURL failed for ${issue[0]}. Expected: ${issue[1]}`);
 }

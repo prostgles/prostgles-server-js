@@ -1033,15 +1033,20 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
             `, [], { returnType: "rows" });
             const apps = await db.sql?.(`SELECT * FROM prostgles.apps`, [], { returnType: "value" });
             const app_triggers = await db.sql?.(`SELECT * FROM prostgles.app_triggers`, [], { returnType: "rows" });
+            log("show-logs");
             log(JSON.stringify({ appName, apps, app_triggers }, null, 2));
           }
         }, 2000);
         const sub = await db[`"""quoted0"""`].subscribe!(filter, {  }, async items => {
           const item = items[0];
+          log(JSON.stringify({
+            item,
+            runs,
+          }, null, 2));
           if(item && item[`"text_col0"`] === "0"){
             runs++;
             if(runs === 1){
-              db[`"""quoted0"""`].update!(filter, filter);
+              await db[`"""quoted0"""`].update!(filter, filter);
             }
             if(runs < 2){
               return;

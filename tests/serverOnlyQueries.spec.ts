@@ -1,8 +1,9 @@
 import { DBHandlerServer } from "../dist/DboBuilder";
+import { getSafeReturnURL } from "../dist/AuthHandler";
 import { test, describe } from "node:test";
 
 export const serverOnlyQueries = async (db: DBHandlerServer) => {
-
+  
   await describe('Server Only Queries', async () => {
     await test('Self reference recursion bug', async () => {
       await db.rec.findOne!({ id: 1 }, { select: { "*": 1, rec_ref: "*" } });
@@ -26,6 +27,6 @@ export const serverOnlyQueries = async (db: DBHandlerServer) => {
       if(newRow.col1 !== null) {
         throw "api_table onMount failed: col1 missing. Got: " + JSON.stringify(newRow);
       }
-    });
+    }); 
   });
 }

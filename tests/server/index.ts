@@ -28,8 +28,10 @@ import type { DBOFullyTyped } from "prostgles-server/dist/DBSchemaBuilder";
 import { spawn } from "child_process";
 export type { DBHandlerServer } from "prostgles-server/dist/Prostgles";
 
+let logs = [];
+
 export const log = (msg: string, extra?: any, trace?: boolean) => {
-	const msgs = ["(server): " + msg, extra].filter(v => v);
+	const msgs = msg.includes("show-logs")? logs : ["(server): " + msg, extra].filter(v => v);
 	if(trace){
 		console.trace(...msgs);
 	} else {
@@ -77,7 +79,6 @@ function dd(){
 	if(!dbo) return;
 	dbo.tbl.find;
 }
-
 (async () => {
 	
 
@@ -101,6 +102,8 @@ function dd(){
 		transactions: true,
 		schema: { public: 1, prostgles_test: 1 },
 		onLog: async ev => {
+			logs.push(ev);
+			logs = logs.slice(-10);
 			if(ev.type === "debug" || ev.type === "connect" || ev.type === "disconnect"){
 				// log("onLog", ev);
 			}
@@ -135,8 +138,11 @@ function dd(){
 			if(isClientTest){
 				log("Client connected -> console does not work. use log function. socket.id:", socket.id);
 				socket.emit("start-test", { server_id: Math.random() });
-				socket.on("log", async (data, cb) => { 
+				socket.on("log", async (data, cb) => {
 					console.log("Client log ", data);
+					if(typeof data === "string" && data.includes("show-logs")){
+						log(data);
+					}
 				});
 				socket.on("stop-test", async (err, cb) => {
 					cb();

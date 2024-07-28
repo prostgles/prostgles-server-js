@@ -71,7 +71,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
 
     const tableConfig = referencedTables[refTable]!;
 
-    for (const [colName, colConfig] of Object.entries(tableConfig.referenceColumns)){
+    for (const [colName] of Object.entries(tableConfig.referenceColumns)){
       const existingCol = cols.find(c => c.name === colName);
       if(existingCol){
         if(existingCol.references?.some(({ ftable }) => ftable === tableName)){
@@ -125,7 +125,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
   if(app){
     app.get(this.fileRouteExpress, async (req, res) => {
       if(!this.dbo[tableName]){
-        res.status(500).json({ err: `Internal error: media table (${tableName}) not valid` });
+        res.status(HTTPCODES.INTERNAL_SERVER_ERROR).json(`Internal error: media table (${tableName}) not valid`);
         return false;
       }
 
@@ -134,8 +134,12 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
       try {
 
         const { name } = req.params;
-        if(typeof name !== "string" || !name) throw "Invalid media name";
-        if(!this.prostgles) throw "Prostgles instance missing";
+        if(typeof name !== "string" || !name) {
+          throw "Invalid media name";
+        }
+        if(!this.prostgles) {
+          throw "Prostgles instance missing";
+        }
         const id = name.slice(0, 36);
         const selectParams = { select: { id: 1, name: 1, signed_url: 1, signed_url_expires: 1, content_type: 1 } }
         const media = await runClientRequest.bind(this.prostgles)({ 
@@ -149,16 +153,8 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
         });
         
         if(!media) {
-          /**
-           * Redirect to login !??
-           */
-          // const mediaExists = await mediaTable.count({ name });
-          // if(mediaExists && this.prostgles.authHandler){
-
-          // } else {
-          //   throw "Invalid media";
-          // }
-          throw "Invalid media";
+          res.status(HTTPCODES.NOT_FOUND).send("File not found or not allowed");
+          return;
         }
         
         if(this.cloudClient){
@@ -184,7 +180,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles){
 
       } catch(e){
         console.log(e)
-        res.status(HTTPCODES.BAD_REQUEST).json({ err: "Invalid/disallowed file" });
+        res.status(HTTPCODES.BAD_REQUEST).send("Invalid/disallowed file");
       }
     });
   }
