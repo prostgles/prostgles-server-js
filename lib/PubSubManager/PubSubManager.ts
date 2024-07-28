@@ -156,12 +156,6 @@ export class PubSubManager {
 
   static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID = "prostgles internal query that should be excluded from schema watch " as const;
 
-  public static canCreate = async (db: DB) => {
-    const canExecute = await getCanExecute(db);
-    const isSuperUs = await getIsSuperUser(db);
-    return { canExecute, isSuperUs, yes: canExecute && isSuperUs };
-  }
-
   public static create = async (options: PubSubManagerOptions) => {
     const instance = new PubSubManager(options);
     const result = await initPubSubManager.bind(instance)();

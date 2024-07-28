@@ -46,9 +46,9 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
     /** Ensure request is valid */
     await this.find(filter, { ...selectParams, limit: 0 }, undefined, table_rules, localParams);   
 
-    if (!this.dboBuilder.prostgles.isSuperUser) {
-      throw "Subscribe not possible. Must be superuser to add triggers 1856";
-    }
+    // if (!this.dboBuilder.prostgles.isSuperUser) {
+    //   throw "Subscribe not possible. Must be superuser";
+    // }
 
     const newQuery: NewQuery = await this.find(filter, { ...selectParams, limit: 0 }, undefined, table_rules, { ...localParams, returnNewQuery: true }) as any;
     const viewOptions = await getSubscribeRelatedTables.bind(this)({ 
@@ -85,7 +85,7 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
       return result;
     } else {
 
-      const { channelName } = await pubSubManager.addSub({ 
+      const { channelName, sendFirstData } = await pubSubManager.addSub({ 
         ...commonSubOpts,
         socket: undefined,  
         localFuncs, 
@@ -97,7 +97,11 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
         pubSubManager.removeLocalSub(channelName, localFuncs)
       };
       await this._log({ command: "subscribe", localParams, data: { filter, params }, duration: Date.now() - start });
-      const res: { unsubscribe: () => any } = Object.freeze({ unsubscribe })
+      const res: { unsubscribe: () => any } = Object.freeze({ unsubscribe });
+      /** Send first data after subscription is initialised to prevent race conditions */
+      setTimeout(() => {
+        sendFirstData?.();
+      }, 0);
       return res;
     }
   } catch (e) {

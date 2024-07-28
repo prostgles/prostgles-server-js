@@ -481,9 +481,7 @@ export class Prostgles {
 
       const methods = await publishParser?.getAllowedMethods(clientInfo, userData);
 
-      const methodSchema: ClientSchema["methods"] = !methods? [] : getKeys(methods).map(methodName => {
-        const method = methods[methodName];
-
+      const methodSchema: ClientSchema["methods"] = !methods? [] : Object.entries(methods).map(([methodName, method]) => {
         if(isObject(method) && "run" in method){
           return {
             name: methodName,

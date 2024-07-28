@@ -1,13 +1,16 @@
 import { SubscriptionChannels } from "prostgles-types";
 import { BasicCallback, parseCondition, PubSubManager, Subscription, SubscriptionParams } from "./PubSubManager";
+import { VoidFunction } from "../SchemaWatch/SchemaWatch";
 
 type AddSubscriptionParams = SubscriptionParams & {
   condition: string;
 }
 
+type AddSubResult = SubscriptionChannels & { sendFirstData: VoidFunction | undefined }
+
 /* Must return a channel for socket */
 /* The distinct list of {table_name, condition} must have a corresponding trigger in the database */
-export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSubscriptionParams, "channel_name" | "parentSubParams">): Promise<SubscriptionChannels> {
+export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSubscriptionParams, "channel_name" | "parentSubParams">): Promise<AddSubResult> {
   const {
     socket, localFuncs, table_rules, filter = {},
     params = {}, condition = "", throttle = 0,  //subOne = false, 
@@ -57,10 +60,11 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
     ]
   }
 
-  const result: SubscriptionChannels = {
+  const result: AddSubResult = {
     channelName: channel_name,
     channelNameReady: channel_name + ".ready",
-    channelNameUnsubscribe: channel_name + ".unsubscribe"
+    channelNameUnsubscribe: channel_name + ".unsubscribe",
+    sendFirstData: undefined,
   }
 
   const [matchingSub] = this.getClientSubs(newSub);
@@ -70,8 +74,6 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
   }
 
   this.upsertSocket(socket);
-
-  // const upsertSub = _upsertSub.bind(this);
 
   if(viewOptions){
     for await(const relatedTable of viewOptions.relatedTables){
@@ -88,10 +90,15 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
 
   }
 
-  if(localFuncs){
+  /** 
+   * Must ensure sub will start sending data after all triggers are set up. 
+   * Socket clients are not affected as they need to confirm they are ready to receive data
+  */
+  result.sendFirstData = () => {
     this.pushSubData(newSub);
+  }
 
-  } else if (socket) {
+  if (socket) {
     const removeListeners = () => {
       socket.removeAllListeners(channel_name);
       socket.removeAllListeners(result.channelNameReady);

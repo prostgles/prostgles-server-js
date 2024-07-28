@@ -1,14 +1,13 @@
 import { getKeys, isObject } from "prostgles-types";
-import { 
-  DboTable, ParsedPublishTable, PublishObject, PublishTableRule, 
-  PublishViewRule, RULE_TO_METHODS, SubscribeRule 
-} from "./publishTypesAndUtils";
 import { AuthResult } from "../AuthHandler";
-import { isPlainObject } from "../DboBuilder/DboBuilder";
 import { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { ViewHandler } from "../DboBuilder/ViewHandler/ViewHandler";
-import { DEFAULT_SYNC_BATCH_SIZE } from "../PubSubManager/PubSubManager"; 
+import { DEFAULT_SYNC_BATCH_SIZE } from "../PubSubManager/PubSubManager";
 import { PublishParser } from "./PublishParser";
+import {
+  DboTable, ParsedPublishTable, PublishObject, PublishTableRule,
+  PublishViewRule, RULE_TO_METHODS, SubscribeRule
+} from "./publishTypesAndUtils";
 
 export async function getTableRulesWithoutFileTable(this: PublishParser, { tableName, localParams }: DboTable, clientInfo?: AuthResult, overridenPublish?: PublishObject): Promise<ParsedPublishTable | undefined> {
 
@@ -26,6 +25,9 @@ export async function getTableRulesWithoutFileTable(this: PublishParser, { table
   /* Get view or table specific rules */
   const tHandler = (this.dbo[tableName] as TableHandler | ViewHandler);
   const is_view = tHandler.is_view;
+  /**
+   * Allow subscribing to a view if it has primary key columns from other tables
+   */
   const canSubscribe = (!is_view || tHandler.columns.some(c => c.references));
   if (!tHandler) {
     throw { stack: ["getTableRules()"], message: `${tableName} could not be found in dbo` };
@@ -37,16 +39,16 @@ export async function getTableRulesWithoutFileTable(this: PublishParser, { table
     const pgUserIsAllowedThis = tHandler.tableOrViewInfo.privileges[r.sqlRule];
     let result = (!is_view || !r.table_only) && pgUserIsAllowedThis;
 
-    if (!pgUserIsAllowedThis && isPlainObject(raw_table_rules) && (raw_table_rules as PublishTableRule)[r.sqlRule]) {
+    if (!pgUserIsAllowedThis && isObject(raw_table_rules) && (raw_table_rules as PublishTableRule)[r.sqlRule]) {
       throw `Your postgres user is not allowed ${r.sqlRule} on table ${tableName}`;
     }
 
-    if ((r.rule === "subscribe" || r.rule === "sync") && !this.prostgles.isSuperUser) {
-      result = false;
-      if (isPlainObject(raw_table_rules) && (raw_table_rules as PublishTableRule)[r.rule]) {
-        throw `Cannot publish realtime rule ${tableName}.${r.rule}. Superuser is required for this`
-      }
-    }
+    // if ((r.rule === "subscribe" || r.rule === "sync") && !this.prostgles.isSuperUser) {
+    //   result = false;
+    //   if (isObject(raw_table_rules) && (raw_table_rules as PublishTableRule)[r.rule]) {
+    //     throw `Cannot publish realtime rule ${tableName}.${r.rule}. Superuser is required for this`
+    //   }
+    // }
 
     if(r.rule === "subscribe" && !canSubscribe){
       result = false;
@@ -65,7 +67,7 @@ export async function getTableRulesWithoutFileTable(this: PublishParser, { table
     });
 
     /** Specific rules allowed */
-  } else if (isPlainObject(raw_table_rules) && getKeys(raw_table_rules).length) {
+  } else if (isObject(raw_table_rules) && getKeys(raw_table_rules).length) {
     const allRuleKeys: (keyof PublishViewRule | keyof PublishTableRule)[] = getKeys(raw_table_rules);
     const dissallowedRuleKeys = allRuleKeys.filter(m => !(raw_table_rules as PublishTableRule)[m])
 
@@ -81,7 +83,7 @@ export async function getTableRulesWithoutFileTable(this: PublishParser, { table
         parsed_table[r.rule] = Object.assign({}, r.no_limits) as any;
 
         /** Carry over detailed config */
-      } else if (isPlainObject((raw_table_rules as any)[r.rule])) {
+      } else if (isObject((raw_table_rules as any)[r.rule])) {
         parsed_table[r.rule] = (raw_table_rules as any)[r.rule]
       }
     });
