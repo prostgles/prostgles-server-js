@@ -779,7 +779,7 @@ export class AuthHandler {
   }
 }
 
-export const getSafeReturnURL = (returnURL: string, returnUrlParamName: string) => {
+export const getSafeReturnURL = (returnURL: string, returnUrlParamName: string, quiet = false) => {
   /** Dissalow redirect to other domains */
   if(returnURL) {
     const allowedOrigin = "https://localhost";
@@ -789,7 +789,9 @@ export const getSafeReturnURL = (returnURL: string, returnUrlParamName: string) 
       returnURL !== `${pathname}${search}` ||
       searchParams.get(returnUrlParamName)
     ){
-      console.error(`Unsafe returnUrl: ${returnURL}. Redirecting to /`);
+      if(!quiet){
+        console.error(`Unsafe returnUrl: ${returnURL}. Redirecting to /`);
+      }
       return "/";
     }
 
@@ -807,7 +809,7 @@ const issue = ([
   ["//http://localhost.com", "/"],
   ["//abc.com", "/"],
   ["///abc.com", "/"],
-] as const).find(([returnURL, expected]) => getSafeReturnURL(returnURL, "returnUrl") !== expected);
+] as const).find(([returnURL, expected]) => getSafeReturnURL(returnURL, "returnUrl", true) !== expected);
 
 if(issue){
   throw new Error(`getSafeReturnURL failed for ${issue[0]}. Expected: ${issue[1]}`);
