@@ -421,7 +421,7 @@ export class PubSubManager {
     const triggers: {
       table_name: string;
       condition: string;
-    }[] = await this.db.any(` 
+    }[] = await this.db.any(`
         SELECT *
         FROM prostgles.v_triggers
         WHERE app_id = $1
@@ -439,7 +439,6 @@ export class PubSubManager {
     });
   }
 
-  // waitingTriggers: { [key: string]: string[] } = undefined;
   addingTrigger: any;
   addTriggerPool?: Record<string, string[]> = undefined;
   async addTrigger(params: { table_name: string; condition: string; }, viewOptions: ViewSubscriptionOptions | undefined, socket: PRGLIOSocket | undefined) {
@@ -471,6 +470,16 @@ export class PubSubManager {
         /* ${ PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
         LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
 
+        /** app_triggers is not refreshed when tables are dropped */
+        DELETE FROM prostgles.app_triggers at
+        WHERE app_id = ${asValue(this.appId)} 
+        AND NOT EXISTS (
+          SELECT 1  
+          FROM pg_catalog.pg_trigger t
+          WHERE tgname like format('prostgles_triggers_%s_', at.table_name) || '%'
+          AND tgenabled = 'O'
+        );
+
         INSERT INTO prostgles.app_triggers (
           table_name, 
           condition, 
@@ -488,7 +497,7 @@ export class PubSubManager {
           ${asValue(viewOptions?.definition ?? null)}
         )
         ON CONFLICT DO NOTHING;
-              
+
         COMMIT WORK;
       `);
 
