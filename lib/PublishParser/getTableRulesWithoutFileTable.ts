@@ -43,6 +43,7 @@ export async function getTableRulesWithoutFileTable(this: PublishParser, { table
       throw `Your postgres user is not allowed ${r.sqlRule} on table ${tableName}`;
     }
 
+    // TODO: Implement comprehensive canSubscribe check
     // if ((r.rule === "subscribe" || r.rule === "sync") && !this.prostgles.isSuperUser) {
     //   result = false;
     //   if (isObject(raw_table_rules) && (raw_table_rules as PublishTableRule)[r.rule]) {

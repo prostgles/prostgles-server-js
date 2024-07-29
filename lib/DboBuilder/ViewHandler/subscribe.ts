@@ -46,6 +46,7 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
     /** Ensure request is valid */
     await this.find(filter, { ...selectParams, limit: 0 }, undefined, table_rules, localParams);   
 
+    // TODO: Implement comprehensive canSubscribe check
     // if (!this.dboBuilder.prostgles.isSuperUser) {
     //   throw "Subscribe not possible. Must be superuser";
     // }

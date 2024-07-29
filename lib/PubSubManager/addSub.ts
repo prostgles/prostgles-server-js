@@ -90,15 +90,17 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
 
   }
 
-  /** 
-   * Must ensure sub will start sending data after all triggers are set up. 
-   * Socket clients are not affected as they need to confirm they are ready to receive data
-  */
-  result.sendFirstData = () => {
-    this.pushSubData(newSub);
-  }
 
-  if (socket) {
+  if(localFuncs){
+    /** 
+     * Must ensure sub will start sending data after all triggers are set up. 
+     * Socket clients are not affected as they need to confirm they are ready to receive data
+    */
+    result.sendFirstData = () => {
+      this.pushSubData(newSub);
+    }
+
+  } else if (socket) {
     const removeListeners = () => {
       socket.removeAllListeners(channel_name);
       socket.removeAllListeners(result.channelNameReady);
