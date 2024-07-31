@@ -45,10 +45,11 @@ export class PublishParser {
     const _methods = await applyParamsIfFunc(this.publishMethods, publishParams);
 
     if (_methods && Object.keys(_methods).length) {
-      getKeys(_methods).map(key => {
+      Object.entries(_methods).map(([key, method]) => {
         const isFuncLike = (maybeFunc: VoidFunction | Promise<void>) => (typeof maybeFunc === "function" || maybeFunc && typeof maybeFunc.then === "function");
-        const method = _methods[key]
+        //@ts-ignore
         if (method && (isFuncLike(method) || isObject(method) && isFuncLike(method.run))) {
+          //@ts-ignore
           methods[key] = _methods[key];
         } else {
           throw `invalid publishMethods item -> ${key} \n Expecting a function or promise`
@@ -146,14 +147,16 @@ export class PublishParser {
 
 export * from "./publishTypesAndUtils";
 
-
-function applyParamsIfFunc(maybeFunc: any, ...params: any): any {
+type FunctionWithArguments = (...args: any) => any
+function applyParamsIfFunc<T>(maybeFunc: T, ...params: any): T extends FunctionWithArguments ? ReturnType<T> : T {
   if (
     (maybeFunc !== null && maybeFunc !== undefined) &&
+    //@ts-ignore
     (typeof maybeFunc === "function" || typeof maybeFunc.then === "function")
   ) {
-    return maybeFunc(...params);
+    return (maybeFunc as FunctionWithArguments)(...params);
   }
 
+  //@ts-ignore
   return maybeFunc;
 }

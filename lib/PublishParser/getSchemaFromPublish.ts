@@ -15,7 +15,7 @@ type Args = ({
 }
 export async function getSchemaFromPublish(this: PublishParser, { userData, ...clientReq }: Args): Promise<{ schema: TableSchemaForClient; tables: DBSchemaTable[] }> {
   const schema: TableSchemaForClient = {};
-  const tables: DBSchemaTable[] = []
+  let tables: DBSchemaTable[] = []
 
   try {
     /* Publish tables and views based on socket */
@@ -129,5 +129,6 @@ export async function getSchemaFromPublish(this: PublishParser, { userData, ...c
     throw e;
   }
 
+  tables = tables.sort((a, b) => a.name.localeCompare(b.name));
   return { schema, tables };
 }
