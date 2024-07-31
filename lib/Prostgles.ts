@@ -489,6 +489,10 @@ export class Prostgles {
           }
         }
         return methodName;
+      }).sort((a, b) => {
+        const aName = isObject(a)? a.name : a;
+        const bName = isObject(b)? b.name : b;
+        return aName.localeCompare(bName);        
       });
 
       const { auth } = clientReq.socket? await this.authHandler.makeSocketAuth(clientReq.socket) : { auth: {} };
