@@ -4,7 +4,7 @@ import { REALTIME_TRIGGER_CHECK_QUERY } from "./initPubSubManager";
 /**
  * Schema and Data watch triggers (DB_OBJ_NAMES.schema_watch_func, DB_OBJ_NAMES.data_watch_func) 
  * survive and continue to user resources even after the client disconnects.
- * We must therefore .
+ * We must therefore delete apps that do not have active connections
  */
 
 const queryIdentifier = "prostgles query used to keep track of which prgl backend clients are still connected";
@@ -14,7 +14,6 @@ const connectedApplicationNamesQuery = `
   WHERE application_name IN (
     SELECT application_name 
     FROM pg_catalog.pg_stat_activity
-    WHERE pid = pg_backend_pid()
   )
 `; 
 
