@@ -17,6 +17,15 @@ const connectedApplicationNamesQuery = `
   )
 `; 
 
+export const DELETE_DISCONNECTED_APPS_QUERY = `
+  DELETE FROM prostgles.apps a
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_stat_activity s
+    WHERE s.application_name = a.application_name
+  )
+`;
+
 /** It is a function to prevent undefined EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID */
 export const getAppCheckQuery = () => `
   /* 
@@ -47,12 +56,7 @@ export const getAppCheckQuery = () => `
 
       /* Remove disconnected apps */
       WITH deleted_apps AS (
-        DELETE FROM prostgles.apps a
-        WHERE NOT EXISTS (
-          SELECT 1
-          FROM pg_catalog.pg_stat_activity s
-          WHERE s.application_name = a.application_name
-        )
+        ${DELETE_DISCONNECTED_APPS_QUERY}
         RETURNING a.id
       )
       DELETE FROM prostgles.app_triggers

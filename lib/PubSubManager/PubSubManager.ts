@@ -26,6 +26,7 @@ import { addSub } from "./addSub";
 import { DB_OBJ_NAMES } from "./getPubSubManagerInitQuery";
 import { notifListener } from "./notifListener";
 import { pushSubData } from "./pushSubData";
+import { DELETE_DISCONNECTED_APPS_QUERY } from "./orphanTriggerCheck";
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 const pgp: PGP = pgPromise({
@@ -265,10 +266,9 @@ export class PubSubManager {
             is_super_user := EXISTS (select 1 from pg_user where usename = CURRENT_USER AND usesuper IS TRUE);
 
             /**
-             *  Delete stale app records, this will delete related triggers
+             *  Delete disconnected app records, this will delete related triggers
              * */
-            DELETE FROM prostgles.apps
-            WHERE last_check < NOW() - 8 * check_frequency_ms * interval '1 millisecond';
+            ${DELETE_DISCONNECTED_APPS_QUERY};
 
             DELETE FROM prostgles.app_triggers
             WHERE app_id NOT IN (SELECT id FROM prostgles.apps);

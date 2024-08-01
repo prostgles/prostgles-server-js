@@ -153,7 +153,6 @@ BEGIN
           id                  TEXT PRIMARY KEY DEFAULT prostgles.random_string(),
           added               TIMESTAMP DEFAULT NOW(),
           application_name    TEXT,
-          last_check          TIMESTAMP NOT NULL DEFAULT NOW(),
           watching_schema_tag_names     _TEXT,
           check_frequency_ms  INTEGER NOT NULL  
         );
