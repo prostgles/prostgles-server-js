@@ -126,6 +126,8 @@ export class PostgresNotifListenManager {
             return setListeners(obj.client, this.notifListener, this.db_channel_name);
           })
           .catch(error => {
+            /** Database was destroyed */
+            if(this.destroyed || error && error.code === "3D000") return;
             console.log('PostgresNotifListenManager: Error Connecting:', error);
             if (--maxAttempts) {
               this.reconnect(delay, maxAttempts)
