@@ -62,6 +62,7 @@ export class SchemaWatch {
       log("Schema changed");
       const { query, command } = event;
 
+      this.dboBuilder.cacheDBTypes(true);
       if (typeof watchSchema === "function") {
         /* Only call the provided func */
         watchSchema(event);

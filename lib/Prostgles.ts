@@ -105,7 +105,7 @@ export class Prostgles {
   loaded = false;
 
   dbEventsManager?: DBEventsManager;
-
+  schemaAge = "0";
 
   fileManager?: FileManager;
   restApi?: RestApi;

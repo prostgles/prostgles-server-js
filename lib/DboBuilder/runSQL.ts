@@ -15,7 +15,7 @@ export async function runSQL(this: DboBuilder, queryWithoutRLS: string, args: un
     }
   }
 
-  await cacheDBTypes.bind(this)();
+  await this.cacheDBTypes();
 
   if (!(await canRunSQL(this.prostgles, localParams))) {
     throw "Not allowed to run SQL";
@@ -116,7 +116,12 @@ const onSQLResult = async function(this: DboBuilder, queryWithoutRLS: string, { 
   }
 }
 
-export async function cacheDBTypes(this: DboBuilder) {
+export async function cacheDBTypes(this: DboBuilder, force = false) {
+  if(force){
+    this.DATA_TYPES = undefined;
+    this.USER_TABLES = undefined;
+    this.USER_TABLE_COLUMNS = undefined;
+  }
   this.DATA_TYPES ??= await this.db.any("SELECT oid, typname FROM pg_type") ?? [];
   this.USER_TABLES ??= await this.db.any(`
     SELECT 

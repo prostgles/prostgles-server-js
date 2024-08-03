@@ -28,7 +28,7 @@ import { parseJoinPath } from "./ViewHandler/parseJoinPath";
 import { PGConstraint, getCanExecute, getConstraints, getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
 import { getTablesForSchemaPostgresSQL } from "./getTablesForSchemaPostgresSQL";
 import { prepareShortestJoinPaths } from "./prepareShortestJoinPaths";
-import { runSQL } from "./runSQL";
+import { cacheDBTypes, runSQL } from "./runSQL";
 import { Join } from "../ProstglesTypes";
 
 export * from "./DboBuilderTypes";
@@ -74,6 +74,7 @@ export class DboBuilder {
    * Used for db.sql field type details
    */
   DATA_TYPES: { oid: string, typname: PG_COLUMN_UDT_DATA_TYPE }[] | undefined;
+  DATA_TYPES_DBKEY = "";
   USER_TABLES: TableOidInfo[] | undefined;
   USER_TABLE_COLUMNS: TableOidColumnInfo[] | undefined;
   
@@ -280,4 +281,6 @@ export class DboBuilder {
       throw e;
     }
   }
+
+  cacheDBTypes = cacheDBTypes.bind(this)
 }
