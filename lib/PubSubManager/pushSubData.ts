@@ -4,7 +4,11 @@ import { log, PubSubManager, Subscription } from "./PubSubManager";
 export async function pushSubData(this: PubSubManager, sub: Subscription, err?: any) {
   if (!sub) throw "pushSubData: invalid sub";
 
-  const { socket_id, channel_name } = sub;  //, subOne = false 
+  const { socket_id, channel_name } = sub;
+  if(!this.subs.some(s => s.channel_name === channel_name)){
+    // Might be throttling a sub that was removed
+    return;
+  }
   const localFuncs = parseLocalFuncs(sub.localFuncs);
 
   if (err) {

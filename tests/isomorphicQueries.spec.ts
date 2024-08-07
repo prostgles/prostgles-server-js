@@ -487,10 +487,19 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
         ) as { tgname: string; enabled: boolean; }[];
       }
       let validTriggers = await getTableTriggers(table_name);
-      console.log("unsubscribe start")
+      console.log("unsubscribe start - " + table_name)
       await sub.unsubscribe();
-      console.log("unsubscribe end")
-      assert.equal(validTriggers.filter(t => t.enabled).length, 3, '3 Triggers should be enabled');
+      console.log("unsubscribe end - " + table_name);
+      assert.equal(
+        validTriggers.filter(t => t.enabled).length, 
+        3, 
+        `3 Triggers should be enabled: \n${
+          JSON.stringify({ 
+            table_name, 
+            filter: sub.filter, 
+            validTriggers 
+          }, null, 2)
+        }`);
       await db.sql?.(`DELETE FROM prostgles.app_triggers`, []);
       validTriggers = await getTableTriggers(table_name);
       assert.equal(validTriggers.length, 3, '3 Triggers should exist but be disabled');
