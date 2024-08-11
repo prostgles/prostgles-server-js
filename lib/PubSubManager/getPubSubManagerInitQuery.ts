@@ -148,6 +148,22 @@ BEGIN
         END;
         $$ LANGUAGE plpgsql;
         COMMENT ON FUNCTION prostgles."user" IS 'Used for row level security';
+ 
+        CREATE OR REPLACE FUNCTION prostgles.user_id()
+        RETURNS UUID AS $$ 
+        BEGIN
+          RETURN prostgles.user('id')::UUID;
+        END;
+        $$ LANGUAGE plpgsql;
+        COMMENT ON FUNCTION prostgles.user_id IS 'Session user id';
+
+        CREATE OR REPLACE FUNCTION prostgles.user_type()
+        RETURNS TEXT AS $$ 
+        BEGIN
+          RETURN prostgles.user('type')::TEXT;
+        END;
+        $$ LANGUAGE plpgsql;
+        COMMENT ON FUNCTION prostgles.user_type IS 'Session user type'; 
 
         CREATE TABLE IF NOT EXISTS prostgles.apps (
           id                  TEXT PRIMARY KEY DEFAULT prostgles.random_string(),
