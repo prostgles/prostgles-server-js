@@ -460,7 +460,9 @@ BEGIN
                                   AFTER INSERT ON %2$s
                                   REFERENCING NEW TABLE AS new_table
                                   FOR EACH STATEMENT EXECUTE PROCEDURE ${DB_OBJ_NAMES.data_watch_func}();
-                                  COMMENT ON TRIGGER %1$I ON %2$s IS 'Prostgles internal trigger used to notify when data in the table changed';
+                                  /* removed to allow less privileges for a user to create subscriptions
+                                    COMMENT ON TRIGGER %1$I ON %2$s IS 'Prostgles internal trigger used to notify when data in the table changed';
+                                  */
                               $q$,  
                               'prostgles_triggers_' || trw.table_name || '_insert', trw.table_name                                                
                           ) || format(
@@ -470,7 +472,7 @@ BEGIN
                                   AFTER UPDATE ON %2$s
                                   REFERENCING OLD TABLE AS old_table NEW TABLE AS new_table
                                   FOR EACH STATEMENT EXECUTE PROCEDURE ${DB_OBJ_NAMES.data_watch_func}();
-                                  COMMENT ON TRIGGER %1$I ON %2$s IS 'Prostgles internal trigger used to notify when data in the table changed';
+                                  --COMMENT ON TRIGGER %1$I ON %2$s IS 'Prostgles internal trigger used to notify when data in the table changed';
                               $q$,  
                               'prostgles_triggers_' || trw.table_name || '_update', trw.table_name   
                           ) || format(
@@ -480,7 +482,7 @@ BEGIN
                                   AFTER DELETE ON %2$s
                                   REFERENCING OLD TABLE AS old_table
                                   FOR EACH STATEMENT EXECUTE PROCEDURE ${DB_OBJ_NAMES.data_watch_func}();
-                                  COMMENT ON TRIGGER %1$I ON %2$s IS 'Prostgles internal trigger used to notify when data in the table changed';
+                                  --COMMENT ON TRIGGER %1$I ON %2$s IS 'Prostgles internal trigger used to notify when data in the table changed';
                               $q$,
                               'prostgles_triggers_' || trw.table_name || '_delete', trw.table_name  
                           );
