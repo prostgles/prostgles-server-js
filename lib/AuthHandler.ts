@@ -466,7 +466,8 @@ export class AuthHandler {
 
             } catch (error) {
               console.error(error);
-              res.status(HTTPCODES.AUTH_ERROR).json({ msg: "Something went wrong when processing your request" });
+              const errorMessage = typeof error === "string" ? error : error instanceof Error ? error.message : "";
+              res.status(HTTPCODES.AUTH_ERROR).json({ msg: "Something went wrong when processing your request" + (errorMessage? (": " + errorMessage) : "") });
             }
 
           });
