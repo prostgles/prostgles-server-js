@@ -633,6 +633,7 @@ export const getPubSubManagerInitQuery = async function(this: PubSubManager): Pr
   const query = pgp.as.format(initQuery, { schema_md5, version });
   const existingSchema = await this.db.any(PROSTGLES_SCHEMA_EXISTS_QUERY);
   if(!existingSchema.length){
+    console.log("getPubSubManagerInitQuery: No prostgles.versions table found. Creating...");
     return query;
   }
   const { existingSchemaVersions } = await tryCatch(async () => {
@@ -642,6 +643,7 @@ export const getPubSubManagerInitQuery = async function(this: PubSubManager): Pr
     }
   });
   if(!existingSchemaVersions?.length){
+    console.log("getPubSubManagerInitQuery: Outdated prostgles schema. Re-creating...");
     return query;
   }
   
