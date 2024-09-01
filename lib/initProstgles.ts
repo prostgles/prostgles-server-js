@@ -52,7 +52,7 @@ export type InitResult = {
    * Generated database public schema TS types for all tables and views
    */
   getTSSchema: () => string;
-  update: (newOpts: Pick<ProstglesInitOptions, "fileTable" | "restApi" | "tableConfig">) => Promise<void>;
+  update: (newOpts: Pick<ProstglesInitOptions, "fileTable" | "restApi" | "tableConfig" | "schema">) => Promise<void>;
   restart: () => Promise<InitResult>; 
 }
 
@@ -170,6 +170,11 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
         }
         if("tableConfig" in newOpts){
           this.opts.tableConfig = newOpts.tableConfig;
+          await this.initTableConfig({ type: "prgl.update" });
+          await this.refreshDBO();
+        }
+        if("schema" in newOpts){
+          this.opts.schema = newOpts.schema;
           await this.initTableConfig({ type: "prgl.update" });
           await this.refreshDBO();
         }
