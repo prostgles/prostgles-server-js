@@ -2,6 +2,9 @@ import { SessionUser } from "./AuthHandler";
 import { Prostgles } from "./Prostgles";
 import { ProstglesInitOptions } from "./ProstglesTypes";
 
+import { testDboTypes } from "./typeTests/dboTypeCheck";
+testDboTypes();
+
 function prostgles<S = void, SUser extends SessionUser = SessionUser>(params: ProstglesInitOptions<S, SUser>){
 
     const prgl = new Prostgles(params as any);

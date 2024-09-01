@@ -4,13 +4,10 @@ import express from 'express';
 import prostgles from "prostgles-server";
 const app = express();
 const http = require('http').createServer(app);
-const { exec } = require('child_process');
 import { testPublishTypes } from "./publishTypeCheck";
 import { testPublish } from "./testPublish";
-import { testDboTypes } from "./dboTypeCheck";
 import { testTableConfig } from "./testTableConfig";
 
-testDboTypes();
 testPublishTypes();
 
 const isClientTest = (process.env.TEST_TYPE === "client");
@@ -255,14 +252,6 @@ function dd(){
 						"dist/client/index.js"
 					], { cwd: execPath, stdio: "inherit" });
 
-					// const clientPath = `cd ${__dirname}/../../../clientz && npm test`;
-					// const proc = exec(clientPath, console.log);
-					// proc.stdout?.on('data', function(data) {
-					// 	console.log(data); 
-					// });
-					// proc.stderr?.on('data', function(data) {
-					// 	console.error(data); 
-					// });
 					log("Waiting for client...");
 					
 				} else if(process.env.TEST_TYPE === "server"){

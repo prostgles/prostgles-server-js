@@ -65,13 +65,13 @@ export type DBSchemaGenerated = {
 `;
 }
 
-type ServerViewHandler<T extends AnyObject = AnyObject> = ViewHandler<T> & { is_view: boolean; }
-type ServerTableHandler<T extends AnyObject = AnyObject> = TableHandler<T> & { is_view: boolean; }
+type ServerViewHandler<T extends AnyObject = AnyObject, Schema extends DBSchema | void = void> = ViewHandler<T, Schema> & { is_view: boolean; }
+type ServerTableHandler<T extends AnyObject = AnyObject, Schema extends DBSchema | void = void> = TableHandler<T, Schema> & { is_view: boolean; }
 
 export type DBTableHandlersFromSchema<Schema = void> = Schema extends DBSchema? { 
   [tov_name in keyof Schema]: Schema[tov_name]["is_view"] extends true? 
-    ServerViewHandler<Schema[tov_name]["columns"]> : 
-    ServerTableHandler<Schema[tov_name]["columns"]>
+    ServerViewHandler<Schema[tov_name]["columns"], Schema> : 
+    ServerTableHandler<Schema[tov_name]["columns"], Schema>
 } : Record<string, Partial<ServerTableHandler>>;
 
 export type DBHandlerServerExtra<TH = Record<string, Partial<ServerTableHandler>>, WithTransactions = true> = {
