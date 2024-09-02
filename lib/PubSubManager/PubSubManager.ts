@@ -245,25 +245,24 @@ export class PubSubManager {
         BEGIN
             --SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
             
-            /** Delete existing triggers without locking */
-            LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
-            EXECUTE format(
-              $q$
+            /** IS THIS STILL NEEDED? Delete existing triggers without locking 
+            */
+              LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
+              EXECUTE format(
+                $q$
 
-                CREATE TEMP TABLE %1$I AS --ON COMMIT DROP AS
-                SELECT * FROM prostgles.app_triggers;
+                  CREATE TEMP TABLE %1$I AS --ON COMMIT DROP AS
+                  SELECT * FROM prostgles.app_triggers;
 
-                DELETE FROM prostgles.app_triggers;
+                  DELETE FROM prostgles.app_triggers;
 
-                INSERT INTO prostgles.app_triggers
-                SELECT * FROM %1$I;
+                  INSERT INTO prostgles.app_triggers
+                  SELECT * FROM %1$I;
 
-                DROP TABLE IF EXISTS %1$I;
-              $q$, 
-              ${asValue('triggers_' + this.appId)}
-            );
-
-            is_super_user := EXISTS (select 1 from pg_user where usename = CURRENT_USER AND usesuper IS TRUE);
+                  DROP TABLE IF EXISTS %1$I;
+                $q$, 
+                ${asValue('triggers_' + this.appId)}
+              );
 
             /**
              *  Delete disconnected app records, this will delete related triggers
@@ -468,7 +467,8 @@ export class PubSubManager {
       await this.db.any(`
         BEGIN WORK;
         /* ${ PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
-        LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
+        /* why is this lock level needed? */
+        --LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
 
         /** app_triggers is not refreshed when tables are dropped */
         DELETE FROM prostgles.app_triggers at
@@ -528,6 +528,9 @@ export class PubSubManager {
 }
 
 const SCHEMA_WATCH_EVENT_TRIGGER_QUERY = `
+
+  is_super_user := EXISTS (select 1 from pg_user where usename = CURRENT_USER AND usesuper IS TRUE);
+
   /* DROP the old buggy schema watch trigger */
   IF EXISTS (
     SELECT 1 FROM pg_catalog.pg_event_trigger
