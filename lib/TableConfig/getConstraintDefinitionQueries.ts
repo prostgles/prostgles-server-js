@@ -1,5 +1,5 @@
 import pgPromise from "pg-promise";
-import { asName, getKeys } from "prostgles-types";
+import { asName } from "prostgles-types";
 import { DB } from "../Prostgles";
 import { asValue } from "../PubSubManager/PubSubManager";
 import { TableConfig } from "./TableConfig";
@@ -26,11 +26,11 @@ export const getConstraintDefinitionQueries = ({ tableConf, tableName }: Args): 
       return undefined;
     }
     
-    if(Array.isArray(constraints)){
+    if(Array.isArray(constraints)) {
       return constraints.map(c => ({ content: c, alterQuery: `ALTER TABLE ${asName(tableName)} ADD ${c}`}));
       
     } else {
-      const constraintNames = getKeys(tableConf.constraints);
+      const constraintNames = Object.keys(constraints);
       return constraintNames.map(constraintName => {
         const _cnstr = constraints[constraintName]!;
         const constraintDef = typeof _cnstr === "string"? _cnstr : `${_cnstr.type} (${_cnstr.content})`;

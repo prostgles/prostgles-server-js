@@ -314,7 +314,7 @@ export type TableConfig<LANG_IDS = { en: 1 }> = {
  */
 export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
-  instanceId = Math.random();
+  instanceId = Date.now() + Math.random();
   
   config: TableConfig<LANG_IDS> = {};
   get dbo(): DBHandlerServer {
