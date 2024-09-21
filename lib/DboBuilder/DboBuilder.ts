@@ -7,7 +7,8 @@
 import {
   PG_COLUMN_UDT_DATA_TYPE,
   SQLOptions,
-  getJoinHandlers
+  getJoinHandlers,
+  tryCatch
 } from "prostgles-types";
 import { getDBSchema } from "../DBSchemaBuilder";
 import {
@@ -95,13 +96,17 @@ export class DboBuilder {
       const canExecute = await getCanExecute(this.db)
       if (!canExecute) throw "PubSubManager based subscriptions not possible: Cannot run EXECUTE statements on this connection";
 
-      this._pubSubManager = await PubSubManager.create({
-        dboBuilder: this,
+      const { pubSubManager, error, hasError } = await tryCatch(async () => {
+        const pubSubManager = await PubSubManager.create({
+          dboBuilder: this,
+        });
+        return { pubSubManager };
       });
-    }
-    if (!this._pubSubManager) {
-      console.trace("Could not create this._pubSubManager")
-      throw "Could not create this._pubSubManager";
+      this._pubSubManager = pubSubManager;
+      if (hasError || !this._pubSubManager ) {
+        console.error("Error in getPubSubManager", error);
+        throw "Could not create this._pubSubManager check logs";
+      }
     }
 
     return this._pubSubManager;
