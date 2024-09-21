@@ -3,12 +3,12 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { DBHandlerServer, DboBuilder, PRGLIOSocket, TableInfo, TableOrViewInfo, getCanExecute } from "../DboBuilder/DboBuilder";
+import * as crypto from "crypto";
+import { DBHandlerServer, DboBuilder, PRGLIOSocket, TableInfo, TableOrViewInfo } from "../DboBuilder/DboBuilder";
 import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
 import { DB, getIsSuperUser } from "../Prostgles";
 import { addSync } from "./addSync";
 import { initPubSubManager } from "./initPubSubManager";
-import * as crypto from "crypto";
 
 import * as Bluebird from "bluebird";
 import * as pgPromise from 'pg-promise';
@@ -25,8 +25,8 @@ import { syncData } from "../SyncReplication";
 import { addSub } from "./addSub";
 import { DB_OBJ_NAMES } from "./getPubSubManagerInitQuery";
 import { notifListener } from "./notifListener";
-import { pushSubData } from "./pushSubData";
 import { DELETE_DISCONNECTED_APPS_QUERY } from "./orphanTriggerCheck";
+import { pushSubData } from "./pushSubData";
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 const pgp: PGP = pgPromise({

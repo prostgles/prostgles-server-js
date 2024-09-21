@@ -68,6 +68,10 @@ export async function getSchemaFromPublish(this: PublishParser, { userData, ...c
               methods = getKeys(table_rules) as any;
             }
 
+            if(!this.prostgles.dboBuilder.canSubscribe){
+              methods = methods.filter(m => !["subscribe", "subscribeOne", "sync", "unsubscribe", "unsync"].includes(m));
+            }
+
             await Promise.all(methods.filter(m => m !== "select" as any)
             .map(async method => {
               if (method === "sync" && table_rules[method]) {

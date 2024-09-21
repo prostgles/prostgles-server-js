@@ -1,6 +1,6 @@
 {
   "name": "prostgles-server",
-  "version": "4.2.108",
+  "version": "4.2.109",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -36,14 +36,13 @@
   "homepage": "https://prostgles.com",
   "dependencies": {
     "bluebird": "^3.7.2",
-    "body-parser": "^1.20.2",
+    "body-parser": "^1.20.3",
     "check-disk-space": "^3.4.0",
     "file-type": "^18.5.0",
     "pg": "^8.11.5",
     "pg-cursor": "^2.11.0",
     "pg-promise": "^11.8.0",
-    "prostgles-client": "^4.0.53",
-    "prostgles-types": "^4.0.88"
+    "prostgles-types": "^4.0.89"
   },
   "devDependencies": {
     "@types/bluebird": "^3.5.36",

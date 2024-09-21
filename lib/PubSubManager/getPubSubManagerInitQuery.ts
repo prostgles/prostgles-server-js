@@ -4,6 +4,7 @@ import { pgp } from "../DboBuilder/DboBuilderTypes";
 import { asValue, NOTIF_CHANNEL, NOTIF_TYPE, PubSubManager } from "./PubSubManager";
 const { version } = require("../../package.json");
 import { getAppCheckQuery } from "./orphanTriggerCheck";
+import { DboBuilder } from "../DboBuilder/DboBuilder";
 
 export const DB_OBJ_NAMES = {
   trigger_add_remove_func: "prostgles.trigger_add_remove_func",
@@ -626,9 +627,9 @@ COMMIT;
  * Initialize the prostgles schema and functions needed for realtime data and schema changes
  * undefined returned if the database contains the apropriate prostgles schema
  */
-export const getPubSubManagerInitQuery = async function(this: PubSubManager): Promise<string | undefined> { 
+export const getPubSubManagerInitQuery = async function(this: DboBuilder): Promise<string | undefined> { 
 
-  const initQuery = getInitQuery(this.dboBuilder.prostgles.opts.DEBUG_MODE);
+  const initQuery = getInitQuery(this.prostgles.opts.DEBUG_MODE);
   const { schema_md5 = "none" } = await this.db.oneOrNone("SELECT md5($1) as schema_md5", [initQuery.trim()]);
   const query = pgp.as.format(initQuery, { schema_md5, version });
   const existingSchema = await this.db.any(PROSTGLES_SCHEMA_EXISTS_QUERY);

@@ -13,7 +13,9 @@ import { getDBSchema } from "../DBSchemaBuilder";
 import {
   DB, Prostgles
 } from "../Prostgles";
+import { Join } from "../ProstglesTypes";
 import { PubSubManager } from "../PubSubManager/PubSubManager";
+import { getCreatePubSubManagerError } from "../PubSubManager/getCreatePubSubManagerError";
 import {
   DbTableInfo,
   PublishParser
@@ -29,7 +31,6 @@ import { PGConstraint, getCanExecute, getConstraints, getSerializedClientErrorFr
 import { getTablesForSchemaPostgresSQL } from "./getTablesForSchemaPostgresSQL";
 import { prepareShortestJoinPaths } from "./prepareShortestJoinPaths";
 import { cacheDBTypes, runSQL } from "./runSQL";
-import { Join } from "../ProstglesTypes";
 
 export * from "./DboBuilderTypes";
 export * from "./dboBuilderUtils";
@@ -169,8 +170,21 @@ export class DboBuilder {
   runSQL = async (query: string, params: any, options: SQLOptions | undefined, localParams?: LocalParams) => {
     return runSQL.bind(this)(query, params, options, localParams).catch(error => Promise.reject(getSerializedClientErrorFromPGError(error, { type: "sql" })));
   }
-  async build(): Promise<DBHandlerServer> {
 
+  canSubscribe = false;
+  async build(): Promise<DBHandlerServer> {
+    if(!this.canSubscribe){
+      const subscribeError = await getCreatePubSubManagerError(this);
+      if(subscribeError){
+        console.error(
+          "Could not initiate PubSubManager. Realtime data/Subscriptions will not work. Error: ",
+          subscribeError
+        );
+        this.canSubscribe = false;
+      } else {
+        this.canSubscribe = true;
+      }
+    }
     const start = Date.now();
     const tablesOrViewsReq = await getTablesForSchemaPostgresSQL(this, this.prostgles.opts.schema);
     await this.prostgles.opts.onLog?.({

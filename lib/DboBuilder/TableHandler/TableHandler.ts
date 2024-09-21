@@ -102,6 +102,10 @@ export class TableHandler extends ViewHandler {
     const start = Date.now();
     try {
       
+      if(!this.dboBuilder.canSubscribe){
+        throw "Cannot subscribe. PubSubManager not initiated";
+      }
+
       if (!localParams) throw "Sync not allowed within the server code";
       const { socket } = localParams;
       if (!socket) throw "socket missing";
@@ -115,7 +119,6 @@ export class TableHandler extends ViewHandler {
       const invalidParams = Object.keys(params || {}).filter(k => !ALLOWED_PARAMS.includes(k));
       if (invalidParams.length) throw "Invalid or dissallowed params found: " + invalidParams.join(", ");
   
-
       const { synced_field, allow_delete }: SyncRule = table_rules.sync;
 
       if (!table_rules.sync.id_fields.length || !synced_field) {
@@ -154,7 +157,8 @@ export class TableHandler extends ViewHandler {
           return pubSubManager.addSync({
             table_info: this.tableOrViewInfo,
             condition,
-            id_fields, synced_field,
+            id_fields, 
+            synced_field,
             allow_delete,
             socket,
             table_rules,

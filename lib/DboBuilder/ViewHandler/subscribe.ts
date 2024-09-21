@@ -30,6 +30,10 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
   const start = Date.now();
   try {
 
+    if(!this.dboBuilder.canSubscribe){
+      throw "Cannot subscribe. PubSubManager not initiated";
+    }
+
     if (this.tx) {
       throw "subscribe not allowed within transactions";
     }

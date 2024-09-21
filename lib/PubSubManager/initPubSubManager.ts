@@ -12,7 +12,7 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
 
   try {
 
-    const initQuery = await getPubSubManagerInitQuery.bind(this)();
+    const initQuery = await getPubSubManagerInitQuery.bind(this.dboBuilder)();
 
     /**
      * High database activity might cause deadlocks.
