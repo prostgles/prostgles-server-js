@@ -26,7 +26,7 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
         /** Try to reduce race condition deadlocks due to multiple clients connecting at the same time */
         await tout(Math.random());
 
-        await this.db.any(initQuery);
+        await this.db.tx(t => t.any(initQuery));
         error = undefined;
         tries = 0;
       } catch (e: any) {
