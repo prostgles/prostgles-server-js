@@ -18,6 +18,8 @@ export const getCreatePubSubManagerError = async (dboBuilder: DboBuilder): Promi
   const checkIfCanCreateProstglesSchema = () => tryCatch(async () => {
     const allGood = await db.tx(async t => {
       await t.none(`
+        DROP SCHEMA IF EXISTS prostgles;
+        ROLLBACK;
         CREATE SCHEMA IF NOT EXISTS prostgles;
         ROLLBACK;
       `);
@@ -36,6 +38,18 @@ export const getCreatePubSubManagerError = async (dboBuilder: DboBuilder): Promi
       return `Not allowed to create prostgles schema. GRANT CREATE ON DATABASE ${dbName} TO ${user}`;
     }
     return undefined;
+  } else {
+    const canCheckVersion = await tryCatch(async () => {
+      await db.any(`
+        SELECT * FROM prostgles.versions
+      `);
+      return { ok: true };
+    });
+
+    if(!canCheckVersion.ok){
+      console.error("prostgles schema exists but cannot check version. Check logs", canCheckVersion.error);
+      return "prostgles schema exists but cannot check version. Check logs";
+    }
   }
 
   const initQuery = await tryCatch(async () => ({ query: await getPubSubManagerInitQuery.bind(dboBuilder)() }));
