@@ -67,10 +67,8 @@ export async function syncData (this: PubSubManager, sync: SyncParams, clientDat
     wal, throttle = 0
   } = sync;
 
-  const  socket = this.sockets[socket_id];
-
+  const socket = this.sockets[socket_id];
   if (!socket) {
-    console.error("Sync socket missing", pickKeys(sync, ["channel_name", "table_name", "condition"]), clientData);
     return;
   }
 
@@ -372,7 +370,7 @@ export async function syncData (this: PubSubManager, sync: SyncParams, clientDat
       if (data.length) {
         const lastRow = data[data.length - 1];
         if (sync.lr?.[synced_field] && +sync.lr?.[synced_field] > +lastRow[synced_field]) {
-          console.error({ syncIssue: "sync.lr[synced_field] is greater than lastRow[synced_field]" })
+          console.error({ syncIssue: "sync.lr[synced_field] is greater than lastRow[synced_field]" }, sync.table_name)
         }
         sync.lr = lastRow;
         sync.last_synced = +sync.lr?.[synced_field];
