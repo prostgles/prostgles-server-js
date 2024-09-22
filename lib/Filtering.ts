@@ -360,6 +360,10 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
 
     } else if(["$nlike"].includes(filterOperand)){
       return leftQ + " NOT LIKE " + asValue(filterValue);
+      
+    } else if(filterOperand === "$isDistinctFrom" || filterOperand === "$isNotDistinctFrom"){
+      const operator = FILTER_OPERAND_TO_SQL_OPERAND[filterOperand];
+      return leftQ + ` ${operator} ` + asValue(filterValue);
 
     /* MAYBE TEXT OR MAYBE ARRAY */
     } else if(["@>", "<@", "$contains", "$containedBy", "$overlaps", "&&", "@@"].includes(filterOperand)){
