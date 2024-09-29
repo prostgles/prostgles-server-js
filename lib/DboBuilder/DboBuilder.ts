@@ -286,7 +286,8 @@ export class DboBuilder {
       const transaction = await this.db.tx(t => {
         const dbTX: DbTxTableHandlers & Pick<DBHandlerServer, "sql"> = {};
         this.tablesOrViews?.map(tov => {
-          dbTX[tov.name] = new (tov.is_view ? ViewHandler : TableHandler)(this.db, tov, this, { t, dbTX }, this.shortestJoinPaths);
+          const handlerClass = tov.is_view ? ViewHandler : TableHandler;
+          dbTX[tov.name] = new handlerClass(this.db, tov, this, { t, dbTX }, this.shortestJoinPaths);
         });
         dbTX.sql = (q, args, opts, localP) => this.runSQL(q, args, opts, { tx: { dbTX, t }, ...(localP ?? {}) })
   

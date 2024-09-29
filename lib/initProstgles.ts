@@ -10,6 +10,7 @@ import { DbTableInfo, PublishParser } from "./PublishParser/PublishParser";
 import { sleep } from "./utils";
 import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { ProstglesInitOptions } from "./ProstglesTypes";
+import { type } from "os";
 
 export type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 export type DbConnectionOpts = pg.IDefaults;
@@ -83,14 +84,16 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
     const application_name = `prostgles ${this.appId} ${existingAppName}`;
 
     /* 1. Connect to db */
-    const { db, pgp } = getDbConnection({ ...conObj, application_name }, this.opts.dbOptions, this.opts.DEBUG_MODE,
-      notice => {
+    const { db, pgp } = getDbConnection({
+      ...this.opts,
+      dbConnection: { ...conObj, application_name }, 
+      onNotice: notice => {
         if (this.opts.onNotice) this.opts.onNotice(notice);
         if (this.dbEventsManager) {
           this.dbEventsManager.onNotice(notice)
         }
       }
-    );
+    });
     this.db = db;
     this.pgp = pgp;
     this.isSuperUser = await getIsSuperUser(db);
@@ -218,25 +221,19 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
   }
 }
 
-function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts | undefined, debugQueries = false, onNotice: ProstglesInitOptions["onNotice"]): { db: DB, pgp: PGP } {
+type GetDbConnectionArgs = Pick<ProstglesInitOptions, "DEBUG_MODE" | "dbConnection" | "dbOptions" | "onNotice">;
+const getDbConnection = function({ dbConnection, DEBUG_MODE, dbOptions, onNotice  }: GetDbConnectionArgs): { db: DB, pgp: PGP } {
+  
+  const onQueryOrError = typeof DEBUG_MODE === "function" ? DEBUG_MODE : DEBUG_MODE? console.log : undefined;
   const pgp: PGP = pgPromise({
 
     promiseLib: promise,
-    ...(debugQueries ? {
-      query: function (ctx) {
-        console.log({ 
-          ...pickKeys(ctx, ["params", "query"]),
-        });
-      },
-      error: (error, ctx) => {
-        console.log({ 
-          ...pickKeys(ctx, ["params", "query"]),
-          error 
-        });        
-      }
+    ...(onQueryOrError ? {
+      query: onQueryOrError,
+      error: onQueryOrError
     } : {}),
-    ...((onNotice || debugQueries) ? {
-      connect: function ({ client, dc, useCount }) {
+    ...((onNotice || onQueryOrError) ? {
+      connect: function ({ client, useCount }) {
         const isFresh = !useCount;
         if (isFresh && !client.listeners('notice').length) {
           client.on('notice', function (msg) {
@@ -259,7 +256,7 @@ function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts |
       },
     } : {})
   });
-  pgp.pg.defaults.max = 70;
+  // pgp.pg.defaults.max = 70;
 
   // /* Casts count/sum/max to bigint. Needs rework to remove casting "+count" and other issues; */
   // pgp.pg.types.setTypeParser(20, BigInt);
@@ -279,8 +276,8 @@ function getDbConnection(dbConnection: DbConnection, options: DbConnectionOpts |
   pgp.pg.types.setTypeParser(pgp.pg.types.builtins.DATE, v => v); // date
   
 
-  if (options) {
-    Object.assign(pgp.pg.defaults, options);
+  if (dbOptions) {
+    Object.assign(pgp.pg.defaults, dbOptions);
   }
 
   return {

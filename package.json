@@ -1,6 +1,6 @@
 {
   "name": "prostgles-server",
-  "version": "4.2.114",
+  "version": "4.2.115",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -41,7 +41,7 @@
     "file-type": "^18.5.0",
     "pg": "^8.11.5",
     "pg-cursor": "^2.11.0",
-    "pg-promise": "^11.8.0",
+    "pg-promise": "^11.9.1",
     "prostgles-types": "^4.0.89"
   },
   "devDependencies": {

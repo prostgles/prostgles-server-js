@@ -5,6 +5,7 @@ import { DboBuilder } from "../DboBuilder/DboBuilder";
 
 export const getCreatePubSubManagerError = async (dboBuilder: DboBuilder): Promise<string | undefined> => {
   const db = dboBuilder.db;
+  
   const canExecute = await getCanExecute(db)
   if (!canExecute) return "Cannot run EXECUTE statements on this connection";
 
@@ -19,7 +20,6 @@ export const getCreatePubSubManagerError = async (dboBuilder: DboBuilder): Promi
     const allGood = await db.tx(async t => {
       await t.none(`
         DROP SCHEMA IF EXISTS prostgles;
-        ROLLBACK;
         CREATE SCHEMA IF NOT EXISTS prostgles;
         ROLLBACK;
       `);
