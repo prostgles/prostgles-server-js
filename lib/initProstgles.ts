@@ -1,16 +1,15 @@
 import * as promise from "bluebird";
 import * as pgPromise from "pg-promise";
 import pg from "pg-promise/typescript/pg-subset";
-import { isEmpty, pickKeys } from "prostgles-types";
+import { isEmpty } from "prostgles-types";
 import { AuthHandler } from "./AuthHandler";
 import { DBEventsManager } from "./DBEventsManager";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { DBHandlerServer, Prostgles, getIsSuperUser } from "./Prostgles";
-import { DbTableInfo, PublishParser } from "./PublishParser/PublishParser";
-import { sleep } from "./utils";
-import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { ProstglesInitOptions } from "./ProstglesTypes";
-import { type } from "os";
+import { DbTableInfo, PublishParser } from "./PublishParser/PublishParser";
+import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
+import { sleep } from "./utils";
 
 export type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
 export type DbConnectionOpts = pg.IDefaults;
@@ -232,7 +231,7 @@ const getDbConnection = function({ dbConnection, DEBUG_MODE, dbOptions, onNotice
       query: onQueryOrError,
       error: onQueryOrError
     } : {}),
-    ...((onNotice || onQueryOrError) ? {
+    ...((onNotice || DEBUG_MODE === true) ? {
       connect: function ({ client, useCount }) {
         const isFresh = !useCount;
         if (isFresh && !client.listeners('notice').length) {
