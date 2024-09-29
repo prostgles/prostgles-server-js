@@ -220,18 +220,29 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
   }
 }
 
-type GetDbConnectionArgs = Pick<ProstglesInitOptions, "DEBUG_MODE" | "dbConnection" | "dbOptions" | "onNotice">;
-const getDbConnection = function({ dbConnection, DEBUG_MODE, dbOptions, onNotice  }: GetDbConnectionArgs): { db: DB, pgp: PGP } {
+type GetDbConnectionArgs = Pick<ProstglesInitOptions, "DEBUG_MODE" | "onQuery" | "dbConnection" | "dbOptions" | "onNotice">;
+const getDbConnection = function({ dbConnection, onQuery, DEBUG_MODE, dbOptions, onNotice  }: GetDbConnectionArgs): { db: DB, pgp: PGP } {
   
-  const onQueryOrError = typeof DEBUG_MODE === "function" ? DEBUG_MODE : DEBUG_MODE? console.log : undefined;
+  const onQueryOrError: undefined | ((error: any, ctx: pgPromise.IEventContext<pg.IClient>) => void) = !onQuery && !DEBUG_MODE? undefined : (error, ctx) => {
+    if (onQuery) {
+      onQuery(error, ctx);
+    } else if (DEBUG_MODE) {
+      if(error){
+        console.error(error, ctx);
+      } else {
+        console.log(ctx)
+      }
+    }
+  };
+  
   const pgp: PGP = pgPromise({
 
     promiseLib: promise,
     ...(onQueryOrError ? {
-      query: onQueryOrError,
+      query: ctx => onQueryOrError(undefined, ctx),
       error: onQueryOrError
     } : {}),
-    ...((onNotice || DEBUG_MODE === true) ? {
+    ...((onNotice || DEBUG_MODE) ? {
       connect: function ({ client, useCount }) {
         const isFresh = !useCount;
         if (isFresh && !client.listeners('notice').length) {

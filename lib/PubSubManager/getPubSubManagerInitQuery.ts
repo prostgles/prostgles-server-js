@@ -629,7 +629,7 @@ COMMIT;
  */
 export const getPubSubManagerInitQuery = async function(this: DboBuilder): Promise<string | undefined> { 
 
-  const initQuery = getInitQuery(this.prostgles.opts.DEBUG_MODE === true);
+  const initQuery = getInitQuery(this.prostgles.opts.DEBUG_MODE);
   const { schema_md5 = "none" } = await this.db.oneOrNone("SELECT md5($1) as schema_md5", [initQuery.trim()]);
   const query = pgp.as.format(initQuery, { schema_md5, version });
   const existingSchema = await this.db.any(PROSTGLES_SCHEMA_EXISTS_QUERY);

@@ -118,7 +118,8 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
   onSocketConnect?: (args: AuthRequestParams<S, SUser> & { socket: PRGLIOSocket }) => void | Promise<void>;
   onSocketDisconnect?: (args: AuthRequestParams<S, SUser> & { socket: PRGLIOSocket }) => void | Promise<void>;
   auth?: Auth<S, SUser>;
-  DEBUG_MODE?: boolean | ((error: any, ctx: pgPromise.IEventContext<pg.IClient>) => void);
+  DEBUG_MODE?: boolean;
+  onQuery?: (error: any, ctx: pgPromise.IEventContext<pg.IClient>) => void;
   watchSchemaType?:
 
   /**

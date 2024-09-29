@@ -452,7 +452,7 @@ export async function syncData (this: PubSubManager, sync: SyncParams, clientDat
     /* Used to throttle and merge incomming updates */
     sync.wal = new WAL({
       id_fields, synced_field, throttle, batch_size,
-      DEBUG_MODE: this.dboBuilder.prostgles.opts.DEBUG_MODE === true,
+      DEBUG_MODE: this.dboBuilder.prostgles.opts.DEBUG_MODE,
       onSendStart: () => {
         sync.is_syncing = true;
       },
