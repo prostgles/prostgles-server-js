@@ -524,6 +524,29 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
       }, { timeout: 4000 });
     });
     
+    await test("parallel subscriptions", async () => {
+      await tryRunP("parallel subscriptions", async (resolve, reject) => {
+
+        let callbacksFired = {};
+        const subscriptions = await Promise.all(
+          [1,2,3,4,5].map(async subId => {
+            const handler = await db.various.subscribe!({ id: 99  }, {  }, async items => {
+              callbacksFired[subId] = true;
+            });
+
+            return {
+              handler,
+            }
+          })
+        ).catch(reject);
+
+        await tout(2000);
+        await Promise.all(Object.values(subscriptions).map(async ({ handler }) => handler.unsubscribe()));
+        assert.equal(Object.keys(callbacksFired).length, 5);
+        resolve(true);
+
+      });
+    });
 
     await test("subscribeOne with throttle", async () => {
       await tryRunP("subscribeOne with throttle", async (resolve, reject) => {

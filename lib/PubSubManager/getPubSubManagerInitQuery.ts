@@ -29,7 +29,17 @@ const PROSTGLES_SCHEMA_VERSION_OK_QUERY = `
   AND schema_md5 = \${schema_md5}
 `;
 
-const getInitQuery = (debugMode: boolean | undefined) => `
+const getInitQuery = (debugMode: boolean | undefined, pgVersion: number) => {
+
+  const canReplaceTriggers = pgVersion >= 140006;
+  const createTriggerQuery = canReplaceTriggers ? 
+    `CREATE OR REPLACE TRIGGER %1$I`: 
+    `
+    DROP TRIGGER IF EXISTS %1$I ON %2$s;
+    CREATE TRIGGER %1$I
+    `;
+
+  return `
 BEGIN; -- TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 
 --SET  TRANSACTION ISOLATION LEVEL SERIALIZABLE;
@@ -456,8 +466,7 @@ BEGIN
 
                           query := format(
                               $q$ 
-                                  DROP TRIGGER IF EXISTS %1$I ON %2$s;
-                                  CREATE TRIGGER %1$I
+                                  ${createTriggerQuery}
                                   AFTER INSERT ON %2$s
                                   REFERENCING NEW TABLE AS new_table
                                   FOR EACH STATEMENT EXECUTE PROCEDURE ${DB_OBJ_NAMES.data_watch_func}();
@@ -468,8 +477,7 @@ BEGIN
                               'prostgles_triggers_' || trw.table_name || '_insert', trw.table_name                                                
                           ) || format(
                               $q$ 
-                                  DROP TRIGGER IF EXISTS %1$I ON %2$s;
-                                  CREATE TRIGGER %1$I
+                                  ${createTriggerQuery}
                                   AFTER UPDATE ON %2$s
                                   REFERENCING OLD TABLE AS old_table NEW TABLE AS new_table
                                   FOR EACH STATEMENT EXECUTE PROCEDURE ${DB_OBJ_NAMES.data_watch_func}();
@@ -478,8 +486,7 @@ BEGIN
                               'prostgles_triggers_' || trw.table_name || '_update', trw.table_name   
                           ) || format(
                               $q$ 
-                                  DROP TRIGGER IF EXISTS %1$I ON %2$s;
-                                  CREATE TRIGGER %1$I
+                                  ${createTriggerQuery}
                                   AFTER DELETE ON %2$s
                                   REFERENCING OLD TABLE AS old_table
                                   FOR EACH STATEMENT EXECUTE PROCEDURE ${DB_OBJ_NAMES.data_watch_func}();
@@ -621,7 +628,9 @@ END
 $do$;
 
 COMMIT;
-`
+`;
+
+}
 
 /**
  * Initialize the prostgles schema and functions needed for realtime data and schema changes
@@ -629,7 +638,8 @@ COMMIT;
  */
 export const getPubSubManagerInitQuery = async function(this: DboBuilder): Promise<string | undefined> { 
 
-  const initQuery = getInitQuery(this.prostgles.opts.DEBUG_MODE);
+  const versionNum = await this.db.one("SELECT current_setting('server_version_num')::int as val");
+  const initQuery = getInitQuery(this.prostgles.opts.DEBUG_MODE, versionNum.val);
   const { schema_md5 = "none" } = await this.db.oneOrNone("SELECT md5($1) as schema_md5", [initQuery.trim()]);
   const query = pgp.as.format(initQuery, { schema_md5, version });
   const existingSchema = await this.db.any(PROSTGLES_SCHEMA_EXISTS_QUERY);

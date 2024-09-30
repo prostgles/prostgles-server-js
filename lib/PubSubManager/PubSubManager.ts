@@ -281,7 +281,7 @@ export class PubSubManager {
         COMMIT;
       `, { EVENT_TRIGGER_TAGS });
       
-      await this.db.any(query)
+      await this.db.tx(t => t.any(query))
       .catch(e => {
         console.error("prepareTriggers failed: ", e);
         throw e;
