@@ -464,7 +464,7 @@ export class PubSubManager {
         )
       };
 
-      await this.db.any(`
+      await this.db.tx(t => t.any(`
         BEGIN WORK;
         /* ${ PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
         /* why is this lock level needed? */
@@ -499,7 +499,7 @@ export class PubSubManager {
         ON CONFLICT DO NOTHING;
 
         COMMIT WORK;
-      `);
+      `));
 
       /** This might be redundant due to trigger on app_triggers */
       await this.refreshTriggers();

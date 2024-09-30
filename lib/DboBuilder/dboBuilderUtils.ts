@@ -183,7 +183,7 @@ export const prepareOrderByQuery = (items: SortItem[], tableAlias?: string): str
 export const getCanExecute = async (db: DB) => {
 
   try {
-    await db.any(`DO $$ BEGIN  EXECUTE 'select 1'; END $$;`);
+    await db.task(t => t.any(`DO $$ BEGIN  EXECUTE 'select 1'; END $$;`));
     return true;
   } catch (error) {
     console.warn(error)

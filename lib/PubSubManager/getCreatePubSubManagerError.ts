@@ -17,12 +17,18 @@ export const getCreatePubSubManagerError = async (dboBuilder: DboBuilder): Promi
   `);
 
   const checkIfCanCreateProstglesSchema = () => tryCatch(async () => {
-    const allGood = await db.tx(async t => {
-      await t.none(`
-        DROP SCHEMA IF EXISTS prostgles;
-        CREATE SCHEMA IF NOT EXISTS prostgles;
-        ROLLBACK;
-      `);
+    const allGood = await db.task(async t => {
+      try {
+        await t.none(`
+          BEGIN;
+          DROP SCHEMA IF EXISTS prostgles CASCADE;
+          CREATE SCHEMA IF NOT EXISTS prostgles;
+          ROLLBACK;
+        `);
+      } catch (e) {
+        await t.none(`ROLLBACK`);
+        return false;
+      }
 
       return true;
     });

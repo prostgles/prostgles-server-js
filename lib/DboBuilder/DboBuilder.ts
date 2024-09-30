@@ -32,6 +32,7 @@ import { PGConstraint, getCanExecute, getConstraints, getSerializedClientErrorFr
 import { getTablesForSchemaPostgresSQL } from "./getTablesForSchemaPostgresSQL";
 import { prepareShortestJoinPaths } from "./prepareShortestJoinPaths";
 import { cacheDBTypes, runSQL } from "./runSQL";
+import { runClientTransactionStatement } from "./runTransaction";
 
 export * from "./DboBuilderTypes";
 export * from "./dboBuilderUtils";
@@ -177,8 +178,10 @@ export class DboBuilder {
   }
 
   canSubscribe = false;
+  checkingCanSubscribe = false;
   async build(): Promise<DBHandlerServer> {
-    if(!this.canSubscribe){
+    if(!this.canSubscribe && !this.checkingCanSubscribe){
+      this.checkingCanSubscribe = true;
       const subscribeError = await getCreatePubSubManagerError(this);
       if(subscribeError){
         console.error(
@@ -189,6 +192,7 @@ export class DboBuilder {
       } else {
         this.canSubscribe = true;
       }
+      this.checkingCanSubscribe = false;
     }
     const start = Date.now();
     const tablesOrViewsReq = await getTablesForSchemaPostgresSQL(this, this.prostgles.opts.schema);
@@ -302,5 +306,9 @@ export class DboBuilder {
     }
   }
 
-  cacheDBTypes = cacheDBTypes.bind(this)
+  cacheDBTypes = cacheDBTypes.bind(this);
+
+  runClientTransactionStatement = (statement: string) => {
+    return runClientTransactionStatement(statement, this.prostgles.opts.dbConnection as any);
+  }
 }

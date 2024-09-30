@@ -25,7 +25,6 @@ import {
   ClientSchema,
   DBSchemaTable,
   SQLRequest, TableSchemaForClient,
-  getKeys,
   isObject, omitKeys, tryCatch
 } from "prostgles-types";
 import { DBEventsManager } from "./DBEventsManager";
