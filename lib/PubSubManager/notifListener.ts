@@ -83,12 +83,19 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     const orphanedConditions = condition_ids.filter((condId) => typeof tableTriggers.at(condId) !== "string" );
     if(orphanedConditions.length){
       this.db
-        .any(" \
-          DELETE FROM prostgles.app_triggers \
-          WHERE table_name = $1 \
-          AND id IN ($2:csv) \
-          AND app_id = $3 \
-          ", 
+        .any(`
+          DELETE FROM prostgles.app_triggers at
+          WHERE EXISTS (
+            SELECT 1
+            FROM prostgles.v_triggers t
+            WHERE t.table_name = $1 
+            AND t.c_id IN ($2:csv) 
+            AND t.app_id = $3
+            AND at.app_id = t.app_id
+            AND at.table_name = t.table_name
+            AND at.condition = t.condition
+          ) 
+          `, 
           [table_name, orphanedConditions, this.appId]
         )
         .catch(e => {

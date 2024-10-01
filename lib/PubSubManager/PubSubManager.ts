@@ -466,7 +466,7 @@ export class PubSubManager {
 
       await this.db.tx(t => t.any(`
         BEGIN WORK;
-        /* ${ PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
+        /* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
         /* why is this lock level needed? */
         --LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
 
