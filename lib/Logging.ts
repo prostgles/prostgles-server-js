@@ -110,6 +110,7 @@ export namespace EventTypes {
     | "initFileTable.end"
     | "initFileManager.runQuery"
     | "DboBuilder.getTablesForSchemaPostgresSQL"
+    | "PubSubManager.create"
     data?: AnyObject;
   }
 }

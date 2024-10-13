@@ -28,7 +28,7 @@ import { QueryStreamer } from "./QueryStreamer";
 import { TableHandler } from "./TableHandler/TableHandler";
 import { JoinPaths, ViewHandler } from "./ViewHandler/ViewHandler";
 import { parseJoinPath } from "./ViewHandler/parseJoinPath";
-import { PGConstraint, getCanExecute, getConstraints, getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
+import { PGConstraint, getCanExecute, getConstraints, getErrorAsObject, getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
 import { getTablesForSchemaPostgresSQL } from "./getTablesForSchemaPostgresSQL";
 import { prepareShortestJoinPaths } from "./prepareShortestJoinPaths";
 import { cacheDBTypes, runSQL } from "./runSQL";
@@ -105,7 +105,12 @@ export class DboBuilder {
       });
       this._pubSubManager = pubSubManager;
       if (hasError || !this._pubSubManager ) {
-        console.error("Error in getPubSubManager", error);
+        await this.prostgles.opts.onLog?.({
+          type: "debug",
+          command: "PubSubManager.create",
+          duration: 0,
+          error: getErrorAsObject(error)
+        });
         throw "Could not create this._pubSubManager check logs";
       }
     }

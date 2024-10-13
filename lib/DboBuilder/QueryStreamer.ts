@@ -66,7 +66,6 @@ export class QueryStreamer {
     });
     return client;
   }
-
   onDisconnect = (socketId: string) => {
     const socketQueries = this.socketQueries[socketId];
     if(!socketQueries) return;
