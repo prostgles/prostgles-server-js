@@ -97,19 +97,15 @@ export function getClientErrorFromPGError(rawError: any, args: GetSerializedClie
 /**
  * Ensure the error is a serializable Object  
  */
-export function parseError(e: any, caller: string): ProstglesError {
+export function parseError(e: any, _caller: string): ProstglesError {
 
   const errorObject = isObject(e) ? e : undefined;
   const message = typeof e === "string" ? e : e instanceof Error ? e.message :
     isObject(errorObject) ? (errorObject.message ?? errorObject.txt ?? JSON.stringify(errorObject) ?? "") : "";
-  const stack = [
-    ...(errorObject && Array.isArray(errorObject.stack) ? errorObject.stack : []),
-    caller
-  ]
+ 
   const result: ProstglesError = {
     ...errorObject,
-    message,
-    // stack,
+    message, 
   }
   return result;
 }
