@@ -98,7 +98,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
   }
 
   if(checkFilter && result.failed_check?.length){
-    throw `New ${name} data failed the check condition: ${JSON.stringify(checkCondition, null, 2)}`;
+    throw new Error(`Insert ${name} records failed the check condition: ${JSON.stringify(checkFilter, null, 2)}`);
   }
 
   const finalDBtx = tableHandler.getFinalDBtx(localParams);

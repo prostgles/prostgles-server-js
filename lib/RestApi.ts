@@ -4,12 +4,13 @@ import { runClientMethod, runClientRequest, runClientSqlRequest } from "./runCli
 import { Express } from "express";
 import * as bodyParser from "body-parser";
 import { parseError } from "./DboBuilder/DboBuilder";
+import { VoidFunction } from "./SchemaWatch/SchemaWatch";
 const jsonParser = bodyParser.json();
 
 export type ExpressApp = {
   _router?: { 
     stack?: {
-      handle: Function;
+      handle: VoidFunction;
       path: undefined,
       keys?: any[];
       route?: { 

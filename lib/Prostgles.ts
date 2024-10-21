@@ -21,6 +21,7 @@ export { DBHandlerServer };
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 
 import {
+  AnyObject,
   CHANNELS,
   ClientSchema,
   DBSchemaTable,
@@ -550,7 +551,7 @@ export class Prostgles {
   }
 }
 
-function makeSocketError(cb: Function, err: any) {
+function makeSocketError(cb: (err: AnyObject) => void, err: any) {
   cb(getErrorAsObject(err));
 }
 

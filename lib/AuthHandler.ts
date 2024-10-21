@@ -738,7 +738,7 @@ export class AuthHandler {
     let handlers: { 
       name: keyof Omit<AuthSocketSchema, "user">;
       ch: string;
-      func: Function;
+      func: (...args: any) => any;
     }[] = [
       { func: (params: any, dbo: any, db: DB, client: LoginClientInfo) => register?.(params, dbo, db), ch: CHANNELS.REGISTER, name: "register" as keyof Omit<AuthSocketSchema, "user"> },
       { func: (params: any, dbo: any, db: DB, client: LoginClientInfo) => login(params, client), ch: CHANNELS.LOGIN, name: "login" as keyof Omit<AuthSocketSchema, "user"> },

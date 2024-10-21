@@ -64,7 +64,7 @@ export const runClientRequest = async function(this: Prostgles, args: Args){
     }
     const tableHandler = this.dbo[tableName];
     if(!tableHandler || !tableHandler.column_names) throw `Invalid tableName ${tableName} provided`;
-    const method = tableHandler[command as keyof TableHandler] as Function;
+    const method = tableHandler[command as keyof TableHandler];
     if(!method) throw `Invalid command ${command} provided`;
     //@ts-ignore
     return this.dbo[tableName][command](param1, param2, param3, valid_table_command_rules, localParams);
@@ -123,7 +123,7 @@ export const runClientMethod = async function(this: Prostgles, reqArgs: ArgsMeth
   } 
 
   const methodDef = methods[method]!;
-  const onRun = (typeof methodDef === "function" || typeof (methodDef as any).then === "function")? (methodDef as Function) : methodDef.run;
+  const onRun = (typeof methodDef === "function" || typeof (methodDef as any).then === "function")? (methodDef as (...args: any) => Promise<void>) : methodDef.run;
   const res = await onRun(...params);
   return res;  
 }

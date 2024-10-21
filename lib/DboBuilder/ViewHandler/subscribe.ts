@@ -11,7 +11,7 @@ export type LocalFuncs = {
   onError?: (error: any) => void;
 } | OnData;
 
-export const getOnDataFunc = (localFuncs: LocalFuncs | undefined): Function | undefined => {
+export const getOnDataFunc = (localFuncs: LocalFuncs | undefined): OnData | undefined => {
   return typeof localFuncs === "function"? localFuncs : localFuncs?.onData;
 }
 export const matchesLocalFuncs = (localFuncs1: LocalFuncs | undefined, localFuncs2: LocalFuncs | undefined) => {
