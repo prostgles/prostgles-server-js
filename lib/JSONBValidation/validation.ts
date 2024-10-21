@@ -66,9 +66,10 @@ export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpt
       const addSemicolonIfMissing = (v: string) => v.trim().endsWith(";")? v : (v.trim() + ";");
       const { type } = fieldType;
       const spacing = isOneOf ? " " : "  ";
-      let objDef = ` {${spacing}` + getKeys(type).map(k => {
-        const fieldType = getFieldTypeObj(type[k]!);
-        return `${spacing}${k}${fieldType.optional ? "?" : ""}: ` + addSemicolonIfMissing(getFieldType(fieldType, true, undefined, depth + 1));
+      let objDef = ` {${spacing}` + getKeys(type).map(key => {
+        const fieldType = getFieldTypeObj(type[key]!);
+        const escapedKey = isValidIdentifier(key) ? key : JSON.stringify(key);
+        return `${spacing}${escapedKey}${fieldType.optional ? "?" : ""}: ` + addSemicolonIfMissing(getFieldType(fieldType, true, undefined, depth + 1));
       }).join(" ") + `${spacing}}`;
       if(!isOneOf){
         objDef = addSemicolonIfMissing(objDef);
@@ -136,3 +137,7 @@ export function getJSONBSchemaTSTypes(schema: JSONB.JSONBSchema, colOpts: ColOpt
   return getFieldType({ ...schema as any, nullable: colOpts.nullable }, undefined, outerLeading);
 }
 
+const isValidIdentifier = (str: string) => {
+  const identifierRegex = /^[A-Za-z$_][A-Za-z0-9$_]*$/;
+  return identifierRegex.test(str);
+}
