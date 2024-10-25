@@ -229,7 +229,7 @@ export class PubSubManager {
     try {
       /** We use these names because they include schema where necessary */
       const allTableNames = Object.keys(this.dbo).filter(k => this.dbo[k]?.tableOrViewInfo);
-
+      const tableFilterQuery = allTableNames.length ? `OR table_name NOT IN (${allTableNames.map(tblName => asValue(tblName)).join(", ")})` : "";
       const query = pgp.as.format(`
         BEGIN;--  ISOLATION LEVEL SERIALIZABLE;
         
@@ -253,7 +253,8 @@ export class PubSubManager {
 
             DELETE FROM prostgles.app_triggers
             WHERE app_id NOT IN (SELECT id FROM prostgles.apps)
-            OR table_name NOT IN (${allTableNames.map(tblName => asValue(tblName)).join(", ")});
+            ${tableFilterQuery}
+            ;
             
             /** IS THIS STILL NEEDED? Delete existing triggers without locking 
             */
