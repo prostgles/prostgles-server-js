@@ -235,7 +235,7 @@ BEGIN
 
                 --PERFORM pg_notify('debug', concat_ws(' ', 'TABLE', TG_TABLE_NAME, TG_OP));
             
-                escaped_table := format('%I', TG_TABLE_NAME);
+                escaped_table := concat_ws('.', CASE WHEN TG_TABLE_SCHEMA <> CURRENT_SCHEMA THEN format('%I', TG_TABLE_SCHEMA) END, format('%I', TG_TABLE_NAME));
 
                 SELECT string_agg(
                   format(

@@ -227,6 +227,8 @@ export class PubSubManager {
     }
 
     try {
+      /** We use these names because they include schema where necessary */
+      const allTableNames = Object.keys(this.dbo).filter(k => this.dbo[k]?.tableOrViewInfo);
 
       const query = pgp.as.format(`
         BEGIN;--  ISOLATION LEVEL SERIALIZABLE;
@@ -243,7 +245,15 @@ export class PubSubManager {
             ev_trg_exists BOOLEAN := FALSE;
             is_super_user BOOLEAN := FALSE;
         BEGIN
-            --SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+
+            /**
+             *  Delete disconnected app records, this will delete related triggers
+             * */
+            ${DELETE_DISCONNECTED_APPS_QUERY};
+
+            DELETE FROM prostgles.app_triggers
+            WHERE app_id NOT IN (SELECT id FROM prostgles.apps)
+            OR table_name NOT IN (${allTableNames.map(tblName => asValue(tblName)).join(", ")});
             
             /** IS THIS STILL NEEDED? Delete existing triggers without locking 
             */
@@ -263,14 +273,6 @@ export class PubSubManager {
                 $q$, 
                 ${asValue('triggers_' + this.appId)}
               );
-
-            /**
-             *  Delete disconnected app records, this will delete related triggers
-             * */
-            ${DELETE_DISCONNECTED_APPS_QUERY};
-
-            DELETE FROM prostgles.app_triggers
-            WHERE app_id NOT IN (SELECT id FROM prostgles.apps);
             
             ${SCHEMA_WATCH_EVENT_TRIGGER_QUERY}
             

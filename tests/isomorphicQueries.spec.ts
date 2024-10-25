@@ -523,6 +523,33 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
         await db.various.update!({ id: 99 }, { name: "zz3zz3" });
       }, { timeout: 4000 });
     });
+
+    await test("subscribe to schema.table", async () => {
+      await tryRunP("subscribe to schema.table", async (resolve, reject) => {
+        let runs = 0;
+        const sub = await db[`prostgles_test.basic1`].subscribe!({}, {}, async items => {
+          runs++;
+          if(runs === 1){
+            if(items.length !== 1) {
+              reject("Should have 1 item");
+            } else {
+              await db[`prostgles_test.basic1`].insert!({
+                txt: "basic12"
+              });
+            }
+          } else if(runs === 2){
+            if(items.length !== 2) {
+              reject("Should have 2 items");
+            } else {
+              await sub.unsubscribe();
+              resolve(true);
+            }
+          } else {
+            reject("Expecting only 2 runs")
+          }
+        });
+      });
+    })
     
     await test("parallel subscriptions", async () => {
       await tryRunP("parallel subscriptions", async (resolve, reject) => {
