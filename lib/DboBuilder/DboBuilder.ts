@@ -8,6 +8,7 @@ import {
   PG_COLUMN_UDT_DATA_TYPE,
   SQLOptions,
   getJoinHandlers,
+  isDefined,
   tryCatch
 } from "prostgles-types";
 import { getDBSchema } from "../DBSchemaBuilder";
@@ -84,11 +85,16 @@ export class DboBuilder {
   queryStreamer: QueryStreamer;
 
   get tables(): DbTableInfo[] {
-    return (this.tablesOrViews ?? []).map(({ name, columns }) => ({
-      name,
-      columns,
-      info: this.dbo[name]!.tableOrViewInfo!
-    }));
+    return (this.tablesOrViews ?? [])
+      .map(({ name, columns }) => {
+        const info = this.dbo[name]?.tableOrViewInfo;
+        if(!info) return undefined;
+        return {
+          name,
+          columns,
+          info
+      }})
+      .filter(isDefined);
   }
 
   getPubSubManager = async (): Promise<PubSubManager> => {
