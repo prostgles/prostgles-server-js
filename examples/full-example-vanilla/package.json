@@ -9,7 +9,6 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "bluebird": "latest",
     "express": "latest",
     "mongodb": "latest",
     "prostgles-server": "latest",

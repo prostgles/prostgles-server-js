@@ -10,7 +10,6 @@ import { DB, getIsSuperUser } from "../Prostgles";
 import { addSync } from "./addSync";
 import { initPubSubManager } from "./initPubSubManager";
 
-import * as Bluebird from "bluebird";
 import * as pgPromise from 'pg-promise';
 import pg from 'pg-promise/typescript/pg-subset';
 
@@ -30,7 +29,6 @@ import { pushSubData } from "./pushSubData";
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 const pgp: PGP = pgPromise({
-  promiseLib: Bluebird
 });
 export const asValue = (v: any) => pgp.as.format("$1", [v]);
 export const DEFAULT_SYNC_BATCH_SIZE = 50;

@@ -1,4 +1,3 @@
-import * as promise from "bluebird";
 import * as pgPromise from "pg-promise";
 import pg from "pg-promise/typescript/pg-subset";
 import { isEmpty } from "prostgles-types";
@@ -236,8 +235,6 @@ const getDbConnection = function({ dbConnection, onQuery, DEBUG_MODE, dbOptions,
   };
   
   const pgp: PGP = pgPromise({
-
-    promiseLib: promise,
     ...(onQueryOrError ? {
       query: ctx => onQueryOrError(undefined, ctx),
       error: onQueryOrError

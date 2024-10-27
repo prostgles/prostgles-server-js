@@ -4,7 +4,6 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import * as Bluebird from "bluebird";
 import * as pgPromise from 'pg-promise';
 import {
   AnyObject,
@@ -132,7 +131,6 @@ export type DBHandlerServer<TH = TableHandlers> =
 
 
 export const pgp: PGP = pgPromise({
-  promiseLib: Bluebird
   // ,query: function (e) { console.log({psql: e.query, params: e.params}); }
 });
 

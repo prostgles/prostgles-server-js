@@ -1,8 +1,7 @@
 import { strict as assert } from 'assert';
 import type { DBHandlerClient, Auth } from "./client";
-import { DBSchemaTable, SocketSQLStreamPacket, isDefined } from "prostgles-types";
+import { AnyObject, DBSchemaTable, SocketSQLStreamPacket, isDefined } from "prostgles-types";
 import { tryRun, tryRunP } from './isomorphicQueries.spec'; 
-import { reject } from 'bluebird';
 import { describe, test } from "node:test";
 
 export const clientOnlyQueries = async (db: DBHandlerClient, auth: Auth, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[], token: string) => {
@@ -171,7 +170,7 @@ export const clientOnlyQueries = async (db: DBHandlerClient, auth: Auth, log: (.
 
     await test("SQL Stream", async () => {
       await Promise.all([1e3, 1e2].map(async (numberOfRows) => {
-        await tryRunP("", async (resolve) => {
+        await tryRunP("", async (resolve, reject) => {
           const res = await db.sql!(`SELECT v.* FROM generate_series(1, ${numberOfRows}) v`, {}, { returnType: "stream" });
           let rows: any[] = [];      
           const listener = async (packet: SocketSQLStreamPacket) => { 
@@ -595,8 +594,8 @@ export const clientOnlyQueries = async (db: DBHandlerClient, auth: Auth, log: (.
     */
     await test("sync handlesOnData true -> false no data bug", { skip: isUser }, async () => {
       
-      let sync1Planes = [];
-      let sync2Planes = [];
+      let sync1Planes: AnyObject[] = [];
+      let sync2Planes: AnyObject[] = [];
       const sync1 = await db.planes.sync!({}, { handlesOnData: true }, async (planes1, deltas) => {
         sync1Planes = planes1;
         log("sync handlesOnData true", planes1.length);

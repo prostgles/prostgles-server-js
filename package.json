@@ -1,6 +1,6 @@
 {
   "name": "prostgles-server",
-  "version": "4.2.127",
+  "version": "4.2.128",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -35,7 +35,6 @@
   ],
   "homepage": "https://prostgles.com",
   "dependencies": {
-    "bluebird": "^3.7.2",
     "body-parser": "^1.20.3",
     "check-disk-space": "^3.4.0",
     "file-type": "^18.5.0",
@@ -45,17 +44,16 @@
     "prostgles-types": "^4.0.89"
   },
   "devDependencies": {
-    "@types/bluebird": "^3.5.36",
     "@types/express": "^4.17.21",
     "@types/json-schema": "^7.0.15",
-    "@types/node": "^18.0.3",
+    "@types/node": "^22.8.1",
     "@types/pg": "^8.11.5",
     "@types/pg-cursor": "^2.7.2",
     "@types/sharp": "^0.30.4",
     "@typescript-eslint/eslint-plugin": "^8.11.0",
     "@typescript-eslint/parser": "^8.11.0",
     "eslint": "^8.51.0",
-    "socket.io": "^4.7.5",
+    "socket.io": "^4.8.1",
     "typescript": "^5.3.3"
   }
 }
