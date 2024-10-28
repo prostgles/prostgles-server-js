@@ -49,14 +49,19 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     throw "table_name undef";
   }
 
-  const tableTriggers = this._triggers?.[table_name];
+  const tableTriggerConditions = this._triggers?.[table_name]?.map((condition, idx) => ({
+    idx,
+    condition,
+    subs: this.getTriggerSubs(table_name, condition),
+    syncs: this.getSyncs(table_name, condition),
+  }));
   let state: "error" | "no-triggers" | "ok" | "invalid_condition_ids" = "ok";
   
   // const triggers = await this.db.any("SELECT * FROM prostgles.triggers WHERE table_name = $1 AND id IN ($2:csv)", [table_name, condition_ids_str.split(",").map(v => +v)]);
   // const conditions: string[] = triggers.map(t => t.condition);
   
 
-  if(!tableTriggers?.length){
+  if(!tableTriggerConditions?.length){
     state = "no-triggers";
 
     /* Trigger error */
@@ -66,8 +71,8 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     state = "error";
     const pref = "INTERNAL ERROR";
     console.error(`${pref}: condition_ids_str: ${condition_ids_str}`)
-    tableTriggers.map(c => {
-      const subs = this.getTriggerSubs(table_name, c);
+    tableTriggerConditions.map(({ condition }) => {
+      const subs = this.getTriggerSubs(table_name, condition);
       subs.map(s => {
         this.pushSubData(s, pref + ". Check server logs. Schema might have changed");
       })
@@ -79,8 +84,11 @@ export async function notifListener(this: PubSubManager, data: { payload: string
   ) {
 
     state = "ok";
-    const conditions = tableTriggers.filter((c, i) => condition_ids.includes(i));
-    const orphanedConditions = condition_ids.filter((condId) => typeof tableTriggers.at(condId) !== "string" );
+    const firedTableConditions = tableTriggerConditions.filter(({ idx }) => condition_ids.includes(idx));
+    const orphanedConditions = condition_ids.filter((condId) => {
+      const tc = tableTriggerConditions.at(condId);
+      return !tc || (tc.subs.length === 0 && tc.syncs.length === 0);
+    });
     if(orphanedConditions.length){
       this.db
         .any(`
@@ -103,10 +111,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
         });
     }
 
-    conditions.map(condition => {
-
-      const subs = this.getTriggerSubs(table_name, condition);
-      const syncs = this.getSyncs(table_name, condition);
+    firedTableConditions.map(({ subs, syncs }) => {
 
       log("notifListener", subs.map(s => s.channel_name), syncs.map(s => s.channel_name))
 
