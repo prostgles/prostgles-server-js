@@ -136,8 +136,6 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { filter, loc
       relatedTables: []
     }
 
-
-
     const nonExistsFilter = newQuery.whereOpts.exists.length ? {} : filter;
     const pushRelatedTable = async (relatedTableName: string, joinPath: ParsedJoinPath[]) => {
       const relatedTableOrViewHandler = this.dboBuilder.dbo[relatedTableName];
@@ -145,8 +143,8 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { filter, loc
         throw `Table ${relatedTableName} not found`;
       }
 
-      const alreadyPushed = viewOptions!.relatedTables.find(rt => rt.tableName === relatedTableName)
-      if(!alreadyPushed || relatedTableOrViewHandler.is_view){
+      const alreadyPushed = viewOptions?.relatedTables.find(rt => rt.tableName === relatedTableName)
+      if(alreadyPushed || relatedTableOrViewHandler.is_view){
         return
       }
 
@@ -176,12 +174,12 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { filter, loc
      * Avoid nested exists error. Will affect performance
      */
     for await (const j of (newQuery.joins ?? [])) {
-      pushRelatedTable(j.table, j.joinPath);
+      await pushRelatedTable(j.table, j.joinPath);
     }
     for await (const e of newQuery.whereOpts.exists.filter(e => e.isJoined)) {
       if(!e.isJoined) throw `Not possible`;
       const targetTable = e.parsedPath.at(-1)!.table;
-      pushRelatedTable(targetTable, e.parsedPath);
+      await pushRelatedTable(targetTable, e.parsedPath);
     }
     if (!viewOptions.relatedTables.length) {
       viewOptions = undefined;

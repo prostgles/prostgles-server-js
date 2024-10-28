@@ -1174,21 +1174,31 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
     });
 
     await test("Related table subscribe", async () => {
-      const sub = await db.tr1.subscribe!(
-        {}, 
-        {
-          select: {
-            "*": 1,
-            tr2: "*",
-            tr3: "*",
+      await tryRunP("Related table subscribe", async (resolve, reject) => {
+        let runs = 0;
+        const sub = await db.tr1.subscribe!(
+          {}, 
+          {
+            select: {
+              "*": 1,
+              tr2: "*",
+              tr3: "*",
+            }
+          },  
+          async _rows => {
+            runs++;
+            console.log({ _rows, runs });
+            if(runs === 1){
+              await db.tr2.insert!({ tr1_id: _rows[0]!.id, t1: "a", t2: "b" });
+            } else if(runs === 2){
+              await sub.unsubscribe();
+              resolve(true);
+            }
+            
           }
-        },  
-        _rows => {
-
-        }
-      );
-
-      await sub.unsubscribe();
+        );
+      
+      });
     });
 
     await test("Nested sort by computed col", async () => {

@@ -85,11 +85,11 @@ export async function notifListener(this: PubSubManager, data: { payload: string
 
     state = "ok";
     const firedTableConditions = tableTriggerConditions.filter(({ idx }) => condition_ids.includes(idx));
-    const orphanedConditions = condition_ids.filter((condId) => {
+    const orphanedTableConditions = condition_ids.filter((condId) => {
       const tc = tableTriggerConditions.at(condId);
       return !tc || (tc.subs.length === 0 && tc.syncs.length === 0);
     });
-    if(orphanedConditions.length){
+    if(orphanedTableConditions.length){
       this.db
         .any(`
           DELETE FROM prostgles.app_triggers at
@@ -104,8 +104,11 @@ export async function notifListener(this: PubSubManager, data: { payload: string
             AND at.condition = t.condition
           ) 
           `, 
-          [table_name, orphanedConditions, this.appId]
+          [table_name, orphanedTableConditions, this.appId]
         )
+        .then(() => {
+          this.refreshTriggers();
+        })
         .catch(e => {
           console.error("Error deleting orphaned triggers", e);
         });
