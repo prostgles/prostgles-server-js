@@ -9,6 +9,7 @@ import {
 } from "prostgles-types";
 import { TableEvent } from "../../Logging";
 import { DB } from "../../Prostgles";
+import { Join } from "../../ProstglesTypes";
 import { TableRule } from "../../PublishParser/PublishParser";
 import { Graph } from "../../shortestPath";
 import {
@@ -17,7 +18,8 @@ import {
   LocalParams,
   TableHandlers, ValidatedTableRules,
   escapeTSNames,
-  parseError, postgresToTsType
+  getSerializedClientErrorFromPGError,
+  postgresToTsType
 } from "../DboBuilder";
 import { TableSchema } from '../DboBuilderTypes';
 import { COMPUTED_FIELDS, FieldSpec } from "../QueryBuilder/Functions";
@@ -31,7 +33,6 @@ import { prepareWhere } from "./prepareWhere";
 import { size } from "./size";
 import { LocalFuncs, subscribe } from "./subscribe";
 import { validateViewRules } from "./validateViewRules";
-import { Join } from "../../ProstglesTypes";
 
 export type JoinPaths = {
   t1: string;
@@ -299,8 +300,7 @@ export class ViewHandler {
       await this._log({ command: "find", localParams, data: { filter, selectParams }, duration: Date.now() - start });
       return result;
     } catch (e) {
-      if (localParams && localParams.testRule) throw e;
-      throw parseError(e, `Issue with dbo.${this.name}.findOne()`);
+      throw getSerializedClientErrorFromPGError(e, { type: "tableMethod", localParams, view: this });
     }
   }
 

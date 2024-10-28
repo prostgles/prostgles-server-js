@@ -1,6 +1,6 @@
 import { AnyObject, InsertParams, asName, isObject } from "prostgles-types";
 import { TableRule, ValidateRowBasic } from "../../PublishParser/PublishParser";
-import { LocalParams, getErrorAsObject, parseError, withUserRLS } from "../DboBuilder";
+import { LocalParams, getErrorAsObject, getSerializedClientErrorFromPGError, withUserRLS } from "../DboBuilder";
 import { insertNestedRecords } from "../insertNestedRecords";
 import { prepareNewData } from "./DataValidator";
 import { TableHandler } from "./TableHandler";
@@ -144,8 +144,7 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
     return result;
   } catch (e) {
     await this._log({ command: "insert", localParams, data: { rowOrRows, param2: insertParams }, duration: Date.now() - start, error: getErrorAsObject(e) });
-    if (localParams?.testRule) throw e;
-    throw parseError(e, `dbo.${this.name}.${ACTION}()`)
+    throw getSerializedClientErrorFromPGError(e, { type: "tableMethod", localParams, view: this });
   }
 } 
 

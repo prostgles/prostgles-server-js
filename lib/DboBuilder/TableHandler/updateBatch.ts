@@ -1,6 +1,6 @@
 import { AnyObject, UpdateParams } from "prostgles-types";
-import { Filter, LocalParams, getClientErrorFromPGError, getErrorAsObject, parseError, withUserRLS } from "../DboBuilder";
 import { TableRule } from "../../PublishParser/PublishParser";
+import { Filter, LocalParams, getClientErrorFromPGError, getErrorAsObject, getSerializedClientErrorFromPGError, withUserRLS } from "../DboBuilder";
 import { TableHandler } from "./TableHandler";
 
 
@@ -44,7 +44,6 @@ export async function updateBatch(this: TableHandler, updates: [Filter, AnyObjec
     return result;
   } catch (e) {
     await this._log({ command: "updateBatch", localParams, data: { data: updates, params }, duration: Date.now() - start, error: getErrorAsObject(e) });
-    if (localParams && localParams.testRule) throw e;
-    throw parseError(e, `dbo.${this.name}.update()`);
+    throw getSerializedClientErrorFromPGError(e, { type: "tableMethod", localParams, view: this });
   }
 }

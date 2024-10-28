@@ -1,7 +1,7 @@
-import { AnyObject, asName, reverseParsedPath, SubscribeParams } from "prostgles-types";
+import { AnyObject, asName, ParsedJoinPath, reverseParsedPath, SubscribeParams } from "prostgles-types";
 import { TableRule } from "../PublishParser/PublishParser";
 import { log, ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
-import { Filter, getClientErrorFromPGError, LocalParams } from "./DboBuilder";
+import { Filter, getSerializedClientErrorFromPGError, LocalParams } from "./DboBuilder";
 import { NewQuery } from "./QueryBuilder/QueryBuilder";
 import { ViewHandler } from "./ViewHandler/ViewHandler";
 
@@ -12,6 +12,11 @@ type Args = {
   localParams: LocalParams | undefined;
   newQuery: NewQuery;
 }
+
+/**
+ * When subscribing to a view: we identify underlying tables to subscribe to them
+ * When subscribing to a table: we identify joined tables to subscribe to them
+ */
 export async function getSubscribeRelatedTables(this: ViewHandler, { filter, localParams, newQuery }: Args){
 
   let viewOptions: ViewSubscriptionOptions | undefined = undefined;
@@ -29,7 +34,7 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { filter, loc
       def = def.slice(0, -1);
     }
     if (!def || typeof def !== "string") {
-      throw getClientErrorFromPGError("Could get view definition", { type: "tableMethod", localParams, view: this,  });
+      throw getSerializedClientErrorFromPGError("Could get view definition", { type: "tableMethod", localParams, view: this,  });
     }
     const { fields } = await this.dboBuilder.dbo.sql!(`SELECT * FROM ( \n ${def} \n ) prostgles_subscribe_view_definition LIMIT 0`, {});
     const tableColumns = fields.filter(f => f.tableName && f.columnName);
@@ -130,45 +135,33 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { filter, loc
       type: "table",
       relatedTables: []
     }
-    /**
-     * Avoid nested exists error. Will affect performance
-     */
+
+
+
     const nonExistsFilter = newQuery.whereOpts.exists.length ? {} : filter;
-    for await (const j of (newQuery.joins ?? [])) {
-      if (!viewOptions!.relatedTables.find(rt => rt.tableName === j.table)) {
-        /**
-         * Must shift on condition
-         */
-        viewOptions.relatedTables.push({
-          tableName: j.table,
-          tableNameEscaped: asName(j.table),
-          condition: (await this.dboBuilder.dbo[j.table]!.prepareWhere!({
-            select: undefined,
-            filter: {
-              $existsJoined: {
-                path: reverseParsedPath(j.joinPath, this.name),
-                filter: nonExistsFilter
-              }
-            },
-            addWhere: false,
-            localParams: undefined,
-            tableRule: undefined
-          })).where
-        });
+    const pushRelatedTable = async (relatedTableName: string, joinPath: ParsedJoinPath[]) => {
+      const relatedTableOrViewHandler = this.dboBuilder.dbo[relatedTableName];
+      if (!relatedTableOrViewHandler) {
+        throw `Table ${relatedTableName} not found`;
       }
-    }
-    for await (const e of newQuery.whereOpts.exists.filter(e => e.isJoined)) {
-      if(!e.isJoined) throw `Not possible`;
-      const targetTable = e.parsedPath.at(-1)!.table;
-      const newPath = reverseParsedPath(e.parsedPath, this.name)
+
+      const alreadyPushed = viewOptions!.relatedTables.find(rt => rt.tableName === relatedTableName)
+      if(!alreadyPushed || relatedTableOrViewHandler.is_view){
+        return
+      }
+
+      viewOptions ??= {
+        type: "table",
+        relatedTables: []
+      }
       viewOptions.relatedTables.push({
-        tableName: targetTable,
-        tableNameEscaped: asName(targetTable),
-        condition: (await this.dboBuilder.dbo[targetTable]!.prepareWhere!({
+        tableName: relatedTableName,
+        tableNameEscaped: asName(relatedTableName),
+        condition: (await relatedTableOrViewHandler!.prepareWhere!({
           select: undefined,
           filter: {
             $existsJoined: {
-              path: newPath,
+              path: reverseParsedPath(joinPath, this.name),
               filter: nonExistsFilter
             }
           },
@@ -177,6 +170,18 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { filter, loc
           tableRule: undefined
         })).where
       });
+    }
+
+    /**
+     * Avoid nested exists error. Will affect performance
+     */
+    for await (const j of (newQuery.joins ?? [])) {
+      pushRelatedTable(j.table, j.joinPath);
+    }
+    for await (const e of newQuery.whereOpts.exists.filter(e => e.isJoined)) {
+      if(!e.isJoined) throw `Not possible`;
+      const targetTable = e.parsedPath.at(-1)!.table;
+      pushRelatedTable(targetTable, e.parsedPath);
     }
     if (!viewOptions.relatedTables.length) {
       viewOptions = undefined;

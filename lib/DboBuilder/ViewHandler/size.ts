@@ -1,8 +1,8 @@
 import { SelectParams } from "prostgles-types";
-import { Filter, LocalParams } from "../DboBuilderTypes";
-import { ViewHandler } from "./ViewHandler"
 import { TableRule } from "../../PublishParser/publishTypesAndUtils";
-import { getErrorAsObject, parseError, withUserRLS } from "../dboBuilderUtils";
+import { Filter, LocalParams } from "../DboBuilderTypes";
+import { getErrorAsObject, getSerializedClientErrorFromPGError, withUserRLS } from "../dboBuilderUtils";
+import { ViewHandler } from "./ViewHandler";
 export async function size(this: ViewHandler, _filter?: Filter, selectParams?: SelectParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<string> {
   const filter = _filter || {};
   const start = Date.now();
@@ -32,7 +32,6 @@ export async function size(this: ViewHandler, _filter?: Filter, selectParams?: S
     return result;
   } catch (e) {
     await this._log({ command: "size", localParams, data: { filter, selectParams }, duration: Date.now() - start, error: getErrorAsObject(e) });
-    if (localParams && localParams.testRule) throw e;
-    throw parseError(e, `dbo.${this.name}.size()`);
+    throw getSerializedClientErrorFromPGError(e, { type: "tableMethod", localParams, view: this });
   }
 }

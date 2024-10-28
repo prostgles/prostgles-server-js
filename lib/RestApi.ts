@@ -1,9 +1,9 @@
-import { Prostgles } from "./Prostgles";
-import { ExpressReq, ExpressRes, HTTPCODES } from "./AuthHandler";
-import { runClientMethod, runClientRequest, runClientSqlRequest } from "./runClientRequest";
-import { Express } from "express";
 import * as bodyParser from "body-parser";
-import { parseError } from "./DboBuilder/DboBuilder";
+import { Express } from "express";
+import { ExpressReq, ExpressRes, HTTPCODES } from "./AuthHandler";
+import { getSerializedClientErrorFromPGError } from "./DboBuilder/DboBuilder";
+import { Prostgles } from "./Prostgles";
+import { runClientMethod, runClientRequest, runClientSqlRequest } from "./runClientRequest";
 import { VoidFunction } from "./SchemaWatch/SchemaWatch";
 const jsonParser = bodyParser.json();
 
@@ -65,7 +65,7 @@ export class RestApi {
       });
       res.json(data);
     } catch(rawError){
-      const error = parseError(rawError, "onPostMethod")
+      const error = getSerializedClientErrorFromPGError(rawError, { type: "method", localParams: { httpReq: req } });
       res.status(400).json({ error });
     }
   }
@@ -74,7 +74,7 @@ export class RestApi {
       const data = await this.prostgles.getClientSchema({ httpReq: req });
       res.json(data);
     } catch(rawError){ 
-      const error = parseError(rawError, "onPostSchema")
+      const error = getSerializedClientErrorFromPGError(rawError, { type: "method", localParams: { httpReq: req } });
       res.status(400).json({ error });
     }
   }
@@ -84,7 +84,7 @@ export class RestApi {
       const data = await runClientSqlRequest.bind(this.prostgles)({ type: "http", httpReq: req, query, args, options });
       res.json(data);
     } catch(rawError){ 
-      const error = parseError(rawError, "onPostSql")
+      const error = getSerializedClientErrorFromPGError(rawError, { type: "sql" });
       res.status(400).json({ error });
     }
   }
@@ -112,7 +112,7 @@ export class RestApi {
       });
       res.json(data);
     } catch(rawError){
-      const error = parseError(rawError, "onPost")
+      const error = getSerializedClientErrorFromPGError(rawError, { type: "tableMethod", localParams: { httpReq: req }, view: this.prostgles.dboBuilder.dbo[tableName] });
       res.status(400).json({ error });
     }
   }

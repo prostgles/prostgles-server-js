@@ -1,8 +1,8 @@
 import { SelectParams } from "prostgles-types";
-import { getErrorAsObject, parseError, withUserRLS } from "../dboBuilderUtils";
-import { ViewHandler } from "./ViewHandler";
-import { Filter, LocalParams } from "../DboBuilder";
 import { TableRule } from "../../PublishParser/publishTypesAndUtils";
+import { Filter, LocalParams } from "../DboBuilder";
+import { getErrorAsObject, getSerializedClientErrorFromPGError, withUserRLS } from "../dboBuilderUtils";
+import { ViewHandler } from "./ViewHandler";
 
 export async function count(this: ViewHandler, _filter?: Filter, selectParams?: SelectParams, _param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<number> {
   const filter = _filter || {};
@@ -33,7 +33,6 @@ export async function count(this: ViewHandler, _filter?: Filter, selectParams?: 
     return result;
   } catch (e) {
     await this._log({ command: "count", localParams, data: { filter }, duration: Date.now() - start, error: getErrorAsObject(e) });
-    if (localParams && localParams.testRule) throw e;
-    throw parseError(e, `dbo.${this.name}.count()`)
+    throw getSerializedClientErrorFromPGError(e, { type: "tableMethod", localParams, view: this });
   }
 }

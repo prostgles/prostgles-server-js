@@ -1,8 +1,8 @@
 import { AnyObject, UpdateParams } from "prostgles-types";
-import { TableHandler } from "./TableHandler";
-import { Filter, LocalParams } from "../DboBuilderTypes";
 import { TableRule } from "../../PublishParser/publishTypesAndUtils";
-import { getErrorAsObject, parseError } from "../dboBuilderUtils";
+import { Filter, LocalParams } from "../DboBuilderTypes";
+import { getErrorAsObject, getSerializedClientErrorFromPGError } from "../dboBuilderUtils";
+import { TableHandler } from "./TableHandler";
 
 export const upsert = async function(this: TableHandler, filter: Filter, newData: AnyObject, params?: UpdateParams, table_rules?: TableRule, localParams?: LocalParams): Promise<any> {
   const start = Date.now();
@@ -29,7 +29,6 @@ export const upsert = async function(this: TableHandler, filter: Filter, newData
 
   } catch (e) {
     await this._log({ command: "upsert", localParams, data: { filter, newData, params }, duration: Date.now() - start, error: getErrorAsObject(e) });
-    if (localParams && localParams.testRule) throw e;
-    throw parseError(e, `dbo.${this.name}.upsert()`);
+    throw getSerializedClientErrorFromPGError(e, { type: "tableMethod", localParams, view: this });
   }
 }

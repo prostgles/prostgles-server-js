@@ -297,24 +297,18 @@ export class DboBuilder {
   }
 
   getTX = async (cb: TxCB) => {
-    try {
-      const transaction = await this.db.tx(t => {
-        const dbTX: DbTxTableHandlers & Pick<DBHandlerServer, "sql"> = {};
-        this.tablesOrViews?.map(tov => {
-          const handlerClass = tov.is_view ? ViewHandler : TableHandler;
-          dbTX[tov.name] = new handlerClass(this.db, tov, this, { t, dbTX }, this.shortestJoinPaths);
-        });
-        dbTX.sql = (q, args, opts, localP) => this.runSQL(q, args, opts, { tx: { dbTX, t }, ...(localP ?? {}) })
-  
-        return cb(dbTX, t);
+    const transaction = await this.db.tx(t => {
+      const dbTX: DbTxTableHandlers & Pick<DBHandlerServer, "sql"> = {};
+      this.tablesOrViews?.map(tov => {
+        const handlerClass = tov.is_view ? ViewHandler : TableHandler;
+        dbTX[tov.name] = new handlerClass(this.db, tov, this, { t, dbTX }, this.shortestJoinPaths);
       });
-  
-      return transaction;
+      dbTX.sql = (q, args, opts, localP) => this.runSQL(q, args, opts, { tx: { dbTX, t }, ...(localP ?? {}) })
 
-    } catch (e) {
-      console.error("Error in getTX", e);
-      throw e;
-    }
+      return cb(dbTX, t);
+    });
+
+    return transaction;
   }
 
   cacheDBTypes = cacheDBTypes.bind(this);

@@ -1,13 +1,13 @@
 
 import { SelectParams, isObject } from "prostgles-types";
-import { Filter, LocalParams, getClientErrorFromPGError, getErrorAsObject, parseError, withUserRLS } from "../DboBuilder";
-import { canRunSQL } from "../runSQL";
 import { TableRule } from "../../PublishParser/PublishParser";
+import { Filter, LocalParams, getClientErrorFromPGError, getErrorAsObject, getSerializedClientErrorFromPGError, withUserRLS } from "../DboBuilder";
 import { getNewQuery } from "../QueryBuilder/getNewQuery";
 import { getSelectQuery } from "../QueryBuilder/getSelectQuery";
+import { NewQuery } from "../QueryBuilder/QueryBuilder";
+import { canRunSQL } from "../runSQL";
 import { TableHandler } from "../TableHandler/TableHandler";
 import { ViewHandler } from "./ViewHandler";
-import { NewQuery } from "../QueryBuilder/QueryBuilder";
 
 export const find = async function(this: ViewHandler, filter?: Filter, selectParams?: SelectParams, _?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any[]> {
   const start = Date.now();
@@ -106,8 +106,7 @@ export const find = async function(this: ViewHandler, filter?: Filter, selectPar
     return result;
   } catch (e) {
     this._log({ command, localParams, data: { filter, selectParams }, duration: Date.now() - start, error: getErrorAsObject(e) });
-    if (localParams && localParams.testRule) throw e;
-    throw parseError(e, `dbo.${this.name}.find()`);
+    throw getSerializedClientErrorFromPGError(e, { type: "tableMethod", localParams, view: this });
   }
 }
 

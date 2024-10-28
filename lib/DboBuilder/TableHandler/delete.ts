@@ -1,7 +1,7 @@
 import pgPromise from "pg-promise";
 import { AnyObject, DeleteParams, FieldFilter } from "prostgles-types";
-import { Filter, LocalParams, getErrorAsObject, parseError, withUserRLS } from "../DboBuilder";
 import { DeleteRule, TableRule } from "../../PublishParser/PublishParser";
+import { Filter, LocalParams, getErrorAsObject, getSerializedClientErrorFromPGError, withUserRLS } from "../DboBuilder";
 import { runQueryReturnType } from "../ViewHandler/find";
 import { TableHandler } from "./TableHandler";
 import { onDeleteFromFileTable } from "./onDeleteFromFileTable";
@@ -109,8 +109,7 @@ export async function _delete(this: TableHandler, filter?: Filter, params?: Dele
 
   } catch (e) {
     await this._log({ command: "delete", localParams, data: { filter, params }, duration: Date.now() - start, error: getErrorAsObject(e) });
-    if (localParams && localParams.testRule) throw e;
-    throw parseError(e, `dbo.${this.name}.delete(${JSON.stringify(filter || {}, null, 2)}, ${JSON.stringify(params || {}, null, 2)})`);
+    throw getSerializedClientErrorFromPGError(e, { type: "tableMethod", localParams, view: this });
   }
 } 
 

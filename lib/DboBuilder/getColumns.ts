@@ -3,7 +3,7 @@ import {
   ValidatedColumnInfo, _PG_geometric, isObject
 } from "prostgles-types";
 import { TableRule } from "../PublishParser/PublishParser";
-import { LocalParams, getErrorAsObject, parseError, postgresToTsType } from "./DboBuilder";
+import { LocalParams, getClientErrorFromPGError, getErrorAsObject, getSerializedClientErrorFromPGError, postgresToTsType } from "./DboBuilder";
 import { TableHandler } from "./TableHandler/TableHandler";
 import { ViewHandler } from "./ViewHandler/ViewHandler";
 
@@ -98,7 +98,7 @@ export async function getColumns(
 
   } catch (e) {
     await this._log({ command: "getColumns", localParams, data: { lang, params }, duration: Date.now() - start, error: getErrorAsObject(e) });
-    throw parseError(e, `db.${this.name}.getColumns()`);
+    throw getSerializedClientErrorFromPGError(e, { type: "tableMethod", localParams, view: this });
   }
 }
 

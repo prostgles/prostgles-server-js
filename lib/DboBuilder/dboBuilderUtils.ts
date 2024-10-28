@@ -5,6 +5,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import {
+  AnyObject,
   PG_COLUMN_UDT_DATA_TYPE,
   ProstglesError,
   TS_PG_Types,
@@ -21,8 +22,9 @@ import { asNameAlias } from "./QueryBuilder/QueryBuilder";
 import { ViewHandler } from "./ViewHandler/ViewHandler";
 import { getSchemaFilter } from "./getTablesForSchemaPostgresSQL";
 
-import { sqlErrCodeToMsg } from "./sqlErrCodeToMsg";
 import { ProstglesInitOptions } from "../ProstglesTypes";
+import { sqlErrCodeToMsg } from "./sqlErrCodeToMsg";
+import { TableHandler } from "./TableHandler/TableHandler";
 export function escapeTSNames(str: string, capitalize = false): string {
   let res = str;
   res = (capitalize ? str[0]?.toUpperCase() : str[0]) + str.slice(1);
@@ -50,52 +52,63 @@ type GetSerializedClientErrorFromPGErrorArgs = {
 } | {
   type: "tableMethod";
   localParams: LocalParams | undefined;
-  view: ViewHandler;
+  view: ViewHandler | Partial<TableHandler> | undefined;
   allowedKeys?: string[];
+  canRunSql?: boolean;
+} | {
+  type: "method";
+  localParams: LocalParams | undefined; 
+  allowedKeys?: string[]; 
+  view?: undefined;
+  canRunSql?: boolean;
 }
-export function getSerializedClientErrorFromPGError(rawError: any, args: GetSerializedClientErrorFromPGErrorArgs) {
+export function getSerializedClientErrorFromPGError(rawError: any, args: GetSerializedClientErrorFromPGErrorArgs): AnyObject {
   const err = getErrorAsObject(rawError);
+  if(err.code) {
+    err.code_info = sqlErrCodeToMsg(err.code);
+  }
   if (process.env.PRGL_DEBUG) {
     console.trace(err)
   }
 
-  if(args.type === "sql"){
-    return {
-      ...err,
-      ...(err?.message ? { txt: err.message } : {}),
-      code_info: sqlErrCodeToMsg(err.code),
-    }
+  const isServerSideRequest = args.type !== "sql" && !args.localParams;
+  if(args.type === "sql" || isServerSideRequest){
+    return err;
   }
+  const { view, allowedKeys } = args;
 
-  const { localParams, view, allowedKeys } = args;
 
-  const errObject = {
-    ...((!localParams || !localParams.socket) ? err : {}),
-    ...pickKeys(err, ["column", "code", "table", "constraint", "hint", "severity", "message", "name", "detail"]),
-  };
+  const sensitiveErrorKeys = ["hint", "detail", "context"];
+  const otherKeys = ["column", "code", "code_info", "table", "constraint", "severity", "message", "name"];
+  const finalKeys = otherKeys
+    .concat(allowedKeys ?? [])
+    .concat(args.canRunSql? sensitiveErrorKeys : []);
+
+  const errObject = pickKeys(err, finalKeys);
   if (view?.dboBuilder?.constraints && errObject.constraint && !errObject.column) {
     const constraint = view.dboBuilder.constraints
       .find(c => c.conname === errObject.constraint && c.relname === view.name);
     if (constraint) {
-      const cols = view.columns.filter(c =>
+      const cols = view.columns?.filter(c =>
         (!allowedKeys || allowedKeys.includes(c.name)) &&
         constraint.conkey.includes(c.ordinal_position)
       );
-      const [firstCol] = cols;
+      const [firstCol] = cols ?? [];
       if (firstCol) {
         errObject.column = firstCol.name;
-        errObject.columns = cols.map(c => c.name);
+        errObject.columns = cols?.map(c => c.name);
       }
     }
   }
   return errObject;
 }
 export function getClientErrorFromPGError(rawError: any, args: GetSerializedClientErrorFromPGErrorArgs) {
-  return Promise.reject(getSerializedClientErrorFromPGError(rawError, args));
+  const errorObj = getSerializedClientErrorFromPGError(rawError, args);
+  return Promise.reject(errorObj);
 }
 
 /**
- * Ensure the error is a serializable Object  
+ * @deprecated
  */
 export function parseError(e: any, _caller: string): ProstglesError {
 

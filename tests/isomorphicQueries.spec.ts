@@ -30,20 +30,42 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
       await db.sql!(`TRUNCATE items RESTART IDENTITY CASCADE;`);
     });
 
-    await test("Insert error structure", async () => {
-      const err = await db.items.insert!({ h: "a" }).catch(err => err);
-      const clientOnlyError = {
-        detail: 'Array value must start with "{" or dimension information.',
-        message: 'malformed array literal: "a"',
-        code: '22P02',
-        name: 'error',
-        severity: 'ERROR',
-      }
-      if(isServer){
-        assert.deepStrictEqual(pickKeys(err, Object.keys(clientOnlyError)), clientOnlyError);
-        assert.equal(typeof err.query, "string");
-      } else {
-        assert.deepStrictEqual(err, clientOnlyError);
+    await test("Error structure", async () => {
+      const errFind = await db.items.find?.({ h: "a" }).catch(err => err);
+      const errCount = await db.items.count?.({ h: "a" }).catch(err => err);
+      const errSize = await db.items.size?.({ h: "a" }).catch(err => err);
+      const errFindOne = await db.items.findOne?.({ h: "a" }).catch(err => err);
+      const errDelete = await db.items.delete?.({ h: "a" }).catch(err => err);
+      const errUpdate = await db.items.update?.({}, { h: "a" }).catch(err => err);
+      const errUpdateBatch = await db.items.updateBatch?.([[{}, { h: "a" }]]).catch(err => err);
+      const errUpsert = await db.items.upsert?.({}, { h: "a" }).catch(err => err);
+      const errInsert = await db.items.insert?.({ h: "a" }).catch(err => err);
+      const errSubscribe = await db.items.subscribe?.({ h: "a" }, {}, console.warn).catch(err => err);
+      const errSubscribeOne = await db.items.subscribeOne?.({ h: "a" }, {}, console.warn).catch(err => err);
+
+      for(const err of [errFind, errCount, errSize, errFindOne, errDelete, errInsert, errUpdate, errUpdateBatch, errUpsert, errSubscribe, errSubscribeOne]){
+        const clientOnlyError = {
+          message: 'malformed array literal: "a"',
+          code: '22P02',
+          code_info: 'invalid_text_representation',
+          name: 'error',
+          severity: 'ERROR',
+        }
+        if (isServer) {
+          const allKeys = ["message", "code", "name", "severity", "detail", "query", "length", "position", "file", "line", "routine", "code_info"];
+          assert.deepStrictEqual(Object.keys(err ?? {}).sort(), allKeys.sort());
+          assert.deepStrictEqual(pickKeys(err, Object.keys(clientOnlyError)), clientOnlyError);
+          assert.equal(typeof err.detail, "string");
+          assert.equal(typeof err.query, "string");
+          assert.equal(typeof err.length, "number");
+          assert.equal(typeof err.position, "string");
+          assert.equal(typeof err.file, "string");
+          assert.equal(typeof err.line, "string");
+          assert.equal(typeof err.routine, "string");
+          assert.equal(typeof err.code_info, "string");
+        } else {
+          assert.deepStrictEqual(err, clientOnlyError);
+        }
       }
     });
 

@@ -3,7 +3,7 @@ import { AnyObject, asName, DeleteParams, FieldFilter, InsertParams, Select, Upd
 import { DB } from "../../Prostgles";
 import { SyncRule, TableRule } from "../../PublishParser/PublishParser";
 import TableConfigurator from "../../TableConfig/TableConfig";
-import { DboBuilder, Filter, getErrorAsObject, LocalParams, parseError, TableHandlers } from "../DboBuilder";
+import { DboBuilder, Filter, getErrorAsObject, getSerializedClientErrorFromPGError, LocalParams, TableHandlers } from "../DboBuilder";
 import type { TableSchema } from "../DboBuilderTypes";
 import { parseUpdateRules } from "../parseUpdateRules";
 import { COMPUTED_FIELDS, FUNCTIONS } from "../QueryBuilder/Functions";
@@ -170,8 +170,7 @@ export class TableHandler extends ViewHandler {
       return result;
     } catch (e) {
       await this._log({ command: "sync", localParams, data: { filter, params }, duration: Date.now() - start, error: getErrorAsObject(e) });
-      if (localParams && localParams.testRule) throw e;
-      throw parseError(e, `dbo.${this.name}.sync()`);
+      throw getSerializedClientErrorFromPGError(e, { type: "tableMethod", localParams, view: this });
     }
 
     /*

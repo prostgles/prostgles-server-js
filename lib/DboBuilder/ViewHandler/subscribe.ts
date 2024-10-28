@@ -1,9 +1,9 @@
 import { AnyObject, SubscribeParams, SubscriptionChannels } from "prostgles-types";
 import { TableRule } from "../../PublishParser/PublishParser";
-import { Filter, LocalParams, getErrorAsObject, parseError } from "../DboBuilder";
+import { Filter, LocalParams, getClientErrorFromPGError, getErrorAsObject, getSerializedClientErrorFromPGError } from "../DboBuilder";
+import { getSubscribeRelatedTables } from "../getSubscribeRelatedTables";
 import { NewQuery } from "../QueryBuilder/QueryBuilder";
 import { ViewHandler } from "./ViewHandler";
-import { getSubscribeRelatedTables } from "../getSubscribeRelatedTables";
 
 type OnData = (items: AnyObject[]) => any; 
 export type LocalFuncs = {
@@ -111,8 +111,7 @@ async function subscribe(this: ViewHandler, filter: Filter, params: SubscribePar
     }
   } catch (e) {
     await this._log({ command: "subscribe", localParams, data: { filter, params }, duration: Date.now() - start, error: getErrorAsObject(e) });
-    if (localParams && localParams.testRule) throw e;
-    throw parseError(e, `dbo.${this.name}.subscribe()`);
+    throw getSerializedClientErrorFromPGError(e, { type: "tableMethod", localParams, view: this });
   }
 }
 

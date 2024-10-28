@@ -1,6 +1,6 @@
 import { DBSchemaTable, MethodKey, TableInfo, TableSchemaForClient, getKeys, pickKeys } from "prostgles-types";
 import { AuthResult, ExpressReq } from "../AuthHandler";
-import { PRGLIOSocket } from "../DboBuilder/DboBuilder";
+import { getErrorAsObject, PRGLIOSocket } from "../DboBuilder/DboBuilder";
 import { PublishObject, PublishParser } from "./PublishParser"
 import { TABLE_METHODS } from "../Prostgles";
 
@@ -85,7 +85,6 @@ export async function getSchemaFromPublish(this: PublishParser, { userData, ...c
                 /* Test for issues with the common table CRUD methods () */
                 if (TABLE_METHODS.includes(method as any)) {
 
-                  let err = null;
                   try {
                     const valid_table_command_rules = await this.getValidatedRequestRule({ tableName, command: method, localParams: clientReq }, clientInfo);
                     if(this.prostgles.opts.testRulesOnConnect){
@@ -93,10 +92,14 @@ export async function getSchemaFromPublish(this: PublishParser, { userData, ...c
                     }
 
                   } catch (e) {
-                    err = "INTERNAL PUBLISH ERROR";
-                    tableSchema[method] = { err };
+                    tableSchema[method] = { 
+                      err: "Internal publish error. Check server logs"
+                    };
 
-                    throw `publish.${tableName}.${method}: \n   -> ${e}`;
+                    throw {
+                      ...getErrorAsObject(e),
+                      publish_path: `publish.${tableName}.${method}: \n   -> ${e}`
+                    };
                   }
                 }
 

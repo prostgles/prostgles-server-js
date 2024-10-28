@@ -1,11 +1,11 @@
 import { AnyObject, UpdateParams } from "prostgles-types";
 import { TableRule } from "../../PublishParser/PublishParser";
-import { Filter, LocalParams, getErrorAsObject, parseError, withUserRLS } from "../DboBuilder";
+import { Filter, LocalParams, getErrorAsObject, getSerializedClientErrorFromPGError, withUserRLS } from "../DboBuilder";
 import { getInsertTableRules, getReferenceColumnInserts } from "../insertNestedRecords";
+import { prepareNewData } from "./DataValidator";
 import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
 import { TableHandler } from "./TableHandler";
 import { updateFile } from "./updateFile";
-import { prepareNewData } from "./DataValidator";
 
 export async function update(this: TableHandler, filter: Filter, _newData: AnyObject, params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<AnyObject | void> {
   const ACTION = "update";
@@ -121,7 +121,6 @@ export async function update(this: TableHandler, filter: Filter, _newData: AnyOb
     return result;
   } catch (e) {
     await this._log({ command: "update", localParams, data: { filter, _newData, params }, duration: Date.now() - start, error: getErrorAsObject(e) });
-    if (localParams && localParams.testRule) throw e;
-    throw parseError(e, `dbo.${this.name}.${ACTION}(${JSON.stringify(filter || {}, null, 2)}, ${Array.isArray(_newData)? "[{...}]": "{...}"}, ${JSON.stringify(params || {}, null, 2)})`)
+    throw getSerializedClientErrorFromPGError(e, { type: "tableMethod", localParams, view: this });
   }
 } 
