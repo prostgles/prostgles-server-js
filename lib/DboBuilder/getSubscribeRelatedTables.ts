@@ -74,17 +74,17 @@ export async function getSubscribeRelatedTables(this: ViewHandler, { filter, loc
 
         try {
           const { count } = await this.db.oneOrNone(`
-                WITH ${asName(tableName)} AS (
-                  SELECT * 
-                  FROM ${asName(tableName)}
-                  LIMIT 0
-                )
+            WITH ${asName(tableName)} AS (
+              SELECT * 
+              FROM ${asName(tableName)}
+              LIMIT 0
+            )
 
-                SELECT COUNT(*) as count
-                FROM (
-                  ${def}
-                ) prostgles_view_ref_table_test
-              `);
+            SELECT COUNT(*) as count
+            FROM (
+              ${def}
+            ) prostgles_view_ref_table_test
+          `);
 
           const relatedTableSubscription = {
             tableName: tableName!,
