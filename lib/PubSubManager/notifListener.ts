@@ -92,6 +92,8 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     if(orphanedTableConditions.length){
       this.db
         .any(`
+          /* Delete removed subscriptions */
+          /* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
           DELETE FROM prostgles.app_triggers at
           WHERE EXISTS (
             SELECT 1
