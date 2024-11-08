@@ -296,9 +296,10 @@ export class PubSubManager {
     }
   }
 
-  getClientSubs(client: Pick<Subscription, "localFuncs" | "socket_id" | "channel_name">): Subscription[] { 
+  getClientSubs({ channel_name, localFuncs, socket_id }: Pick<Subscription, "localFuncs" | "socket_id" | "channel_name">): Subscription[] { 
     return this.subs.filter(s => {
-      return s.channel_name === client.channel_name && (matchesLocalFuncs(client.localFuncs, s.localFuncs) || client.socket_id && s.socket_id === client.socket_id)
+      return s.channel_name === channel_name && 
+        (matchesLocalFuncs(localFuncs, s.localFuncs) || socket_id && s.socket_id === socket_id)
     });
   }
 
@@ -334,7 +335,7 @@ export class PubSubManager {
     const { name: table_name } = table_info;
     
     if (!this.dbo?.[table_name]?.find) {
-      throw new Error(`1107 this.dbo.${table_name}.find`);
+      throw new Error(`this.dbo.${table_name}.find undefined`);
     }
 
     try {
