@@ -36,18 +36,16 @@ export type AuthClientRequest = { socket: PRGLIOSocket } | { httpReq: ExpressReq
 
 type ThirdPartyProviders = {
   facebook?: Pick<FacebookStrategy, "clientID" | "clientSecret"> & {
-    // appId: string;
-    // appSecret: string;
-    authOpts: AuthenticateOptions;
+    authOpts?: AuthenticateOptions;
   };
   google?: Pick<GoogleStrategy, "clientID" | "clientSecret"> & {
-    authOpts: AuthenticateOptions;
+    authOpts?: AuthenticateOptions;
   };
   github?: Pick<GitHubStrategy, "clientID" | "clientSecret"> & {
-    authOpts: AuthenticateOptions;
+    authOpts?: AuthenticateOptions;
   };
   microsoft?: Pick<MicrosoftStrategyOptions, "clientID" | "clientSecret"> & {
-    authOpts: AuthenticateOptions;
+    authOpts?: AuthenticateOptions;
   };
 };
 

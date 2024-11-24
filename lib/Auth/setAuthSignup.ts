@@ -69,7 +69,7 @@ export const setAuthSignup = ({ registrations, app }: Required<Auth>["expressCon
     );
 
     app.get(`/auth/${providerName}`,
-      passport.authenticate(providerName, authOpts)
+      passport.authenticate(providerName, authOpts ?? {})
     );
 
     app.get(callbackPath,
@@ -84,7 +84,11 @@ export const setAuthSignup = ({ registrations, app }: Required<Auth>["expressCon
 
 export const getProviders = (registrations: Required<Auth>["expressConfig"]["registrations"]): AuthSocketSchema["providers"] | undefined => {
   if(!registrations) return undefined;
-  const { email, websiteUrl, onRegister, ...providers } = registrations;
+  const { 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    email, websiteUrl, onRegister, 
+    ...providers 
+  } = registrations;
   if(isEmpty(providers)) return undefined;
  
   const result: AuthSocketSchema["providers"] = {}
