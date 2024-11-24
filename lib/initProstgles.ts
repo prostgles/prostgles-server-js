@@ -1,6 +1,6 @@
 import * as pgPromise from "pg-promise";
 import pg from "pg-promise/typescript/pg-subset";
-import { isEmpty } from "prostgles-types";
+import { getKeys, isEmpty } from "prostgles-types";
 import { AuthHandler } from "./Auth/AuthHandler";
 import { DBEventsManager } from "./DBEventsManager";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
@@ -58,6 +58,7 @@ export type InitResult = {
   getTSSchema: () => string;
   update: (newOpts: UpdateableOptions) => Promise<void>;
   restart: () => Promise<InitResult>; 
+  options: ProstglesInitOptions;
 }
 
 export const initProstgles = async function(this: Prostgles, onReady: OnReadyCallbackBasic, reason: OnInitReason): Promise<InitResult> {
@@ -165,22 +166,25 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
       pgp,
       io: this.opts.io,
       getTSSchema: this.getTSFileContent,
+      options: this.opts,
       update: async (newOpts) => {
+
+        getKeys(newOpts).forEach(k => {
+          //@ts-ignore
+          this.opts[k] = newOpts[k];
+        });
+
         if("fileTable" in newOpts){
-          this.opts.fileTable = newOpts.fileTable;
           await this.initFileTable();
         }
         if("restApi" in newOpts){
-          this.opts.restApi = newOpts.restApi;
           await this.initRestApi();
         }
         if("tableConfig" in newOpts){
-          this.opts.tableConfig = newOpts.tableConfig;
           await this.initTableConfig({ type: "prgl.update", newOpts });
           await this.refreshDBO();
         }
         if("schema" in newOpts){
-          this.opts.schema = newOpts.schema;
           await this.initTableConfig({ type: "prgl.update", newOpts });
           await this.refreshDBO();
         }
