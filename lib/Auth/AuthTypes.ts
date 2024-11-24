@@ -63,7 +63,7 @@ type SMTPConfig = {
 }
 
 type RegistrationProviders = ThirdPartyProviders & {
-  email: {
+  email?: {
     signupType: "withMagicLink" | "withPassword";
     smtp: SMTPConfig
   } | {

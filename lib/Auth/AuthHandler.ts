@@ -466,7 +466,7 @@ export class AuthHandler {
       providers: getProviders(this.opts?.expressConfig?.registrations),
       register: this.opts?.expressConfig?.registrations?.email && { type: this.opts?.expressConfig?.registrations?.email.signupType, url: "/register" },
       user: userData?.clientUser,
-      loginType: this.opts?.expressConfig?.registrations?.email.signupType,
+      loginType: this.opts?.expressConfig?.registrations?.email?.signupType,
       pathGuard,
     };
     return { auth, userData };

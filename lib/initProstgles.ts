@@ -16,14 +16,19 @@ export type DbConnectionOpts = pg.IDefaults;
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 
+export type UpdateableOptions = Pick<ProstglesInitOptions, "fileTable" | "restApi" | "tableConfig" | "schema" | "auth">;
 export type OnInitReason = 
   | { 
     type: "schema change"; 
     query: string; 
     command: string; 
   } 
+  | {
+    type: "prgl.update";
+    newOpts: UpdateableOptions;
+  }
   | { 
-    type: "init" | "prgl.restart" | "prgl.update" | "TableConfig"
+    type: "init" | "prgl.restart" | "TableConfig"
   };
 
 type OnReadyParamsCommon = {
@@ -51,7 +56,7 @@ export type InitResult = {
    * Generated database public schema TS types for all tables and views
    */
   getTSSchema: () => string;
-  update: (newOpts: Pick<ProstglesInitOptions, "fileTable" | "restApi" | "tableConfig" | "schema" | "auth">) => Promise<void>;
+  update: (newOpts: UpdateableOptions) => Promise<void>;
   restart: () => Promise<InitResult>; 
 }
 
@@ -171,12 +176,12 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
         }
         if("tableConfig" in newOpts){
           this.opts.tableConfig = newOpts.tableConfig;
-          await this.initTableConfig({ type: "prgl.update" });
+          await this.initTableConfig({ type: "prgl.update", newOpts });
           await this.refreshDBO();
         }
         if("schema" in newOpts){
           this.opts.schema = newOpts.schema;
-          await this.initTableConfig({ type: "prgl.update" });
+          await this.initTableConfig({ type: "prgl.update", newOpts });
           await this.refreshDBO();
         }
         if("auth" in newOpts){
@@ -185,7 +190,7 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
           await this.authHandler.init();
         }
         if(!isEmpty(newOpts)){
-          await this.init(onReady, { type: "prgl.update"});
+          await this.init(onReady, { type: "prgl.update", newOpts });
         }
       },
       restart: () => this.init(onReady, { type: "prgl.restart" }),
