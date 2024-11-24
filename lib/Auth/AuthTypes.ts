@@ -115,7 +115,7 @@ export type AuthRegistrationConfig = RegistrationProviders & {
   /**
    * Do something with the registered user
    */
-  onRegister: (data: RegistrationData) => Promise<any>;
+  onRegister: (data: RegistrationData) => void | Promise<any>;
 };
 
 export type SessionUser<ServerUser extends UserLike = UserLike, ClientUser extends UserLike = UserLike> = {

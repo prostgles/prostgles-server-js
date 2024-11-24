@@ -1,5 +1,6 @@
 import { Auth } from './AuthTypes';
-import passport from "passport";
+/** For some reason normal import is undefined */
+const passport = require("passport") as typeof import("passport");
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Strategy as GitHubStrategy } from "passport-github2";
 import { Strategy as MicrosoftStrategy } from "passport-microsoft";

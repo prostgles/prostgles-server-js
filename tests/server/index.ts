@@ -197,6 +197,14 @@ function dd(){
 					log(req.originalUrl)
 					res.sendFile(path.join(__dirname, '../../index.html'));
 				},
+				registrations: {
+					websiteUrl: "http://localhost:3000",
+					github: {
+						clientID: "GITHUB_CLIENT_ID",
+						clientSecret: "GITHUB"
+					},
+					onRegister: console.log
+				},
 			}
 		},
 		publishMethods: async (params) => {
