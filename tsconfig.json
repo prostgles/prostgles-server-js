@@ -14,7 +14,6 @@
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "noUncheckedIndexedAccess": true,
-    "keyofStringsOnly": true,
     "ignoreDeprecations": "5.0",
     "declaration": true,
     "skipLibCheck": true,

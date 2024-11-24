@@ -12,9 +12,10 @@ import {
   EXISTS_KEY,
   RawJoinPath,
   SQLHandler,
-  TableInfo as TInfo
+  TableInfo as TInfo,
+  UserLike
 } from "prostgles-types";
-import { BasicSession, ExpressReq, UserLike } from "../AuthHandler";
+import { BasicSession, ExpressReq } from "../Auth/AuthTypes";
 import { BasicCallback } from "../PubSubManager/PubSubManager";
 import {
   PublishAllOrNothing
@@ -182,7 +183,7 @@ export type PRGLIOSocket = {
   __prglCache?: {
     session: BasicSession;
     user: UserLike;
-    clientUser: AnyObject;
+    clientUser: UserLike;
   }
 
   _user?: AnyObject

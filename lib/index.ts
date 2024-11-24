@@ -1,4 +1,4 @@
-import { SessionUser } from "./AuthHandler";
+import { SessionUser } from "./Auth/AuthTypes";
 import { Prostgles } from "./Prostgles";
 import { ProstglesInitOptions } from "./ProstglesTypes";
 

@@ -1,6 +1,7 @@
 import * as bodyParser from "body-parser";
 import { Express } from "express";
-import { ExpressReq, ExpressRes, HTTPCODES } from "./AuthHandler";
+import { HTTPCODES } from "./Auth/AuthHandler";
+import { ExpressReq, ExpressRes } from "./Auth/AuthTypes";
 import { getSerializedClientErrorFromPGError } from "./DboBuilder/DboBuilder";
 import { Prostgles } from "./Prostgles";
 import { runClientMethod, runClientRequest, runClientSqlRequest } from "./runClientRequest";

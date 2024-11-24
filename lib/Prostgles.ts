@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as pgPromise from 'pg-promise';
-import { AuthHandler } from "./AuthHandler";
+import { AuthHandler } from "./Auth/AuthHandler";
 import { FileManager } from "./FileManager/FileManager";
 import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { OnInitReason, initProstgles } from "./initProstgles";
@@ -495,7 +495,7 @@ export class Prostgles {
         return aName.localeCompare(bName);        
       });
 
-      const { auth } = clientReq.socket? await this.authHandler.makeSocketAuth(clientReq.socket) : { auth: {} };
+      const { auth } = await this.authHandler.getClientAuth(clientReq);
       
       const clientSchema: ClientSchema = {
         schema,

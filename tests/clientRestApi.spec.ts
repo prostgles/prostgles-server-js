@@ -1,9 +1,9 @@
 import { strict as assert } from 'assert';
-import type { DBHandlerClient, Auth } from "./client";
+import type { DBHandlerClient, AuthHandler } from "./client";
 import { DBSchemaTable } from "prostgles-types";
 import { describe, test } from "node:test";
 
-export const clientRestApi = async(db: DBHandlerClient, auth: Auth, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[], token: string) => {
+export const clientRestApi = async(db: DBHandlerClient, auth: AuthHandler, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[], token: string) => {
   
   await describe("clientRestApi", async () => {
       

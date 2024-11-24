@@ -1,6 +1,6 @@
 import { AnyObject, DbJoinMaker, DBSchema, isObject, JSONB, SQLHandler, TableHandler, ViewHandler } from "prostgles-types";
 import prostgles from ".";
-import { Auth } from "./AuthHandler";
+import { Auth } from "./Auth/AuthTypes";
 import { DboBuilder, escapeTSNames, postgresToTsType } from "./DboBuilder/DboBuilder";
 import { PublishAllOrNothing, PublishParams, PublishTableRule, PublishViewRule,  } from "./PublishParser/PublishParser";
 import { getJSONBSchemaTSTypes } from "./JSONBValidation/validation";

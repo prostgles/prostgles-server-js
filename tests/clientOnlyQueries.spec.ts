@@ -1,10 +1,10 @@
 import { strict as assert } from 'assert';
-import type { DBHandlerClient, Auth } from "./client";
+import type { DBHandlerClient, AuthHandler } from "./client";
 import { AnyObject, DBSchemaTable, SocketSQLStreamPacket, isDefined } from "prostgles-types";
 import { tryRun, tryRunP } from './isomorphicQueries.spec'; 
 import { describe, test } from "node:test";
 
-export const clientOnlyQueries = async (db: DBHandlerClient, auth: Auth, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[], token: string) => {
+export const clientOnlyQueries = async (db: DBHandlerClient, auth: AuthHandler, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[], token: string) => {
 
   await describe("Client only queries", async (t) => {
 

@@ -1,5 +1,5 @@
-import { DBHandlerServer } from "../dist/DboBuilder";
-import { getSafeReturnURL } from "../dist/AuthHandler";
+//@ts-ignore
+import type { DBHandlerServer } from "../dist/DboBuilder";
 import { test, describe } from "node:test";
 
 export const serverOnlyQueries = async (db: DBHandlerServer) => {

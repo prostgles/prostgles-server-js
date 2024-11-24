@@ -1,12 +1,11 @@
 
 import { DBSchemaTable } from "prostgles-types";
-import type { Auth, DBHandlerClient } from "./client";
-import { tryRun } from './isomorphicQueries.spec';
+import type { AuthHandler, DBHandlerClient } from "./client";
 import { strict as assert } from 'assert';
 import fs from "fs";
 import { describe, test } from "node:test";
 
-export const clientFileTests = async (db: DBHandlerClient, auth: Auth, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[]) => {
+export const clientFileTests = async (db: DBHandlerClient, auth: AuthHandler, log: (...args: any[]) => any, methods, tableSchema: DBSchemaTable[]) => {
    
   await describe("clientFileTests", async () => {
       

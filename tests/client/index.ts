@@ -1,15 +1,17 @@
 import prostgles from "prostgles-client";
 import io from "socket.io-client";
 
+import { AuthHandler } from "prostgles-client/dist/Auth";
+export { AuthHandler } from "prostgles-client/dist/Auth";
+import type { DBHandlerClient, MethodHandler } from "prostgles-client/dist/prostgles";
+import { DBSchemaTable } from "prostgles-types";
+import { clientFileTests } from "../clientFileTests.spec";
+import { clientOnlyQueries } from "../clientOnlyQueries.spec";
+import { clientRestApi } from "../clientRestApi.spec";
 import { isomorphicQueries } from "../isomorphicQueries.spec";
-import { clientOnlyQueries } from "../clientOnlyQueries.spec"; 
-import { clientRestApi } from "../clientRestApi.spec"; 
-import { clientFileTests } from "../clientFileTests.spec"; 
-import type { Auth, DBHandlerClient, MethodHandler } from "prostgles-client/dist/prostgles";
-export { DBHandlerClient, Auth } from "prostgles-client/dist/prostgles";
 import { clientHooks } from "./hooks.spec";
 import { newly_created_table, useProstglesTest } from "./useProstgles.spec";
-import { DBSchemaTable } from "prostgles-types";
+export { DBHandlerClient } from "prostgles-client/dist/prostgles";
 
 const start = Date.now();
 const log = (msgOrObj: any, extra?: any) => {
@@ -35,7 +37,7 @@ type ClientTestSpecV2 = (args: {
   methods: MethodHandler;
   tableSchema: DBSchemaTable[];
   isReconnect?: boolean;
-  auth: Auth;
+  auth: AuthHandler;
 }) => Promise<void>;
 
 const tests: Record<string, ClientTestSpecV2> = {

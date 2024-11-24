@@ -5,7 +5,7 @@ import { canCreateTables } from "../DboBuilder/runSQL";
 import { Prostgles } from "../Prostgles";
 import { FileManager, HOUR, LocalConfig } from "./FileManager";
 import { runClientRequest } from "../runClientRequest";
-import { HTTPCODES } from "../AuthHandler";
+import { HTTPCODES } from "../Auth/AuthHandler";
 
 export async function initFileManager(this: FileManager, prg: Prostgles){
   this.prostgles = prg;

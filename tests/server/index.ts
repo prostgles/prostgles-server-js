@@ -168,7 +168,7 @@ function dd(){
 					if(s) {
 						const user = users.find(u => s && s.user_id === u.id);
 						if(user) {
-							return { sid: s.id, user, clientUser: { sid: s.id, uid: user.id } }
+							return { sid: s.id, user, clientUser: { sid: s.id, uid: user.id, id: user.id, type: user.type } }
 						}
 					}
 				}

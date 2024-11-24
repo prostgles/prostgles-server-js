@@ -1,5 +1,5 @@
-import { AnyObject, TableHandler, getKeys, pickKeys } from "prostgles-types";
-import { ExpressReq, UserLike } from "./AuthHandler";
+import { AnyObject, TableHandler, UserLike, getKeys, pickKeys } from "prostgles-types";
+import { ExpressReq } from "./Auth/AuthTypes";
 import { LocalParams, PRGLIOSocket } from "./DboBuilder/DboBuilder";
 import { parseFieldFilter } from "./DboBuilder/ViewHandler/parseFieldFilter";
 import { canRunSQL } from "./DboBuilder/runSQL";
@@ -50,7 +50,7 @@ export const runClientRequest = async function(this: Prostgles, args: Args){
   const valid_table_command_rules = await this.publishParser.getValidatedRequestRule({ tableName, command, localParams: reqInfo }, clientInfo);
   if (valid_table_command_rules) {
     const sessionUser: UserLike | undefined = !clientInfo?.user? undefined : {
-      ...parseFieldFilter(clientInfo.sessionFields ?? [], false, getKeys(clientInfo.user)),
+      ...parseFieldFilter(clientInfo.sessionFields ?? [] as any, false, Object.keys(clientInfo.user)),
       ...pickKeys(clientInfo.user, ["id", "type"]) as UserLike,
     }
     const localParams: LocalParams = { ...reqInfo, isRemoteRequest: { user: sessionUser } }

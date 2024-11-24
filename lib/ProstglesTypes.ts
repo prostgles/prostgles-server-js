@@ -1,6 +1,6 @@
 
 import { FileColumnConfig } from "prostgles-types";
-import { Auth, AuthRequestParams, SessionUser } from "./AuthHandler";
+import { Auth, AuthRequestParams, SessionUser } from "./Auth/AuthTypes";
 import { EventTriggerTagFilter } from "./Event_Trigger_Tags";
 import { CloudClient, ImageOptions, LocalConfig } from "./FileManager/FileManager";
 import { EventInfo } from "./Logging";

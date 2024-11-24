@@ -1,5 +1,5 @@
 import { getKeys, isObject } from "prostgles-types";
-import { AuthResult } from "../AuthHandler";
+import { AuthResult } from "../Auth/AuthTypes";
 import { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { ViewHandler } from "../DboBuilder/ViewHandler/ViewHandler";
 import { DEFAULT_SYNC_BATCH_SIZE } from "../PubSubManager/PubSubManager";

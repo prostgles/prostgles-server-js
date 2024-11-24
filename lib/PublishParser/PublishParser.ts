@@ -1,12 +1,12 @@
-import { Method, getKeys, isObject } from "prostgles-types";
-import { AuthResult, SessionUser } from "../AuthHandler";
+import { Method, isObject } from "prostgles-types";
+import { AuthResult, SessionUser } from "../Auth/AuthTypes";
 import { LocalParams } from "../DboBuilder/DboBuilder";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
+import { VoidFunction } from "../SchemaWatch/SchemaWatch";
 import { getFileTableRules } from "./getFileTableRules";
 import { getSchemaFromPublish } from "./getSchemaFromPublish";
 import { getTableRulesWithoutFileTable } from "./getTableRulesWithoutFileTable";
 import { DboTable, DboTableCommand, ParsedPublishTable, PublishMethods, PublishObject, PublishParams, RULE_TO_METHODS, TableRule } from "./publishTypesAndUtils";
-import { VoidFunction } from "../SchemaWatch/SchemaWatch";
 
 export class PublishParser {
   publish: any;

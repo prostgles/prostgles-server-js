@@ -13,13 +13,13 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.21.0",
+    "express": "^4.21.1",
     "prostgles-server": "file:../.."
   },
   "devDependencies": {
     "@types/node": "^20.9.2",
     "socket.io": "^4.8.1",
-    "tsc-watch": "^4.5.0",
+    "tsc-watch": "^6.2.1",
     "typescript": "^5.3.3"
   }
 }
