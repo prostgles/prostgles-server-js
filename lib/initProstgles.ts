@@ -51,7 +51,7 @@ export type InitResult = {
    * Generated database public schema TS types for all tables and views
    */
   getTSSchema: () => string;
-  update: (newOpts: Pick<ProstglesInitOptions, "fileTable" | "restApi" | "tableConfig" | "schema">) => Promise<void>;
+  update: (newOpts: Pick<ProstglesInitOptions, "fileTable" | "restApi" | "tableConfig" | "schema" | "auth">) => Promise<void>;
   restart: () => Promise<InitResult>; 
 }
 
@@ -178,6 +178,11 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
           this.opts.schema = newOpts.schema;
           await this.initTableConfig({ type: "prgl.update" });
           await this.refreshDBO();
+        }
+        if("auth" in newOpts){
+          this.authHandler?.destroy();
+          this.authHandler = new AuthHandler(this as any);
+          await this.authHandler.init();
         }
         if(!isEmpty(newOpts)){
           await this.init(onReady, { type: "prgl.update"});
