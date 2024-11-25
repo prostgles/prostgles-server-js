@@ -3,7 +3,7 @@ import { LocalParams, PRGLIOSocket } from "../DboBuilder/DboBuilder";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { removeExpressRoute } from "../FileManager/FileManager";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
-import { Auth, AuthClientRequest, AuthResult, BasicSession, ExpressReq, ExpressRes, LoginClientInfo } from "./AuthTypes"
+import { Auth, AuthClientRequest, AuthResult, BasicSession, ExpressReq, ExpressRes, LoginClientInfo, LoginParams } from "./AuthTypes"
 import { getSafeReturnURL } from "./getSafeReturnURL";
 import { setupAuthRoutes } from "./setupAuthRoutes";
 import { getProviders } from "./setAuthProviders";
@@ -198,7 +198,7 @@ export class AuthHandler {
     })
   }
 
-  loginThrottled = async (params: AnyObject, client: LoginClientInfo): Promise<BasicSession> => {
+  loginThrottled = async (params: LoginParams, client: LoginClientInfo): Promise<BasicSession> => {
     if (!this.opts?.login) throw "Auth login config missing";
     const { responseThrottle = 500 } = this.opts;
 
@@ -219,6 +219,26 @@ export class AuthHandler {
       return result;
     }, responseThrottle);
 
+  };
+
+  loginThrottledAndSetCookie = async (req: ExpressReq, res: ExpressRes, loginParams: LoginParams) => {
+    const start = Date.now();
+    const { sid, expires } = await this.loginThrottled(loginParams, getLoginClientInfo({ httpReq: req })) || {};
+    await this.prostgles.opts.onLog?.({
+      type: "auth",
+      command: "login",
+      duration: Date.now() - start,
+      sid,
+      socketId: undefined,
+    });
+    
+    if (sid) {
+
+      this.setCookieAndGoToReturnURLIFSet({ sid, expires }, { req, res });
+
+    } else {
+      throw ("Internal error: no user or session")
+    }
   }
 
 
@@ -400,50 +420,6 @@ export class AuthHandler {
 
       }
     }
-
-    
-    /**
-     * ARE THESE NEEDED?!
-    */
-    // const {
-    //   register,
-    //   logout
-    // } = this.opts;
-    // const login = this.loginThrottled
-    // let handlers: {
-    //   name: keyof Omit<AuthSocketSchema, "user">;
-    //   ch: string;
-    //   func: (...args: any) => any;
-    // }[] = [
-    //   { func: (params: any, dbo: any, db: DB, client: LoginClientInfo) => register?.(params, dbo, db), ch: CHANNELS.REGISTER, name: "register" as keyof Omit<AuthSocketSchema, "user"> },
-    //   { func: (params: any, dbo: any, db: DB, client: LoginClientInfo) => login(params, client), ch: CHANNELS.LOGIN, name: "login" as keyof Omit<AuthSocketSchema, "user"> },
-    //   { func: (params: any, dbo: any, db: DB, client: LoginClientInfo) => logout?.(this.getSID({ socket }), dbo, db), ch: CHANNELS.LOGOUT, name: "logout"  as keyof Omit<AuthSocketSchema, "user">}
-    // ].filter(h => h.func);
-
-
-    // handlers.map(({ func, ch, name }) => {
-    //   auth[name] = true;
-
-    //   socket.removeAllListeners(ch)
-    //   socket.on(ch, async (params: any, cb = (..._callback: any) => { /** Empty */ }) => {
-
-    //     try {
-    //       if (!socket) throw "socket missing??!!";
-    //       const id_address = (socket as any)?.conn?.remoteAddress;
-    //       const user_agent = socket.handshake?.headers?.["user-agent"];
-    //       const res = await func(params, this.dbo as any, this.db, { user_agent, id_address });
-    //       if (name === "login" && res && res.sid) {
-    //         /* TODO: Re-send schema to client */
-    //       }
-
-    //       cb(null, true);
-
-    //     } catch (err) {
-    //       console.error(name + " err", err);
-    //       cb(err)
-    //     }
-    //   });
-    // });
 
     const userData = await this.getClientInfo(clientReq);
     const auth: AuthSocketSchema = {

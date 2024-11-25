@@ -1,7 +1,7 @@
 import { RequestHandler } from "express";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { AUTH_ROUTES_AND_PARAMS, AuthHandler, getLoginClientInfo, HTTPCODES } from "./AuthHandler";
-import { AuthClientRequest, ExpressReq, ExpressRes } from "./AuthTypes";
+import { AuthClientRequest, ExpressReq, ExpressRes, LoginParams } from "./AuthTypes";
 import { setAuthProviders, upsertNamedExpressMiddleware } from "./setAuthProviders";
 
 export async function setupAuthRoutes(this: AuthHandler) {
@@ -74,22 +74,28 @@ export async function setupAuthRoutes(this: AuthHandler) {
 
   app.post(AUTH_ROUTES_AND_PARAMS.login, async (req: ExpressReq, res: ExpressRes) => {
     try {
-      const start = Date.now();
-      const { sid, expires } = await this.loginThrottled(req.body || {}, getLoginClientInfo({ httpReq: req })) || {};
-      await this.prostgles.opts.onLog?.({
-        type: "auth",
-        command: "login",
-        duration: Date.now() - start,
-        sid,
-        socketId: undefined,
-      })
-      if (sid) {
+      // const start = Date.now();
+      const loginParams: LoginParams = {
+        type: "username",
+        ...req.body,
+      };
 
-        this.setCookieAndGoToReturnURLIFSet({ sid, expires }, { req, res });
+      await this.loginThrottledAndSetCookie(req, res, loginParams);
+      // const { sid, expires } = await this.loginThrottled(loginParams, getLoginClientInfo({ httpReq: req })) || {};
+      // await this.prostgles.opts.onLog?.({
+      //   type: "auth",
+      //   command: "login",
+      //   duration: Date.now() - start,
+      //   sid,
+      //   socketId: undefined,
+      // })
+      // if (sid) {
 
-      } else {
-        throw ("Internal error: no user or session")
-      }
+      //   this.setCookieAndGoToReturnURLIFSet({ sid, expires }, { req, res });
+
+      // } else {
+      //   throw ("Internal error: no user or session")
+      // }
     } catch (err) {
       console.log(err)
       res.status(HTTPCODES.AUTH_ERROR).json({ err });

@@ -10,6 +10,7 @@ import { AUTH_ROUTES_AND_PARAMS, AuthHandler } from "./AuthHandler";
 import type e from "express";
 import { RequestHandler } from "express";
 import { removeExpressRouteByName } from "../FileManager/FileManager";
+import { getErrorAsObject } from "../DboBuilder/dboBuilderUtils";
 
 
 export const upsertNamedExpressMiddleware = (app: e.Express, handler: RequestHandler, name: string) => {
@@ -76,7 +77,7 @@ export function setAuthProviders (this: AuthHandler, { registrations, app }: Req
         async (accessToken, refreshToken, profile, done) => {
           // This callback is where you would normally store or retrieve user info from the database
           await onRegister({ provider: providerName as "google", accessToken, refreshToken, profile });
-          return done(null, profile);
+          return done(null, profile, { accessToken, refreshToken, profile });
         }
       )
     );
@@ -87,9 +88,15 @@ export function setAuthProviders (this: AuthHandler, { registrations, app }: Req
 
     app.get(callbackPath,
       passport.authenticate(providerName, { session: false, failureRedirect: "/login" }),
-      (req, res) => {
-        // Successful authentication, redirect to main page
-        res.redirect("/");
+      async (req, res) => {
+        this.loginThrottledAndSetCookie(req, res, { type: "provider", provider: providerName, ...req.authInfo as any })
+          .then(() => {
+            // Successful authentication, redirect to main page
+            res.redirect("/");
+          })
+          .catch((e: any) => {
+            res.status(500).json(getErrorAsObject(e));
+          });
       }
     );
   });

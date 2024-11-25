@@ -1,5 +1,5 @@
 import { Express, NextFunction, Request, Response } from "express";
-import { AnyObject, EmailSignupType, FieldFilter, UserLike } from "prostgles-types";
+import { AnyObject, FieldFilter, UserLike } from "prostgles-types";
 import { DB } from "../Prostgles";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
@@ -73,14 +73,7 @@ type RegistrationProviders = ThirdPartyProviders & {
   };
 }
 
-type RegistrationData = 
-| {
-  provider: "email";
-  profile: {
-    username: string;
-    password: string;
-  }
-} 
+export type AuthProviderUserData = 
 | {
   provider: "google";
   profile: GoogleProfile;
@@ -105,6 +98,16 @@ type RegistrationData =
   accessToken: string; 
   refreshToken: string;
 }
+
+export type RegistrationData = 
+| {
+  provider: "email";
+  profile: {
+    username: string;
+    password: string;
+  }
+} 
+| AuthProviderUserData;
 
 export type AuthRegistrationConfig = RegistrationProviders & {
   /**
@@ -218,7 +221,7 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
    */
   getUser: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB, client: AuthClientRequest & LoginClientInfo) => Awaitable<AuthResult<SUser>>;
 
-  login?: (params: AnyObject, dbo: DBOFullyTyped<S>, db: DB, client: LoginClientInfo) => Awaitable<BasicSession> | BasicSession;
+  login?: (params: LoginParams, dbo: DBOFullyTyped<S>, db: DB, client: LoginClientInfo) => Awaitable<BasicSession> | BasicSession;
   logout?: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<any>;
 
   /**
@@ -228,3 +231,8 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
     getSession: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession>
   }
 }
+
+
+export type LoginParams = 
+| { type: "username"; username: string; password: string; [key: string]: any }
+| ({ type: "provider"; } & AuthProviderUserData)
