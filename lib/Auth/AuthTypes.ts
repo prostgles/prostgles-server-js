@@ -109,7 +109,7 @@ export type RegistrationData =
 } 
 | AuthProviderUserData;
 
-export type AuthRegistrationConfig = RegistrationProviders & {
+export type AuthRegistrationConfig<S> = RegistrationProviders & {
   /**
    * Required for social login callback
    */
@@ -123,12 +123,12 @@ export type AuthRegistrationConfig = RegistrationProviders & {
   /**
    * Used to stop abuse
    */
-  onProviderLoginStart: (data: { provider: IdentityProvider; req: ExpressReq, res: ExpressRes}, client: LoginClientInfo) => Promise<{ error: string; } | { ok: true; }>;
+  onProviderLoginStart: (data: { provider: IdentityProvider; dbo: DBOFullyTyped<S>, db: DB; req: ExpressReq, res: ExpressRes; clientInfo: LoginClientInfo }) => Promise<{ error: string; } | { ok: true; }>;
 
   /**
    * Used to identify abuse
    */
-  onProviderLoginFail: (data: { provider: IdentityProvider; error: any, req: ExpressReq, res: ExpressRes}, client: LoginClientInfo) => void | Promise<void>;
+  onProviderLoginFail: (data: { provider: IdentityProvider; error: any; dbo: DBOFullyTyped<S>, db: DB; req: ExpressReq, res: ExpressRes; clientInfo: LoginClientInfo }) => void | Promise<void>;
 };
 
 export type SessionUser<ServerUser extends UserLike = UserLike, ClientUser extends UserLike = UserLike> = {
@@ -223,7 +223,7 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
       check: (magicId: string, dbo: DBOFullyTyped<S>, db: DB, client: LoginClientInfo) => Awaitable<BasicSession | undefined>;
     }
 
-    registrations?: AuthRegistrationConfig;
+    registrations?: AuthRegistrationConfig<S>;
   }
 
   /**
