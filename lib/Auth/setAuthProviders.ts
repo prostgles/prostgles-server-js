@@ -87,11 +87,14 @@ export function setAuthProviders (this: AuthHandler, { registrations, app }: Req
     );
 
     app.get(callbackPath,
-      passport.authenticate(providerName, { session: false, failureRedirect: "/login" }),
+      passport.authenticate(providerName, {
+        session: false, 
+        failureRedirect: "/login",
+        failWithError: true,
+      }, console.log),
       async (req, res) => {
         this.loginThrottledAndSetCookie(req, res, { type: "provider", provider: providerName, ...req.authInfo as any })
           .then(() => {
-            // Successful authentication, redirect to main page
             res.redirect("/");
           })
           .catch((e: any) => {
