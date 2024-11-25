@@ -6,7 +6,7 @@ import { Strategy as GitHubStrategy } from "passport-github2";
 import { Strategy as MicrosoftStrategy } from "passport-microsoft";
 import { Strategy as FacebookStrategy } from "passport-facebook";
 import { AuthSocketSchema, getKeys, isDefined, isEmpty } from "prostgles-types";
-import { AUTH_ROUTES_AND_PARAMS, AuthHandler } from "./AuthHandler";
+import { AUTH_ROUTES_AND_PARAMS, AuthHandler, getLoginClientInfo } from "./AuthHandler";
 import type e from "express";
 import { RequestHandler } from "express";
 import { removeExpressRouteByName } from "../FileManager/FileManager";
@@ -22,7 +22,7 @@ export const upsertNamedExpressMiddleware = (app: e.Express, handler: RequestHan
 
 export function setAuthProviders (this: AuthHandler, { registrations, app }: Required<Auth>["expressConfig"]) {
   if(!registrations) return;
-  const { email, onRegister, onProviderLoginFail, websiteUrl, ...providers } = registrations;
+  const { email, onRegister, onProviderLoginFail, onProviderLoginStart, websiteUrl, ...providers } = registrations;
   if(email){
     app.post(AUTH_ROUTES_AND_PARAMS.emailSignup, async (req, res) => {
       const { username, password } = req.body;
@@ -88,32 +88,41 @@ export function setAuthProviders (this: AuthHandler, { registrations, app }: Req
 
     app.get(
       callbackPath,
-      (req, res) => {
-        
-        passport.authenticate(
-          providerName, 
-          {
-            session: false, 
-            failureRedirect: "/login",
-            failWithError: true,
-          },
-          async (error: any, profile: any, authInfo: any) => {
-            if(error){
-              await onProviderLoginFail({ provider: providerName, error, req, res });
-              res.status(500).json({
-                error: "Failed to login with provider",
-              });
-            } else {
-              this.loginThrottledAndSetCookie(req, res, { type: "provider", provider: providerName, ...authInfo })
-              .then(() => {
-                res.redirect("/");
-              })
-              .catch((e: any) => {
-                res.status(500).json(getErrorAsObject(e));
-              });
-            }
-          } 
-        )(req, res);
+      async (req, res) => {
+        try {
+          const startCheck = await onProviderLoginStart({ provider: providerName, req, res }, getLoginClientInfo({ httpReq: req }));
+          if("error" in startCheck){
+            res.status(500).json({ error: startCheck.error });
+            return;
+          }
+          passport.authenticate(
+            providerName, 
+            {
+              session: false, 
+              failureRedirect: "/login",
+              failWithError: true,
+            },
+            async (error: any, _profile: any, authInfo: any) => {
+              if(error){
+                await onProviderLoginFail({ provider: providerName, error, req, res });
+                res.status(500).json({
+                  error: "Failed to login with provider",
+                });
+              } else {
+                this.loginThrottledAndSetCookie(req, res, { type: "provider", provider: providerName, ...authInfo })
+                .then(() => {
+                  res.redirect("/");
+                })
+                .catch((e: any) => {
+                  res.status(500).json(getErrorAsObject(e));
+                });
+              }
+            } 
+          )(req, res);
+
+        } catch (e) {
+          res.status(500).json({ error: "Something went wrong" });
+        }
       }
     );
 
@@ -125,7 +134,7 @@ export function getProviders(this: AuthHandler): AuthSocketSchema["providers"] |
   if(!registrations) return undefined;
   const { 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    email, websiteUrl, onRegister, onProviderLoginFail,
+    email, websiteUrl, onRegister, onProviderLoginFail, onProviderLoginStart,
     ...providers 
   } = registrations;
   if(isEmpty(providers)) return undefined;

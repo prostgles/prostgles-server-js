@@ -205,6 +205,7 @@ function dd(){
 						clientID: "GITHUB_CLIENT_ID",
 						clientSecret: "GITHUB"
 					},
+					onProviderLoginStart: async () => ({ ok: true }),
 					onProviderLoginFail: console.error,
 					onRegister: console.log
 				},

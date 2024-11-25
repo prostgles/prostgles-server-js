@@ -121,6 +121,11 @@ export type AuthRegistrationConfig = RegistrationProviders & {
   onRegister: (data: RegistrationData) => void | Promise<any>;
 
   /**
+   * Used to stop abuse
+   */
+  onProviderLoginStart: (data: { provider: IdentityProvider; req: ExpressReq, res: ExpressRes}, client: LoginClientInfo) => Promise<{ error: string; } | { ok: true; }>;
+  
+  /**
    * Used to identify abuse
    */
   onProviderLoginFail: (data: { provider: IdentityProvider; error: any, req: ExpressReq, res: ExpressRes}) => void | Promise<void>;
