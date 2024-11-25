@@ -119,8 +119,8 @@ export async function setupAuthRoutes(this: AuthHandler) {
       const returnURL = this.getReturnUrl(req);
       
       if(this.matchesRoute(AUTH_ROUTES_AND_PARAMS.logoutGetPath, req.path)){
-        onLogout(req, res);
-        next();
+        await onLogout(req, res);
+        // next();
         return;
       }
 
