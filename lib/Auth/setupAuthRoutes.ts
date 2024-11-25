@@ -13,7 +13,7 @@ export async function setupAuthRoutes(this: AuthHandler) {
     throw "Invalid auth: Provide { sidKeyName: string } ";
   }
 
-  if ((AUTH_ROUTES_AND_PARAMS.sidKeyName as any) === "sid") {
+  if (this.sidKeyName === "sid") {
     throw "sidKeyName cannot be 'sid' due to collision with socket.io";
   }
 
@@ -74,28 +74,12 @@ export async function setupAuthRoutes(this: AuthHandler) {
 
   app.post(AUTH_ROUTES_AND_PARAMS.login, async (req: ExpressReq, res: ExpressRes) => {
     try {
-      // const start = Date.now();
       const loginParams: LoginParams = {
         type: "username",
         ...req.body,
       };
 
       await this.loginThrottledAndSetCookie(req, res, loginParams);
-      // const { sid, expires } = await this.loginThrottled(loginParams, getLoginClientInfo({ httpReq: req })) || {};
-      // await this.prostgles.opts.onLog?.({
-      //   type: "auth",
-      //   command: "login",
-      //   duration: Date.now() - start,
-      //   sid,
-      //   socketId: undefined,
-      // })
-      // if (sid) {
-
-      //   this.setCookieAndGoToReturnURLIFSet({ sid, expires }, { req, res });
-
-      // } else {
-      //   throw ("Internal error: no user or session")
-      // }
     } catch (err) {
       console.log(err)
       res.status(HTTPCODES.AUTH_ERROR).json({ err });
@@ -103,75 +87,79 @@ export async function setupAuthRoutes(this: AuthHandler) {
 
   });
 
-  if (AUTH_ROUTES_AND_PARAMS.logoutGetPath && this.opts.logout) {
-    app.get(AUTH_ROUTES_AND_PARAMS.logoutGetPath, async (req: ExpressReq, res: ExpressRes) => {
-      const sid = this.validateSid(req?.cookies?.[AUTH_ROUTES_AND_PARAMS.sidKeyName]);
-      if (sid) {
-        try {
-          await this.throttledFunc(() => {
-            return this.opts!.logout!(req?.cookies?.[AUTH_ROUTES_AND_PARAMS.sidKeyName], this.dbo as any, this.db);
-          })
-        } catch (err) {
-          console.error(err);
-        }
-      }
-      res.redirect("/")
-    });
-  }
-
-  if (Array.isArray(publicRoutes)) {
-
-    /* Redirect if not logged in and requesting non public content */
-    app.get(AUTH_ROUTES_AND_PARAMS.catchAll, async (req: ExpressReq, res: ExpressRes, next) => {
-
-      const clientReq: AuthClientRequest = { httpReq: req };
-      const getUser = this.getUser;
-      if(this.prostgles.restApi){
-        if(Object.values(this.prostgles.restApi.routes).some(restRoute => this.matchesRoute(restRoute.split("/:")[0], req.path))){
-          next();
-          return;
-        }
-      }
+  const onLogout = async (req: ExpressReq, res: ExpressRes) => {
+    const sid = this.validateSid(req?.cookies?.[this.sidKeyName]);
+    if (sid) {
       try {
-        const returnURL = this.getReturnUrl(req);
+        await this.throttledFunc(() => {
+          return this.opts?.logout?.(req?.cookies?.[this.sidKeyName], this.dbo as any, this.db);
+        })
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    res.redirect("/")
+  }
+  
+  // app.get(AUTH_ROUTES_AND_PARAMS.logoutGetPath, onLogout);
 
-        if(this.matchesRoute(AUTH_ROUTES_AND_PARAMS.loginWithProvider, req.path)){
-          next();
-          return;
-        }
-        /**
-         * Requesting a User route
-         */
-        if (this.isUserRoute(req.path)) {
 
-          /* Check auth. Redirect to login if unauthorized */
-          const u = await getUser(clientReq);
-          if (!u) {
-            res.redirect(`${AUTH_ROUTES_AND_PARAMS.login}?returnURL=${encodeURIComponent(req.originalUrl)}`);
-            return;
-          }
+  /* Redirect if not logged in and requesting non public content */
+  app.get(AUTH_ROUTES_AND_PARAMS.catchAll, async (req: ExpressReq, res: ExpressRes, next) => {
 
-          /* If authorized and going to returnUrl then redirect. Otherwise serve file */
-        } else if (returnURL && (await getUser(clientReq))) {
-
-          res.redirect(returnURL);
-          return;
-
-          /** If Logged in and requesting login then redirect to main page */
-        } else if (this.matchesRoute(AUTH_ROUTES_AND_PARAMS.login, req.path) && (await getUser(clientReq))) {
-
-          res.redirect("/");
-          return;
-        }
-
-        onGetRequestOK?.(req, res, { getUser: () => getUser(clientReq), dbo: this.dbo as DBOFullyTyped, db: this.db })
-
-      } catch (error) {
-        console.error(error);
-        const errorMessage = typeof error === "string" ? error : error instanceof Error ? error.message : "";
-        res.status(HTTPCODES.AUTH_ERROR).json({ msg: "Something went wrong when processing your request" + (errorMessage? (": " + errorMessage) : "") });
+    const clientReq: AuthClientRequest = { httpReq: req };
+    const getUser = this.getUser;
+    if(this.prostgles.restApi){
+      if(Object.values(this.prostgles.restApi.routes).some(restRoute => this.matchesRoute(restRoute.split("/:")[0], req.path))){
+        next();
+        return;
+      }
+    }
+    try {
+      const returnURL = this.getReturnUrl(req);
+      
+      if(this.matchesRoute(AUTH_ROUTES_AND_PARAMS.logoutGetPath, req.path)){
+        onLogout(req, res);
+        next();
+        return;
       }
 
-    });
-  }
+      if(this.matchesRoute(AUTH_ROUTES_AND_PARAMS.loginWithProvider, req.path)){
+        next();
+        return;
+      }
+      /**
+       * Requesting a User route
+       */
+      if (this.isUserRoute(req.path)) {
+
+        /* Check auth. Redirect to login if unauthorized */
+        const u = await getUser(clientReq);
+        if (!u) {
+          res.redirect(`${AUTH_ROUTES_AND_PARAMS.login}?returnURL=${encodeURIComponent(req.originalUrl)}`);
+          return;
+        }
+
+        /* If authorized and going to returnUrl then redirect. Otherwise serve file */
+      } else if (returnURL && (await getUser(clientReq))) {
+
+        res.redirect(returnURL);
+        return;
+
+        /** If Logged in and requesting login then redirect to main page */
+      } else if (this.matchesRoute(AUTH_ROUTES_AND_PARAMS.login, req.path) && (await getUser(clientReq))) {
+
+        res.redirect("/");
+        return;
+      }
+
+      onGetRequestOK?.(req, res, { getUser: () => getUser(clientReq), dbo: this.dbo as DBOFullyTyped, db: this.db })
+
+    } catch (error) {
+      console.error(error);
+      const errorMessage = typeof error === "string" ? error : error instanceof Error ? error.message : "";
+      res.status(HTTPCODES.AUTH_ERROR).json({ msg: "Something went wrong when processing your request" + (errorMessage? (": " + errorMessage) : "") });
+    }
+
+  });
 }

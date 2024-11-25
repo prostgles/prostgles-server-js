@@ -213,7 +213,7 @@ export class AuthHandler {
         throw err
       }
       if(result && result.expires < Date.now()){
-        throw { msg: "auth.login() is returning an expired session. Can only login with a session.expires greater than Date.now()"}
+        throw { msg: "auth.login() is returning an expired session. Can only login with a session.expires greater than Date.now()" }
       }
 
       return result;
