@@ -113,9 +113,6 @@ export function setAuthProviders (this: AuthHandler, { registrations, app }: Req
                 });
               } else {
                 this.loginThrottledAndSetCookie(req, res, { type: "provider", provider: providerName, ...authInfo })
-                .then(() => {
-                  res.redirect("/");
-                })
                 .catch((e: any) => {
                   res.status(500).json(getErrorAsObject(e));
                 });

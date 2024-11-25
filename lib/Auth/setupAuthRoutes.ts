@@ -101,9 +101,6 @@ export async function setupAuthRoutes(this: AuthHandler) {
     res.redirect("/")
   }
   
-  // app.get(AUTH_ROUTES_AND_PARAMS.logoutGetPath, onLogout);
-
-
   /* Redirect if not logged in and requesting non public content */
   app.get(AUTH_ROUTES_AND_PARAMS.catchAll, async (req: ExpressReq, res: ExpressRes, next) => {
 
@@ -120,7 +117,6 @@ export async function setupAuthRoutes(this: AuthHandler) {
       
       if(this.matchesRoute(AUTH_ROUTES_AND_PARAMS.logoutGetPath, req.path)){
         await onLogout(req, res);
-        // next();
         return;
       }
 
