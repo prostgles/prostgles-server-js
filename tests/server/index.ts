@@ -174,7 +174,9 @@ function dd(){
 				}
 				return undefined;
 			},
-			login: async ({ username, password } = {}) => {
+			login: async (loginData) => {
+				if(loginData.type !== "username") throw "Only username login is supported";
+				const { username, password } = loginData;
 				const u = users.find(u => u.username === username && u.password === password);
 				if(!u) throw "something went wrong: " + JSON.stringify({ username, password });
 				let s = sessions.find(s => s.user_id === u.id)
@@ -203,6 +205,7 @@ function dd(){
 						clientID: "GITHUB_CLIENT_ID",
 						clientSecret: "GITHUB"
 					},
+					onProviderLoginFail: console.error,
 					onRegister: console.log
 				},
 			}

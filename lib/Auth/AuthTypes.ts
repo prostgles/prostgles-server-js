@@ -1,5 +1,5 @@
 import { Express, NextFunction, Request, Response } from "express";
-import { AnyObject, FieldFilter, UserLike } from "prostgles-types";
+import { AnyObject, FieldFilter, IdentityProvider, UserLike } from "prostgles-types";
 import { DB } from "../Prostgles";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
@@ -119,6 +119,11 @@ export type AuthRegistrationConfig = RegistrationProviders & {
    * Do something with the registered user
    */
   onRegister: (data: RegistrationData) => void | Promise<any>;
+
+  /**
+   * Used to identify abuse
+   */
+  onProviderLoginFail: (data: { provider: IdentityProvider; error: any, req: ExpressReq, res: ExpressRes}) => void | Promise<void>;
 };
 
 export type SessionUser<ServerUser extends UserLike = UserLike, ClientUser extends UserLike = UserLike> = {

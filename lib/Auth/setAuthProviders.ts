@@ -22,7 +22,7 @@ export const upsertNamedExpressMiddleware = (app: e.Express, handler: RequestHan
 
 export function setAuthProviders (this: AuthHandler, { registrations, app }: Required<Auth>["expressConfig"]) {
   if(!registrations) return;
-  const { email, onRegister, websiteUrl, ...providers } = registrations;
+  const { email, onRegister, onProviderLoginFail, websiteUrl, ...providers } = registrations;
   if(email){
     app.post(AUTH_ROUTES_AND_PARAMS.emailSignup, async (req, res) => {
       const { username, password } = req.body;
@@ -86,22 +86,37 @@ export function setAuthProviders (this: AuthHandler, { registrations, app }: Req
       passport.authenticate(providerName, authOpts ?? {})
     );
 
-    app.get(callbackPath,
-      passport.authenticate(providerName, {
-        session: false, 
-        failureRedirect: "/login",
-        failWithError: true,
-      }, console.log),
-      async (req, res) => {
-        this.loginThrottledAndSetCookie(req, res, { type: "provider", provider: providerName, ...req.authInfo as any })
-          .then(() => {
-            res.redirect("/");
-          })
-          .catch((e: any) => {
-            res.status(500).json(getErrorAsObject(e));
-          });
+    app.get(
+      callbackPath,
+      (req, res) => {
+        
+        passport.authenticate(
+          providerName, 
+          {
+            session: false, 
+            failureRedirect: "/login",
+            failWithError: true,
+          },
+          async (error: any, profile: any, authInfo: any) => {
+            if(error){
+              await onProviderLoginFail({ provider: providerName, error, req, res });
+              res.status(500).json({
+                error: "Failed to login with provider",
+              });
+            } else {
+              this.loginThrottledAndSetCookie(req, res, { type: "provider", provider: providerName, ...authInfo })
+              .then(() => {
+                res.redirect("/");
+              })
+              .catch((e: any) => {
+                res.status(500).json(getErrorAsObject(e));
+              });
+            }
+          } 
+        )(req, res);
       }
     );
+
   });
 }
 
@@ -110,7 +125,7 @@ export function getProviders(this: AuthHandler): AuthSocketSchema["providers"] |
   if(!registrations) return undefined;
   const { 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    email, websiteUrl, onRegister, 
+    email, websiteUrl, onRegister, onProviderLoginFail,
     ...providers 
   } = registrations;
   if(isEmpty(providers)) return undefined;
