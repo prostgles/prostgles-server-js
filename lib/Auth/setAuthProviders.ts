@@ -86,10 +86,10 @@ export function setAuthProviders (this: AuthHandler, { registrations, app }: Req
     );
 
     app.get(callbackPath,
-      passport.authenticate(providerName, { failureRedirect: '/' }),
+      passport.authenticate(providerName, { session: false, failureRedirect: "/login" }),
       (req, res) => {
         // Successful authentication, redirect to main page
-        res.redirect('/');
+        res.redirect("/");
       }
     );
   });
