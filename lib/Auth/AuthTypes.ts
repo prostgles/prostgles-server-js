@@ -124,11 +124,11 @@ export type AuthRegistrationConfig = RegistrationProviders & {
    * Used to stop abuse
    */
   onProviderLoginStart: (data: { provider: IdentityProvider; req: ExpressReq, res: ExpressRes}, client: LoginClientInfo) => Promise<{ error: string; } | { ok: true; }>;
-  
+
   /**
    * Used to identify abuse
    */
-  onProviderLoginFail: (data: { provider: IdentityProvider; error: any, req: ExpressReq, res: ExpressRes}) => void | Promise<void>;
+  onProviderLoginFail: (data: { provider: IdentityProvider; error: any, req: ExpressReq, res: ExpressRes}, client: LoginClientInfo) => void | Promise<void>;
 };
 
 export type SessionUser<ServerUser extends UserLike = UserLike, ClientUser extends UserLike = UserLike> = {

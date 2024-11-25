@@ -90,7 +90,8 @@ export function setAuthProviders (this: AuthHandler, { registrations, app }: Req
       callbackPath,
       async (req, res) => {
         try {
-          const startCheck = await onProviderLoginStart({ provider: providerName, req, res }, getLoginClientInfo({ httpReq: req }));
+          const clientInfo = getLoginClientInfo({ httpReq: req });
+          const startCheck = await onProviderLoginStart({ provider: providerName, req, res }, clientInfo);
           if("error" in startCheck){
             res.status(500).json({ error: startCheck.error });
             return;
@@ -104,7 +105,7 @@ export function setAuthProviders (this: AuthHandler, { registrations, app }: Req
             },
             async (error: any, _profile: any, authInfo: any) => {
               if(error){
-                await onProviderLoginFail({ provider: providerName, error, req, res });
+                await onProviderLoginFail({ provider: providerName, error, req, res }, clientInfo);
                 res.status(500).json({
                   error: "Failed to login with provider",
                 });
