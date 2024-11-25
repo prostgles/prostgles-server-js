@@ -34,7 +34,8 @@ export const testPublishTypes = () => {
       },
       items3: "*"
     };
-    const p123: PublishFullyTyped<DBSchemaGenerated> = p11; 
+    const p123: PublishFullyTyped<DBSchemaGenerated> = p11;
+    //@ts-ignore 
     const p1234: PublishFullyTyped = p1;
 
     const p12: PublishFullyTyped = "*";

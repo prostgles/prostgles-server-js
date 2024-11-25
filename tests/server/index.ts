@@ -198,7 +198,7 @@ function dd(){
 					res.sendFile(path.join(__dirname, '../../index.html'));
 				},
 				registrations: {
-					websiteUrl: "http://localhost:3000",
+					websiteUrl: "http://localhost:3001",
 					github: {
 						clientID: "GITHUB_CLIENT_ID",
 						clientSecret: "GITHUB"
@@ -247,7 +247,7 @@ function dd(){
 		],
 		onReady: async ({ dbo, db }) => {
 			log("prostgles onReady");
-
+			
 			try {
 				
 				if(isClientTest){

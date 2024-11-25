@@ -154,21 +154,18 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
    */
   responseThrottle?: number;
 
+  /**
+   * Will setup auth routes 
+   *  /login
+   *  /logout
+   *  /magic-link/:id
+   */
   expressConfig?: {
+
     /**
      * Express app instance. If provided Prostgles will attempt to set sidKeyName to user cookie
      */
     app: Express;
-
-    /**
-     * Used in allowing logging in through express. Defaults to /login
-     */
-    loginRoute?: string;
-
-    /**
-     * Used in allowing logging out through express. Defaults to /logout
-     */
-    logoutGetPath?: string;
 
     /**
      * Options used in setting the cookie after a successful login
@@ -203,20 +200,9 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
     ) => any;
 
     /**
-     * Name of get url parameter used in redirecting user after successful login. 
-     * Defaults to "returnURL"
-     */
-    returnUrlParamName?: string;
-
-    /**
      * If defined, will check the magic link id and log in the user and redirect to the returnUrl if set
      */
     magicLinks?: {
-
-      /**
-       * Will default to /magic-link
-       */
-      route?: string;
 
       /**
        * Used in creating a session/logging in using a magic link

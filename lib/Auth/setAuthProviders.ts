@@ -6,12 +6,13 @@ import { Strategy as GitHubStrategy } from "passport-github2";
 import { Strategy as MicrosoftStrategy } from "passport-microsoft";
 import { Strategy as FacebookStrategy } from "passport-facebook";
 import { AuthSocketSchema, getKeys, isDefined, isEmpty } from "prostgles-types";
+import { AUTH_ROUTES_AND_PARAMS, AuthHandler } from "./AuthHandler";
 
-export const setAuthSignup = ({ registrations, app }: Required<Auth>["expressConfig"]) => {
+export function setAuthProviders (this: AuthHandler, { registrations, app }: Required<Auth>["expressConfig"]) {
   if(!registrations) return;
   const { email, onRegister, websiteUrl, ...providers } = registrations;
   if(email){
-    app.post("/signup", async (req, res) => {
+    app.post(AUTH_ROUTES_AND_PARAMS.emailSignup, async (req, res) => {
       const { username, password } = req.body;
       if(typeof username !== "string" || typeof password !== "string"){
         res.status(400).json({ msg: "Invalid username or password" });
@@ -54,7 +55,7 @@ export const setAuthSignup = ({ registrations, app }: Required<Auth>["expressCon
     providerName,
   }) => {
 
-    const callbackPath = `/auth/${providerName}/callback`;
+    const callbackPath = `${AUTH_ROUTES_AND_PARAMS.loginWithProvider}/${providerName}/callback`;
     passport.use(
       new (strategy as typeof GoogleStrategy)(
         {
@@ -69,7 +70,7 @@ export const setAuthSignup = ({ registrations, app }: Required<Auth>["expressCon
       )
     );
 
-    app.get(`/auth/${providerName}`,
+    app.get(`${AUTH_ROUTES_AND_PARAMS.loginWithProvider}/${providerName}`,
       passport.authenticate(providerName, authOpts ?? {})
     );
 
@@ -83,7 +84,8 @@ export const setAuthSignup = ({ registrations, app }: Required<Auth>["expressCon
   });
 }
 
-export const getProviders = (registrations: Required<Auth>["expressConfig"]["registrations"]): AuthSocketSchema["providers"] | undefined => {
+export function getProviders(this: AuthHandler): AuthSocketSchema["providers"] | undefined {
+  const { registrations } = this.opts?.expressConfig ?? {}
   if(!registrations) return undefined;
   const { 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -96,7 +98,7 @@ export const getProviders = (registrations: Required<Auth>["expressConfig"]["reg
   getKeys(providers).forEach(providerName => {
     if(providers[providerName]?.clientID){
       result[providerName] = {
-        url: `/auth/${providerName}`,
+        url: `${AUTH_ROUTES_AND_PARAMS.loginWithProvider}/${providerName}`,
       }
     }
   });

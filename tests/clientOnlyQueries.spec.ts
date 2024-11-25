@@ -8,6 +8,12 @@ export const clientOnlyQueries = async (db: DBHandlerClient, auth: AuthHandler, 
 
   await describe("Client only queries", async (t) => {
 
+    // await test("Social auth redirect routes work", async ( ) => {
+    //   assert.equal(!!auth.login.withProvider.github, true);
+    //   const response = await fetch("http://localhost:3001/auth/github");
+    //   assert.equal(response.status, 302);
+    // });
+
     await test("SQL Stream more than 1k records", async ( ) => {
       const expectedRowCount = 2e3;
       await tryRunP("", async (resolve, reject) => {
@@ -266,6 +272,7 @@ export const clientOnlyQueries = async (db: DBHandlerClient, auth: AuthHandler, 
 
     await test("SQL Stream table fields are the same as on default request", async ( ) => {
       await tryRunP("", async (resolve, reject) => {
+        await db.sql!("TRUNCATE planes RESTART IDENTITY CASCADE;", {});
         await db.sql!("INSERT INTO planes (last_updated) VALUES (56789);", {});
         const res = await db.sql!("SELECT * FROM planes", {}, { returnType: "stream" });
         const listener = async (packet: SocketSQLStreamPacket) => { 
@@ -417,6 +424,7 @@ export const clientOnlyQueries = async (db: DBHandlerClient, auth: AuthHandler, 
         const start = Date.now();
     
         await db.planes.delete!();
+        await db.sql!("TRUNCATE planes RESTART IDENTITY CASCADE;", {});
         let inserts = new Array(100).fill(null).map((d, i) => ({ id: i, flight_number: `FN${i}`, x: Math.random(), y: i }));
         await db.planes.insert!(inserts);
       

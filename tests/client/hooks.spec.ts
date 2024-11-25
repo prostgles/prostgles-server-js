@@ -147,10 +147,15 @@ export const clientHooks = async (db: DBHandlerClient, getSocketOptions: (watchS
         expectedRerenders: 3
       });
       assert.equal(results.length, 3);
-      assert.deepStrictEqual(results.slice(0, 2), [
-        { data: undefined, isLoading: true, error: undefined },
+      assert.deepStrictEqual(
+        results[0],
+        { data: undefined, isLoading: true, error: undefined }
+      );
+      /** This fails from time to time */
+      assert.deepStrictEqual(
+        results[1],
         { data: [], error: undefined, isLoading: false },
-      ]);
+      );
       const lastData = results.at(-1)?.data;
       assert.equal(lastData.length, 1);
       const lastDataItem = lastData[0];

@@ -106,10 +106,12 @@ try {
       onReady: async (db, methods, tableSchema, auth, isReconnect) => {
         log(`TEST_NAME: ${TEST_NAME} Started`)
         try {
+          //@ts-ignore
           if(typeof window !== "undefined"){
             const onLog = (...args: any[]) => {
               socket.emit("log", args.map(v => typeof v === "object"? JSON.stringify(v) : v).join(" "));
             }
+            //@ts-ignore
             window.onerror = function myErrorHandler(errorMsg, url, lineNumber) {
               console.error("Error occured: " + errorMsg);
               stopTest({ err: errorMsg });

@@ -5,8 +5,8 @@ import { removeExpressRoute } from "../FileManager/FileManager";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import { Auth, AuthClientRequest, AuthResult, BasicSession, ExpressReq, ExpressRes, LoginClientInfo } from "./AuthTypes"
 import { getSafeReturnURL } from "./getSafeReturnURL";
-import { authInit } from "./authInit";
-import { getProviders } from "./setAuthSignup";
+import { setupAuthRoutes } from "./setupAuthRoutes";
+import { getProviders } from "./setAuthProviders";
 
 export const HTTPCODES = { 
   AUTH_ERROR: 401,
@@ -38,46 +38,34 @@ export const getLoginClientInfo = (req: AuthClientRequest): AuthClientRequest & 
   }
 }
 
+export const AUTH_ROUTES_AND_PARAMS = {
+  login: "/login",
+  loginWithProvider: "/auth",
+  emailSignup: "/register",
+  returnUrlParamName: "returnURL",
+  sidKeyName: "session_id",
+  logoutGetPath: "/logout",
+  magicLinksRoute: "/magic-link",
+  magicLinksExpressRoute: "/magic-link/:id",
+  catchAll: "*",
+} as const;
+
 export class AuthHandler {
   protected prostgles: Prostgles;
   protected opts?: Auth;
   dbo: DBHandlerServer;
   db: DB;
-  sidKeyName?: string;
-
-  routes: {
-    login?: string;
-    returnUrlParamName?: string;
-    logoutGetPath?: string;
-    magicLinks?: {
-      route: string;
-      expressRoute: string;
-    }
-    readonly catchAll: '*';
-  } = {
-    catchAll: "*"
-  }
 
   constructor(prostgles: Prostgles) {
     this.prostgles = prostgles;
     this.opts = prostgles.opts.auth as any;
-    if (prostgles.opts.auth?.expressConfig) {
-      const { magicLinks, returnUrlParamName, loginRoute, logoutGetPath } = prostgles.opts.auth.expressConfig;
-      const magicLinksRoute = magicLinks?.route || "/magic-link"
-      this.routes = {
-        magicLinks: magicLinks? {
-          expressRoute: `${magicLinksRoute}/:id`,
-          route: magicLinksRoute
-        } : undefined,
-        returnUrlParamName: returnUrlParamName || "returnURL",
-        login: loginRoute || "/login",
-        logoutGetPath: logoutGetPath || "/logout",
-        catchAll: "*"
-      }
-    }
     if(!prostgles.dbo || !prostgles.db) throw "dbo or db missing";
     this.dbo = prostgles.dbo;
     this.db = prostgles.db;
+  }
+
+  get sidKeyName() {
+    return this.opts?.sidKeyName ?? AUTH_ROUTES_AND_PARAMS.sidKeyName;
   }
 
   validateSid = (sid: string | undefined) => {
@@ -94,12 +82,11 @@ export class AuthHandler {
   }
 
   isUserRoute = (pathname: string) => {
+    const { login, logoutGetPath, magicLinksRoute, loginWithProvider } = AUTH_ROUTES_AND_PARAMS;
     const pubRoutes = [
       ...this.opts?.expressConfig?.publicRoutes || [],
-    ];
-    if (this.routes?.login) pubRoutes.push(this.routes.login);
-    if (this.routes?.logoutGetPath) pubRoutes.push(this.routes.logoutGetPath);
-    if (this.routes?.magicLinks?.route) pubRoutes.push(this.routes.magicLinks.route);
+      login, logoutGetPath, magicLinksRoute, loginWithProvider,
+    ].filter(publicRoute => publicRoute);
 
     return !pubRoutes.some(publicRoute => {
       return this.matchesRoute(publicRoute, pathname);
@@ -133,7 +120,6 @@ export class AuthHandler {
         ...(this.opts?.expressConfig?.cookieOptions || {}) 
       };
       const cookieData = sid;
-      if(!this.sidKeyName || !this.routes?.returnUrlParamName) throw "sidKeyName or returnURL missing"
       res.cookie(this.sidKeyName, cookieData, cookieOpts);
       const successURL = this.getReturnUrl(req) || "/";
       res.redirect(successURL);
@@ -144,8 +130,8 @@ export class AuthHandler {
   }
 
   getUser = async (clientReq: { httpReq: ExpressReq; }): Promise<AuthResult> => {
-    if(!this.sidKeyName || !this.opts?.getUser) {
-      throw "sidKeyName or this.opts.getUser missing";
+    if(!this.opts?.getUser) {
+      throw "this.opts.getUser missing";
     }
     const sid = clientReq.httpReq?.cookies?.[this.sidKeyName];
     if (!sid) return undefined;
@@ -160,10 +146,10 @@ export class AuthHandler {
     return undefined;
   }
 
-  init = authInit.bind(this);
+  init = setupAuthRoutes.bind(this);
 
   getReturnUrl = (req: ExpressReq) => {
-    const { returnUrlParamName } = this.routes;
+    const { returnUrlParamName } = AUTH_ROUTES_AND_PARAMS;
     if (returnUrlParamName && req?.query?.[returnUrlParamName]) {
       const returnURL = decodeURIComponent(req?.query?.[returnUrlParamName] as string);
       
@@ -174,8 +160,8 @@ export class AuthHandler {
 
   destroy = () => {
     const app = this.opts?.expressConfig?.app;
-    const { login, logoutGetPath, magicLinks } = this.routes;
-    removeExpressRoute(app, [login, logoutGetPath, magicLinks?.expressRoute]);
+    const { login, logoutGetPath, magicLinksExpressRoute, catchAll, loginWithProvider } = AUTH_ROUTES_AND_PARAMS;
+    removeExpressRoute(app, [login, logoutGetPath, magicLinksExpressRoute, catchAll, loginWithProvider]);
   }
 
   throttledFunc = <T>(func: () => Promise<T>, throttle = 500): Promise<T> => {
@@ -246,10 +232,8 @@ export class AuthHandler {
   getSID(localParams: LocalParams): string | undefined {
     if (!this.opts) return undefined;
 
-    const { sidKeyName } = this.opts;
-
-    if (!sidKeyName || !localParams) return undefined;
-
+    if (!localParams) return undefined;
+    const { sidKeyName } = this;
     if (localParams.socket) {
       const { handshake } = localParams.socket;
       const querySid = handshake?.auth?.[sidKeyName] || handshake?.query?.[sidKeyName];
@@ -463,8 +447,8 @@ export class AuthHandler {
 
     const userData = await this.getClientInfo(clientReq);
     const auth: AuthSocketSchema = {
-      providers: getProviders(this.opts?.expressConfig?.registrations),
-      register: this.opts?.expressConfig?.registrations?.email && { type: this.opts?.expressConfig?.registrations?.email.signupType, url: "/register" },
+      providers: getProviders.bind(this)(),
+      register: this.opts?.expressConfig?.registrations?.email && { type: this.opts?.expressConfig?.registrations?.email.signupType, url: AUTH_ROUTES_AND_PARAMS.emailSignup },
       user: userData?.clientUser,
       loginType: this.opts?.expressConfig?.registrations?.email?.signupType,
       pathGuard,
