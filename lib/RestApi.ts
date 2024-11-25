@@ -11,11 +11,18 @@ const jsonParser = bodyParser.json();
 export type ExpressApp = {
   _router?: { 
     stack?: {
+      name: string;
       handle: VoidFunction;
       path: undefined,
       keys?: any[];
       route?: { 
         path?: string;
+        methods?: {
+          get?: boolean;
+          post?: boolean;
+          put?: boolean;
+          delete?: boolean;
+        };
       }
     }[]
   }

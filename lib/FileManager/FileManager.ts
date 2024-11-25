@@ -293,6 +293,17 @@ export const removeExpressRoute = (app: ExpressApp | undefined, routePaths: (str
   }
 }
 
+export const removeExpressRouteByName = (app: ExpressApp | undefined, name: string) => {
+  const routes = app?._router?.stack;
+  if(routes){
+    routes.forEach((route, i) => {
+      if(route.name === name){
+        routes.splice(i, 1);
+      }
+    })
+  }
+}
+
 export const getFileTypeFromFilename = (fileName: string): { mime: ALLOWED_CONTENT_TYPE; ext: ALLOWED_EXTENSION | string } | undefined => {
 
   const nameParts = fileName.split(".");

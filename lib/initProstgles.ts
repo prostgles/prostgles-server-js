@@ -25,7 +25,7 @@ export type OnInitReason =
   } 
   | {
     type: "prgl.update";
-    newOpts: UpdateableOptions;
+    newOpts: Omit<UpdateableOptions, typeof clientOnlyUpdateKeys[number]>;
   }
   | { 
     type: "init" | "prgl.restart" | "TableConfig"
@@ -60,6 +60,8 @@ export type InitResult = {
   restart: () => Promise<InitResult>; 
   options: ProstglesInitOptions;
 }
+
+const clientOnlyUpdateKeys = ["auth"] as const satisfies (keyof UpdateableOptions)[];
 
 export const initProstgles = async function(this: Prostgles, onReady: OnReadyCallbackBasic, reason: OnInitReason): Promise<InitResult> {
   this.loaded = false;
@@ -123,7 +125,9 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
 
     if (this.opts.publish) {
 
-      if (!this.opts.io) console.warn("IO missing. Publish has no effect without io");
+      if (!this.opts.io) {
+        console.warn("IO missing. Publish has no effect without io");
+      }
 
       /* 3.9 Check auth config */
       this.authHandler = new AuthHandler(this as any);
@@ -174,6 +178,7 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
           this.opts[k] = newOpts[k];
         });
 
+
         if("fileTable" in newOpts){
           await this.initFileTable();
         }
@@ -193,7 +198,16 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
           this.authHandler = new AuthHandler(this as any);
           await this.authHandler.init();
         }
-        if(!isEmpty(newOpts)){
+
+        if(isEmpty(newOpts)) return;
+
+        /** 
+         * Some of these changes require clients to reconnect 
+         * While others also affect the server and onReady should be called
+        */
+        if(getKeys(newOpts).every(updatedKey => clientOnlyUpdateKeys.includes(updatedKey as any))){
+          await this.setSocketEvents();
+        } else {
           await this.init(onReady, { type: "prgl.update", newOpts });
         }
       },

@@ -7,6 +7,17 @@ import { Strategy as MicrosoftStrategy } from "passport-microsoft";
 import { Strategy as FacebookStrategy } from "passport-facebook";
 import { AuthSocketSchema, getKeys, isDefined, isEmpty } from "prostgles-types";
 import { AUTH_ROUTES_AND_PARAMS, AuthHandler } from "./AuthHandler";
+import type e from "express";
+import { RequestHandler } from "express";
+import { removeExpressRouteByName } from "../FileManager/FileManager";
+
+
+export const upsertNamedExpressMiddleware = (app: e.Express, handler: RequestHandler, name: string) => {
+  const funcName = name;
+  Object.defineProperty(handler, "name", { value: funcName });
+  removeExpressRouteByName(app, name);
+  app.use(handler);
+}
 
 export function setAuthProviders (this: AuthHandler, { registrations, app }: Required<Auth>["expressConfig"]) {
   if(!registrations) return;
@@ -23,7 +34,7 @@ export function setAuthProviders (this: AuthHandler, { registrations, app }: Req
   }
 
   if(!isEmpty(providers)){
-    app.use(passport.initialize());
+    upsertNamedExpressMiddleware(app, passport.initialize(), "prostglesPassportMiddleware");
   }
 
   ([

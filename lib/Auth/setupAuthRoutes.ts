@@ -1,7 +1,8 @@
+import { RequestHandler } from "express";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { AUTH_ROUTES_AND_PARAMS, AuthHandler, getLoginClientInfo, HTTPCODES } from "./AuthHandler";
 import { AuthClientRequest, ExpressReq, ExpressRes } from "./AuthTypes";
-import { setAuthProviders } from "./setAuthProviders";
+import { setAuthProviders, upsertNamedExpressMiddleware } from "./setAuthProviders";
 
 export async function setupAuthRoutes(this: AuthHandler) {
   if (!this.opts) return;
@@ -29,7 +30,7 @@ export async function setupAuthRoutes(this: AuthHandler) {
   setAuthProviders.bind(this)(expressConfig);
 
   if(use){
-    app.use((req, res, next) => {
+    const prostglesUseMiddleware: RequestHandler = (req, res, next) => {
       use({ 
         req, 
         res, 
@@ -38,7 +39,8 @@ export async function setupAuthRoutes(this: AuthHandler) {
         dbo: this.dbo as DBOFullyTyped, 
         db: this.db,
       })
-    })
+    };
+    upsertNamedExpressMiddleware(app, prostglesUseMiddleware, "prostglesUseMiddleware");
   }
 
   if (magicLinks) {
