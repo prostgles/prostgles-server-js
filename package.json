@@ -1,6 +1,6 @@
 {
   "name": "prostgles-server",
-  "version": "4.2.153",
+  "version": "4.2.154",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -14,7 +14,7 @@
     "lint": "eslint . --ext .ts --quiet --fix",
     "test-only": "cd tests/ && ./test.sh",
     "test-quick": "cd tests/ && ./test.sh -quick",
-    "test": "rm -rf ./node_modules/* && npm i && npm run lint && npm run test-only",
+    "test": "rm -rf ./node_modules/* && rm -rf ./dist/* && npm i && npm run lint && npm run test-only",
     "pushpublish": "npm version patch --git-tag-version false && git push && npm publish"
   },
   "repository": {
