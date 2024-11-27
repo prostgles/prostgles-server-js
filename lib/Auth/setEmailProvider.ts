@@ -67,9 +67,9 @@ export async function setEmailProvider(this: AuthHandler, app: e.Express) {
 }
 
 const checkDmarc = async (websiteUrl: string) => {
-  const { host } = new URL(websiteUrl);
+  const { host, hostname } = new URL(websiteUrl);
   const ignoredHosts = ["localhost", "127.0.0.1"]
-  if(!host || ignoredHosts.includes(host)){
+  if(!hostname || ignoredHosts.includes(hostname)){
     return;
   }
   const dmarc = await promises.resolveTxt(`_dmarc.${host}`);
