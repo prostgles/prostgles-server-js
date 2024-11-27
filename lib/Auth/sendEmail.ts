@@ -1,5 +1,5 @@
 import { Email, SMTPConfig } from "./AuthTypes";
-import nodemailer from "nodemailer";
+import * as nodemailer from "nodemailer";
 import * as aws from "@aws-sdk/client-ses";
 import SESTransport from "nodemailer/lib/ses-transport";
 

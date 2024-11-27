@@ -10,8 +10,6 @@ import { removeExpressRouteByName } from "../FileManager/FileManager";
 import { AUTH_ROUTES_AND_PARAMS, AuthHandler, getLoginClientInfo } from "./AuthHandler";
 import { Auth } from './AuthTypes';
 import { setEmailProvider } from "./setEmailProvider";
-/** For some reason normal import is undefined */
-// const passport = require("passport") as typeof import("passport");
 import * as passport from "passport";
 
 export const upsertNamedExpressMiddleware = (app: e.Express, handler: RequestHandler, name: string) => {
