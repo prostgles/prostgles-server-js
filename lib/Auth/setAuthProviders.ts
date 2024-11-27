@@ -22,7 +22,7 @@ export const upsertNamedExpressMiddleware = (app: e.Express, handler: RequestHan
 
 export async function setAuthProviders (this: AuthHandler, { registrations, app }: Required<Auth>["expressConfig"]) {
   if(!registrations) return;
-  const { onRegister, onProviderLoginFail, onProviderLoginStart, websiteUrl, OAuthProviders } = registrations;
+  const { onProviderLoginFail, onProviderLoginStart, websiteUrl, OAuthProviders } = registrations;
 
   await setEmailProvider.bind(this)(app);
 
@@ -56,7 +56,6 @@ export async function setAuthProviders (this: AuthHandler, { registrations, app 
         },
         async (accessToken, refreshToken, profile, done) => {
           // This callback is where you would normally store or retrieve user info from the database
-          await onRegister({ provider: providerName as "google", accessToken, refreshToken, profile });
           return done(null, profile, { accessToken, refreshToken, profile });
         }
       )
@@ -74,8 +73,8 @@ export async function setAuthProviders (this: AuthHandler, { registrations, app 
           const db = this.db;
           const dbo = this.dbo as any;
           const args = { provider: providerName, req, res, clientInfo, db, dbo };
-          const startCheck = await onProviderLoginStart(args);
-          if("error" in startCheck){
+          const startCheck = await onProviderLoginStart?.(args);
+          if(startCheck && "error" in startCheck){
             res.status(500).json({ error: startCheck.error });
             return;
           }
@@ -88,7 +87,7 @@ export async function setAuthProviders (this: AuthHandler, { registrations, app 
             },
             async (error: any, _profile: any, authInfo: any) => {
               if(error){
-                await onProviderLoginFail({ ...args, error });
+                await onProviderLoginFail?.({ ...args, error });
                 res.status(500).json({
                   error: "Failed to login with provider",
                 });

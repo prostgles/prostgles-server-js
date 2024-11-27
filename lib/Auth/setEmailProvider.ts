@@ -57,7 +57,7 @@ export async function setEmailProvider(this: AuthHandler, app: e.Express) {
     app.get(AUTH_ROUTES_AND_PARAMS.confirmEmailExpressRoute, async (req, res) => {
       const { id } = req.params ?? {};
       try {
-        await email.emailConfirmation?.onConfirmed({ confirmationUrlPath: id });
+        await email.emailConfirmation?.onConfirmed({ confirmationCode: id });
         res.json({ msg: "Email confirmed" });
       } catch (_e) {
         res.status(500).json({ error: "Failed to confirm email" });

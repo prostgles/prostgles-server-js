@@ -95,14 +95,14 @@ type EmailProvider =
   /**
    * Defaults to 8
    */
-  minPasswordLength: number;
+  minPasswordLength?: number;
   /**
    * If provided, the user will be required to confirm their email address
    */
   emailConfirmation?: {
     onSend: (data: { email: string; confirmationUrlPath: string; }) => EmailWithoutTo | Promise<EmailWithoutTo>;
     smtp: SMTPConfig;
-    onConfirmed: (data: { confirmationUrlPath: string; }) => void | Promise<void>;
+    onConfirmed: (data: { confirmationCode: string; }) => void | Promise<void>;
   };
 };
 
@@ -153,19 +153,14 @@ export type AuthRegistrationConfig<S> = {
   websiteUrl: string;
 
   /**
-   * Do something with the registered user
-   */
-  onRegister: (data: RegistrationData) => void | Promise<any>;
-
-  /**
    * Used to stop abuse
    */
-  onProviderLoginStart: (data: { provider: IdentityProvider; dbo: DBOFullyTyped<S>, db: DB; req: ExpressReq, res: ExpressRes; clientInfo: LoginClientInfo }) => Promise<{ error: string; } | { ok: true; }>;
+  onProviderLoginStart?: (data: { provider: IdentityProvider; dbo: DBOFullyTyped<S>, db: DB; req: ExpressReq, res: ExpressRes; clientInfo: LoginClientInfo }) => Promise<{ error: string; } | { ok: true; }>;
 
   /**
    * Used to identify abuse
    */
-  onProviderLoginFail: (data: { provider: IdentityProvider; error: any; dbo: DBOFullyTyped<S>, db: DB; req: ExpressReq, res: ExpressRes; clientInfo: LoginClientInfo }) => void | Promise<void>;
+  onProviderLoginFail?: (data: { provider: IdentityProvider; error: any; dbo: DBOFullyTyped<S>, db: DB; req: ExpressReq, res: ExpressRes; clientInfo: LoginClientInfo }) => void | Promise<void>;
 };
 
 export type SessionUser<ServerUser extends UserLike = UserLike, ClientUser extends UserLike = UserLike> = {

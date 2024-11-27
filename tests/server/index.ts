@@ -209,7 +209,6 @@ function dd(){
 					},
 					onProviderLoginStart: async () => ({ ok: true }),
 					onProviderLoginFail: console.error,
-					onRegister: console.log
 				},
 			}
 		},
