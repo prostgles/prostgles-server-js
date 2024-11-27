@@ -27,7 +27,7 @@ export async function setupAuthRoutes(this: AuthHandler) {
     throw "Invalid or empty string provided within publicRoutes "
   }
 
-  setAuthProviders.bind(this)(expressConfig);
+  await setAuthProviders.bind(this)(expressConfig);
 
   if(use){
     const prostglesUseMiddleware: RequestHandler = (req, res, next) => {

@@ -20,11 +20,11 @@ export const upsertNamedExpressMiddleware = (app: e.Express, handler: RequestHan
   app.use(handler);
 }
 
-export function setAuthProviders (this: AuthHandler, { registrations, app }: Required<Auth>["expressConfig"]) {
+export async function setAuthProviders (this: AuthHandler, { registrations, app }: Required<Auth>["expressConfig"]) {
   if(!registrations) return;
   const { onRegister, onProviderLoginFail, onProviderLoginStart, websiteUrl, OAuthProviders } = registrations;
 
-  setEmailProvider.bind(this)(app);
+  await setEmailProvider.bind(this)(app);
 
   if(!OAuthProviders || isEmpty(OAuthProviders)){
     return;

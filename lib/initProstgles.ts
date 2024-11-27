@@ -130,8 +130,7 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
       }
 
       /* 3.9 Check auth config */
-      this.authHandler = new AuthHandler(this as any);
-      await this.authHandler.init();
+      await this.initAuthHandler();
 
       this.publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods as any, this.opts.publishRawSQL, this.dbo!, this.db, this as any);
       this.dboBuilder.publishParser = this.publishParser;
@@ -194,9 +193,7 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
           await this.refreshDBO();
         }
         if("auth" in newOpts){
-          this.authHandler?.destroy();
-          this.authHandler = new AuthHandler(this as any);
-          await this.authHandler.init();
+          await this.initAuthHandler();
         }
 
         if(isEmpty(newOpts)) return;

@@ -162,8 +162,8 @@ export class AuthHandler {
 
   destroy = () => {
     const app = this.opts?.expressConfig?.app;
-    const { login, logoutGetPath, magicLinksExpressRoute, catchAll, loginWithProvider, emailSignup, magicLinksRoute, confirmEmail } = AUTH_ROUTES_AND_PARAMS;
-    removeExpressRoute(app, [login, logoutGetPath, magicLinksExpressRoute, catchAll, loginWithProvider, emailSignup, magicLinksRoute, confirmEmail]);
+    const { login, logoutGetPath, magicLinksExpressRoute, catchAll, loginWithProvider, emailSignup, magicLinksRoute, confirmEmail, confirmEmailExpressRoute } = AUTH_ROUTES_AND_PARAMS;
+    removeExpressRoute(app, [login, logoutGetPath, magicLinksExpressRoute, catchAll, loginWithProvider, emailSignup, magicLinksRoute, confirmEmail, confirmEmailExpressRoute]);
   }
 
   throttledFunc = <T>(func: () => Promise<T>, throttle = 500): Promise<T> => {

@@ -2,11 +2,15 @@ import e from "express";
 import { AUTH_ROUTES_AND_PARAMS, AuthHandler } from "./AuthHandler";
 import { Email, SMTPConfig } from "./AuthTypes";
 import { sendEmail } from "./sendEmail";
+import { promises } from "node:dns";
 
-export function setEmailProvider(this: AuthHandler, app: e.Express) {
+export async function setEmailProvider(this: AuthHandler, app: e.Express) {
   
   const { email, websiteUrl } = this.opts?.expressConfig?.registrations ?? {};
   if(!email) return;
+  if(websiteUrl){
+    await checkDmarc(websiteUrl);
+  }
 
   app.post(AUTH_ROUTES_AND_PARAMS.emailSignup, async (req, res) => {
     const { username, password } = req.body;
@@ -59,5 +63,23 @@ export function setEmailProvider(this: AuthHandler, app: e.Express) {
         res.status(500).json({ error: "Failed to confirm email" });
       }
     });
+  }
+}
+
+const checkDmarc = async (websiteUrl: string) => {
+  const { host } = new URL(websiteUrl);
+  const ignoredHosts = ["localhost", "127.0.0.1"]
+  if(!host || ignoredHosts.includes(host)){
+    return;
+  }
+  const dmarc = await promises.resolveTxt(`_dmarc.${host}`);
+  const dmarkTxt = dmarc[0]?.[0];
+  if(
+    !dmarkTxt?.includes("v=DMARC1") ||
+    (!dmarkTxt?.includes("p=reject") && !dmarkTxt?.includes("p=quarantine"))
+  ){
+    throw new Error("DMARC not set to reject/quarantine");
+  } else {
+    console.log("DMARC set to reject")
   }
 }

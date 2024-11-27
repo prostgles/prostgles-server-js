@@ -226,6 +226,12 @@ export class Prostgles {
     }
   }
 
+  initAuthHandler = async () => {
+    this.authHandler?.destroy();
+    this.authHandler = new AuthHandler(this as any);
+    await this.authHandler.init();
+  }
+
   initTableConfig = async (reason: OnInitReason) => {
     const res = await tryCatch(async () => {
 
