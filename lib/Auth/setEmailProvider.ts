@@ -1,7 +1,7 @@
 import e from "express";
 import { AUTH_ROUTES_AND_PARAMS, AuthHandler, HTTPCODES } from "./AuthHandler";
 import { Email, SMTPConfig } from "./AuthTypes";
-import { sendEmail } from "./sendEmail";
+import { getOrSetTransporter, sendEmail } from "./sendEmail";
 import { promises } from "node:dns";
 
 export async function setEmailProvider(this: AuthHandler, app: e.Express) {
@@ -10,6 +10,14 @@ export async function setEmailProvider(this: AuthHandler, app: e.Express) {
   if(!email) return;
   if(websiteUrl){
     await checkDmarc(websiteUrl);
+  }
+
+  if(email.signupType === "withPassword"){
+    if(email.emailConfirmation){
+      tryGetTransporter(email.emailConfirmation.smtp);
+    }
+  } else {
+    tryGetTransporter(email.emailMagicLink.smtp);
   }
 
   app.post(AUTH_ROUTES_AND_PARAMS.emailSignup, async (req, res) => {
@@ -81,5 +89,13 @@ const checkDmarc = async (websiteUrl: string) => {
     throw new Error("DMARC not set to reject/quarantine");
   } else {
     console.log("DMARC set to reject")
+  }
+}
+
+const tryGetTransporter = (smtp: SMTPConfig) => {
+  try {
+    getOrSetTransporter(smtp);
+  } catch(err) {
+    console.error("Failed to set email transporter", err);
   }
 }

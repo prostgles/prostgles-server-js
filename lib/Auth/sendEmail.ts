@@ -14,13 +14,17 @@ const transporterCache: Map<string, Transporter> = new Map();
  * https://www.nodemailer.com/transports/ses/
  */
 export const sendEmail = (smptConfig: SMTPConfig, email: Email) => {
+  const transporter = getOrSetTransporter(smptConfig);
+  return send(transporter, email);
+}
+
+export const getOrSetTransporter = (smptConfig: SMTPConfig) => {
   const configStr = JSON.stringify(smptConfig);
   const transporter = transporterCache.get(configStr) ?? getTransporter(smptConfig);
   if(!transporterCache.has(configStr)){
     transporterCache.set(configStr, transporter);
   }
-
-  return send(transporter, email);
+  return transporter;
 }
 
 const getTransporter = (smptConfig: SMTPConfig) => {
