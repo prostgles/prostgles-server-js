@@ -30,6 +30,7 @@ import {
 } from "prostgles-types";
 import { DBEventsManager } from "./DBEventsManager";
 import { PublishParser } from "./PublishParser/PublishParser";
+export { sendEmail, getOrSetTransporter } from "./Auth/sendEmail";
 
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 export type DBorTx = DB | pgPromise.ITask<{}>
@@ -61,6 +62,7 @@ const DEFAULT_KEYWORDS = {
 
 import { randomUUID } from "crypto";
 import * as fs from 'fs';
+import { sendEmail } from "./Auth/sendEmail";
 
 export class Prostgles {
   /**

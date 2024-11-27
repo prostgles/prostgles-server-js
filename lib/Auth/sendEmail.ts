@@ -18,6 +18,9 @@ export const sendEmail = (smptConfig: SMTPConfig, email: Email) => {
   return send(transporter, email);
 }
 
+/**
+ * Returns a transporter from cache or creates a new one
+ */
 export const getOrSetTransporter = (smptConfig: SMTPConfig) => {
   const configStr = JSON.stringify(smptConfig);
   const transporter = transporterCache.get(configStr) ?? getTransporter(smptConfig);
