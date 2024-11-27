@@ -12,6 +12,9 @@ export async function setEmailProvider(this: AuthHandler, app: e.Express) {
     await checkDmarc(websiteUrl);
   }
 
+  /**
+   * Setup nodemailer transporters
+   */
   if(email.signupType === "withPassword"){
     if(email.emailConfirmation){
       tryGetTransporter(email.emailConfirmation.smtp);

@@ -11,7 +11,8 @@ import { AUTH_ROUTES_AND_PARAMS, AuthHandler, getLoginClientInfo } from "./AuthH
 import { Auth } from './AuthTypes';
 import { setEmailProvider } from "./setEmailProvider";
 /** For some reason normal import is undefined */
-const passport = require("passport") as typeof import("passport");
+// const passport = require("passport") as typeof import("passport");
+import * as passport from "passport";
 
 export const upsertNamedExpressMiddleware = (app: e.Express, handler: RequestHandler, name: string) => {
   const funcName = name;

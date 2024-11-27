@@ -1,6 +1,6 @@
 import { Email, SMTPConfig } from "./AuthTypes";
 import nodemailer from "nodemailer";
-import aws from "@aws-sdk/client-ses";
+import * as aws from "@aws-sdk/client-ses";
 import SESTransport from "nodemailer/lib/ses-transport";
 
 type SESTransporter =  nodemailer.Transporter<SESTransport.SentMessageInfo, SESTransport.Options>;
