@@ -8,6 +8,7 @@ import type { StrategyOptions as GoogleStrategy, Profile as GoogleProfile } from
 import type { StrategyOptions as GitHubStrategy, Profile as GitHubProfile } from "passport-github2";
 import type { MicrosoftStrategyOptions } from "passport-microsoft";
 import type { StrategyOptions as FacebookStrategy, Profile as FacebookProfile } from "passport-facebook";
+import Mail from "nodemailer/lib/mailer";
 
 type Awaitable<T> = T | Promise<T>;
 
@@ -49,29 +50,61 @@ type ThirdPartyProviders = {
   };
 };
 
-type SMTPConfig = {
-  type: "aws-ses" | "smtp";
+export type SMTPConfig = {
+  type: "smtp";
   host: string;
   port: number;
   secure: boolean;
-  auth: {
-    user: string;
-    pass: string;
-  }
+  user: string;
+  pass: string;
+} | {
+  type: "aws-ses";
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  /**
+   * Sending rate per second
+   * Defaults to 1
+   */
+  sendingRate?: number;
 }
 
-type RegistrationProviders = ThirdPartyProviders & {
-  email?: {
-    signupType: "withMagicLink" | "withPassword";
-    smtp: SMTPConfig
-  } | {
-    signupType: "withPassword";
-    /**
-     * If provided, the user will be required to confirm their email address
-     */
-    smtp?: SMTPConfig;
-  };
+export type Email = {
+  from: string;
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+  attachments?: { filename: string; content: string; }[] | Mail.Attachment[];
 }
+
+type EmailWithoutTo = Omit<Email, "to">;
+
+type EmailProvider = 
+| {
+  signupType: "withMagicLink";
+  onRegistered: (data: { username: string; }) => void | Promise<void>;
+  emailMagicLink:  {
+    onSend: (data: { email: string; magicLinkPath: string; }) => EmailWithoutTo | Promise<EmailWithoutTo>;
+    smtp: SMTPConfig;
+  };
+} 
+| {
+  signupType: "withPassword";
+  onRegistered: (data: { username: string; password: string; }) => void | Promise<void>;
+  /**
+   * Defaults to 8
+   */
+  minPasswordLength: number;
+  /**
+   * If provided, the user will be required to confirm their email address
+   */
+  emailConfirmation?: {
+    onSend: (data: { email: string; confirmationUrlPath: string; }) => EmailWithoutTo | Promise<EmailWithoutTo>;
+    smtp: SMTPConfig;
+    onConfirmed: (data: { confirmationUrlPath: string; }) => void | Promise<void>;
+  };
+};
 
 export type AuthProviderUserData = 
 | {
@@ -109,7 +142,11 @@ export type RegistrationData =
 } 
 | AuthProviderUserData;
 
-export type AuthRegistrationConfig<S> = RegistrationProviders & {
+export type AuthRegistrationConfig<S> = {
+  email?: EmailProvider;
+
+  OAuthProviders?: ThirdPartyProviders;
+
   /**
    * Required for social login callback
    */

@@ -201,9 +201,11 @@ function dd(){
 				},
 				registrations: {
 					websiteUrl: "http://localhost:3001",
-					github: {
-						clientID: "GITHUB_CLIENT_ID",
-						clientSecret: "GITHUB"
+					OAuthProviders: {
+						github: {
+							clientID: "GITHUB_CLIENT_ID",
+							clientSecret: "GITHUB"
+						},
 					},
 					onProviderLoginStart: async () => ({ ok: true }),
 					onProviderLoginFail: console.error,
