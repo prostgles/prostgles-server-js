@@ -1,5 +1,5 @@
 import e from "express";
-import { AUTH_ROUTES_AND_PARAMS, AuthHandler } from "./AuthHandler";
+import { AUTH_ROUTES_AND_PARAMS, AuthHandler, HTTPCODES } from "./AuthHandler";
 import { Email, SMTPConfig } from "./AuthTypes";
 import { sendEmail } from "./sendEmail";
 import { promises } from "node:dns";
@@ -27,7 +27,7 @@ export async function setEmailProvider(this: AuthHandler, app: e.Express) {
       }
     }
     if(validationError){
-      res.status(400).json({ error: validationError });
+      res.status(HTTPCODES.AUTH_ERROR).json({ success: false, error: validationError });
       return;
     }
     try {
@@ -46,10 +46,10 @@ export async function setEmailProvider(this: AuthHandler, app: e.Express) {
 
       if(emailMessage){
         await sendEmail(emailMessage.smtp, emailMessage.message);
-        res.json({ msg: "Email sent" });
+        res.json({ success: true, message: "Email sent" });
       }
     } catch {
-      res.status(500).json({ error: "Failed to send email" });
+      res.status(HTTPCODES.AUTH_ERROR).json({ success: false, error: "Failed to send email" });
     }
   });
 
@@ -58,9 +58,9 @@ export async function setEmailProvider(this: AuthHandler, app: e.Express) {
       const { id } = req.params ?? {};
       try {
         await email.emailConfirmation?.onConfirmed({ confirmationCode: id });
-        res.json({ msg: "Email confirmed" });
+        res.json({ success: true, message: "Email confirmed" });
       } catch (_e) {
-        res.status(500).json({ error: "Failed to confirm email" });
+        res.status(HTTPCODES.AUTH_ERROR).json({ success: false, error: "Failed to confirm email" });
       }
     });
   }

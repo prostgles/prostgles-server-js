@@ -59,14 +59,14 @@ export async function setupAuthRoutes(this: AuthHandler) {
           const session = await this.throttledFunc(async () => {
             return check(id, this.dbo as any, this.db, getLoginClientInfo({ httpReq: req }));
           });
-          if (!session) {
-            res.status(HTTPCODES.AUTH_ERROR).json({ msg: "Invalid magic-link" });
+          if(!session) {
+            res.status(HTTPCODES.AUTH_ERROR).json({ error: "Invalid magic-link" });
           } else {
             this.setCookieAndGoToReturnURLIFSet(session, { req, res });
           }
 
         } catch (e) {
-          res.status(HTTPCODES.AUTH_ERROR).json({ msg: e });
+          res.status(HTTPCODES.AUTH_ERROR).json({ error: e });
         }
       }
     });
@@ -80,11 +80,9 @@ export async function setupAuthRoutes(this: AuthHandler) {
       };
 
       await this.loginThrottledAndSetCookie(req, res, loginParams);
-    } catch (err) {
-      console.log(err)
-      res.status(HTTPCODES.AUTH_ERROR).json({ err });
+    } catch (error) {
+      res.status(HTTPCODES.AUTH_ERROR).json({ error });
     }
-
   });
 
   const onLogout = async (req: ExpressReq, res: ExpressRes) => {
@@ -154,7 +152,7 @@ export async function setupAuthRoutes(this: AuthHandler) {
     } catch (error) {
       console.error(error);
       const errorMessage = typeof error === "string" ? error : error instanceof Error ? error.message : "";
-      res.status(HTTPCODES.AUTH_ERROR).json({ msg: "Something went wrong when processing your request" + (errorMessage? (": " + errorMessage) : "") });
+      res.status(HTTPCODES.AUTH_ERROR).json({ error: "Something went wrong when processing your request" + (errorMessage? (": " + errorMessage) : "") });
     }
 
   });
