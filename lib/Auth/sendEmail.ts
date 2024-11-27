@@ -69,7 +69,7 @@ const getTransporter = (smptConfig: SMTPConfig) => {
 
 const send = (transporter: Transporter, email: Email) => {
   return new Promise((resolve, reject) => {
-    transporter.once('idle', () => {
+    const doSend = () => {
       if (transporter.isIdle()) {
         transporter.sendMail(
           email,
@@ -82,6 +82,11 @@ const send = (transporter: Transporter, email: Email) => {
           }
         );
       }
-    });
+    }
+    if(transporter.isIdle()){
+      doSend();
+    } else {
+      transporter.once('idle', doSend);
+    }
   });
 };
