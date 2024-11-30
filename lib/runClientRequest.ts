@@ -104,6 +104,7 @@ export const runClientRequest = async function(this: Prostgles, args: Args){
    */
   const tableCommand = tableHandler[command] satisfies undefined | TableMethodFunctionWithRulesAndLocalParams;
   if(!tableCommand) throw `Invalid or disallowed command provided: ${command}`;
+  //TODO: why does this not work?
   // const result = await (tableCommand as TableMethodFunctionWithRulesAndLocalParams)(param1, param2, param3, validRules, localParams);
   // return result;
   //@ts-ignore
