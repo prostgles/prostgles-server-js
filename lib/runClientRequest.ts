@@ -104,8 +104,10 @@ export const runClientRequest = async function(this: Prostgles, args: Args){
    */
   const tableCommand = tableHandler[command]?.bind(tableHandler) satisfies undefined | TableMethodFunctionWithRulesAndLocalParams;
   if(!tableCommand) throw `Invalid or disallowed command provided: ${command}`;
-  const result = await (tableCommand as TableMethodFunctionWithRulesAndLocalParams)(param1, param2, param3, validRules, localParams);
-  return result;
+  return (this.dbo[tableName]![command] as TableMethodFunctionWithRulesAndLocalParams)(param1, param2, param3, validRules, localParams);
+  // This approach is breaking context
+  // const result = await (tableCommand as TableMethodFunctionWithRulesAndLocalParams)(param1, param2, param3, validRules, localParams);
+  // return result;
 }
 
 export const clientCanRunSqlRequest = async function(this: Prostgles, args: ReqInfo){
