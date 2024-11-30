@@ -436,7 +436,6 @@ export class Prostgles {
       
       return {
         publishValidationError,
-        tableSchemaErrors,
         clientSchema,
         userData
       }
