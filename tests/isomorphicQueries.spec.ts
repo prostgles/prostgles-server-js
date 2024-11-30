@@ -43,17 +43,17 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
       const errSubscribe = await db.items.subscribe?.({ h: "a" }, {}, console.warn).catch(err => err);
       const errSubscribeOne = await db.items.subscribeOne?.({ h: "a" }, {}, console.warn).catch(err => err);
 
-      for(const err of [errFind, errCount, errSize, errFindOne, errDelete, errInsert, errUpdate, errUpdateBatch, errUpsert, errSubscribe, errSubscribeOne]){
+      for(const [index, err] of [errFind, errCount, errSize, errFindOne, errDelete, errInsert, errUpdate, errUpdateBatch, errUpsert, errSubscribe, errSubscribeOne].entries()){
         const clientOnlyError = {
           message: 'malformed array literal: "a"',
+          name: 'error',
           code: '22P02',
           code_info: 'invalid_text_representation',
-          name: 'error',
           severity: 'ERROR',
         }
-        if (isServer) {
+        if (isServer || db.sql) {
           const allKeys = ["message", "code", "name", "severity", "detail", "query", "length", "position", "file", "line", "routine", "code_info"];
-          assert.deepStrictEqual(Object.keys(err ?? {}).sort(), allKeys.sort());
+          assert.deepStrictEqual(Object.keys(err ?? {}).sort(), allKeys.sort(), "index: " + index);
           assert.deepStrictEqual(pickKeys(err, Object.keys(clientOnlyError)), clientOnlyError);
           assert.equal(typeof err.detail, "string");
           assert.equal(typeof err.query, "string");
@@ -64,6 +64,8 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
           assert.equal(typeof err.routine, "string");
           assert.equal(typeof err.code_info, "string");
         } else {
+          // TODO: ensure this runs
+          assert.deepStrictEqual(!!db.sql, false);
           assert.deepStrictEqual(err, clientOnlyError);
         }
       }

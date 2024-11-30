@@ -49,19 +49,22 @@ export const getErrorAsObject = (rawError: any, includeStack = false) => {
 
 type GetSerializedClientErrorFromPGErrorArgs = {
   type: "sql";
+  localParams: LocalParams | undefined;
 } | {
   type: "tableMethod";
   localParams: LocalParams | undefined;
   view: ViewHandler | Partial<TableHandler> | undefined;
   allowedKeys?: string[];
-  canRunSql?: boolean;
 } | {
   type: "method";
   localParams: LocalParams | undefined; 
   allowedKeys?: string[]; 
   view?: undefined;
-  canRunSql?: boolean;
-}
+};
+
+const sensitiveErrorKeys = ["hint", "detail", "context"] as const;
+const otherKeys = ["column", "code", "code_info", "table", "constraint", "severity", "message", "name"] as const;
+
 export function getSerializedClientErrorFromPGError(rawError: any, args: GetSerializedClientErrorFromPGErrorArgs): AnyObject {
   const err = getErrorAsObject(rawError);
   if(err.code) {
@@ -71,18 +74,19 @@ export function getSerializedClientErrorFromPGError(rawError: any, args: GetSeri
     console.trace(err)
   }
 
-  const isServerSideRequest = args.type !== "sql" && !args.localParams;
-  if(args.type === "sql" || isServerSideRequest){
+  const isServerSideRequest = !args.localParams;
+  //TODO: add a rawSQL check for HTTP requests
+  const showFullError = isServerSideRequest || args.type === "sql" || args.localParams?.socket?.prostgles?.rawSQL;
+  if(showFullError){
     return err;
   }
   const { view, allowedKeys } = args;
 
-
-  const sensitiveErrorKeys = ["hint", "detail", "context"];
-  const otherKeys = ["column", "code", "code_info", "table", "constraint", "severity", "message", "name"];
-  const finalKeys = otherKeys
-    .concat(allowedKeys ?? [])
-    .concat(args.canRunSql? sensitiveErrorKeys : []);
+  const finalKeys = [
+    ...otherKeys,
+    ...(allowedKeys ?? []),
+    ...(showFullError? sensitiveErrorKeys : [])
+  ];
 
   const errObject = pickKeys(err, finalKeys);
   if (view?.dboBuilder?.constraints && errObject.constraint && !errObject.column) {

@@ -528,7 +528,7 @@ export const clientOnlyQueries = async (db: DBHandlerClient, auth: AuthHandler, 
     /* TODO: SECURITY */
     log("auth.user:", auth.user);
 
-    assert.equal(!!auth.login.withPassword, true, "auth.login.withPassword should be defined");
+    assert.equal(!!auth.login?.withPassword, true, "auth.login.withPassword should be defined");
     const isUser = !!auth.user;
   
     // Public data

@@ -92,7 +92,7 @@ export class RestApi {
       const data = await runClientSqlRequest.bind(this.prostgles)({ type: "http", httpReq: req, query, args, options });
       res.json(data);
     } catch(rawError){ 
-      const error = getSerializedClientErrorFromPGError(rawError, { type: "sql" });
+      const error = getSerializedClientErrorFromPGError(rawError, { type: "sql", localParams: { httpReq: req } });
       res.status(400).json({ error });
     }
   }

@@ -89,7 +89,7 @@ export class TableHandler extends ViewHandler {
 
   async delete(filter?: Filter, params?: DeleteParams, param3_unused?: undefined, table_rules?: TableRule, localParams?: LocalParams): Promise<any> {
     return _delete.bind(this)(filter, params, param3_unused, table_rules, localParams);
-  } 
+  }
 
   remove(filter: Filter, params?: UpdateParams, param3_unused?: undefined, tableRules?: TableRule, localParams?: LocalParams) {
     return this.delete(filter, params, param3_unused, tableRules, localParams);

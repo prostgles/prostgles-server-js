@@ -7,6 +7,7 @@
 import * as pgPromise from 'pg-promise';
 import {
   AnyObject,
+  ClientSchema,
   ColumnInfo,
   DbJoinMaker,
   EXISTS_KEY,
@@ -189,7 +190,7 @@ export type PRGLIOSocket = {
   _user?: AnyObject
 
   /** Used for publish error caching */
-  prostgles?: AnyObject;
+  prostgles?: ClientSchema;
 };
 
 export type LocalParams = {

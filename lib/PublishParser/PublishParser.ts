@@ -108,9 +108,9 @@ export class PublishParser {
     if (!this.publish) throw "publish is missing";
 
     /* Get any publish errors for socket */
-    const schm = localParams?.socket?.prostgles?.schema?.[tableName]?.[command];
+    const errorInfo = localParams?.socket?.prostgles?.tableSchemaErrors?.[tableName]?.[command];
 
-    if (schm && schm.err) throw schm.err;
+    if (errorInfo) throw errorInfo.error;
 
     const table_rule = await this.getTableRules({ tableName, localParams }, clientInfo);
     if (!table_rule) throw { stack: ["getValidatedRequestRule()"], message: "Invalid or disallowed table: " + tableName };

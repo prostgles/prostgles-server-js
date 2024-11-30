@@ -185,7 +185,7 @@ export class DboBuilder {
   }
 
   runSQL = async (query: string, params: any, options: SQLOptions | undefined, localParams?: LocalParams) => {
-    return runSQL.bind(this)(query, params, options, localParams).catch(error => Promise.reject(getSerializedClientErrorFromPGError(error, { type: "sql" })));
+    return runSQL.bind(this)(query, params, options, localParams).catch(error => Promise.reject(getSerializedClientErrorFromPGError(error, { type: "sql", localParams })));
   }
 
   canSubscribe = false;

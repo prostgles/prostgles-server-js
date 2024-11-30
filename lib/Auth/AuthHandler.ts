@@ -424,11 +424,12 @@ export class AuthHandler {
     }
 
     const userData = await this.getClientInfo(clientReq);
+    const { email } = this.opts?.expressConfig?.registrations ?? {};
     const auth: AuthSocketSchema = {
       providers: getProviders.bind(this)(),
-      register: this.opts?.expressConfig?.registrations?.email && { type: this.opts?.expressConfig?.registrations?.email.signupType, url: AUTH_ROUTES_AND_PARAMS.emailSignup },
+      register: email && { type: email.signupType, url: AUTH_ROUTES_AND_PARAMS.emailSignup },
       user: userData?.clientUser,
-      loginType: this.opts?.expressConfig?.registrations?.email?.signupType ?? "withPassword",
+      loginType: email?.signupType ?? "withPassword",
       pathGuard,
     };
     return { auth, userData };

@@ -8,7 +8,7 @@
     "dev": "NOSTOP=true npm start",
     "build": "rm -rf ./node_modules/* && rm -rf ./media/* && rm -rf ./dist/* && npm i && tsc",
     "test-server": "TEST_TYPE=server node --trace-uncaught --test dist/server/index.js ",
-    "test-client": "TEST_TYPE=client node --trace-uncaught --test dist/server/index.js "
+    "test-client": "TEST_TYPE=client node --inspect-brk --trace-uncaught --test dist/server/index.js "
   },
   "author": "",
   "license": "ISC",

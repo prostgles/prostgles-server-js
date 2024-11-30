@@ -219,7 +219,7 @@ export async function syncData (this: PubSubManager, sync: SyncParams, clientDat
 
               updateData.push([syncSafeFilter, omitKeys(upd, id_fields)])
             }));
-            await tbl.updateBatch(updateData, { fixIssues: true }, table_rules);
+            await tbl.updateBatch(updateData, { fixIssues: true }, undefined, table_rules);
           } else {
             updates = [];
           }

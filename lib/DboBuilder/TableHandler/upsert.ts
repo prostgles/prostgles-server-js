@@ -21,11 +21,10 @@ export const upsert = async function(this: TableHandler, filter: Filter, newData
     /* Do it within a transaction to ensure consisency */
     if (!this.tx) {
       return this.dboBuilder.getTX(dbTX => _upsert(dbTX[this.name] as TableHandler))
-    } else {
-      const result = await _upsert(this);
-      await this._log({ command: "upsert", localParams, data: { filter, newData, params }, duration: Date.now() - start });
-      return result;
     }
+    const result = await _upsert(this);
+    await this._log({ command: "upsert", localParams, data: { filter, newData, params }, duration: Date.now() - start });
+    return result;
 
   } catch (e) {
     await this._log({ command: "upsert", localParams, data: { filter, newData, params }, duration: Date.now() - start, error: getErrorAsObject(e) });

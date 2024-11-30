@@ -4,7 +4,7 @@ import { Filter, LocalParams, getClientErrorFromPGError, getErrorAsObject, getSe
 import { TableHandler } from "./TableHandler";
 
 
-export async function updateBatch(this: TableHandler, updates: [Filter, AnyObject][], params?: UpdateParams, tableRules?: TableRule, localParams?: LocalParams): Promise<any> {
+export async function updateBatch(this: TableHandler, updates: [Filter, AnyObject][], params?: UpdateParams, _?: undefined, tableRules?: TableRule, localParams?: LocalParams): Promise<any> {
   const start = Date.now();
   try {
     const { checkFilter, postValidate } = tableRules?.update ?? {};
@@ -38,7 +38,7 @@ export async function updateBatch(this: TableHandler, updates: [Filter, AnyObjec
     const result = await this.db.tx(t => {
         return t.none(queries.join(";\n"));
       })
-      .catch(err => getClientErrorFromPGError(err, { type: "tableMethod", localParams, view: this, allowedKeys: []}));
+      .catch(err => getClientErrorFromPGError(err, { type: "tableMethod", localParams, view: this, allowedKeys: [] }));
 
     await this._log({ command: "updateBatch", localParams, data: { data: updates, params }, duration: Date.now() - start });
     return result;

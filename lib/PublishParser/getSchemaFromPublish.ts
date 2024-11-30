@@ -1,4 +1,4 @@
-import { DBSchemaTable, MethodKey, TableInfo, TableSchemaForClient, getKeys, pickKeys } from "prostgles-types";
+import { DBSchemaTable, MethodKey, TableInfo, TableSchemaErrors, TableSchemaForClient, getKeys, pickKeys } from "prostgles-types";
 import { AuthResult, ExpressReq } from "../Auth/AuthTypes";
 import { getErrorAsObject, PRGLIOSocket } from "../DboBuilder/DboBuilder";
 import { PublishObject, PublishParser } from "./PublishParser"
@@ -13,8 +13,10 @@ type Args = ({
 }) & {
   userData: AuthResult | undefined;
 }
-export async function getSchemaFromPublish(this: PublishParser, { userData, ...clientReq }: Args): Promise<{ schema: TableSchemaForClient; tables: DBSchemaTable[] }> {
+
+export async function getSchemaFromPublish(this: PublishParser, { userData, ...clientReq }: Args): Promise<{ schema: TableSchemaForClient; tables: DBSchemaTable[]; tableSchemaErrors: TableSchemaErrors }> {
   const schema: TableSchemaForClient = {};
+  const tableSchemaErrors: TableSchemaErrors = {};
   let tables: DBSchemaTable[] = []
 
   try {
@@ -92,9 +94,8 @@ export async function getSchemaFromPublish(this: PublishParser, { userData, ...c
                     }
 
                   } catch (e) {
-                    tableSchema[method] = { 
-                      err: "Internal publish error. Check server logs"
-                    };
+                    tableSchemaErrors[tableName] ??= {};
+                    tableSchemaErrors[tableName]![method] = { error: "Internal publish error. Check server logs" };
 
                     throw {
                       ...getErrorAsObject(e),
@@ -137,5 +138,5 @@ export async function getSchemaFromPublish(this: PublishParser, { userData, ...c
   }
 
   tables = tables.sort((a, b) => a.name.localeCompare(b.name));
-  return { schema, tables };
+  return { schema, tables, tableSchemaErrors };
 }

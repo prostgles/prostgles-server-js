@@ -98,7 +98,7 @@ export class QueryStreamer {
         if(errored) return;
         errored = true;
 
-        const errorWithoutQuery = getSerializedClientErrorFromPGError(rawError, { type: "sql" });
+        const errorWithoutQuery = getSerializedClientErrorFromPGError(rawError, { type: "sql", localParams: { socket } });
         // For some reason query is not present on the error object from sql stream mode
         const error = { ...errorWithoutQuery, query: query.query };
         socket.emit(channel, { type: "error", error } satisfies SocketSQLStreamPacket);

@@ -122,7 +122,7 @@ type RunQueryReturnTypeArgs = {
 export const runQueryReturnType = async ({ newQuery, handler, localParams, queryWithRLS, queryWithoutRLS, returnType,}: RunQueryReturnTypeArgs) => {
 
   const query = queryWithRLS;
-  const sqlTypes = ["statement", "statement-no-rls", "statement-where"];
+  const sqlTypes = ["statement", "statement-no-rls", "statement-where"] as const;
   if(!returnType || returnType === "values"){
 
     return handler.dbHandler.any(query).then(data => {
@@ -134,7 +134,7 @@ export const runQueryReturnType = async ({ newQuery, handler, localParams, query
 
   } else if (sqlTypes.some(v => v === returnType)) {
     if (!(await canRunSQL(handler.dboBuilder.prostgles, localParams))) {
-      throw `Not allowed:  {returnType: ${JSON.stringify(returnType)}} requires execute sql privileges `
+      throw `Not allowed:  { returnType: ${JSON.stringify(returnType)} } requires execute sql privileges `
     }
     if(returnType === "statement-no-rls"){
       return queryWithoutRLS as any;

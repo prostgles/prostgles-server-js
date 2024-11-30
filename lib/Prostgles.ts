@@ -24,13 +24,12 @@ export type PGP = pgPromise.IMain<{}, pg.IClient>;
 import {
   CHANNELS,
   ClientSchema,
-  DBSchemaTable,
-  SQLRequest, TableSchemaForClient,
+  SQLRequest,
   isObject, omitKeys, tryCatch
 } from "prostgles-types";
 import { DBEventsManager } from "./DBEventsManager";
 import { PublishParser } from "./PublishParser/PublishParser";
-export { sendEmail, getOrSetTransporter } from "./Auth/sendEmail";
+export { getOrSetTransporter, sendEmail } from "./Auth/sendEmail";
 
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 export type DBorTx = DB | pgPromise.ITask<{}>
@@ -62,7 +61,6 @@ const DEFAULT_KEYWORDS = {
 
 import { randomUUID } from "crypto";
 import * as fs from 'fs';
-import { sendEmail } from "./Auth/sendEmail";
 
 export class Prostgles {
   /**
@@ -376,10 +374,7 @@ export class Prostgles {
       if(!this.authHandler) throw "this.authHandler missing";
       const userData = await this.authHandler.getClientInfo(clientInfo); 
       const { publishParser } = this;
-      let fullSchema: {
-        schema: TableSchemaForClient;
-        tables: DBSchemaTable[];
-      } | undefined;
+      let fullSchema: Awaited<ReturnType<PublishParser["getSchemaFromPublish"]>> | undefined;
       let publishValidationError;
 
       try {
@@ -395,7 +390,7 @@ export class Prostgles {
         rawSQL = allowed;
       }
 
-      const { schema, tables } = fullSchema ?? { schema: {}, tables: [] };
+      const { schema, tables, tableSchemaErrors } = fullSchema ?? { schema: {}, tables: [], tableSchemaErrors: {} };
       const joinTables2: string[][] = [];
       if (this.opts.joins) {
         const _joinTables2 = this.dboBuilder.getAllJoinPaths()
@@ -433,6 +428,7 @@ export class Prostgles {
         tableSchema: tables,
         rawSQL,
         joinTables: joinTables2,
+        tableSchemaErrors,
         auth,
         version,
         err: publishValidationError? "Server Error: User publish validation failed." : undefined
@@ -440,6 +436,7 @@ export class Prostgles {
       
       return {
         publishValidationError,
+        tableSchemaErrors,
         clientSchema,
         userData
       }
@@ -460,8 +457,7 @@ export class Prostgles {
 
     try {
       const clientSchema = await this.getClientSchema({ socket });
-      socket.prostgles = socket.prostgles || {};
-      socket.prostgles.schema = clientSchema.schema;
+      socket.prostgles = clientSchema;
       if (clientSchema.rawSQL) {
         socket.removeAllListeners(CHANNELS.SQL)
         socket.on(CHANNELS.SQL, async ({ query, params, options }: SQLRequest, cb = (..._callback: any) => { /* Empty */ }) => {
