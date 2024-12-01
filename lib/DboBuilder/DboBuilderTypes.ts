@@ -34,7 +34,7 @@ export type TableSchemaColumn = ColumnInfo & {
   privileges: Partial<Record<"INSERT" | "REFERENCES" | "SELECT" | "UPDATE", true>>;
 }
 
-export type TableSchema = {
+export type TableSchema = Pick<TableInfo, "uniqueColumnGroups"> & {
   schema: string;
   name: string;
   escaped_identifier: string;

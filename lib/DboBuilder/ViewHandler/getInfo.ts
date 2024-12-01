@@ -15,6 +15,7 @@ export async function getInfo(this: ViewHandler, lang?: string, param2?: any, pa
   const fileTableName = this.dboBuilder.prostgles?.opts?.fileTable?.tableName;
 
   await this._log({ command: "getInfo", localParams, data: { lang }, duration: 0 });
+  const allowedFieldsToSelect = this.parseFieldFilter(tableRules?.select?.fields);
   return {
     oid: this.tableOrViewInfo.oid,
     comment: this.tableOrViewInfo.comment,
@@ -27,6 +28,10 @@ export async function getInfo(this: ViewHandler, lang?: string, param2?: any, pa
     fileTableName,
     dynamicRules: {
       update: Boolean(tableRules?.update?.dynamicFields?.length)
-    }
+    },
+    /**
+     * Only show column groups that are fully allowed to be selected by the user
+     */
+    uniqueColumnGroups: this.tableOrViewInfo.uniqueColumnGroups?.filter(g => !localParams || g.every(c => allowedFieldsToSelect.includes(c))),
   }
 }

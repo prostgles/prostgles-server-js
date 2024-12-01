@@ -1,5 +1,5 @@
 import { SQLResult, asName } from "prostgles-types";
-import { omitKeys, tryCatch } from "prostgles-types/dist/util";
+import { omitKeys, tryCatch, tryCatchV2 } from "prostgles-types/dist/util";
 import { DboBuilder } from "../DboBuilder/DboBuilder";
 import { DBorTx } from "../Prostgles";
 import { clone } from "../utils";
@@ -166,6 +166,43 @@ export async function getTablesForSchemaPostgresSQL(
     });
     if(getFkeys.error !== undefined){
       throw getFkeys.error;
+    }
+
+    const uniqueColsReq = await tryCatchV2(async () => {
+      const res = await t.any(`
+        select
+            t.relname as table_name,
+            (SELECT pnm.nspname FROM pg_catalog.pg_namespace pnm WHERE pnm.oid =  i.relnamespace) as table_schema,
+            i.relname as index_name,
+            array_agg(a.attname)::_TEXT as column_names
+        from
+            pg_class t,
+            pg_class i,
+            pg_index ix,
+            pg_attribute a
+        where
+            t.oid = ix.indrelid
+            and i.oid = ix.indexrelid
+            and a.attrelid = t.oid
+            and a.attnum = ANY(ix.indkey)
+            and t.relkind = 'r'
+            and ix.indisunique
+        group by 1,2,3
+        order by
+            t.relname,
+            i.relname;
+      `) as {
+          table_name: string;
+          table_schema: string;
+          index_name: string;
+          column_names: string[]; 
+        }[];
+
+        return res;
+    });
+
+    if(uniqueColsReq.error){
+      throw uniqueColsReq.error;
     }
   
     const badFkey = getFkeys.fkeys!.find(r => r.fcols.includes(null as any));
@@ -386,6 +423,8 @@ export async function getTablesForSchemaPostgresSQL(
   
         });
         table.isHyperTable = getHyperTablesReq.hyperTables?.includes(table.name);
+
+        table.uniqueColumnGroups = uniqueColsReq.data?.filter(r => r.table_name === table.name && r.table_schema === table.schema).map(r => r.column_names);
   
         return table;
       }));

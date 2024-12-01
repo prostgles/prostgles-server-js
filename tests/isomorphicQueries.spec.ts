@@ -71,6 +71,31 @@ export const isomorphicQueries = async (db: DBOFullyTyped | DBHandlerClient, log
       }
     });
 
+    await test("Table info", async () => {
+      const { 
+        /** Excluded because their value may vary */
+        oid, isFileTable, 
+        ...tableInfo 
+      } = (await db.items.getInfo?.()) ?? {};
+      assert.deepStrictEqual(tableInfo, {
+        "comment": null,
+        "info": {
+          "label": "items"
+        },
+        "isView": false,
+        "hasFiles": false,
+        "fileTableName": "files",
+        "dynamicRules": {
+          "update": false
+        },
+        "uniqueColumnGroups": [
+          [
+            "id"
+          ]
+        ]
+      });
+    });
+
     await test("Prepare data", async () => {
       if(!db.sql) throw "db.sql missing";
       const res = await db.items.insert!([{ name: "a" }, { name: "a" }, { name: "b" }], { returning: "*" }); 
