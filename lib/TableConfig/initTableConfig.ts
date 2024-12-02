@@ -54,14 +54,14 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
   if (this.prostgles.opts.tableConfigMigrations) {
     const { onMigrate, version, versionTableName = "schema_version" } = this.prostgles.opts.tableConfigMigrations;
     await this.db.any(`
-        /* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
-        CREATE TABLE IF NOT EXISTS ${asName(versionTableName)}(id NUMERIC PRIMARY KEY, table_config JSONB NOT NULL)
-      `);
+      /* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
+      CREATE TABLE IF NOT EXISTS ${asName(versionTableName)}(id NUMERIC PRIMARY KEY, table_config JSONB NOT NULL)
+    `);
     migrations = { version, table: versionTableName };
     let latestVersion: number | undefined;
     try {
       latestVersion = Number((await this.db.oneOrNone(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`)).v);
-    } catch (e) {
+    } catch (_e) {
 
     }
 

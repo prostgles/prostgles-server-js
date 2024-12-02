@@ -150,7 +150,7 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
     /* 5. Finish init and provide DBO object */
     try {
       if (this.destroyed) {
-        console.trace(1)
+        console.trace("Prostgles: Instance is destroyed")
       }
       onReady({
         dbo: this.dbo as any, 
@@ -186,10 +186,8 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
         }
         if("tableConfig" in newOpts){
           await this.initTableConfig({ type: "prgl.update", newOpts });
-          await this.refreshDBO();
         }
         if("schema" in newOpts){
-          await this.initTableConfig({ type: "prgl.update", newOpts });
           await this.refreshDBO();
         }
         if("auth" in newOpts){
