@@ -37,8 +37,6 @@ export type DBorTx = DB | pgPromise.ITask<{}>
 
 export const TABLE_METHODS = ["update", "find", "findOne", "insert", "delete", "upsert"] as const;
 
-
-
 /*
     1. Connect to db
     2. Execute any SQL file if provided

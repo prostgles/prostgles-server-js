@@ -10,7 +10,11 @@ type Args = {
   tableName: string;
   constraintDefs?: ConstraintDef[];
 };
- 
+
+/**
+ * Given a table name, column definitions and constraint definitions, 
+ * returns structured resulting column definitions and constraints of the table
+ */
 export const getFutureTableSchema = async ({ columnDefs, tableName, constraintDefs = [], db }: Args): Promise<{
   constraints: ColConstraint[];
   cols: ColumnMinimalInfo[];
