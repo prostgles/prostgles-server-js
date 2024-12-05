@@ -58,7 +58,7 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
       CREATE TABLE IF NOT EXISTS ${asName(versionTableName)}(id NUMERIC PRIMARY KEY, table_config JSONB NOT NULL)
     `);
     migrations = { version, table: versionTableName };
-    const maxVersion = (await this.db.oneOrNone(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`)).v
+    const maxVersion = +(await this.db.oneOrNone(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`)).v
     const latestVersion = Number.isFinite(maxVersion) ? maxVersion : undefined;
 
     if (latestVersion === version) {
@@ -70,7 +70,7 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
         return;
       }
     }
-    if (!latestVersion || latestVersion < version) {
+    if (latestVersion !== undefined && latestVersion < version) {
       await onMigrate({ db: this.db, oldVersion: latestVersion, getConstraints: (table, col, types) => getColConstraints({ db: this.db, table, column: col, types }) })
     }
   }
