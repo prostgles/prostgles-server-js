@@ -93,3 +93,16 @@ const send = (transporter: Transporter, email: Email) => {
     }
   });
 };
+
+export const verifySMTPConfig = async (smptConfig: SMTPConfig) => {
+  const transporter = getOrSetTransporter(smptConfig);
+  return new Promise((resolve, reject) => {
+    transporter.verify((err, success) => {
+      if(err){
+        reject(err);
+      } else {
+        resolve(success);
+      }
+    });
+  });
+}
