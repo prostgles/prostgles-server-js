@@ -58,16 +58,15 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
       CREATE TABLE IF NOT EXISTS ${asName(versionTableName)}(id NUMERIC PRIMARY KEY, table_config JSONB NOT NULL)
     `);
     migrations = { version, table: versionTableName };
-    let latestVersion: number | undefined;
-    try {
-      latestVersion = Number((await this.db.oneOrNone(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`)).v);
-    } catch (_e) {
-
-    }
+    const maxVersion = (await this.db.oneOrNone(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`)).v
+    const latestVersion = Number.isFinite(maxVersion) ? maxVersion : undefined;
 
     if (latestVersion === version) {
       const isLatest = (await this.db.oneOrNone(`SELECT table_config = \${table_config} as v FROM ${asName(versionTableName)} WHERE id = \${version}`, { version, table_config: this.config })).v;
       if (isLatest) {
+        /**
+         * If the table config is the same as the latest version then we can skip all schema checks and changes
+         */
         return;
       }
     }
@@ -271,10 +270,11 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
             addFuncDef();
             const newTableName = action !== "delete" ? "NEW TABLE AS new_table" : "";
             const oldTableName = action !== "insert" ? "OLD TABLE AS old_table" : "";
+            const transitionTables = trigger.forEach === "row" ? "" : `REFERENCING ${newTableName} ${oldTableName}`;
             queries.push(`
                 CREATE TRIGGER ${triggerActionNameParsed}
                 ${trigger.type} ${action} ON ${tableName}
-                REFERENCING ${newTableName} ${oldTableName}
+                ${transitionTables}
                 FOR EACH ${trigger.forEach}
                 EXECUTE PROCEDURE ${funcNameParsed}();
               `);
