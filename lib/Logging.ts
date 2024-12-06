@@ -1,4 +1,4 @@
-import { AnyObject } from "prostgles-types";
+import { AnyObject, ClientSchema } from "prostgles-types";
 import { LocalParams } from "./DboBuilder/DboBuilder";
 import { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
 
@@ -93,7 +93,7 @@ export namespace EventTypes {
   | { command: "login"; } 
   );
 
-  export type Debug = DebugInfo & {
+  export type Debug = DebugInfo & ({
     type: "debug";
     command: 
     | "initFileTable" 
@@ -112,7 +112,11 @@ export namespace EventTypes {
     | "DboBuilder.getTablesForSchemaPostgresSQL"
     | "PubSubManager.create"
     data?: AnyObject;
-  }
+  } | {
+    type: "debug";
+    command: "pushSocketSchema";
+    data: { socketId: string, clientSchema: ClientSchema; }
+  })
 }
 
 export type EventInfo =

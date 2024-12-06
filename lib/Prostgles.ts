@@ -466,6 +466,7 @@ export class Prostgles {
           });
         });
       }
+      await this.dboBuilder.prostgles.opts.onLog?.({ type: "debug", command: "pushSocketSchema", duration: -1, data: { socketId: socket.id, clientSchema } });
       socket.emit(CHANNELS.SCHEMA, clientSchema);
 
     } catch (err) {
