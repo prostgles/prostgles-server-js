@@ -1,7 +1,6 @@
 import * as pgPromise from "pg-promise";
 import pg from "pg-promise/typescript/pg-subset";
 import { getKeys, isEmpty } from "prostgles-types";
-import { AuthHandler } from "./Auth/AuthHandler";
 import { DBEventsManager } from "./DBEventsManager";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { DBHandlerServer, Prostgles, getIsSuperUser } from "./Prostgles";
@@ -10,38 +9,48 @@ import { DbTableInfo, PublishParser } from "./PublishParser/PublishParser";
 import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { sleep } from "./utils";
 
-export type DbConnection = string | pg.IConnectionParameters<pg.IClient>;
+/**
+ * Database connection details
+ */
+export type DbConnection =
+  /**
+   * Connection URI
+   */
+  string | pg.IConnectionParameters<pg.IClient>;
 export type DbConnectionOpts = pg.IDefaults;
 
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 
-export type UpdateableOptions = Pick<ProstglesInitOptions, "fileTable" | "restApi" | "tableConfig" | "schema" | "auth">;
-export type OnInitReason = 
-  | { 
-    type: "schema change"; 
-    query: string; 
-    command: string; 
-  } 
+export type UpdateableOptions = Pick<
+  ProstglesInitOptions,
+  "fileTable" | "restApi" | "tableConfig" | "schema" | "auth"
+>;
+export type OnInitReason =
   | {
-    type: "prgl.update";
-    newOpts: Omit<UpdateableOptions, typeof clientOnlyUpdateKeys[number]>;
-  }
-  | { 
-    type: "init" | "prgl.restart" | "TableConfig"
-  };
+      type: "schema change";
+      query: string;
+      command: string;
+    }
+  | {
+      type: "prgl.update";
+      newOpts: Omit<UpdateableOptions, (typeof clientOnlyUpdateKeys)[number]>;
+    }
+  | {
+      type: "init" | "prgl.restart" | "TableConfig";
+    };
 
 type OnReadyParamsCommon = {
   db: DB;
   tables: DbTableInfo[];
   reason: OnInitReason;
-}
+};
 export type OnReadyParamsBasic = OnReadyParamsCommon & {
-  dbo: DBHandlerServer; 
-}
+  dbo: DBHandlerServer;
+};
 export type OnReadyParams<S> = OnReadyParamsCommon & {
-  dbo: DBOFullyTyped<S>; 
-}
+  dbo: DBOFullyTyped<S>;
+};
 
 export type OnReadyCallback<S = void> = (params: OnReadyParams<S>) => any;
 export type OnReadyCallbackBasic = (params: OnReadyParamsBasic) => any;
@@ -57,48 +66,54 @@ export type InitResult = {
    */
   getTSSchema: () => string;
   update: (newOpts: UpdateableOptions) => Promise<void>;
-  restart: () => Promise<InitResult>; 
+  restart: () => Promise<InitResult>;
   options: ProstglesInitOptions;
-}
+};
 
 const clientOnlyUpdateKeys = ["auth"] as const satisfies (keyof UpdateableOptions)[];
 
-export const initProstgles = async function(this: Prostgles, onReady: OnReadyCallbackBasic, reason: OnInitReason): Promise<InitResult> {
+export const initProstgles = async function (
+  this: Prostgles,
+  onReady: OnReadyCallbackBasic,
+  reason: OnInitReason
+): Promise<InitResult> {
   this.loaded = false;
 
   if (!this.db) {
     let existingAppName = "";
     let connString = "";
-    if(typeof this.opts.dbConnection === "string"){
+    if (typeof this.opts.dbConnection === "string") {
       connString = this.opts.dbConnection;
-    } else if(this.opts.dbConnection.connectionString){
+    } else if (this.opts.dbConnection.connectionString) {
       connString = this.opts.dbConnection.connectionString;
     } else {
       existingAppName = this.opts.dbConnection.application_name ?? "";
     }
 
-    if(connString){
+    if (connString) {
       try {
         const url = new URL(connString);
-        existingAppName = url.searchParams.get("application_name") ?? url.searchParams.get("ApplicationName") ?? "";
-      } catch (e) {
-
-      }
+        existingAppName =
+          url.searchParams.get("application_name") ?? url.searchParams.get("ApplicationName") ?? "";
+      } catch (e) {}
     }
 
-    const conObj = typeof this.opts.dbConnection === "string" ? { connectionString: this.opts.dbConnection } : this.opts.dbConnection 
+    const conObj =
+      typeof this.opts.dbConnection === "string"
+        ? { connectionString: this.opts.dbConnection }
+        : this.opts.dbConnection;
     const application_name = `prostgles ${this.appId} ${existingAppName}`;
 
     /* 1. Connect to db */
     const { db, pgp } = getDbConnection({
       ...this.opts,
-      dbConnection: { ...conObj, application_name }, 
-      onNotice: notice => {
+      dbConnection: { ...conObj, application_name },
+      onNotice: (notice) => {
         if (this.opts.onNotice) this.opts.onNotice(notice);
         if (this.dbEventsManager) {
-          this.dbEventsManager.onNotice(notice)
+          this.dbEventsManager.onNotice(notice);
         }
-      }
+      },
     });
     this.db = db;
     this.pgp = pgp;
@@ -115,7 +130,6 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
   }
 
   try {
-
     await this.refreshDBO();
     await this.initTableConfig(reason);
     await this.initFileTable();
@@ -124,7 +138,6 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
     this.schemaWatch = await SchemaWatch.create(this.dboBuilder);
 
     if (this.opts.publish) {
-
       if (!this.opts.io) {
         console.warn("IO missing. Publish has no effect without io");
       }
@@ -132,34 +145,39 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
       /* 3.9 Check auth config */
       await this.initAuthHandler();
 
-      this.publishParser = new PublishParser(this.opts.publish, this.opts.publishMethods as any, this.opts.publishRawSQL, this.dbo!, this.db, this as any);
+      this.publishParser = new PublishParser(
+        this.opts.publish,
+        this.opts.publishMethods as any,
+        this.opts.publishRawSQL,
+        this.dbo!,
+        this.db,
+        this as any
+      );
       this.dboBuilder.publishParser = this.publishParser;
 
       /* 4. Set publish and auth listeners */
       await this.setSocketEvents();
-
     } else if (this.opts.auth) {
       throw "Auth config does not work without publish";
     }
 
     this.dbEventsManager = new DBEventsManager(db, pgp);
 
-
     this.writeDBSchema();
 
     /* 5. Finish init and provide DBO object */
     try {
       if (this.destroyed) {
-        console.trace("Prostgles: Instance is destroyed")
+        console.trace("Prostgles: Instance is destroyed");
       }
       onReady({
-        dbo: this.dbo as any, 
-        db: this.db, 
+        dbo: this.dbo as any,
+        db: this.db,
         tables: this.dboBuilder.tables,
-        reason
+        reason,
       });
     } catch (err) {
-      console.error("Prostgles: Error within onReady: \n", err)
+      console.error("Prostgles: Error within onReady: \n", err);
     }
 
     this.loaded = true;
@@ -171,36 +189,36 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
       getTSSchema: this.getTSFileContent,
       options: this.opts,
       update: async (newOpts) => {
-
-        getKeys(newOpts).forEach(k => {
+        getKeys(newOpts).forEach((k) => {
           //@ts-ignore
           this.opts[k] = newOpts[k];
         });
 
-
-        if("fileTable" in newOpts){
+        if ("fileTable" in newOpts) {
           await this.initFileTable();
         }
-        if("restApi" in newOpts){
+        if ("restApi" in newOpts) {
           await this.initRestApi();
         }
-        if("tableConfig" in newOpts){
+        if ("tableConfig" in newOpts) {
           await this.initTableConfig({ type: "prgl.update", newOpts });
         }
-        if("schema" in newOpts){
+        if ("schema" in newOpts) {
           await this.refreshDBO();
         }
-        if("auth" in newOpts){
+        if ("auth" in newOpts) {
           await this.initAuthHandler();
         }
 
-        if(isEmpty(newOpts)) return;
+        if (isEmpty(newOpts)) return;
 
-        /** 
-         * Some of these changes require clients to reconnect 
+        /**
+         * Some of these changes require clients to reconnect
          * While others also affect the server and onReady should be called
-        */
-        if(getKeys(newOpts).every(updatedKey => clientOnlyUpdateKeys.includes(updatedKey as any))){
+         */
+        if (
+          getKeys(newOpts).every((updatedKey) => clientOnlyUpdateKeys.includes(updatedKey as any))
+        ) {
           await this.setSocketEvents();
         } else {
           await this.init(onReady, { type: "prgl.update", newOpts });
@@ -208,22 +226,22 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
       },
       restart: () => this.init(onReady, { type: "prgl.restart" }),
       destroy: async () => {
-        console.log("destroying prgl instance")
+        console.log("destroying prgl instance");
         this.destroyed = true;
         if (this.opts.io) {
           this.opts.io.on("connection", () => {
-            console.log("Socket connected to destroyed instance")
+            console.log("Socket connected to destroyed instance");
           });
 
           /** Try to close IO without stopping http server */
-          if(this.opts.io.sockets.constructor.name === "Namespace"){
+          if (this.opts.io.sockets.constructor.name === "Namespace") {
             for (const socket of this.opts.io.sockets.sockets.values()) {
               socket._onclose("server shutting down");
             }
           }
-          if(this.opts.io.engine.constructor.name === 'Server'){
+          if (this.opts.io.engine.constructor.name === "Server") {
             this.opts.io.engine.close();
-          } 
+          }
         }
         this.fileManager?.destroy();
         this.dboBuilder?.destroy();
@@ -234,57 +252,74 @@ export const initProstgles = async function(this: Prostgles, onReady: OnReadyCal
         await db.$pool.end();
         await sleep(1000);
         return true;
-      }
+      },
     };
   } catch (e: any) {
-    console.trace(e)
+    console.trace(e);
     throw "init issues: " + e.toString();
   }
-}
+};
 
-type GetDbConnectionArgs = Pick<ProstglesInitOptions, "DEBUG_MODE" | "onQuery" | "dbConnection" | "dbOptions" | "onNotice">;
-const getDbConnection = function({ dbConnection, onQuery, DEBUG_MODE, dbOptions, onNotice  }: GetDbConnectionArgs): { db: DB, pgp: PGP } {
-  
-  const onQueryOrError: undefined | ((error: any, ctx: pgPromise.IEventContext<pg.IClient>) => void) = !onQuery && !DEBUG_MODE? undefined : (error, ctx) => {
-    if (onQuery) {
-      onQuery(error, ctx);
-    } else if (DEBUG_MODE) {
-      if(error){
-        console.error(error, ctx);
-      } else {
-        console.log(ctx)
-      }
-    }
-  };
-  
+type GetDbConnectionArgs = Pick<
+  ProstglesInitOptions,
+  "DEBUG_MODE" | "onQuery" | "dbConnection" | "dbOptions" | "onNotice"
+>;
+const getDbConnection = function ({
+  dbConnection,
+  onQuery,
+  DEBUG_MODE,
+  dbOptions,
+  onNotice,
+}: GetDbConnectionArgs): { db: DB; pgp: PGP } {
+  const onQueryOrError:
+    | undefined
+    | ((error: any, ctx: pgPromise.IEventContext<pg.IClient>) => void) =
+    !onQuery && !DEBUG_MODE
+      ? undefined
+      : (error, ctx) => {
+          if (onQuery) {
+            onQuery(error, ctx);
+          } else if (DEBUG_MODE) {
+            if (error) {
+              console.error(error, ctx);
+            } else {
+              console.log(ctx);
+            }
+          }
+        };
+
   const pgp: PGP = pgPromise({
-    ...(onQueryOrError ? {
-      query: ctx => onQueryOrError(undefined, ctx),
-      error: onQueryOrError
-    } : {}),
-    ...((onNotice || DEBUG_MODE) ? {
-      connect: function ({ client, useCount }) {
-        const isFresh = !useCount;
-        if (isFresh && !client.listeners('notice').length) {
-          client.on('notice', function (msg) {
-            if (onNotice) {
-              onNotice(msg, msg?.message);
-            } else {
-              console.log("notice: %j", msg?.message);
-            }
-          });
+    ...(onQueryOrError
+      ? {
+          query: (ctx) => onQueryOrError(undefined, ctx),
+          error: onQueryOrError,
         }
-        if (isFresh && !client.listeners('error').length) {
-          client.on('error', function (msg) {
-            if (onNotice) {
-              onNotice(msg, msg?.message);
-            } else {
-              console.log("error: %j", msg?.message);
+      : {}),
+    ...(onNotice || DEBUG_MODE
+      ? {
+          connect: function ({ client, useCount }) {
+            const isFresh = !useCount;
+            if (isFresh && !client.listeners("notice").length) {
+              client.on("notice", function (msg) {
+                if (onNotice) {
+                  onNotice(msg, msg?.message);
+                } else {
+                  console.log("notice: %j", msg?.message);
+                }
+              });
             }
-          });
+            if (isFresh && !client.listeners("error").length) {
+              client.on("error", function (msg) {
+                if (onNotice) {
+                  onNotice(msg, msg?.message);
+                } else {
+                  console.log("error: %j", msg?.message);
+                }
+              });
+            }
+          },
         }
-      },
-    } : {})
+      : {}),
   });
   // pgp.pg.defaults.max = 70;
 
@@ -301,10 +336,9 @@ const getDbConnection = function({ dbConnection, onQuery, DEBUG_MODE, dbOptions,
   // pgp.pg.types.setTypeParser(1114, v => v); // timestamp without time zone
   // pgp.pg.types.setTypeParser(1184, v => v); // timestamp with time zone
   // pgp.pg.types.setTypeParser(1182, v => v); // date
-  pgp.pg.types.setTypeParser(pgp.pg.types.builtins.TIMESTAMP, v => v); // timestamp without time zone
-  pgp.pg.types.setTypeParser(pgp.pg.types.builtins.TIMESTAMPTZ, v => v); // timestamp with time zone
-  pgp.pg.types.setTypeParser(pgp.pg.types.builtins.DATE, v => v); // date
-  
+  pgp.pg.types.setTypeParser(pgp.pg.types.builtins.TIMESTAMP, (v) => v); // timestamp without time zone
+  pgp.pg.types.setTypeParser(pgp.pg.types.builtins.TIMESTAMPTZ, (v) => v); // timestamp with time zone
+  pgp.pg.types.setTypeParser(pgp.pg.types.builtins.DATE, (v) => v); // date
 
   if (dbOptions) {
     Object.assign(pgp.pg.defaults, dbOptions);
@@ -312,6 +346,6 @@ const getDbConnection = function({ dbConnection, onQuery, DEBUG_MODE, dbOptions,
 
   return {
     db: pgp(dbConnection),
-    pgp
+    pgp,
   };
-}
+};

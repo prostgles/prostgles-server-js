@@ -22,7 +22,7 @@ export type ValidatedParams = {
   forcedData?: AnyObject;
   allowedFields?: FieldFilter;
   tableRules?: TableRule;
-  fixIssues: boolean;
+  removeDisallowedFields: boolean;
   tableConfigurator: TableConfigurator | undefined;
   tableHandler: TableHandler;
 }

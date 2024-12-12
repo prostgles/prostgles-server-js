@@ -13,7 +13,7 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
   const start = Date.now();
   try {
 
-    const { fixIssues = false } = insertParams || {};
+    const { removeDisallowedFields = false } = insertParams || {};
     const { returnQuery = false, nestedInsert } = localParams || {};
  
     const finalDBtx = this.getFinalDBtx(localParams);
@@ -79,7 +79,7 @@ export async function insert(this: TableHandler, rowOrRows: AnyObject | AnyObjec
           forcedData, 
           allowedFields: fields, 
           tableRules, 
-          fixIssues, 
+          removeDisallowedFields, 
           tableConfigurator: this.dboBuilder.prostgles.tableConfigurator, 
           tableHandler: this, 
         });
@@ -165,7 +165,7 @@ const validateInsertParams = (params: InsertParams | undefined) => {
   }
 
   if (params) {
-    const good_paramsObj: Record<keyof InsertParams, 1> = { returning: 1, returnType: 1, fixIssues: 1, onConflict: 1 };
+    const good_paramsObj: Record<keyof InsertParams, 1> = { returning: 1, returnType: 1, removeDisallowedFields: 1, onConflict: 1 };
     const good_params = Object.keys(good_paramsObj);
     const bad_params = Object.keys(params).filter(k => !good_params.includes(k));
     if (bad_params && bad_params.length) throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");

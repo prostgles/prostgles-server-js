@@ -1,0 +1,28 @@
+{
+  "files": ["generateDocs.ts"],
+  "compilerOptions": {
+    "baseUrl": ".",
+    "target": "es2019",
+    "lib": [
+      "es6",
+      "dom", 
+      "es2017",
+      "es2019",
+    ],
+    "strict": true,
+    "module": "commonjs",
+    "resolveJsonModule": true, 
+    "rootDir": "./", 
+    "outDir": "dist",
+    "noImplicitAny": false, 
+    "declaration": true,
+    "strictNullChecks": true,
+    "declarationMap": true,
+    "ignoreDeprecations": "5.0", 
+    "skipLibCheck": true,
+    "noUncheckedIndexedAccess": true,
+  }, 
+  "exclude": [ 
+    "node_modules"
+  ]
+}

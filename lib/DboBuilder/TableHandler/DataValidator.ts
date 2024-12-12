@@ -82,7 +82,7 @@ type PrepareFieldValuesArgs = {
   row: AnyObject | undefined; 
   forcedData: AnyObject | undefined; 
   allowedCols: FieldFilter | undefined;
-  removeDisallowedColumns?: boolean;
+  removeDisallowedFields?: boolean;
   tableHandler: TableHandler;
 }
 /** 
@@ -94,7 +94,7 @@ type PrepareFieldValuesArgs = {
 * @param {Object} forcedData - set/override property
 * @param {string[]} allowed_cols - allowed columns (excluding forcedData) from table rules
 */
-const getValidatedRow = ({ row = {}, forcedData = {}, allowedCols, removeDisallowedColumns = false, tableHandler }: PrepareFieldValuesArgs): AnyObject => {
+const getValidatedRow = ({ row = {}, forcedData = {}, allowedCols, removeDisallowedFields = false, tableHandler }: PrepareFieldValuesArgs): AnyObject => {
   const column_names = tableHandler.column_names.slice(0);
   if (!column_names.length) {
     throw "table column_names mising";
@@ -102,7 +102,7 @@ const getValidatedRow = ({ row = {}, forcedData = {}, allowedCols, removeDisallo
   const validatedAllowedColumns = tableHandler.parseFieldFilter(allowedCols, false);
  
   let finalRow = { ...row };
-  if (removeDisallowedColumns && !isEmpty(finalRow)) {
+  if (removeDisallowedFields && !isEmpty(finalRow)) {
     finalRow = pickKeys(finalRow, validatedAllowedColumns);
   }
 
@@ -124,7 +124,7 @@ const getValidatedRow = ({ row = {}, forcedData = {}, allowedCols, removeDisallo
  * prepareFieldValues(): Apply forcedData, remove disallowed columns, validate against allowed columns
  * tableConfigurator?.checkColVal(): Validate column min/max/isText/lowerCased/trimmed values
  */
-export const prepareNewData = async ({ row, forcedData, allowedFields, tableRules, fixIssues = false, tableConfigurator, tableHandler }: ValidatedParams) => {
+export const prepareNewData = async ({ row, forcedData, allowedFields, tableRules, removeDisallowedFields = false, tableConfigurator, tableHandler }: ValidatedParams) => {
   const synced_field = (tableRules ?? {})?.sync?.synced_field;
 
   /* Update synced_field if sync is on and missing */
@@ -132,7 +132,7 @@ export const prepareNewData = async ({ row, forcedData, allowedFields, tableRule
     row[synced_field] = Date.now();
   }
 
-  const data = getValidatedRow({ tableHandler, row, forcedData, allowedCols: allowedFields , removeDisallowedColumns: fixIssues });
+  const data = getValidatedRow({ tableHandler, row, forcedData, allowedCols: allowedFields, removeDisallowedFields });
   const dataKeys = getKeys(data);
 
   dataKeys.forEach(col => {

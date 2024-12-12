@@ -353,7 +353,7 @@ export class ViewHandler {
    */
   prepareWhere = prepareWhere.bind(this); 
 
-  intersectColumns(allowedFields: FieldFilter, dissallowedFields: FieldFilter, fixIssues = false): string[] {
+  intersectColumns(allowedFields: FieldFilter, dissallowedFields: FieldFilter, removeDisallowedFields = false): string[] {
     let result: string[] = [];
     if (allowedFields) {
       result = this.parseFieldFilter(allowedFields);
@@ -361,7 +361,7 @@ export class ViewHandler {
     if (dissallowedFields) {
       const _dissalowed = this.parseFieldFilter(dissallowedFields);
 
-      if (!fixIssues) {
+      if (!removeDisallowedFields) {
 
         throw `dissallowed/invalid field found for ${this.name}: `
       }

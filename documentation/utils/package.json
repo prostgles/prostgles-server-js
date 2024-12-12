@@ -1,0 +1,14 @@
+{
+  "name": "generate-docs",
+  "version": "1.0.0",
+  "description": "",
+  "main": "generateDocs.js",
+  "scripts": {
+    "start": "npm i && tsc && node dist/generateDocs.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^20.10.0"
+  }
+}

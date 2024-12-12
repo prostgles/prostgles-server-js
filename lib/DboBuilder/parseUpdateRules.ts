@@ -136,7 +136,7 @@ export async function parseUpdateRules(
             forcedData: undefined, 
             allowedFields: "*", 
             tableRules, 
-            fixIssues: false, 
+            removeDisallowedFields: false, 
             tableConfigurator: this.dboBuilder.prostgles.tableConfigurator,
             tableHandler: this,
           });

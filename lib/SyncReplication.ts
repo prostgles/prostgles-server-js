@@ -219,13 +219,13 @@ export async function syncData (this: PubSubManager, sync: SyncParams, clientDat
 
               updateData.push([syncSafeFilter, omitKeys(upd, id_fields)])
             }));
-            await tbl.updateBatch(updateData, { fixIssues: true }, undefined, table_rules);
+            await tbl.updateBatch(updateData, { removeDisallowedFields: true }, undefined, table_rules);
           } else {
             updates = [];
           }
 
           if (table_rules.insert && inserts.length) {
-            await tbl.insert(inserts, { fixIssues: true }, undefined, table_rules);
+            await tbl.insert(inserts, { removeDisallowedFields: true }, undefined, table_rules);
           } else {
             inserts = [];
           }

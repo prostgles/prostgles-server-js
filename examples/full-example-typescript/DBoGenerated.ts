@@ -15,13 +15,13 @@ export type SelectParams = {
 export type UpdateParams = {
     returning?: FieldFilter;
     onConflictDoNothing?: boolean;
-    fixIssues?: boolean;
+    removeDisallowedFields?: boolean;
     multi?: boolean;
 }
 export type InsertParams = {
     returning?: FieldFilter;
     onConflictDoNothing?: boolean;
-    fixIssues?: boolean;
+    removeDisallowedFields?: boolean;
 }
 export type DeleteParams = {
     returning?: FieldFilter;
