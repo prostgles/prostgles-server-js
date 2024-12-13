@@ -4,6 +4,7 @@ import { getResolvedTypes } from "./getResolvedTypes";
 import { definitions } from "./serverTypes";
 import { getObjectEntries } from "prostgles-types";
 import { TS_Type } from "./getSerializableType";
+import { renderTsType } from "./renderTsType";
 
 const testFolderPath = `${__dirname}/../../../tests/`;
 const docsFolder = `${__dirname}/../../`;
@@ -22,8 +23,8 @@ export const generateServerDocs = () => {
         "ProstglesInitOptions",
         // "DBOFullyTyped",
       ],
-      excludedTypes: [],
-      maxDepth: 2,
+      excludedTypes: ["Server<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>"],
+      maxDepth: 4,
     },
   });
 
@@ -33,9 +34,15 @@ export const generateServerDocs = () => {
   ].join("\n");
   fs.writeFileSync(`${docsFolder}/utils/serverTypes.ts`, serverTypesStr, { encoding: "utf-8" });
 
-  const prostglesInitOpts = (definitions as any)[0];
+  const prostglesInitOpts = definitions[0];
   if (!ProstglesInitOptions || !prostglesInitOpts)
     throw new Error("ProstglesInitOptions not found");
+
+  const configurationPropsMarkdown = getObjectEntries(prostglesInitOpts.properties).map(
+    ([propName, prop]) => {
+      return renderTsType(prop, 0, { name: propName, optional: prop.optional });
+    }
+  );
   const docs = [
     `# Overview`,
     `Our Isomorphic Typescript API allows connecting to a PostgreSQL database to get a realtime view of the data and schema. Interact with the data with full end-to-end type safety.`,
@@ -71,13 +78,7 @@ export const generateServerDocs = () => {
     `});`,
     `\`\`\``,
     `### Configuration options`,
-    ...getObjectEntries(prostglesInitOpts.properties).map(([propName, prop]) => {
-      //@ts-ignore
-      const title = `  - <strong>${propName}</strong> \`${(prop as TS_Type).aliasSymbolescapedName || (prop as TS_Type).alias}\``;
-      const comments = (prop as TS_Type).comments || "";
-      if (!comments) return title;
-      return [title, `  ` + comments + "  "].join("\n");
-    }),
+    configurationPropsMarkdown.join("\n\n"),
   ].join("\n");
 
   fs.writeFileSync(`${docsFolder}SERVER.md`, docs, { encoding: "utf-8" });

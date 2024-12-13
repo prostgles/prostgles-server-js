@@ -1,6 +1,6 @@
 {
   "name": "prostgles-server",
-  "version": "4.2.181",
+  "version": "4.2.182",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -15,7 +15,7 @@
     "test-only": "cd tests/ && ./test.sh",
     "test-quick": "cd tests/ && ./test.sh -quick",
     "test": "rm -rf ./node_modules/* && rm -rf ./dist/* && npm i && npm run lint && npm run test-only",
-    "generate-docs": "rm -f ./documentation/*.md && cd documentation/utils && npm start",
+    "generate-docs": "rm -f ./docs/*.md && cd docs/utils && npm start",
     "pushpublish": "npm run generate-docs && npm version patch --git-tag-version false && git push && npm publish"
   },
   "repository": {

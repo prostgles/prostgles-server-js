@@ -99,7 +99,7 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
   // dbOptions?: DbConnectionOpts;
 
   /**
-   * If defined then a `DBGeneratedSchema.d.ts` file will be created in the provided directory.
+   * Path to the directory where the generated types (`DBGeneratedSchema.d.ts`) will be saved
    * This file exports a `DBGeneratedSchema` type which contains types for the database tables and
    * can be used as a generic type input for the prostgles instances to ensure type safety
    */

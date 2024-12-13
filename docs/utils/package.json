@@ -4,7 +4,7 @@
   "description": "",
   "main": "generateDocs.js",
   "scripts": {
-    "start": "npm i && tsc && node dist/generateDocs.js"
+    "start": "npm i && tsc && node --inspect dist/generateDocs.js"
   },
   "author": "",
   "license": "ISC",
