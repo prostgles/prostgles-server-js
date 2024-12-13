@@ -4,7 +4,7 @@
  /* SCHEMA DEFINITON. Table names have been altered to work with Typescript */
 /* DBO Definition */
 
-export type DBSchemaGenerated = {
+export type DBGeneratedSchema = {
   "\"\"\"*\"\"\"": {
     is_view: false;
     select: true;

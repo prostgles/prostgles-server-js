@@ -11,8 +11,8 @@ To get started, you need to provide a configuration object to the server.
 Basic example:
 ```typescript
 import prostgles from "prostgles-server";
-import { DBSchemaGenerated } from "./DBSchemaGenerated";
-prostgles<DBSchemaGenerated>({
+import { DBGeneratedSchema } from "./DBGeneratedSchema";
+prostgles<DBGeneratedSchema>({
   dbConnection: {
     host: "localhost",
     port: 5432,
@@ -37,10 +37,9 @@ prostgles<DBSchemaGenerated>({
   - <strong>onReady</strong> `OnReadyCallback`
   Called when the prostgles server is ready to accept connections.
 It waits for auth, tableConfig and other async configurations to complete before executing  
-  - <strong>dbOptions</strong> `IDefaults`
   - <strong>tsGeneratedTypesDir</strong> `string | undefined`
-  If defined then a `DBSchemaGenerated.d.ts` file will be created in the provided directory.
-This file exports a `DBSchemaGenerated` type which contains types for the database tables and
+  If defined then a `DBGeneratedSchema.d.ts` file will be created in the provided directory.
+This file exports a `DBGeneratedSchema` type which contains types for the database tables and
 can be used as a generic type input for the prostgles instances to ensure type safety  
   - <strong>disableRealtime</strong> `boolean | undefined`
   If true then schema watch, subscriptions and syncs will be disabled.
@@ -83,11 +82,11 @@ Supports email and OAuth strategies
 Useful for logging or debugging  
   - <strong>watchSchemaType</strong> `"DDL_trigger" | "prostgles_queries" | undefined`
   - <strong>watchSchema</strong> `boolean | EventTriggerTagFilter | "hotReloadMode" | OnSchemaChangeCallback | undefined`
-  If truthy then DBSchemaGenerated.d.ts will be updated
+  If truthy then DBGeneratedSchema.d.ts will be updated
 and "onReady" will be called with new schema on both client and server  
   - <strong>keywords</strong> `Keywords`
   - <strong>onNotice</strong> `(notice: AnyObject, message?: string | undefined) => void`
-  - <strong>fileTable</strong> `FileTableConfig`
+  - <strong>fileTable</strong> `FileTableConfig | undefined`
   Enables file storage and serving.
 Currently supports saving files locally or to AWS S3  
   - <strong>restApi</strong> `RestApiConfig`

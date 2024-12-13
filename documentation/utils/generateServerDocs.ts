@@ -15,7 +15,6 @@ export const generateServerDocs = () => {
   );
   const {
     resolvedTypes: [ProstglesInitOptions],
-    visitedMaps,
   } = getResolvedTypes({
     filePath: serverFilePath,
     filter: {
@@ -28,8 +27,15 @@ export const generateServerDocs = () => {
     },
   });
 
-  if (!ProstglesInitOptions) throw new Error("ProstglesInitOptions not found");
-  const prostglesInitOpts = definitions[0];
+  const serverTypesStr = [
+    `import type { TS_Type } from "./getSerializableType";`,
+    `export const definitions = ${JSON.stringify([ProstglesInitOptions], null, 2)} as const satisfies TS_Type[];`,
+  ].join("\n");
+  fs.writeFileSync(`${docsFolder}/utils/serverTypes.ts`, serverTypesStr, { encoding: "utf-8" });
+
+  const prostglesInitOpts = (definitions as any)[0];
+  if (!ProstglesInitOptions || !prostglesInitOpts)
+    throw new Error("ProstglesInitOptions not found");
   const docs = [
     `# Overview`,
     `Our Isomorphic Typescript API allows connecting to a PostgreSQL database to get a realtime view of the data and schema. Interact with the data with full end-to-end type safety.`,
@@ -44,8 +50,8 @@ export const generateServerDocs = () => {
     `Basic example:`,
     `\`\`\`typescript`,
     `import prostgles from "prostgles-server";`,
-    `import { DBSchemaGenerated } from "./DBSchemaGenerated";`,
-    `prostgles<DBSchemaGenerated>({`,
+    `import { DBGeneratedSchema } from "./DBGeneratedSchema";`,
+    `prostgles<DBGeneratedSchema>({`,
     `  dbConnection: {`,
     `    host: "localhost",`,
     `    port: 5432,`,
@@ -66,6 +72,7 @@ export const generateServerDocs = () => {
     `\`\`\``,
     `### Configuration options`,
     ...getObjectEntries(prostglesInitOpts.properties).map(([propName, prop]) => {
+      //@ts-ignore
       const title = `  - <strong>${propName}</strong> \`${(prop as TS_Type).aliasSymbolescapedName || (prop as TS_Type).alias}\``;
       const comments = (prop as TS_Type).comments || "";
       if (!comments) return title;
@@ -73,10 +80,5 @@ export const generateServerDocs = () => {
     }),
   ].join("\n");
 
-  const serverTypesStr = [
-    `import type { TS_Type } from "./getSerializableType";`,
-    `export const definitions = ${JSON.stringify([ProstglesInitOptions], null, 2)} as const satisfies TS_Type[];`,
-  ].join("\n");
-  fs.writeFileSync(`${docsFolder}/utils/serverTypes.ts`, serverTypesStr, { encoding: "utf-8" });
   fs.writeFileSync(`${docsFolder}SERVER.md`, docs, { encoding: "utf-8" });
 };

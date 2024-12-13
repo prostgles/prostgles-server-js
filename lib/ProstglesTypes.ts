@@ -93,11 +93,14 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
    * It waits for auth, tableConfig and other async configurations to complete before executing
    */
   onReady: OnReadyCallback<S>;
-  dbOptions?: DbConnectionOpts;
+  /**
+   * @deprecated
+   */
+  // dbOptions?: DbConnectionOpts;
 
   /**
-   * If defined then a `DBSchemaGenerated.d.ts` file will be created in the provided directory.
-   * This file exports a `DBSchemaGenerated` type which contains types for the database tables and
+   * If defined then a `DBGeneratedSchema.d.ts` file will be created in the provided directory.
+   * This file exports a `DBGeneratedSchema` type which contains types for the database tables and
    * can be used as a generic type input for the prostgles instances to ensure type safety
    */
   tsGeneratedTypesDir?: string;
@@ -196,7 +199,7 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
     | "prostgles_queries";
 
   /**
-   * If truthy then DBSchemaGenerated.d.ts will be updated
+   * If truthy then DBGeneratedSchema.d.ts will be updated
    * and "onReady" will be called with new schema on both client and server
    */
   watchSchema?: /**

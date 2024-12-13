@@ -1,21 +1,17 @@
-
-
 /* Dashboard */
-import express from 'express';
+import express from "express";
 
-process.on('unhandledRejection', (reason, p) => {
-  console.trace('Unhandled Rejection at:', p, 'reason:', reason)
-  process.exit(1)
+process.on("unhandledRejection", (reason, p) => {
+  console.trace("Unhandled Rejection at:", p, "reason:", reason);
+  process.exit(1);
 });
 
-const app = express(); 
+const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 const _http = require("http");
-const http = _http.createServer(app); 
+const http = _http.createServer(app);
 http.listen(process.env.NPORT || 3000);
- 
-
 
 // import WebSocket from 'ws';
 // const wss = new WebSocket.Server({
@@ -56,12 +52,12 @@ const connectionString = `postgresql://api:api@localhost/postgres`;
 //   preferences JSONB,
 //   status TEXT,
 //   type TEXT
-// );    
+// );
 // `);
-// type DBSchemaGenerated = any;
+// type DBGeneratedSchema = any;
 
 // const user = await db.users.find(
-//   { type: "admin", status: "active" }, 
+//   { type: "admin", status: "active" },
 //   { select: { email: 1 } }
 // )
 // await db.sql(`
@@ -72,20 +68,17 @@ const connectionString = `postgresql://api:api@localhost/postgres`;
 //   preferences JSONB,
 //   status TEXT NOT NULL,
 //   type TEXT NOT NULL
-// );    
+// );
 // `);
 
 import prostgles from "prostgles-server";
-import { DBSchemaGenerated } from "./DBoGenerated";
+import { DBGeneratedSchema } from "./DBoGenerated";
 
-prostgles<DBSchemaGenerated>({
+prostgles<DBGeneratedSchema>({
   dbConnection: { connectionString },
   tsGeneratedTypesDir: __dirname,
   watchSchema: true,
   onReady: async (db) => {
-
-    await db.users.insert({ 
-      
-    })
-  }
+    await db.users.insert({});
+  },
 });

@@ -2,10 +2,8 @@ import * as path from "path";
 import * as ts from "typescript";
 
 export const loadTsFile = (filePath: string) => {
-  // Normalize file path
   const absolutePath = path.resolve(filePath);
 
-  // Create compiler host and program
   const configPath = ts.findConfigFile(
     path.dirname(absolutePath),
     ts.sys.fileExists,
@@ -16,7 +14,6 @@ export const loadTsFile = (filePath: string) => {
     throw new Error("Could not find a valid 'tsconfig.json'.");
   }
 
-  // Parse the config file
   const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
   const parsedConfig = ts.parseJsonConfigFileContent(
     configFile.config,
@@ -24,7 +21,6 @@ export const loadTsFile = (filePath: string) => {
     path.dirname(configPath)
   );
 
-  // Create program
   const program = ts.createProgram({
     rootNames: [absolutePath],
     options: parsedConfig.options,

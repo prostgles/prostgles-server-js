@@ -99,9 +99,9 @@ export const initProstgles = async function (
     }
 
     const conObj =
-      typeof this.opts.dbConnection === "string"
-        ? { connectionString: this.opts.dbConnection }
-        : this.opts.dbConnection;
+      typeof this.opts.dbConnection === "string" ?
+        { connectionString: this.opts.dbConnection }
+      : this.opts.dbConnection;
     const application_name = `prostgles ${this.appId} ${existingAppName}`;
 
     /* 1. Connect to db */
@@ -262,64 +262,63 @@ export const initProstgles = async function (
 
 type GetDbConnectionArgs = Pick<
   ProstglesInitOptions,
-  "DEBUG_MODE" | "onQuery" | "dbConnection" | "dbOptions" | "onNotice"
+  "DEBUG_MODE" | "onQuery" | "dbConnection" | "onNotice"
 >;
 const getDbConnection = function ({
   dbConnection,
   onQuery,
   DEBUG_MODE,
-  dbOptions,
   onNotice,
 }: GetDbConnectionArgs): { db: DB; pgp: PGP } {
   const onQueryOrError:
     | undefined
     | ((error: any, ctx: pgPromise.IEventContext<pg.IClient>) => void) =
-    !onQuery && !DEBUG_MODE
-      ? undefined
-      : (error, ctx) => {
-          if (onQuery) {
-            onQuery(error, ctx);
-          } else if (DEBUG_MODE) {
-            if (error) {
-              console.error(error, ctx);
-            } else {
-              console.log(ctx);
-            }
+    !onQuery && !DEBUG_MODE ?
+      undefined
+    : (error, ctx) => {
+        if (onQuery) {
+          onQuery(error, ctx);
+        } else if (DEBUG_MODE) {
+          if (error) {
+            console.error(error, ctx);
+          } else {
+            console.log(ctx);
           }
-        };
+        }
+      };
 
   const pgp: PGP = pgPromise({
-    ...(onQueryOrError
-      ? {
-          query: (ctx) => onQueryOrError(undefined, ctx),
-          error: onQueryOrError,
-        }
-      : {}),
-    ...(onNotice || DEBUG_MODE
-      ? {
-          connect: function ({ client, useCount }) {
-            const isFresh = !useCount;
-            if (isFresh && !client.listeners("notice").length) {
-              client.on("notice", function (msg) {
-                if (onNotice) {
-                  onNotice(msg, msg?.message);
-                } else {
-                  console.log("notice: %j", msg?.message);
-                }
-              });
-            }
-            if (isFresh && !client.listeners("error").length) {
-              client.on("error", function (msg) {
-                if (onNotice) {
-                  onNotice(msg, msg?.message);
-                } else {
-                  console.log("error: %j", msg?.message);
-                }
-              });
-            }
-          },
-        }
-      : {}),
+    ...(onQueryOrError ?
+      {
+        query: (ctx) => onQueryOrError(undefined, ctx),
+        error: onQueryOrError,
+      }
+    : {}),
+    ...(onNotice || DEBUG_MODE ?
+      {
+        connect: function ({ client, useCount }) {
+          const isFresh = !useCount;
+          if (isFresh && !client.listeners("notice").length) {
+            client.on("notice", function (msg) {
+              if (onNotice) {
+                onNotice(msg, msg?.message);
+              } else {
+                console.log("notice: %j", msg?.message);
+              }
+            });
+          }
+          if (isFresh && !client.listeners("error").length) {
+            client.on("error", function (msg) {
+              if (onNotice) {
+                onNotice(msg, msg?.message);
+              } else {
+                console.log("error: %j", msg?.message);
+              }
+            });
+          }
+        },
+      }
+    : {}),
   });
   // pgp.pg.defaults.max = 70;
 
@@ -340,9 +339,9 @@ const getDbConnection = function ({
   pgp.pg.types.setTypeParser(pgp.pg.types.builtins.TIMESTAMPTZ, (v) => v); // timestamp with time zone
   pgp.pg.types.setTypeParser(pgp.pg.types.builtins.DATE, (v) => v); // date
 
-  if (dbOptions) {
-    Object.assign(pgp.pg.defaults, dbOptions);
-  }
+  // if (dbOptions) {
+  //   Object.assign(pgp.pg.defaults, dbOptions);
+  // }
 
   return {
     db: pgp(dbConnection),

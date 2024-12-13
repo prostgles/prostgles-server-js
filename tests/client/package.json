@@ -13,9 +13,9 @@
   "license": "ISC",
   "dependencies": {
     "@types/node": "^20.9.2",
-    "prostgles-client": "^4.0.176",
+    "prostgles-client": "^4.0.178",
     "prostgles-types": "^4.0.51",
-    "socket.io-client": "^4.7.5"
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "jsdom": "^24.0.0",

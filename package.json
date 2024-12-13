@@ -1,6 +1,6 @@
 {
   "name": "prostgles-server",
-  "version": "4.2.179",
+  "version": "4.2.180",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -15,7 +15,8 @@
     "test-only": "cd tests/ && ./test.sh",
     "test-quick": "cd tests/ && ./test.sh -quick",
     "test": "rm -rf ./node_modules/* && rm -rf ./dist/* && npm i && npm run lint && npm run test-only",
-    "pushpublish": "npm version patch --git-tag-version false && git push && npm publish"
+    "generate-docs": "rm -f ./documentation/*.md && cd documentation/utils && npm start",
+    "pushpublish": "npm run generate-docs && npm version patch --git-tag-version false && git push && npm publish"
   },
   "repository": {
     "type": "git",
@@ -54,7 +55,7 @@
     "pg": "^8.11.5",
     "pg-cursor": "^2.11.0",
     "pg-promise": "^11.9.1",
-    "prostgles-types": "^4.0.117"
+    "prostgles-types": "^4.0.119"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

@@ -19,7 +19,7 @@ http.listen(3001);
 import { isomorphicQueries } from "../isomorphicQueries.spec";
 import { serverOnlyQueries } from "../serverOnlyQueries.spec";
 
-import { DBSchemaGenerated } from "./DBSchemaGenerated";
+import { DBGeneratedSchema } from "./DBGeneratedSchema";
 
 import type { DBOFullyTyped } from "prostgles-server/dist/DBSchemaBuilder";
 import { spawn } from "child_process";
@@ -78,7 +78,7 @@ function dd() {
 }
 (async () => {
   if (isClientTest && process.env.TEST_NAME === "useProstgles") {
-    await prostgles<DBSchemaGenerated>({
+    await prostgles<DBGeneratedSchema>({
       dbConnection,
       io: ioWatchSchema,
       transactions: true,
@@ -89,7 +89,7 @@ function dd() {
     });
   }
 
-  prostgles<DBSchemaGenerated>({
+  prostgles<DBGeneratedSchema>({
     dbConnection,
     sqlFilePath: path.join(__dirname + "/../../init.sql"),
     io,

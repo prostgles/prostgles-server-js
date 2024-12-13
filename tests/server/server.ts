@@ -1,8 +1,8 @@
 import path from "path";
 import prostgles from "prostgles-server";
-import { DBSchemaGenerated } from "./DBoGenerated";
+import { DBGeneratedSchema } from "./DBoGenerated";
 
-prostgles<DBSchemaGenerated>({
+prostgles<DBGeneratedSchema>({
   dbConnection: {
     connectionString: process.env.DB_CONNECTION,
   },

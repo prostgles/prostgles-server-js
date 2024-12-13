@@ -1,9 +1,8 @@
 import * as fs from "fs";
 import * as path from "path";
-import { isDefined } from "prostgles-types";
-import { getResolvedTypes } from "./getResolvedTypes";
-import { getObjectEntries } from "prostgles-types";
+import { getObjectEntries, isDefined, TableHandler } from "prostgles-types";
 import { definitions } from "./clientTypes";
+import { getResolvedTypes } from "./getResolvedTypes";
 import { TS_Function, TS_Type } from "./getSerializableType";
 
 const testFolderPath = `${__dirname}/../../../tests/`;
@@ -14,8 +13,8 @@ export const generateClientDocs = () => {
     `${testFolderPath}/client/node_modules/prostgles-client/dist/prostgles.d.ts`
   );
   const excludedTypes = [
-    "FullFilter",
-    "FullFilter<T, S> | undefined",
+    // "FullFilter",
+    // "FullFilter<T, S> | undefined",
     "FieldFilter | undefined",
     "SyncOptions",
     "SyncOneOptions",
@@ -24,10 +23,7 @@ export const generateClientDocs = () => {
   const { resolvedTypes, visitedMaps } = getResolvedTypes({
     filePath: clientFilePath,
     filter: {
-      nodeNames: [
-        // "ViewHandlerClient",
-        "TableHandlerClient",
-      ],
+      nodeNames: ["TableHandlerClient"],
       excludedTypes,
     },
   });
@@ -57,8 +53,51 @@ export const generateClientDocs = () => {
     }
   );
 
-  const docPath = `${docsFolder}CLIENT.md`;
-  generateMDX(docPath);
+  const docPath = `${docsFolder}METHODS.md`;
+
+  const tableHandler = definitions[0];
+  const isomotphicMethodNames = {
+    count: 1,
+    delete: 1,
+    find: 1,
+    insert: 1,
+    update: 1,
+    findOne: 1,
+    getColumns: 1,
+    getInfo: 1,
+    size: 1,
+    subscribe: 1,
+    subscribeOne: 1,
+    updateBatch: 1,
+    upsert: 1,
+  } satisfies Record<keyof TableHandler, 1>;
+
+  const isomorphicMd = getMethodsDocs(
+    getObjectEntries(tableHandler.properties).filter(
+      ([methodName]) => isomotphicMethodNames[methodName]
+    )
+  );
+  const clientMd = getMethodsDocs(
+    getObjectEntries(tableHandler.properties).filter(
+      ([methodName]) => !isomotphicMethodNames[methodName]
+    )
+  );
+
+  const result = [
+    `# Isomorphic Methods`,
+    ``,
+    `The following methods are available on the client and server.`,
+    ``,
+    isomorphicMd.join("\n\n"),
+
+    `# Client Methods`,
+    ``,
+    `The following methods are available on the client.`,
+    ``,
+    clientMd.join("\n\n"),
+  ].join("\n");
+
+  fs.writeFileSync(docPath, result, { encoding: "utf-8" });
 };
 
 const getAliasWithoutGenerics = (type: TS_Type) => {
@@ -66,45 +105,65 @@ const getAliasWithoutGenerics = (type: TS_Type) => {
   return type.aliasSymbolescapedName || type.alias;
 };
 
-export const generateMDX = (filePath: string) => {
-  const tableHandler = definitions[0];
-  const mdxContent = getObjectEntries(tableHandler.properties).map(([methodName, _methodInfo]) => {
+const getMethodsDocs = (methods: [name: string, TS_Type][]) => {
+  return methods.map(([methodName, _methodInfo]) => {
     const methodInfo = (
       _methodInfo.type === "function" ?
         (_methodInfo as TS_Function)
         // : _methodInfo.type === "union" ? _methodInfo.types.find((t) => t.type === "function")
       : undefined) as TS_Function | undefined;
     if (!methodInfo) return "";
+    const args = `${methodInfo.arguments
+      .map((arg) => `${arg.name}${arg.optional ? "?" : ""}: ${getAliasWithoutGenerics(arg)}`)
+      .join(", ")}`;
+    const rType = `${methodInfo.returnType.aliasSymbolescapedName || methodInfo.returnType.alias}`
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;");
     return [
-      `## ${methodName}()`,
+      `## ${methodName}<span style="opacity: 0.6;">(${args}): ${rType}</span>`,
       methodInfo.comments ?? "",
-      `\`\`\`typescript
-  ${methodName}: (${methodInfo.arguments
-    .map((arg) => `${arg.name}${arg.optional ? "?" : ""}: ${getAliasWithoutGenerics(arg)}`)
-    .join(", ")}): ${methodInfo.returnType.aliasSymbolescapedName || methodInfo.returnType.alias}
-  \`\`\``,
-      `#### Arguments`,
+      `\`\`\`typescript`,
+      `${methodName}: (): `,
+      `\`\`\``,
+      `#### Parameters`,
       ``,
       ...methodInfo.arguments.map((arg) => {
         return renderType(arg, 2, { name: arg.name, optional: arg.optional });
       }),
-      `#### Return type`,
-      renderType(methodInfo.returnType, 0, undefined),
+      // `#### Return type`,
+      `#### ` + renderType(methodInfo.returnType, 0, undefined),
     ].join("\n");
   });
-  const result = mdxContent.join("\n\n");
-  fs.writeFileSync(filePath, result, { encoding: "utf-8" });
 };
 
+const renderedAliases = new Set<string>();
 const renderType = (
   type: TS_Type,
   indent = 2,
   argOrProp: { name: string; optional: boolean } | undefined
 ): string => {
   const indentText = " ".repeat(indent);
-  const title = `${indentText}${argOrProp?.name ? `- **${argOrProp.name}**: ` : ""}\`${
-    type.aliasSymbolescapedName || type.alias
-  }\`  ${type.comments ? ` - ${removeLineBreaks(type.comments)}` : ""}`;
+  const typeAlias = `\`${type.aliasSymbolescapedName || type.alias}\``;
+  const typeText =
+    type.aliasSymbolescapedName && type.type === "object" ?
+      `<span style="color: green;">${type.aliasSymbolescapedName}</span>`
+    : typeAlias;
+  const title = [
+    `${indentText}${argOrProp?.name ? `- **${argOrProp.name}**: ` : ""}${typeAlias}`,
+    `${type.comments ? `${removeLineBreaks(type.comments, indentText + "  ")}` : ""}`,
+  ].join("\n\n");
+
+  if (typeAlias?.includes("FullFilter")) {
+    // debugger;
+  }
+  /**
+   * Re-use rendered types by linking them through an anchor tag
+   */
+  if (type.aliasSymbolescapedName && argOrProp?.name) {
+    renderedAliases.add(type.aliasSymbolescapedName);
+    console.log(type.aliasSymbolescapedName);
+  }
+
   if (type.type === "primitive" || type.type === "literal") {
     return title;
   }
@@ -133,10 +192,19 @@ const renderType = (
   return title;
 };
 
-const removeLineBreaks = (str = "") =>
+const removeLineBreaks = (str: string, indent: string) =>
   str
     .split("\n")
     .map((line) => {
-      if (!line.trim().endsWith(".")) return `${line}.`;
+      return `${indent}${line.trimStart()}`;
     })
-    .join(" ");
+    .join("\n");
+
+const renderTypeAlias = (type: TS_Type) => {
+  const typeAlias = type.aliasSymbolescapedName || type.alias;
+  const style = type.aliasSymbolescapedName ? `style="color: green;"` : "";
+  // if (renderedAliases.has(typeAlias)) {
+  //   return `<a ${style} href="#${typeAlias}">${typeAlias}</a>`;
+  // }
+  return `<span ${style}>${typeAlias}</span>`;
+};

@@ -4,8 +4,8 @@ import { AnyObject, isDefined } from "prostgles-types";
 type TS_Base = {
   alias?: string;
   aliasSymbolescapedName?: string;
-  intersectionParent?: string;
   comments?: string;
+  intersectionParent?: string;
 };
 
 export type TS_Literal = TS_Base & {
@@ -359,12 +359,22 @@ export const getSerializableType = (
         opts,
         depth + 1
       );
-      intersectionType.intersectionParent = aliasSymbolescapedName || alias;
+
+      if (intersectionType.type === "object") {
+        intersectionType.intersectionParent = aliasSymbolescapedName;
+      }
       return intersectionType;
     });
     if (intersectionTypes.every((t) => t.type === "object")) {
       const properties = (intersectionTypes as TS_Object[]).reduce((acc, t) => {
-        return { ...acc, ...t.properties };
+        const propertiesWithParentObject = Object.entries(t.properties).reduce(
+          (acc, [k, v]) => ({
+            ...acc,
+            [k]: { ...v, intersectionParent: t.aliasSymbolescapedName },
+          }),
+          {}
+        );
+        return { ...acc, ...propertiesWithParentObject };
       }, {});
       return withAlias({
         type: "object",

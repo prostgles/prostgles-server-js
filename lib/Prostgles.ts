@@ -124,7 +124,6 @@ export class Prostgles {
       disableRealtime: 1,
       onReady: 1,
       dbConnection: 1,
-      dbOptions: 1,
       publishMethods: 1,
       io: 1,
       publish: 1,
@@ -176,7 +175,7 @@ export class Prostgles {
   }
 
   getTSFileName() {
-    const fileName = "DBSchemaGenerated.d.ts"; //`dbo_${this.schema}_types.ts`;
+    const fileName = "DBGeneratedSchema.d.ts"; //`dbo_${this.schema}_types.ts`;
     const _dir = this.opts.tsGeneratedTypesDir || "";
     const dir = _dir.endsWith("/") ? _dir : `${_dir}/`;
     const fullPath = dir + fileName;

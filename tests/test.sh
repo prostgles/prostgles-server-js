@@ -9,9 +9,7 @@ if [ $# -eq 0 ]; then
   npm i
 fi
 
-npm run build
-
-#npm run test-server 2>&1 ./server.log
+npm run build && \
 npm run test-server && \
 TEST_NAME="main"         npm run test-client && \
 TEST_NAME="useProstgles" npm run test-client && \

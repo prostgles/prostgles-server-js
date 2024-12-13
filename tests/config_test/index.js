@@ -1,12 +1,14 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
+var __importDefault =
+  (this && this.__importDefault) ||
+  function (mod) {
+    return mod && mod.__esModule ? mod : { default: mod };
+  };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
-process.on('unhandledRejection', (reason, p) => {
-    console.trace('Unhandled Rejection at:', p, 'reason:', reason);
-    process.exit(1);
+process.on("unhandledRejection", (reason, p) => {
+  console.trace("Unhandled Rejection at:", p, "reason:", reason);
+  process.exit(1);
 });
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
@@ -14,12 +16,12 @@ app.use(express_1.default.urlencoded({ extended: true }));
 const _http = require("http");
 const http = _http.createServer(app);
 const io = require("socket.io")(http, {
-    path: "/teztz/s",
-    // maxHttpBufferSize: 1e8, // 100Mb
+  path: "/teztz/s",
+  // maxHttpBufferSize: 1e8, // 100Mb
 });
 http.listen(process.env.NPORT || 3000);
 const log = (msg, extra) => {
-    console.log(...["(server): " + msg, extra].filter(v => v));
+  console.log(...["(server): " + msg, extra].filter((v) => v));
 };
 // import WebSocket from 'ws';
 // const wss = new WebSocket.Server({
@@ -58,11 +60,11 @@ const connectionString = `postgresql://api:api@localhost/postgres`;
 //   preferences JSONB,
 //   status TEXT,
 //   type TEXT
-// );    
+// );
 // `);
-// type DBSchemaGenerated = any;
+// type DBGeneratedSchema = any;
 // const user = await db.users.find(
-//   { type: "admin", status: "active" }, 
+//   { type: "admin", status: "active" },
 //   { select: { email: 1 } }
 // )
 // await db.sql(`
@@ -73,14 +75,14 @@ const connectionString = `postgresql://api:api@localhost/postgres`;
 //   preferences JSONB,
 //   status TEXT NOT NULL,
 //   type TEXT NOT NULL
-// );    
+// );
 // `);
 const prostgles_server_1 = __importDefault(require("prostgles-server"));
 (0, prostgles_server_1.default)({
-    dbConnection: { connectionString },
-    tsGeneratedTypesDir: __dirname,
-    watchSchema: true,
-    onReady: async (db) => {
-        await db.users.insert({});
-    }
+  dbConnection: { connectionString },
+  tsGeneratedTypesDir: __dirname,
+  watchSchema: true,
+  onReady: async (db) => {
+    await db.users.insert({});
+  },
 });

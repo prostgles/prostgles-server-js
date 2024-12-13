@@ -15,7 +15,7 @@ export const definitions = [
             "type": "primitive",
             "alias": "string",
             "subType": "string",
-            "comments": "Language code for i18n data\n```typescript\n  \"en\"\n```"
+            "comments": "Language code for i18n data. \"en\" by default"
           }
         ],
         "returnType": {
@@ -44,7 +44,8 @@ export const definitions = [
               },
               "isFileTable": {
                 "type": "object",
-                "alias": "{ allowedNestedInserts?: { table: string; column: string; }[] | undefined; }",
+                "alias": "FileTableConfig",
+                "aliasSymbolescapedName": "FileTableConfig",
                 "comments": "Defined if this is the fileTable",
                 "properties": {
                   "allowedNestedInserts": {
@@ -79,20 +80,21 @@ export const definitions = [
                 "alias": "false",
                 "subType": "boolean",
                 "optional": true,
-                "comments": "True if fileTable is enabled and this table references the fileTable"
+                "comments": "True if fileTable is enabled and this table references the fileTable\nUsed in UI"
               },
               "isView": {
                 "type": "primitive",
                 "alias": "false",
                 "subType": "boolean",
-                "optional": true
+                "optional": true,
+                "comments": "True if this is a view.\nTable methods (insert, update, delete) are undefined for views"
               },
               "fileTableName": {
                 "type": "primitive",
                 "alias": "string",
                 "subType": "string",
                 "optional": true,
-                "comments": "Name of the fileTable (if enabled)"
+                "comments": "Name of the fileTable (if enabled)\nUsed in UI"
               },
               "dynamicRules": {
                 "type": "object",
@@ -152,7 +154,8 @@ export const definitions = [
           }
         },
         "optional": false,
-        "comments": "Retrieves the table/view info"
+        "comments": "Retrieves the table/view info",
+        "intersectionParent": "ViewHandler"
       },
       "getColumns": {
         "type": "function",
@@ -189,10 +192,145 @@ export const definitions = [
                 "optional": false
               },
               "filter": {
-                "type": "object",
-                "alias": "AnyObject",
-                "aliasSymbolescapedName": "AnyObject",
-                "properties": {},
+                "type": "union",
+                "alias": "FullFilter<void, void>",
+                "aliasSymbolescapedName": "FullFilter",
+                "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                "types": [
+                  {
+                    "type": "object",
+                    "alias": "ComplexFilter",
+                    "aliasSymbolescapedName": "ComplexFilter",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $and: FullFilter<void, void>[]; }",
+                    "properties": {
+                      "$and": {
+                        "type": "array",
+                        "alias": "FullFilter<void, void>[]",
+                        "itemType": {
+                          "type": "reference",
+                          "alias": "FullFilter<void, void>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`"
+                        },
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $or: FullFilter<void, void>[]; }",
+                    "properties": {
+                      "$or": {
+                        "type": "array",
+                        "alias": "FullFilter<void, void>[]",
+                        "itemType": {
+                          "type": "reference",
+                          "alias": "FullFilter<void, void>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`"
+                        },
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "NormalFilter<AnyObject>",
+                    "aliasSymbolescapedName": "NormalFilter",
+                    "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true,
+                        "intersectionParent": "Partial"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ [x: `${string}.=`]: any; [x: `${string}.$eq`]: any; [x: `${string}.<>`]: any; [x: `${string}.>`]: any; [x: `${string}.<`]: any; [x: `${string}.>=`]: any; [x: `${string}.<=`]: any; [x: `${string}.$ne`]: any; [x: `${string}.$gt`]: any; [x: `${string}.$gte`]: any; [x: `${string}.$lt`]: any; [x: `${string}.$lt...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {}
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ [x: `${string}.$in`]: any[]; [x: `${string}.$nin`]: any[]; }>",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {}
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ [x: `${string}.=`]: any; [x: `${string}.$eq`]: any; [x: `${string}.<>`]: any; [x: `${string}.>`]: any; [x: `${string}.<`]: any; [x: `${string}.>=`]: any; [x: `${string}.<=`]: any; [x: `${string}.$ne`]: any; [x: `${string}.$gt`]: any; [x: `${string}.$gte`]: any; [x: `${string}.$lt`]: any; [x: `${string}.$lt...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {}
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ [x: `${string}.=`]: any; [x: `${string}.$eq`]: any; [x: `${string}.<>`]: any; [x: `${string}.>`]: any; [x: `${string}.<`]: any; [x: `${string}.>=`]: any; [x: `${string}.<=`]: any; [x: `${string}.$ne`]: any; [x: `${string}.$gt`]: any; [x: `${string}.$gte`]: any; [x: `${string}.$lt`]: any; [x: `${string}.$lt...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {}
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ [x: `${string}.$in`]: any[]; [x: `${string}.$nin`]: any[]; }> & Partial<{ [x: `${string}.$ilike`]: any; [x: `${string}.$like`]: any; [x: `${string}.$nilike`]: any; [x: `${string}.$nlike`]: any; }>",
+                    "properties": {}
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ [x: `${string}.$in`]: any[]; [x: `${string}.$nin`]: any[]; }> & Partial<{ [x: `${string}.@@`]: any; [x: `${string}.@>`]: any; [x: `${string}.<@`]: any; [x: `${string}.$contains`]: any; [x: `${string}.$containedBy`]: any; }>",
+                    "properties": {}
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ $exists: any; $notExists: any; $existsJoined: any; $notExistsJoined: any; }>",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {
+                      "$exists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$existsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExistsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      }
+                    }
+                  }
+                ],
                 "optional": false
               }
             }
@@ -214,28 +352,43 @@ export const definitions = [
                   "type": "primitive",
                   "alias": "string",
                   "subType": "string",
-                  "optional": false
+                  "optional": false,
+                  "intersectionParent": "ColumnInfo"
                 },
                 "label": {
                   "type": "primitive",
                   "alias": "string",
                   "subType": "string",
                   "optional": false,
-                  "comments": "Column display name. Will be first non empty value from i18n data, comment, name"
+                  "comments": "Column display name. Will be first non empty value from i18n data, comment, name",
+                  "intersectionParent": "ColumnInfo"
                 },
                 "comment": {
-                  "type": "primitive",
-                  "alias": "string",
-                  "subType": "string",
+                  "type": "union",
+                  "alias": "string | undefined",
+                  "types": [
+                    {
+                      "type": "primitive",
+                      "alias": "undefined",
+                      "subType": "undefined"
+                    },
+                    {
+                      "type": "primitive",
+                      "alias": "string",
+                      "subType": "string"
+                    }
+                  ],
                   "optional": false,
-                  "comments": "Column description (if provided)"
+                  "comments": "Column description (if provided)",
+                  "intersectionParent": "ColumnInfo"
                 },
                 "ordinal_position": {
                   "type": "primitive",
                   "alias": "number",
                   "subType": "number",
                   "optional": false,
-                  "comments": "Ordinal position of the column within the table (count starts at 1)"
+                  "comments": "Ordinal position of the column within the table (count starts at 1)",
+                  "intersectionParent": "ColumnInfo"
                 },
                 "is_nullable": {
                   "type": "union",
@@ -248,7 +401,8 @@ export const definitions = [
                     }
                   ],
                   "optional": false,
-                  "comments": "True if column is nullable. A not-null constraint is one way a column can be known not nullable, but there may be others."
+                  "comments": "True if column is nullable",
+                  "intersectionParent": "ColumnInfo"
                 },
                 "is_updatable": {
                   "type": "union",
@@ -260,7 +414,8 @@ export const definitions = [
                       "subType": "boolean"
                     }
                   ],
-                  "optional": false
+                  "optional": false,
+                  "intersectionParent": "ColumnInfo"
                 },
                 "is_generated": {
                   "type": "union",
@@ -273,35 +428,62 @@ export const definitions = [
                     }
                   ],
                   "optional": false,
-                  "comments": "If the column is a generated column (converted to boolean from ALWAYS and NEVER)"
+                  "comments": "If the column is a generated column (converted to boolean from ALWAYS and NEVER)",
+                  "intersectionParent": "ColumnInfo"
                 },
                 "data_type": {
                   "type": "primitive",
                   "alias": "string",
                   "subType": "string",
                   "optional": false,
-                  "comments": "Simplified data type"
+                  "comments": "Simplified data type",
+                  "intersectionParent": "ColumnInfo"
                 },
                 "udt_name": {
                   "type": "reference",
                   "alias": "PG_COLUMN_UDT_DATA_TYPE",
                   "aliasSymbolescapedName": "PG_COLUMN_UDT_DATA_TYPE",
-                  "comments": "Postgres raw data types. values starting with underscore means it's an array of that data type",
-                  "optional": false
+                  "comments": "Postgres data type name.\nArray types start with an underscore",
+                  "optional": false,
+                  "intersectionParent": "ColumnInfo"
                 },
                 "element_type": {
-                  "type": "primitive",
-                  "alias": "string",
-                  "subType": "string",
+                  "type": "union",
+                  "alias": "string | undefined",
+                  "types": [
+                    {
+                      "type": "primitive",
+                      "alias": "undefined",
+                      "subType": "undefined"
+                    },
+                    {
+                      "type": "primitive",
+                      "alias": "string",
+                      "subType": "string"
+                    }
+                  ],
                   "optional": false,
-                  "comments": "Element data type"
+                  "comments": "Element data type",
+                  "intersectionParent": "ColumnInfo"
                 },
                 "element_udt_name": {
-                  "type": "primitive",
-                  "alias": "string",
-                  "subType": "string",
+                  "type": "union",
+                  "alias": "string | undefined",
+                  "types": [
+                    {
+                      "type": "primitive",
+                      "alias": "undefined",
+                      "subType": "undefined"
+                    },
+                    {
+                      "type": "primitive",
+                      "alias": "string",
+                      "subType": "string"
+                    }
+                  ],
                   "optional": false,
-                  "comments": "Element raw data type"
+                  "comments": "Element data type name",
+                  "intersectionParent": "ColumnInfo"
                 },
                 "is_pkey": {
                   "type": "union",
@@ -314,14 +496,17 @@ export const definitions = [
                     }
                   ],
                   "optional": false,
-                  "comments": "PRIMARY KEY constraint on column. A table can have more then one PK"
+                  "comments": "PRIMARY KEY constraint on column.\nA table can have a multi column primary key",
+                  "intersectionParent": "ColumnInfo"
                 },
                 "references": {
                   "type": "array",
-                  "alias": "{ ftable: string; fcols: string[]; cols: string[]; }[]",
+                  "alias": "ReferenceTable[]",
                   "itemType": {
                     "type": "object",
-                    "alias": "{ ftable: string; fcols: string[]; cols: string[]; }",
+                    "alias": "ReferenceTable",
+                    "aliasSymbolescapedName": "ReferenceTable",
+                    "comments": "",
                     "properties": {
                       "ftable": {
                         "type": "primitive",
@@ -352,7 +537,8 @@ export const definitions = [
                     }
                   },
                   "optional": true,
-                  "comments": "Foreign key constraint\nA column can reference multiple tables"
+                  "comments": "Foreign key constraint\nA column can reference multiple tables",
+                  "intersectionParent": "ColumnInfo"
                 },
                 "has_default": {
                   "type": "union",
@@ -365,14 +551,16 @@ export const definitions = [
                     }
                   ],
                   "optional": false,
-                  "comments": "true if column has a default value\nUsed for excluding pkey from insert"
+                  "comments": "true if column has a default value\nUsed for excluding pkey from insert",
+                  "intersectionParent": "ColumnInfo"
                 },
                 "column_default": {
                   "type": "primitive",
                   "alias": "any",
                   "subType": "any",
                   "optional": true,
-                  "comments": "Column default value"
+                  "comments": "Column default value",
+                  "intersectionParent": "ColumnInfo"
                 },
                 "min": {
                   "type": "union",
@@ -395,7 +583,8 @@ export const definitions = [
                     }
                   ],
                   "optional": true,
-                  "comments": "Extracted from tableConfig\nUsed in SmartForm"
+                  "comments": "Extracted from tableConfig\nUsed in SmartForm",
+                  "intersectionParent": "ColumnInfo"
                 },
                 "max": {
                   "type": "union",
@@ -417,13 +606,15 @@ export const definitions = [
                       "subType": "number"
                     }
                   ],
-                  "optional": true
+                  "optional": true,
+                  "intersectionParent": "ColumnInfo"
                 },
                 "hint": {
                   "type": "primitive",
                   "alias": "string",
                   "subType": "string",
-                  "optional": true
+                  "optional": true,
+                  "intersectionParent": "ColumnInfo"
                 },
                 "jsonbSchema": {
                   "type": "object",
@@ -435,73 +626,85 @@ export const definitions = [
                       "alias": "any",
                       "subType": "any",
                       "optional": true,
-                      "comments": "False by default"
+                      "comments": "False by default",
+                      "intersectionParent": "Omit"
                     },
                     "description": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Omit"
                     },
                     "title": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Omit"
                     },
                     "type": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Omit"
                     },
                     "allowedValues": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Omit"
                     },
                     "oneOf": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Omit"
                     },
                     "oneOfType": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Omit"
                     },
                     "arrayOf": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Omit"
                     },
                     "arrayOfType": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Omit"
                     },
                     "enum": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Omit"
                     },
                     "record": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Omit"
                     },
                     "lookup": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Omit"
                     },
                     "defaultValue": {
                       "type": "primitive",
@@ -510,7 +713,9 @@ export const definitions = [
                       "optional": true
                     }
                   },
-                  "optional": true
+                  "optional": true,
+                  "comments": "JSONB schema (a simplified version of json schema) for the column (if defined in the tableConfig)\nA check constraint will use this schema for runtime data validation and apropriate TS types will be generated",
+                  "intersectionParent": "ColumnInfo"
                 },
                 "file": {
                   "type": "union",
@@ -3625,7 +3830,8 @@ export const definitions = [
                     }
                   ],
                   "optional": true,
-                  "comments": "If degined then this column is referencing the file table\nExtracted from FileTable config\nUsed in SmartForm"
+                  "comments": "If degined then this column is referencing the file table\nExtracted from FileTable config\nUsed in SmartForm",
+                  "intersectionParent": "ColumnInfo"
                 },
                 "tsDataType": {
                   "type": "union",
@@ -3686,7 +3892,7 @@ export const definitions = [
                     }
                   ],
                   "optional": false,
-                  "comments": "Can be viewed/selected"
+                  "comments": "Can be viewed/selected\nBased on access rules and postgres policies"
                 },
                 "orderBy": {
                   "type": "union",
@@ -3699,7 +3905,7 @@ export const definitions = [
                     }
                   ],
                   "optional": false,
-                  "comments": "Can be ordered by"
+                  "comments": "Can be ordered by\nBased on access rules"
                 },
                 "filter": {
                   "type": "union",
@@ -3712,7 +3918,7 @@ export const definitions = [
                     }
                   ],
                   "optional": false,
-                  "comments": "Can be filtered by"
+                  "comments": "Can be filtered by\nBased on access rules"
                 },
                 "insert": {
                   "type": "union",
@@ -3725,7 +3931,7 @@ export const definitions = [
                     }
                   ],
                   "optional": false,
-                  "comments": "Can be inserted"
+                  "comments": "Can be inserted\nBased on access rules and postgres policies"
                 },
                 "update": {
                   "type": "union",
@@ -3738,7 +3944,7 @@ export const definitions = [
                     }
                   ],
                   "optional": false,
-                  "comments": "Can be updated"
+                  "comments": "Can be updated\nBased on access rules and postgres policies"
                 },
                 "delete": {
                   "type": "union",
@@ -3751,14 +3957,15 @@ export const definitions = [
                     }
                   ],
                   "optional": false,
-                  "comments": "Can be used in the delete filter"
+                  "comments": "Can be used in the delete filter\nBased on access rules"
                 }
               }
             }
           }
         },
         "optional": false,
-        "comments": "Retrieves columns metadata of the table/view"
+        "comments": "Retrieves columns metadata of the table/view",
+        "intersectionParent": "ViewHandler"
       },
       "find": {
         "type": "function",
@@ -3767,9 +3974,197 @@ export const definitions = [
           {
             "name": "filter",
             "optional": true,
-            "type": "reference",
+            "type": "union",
             "alias": "FullFilter<T, S> | undefined",
-            "comments": ""
+            "types": [
+              {
+                "type": "primitive",
+                "alias": "undefined",
+                "subType": "undefined"
+              },
+              {
+                "type": "object",
+                "alias": "ComplexFilter",
+                "aliasSymbolescapedName": "ComplexFilter",
+                "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $and: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$and": {
+                    "type": "array",
+                    "alias": "FullFilter<T, S>[]",
+                    "itemType": {
+                      "type": "union",
+                      "alias": "FullFilter<T, S>",
+                      "aliasSymbolescapedName": "FullFilter",
+                      "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                      "types": [
+                        {
+                          "type": "object",
+                          "alias": "ComplexFilter",
+                          "aliasSymbolescapedName": "ComplexFilter",
+                          "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "reference",
+                          "alias": "{ $and: FullFilter<T, S>[]; }"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "{ $or: FullFilter<T, S>[]; }",
+                          "properties": {
+                            "$or": {
+                              "type": "reference",
+                              "alias": "FullFilter<T, S>[]",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "NormalFilter",
+                          "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true,
+                              "intersectionParent": "Partial"
+                            }
+                          }
+                        },
+                        {
+                          "type": "primitive",
+                          "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "ShorthandFilter",
+                          "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                          "subType": "any"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                          "aliasSymbolescapedName": "Partial",
+                          "comments": "Make all properties in T optional",
+                          "properties": {
+                            "$exists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$existsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExistsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $or: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$or": {
+                    "type": "reference",
+                    "alias": "FullFilter<T, S>[]",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "NormalFilter",
+                "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true,
+                    "intersectionParent": "Partial"
+                  }
+                }
+              },
+              {
+                "type": "primitive",
+                "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "ShorthandFilter",
+                "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                "subType": "any"
+              },
+              {
+                "type": "object",
+                "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                "aliasSymbolescapedName": "Partial",
+                "comments": "Make all properties in T optional",
+                "properties": {
+                  "$exists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$existsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExistsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  }
+                }
+              }
+            ],
+            "comments": "Filter to apply. Undefined will return all records\n- { \"field\": \"value\" }\n- { \"field\": { $in: [\"value\", \"value2\"] } }\n- { $or: [\n     { \"field1\": \"value\" },\n     { \"field2\": \"value\" }\n    ]\n  }\n- { $existsJoined: { linkedTable: { \"linkedTableField\": \"value\" } } }"
           },
           {
             "name": "selectParams",
@@ -3799,21 +4194,24 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Max number of rows to return\n- If undefined then 1000 will be applied as the default\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)"
+                "comments": "Max number of rows to return. Defaults to 1000\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)",
+                "intersectionParent": "CommonSelectParams"
               },
               "offset": {
                 "type": "primitive",
                 "alias": "number",
                 "subType": "number",
                 "optional": true,
-                "comments": "Number of rows to skip"
+                "comments": "Number of rows to skip",
+                "intersectionParent": "CommonSelectParams"
               },
               "groupBy": {
                 "type": "primitive",
                 "alias": "false",
                 "subType": "boolean",
                 "optional": true,
-                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)"
+                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)",
+                "intersectionParent": "CommonSelectParams"
               },
               "returnType": {
                 "type": "union",
@@ -3856,13 +4254,14 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Result data structure/type:\n- row: the first row as an object\n- value: the first value from of first field\n- values: array of values from the selected field\n- statement: sql statement\n- statement-no-rls: sql statement without row level security\n- statement-where: sql statement where condition"
+                "comments": "Result data structure/type:\n- **row**: the first row as an object\n- **value**: the first value from of first field\n- **values**: array of values from the selected field\n- **statement**: sql statement\n- **statement-no-rls**: sql statement without row level security\n- **statement-where**: sql statement where condition",
+                "intersectionParent": "CommonSelectParams"
               },
               "select": {
                 "type": "primitive",
                 "alias": "Select<T, S>",
                 "aliasSymbolescapedName": "Select",
-                "comments": "Fields/expressions/linked data to select\n- If empty then all fields will be selected\n- If \"*\" then all fields will be selected\n- If { field: 0 } then all fields except the specified field will be selected\n- If { field: 1 } then only the specified field will be selected\n- If { field: { funcName: [args] } } then the field will be selected with the specified function applied\n- If { field: { nestedTable: { field: 1 } } } then the field will be selected with the nested table fields",
+                "comments": "Fields/expressions/linked data to select\n- `\"*\"` or empty will return all fields\n- `{ field: 0 }` - all fields except the specified field will be selected\n- `{ field: 1 }` - only the specified field will be selected\n- `{ field: { $funcName: [args] } }` - the field will be selected with the specified function applied\n- `{ field: 1, referencedTable: \"*\" }` - field together with all fields from referencedTable will be selected\n- `{ linkedData: { referencedTable: { field: 1 } } }` - linkedData will contain the linked/joined records from referencedTable",
                 "subType": "any",
                 "optional": true
               },
@@ -3872,13 +4271,201 @@ export const definitions = [
                 "aliasSymbolescapedName": "OrderBy",
                 "subType": "any",
                 "optional": true,
-                "comments": "Order by options\n- If array then the order will be maintained"
+                "comments": "Order by options\n- Order is maintained in arrays\n- `[{ key: \"field\", asc: true, nulls: \"last\" }]`"
               },
               "having": {
-                "type": "reference",
+                "type": "union",
                 "alias": "FullFilter<T, S> | undefined",
-                "comments": "Filter applied after any aggregations (group by)",
-                "optional": true
+                "types": [
+                  {
+                    "type": "primitive",
+                    "alias": "undefined",
+                    "subType": "undefined"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "ComplexFilter",
+                    "aliasSymbolescapedName": "ComplexFilter",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $and: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$and": {
+                        "type": "array",
+                        "alias": "FullFilter<T, S>[]",
+                        "itemType": {
+                          "type": "union",
+                          "alias": "FullFilter<T, S>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                          "types": [
+                            {
+                              "type": "object",
+                              "alias": "ComplexFilter",
+                              "aliasSymbolescapedName": "ComplexFilter",
+                              "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "reference",
+                              "alias": "{ $and: FullFilter<T, S>[]; }"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "{ $or: FullFilter<T, S>[]; }",
+                              "properties": {
+                                "$or": {
+                                  "type": "reference",
+                                  "alias": "FullFilter<T, S>[]",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "NormalFilter",
+                              "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true,
+                                  "intersectionParent": "Partial"
+                                }
+                              }
+                            },
+                            {
+                              "type": "primitive",
+                              "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "ShorthandFilter",
+                              "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                              "subType": "any"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                              "aliasSymbolescapedName": "Partial",
+                              "comments": "Make all properties in T optional",
+                              "properties": {
+                                "$exists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$existsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExistsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $or: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$or": {
+                        "type": "reference",
+                        "alias": "FullFilter<T, S>[]",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "NormalFilter",
+                    "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true,
+                        "intersectionParent": "Partial"
+                      }
+                    }
+                  },
+                  {
+                    "type": "primitive",
+                    "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "ShorthandFilter",
+                    "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                    "subType": "any"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {
+                      "$exists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$existsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExistsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      }
+                    }
+                  }
+                ],
+                "optional": true,
+                "comments": "Filter applied after any aggregations (group by)"
               }
             },
             "comments": ""
@@ -3896,7 +4483,8 @@ export const definitions = [
           }
         },
         "optional": false,
-        "comments": "Retrieves a list of matching records from the view/table"
+        "comments": "Retrieves a list of matching records from the view/table",
+        "intersectionParent": "ViewHandler"
       },
       "findOne": {
         "type": "function",
@@ -3905,8 +4493,196 @@ export const definitions = [
           {
             "name": "filter",
             "optional": true,
-            "type": "reference",
+            "type": "union",
             "alias": "FullFilter<T, S> | undefined",
+            "types": [
+              {
+                "type": "primitive",
+                "alias": "undefined",
+                "subType": "undefined"
+              },
+              {
+                "type": "object",
+                "alias": "ComplexFilter",
+                "aliasSymbolescapedName": "ComplexFilter",
+                "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $and: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$and": {
+                    "type": "array",
+                    "alias": "FullFilter<T, S>[]",
+                    "itemType": {
+                      "type": "union",
+                      "alias": "FullFilter<T, S>",
+                      "aliasSymbolescapedName": "FullFilter",
+                      "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                      "types": [
+                        {
+                          "type": "object",
+                          "alias": "ComplexFilter",
+                          "aliasSymbolescapedName": "ComplexFilter",
+                          "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "reference",
+                          "alias": "{ $and: FullFilter<T, S>[]; }"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "{ $or: FullFilter<T, S>[]; }",
+                          "properties": {
+                            "$or": {
+                              "type": "reference",
+                              "alias": "FullFilter<T, S>[]",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "NormalFilter",
+                          "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true,
+                              "intersectionParent": "Partial"
+                            }
+                          }
+                        },
+                        {
+                          "type": "primitive",
+                          "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "ShorthandFilter",
+                          "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                          "subType": "any"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                          "aliasSymbolescapedName": "Partial",
+                          "comments": "Make all properties in T optional",
+                          "properties": {
+                            "$exists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$existsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExistsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $or: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$or": {
+                    "type": "reference",
+                    "alias": "FullFilter<T, S>[]",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "NormalFilter",
+                "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true,
+                    "intersectionParent": "Partial"
+                  }
+                }
+              },
+              {
+                "type": "primitive",
+                "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "ShorthandFilter",
+                "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                "subType": "any"
+              },
+              {
+                "type": "object",
+                "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                "aliasSymbolescapedName": "Partial",
+                "comments": "Make all properties in T optional",
+                "properties": {
+                  "$exists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$existsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExistsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  }
+                }
+              }
+            ],
             "comments": ""
           },
           {
@@ -3937,21 +4713,24 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Max number of rows to return\n- If undefined then 1000 will be applied as the default\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)"
+                "comments": "Max number of rows to return. Defaults to 1000\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)",
+                "intersectionParent": "CommonSelectParams"
               },
               "offset": {
                 "type": "primitive",
                 "alias": "number",
                 "subType": "number",
                 "optional": true,
-                "comments": "Number of rows to skip"
+                "comments": "Number of rows to skip",
+                "intersectionParent": "CommonSelectParams"
               },
               "groupBy": {
                 "type": "primitive",
                 "alias": "false",
                 "subType": "boolean",
                 "optional": true,
-                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)"
+                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)",
+                "intersectionParent": "CommonSelectParams"
               },
               "returnType": {
                 "type": "union",
@@ -3994,13 +4773,14 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Result data structure/type:\n- row: the first row as an object\n- value: the first value from of first field\n- values: array of values from the selected field\n- statement: sql statement\n- statement-no-rls: sql statement without row level security\n- statement-where: sql statement where condition"
+                "comments": "Result data structure/type:\n- **row**: the first row as an object\n- **value**: the first value from of first field\n- **values**: array of values from the selected field\n- **statement**: sql statement\n- **statement-no-rls**: sql statement without row level security\n- **statement-where**: sql statement where condition",
+                "intersectionParent": "CommonSelectParams"
               },
               "select": {
                 "type": "primitive",
                 "alias": "Select<T, S>",
                 "aliasSymbolescapedName": "Select",
-                "comments": "Fields/expressions/linked data to select\n- If empty then all fields will be selected\n- If \"*\" then all fields will be selected\n- If { field: 0 } then all fields except the specified field will be selected\n- If { field: 1 } then only the specified field will be selected\n- If { field: { funcName: [args] } } then the field will be selected with the specified function applied\n- If { field: { nestedTable: { field: 1 } } } then the field will be selected with the nested table fields",
+                "comments": "Fields/expressions/linked data to select\n- `\"*\"` or empty will return all fields\n- `{ field: 0 }` - all fields except the specified field will be selected\n- `{ field: 1 }` - only the specified field will be selected\n- `{ field: { $funcName: [args] } }` - the field will be selected with the specified function applied\n- `{ field: 1, referencedTable: \"*\" }` - field together with all fields from referencedTable will be selected\n- `{ linkedData: { referencedTable: { field: 1 } } }` - linkedData will contain the linked/joined records from referencedTable",
                 "subType": "any",
                 "optional": true
               },
@@ -4010,13 +4790,201 @@ export const definitions = [
                 "aliasSymbolescapedName": "OrderBy",
                 "subType": "any",
                 "optional": true,
-                "comments": "Order by options\n- If array then the order will be maintained"
+                "comments": "Order by options\n- Order is maintained in arrays\n- `[{ key: \"field\", asc: true, nulls: \"last\" }]`"
               },
               "having": {
-                "type": "reference",
+                "type": "union",
                 "alias": "FullFilter<T, S> | undefined",
-                "comments": "Filter applied after any aggregations (group by)",
-                "optional": true
+                "types": [
+                  {
+                    "type": "primitive",
+                    "alias": "undefined",
+                    "subType": "undefined"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "ComplexFilter",
+                    "aliasSymbolescapedName": "ComplexFilter",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $and: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$and": {
+                        "type": "array",
+                        "alias": "FullFilter<T, S>[]",
+                        "itemType": {
+                          "type": "union",
+                          "alias": "FullFilter<T, S>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                          "types": [
+                            {
+                              "type": "object",
+                              "alias": "ComplexFilter",
+                              "aliasSymbolescapedName": "ComplexFilter",
+                              "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "reference",
+                              "alias": "{ $and: FullFilter<T, S>[]; }"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "{ $or: FullFilter<T, S>[]; }",
+                              "properties": {
+                                "$or": {
+                                  "type": "reference",
+                                  "alias": "FullFilter<T, S>[]",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "NormalFilter",
+                              "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true,
+                                  "intersectionParent": "Partial"
+                                }
+                              }
+                            },
+                            {
+                              "type": "primitive",
+                              "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "ShorthandFilter",
+                              "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                              "subType": "any"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                              "aliasSymbolescapedName": "Partial",
+                              "comments": "Make all properties in T optional",
+                              "properties": {
+                                "$exists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$existsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExistsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $or: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$or": {
+                        "type": "reference",
+                        "alias": "FullFilter<T, S>[]",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "NormalFilter",
+                    "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true,
+                        "intersectionParent": "Partial"
+                      }
+                    }
+                  },
+                  {
+                    "type": "primitive",
+                    "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "ShorthandFilter",
+                    "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                    "subType": "any"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {
+                      "$exists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$existsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExistsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      }
+                    }
+                  }
+                ],
+                "optional": true,
+                "comments": "Filter applied after any aggregations (group by)"
               }
             },
             "comments": ""
@@ -4045,19 +5013,105 @@ export const definitions = [
           }
         },
         "optional": false,
-        "comments": "Retrieves a record from the view/table"
+        "comments": "Retrieves a record from the view/table",
+        "intersectionParent": "ViewHandler"
       },
       "subscribe": {
         "type": "function",
-        "alias": "<P extends SubscribeParams<T, S>>(filter: FullFilter<T, S>, params: P, onData: (items: GetSelectReturnType<S, P, T, true>) => any, onError?: OnError | undefined) => Promise<...>",
+        "alias": "<P extends SubscribeParams<T, S>>(filter: FullFilter<T, S>, params: P, onData: SubscribeCallback<GetSelectReturnType<S, P, T, true>>, onError?: SubscribeOnError | undefined) => Promise<...>",
         "arguments": [
           {
             "name": "filter",
             "optional": false,
-            "type": "reference",
+            "type": "union",
             "alias": "FullFilter<T, S>",
             "aliasSymbolescapedName": "FullFilter",
-            "comments": "Group or simple filter"
+            "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+            "types": [
+              {
+                "type": "object",
+                "alias": "ComplexFilter",
+                "aliasSymbolescapedName": "ComplexFilter",
+                "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "reference",
+                "alias": "{ $and: FullFilter<T, S>[]; }"
+              },
+              {
+                "type": "object",
+                "alias": "{ $or: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$or": {
+                    "type": "reference",
+                    "alias": "FullFilter<T, S>[]",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "NormalFilter",
+                "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true,
+                    "intersectionParent": "Partial"
+                  }
+                }
+              },
+              {
+                "type": "primitive",
+                "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "ShorthandFilter",
+                "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                "subType": "any"
+              },
+              {
+                "type": "object",
+                "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                "aliasSymbolescapedName": "Partial",
+                "comments": "Make all properties in T optional",
+                "properties": {
+                  "$exists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$existsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExistsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  }
+                }
+              }
+            ]
           },
           {
             "name": "params",
@@ -4087,21 +5141,24 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Max number of rows to return\n- If undefined then 1000 will be applied as the default\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)"
+                "comments": "Max number of rows to return. Defaults to 1000\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)",
+                "intersectionParent": "CommonSelectParams"
               },
               "offset": {
                 "type": "primitive",
                 "alias": "number",
                 "subType": "number",
                 "optional": true,
-                "comments": "Number of rows to skip"
+                "comments": "Number of rows to skip",
+                "intersectionParent": "CommonSelectParams"
               },
               "groupBy": {
                 "type": "primitive",
                 "alias": "false",
                 "subType": "boolean",
                 "optional": true,
-                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)"
+                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)",
+                "intersectionParent": "CommonSelectParams"
               },
               "returnType": {
                 "type": "union",
@@ -4144,13 +5201,14 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Result data structure/type:\n- row: the first row as an object\n- value: the first value from of first field\n- values: array of values from the selected field\n- statement: sql statement\n- statement-no-rls: sql statement without row level security\n- statement-where: sql statement where condition"
+                "comments": "Result data structure/type:\n- **row**: the first row as an object\n- **value**: the first value from of first field\n- **values**: array of values from the selected field\n- **statement**: sql statement\n- **statement-no-rls**: sql statement without row level security\n- **statement-where**: sql statement where condition",
+                "intersectionParent": "CommonSelectParams"
               },
               "select": {
                 "type": "primitive",
                 "alias": "Select<T, S>",
                 "aliasSymbolescapedName": "Select",
-                "comments": "Fields/expressions/linked data to select\n- If empty then all fields will be selected\n- If \"*\" then all fields will be selected\n- If { field: 0 } then all fields except the specified field will be selected\n- If { field: 1 } then only the specified field will be selected\n- If { field: { funcName: [args] } } then the field will be selected with the specified function applied\n- If { field: { nestedTable: { field: 1 } } } then the field will be selected with the nested table fields",
+                "comments": "Fields/expressions/linked data to select\n- `\"*\"` or empty will return all fields\n- `{ field: 0 }` - all fields except the specified field will be selected\n- `{ field: 1 }` - only the specified field will be selected\n- `{ field: { $funcName: [args] } }` - the field will be selected with the specified function applied\n- `{ field: 1, referencedTable: \"*\" }` - field together with all fields from referencedTable will be selected\n- `{ linkedData: { referencedTable: { field: 1 } } }` - linkedData will contain the linked/joined records from referencedTable",
                 "subType": "any",
                 "optional": true
               },
@@ -4160,13 +5218,201 @@ export const definitions = [
                 "aliasSymbolescapedName": "OrderBy",
                 "subType": "any",
                 "optional": true,
-                "comments": "Order by options\n- If array then the order will be maintained"
+                "comments": "Order by options\n- Order is maintained in arrays\n- `[{ key: \"field\", asc: true, nulls: \"last\" }]`"
               },
               "having": {
-                "type": "reference",
+                "type": "union",
                 "alias": "FullFilter<T, S> | undefined",
-                "comments": "Filter applied after any aggregations (group by)",
-                "optional": true
+                "types": [
+                  {
+                    "type": "primitive",
+                    "alias": "undefined",
+                    "subType": "undefined"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "ComplexFilter",
+                    "aliasSymbolescapedName": "ComplexFilter",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $and: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$and": {
+                        "type": "array",
+                        "alias": "FullFilter<T, S>[]",
+                        "itemType": {
+                          "type": "union",
+                          "alias": "FullFilter<T, S>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                          "types": [
+                            {
+                              "type": "object",
+                              "alias": "ComplexFilter",
+                              "aliasSymbolescapedName": "ComplexFilter",
+                              "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "reference",
+                              "alias": "{ $and: FullFilter<T, S>[]; }"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "{ $or: FullFilter<T, S>[]; }",
+                              "properties": {
+                                "$or": {
+                                  "type": "reference",
+                                  "alias": "FullFilter<T, S>[]",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "NormalFilter",
+                              "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true,
+                                  "intersectionParent": "Partial"
+                                }
+                              }
+                            },
+                            {
+                              "type": "primitive",
+                              "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "ShorthandFilter",
+                              "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                              "subType": "any"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                              "aliasSymbolescapedName": "Partial",
+                              "comments": "Make all properties in T optional",
+                              "properties": {
+                                "$exists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$existsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExistsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $or: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$or": {
+                        "type": "reference",
+                        "alias": "FullFilter<T, S>[]",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "NormalFilter",
+                    "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true,
+                        "intersectionParent": "Partial"
+                      }
+                    }
+                  },
+                  {
+                    "type": "primitive",
+                    "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "ShorthandFilter",
+                    "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                    "subType": "any"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {
+                      "$exists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$existsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExistsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      }
+                    }
+                  }
+                ],
+                "optional": true,
+                "comments": "Filter applied after any aggregations (group by)"
               }
             },
             "comments": ""
@@ -4175,7 +5421,9 @@ export const definitions = [
             "name": "onData",
             "optional": false,
             "type": "function",
-            "alias": "(items: GetSelectReturnType<S, P, T, true>) => any",
+            "alias": "SubscribeCallback<GetSelectReturnType<S, P, T, true>>",
+            "aliasSymbolescapedName": "SubscribeCallback",
+            "comments": "Callback fired once after subscribing and then every time the data matching the filter changes",
             "arguments": [
               {
                 "name": "items",
@@ -4188,18 +5436,34 @@ export const definitions = [
               }
             ],
             "returnType": {
-              "type": "primitive",
-              "alias": "any",
-              "subType": "any"
-            },
-            "comments": ""
+              "type": "union",
+              "alias": "void | Promise<void>",
+              "types": [
+                {
+                  "type": "primitive",
+                  "alias": "void",
+                  "subType": "any"
+                },
+                {
+                  "type": "promise",
+                  "alias": "Promise<void>",
+                  "comments": "Represents the completion of an asynchronous operation",
+                  "innerType": {
+                    "type": "primitive",
+                    "alias": "void",
+                    "subType": "any"
+                  }
+                }
+              ]
+            }
           },
           {
             "name": "onError",
             "optional": true,
             "type": "function",
-            "alias": "OnError",
-            "aliasSymbolescapedName": "OnError",
+            "alias": "SubscribeOnError",
+            "aliasSymbolescapedName": "SubscribeOnError",
+            "comments": "Error handler that may fire due to schema changes or other post subscribe issues\nColumn or filter issues are thrown during the subscribe call",
             "arguments": [
               {
                 "name": "err",
@@ -4214,8 +5478,7 @@ export const definitions = [
               "type": "primitive",
               "alias": "void",
               "subType": "any"
-            },
-            "comments": ""
+            }
           }
         ],
         "returnType": {
@@ -4257,7 +5520,7 @@ export const definitions = [
                     "type": "object",
                     "alias": "ComplexFilter",
                     "aliasSymbolescapedName": "ComplexFilter",
-                    "comments": "Complex filter that allows applying functions to columns",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
                     "properties": {
                       "$filter": {
                         "type": "primitive",
@@ -4278,7 +5541,7 @@ export const definitions = [
                           "type": "reference",
                           "alias": "FullFilter<void, void>",
                           "aliasSymbolescapedName": "FullFilter",
-                          "comments": "Group or simple filter"
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`"
                         },
                         "optional": false
                       }
@@ -4289,8 +5552,14 @@ export const definitions = [
                     "alias": "{ $or: FullFilter<void, void>[]; }",
                     "properties": {
                       "$or": {
-                        "type": "reference",
+                        "type": "array",
                         "alias": "FullFilter<void, void>[]",
+                        "itemType": {
+                          "type": "reference",
+                          "alias": "FullFilter<void, void>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`"
+                        },
                         "optional": false
                       }
                     }
@@ -4305,7 +5574,8 @@ export const definitions = [
                         "type": "primitive",
                         "alias": "any",
                         "subType": "any",
-                        "optional": true
+                        "optional": true,
+                        "intersectionParent": "Partial"
                       }
                     }
                   },
@@ -4321,8 +5591,7 @@ export const definitions = [
                     "alias": "Partial<{ [x: `${string}.$in`]: any[]; [x: `${string}.$nin`]: any[]; }>",
                     "aliasSymbolescapedName": "Partial",
                     "comments": "Make all properties in T optional",
-                    "properties": {},
-                    "intersectionParent": "Partial<{ [x: `${string}.$in`]: any[]; [x: `${string}.$nin`]: any[]; }> & Partial<{ [x: `${string}.@@`]: any; [x: `${string}.@>`]: any; [x: `${string}.<@`]: any; [x: `${string}.$contains`]: any; [x: `${string}.$containedBy`]: any; }>"
+                    "properties": {}
                   },
                   {
                     "type": "object",
@@ -4387,19 +5656,105 @@ export const definitions = [
           }
         },
         "optional": false,
-        "comments": "Retrieves a list of matching records from the view/table and subscribes to changes"
+        "comments": "Retrieves a list of matching records from the view/table and subscribes to changes",
+        "intersectionParent": "ViewHandler"
       },
       "subscribeOne": {
         "type": "function",
-        "alias": "<P extends SubscribeParams<T, S>>(filter: FullFilter<T, S>, params: P, onData: (item: GetSelectReturnType<S, P, T, false> | undefined) => any, onError?: OnError | undefined) => Promise<...>",
+        "alias": "<P extends SubscribeParams<T, S>>(filter: FullFilter<T, S>, params: P, onData: SubscribeOneCallback<GetSelectReturnType<S, P, T, false> | undefined>, onError?: SubscribeOnError | undefined) => Promise<...>",
         "arguments": [
           {
             "name": "filter",
             "optional": false,
-            "type": "reference",
+            "type": "union",
             "alias": "FullFilter<T, S>",
             "aliasSymbolescapedName": "FullFilter",
-            "comments": "Group or simple filter"
+            "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+            "types": [
+              {
+                "type": "object",
+                "alias": "ComplexFilter",
+                "aliasSymbolescapedName": "ComplexFilter",
+                "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "reference",
+                "alias": "{ $and: FullFilter<T, S>[]; }"
+              },
+              {
+                "type": "object",
+                "alias": "{ $or: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$or": {
+                    "type": "reference",
+                    "alias": "FullFilter<T, S>[]",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "NormalFilter",
+                "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true,
+                    "intersectionParent": "Partial"
+                  }
+                }
+              },
+              {
+                "type": "primitive",
+                "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "ShorthandFilter",
+                "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                "subType": "any"
+              },
+              {
+                "type": "object",
+                "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                "aliasSymbolescapedName": "Partial",
+                "comments": "Make all properties in T optional",
+                "properties": {
+                  "$exists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$existsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExistsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  }
+                }
+              }
+            ]
           },
           {
             "name": "params",
@@ -4429,21 +5784,24 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Max number of rows to return\n- If undefined then 1000 will be applied as the default\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)"
+                "comments": "Max number of rows to return. Defaults to 1000\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)",
+                "intersectionParent": "CommonSelectParams"
               },
               "offset": {
                 "type": "primitive",
                 "alias": "number",
                 "subType": "number",
                 "optional": true,
-                "comments": "Number of rows to skip"
+                "comments": "Number of rows to skip",
+                "intersectionParent": "CommonSelectParams"
               },
               "groupBy": {
                 "type": "primitive",
                 "alias": "false",
                 "subType": "boolean",
                 "optional": true,
-                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)"
+                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)",
+                "intersectionParent": "CommonSelectParams"
               },
               "returnType": {
                 "type": "union",
@@ -4486,13 +5844,14 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Result data structure/type:\n- row: the first row as an object\n- value: the first value from of first field\n- values: array of values from the selected field\n- statement: sql statement\n- statement-no-rls: sql statement without row level security\n- statement-where: sql statement where condition"
+                "comments": "Result data structure/type:\n- **row**: the first row as an object\n- **value**: the first value from of first field\n- **values**: array of values from the selected field\n- **statement**: sql statement\n- **statement-no-rls**: sql statement without row level security\n- **statement-where**: sql statement where condition",
+                "intersectionParent": "CommonSelectParams"
               },
               "select": {
                 "type": "primitive",
                 "alias": "Select<T, S>",
                 "aliasSymbolescapedName": "Select",
-                "comments": "Fields/expressions/linked data to select\n- If empty then all fields will be selected\n- If \"*\" then all fields will be selected\n- If { field: 0 } then all fields except the specified field will be selected\n- If { field: 1 } then only the specified field will be selected\n- If { field: { funcName: [args] } } then the field will be selected with the specified function applied\n- If { field: { nestedTable: { field: 1 } } } then the field will be selected with the nested table fields",
+                "comments": "Fields/expressions/linked data to select\n- `\"*\"` or empty will return all fields\n- `{ field: 0 }` - all fields except the specified field will be selected\n- `{ field: 1 }` - only the specified field will be selected\n- `{ field: { $funcName: [args] } }` - the field will be selected with the specified function applied\n- `{ field: 1, referencedTable: \"*\" }` - field together with all fields from referencedTable will be selected\n- `{ linkedData: { referencedTable: { field: 1 } } }` - linkedData will contain the linked/joined records from referencedTable",
                 "subType": "any",
                 "optional": true
               },
@@ -4502,13 +5861,201 @@ export const definitions = [
                 "aliasSymbolescapedName": "OrderBy",
                 "subType": "any",
                 "optional": true,
-                "comments": "Order by options\n- If array then the order will be maintained"
+                "comments": "Order by options\n- Order is maintained in arrays\n- `[{ key: \"field\", asc: true, nulls: \"last\" }]`"
               },
               "having": {
-                "type": "reference",
+                "type": "union",
                 "alias": "FullFilter<T, S> | undefined",
-                "comments": "Filter applied after any aggregations (group by)",
-                "optional": true
+                "types": [
+                  {
+                    "type": "primitive",
+                    "alias": "undefined",
+                    "subType": "undefined"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "ComplexFilter",
+                    "aliasSymbolescapedName": "ComplexFilter",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $and: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$and": {
+                        "type": "array",
+                        "alias": "FullFilter<T, S>[]",
+                        "itemType": {
+                          "type": "union",
+                          "alias": "FullFilter<T, S>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                          "types": [
+                            {
+                              "type": "object",
+                              "alias": "ComplexFilter",
+                              "aliasSymbolescapedName": "ComplexFilter",
+                              "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "reference",
+                              "alias": "{ $and: FullFilter<T, S>[]; }"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "{ $or: FullFilter<T, S>[]; }",
+                              "properties": {
+                                "$or": {
+                                  "type": "reference",
+                                  "alias": "FullFilter<T, S>[]",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "NormalFilter",
+                              "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true,
+                                  "intersectionParent": "Partial"
+                                }
+                              }
+                            },
+                            {
+                              "type": "primitive",
+                              "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "ShorthandFilter",
+                              "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                              "subType": "any"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                              "aliasSymbolescapedName": "Partial",
+                              "comments": "Make all properties in T optional",
+                              "properties": {
+                                "$exists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$existsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExistsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $or: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$or": {
+                        "type": "reference",
+                        "alias": "FullFilter<T, S>[]",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "NormalFilter",
+                    "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true,
+                        "intersectionParent": "Partial"
+                      }
+                    }
+                  },
+                  {
+                    "type": "primitive",
+                    "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "ShorthandFilter",
+                    "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                    "subType": "any"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {
+                      "$exists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$existsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExistsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      }
+                    }
+                  }
+                ],
+                "optional": true,
+                "comments": "Filter applied after any aggregations (group by)"
               }
             },
             "comments": ""
@@ -4517,7 +6064,9 @@ export const definitions = [
             "name": "onData",
             "optional": false,
             "type": "function",
-            "alias": "(item: GetSelectReturnType<S, P, T, false> | undefined) => any",
+            "alias": "SubscribeOneCallback<GetSelectReturnType<S, P, T, false> | undefined>",
+            "aliasSymbolescapedName": "SubscribeOneCallback",
+            "comments": "Callback fired once after subscribing and then every time the data matching the filter changes",
             "arguments": [
               {
                 "name": "item",
@@ -4541,18 +6090,34 @@ export const definitions = [
               }
             ],
             "returnType": {
-              "type": "primitive",
-              "alias": "any",
-              "subType": "any"
-            },
-            "comments": ""
+              "type": "union",
+              "alias": "void | Promise<void>",
+              "types": [
+                {
+                  "type": "primitive",
+                  "alias": "void",
+                  "subType": "any"
+                },
+                {
+                  "type": "promise",
+                  "alias": "Promise<void>",
+                  "comments": "Represents the completion of an asynchronous operation",
+                  "innerType": {
+                    "type": "primitive",
+                    "alias": "void",
+                    "subType": "any"
+                  }
+                }
+              ]
+            }
           },
           {
             "name": "onError",
             "optional": true,
             "type": "function",
-            "alias": "OnError",
-            "aliasSymbolescapedName": "OnError",
+            "alias": "SubscribeOnError",
+            "aliasSymbolescapedName": "SubscribeOnError",
+            "comments": "Error handler that may fire due to schema changes or other post subscribe issues\nColumn or filter issues are thrown during the subscribe call",
             "arguments": [
               {
                 "name": "err",
@@ -4567,8 +6132,7 @@ export const definitions = [
               "type": "primitive",
               "alias": "void",
               "subType": "any"
-            },
-            "comments": ""
+            }
           }
         ],
         "returnType": {
@@ -4610,7 +6174,7 @@ export const definitions = [
                     "type": "object",
                     "alias": "ComplexFilter",
                     "aliasSymbolescapedName": "ComplexFilter",
-                    "comments": "Complex filter that allows applying functions to columns",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
                     "properties": {
                       "$filter": {
                         "type": "primitive",
@@ -4631,7 +6195,7 @@ export const definitions = [
                           "type": "reference",
                           "alias": "FullFilter<void, void>",
                           "aliasSymbolescapedName": "FullFilter",
-                          "comments": "Group or simple filter"
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`"
                         },
                         "optional": false
                       }
@@ -4642,8 +6206,14 @@ export const definitions = [
                     "alias": "{ $or: FullFilter<void, void>[]; }",
                     "properties": {
                       "$or": {
-                        "type": "reference",
+                        "type": "array",
                         "alias": "FullFilter<void, void>[]",
+                        "itemType": {
+                          "type": "reference",
+                          "alias": "FullFilter<void, void>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`"
+                        },
                         "optional": false
                       }
                     }
@@ -4658,7 +6228,8 @@ export const definitions = [
                         "type": "primitive",
                         "alias": "any",
                         "subType": "any",
-                        "optional": true
+                        "optional": true,
+                        "intersectionParent": "Partial"
                       }
                     }
                   },
@@ -4674,8 +6245,7 @@ export const definitions = [
                     "alias": "Partial<{ [x: `${string}.$in`]: any[]; [x: `${string}.$nin`]: any[]; }>",
                     "aliasSymbolescapedName": "Partial",
                     "comments": "Make all properties in T optional",
-                    "properties": {},
-                    "intersectionParent": "Partial<{ [x: `${string}.$in`]: any[]; [x: `${string}.$nin`]: any[]; }> & Partial<{ [x: `${string}.@@`]: any; [x: `${string}.@>`]: any; [x: `${string}.<@`]: any; [x: `${string}.$contains`]: any; [x: `${string}.$containedBy`]: any; }>"
+                    "properties": {}
                   },
                   {
                     "type": "object",
@@ -4740,7 +6310,8 @@ export const definitions = [
           }
         },
         "optional": false,
-        "comments": "Retrieves first matching record from the view/table and subscribes to changes"
+        "comments": "Retrieves first matching record from the view/table and subscribes to changes",
+        "intersectionParent": "ViewHandler"
       },
       "count": {
         "type": "function",
@@ -4749,8 +6320,196 @@ export const definitions = [
           {
             "name": "filter",
             "optional": true,
-            "type": "reference",
+            "type": "union",
             "alias": "FullFilter<T, S> | undefined",
+            "types": [
+              {
+                "type": "primitive",
+                "alias": "undefined",
+                "subType": "undefined"
+              },
+              {
+                "type": "object",
+                "alias": "ComplexFilter",
+                "aliasSymbolescapedName": "ComplexFilter",
+                "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $and: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$and": {
+                    "type": "array",
+                    "alias": "FullFilter<T, S>[]",
+                    "itemType": {
+                      "type": "union",
+                      "alias": "FullFilter<T, S>",
+                      "aliasSymbolescapedName": "FullFilter",
+                      "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                      "types": [
+                        {
+                          "type": "object",
+                          "alias": "ComplexFilter",
+                          "aliasSymbolescapedName": "ComplexFilter",
+                          "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "reference",
+                          "alias": "{ $and: FullFilter<T, S>[]; }"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "{ $or: FullFilter<T, S>[]; }",
+                          "properties": {
+                            "$or": {
+                              "type": "reference",
+                              "alias": "FullFilter<T, S>[]",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "NormalFilter",
+                          "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true,
+                              "intersectionParent": "Partial"
+                            }
+                          }
+                        },
+                        {
+                          "type": "primitive",
+                          "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "ShorthandFilter",
+                          "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                          "subType": "any"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                          "aliasSymbolescapedName": "Partial",
+                          "comments": "Make all properties in T optional",
+                          "properties": {
+                            "$exists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$existsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExistsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $or: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$or": {
+                    "type": "reference",
+                    "alias": "FullFilter<T, S>[]",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "NormalFilter",
+                "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true,
+                    "intersectionParent": "Partial"
+                  }
+                }
+              },
+              {
+                "type": "primitive",
+                "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "ShorthandFilter",
+                "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                "subType": "any"
+              },
+              {
+                "type": "object",
+                "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                "aliasSymbolescapedName": "Partial",
+                "comments": "Make all properties in T optional",
+                "properties": {
+                  "$exists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$existsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExistsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  }
+                }
+              }
+            ],
             "comments": ""
           },
           {
@@ -4781,21 +6540,24 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Max number of rows to return\n- If undefined then 1000 will be applied as the default\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)"
+                "comments": "Max number of rows to return. Defaults to 1000\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)",
+                "intersectionParent": "CommonSelectParams"
               },
               "offset": {
                 "type": "primitive",
                 "alias": "number",
                 "subType": "number",
                 "optional": true,
-                "comments": "Number of rows to skip"
+                "comments": "Number of rows to skip",
+                "intersectionParent": "CommonSelectParams"
               },
               "groupBy": {
                 "type": "primitive",
                 "alias": "false",
                 "subType": "boolean",
                 "optional": true,
-                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)"
+                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)",
+                "intersectionParent": "CommonSelectParams"
               },
               "returnType": {
                 "type": "union",
@@ -4838,13 +6600,14 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Result data structure/type:\n- row: the first row as an object\n- value: the first value from of first field\n- values: array of values from the selected field\n- statement: sql statement\n- statement-no-rls: sql statement without row level security\n- statement-where: sql statement where condition"
+                "comments": "Result data structure/type:\n- **row**: the first row as an object\n- **value**: the first value from of first field\n- **values**: array of values from the selected field\n- **statement**: sql statement\n- **statement-no-rls**: sql statement without row level security\n- **statement-where**: sql statement where condition",
+                "intersectionParent": "CommonSelectParams"
               },
               "select": {
                 "type": "primitive",
                 "alias": "Select<T, S>",
                 "aliasSymbolescapedName": "Select",
-                "comments": "Fields/expressions/linked data to select\n- If empty then all fields will be selected\n- If \"*\" then all fields will be selected\n- If { field: 0 } then all fields except the specified field will be selected\n- If { field: 1 } then only the specified field will be selected\n- If { field: { funcName: [args] } } then the field will be selected with the specified function applied\n- If { field: { nestedTable: { field: 1 } } } then the field will be selected with the nested table fields",
+                "comments": "Fields/expressions/linked data to select\n- `\"*\"` or empty will return all fields\n- `{ field: 0 }` - all fields except the specified field will be selected\n- `{ field: 1 }` - only the specified field will be selected\n- `{ field: { $funcName: [args] } }` - the field will be selected with the specified function applied\n- `{ field: 1, referencedTable: \"*\" }` - field together with all fields from referencedTable will be selected\n- `{ linkedData: { referencedTable: { field: 1 } } }` - linkedData will contain the linked/joined records from referencedTable",
                 "subType": "any",
                 "optional": true
               },
@@ -4854,13 +6617,201 @@ export const definitions = [
                 "aliasSymbolescapedName": "OrderBy",
                 "subType": "any",
                 "optional": true,
-                "comments": "Order by options\n- If array then the order will be maintained"
+                "comments": "Order by options\n- Order is maintained in arrays\n- `[{ key: \"field\", asc: true, nulls: \"last\" }]`"
               },
               "having": {
-                "type": "reference",
+                "type": "union",
                 "alias": "FullFilter<T, S> | undefined",
-                "comments": "Filter applied after any aggregations (group by)",
-                "optional": true
+                "types": [
+                  {
+                    "type": "primitive",
+                    "alias": "undefined",
+                    "subType": "undefined"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "ComplexFilter",
+                    "aliasSymbolescapedName": "ComplexFilter",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $and: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$and": {
+                        "type": "array",
+                        "alias": "FullFilter<T, S>[]",
+                        "itemType": {
+                          "type": "union",
+                          "alias": "FullFilter<T, S>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                          "types": [
+                            {
+                              "type": "object",
+                              "alias": "ComplexFilter",
+                              "aliasSymbolescapedName": "ComplexFilter",
+                              "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "reference",
+                              "alias": "{ $and: FullFilter<T, S>[]; }"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "{ $or: FullFilter<T, S>[]; }",
+                              "properties": {
+                                "$or": {
+                                  "type": "reference",
+                                  "alias": "FullFilter<T, S>[]",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "NormalFilter",
+                              "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true,
+                                  "intersectionParent": "Partial"
+                                }
+                              }
+                            },
+                            {
+                              "type": "primitive",
+                              "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "ShorthandFilter",
+                              "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                              "subType": "any"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                              "aliasSymbolescapedName": "Partial",
+                              "comments": "Make all properties in T optional",
+                              "properties": {
+                                "$exists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$existsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExistsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $or: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$or": {
+                        "type": "reference",
+                        "alias": "FullFilter<T, S>[]",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "NormalFilter",
+                    "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true,
+                        "intersectionParent": "Partial"
+                      }
+                    }
+                  },
+                  {
+                    "type": "primitive",
+                    "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "ShorthandFilter",
+                    "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                    "subType": "any"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {
+                      "$exists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$existsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExistsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      }
+                    }
+                  }
+                ],
+                "optional": true,
+                "comments": "Filter applied after any aggregations (group by)"
               }
             },
             "comments": ""
@@ -4877,7 +6828,8 @@ export const definitions = [
           }
         },
         "optional": false,
-        "comments": "Returns the number of rows that match the filter"
+        "comments": "Returns the number of rows that match the filter",
+        "intersectionParent": "ViewHandler"
       },
       "size": {
         "type": "function",
@@ -4886,8 +6838,196 @@ export const definitions = [
           {
             "name": "filter",
             "optional": true,
-            "type": "reference",
+            "type": "union",
             "alias": "FullFilter<T, S> | undefined",
+            "types": [
+              {
+                "type": "primitive",
+                "alias": "undefined",
+                "subType": "undefined"
+              },
+              {
+                "type": "object",
+                "alias": "ComplexFilter",
+                "aliasSymbolescapedName": "ComplexFilter",
+                "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $and: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$and": {
+                    "type": "array",
+                    "alias": "FullFilter<T, S>[]",
+                    "itemType": {
+                      "type": "union",
+                      "alias": "FullFilter<T, S>",
+                      "aliasSymbolescapedName": "FullFilter",
+                      "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                      "types": [
+                        {
+                          "type": "object",
+                          "alias": "ComplexFilter",
+                          "aliasSymbolescapedName": "ComplexFilter",
+                          "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "reference",
+                          "alias": "{ $and: FullFilter<T, S>[]; }"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "{ $or: FullFilter<T, S>[]; }",
+                          "properties": {
+                            "$or": {
+                              "type": "reference",
+                              "alias": "FullFilter<T, S>[]",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "NormalFilter",
+                          "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true,
+                              "intersectionParent": "Partial"
+                            }
+                          }
+                        },
+                        {
+                          "type": "primitive",
+                          "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "ShorthandFilter",
+                          "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                          "subType": "any"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                          "aliasSymbolescapedName": "Partial",
+                          "comments": "Make all properties in T optional",
+                          "properties": {
+                            "$exists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$existsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExistsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $or: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$or": {
+                    "type": "reference",
+                    "alias": "FullFilter<T, S>[]",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "NormalFilter",
+                "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true,
+                    "intersectionParent": "Partial"
+                  }
+                }
+              },
+              {
+                "type": "primitive",
+                "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "ShorthandFilter",
+                "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                "subType": "any"
+              },
+              {
+                "type": "object",
+                "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                "aliasSymbolescapedName": "Partial",
+                "comments": "Make all properties in T optional",
+                "properties": {
+                  "$exists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$existsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExistsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  }
+                }
+              }
+            ],
             "comments": ""
           },
           {
@@ -4918,21 +7058,24 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Max number of rows to return\n- If undefined then 1000 will be applied as the default\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)"
+                "comments": "Max number of rows to return. Defaults to 1000\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)",
+                "intersectionParent": "CommonSelectParams"
               },
               "offset": {
                 "type": "primitive",
                 "alias": "number",
                 "subType": "number",
                 "optional": true,
-                "comments": "Number of rows to skip"
+                "comments": "Number of rows to skip",
+                "intersectionParent": "CommonSelectParams"
               },
               "groupBy": {
                 "type": "primitive",
                 "alias": "false",
                 "subType": "boolean",
                 "optional": true,
-                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)"
+                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)",
+                "intersectionParent": "CommonSelectParams"
               },
               "returnType": {
                 "type": "union",
@@ -4975,13 +7118,14 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Result data structure/type:\n- row: the first row as an object\n- value: the first value from of first field\n- values: array of values from the selected field\n- statement: sql statement\n- statement-no-rls: sql statement without row level security\n- statement-where: sql statement where condition"
+                "comments": "Result data structure/type:\n- **row**: the first row as an object\n- **value**: the first value from of first field\n- **values**: array of values from the selected field\n- **statement**: sql statement\n- **statement-no-rls**: sql statement without row level security\n- **statement-where**: sql statement where condition",
+                "intersectionParent": "CommonSelectParams"
               },
               "select": {
                 "type": "primitive",
                 "alias": "Select<T, S>",
                 "aliasSymbolescapedName": "Select",
-                "comments": "Fields/expressions/linked data to select\n- If empty then all fields will be selected\n- If \"*\" then all fields will be selected\n- If { field: 0 } then all fields except the specified field will be selected\n- If { field: 1 } then only the specified field will be selected\n- If { field: { funcName: [args] } } then the field will be selected with the specified function applied\n- If { field: { nestedTable: { field: 1 } } } then the field will be selected with the nested table fields",
+                "comments": "Fields/expressions/linked data to select\n- `\"*\"` or empty will return all fields\n- `{ field: 0 }` - all fields except the specified field will be selected\n- `{ field: 1 }` - only the specified field will be selected\n- `{ field: { $funcName: [args] } }` - the field will be selected with the specified function applied\n- `{ field: 1, referencedTable: \"*\" }` - field together with all fields from referencedTable will be selected\n- `{ linkedData: { referencedTable: { field: 1 } } }` - linkedData will contain the linked/joined records from referencedTable",
                 "subType": "any",
                 "optional": true
               },
@@ -4991,13 +7135,201 @@ export const definitions = [
                 "aliasSymbolescapedName": "OrderBy",
                 "subType": "any",
                 "optional": true,
-                "comments": "Order by options\n- If array then the order will be maintained"
+                "comments": "Order by options\n- Order is maintained in arrays\n- `[{ key: \"field\", asc: true, nulls: \"last\" }]`"
               },
               "having": {
-                "type": "reference",
+                "type": "union",
                 "alias": "FullFilter<T, S> | undefined",
-                "comments": "Filter applied after any aggregations (group by)",
-                "optional": true
+                "types": [
+                  {
+                    "type": "primitive",
+                    "alias": "undefined",
+                    "subType": "undefined"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "ComplexFilter",
+                    "aliasSymbolescapedName": "ComplexFilter",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $and: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$and": {
+                        "type": "array",
+                        "alias": "FullFilter<T, S>[]",
+                        "itemType": {
+                          "type": "union",
+                          "alias": "FullFilter<T, S>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                          "types": [
+                            {
+                              "type": "object",
+                              "alias": "ComplexFilter",
+                              "aliasSymbolescapedName": "ComplexFilter",
+                              "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "reference",
+                              "alias": "{ $and: FullFilter<T, S>[]; }"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "{ $or: FullFilter<T, S>[]; }",
+                              "properties": {
+                                "$or": {
+                                  "type": "reference",
+                                  "alias": "FullFilter<T, S>[]",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "NormalFilter",
+                              "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true,
+                                  "intersectionParent": "Partial"
+                                }
+                              }
+                            },
+                            {
+                              "type": "primitive",
+                              "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "ShorthandFilter",
+                              "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                              "subType": "any"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                              "aliasSymbolescapedName": "Partial",
+                              "comments": "Make all properties in T optional",
+                              "properties": {
+                                "$exists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$existsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExistsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $or: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$or": {
+                        "type": "reference",
+                        "alias": "FullFilter<T, S>[]",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "NormalFilter",
+                    "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true,
+                        "intersectionParent": "Partial"
+                      }
+                    }
+                  },
+                  {
+                    "type": "primitive",
+                    "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "ShorthandFilter",
+                    "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                    "subType": "any"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {
+                      "$exists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$existsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExistsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      }
+                    }
+                  }
+                ],
+                "optional": true,
+                "comments": "Filter applied after any aggregations (group by)"
               }
             },
             "comments": ""
@@ -5014,7 +7346,8 @@ export const definitions = [
           }
         },
         "optional": false,
-        "comments": "Returns result size in bits"
+        "comments": "Returns result size in bits",
+        "intersectionParent": "ViewHandler"
       },
       "getJoinedTables": {
         "type": "function",
@@ -5085,43 +7418,50 @@ export const definitions = [
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Partial"
                     },
                     "$find": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Partial"
                     },
                     "$unsync": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Partial"
                     },
                     "$delete": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Partial"
                     },
                     "$update": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Partial"
                     },
                     "$cloneSync": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Partial"
                     },
                     "$cloneMultiSync": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Partial"
                     }
                   }
                 },
@@ -5288,43 +7628,50 @@ export const definitions = [
                         "type": "primitive",
                         "alias": "any",
                         "subType": "any",
-                        "optional": true
+                        "optional": true,
+                        "intersectionParent": "Partial"
                       },
                       "$find": {
                         "type": "primitive",
                         "alias": "any",
                         "subType": "any",
-                        "optional": true
+                        "optional": true,
+                        "intersectionParent": "Partial"
                       },
                       "$unsync": {
                         "type": "primitive",
                         "alias": "any",
                         "subType": "any",
-                        "optional": true
+                        "optional": true,
+                        "intersectionParent": "Partial"
                       },
                       "$delete": {
                         "type": "primitive",
                         "alias": "any",
                         "subType": "any",
-                        "optional": true
+                        "optional": true,
+                        "intersectionParent": "Partial"
                       },
                       "$update": {
                         "type": "primitive",
                         "alias": "any",
                         "subType": "any",
-                        "optional": true
+                        "optional": true,
+                        "intersectionParent": "Partial"
                       },
                       "$cloneSync": {
                         "type": "primitive",
                         "alias": "any",
                         "subType": "any",
-                        "optional": true
+                        "optional": true,
+                        "intersectionParent": "Partial"
                       },
                       "$cloneMultiSync": {
                         "type": "primitive",
                         "alias": "any",
                         "subType": "any",
-                        "optional": true
+                        "optional": true,
+                        "intersectionParent": "Partial"
                       }
                     }
                   }
@@ -5394,43 +7741,50 @@ export const definitions = [
                     "type": "primitive",
                     "alias": "any",
                     "subType": "any",
-                    "optional": true
+                    "optional": true,
+                    "intersectionParent": "Partial"
                   },
                   "$find": {
                     "type": "primitive",
                     "alias": "any",
                     "subType": "any",
-                    "optional": true
+                    "optional": true,
+                    "intersectionParent": "Partial"
                   },
                   "$unsync": {
                     "type": "primitive",
                     "alias": "any",
                     "subType": "any",
-                    "optional": true
+                    "optional": true,
+                    "intersectionParent": "Partial"
                   },
                   "$delete": {
                     "type": "primitive",
                     "alias": "any",
                     "subType": "any",
-                    "optional": true
+                    "optional": true,
+                    "intersectionParent": "Partial"
                   },
                   "$update": {
                     "type": "primitive",
                     "alias": "any",
                     "subType": "any",
-                    "optional": true
+                    "optional": true,
+                    "intersectionParent": "Partial"
                   },
                   "$cloneSync": {
                     "type": "primitive",
                     "alias": "any",
                     "subType": "any",
-                    "optional": true
+                    "optional": true,
+                    "intersectionParent": "Partial"
                   },
                   "$cloneMultiSync": {
                     "type": "primitive",
                     "alias": "any",
                     "subType": "any",
-                    "optional": true
+                    "optional": true,
+                    "intersectionParent": "Partial"
                   }
                 },
                 "comments": ""
@@ -5632,43 +7986,50 @@ export const definitions = [
                             "type": "primitive",
                             "alias": "any",
                             "subType": "any",
-                            "optional": true
+                            "optional": true,
+                            "intersectionParent": "Partial"
                           },
                           "$find": {
                             "type": "primitive",
                             "alias": "any",
                             "subType": "any",
-                            "optional": true
+                            "optional": true,
+                            "intersectionParent": "Partial"
                           },
                           "$unsync": {
                             "type": "primitive",
                             "alias": "any",
                             "subType": "any",
-                            "optional": true
+                            "optional": true,
+                            "intersectionParent": "Partial"
                           },
                           "$delete": {
                             "type": "primitive",
                             "alias": "any",
                             "subType": "any",
-                            "optional": true
+                            "optional": true,
+                            "intersectionParent": "Partial"
                           },
                           "$update": {
                             "type": "primitive",
                             "alias": "any",
                             "subType": "any",
-                            "optional": true
+                            "optional": true,
+                            "intersectionParent": "Partial"
                           },
                           "$cloneSync": {
                             "type": "primitive",
                             "alias": "any",
                             "subType": "any",
-                            "optional": true
+                            "optional": true,
+                            "intersectionParent": "Partial"
                           },
                           "$cloneMultiSync": {
                             "type": "primitive",
                             "alias": "any",
                             "subType": "any",
-                            "optional": true
+                            "optional": true,
+                            "intersectionParent": "Partial"
                           }
                         },
                         "comments": ""
@@ -5747,43 +8108,50 @@ export const definitions = [
                               "type": "primitive",
                               "alias": "any",
                               "subType": "any",
-                              "optional": true
+                              "optional": true,
+                              "intersectionParent": "Partial"
                             },
                             "$find": {
                               "type": "primitive",
                               "alias": "any",
                               "subType": "any",
-                              "optional": true
+                              "optional": true,
+                              "intersectionParent": "Partial"
                             },
                             "$unsync": {
                               "type": "primitive",
                               "alias": "any",
                               "subType": "any",
-                              "optional": true
+                              "optional": true,
+                              "intersectionParent": "Partial"
                             },
                             "$delete": {
                               "type": "primitive",
                               "alias": "any",
                               "subType": "any",
-                              "optional": true
+                              "optional": true,
+                              "intersectionParent": "Partial"
                             },
                             "$update": {
                               "type": "primitive",
                               "alias": "any",
                               "subType": "any",
-                              "optional": true
+                              "optional": true,
+                              "intersectionParent": "Partial"
                             },
                             "$cloneSync": {
                               "type": "primitive",
                               "alias": "any",
                               "subType": "any",
-                              "optional": true
+                              "optional": true,
+                              "intersectionParent": "Partial"
                             },
                             "$cloneMultiSync": {
                               "type": "primitive",
                               "alias": "any",
                               "subType": "any",
-                              "optional": true
+                              "optional": true,
+                              "intersectionParent": "Partial"
                             }
                           }
                         },
@@ -5947,43 +8315,50 @@ export const definitions = [
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Partial"
                     },
                     "$find": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Partial"
                     },
                     "$unsync": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Partial"
                     },
                     "$delete": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Partial"
                     },
                     "$update": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Partial"
                     },
                     "$cloneSync": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Partial"
                     },
                     "$cloneMultiSync": {
                       "type": "primitive",
                       "alias": "any",
                       "subType": "any",
-                      "optional": true
+                      "optional": true,
+                      "intersectionParent": "Partial"
                     }
                   }
                 }
@@ -6026,8 +8401,196 @@ export const definitions = [
           {
             "name": "filter",
             "optional": true,
-            "type": "reference",
+            "type": "union",
             "alias": "FullFilter<T, S> | undefined",
+            "types": [
+              {
+                "type": "primitive",
+                "alias": "undefined",
+                "subType": "undefined"
+              },
+              {
+                "type": "object",
+                "alias": "ComplexFilter",
+                "aliasSymbolescapedName": "ComplexFilter",
+                "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $and: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$and": {
+                    "type": "array",
+                    "alias": "FullFilter<T, S>[]",
+                    "itemType": {
+                      "type": "union",
+                      "alias": "FullFilter<T, S>",
+                      "aliasSymbolescapedName": "FullFilter",
+                      "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                      "types": [
+                        {
+                          "type": "object",
+                          "alias": "ComplexFilter",
+                          "aliasSymbolescapedName": "ComplexFilter",
+                          "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "reference",
+                          "alias": "{ $and: FullFilter<T, S>[]; }"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "{ $or: FullFilter<T, S>[]; }",
+                          "properties": {
+                            "$or": {
+                              "type": "reference",
+                              "alias": "FullFilter<T, S>[]",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "NormalFilter",
+                          "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true,
+                              "intersectionParent": "Partial"
+                            }
+                          }
+                        },
+                        {
+                          "type": "primitive",
+                          "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "ShorthandFilter",
+                          "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                          "subType": "any"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                          "aliasSymbolescapedName": "Partial",
+                          "comments": "Make all properties in T optional",
+                          "properties": {
+                            "$exists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$existsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExistsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $or: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$or": {
+                    "type": "reference",
+                    "alias": "FullFilter<T, S>[]",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "NormalFilter",
+                "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true,
+                    "intersectionParent": "Partial"
+                  }
+                }
+              },
+              {
+                "type": "primitive",
+                "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "ShorthandFilter",
+                "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                "subType": "any"
+              },
+              {
+                "type": "object",
+                "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                "aliasSymbolescapedName": "Partial",
+                "comments": "Make all properties in T optional",
+                "properties": {
+                  "$exists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$existsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExistsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  }
+                }
+              }
+            ],
             "comments": ""
           },
           {
@@ -6058,21 +8621,24 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Max number of rows to return\n- If undefined then 1000 will be applied as the default\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)"
+                "comments": "Max number of rows to return. Defaults to 1000\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)",
+                "intersectionParent": "CommonSelectParams"
               },
               "offset": {
                 "type": "primitive",
                 "alias": "number",
                 "subType": "number",
                 "optional": true,
-                "comments": "Number of rows to skip"
+                "comments": "Number of rows to skip",
+                "intersectionParent": "CommonSelectParams"
               },
               "groupBy": {
                 "type": "primitive",
                 "alias": "false",
                 "subType": "boolean",
                 "optional": true,
-                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)"
+                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)",
+                "intersectionParent": "CommonSelectParams"
               },
               "returnType": {
                 "type": "union",
@@ -6115,13 +8681,14 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Result data structure/type:\n- row: the first row as an object\n- value: the first value from of first field\n- values: array of values from the selected field\n- statement: sql statement\n- statement-no-rls: sql statement without row level security\n- statement-where: sql statement where condition"
+                "comments": "Result data structure/type:\n- **row**: the first row as an object\n- **value**: the first value from of first field\n- **values**: array of values from the selected field\n- **statement**: sql statement\n- **statement-no-rls**: sql statement without row level security\n- **statement-where**: sql statement where condition",
+                "intersectionParent": "CommonSelectParams"
               },
               "select": {
                 "type": "primitive",
                 "alias": "Select<T, S>",
                 "aliasSymbolescapedName": "Select",
-                "comments": "Fields/expressions/linked data to select\n- If empty then all fields will be selected\n- If \"*\" then all fields will be selected\n- If { field: 0 } then all fields except the specified field will be selected\n- If { field: 1 } then only the specified field will be selected\n- If { field: { funcName: [args] } } then the field will be selected with the specified function applied\n- If { field: { nestedTable: { field: 1 } } } then the field will be selected with the nested table fields",
+                "comments": "Fields/expressions/linked data to select\n- `\"*\"` or empty will return all fields\n- `{ field: 0 }` - all fields except the specified field will be selected\n- `{ field: 1 }` - only the specified field will be selected\n- `{ field: { $funcName: [args] } }` - the field will be selected with the specified function applied\n- `{ field: 1, referencedTable: \"*\" }` - field together with all fields from referencedTable will be selected\n- `{ linkedData: { referencedTable: { field: 1 } } }` - linkedData will contain the linked/joined records from referencedTable",
                 "subType": "any",
                 "optional": true
               },
@@ -6131,13 +8698,201 @@ export const definitions = [
                 "aliasSymbolescapedName": "OrderBy",
                 "subType": "any",
                 "optional": true,
-                "comments": "Order by options\n- If array then the order will be maintained"
+                "comments": "Order by options\n- Order is maintained in arrays\n- `[{ key: \"field\", asc: true, nulls: \"last\" }]`"
               },
               "having": {
-                "type": "reference",
+                "type": "union",
                 "alias": "FullFilter<T, S> | undefined",
-                "comments": "Filter applied after any aggregations (group by)",
-                "optional": true
+                "types": [
+                  {
+                    "type": "primitive",
+                    "alias": "undefined",
+                    "subType": "undefined"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "ComplexFilter",
+                    "aliasSymbolescapedName": "ComplexFilter",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $and: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$and": {
+                        "type": "array",
+                        "alias": "FullFilter<T, S>[]",
+                        "itemType": {
+                          "type": "union",
+                          "alias": "FullFilter<T, S>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                          "types": [
+                            {
+                              "type": "object",
+                              "alias": "ComplexFilter",
+                              "aliasSymbolescapedName": "ComplexFilter",
+                              "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "reference",
+                              "alias": "{ $and: FullFilter<T, S>[]; }"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "{ $or: FullFilter<T, S>[]; }",
+                              "properties": {
+                                "$or": {
+                                  "type": "reference",
+                                  "alias": "FullFilter<T, S>[]",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "NormalFilter",
+                              "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true,
+                                  "intersectionParent": "Partial"
+                                }
+                              }
+                            },
+                            {
+                              "type": "primitive",
+                              "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "ShorthandFilter",
+                              "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                              "subType": "any"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                              "aliasSymbolescapedName": "Partial",
+                              "comments": "Make all properties in T optional",
+                              "properties": {
+                                "$exists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$existsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExistsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $or: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$or": {
+                        "type": "reference",
+                        "alias": "FullFilter<T, S>[]",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "NormalFilter",
+                    "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true,
+                        "intersectionParent": "Partial"
+                      }
+                    }
+                  },
+                  {
+                    "type": "primitive",
+                    "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "ShorthandFilter",
+                    "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                    "subType": "any"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {
+                      "$exists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$existsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExistsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      }
+                    }
+                  }
+                ],
+                "optional": true,
+                "comments": "Filter applied after any aggregations (group by)"
               },
               "throttle": {
                 "type": "primitive",
@@ -6216,8 +8971,196 @@ export const definitions = [
           {
             "name": "filter",
             "optional": true,
-            "type": "reference",
+            "type": "union",
             "alias": "FullFilter<T, S> | undefined",
+            "types": [
+              {
+                "type": "primitive",
+                "alias": "undefined",
+                "subType": "undefined"
+              },
+              {
+                "type": "object",
+                "alias": "ComplexFilter",
+                "aliasSymbolescapedName": "ComplexFilter",
+                "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $and: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$and": {
+                    "type": "array",
+                    "alias": "FullFilter<T, S>[]",
+                    "itemType": {
+                      "type": "union",
+                      "alias": "FullFilter<T, S>",
+                      "aliasSymbolescapedName": "FullFilter",
+                      "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                      "types": [
+                        {
+                          "type": "object",
+                          "alias": "ComplexFilter",
+                          "aliasSymbolescapedName": "ComplexFilter",
+                          "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "reference",
+                          "alias": "{ $and: FullFilter<T, S>[]; }"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "{ $or: FullFilter<T, S>[]; }",
+                          "properties": {
+                            "$or": {
+                              "type": "reference",
+                              "alias": "FullFilter<T, S>[]",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "NormalFilter",
+                          "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true,
+                              "intersectionParent": "Partial"
+                            }
+                          }
+                        },
+                        {
+                          "type": "primitive",
+                          "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "ShorthandFilter",
+                          "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                          "subType": "any"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                          "aliasSymbolescapedName": "Partial",
+                          "comments": "Make all properties in T optional",
+                          "properties": {
+                            "$exists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$existsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExistsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $or: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$or": {
+                    "type": "reference",
+                    "alias": "FullFilter<T, S>[]",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "NormalFilter",
+                "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true,
+                    "intersectionParent": "Partial"
+                  }
+                }
+              },
+              {
+                "type": "primitive",
+                "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "ShorthandFilter",
+                "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                "subType": "any"
+              },
+              {
+                "type": "object",
+                "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                "aliasSymbolescapedName": "Partial",
+                "comments": "Make all properties in T optional",
+                "properties": {
+                  "$exists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$existsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExistsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  }
+                }
+              }
+            ],
             "comments": ""
           },
           {
@@ -6248,21 +9191,24 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Max number of rows to return\n- If undefined then 1000 will be applied as the default\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)"
+                "comments": "Max number of rows to return. Defaults to 1000\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)",
+                "intersectionParent": "CommonSelectParams"
               },
               "offset": {
                 "type": "primitive",
                 "alias": "number",
                 "subType": "number",
                 "optional": true,
-                "comments": "Number of rows to skip"
+                "comments": "Number of rows to skip",
+                "intersectionParent": "CommonSelectParams"
               },
               "groupBy": {
                 "type": "primitive",
                 "alias": "false",
                 "subType": "boolean",
                 "optional": true,
-                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)"
+                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)",
+                "intersectionParent": "CommonSelectParams"
               },
               "returnType": {
                 "type": "union",
@@ -6305,13 +9251,14 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Result data structure/type:\n- row: the first row as an object\n- value: the first value from of first field\n- values: array of values from the selected field\n- statement: sql statement\n- statement-no-rls: sql statement without row level security\n- statement-where: sql statement where condition"
+                "comments": "Result data structure/type:\n- **row**: the first row as an object\n- **value**: the first value from of first field\n- **values**: array of values from the selected field\n- **statement**: sql statement\n- **statement-no-rls**: sql statement without row level security\n- **statement-where**: sql statement where condition",
+                "intersectionParent": "CommonSelectParams"
               },
               "select": {
                 "type": "primitive",
                 "alias": "Select<T, S>",
                 "aliasSymbolescapedName": "Select",
-                "comments": "Fields/expressions/linked data to select\n- If empty then all fields will be selected\n- If \"*\" then all fields will be selected\n- If { field: 0 } then all fields except the specified field will be selected\n- If { field: 1 } then only the specified field will be selected\n- If { field: { funcName: [args] } } then the field will be selected with the specified function applied\n- If { field: { nestedTable: { field: 1 } } } then the field will be selected with the nested table fields",
+                "comments": "Fields/expressions/linked data to select\n- `\"*\"` or empty will return all fields\n- `{ field: 0 }` - all fields except the specified field will be selected\n- `{ field: 1 }` - only the specified field will be selected\n- `{ field: { $funcName: [args] } }` - the field will be selected with the specified function applied\n- `{ field: 1, referencedTable: \"*\" }` - field together with all fields from referencedTable will be selected\n- `{ linkedData: { referencedTable: { field: 1 } } }` - linkedData will contain the linked/joined records from referencedTable",
                 "subType": "any",
                 "optional": true
               },
@@ -6321,13 +9268,201 @@ export const definitions = [
                 "aliasSymbolescapedName": "OrderBy",
                 "subType": "any",
                 "optional": true,
-                "comments": "Order by options\n- If array then the order will be maintained"
+                "comments": "Order by options\n- Order is maintained in arrays\n- `[{ key: \"field\", asc: true, nulls: \"last\" }]`"
               },
               "having": {
-                "type": "reference",
+                "type": "union",
                 "alias": "FullFilter<T, S> | undefined",
-                "comments": "Filter applied after any aggregations (group by)",
-                "optional": true
+                "types": [
+                  {
+                    "type": "primitive",
+                    "alias": "undefined",
+                    "subType": "undefined"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "ComplexFilter",
+                    "aliasSymbolescapedName": "ComplexFilter",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $and: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$and": {
+                        "type": "array",
+                        "alias": "FullFilter<T, S>[]",
+                        "itemType": {
+                          "type": "union",
+                          "alias": "FullFilter<T, S>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                          "types": [
+                            {
+                              "type": "object",
+                              "alias": "ComplexFilter",
+                              "aliasSymbolescapedName": "ComplexFilter",
+                              "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "reference",
+                              "alias": "{ $and: FullFilter<T, S>[]; }"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "{ $or: FullFilter<T, S>[]; }",
+                              "properties": {
+                                "$or": {
+                                  "type": "reference",
+                                  "alias": "FullFilter<T, S>[]",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "NormalFilter",
+                              "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true,
+                                  "intersectionParent": "Partial"
+                                }
+                              }
+                            },
+                            {
+                              "type": "primitive",
+                              "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "ShorthandFilter",
+                              "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                              "subType": "any"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                              "aliasSymbolescapedName": "Partial",
+                              "comments": "Make all properties in T optional",
+                              "properties": {
+                                "$exists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$existsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExistsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $or: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$or": {
+                        "type": "reference",
+                        "alias": "FullFilter<T, S>[]",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "NormalFilter",
+                    "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true,
+                        "intersectionParent": "Partial"
+                      }
+                    }
+                  },
+                  {
+                    "type": "primitive",
+                    "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "ShorthandFilter",
+                    "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                    "subType": "any"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {
+                      "$exists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$existsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExistsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      }
+                    }
+                  }
+                ],
+                "optional": true,
+                "comments": "Filter applied after any aggregations (group by)"
               },
               "throttle": {
                 "type": "primitive",
@@ -6406,8 +9541,196 @@ export const definitions = [
           {
             "name": "filter",
             "optional": true,
-            "type": "reference",
+            "type": "union",
             "alias": "FullFilter<T, S> | undefined",
+            "types": [
+              {
+                "type": "primitive",
+                "alias": "undefined",
+                "subType": "undefined"
+              },
+              {
+                "type": "object",
+                "alias": "ComplexFilter",
+                "aliasSymbolescapedName": "ComplexFilter",
+                "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $and: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$and": {
+                    "type": "array",
+                    "alias": "FullFilter<T, S>[]",
+                    "itemType": {
+                      "type": "union",
+                      "alias": "FullFilter<T, S>",
+                      "aliasSymbolescapedName": "FullFilter",
+                      "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                      "types": [
+                        {
+                          "type": "object",
+                          "alias": "ComplexFilter",
+                          "aliasSymbolescapedName": "ComplexFilter",
+                          "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "reference",
+                          "alias": "{ $and: FullFilter<T, S>[]; }"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "{ $or: FullFilter<T, S>[]; }",
+                          "properties": {
+                            "$or": {
+                              "type": "reference",
+                              "alias": "FullFilter<T, S>[]",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "NormalFilter",
+                          "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true,
+                              "intersectionParent": "Partial"
+                            }
+                          }
+                        },
+                        {
+                          "type": "primitive",
+                          "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "ShorthandFilter",
+                          "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                          "subType": "any"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                          "aliasSymbolescapedName": "Partial",
+                          "comments": "Make all properties in T optional",
+                          "properties": {
+                            "$exists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$existsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExistsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $or: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$or": {
+                    "type": "reference",
+                    "alias": "FullFilter<T, S>[]",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "NormalFilter",
+                "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true,
+                    "intersectionParent": "Partial"
+                  }
+                }
+              },
+              {
+                "type": "primitive",
+                "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "ShorthandFilter",
+                "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                "subType": "any"
+              },
+              {
+                "type": "object",
+                "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                "aliasSymbolescapedName": "Partial",
+                "comments": "Make all properties in T optional",
+                "properties": {
+                  "$exists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$existsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExistsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  }
+                }
+              }
+            ],
             "comments": ""
           },
           {
@@ -6438,21 +9761,24 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Max number of rows to return\n- If undefined then 1000 will be applied as the default\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)"
+                "comments": "Max number of rows to return. Defaults to 1000\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)",
+                "intersectionParent": "CommonSelectParams"
               },
               "offset": {
                 "type": "primitive",
                 "alias": "number",
                 "subType": "number",
                 "optional": true,
-                "comments": "Number of rows to skip"
+                "comments": "Number of rows to skip",
+                "intersectionParent": "CommonSelectParams"
               },
               "groupBy": {
                 "type": "primitive",
                 "alias": "false",
                 "subType": "boolean",
                 "optional": true,
-                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)"
+                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)",
+                "intersectionParent": "CommonSelectParams"
               },
               "returnType": {
                 "type": "union",
@@ -6495,13 +9821,14 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Result data structure/type:\n- row: the first row as an object\n- value: the first value from of first field\n- values: array of values from the selected field\n- statement: sql statement\n- statement-no-rls: sql statement without row level security\n- statement-where: sql statement where condition"
+                "comments": "Result data structure/type:\n- **row**: the first row as an object\n- **value**: the first value from of first field\n- **values**: array of values from the selected field\n- **statement**: sql statement\n- **statement-no-rls**: sql statement without row level security\n- **statement-where**: sql statement where condition",
+                "intersectionParent": "CommonSelectParams"
               },
               "select": {
                 "type": "primitive",
                 "alias": "Select<T, S>",
                 "aliasSymbolescapedName": "Select",
-                "comments": "Fields/expressions/linked data to select\n- If empty then all fields will be selected\n- If \"*\" then all fields will be selected\n- If { field: 0 } then all fields except the specified field will be selected\n- If { field: 1 } then only the specified field will be selected\n- If { field: { funcName: [args] } } then the field will be selected with the specified function applied\n- If { field: { nestedTable: { field: 1 } } } then the field will be selected with the nested table fields",
+                "comments": "Fields/expressions/linked data to select\n- `\"*\"` or empty will return all fields\n- `{ field: 0 }` - all fields except the specified field will be selected\n- `{ field: 1 }` - only the specified field will be selected\n- `{ field: { $funcName: [args] } }` - the field will be selected with the specified function applied\n- `{ field: 1, referencedTable: \"*\" }` - field together with all fields from referencedTable will be selected\n- `{ linkedData: { referencedTable: { field: 1 } } }` - linkedData will contain the linked/joined records from referencedTable",
                 "subType": "any",
                 "optional": true
               },
@@ -6511,13 +9838,201 @@ export const definitions = [
                 "aliasSymbolescapedName": "OrderBy",
                 "subType": "any",
                 "optional": true,
-                "comments": "Order by options\n- If array then the order will be maintained"
+                "comments": "Order by options\n- Order is maintained in arrays\n- `[{ key: \"field\", asc: true, nulls: \"last\" }]`"
               },
               "having": {
-                "type": "reference",
+                "type": "union",
                 "alias": "FullFilter<T, S> | undefined",
-                "comments": "Filter applied after any aggregations (group by)",
-                "optional": true
+                "types": [
+                  {
+                    "type": "primitive",
+                    "alias": "undefined",
+                    "subType": "undefined"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "ComplexFilter",
+                    "aliasSymbolescapedName": "ComplexFilter",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $and: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$and": {
+                        "type": "array",
+                        "alias": "FullFilter<T, S>[]",
+                        "itemType": {
+                          "type": "union",
+                          "alias": "FullFilter<T, S>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                          "types": [
+                            {
+                              "type": "object",
+                              "alias": "ComplexFilter",
+                              "aliasSymbolescapedName": "ComplexFilter",
+                              "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "reference",
+                              "alias": "{ $and: FullFilter<T, S>[]; }"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "{ $or: FullFilter<T, S>[]; }",
+                              "properties": {
+                                "$or": {
+                                  "type": "reference",
+                                  "alias": "FullFilter<T, S>[]",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "NormalFilter",
+                              "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true,
+                                  "intersectionParent": "Partial"
+                                }
+                              }
+                            },
+                            {
+                              "type": "primitive",
+                              "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "ShorthandFilter",
+                              "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                              "subType": "any"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                              "aliasSymbolescapedName": "Partial",
+                              "comments": "Make all properties in T optional",
+                              "properties": {
+                                "$exists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$existsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExistsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $or: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$or": {
+                        "type": "reference",
+                        "alias": "FullFilter<T, S>[]",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "NormalFilter",
+                    "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true,
+                        "intersectionParent": "Partial"
+                      }
+                    }
+                  },
+                  {
+                    "type": "primitive",
+                    "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "ShorthandFilter",
+                    "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                    "subType": "any"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {
+                      "$exists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$existsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExistsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      }
+                    }
+                  }
+                ],
+                "optional": true,
+                "comments": "Filter applied after any aggregations (group by)"
               }
             },
             "comments": ""
@@ -6575,8 +10090,196 @@ export const definitions = [
           {
             "name": "filter",
             "optional": true,
-            "type": "reference",
+            "type": "union",
             "alias": "FullFilter<T, S> | undefined",
+            "types": [
+              {
+                "type": "primitive",
+                "alias": "undefined",
+                "subType": "undefined"
+              },
+              {
+                "type": "object",
+                "alias": "ComplexFilter",
+                "aliasSymbolescapedName": "ComplexFilter",
+                "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $and: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$and": {
+                    "type": "array",
+                    "alias": "FullFilter<T, S>[]",
+                    "itemType": {
+                      "type": "union",
+                      "alias": "FullFilter<T, S>",
+                      "aliasSymbolescapedName": "FullFilter",
+                      "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                      "types": [
+                        {
+                          "type": "object",
+                          "alias": "ComplexFilter",
+                          "aliasSymbolescapedName": "ComplexFilter",
+                          "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "reference",
+                          "alias": "{ $and: FullFilter<T, S>[]; }"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "{ $or: FullFilter<T, S>[]; }",
+                          "properties": {
+                            "$or": {
+                              "type": "reference",
+                              "alias": "FullFilter<T, S>[]",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "NormalFilter",
+                          "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true,
+                              "intersectionParent": "Partial"
+                            }
+                          }
+                        },
+                        {
+                          "type": "primitive",
+                          "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "ShorthandFilter",
+                          "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                          "subType": "any"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                          "aliasSymbolescapedName": "Partial",
+                          "comments": "Make all properties in T optional",
+                          "properties": {
+                            "$exists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$existsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExistsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $or: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$or": {
+                    "type": "reference",
+                    "alias": "FullFilter<T, S>[]",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "NormalFilter",
+                "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true,
+                    "intersectionParent": "Partial"
+                  }
+                }
+              },
+              {
+                "type": "primitive",
+                "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "ShorthandFilter",
+                "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                "subType": "any"
+              },
+              {
+                "type": "object",
+                "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                "aliasSymbolescapedName": "Partial",
+                "comments": "Make all properties in T optional",
+                "properties": {
+                  "$exists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$existsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExistsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  }
+                }
+              }
+            ],
             "comments": ""
           },
           {
@@ -6607,21 +10310,24 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Max number of rows to return\n- If undefined then 1000 will be applied as the default\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)"
+                "comments": "Max number of rows to return. Defaults to 1000\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)",
+                "intersectionParent": "CommonSelectParams"
               },
               "offset": {
                 "type": "primitive",
                 "alias": "number",
                 "subType": "number",
                 "optional": true,
-                "comments": "Number of rows to skip"
+                "comments": "Number of rows to skip",
+                "intersectionParent": "CommonSelectParams"
               },
               "groupBy": {
                 "type": "primitive",
                 "alias": "false",
                 "subType": "boolean",
                 "optional": true,
-                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)"
+                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)",
+                "intersectionParent": "CommonSelectParams"
               },
               "returnType": {
                 "type": "union",
@@ -6664,13 +10370,14 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Result data structure/type:\n- row: the first row as an object\n- value: the first value from of first field\n- values: array of values from the selected field\n- statement: sql statement\n- statement-no-rls: sql statement without row level security\n- statement-where: sql statement where condition"
+                "comments": "Result data structure/type:\n- **row**: the first row as an object\n- **value**: the first value from of first field\n- **values**: array of values from the selected field\n- **statement**: sql statement\n- **statement-no-rls**: sql statement without row level security\n- **statement-where**: sql statement where condition",
+                "intersectionParent": "CommonSelectParams"
               },
               "select": {
                 "type": "primitive",
                 "alias": "Select<T, S>",
                 "aliasSymbolescapedName": "Select",
-                "comments": "Fields/expressions/linked data to select\n- If empty then all fields will be selected\n- If \"*\" then all fields will be selected\n- If { field: 0 } then all fields except the specified field will be selected\n- If { field: 1 } then only the specified field will be selected\n- If { field: { funcName: [args] } } then the field will be selected with the specified function applied\n- If { field: { nestedTable: { field: 1 } } } then the field will be selected with the nested table fields",
+                "comments": "Fields/expressions/linked data to select\n- `\"*\"` or empty will return all fields\n- `{ field: 0 }` - all fields except the specified field will be selected\n- `{ field: 1 }` - only the specified field will be selected\n- `{ field: { $funcName: [args] } }` - the field will be selected with the specified function applied\n- `{ field: 1, referencedTable: \"*\" }` - field together with all fields from referencedTable will be selected\n- `{ linkedData: { referencedTable: { field: 1 } } }` - linkedData will contain the linked/joined records from referencedTable",
                 "subType": "any",
                 "optional": true
               },
@@ -6680,13 +10387,201 @@ export const definitions = [
                 "aliasSymbolescapedName": "OrderBy",
                 "subType": "any",
                 "optional": true,
-                "comments": "Order by options\n- If array then the order will be maintained"
+                "comments": "Order by options\n- Order is maintained in arrays\n- `[{ key: \"field\", asc: true, nulls: \"last\" }]`"
               },
               "having": {
-                "type": "reference",
+                "type": "union",
                 "alias": "FullFilter<T, S> | undefined",
-                "comments": "Filter applied after any aggregations (group by)",
-                "optional": true
+                "types": [
+                  {
+                    "type": "primitive",
+                    "alias": "undefined",
+                    "subType": "undefined"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "ComplexFilter",
+                    "aliasSymbolescapedName": "ComplexFilter",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $and: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$and": {
+                        "type": "array",
+                        "alias": "FullFilter<T, S>[]",
+                        "itemType": {
+                          "type": "union",
+                          "alias": "FullFilter<T, S>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                          "types": [
+                            {
+                              "type": "object",
+                              "alias": "ComplexFilter",
+                              "aliasSymbolescapedName": "ComplexFilter",
+                              "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "reference",
+                              "alias": "{ $and: FullFilter<T, S>[]; }"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "{ $or: FullFilter<T, S>[]; }",
+                              "properties": {
+                                "$or": {
+                                  "type": "reference",
+                                  "alias": "FullFilter<T, S>[]",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "NormalFilter",
+                              "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true,
+                                  "intersectionParent": "Partial"
+                                }
+                              }
+                            },
+                            {
+                              "type": "primitive",
+                              "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "ShorthandFilter",
+                              "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                              "subType": "any"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                              "aliasSymbolescapedName": "Partial",
+                              "comments": "Make all properties in T optional",
+                              "properties": {
+                                "$exists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$existsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExistsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $or: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$or": {
+                        "type": "reference",
+                        "alias": "FullFilter<T, S>[]",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "NormalFilter",
+                    "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true,
+                        "intersectionParent": "Partial"
+                      }
+                    }
+                  },
+                  {
+                    "type": "primitive",
+                    "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "ShorthandFilter",
+                    "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                    "subType": "any"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {
+                      "$exists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$existsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExistsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      }
+                    }
+                  }
+                ],
+                "optional": true,
+                "comments": "Filter applied after any aggregations (group by)"
               }
             },
             "comments": ""
@@ -6744,8 +10639,196 @@ export const definitions = [
           {
             "name": "filter",
             "optional": true,
-            "type": "reference",
+            "type": "union",
             "alias": "FullFilter<T, S> | undefined",
+            "types": [
+              {
+                "type": "primitive",
+                "alias": "undefined",
+                "subType": "undefined"
+              },
+              {
+                "type": "object",
+                "alias": "ComplexFilter",
+                "aliasSymbolescapedName": "ComplexFilter",
+                "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $and: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$and": {
+                    "type": "array",
+                    "alias": "FullFilter<T, S>[]",
+                    "itemType": {
+                      "type": "union",
+                      "alias": "FullFilter<T, S>",
+                      "aliasSymbolescapedName": "FullFilter",
+                      "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                      "types": [
+                        {
+                          "type": "object",
+                          "alias": "ComplexFilter",
+                          "aliasSymbolescapedName": "ComplexFilter",
+                          "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "reference",
+                          "alias": "{ $and: FullFilter<T, S>[]; }"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "{ $or: FullFilter<T, S>[]; }",
+                          "properties": {
+                            "$or": {
+                              "type": "reference",
+                              "alias": "FullFilter<T, S>[]",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "NormalFilter",
+                          "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true,
+                              "intersectionParent": "Partial"
+                            }
+                          }
+                        },
+                        {
+                          "type": "primitive",
+                          "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "ShorthandFilter",
+                          "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                          "subType": "any"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                          "aliasSymbolescapedName": "Partial",
+                          "comments": "Make all properties in T optional",
+                          "properties": {
+                            "$exists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$existsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExistsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $or: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$or": {
+                    "type": "reference",
+                    "alias": "FullFilter<T, S>[]",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "NormalFilter",
+                "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true,
+                    "intersectionParent": "Partial"
+                  }
+                }
+              },
+              {
+                "type": "primitive",
+                "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "ShorthandFilter",
+                "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                "subType": "any"
+              },
+              {
+                "type": "object",
+                "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                "aliasSymbolescapedName": "Partial",
+                "comments": "Make all properties in T optional",
+                "properties": {
+                  "$exists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$existsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExistsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  }
+                }
+              }
+            ],
             "comments": ""
           },
           {
@@ -6776,21 +10859,24 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Max number of rows to return\n- If undefined then 1000 will be applied as the default\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)"
+                "comments": "Max number of rows to return. Defaults to 1000\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)",
+                "intersectionParent": "CommonSelectParams"
               },
               "offset": {
                 "type": "primitive",
                 "alias": "number",
                 "subType": "number",
                 "optional": true,
-                "comments": "Number of rows to skip"
+                "comments": "Number of rows to skip",
+                "intersectionParent": "CommonSelectParams"
               },
               "groupBy": {
                 "type": "primitive",
                 "alias": "false",
                 "subType": "boolean",
                 "optional": true,
-                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)"
+                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)",
+                "intersectionParent": "CommonSelectParams"
               },
               "returnType": {
                 "type": "union",
@@ -6833,13 +10919,14 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Result data structure/type:\n- row: the first row as an object\n- value: the first value from of first field\n- values: array of values from the selected field\n- statement: sql statement\n- statement-no-rls: sql statement without row level security\n- statement-where: sql statement where condition"
+                "comments": "Result data structure/type:\n- **row**: the first row as an object\n- **value**: the first value from of first field\n- **values**: array of values from the selected field\n- **statement**: sql statement\n- **statement-no-rls**: sql statement without row level security\n- **statement-where**: sql statement where condition",
+                "intersectionParent": "CommonSelectParams"
               },
               "select": {
                 "type": "primitive",
                 "alias": "Select<T, S>",
                 "aliasSymbolescapedName": "Select",
-                "comments": "Fields/expressions/linked data to select\n- If empty then all fields will be selected\n- If \"*\" then all fields will be selected\n- If { field: 0 } then all fields except the specified field will be selected\n- If { field: 1 } then only the specified field will be selected\n- If { field: { funcName: [args] } } then the field will be selected with the specified function applied\n- If { field: { nestedTable: { field: 1 } } } then the field will be selected with the nested table fields",
+                "comments": "Fields/expressions/linked data to select\n- `\"*\"` or empty will return all fields\n- `{ field: 0 }` - all fields except the specified field will be selected\n- `{ field: 1 }` - only the specified field will be selected\n- `{ field: { $funcName: [args] } }` - the field will be selected with the specified function applied\n- `{ field: 1, referencedTable: \"*\" }` - field together with all fields from referencedTable will be selected\n- `{ linkedData: { referencedTable: { field: 1 } } }` - linkedData will contain the linked/joined records from referencedTable",
                 "subType": "any",
                 "optional": true
               },
@@ -6849,13 +10936,201 @@ export const definitions = [
                 "aliasSymbolescapedName": "OrderBy",
                 "subType": "any",
                 "optional": true,
-                "comments": "Order by options\n- If array then the order will be maintained"
+                "comments": "Order by options\n- Order is maintained in arrays\n- `[{ key: \"field\", asc: true, nulls: \"last\" }]`"
               },
               "having": {
-                "type": "reference",
+                "type": "union",
                 "alias": "FullFilter<T, S> | undefined",
-                "comments": "Filter applied after any aggregations (group by)",
-                "optional": true
+                "types": [
+                  {
+                    "type": "primitive",
+                    "alias": "undefined",
+                    "subType": "undefined"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "ComplexFilter",
+                    "aliasSymbolescapedName": "ComplexFilter",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $and: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$and": {
+                        "type": "array",
+                        "alias": "FullFilter<T, S>[]",
+                        "itemType": {
+                          "type": "union",
+                          "alias": "FullFilter<T, S>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                          "types": [
+                            {
+                              "type": "object",
+                              "alias": "ComplexFilter",
+                              "aliasSymbolescapedName": "ComplexFilter",
+                              "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "reference",
+                              "alias": "{ $and: FullFilter<T, S>[]; }"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "{ $or: FullFilter<T, S>[]; }",
+                              "properties": {
+                                "$or": {
+                                  "type": "reference",
+                                  "alias": "FullFilter<T, S>[]",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "NormalFilter",
+                              "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true,
+                                  "intersectionParent": "Partial"
+                                }
+                              }
+                            },
+                            {
+                              "type": "primitive",
+                              "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "ShorthandFilter",
+                              "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                              "subType": "any"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                              "aliasSymbolescapedName": "Partial",
+                              "comments": "Make all properties in T optional",
+                              "properties": {
+                                "$exists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$existsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExistsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $or: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$or": {
+                        "type": "reference",
+                        "alias": "FullFilter<T, S>[]",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "NormalFilter",
+                    "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true,
+                        "intersectionParent": "Partial"
+                      }
+                    }
+                  },
+                  {
+                    "type": "primitive",
+                    "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "ShorthandFilter",
+                    "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                    "subType": "any"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {
+                      "$exists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$existsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExistsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      }
+                    }
+                  }
+                ],
+                "optional": true,
+                "comments": "Filter applied after any aggregations (group by)"
               }
             },
             "comments": ""
@@ -6912,8 +11187,196 @@ export const definitions = [
           {
             "name": "filter",
             "optional": true,
-            "type": "reference",
+            "type": "union",
             "alias": "FullFilter<T, S> | undefined",
+            "types": [
+              {
+                "type": "primitive",
+                "alias": "undefined",
+                "subType": "undefined"
+              },
+              {
+                "type": "object",
+                "alias": "ComplexFilter",
+                "aliasSymbolescapedName": "ComplexFilter",
+                "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $and: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$and": {
+                    "type": "array",
+                    "alias": "FullFilter<T, S>[]",
+                    "itemType": {
+                      "type": "union",
+                      "alias": "FullFilter<T, S>",
+                      "aliasSymbolescapedName": "FullFilter",
+                      "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                      "types": [
+                        {
+                          "type": "object",
+                          "alias": "ComplexFilter",
+                          "aliasSymbolescapedName": "ComplexFilter",
+                          "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "reference",
+                          "alias": "{ $and: FullFilter<T, S>[]; }"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "{ $or: FullFilter<T, S>[]; }",
+                          "properties": {
+                            "$or": {
+                              "type": "reference",
+                              "alias": "FullFilter<T, S>[]",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "NormalFilter",
+                          "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true,
+                              "intersectionParent": "Partial"
+                            }
+                          }
+                        },
+                        {
+                          "type": "primitive",
+                          "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "ShorthandFilter",
+                          "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                          "subType": "any"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                          "aliasSymbolescapedName": "Partial",
+                          "comments": "Make all properties in T optional",
+                          "properties": {
+                            "$exists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$existsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExistsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $or: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$or": {
+                    "type": "reference",
+                    "alias": "FullFilter<T, S>[]",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "NormalFilter",
+                "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true,
+                    "intersectionParent": "Partial"
+                  }
+                }
+              },
+              {
+                "type": "primitive",
+                "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "ShorthandFilter",
+                "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                "subType": "any"
+              },
+              {
+                "type": "object",
+                "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                "aliasSymbolescapedName": "Partial",
+                "comments": "Make all properties in T optional",
+                "properties": {
+                  "$exists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$existsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExistsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  }
+                }
+              }
+            ],
             "comments": ""
           },
           {
@@ -6944,21 +11407,24 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Max number of rows to return\n- If undefined then 1000 will be applied as the default\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)"
+                "comments": "Max number of rows to return. Defaults to 1000\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)",
+                "intersectionParent": "CommonSelectParams"
               },
               "offset": {
                 "type": "primitive",
                 "alias": "number",
                 "subType": "number",
                 "optional": true,
-                "comments": "Number of rows to skip"
+                "comments": "Number of rows to skip",
+                "intersectionParent": "CommonSelectParams"
               },
               "groupBy": {
                 "type": "primitive",
                 "alias": "false",
                 "subType": "boolean",
                 "optional": true,
-                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)"
+                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)",
+                "intersectionParent": "CommonSelectParams"
               },
               "returnType": {
                 "type": "union",
@@ -7001,13 +11467,14 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Result data structure/type:\n- row: the first row as an object\n- value: the first value from of first field\n- values: array of values from the selected field\n- statement: sql statement\n- statement-no-rls: sql statement without row level security\n- statement-where: sql statement where condition"
+                "comments": "Result data structure/type:\n- **row**: the first row as an object\n- **value**: the first value from of first field\n- **values**: array of values from the selected field\n- **statement**: sql statement\n- **statement-no-rls**: sql statement without row level security\n- **statement-where**: sql statement where condition",
+                "intersectionParent": "CommonSelectParams"
               },
               "select": {
                 "type": "primitive",
                 "alias": "Select<T, S>",
                 "aliasSymbolescapedName": "Select",
-                "comments": "Fields/expressions/linked data to select\n- If empty then all fields will be selected\n- If \"*\" then all fields will be selected\n- If { field: 0 } then all fields except the specified field will be selected\n- If { field: 1 } then only the specified field will be selected\n- If { field: { funcName: [args] } } then the field will be selected with the specified function applied\n- If { field: { nestedTable: { field: 1 } } } then the field will be selected with the nested table fields",
+                "comments": "Fields/expressions/linked data to select\n- `\"*\"` or empty will return all fields\n- `{ field: 0 }` - all fields except the specified field will be selected\n- `{ field: 1 }` - only the specified field will be selected\n- `{ field: { $funcName: [args] } }` - the field will be selected with the specified function applied\n- `{ field: 1, referencedTable: \"*\" }` - field together with all fields from referencedTable will be selected\n- `{ linkedData: { referencedTable: { field: 1 } } }` - linkedData will contain the linked/joined records from referencedTable",
                 "subType": "any",
                 "optional": true
               },
@@ -7017,13 +11484,201 @@ export const definitions = [
                 "aliasSymbolescapedName": "OrderBy",
                 "subType": "any",
                 "optional": true,
-                "comments": "Order by options\n- If array then the order will be maintained"
+                "comments": "Order by options\n- Order is maintained in arrays\n- `[{ key: \"field\", asc: true, nulls: \"last\" }]`"
               },
               "having": {
-                "type": "reference",
+                "type": "union",
                 "alias": "FullFilter<T, S> | undefined",
-                "comments": "Filter applied after any aggregations (group by)",
-                "optional": true
+                "types": [
+                  {
+                    "type": "primitive",
+                    "alias": "undefined",
+                    "subType": "undefined"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "ComplexFilter",
+                    "aliasSymbolescapedName": "ComplexFilter",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $and: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$and": {
+                        "type": "array",
+                        "alias": "FullFilter<T, S>[]",
+                        "itemType": {
+                          "type": "union",
+                          "alias": "FullFilter<T, S>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                          "types": [
+                            {
+                              "type": "object",
+                              "alias": "ComplexFilter",
+                              "aliasSymbolescapedName": "ComplexFilter",
+                              "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "reference",
+                              "alias": "{ $and: FullFilter<T, S>[]; }"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "{ $or: FullFilter<T, S>[]; }",
+                              "properties": {
+                                "$or": {
+                                  "type": "reference",
+                                  "alias": "FullFilter<T, S>[]",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "NormalFilter",
+                              "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true,
+                                  "intersectionParent": "Partial"
+                                }
+                              }
+                            },
+                            {
+                              "type": "primitive",
+                              "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "ShorthandFilter",
+                              "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                              "subType": "any"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                              "aliasSymbolescapedName": "Partial",
+                              "comments": "Make all properties in T optional",
+                              "properties": {
+                                "$exists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$existsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExistsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $or: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$or": {
+                        "type": "reference",
+                        "alias": "FullFilter<T, S>[]",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "NormalFilter",
+                    "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true,
+                        "intersectionParent": "Partial"
+                      }
+                    }
+                  },
+                  {
+                    "type": "primitive",
+                    "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "ShorthandFilter",
+                    "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                    "subType": "any"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {
+                      "$exists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$existsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExistsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      }
+                    }
+                  }
+                ],
+                "optional": true,
+                "comments": "Filter applied after any aggregations (group by)"
               }
             },
             "comments": ""
@@ -7080,10 +11735,95 @@ export const definitions = [
           {
             "name": "filter",
             "optional": false,
-            "type": "reference",
+            "type": "union",
             "alias": "FullFilter<T, S>",
             "aliasSymbolescapedName": "FullFilter",
-            "comments": "Group or simple filter"
+            "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+            "types": [
+              {
+                "type": "object",
+                "alias": "ComplexFilter",
+                "aliasSymbolescapedName": "ComplexFilter",
+                "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "reference",
+                "alias": "{ $and: FullFilter<T, S>[]; }"
+              },
+              {
+                "type": "object",
+                "alias": "{ $or: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$or": {
+                    "type": "reference",
+                    "alias": "FullFilter<T, S>[]",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "NormalFilter",
+                "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true,
+                    "intersectionParent": "Partial"
+                  }
+                }
+              },
+              {
+                "type": "primitive",
+                "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "ShorthandFilter",
+                "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                "subType": "any"
+              },
+              {
+                "type": "object",
+                "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                "aliasSymbolescapedName": "Partial",
+                "comments": "Make all properties in T optional",
+                "properties": {
+                  "$exists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$existsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExistsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  }
+                }
+              }
+            ]
           },
           {
             "name": "newData",
@@ -7122,21 +11862,24 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Max number of rows to return\n- If undefined then 1000 will be applied as the default\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)"
+                "comments": "Max number of rows to return. Defaults to 1000\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)",
+                "intersectionParent": "CommonSelectParams"
               },
               "offset": {
                 "type": "primitive",
                 "alias": "number",
                 "subType": "number",
                 "optional": true,
-                "comments": "Number of rows to skip"
+                "comments": "Number of rows to skip",
+                "intersectionParent": "CommonSelectParams"
               },
               "groupBy": {
                 "type": "primitive",
                 "alias": "false",
                 "subType": "boolean",
                 "optional": true,
-                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)"
+                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)",
+                "intersectionParent": "CommonSelectParams"
               },
               "returnType": {
                 "type": "union",
@@ -7179,13 +11922,14 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Result data structure/type:\n- row: the first row as an object\n- value: the first value from of first field\n- values: array of values from the selected field\n- statement: sql statement\n- statement-no-rls: sql statement without row level security\n- statement-where: sql statement where condition"
+                "comments": "Result data structure/type:\n- **row**: the first row as an object\n- **value**: the first value from of first field\n- **values**: array of values from the selected field\n- **statement**: sql statement\n- **statement-no-rls**: sql statement without row level security\n- **statement-where**: sql statement where condition",
+                "intersectionParent": "CommonSelectParams"
               },
               "select": {
                 "type": "primitive",
                 "alias": "Select<T, S>",
                 "aliasSymbolescapedName": "Select",
-                "comments": "Fields/expressions/linked data to select\n- If empty then all fields will be selected\n- If \"*\" then all fields will be selected\n- If { field: 0 } then all fields except the specified field will be selected\n- If { field: 1 } then only the specified field will be selected\n- If { field: { funcName: [args] } } then the field will be selected with the specified function applied\n- If { field: { nestedTable: { field: 1 } } } then the field will be selected with the nested table fields",
+                "comments": "Fields/expressions/linked data to select\n- `\"*\"` or empty will return all fields\n- `{ field: 0 }` - all fields except the specified field will be selected\n- `{ field: 1 }` - only the specified field will be selected\n- `{ field: { $funcName: [args] } }` - the field will be selected with the specified function applied\n- `{ field: 1, referencedTable: \"*\" }` - field together with all fields from referencedTable will be selected\n- `{ linkedData: { referencedTable: { field: 1 } } }` - linkedData will contain the linked/joined records from referencedTable",
                 "subType": "any",
                 "optional": true
               },
@@ -7195,13 +11939,201 @@ export const definitions = [
                 "aliasSymbolescapedName": "OrderBy",
                 "subType": "any",
                 "optional": true,
-                "comments": "Order by options\n- If array then the order will be maintained"
+                "comments": "Order by options\n- Order is maintained in arrays\n- `[{ key: \"field\", asc: true, nulls: \"last\" }]`"
               },
               "having": {
-                "type": "reference",
+                "type": "union",
                 "alias": "FullFilter<T, S> | undefined",
-                "comments": "Filter applied after any aggregations (group by)",
-                "optional": true
+                "types": [
+                  {
+                    "type": "primitive",
+                    "alias": "undefined",
+                    "subType": "undefined"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "ComplexFilter",
+                    "aliasSymbolescapedName": "ComplexFilter",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $and: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$and": {
+                        "type": "array",
+                        "alias": "FullFilter<T, S>[]",
+                        "itemType": {
+                          "type": "union",
+                          "alias": "FullFilter<T, S>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                          "types": [
+                            {
+                              "type": "object",
+                              "alias": "ComplexFilter",
+                              "aliasSymbolescapedName": "ComplexFilter",
+                              "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "reference",
+                              "alias": "{ $and: FullFilter<T, S>[]; }"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "{ $or: FullFilter<T, S>[]; }",
+                              "properties": {
+                                "$or": {
+                                  "type": "reference",
+                                  "alias": "FullFilter<T, S>[]",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "NormalFilter",
+                              "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true,
+                                  "intersectionParent": "Partial"
+                                }
+                              }
+                            },
+                            {
+                              "type": "primitive",
+                              "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "ShorthandFilter",
+                              "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                              "subType": "any"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                              "aliasSymbolescapedName": "Partial",
+                              "comments": "Make all properties in T optional",
+                              "properties": {
+                                "$exists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$existsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExistsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $or: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$or": {
+                        "type": "reference",
+                        "alias": "FullFilter<T, S>[]",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "NormalFilter",
+                    "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true,
+                        "intersectionParent": "Partial"
+                      }
+                    }
+                  },
+                  {
+                    "type": "primitive",
+                    "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "ShorthandFilter",
+                    "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                    "subType": "any"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {
+                      "$exists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$existsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExistsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      }
+                    }
+                  }
+                ],
+                "optional": true,
+                "comments": "Filter applied after any aggregations (group by)"
               }
             },
             "comments": ""
@@ -7243,10 +12175,95 @@ export const definitions = [
             "alias": "[FullFilter<T, S>, Partial<UpsertDataToPGCast<T>>][]",
             "itemTypes": [
               {
-                "type": "reference",
+                "type": "union",
                 "alias": "FullFilter<T, S>",
                 "aliasSymbolescapedName": "FullFilter",
-                "comments": "Group or simple filter"
+                "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                "types": [
+                  {
+                    "type": "object",
+                    "alias": "ComplexFilter",
+                    "aliasSymbolescapedName": "ComplexFilter",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "reference",
+                    "alias": "{ $and: FullFilter<T, S>[]; }"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $or: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$or": {
+                        "type": "reference",
+                        "alias": "FullFilter<T, S>[]",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "NormalFilter",
+                    "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true,
+                        "intersectionParent": "Partial"
+                      }
+                    }
+                  },
+                  {
+                    "type": "primitive",
+                    "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "ShorthandFilter",
+                    "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                    "subType": "any"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {
+                      "$exists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$existsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExistsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      }
+                    }
+                  }
+                ]
               },
               {
                 "type": "object",
@@ -7286,21 +12303,24 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Max number of rows to return\n- If undefined then 1000 will be applied as the default\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)"
+                "comments": "Max number of rows to return. Defaults to 1000\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)",
+                "intersectionParent": "CommonSelectParams"
               },
               "offset": {
                 "type": "primitive",
                 "alias": "number",
                 "subType": "number",
                 "optional": true,
-                "comments": "Number of rows to skip"
+                "comments": "Number of rows to skip",
+                "intersectionParent": "CommonSelectParams"
               },
               "groupBy": {
                 "type": "primitive",
                 "alias": "false",
                 "subType": "boolean",
                 "optional": true,
-                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)"
+                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)",
+                "intersectionParent": "CommonSelectParams"
               },
               "returnType": {
                 "type": "union",
@@ -7343,13 +12363,14 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Result data structure/type:\n- row: the first row as an object\n- value: the first value from of first field\n- values: array of values from the selected field\n- statement: sql statement\n- statement-no-rls: sql statement without row level security\n- statement-where: sql statement where condition"
+                "comments": "Result data structure/type:\n- **row**: the first row as an object\n- **value**: the first value from of first field\n- **values**: array of values from the selected field\n- **statement**: sql statement\n- **statement-no-rls**: sql statement without row level security\n- **statement-where**: sql statement where condition",
+                "intersectionParent": "CommonSelectParams"
               },
               "select": {
                 "type": "primitive",
                 "alias": "Select<T, S>",
                 "aliasSymbolescapedName": "Select",
-                "comments": "Fields/expressions/linked data to select\n- If empty then all fields will be selected\n- If \"*\" then all fields will be selected\n- If { field: 0 } then all fields except the specified field will be selected\n- If { field: 1 } then only the specified field will be selected\n- If { field: { funcName: [args] } } then the field will be selected with the specified function applied\n- If { field: { nestedTable: { field: 1 } } } then the field will be selected with the nested table fields",
+                "comments": "Fields/expressions/linked data to select\n- `\"*\"` or empty will return all fields\n- `{ field: 0 }` - all fields except the specified field will be selected\n- `{ field: 1 }` - only the specified field will be selected\n- `{ field: { $funcName: [args] } }` - the field will be selected with the specified function applied\n- `{ field: 1, referencedTable: \"*\" }` - field together with all fields from referencedTable will be selected\n- `{ linkedData: { referencedTable: { field: 1 } } }` - linkedData will contain the linked/joined records from referencedTable",
                 "subType": "any",
                 "optional": true
               },
@@ -7359,13 +12380,201 @@ export const definitions = [
                 "aliasSymbolescapedName": "OrderBy",
                 "subType": "any",
                 "optional": true,
-                "comments": "Order by options\n- If array then the order will be maintained"
+                "comments": "Order by options\n- Order is maintained in arrays\n- `[{ key: \"field\", asc: true, nulls: \"last\" }]`"
               },
               "having": {
-                "type": "reference",
+                "type": "union",
                 "alias": "FullFilter<T, S> | undefined",
-                "comments": "Filter applied after any aggregations (group by)",
-                "optional": true
+                "types": [
+                  {
+                    "type": "primitive",
+                    "alias": "undefined",
+                    "subType": "undefined"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "ComplexFilter",
+                    "aliasSymbolescapedName": "ComplexFilter",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $and: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$and": {
+                        "type": "array",
+                        "alias": "FullFilter<T, S>[]",
+                        "itemType": {
+                          "type": "union",
+                          "alias": "FullFilter<T, S>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                          "types": [
+                            {
+                              "type": "object",
+                              "alias": "ComplexFilter",
+                              "aliasSymbolescapedName": "ComplexFilter",
+                              "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "reference",
+                              "alias": "{ $and: FullFilter<T, S>[]; }"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "{ $or: FullFilter<T, S>[]; }",
+                              "properties": {
+                                "$or": {
+                                  "type": "reference",
+                                  "alias": "FullFilter<T, S>[]",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "NormalFilter",
+                              "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true,
+                                  "intersectionParent": "Partial"
+                                }
+                              }
+                            },
+                            {
+                              "type": "primitive",
+                              "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "ShorthandFilter",
+                              "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                              "subType": "any"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                              "aliasSymbolescapedName": "Partial",
+                              "comments": "Make all properties in T optional",
+                              "properties": {
+                                "$exists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$existsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExistsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $or: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$or": {
+                        "type": "reference",
+                        "alias": "FullFilter<T, S>[]",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "NormalFilter",
+                    "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true,
+                        "intersectionParent": "Partial"
+                      }
+                    }
+                  },
+                  {
+                    "type": "primitive",
+                    "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "ShorthandFilter",
+                    "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                    "subType": "any"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {
+                      "$exists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$existsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExistsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      }
+                    }
+                  }
+                ],
+                "optional": true,
+                "comments": "Filter applied after any aggregations (group by)"
               }
             },
             "comments": ""
@@ -7456,21 +12665,24 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Max number of rows to return\n- If undefined then 1000 will be applied as the default\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)"
+                "comments": "Max number of rows to return. Defaults to 1000\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)",
+                "intersectionParent": "CommonSelectParams"
               },
               "offset": {
                 "type": "primitive",
                 "alias": "number",
                 "subType": "number",
                 "optional": true,
-                "comments": "Number of rows to skip"
+                "comments": "Number of rows to skip",
+                "intersectionParent": "CommonSelectParams"
               },
               "groupBy": {
                 "type": "primitive",
                 "alias": "false",
                 "subType": "boolean",
                 "optional": true,
-                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)"
+                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)",
+                "intersectionParent": "CommonSelectParams"
               },
               "returnType": {
                 "type": "union",
@@ -7513,13 +12725,14 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Result data structure/type:\n- row: the first row as an object\n- value: the first value from of first field\n- values: array of values from the selected field\n- statement: sql statement\n- statement-no-rls: sql statement without row level security\n- statement-where: sql statement where condition"
+                "comments": "Result data structure/type:\n- **row**: the first row as an object\n- **value**: the first value from of first field\n- **values**: array of values from the selected field\n- **statement**: sql statement\n- **statement-no-rls**: sql statement without row level security\n- **statement-where**: sql statement where condition",
+                "intersectionParent": "CommonSelectParams"
               },
               "select": {
                 "type": "primitive",
                 "alias": "Select<T, S>",
                 "aliasSymbolescapedName": "Select",
-                "comments": "Fields/expressions/linked data to select\n- If empty then all fields will be selected\n- If \"*\" then all fields will be selected\n- If { field: 0 } then all fields except the specified field will be selected\n- If { field: 1 } then only the specified field will be selected\n- If { field: { funcName: [args] } } then the field will be selected with the specified function applied\n- If { field: { nestedTable: { field: 1 } } } then the field will be selected with the nested table fields",
+                "comments": "Fields/expressions/linked data to select\n- `\"*\"` or empty will return all fields\n- `{ field: 0 }` - all fields except the specified field will be selected\n- `{ field: 1 }` - only the specified field will be selected\n- `{ field: { $funcName: [args] } }` - the field will be selected with the specified function applied\n- `{ field: 1, referencedTable: \"*\" }` - field together with all fields from referencedTable will be selected\n- `{ linkedData: { referencedTable: { field: 1 } } }` - linkedData will contain the linked/joined records from referencedTable",
                 "subType": "any",
                 "optional": true
               },
@@ -7529,13 +12742,201 @@ export const definitions = [
                 "aliasSymbolescapedName": "OrderBy",
                 "subType": "any",
                 "optional": true,
-                "comments": "Order by options\n- If array then the order will be maintained"
+                "comments": "Order by options\n- Order is maintained in arrays\n- `[{ key: \"field\", asc: true, nulls: \"last\" }]`"
               },
               "having": {
-                "type": "reference",
+                "type": "union",
                 "alias": "FullFilter<T, S> | undefined",
-                "comments": "Filter applied after any aggregations (group by)",
-                "optional": true
+                "types": [
+                  {
+                    "type": "primitive",
+                    "alias": "undefined",
+                    "subType": "undefined"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "ComplexFilter",
+                    "aliasSymbolescapedName": "ComplexFilter",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $and: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$and": {
+                        "type": "array",
+                        "alias": "FullFilter<T, S>[]",
+                        "itemType": {
+                          "type": "union",
+                          "alias": "FullFilter<T, S>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                          "types": [
+                            {
+                              "type": "object",
+                              "alias": "ComplexFilter",
+                              "aliasSymbolescapedName": "ComplexFilter",
+                              "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "reference",
+                              "alias": "{ $and: FullFilter<T, S>[]; }"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "{ $or: FullFilter<T, S>[]; }",
+                              "properties": {
+                                "$or": {
+                                  "type": "reference",
+                                  "alias": "FullFilter<T, S>[]",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "NormalFilter",
+                              "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true,
+                                  "intersectionParent": "Partial"
+                                }
+                              }
+                            },
+                            {
+                              "type": "primitive",
+                              "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "ShorthandFilter",
+                              "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                              "subType": "any"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                              "aliasSymbolescapedName": "Partial",
+                              "comments": "Make all properties in T optional",
+                              "properties": {
+                                "$exists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$existsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExistsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $or: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$or": {
+                        "type": "reference",
+                        "alias": "FullFilter<T, S>[]",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "NormalFilter",
+                    "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true,
+                        "intersectionParent": "Partial"
+                      }
+                    }
+                  },
+                  {
+                    "type": "primitive",
+                    "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "ShorthandFilter",
+                    "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                    "subType": "any"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {
+                      "$exists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$existsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExistsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      }
+                    }
+                  }
+                ],
+                "optional": true,
+                "comments": "Filter applied after any aggregations (group by)"
               }
             },
             "comments": ""
@@ -7562,10 +12963,95 @@ export const definitions = [
           {
             "name": "filter",
             "optional": false,
-            "type": "reference",
+            "type": "union",
             "alias": "FullFilter<T, S>",
             "aliasSymbolescapedName": "FullFilter",
-            "comments": "Group or simple filter"
+            "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+            "types": [
+              {
+                "type": "object",
+                "alias": "ComplexFilter",
+                "aliasSymbolescapedName": "ComplexFilter",
+                "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "reference",
+                "alias": "{ $and: FullFilter<T, S>[]; }"
+              },
+              {
+                "type": "object",
+                "alias": "{ $or: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$or": {
+                    "type": "reference",
+                    "alias": "FullFilter<T, S>[]",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "NormalFilter",
+                "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true,
+                    "intersectionParent": "Partial"
+                  }
+                }
+              },
+              {
+                "type": "primitive",
+                "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "ShorthandFilter",
+                "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                "subType": "any"
+              },
+              {
+                "type": "object",
+                "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                "aliasSymbolescapedName": "Partial",
+                "comments": "Make all properties in T optional",
+                "properties": {
+                  "$exists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$existsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExistsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  }
+                }
+              }
+            ]
           },
           {
             "name": "newData",
@@ -7604,21 +13090,24 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Max number of rows to return\n- If undefined then 1000 will be applied as the default\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)"
+                "comments": "Max number of rows to return. Defaults to 1000\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)",
+                "intersectionParent": "CommonSelectParams"
               },
               "offset": {
                 "type": "primitive",
                 "alias": "number",
                 "subType": "number",
                 "optional": true,
-                "comments": "Number of rows to skip"
+                "comments": "Number of rows to skip",
+                "intersectionParent": "CommonSelectParams"
               },
               "groupBy": {
                 "type": "primitive",
                 "alias": "false",
                 "subType": "boolean",
                 "optional": true,
-                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)"
+                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)",
+                "intersectionParent": "CommonSelectParams"
               },
               "returnType": {
                 "type": "union",
@@ -7661,13 +13150,14 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Result data structure/type:\n- row: the first row as an object\n- value: the first value from of first field\n- values: array of values from the selected field\n- statement: sql statement\n- statement-no-rls: sql statement without row level security\n- statement-where: sql statement where condition"
+                "comments": "Result data structure/type:\n- **row**: the first row as an object\n- **value**: the first value from of first field\n- **values**: array of values from the selected field\n- **statement**: sql statement\n- **statement-no-rls**: sql statement without row level security\n- **statement-where**: sql statement where condition",
+                "intersectionParent": "CommonSelectParams"
               },
               "select": {
                 "type": "primitive",
                 "alias": "Select<T, S>",
                 "aliasSymbolescapedName": "Select",
-                "comments": "Fields/expressions/linked data to select\n- If empty then all fields will be selected\n- If \"*\" then all fields will be selected\n- If { field: 0 } then all fields except the specified field will be selected\n- If { field: 1 } then only the specified field will be selected\n- If { field: { funcName: [args] } } then the field will be selected with the specified function applied\n- If { field: { nestedTable: { field: 1 } } } then the field will be selected with the nested table fields",
+                "comments": "Fields/expressions/linked data to select\n- `\"*\"` or empty will return all fields\n- `{ field: 0 }` - all fields except the specified field will be selected\n- `{ field: 1 }` - only the specified field will be selected\n- `{ field: { $funcName: [args] } }` - the field will be selected with the specified function applied\n- `{ field: 1, referencedTable: \"*\" }` - field together with all fields from referencedTable will be selected\n- `{ linkedData: { referencedTable: { field: 1 } } }` - linkedData will contain the linked/joined records from referencedTable",
                 "subType": "any",
                 "optional": true
               },
@@ -7677,13 +13167,201 @@ export const definitions = [
                 "aliasSymbolescapedName": "OrderBy",
                 "subType": "any",
                 "optional": true,
-                "comments": "Order by options\n- If array then the order will be maintained"
+                "comments": "Order by options\n- Order is maintained in arrays\n- `[{ key: \"field\", asc: true, nulls: \"last\" }]`"
               },
               "having": {
-                "type": "reference",
+                "type": "union",
                 "alias": "FullFilter<T, S> | undefined",
-                "comments": "Filter applied after any aggregations (group by)",
-                "optional": true
+                "types": [
+                  {
+                    "type": "primitive",
+                    "alias": "undefined",
+                    "subType": "undefined"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "ComplexFilter",
+                    "aliasSymbolescapedName": "ComplexFilter",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $and: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$and": {
+                        "type": "array",
+                        "alias": "FullFilter<T, S>[]",
+                        "itemType": {
+                          "type": "union",
+                          "alias": "FullFilter<T, S>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                          "types": [
+                            {
+                              "type": "object",
+                              "alias": "ComplexFilter",
+                              "aliasSymbolescapedName": "ComplexFilter",
+                              "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "reference",
+                              "alias": "{ $and: FullFilter<T, S>[]; }"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "{ $or: FullFilter<T, S>[]; }",
+                              "properties": {
+                                "$or": {
+                                  "type": "reference",
+                                  "alias": "FullFilter<T, S>[]",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "NormalFilter",
+                              "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true,
+                                  "intersectionParent": "Partial"
+                                }
+                              }
+                            },
+                            {
+                              "type": "primitive",
+                              "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "ShorthandFilter",
+                              "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                              "subType": "any"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                              "aliasSymbolescapedName": "Partial",
+                              "comments": "Make all properties in T optional",
+                              "properties": {
+                                "$exists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$existsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExistsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $or: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$or": {
+                        "type": "reference",
+                        "alias": "FullFilter<T, S>[]",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "NormalFilter",
+                    "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true,
+                        "intersectionParent": "Partial"
+                      }
+                    }
+                  },
+                  {
+                    "type": "primitive",
+                    "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "ShorthandFilter",
+                    "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                    "subType": "any"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {
+                      "$exists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$existsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExistsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      }
+                    }
+                  }
+                ],
+                "optional": true,
+                "comments": "Filter applied after any aggregations (group by)"
               }
             },
             "comments": ""
@@ -7721,8 +13399,196 @@ export const definitions = [
           {
             "name": "filter",
             "optional": true,
-            "type": "reference",
+            "type": "union",
             "alias": "FullFilter<T, S> | undefined",
+            "types": [
+              {
+                "type": "primitive",
+                "alias": "undefined",
+                "subType": "undefined"
+              },
+              {
+                "type": "object",
+                "alias": "ComplexFilter",
+                "aliasSymbolescapedName": "ComplexFilter",
+                "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $and: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$and": {
+                    "type": "array",
+                    "alias": "FullFilter<T, S>[]",
+                    "itemType": {
+                      "type": "union",
+                      "alias": "FullFilter<T, S>",
+                      "aliasSymbolescapedName": "FullFilter",
+                      "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                      "types": [
+                        {
+                          "type": "object",
+                          "alias": "ComplexFilter",
+                          "aliasSymbolescapedName": "ComplexFilter",
+                          "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "reference",
+                          "alias": "{ $and: FullFilter<T, S>[]; }"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "{ $or: FullFilter<T, S>[]; }",
+                          "properties": {
+                            "$or": {
+                              "type": "reference",
+                              "alias": "FullFilter<T, S>[]",
+                              "optional": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "NormalFilter",
+                          "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                          "properties": {
+                            "$filter": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true,
+                              "intersectionParent": "Partial"
+                            }
+                          }
+                        },
+                        {
+                          "type": "primitive",
+                          "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                          "aliasSymbolescapedName": "ShorthandFilter",
+                          "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                          "subType": "any"
+                        },
+                        {
+                          "type": "object",
+                          "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                          "aliasSymbolescapedName": "Partial",
+                          "comments": "Make all properties in T optional",
+                          "properties": {
+                            "$exists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExists": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$existsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            },
+                            "$notExistsJoined": {
+                              "type": "primitive",
+                              "alias": "any",
+                              "subType": "any",
+                              "optional": true
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "{ $or: FullFilter<T, S>[]; }",
+                "properties": {
+                  "$or": {
+                    "type": "reference",
+                    "alias": "FullFilter<T, S>[]",
+                    "optional": false
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "NormalFilter",
+                "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                "properties": {
+                  "$filter": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true,
+                    "intersectionParent": "Partial"
+                  }
+                }
+              },
+              {
+                "type": "primitive",
+                "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                "aliasSymbolescapedName": "ShorthandFilter",
+                "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                "subType": "any"
+              },
+              {
+                "type": "object",
+                "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                "aliasSymbolescapedName": "Partial",
+                "comments": "Make all properties in T optional",
+                "properties": {
+                  "$exists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExists": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$existsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  },
+                  "$notExistsJoined": {
+                    "type": "primitive",
+                    "alias": "any",
+                    "subType": "any",
+                    "optional": true
+                  }
+                }
+              }
+            ],
             "comments": ""
           },
           {
@@ -7753,21 +13619,24 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Max number of rows to return\n- If undefined then 1000 will be applied as the default\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)"
+                "comments": "Max number of rows to return. Defaults to 1000\n- On client publish rules can affect this behaviour: cannot request more than the maxLimit (if present)",
+                "intersectionParent": "CommonSelectParams"
               },
               "offset": {
                 "type": "primitive",
                 "alias": "number",
                 "subType": "number",
                 "optional": true,
-                "comments": "Number of rows to skip"
+                "comments": "Number of rows to skip",
+                "intersectionParent": "CommonSelectParams"
               },
               "groupBy": {
                 "type": "primitive",
                 "alias": "false",
                 "subType": "boolean",
                 "optional": true,
-                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)"
+                "comments": "Will group by all non aggregated fields specified in select (or all fields by default)",
+                "intersectionParent": "CommonSelectParams"
               },
               "returnType": {
                 "type": "union",
@@ -7810,13 +13679,14 @@ export const definitions = [
                   }
                 ],
                 "optional": true,
-                "comments": "Result data structure/type:\n- row: the first row as an object\n- value: the first value from of first field\n- values: array of values from the selected field\n- statement: sql statement\n- statement-no-rls: sql statement without row level security\n- statement-where: sql statement where condition"
+                "comments": "Result data structure/type:\n- **row**: the first row as an object\n- **value**: the first value from of first field\n- **values**: array of values from the selected field\n- **statement**: sql statement\n- **statement-no-rls**: sql statement without row level security\n- **statement-where**: sql statement where condition",
+                "intersectionParent": "CommonSelectParams"
               },
               "select": {
                 "type": "primitive",
                 "alias": "Select<T, S>",
                 "aliasSymbolescapedName": "Select",
-                "comments": "Fields/expressions/linked data to select\n- If empty then all fields will be selected\n- If \"*\" then all fields will be selected\n- If { field: 0 } then all fields except the specified field will be selected\n- If { field: 1 } then only the specified field will be selected\n- If { field: { funcName: [args] } } then the field will be selected with the specified function applied\n- If { field: { nestedTable: { field: 1 } } } then the field will be selected with the nested table fields",
+                "comments": "Fields/expressions/linked data to select\n- `\"*\"` or empty will return all fields\n- `{ field: 0 }` - all fields except the specified field will be selected\n- `{ field: 1 }` - only the specified field will be selected\n- `{ field: { $funcName: [args] } }` - the field will be selected with the specified function applied\n- `{ field: 1, referencedTable: \"*\" }` - field together with all fields from referencedTable will be selected\n- `{ linkedData: { referencedTable: { field: 1 } } }` - linkedData will contain the linked/joined records from referencedTable",
                 "subType": "any",
                 "optional": true
               },
@@ -7826,13 +13696,201 @@ export const definitions = [
                 "aliasSymbolescapedName": "OrderBy",
                 "subType": "any",
                 "optional": true,
-                "comments": "Order by options\n- If array then the order will be maintained"
+                "comments": "Order by options\n- Order is maintained in arrays\n- `[{ key: \"field\", asc: true, nulls: \"last\" }]`"
               },
               "having": {
-                "type": "reference",
+                "type": "union",
                 "alias": "FullFilter<T, S> | undefined",
-                "comments": "Filter applied after any aggregations (group by)",
-                "optional": true
+                "types": [
+                  {
+                    "type": "primitive",
+                    "alias": "undefined",
+                    "subType": "undefined"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "ComplexFilter",
+                    "aliasSymbolescapedName": "ComplexFilter",
+                    "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $and: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$and": {
+                        "type": "array",
+                        "alias": "FullFilter<T, S>[]",
+                        "itemType": {
+                          "type": "union",
+                          "alias": "FullFilter<T, S>",
+                          "aliasSymbolescapedName": "FullFilter",
+                          "comments": "Data filter\n- `{ status: 'live' }`\n- `{ $or: [{ id: 1 }, { status: 'live' }] }`\n- `{ $existsJoined: { referencedTable: { id: 1 } } }`\n- `{\n     $filter: [\n       { $age: [\"created_at\"] },\n       \"<\",\n       '1 year'\n     ]\n  }`",
+                          "types": [
+                            {
+                              "type": "object",
+                              "alias": "ComplexFilter",
+                              "aliasSymbolescapedName": "ComplexFilter",
+                              "comments": "Complex filter that allows applying functions to columns\n `{\n   $filter: [\n     { $funcName: [...args] },\n     operand,\n     value | funcFilter\n   ]\n }`",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "reference",
+                              "alias": "{ $and: FullFilter<T, S>[]; }"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "{ $or: FullFilter<T, S>[]; }",
+                              "properties": {
+                                "$or": {
+                                  "type": "reference",
+                                  "alias": "FullFilter<T, S>[]",
+                                  "optional": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "NormalFilter",
+                              "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                              "properties": {
+                                "$filter": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true,
+                                  "intersectionParent": "Partial"
+                                }
+                              }
+                            },
+                            {
+                              "type": "primitive",
+                              "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                              "aliasSymbolescapedName": "ShorthandFilter",
+                              "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                              "subType": "any"
+                            },
+                            {
+                              "type": "object",
+                              "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                              "aliasSymbolescapedName": "Partial",
+                              "comments": "Make all properties in T optional",
+                              "properties": {
+                                "$exists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExists": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$existsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                },
+                                "$notExistsJoined": {
+                                  "type": "primitive",
+                                  "alias": "any",
+                                  "subType": "any",
+                                  "optional": true
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "{ $or: FullFilter<T, S>[]; }",
+                    "properties": {
+                      "$or": {
+                        "type": "reference",
+                        "alias": "FullFilter<T, S>[]",
+                        "optional": false
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "alias": "NormalFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "NormalFilter",
+                    "comments": "Column filter with operators\nMultiple columns are combined with AND",
+                    "properties": {
+                      "$filter": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true,
+                        "intersectionParent": "Partial"
+                      }
+                    }
+                  },
+                  {
+                    "type": "primitive",
+                    "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
+                    "aliasSymbolescapedName": "ShorthandFilter",
+                    "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
+                    "subType": "any"
+                  },
+                  {
+                    "type": "object",
+                    "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
+                    "aliasSymbolescapedName": "Partial",
+                    "comments": "Make all properties in T optional",
+                    "properties": {
+                      "$exists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExists": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$existsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      },
+                      "$notExistsJoined": {
+                        "type": "primitive",
+                        "alias": "any",
+                        "subType": "any",
+                        "optional": true
+                      }
+                    }
+                  }
+                ],
+                "optional": true,
+                "comments": "Filter applied after any aggregations (group by)"
               }
             },
             "comments": ""
@@ -8084,112 +14142,6 @@ export const definitions = [
   },
   {
     "type": "union",
-    "alias": "FullFilter<T, S> | undefined",
-    "types": [
-      {
-        "type": "primitive",
-        "alias": "undefined",
-        "subType": "undefined"
-      },
-      {
-        "type": "object",
-        "alias": "ComplexFilter",
-        "aliasSymbolescapedName": "ComplexFilter",
-        "comments": "Complex filter that allows applying functions to columns",
-        "properties": {
-          "$filter": {
-            "type": "primitive",
-            "alias": "any",
-            "subType": "any",
-            "optional": false
-          }
-        }
-      },
-      {
-        "type": "object",
-        "alias": "{ $and: FullFilter<T, S>[]; }",
-        "properties": {
-          "$and": {
-            "type": "array",
-            "alias": "FullFilter<T, S>[]",
-            "itemType": {
-              "type": "reference",
-              "alias": "FullFilter<T, S>",
-              "aliasSymbolescapedName": "FullFilter",
-              "comments": "Group or simple filter"
-            },
-            "optional": false
-          }
-        }
-      },
-      {
-        "type": "object",
-        "alias": "{ $or: FullFilter<T, S>[]; }",
-        "properties": {
-          "$or": {
-            "type": "reference",
-            "alias": "FullFilter<T, S>[]",
-            "optional": false
-          }
-        }
-      },
-      {
-        "type": "object",
-        "alias": "NormalFilter<AnyObjIfVoid<T>>",
-        "aliasSymbolescapedName": "NormalFilter",
-        "comments": "Column filter with operators\nMultiple columns are combined with AND",
-        "properties": {
-          "$filter": {
-            "type": "primitive",
-            "alias": "any",
-            "subType": "any",
-            "optional": true
-          }
-        }
-      },
-      {
-        "type": "primitive",
-        "alias": "ShorthandFilter<AnyObjIfVoid<T>>",
-        "aliasSymbolescapedName": "ShorthandFilter",
-        "comments": "Filters with shorthand notation for autocomplete convenience\nOperator is inside the key: ` \"{columnName}.{operator}\": value`",
-        "subType": "any"
-      },
-      {
-        "type": "object",
-        "alias": "Partial<{ $exists: S extends DBSchema ? ExactlyOne<{ [tname in KeyofString<S>]: FullFilter<S[tname][\"columns\"], S> | { path: RawJoinPath[]; filter: FullFilter<...>; }; }> : any; $notExists: S extends DBSchema ? ExactlyOne<...> : any; $existsJoined: S extends DBSchema ? ExactlyOne<...> : any; $notExistsJoined: S exte...",
-        "aliasSymbolescapedName": "Partial",
-        "comments": "Make all properties in T optional",
-        "properties": {
-          "$exists": {
-            "type": "primitive",
-            "alias": "any",
-            "subType": "any",
-            "optional": true
-          },
-          "$notExists": {
-            "type": "primitive",
-            "alias": "any",
-            "subType": "any",
-            "optional": true
-          },
-          "$existsJoined": {
-            "type": "primitive",
-            "alias": "any",
-            "subType": "any",
-            "optional": true
-          },
-          "$notExistsJoined": {
-            "type": "primitive",
-            "alias": "any",
-            "subType": "any",
-            "optional": true
-          }
-        }
-      }
-    ]
-  },
-  {
-    "type": "union",
     "alias": "FieldFilter | undefined",
     "types": [
       {
@@ -8249,43 +14201,50 @@ export const definitions = [
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "filter": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "onChange": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "onError": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "db": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "pushDebounce": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "skipFirstTrigger": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "select": {
         "type": "reference",
@@ -8296,37 +14255,43 @@ export const definitions = [
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "patchText": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "patchJSON": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "onReady": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "skipIncomingDeltaCheck": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "onDebug": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "handlesOnData": {
         "type": "primitive",
@@ -8345,85 +14310,99 @@ export const definitions = [
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "filter": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "onChange": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "onError": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "db": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "pushDebounce": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "skipFirstTrigger": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "select": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "storageType": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "patchText": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "patchJSON": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "onReady": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "skipIncomingDeltaCheck": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "onDebug": {
         "type": "primitive",
         "alias": "any",
         "subType": "any",
-        "optional": true
+        "optional": true,
+        "intersectionParent": "Partial"
       },
       "handlesOnData": {
         "type": "primitive",

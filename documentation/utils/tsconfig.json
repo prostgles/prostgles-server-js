@@ -2,12 +2,12 @@
   "files": ["generateDocs.ts"],
   "compilerOptions": {
     "baseUrl": ".",
-    "target": "es2019",
+    "target": "es2021",
     "lib": [
       "es6",
       "dom", 
       "es2017",
-      "es2019",
+      "es2021",
     ],
     "strict": true,
     "module": "commonjs",

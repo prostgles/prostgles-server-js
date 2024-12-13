@@ -46,15 +46,10 @@ export const definitions = [
         "optional": false,
         "comments": "Called when the prostgles server is ready to accept connections.\nIt waits for auth, tableConfig and other async configurations to complete before executing"
       },
-      "dbOptions": {
-        "type": "reference",
-        "alias": "IDefaults",
-        "optional": true
-      },
       "tsGeneratedTypesDir": {
         "type": "reference",
         "alias": "string | undefined",
-        "comments": "If defined then a `DBSchemaGenerated.d.ts` file will be created in the provided directory.\nThis file exports a `DBSchemaGenerated` type which contains types for the database tables and\ncan be used as a generic type input for the prostgles instances to ensure type safety",
+        "comments": "If defined then a `DBGeneratedSchema.d.ts` file will be created in the provided directory.\nThis file exports a `DBGeneratedSchema` type which contains types for the database tables and\ncan be used as a generic type input for the prostgles instances to ensure type safety",
         "optional": true
       },
       "disableRealtime": {
@@ -295,7 +290,7 @@ export const definitions = [
           }
         ],
         "optional": true,
-        "comments": "If truthy then DBSchemaGenerated.d.ts will be updated\nand \"onReady\" will be called with new schema on both client and server"
+        "comments": "If truthy then DBGeneratedSchema.d.ts will be updated\nand \"onReady\" will be called with new schema on both client and server"
       },
       "keywords": {
         "type": "reference",
@@ -310,8 +305,7 @@ export const definitions = [
       },
       "fileTable": {
         "type": "reference",
-        "alias": "FileTableConfig",
-        "aliasSymbolescapedName": "FileTableConfig",
+        "alias": "FileTableConfig | undefined",
         "comments": "Enables file storage and serving.\nCurrently supports saving files locally or to AWS S3",
         "optional": true
       },
