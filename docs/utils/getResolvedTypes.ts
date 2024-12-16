@@ -18,7 +18,11 @@ type Args = {
   outputFilename?: string;
 };
 
-export const getResolvedTypes = ({ filePath, outputFilename, filter }: Args) => {
+export const getResolvedTypes = ({
+  filePath,
+  outputFilename,
+  filter,
+}: Args) => {
   const { checker, sourceFile } = loadTsFile(filePath);
 
   const results: TS_Type[] = [];
@@ -53,9 +57,13 @@ export const getResolvedTypes = ({ filePath, outputFilename, filter }: Args) => 
       `export const definitions = ${JSON.stringify(results, null, 2)} as const satisfies TS_Type[];`,
     ].join("\n");
 
-    fs.writeFileSync(`${docsFolder}/utils/${outputFilename}.ts`, serverTypesStr, {
-      encoding: "utf-8",
-    });
+    fs.writeFileSync(
+      `${docsFolder}/utils/${outputFilename}.ts`,
+      serverTypesStr,
+      {
+        encoding: "utf-8",
+      },
+    );
   }
 
   return result;

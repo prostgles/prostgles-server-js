@@ -10,7 +10,7 @@ const docsFolder = `${__dirname}/../../`;
 
 export const generateServerDocs = () => {
   const serverFilePath = path.resolve(
-    `${testFolderPath}/server/node_modules/prostgles-server/dist/ProstglesTypes.d.ts` // "ProstglesInitOptions",
+    `${testFolderPath}/server/node_modules/prostgles-server/dist/ProstglesTypes.d.ts`, // "ProstglesInitOptions",
   );
   const {
     resolvedTypes: [ProstglesInitOptions],
@@ -38,11 +38,11 @@ export const generateServerDocs = () => {
   if (!ProstglesInitOptions || !prostglesInitOpts)
     throw new Error("ProstglesInitOptions not found");
 
-  const configurationPropsMarkdown = getObjectEntries(prostglesInitOpts.properties).map(
-    ([propName, prop]) => {
-      return renderTsType(prop, 0, { name: propName, optional: prop.optional });
-    }
-  );
+  const configurationPropsMarkdown = getObjectEntries(
+    prostglesInitOpts.properties,
+  ).map(([propName, prop]) => {
+    return renderTsType(prop, 0, { name: propName, optional: prop.optional });
+  });
 
   const docs = [
     `# Overview`,

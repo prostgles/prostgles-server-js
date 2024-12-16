@@ -1,7 +1,11 @@
-
 import { tryCatch } from "prostgles-types";
 import { pgp } from "../DboBuilder/DboBuilderTypes";
-import { asValue, NOTIF_CHANNEL, NOTIF_TYPE, PubSubManager } from "./PubSubManager";
+import {
+  asValue,
+  NOTIF_CHANNEL,
+  NOTIF_TYPE,
+  PubSubManager,
+} from "./PubSubManager";
 const { version } = require("../../package.json");
 import { getAppCheckQuery } from "./orphanTriggerCheck";
 import { DboBuilder } from "../DboBuilder/DboBuilder";
@@ -11,7 +15,7 @@ export const DB_OBJ_NAMES = {
   data_watch_func: "prostgles.prostgles_trigger_function",
   schema_watch_func: "prostgles.schema_watch_func",
   schema_watch_trigger: "prostgles_schema_watch_trigger_new",
-  schema_watch_trigger_drop: "prostgles_schema_watch_trigger_new_drop"
+  schema_watch_trigger_drop: "prostgles_schema_watch_trigger_new_drop",
 } as const;
 
 const PROSTGLES_SCHEMA_EXISTS_QUERY = `
@@ -30,11 +34,10 @@ const PROSTGLES_SCHEMA_VERSION_OK_QUERY = `
 `;
 
 const getInitQuery = (debugMode: boolean | undefined, pgVersion: number) => {
-
   const canReplaceTriggers = pgVersion >= 140006;
-  const createTriggerQuery = canReplaceTriggers ? 
-    `CREATE OR REPLACE TRIGGER %1$I`: 
-    `
+  const createTriggerQuery = canReplaceTriggers
+    ? `CREATE OR REPLACE TRIGGER %1$I`
+    : `
     DROP TRIGGER IF EXISTS %1$I ON %2$s;
     CREATE TRIGGER %1$I
     `;
@@ -334,7 +337,7 @@ BEGIN
                                   THEN concat_ws('; ', 'error', err_text, err_detail, err_hint, 'query: ' || query ) 
                                   ELSE COALESCE(v_trigger.cids, '') 
                                 END
-                                ${debugMode? (", COALESCE(current_query(), 'current_query ??'), ' ', query") : ""}
+                                ${debugMode ? ", COALESCE(current_query(), 'current_query ??'), ' ', query" : ""}
                               ), 7999/4) -- Some chars are 2bytes -> 'Ω'
                             );
                         END LOOP;
@@ -504,7 +507,7 @@ BEGIN
                             $q$
                                 DO $e$ 
                                 BEGIN
-                                    /* ${ PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
+                                    /* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
                                     %s
 
                                 END $e$;
@@ -532,7 +535,7 @@ BEGIN
                         json_build_object(
                           'TG_OP', TG_OP, 
                           'duration', (EXTRACT(EPOCH FROM now()) * 1000) - start_time,
-                          'query', ${debugMode? 'LEFT(current_query(), 400)' : "'Only shown in debug mode'"}
+                          'query', ${debugMode ? "LEFT(current_query(), 400)" : "'Only shown in debug mode'"}
                         )
                       )::TEXT, 7999/4)
                     );
@@ -609,7 +612,7 @@ BEGIN
                           ${asValue(NOTIF_TYPE.schema)}, 
                           tg_tag , 
                           TG_event, 
-                          ${debugMode? 'curr_query' : "'Only shown in debug mode'"}
+                          ${debugMode ? "curr_query" : "'Only shown in debug mode'"}
                         ), 7999/4)
                       );
                     END LOOP;
@@ -629,34 +632,49 @@ $do$;
 
 COMMIT;
 `;
-
-}
+};
 
 /**
  * Initialize the prostgles schema and functions needed for realtime data and schema changes
  * undefined returned if the database contains the apropriate prostgles schema
  */
-export const getPubSubManagerInitQuery = async function(this: DboBuilder): Promise<string | undefined> { 
-
-  const versionNum = await this.db.one("SELECT current_setting('server_version_num')::int as val");
-  const initQuery = getInitQuery(this.prostgles.opts.DEBUG_MODE, versionNum.val);
-  const { schema_md5 = "none" } = await this.db.oneOrNone("SELECT md5($1) as schema_md5", [initQuery.trim()]);
+export const getPubSubManagerInitQuery = async function (
+  this: DboBuilder,
+): Promise<string | undefined> {
+  const versionNum = await this.db.one(
+    "SELECT current_setting('server_version_num')::int as val",
+  );
+  const initQuery = getInitQuery(
+    this.prostgles.opts.DEBUG_MODE,
+    versionNum.val,
+  );
+  const { schema_md5 = "none" } = await this.db.oneOrNone(
+    "SELECT md5($1) as schema_md5",
+    [initQuery.trim()],
+  );
   const query = pgp.as.format(initQuery, { schema_md5, version });
   const existingSchema = await this.db.any(PROSTGLES_SCHEMA_EXISTS_QUERY);
-  if(!existingSchema.length){
-    console.log("getPubSubManagerInitQuery: No prostgles.versions table found. Creating...");
+  if (!existingSchema.length) {
+    console.log(
+      "getPubSubManagerInitQuery: No prostgles.versions table found. Creating...",
+    );
     return query;
   }
   const { existingSchemaVersions } = await tryCatch(async () => {
-    const existingSchemaVersions = await this.db.any(PROSTGLES_SCHEMA_VERSION_OK_QUERY, { schema_md5, version });
+    const existingSchemaVersions = await this.db.any(
+      PROSTGLES_SCHEMA_VERSION_OK_QUERY,
+      { schema_md5, version },
+    );
     return {
-      existingSchemaVersions
-    }
+      existingSchemaVersions,
+    };
   });
-  if(!existingSchemaVersions?.length){
-    console.log("getPubSubManagerInitQuery: Outdated prostgles schema. Re-creating...");
+  if (!existingSchemaVersions?.length) {
+    console.log(
+      "getPubSubManagerInitQuery: Outdated prostgles schema. Re-creating...",
+    );
     return query;
   }
-  
+
   return undefined;
-}
+};

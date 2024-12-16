@@ -11,7 +11,7 @@ const docsFolder = `${__dirname}/../../`;
 
 export const generateClientDocs = async () => {
   const clientFilePath = path.resolve(
-    `${testFolderPath}/client/node_modules/prostgles-client/dist/prostgles.d.ts`
+    `${testFolderPath}/client/node_modules/prostgles-client/dist/prostgles.d.ts`,
   );
   const excludedTypes = [
     "FullFilter",
@@ -51,13 +51,13 @@ export const generateClientDocs = async () => {
 
   const isomorphicMd = getMethodsDocs(
     getObjectEntries(tableHandler.properties).filter(
-      ([methodName]) => isomotphicMethodNames[methodName]
-    )
+      ([methodName]) => isomotphicMethodNames[methodName],
+    ),
   );
   const clientMd = getMethodsDocs(
     getObjectEntries(tableHandler.properties).filter(
-      ([methodName]) => !isomotphicMethodNames[methodName]
-    )
+      ([methodName]) => !isomotphicMethodNames[methodName],
+    ),
   );
 
   const result = [

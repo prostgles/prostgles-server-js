@@ -3,11 +3,14 @@ import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
 import { getWatchSchemaTagList } from "../SchemaWatch/getWatchSchemaTagList";
 import { NOTIF_CHANNEL, PubSubManager, asValue } from "./PubSubManager";
 import { getPubSubManagerInitQuery } from "./getPubSubManagerInitQuery";
-export const REALTIME_TRIGGER_CHECK_QUERY = "prostgles-server internal query used to manage realtime triggers" as const;  
+export const REALTIME_TRIGGER_CHECK_QUERY =
+  "prostgles-server internal query used to manage realtime triggers" as const;
 
-export const tout = (ms: number) => new Promise(res => setTimeout(res, ms));
+export const tout = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
-export async function initPubSubManager(this: PubSubManager): Promise<PubSubManager | undefined> {
+export async function initPubSubManager(
+  this: PubSubManager,
+): Promise<PubSubManager | undefined> {
   if (!this.getIsDestroyed()) return undefined;
 
   const initQuery = await getPubSubManagerInitQuery.bind(this.dboBuilder)();
@@ -15,7 +18,7 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
   /**
    * High database activity might cause deadlocks.
    * Must retry
-  */
+   */
   let didDeadlock = false;
   let tries = 3;
   let error: any;
@@ -25,20 +28,20 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
       await tout(Math.random());
 
       // await this.dboBuilder.runClientTransactionStatement(initQuery);// this.db.tx(t => t.any(initQuery));
-      await this.db.tx(t => t.any(initQuery));
+      await this.db.tx((t) => t.any(initQuery));
       error = undefined;
       tries = 0;
     } catch (e: any) {
-      if(!didDeadlock && isObject(e) && e.code === "40P01"){
+      if (!didDeadlock && isObject(e) && e.code === "40P01") {
         didDeadlock = true;
         tries = 5;
         console.error("Deadlock detected. Retrying...");
       }
       error = e;
-      tries --;
+      tries--;
     }
   }
-  if(error){
+  if (error) {
     throw error;
   }
 
@@ -48,19 +51,21 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
   if (!this.appInfoWasInserted) {
     this.appInfoWasInserted = true;
     const check_frequency_ms = this.appCheckFrequencyMS;
-    const watching_schema_tag_names = this.dboBuilder.prostgles.schemaWatch?.type.watchType !== "NONE" ? getWatchSchemaTagList(this.dboBuilder.prostgles.opts.watchSchema) : null;
+    const watching_schema_tag_names =
+      this.dboBuilder.prostgles.schemaWatch?.type.watchType !== "NONE"
+        ? getWatchSchemaTagList(this.dboBuilder.prostgles.opts.watchSchema)
+        : null;
     await this.db.one(
       "INSERT INTO prostgles.apps (id, check_frequency_ms, watching_schema_tag_names, application_name) \
       VALUES($1, $2, $3, current_setting('application_name')) \
-      RETURNING *; "
-      , [
-        this.appId,
-        check_frequency_ms,
-        watching_schema_tag_names
-      ]
+      RETURNING *; ",
+      [this.appId, check_frequency_ms, watching_schema_tag_names],
     );
 
-    const appRecord = await this.db.one("SELECT * FROM prostgles.apps WHERE id = $1", [this.appId]);
+    const appRecord = await this.db.one(
+      "SELECT * FROM prostgles.apps WHERE id = $1",
+      [this.appId],
+    );
     if (!appRecord || !appRecord.application_name?.includes(this.appId)) {
       throw `initPubSubManager error: App record with application_name containing appId (${this.appId}) not found`;
     }
@@ -71,7 +76,11 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
     `);
   }
 
-  this.postgresNotifListenManager = new PostgresNotifListenManager(this.db, this.notifListener, NOTIF_CHANNEL.getFull(this.appId));
+  this.postgresNotifListenManager = new PostgresNotifListenManager(
+    this.db,
+    this.notifListener,
+    NOTIF_CHANNEL.getFull(this.appId),
+  );
 
   await this.initialiseEventTriggers();
 

@@ -7,7 +7,7 @@ export const loadTsFile = (filePath: string) => {
   const configPath = ts.findConfigFile(
     path.dirname(absolutePath),
     ts.sys.fileExists,
-    "tsconfig.json"
+    "tsconfig.json",
   );
 
   if (!configPath) {
@@ -18,7 +18,7 @@ export const loadTsFile = (filePath: string) => {
   const parsedConfig = ts.parseJsonConfigFileContent(
     configFile.config,
     ts.sys,
-    path.dirname(configPath)
+    path.dirname(configPath),
   );
 
   const program = ts.createProgram({

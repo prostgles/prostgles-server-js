@@ -3,8 +3,14 @@ import * as nodemailer from "nodemailer";
 import * as aws from "@aws-sdk/client-ses";
 import SESTransport from "nodemailer/lib/ses-transport";
 
-type SESTransporter =  nodemailer.Transporter<SESTransport.SentMessageInfo, SESTransport.Options>;
-type SMTPTransporter = nodemailer.Transporter<nodemailer.SentMessageInfo, nodemailer.TransportOptions>;
+type SESTransporter = nodemailer.Transporter<
+  SESTransport.SentMessageInfo,
+  SESTransport.Options
+>;
+type SMTPTransporter = nodemailer.Transporter<
+  nodemailer.SentMessageInfo,
+  nodemailer.TransportOptions
+>;
 type Transporter = SESTransporter | SMTPTransporter;
 
 const transporterCache: Map<string, Transporter> = new Map();
@@ -16,80 +22,77 @@ const transporterCache: Map<string, Transporter> = new Map();
 export const sendEmail = (smptConfig: SMTPConfig, email: Email) => {
   const transporter = getOrSetTransporter(smptConfig);
   return send(transporter, email);
-}
+};
 
 /**
  * Returns a transporter from cache or creates a new one
  */
 export const getOrSetTransporter = (smptConfig: SMTPConfig) => {
   const configStr = JSON.stringify(smptConfig);
-  const transporter = transporterCache.get(configStr) ?? getTransporter(smptConfig);
-  if(!transporterCache.has(configStr)){
+  const transporter =
+    transporterCache.get(configStr) ?? getTransporter(smptConfig);
+  if (!transporterCache.has(configStr)) {
     transporterCache.set(configStr, transporter);
   }
   return transporter;
-}
+};
 
 const getTransporter = (smptConfig: SMTPConfig) => {
   let transporter: Transporter | undefined;
-  if(smptConfig.type === "aws-ses"){
-    const { 
-      region, 
-      accessKeyId, 
+  if (smptConfig.type === "aws-ses") {
+    const {
+      region,
+      accessKeyId,
       secretAccessKey,
       /**
        * max 1 messages/second
        */
-      sendingRate = 1 
+      sendingRate = 1,
     } = smptConfig;
     const ses = new aws.SES({
       apiVersion: "2010-12-01",
       region,
       credentials: {
         accessKeyId,
-        secretAccessKey
-      }
+        secretAccessKey,
+      },
     });
 
     transporter = nodemailer.createTransport({
       SES: { ses, aws },
       maxConnections: 1,
-      sendingRate 
+      sendingRate,
     });
-
   } else {
     const { user, pass, host, port, secure } = smptConfig;
     transporter = nodemailer.createTransport({
       host,
       port,
       secure,
-      auth: { user, pass }
+      auth: { user, pass },
     });
   }
 
   return transporter;
-}
+};
 
 const send = (transporter: Transporter, email: Email) => {
   return new Promise((resolve, reject) => {
     const doSend = () => {
       if (transporter.isIdle()) {
-        transporter.sendMail(
-          email,
-          (err, info) => {
-            if(err){
-              reject(err);
-            } else {
-              resolve(info);
-            }
+        transporter.sendMail(email, (err, info) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(info);
           }
-        );
+        });
       }
-    }
-    if(transporter.isIdle()){
+    };
+    if (transporter.isIdle()) {
       doSend();
     } else {
-      transporter.once('idle', doSend);
+      transporter.once("idle", doSend);
     }
   });
 };
@@ -98,11 +101,11 @@ export const verifySMTPConfig = async (smptConfig: SMTPConfig) => {
   const transporter = getOrSetTransporter(smptConfig);
   return new Promise((resolve, reject) => {
     transporter.verify((err, success) => {
-      if(err){
+      if (err) {
         reject(err);
       } else {
         resolve(success);
       }
     });
   });
-}
+};

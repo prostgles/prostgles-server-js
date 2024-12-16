@@ -266,7 +266,11 @@ export type DBGeneratedSchema = {
     columns: {
       email: string;
       id?: number;
-      preferences: { showIntro?: boolean; theme?: "light" | "dark" | "auto"; others: any[] };
+      preferences: {
+        showIntro?: boolean;
+        theme?: "light" | "dark" | "auto";
+        others: any[];
+      };
       status: "active" | "disabled" | "pending";
     };
   };

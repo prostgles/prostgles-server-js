@@ -6,48 +6,55 @@ import { TableConfig } from "./TableConfig";
 
 type Args = {
   tableName: string;
-  tableConf: TableConfig[string]
+  tableConf: TableConfig[string];
   // tableConf: BaseTableDefinition<LANG_IDS> & (TableDefinition<LANG_IDS> | LookupTableDefinition<LANG_IDS>)
 };
 
-export type ConstraintDef = {  
+export type ConstraintDef = {
   /**
    * Named constraints are used to show a relevant error message
    */
-  name?: string; 
-  content: string; 
-  alterQuery: string; 
+  name?: string;
+  content: string;
+  alterQuery: string;
 };
-export const getConstraintDefinitionQueries = ({ tableConf, tableName }: Args): ConstraintDef[] | undefined => {
-
+export const getConstraintDefinitionQueries = ({
+  tableConf,
+  tableName,
+}: Args): ConstraintDef[] | undefined => {
   if ("constraints" in tableConf && tableConf.constraints) {
     const { constraints } = tableConf;
-    if(!constraints){
+    if (!constraints) {
       return undefined;
     }
-    
-    if(Array.isArray(constraints)) {
-      return constraints.map(c => ({ content: c, alterQuery: `ALTER TABLE ${asName(tableName)} ADD ${c}`}));
-      
+
+    if (Array.isArray(constraints)) {
+      return constraints.map((c) => ({
+        content: c,
+        alterQuery: `ALTER TABLE ${asName(tableName)} ADD ${c}`,
+      }));
     } else {
       const constraintNames = Object.keys(constraints);
-      return constraintNames.map(constraintName => {
+      return constraintNames.map((constraintName) => {
         const _cnstr = constraints[constraintName]!;
-        const constraintDef = typeof _cnstr === "string"? _cnstr : `${_cnstr.type} (${_cnstr.content})`;
-        
+        const constraintDef =
+          typeof _cnstr === "string"
+            ? _cnstr
+            : `${_cnstr.type} (${_cnstr.content})`;
+
         /** Drop constraints with the same name */
         // const existingConstraint = constraints.some(c => c.conname === constraintName);
         // if(existingConstraint){
         //   if(canDrop) queries.push(`ALTER TABLE ${asName(tableName)} DROP CONSTRAINT ${asName(constraintName)};`);
         // }
-        
+
         const alterQuery = `ALTER TABLE ${asName(tableName)} ADD CONSTRAINT ${asName(constraintName)} ${constraintDef};`;
 
         return { name: constraintName, alterQuery, content: constraintDef };
       });
     }
   }
-}
+};
 
 export type ColConstraint = {
   name: string;
@@ -56,14 +63,18 @@ export type ColConstraint = {
   cols: Array<string>;
   definition: string;
   schema: string;
-}
+};
 type ColConstraintsArgs = {
   db: DB | pgPromise.ITask<{}>;
   table?: string;
   column?: string;
   types?: ColConstraint["type"][];
-}
-export const getColConstraintsQuery = ({ column, table, types }: Omit<ColConstraintsArgs, "db">) => {
+};
+export const getColConstraintsQuery = ({
+  column,
+  table,
+  types,
+}: Omit<ColConstraintsArgs, "db">) => {
   let query = `
     SELECT *
     FROM (             
@@ -86,10 +97,15 @@ export const getColConstraintsQuery = ({ column, table, types }: Omit<ColConstra
   `;
   if (table) query += `\nAND "table" = ${asValue(table)}`;
   if (column) query += `\nAND cols @> ARRAY[${asValue(column)}]`;
-  if (types?.length) query += `\nAND type IN (${types.map(v => asValue(v)).join(", ")})`;
+  if (types?.length)
+    query += `\nAND type IN (${types.map((v) => asValue(v)).join(", ")})`;
   return query;
-}
-export const getColConstraints = ({ db, column, table, types }: ColConstraintsArgs ): Promise<ColConstraint[]>  => {
-  
+};
+export const getColConstraints = ({
+  db,
+  column,
+  table,
+  types,
+}: ColConstraintsArgs): Promise<ColConstraint[]> => {
   return db.manyOrNone(getColConstraintsQuery({ column, table, types }));
-}
+};

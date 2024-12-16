@@ -10,29 +10,44 @@ type OnDeleteFromFileTableArgs = {
   filterOpts: {
     where: string;
     filter: AnyObject;
-  }
-}
-export async function onDeleteFromFileTable(this: TableHandler, { localParams, queryType, returningQuery, filterOpts }: OnDeleteFromFileTableArgs){
-
-  if (!this.dboBuilder.prostgles.fileManager) throw new Error("fileManager missing")
+  };
+};
+export async function onDeleteFromFileTable(
+  this: TableHandler,
+  {
+    localParams,
+    queryType,
+    returningQuery,
+    filterOpts,
+  }: OnDeleteFromFileTableArgs,
+) {
+  if (!this.dboBuilder.prostgles.fileManager)
+    throw new Error("fileManager missing");
   if (this.dboBuilder.prostgles.opts.fileTable?.delayedDelete) {
-    return this.dbHandler[queryType](`UPDATE ${asName(this.name)} SET deleted = now() ${filterOpts.where} ${returningQuery ?? ""};`)
+    return this.dbHandler[queryType](
+      `UPDATE ${asName(this.name)} SET deleted = now() ${filterOpts.where} ${returningQuery ?? ""};`,
+    );
   } else {
-
     const txDelete = async (tbl: TableHandler) => {
       if (!tbl.tx) throw new Error("Missing transaction object tx");
       let files: { id: string; name: string }[] = [];
       const totalFiles = await tbl.count(filterOpts.filter);
       do {
-        const batch = await tbl.find(filterOpts.filter, { limit: 100, offset: files.length });
+        const batch = await tbl.find(filterOpts.filter, {
+          limit: 100,
+          offset: files.length,
+        });
         files = files.concat(batch);
-      } while(files.length < totalFiles)
-      
-      const fileManager = tbl.dboBuilder.prostgles.fileManager
+      } while (files.length < totalFiles);
+
+      const fileManager = tbl.dboBuilder.prostgles.fileManager;
       if (!fileManager) throw new Error("fileManager missing");
 
       for await (const file of files) {
-        await tbl.tx.t.any(`DELETE FROM ${asName(this.name)} WHERE id = \${id}`, file);
+        await tbl.tx.t.any(
+          `DELETE FROM ${asName(this.name)} WHERE id = \${id}`,
+          file,
+        );
       }
       /** If any table delete fails then do not delete files */
       for await (const file of files) {
@@ -42,21 +57,20 @@ export async function onDeleteFromFileTable(this: TableHandler, { localParams, q
       }
 
       if (returningQuery) {
-        return files.map(f => pickKeys(f, ["id", "name"]));
+        return files.map((f) => pickKeys(f, ["id", "name"]));
       }
 
       return undefined;
-    }
+    };
 
     if (localParams?.tx?.dbTX) {
-      return txDelete(localParams.tx.dbTX[this.name] as TableHandler)
+      return txDelete(localParams.tx.dbTX[this.name] as TableHandler);
     } else if (this.tx) {
-      return txDelete(this)
+      return txDelete(this);
     } else {
-
-      return this.dboBuilder.getTX(tx => {
-        return txDelete(tx[this.name] as TableHandler)
-      })
+      return this.dboBuilder.getTX((tx) => {
+        return txDelete(tx[this.name] as TableHandler);
+      });
     }
   }
 }

@@ -38,7 +38,9 @@ export const getSerializableObjectOrRecord: TsTypeParser = ({
             depth: depth + 1,
           }).resolvedType;
         const innerType: Exclude<TS_Type, TS_Promise> =
-          resolvedInnerType?.type === "promise" ? defaultType : (resolvedInnerType ?? defaultType);
+          resolvedInnerType?.type === "promise"
+            ? defaultType
+            : (resolvedInnerType ?? defaultType);
         return {
           type: "promise",
           innerType,
@@ -48,9 +50,8 @@ export const getSerializableObjectOrRecord: TsTypeParser = ({
 
     const properties: TS_Object["properties"] = {};
     myType.getProperties().forEach((symbol) => {
-      const propertyType =
-        symbol.valueDeclaration ?
-          checker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration)
+      const propertyType = symbol.valueDeclaration
+        ? checker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration)
         : checker.getTypeOfSymbol(symbol);
 
       const resolvedPropertyType = getSerializableType({
@@ -65,10 +66,13 @@ export const getSerializableObjectOrRecord: TsTypeParser = ({
       /**
        * Prioritise symbol comments over resolved property type comments
        */
-      const propertyComments = getSymbolComments(symbol, checker) || resolvedPropertyType.comments;
+      const propertyComments =
+        getSymbolComments(symbol, checker) || resolvedPropertyType.comments;
       const optional = Boolean(symbol.flags & ts.SymbolFlags.Optional);
       properties[symbol.name] = {
-        ...(optional ? simplifyUnionForOptionalType(resolvedPropertyType) : resolvedPropertyType),
+        ...(optional
+          ? simplifyUnionForOptionalType(resolvedPropertyType)
+          : resolvedPropertyType),
         optional,
         comments: propertyComments || undefined,
       };
@@ -120,7 +124,9 @@ export const getSerializableObjectOrRecord: TsTypeParser = ({
   }
 };
 
-const getNonInternalTSDeclarations = (declarations: ts.Declaration[]): ts.Declaration[] => {
+const getNonInternalTSDeclarations = (
+  declarations: ts.Declaration[],
+): ts.Declaration[] => {
   return declarations.filter((d) => {
     return !d.getSourceFile().fileName.includes("/node_modules/typescript/");
   });

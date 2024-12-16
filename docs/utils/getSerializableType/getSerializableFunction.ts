@@ -22,7 +22,10 @@ export const getSerializableFunction: TsTypeParser = ({
       .map((param) => {
         const { valueDeclaration } = param;
         if (!valueDeclaration) return undefined;
-        const paramType = checker.getTypeOfSymbolAtLocation(param, valueDeclaration);
+        const paramType = checker.getTypeOfSymbolAtLocation(
+          param,
+          valueDeclaration,
+        );
         const resolvedParamType = getSerializableType({
           myType: paramType,
           checker,
@@ -34,15 +37,18 @@ export const getSerializableFunction: TsTypeParser = ({
         const paramComments = getSymbolComments(param, checker);
         const optional = Boolean(
           (ts as any).isParameterDeclaration(param.valueDeclaration) &&
-            checker.isOptionalParameter(valueDeclaration as ts.ParameterDeclaration)
+            checker.isOptionalParameter(
+              valueDeclaration as ts.ParameterDeclaration,
+            ),
         );
         const name = param.escapedName.toString() || param.name;
 
         // if (name === "selectParams") {
         //   debugger;
         // }
-        const resolvedParam =
-          optional ? simplifyUnionForOptionalType(resolvedParamType) : resolvedParamType;
+        const resolvedParam = optional
+          ? simplifyUnionForOptionalType(resolvedParamType)
+          : resolvedParamType;
         return {
           name,
           optional,
@@ -75,7 +81,7 @@ export const getSerializableFunction: TsTypeParser = ({
 export const simplifyUnionForOptionalType = (resolvedType: TS_Type) => {
   if (resolvedType.type === "union") {
     const indexOfUndefined = resolvedType.types.findIndex(
-      (t) => t.type === "primitive" && t.subType === "undefined"
+      (t) => t.type === "primitive" && t.subType === "undefined",
     );
     if (indexOfUndefined === -1) return resolvedType;
 
@@ -84,7 +90,8 @@ export const simplifyUnionForOptionalType = (resolvedType: TS_Type) => {
       const nonUndefined = unionTypes.find((_, i) => indexOfUndefined !== i);
       if (
         nonUndefined &&
-        (nonUndefined.type !== "primitive" || nonUndefined.subType !== "undefined")
+        (nonUndefined.type !== "primitive" ||
+          nonUndefined.subType !== "undefined")
       ) {
         return nonUndefined;
       }

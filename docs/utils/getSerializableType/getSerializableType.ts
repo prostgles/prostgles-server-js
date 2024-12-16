@@ -117,13 +117,20 @@ type GetSerializableTypeArgs = {
 export type TsTypeParser = (
   args: Omit<GetSerializableTypeArgs, "parentAliases"> & {
     nextUnresolvedParentAliases: string[];
-  }
+  },
 ) => TS_Type | undefined;
 
 export const getSerializableType = (
-  args: GetSerializableTypeArgs
+  args: GetSerializableTypeArgs,
 ): { resolvedType: TS_Type; visited: VisitedTypesMap } => {
-  const { myType, checker, depth, opts, parentAliases, visited = new Map() } = args;
+  const {
+    myType,
+    checker,
+    depth,
+    opts,
+    parentAliases,
+    visited = new Map(),
+  } = args;
   let alias = "unknown";
   const { escapedName } = myType.aliasSymbol ?? {};
   const aliasSymbolescapedName = escapedName?.toString();
@@ -137,13 +144,17 @@ export const getSerializableType = (
 
   const isTooDeep = opts?.maxDepth !== undefined && depth >= opts.maxDepth;
 
-  const unresolvedParentAliases = parentAliases?.filter((a) => !visited.get(a)) ?? [];
+  const unresolvedParentAliases =
+    parentAliases?.filter((a) => !visited.get(a)) ?? [];
   // console.log(unresolvedParentAliases, alias);
 
   /* Circular resolved type */
   const visitedType = visited.get(alias);
   if (visitedType) {
-    return { resolvedType: visitedType.reference?.type ?? visitedType.resolvedType, visited };
+    return {
+      resolvedType: visitedType.reference?.type ?? visitedType.resolvedType,
+      visited,
+    };
   }
   const withAlias = (_type: TS_Type) => {
     const finalComments = _type.comments || comments;
@@ -154,33 +165,32 @@ export const getSerializableType = (
         ..._type,
         ...(finalComments && { comments: finalComments }),
       },
-      ["type", "alias", "aliasSymbolescapedName", "comments"]
+      ["type", "alias", "aliasSymbolescapedName", "comments"],
     );
 
     let referenceType: TS_Type | undefined;
     const fileName = symbol?.declarations?.[0]?.getSourceFile().fileName;
     const referenceReason =
-      (
-        opts?.excludedTypes.includes(alias) ||
-        (fileName &&
-          opts?.excludedFilenameParts?.length &&
-          opts.excludedFilenameParts.some((part) => fileName.includes(part))) ||
-        (escapedName && opts?.excludedTypes.includes(escapedName))
-      ) ?
-        // TODO: Add a way to exclude well known types (Date, Array, UInt8Array, etc)
-        "excluded"
-      : isTooDeep ? "depth"
-      : undefined;
+      opts?.excludedTypes.includes(alias) ||
+      (fileName &&
+        opts?.excludedFilenameParts?.length &&
+        opts.excludedFilenameParts.some((part) => fileName.includes(part))) ||
+      (escapedName && opts?.excludedTypes.includes(escapedName))
+        ? // TODO: Add a way to exclude well known types (Date, Array, UInt8Array, etc)
+          "excluded"
+        : isTooDeep
+          ? "depth"
+          : undefined;
     if (referenceReason) {
       referenceType =
-        resolvedType.type === "primitive" ?
-          resolvedType
-        : {
-            type: "reference",
-            alias,
-            aliasSymbolescapedName,
-            comments: resolvedType.comments,
-          };
+        resolvedType.type === "primitive"
+          ? resolvedType
+          : {
+              type: "reference",
+              alias,
+              aliasSymbolescapedName,
+              comments: resolvedType.comments,
+            };
     }
 
     visited.set(alias, {
@@ -255,7 +265,7 @@ export type ResolveTypeOptions = {
 export const resolveType = (
   myType: ts.Type,
   checker: ts.TypeChecker,
-  opts: ResolveTypeOptions
+  opts: ResolveTypeOptions,
 ): { resolvedType: TS_Type; constituentTypes?: TS_Type[] } => {
   const { resolvedType } = getSerializableType({
     myType,
@@ -265,7 +275,10 @@ export const resolveType = (
     opts,
     depth: 0,
   });
-  if (resolvedType.type === "reference" && opts.excludedTypes.includes(resolvedType.alias)) {
+  if (
+    resolvedType.type === "reference" &&
+    opts.excludedTypes.includes(resolvedType.alias)
+  ) {
     return { resolvedType: { type: "primitive", subType: "any" } };
   }
   return { resolvedType, constituentTypes: [] };
@@ -273,7 +286,7 @@ export const resolveType = (
 
 const sortObjectsByKeyOrder = <T extends AnyObject, K extends keyof T & string>(
   obj: T,
-  keyOrder: K[]
+  keyOrder: K[],
 ): T => {
   const newKeyOrder = arraySort(Object.keys(obj), keyOrder);
 
@@ -282,7 +295,7 @@ const sortObjectsByKeyOrder = <T extends AnyObject, K extends keyof T & string>(
       ...acc,
       [key]: obj[key],
     }),
-    {} as T
+    {} as T,
   );
 };
 
@@ -297,7 +310,10 @@ const arraySort = (arrayToSort: string[], keyOrder: string[]): string[] => {
   });
 };
 
-export const getSymbolComments = (symbol: ts.Symbol, checker: ts.TypeChecker): string => {
+export const getSymbolComments = (
+  symbol: ts.Symbol,
+  checker: ts.TypeChecker,
+): string => {
   const comments = symbol.getDocumentationComment(checker);
   return comments
     .map((comment) => comment.text)

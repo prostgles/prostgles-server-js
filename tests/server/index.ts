@@ -10,9 +10,12 @@ import { testTableConfig } from "./testTableConfig";
 testPublishTypes();
 
 const isClientTest = process.env.TEST_TYPE === "client";
-const io = !isClientTest ? undefined : require("socket.io")(http, { path: "/teztz/s" });
-const ioWatchSchema =
-  !isClientTest ? undefined : require("socket.io")(http, { path: "/teztz/sWatchSchema" });
+const io = !isClientTest
+  ? undefined
+  : require("socket.io")(http, { path: "/teztz/s" });
+const ioWatchSchema = !isClientTest
+  ? undefined
+  : require("socket.io")(http, { path: "/teztz/sWatchSchema" });
 
 http.listen(3001);
 
@@ -28,7 +31,9 @@ export type { DBHandlerServer } from "prostgles-server/dist/Prostgles";
 let logs = [];
 
 export const log = (msg: string, extra?: any, trace?: boolean) => {
-  const msgs = msg.includes("show-logs") ? logs : ["(server): " + msg, extra].filter((v) => v);
+  const msgs = msg.includes("show-logs")
+    ? logs
+    : ["(server): " + msg, extra].filter((v) => v);
   if (trace) {
     console.trace(...msgs);
   } else {
@@ -50,7 +55,9 @@ type USER = {
   password: string;
   type: string;
 };
-const users: USER[] = [{ id: "1a", username: "john", password: "secret", type: "default" }];
+const users: USER[] = [
+  { id: "1a", username: "john", password: "secret", type: "default" },
+];
 
 process.on("unhandledRejection", (reason, p) => {
   console.trace("Unhandled Rejection at:", p, "reason:", reason);
@@ -71,8 +78,9 @@ const dbConnection = {
 };
 
 function dd() {
-  const dbo: DBOFullyTyped<{ tbl: { is_view: true; columns: { col1: { type: number } } } }> =
-    1 as any;
+  const dbo: DBOFullyTyped<{
+    tbl: { is_view: true; columns: { col1: { type: number } } };
+  }> = 1 as any;
   if (!dbo) return;
   dbo.tbl.find;
 }
@@ -99,7 +107,11 @@ function dd() {
     onLog: async (ev) => {
       logs.push(ev);
       logs = logs.slice(-10);
-      if (ev.type === "debug" || ev.type === "connect" || ev.type === "disconnect") {
+      if (
+        ev.type === "debug" ||
+        ev.type === "connect" ||
+        ev.type === "disconnect"
+      ) {
         // log("onLog", ev);
       }
     },
@@ -131,7 +143,10 @@ function dd() {
     onSocketConnect: ({ socket, db }) => {
       console.log("onSocketConnect", socket.id);
       if (isClientTest) {
-        log("Client connected -> console does not work. use log function. socket.id:", socket.id);
+        log(
+          "Client connected -> console does not work. use log function. socket.id:",
+          socket.id,
+        );
         socket.emit("start-test", { server_id: Math.random() });
         socket.on("log", async (data, cb) => {
           console.log("Client log ", data);
@@ -167,7 +182,12 @@ function dd() {
               return {
                 sid: s.id,
                 user,
-                clientUser: { sid: s.id, uid: user.id, id: user.id, type: user.type },
+                clientUser: {
+                  sid: s.id,
+                  uid: user.id,
+                  id: user.id,
+                  type: user.type,
+                },
               };
             }
           }
@@ -175,10 +195,16 @@ function dd() {
         return undefined;
       },
       login: async (loginData) => {
-        if (loginData.type !== "username") throw "Only username login is supported";
+        if (loginData.type !== "username")
+          throw "Only username login is supported";
         const { username, password } = loginData;
-        const u = users.find((u) => u.username === username && u.password === password);
-        if (!u) throw "something went wrong: " + JSON.stringify({ username, password });
+        const u = users.find(
+          (u) => u.username === username && u.password === password,
+        );
+        if (!u)
+          throw (
+            "something went wrong: " + JSON.stringify({ username, password })
+          );
         let s = sessions.find((s) => s.user_id === u.id);
         if (!s) {
           s = { id: "SID" + Date.now(), user_id: u.id };
@@ -190,7 +216,9 @@ function dd() {
       cacheSession: {
         getSession: async (sid) => {
           const s = sessions.find((s) => s.id === sid);
-          return s ? { sid: s.id, expires: Infinity, onExpiration: "redirect" } : undefined;
+          return s
+            ? { sid: s.id, expires: Infinity, onExpiration: "redirect" }
+            : undefined;
         },
       },
       expressConfig: {
@@ -241,7 +269,12 @@ function dd() {
       },
       {
         tables: ["items_multi", "items"],
-        on: [{ items0_id: "id" }, { items1_id: "id" }, { items2_id: "id" }, { items3_id: "id" }],
+        on: [
+          { items0_id: "id" },
+          { items1_id: "id" },
+          { items2_id: "id" },
+          { items3_id: "id" },
+        ],
         type: "many-many",
       },
     ],
@@ -260,7 +293,7 @@ function dd() {
               // "--inspect-brk",
               "dist/client/index.js",
             ],
-            { cwd: execPath, stdio: "inherit" }
+            { cwd: execPath, stdio: "inherit" },
           );
 
           log("Waiting for client...");

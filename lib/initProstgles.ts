@@ -70,12 +70,14 @@ export type InitResult = {
   options: ProstglesInitOptions;
 };
 
-const clientOnlyUpdateKeys = ["auth"] as const satisfies (keyof UpdateableOptions)[];
+const clientOnlyUpdateKeys = [
+  "auth",
+] as const satisfies (keyof UpdateableOptions)[];
 
 export const initProstgles = async function (
   this: Prostgles,
   onReady: OnReadyCallbackBasic,
-  reason: OnInitReason
+  reason: OnInitReason,
 ): Promise<InitResult> {
   this.loaded = false;
 
@@ -94,14 +96,16 @@ export const initProstgles = async function (
       try {
         const url = new URL(connString);
         existingAppName =
-          url.searchParams.get("application_name") ?? url.searchParams.get("ApplicationName") ?? "";
+          url.searchParams.get("application_name") ??
+          url.searchParams.get("ApplicationName") ??
+          "";
       } catch (e) {}
     }
 
     const conObj =
-      typeof this.opts.dbConnection === "string" ?
-        { connectionString: this.opts.dbConnection }
-      : this.opts.dbConnection;
+      typeof this.opts.dbConnection === "string"
+        ? { connectionString: this.opts.dbConnection }
+        : this.opts.dbConnection;
     const application_name = `prostgles ${this.appId} ${existingAppName}`;
 
     /* 1. Connect to db */
@@ -151,7 +155,7 @@ export const initProstgles = async function (
         this.opts.publishRawSQL,
         this.dbo!,
         this.db,
-        this as any
+        this as any,
       );
       this.dboBuilder.publishParser = this.publishParser;
 
@@ -217,7 +221,9 @@ export const initProstgles = async function (
          * While others also affect the server and onReady should be called
          */
         if (
-          getKeys(newOpts).every((updatedKey) => clientOnlyUpdateKeys.includes(updatedKey as any))
+          getKeys(newOpts).every((updatedKey) =>
+            clientOnlyUpdateKeys.includes(updatedKey as any),
+          )
         ) {
           await this.setSocketEvents();
         } else {
@@ -273,52 +279,52 @@ const getDbConnection = function ({
   const onQueryOrError:
     | undefined
     | ((error: any, ctx: pgPromise.IEventContext<pg.IClient>) => void) =
-    !onQuery && !DEBUG_MODE ?
-      undefined
-    : (error, ctx) => {
-        if (onQuery) {
-          onQuery(error, ctx);
-        } else if (DEBUG_MODE) {
-          if (error) {
-            console.error(error, ctx);
-          } else {
-            console.log(ctx);
+    !onQuery && !DEBUG_MODE
+      ? undefined
+      : (error, ctx) => {
+          if (onQuery) {
+            onQuery(error, ctx);
+          } else if (DEBUG_MODE) {
+            if (error) {
+              console.error(error, ctx);
+            } else {
+              console.log(ctx);
+            }
           }
-        }
-      };
+        };
 
   const pgp: PGP = pgPromise({
-    ...(onQueryOrError ?
-      {
-        query: (ctx) => onQueryOrError(undefined, ctx),
-        error: onQueryOrError,
-      }
-    : {}),
-    ...(onNotice || DEBUG_MODE ?
-      {
-        connect: function ({ client, useCount }) {
-          const isFresh = !useCount;
-          if (isFresh && !client.listeners("notice").length) {
-            client.on("notice", function (msg) {
-              if (onNotice) {
-                onNotice(msg, msg?.message);
-              } else {
-                console.log("notice: %j", msg?.message);
-              }
-            });
-          }
-          if (isFresh && !client.listeners("error").length) {
-            client.on("error", function (msg) {
-              if (onNotice) {
-                onNotice(msg, msg?.message);
-              } else {
-                console.log("error: %j", msg?.message);
-              }
-            });
-          }
-        },
-      }
-    : {}),
+    ...(onQueryOrError
+      ? {
+          query: (ctx) => onQueryOrError(undefined, ctx),
+          error: onQueryOrError,
+        }
+      : {}),
+    ...(onNotice || DEBUG_MODE
+      ? {
+          connect: function ({ client, useCount }) {
+            const isFresh = !useCount;
+            if (isFresh && !client.listeners("notice").length) {
+              client.on("notice", function (msg) {
+                if (onNotice) {
+                  onNotice(msg, msg?.message);
+                } else {
+                  console.log("notice: %j", msg?.message);
+                }
+              });
+            }
+            if (isFresh && !client.listeners("error").length) {
+              client.on("error", function (msg) {
+                if (onNotice) {
+                  onNotice(msg, msg?.message);
+                } else {
+                  console.log("error: %j", msg?.message);
+                }
+              });
+            }
+          },
+        }
+      : {}),
   });
   // pgp.pg.defaults.max = 70;
 

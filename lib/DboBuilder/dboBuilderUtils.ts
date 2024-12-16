@@ -34,7 +34,9 @@ export const getErrorAsObject = (rawError: any, includeStack = false) => {
     return { message: rawError };
   }
   if (rawError instanceof Error) {
-    const result = JSON.parse(JSON.stringify(rawError, Object.getOwnPropertyNames(rawError)));
+    const result = JSON.parse(
+      JSON.stringify(rawError, Object.getOwnPropertyNames(rawError)),
+    );
     if (!includeStack) {
       return omitKeys(result, ["stack"]);
     }
@@ -76,7 +78,7 @@ const otherKeys = [
 
 export function getSerializedClientErrorFromPGError(
   rawError: any,
-  args: GetSerializedClientErrorFromPGErrorArgs
+  args: GetSerializedClientErrorFromPGErrorArgs,
 ): AnyObject {
   const err = getErrorAsObject(rawError);
   if (err.code) {
@@ -89,7 +91,9 @@ export function getSerializedClientErrorFromPGError(
   const isServerSideRequest = !args.localParams;
   //TODO: add a rawSQL check for HTTP requests
   const showFullError =
-    isServerSideRequest || args.type === "sql" || args.localParams?.socket?.prostgles?.rawSQL;
+    isServerSideRequest ||
+    args.type === "sql" ||
+    args.localParams?.socket?.prostgles?.rawSQL;
   if (showFullError) {
     return err;
   }
@@ -102,15 +106,19 @@ export function getSerializedClientErrorFromPGError(
   ];
 
   const errObject = pickKeys(err, finalKeys);
-  if (view?.dboBuilder?.constraints && errObject.constraint && !errObject.column) {
+  if (
+    view?.dboBuilder?.constraints &&
+    errObject.constraint &&
+    !errObject.column
+  ) {
     const constraint = view.dboBuilder.constraints.find(
-      (c) => c.conname === errObject.constraint && c.relname === view.name
+      (c) => c.conname === errObject.constraint && c.relname === view.name,
     );
     if (constraint) {
       const cols = view.columns?.filter(
         (c) =>
           (!allowedKeys || allowedKeys.includes(c.name)) &&
-          constraint.conkey.includes(c.ordinal_position)
+          constraint.conkey.includes(c.ordinal_position),
       );
       const [firstCol] = cols ?? [];
       if (firstCol) {
@@ -123,7 +131,7 @@ export function getSerializedClientErrorFromPGError(
 }
 export function getClientErrorFromPGError(
   rawError: any,
-  args: GetSerializedClientErrorFromPGErrorArgs
+  args: GetSerializedClientErrorFromPGErrorArgs,
 ) {
   const errorObj = getSerializedClientErrorFromPGError(rawError, args);
   return Promise.reject(errorObj);
@@ -135,11 +143,16 @@ export function getClientErrorFromPGError(
 export function parseError(e: any, _caller: string): ProstglesError {
   const errorObject = isObject(e) ? e : undefined;
   const message =
-    typeof e === "string" ? e
-    : e instanceof Error ? e.message
-    : isObject(errorObject) ?
-      (errorObject.message ?? errorObject.txt ?? JSON.stringify(errorObject) ?? "")
-    : "";
+    typeof e === "string"
+      ? e
+      : e instanceof Error
+        ? e.message
+        : isObject(errorObject)
+          ? (errorObject.message ??
+            errorObject.txt ??
+            JSON.stringify(errorObject) ??
+            "")
+          : "";
 
   const result: ProstglesError = {
     ...errorObject,
@@ -175,7 +188,7 @@ export type PGConstraint = {
 
 export const getConstraints = async (
   db: DB,
-  schema: ProstglesInitOptions["schemaFilter"]
+  schema: ProstglesInitOptions["schemaFilter"],
 ): Promise<PGConstraint[]> => {
   const { sql, schemaNames } = getSchemaFilter(schema);
   return db.any(
@@ -188,7 +201,7 @@ export const getConstraints = async (
             ON nsp.oid = connamespace
     WHERE nsp.nspname ${sql}
   `,
-    { schemaNames }
+    { schemaNames },
   );
 };
 
@@ -200,7 +213,9 @@ export function isPlainObject(o: any): o is Record<string, any> {
   return Object(o) === o && Object.getPrototypeOf(o) === Object.prototype;
 }
 
-export function postgresToTsType(udt_data_type: PG_COLUMN_UDT_DATA_TYPE): keyof typeof TS_PG_Types {
+export function postgresToTsType(
+  udt_data_type: PG_COLUMN_UDT_DATA_TYPE,
+): keyof typeof TS_PG_Types {
   return (
     getKeys(TS_PG_Types).find((k) => {
       // @ts-ignore
@@ -209,14 +224,19 @@ export function postgresToTsType(udt_data_type: PG_COLUMN_UDT_DATA_TYPE): keyof 
   );
 }
 
-export const prepareOrderByQuery = (items: SortItem[], tableAlias?: string): string[] => {
+export const prepareOrderByQuery = (
+  items: SortItem[],
+  tableAlias?: string,
+): string[] => {
   if (!items.length) return [];
   return [
     "ORDER BY " +
       items
         .map((d) => {
           const orderType = d.asc ? " ASC " : " DESC ";
-          const nullOrder = d.nulls ? ` NULLS ${d.nulls === "first" ? " FIRST " : " LAST "}` : "";
+          const nullOrder = d.nulls
+            ? ` NULLS ${d.nulls === "first" ? " FIRST " : " LAST "}`
+            : "";
           if (d.type === "query" && d.nested) {
             return d.fieldQuery;
           }
@@ -237,7 +257,10 @@ export const getCanExecute = async (db: DB) => {
   return false;
 };
 
-export const withUserRLS = (localParams: LocalParams | undefined, query: string) => {
+export const withUserRLS = (
+  localParams: LocalParams | undefined,
+  query: string,
+) => {
   const user = localParams?.isRemoteRequest?.user;
   const queryPrefix = `SET SESSION "prostgles.user" \nTO`;
   let firstQuery = `${queryPrefix} '';`;

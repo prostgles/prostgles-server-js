@@ -4,7 +4,11 @@ import { HTTPCODES } from "./Auth/AuthHandler";
 import { ExpressReq, ExpressRes } from "./Auth/AuthTypes";
 import { getSerializedClientErrorFromPGError } from "./DboBuilder/DboBuilder";
 import { Prostgles } from "./Prostgles";
-import { runClientMethod, runClientRequest, runClientSqlRequest } from "./runClientRequest";
+import {
+  runClientMethod,
+  runClientRequest,
+  runClientSqlRequest,
+} from "./runClientRequest";
 import { VoidFunction } from "./SchemaWatch/SchemaWatch";
 const jsonParser = bodyParser.json();
 
@@ -49,7 +53,11 @@ export class RestApi {
     schema: string;
   };
   expressApp: Express;
-  constructor({ expressApp, routePrefix, prostgles }: RestApiConfig & { prostgles: Prostgles }) {
+  constructor({
+    expressApp,
+    routePrefix,
+    prostgles,
+  }: RestApiConfig & { prostgles: Prostgles }) {
     this.prostgles = prostgles;
     this.routes = {
       db: `${routePrefix}/db/:tableName/:command`,

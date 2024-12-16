@@ -3,10 +3,12 @@ import { getPubSubManagerInitQuery } from "./getPubSubManagerInitQuery";
 import { getCanExecute } from "../DboBuilder/dboBuilderUtils";
 import { DboBuilder } from "../DboBuilder/DboBuilder";
 
-export const getCreatePubSubManagerError = async (dboBuilder: DboBuilder): Promise<string | undefined> => {
+export const getCreatePubSubManagerError = async (
+  dboBuilder: DboBuilder,
+): Promise<string | undefined> => {
   const db = dboBuilder.db;
-  
-  const canExecute = await getCanExecute(db)
+
+  const canExecute = await getCanExecute(db);
   if (!canExecute) return "Cannot run EXECUTE statements on this connection";
 
   /** Check if prostgles schema exists */
@@ -16,25 +18,26 @@ export const getCreatePubSubManagerError = async (dboBuilder: DboBuilder): Promi
     WHERE nspname = 'prostgles'
   `);
 
-  const checkIfCanCreateProstglesSchema = () => tryCatch(async () => {
-    const allGood = await db.task(async t => {
-      try {
-        await t.none(`
+  const checkIfCanCreateProstglesSchema = () =>
+    tryCatch(async () => {
+      const allGood = await db.task(async (t) => {
+        try {
+          await t.none(`
           BEGIN;
           DROP SCHEMA IF EXISTS prostgles CASCADE;
           CREATE SCHEMA IF NOT EXISTS prostgles;
           ROLLBACK;
         `);
-      } catch (e) {
-        await t.none(`ROLLBACK`);
-        return false;
-      }
+        } catch (e) {
+          await t.none(`ROLLBACK`);
+          return false;
+        }
 
-      return true;
+        return true;
+      });
+
+      return allGood;
     });
-
-    return allGood;
-  });
 
   if (!prglSchema.length) {
     const canCreate = await checkIfCanCreateProstglesSchema();
@@ -52,21 +55,26 @@ export const getCreatePubSubManagerError = async (dboBuilder: DboBuilder): Promi
       return { ok: true };
     });
 
-    if(!canCheckVersion.ok){
-      console.error("prostgles schema exists but cannot check version. Check logs", canCheckVersion.error);
+    if (!canCheckVersion.ok) {
+      console.error(
+        "prostgles schema exists but cannot check version. Check logs",
+        canCheckVersion.error,
+      );
       return "prostgles schema exists but cannot check version. Check logs";
     }
   }
 
-  const initQuery = await tryCatch(async () => ({ query: await getPubSubManagerInitQuery.bind(dboBuilder)() }));
-  if(initQuery.hasError){
+  const initQuery = await tryCatch(async () => ({
+    query: await getPubSubManagerInitQuery.bind(dboBuilder)(),
+  }));
+  if (initQuery.hasError) {
     console.error(initQuery.error);
     return "Could not get initQuery. Check logs";
   }
 
-  if(!initQuery.query){
+  if (!initQuery.query) {
     return undefined;
   }
 
   return undefined;
-}
+};

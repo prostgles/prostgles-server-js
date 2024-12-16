@@ -1,4 +1,8 @@
-import { getSerializableType, TS_Object, TsTypeParser } from "./getSerializableType";
+import {
+  getSerializableType,
+  TS_Object,
+  TsTypeParser,
+} from "./getSerializableType";
 
 /**
  * A & B
@@ -37,7 +41,7 @@ export const getSerializableIntersection: TsTypeParser = ({
             ...acc,
             [k]: { ...v, intersectionParent: t.aliasSymbolescapedName },
           }),
-          {}
+          {},
         );
         return { ...acc, ...propertiesWithParentObject };
       }, {});

@@ -15,7 +15,8 @@ import {
 import { TableHandler } from "./TableHandler/TableHandler";
 import { ViewHandler } from "./ViewHandler/ViewHandler";
 
-export const isTableHandler = (v: any): v is TableHandler => "parseUpdateRules" in v;
+export const isTableHandler = (v: any): v is TableHandler =>
+  "parseUpdateRules" in v;
 
 export async function getColumns(
   this: ViewHandler,
@@ -23,7 +24,7 @@ export async function getColumns(
   params?: { rule: "update"; filter: AnyObject },
   _param3?: undefined,
   tableRules?: TableRule,
-  localParams?: LocalParams
+  localParams?: LocalParams,
 ): Promise<ValidatedColumnInfo[]> {
   const start = Date.now();
   try {
@@ -34,7 +35,11 @@ export async function getColumns(
     let dynamicUpdateFields = this.column_names;
 
     if (params && tableRules && isTableHandler(this)) {
-      if (!isObject(params) || !isObject(params.filter) || params.rule !== "update") {
+      if (
+        !isObject(params) ||
+        !isObject(params.filter) ||
+        params.rule !== "update"
+      ) {
         throw (
           "params must be { rule: 'update', filter: object } but received: " +
           JSON.stringify(params)
@@ -45,7 +50,12 @@ export async function getColumns(
         dynamicUpdateFields = [];
       } else {
         const { filter } = params;
-        const updateRules = await this.parseUpdateRules(filter, undefined, tableRules, localParams);
+        const updateRules = await this.parseUpdateRules(
+          filter,
+          undefined,
+          tableRules,
+          localParams,
+        );
         dynamicUpdateFields = updateRules.fields;
       }
     }
@@ -79,11 +89,17 @@ export async function getColumns(
         });
 
         /** Do not allow updates to file table unless it's to delete fields */
-        if (prostgles.fileManager?.config && prostgles.fileManager.tableName === this.name) {
+        if (
+          prostgles.fileManager?.config &&
+          prostgles.fileManager.tableName === this.name
+        ) {
           update = false;
         }
 
-        const nonOrderableUD_Types: PG_COLUMN_UDT_DATA_TYPE[] = [..._PG_geometric, "xml" as any];
+        const nonOrderableUD_Types: PG_COLUMN_UDT_DATA_TYPE[] = [
+          ..._PG_geometric,
+          "xml" as any,
+        ];
 
         const result: ValidatedColumnInfo = {
           ...c,
@@ -97,7 +113,9 @@ export async function getColumns(
           select: select && Boolean(p.select?.fields?.includes(c.name)),
           orderBy:
             select &&
-            Boolean(p.select?.fields && p.select.orderByFields.includes(c.name)) &&
+            Boolean(
+              p.select?.fields && p.select.orderByFields.includes(c.name),
+            ) &&
             !nonOrderableUD_Types.includes(c.udt_name),
           filter: Boolean(p.select?.filterFields?.includes(c.name)),
           update:
@@ -108,9 +126,16 @@ export async function getColumns(
             dynamicUpdateFields.includes(c.name),
           delete:
             _delete &&
-            Boolean(p.delete && p.delete.filterFields && p.delete.filterFields.includes(c.name)),
-          ...(prostgles?.tableConfigurator?.getColInfo({ table: this.name, col: c.name, lang }) ||
-            {}),
+            Boolean(
+              p.delete &&
+                p.delete.filterFields &&
+                p.delete.filterFields.includes(c.name),
+            ),
+          ...(prostgles?.tableConfigurator?.getColInfo({
+            table: this.name,
+            col: c.name,
+            lang,
+          }) || {}),
           ...(fileConfig && { file: fileConfig }),
         };
 
@@ -133,14 +158,21 @@ export async function getColumns(
       duration: Date.now() - start,
       error: getErrorAsObject(e),
     });
-    throw getSerializedClientErrorFromPGError(e, { type: "tableMethod", localParams, view: this });
+    throw getSerializedClientErrorFromPGError(e, {
+      type: "tableMethod",
+      localParams,
+      view: this,
+    });
   }
 }
 
 function replaceNonAlphaNumeric(string: string, replacement = "_"): string {
   return string.replace(/[\W_]+/g, replacement);
 }
-function capitalizeFirstLetter(string: string, nonalpha_replacement?: string): string {
+function capitalizeFirstLetter(
+  string: string,
+  nonalpha_replacement?: string,
+): string {
   const str = replaceNonAlphaNumeric(string, nonalpha_replacement);
   return str.charAt(0).toUpperCase() + str.slice(1);
 }

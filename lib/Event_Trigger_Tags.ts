@@ -1,4 +1,3 @@
-
 export const EVENT_TRIGGER_TAGS = [
   "ALTER AGGREGATE",
   "ALTER COLLATION",
@@ -110,9 +109,12 @@ export const EVENT_TRIGGER_TAGS = [
   "REFRESH MATERIALIZED VIEW",
   "REVOKE",
   "SECURITY LABEL",
-  "SELECT INTO"
+  "SELECT INTO",
 ] as const;
 
-export type EventTriggerTag = typeof EVENT_TRIGGER_TAGS[number];
+export type EventTriggerTag = (typeof EVENT_TRIGGER_TAGS)[number];
 
-export type EventTriggerTagFilter = Partial<Record<EventTriggerTag, 1>> | Partial<Record<EventTriggerTag, 0>> | "*";
+export type EventTriggerTagFilter =
+  | Partial<Record<EventTriggerTag, 1>>
+  | Partial<Record<EventTriggerTag, 0>>
+  | "*";

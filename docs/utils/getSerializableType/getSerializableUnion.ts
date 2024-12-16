@@ -1,4 +1,8 @@
-import { getSerializableType, TS_Union, TsTypeParser } from "./getSerializableType";
+import {
+  getSerializableType,
+  TS_Union,
+  TsTypeParser,
+} from "./getSerializableType";
 
 export const getSerializableUnion: TsTypeParser = ({
   myType,
@@ -14,7 +18,11 @@ export const getSerializableUnion: TsTypeParser = ({
      * myType.types tends to unnest unions into bigger unions.
      * myType.origin is the original union which we want to keep for brevity.
      */
-    if ("origin" in myType && myType.origin && (myType.origin as any).isUnion()) {
+    if (
+      "origin" in myType &&
+      myType.origin &&
+      (myType.origin as any).isUnion()
+    ) {
       unionMembers = (myType.origin as any).types;
     }
     const unionTypes = unionMembers.map((t) => {
@@ -35,14 +43,14 @@ export const getSerializableUnion: TsTypeParser = ({
      * So we need to check for "true" and "false" and merge them into "boolean"
      */
     const booleanTypes = unionTypes.filter(
-      (t) => t.type === "primitive" && t.subType === "boolean"
+      (t) => t.type === "primitive" && t.subType === "boolean",
     );
     const dedupedTypes =
-      booleanTypes.length > 1 ?
-        unionTypes
-          .filter((t) => t.type !== "primitive" || t.subType !== "boolean")
-          .concat(booleanTypes[0]!)
-      : unionTypes;
+      booleanTypes.length > 1
+        ? unionTypes
+            .filter((t) => t.type !== "primitive" || t.subType !== "boolean")
+            .concat(booleanTypes[0]!)
+        : unionTypes;
 
     const result: TS_Union = {
       type: "union",

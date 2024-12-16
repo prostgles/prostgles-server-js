@@ -29,7 +29,11 @@ import {
 } from "prostgles-types";
 
 import { find, pickKeys, tryCatch } from "prostgles-types/dist/util";
-import { LocalFuncs, getOnDataFunc, matchesLocalFuncs } from "../DboBuilder/ViewHandler/subscribe";
+import {
+  LocalFuncs,
+  getOnDataFunc,
+  matchesLocalFuncs,
+} from "../DboBuilder/ViewHandler/subscribe";
 import { EVENT_TRIGGER_TAGS } from "../Event_Trigger_Tags";
 import { EventTypes } from "../Logging";
 import { TableRule } from "../PublishParser/PublishParser";
@@ -109,7 +113,10 @@ export type ViewSubscriptionOptions = (
   }[];
 };
 
-export type SubscriptionParams = Pick<SubscribeParams, "throttle" | "throttleOpts"> & {
+export type SubscriptionParams = Pick<
+  SubscribeParams,
+  "throttle" | "throttleOpts"
+> & {
   socket_id?: string;
   channel_name: string;
 
@@ -230,16 +237,17 @@ export class PubSubManager {
     const { watchSchema } = this.dboBuilder.prostgles.opts;
     if (watchSchema && !(await getIsSuperUser(this.db))) {
       console.warn(
-        "prostgles watchSchema requires superuser db user. Will not watch using event triggers"
+        "prostgles watchSchema requires superuser db user. Will not watch using event triggers",
       );
     }
 
     try {
       /** We use these names because they include schema where necessary */
-      const allTableNames = Object.keys(this.dbo).filter((k) => this.dbo[k]?.tableOrViewInfo);
-      const tableFilterQuery =
-        allTableNames.length ?
-          `OR table_name NOT IN (${allTableNames.map((tblName) => asValue(tblName)).join(", ")})`
+      const allTableNames = Object.keys(this.dbo).filter(
+        (k) => this.dbo[k]?.tableOrViewInfo,
+      );
+      const tableFilterQuery = allTableNames.length
+        ? `OR table_name NOT IN (${allTableNames.map((tblName) => asValue(tblName)).join(", ")})`
         : "";
       const query = pgp.as.format(
         `
@@ -295,7 +303,7 @@ export class PubSubManager {
 
         COMMIT;
       `,
-        { EVENT_TRIGGER_TAGS }
+        { EVENT_TRIGGER_TAGS },
       );
 
       await this.db
@@ -316,45 +324,58 @@ export class PubSubManager {
     channel_name,
     localFuncs,
     socket_id,
-  }: Pick<Subscription, "localFuncs" | "socket_id" | "channel_name">): Subscription[] {
+  }: Pick<
+    Subscription,
+    "localFuncs" | "socket_id" | "channel_name"
+  >): Subscription[] {
     return this.subs.filter((s) => {
       return (
         s.channel_name === channel_name &&
-        (matchesLocalFuncs(localFuncs, s.localFuncs) || (socket_id && s.socket_id === socket_id))
+        (matchesLocalFuncs(localFuncs, s.localFuncs) ||
+          (socket_id && s.socket_id === socket_id))
       );
     });
   }
 
   getTriggerSubs(table_name: string, condition: string): Subscription[] {
-    const subs = this.subs.filter((s) => find(s.triggers, { table_name, condition }));
+    const subs = this.subs.filter((s) =>
+      find(s.triggers, { table_name, condition }),
+    );
     return subs;
   }
 
   removeLocalSub(channelName: string, localFuncs: LocalFuncs) {
     const matchingSubIdx = this.subs.findIndex(
       (s) =>
-        s.channel_name === channelName && getOnDataFunc(localFuncs) === getOnDataFunc(s.localFuncs)
+        s.channel_name === channelName &&
+        getOnDataFunc(localFuncs) === getOnDataFunc(s.localFuncs),
     );
     if (matchingSubIdx > -1) {
       this.subs.splice(matchingSubIdx, 1);
     } else {
-      console.error("Could not unsubscribe. Subscription might not have initialised yet", {
-        channelName,
-      });
+      console.error(
+        "Could not unsubscribe. Subscription might not have initialised yet",
+        {
+          channelName,
+        },
+      );
     }
   }
 
   getSyncs(table_name: string, condition: string) {
     return (this.syncs || []).filter(
-      (s: SyncParams) => s.table_name === table_name && s.condition === condition
+      (s: SyncParams) =>
+        s.table_name === table_name && s.condition === condition,
     );
   }
 
   notifListener = notifListener.bind(this);
 
   getSubData = async (
-    sub: Subscription
-  ): Promise<{ data: any[]; err?: undefined } | { data?: undefined; err: any }> => {
+    sub: Subscription,
+  ): Promise<
+    { data: any[]; err?: undefined } | { data?: undefined; err: any }
+  > => {
     const { table_info, filter, params, table_rules } = sub; //, subOne = false
     const { name: table_name } = table_info;
 
@@ -363,7 +384,12 @@ export class PubSubManager {
     }
 
     try {
-      const data = await this.dbo?.[table_name]!.find!(filter, params, undefined, table_rules);
+      const data = await this.dbo?.[table_name]!.find!(
+        filter,
+        params,
+        undefined,
+        table_rules,
+      );
       return { data };
     } catch (err) {
       return { err };
@@ -395,10 +421,13 @@ export class PubSubManager {
           socketId: socket.id,
           connectedSocketIds: this.connectedSocketIds,
           remainingSubs: JSON.stringify(
-            this.subs.map((s) => ({ tableName: s.table_info.name, triggers: s.triggers }))
+            this.subs.map((s) => ({
+              tableName: s.table_info.name,
+              triggers: s.triggers,
+            })),
           ),
           remainingSyncs: JSON.stringify(
-            this.syncs.map((s) => pickKeys(s, ["table_name", "condition"]))
+            this.syncs.map((s) => pickKeys(s, ["table_name", "condition"])),
           ),
         });
 
@@ -424,7 +453,9 @@ export class PubSubManager {
   getActiveListeners = (): { table_name: string; condition: string }[] => {
     const activeListeners: { table_name: string; condition: string }[] = [];
     const upsert = (t: string, c: string) => {
-      if (!activeListeners.find((r) => r.table_name === t && r.condition === c)) {
+      if (
+        !activeListeners.find((r) => r.table_name === t && r.condition === c)
+      ) {
         activeListeners.push({ table_name: t, condition: c });
       }
     };
@@ -455,7 +486,7 @@ export class PubSubManager {
         WHERE app_id = $1
         ORDER BY table_name, condition
       `,
-      [this.dboBuilder.prostgles.appId]
+      [this.dboBuilder.prostgles.appId],
     );
 
     this._triggers = {};
@@ -473,7 +504,7 @@ export class PubSubManager {
   async addTrigger(
     params: { table_name: string; condition: string },
     viewOptions: ViewSubscriptionOptions | undefined,
-    socket: PRGLIOSocket | undefined
+    socket: PRGLIOSocket | undefined,
   ) {
     const addedTrigger = await tryCatch(async () => {
       const { table_name } = { ...params };
@@ -491,7 +522,9 @@ export class PubSubManager {
       const trgVals = {
         tbl: asValue(table_name),
         cond: asValue(condition),
-        condHash: asValue(crypto.createHash("md5").update(condition).digest("hex")),
+        condHash: asValue(
+          crypto.createHash("md5").update(condition).digest("hex"),
+        ),
       };
 
       await this.db.tx((t) =>
@@ -530,7 +563,7 @@ export class PubSubManager {
         ON CONFLICT DO NOTHING;
 
         COMMIT WORK;
-      `)
+      `),
       );
 
       /** This might be redundant due to trigger on app_triggers */
@@ -549,7 +582,9 @@ export class PubSubManager {
       error: addedTrigger.error,
       sid: this.dboBuilder.prostgles.authHandler?.getSIDNoError({ socket }),
       tableName: addedTrigger.tbl ?? params.table_name,
-      connectedSocketIds: this.dboBuilder.prostgles.connectedSockets.map((s) => s.id),
+      connectedSocketIds: this.dboBuilder.prostgles.connectedSockets.map(
+        (s) => s.id,
+      ),
       localParams: { socket },
     });
 

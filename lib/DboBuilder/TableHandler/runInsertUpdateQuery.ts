@@ -1,37 +1,62 @@
-import { AnyObject, asName, FieldFilter, InsertParams, UpdateParams } from "prostgles-types";
+import {
+  AnyObject,
+  asName,
+  FieldFilter,
+  InsertParams,
+  UpdateParams,
+} from "prostgles-types";
 import { InsertRule, UpdateRule } from "../../PublishParser/PublishParser";
-import { getClientErrorFromPGError, LocalParams, withUserRLS } from "../DboBuilder";
+import {
+  getClientErrorFromPGError,
+  LocalParams,
+  withUserRLS,
+} from "../DboBuilder";
 import { getSelectItemQuery, TableHandler } from "./TableHandler";
 
 type RunInsertUpdateQueryArgs = {
   tableHandler: TableHandler;
-  queryWithoutUserRLS: string; 
+  queryWithoutUserRLS: string;
   localParams: LocalParams | undefined;
   fields: FieldFilter | undefined;
   returningFields: FieldFilter | undefined;
-} & ({
-  type: "insert";
-  params: InsertParams | undefined
-  rule: InsertRule | undefined;
-  data: AnyObject | AnyObject[];
-  isMultiInsert: boolean;
-  nestedInsertsResultsObj?: undefined;
-} | {
-  type: "update";
-  nestedInsertsResultsObj: Record<string, any>;
-  params: UpdateParams | undefined
-  rule: UpdateRule | undefined;
-  data: undefined;
-});
+} & (
+  | {
+      type: "insert";
+      params: InsertParams | undefined;
+      rule: InsertRule | undefined;
+      data: AnyObject | AnyObject[];
+      isMultiInsert: boolean;
+      nestedInsertsResultsObj?: undefined;
+    }
+  | {
+      type: "update";
+      nestedInsertsResultsObj: Record<string, any>;
+      params: UpdateParams | undefined;
+      rule: UpdateRule | undefined;
+      data: undefined;
+    }
+);
 
 export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
-  const { tableHandler, queryWithoutUserRLS, rule, localParams, fields, returningFields, params, nestedInsertsResultsObj } = args;
+  const {
+    tableHandler,
+    queryWithoutUserRLS,
+    rule,
+    localParams,
+    fields,
+    returningFields,
+    params,
+    nestedInsertsResultsObj,
+  } = args;
   const { name } = tableHandler;
 
-  const returningSelectItems = await tableHandler.prepareReturning(params?.returning, tableHandler.parseFieldFilter(returningFields))
+  const returningSelectItems = await tableHandler.prepareReturning(
+    params?.returning,
+    tableHandler.parseFieldFilter(returningFields),
+  );
   const { checkFilter, postValidate } = rule ?? {};
   let checkCondition = "WHERE FALSE";
-  if(checkFilter){
+  if (checkFilter) {
     const checkCond = await tableHandler.prepareWhere({
       select: undefined,
       localParams: undefined,
@@ -43,7 +68,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
   }
   const hasReturning = !!returningSelectItems.length;
   const userRLS = withUserRLS(localParams, "");
-  const escapedTableName = asName(name)
+  const escapedTableName = asName(name);
   const query = ` 
     ${userRLS}
     WITH ${escapedTableName} AS (
@@ -62,9 +87,9 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
       (
         SELECT json_agg(item)
         FROM (
-          SELECT ${!hasReturning? "1" : getSelectItemQuery(returningSelectItems)}
+          SELECT ${!hasReturning ? "1" : getSelectItemQuery(returningSelectItems)}
           FROM ${escapedTableName}
-          WHERE ${hasReturning? "TRUE" : "FALSE"}
+          WHERE ${hasReturning ? "TRUE" : "FALSE"}
         ) item
       ) as modified_returning,
       ( 
@@ -80,55 +105,80 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
   `;
 
   const allowedFieldKeys = tableHandler.parseFieldFilter(fields);
-  let result: { 
-    row_count: number | null; 
-    modified: AnyObject[] | null; 
+  let result: {
+    row_count: number | null;
+    modified: AnyObject[] | null;
     failed_check: AnyObject[] | null;
     modified_returning: AnyObject[] | null;
   };
-  
+
   const queryType = "one";
 
   const tx = localParams?.tx?.t || tableHandler.tx?.t;
   if (tx) {
-    result = await tx[queryType](query).catch((err: any) => getClientErrorFromPGError(err, { type: "tableMethod", localParams, view: tableHandler, allowedKeys: allowedFieldKeys }));
+    result = await tx[queryType](query).catch((err: any) =>
+      getClientErrorFromPGError(err, {
+        type: "tableMethod",
+        localParams,
+        view: tableHandler,
+        allowedKeys: allowedFieldKeys,
+      }),
+    );
   } else {
-    result = await tableHandler.db.tx(t => (t as any)[queryType](query)).catch(err => getClientErrorFromPGError(err, { type: "tableMethod", localParams, view: tableHandler, allowedKeys: allowedFieldKeys }));
+    result = await tableHandler.db
+      .tx((t) => (t as any)[queryType](query))
+      .catch((err) =>
+        getClientErrorFromPGError(err, {
+          type: "tableMethod",
+          localParams,
+          view: tableHandler,
+          allowedKeys: allowedFieldKeys,
+        }),
+      );
   }
 
-  if(checkFilter && result.failed_check?.length){
-    throw new Error(`Insert ${name} records failed the check condition: ${JSON.stringify(checkFilter, null, 2)}`);
+  if (checkFilter && result.failed_check?.length) {
+    throw new Error(
+      `Insert ${name} records failed the check condition: ${JSON.stringify(checkFilter, null, 2)}`,
+    );
   }
 
   const finalDBtx = tableHandler.getFinalDBtx(localParams);
-  if(postValidate){
-    if(!finalDBtx) throw new Error("Unexpected: no dbTX for postValidate");
-    if(!localParams) throw new Error("Unexpected: no localParams for postValidate");
+  if (postValidate) {
+    if (!finalDBtx) throw new Error("Unexpected: no dbTX for postValidate");
+    if (!localParams)
+      throw new Error("Unexpected: no localParams for postValidate");
 
     const rows = result.modified ?? [];
-    for await (const row of rows){
-      await postValidate({ row: row ?? {}, dbx: finalDBtx as any, localParams })
+    for await (const row of rows) {
+      await postValidate({
+        row: row ?? {},
+        dbx: finalDBtx as any,
+        localParams,
+      });
     }
   }
 
   let returnMany = false;
-  if(args.type === "update"){
+  if (args.type === "update") {
     const { multi = true } = args.params || {};
-    if(!multi && result.row_count && +result.row_count > 1){
+    if (!multi && result.row_count && +result.row_count > 1) {
       throw `More than 1 row modified: ${result.row_count} rows affected`;
     }
 
-    if(hasReturning){
+    if (hasReturning) {
       returnMany = multi;
     }
-
   } else {
-    returnMany = args.isMultiInsert
+    returnMany = args.isMultiInsert;
   }
 
-  if(!hasReturning) return undefined;
+  if (!hasReturning) return undefined;
 
-  const modified_returning = result.modified_returning?.map(d => ({ ...d, ...nestedInsertsResultsObj }))
+  const modified_returning = result.modified_returning?.map((d) => ({
+    ...d,
+    ...nestedInsertsResultsObj,
+  }));
 
-  return returnMany? modified_returning : modified_returning?.[0];
-}
+  return returnMany ? modified_returning : modified_returning?.[0];
+};

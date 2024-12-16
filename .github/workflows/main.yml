@@ -5,10 +5,10 @@ name: tests
 on:
   push:
     branches:
-    - master
+      - master
   pull_request:
     branches:
-    - master
+      - master
 
 # The service containers will use host port binding instead of container networking so you access them via localhost rather than the service name
 jobs:
@@ -28,23 +28,23 @@ jobs:
           POSTGRES_PASSWORD: api
           POSTGRES_DB: prostgles_server_tests
         ports:
-        # will assign a random free host port
-        - 5432/tcp
+          # will assign a random free host port
+          - 5432/tcp
         # needed because the postgres container does not provide a healthcheck
-        options: >- 
+        options: >-
           --health-cmd pg_isready 
           --health-interval 10s 
           --health-timeout 5s
           --health-retries 10
 
     steps:
-    - uses: actions/checkout@v1     
-    - run: npm ci
-      # working-directory: ./postgres
-    - run: npm test
-      # working-directory: ./postgres
-      env:
-        # use localhost for the host here because we are running the job on the VM.
-        # If we were running the job on in a container this would be postgres
-        POSTGRES_HOST: localhost
-        POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }} # get randomly assigned published port
+      - uses: actions/checkout@v1
+      - run: npm ci
+        # working-directory: ./postgres
+      - run: npm test
+        # working-directory: ./postgres
+        env:
+          # use localhost for the host here because we are running the job on the VM.
+          # If we were running the job on in a container this would be postgres
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }} # get randomly assigned published port

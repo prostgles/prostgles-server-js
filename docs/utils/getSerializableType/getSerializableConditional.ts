@@ -1,5 +1,9 @@
 import * as ts from "typescript";
-import { getSerializableType, TS_Conditional, TsTypeParser } from "./getSerializableType";
+import {
+  getSerializableType,
+  TS_Conditional,
+  TsTypeParser,
+} from "./getSerializableType";
 
 /**
  * T<G> = G extends true? string : number

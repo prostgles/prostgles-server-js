@@ -1,20 +1,16 @@
 import { DATA_TYPES } from "prostgles-types";
 import { PubSubManager } from "../PubSubManager/PubSubManager";
 
-
 const raiseException = (err: string) => `
 IF (context->'silent')::BOOLEAN = TRUE THEN
   RETURN FALSE;
 ELSE
   RAISE EXCEPTION ${err} USING HINT = path, COLUMN = colname, TABLE = tablename, CONSTRAINT = 'validate_jsonb_schema: ' || jsonb_pretty(jsonb_schema::JSONB);
 END IF;
-`
+`;
 
 export const VALIDATE_SCHEMA_FUNCNAME = "validate_jsonb_schema" as const;
-export const JSONB_DATA_TYPES = [
-  ...DATA_TYPES,
-  "Lookup","Lookup[]"
-] as const; 
+export const JSONB_DATA_TYPES = [...DATA_TYPES, "Lookup", "Lookup[]"] as const;
 
 export const validate_jsonb_schema_sql = `
 
@@ -499,4 +495,3 @@ SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "type": "Date"}', '"2222-22-22"');
 
 SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "oneOf": ["number"]}','2');
 `;
- 

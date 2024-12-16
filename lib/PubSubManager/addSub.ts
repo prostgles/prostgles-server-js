@@ -1,20 +1,41 @@
 import { SubscriptionChannels } from "prostgles-types";
-import { BasicCallback, parseCondition, PubSubManager, Subscription, SubscriptionParams } from "./PubSubManager";
+import {
+  BasicCallback,
+  parseCondition,
+  PubSubManager,
+  Subscription,
+  SubscriptionParams,
+} from "./PubSubManager";
 import { VoidFunction } from "../SchemaWatch/SchemaWatch";
 
 type AddSubscriptionParams = SubscriptionParams & {
   condition: string;
-}
+};
 
-type AddSubResult = SubscriptionChannels & { sendFirstData: VoidFunction | undefined }
+type AddSubResult = SubscriptionChannels & {
+  sendFirstData: VoidFunction | undefined;
+};
 
 /* Must return a channel for socket */
 /* The distinct list of {table_name, condition} must have a corresponding trigger in the database */
-export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSubscriptionParams, "channel_name" | "parentSubParams">): Promise<AddSubResult> {
+export async function addSub(
+  this: PubSubManager,
+  subscriptionParams: Omit<
+    AddSubscriptionParams,
+    "channel_name" | "parentSubParams"
+  >,
+): Promise<AddSubResult> {
   const {
-    socket, localFuncs, table_rules, filter = {},
-    params = {}, condition = "", throttle = 0,  //subOne = false, 
-    viewOptions, table_info, throttleOpts,
+    socket,
+    localFuncs,
+    table_rules,
+    filter = {},
+    params = {},
+    condition = "",
+    throttle = 0, //subOne = false,
+    viewOptions,
+    table_info,
+    throttleOpts,
   } = subscriptionParams || {};
   const table_name = table_info.name;
 
@@ -55,71 +76,70 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
     socket_id: socket?.id,
     table_rules,
     throttle: validated_throttle,
-    triggers: [
-      mainTrigger
-    ]
-  }
+    triggers: [mainTrigger],
+  };
 
   const result: AddSubResult = {
     channelName: channel_name,
     channelNameReady: channel_name + ".ready",
     channelNameUnsubscribe: channel_name + ".unsubscribe",
     sendFirstData: undefined,
-  }
+  };
 
   const [matchingSub] = this.getClientSubs(newSub);
-  if(matchingSub){
+  if (matchingSub) {
     console.error("Trying to add a duplicate sub for: ", channel_name);
     return result;
   }
 
   this.upsertSocket(socket);
 
-  if(viewOptions){
-    for await(const relatedTable of viewOptions.relatedTables){
+  if (viewOptions) {
+    for await (const relatedTable of viewOptions.relatedTables) {
       const relatedSub = {
         table_name: relatedTable.tableName,
         condition: parseCondition(relatedTable.condition),
         is_related: true,
       } as const;
 
-      newSub.triggers.push(relatedSub)
-  
-      await this.addTrigger(relatedSub, viewOptions, socket);      
-    }
+      newSub.triggers.push(relatedSub);
 
+      await this.addTrigger(relatedSub, viewOptions, socket);
+    }
   }
 
-
-  if(localFuncs){
-    /** 
-     * Must ensure sub will start sending data after all triggers are set up. 
+  if (localFuncs) {
+    /**
+     * Must ensure sub will start sending data after all triggers are set up.
      * Socket clients are not affected as they need to confirm they are ready to receive data
-    */
+     */
     result.sendFirstData = () => {
       this.pushSubData(newSub);
-    }
-
+    };
   } else if (socket) {
     const removeListeners = () => {
       socket.removeAllListeners(channel_name);
       socket.removeAllListeners(result.channelNameReady);
       socket.removeAllListeners(result.channelNameUnsubscribe);
-    }
+    };
     removeListeners();
 
     socket.once(result.channelNameReady, () => {
       this.pushSubData(newSub);
     });
-    socket.once(result.channelNameUnsubscribe, (_data: any, cb: BasicCallback) => {
-      const res = "ok";
-      this.subs = this.subs.filter(s => {
-        const isMatch = s.socket?.id === socket.id && s.channel_name === channel_name;
-        return !isMatch;
-      });
-      removeListeners();
-      cb(null, { res });
-    });
+    socket.once(
+      result.channelNameUnsubscribe,
+      (_data: any, cb: BasicCallback) => {
+        const res = "ok";
+        this.subs = this.subs.filter((s) => {
+          const isMatch =
+            s.socket?.id === socket.id && s.channel_name === channel_name;
+          return !isMatch;
+        });
+        removeListeners();
+        cb(null, { res });
+      },
+    );
   }
 
   this.subs.push(newSub);
@@ -129,7 +149,6 @@ export async function addSub(this: PubSubManager, subscriptionParams: Omit<AddSu
     if (!viewOptions?.relatedTables.length) {
       throw "PubSubManager: view parent_tables missing";
     }
-
   } else {
     await this.addTrigger(mainTrigger, undefined, socket);
   }

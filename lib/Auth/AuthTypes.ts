@@ -1,5 +1,10 @@
 import { Express, NextFunction, Request, Response } from "express";
-import { AnyObject, FieldFilter, IdentityProvider, UserLike } from "prostgles-types";
+import {
+  AnyObject,
+  FieldFilter,
+  IdentityProvider,
+  UserLike,
+} from "prostgles-types";
 import { DB } from "../Prostgles";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
@@ -8,7 +13,10 @@ import type {
   StrategyOptions as GoogleStrategy,
   Profile as GoogleProfile,
 } from "passport-google-oauth20";
-import type { StrategyOptions as GitHubStrategy, Profile as GitHubProfile } from "passport-github2";
+import type {
+  StrategyOptions as GitHubStrategy,
+  Profile as GitHubProfile,
+} from "passport-github2";
 import type { MicrosoftStrategyOptions } from "passport-microsoft";
 import type {
   StrategyOptions as FacebookStrategy,
@@ -38,7 +46,9 @@ export type BasicSession = {
   /** On expired */
   onExpiration: "redirect" | "show_error";
 };
-export type AuthClientRequest = { socket: PRGLIOSocket } | { httpReq: ExpressReq };
+export type AuthClientRequest =
+  | { socket: PRGLIOSocket }
+  | { httpReq: ExpressReq };
 
 type ThirdPartyProviders = {
   facebook?: Pick<FacebookStrategy, "clientID" | "clientSecret"> & {
@@ -101,7 +111,10 @@ type EmailProvider =
     }
   | {
       signupType: "withPassword";
-      onRegistered: (data: { username: string; password: string }) => void | Promise<void>;
+      onRegistered: (data: {
+        username: string;
+        password: string;
+      }) => void | Promise<void>;
       /**
        * Defaults to 8
        */
@@ -115,7 +128,9 @@ type EmailProvider =
           confirmationUrlPath: string;
         }) => EmailWithoutTo | Promise<EmailWithoutTo>;
         smtp: SMTPConfig;
-        onConfirmed: (data: { confirmationCode: string }) => void | Promise<void>;
+        onConfirmed: (data: {
+          confirmationCode: string;
+        }) => void | Promise<void>;
       };
     };
 
@@ -252,22 +267,30 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
     sid: string | undefined,
     dbo: DBOFullyTyped<S>,
     db: DB,
-    client: AuthClientRequest & LoginClientInfo
+    client: AuthClientRequest & LoginClientInfo,
   ) => Awaitable<AuthResult<SUser>>;
 
   login?: (
     params: LoginParams,
     dbo: DBOFullyTyped<S>,
     db: DB,
-    client: LoginClientInfo
+    client: LoginClientInfo,
   ) => Awaitable<BasicSession> | BasicSession;
-  logout?: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<any>;
+  logout?: (
+    sid: string | undefined,
+    dbo: DBOFullyTyped<S>,
+    db: DB,
+  ) => Awaitable<any>;
 
   /**
    * If provided then session info will be saved on socket.__prglCache and reused from there
    */
   cacheSession?: {
-    getSession: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession>;
+    getSession: (
+      sid: string | undefined,
+      dbo: DBOFullyTyped<S>,
+      db: DB,
+    ) => Awaitable<BasicSession>;
   };
 };
 
@@ -307,7 +330,11 @@ type ExpressConfig<S, SUser extends SessionUser> = {
    * Will be called after a GET request is authorised
    * This means that
    */
-  onGetRequestOK?: (req: ExpressReq, res: ExpressRes, params: AuthRequestParams<S, SUser>) => any;
+  onGetRequestOK?: (
+    req: ExpressReq,
+    res: ExpressRes,
+    params: AuthRequestParams<S, SUser>,
+  ) => any;
 
   /**
    * If defined, will check the magic link id and log in the user and redirect to the returnUrl if set
@@ -320,7 +347,7 @@ type ExpressConfig<S, SUser extends SessionUser> = {
       magicId: string,
       dbo: DBOFullyTyped<S>,
       db: DB,
-      client: LoginClientInfo
+      client: LoginClientInfo,
     ) => Awaitable<BasicSession | undefined>;
   };
 
@@ -328,5 +355,9 @@ type ExpressConfig<S, SUser extends SessionUser> = {
 };
 
 type ExpressMiddleware<S, SUser extends SessionUser> = (
-  args: { req: ExpressReq; res: ExpressRes; next: NextFunction } & AuthRequestParams<S, SUser>
+  args: {
+    req: ExpressReq;
+    res: ExpressRes;
+    next: NextFunction;
+  } & AuthRequestParams<S, SUser>,
 ) => void | Promise<void>;

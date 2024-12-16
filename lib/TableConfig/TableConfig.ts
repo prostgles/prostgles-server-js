@@ -1,4 +1,13 @@
-import { asName as _asName, AnyObject, TableInfo,  ALLOWED_EXTENSION, ALLOWED_CONTENT_TYPE, isObject, JSONB, ColumnInfo } from "prostgles-types";
+import {
+  asName as _asName,
+  AnyObject,
+  TableInfo,
+  ALLOWED_EXTENSION,
+  ALLOWED_CONTENT_TYPE,
+  isObject,
+  JSONB,
+  ColumnInfo,
+} from "prostgles-types";
 import { isPlainObject, JoinInfo, LocalParams } from "../DboBuilder/DboBuilder";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import { InsertRule, ValidateRowArgs } from "../PublishParser/PublishParser";
@@ -14,39 +23,41 @@ type ColExtraInfo = {
 
 export type I18N_Config<LANG_IDS> = {
   [lang_id in keyof LANG_IDS]: string;
-}
+};
 
 export const parseI18N = <LANG_IDS, Def extends string | undefined>(params: {
-  config?: I18N_Config<LANG_IDS> | string; 
-  lang?: keyof LANG_IDS | string; 
+  config?: I18N_Config<LANG_IDS> | string;
+  lang?: keyof LANG_IDS | string;
   defaultLang: keyof LANG_IDS | string;
   defaultValue: Def;
 }): Def | string => {
   const { config, lang, defaultLang, defaultValue } = params;
-  if(config){
-    if(isPlainObject(config)){
+  if (config) {
+    if (isPlainObject(config)) {
       //@ts-ignore
       return config[lang] ?? config[defaultLang];
-    } else if(typeof config === "string"){
+    } else if (typeof config === "string") {
       return config;
     }
   }
 
   return defaultValue;
-}
+};
 
 type BaseTableDefinition<LANG_IDS = AnyObject> = {
   info?: {
     label?: string | I18N_Config<LANG_IDS>;
-  }
+  };
   dropIfExistsCascade?: boolean;
   dropIfExists?: boolean;
   hooks?: {
     /**
-     * Hook used to run custom logic before inserting a row. 
+     * Hook used to run custom logic before inserting a row.
      * The returned row must satisfy the table schema
      */
-    getPreInsertRow?: (args: GetPreInsertRowArgs) => Promise<{ row: AnyObject; onInserted: Promise<void>; }>;
+    getPreInsertRow?: (
+      args: GetPreInsertRowArgs,
+    ) => Promise<{ row: AnyObject; onInserted: Promise<void> }>;
   };
   triggers?: {
     [triggerName: string]: {
@@ -77,19 +88,21 @@ type BaseTableDefinition<LANG_IDS = AnyObject> = {
         END;
        */
       query: string;
-    }
+    };
   };
-}
+};
 
 type LookupTableDefinition<LANG_IDS> = {
   isLookupTable: {
     values: {
-      [id_value: string]: {} | {
-        [lang_id in keyof LANG_IDS]: string
-      }
-    }
-  }
-}
+      [id_value: string]:
+        | {}
+        | {
+            [lang_id in keyof LANG_IDS]: string;
+          };
+    };
+  };
+};
 
 export type BaseColumn<LANG_IDS> = {
   /**
@@ -97,21 +110,20 @@ export type BaseColumn<LANG_IDS> = {
    */
   info?: ColExtraInfo;
 
-  label?: string | Partial<{ [lang_id in keyof LANG_IDS]: string; }>;
-}
+  label?: string | Partial<{ [lang_id in keyof LANG_IDS]: string }>;
+};
 
 type SQLDefColumn = {
-
   /**
    * Raw sql statement used in creating/adding column
    */
   sqlDefinition?: string;
-}
+};
 
 export type BaseColumnTypes = {
   defaultValue?: any;
   nullable?: boolean;
-}
+};
 
 type TextColumn = BaseColumnTypes & {
   isText: true;
@@ -124,44 +136,51 @@ type TextColumn = BaseColumnTypes & {
    * Value will be lower cased before update/insert
    */
   lowerCased?: boolean;
-}
+};
 
 export type JSONBColumnDef = (BaseColumnTypes & {
   /**
    * If the new schema CHECK fails old rows the update old rows using this function
    */
   // onMigrationFail?: <T>(failedRow: T) => AnyObject | Promise<AnyObject>;
-}) & ({
-  jsonbSchema: JSONB.JSONBSchema;
-  jsonbSchemaType?: undefined;
-} | {
-  jsonbSchema?: undefined;
-  jsonbSchemaType: JSONB.ObjectType["type"];
-})
+}) &
+  (
+    | {
+        jsonbSchema: JSONB.JSONBSchema;
+        jsonbSchemaType?: undefined;
+      }
+    | {
+        jsonbSchema?: undefined;
+        jsonbSchemaType: JSONB.ObjectType["type"];
+      }
+  );
 
 /**
  * Allows referencing media to this table.
  * Requires this table to have a primary key AND a valid fileTable config
  */
-type MediaColumn = ({
-
+type MediaColumn = {
   name: string;
   label?: string;
   files: "one" | "many";
 } & (
-    {
-
+  | {
       /**
        * https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/accept
        */
-      allowedContentType?: Record<Partial<("audio/*" | "video/*" | "image/*" | "text/*" | ALLOWED_CONTENT_TYPE)>, 1>
-    } |
-    {
-      allowedExtensions?: Record<Partial<ALLOWED_EXTENSION>, 1>
+      allowedContentType?: Record<
+        Partial<
+          "audio/*" | "video/*" | "image/*" | "text/*" | ALLOWED_CONTENT_TYPE
+        >,
+        1
+      >;
     }
-  ));
+  | {
+      allowedExtensions?: Record<Partial<ALLOWED_EXTENSION>, 1>;
+    }
+);
 
-type ReferencedColumn = { 
+type ReferencedColumn = {
   /**
    * Will create a lookup table that this column will reference
    */
@@ -171,14 +190,14 @@ type ReferencedColumn = {
      * Defaults to id
      */
     columnName?: string;
-  }
-}
+  };
+};
 
 type JoinDef = {
   sourceTable: string;
   targetTable: string;
   on: JoinInfo["paths"][number]["on"];
-}
+};
 
 /**
  * Used in specifying a join path to a table. This column name can then be used in select
@@ -186,54 +205,72 @@ type JoinDef = {
 type NamedJoinColumn = {
   label?: string;
   joinDef: JoinDef[];
-}
-
-type Enum<T extends string | number = any> = { 
-  enum: T[] | readonly T[];
-  nullable?: boolean; 
-  defaultValue?: T; 
 };
 
-export type ColumnConfig<LANG_IDS = { en: 1 }> = string | StrictUnion<NamedJoinColumn | MediaColumn | (BaseColumn<LANG_IDS> & (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef | Enum))>;
+type Enum<T extends string | number = any> = {
+  enum: T[] | readonly T[];
+  nullable?: boolean;
+  defaultValue?: T;
+};
+
+export type ColumnConfig<LANG_IDS = { en: 1 }> =
+  | string
+  | StrictUnion<
+      | NamedJoinColumn
+      | MediaColumn
+      | (BaseColumn<LANG_IDS> &
+          (
+            | SQLDefColumn
+            | ReferencedColumn
+            | TextColumn
+            | JSONBColumnDef
+            | Enum
+          ))
+    >;
 
 export type ColumnConfigs<LANG_IDS = { en: 1 }> = {
-  sql: string | BaseColumn<LANG_IDS> & SQLDefColumn;
+  sql: string | (BaseColumn<LANG_IDS> & SQLDefColumn);
   join: BaseColumn<LANG_IDS> & NamedJoinColumn;
   media: BaseColumn<LANG_IDS> & MediaColumn;
   referenced: BaseColumn<LANG_IDS> & ReferencedColumn;
   text: BaseColumn<LANG_IDS> & TextColumn;
   jsonb: BaseColumn<LANG_IDS> & JSONBColumnDef;
   enum: BaseColumn<LANG_IDS> & Enum;
-}
+};
 
 type UnionKeys<T> = T extends T ? keyof T : never;
-type StrictUnionHelper<T, TAll> = T extends any ? T & Partial<Record<Exclude<UnionKeys<TAll>, keyof T>, never>> : never;
-export type StrictUnion<T> = StrictUnionHelper<T, T>
+type StrictUnionHelper<T, TAll> = T extends any
+  ? T & Partial<Record<Exclude<UnionKeys<TAll>, keyof T>, never>>
+  : never;
+export type StrictUnion<T> = StrictUnionHelper<T, T>;
 
-export const CONSTRAINT_TYPES = ["PRIMARY KEY", "UNIQUE", "CHECK"] as const; 
+export const CONSTRAINT_TYPES = ["PRIMARY KEY", "UNIQUE", "CHECK"] as const;
 export type TableDefinition<LANG_IDS> = {
-  onMount?: (params: { dbo: DBHandlerServer; _db: DB }) => Promise<void | { onUnmount: () => void; }>;
+  onMount?: (params: {
+    dbo: DBHandlerServer;
+    _db: DB;
+  }) => Promise<void | { onUnmount: () => void }>;
   columns?: {
-    [column_name: string]: ColumnConfig<LANG_IDS>
-  },
-  constraints?: 
-    | string[] 
+    [column_name: string]: ColumnConfig<LANG_IDS>;
+  };
+  constraints?:
+    | string[]
     | {
-      [constraint_name: string]: 
-        | string 
-        | { 
-            type: typeof CONSTRAINT_TYPES[number]; 
-            dropIfExists?: boolean; 
-            /**
-             * E.g.: 
-             * colname
-             * col1, col2
-             * col1 > col3
-             */
-            content: string;
-          } 
+        [constraint_name: string]:
+          | string
+          | {
+              type: (typeof CONSTRAINT_TYPES)[number];
+              dropIfExists?: boolean;
+              /**
+               * E.g.:
+               * colname
+               * col1, col2
+               * col1 > col3
+               */
+              content: string;
+            };
         // & ({
-        // } 
+        // }
         // | {
         //   type: "FOREIGN KEY",
         //   columns: string[];
@@ -241,7 +278,7 @@ export type TableDefinition<LANG_IDS> = {
         //   fcols: string[];
         // }
         // )
-  },
+      };
 
   /**
    * Similar to unique constraints but expressions are allowed inside definition
@@ -249,7 +286,6 @@ export type TableDefinition<LANG_IDS> = {
   replaceUniqueIndexes?: boolean;
   indexes?: {
     [index_name: string]: {
-
       /**
        * If true then will drop any existing index with this name
        * Overrides replaceUniqueIndexes
@@ -257,14 +293,14 @@ export type TableDefinition<LANG_IDS> = {
       replace?: boolean;
 
       /**
-       * Causes the system to check for duplicate values in the table when the index is created (if data already exist) and each time data is added. 
+       * Causes the system to check for duplicate values in the table when the index is created (if data already exist) and each time data is added.
        * Attempts to insert or update data which would result in duplicate entries will generate an error.
        */
       unique?: boolean;
 
       /**
-       * When this option is used, PostgreSQL will build the index without taking any locks that prevent 
-       * concurrent inserts, updates, or deletes on the table; whereas a standard index build locks out writes (but not reads) on the table until it's done. 
+       * When this option is used, PostgreSQL will build the index without taking any locks that prevent
+       * concurrent inserts, updates, or deletes on the table; whereas a standard index build locks out writes (but not reads) on the table until it's done.
        * There are several caveats to be aware of when using this option — see Building Indexes Concurrently.
        */
       concurrently?: boolean;
@@ -288,44 +324,44 @@ export type TableDefinition<LANG_IDS> = {
       where?: string;
 
       /**
-       * The name of the index method to be used. 
+       * The name of the index method to be used.
        * Choices are btree, hash, gist, and gin. The default method is btree.
        */
       using?: "btree" | "hash" | "gist" | "gin";
-    }
-  }
-}
+    };
+  };
+};
 
 type GetPreInsertRowArgs = Omit<ValidateRowArgs, "localParams"> & {
   // preValidate: InsertRule["preValidate"];
   validate: InsertRule["validate"];
   localParams: LocalParams | undefined;
-}
+};
 
 /**
  * Helper utility to create lookup tables for TEXT columns
  */
 export type TableConfig<LANG_IDS = { en: 1 }> = {
-  [table_name: string]: BaseTableDefinition<LANG_IDS> & (TableDefinition<LANG_IDS> | LookupTableDefinition<LANG_IDS>);
-}
+  [table_name: string]: BaseTableDefinition<LANG_IDS> &
+    (TableDefinition<LANG_IDS> | LookupTableDefinition<LANG_IDS>);
+};
 
 /**
  * Will be run between initSQL and fileTable
  */
 export default class TableConfigurator<LANG_IDS = { en: 1 }> {
-
   instanceId = Date.now() + Math.random();
-  
+
   config: TableConfig<LANG_IDS> = {};
   get dbo(): DBHandlerServer {
-    if (!this.prostgles.dbo) throw "this.prostgles.dbo missing"
-    return this.prostgles.dbo
-  } 
+    if (!this.prostgles.dbo) throw "this.prostgles.dbo missing";
+    return this.prostgles.dbo;
+  }
   get db(): DB {
-    if (!this.prostgles.db) throw "this.prostgles.db missing"
-    return this.prostgles.db
-  }  
-  prostgles: Prostgles
+    if (!this.prostgles.db) throw "this.prostgles.db missing";
+    return this.prostgles.db;
+  }
+  prostgles: Prostgles;
 
   constructor(prostgles: Prostgles) {
     this.config = (prostgles.opts.tableConfig as any) ?? {};
@@ -333,56 +369,80 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
   }
 
   destroy = async () => {
-    for await(const { onUnmount } of Object.values(this.tableOnMounts)){
+    for await (const { onUnmount } of Object.values(this.tableOnMounts)) {
       try {
         await onUnmount();
       } catch (error) {
         console.error(error);
       }
     }
-  }
+  };
 
-  tableOnMounts: Record<string, { onUnmount: () => void; }> = {};
+  tableOnMounts: Record<string, { onUnmount: () => void }> = {};
   setTableOnMounts = async () => {
     this.tableOnMounts = {};
     for (const [tableName, tableConfig] of Object.entries(this.config)) {
-      if("onMount" in tableConfig && tableConfig.onMount){
-        const cleanup = await tableConfig.onMount({ dbo: this.dbo, _db: this.db });
-        if(cleanup){
+      if ("onMount" in tableConfig && tableConfig.onMount) {
+        const cleanup = await tableConfig.onMount({
+          dbo: this.dbo,
+          _db: this.db,
+        });
+        if (cleanup) {
           this.tableOnMounts[tableName] = cleanup;
         }
       }
     }
-  }
+  };
 
-  getColumnConfig = (tableName: string, colName: string): ColumnConfig | undefined => {
+  getColumnConfig = (
+    tableName: string,
+    colName: string,
+  ): ColumnConfig | undefined => {
     const tconf = this.config?.[tableName];
     if (tconf && "columns" in tconf) {
       return tconf.columns?.[colName];
     }
     return undefined;
-  }
+  };
 
-  getTableInfo = (params: { tableName: string; lang?: string }): TableInfo["info"] | undefined => {
+  getTableInfo = (params: {
+    tableName: string;
+    lang?: string;
+  }): TableInfo["info"] | undefined => {
     const tconf = this.config?.[params.tableName];
-    
-    return {
-      label: parseI18N<LANG_IDS, string>({ config: tconf?.info?.label, lang: params.lang, defaultLang: "en", defaultValue: params.tableName })
-    }
-  }
 
-  getColInfo = (params: { col: string, table: string, lang?: string }): (ColExtraInfo & { label?: string; } & Pick<ColumnInfo, "jsonbSchema">) | undefined => {
+    return {
+      label: parseI18N<LANG_IDS, string>({
+        config: tconf?.info?.label,
+        lang: params.lang,
+        defaultLang: "en",
+        defaultValue: params.tableName,
+      }),
+    };
+  };
+
+  getColInfo = (params: {
+    col: string;
+    table: string;
+    lang?: string;
+  }):
+    | (ColExtraInfo & { label?: string } & Pick<ColumnInfo, "jsonbSchema">)
+    | undefined => {
     const colConf = this.getColumnConfig(params.table, params.col);
     let result: Partial<ReturnType<typeof this.getColInfo>> = undefined;
     if (colConf) {
-
       if (isObject(colConf)) {
         const { jsonbSchema, jsonbSchemaType, info } = colConf;
         result = {
           ...(result ?? {}),
           ...info,
-          ...((jsonbSchema || jsonbSchemaType) && { jsonbSchema: { nullable: colConf.nullable, ...(jsonbSchema || { type: jsonbSchemaType }) } })
-        }
+          ...((jsonbSchema || jsonbSchemaType) && {
+            jsonbSchema: {
+              nullable: colConf.nullable,
+              ...(jsonbSchema || { type: jsonbSchemaType }),
+            },
+          }),
+        };
 
         /**
          * Get labels from TableConfig if specified
@@ -393,34 +453,35 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
           if (["string", "object"].includes(typeof lbl)) {
             if (typeof lbl === "string") {
               result ??= {};
-              result.label = lbl
+              result.label = lbl;
             } else if (lang && (lbl?.[lang as "en"] || lbl?.en)) {
               result ??= {};
-              result.label = (lbl?.[lang as "en"]) || lbl?.en;
+              result.label = lbl?.[lang as "en"] || lbl?.en;
             }
           }
-
         }
-
       }
-
     }
 
-
     return result;
-  }
+  };
 
-  checkColVal = (params: { col: string, table: string, value: any }): void => {
+  checkColVal = (params: { col: string; table: string; value: any }): void => {
     const conf = this.getColInfo(params);
     if (conf) {
       const { value } = params;
       const { min, max } = conf;
-      if (min !== undefined && value !== undefined && value < min) throw `${params.col} must be greater than ${min}`
-      if (max !== undefined && value !== undefined && value > max) throw `${params.col} must be less than ${max}`
+      if (min !== undefined && value !== undefined && value < min)
+        throw `${params.col} must be greater than ${min}`;
+      if (max !== undefined && value !== undefined && value > max)
+        throw `${params.col} must be less than ${max}`;
     }
-  }
+  };
 
-  getJoinInfo = (sourceTable: string, targetTable: string): JoinInfo | undefined => {
+  getJoinInfo = (
+    sourceTable: string,
+    targetTable: string,
+  ): JoinInfo | undefined => {
     if (
       this.config &&
       sourceTable in this.config &&
@@ -431,7 +492,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
       if ("columns" in td && td.columns?.[targetTable]) {
         const cd = td.columns[targetTable];
         if (isObject(cd) && "joinDef" in cd) {
-          if(!cd.joinDef) throw "cd.joinDef missing"
+          if (!cd.joinDef) throw "cd.joinDef missing";
           const { joinDef } = cd;
           const res: JoinInfo = {
             expectOne: false,
@@ -439,30 +500,33 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
               source: sourceTable,
               target: targetTable,
               table,
-              on
+              on,
             })),
-          }
+          };
 
           return res;
         }
       }
     }
     return undefined;
-  }
+  };
 
-  getPreInsertRow = async (tableHandler: TableHandler, args: Pick<GetPreInsertRowArgs, "localParams" | "row" | "validate" | "dbx">): Promise<AnyObject> => {
+  getPreInsertRow = async (
+    tableHandler: TableHandler,
+    args: Pick<GetPreInsertRowArgs, "localParams" | "row" | "validate" | "dbx">,
+  ): Promise<AnyObject> => {
     const tableHook = this.config?.[tableHandler.name]?.hooks?.getPreInsertRow;
-    if(tableHandler.is_media){
+    if (tableHandler.is_media) {
       return uploadFile.bind(tableHandler)(args) as Promise<AnyObject>;
-    } 
-    if(tableHook){
-      return tableHook(args)
+    }
+    if (tableHook) {
+      return tableHook(args);
     }
 
     return args.row;
-  }
+  };
 
   prevInitQueryHistory?: string[];
   initialising = false;
   init = initTableConfig.bind(this);
-} 
+}

@@ -1,11 +1,15 @@
 import { parseLocalFuncs } from "../DboBuilder/ViewHandler/subscribe";
 import { log, PubSubManager, Subscription } from "./PubSubManager";
 
-export async function pushSubData(this: PubSubManager, sub: Subscription, err?: any) {
+export async function pushSubData(
+  this: PubSubManager,
+  sub: Subscription,
+  err?: any,
+) {
   if (!sub) throw "pushSubData: invalid sub";
 
   const { socket_id, channel_name } = sub;
-  if(!this.subs.some(s => s.channel_name === channel_name)){
+  if (!this.subs.some((s) => s.channel_name === channel_name)) {
     // Might be throttling a sub that was removed
     return;
   }
@@ -20,13 +24,12 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
 
   return new Promise(async (resolve, reject) => {
     /* TODO: Retire subOne -> it's redundant */
-    
+
     const { data, err } = await this.getSubData(sub);
 
-    if(data){
-
+    if (data) {
       if (socket_id && this.sockets[socket_id]) {
-        log("Pushed " + data.length + " records to sub")
+        log("Pushed " + data.length + " records to sub");
         this.sockets[socket_id].emit(channel_name, { data }, () => {
           resolve(data);
         });
@@ -38,13 +41,12 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
         resolve(data);
       }
       // sub.last_throttled = Date.now();
-
     } else {
       const errObj = { _err_msg: err.toString(), err };
       if (socket_id && this.sockets[socket_id]) {
         this.sockets[socket_id].emit(channel_name, { err: errObj });
       } else if (localFuncs) {
-        if(!localFuncs.onError){
+        if (!localFuncs.onError) {
           console.error("Uncaught subscription error", err);
         }
         localFuncs.onError?.(errObj);

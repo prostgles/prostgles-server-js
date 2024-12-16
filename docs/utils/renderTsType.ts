@@ -6,13 +6,15 @@ const renderedAliases = new Set<string>();
 export const renderTsType = (
   type: TS_Type,
   indent = 2,
-  argOrProp: ArgOrProp | undefined
+  argOrProp: ArgOrProp | undefined,
 ): string => {
   const indentText = " ".repeat(indent);
   const typeAlias = renderTypeAlias(type, argOrProp);
   const title = [
     `${indentText}${argOrProp?.name ? `- **${argOrProp.name}** <span style="color: ${argOrProp.optional ? "grey" : "red"}">${argOrProp.optional ? "optional" : "required"}</span> ` : ""}${typeAlias}`,
-    type.comments ? `${reIndentLineStarts(type.comments, indentText + "  ")}` : undefined,
+    type.comments
+      ? `${reIndentLineStarts(type.comments, indentText + "  ")}`
+      : undefined,
   ]
     .filter(isDefined)
     .join("\n\n");
@@ -34,7 +36,9 @@ export const renderTsType = (
       title +
       `\n` +
       getObjectEntries(type.properties)
-        .map(([name, p]) => renderTsType(p, indent + 2, { name, optional: p.optional }))
+        .map(([name, p]) =>
+          renderTsType(p, indent + 2, { name, optional: p.optional }),
+        )
         .join("\n")
     );
   }
@@ -64,11 +68,11 @@ const reIndentLineStarts = (str: string, indent: string) =>
 
 const renderTypeAlias = (type: TS_Type, argOrProp: ArgOrProp | undefined) => {
   const typeAlias =
-    type.type === "primitive" ?
-      type.subType
-    : (type.aliasSymbolescapedName || type.alias || type.type)
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;");
+    type.type === "primitive"
+      ? type.subType
+      : (type.aliasSymbolescapedName || type.alias || type.type)
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;");
   const color = type.type === "literal" ? "brown" : "green";
   const style = `style="color: ${color};"`;
 

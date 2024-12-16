@@ -17,9 +17,10 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
   const { tableName = "files", referencedTables = {} } = fileTable;
   this.tableName = tableName;
 
-  const maxBfSizeMB = (prg.opts.io?.engine?.opts?.maxHttpBufferSize || 1e6) / 1e6;
+  const maxBfSizeMB =
+    (prg.opts.io?.engine?.opts?.maxHttpBufferSize || 1e6) / 1e6;
   console.log(
-    `Prostgles: Initiated file manager. Max allowed file size: ${maxBfSizeMB}MB (maxHttpBufferSize = 1e6). To increase this set maxHttpBufferSize in socket.io server init options`
+    `Prostgles: Initiated file manager. Max allowed file size: ${maxBfSizeMB}MB (maxHttpBufferSize = 1e6). To increase this set maxHttpBufferSize in socket.io server init options`,
   );
 
   const canCreate = await canCreateTables(this.db);
@@ -65,7 +66,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
         UNIQUE(id),
         UNIQUE(name)
     )`,
-      `Create fileTable ${asName(tableName)}`
+      `Create fileTable ${asName(tableName)}`,
     );
     await prg.refreshDBO();
   }
@@ -84,7 +85,9 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
     for (const [colName] of Object.entries(tableConfig.referenceColumns)) {
       const existingCol = cols.find((c) => c.name === colName);
       if (existingCol) {
-        if (existingCol.references?.some(({ ftable }) => ftable === tableName)) {
+        if (
+          existingCol.references?.some(({ ftable }) => ftable === tableName)
+        ) {
           // All ok
         } else {
           if (existingCol.udt_name === "uuid") {
@@ -94,12 +97,12 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
               await runQuery(query, msg);
             } catch (e) {
               console.error(
-                `Could not add constraing. Err: ${e instanceof Error ? e.message : JSON.stringify(e)}`
+                `Could not add constraing. Err: ${e instanceof Error ? e.message : JSON.stringify(e)}`,
               );
             }
           } else {
             console.error(
-              `Referenced file column ${refTable} (${colName}) exists but is not of required type (UUID). Choose a different column name or ALTER the existing column to match the type and the data found in file table ${tableName}(id)`
+              `Referenced file column ${refTable} (${colName}) exists but is not of required type (UUID). Choose a different column name or ALTER the existing column to match the type and the data found in file table ${tableName}(id)`,
             );
           }
         }
@@ -115,7 +118,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
         // }
         // await createColumn();
         console.error(
-          `Referenced file column ${refTable} (${colName}) does not exist. Create it using this query:\n${query}`
+          `Referenced file column ${refTable} (${colName}) does not exist. Create it using this query:\n${query}`,
         );
       }
     }
@@ -154,7 +157,13 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
         }
         const id = name.slice(0, 36);
         const selectParams = {
-          select: { id: 1, name: 1, signed_url: 1, signed_url_expires: 1, content_type: 1 },
+          select: {
+            id: 1,
+            name: 1,
+            signed_url: 1,
+            signed_url_expires: 1,
+            content_type: 1,
+          },
         };
         const media = await runClientRequest.bind(this.prostgles)({
           type: "http",
@@ -178,7 +187,10 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
           const EXPIRES = Date.now() + HOUR;
           if (!url || expires < EXPIRES) {
             url = await this.getFileCloudDownloadURL(media.name, 60 * 60);
-            await mediaTable.update({ name }, { signed_url: url, signed_url_expires: EXPIRES });
+            await mediaTable.update(
+              { name },
+              { signed_url: url, signed_url_expires: EXPIRES },
+            );
           }
 
           res.redirect(url);

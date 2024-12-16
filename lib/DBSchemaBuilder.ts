@@ -10,7 +10,11 @@ import {
 } from "prostgles-types";
 import prostgles from ".";
 import { Auth } from "./Auth/AuthTypes";
-import { DboBuilder, escapeTSNames, postgresToTsType } from "./DboBuilder/DboBuilder";
+import {
+  DboBuilder,
+  escapeTSNames,
+  postgresToTsType,
+} from "./DboBuilder/DboBuilder";
 import {
   PublishAllOrNothing,
   PublishParams,
@@ -18,14 +22,28 @@ import {
   PublishViewRule,
 } from "./PublishParser/PublishParser";
 import { getJSONBSchemaTSTypes } from "./JSONBValidation/validation";
-import { DBHandlerServer, TableSchemaColumn, TX } from "./DboBuilder/DboBuilderTypes";
+import {
+  DBHandlerServer,
+  TableSchemaColumn,
+  TX,
+} from "./DboBuilder/DboBuilderTypes";
 
 export const getDBSchema = (dboBuilder: DboBuilder): string => {
   const tables: string[] = [];
 
-  const getColTypeForDBSchema = (udt_name: TableSchemaColumn["udt_name"]): string => {
+  const getColTypeForDBSchema = (
+    udt_name: TableSchemaColumn["udt_name"],
+  ): string => {
     if (udt_name === "interval") {
-      const units = ["years", "months", "days", "hours", "minutes", "seconds", "milliseconds"];
+      const units = [
+        "years",
+        "months",
+        "days",
+        "hours",
+        "minutes",
+        "seconds",
+        "milliseconds",
+      ];
 
       return `{ ${units.map((u) => `${u}?: number;`).join(" ")} }`;
     }
@@ -38,13 +56,23 @@ export const getDBSchema = (dboBuilder: DboBuilder): string => {
     ?.slice(0)
     .sort((a, b) => a.name.localeCompare(b.name))
     .forEach((tov) => {
-      const cols = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
+      const cols = tov.columns
+        .slice(0)
+        .sort((a, b) => a.name.localeCompare(b.name));
       const getColType = (c: (typeof cols)[number]) => {
         let type: string =
-          (c.is_nullable ? "null | " : "") + getColTypeForDBSchema(c.udt_name) + ";";
-        const colConf = dboBuilder.prostgles.tableConfigurator?.getColumnConfig(tov.name, c.name);
+          (c.is_nullable ? "null | " : "") +
+          getColTypeForDBSchema(c.udt_name) +
+          ";";
+        const colConf = dboBuilder.prostgles.tableConfigurator?.getColumnConfig(
+          tov.name,
+          c.name,
+        );
         if (colConf) {
-          if (isObject(colConf) && (colConf.jsonbSchema || colConf.jsonbSchemaType)) {
+          if (
+            isObject(colConf) &&
+            (colConf.jsonbSchema || colConf.jsonbSchemaType)
+          ) {
             const schema: JSONB.JSONBSchema = colConf.jsonbSchema || {
               ...colConf,
               type: colConf.jsonbSchemaType,
@@ -54,11 +82,13 @@ export const getDBSchema = (dboBuilder: DboBuilder): string => {
               schema,
               { nullable: colConf.nullable },
               "      ",
-              dboBuilder.tablesOrViews ?? []
+              dboBuilder.tablesOrViews ?? [],
             );
           } else if (isObject(colConf) && "enum" in colConf) {
             if (!colConf.enum) throw "colConf.enum missing";
-            const types = colConf.enum.map((t) => (typeof t === "number" ? t : JSON.stringify(t)));
+            const types = colConf.enum.map((t) =>
+              typeof t === "number" ? t : JSON.stringify(t),
+            );
             if (colConf.nullable) {
               types.unshift("null");
             }
@@ -80,7 +110,7 @@ export const getDBSchema = (dboBuilder: DboBuilder): string => {
     columns: {${cols
       .map(
         (c) => `
-      ${getColType(c)}`
+      ${getColType(c)}`,
       )
       .join("")}
     };
@@ -102,12 +132,11 @@ type ServerTableHandler<
   Schema extends DBSchema | void = void,
 > = TableHandler<T, Schema> & { is_view: boolean };
 
-export type DBTableHandlersFromSchema<Schema = void> =
-  Schema extends DBSchema ?
-    {
-      [tov_name in keyof Schema]: Schema[tov_name]["is_view"] extends true ?
-        ServerViewHandler<Schema[tov_name]["columns"], Schema>
-      : ServerTableHandler<Schema[tov_name]["columns"], Schema>;
+export type DBTableHandlersFromSchema<Schema = void> = Schema extends DBSchema
+  ? {
+      [tov_name in keyof Schema]: Schema[tov_name]["is_view"] extends true
+        ? ServerViewHandler<Schema[tov_name]["columns"], Schema>
+        : ServerTableHandler<Schema[tov_name]["columns"], Schema>;
     }
   : Record<string, Partial<ServerTableHandler>>;
 
@@ -125,17 +154,22 @@ export type DBHandlerServerExtra<
 export type DBOFullyTyped<Schema = void> = DBTableHandlersFromSchema<Schema> &
   DBHandlerServerExtra<DBTableHandlersFromSchema<Schema>>;
 
-export type PublishFullyTyped<Schema = void> =
-  Schema extends DBSchema ?
-    | PublishAllOrNothing
-    | {
-        [tov_name in keyof Partial<Schema>]:
-          | PublishAllOrNothing
-          | (Schema[tov_name]["is_view"] extends true ?
-              PublishViewRule<Schema[tov_name]["columns"], Schema>
-            : PublishTableRule<Schema[tov_name]["columns"], Schema>);
-      }
-  : PublishAllOrNothing | Record<string, PublishViewRule | PublishTableRule | PublishAllOrNothing>;
+export type PublishFullyTyped<Schema = void> = Schema extends DBSchema
+  ?
+      | PublishAllOrNothing
+      | {
+          [tov_name in keyof Partial<Schema>]:
+            | PublishAllOrNothing
+            | (Schema[tov_name]["is_view"] extends true
+                ? PublishViewRule<Schema[tov_name]["columns"], Schema>
+                : PublishTableRule<Schema[tov_name]["columns"], Schema>);
+        }
+  :
+      | PublishAllOrNothing
+      | Record<
+          string,
+          PublishViewRule | PublishTableRule | PublishAllOrNothing
+        >;
 
 /** Type checks */
 () => {

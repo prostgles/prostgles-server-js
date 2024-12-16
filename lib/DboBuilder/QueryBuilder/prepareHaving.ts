@@ -8,10 +8,15 @@ type Args = {
   select: SelectItemValidated[];
   tableAlias: string | undefined;
   filterFieldNames: string[];
-}
-export const prepareHaving = ({ having, select, tableAlias, filterFieldNames }: Args) => {
-  if(!having || isEmpty(having)) return "";
-  
+};
+export const prepareHaving = ({
+  having,
+  select,
+  tableAlias,
+  filterFieldNames,
+}: Args) => {
+  if (!having || isEmpty(having)) return "";
+
   const havingStr = parseFilterItem({
     filter: having,
     select,
@@ -19,4 +24,4 @@ export const prepareHaving = ({ having, select, tableAlias, filterFieldNames }: 
     allowedColumnNames: filterFieldNames,
   });
   return havingStr;
-}
+};

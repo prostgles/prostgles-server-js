@@ -13,8 +13,11 @@ type PGIndex = {
   size: string;
   description: string | null;
 };
-export const getPGIndexes = async (db: DB, tableName: string, schema: string): Promise<PGIndex[]> => {
-
+export const getPGIndexes = async (
+  db: DB,
+  tableName: string,
+  schema: string,
+): Promise<PGIndex[]> => {
   const indexQuery = `
     SELECT n.nspname as schemaname,
       c.relname as indexname,
@@ -48,6 +51,6 @@ export const getPGIndexes = async (db: DB, tableName: string, schema: string): P
     AND c2.relname = \${tableName}
     AND n.nspname = \${schema}
     ORDER BY 1,2;
-    `
+    `;
   return db.any(indexQuery, { tableName, schema });
 };

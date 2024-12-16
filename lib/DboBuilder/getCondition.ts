@@ -9,7 +9,7 @@ import { getExistsCondition } from "./ViewHandler/getExistsCondition";
 import { getExistsFilters } from "./ViewHandler/getExistsFilters";
 import { parseComplexFilter } from "./ViewHandler/parseComplexFilter";
 
-const FILTER_FUNCS = FUNCTIONS.filter(f => f.canBeUsedForFilter);
+const FILTER_FUNCS = FUNCTIONS.filter((f) => f.canBeUsedForFilter);
 
 /**
  * parses a single filter
@@ -18,52 +18,79 @@ const FILTER_FUNCS = FUNCTIONS.filter(f => f.canBeUsedForFilter);
  *  { fff: { $ilike: 'abc' } } => "fff" ilike 'abc'
  */
 export async function getCondition(
-  this: ViewHandler, 
-  params: { 
-    filter: any, 
-    select: SelectItem[] | undefined, 
-    allowed_colnames: string[], 
-    tableAlias?: string, 
-    localParams?: LocalParams, 
-    tableRules?: TableRule,
-    isHaving?: boolean,
+  this: ViewHandler,
+  params: {
+    filter: any;
+    select: SelectItem[] | undefined;
+    allowed_colnames: string[];
+    tableAlias?: string;
+    localParams?: LocalParams;
+    tableRules?: TableRule;
+    isHaving?: boolean;
   },
 ): Promise<{ exists: ExistsFilterConfig[]; condition: string }> {
-  const { filter: rawFilter, select, allowed_colnames, tableAlias, localParams, tableRules, isHaving } = params;
- 
-  const filter = { ... (rawFilter as any) } as any;
+  const {
+    filter: rawFilter,
+    select,
+    allowed_colnames,
+    tableAlias,
+    localParams,
+    tableRules,
+    isHaving,
+  } = params;
+
+  const filter = { ...(rawFilter as any) } as any;
 
   const existsConfigs = getExistsFilters(filter, this);
 
   const funcConds: string[] = [];
-  const funcFilter = FILTER_FUNCS.filter(f => f.name in filter);
+  const funcFilter = FILTER_FUNCS.filter((f) => f.name in filter);
 
-  funcFilter.map(f => {
+  funcFilter.map((f) => {
     const funcArgs = filter[f.name];
     if (!Array.isArray(funcArgs)) {
       throw `A function filter must contain an array. E.g: { $funcFilterName: ["col1"] } \n but got: ${JSON.stringify(pickKeys(filter, [f.name]))} `;
     }
-    const fields = this.parseFieldFilter(f.getFields(funcArgs), true, allowed_colnames);
+    const fields = this.parseFieldFilter(
+      f.getFields(funcArgs),
+      true,
+      allowed_colnames,
+    );
 
-    const dissallowedCols = fields.filter(fname => !allowed_colnames.includes(fname))
+    const dissallowedCols = fields.filter(
+      (fname) => !allowed_colnames.includes(fname),
+    );
     if (dissallowedCols.length) {
-      throw `Invalid/disallowed columns found in function filter: ${dissallowedCols}`
+      throw `Invalid/disallowed columns found in function filter: ${dissallowedCols}`;
     }
-    funcConds.push(f.getQuery({ args: funcArgs, allColumns: this.columns, allowedFields: allowed_colnames, tableAlias }));
+    funcConds.push(
+      f.getQuery({
+        args: funcArgs,
+        allColumns: this.columns,
+        allowedFields: allowed_colnames,
+        tableAlias,
+      }),
+    );
   });
-
 
   let existsCond = "";
   if (existsConfigs.length) {
-    existsCond = (await Promise.all(existsConfigs.map(async existsConfig => await getExistsCondition.bind(this)(existsConfig, localParams)))).join(" AND ");
+    existsCond = (
+      await Promise.all(
+        existsConfigs.map(
+          async (existsConfig) =>
+            await getExistsCondition.bind(this)(existsConfig, localParams),
+        ),
+      )
+    ).join(" AND ");
   }
 
   /* Computed field queries ($rowhash) */
   const p = this.getValidatedRules(tableRules, localParams);
-  const computedFields = p.allColumns.filter(c => c.type === "computed");
+  const computedFields = p.allColumns.filter((c) => c.type === "computed");
   const computedColConditions: string[] = [];
-  Object.keys(filter || {}).map(key => {
-    const compCol = computedFields.find(cf => cf.name === key);
+  Object.keys(filter || {}).map((key) => {
+    const compCol = computedFields.find((cf) => cf.name === key);
     if (compCol) {
       computedColConditions.push(
         compCol.getQuery({
@@ -75,7 +102,7 @@ export async function getCondition(
           // ctidField: this.is_view? undefined : "ctid"
 
           ctidField: undefined,
-        }) + ` = ${pgp.as.format("$1", [(filter as any)[key]])}`
+        }) + ` = ${pgp.as.format("$1", [(filter as any)[key]])}`,
       );
       delete (filter as any)[key];
     }
@@ -85,41 +112,48 @@ export async function getCondition(
   /* Select aliases take precedence over col names. This is to ensure filters work correctly even on computed cols*/
   if (select) {
     /* Allow filtering by selected fields/funcs */
-    allowedSelect = select.filter(s => {
-      if (["function", "computed", "column"].includes(s.type) || isHaving && s.type === "aggregation") {
+    allowedSelect = select.filter((s) => {
+      if (
+        ["function", "computed", "column"].includes(s.type) ||
+        (isHaving && s.type === "aggregation")
+      ) {
         /** Selected computed cols are allowed for filtering without checking. Why not allow all?! */
         if (s.type !== "column" || allowed_colnames.includes(s.alias)) {
           return true;
         }
       }
       return false;
-    })
+    });
   }
 
   /* Add remaining allowed fields */
-  const remainingNonSelectedColumns: SelectItem[] = p.allColumns.filter(c =>
-    allowed_colnames.includes(c.name) &&
-    !allowedSelect.find(s => s.alias === c.name)
-  ).map(f => ({
-    type: f.type,
-    alias: f.name,
-    columnName: f.type === "column"? f.name : undefined as any,
-    getQuery: (tableAlias) => f.getQuery({
-      tableAlias,
-      allColumns: this.columns,
-      allowedFields: allowed_colnames
-    }),
-    selected: false,
-    getFields: () => [f.name],
-    column_udt_type: f.type === "column" ? this.columns.find(c => c.name === f.name)?.udt_name : undefined
-  }))
-  allowedSelect = allowedSelect.concat(
-    remainingNonSelectedColumns
-  );
+  const remainingNonSelectedColumns: SelectItem[] = p.allColumns
+    .filter(
+      (c) =>
+        allowed_colnames.includes(c.name) &&
+        !allowedSelect.find((s) => s.alias === c.name),
+    )
+    .map((f) => ({
+      type: f.type,
+      alias: f.name,
+      columnName: f.type === "column" ? f.name : (undefined as any),
+      getQuery: (tableAlias) =>
+        f.getQuery({
+          tableAlias,
+          allColumns: this.columns,
+          allowedFields: allowed_colnames,
+        }),
+      selected: false,
+      getFields: () => [f.name],
+      column_udt_type:
+        f.type === "column"
+          ? this.columns.find((c) => c.name === f.name)?.udt_name
+          : undefined,
+    }));
+  allowedSelect = allowedSelect.concat(remainingNonSelectedColumns);
   const complexFilters: string[] = [];
   const complexFilterKey = "$filter";
   if (complexFilterKey in filter) {
-
     const complexFilterCondition = parseComplexFilter({
       filter,
       complexFilterKey,
@@ -135,39 +169,43 @@ export async function getCondition(
       will make an exists filter
   */
 
-  const filterKeys = Object.keys(filter)
-    .filter(k => 
-      k !== complexFilterKey && 
-      !funcFilter.find(ek => ek.name === k) && 
-      !computedFields.find(cf => cf.name === k) && 
-      !existsConfigs.find(ek => ek.existType === k)
-    );
+  const filterKeys = Object.keys(filter).filter(
+    (k) =>
+      k !== complexFilterKey &&
+      !funcFilter.find((ek) => ek.name === k) &&
+      !computedFields.find((cf) => cf.name === k) &&
+      !existsConfigs.find((ek) => ek.existType === k),
+  );
 
-  const validFieldNames = allowedSelect.map(s => s.alias);
-  const invalidColumn = filterKeys
-    .find(fName => !validFieldNames.find(c =>
-      c === fName ||
-      (
-        fName.startsWith(c) && (
-          fName.slice(c.length).includes("->") ||
-          fName.slice(c.length).includes(".")
-        )
-      )
-    ));
+  const validFieldNames = allowedSelect.map((s) => s.alias);
+  const invalidColumn = filterKeys.find(
+    (fName) =>
+      !validFieldNames.find(
+        (c) =>
+          c === fName ||
+          (fName.startsWith(c) &&
+            (fName.slice(c.length).includes("->") ||
+              fName.slice(c.length).includes("."))),
+      ),
+  );
 
   if (invalidColumn) {
-    const selItem = select?.find(s => s.alias === invalidColumn);
+    const selItem = select?.find((s) => s.alias === invalidColumn);
     let isComplexFilter = false;
-    if(selItem?.type === "aggregation"){
-      if(!params.isHaving){
-        throw new Error(`Filtering by ${invalidColumn} is not allowed. Aggregations cannot be filtered. Use HAVING clause instead.`);
+    if (selItem?.type === "aggregation") {
+      if (!params.isHaving) {
+        throw new Error(
+          `Filtering by ${invalidColumn} is not allowed. Aggregations cannot be filtered. Use HAVING clause instead.`,
+        );
       } else {
         isComplexFilter = true;
       }
     }
 
-    if(!isComplexFilter){
-      const allowedCols = allowedSelect.map(s => s.type === "column" ? s.getQuery() : s.alias).join(", ");
+    if (!isComplexFilter) {
+      const allowedCols = allowedSelect
+        .map((s) => (s.type === "column" ? s.getQuery() : s.alias))
+        .join(", ");
       const errMessage = `Table: ${this.name} -> disallowed/inexistent columns in filter: ${invalidColumn} \n  Expecting one of: ${allowedCols}`;
       throw errMessage;
     }
@@ -182,10 +220,14 @@ export async function getCondition(
     filter: f,
     tableAlias,
     select: allowedSelect,
-    allowedColumnNames: !tableRules? this.column_names.slice(0) : this.parseFieldFilter(tableRules.select?.filterFields ?? tableRules.select?.fields),
+    allowedColumnNames: !tableRules
+      ? this.column_names.slice(0)
+      : this.parseFieldFilter(
+          tableRules.select?.filterFields ?? tableRules.select?.fields,
+        ),
   });
 
-  let templates: string[] = [q].filter(q => q);
+  let templates: string[] = [q].filter((q) => q);
 
   if (existsCond) templates.push(existsCond);
   templates = templates.concat(funcConds);
@@ -193,9 +235,8 @@ export async function getCondition(
   templates = templates.concat(complexFilters);
 
   /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
-  return { 
-    exists: existsConfigs, 
-    condition: templates.sort().join(" AND \n") 
+  return {
+    exists: existsConfigs,
+    condition: templates.sort().join(" AND \n"),
   };
-
 }

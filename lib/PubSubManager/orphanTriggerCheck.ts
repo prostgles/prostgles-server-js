@@ -1,13 +1,14 @@
-import { PubSubManager } from './PubSubManager';
+import { PubSubManager } from "./PubSubManager";
 import { REALTIME_TRIGGER_CHECK_QUERY } from "./initPubSubManager";
 
 /**
- * Schema and Data watch triggers (DB_OBJ_NAMES.schema_watch_func, DB_OBJ_NAMES.data_watch_func) 
+ * Schema and Data watch triggers (DB_OBJ_NAMES.schema_watch_func, DB_OBJ_NAMES.data_watch_func)
  * survive and continue to user resources even after the client disconnects.
  * We must therefore delete apps that do not have active connections
  */
 
-const queryIdentifier = "prostgles query used to keep track of which prgl backend clients are still connected";
+const queryIdentifier =
+  "prostgles query used to keep track of which prgl backend clients are still connected";
 const connectedApplicationNamesQuery = `
   SELECT DISTINCT application_name
   FROM prostgles.apps 
@@ -15,7 +16,7 @@ const connectedApplicationNamesQuery = `
     SELECT application_name 
     FROM pg_catalog.pg_stat_activity
   )
-`; 
+`;
 
 export const DELETE_DISCONNECTED_APPS_QUERY = `
   DELETE FROM prostgles.apps a

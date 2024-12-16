@@ -63,13 +63,12 @@ export const testPublishTypes = () => {
       },
 
       items4: {
-        select:
-          Math.random() ? "*" : (
-            {
+        select: Math.random()
+          ? "*"
+          : {
               fields: { name: 0 },
               forcedFilter: { name: "abc" },
-            }
-          ),
+            },
         insert: "*",
         update: "*",
         delete: "*",

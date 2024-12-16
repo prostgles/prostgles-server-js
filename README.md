@@ -44,7 +44,7 @@ prostgles({
       {
         orderBy: { created: -1 },
         limit: 10,
-      }
+      },
     );
   },
 });
