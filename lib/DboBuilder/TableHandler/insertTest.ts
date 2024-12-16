@@ -7,12 +7,12 @@ import { TableHandler } from "./TableHandler";
 type InsertTestArgs = {
   tableRules: TableRule | undefined;
   localParams: LocalParams | undefined;
-}
+};
 export async function insertTest(this: TableHandler, { localParams, tableRules }: InsertTestArgs) {
   const { testRule } = localParams || {};
-  
+
   const ACTION = "insert";
-  
+
   let returningFields: FieldFilter | undefined;
   let forcedData: AnyObject | undefined;
   let fields: FieldFilter | undefined;
@@ -33,33 +33,62 @@ export async function insertTest(this: TableHandler, { localParams, tableRules }
 
     /* Safely test publish rules */
     if (testRule) {
-      await this.validateViewRules({ fields, returningFields, forcedFilter: forcedData, rule: "insert" });
-      if(checkFilter){
+      await this.validateViewRules({
+        fields,
+        returningFields,
+        forcedFilter: forcedData,
+        rule: "insert",
+      });
+      if (checkFilter) {
         try {
           await this.find(checkFilter, { limit: 0 });
-        } catch (e){
-          throw `Invalid checkFilter provided for ${this.name}. Error: ${JSON.stringify(e)}`
+        } catch (e) {
+          throw `Invalid checkFilter provided for ${this.name}. Error: ${JSON.stringify(e)}`;
         }
       }
       if (forcedData) {
         const keys = Object.keys(forcedData);
         if (keys.length) {
-          const dataCols = keys.filter(k => this.column_names.includes(k));
-          const nestedInsertCols = keys.filter(k => !this.column_names.includes(k) && this.dboBuilder.dbo[k]?.insert);
-          if(nestedInsertCols.length){
+          const dataCols = keys.filter((k) => this.column_names.includes(k));
+          const nestedInsertCols = keys.filter(
+            (k) => !this.column_names.includes(k) && this.dboBuilder.dbo[k]?.insert
+          );
+          if (nestedInsertCols.length) {
             throw `Nested insert not supported for forcedData rule: ${nestedInsertCols}`;
           }
-          const badCols = keys.filter(k => !dataCols.includes(k) && !nestedInsertCols.includes(k));
-          if(badCols.length){
+          const badCols = keys.filter(
+            (k) => !dataCols.includes(k) && !nestedInsertCols.includes(k)
+          );
+          if (badCols.length) {
             throw `Invalid columns found in forced filter: ${badCols.join(", ")}`;
           }
           try {
-            const values = "(" + dataCols.map(k => asValue(forcedData![k]) + "::" + this.columns.find(c => c.name === k)!.udt_name).join(", ") + ")",
-              colNames = dataCols.map(k => asName(k)).join(",");
-            const query = pgp.as.format("EXPLAIN INSERT INTO " + this.escapedName + " (${colNames:raw}) SELECT * FROM ( VALUES ${values:raw} ) t WHERE FALSE;", { colNames, values })
+            const values =
+                "(" +
+                dataCols
+                  .map(
+                    (k) =>
+                      asValue(forcedData![k]) +
+                      "::" +
+                      this.columns.find((c) => c.name === k)!.udt_name
+                  )
+                  .join(", ") +
+                ")",
+              colNames = dataCols.map((k) => asName(k)).join(",");
+            const query = pgp.as.format(
+              "EXPLAIN INSERT INTO " +
+                this.escapedName +
+                " (${colNames:raw}) SELECT * FROM ( VALUES ${values:raw} ) t WHERE FALSE;",
+              { colNames, values }
+            );
             await this.db.any(query);
           } catch (e) {
-            throw "\nissue with forcedData: \nVALUE: " + JSON.stringify(forcedData, null, 2) + "\nERROR: " + e;
+            throw (
+              "\nissue with forcedData: \nVALUE: " +
+              JSON.stringify(forcedData, null, 2) +
+              "\nERROR: " +
+              e
+            );
           }
         }
       }
@@ -73,6 +102,6 @@ export async function insertTest(this: TableHandler, { localParams, tableRules }
     fields,
     forcedData,
     checkFilter,
-    testOnly
-  }
-} 
+    testOnly,
+  };
+}

@@ -1,62 +1,38 @@
 import * as fs from "fs";
 import * as path from "path";
-import { getObjectEntries, isDefined, TableHandler } from "prostgles-types";
-import { definitions } from "./clientTypes";
+import { getObjectEntries, TableHandler } from "prostgles-types";
 import { getMethodsDocs } from "./getMethodsDocs";
 import { getResolvedTypes } from "./getResolvedTypes";
-import { TS_Type } from "./getSerializableType";
+import { TS_Object } from "./getSerializableType/getSerializableType";
+import { renderTsType } from "./renderTsType";
 
 const testFolderPath = `${__dirname}/../../../tests/`;
 const docsFolder = `${__dirname}/../../`;
 
-export const generateClientDocs = () => {
+export const generateClientDocs = async () => {
   const clientFilePath = path.resolve(
     `${testFolderPath}/client/node_modules/prostgles-client/dist/prostgles.d.ts`
   );
   const excludedTypes = [
-    // "FullFilter",
-    // "FullFilter<T, S> | undefined",
-    "FieldFilter | undefined",
+    "FullFilter",
+    "FullFilter<T, S>",
+    "FieldFilter",
     "SyncOptions",
-    "SyncOneOptions",
     "PG_COLUMN_UDT_DATA_TYPE",
+    "Socket<DefaultEventsMap, DefaultEventsMap>",
   ];
-  const { resolvedTypes, visitedMaps } = getResolvedTypes({
+  const { resolvedTypes } = getResolvedTypes({
     filePath: clientFilePath,
     filter: {
-      nodeNames: ["TableHandlerClient"],
+      nodeNames: ["TableHandlerClient", "InitOptions"],
+      excludedFilenameParts: ["node_modules/engine.io"],
       excludedTypes,
+      maxDepth: 9,
     },
+    // outputFilename: "clientTypes",
   });
 
-  const jsonTypes = JSON.stringify(
-    [
-      ...resolvedTypes,
-      ...visitedMaps
-        .flatMap((m) =>
-          Array.from(m.values()).map((v) =>
-            excludedTypes.includes(v.resolvedType.alias ?? "") ? v.resolvedType : undefined
-          )
-        )
-        .filter(isDefined),
-    ] satisfies TS_Type[],
-    null,
-    2
-  );
-  fs.writeFileSync(
-    `${__dirname}/../clientTypes.ts`,
-    [
-      `import type { TS_Type } from "./getSerializableType";`,
-      `export const definitions = ${jsonTypes} as const satisfies TS_Type[];`,
-    ].join("\n"),
-    {
-      encoding: "utf-8",
-    }
-  );
-
-  const docPath = `${docsFolder}METHODS.md`;
-
-  const tableHandler = definitions[0];
+  const tableHandler = resolvedTypes[0] as TS_Object; //(typeof import("./clientTypes").definitions)[0];
   const isomotphicMethodNames = {
     count: 1,
     delete: 1,
@@ -87,10 +63,59 @@ export const generateClientDocs = () => {
   const result = [
     `# Isomorphic Methods`,
     ``,
-    `The following table/view methods are available on the client and server.`,
+    `The following table/view methods are available on the client and server db object`,
     ``,
     isomorphicMd.join("\n\n"),
+  ].join("\n");
 
+  fs.writeFileSync(`${docsFolder}db-handler.md`, result, { encoding: "utf-8" });
+
+  const InitOptions = resolvedTypes[1] as TS_Object; // (typeof import("./clientTypes").definitions)[1];
+
+  const configurationClientMarkdown = renderTsType(InitOptions, 0, undefined);
+  const docs = [
+    `# Overview`,
+    `Client-side API for interacting with a PostgreSQL database.`,
+    ``,
+    `### Installation`,
+    `To install the package, run:`,
+    `\`\`\`bash`,
+    `npm install prostgles-client`,
+    `\`\`\``,
+    ``,
+    `### Configuration`,
+    `Example react configuration and usage:`,
+    `\`\`\`typescript`,
+    `import prostgles from "prostgles-client";`,
+    `import { DBGeneratedSchema } from "./DBGeneratedSchema";`,
+    ``,
+    `export const App = () => {`,
+    ``,
+    `  const prgl = useProstglesClient("/ws-api");`,
+    ``,
+    `  if(prgl.isLoading) return <div>Loading...</div>;`,
+    `  return <MyComponent prgl={prgl} />;`,
+    `}`,
+    `\`\`\``,
+    ``,
+    `Example configuration:`,
+    `\`\`\`typescript`,
+    `import prostgles from "prostgles-client";`,
+    `import { DBGeneratedSchema } from "./DBGeneratedSchema";`,
+    `import io from "socket.io-client";`,
+    `const socket = io({ path: "/ws-api" });`,
+    ``,
+    `const prostglesClient = prostgles<DBGeneratedSchema>`,
+    `  socket,`,
+    `  onReady: async (dbs, methods, schema, auth) => {`,
+    `    console.log(dbs.items.find());`,
+    `  }`,
+    `})`,
+    `\`\`\``,
+    ``,
+    `### Configuration options`,
+    configurationClientMarkdown,
+    ``,
     `# Client-only Methods`,
     ``,
     `The following table/view methods are available on the client.`,
@@ -98,5 +123,5 @@ export const generateClientDocs = () => {
     clientMd.join("\n\n"),
   ].join("\n");
 
-  fs.writeFileSync(docPath, result, { encoding: "utf-8" });
+  fs.writeFileSync(`${docsFolder}client.md`, docs, { encoding: "utf-8" });
 };

@@ -127,9 +127,8 @@ export class Prostgles {
       publishMethods: 1,
       io: 1,
       publish: 1,
-      schema: 1,
+      schemaFilter: 1,
       publishRawSQL: 1,
-      wsChannelNamePrefix: 1,
       onSocketConnect: 1,
       onSocketDisconnect: 1,
       sqlFilePath: 1,
@@ -141,7 +140,6 @@ export class Prostgles {
       onQuery: 1,
       tableConfig: 1,
       tableConfigMigrations: 1,
-      keywords: 1,
       onNotice: 1,
       onLog: 1,
       restApi: 1,
@@ -160,11 +158,10 @@ export class Prostgles {
     if (this.opts?.fileTable) {
       this.opts.fileTable.tableName ??= "media";
     }
-    this.opts.schema ??= { public: 1 };
+    this.opts.schemaFilter ??= { public: 1 };
 
     this.keywords = {
       ...DEFAULT_KEYWORDS,
-      ...params.keywords,
     };
   }
 

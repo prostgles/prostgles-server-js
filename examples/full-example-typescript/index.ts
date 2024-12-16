@@ -1,12 +1,14 @@
 import express from "express";
 import path from "path";
 import prostgles from "prostgles-server";
+import http from "http";
+import { Server } from "socket.io";
 const app = express();
-var http = require("http").createServer(app);
-var io = require("socket.io")(http);
-http.listen(30009);
-
-import { DBObj } from "./DBoGenerated";
+const httpServer = http.createServer(app);
+httpServer.listen(30009);
+const io = new Server(httpServer, {
+  path: "/prgl-api",
+});
 
 prostgles({
   dbConnection: {
@@ -34,7 +36,7 @@ prostgles({
     };
   },
 
-  onReady: async (dbo: DBObj) => {
+  onReady: async ({ dbo }) => {
     let plane = await dbo.planes.findOne();
 
     app.get("/", (req, res) => {

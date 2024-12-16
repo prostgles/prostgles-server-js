@@ -1,37 +1,41 @@
+import * as fs from "fs";
 import * as ts from "typescript";
-import { getSerializableType, TS_Type, VisitedTypesMap } from "./getSerializableType";
+import {
+  getSerializableType,
+  ResolveTypeOptions,
+  TS_Type,
+  VisitedTypesMap,
+} from "./getSerializableType/getSerializableType";
 import { loadTsFile } from "./loadTsFile";
+
+const docsFolder = `${__dirname}/../../`;
 
 type Args = {
   filePath: string;
   filter?: {
     nodeNames: string[];
-    excludedTypes: string[];
-    maxDepth?: number;
-  };
+  } & ResolveTypeOptions;
+  outputFilename?: string;
 };
-export const getResolvedTypes = ({ filePath, filter }: Args) => {
+
+export const getResolvedTypes = ({ filePath, outputFilename, filter }: Args) => {
   const { checker, sourceFile } = loadTsFile(filePath);
 
   const results: TS_Type[] = [];
   const visitedMaps: VisitedTypesMap[] = [];
 
   const visit = (node: ts.Node) => {
-    // const nodeText = node.getText();
-    // if (nodeText.includes("DBOFullyTyped")) {
-    //   console.log("node.name.text", node.getText());
-    // }
     if (ts.isTypeAliasDeclaration(node)) {
       if (!filter || filter?.nodeNames.includes(node.name.text)) {
         const type1 = checker.getTypeAtLocation(node.type);
-        const { resolvedType, visited } = getSerializableType(
-          type1,
+        const { resolvedType, visited } = getSerializableType({
+          myType: type1,
           checker,
-          undefined,
-          [],
-          filter,
-          0
-        );
+          visited: new Map(),
+          parentAliases: [],
+          opts: filter,
+          depth: 0,
+        });
         results.push(resolvedType);
         visitedMaps.push(visited);
       }
@@ -41,5 +45,18 @@ export const getResolvedTypes = ({ filePath, filter }: Args) => {
   };
 
   visit(sourceFile);
-  return { resolvedTypes: results, visitedMaps };
+  const result = { resolvedTypes: results, visitedMaps };
+
+  if (outputFilename) {
+    const serverTypesStr = [
+      `import type { TS_Type } from "./getSerializableType/getSerializableType";`,
+      `export const definitions = ${JSON.stringify(results, null, 2)} as const satisfies TS_Type[];`,
+    ].join("\n");
+
+    fs.writeFileSync(`${docsFolder}/utils/${outputFilename}.ts`, serverTypesStr, {
+      encoding: "utf-8",
+    });
+  }
+
+  return result;
 };

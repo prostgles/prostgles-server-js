@@ -82,7 +82,7 @@ function dd() {
       dbConnection,
       io: ioWatchSchema,
       transactions: true,
-      schema: { public: 1, prostgles_test: 1 },
+      schemaFilter: { public: 1, prostgles_test: 1 },
       onReady: async ({ dbo, db }) => {},
       publish: "*",
       watchSchema: true,
@@ -95,7 +95,7 @@ function dd() {
     io,
     tsGeneratedTypesDir: path.join(__dirname + "/../../"),
     transactions: true,
-    schema: { public: 1, prostgles_test: 1 },
+    schemaFilter: { public: 1, prostgles_test: 1 },
     onLog: async (ev) => {
       logs.push(ev);
       logs = logs.slice(-10);

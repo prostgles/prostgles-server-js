@@ -24,7 +24,7 @@ export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 
 export type UpdateableOptions = Pick<
   ProstglesInitOptions,
-  "fileTable" | "restApi" | "tableConfig" | "schema" | "auth"
+  "fileTable" | "restApi" | "tableConfig" | "schemaFilter" | "auth"
 >;
 export type OnInitReason =
   | {

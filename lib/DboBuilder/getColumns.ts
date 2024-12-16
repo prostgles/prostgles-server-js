@@ -20,7 +20,7 @@ export const isTableHandler = (v: any): v is TableHandler => "parseUpdateRules" 
 export async function getColumns(
   this: ViewHandler,
   lang?: string,
-  params?: { rule: "update"; filter: AnyObject; data: AnyObject },
+  params?: { rule: "update"; filter: AnyObject },
   _param3?: undefined,
   tableRules?: TableRule,
   localParams?: LocalParams

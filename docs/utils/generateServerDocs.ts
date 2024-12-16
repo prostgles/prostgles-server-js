@@ -1,17 +1,15 @@
 import * as fs from "fs";
 import * as path from "path";
-import { getResolvedTypes } from "./getResolvedTypes";
-import { definitions } from "./serverTypes";
 import { getObjectEntries } from "prostgles-types";
-import { TS_Type } from "./getSerializableType";
+import { getResolvedTypes } from "./getResolvedTypes";
 import { renderTsType } from "./renderTsType";
+import { TS_Object } from "./getSerializableType/getSerializableType";
 
 const testFolderPath = `${__dirname}/../../../tests/`;
 const docsFolder = `${__dirname}/../../`;
 
 export const generateServerDocs = () => {
   const serverFilePath = path.resolve(
-    // `${testFolderPath}/server/node_modules/prostgles-server/dist/DBSchemaBuilder.d.ts` // "DBOFullyTyped",
     `${testFolderPath}/server/node_modules/prostgles-server/dist/ProstglesTypes.d.ts` // "ProstglesInitOptions",
   );
   const {
@@ -19,22 +17,24 @@ export const generateServerDocs = () => {
   } = getResolvedTypes({
     filePath: serverFilePath,
     filter: {
-      nodeNames: [
-        "ProstglesInitOptions",
-        // "DBOFullyTyped",
+      nodeNames: ["ProstglesInitOptions"],
+      excludedTypes: [
+        "ExpressApp",
+        "Server<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>",
+        "Server<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any> | undefined",
+        "IConnectionParameters<IClient>",
+        "Express",
+        "Partial<DbJoinMaker>",
+        "DB",
+        "IEventContext<IClient>",
       ],
-      excludedTypes: ["Server<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>"],
-      maxDepth: 4,
+      excludedFilenameParts: ["node_modules/engine.io"],
+      maxDepth: 5,
     },
+    // outputFilename: "serverTypes",
   });
 
-  const serverTypesStr = [
-    `import type { TS_Type } from "./getSerializableType";`,
-    `export const definitions = ${JSON.stringify([ProstglesInitOptions], null, 2)} as const satisfies TS_Type[];`,
-  ].join("\n");
-  fs.writeFileSync(`${docsFolder}/utils/serverTypes.ts`, serverTypesStr, { encoding: "utf-8" });
-
-  const prostglesInitOpts = definitions[0];
+  const prostglesInitOpts = ProstglesInitOptions as TS_Object; //as (typeof import("./serverTypes").definitions)[0];
   if (!ProstglesInitOptions || !prostglesInitOpts)
     throw new Error("ProstglesInitOptions not found");
 
@@ -43,9 +43,11 @@ export const generateServerDocs = () => {
       return renderTsType(prop, 0, { name: propName, optional: prop.optional });
     }
   );
+
   const docs = [
     `# Overview`,
-    `Our Isomorphic Typescript API allows connecting to a PostgreSQL database to get a realtime view of the data and schema. Interact with the data with full end-to-end type safety.`,
+    `Prostgles allows connecting to a PostgreSQL database to get a realtime view of the data and schema changes. `,
+    `By configuring "tsGeneratedTypesDir" the database schema types are generated automatically allowing full end-to-end type safety`,
     `### Installation`,
     `To install the package, run:`,
     `\`\`\`bash`,
@@ -54,7 +56,7 @@ export const generateServerDocs = () => {
     `### Configuration`,
     `To get started, you need to provide a configuration object to the server.`,
     ``,
-    `Basic example:`,
+    `Minimal configuration:`,
     `\`\`\`typescript`,
     `import prostgles from "prostgles-server";`,
     `import { DBGeneratedSchema } from "./DBGeneratedSchema";`,
@@ -77,9 +79,51 @@ export const generateServerDocs = () => {
     `  },`,
     `});`,
     `\`\`\``,
+    ``,
+    `To allow clients to connect an express server with socket.io needs to be configured:`,
+    `\`\`\`typescript`,
+    `import prostgles from "prostgles-server";`,
+    `import { DBGeneratedSchema } from "./DBGeneratedSchema";`,
+    `import express from "express";`,
+    `import path from "path";`,
+    `import http from "http";`,
+    `import { Server } from "socket.io";`,
+    ``,
+    `const app = express();`,
+    `const httpServer = http.createServer(app);`,
+    `httpServer.listen(30009);`,
+    `const io = new Server(httpServer, {`,
+    `  path: "/prgl-api",`,
+    `});`,
+    ``,
+    `prostgles<DBGeneratedSchema>({`,
+    `  dbConnection: {`,
+    `    host: "localhost",`,
+    `    port: 5432,`,
+    `    database: "postgres"`,
+    `    user: process.env.PRGL_USER,`,
+    `    password: process.env.PRGL_PWD`,
+    `  },`,
+    `  io,`,
+    `  publish: () => {`,
+    `    return {`,
+    `      items: "*",`,
+    `    }`,
+    `  },`,
+    `  tsGeneratedTypesDir: __dirname,`,
+    `  onReady: async ({ dbo }) => {`,
+    `    try {`,
+    `      await dbo.items.insert({ name: "a" });`,
+    `      console.log(await dbo.items.find());`,
+    `    } catch(err) {`,
+    `      console.error(err)`,
+    `    }`,
+    `  },`,
+    `});`,
+    `\`\`\``,
     `### Configuration options`,
     configurationPropsMarkdown.join("\n\n"),
   ].join("\n");
 
-  fs.writeFileSync(`${docsFolder}SERVER.md`, docs, { encoding: "utf-8" });
+  fs.writeFileSync(`${docsFolder}server.md`, docs, { encoding: "utf-8" });
 };

@@ -1,4 +1,3 @@
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Stefan L. All rights reserved.
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
@@ -9,27 +8,35 @@ import {
   SQLOptions,
   getJoinHandlers,
   isDefined,
-  tryCatch
+  tryCatch,
 } from "prostgles-types";
 import { getDBSchema } from "../DBSchemaBuilder";
-import {
-  DB, Prostgles
-} from "../Prostgles";
+import { DB, Prostgles } from "../Prostgles";
 import { Join } from "../ProstglesTypes";
 import { PubSubManager } from "../PubSubManager/PubSubManager";
 import { getCreatePubSubManagerError } from "../PubSubManager/getCreatePubSubManagerError";
-import {
-  DbTableInfo,
-  PublishParser
-} from "../PublishParser/PublishParser";
+import { DbTableInfo, PublishParser } from "../PublishParser/PublishParser";
 import { Graph } from "../shortestPath";
 import { clone } from "../utils";
-import { DBHandlerServer, DbTxTableHandlers, LocalParams, TX, TableSchema, TxCB } from "./DboBuilderTypes";
+import {
+  DBHandlerServer,
+  DbTxTableHandlers,
+  LocalParams,
+  TX,
+  TableSchema,
+  TxCB,
+} from "./DboBuilderTypes";
 import { QueryStreamer } from "./QueryStreamer";
 import { TableHandler } from "./TableHandler/TableHandler";
 import { JoinPaths, ViewHandler } from "./ViewHandler/ViewHandler";
 import { parseJoinPath } from "./ViewHandler/parseJoinPath";
-import { PGConstraint, getCanExecute, getConstraints, getErrorAsObject, getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
+import {
+  PGConstraint,
+  getCanExecute,
+  getConstraints,
+  getErrorAsObject,
+  getSerializedClientErrorFromPGError,
+} from "./dboBuilderUtils";
 import { getTablesForSchemaPostgresSQL } from "./getTablesForSchemaPostgresSQL";
 import { prepareShortestJoinPaths } from "./prepareShortestJoinPaths";
 import { cacheDBTypes, runSQL } from "./runSQL";
@@ -57,7 +64,6 @@ type TableOidColumnInfo = OidInfo & {
   ordinal_position: number;
 };
 
-
 export class DboBuilder {
   tablesOrViews?: TableSchema[];
   /**
@@ -77,52 +83,51 @@ export class DboBuilder {
   /**
    * Used for db.sql field type details
    */
-  DATA_TYPES: { oid: string, typname: PG_COLUMN_UDT_DATA_TYPE }[] | undefined;
+  DATA_TYPES: { oid: string; typname: PG_COLUMN_UDT_DATA_TYPE }[] | undefined;
   DATA_TYPES_DBKEY = "";
   USER_TABLES: TableOidInfo[] | undefined;
   USER_TABLE_COLUMNS: TableOidColumnInfo[] | undefined;
-  
+
   queryStreamer: QueryStreamer;
 
   get tables(): DbTableInfo[] {
     return (this.tablesOrViews ?? [])
       .map(({ name, columns }) => {
         const info = this.dbo[name]?.tableOrViewInfo;
-        if(!info) return undefined;
+        if (!info) return undefined;
         return {
           name,
           columns,
-          info
-      }})
+          info,
+        };
+      })
       .filter(isDefined);
   }
 
   getPubSubManager = async (): Promise<PubSubManager> => {
     if (!this._pubSubManager) {
-
-      const canExecute = await getCanExecute(this.db)
-      if (!canExecute) throw "PubSubManager based subscriptions not possible: Cannot run EXECUTE statements on this connection";
+      const canExecute = await getCanExecute(this.db);
+      if (!canExecute)
+        throw "PubSubManager based subscriptions not possible: Cannot run EXECUTE statements on this connection";
 
       const { pubSubManager, error, hasError } = await tryCatch(async () => {
-        const pubSubManager = await PubSubManager.create({
-          dboBuilder: this,
-        });
+        const pubSubManager = await PubSubManager.create(this);
         return { pubSubManager };
       });
       this._pubSubManager = pubSubManager;
-      if (hasError || !this._pubSubManager ) {
+      if (hasError || !this._pubSubManager) {
         await this.prostgles.opts.onLog?.({
           type: "debug",
           command: "PubSubManager.create",
           duration: 0,
-          error: getErrorAsObject(error)
+          error: getErrorAsObject(error),
         });
         throw "Could not create this._pubSubManager check logs";
       }
     }
 
     return this._pubSubManager;
-  }
+  };
 
   tsTypesDefinition?: string;
   joinGraph?: Graph;
@@ -135,30 +140,26 @@ export class DboBuilder {
 
   private constructor(prostgles: Prostgles) {
     this.prostgles = prostgles;
-    if (!this.prostgles.db) throw "db missing"
+    if (!this.prostgles.db) throw "db missing";
     this.db = this.prostgles.db;
     this.dbo = {} as unknown as DBHandlerServer;
     this.queryStreamer = new QueryStreamer(this);
   }
 
   private init = async () => {
-
     await this.build();
     /* If watchSchema is enabled then PubSubManager must be created (if possible) because it creates the event trigger */
-    if (
-      this.prostgles.schemaWatch?.type.watchType === "DDL_trigger"
-    ) {
-      await this.getPubSubManager()
+    if (this.prostgles.schemaWatch?.type.watchType === "DDL_trigger") {
+      await this.getPubSubManager();
     }
 
     return this;
-  }
+  };
 
   public static create = async (prostgles: Prostgles): Promise<DboBuilder> => {
-    const res = new DboBuilder(prostgles)
+    const res = new DboBuilder(prostgles);
     return await res.init();
-  }
-
+  };
 
   destroy() {
     this._pubSubManager?.destroy();
@@ -166,7 +167,7 @@ export class DboBuilder {
 
   _joins?: Join[];
   get joins(): Join[] {
-    return clone(this._joins ?? []).filter(j => j.tables[0] !== j.tables[1]) as Join[];
+    return clone(this._joins ?? []).filter((j) => j.tables[0] !== j.tables[1]) as Join[];
   }
 
   set joins(j: Join[]) {
@@ -182,19 +183,28 @@ export class DboBuilder {
     this.joinGraph = joinGraph;
     this.joins = joins;
     this.shortestJoinPaths = shortestJoinPaths;
-  }
+  };
 
-  runSQL = async (query: string, params: any, options: SQLOptions | undefined, localParams?: LocalParams) => {
-    return runSQL.bind(this)(query, params, options, localParams).catch(error => Promise.reject(getSerializedClientErrorFromPGError(error, { type: "sql", localParams })));
-  }
+  runSQL = async (
+    query: string,
+    params: any,
+    options: SQLOptions | undefined,
+    localParams?: LocalParams
+  ) => {
+    return runSQL
+      .bind(this)(query, params, options, localParams)
+      .catch((error) =>
+        Promise.reject(getSerializedClientErrorFromPGError(error, { type: "sql", localParams }))
+      );
+  };
 
   canSubscribe = false;
   checkingCanSubscribe = false;
   async build(): Promise<DBHandlerServer> {
-    if(!this.canSubscribe && !this.checkingCanSubscribe){
+    if (!this.canSubscribe && !this.checkingCanSubscribe) {
       this.checkingCanSubscribe = true;
       const subscribeError = await getCreatePubSubManagerError(this);
-      if(subscribeError){
+      if (subscribeError) {
         console.error(
           "Could not initiate PubSubManager. Realtime data/Subscriptions will not work. Error: ",
           subscribeError
@@ -206,35 +216,45 @@ export class DboBuilder {
       this.checkingCanSubscribe = false;
     }
     const start = Date.now();
-    const tablesOrViewsReq = await getTablesForSchemaPostgresSQL(this, this.prostgles.opts.schema);
+    const tablesOrViewsReq = await getTablesForSchemaPostgresSQL(
+      this,
+      this.prostgles.opts.schemaFilter
+    );
     await this.prostgles.opts.onLog?.({
       type: "debug",
       command: "DboBuilder.getTablesForSchemaPostgresSQL",
       data: tablesOrViewsReq.durations,
       duration: Date.now() - start,
-    })
+    });
     this.tablesOrViews = tablesOrViewsReq.result;
 
-    this.constraints = await getConstraints(this.db, this.prostgles.opts.schema);
+    this.constraints = await getConstraints(this.db, this.prostgles.opts.schemaFilter);
     await this.prepareShortestJoinPaths();
 
     this.dbo = {};
-    this.tablesOrViews.map(tov => {
+    this.tablesOrViews.map((tov) => {
       const columnsForTypes = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
 
-
       const filterKeywords = Object.values(this.prostgles.keywords);
-      const $filterCol = columnsForTypes.find(c => filterKeywords.includes(c.name));
+      const $filterCol = columnsForTypes.find((c) => filterKeywords.includes(c.name));
       if ($filterCol) {
         throw `DboBuilder init error: \n\nTable ${JSON.stringify(tov.name)} column ${JSON.stringify($filterCol.name)} is colliding with Prostgles filtering functionality ($filter keyword)
                 Please provide a replacement keyword name using the $filter_keyName init option. 
                 Alternatively you can rename the table column\n`;
       }
 
-      this.dbo[tov.escaped_identifier] = new (tov.is_view ? ViewHandler : TableHandler)(this.db, tov, this, undefined, this.shortestJoinPaths);
+      this.dbo[tov.escaped_identifier] = new (tov.is_view ? ViewHandler : TableHandler)(
+        this.db,
+        tov,
+        this,
+        undefined,
+        this.shortestJoinPaths
+      );
 
-      if (this.shortestJoinPaths && this.shortestJoinPaths.find(jp => [jp.t1, jp.t2].includes(tov.name))) {
-
+      if (
+        this.shortestJoinPaths &&
+        this.shortestJoinPaths.find((jp) => [jp.t1, jp.t2].includes(tov.name))
+      ) {
         const table = tov.name;
 
         this.dbo.innerJoin ??= {};
@@ -252,68 +272,72 @@ export class DboBuilder {
     });
 
     if (this.prostgles.opts.transactions) {
-      let txKey = "tx";
-      if (typeof this.prostgles.opts.transactions === "string") txKey = this.prostgles.opts.transactions;
+      const txKey = "tx";
+      // if (typeof this.prostgles.opts.transactions === "string")
+      //   txKey = this.prostgles.opts.transactions;
 
       (this.dbo[txKey] as unknown as TX) = (cb: TxCB) => this.getTX(cb);
     }
 
     if (!this.dbo.sql) {
-
       this.dbo.sql = this.runSQL;
     } else {
-      console.warn(`Could not create dbo.sql handler because there is already a table named "sql"`)
+      console.warn(`Could not create dbo.sql handler because there is already a table named "sql"`);
     }
 
     this.tsTypesDefinition = [
       `/* SCHEMA DEFINITON. Table names have been altered to work with Typescript */`,
       `/* DBO Definition */`,
-      getDBSchema(this)
+      getDBSchema(this),
     ].join("\n");
 
     return this.dbo;
   }
 
-  getShortestJoinPath = (viewHandler: ViewHandler, target: string): JoinPaths[number] | undefined => {
+  getShortestJoinPath = (
+    viewHandler: ViewHandler,
+    target: string
+  ): JoinPaths[number] | undefined => {
     const source = viewHandler.name;
-    if(source === target){
+    if (source === target) {
       const joinPath = parseJoinPath({
         rawPath: target,
         rootTable: source,
-        viewHandler
+        viewHandler,
       });
 
-      if(!joinPath) return undefined;
+      if (!joinPath) return undefined;
 
       return {
         t1: source,
         t2: target,
-        path: [source]
-      }
+        path: [source],
+      };
     }
 
-    const jp = this.shortestJoinPaths.find(jp => jp.t1 === source && jp.t2 === target);
+    const jp = this.shortestJoinPaths.find((jp) => jp.t1 === source && jp.t2 === target);
     return jp;
-  }
+  };
 
   getTX = async (cb: TxCB) => {
-    const transaction = await this.db.tx(t => {
+    const transaction = await this.db.tx((t) => {
       const dbTX: DbTxTableHandlers & Pick<DBHandlerServer, "sql"> = {};
-      this.tablesOrViews?.map(tov => {
+      this.tablesOrViews?.map((tov) => {
         const handlerClass = tov.is_view ? ViewHandler : TableHandler;
         dbTX[tov.name] = new handlerClass(this.db, tov, this, { t, dbTX }, this.shortestJoinPaths);
       });
-      dbTX.sql = (q, args, opts, localP) => this.runSQL(q, args, opts, { tx: { dbTX, t }, ...(localP ?? {}) })
+      dbTX.sql = (q, args, opts, localP) =>
+        this.runSQL(q, args, opts, { tx: { dbTX, t }, ...(localP ?? {}) });
 
       return cb(dbTX, t);
     });
 
     return transaction;
-  }
+  };
 
   cacheDBTypes = cacheDBTypes.bind(this);
 
   runClientTransactionStatement = (statement: string) => {
     return runClientTransactionStatement(statement, this.prostgles.opts.dbConnection as any);
-  }
+  };
 }
