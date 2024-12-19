@@ -18,6 +18,7 @@ import {
   ExpressRes,
   LoginClientInfo,
   LoginParams,
+  LoginResponse,
 } from "./AuthTypes";
 import { getSafeReturnURL } from "./getSafeReturnURL";
 import { setupAuthRoutes } from "./setupAuthRoutes";
@@ -247,7 +248,7 @@ export class AuthHandler {
     });
   };
 
-  loginThrottled = async (params: LoginParams, client: LoginClientInfo): Promise<BasicSession> => {
+  loginThrottled = async (params: LoginParams, client: LoginClientInfo): Promise<LoginResponse> => {
     if (!this.opts?.login) throw "Auth login config missing";
     const { responseThrottle = 500 } = this.opts;
 
@@ -260,6 +261,7 @@ export class AuthHandler {
       };
 
       if (!result) throw err;
+      if ("success" in result) throw result;
       if (
         (result && (typeof result.sid !== "string" || typeof result.expires !== "number")) ||
         (!result && ![undefined, null].includes(result))
@@ -282,8 +284,12 @@ export class AuthHandler {
     loginParams: LoginParams
   ) => {
     const start = Date.now();
-    const { sid, expires } =
+    const loginResponse =
       (await this.loginThrottled(loginParams, getLoginClientInfo({ httpReq: req }))) || {};
+    if ("success" in loginResponse) {
+      return res.status(HTTPCODES.AUTH_ERROR).json(loginResponse);
+    }
+    const { sid, expires } = loginResponse;
     await this.prostgles.opts.onLog?.({
       type: "auth",
       command: "login",

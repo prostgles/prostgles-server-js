@@ -71,7 +71,13 @@ export async function setEmailProvider(this: AuthHandler, app: e.Express) {
 
       if (emailMessage) {
         await sendEmail(emailMessage.smtp, emailMessage.message);
-        res.json({ success: true, message: "Email sent" });
+        res.json({
+          success: true,
+          message:
+            email.signupType === "withPassword" ?
+              `We've sent a confirmation email to ${emailMessage.message.to}. Please check your inbox (and your spam folder) for a message from us.`
+            : "Email sent",
+        });
       }
     } catch {
       res.status(HTTPCODES.AUTH_ERROR).json({ success: false, error: "Failed to send email" });
@@ -82,6 +88,9 @@ export async function setEmailProvider(this: AuthHandler, app: e.Express) {
     app.get(AUTH_ROUTES_AND_PARAMS.confirmEmailExpressRoute, async (req, res) => {
       const { id } = req.params ?? {};
       try {
+        if (!id || typeof id !== "string") {
+          throw new Error("Invalid confirmation code");
+        }
         const { httpReq, ...clientInfo } = getLoginClientInfo({ httpReq: req });
         await email.emailConfirmation?.onConfirmed({
           confirmationCode: id,

@@ -1,5 +1,12 @@
 import { Express, NextFunction, Request, Response } from "express";
-import { AnyObject, FieldFilter, IdentityProvider, UserLike } from "prostgles-types";
+import {
+  AnyObject,
+  EmailLoginResponse,
+  EmailRegisterResponse,
+  FieldFilter,
+  IdentityProvider,
+  UserLike,
+} from "prostgles-types";
 import { DB } from "../Prostgles";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
@@ -92,7 +99,7 @@ type EmailWithoutTo = Omit<Email, "to">;
 type EmailProvider =
   | {
       signupType: "withMagicLink";
-      onRegistered: (data: { username: string }) => void | Promise<void>;
+      onRegistered: (data: { username: string }) => Awaitable<EmailRegisterResponse>;
       emailMagicLink: {
         onSend: (data: {
           email: string;
@@ -108,7 +115,7 @@ type EmailProvider =
       onRegistered: (
         data: { username: string; password: string },
         clientInfo: LoginClientInfo
-      ) => void | Promise<void>;
+      ) => Awaitable<EmailRegisterResponse>;
       /**
        * Defaults to 8
        */
@@ -280,7 +287,7 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
     dbo: DBOFullyTyped<S>,
     db: DB,
     client: LoginClientInfo
-  ) => Awaitable<BasicSession> | BasicSession;
+  ) => Awaitable<LoginResponse>;
   logout?: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<any>;
 
   /**
@@ -290,6 +297,8 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
     getSession: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession>;
   };
 };
+
+export type LoginResponse = BasicSession | Exclude<EmailLoginResponse, { success: true }>;
 
 export type LoginParams =
   | { type: "username"; username: string; password: string; [key: string]: any }
