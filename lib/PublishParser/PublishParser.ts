@@ -1,4 +1,4 @@
-import { AnyObject, Method, getObjectEntries, isObject } from "prostgles-types";
+import { Method, getObjectEntries, isObject } from "prostgles-types";
 import { AuthResult, SessionUser } from "../Auth/AuthTypes";
 import { LocalParams } from "../DboBuilder/DboBuilder";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";

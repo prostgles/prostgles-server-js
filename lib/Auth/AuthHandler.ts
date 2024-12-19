@@ -30,10 +30,8 @@ export const HTTPCODES = {
   INTERNAL_SERVER_ERROR: 500,
 } as const;
 
-export const getLoginClientInfo = (
-  req: AuthClientRequest,
-): AuthClientRequest & LoginClientInfo => {
-  if ("httpReq" in req) {
+export const getLoginClientInfo = <T extends AuthClientRequest>(req: T): T & LoginClientInfo => {
+  if (req.httpReq) {
     const ip_address = req.httpReq.ip;
     if (!ip_address) throw new Error("ip_address missing from req.httpReq");
     const user_agent = req.httpReq.headers["user-agent"];
@@ -104,8 +102,7 @@ export class AuthHandler {
   };
 
   isUserRoute = (pathname: string) => {
-    const { login, logoutGetPath, magicLinksRoute, loginWithProvider } =
-      AUTH_ROUTES_AND_PARAMS;
+    const { login, logoutGetPath, magicLinksRoute, loginWithProvider } = AUTH_ROUTES_AND_PARAMS;
     const pubRoutes = [
       ...(this.opts?.expressConfig?.publicRoutes || []),
       login,
@@ -121,7 +118,7 @@ export class AuthHandler {
 
   setCookieAndGoToReturnURLIFSet = (
     cookie: { sid: string; expires: number },
-    r: { req: ExpressReq; res: ExpressRes },
+    r: { req: ExpressReq; res: ExpressRes }
   ) => {
     const { sid, expires } = cookie;
     const { res, req } = r;
@@ -136,9 +133,7 @@ export class AuthHandler {
         cookieDuration = { expires: new Date(expires) };
         const days = (+cookieDuration.expires - Date.now()) / (24 * 60 * 60e3);
         if (days >= 400) {
-          console.warn(
-            `Cookie expiration is higher than the Chrome 400 day limit: ${days}days`,
-          );
+          console.warn(`Cookie expiration is higher than the Chrome 400 day limit: ${days}days`);
         }
       }
 
@@ -172,7 +167,7 @@ export class AuthHandler {
           this.validateSid(sid),
           this.dbo as any,
           this.db,
-          getLoginClientInfo(clientReq),
+          getLoginClientInfo(clientReq)
         );
       }, 50);
     } catch (err) {
@@ -186,9 +181,7 @@ export class AuthHandler {
   getReturnUrl = (req: ExpressReq) => {
     const { returnUrlParamName } = AUTH_ROUTES_AND_PARAMS;
     if (returnUrlParamName && req?.query?.[returnUrlParamName]) {
-      const returnURL = decodeURIComponent(
-        req?.query?.[returnUrlParamName] as string,
-      );
+      const returnURL = decodeURIComponent(req?.query?.[returnUrlParamName] as string);
 
       return getSafeReturnURL(returnURL, returnUrlParamName);
     }
@@ -254,20 +247,12 @@ export class AuthHandler {
     });
   };
 
-  loginThrottled = async (
-    params: LoginParams,
-    client: LoginClientInfo,
-  ): Promise<BasicSession> => {
+  loginThrottled = async (params: LoginParams, client: LoginClientInfo): Promise<BasicSession> => {
     if (!this.opts?.login) throw "Auth login config missing";
     const { responseThrottle = 500 } = this.opts;
 
     return this.throttledFunc(async () => {
-      const result = await this.opts?.login?.(
-        params,
-        this.dbo as DBOFullyTyped,
-        this.db,
-        client,
-      );
+      const result = await this.opts?.login?.(params, this.dbo as DBOFullyTyped, this.db, client);
       const err = {
         msg:
           "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number } but got: " +
@@ -276,9 +261,7 @@ export class AuthHandler {
 
       if (!result) throw err;
       if (
-        (result &&
-          (typeof result.sid !== "string" ||
-            typeof result.expires !== "number")) ||
+        (result && (typeof result.sid !== "string" || typeof result.expires !== "number")) ||
         (!result && ![undefined, null].includes(result))
       ) {
         throw err;
@@ -296,14 +279,11 @@ export class AuthHandler {
   loginThrottledAndSetCookie = async (
     req: ExpressReq,
     res: ExpressRes,
-    loginParams: LoginParams,
+    loginParams: LoginParams
   ) => {
     const start = Date.now();
     const { sid, expires } =
-      (await this.loginThrottled(
-        loginParams,
-        getLoginClientInfo({ httpReq: req }),
-      )) || {};
+      (await this.loginThrottled(loginParams, getLoginClientInfo({ httpReq: req }))) || {};
     await this.prostgles.opts.onLog?.({
       type: "auth",
       command: "login",
@@ -333,8 +313,7 @@ export class AuthHandler {
     const { sidKeyName } = this;
     if (localParams.socket) {
       const { handshake } = localParams.socket;
-      const querySid =
-        handshake?.auth?.[sidKeyName] || handshake?.query?.[sidKeyName];
+      const querySid = handshake?.auth?.[sidKeyName] || handshake?.query?.[sidKeyName];
       let rawSid = querySid;
       if (!rawSid) {
         const cookie_str = localParams.socket?.handshake?.headers?.cookie;
@@ -343,8 +322,7 @@ export class AuthHandler {
       }
       return this.validateSid(rawSid);
     } else if (localParams.httpReq) {
-      const [tokenType, base64Token] =
-        localParams.httpReq.headers.authorization?.split(" ") ?? [];
+      const [tokenType, base64Token] = localParams.httpReq.headers.authorization?.split(" ") ?? [];
       let bearerSid: string | undefined;
       if (tokenType && base64Token) {
         if (tokenType.trim() !== "Bearer") {
@@ -352,9 +330,7 @@ export class AuthHandler {
         }
         bearerSid = Buffer.from(base64Token, "base64").toString();
       }
-      return this.validateSid(
-        bearerSid ?? localParams.httpReq?.cookies?.[sidKeyName],
-      );
+      return this.validateSid(bearerSid ?? localParams.httpReq?.cookies?.[sidKeyName]);
     } else throw "socket OR httpReq missing from localParams";
 
     function parseCookieStr(cookie_str: string | undefined): any {
@@ -376,9 +352,7 @@ export class AuthHandler {
   /**
    * Used for logging
    */
-  getSIDNoError = (
-    localParams: LocalParams | undefined,
-  ): string | undefined => {
+  getSIDNoError = (localParams: LocalParams | undefined): string | undefined => {
     if (!localParams) return undefined;
     try {
       return this.getSID(localParams);
@@ -387,9 +361,7 @@ export class AuthHandler {
     }
   };
 
-  async getClientInfo(
-    localParams: Pick<LocalParams, "socket" | "httpReq">,
-  ): Promise<AuthResult> {
+  async getClientInfo(localParams: Pick<LocalParams, "socket" | "httpReq">): Promise<AuthResult> {
     if (!this.opts) return {};
 
     const getSession = this.opts.cacheSession?.getSession;
@@ -415,22 +387,17 @@ export class AuthHandler {
     const res = await this.throttledFunc(async () => {
       const { getUser } = this.opts ?? {};
 
-      if (
-        getUser &&
-        localParams &&
-        (localParams.httpReq || localParams.socket)
-      ) {
+      if (getUser && localParams && (localParams.httpReq || localParams.socket)) {
         const sid = this.getSID(localParams);
-        const clientReq = localParams.httpReq
-          ? { httpReq: localParams.httpReq }
-          : { socket: localParams.socket! };
+        const clientReq =
+          localParams.httpReq ? { httpReq: localParams.httpReq } : { socket: localParams.socket! };
         let user, clientUser;
         if (sid) {
           const res = (await getUser(
             sid,
             this.dbo as any,
             this.db,
-            getLoginClientInfo(clientReq),
+            getLoginClientInfo(clientReq)
           )) as any;
           user = res?.user;
           clientUser = res?.clientUser;
@@ -463,10 +430,7 @@ export class AuthHandler {
     return res;
   }
 
-  isValidSocketSession = (
-    socket: PRGLIOSocket,
-    session: BasicSession,
-  ): boolean => {
+  isValidSocketSession = (socket: PRGLIOSocket, session: BasicSession): boolean => {
     const hasExpired = Boolean(session && session.expires <= Date.now());
     if (
       this.opts?.expressConfig?.publicRoutes &&
@@ -486,7 +450,7 @@ export class AuthHandler {
   };
 
   getClientAuth = async (
-    clientReq: Pick<LocalParams, "socket" | "httpReq">,
+    clientReq: Pick<LocalParams, "socket" | "httpReq">
   ): Promise<{ auth: AuthSocketSchema; userData: AuthResult }> => {
     let pathGuard = false;
     if (
@@ -504,16 +468,13 @@ export class AuthHandler {
             params: AuthGuardLocation,
             cb = (_err: any, _res?: AuthGuardLocationResponse) => {
               /** EMPTY */
-            },
+            }
           ) => {
             try {
               const { pathname, origin } =
                 typeof params === "string" ? JSON.parse(params) : params || {};
               if (pathname && typeof pathname !== "string") {
-                console.warn(
-                  "Invalid pathname provided for AuthGuardLocation: ",
-                  pathname,
-                );
+                console.warn("Invalid pathname provided for AuthGuardLocation: ", pathname);
               }
 
               /** These origins  */
@@ -533,7 +494,7 @@ export class AuthHandler {
               console.error("AUTHGUARD err: ", err);
               cb(err);
             }
-          },
+          }
         );
       }
     }

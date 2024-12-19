@@ -1,5 +1,5 @@
 import e from "express";
-import { AUTH_ROUTES_AND_PARAMS, AuthHandler, HTTPCODES } from "./AuthHandler";
+import { AUTH_ROUTES_AND_PARAMS, AuthHandler, getLoginClientInfo, HTTPCODES } from "./AuthHandler";
 import { Email, SMTPConfig } from "./AuthTypes";
 import { getOrSetTransporter, sendEmail } from "./sendEmail";
 import { promises } from "node:dns";
@@ -37,12 +37,11 @@ export async function setEmailProvider(this: AuthHandler, app: e.Express) {
       }
     }
     if (validationError) {
-      res
-        .status(HTTPCODES.AUTH_ERROR)
-        .json({ success: false, error: validationError });
+      res.status(HTTPCODES.AUTH_ERROR).json({ success: false, error: validationError });
       return;
     }
     try {
+      const { httpReq, ...clientInfo } = getLoginClientInfo({ httpReq: req });
       let emailMessage: undefined | { message: Email; smtp: SMTPConfig };
       if (email.signupType === "withPassword") {
         if (email.emailConfirmation) {
@@ -50,6 +49,8 @@ export async function setEmailProvider(this: AuthHandler, app: e.Express) {
           const message = await onSend({
             email: username,
             confirmationUrlPath: `${websiteUrl}${AUTH_ROUTES_AND_PARAMS.confirmEmail}`,
+            clientInfo,
+            req: httpReq,
           });
           emailMessage = { message: { ...message, to: username }, smtp };
         }
@@ -58,6 +59,8 @@ export async function setEmailProvider(this: AuthHandler, app: e.Express) {
         const message = await emailMagicLink.onSend({
           email: username,
           magicLinkPath: `${websiteUrl}${AUTH_ROUTES_AND_PARAMS.magicLinksRoute}`,
+          clientInfo,
+          req: httpReq,
         });
         emailMessage = {
           message: { ...message, to: username },
@@ -70,27 +73,25 @@ export async function setEmailProvider(this: AuthHandler, app: e.Express) {
         res.json({ success: true, message: "Email sent" });
       }
     } catch {
-      res
-        .status(HTTPCODES.AUTH_ERROR)
-        .json({ success: false, error: "Failed to send email" });
+      res.status(HTTPCODES.AUTH_ERROR).json({ success: false, error: "Failed to send email" });
     }
   });
 
   if (email.signupType === "withPassword" && email.emailConfirmation) {
-    app.get(
-      AUTH_ROUTES_AND_PARAMS.confirmEmailExpressRoute,
-      async (req, res) => {
-        const { id } = req.params ?? {};
-        try {
-          await email.emailConfirmation?.onConfirmed({ confirmationCode: id });
-          res.json({ success: true, message: "Email confirmed" });
-        } catch (_e) {
-          res
-            .status(HTTPCODES.AUTH_ERROR)
-            .json({ success: false, error: "Failed to confirm email" });
-        }
-      },
-    );
+    app.get(AUTH_ROUTES_AND_PARAMS.confirmEmailExpressRoute, async (req, res) => {
+      const { id } = req.params ?? {};
+      try {
+        const { httpReq, ...clientInfo } = getLoginClientInfo({ httpReq: req });
+        await email.emailConfirmation?.onConfirmed({
+          confirmationCode: id,
+          clientInfo,
+          req: httpReq,
+        });
+        res.json({ success: true, message: "Email confirmed" });
+      } catch (_e) {
+        res.status(HTTPCODES.AUTH_ERROR).json({ success: false, error: "Failed to confirm email" });
+      }
+    });
   }
 }
 
