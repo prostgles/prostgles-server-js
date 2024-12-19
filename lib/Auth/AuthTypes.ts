@@ -122,6 +122,7 @@ type EmailProvider =
          */
         onSend: (data: {
           email: string;
+          password: string;
           confirmationUrlPath: string;
           clientInfo: LoginClientInfo;
           req: ExpressReq;

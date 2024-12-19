@@ -48,6 +48,7 @@ export async function setEmailProvider(this: AuthHandler, app: e.Express) {
           const { onSend, smtp } = email.emailConfirmation;
           const message = await onSend({
             email: username,
+            password,
             confirmationUrlPath: `${websiteUrl}${AUTH_ROUTES_AND_PARAMS.confirmEmail}`,
             clientInfo,
             req: httpReq,
