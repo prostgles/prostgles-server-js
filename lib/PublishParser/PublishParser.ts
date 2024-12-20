@@ -40,14 +40,13 @@ export class PublishParser {
     this.db = db;
     this.prostgles = prostgles;
 
-    if (!this.dbo || !this.publish) throw "INTERNAL ERROR: dbo and/or publish missing";
+    if (!this.publish) throw "INTERNAL ERROR: dbo and/or publish missing";
   }
 
   async getPublishParams(
     localParams: LocalParams,
     clientInfo?: AuthResult
   ): Promise<PublishParams> {
-    if (!this.dbo) throw "dbo missing";
     return {
       ...(clientInfo || (await this.prostgles.authHandler?.getClientInfo(localParams))),
       dbo: this.dbo as any,
@@ -69,12 +68,11 @@ export class PublishParser {
     if (_methods && Object.keys(_methods).length) {
       getObjectEntries(_methods).map(([key, method]) => {
         const isFuncLike = (maybeFunc: VoidFunction | Promise<void> | Promise<any>) =>
-          typeof maybeFunc === "function" || (maybeFunc && typeof maybeFunc.then === "function");
+          typeof maybeFunc === "function" || typeof maybeFunc.then === "function";
         if (
-          method &&
-          (isFuncLike(method as Extract<Method, Promise<any>>) ||
-            // @ts-ignore
-            (isObject(method) && isFuncLike(method.run)))
+          isFuncLike(method as Extract<Method, Promise<any>>) ||
+          // @ts-ignore
+          (isObject(method) && isFuncLike(method.run))
         ) {
           methods[key] = _methods[key]!;
         } else {
@@ -122,8 +120,6 @@ export class PublishParser {
     { tableName, command, localParams }: DboTableCommand,
     clientInfo?: AuthResult
   ): Promise<TableRule> {
-    if (!this.dbo) throw "INTERNAL ERROR: dbo is missing";
-
     if (!command || !tableName) throw "command OR tableName are missing";
 
     const rtm = RULE_TO_METHODS.find((rtms) => (rtms.methods as any).includes(command));
@@ -132,7 +128,7 @@ export class PublishParser {
     }
 
     /* Must be local request -> allow everything */
-    if (!localParams || (!localParams.socket && !localParams.httpReq)) {
+    if (!localParams.socket && !localParams.httpReq) {
       return RULE_TO_METHODS.reduce(
         (a, v) => ({
           ...a,
@@ -146,7 +142,7 @@ export class PublishParser {
     if (!this.publish) throw "publish is missing";
 
     /* Get any publish errors for socket */
-    const errorInfo = localParams?.socket?.prostgles?.tableSchemaErrors?.[tableName]?.[command];
+    const errorInfo = localParams.socket?.prostgles?.tableSchemaErrors[tableName]?.[command];
 
     if (errorInfo) throw errorInfo.error;
 
@@ -166,7 +162,7 @@ export class PublishParser {
       }
     }
 
-    if (rtm && table_rule && table_rule[rtm.rule]) {
+    if (table_rule[rtm.rule]) {
       return table_rule;
     } else
       throw {

@@ -231,7 +231,7 @@ prostgles<DBGeneratedSchema>({
   - **getUser** <span style="color: red">required</span> <span style="color: green;">(sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: AuthClientRequest & LoginClientInfo) =&gt; Awaitable&lt;AuthResult&lt;...&gt;&gt;</span>
 
     undefined sid is allowed to enable public users
-  - **login** <span style="color: grey">optional</span> <span style="color: green;">(params: LoginParams, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: LoginClientInfo) =&gt; Awaitable&lt;BasicSession&gt;</span>
+  - **login** <span style="color: grey">optional</span> <span style="color: green;">(params: LoginParams, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: LoginClientInfo) =&gt; Awaitable&lt;LoginResponse&gt;</span>
   - **logout** <span style="color: grey">optional</span> <span style="color: green;">(sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; any</span>
   - **cacheSession** <span style="color: grey">optional</span> <span style="color: green;">{ getSession: (sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; Awaitable&lt;BasicSession&gt;; }</span>
 

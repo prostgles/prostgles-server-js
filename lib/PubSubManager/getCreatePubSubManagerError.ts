@@ -1,10 +1,10 @@
-import { tryCatch } from "prostgles-types";
+import { tryCatch, tryCatchV2 } from "prostgles-types";
 import { getPubSubManagerInitQuery } from "./getPubSubManagerInitQuery";
 import { getCanExecute } from "../DboBuilder/dboBuilderUtils";
 import { DboBuilder } from "../DboBuilder/DboBuilder";
 
 export const getCreatePubSubManagerError = async (
-  dboBuilder: DboBuilder,
+  dboBuilder: DboBuilder
 ): Promise<string | undefined> => {
   const db = dboBuilder.db;
 
@@ -19,7 +19,7 @@ export const getCreatePubSubManagerError = async (
   `);
 
   const checkIfCanCreateProstglesSchema = () =>
-    tryCatch(async () => {
+    tryCatchV2(async () => {
       const allGood = await db.task(async (t) => {
         try {
           await t.none(`
@@ -40,7 +40,7 @@ export const getCreatePubSubManagerError = async (
     });
 
   if (!prglSchema.length) {
-    const canCreate = await checkIfCanCreateProstglesSchema();
+    const { data: canCreate } = await checkIfCanCreateProstglesSchema();
     if (!canCreate) {
       const dbName = await db.one(`SELECT current_database()`);
       const user = await db.one(`SELECT current_user`);
@@ -48,23 +48,23 @@ export const getCreatePubSubManagerError = async (
     }
     return undefined;
   } else {
-    const canCheckVersion = await tryCatch(async () => {
+    const canCheckVersion = await tryCatchV2(async () => {
       await db.any(`
         SELECT * FROM prostgles.versions
       `);
       return { ok: true };
     });
 
-    if (!canCheckVersion.ok) {
+    if (!canCheckVersion.data?.ok) {
       console.error(
         "prostgles schema exists but cannot check version. Check logs",
-        canCheckVersion.error,
+        canCheckVersion.error
       );
       return "prostgles schema exists but cannot check version. Check logs";
     }
   }
 
-  const initQuery = await tryCatch(async () => ({
+  const initQuery = await tryCatchV2(async () => ({
     query: await getPubSubManagerInitQuery.bind(dboBuilder)(),
   }));
   if (initQuery.hasError) {
@@ -72,7 +72,7 @@ export const getCreatePubSubManagerError = async (
     return "Could not get initQuery. Check logs";
   }
 
-  if (!initQuery.query) {
+  if (!initQuery.data.query) {
     return undefined;
   }
 

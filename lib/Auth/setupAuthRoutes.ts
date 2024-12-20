@@ -1,26 +1,13 @@
-import { RequestHandler } from "express";
+import { RequestHandler, Response } from "express";
+import { AuthResponse } from "prostgles-types";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
-import {
-  AUTH_ROUTES_AND_PARAMS,
-  AuthHandler,
-  getLoginClientInfo,
-  HTTPCODES,
-} from "./AuthHandler";
-import {
-  AuthClientRequest,
-  ExpressReq,
-  ExpressRes,
-  LoginParams,
-} from "./AuthTypes";
-import {
-  setAuthProviders,
-  upsertNamedExpressMiddleware,
-} from "./setAuthProviders";
-
+import { AUTH_ROUTES_AND_PARAMS, AuthHandler, HTTP_FAIL_CODES } from "./AuthHandler";
+import { AuthClientRequest, ExpressReq, ExpressRes, LoginParams } from "./AuthTypes";
+import { setAuthProviders, upsertNamedExpressMiddleware } from "./setAuthProviders";
+import { getClientRequestIPsInfo } from "./utils/getClientRequestIPsInfo";
+import { getReturnUrl } from "./utils/getReturnUrl";
 export async function setupAuthRoutes(this: AuthHandler) {
-  if (!this.opts) return;
-
-  const { login, getUser, expressConfig } = this.opts;
+  const { login, expressConfig } = this.opts;
 
   if (!login) {
     throw "Invalid auth: Provide { sidKeyName: string } ";
@@ -30,18 +17,10 @@ export async function setupAuthRoutes(this: AuthHandler) {
     throw "sidKeyName cannot be 'sid' due to collision with socket.io";
   }
 
-  if (!getUser) throw "getUser missing from auth config";
-
   if (!expressConfig) {
     return;
   }
-  const {
-    app,
-    publicRoutes = [],
-    onGetRequestOK,
-    magicLinks,
-    use,
-  } = expressConfig;
+  const { app, publicRoutes = [], onGetRequestOK, onMagicLink, use } = expressConfig;
   if (publicRoutes.find((r) => typeof r !== "string" || !r)) {
     throw "Invalid or empty string provided within publicRoutes ";
   }
@@ -59,79 +38,66 @@ export async function setupAuthRoutes(this: AuthHandler) {
         db: this.db,
       });
     };
-    upsertNamedExpressMiddleware(
-      app,
-      prostglesUseMiddleware,
-      "prostglesUseMiddleware",
-    );
+    upsertNamedExpressMiddleware(app, prostglesUseMiddleware, "prostglesUseMiddleware");
   }
 
-  if (magicLinks) {
-    const { check } = magicLinks;
-    if (!check) {
-      throw "Check must be defined for magicLinks";
-    }
-
+  if (onMagicLink) {
     app.get(
       AUTH_ROUTES_AND_PARAMS.magicLinksExpressRoute,
-      async (req: ExpressReq, res: ExpressRes) => {
-        const { id } = req.params ?? {};
+      async (
+        req: ExpressReq,
+        res: Response<AuthResponse.MagicLinkAuthFailure | AuthResponse.MagicLinkAuthSuccess>
+      ) => {
+        const { id } = req.params;
 
         if (typeof id !== "string" || !id) {
           res
-            .status(HTTPCODES.BAD_REQUEST)
-            .json({ msg: "Invalid magic-link id. Expecting a string" });
+            .status(HTTP_FAIL_CODES.BAD_REQUEST)
+            .json({ success: false, code: "something-went-wrong", message: "Invalid magic link" });
         } else {
           try {
-            const session = await this.throttledFunc(async () => {
-              return check(
+            const response = await this.throttledFunc(async () => {
+              return onMagicLink(
                 id,
                 this.dbo as any,
                 this.db,
-                getLoginClientInfo({ httpReq: req }),
+                getClientRequestIPsInfo({ httpReq: req })
               );
             });
-            if (!session) {
-              res
-                .status(HTTPCODES.AUTH_ERROR)
-                .json({ error: "Invalid magic-link" });
+            if (!response.session) {
+              res.status(HTTP_FAIL_CODES.UNAUTHORIZED).json(response.response);
             } else {
-              this.setCookieAndGoToReturnURLIFSet(session, { req, res });
+              this.setCookieAndGoToReturnURLIFSet(response.session, { req, res });
             }
           } catch (e) {
-            res.status(HTTPCODES.AUTH_ERROR).json({ error: e });
+            res
+              .status(HTTP_FAIL_CODES.UNAUTHORIZED)
+              .json({ success: false, code: "something-went-wrong" });
           }
         }
-      },
+      }
     );
   }
 
-  app.post(
-    AUTH_ROUTES_AND_PARAMS.login,
-    async (req: ExpressReq, res: ExpressRes) => {
-      try {
-        const loginParams: LoginParams = {
-          type: "username",
-          ...req.body,
-        };
+  app.post(AUTH_ROUTES_AND_PARAMS.login, async (req: ExpressReq, res: ExpressRes) => {
+    try {
+      const loginParams: LoginParams = {
+        type: "username",
+        ...req.body,
+      };
 
-        await this.loginThrottledAndSetCookie(req, res, loginParams);
-      } catch (error) {
-        res.status(HTTPCODES.AUTH_ERROR).json({ error });
-      }
-    },
-  );
+      await this.loginThrottledAndSetCookie(req, res, loginParams);
+    } catch (error) {
+      res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({ error });
+    }
+  });
 
   const onLogout = async (req: ExpressReq, res: ExpressRes) => {
-    const sid = this.validateSid(req?.cookies?.[this.sidKeyName]);
+    const sid = this.validateSid(req.cookies?.[this.sidKeyName]);
     if (sid) {
       try {
         await this.throttledFunc(() => {
-          return this.opts?.logout?.(
-            req?.cookies?.[this.sidKeyName],
-            this.dbo as any,
-            this.db,
-          );
+          return this.opts.logout?.(req.cookies?.[this.sidKeyName], this.dbo as any, this.db);
         });
       } catch (err) {
         console.error(err);
@@ -141,83 +107,74 @@ export async function setupAuthRoutes(this: AuthHandler) {
   };
 
   /* Redirect if not logged in and requesting non public content */
-  app.get(
-    AUTH_ROUTES_AND_PARAMS.catchAll,
-    async (req: ExpressReq, res: ExpressRes, next) => {
-      const clientReq: AuthClientRequest = { httpReq: req };
-      const getUser = this.getUser;
-      if (this.prostgles.restApi) {
-        if (
-          Object.values(this.prostgles.restApi.routes).some((restRoute) =>
-            this.matchesRoute(restRoute.split("/:")[0], req.path),
-          )
-        ) {
-          next();
-          return;
-        }
+  app.get(AUTH_ROUTES_AND_PARAMS.catchAll, async (req: ExpressReq, res: ExpressRes, next) => {
+    const clientReq: AuthClientRequest = { httpReq: req };
+    const getUser = this.getUser;
+    if (this.prostgles.restApi) {
+      if (
+        Object.values(this.prostgles.restApi.routes).some((restRoute) =>
+          this.matchesRoute(restRoute.split("/:")[0], req.path)
+        )
+      ) {
+        next();
+        return;
       }
-      try {
-        const returnURL = this.getReturnUrl(req);
+    }
+    try {
+      const returnURL = getReturnUrl(req);
 
-        if (this.matchesRoute(AUTH_ROUTES_AND_PARAMS.logoutGetPath, req.path)) {
-          await onLogout(req, res);
-          return;
-        }
-
-        if (
-          this.matchesRoute(AUTH_ROUTES_AND_PARAMS.loginWithProvider, req.path)
-        ) {
-          next();
-          return;
-        }
-        /**
-         * Requesting a User route
-         */
-        if (this.isUserRoute(req.path)) {
-          /* Check auth. Redirect to login if unauthorized */
-          const u = await getUser(clientReq);
-          if (!u) {
-            res.redirect(
-              `${AUTH_ROUTES_AND_PARAMS.login}?returnURL=${encodeURIComponent(req.originalUrl)}`,
-            );
-            return;
-          }
-
-          /* If authorized and going to returnUrl then redirect. Otherwise serve file */
-        } else if (returnURL && (await getUser(clientReq))) {
-          res.redirect(returnURL);
-          return;
-
-          /** If Logged in and requesting login then redirect to main page */
-        } else if (
-          this.matchesRoute(AUTH_ROUTES_AND_PARAMS.login, req.path) &&
-          (await getUser(clientReq))
-        ) {
-          res.redirect("/");
-          return;
-        }
-
-        onGetRequestOK?.(req, res, {
-          getUser: () => getUser(clientReq),
-          dbo: this.dbo as DBOFullyTyped,
-          db: this.db,
-        });
-      } catch (error) {
-        console.error(error);
-        const errorMessage =
-          typeof error === "string"
-            ? error
-            : error instanceof Error
-              ? error.message
-              : "";
-        res
-          .status(HTTPCODES.AUTH_ERROR)
-          .json({
-            error:
-              "Something went wrong when processing your request" +
-              (errorMessage ? ": " + errorMessage : ""),
-          });
+      if (this.matchesRoute(AUTH_ROUTES_AND_PARAMS.logoutGetPath, req.path)) {
+        await onLogout(req, res);
+        return;
       }
-    },
-  );
+
+      if (this.matchesRoute(AUTH_ROUTES_AND_PARAMS.loginWithProvider, req.path)) {
+        next();
+        return;
+      }
+      /**
+       * Requesting a User route
+       */
+      if (this.isUserRoute(req.path)) {
+        /* Check auth. Redirect to login if unauthorized */
+        const u = await getUser(clientReq);
+        if (!u) {
+          res.redirect(
+            `${AUTH_ROUTES_AND_PARAMS.login}?returnURL=${encodeURIComponent(req.originalUrl)}`
+          );
+          return;
+        }
+
+        /* If authorized and going to returnUrl then redirect. Otherwise serve file */
+      } else if (returnURL && (await getUser(clientReq))) {
+        res.redirect(returnURL);
+        return;
+
+        /** If Logged in and requesting login then redirect to main page */
+      } else if (
+        this.matchesRoute(AUTH_ROUTES_AND_PARAMS.login, req.path) &&
+        (await getUser(clientReq))
+      ) {
+        res.redirect("/");
+        return;
+      }
+
+      onGetRequestOK?.(req, res, {
+        getUser: () => getUser(clientReq),
+        dbo: this.dbo as DBOFullyTyped,
+        db: this.db,
+      });
+    } catch (error) {
+      console.error(error);
+      const errorMessage =
+        typeof error === "string" ? error
+        : error instanceof Error ? error.message
+        : "";
+      res.status(HTTP_FAIL_CODES.UNAUTHORIZED).json({
+        error:
+          "Something went wrong when processing your request" +
+          (errorMessage ? ": " + errorMessage : ""),
+      });
+    }
+  });
 }

@@ -75,8 +75,6 @@ export class ViewHandler {
     tx?: { t: pgPromise.ITask<{}>; dbTX: TableHandlers },
     joinPaths?: JoinPaths
   ) {
-    if (!db || !tableOrViewInfo) throw "";
-
     this.db = db;
     this.tx = tx;
     this.joinPaths = joinPaths;
@@ -92,7 +90,7 @@ export class ViewHandler {
     this.column_names = tableOrViewInfo.columns.map((c) => c.name);
 
     this.dboBuilder = dboBuilder;
-    this.joins = this.dboBuilder.joins ?? [];
+    this.joins = this.dboBuilder.joins;
     this.columnsForTypes.map(({ name, udt_name, is_nullable }) => {
       this.tsColumnDefs.push(
         `${escapeTSNames(name)}?: ${postgresToTsType(udt_name) as string} ${is_nullable ? " | null " : ""};`
@@ -111,7 +109,7 @@ export class ViewHandler {
     error?: any;
   }) => {
     if (localParams?.noLog) {
-      if (localParams?.socket || localParams.httpReq) {
+      if (localParams.socket || localParams.httpReq) {
         throw new Error("noLog option is not allowed from a remote client");
       }
       return;
@@ -244,9 +242,9 @@ export class ViewHandler {
 
       const res: ValidatedTableRules = {
         allColumns,
-        getColumns: tableRules?.getColumns ?? true,
-        getInfo: tableRules?.getColumns ?? true,
-      } as ValidatedTableRules;
+        getColumns: tableRules.getColumns ?? true,
+        getInfo: tableRules.getColumns ?? true,
+      };
 
       if (tableRules.select) {
         if (!tableRules.select.fields) return throwFieldsErr("select");
@@ -258,7 +256,7 @@ export class ViewHandler {
           tableRules.select.maxLimit !== maxLimit
         ) {
           const ml = tableRules.select.maxLimit;
-          if (ml !== null && (!Number.isInteger(ml) || ml < 0))
+          if (!Number.isInteger(ml) || ml < 0)
             throw (
               ` Invalid publish.${this.name}.select.maxLimit -> expecting   a positive integer OR null    but got ` +
               ml
@@ -287,8 +285,8 @@ export class ViewHandler {
           forcedData: { ...tableRules.update.forcedData },
           forcedFilter: { ...tableRules.update.forcedFilter },
           returningFields: getFirstSpecified(
-            tableRules.update?.returningFields,
-            tableRules?.select?.fields,
+            tableRules.update.returningFields,
+            tableRules.select?.fields,
             tableRules.update.fields
           ),
           filterFields: this.parseFieldFilter(tableRules.update.filterFields),
@@ -303,7 +301,7 @@ export class ViewHandler {
           forcedData: { ...tableRules.insert.forcedData },
           returningFields: getFirstSpecified(
             tableRules.insert.returningFields,
-            tableRules?.select?.fields,
+            tableRules.select?.fields,
             tableRules.insert.fields
           ),
         };
@@ -317,7 +315,7 @@ export class ViewHandler {
           filterFields: this.parseFieldFilter(tableRules.delete.filterFields),
           returningFields: getFirstSpecified(
             tableRules.delete.returningFields,
-            tableRules?.select?.fields,
+            tableRules.select?.fields,
             tableRules.delete.filterFields
           ),
         };
@@ -476,10 +474,10 @@ export class ViewHandler {
     if (allowed_cols) {
       allowedFields = this.parseFieldFilter(allowed_cols, allow_empty);
     }
-    let col_names = (resultFields || []).filter((f) => !allowedFields || allowedFields.includes(f));
+    let col_names = resultFields.filter((f) => allowedFields.includes(f));
 
     /* Maintain allowed cols order */
-    if (selectParams === "*" && allowedFields && allowedFields.length) {
+    if (selectParams === "*" && allowedFields.length) {
       col_names = allowedFields;
     }
 
@@ -525,7 +523,7 @@ export class ViewHandler {
  * Throw error if illegal keys found in object
  */
 export const validateObj = <T extends Record<string, any>>(obj: T, allowedKeys: string[]): T => {
-  if (obj && Object.keys(obj).length) {
+  if (Object.keys(obj).length) {
     const invalid_keys = Object.keys(obj).filter((k) => !allowedKeys.includes(k));
     if (invalid_keys.length) {
       throw "Invalid/Illegal fields found: " + invalid_keys.join(", ");

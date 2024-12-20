@@ -18,7 +18,7 @@ export async function _delete(
   params?: DeleteParams,
   param3_unused?: undefined,
   tableRules?: TableRule,
-  localParams?: LocalParams,
+  localParams?: LocalParams
 ): Promise<any> {
   const start = Date.now();
   try {
@@ -39,11 +39,10 @@ export async function _delete(
       returningFields = tableRules.delete.returningFields;
       validate = tableRules.delete.validate;
 
-      if (!returningFields) returningFields = tableRules?.select?.fields;
-      if (!returningFields) returningFields = tableRules?.delete?.filterFields;
+      if (!returningFields) returningFields = tableRules.select?.fields;
+      if (!returningFields) returningFields = tableRules.delete.filterFields;
 
-      if (!filterFields)
-        throw ` Invalid delete rule for ${this.name}. filterFields missing `;
+      if (!filterFields) throw ` Invalid delete rule for ${this.name}. filterFields missing `;
 
       /* Safely test publish rules */
       if (testRule) {
@@ -63,15 +62,10 @@ export async function _delete(
         returnType: 1,
       };
       const good_params = Object.keys(good_paramsObj);
-      const bad_params = Object.keys(params).filter(
-        (k) => !good_params.includes(k),
-      );
-      if (bad_params && bad_params.length)
+      const bad_params = Object.keys(params).filter((k) => !good_params.includes(k));
+      if (bad_params.length)
         throw (
-          "Invalid params: " +
-          bad_params.join(", ") +
-          " \n Expecting: " +
-          good_params.join(", ")
+          "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ")
         );
     }
 
@@ -98,10 +92,7 @@ export async function _delete(
         throw "Returning dissallowed";
       }
       returningQuery = this.makeReturnQuery(
-        await this.prepareReturning(
-          returning,
-          this.parseFieldFilter(returningFields),
-        ),
+        await this.prepareReturning(returning, this.parseFieldFilter(returningFields))
       );
       queryWithoutRLS += returningQuery;
     }
@@ -124,7 +115,7 @@ export async function _delete(
       const result = await onDeleteFromFileTable.bind(this)({
         localParams,
         queryType,
-        returningQuery: returnQuery ? returnQuery : undefined,
+        returningQuery: undefined,
         filterOpts,
       });
       await this._log({

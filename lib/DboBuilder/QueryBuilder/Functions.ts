@@ -36,16 +36,13 @@ export const parseFunction = (funcData: {
 
   if (!funcDef) {
     const sf = functions
-      .filter((f) =>
-        f.name.toLowerCase().slice(1).startsWith(funcName.toLowerCase()),
-      )
+      .filter((f) => f.name.toLowerCase().slice(1).startsWith(funcName.toLowerCase()))
       .sort((a, b) => a.name.length - b.name.length);
-    const hint = sf.length
-      ? `. \n Maybe you meant: \n | ${sf.map((s) => s.name + " " + (s.description || "")).join("    \n | ")}  ?`
+    const hint =
+      sf.length ?
+        `. \n Maybe you meant: \n | ${sf.map((s) => s.name + " " + (s.description || "")).join("    \n | ")}  ?`
       : "";
-    throw (
-      "\n Function " + funcName + " does not exist or is not allowed " + hint
-    );
+    throw "\n Function " + funcName + " does not exist or is not allowed " + hint;
   }
 
   /* Validate fields */
@@ -54,14 +51,12 @@ export const parseFunction = (funcData: {
     fields.forEach((fieldKey) => {
       if (typeof fieldKey !== "string" || !allowedFields.includes(fieldKey)) {
         throw makeErr(
-          `getFields() => field name ${JSON.stringify(fieldKey)} is invalid or disallowed`,
+          `getFields() => field name ${JSON.stringify(fieldKey)} is invalid or disallowed`
         );
       }
     });
     if ((funcDef.minCols ?? 0) > fields.length) {
-      throw makeErr(
-        `Less columns provided than necessary (minCols=${funcDef.minCols})`,
-      );
+      throw makeErr(`Less columns provided than necessary (minCols=${funcDef.minCols})`);
     }
   }
 
@@ -147,16 +142,12 @@ const parseUnix = (
   colName: string,
   tableAlias: string | undefined,
   allColumns: ColumnInfo[],
-  opts: { timeZone: boolean | string } | undefined,
+  opts: { timeZone: boolean | string } | undefined
 ) => {
   let tz = "";
   if (opts) {
-    const { timeZone } = opts ?? {};
-    if (
-      timeZone &&
-      typeof timeZone !== "string" &&
-      typeof timeZone !== "boolean"
-    ) {
+    const { timeZone } = opts;
+    if (timeZone && typeof timeZone !== "string" && typeof timeZone !== "boolean") {
       throw `Bad timeZone value. timeZone can be boolean or string`;
     }
     if (timeZone === true) {
@@ -213,11 +204,7 @@ const JSON_Funcs: FunctionSpec[] = [
     numArgs: 4,
     type: "function",
     getFields: ([column]) => column,
-    getQuery: ({
-      args: [colName, jsonPath, ...otherArgs],
-      tableAlias,
-      allowedFields,
-    }) => {
+    getQuery: ({ args: [colName, jsonPath, ...otherArgs], tableAlias, allowedFields }) => {
       if (!allowedFields.includes(colName)) {
         throw `Unexpected: column ${colName} not found`;
       }
@@ -232,14 +219,8 @@ const JSON_Funcs: FunctionSpec[] = [
 
   ...(
     [
-      [
-        "jsonb_array_length",
-        "Returns the number of elements in the outermost JSON array",
-      ],
-      [
-        "jsonb_each",
-        "Expands the outermost JSON object into a set of key/value pairs",
-      ],
+      ["jsonb_array_length", "Returns the number of elements in the outermost JSON array"],
+      ["jsonb_each", "Expands the outermost JSON object into a set of key/value pairs"],
       [
         "jsonb_each_text",
         "Expands the outermost JSON object into a set of key/value pairs. The returned values will be of type text",
@@ -252,10 +233,7 @@ const JSON_Funcs: FunctionSpec[] = [
       ["jsonb_pretty", "Returns from_json as indented JSON text "],
       ["jsonb_to_record", "Builds an arbitrary record from a JSON object"],
       ["jsonb_array_elements", "Expands a JSON array to a set of JSON values"],
-      [
-        "jsonb_array_elements_text",
-        "Expands a JSON array to a set of text values ",
-      ],
+      ["jsonb_array_elements_text", "Expands a JSON array to a set of text values "],
       [
         "jsonb_typeof",
         "Returns the type of the outermost JSON value as a text string. Possible types are object, array, string, number, boolean, and null ",
@@ -274,7 +252,7 @@ const JSON_Funcs: FunctionSpec[] = [
           const escapedName = asNameAlias(colName, tableAlias);
           return `${name}(${escapedName})`;
         },
-      }) as FunctionSpec,
+      }) as FunctionSpec
   ),
 ];
 
@@ -309,18 +287,14 @@ const FTS_Funcs: FunctionSpec[] =
         const keys = Object.keys(qVal);
         if (!keys.length) throw "Bad arg";
         if (keys.length !== 1 || !searchTypes.includes(keys[0] as any))
-          throw (
-            "Expecting a an object with a single key named one of: " +
-            searchTypes.join(", ")
-          );
+          throw "Expecting a an object with a single key named one of: " + searchTypes.join(", ");
         qType = keys[0]!;
         qVal = asValue(qVal[qType]);
 
         /* 'search term' */
       } else if (typeof qVal === "string") {
         qVal = pgp.as.format(qType + "($1)", [qVal]);
-      } else
-        throw "Bad second arg. Exepcting search string or { to_tsquery: 'search string' }";
+      } else throw "Bad second arg. Exepcting search string or { to_tsquery: 'search string' }";
 
       const res = `ts_headline(${_type} ${col}::text, ${qVal}, 'ShortWord=1 ' )`;
       // console.log(res)
@@ -449,8 +423,7 @@ let PostGIS_Funcs: FunctionSpec[] = (
     } else if (fname === "ST_DistanceSpheroid") {
       colCast = "::geometry";
       geomQCast = "::geometry";
-      if (typeof spheroid !== "string")
-        throw `ST_DistanceSpheroid: spheroid param must be string`;
+      if (typeof spheroid !== "string") throw `ST_DistanceSpheroid: spheroid param must be string`;
       extraParams = `, ${asValue(spheroid)}`;
 
       /**
@@ -465,18 +438,18 @@ let PostGIS_Funcs: FunctionSpec[] = (
        * double precision <->( geometry A , geometry B );
        * double precision <->( geography A , geography B );
        */
-    } else if (fname === "<->") {
+    } else if ((fname as string) === "<->") {
       colCast = colIsGeog ? "::geography" : "::geometry";
       geomQCast = colIsGeog ? "::geography" : "::geometry";
       const q = pgp.as.format(
-        `${asNameAlias(columnName, tableAlias)}${colCast} <-> ${geomQ}${geomQCast}`,
+        `${asNameAlias(columnName, tableAlias)}${colCast} <-> ${geomQ}${geomQCast}`
       );
       if (debug) throw q;
       return q;
     }
 
     const query = pgp.as.format(
-      `${fname}(${asNameAlias(columnName, tableAlias)}${colCast} , ${geomQ}${geomQCast} ${extraParams})`,
+      `${fname}(${asNameAlias(columnName, tableAlias)}${colCast} , ${geomQ}${geomQCast} ${extraParams})`
     );
     if (debug) {
       throw query;
@@ -508,15 +481,10 @@ PostGIS_Funcs = PostGIS_Funcs.concat(
       getFields: (args: any[]) => [args[0]],
       getQuery: ({ args: [colName, ...otherArgs], tableAlias }) => {
         let secondArg = "";
-        if (otherArgs.length)
-          secondArg = ", " + otherArgs.map((arg) => asValue(arg)).join(", ");
+        if (otherArgs.length) secondArg = ", " + otherArgs.map((arg) => asValue(arg)).join(", ");
         const escTabelName = asNameAlias(colName, tableAlias) + "::geometry";
         const result = pgp.as.format(
-          fname +
-            "(" +
-            escTabelName +
-            secondArg +
-            (fname === "ST_AsGeoJSON" ? ")::jsonb" : ")"),
+          fname + "(" + escTabelName + secondArg + (fname === "ST_AsGeoJSON" ? ")::jsonb" : ")")
         );
         if (["ST_Centroid", "ST_SnapToGrid", "ST_Simplify"].includes(fname)) {
           const r = `ST_AsGeoJSON(${result})::jsonb`;
@@ -526,7 +494,7 @@ PostGIS_Funcs = PostGIS_Funcs.concat(
       },
     };
     return res;
-  }),
+  })
 );
 
 PostGIS_Funcs = PostGIS_Funcs.concat(
@@ -558,7 +526,7 @@ PostGIS_Funcs = PostGIS_Funcs.concat(
       },
     };
     return res;
-  }),
+  })
 );
 
 PostGIS_Funcs = PostGIS_Funcs.concat(
@@ -576,7 +544,7 @@ PostGIS_Funcs = PostGIS_Funcs.concat(
 
       return `${fname}(${escapedColName})`;
     },
-  })),
+  }))
 );
 
 /**
@@ -595,12 +563,9 @@ export const FUNCTIONS: FunctionSpec[] = [
       const q = pgp.as.format(
         "md5(" +
           args
-            .map(
-              (fname) =>
-                "COALESCE( " + asNameAlias(fname, tableAlias) + "::text, '' )",
-            )
+            .map((fname) => "COALESCE( " + asNameAlias(fname, tableAlias) + "::text, '' )")
             .join(" || ") +
-          ")",
+          ")"
       );
       return q;
     },
@@ -616,12 +581,9 @@ export const FUNCTIONS: FunctionSpec[] = [
       const q = pgp.as.format(
         "md5(string_agg(" +
           args
-            .map(
-              (fname) =>
-                "COALESCE( " + asNameAlias(fname, tableAlias) + "::text, '' )",
-            )
+            .map((fname) => "COALESCE( " + asNameAlias(fname, tableAlias) + "::text, '' )")
             .join(" || ") +
-          ", ','))",
+          ", ','))"
       );
       return q;
     },
@@ -638,12 +600,9 @@ export const FUNCTIONS: FunctionSpec[] = [
       const q = pgp.as.format(
         "encode(sha256((" +
           args
-            .map(
-              (fname) =>
-                "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )",
-            )
+            .map((fname) => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )")
             .join(" || ") +
-          ")::text::bytea), 'hex')",
+          ")::text::bytea), 'hex')"
       );
       return q;
     },
@@ -659,12 +618,9 @@ export const FUNCTIONS: FunctionSpec[] = [
       const q = pgp.as.format(
         "encode(sha256(string_agg(" +
           args
-            .map(
-              (fname) =>
-                "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )",
-            )
+            .map((fname) => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )")
             .join(" || ") +
-          ", ',')::text::bytea), 'hex')",
+          ", ',')::text::bytea), 'hex')"
       );
       return q;
     },
@@ -680,12 +636,9 @@ export const FUNCTIONS: FunctionSpec[] = [
       const q = pgp.as.format(
         "encode(sha512((" +
           args
-            .map(
-              (fname) =>
-                "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )",
-            )
+            .map((fname) => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )")
             .join(" || ") +
-          ")::text::bytea), 'hex')",
+          ")::text::bytea), 'hex')"
       );
       return q;
     },
@@ -701,12 +654,9 @@ export const FUNCTIONS: FunctionSpec[] = [
       const q = pgp.as.format(
         "encode(sha512(string_agg(" +
           args
-            .map(
-              (fname) =>
-                "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )",
-            )
+            .map((fname) => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )")
             .join(" || ") +
-          ", ',')::text::bytea), 'hex')",
+          ", ',')::text::bytea), 'hex')"
       );
       return q;
     },
@@ -726,10 +676,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: false,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
-      return pgp.as.format(
-        "LEFT(" + asNameAlias(args[0], tableAlias) + ", $1)",
-        [args[1]],
-      );
+      return pgp.as.format("LEFT(" + asNameAlias(args[0], tableAlias) + ", $1)", [args[1]]);
     },
   },
   {
@@ -741,9 +688,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
       return pgp.as.format(
-        "unnest(string_to_array(" +
-          asNameAlias(args[0], tableAlias) +
-          "::TEXT , ' '))",
+        "unnest(string_to_array(" + asNameAlias(args[0], tableAlias) + "::TEXT , ' '))"
       ); //, [args[1]]
     },
   },
@@ -755,10 +700,7 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: false,
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
-      return pgp.as.format(
-        "RIGHT(" + asNameAlias(args[0], tableAlias) + ", $1)",
-        [args[1]],
-      );
+      return pgp.as.format("RIGHT(" + asNameAlias(args[0], tableAlias) + ", $1)", [args[1]]);
     },
   },
 
@@ -771,15 +713,16 @@ export const FUNCTIONS: FunctionSpec[] = [
     getFields: (args: any[]) => [args[0]],
     getQuery: ({ allowedFields, args, tableAlias }) => {
       if (args.length === 3) {
-        return pgp.as.format(
-          "to_char(" + asNameAlias(args[0], tableAlias) + ", $2, $3)",
-          [args[0], args[1], args[2]],
-        );
+        return pgp.as.format("to_char(" + asNameAlias(args[0], tableAlias) + ", $2, $3)", [
+          args[0],
+          args[1],
+          args[2],
+        ]);
       }
-      return pgp.as.format(
-        "to_char(" + asNameAlias(args[0], tableAlias) + ", $2)",
-        [args[0], args[1]],
-      );
+      return pgp.as.format("to_char(" + asNameAlias(args[0], tableAlias) + ", $2)", [
+        args[0],
+        args[1],
+      ]);
     },
   },
 
@@ -871,7 +814,7 @@ export const FUNCTIONS: FunctionSpec[] = [
             // console.log(res);
             return res;
           },
-        }) as FunctionSpec,
+        }) as FunctionSpec
     ),
 
   /* Date funcs date_part */
@@ -883,16 +826,16 @@ export const FUNCTIONS: FunctionSpec[] = [
         numArgs: 3,
         description:
           ` :[unit<string>, column_name, opts?: { timeZone: true | string }] -> ` +
-          (funcName === "date_trunc"
-            ? ` round down timestamp to closest unit value. `
-            : ` extract date unit as float8. `) +
+          (funcName === "date_trunc" ?
+            ` round down timestamp to closest unit value. `
+          : ` extract date unit as float8. `) +
           ` E.g. ['hour', col] `,
         singleColArg: false,
         getFields: (args: any[]) => [args[1]],
         getQuery: ({ allColumns, args, tableAlias }) => {
           return `${funcName}(${asValue(args[0])}, ${parseUnix(args[1], tableAlias, allColumns, args[2])})`;
         },
-      }) as FunctionSpec,
+      }) as FunctionSpec
   ),
 
   /* Handy date funcs */
@@ -937,34 +880,32 @@ export const FUNCTIONS: FunctionSpec[] = [
         name: "$" + funcName,
         type: "function",
         description:
-          ` :[column_name, opts?: { timeZone: true | string }] -> get timestamp formated as ` +
-          txt,
+          ` :[column_name, opts?: { timeZone: true | string }] -> get timestamp formated as ` + txt,
         singleColArg: true,
         numArgs: 1,
         getFields: (args: any[]) => [args[0]],
         getQuery: ({ allColumns, args, tableAlias }) => {
           return pgp.as.format(
-            "trim(to_char(" +
-              parseUnix(args[0], tableAlias, allColumns, args[1]) +
-              ", $2))",
-            [args[0], txt],
+            "trim(to_char(" + parseUnix(args[0], tableAlias, allColumns, args[1]) + ", $2))",
+            [args[0], txt]
           );
         },
-      }) as FunctionSpec,
+      }) as FunctionSpec
   ),
 
   /* Basic 1 arg col funcs */
   ...[
     ...["TEXT"].flatMap((cast) =>
-      ["upper", "lower", "length", "reverse", "trim", "initcap"].map(
-        (funcName) => ({ cast, funcName }),
-      ),
+      ["upper", "lower", "length", "reverse", "trim", "initcap"].map((funcName) => ({
+        cast,
+        funcName,
+      }))
     ),
     ...[""].flatMap((cast) =>
       ["round", "ceil", "floor", "sign", "md5"].map((funcName) => ({
         cast,
         funcName,
-      })),
+      }))
     ),
   ].map(
     ({ funcName, cast }) =>
@@ -977,7 +918,7 @@ export const FUNCTIONS: FunctionSpec[] = [
         getQuery: ({ args, tableAlias }) => {
           return `${funcName}(${asNameAlias(args[0], tableAlias)}${cast ? `::${cast}` : ""})`;
         },
-      }) as FunctionSpec,
+      }) as FunctionSpec
   ),
 
   /**
@@ -991,35 +932,20 @@ export const FUNCTIONS: FunctionSpec[] = [
         type: "function",
         numArgs: 2,
         singleColArg: true,
-        getFields: (args: any[]) =>
-          args.slice(0, 2).filter((a) => typeof a === "string"), // Filtered because the second arg is optional
-        getQuery: ({ allowedFields, args, tableAlias, allColumns }) => {
-          const validColCount = args
-            .slice(0, 2)
-            .filter((a) => typeof a === "string").length;
+        getFields: (args: any[]) => args.slice(0, 2).filter((a) => typeof a === "string"), // Filtered because the second arg is optional
+        getQuery: ({ args, tableAlias, allColumns }) => {
+          const validColCount = args.slice(0, 2).filter((a) => typeof a === "string").length;
           const trunc = args[2];
-          const allowedTruncs = [
-            "second",
-            "minute",
-            "hour",
-            "day",
-            "month",
-            "year",
-          ];
+          const allowedTruncs = ["second", "minute", "hour", "day", "month", "year"];
           if (trunc && !allowedTruncs.includes(trunc))
-            throw new Error(
-              "Incorrect trunc provided. Allowed values: " + allowedTruncs,
-            );
+            throw new Error("Incorrect trunc provided. Allowed values: " + allowedTruncs);
           if (funcName === "difference" && validColCount !== 2)
             throw new Error("Must have two column names");
-          if (![1, 2].includes(validColCount))
-            throw new Error("Must have one or two column names");
+          if (![1, 2].includes(validColCount)) throw new Error("Must have one or two column names");
           const [leftField, rightField] = args as [string, string];
           const tzOpts = args[2];
           const leftQ = parseUnix(leftField, tableAlias, allColumns, tzOpts);
-          let rightQ = rightField
-            ? parseUnix(rightField, tableAlias, allColumns, tzOpts)
-            : "";
+          let rightQ = rightField ? parseUnix(rightField, tableAlias, allColumns, tzOpts) : "";
           let query = "";
           if (funcName === "ageNow" && validColCount === 1) {
             query = `age(now(), ${leftQ})`;
@@ -1031,7 +957,7 @@ export const FUNCTIONS: FunctionSpec[] = [
           }
           return trunc ? `date_trunc(${asValue(trunc)}, ${query})` : query;
         },
-      }) as FunctionSpec,
+      }) as FunctionSpec
   ),
 
   /* pgcrypto funcs */
@@ -1049,7 +975,7 @@ export const FUNCTIONS: FunctionSpec[] = [
 
           return `crypt(${value}, ${seedColumnName}::text)`;
         },
-      }) as FunctionSpec,
+      }) as FunctionSpec
   ),
 
   /* Text col and value funcs */
@@ -1070,7 +996,7 @@ export const FUNCTIONS: FunctionSpec[] = [
           }
           return `position( ${a1} IN ${a2} )`;
         },
-      }) as FunctionSpec,
+      }) as FunctionSpec
   ),
   ...["template_string"].map(
     (funcName) =>
@@ -1087,9 +1013,7 @@ export const FUNCTIONS: FunctionSpec[] = [
 
           const rawValue = args[0];
           let finalValue = rawValue;
-          const usedColumns = allowedFields.filter((fName) =>
-            rawValue.includes(`{${fName}}`),
-          );
+          const usedColumns = allowedFields.filter((fName) => rawValue.includes(`{${fName}}`));
           usedColumns.forEach((colName, idx) => {
             finalValue = finalValue.split(`{${colName}}`).join(`%${idx + 1}$s`);
           });
@@ -1101,7 +1025,7 @@ export const FUNCTIONS: FunctionSpec[] = [
 
           return `format(${finalValue})`;
         },
-      }) as FunctionSpec,
+      }) as FunctionSpec
   ),
 
   /** Custom highlight -> myterm => ['some text and', ['myterm'], ' and some other text']
@@ -1121,20 +1045,10 @@ export const FUNCTIONS: FunctionSpec[] = [
       const cols = parseFieldFilter(args[0], false, allowedFields);
       let term = args[1];
       const rawTerm = args[1];
-      const {
-        edgeTruncate,
-        noFields = false,
-        returnType,
-        matchCase = false,
-      } = args[2] || {};
+      const { edgeTruncate, noFields = false, returnType, matchCase = false } = args[2] || {};
       if (!isEmpty(args[2])) {
         const keys = Object.keys(args[2]);
-        const validKeys = [
-          "edgeTruncate",
-          "noFields",
-          "returnType",
-          "matchCase",
-        ];
+        const validKeys = ["edgeTruncate", "noFields", "returnType", "matchCase"];
         const bad_keys = keys.filter((k) => !validKeys.includes(k));
         if (bad_keys.length)
           throw (
@@ -1144,13 +1058,9 @@ export const FUNCTIONS: FunctionSpec[] = [
       }
       if (!cols.length) throw "Cols are empty/invalid";
       if (typeof term !== "string") throw "Non string term provided: " + term;
-      if (
-        edgeTruncate !== undefined &&
-        (!Number.isInteger(edgeTruncate) || edgeTruncate < -1)
-      )
+      if (edgeTruncate !== undefined && (!Number.isInteger(edgeTruncate) || edgeTruncate < -1))
         throw "Invalid edgeTruncate. expecting a positive integer";
-      if (typeof noFields !== "boolean")
-        throw "Invalid noFields. expecting boolean";
+      if (typeof noFields !== "boolean") throw "Invalid noFields. expecting boolean";
       const RETURN_TYPES = ["index", "boolean", "object"];
       if (returnType && !RETURN_TYPES.includes(returnType)) {
         throw `returnType can only be one of: ${RETURN_TYPES}`;
@@ -1189,7 +1099,7 @@ export const FUNCTIONS: FunctionSpec[] = [
         cols
           .map(
             (c) =>
-              `${noFields ? "" : asValue(c + ": ") + " || "} COALESCE(${asNameAlias(c, tableAlias)}::TEXT, '')`,
+              `${noFields ? "" : asValue(c + ": ") + " || "} COALESCE(${asNameAlias(c, tableAlias)}::TEXT, '')`
           )
           .join(" || ', ' || ") +
         " )";
@@ -1229,7 +1139,7 @@ export const FUNCTIONS: FunctionSpec[] = [
         const _cols = validCols.filter(
           (c) =>
             /** Exclude numeric columns when the search tern contains a character */
-            !hasChars || postgresToTsType(c.colInfo!.udt_name) !== "number",
+            !hasChars || postgresToTsType(c.colInfo!.udt_name) !== "number"
         );
 
         /** This will break GROUP BY (non-integer constant in GROUP BY) */
@@ -1290,17 +1200,7 @@ export const FUNCTIONS: FunctionSpec[] = [
   },
 
   /* Aggs */
-  ...[
-    "max",
-    "min",
-    "count",
-    "avg",
-    "json_agg",
-    "jsonb_agg",
-    "string_agg",
-    "array_agg",
-    "sum",
-  ].map(
+  ...["max", "min", "count", "avg", "json_agg", "jsonb_agg", "string_agg", "array_agg", "sum"].map(
     (aggName) =>
       ({
         name: "$" + aggName,
@@ -1313,11 +1213,9 @@ export const FUNCTIONS: FunctionSpec[] = [
           if (args.length > 1) {
             extraArgs = pgp.as.format(", $1:csv", args.slice(1));
           }
-          return (
-            aggName + "(" + asNameAlias(args[0], tableAlias) + `${extraArgs})`
-          );
+          return aggName + "(" + asNameAlias(args[0], tableAlias) + `${extraArgs})`;
         },
-      }) satisfies FunctionSpec,
+      }) satisfies FunctionSpec
   ),
 
   {

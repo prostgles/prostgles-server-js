@@ -18,7 +18,7 @@ export async function insert(
   insertParams?: InsertParams,
   param3_unused?: undefined,
   tableRules?: TableRule,
-  localParams?: LocalParams,
+  localParams?: LocalParams
 ): Promise<any | any[] | boolean> {
   const ACTION = "insert";
   const start = Date.now();
@@ -28,8 +28,7 @@ export async function insert(
 
     const finalDBtx = this.getFinalDBtx(localParams);
     const rule = tableRules?.[ACTION];
-    const { postValidate, checkFilter, validate, allowedNestedInserts } =
-      rule ?? {};
+    const { postValidate, checkFilter, validate, allowedNestedInserts } = rule ?? {};
 
     /** Post validate and checkFilter require a transaction dbo handler because they happen after the insert */
     if (postValidate || checkFilter) {
@@ -40,14 +39,16 @@ export async function insert(
             insertParams,
             param3_unused,
             tableRules,
-            localParams,
-          ),
+            localParams
+          )
         );
       }
     }
 
-    const { testOnly, fields, forcedData, returningFields } =
-      await insertTest.bind(this)({ tableRules, localParams });
+    const { testOnly, fields, forcedData, returningFields } = await insertTest.bind(this)({
+      tableRules,
+      localParams,
+    });
     if (testOnly) {
       return true;
     }
@@ -57,8 +58,7 @@ export async function insert(
         !nestedInsert ||
         !allowedNestedInserts.some(
           (ai) =>
-            ai.table === nestedInsert?.previousTable &&
-            ai.column === nestedInsert.referencingColumn,
+            ai.table === nestedInsert.previousTable && ai.column === nestedInsert.referencingColumn
         )
       ) {
         throw `Direct inserts not allowed. Only nested inserts from these tables: ${JSON.stringify(allowedNestedInserts)} `;
@@ -88,11 +88,9 @@ export async function insert(
         }
 
         return row;
-      }),
+      })
     );
-    const preValidatedrowOrRows = isMultiInsert
-      ? preValidatedRows
-      : preValidatedRows[0]!;
+    const preValidatedrowOrRows = isMultiInsert ? preValidatedRows : preValidatedRows[0]!;
 
     /**
      * If media it will: upload file and continue insert
@@ -132,12 +130,10 @@ export async function insert(
             tableHandler: this,
           });
           return { validatedRow, allowedCols };
-        }),
+        })
       );
       const validatedRows = validatedData.map((d) => d.validatedRow);
-      const allowedCols = Array.from(
-        new Set(validatedData.flatMap((d) => d.allowedCols)),
-      );
+      const allowedCols = Array.from(new Set(validatedData.flatMap((d) => d.allowedCols)));
       const dbTx = finalDBtx || this.dboBuilder.dbo;
       const validationOptions = {
         validate: validate as ValidateRowBasic,
@@ -161,9 +157,7 @@ export async function insert(
         if (!pkeyNames.length) {
           throw "Cannot do DoUpdate on a table without a primary key";
         }
-        const nonPkeyCols = allowedCols
-          .filter((c) => !pkeyNames.includes(c))
-          .map((v) => asName(v));
+        const nonPkeyCols = allowedCols.filter((c) => !pkeyNames.includes(c)).map((v) => asName(v));
         if (!nonPkeyCols.length) {
           throw "Cannot on conflict DoUpdate on a table with only primary key columns";
         }
@@ -188,7 +182,7 @@ export async function insert(
     if (returnQuery) return queryWithRLS;
 
     if (this.dboBuilder.prostgles.opts.DEBUG_MODE) {
-      console.log(this.tx?.t.ctx?.start, "insert in " + this.name, data);
+      console.log(this.tx?.t.ctx.start, "insert in " + this.name, data);
     }
 
     const result = await runInsertUpdateQuery({
@@ -255,16 +249,9 @@ const validateInsertParams = (params: InsertParams | undefined) => {
       onConflict: 1,
     };
     const good_params = Object.keys(good_paramsObj);
-    const bad_params = Object.keys(params).filter(
-      (k) => !good_params.includes(k),
-    );
-    if (bad_params && bad_params.length)
-      throw (
-        "Invalid params: " +
-        bad_params.join(", ") +
-        " \n Expecting: " +
-        good_params.join(", ")
-      );
+    const bad_params = Object.keys(params).filter((k) => !good_params.includes(k));
+    if (bad_params.length)
+      throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
   }
 };
 

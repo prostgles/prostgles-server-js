@@ -6,10 +6,7 @@ import { clone } from "../utils";
 import { TableSchema, TableSchemaColumn } from "./DboBuilderTypes";
 import { ProstglesInitOptions } from "../ProstglesTypes";
 
-const getMaterialViews = (
-  db: DBorTx,
-  schema: ProstglesInitOptions["schemaFilter"],
-) => {
+const getMaterialViews = (db: DBorTx, schema: ProstglesInitOptions["schemaFilter"]) => {
   const { sql, schemaNames } = getSchemaFilter(schema);
 
   const query = `
@@ -100,9 +97,7 @@ where nspname = 'public' and relname = 'test_view';
   return db.any(query, { schemaNames });
 };
 
-export const getSchemaFilter = (
-  schema: ProstglesInitOptions["schemaFilter"] = { public: 1 },
-) => {
+export const getSchemaFilter = (schema: ProstglesInitOptions["schemaFilter"] = { public: 1 }) => {
   const schemaNames = Object.keys(schema);
   const isInclusive = Object.values(schema).every((v) => v);
   if (!schemaNames.length) {
@@ -119,7 +114,7 @@ export const getSchemaFilter = (
 // Reason: this query gets blocked by prostgles.app_triggers from PubSubManager.addTrigger in some cases (pg_dump locks that table)
 export async function getTablesForSchemaPostgresSQL(
   { db, runSQL }: DboBuilder,
-  schema: ProstglesInitOptions["schemaFilter"],
+  schema: ProstglesInitOptions["schemaFilter"]
 ): Promise<{
   result: TableSchema[];
   durations: Record<string, number>;
@@ -165,7 +160,7 @@ export async function getTablesForSchemaPostgresSQL(
       )
       SELECT * FROM  fk
       `,
-        { schemaNames },
+        { schemaNames }
       );
 
       return { fkeys };
@@ -217,9 +212,8 @@ export async function getTablesForSchemaPostgresSQL(
     }
 
     const getTVColumns = await tryCatch(async () => {
-      const columns: (TableSchemaColumn & { table_oid: number })[] =
-        await t.any(
-          `
+      const columns: (TableSchemaColumn & { table_oid: number })[] = await t.any(
+        `
           SELECT
             table_oid
               , ccc.column_name as name ,
@@ -281,8 +275,8 @@ export async function getTablesForSchemaPostgresSQL(
           WHERE table_schema ${sql}
           ORDER BY table_oid, ordinal_position
       `,
-          { schemaNames },
-        );
+        { schemaNames }
+      );
 
       return { columns };
     });
@@ -291,8 +285,7 @@ export async function getTablesForSchemaPostgresSQL(
     }
 
     const getViewParentTables = await tryCatch(async () => {
-      const parent_tables: { oid: number; table_names: string[] }[] =
-        await t.any(`
+      const parent_tables: { oid: number; table_names: string[] }[] = await t.any(`
         SELECT cl_r.oid, cl_r.relname as view_name, array_agg(DISTINCT cl_d.relname) AS table_names 
         FROM pg_rewrite AS r 
         JOIN pg_class AS cl_r ON r.ev_class = cl_r.oid 
@@ -338,18 +331,17 @@ export async function getTablesForSchemaPostgresSQL(
         --GROUP BY t.table_schema, t.table_name, t.is_view, t.view_definition, t.oid
         ORDER BY schema, name
         `;
-      const tablesAndViews = (
-        (await t.any(query, { schemaNames })) as TableSchema[]
-      ).map((table) => {
-        table.columns =
-          clone(getTVColumns.columns)
+      const tablesAndViews = ((await t.any(query, { schemaNames })) as TableSchema[]).map(
+        (table) => {
+          table.columns = clone(getTVColumns.columns)
             .filter((c) => c.table_oid === table.oid)
-            .map((c) => omitKeys(c, ["table_oid"])) ?? [];
-        table.parent_tables =
-          getViewParentTables.parent_tables?.find((vr) => vr.oid === table.oid)
-            ?.table_names ?? [];
-        return table;
-      });
+            .map((c) => omitKeys(c, ["table_oid"]));
+          table.parent_tables =
+            getViewParentTables.parent_tables?.find((vr) => vr.oid === table.oid)?.table_names ??
+            [];
+          return table;
+        }
+      );
       return { tablesAndViews };
     });
     if (getTablesAndViews.error || !getTablesAndViews.tablesAndViews) {
@@ -372,14 +364,12 @@ export async function getTablesForSchemaPostgresSQL(
       console.error(getHyperTablesReq.error);
     }
 
-    let result = getTablesAndViews.tablesAndViews.concat(
-      getMaterialViewsReq.materialViews,
-    );
+    let result = getTablesAndViews.tablesAndViews.concat(getMaterialViewsReq.materialViews);
     result = await Promise.all(
       result.map(async (table) => {
         table.name = table.escaped_identifier;
         /** This is used to prevent bug of table schema not sent */
-        const allowAllIfNoColumns = !table.columns?.length ? true : undefined;
+        const allowAllIfNoColumns = !table.columns.length ? true : undefined;
         table.privileges.select =
           allowAllIfNoColumns ?? table.columns.some((c) => c.privileges.SELECT);
         table.privileges.insert =
@@ -388,7 +378,7 @@ export async function getTablesForSchemaPostgresSQL(
           allowAllIfNoColumns ?? table.columns.some((c) => c.privileges.UPDATE);
         table.columns = table.columns.map((c) => {
           const refs = getFkeys.fkeys!.filter(
-            (fc) => fc.oid === table.oid && fc.cols.includes(c.name),
+            (fc) => fc.oid === table.oid && fc.cols.includes(c.name)
           );
           if (refs.length)
             c.references = refs.map((_ref) => {
@@ -404,30 +394,25 @@ export async function getTablesForSchemaPostgresSQL(
         let viewFCols: Pick<TableSchemaColumn, "name" | "references">[] = [];
         if (table.is_view) {
           try {
-            const view_definition = table.view_definition?.endsWith(";")
-              ? table.view_definition.slice(0, -1)
+            const view_definition =
+              table.view_definition?.endsWith(";") ?
+                table.view_definition.slice(0, -1)
               : table.view_definition;
             const { fields } = (await runSQL(
               `SELECT * FROM \n ( ${view_definition!} \n) t LIMIT 0`,
               {},
               {},
-              undefined,
+              undefined
             )) as SQLResult<undefined>;
-            const ftables = result.filter((r) =>
-              fields.some((f) => f.tableID === r.oid),
-            );
+            const ftables = result.filter((r) => fields.some((f) => f.tableID === r.oid));
             ftables.forEach((ft) => {
               const fFields = fields.filter((f) => f.tableID === ft.oid);
               const pkeys = ft.columns.filter((c) => c.is_pkey);
-              const fFieldPK = fFields.filter((ff) =>
-                pkeys.some((p) => p.name === ff.columnName),
-              );
+              const fFieldPK = fFields.filter((ff) => pkeys.some((p) => p.name === ff.columnName));
               const refCols =
-                pkeys.length && fFieldPK.length === pkeys.length
-                  ? fFieldPK
-                  : fFields.filter(
-                      (ff) => !["json", "jsonb", "xml"].includes(ff.udt_name),
-                    );
+                pkeys.length && fFieldPK.length === pkeys.length ?
+                  fFieldPK
+                : fFields.filter((ff) => !["json", "jsonb", "xml"].includes(ff.udt_name));
               const _fcols: typeof viewFCols = refCols.map((ff) => {
                 const d: Pick<TableSchemaColumn, "name" | "references"> = {
                   name: ff.columnName!,
@@ -452,33 +437,30 @@ export async function getTablesForSchemaPostgresSQL(
           if (col.has_default) {
             /** Hide pkey default value */
             col.column_default =
-              col.udt_name !== "uuid" &&
-              !col.is_pkey &&
-              !col.column_default.startsWith("nextval(")
-                ? col.column_default
-                : null;
+              (
+                col.udt_name !== "uuid" &&
+                !col.is_pkey &&
+                !col.column_default.startsWith("nextval(")
+              ) ?
+                col.column_default
+              : null;
           }
 
-          const viewFCol = viewFCols?.find((fc) => fc.name === col.name);
+          const viewFCol = viewFCols.find((fc) => fc.name === col.name);
           if (viewFCol) {
             col.references = viewFCol.references;
           }
 
           return col;
         });
-        table.isHyperTable = getHyperTablesReq.hyperTables?.includes(
-          table.name,
-        );
+        table.isHyperTable = getHyperTablesReq.hyperTables?.includes(table.name);
 
         table.uniqueColumnGroups = uniqueColsReq.data
-          ?.filter(
-            (r) =>
-              r.table_name === table.name && r.table_schema === table.schema,
-          )
+          ?.filter((r) => r.table_name === table.name && r.table_schema === table.schema)
           .map((r) => r.column_names);
 
         return table;
-      }),
+      })
     );
 
     const res = {
@@ -510,11 +492,11 @@ const getHyperTables = async (db: DBorTx): Promise<string[] | undefined> => {
           AND table_schema = ${schema} \
           AND table_name = 'hypertable' \
     );",
-    { schema },
+    { schema }
   );
   if (res.exists) {
     const tables: { table_name: string }[] = await db.any(
-      "SELECT table_name FROM " + asName(schema) + ".hypertable;",
+      "SELECT table_name FROM " + asName(schema) + ".hypertable;"
     );
     return tables.map((t) => t.table_name);
   }

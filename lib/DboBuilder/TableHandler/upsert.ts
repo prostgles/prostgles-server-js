@@ -1,10 +1,7 @@
 import { AnyObject, UpdateParams } from "prostgles-types";
 import { TableRule } from "../../PublishParser/publishTypesAndUtils";
 import { Filter, LocalParams } from "../DboBuilderTypes";
-import {
-  getErrorAsObject,
-  getSerializedClientErrorFromPGError,
-} from "../dboBuilderUtils";
+import { getErrorAsObject, getSerializedClientErrorFromPGError } from "../dboBuilderUtils";
 import { TableHandler } from "./TableHandler";
 
 export const upsert = async function (
@@ -13,35 +10,23 @@ export const upsert = async function (
   newData: AnyObject,
   params?: UpdateParams,
   table_rules?: TableRule,
-  localParams?: LocalParams,
+  localParams?: LocalParams
 ): Promise<any> {
   const start = Date.now();
   try {
     const _upsert = async function (tblH: TableHandler) {
       return tblH
-        .find(
-          filter,
-          { select: "", limit: 1 },
-          undefined,
-          table_rules,
-          localParams,
-        )
+        .find(filter, { select: "", limit: 1 }, undefined, table_rules, localParams)
         .then((exists) => {
-          if (exists && exists.length) {
-            return tblH.update(
-              filter,
-              newData,
-              params,
-              table_rules,
-              localParams,
-            );
+          if (exists.length) {
+            return tblH.update(filter, newData, params, table_rules, localParams);
           } else {
             return tblH.insert(
               { ...newData, ...filter },
               params,
               undefined,
               table_rules,
-              localParams,
+              localParams
             );
           }
         });
@@ -49,9 +34,7 @@ export const upsert = async function (
 
     /* Do it within a transaction to ensure consisency */
     if (!this.tx) {
-      return this.dboBuilder.getTX((dbTX) =>
-        _upsert(dbTX[this.name] as TableHandler),
-      );
+      return this.dboBuilder.getTX((dbTX) => _upsert(dbTX[this.name] as TableHandler));
     }
     const result = await _upsert(this);
     await this._log({

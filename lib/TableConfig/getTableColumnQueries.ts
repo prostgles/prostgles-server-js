@@ -1,16 +1,7 @@
-import {
-  getKeys,
-  asName as _asName,
-  isObject,
-  asName,
-  getObjectEntries,
-} from "prostgles-types";
+import { getKeys, asName as _asName, isObject, asName, getObjectEntries } from "prostgles-types";
 import { DB, DBHandlerServer } from "../Prostgles";
 import { validate_jsonb_schema_sql } from "../JSONBValidation/validate_jsonb_schema_sql";
-import {
-  getColumnDefinitionQuery,
-  getTableColumns,
-} from "./getColumnDefinitionQuery";
+import { getColumnDefinitionQuery, getTableColumns } from "./getColumnDefinitionQuery";
 import { TableConfig } from "./TableConfig";
 import { getFutureTableSchema } from "./getFutureTableSchema";
 
@@ -51,9 +42,7 @@ export const getTableColumnQueries = async ({
 
   const hasJSONBValidation = getKeys(tableConf.columns).some((c) => {
     const cConf = tableConf.columns?.[c];
-    return (
-      cConf && isObject(cConf) && (cConf.jsonbSchema || cConf.jsonbSchemaType)
-    );
+    return cConf && isObject(cConf) && (cConf.jsonbSchema || cConf.jsonbSchemaType);
   });
 
   /** Must install validation function */
@@ -61,10 +50,7 @@ export const getTableColumnQueries = async ({
     try {
       await db.any(validate_jsonb_schema_sql);
     } catch (err: any) {
-      console.error(
-        "Could not install the jsonb validation function due to error: ",
-        err,
-      );
+      console.error("Could not install the jsonb validation function due to error: ", err);
       throw err;
     }
   }
@@ -97,7 +83,7 @@ export const getTableColumnQueries = async ({
   const ALTERQ = `ALTER TABLE ${asName(tableName)}`;
   if (!tableHandler) {
     newColumnDefs.push(...colDefs.map((c) => c.def));
-  } else if (tableHandler) {
+  } else {
     const currCols = await getTableColumns({ db, table: tableName });
 
     /** Add new columns */
@@ -118,43 +104,35 @@ export const getTableColumnQueries = async ({
         droppedColNames.push(c.column_name);
       } else if (newCol.nullable !== c.nullable) {
         alteredColQueries.push(
-          `${ALTERQ} ALTER COLUMN ${asName(c.column_name)} ${newCol.nullable ? "DROP" : "SET"} NOT NULL;`,
+          `${ALTERQ} ALTER COLUMN ${asName(c.column_name)} ${newCol.nullable ? "DROP" : "SET"} NOT NULL;`
         );
       } else if (newCol.udt_name !== c.udt_name) {
         alteredColQueries.push(
-          `${ALTERQ} ALTER COLUMN ${asName(c.column_name)} TYPE ${newCol.udt_name} USING ${asName(c.column_name)}::${newCol.udt_name};`,
+          `${ALTERQ} ALTER COLUMN ${asName(c.column_name)} TYPE ${newCol.udt_name} USING ${asName(c.column_name)}::${newCol.udt_name};`
         );
       } else if (newCol.column_default !== c.column_default) {
         const colConfig = colDefs.find((cd) => cd.name === c.column_name);
         if (
-          ["serial", "bigserial"].some((t) =>
-            colConfig?.def.toLowerCase().includes(` ${t}`),
-          ) &&
+          ["serial", "bigserial"].some((t) => colConfig?.def.toLowerCase().includes(` ${t}`)) &&
           c.column_default?.toLowerCase().includes("nextval")
         ) {
           /** Ignore SERIAL/BIGSERIAL <> nextval mismatch */
         } else {
           alteredColQueries.push(
-            `${ALTERQ} ALTER COLUMN ${asName(c.column_name)} ${newCol.column_default === null ? "DROP DEFAULT" : `SET DEFAULT ${newCol.column_default}`};`,
+            `${ALTERQ} ALTER COLUMN ${asName(c.column_name)} ${newCol.column_default === null ? "DROP DEFAULT" : `SET DEFAULT ${newCol.column_default}`};`
           );
         }
       }
     });
   }
 
-  if (
-    !tableHandler ||
-    tableConf.dropIfExists ||
-    tableConf.dropIfExistsCascade
-  ) {
+  if (!tableHandler || tableConf.dropIfExists || tableConf.dropIfExistsCascade) {
     isCreate = true;
     const DROPQ = `DROP TABLE IF EXISTS ${asName(tableName)}`;
     fullQuery = [
-      ...(tableConf.dropIfExists
-        ? [`${DROPQ};`]
-        : tableConf.dropIfExistsCascade
-          ? [`${DROPQ} CASCADE;`]
-          : []),
+      ...(tableConf.dropIfExists ? [`${DROPQ};`]
+      : tableConf.dropIfExistsCascade ? [`${DROPQ} CASCADE;`]
+      : []),
       `CREATE TABLE ${asName(tableName)} (`,
       columnDefs.join(", \n"),
       `);`,

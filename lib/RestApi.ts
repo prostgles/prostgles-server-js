@@ -1,14 +1,10 @@
 import * as bodyParser from "body-parser";
 import { Express } from "express";
-import { HTTPCODES } from "./Auth/AuthHandler";
+import { HTTP_FAIL_CODES } from "./Auth/AuthHandler";
 import { ExpressReq, ExpressRes } from "./Auth/AuthTypes";
 import { getSerializedClientErrorFromPGError } from "./DboBuilder/DboBuilder";
 import { Prostgles } from "./Prostgles";
-import {
-  runClientMethod,
-  runClientRequest,
-  runClientSqlRequest,
-} from "./runClientRequest";
+import { runClientMethod, runClientRequest, runClientSqlRequest } from "./runClientRequest";
 import { VoidFunction } from "./SchemaWatch/SchemaWatch";
 const jsonParser = bodyParser.json();
 
@@ -53,11 +49,7 @@ export class RestApi {
     schema: string;
   };
   expressApp: Express;
-  constructor({
-    expressApp,
-    routePrefix,
-    prostgles,
-  }: RestApiConfig & { prostgles: Prostgles }) {
+  constructor({ expressApp, routePrefix, prostgles }: RestApiConfig & { prostgles: Prostgles }) {
     this.prostgles = prostgles;
     this.routes = {
       db: `${routePrefix}/db/:tableName/:command`,
@@ -137,7 +129,7 @@ export class RestApi {
       return;
     }
     if (!command || typeof command !== "string") {
-      res.status(HTTPCODES.BAD_REQUEST).json({ error: "command missing" });
+      res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({ error: "command missing" });
       return;
     }
 

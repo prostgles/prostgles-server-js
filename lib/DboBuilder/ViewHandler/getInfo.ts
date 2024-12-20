@@ -23,7 +23,7 @@ export async function getInfo(
     throw "Not allowed";
   }
 
-  const fileTableName = this.dboBuilder.prostgles?.opts?.fileTable?.tableName;
+  const fileTableName = this.dboBuilder.prostgles.opts.fileTable?.tableName;
 
   await this._log({
     command: "getInfo",
@@ -37,7 +37,7 @@ export async function getInfo(
   return {
     oid: this.tableOrViewInfo.oid,
     comment: this.tableOrViewInfo.comment,
-    info: this.dboBuilder.prostgles?.tableConfigurator?.getTableInfo({
+    info: this.dboBuilder.prostgles.tableConfigurator?.getTableInfo({
       tableName: this.name,
       lang,
     }),

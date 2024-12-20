@@ -13,10 +13,7 @@ import { VoidFunction } from "../SchemaWatch/SchemaWatch";
 import { DB } from "../initProstgles";
 import { DboBuilder } from "./DboBuilder";
 import { PRGLIOSocket } from "./DboBuilderTypes";
-import {
-  getErrorAsObject,
-  getSerializedClientErrorFromPGError,
-} from "./dboBuilderUtils";
+import { getErrorAsObject, getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
 import { getDetailedFieldInfo } from "./runSQL";
 const Cursor: typeof CursorType = require("pg-cursor");
 
@@ -62,27 +59,19 @@ export class QueryStreamer {
     };
     this.adminClient = this.getConnection(
       (error) => {
-        if (
-          error.message?.includes("database") &&
-          error.message?.includes("does not exist")
-        )
+        if (error.message?.includes("database") && error.message?.includes("does not exist"))
           return;
         console.log("Admin client error. Reconnecting...", error);
         setAdminClient();
       },
-      { keepAlive: true },
+      { keepAlive: true }
     );
     this.adminClient.connect();
   }
 
-  getConnection = (
-    onError: ((err: any) => void) | undefined,
-    extraOptions?: pg.ClientConfig,
-  ) => {
+  getConnection = (onError: ((err: any) => void) | undefined, extraOptions?: pg.ClientConfig) => {
     const connectionInfo =
-      typeof this.db.$cn === "string"
-        ? { connectionString: this.db.$cn }
-        : (this.db.$cn as any);
+      typeof this.db.$cn === "string" ? { connectionString: this.db.$cn } : (this.db.$cn as any);
     const client = new pg.Client({ ...connectionInfo, ...extraOptions });
     client.on("error", (err) => {
       onError?.(err);
@@ -100,9 +89,7 @@ export class QueryStreamer {
     delete this.socketQueries[socketId];
   };
 
-  create = async (
-    query: ClientStreamedRequest,
-  ): Promise<SocketSQLStreamServer> => {
+  create = async (query: ClientStreamedRequest): Promise<SocketSQLStreamServer> => {
     const { socket, persistConnection } = query;
     const socketId = socket.id;
     const id = getSetShortSocketId(socketId);
@@ -123,10 +110,10 @@ export class QueryStreamer {
         if (errored) return;
         errored = true;
 
-        const errorWithoutQuery = getSerializedClientErrorFromPGError(
-          rawError,
-          { type: "sql", localParams: { socket } },
-        );
+        const errorWithoutQuery = getSerializedClientErrorFromPGError(rawError, {
+          type: "sql",
+          localParams: { socket },
+        });
         // For some reason query is not present on the error object from sql stream mode
         const error = { ...errorWithoutQuery, query: query.query };
         socket.emit(channel, {
@@ -135,14 +122,12 @@ export class QueryStreamer {
         } satisfies SocketSQLStreamPacket);
       },
     };
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     this.socketQueries[socketId]![id] ??= socketQuery;
     let processID = -1;
     let streamState: "started" | "ended" | "errored" | undefined;
 
-    const startStream = async (
-      client: pg.Client | undefined,
-      query: ClientStreamedRequest,
-    ) => {
+    const startStream = async (client: pg.Client | undefined, query: ClientStreamedRequest) => {
       const socketQuery = this.socketQueries[socketId]?.[id];
       if (!socketQuery) {
         throw "socket query not found";
@@ -157,10 +142,8 @@ export class QueryStreamer {
       }:
         | { reachedEnd: true; rows: any[]; info: Info }
         | { reachedEnd: false; rows: any[]; info: Omit<Info, "command"> }) => {
-        if (!info?.fields) throw "No fields";
-        const fields = getDetailedFieldInfo.bind(this.dboBuilder)(
-          info.fields as any,
-        );
+        if (!(info as any).fields) throw "No fields";
+        const fields = getDetailedFieldInfo.bind(this.dboBuilder)(info.fields as any);
         const packet: SocketSQLStreamPacket = {
           type: "data",
           rows,
@@ -193,16 +176,14 @@ export class QueryStreamer {
 
         if (
           query.options?.streamLimit &&
-          (!Number.isInteger(query.options.streamLimit) ||
-            query.options.streamLimit < 0)
+          (!Number.isInteger(query.options.streamLimit) || query.options.streamLimit < 0)
         ) {
           throw "streamLimit must be a positive integer";
         }
-        const batchSize = query.options?.streamLimit
-          ? Math.min(1e3, query.options?.streamLimit)
-          : 1e3;
+        const batchSize =
+          query.options?.streamLimit ? Math.min(1e3, query.options.streamLimit) : 1e3;
         const cursor = currentClient.query(
-          new Cursor(query.query, undefined, { rowMode: "array" }),
+          new Cursor(query.query, undefined, { rowMode: "array" })
         );
         this.socketQueries[socketId]![id]!.cursor = cursor;
         let streamLimitReached = false;
@@ -221,8 +202,7 @@ export class QueryStreamer {
               ]) as Info;
               rowsSent += rowChunk.length;
               streamLimitReached = Boolean(
-                query.options?.streamLimit &&
-                  rowsSent >= query.options.streamLimit,
+                query.options?.streamLimit && rowsSent >= query.options.streamLimit
               );
               reachedEnd = rowChunk.length < batchSize;
               emit({
@@ -241,14 +221,11 @@ export class QueryStreamer {
             cursor.close();
           } catch (error: any) {
             streamState = "errored";
-            if (
-              error.message ===
-              "cannot insert multiple commands into a prepared statement"
-            ) {
+            if (error.message === "cannot insert multiple commands into a prepared statement") {
               this.dboBuilder.dbo.sql!(
                 query.query,
                 {},
-                { returnType: "arrayMode", hasParams: false },
+                { returnType: "arrayMode", hasParams: false }
               )
                 .then((res) => {
                   emit({
@@ -276,10 +253,7 @@ export class QueryStreamer {
       socket.removeAllListeners(channel);
       delete this.socketQueries[socketId]?.[id];
     };
-    const stop = async (
-      opts: { terminate?: boolean } | undefined,
-      cb: BasicCallback,
-    ) => {
+    const stop = async (opts: { terminate?: boolean } | undefined, cb: BasicCallback) => {
       const { client: queryClient } = this.socketQueries[socketId]?.[id] ?? {};
       if (!queryClient) return;
       if (opts?.terminate) {
@@ -288,12 +262,10 @@ export class QueryStreamer {
         }, 4e3);
       }
       try {
-        const stopFunction = opts?.terminate
-          ? "pg_terminate_backend"
-          : "pg_cancel_backend";
+        const stopFunction = opts?.terminate ? "pg_terminate_backend" : "pg_cancel_backend";
         const rows = await this.adminClient.query(
           `SELECT ${stopFunction}(pid), pid, state, query FROM pg_stat_activity WHERE pid = $1`,
-          [processID],
+          [processID]
         );
         cleanup();
         cb({ processID, info: rows.rows[0] });
@@ -313,10 +285,7 @@ export class QueryStreamer {
     socket.removeAllListeners(channel);
     socket.on(
       channel,
-      async (
-        _data: { query: string; params: any } | undefined,
-        cb: BasicCallback,
-      ) => {
+      async (_data: { query: string; params: any } | undefined, cb: BasicCallback) => {
         if (streamState === "started") {
           return cb(processID, "Already started");
         }
@@ -340,7 +309,7 @@ export class QueryStreamer {
           cb(processID, getErrorAsObject(err) ?? "Something went wrong");
         }
         runCount++;
-      },
+      }
     );
 
     /** If not started within 5 seconds then assume it will never happen */

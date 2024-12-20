@@ -9,10 +9,8 @@ import { isPlainObject } from "../DboBuilder";
 export const parseFieldFilter = <AllowedKeys extends string[]>(
   fieldParams: FieldFilter<Record<AllowedKeys[number], any>> = "*",
   allow_empty = true,
-  all_cols: AllowedKeys,
+  all_cols: AllowedKeys
 ): AllowedKeys | [""] => {
-  if (!all_cols) throw "all_cols missing";
-  const all_fields = all_cols; // || this.column_names.slice(0);
   let colNames: AllowedKeys = [] as any;
   const initialParams = JSON.stringify(fieldParams);
 
@@ -25,15 +23,12 @@ export const parseFieldFilter = <AllowedKeys extends string[]>(
     }
 
     /* string[] */
-    if (
-      Array.isArray(fieldParams) &&
-      !fieldParams.find((f) => typeof f !== "string")
-    ) {
+    if (Array.isArray(fieldParams) && !fieldParams.find((f) => typeof f !== "string")) {
       /* 
           ["*"] 
       */
       if (fieldParams[0] === "*") {
-        return all_fields.slice(0) as typeof all_fields;
+        return all_cols.slice(0) as typeof all_cols;
 
         /* 
             [""] 
@@ -57,13 +52,13 @@ export const parseFieldFilter = <AllowedKeys extends string[]>(
       */
     } else if (isPlainObject(fieldParams)) {
       if (!getKeys(fieldParams).length) {
-        return [] as unknown as typeof all_fields; //all_fields.slice(0) as typeof all_fields;
+        return [] as unknown as typeof all_cols; //all_fields.slice(0) as typeof all_fields;
       }
 
       const keys = getKeys(
         fieldParams as {
           [key: string]: boolean | 0 | 1;
-        },
+        }
       ) as AllowedKeys;
       if (keys[0] === "") {
         if (allow_empty) {
@@ -84,10 +79,8 @@ export const parseFieldFilter = <AllowedKeys extends string[]>(
       const allowed = keys.filter((key) => (fieldParams as any)[key]),
         disallowed = keys.filter((key) => !(fieldParams as any)[key]);
 
-      if (disallowed && disallowed.length) {
-        return all_fields.filter(
-          (col) => !disallowed.includes(col),
-        ) as typeof all_fields;
+      if (disallowed.length) {
+        return all_cols.filter((col) => !disallowed.includes(col)) as typeof all_cols;
       } else {
         return [...allowed] as any;
       }
@@ -103,8 +96,8 @@ export const parseFieldFilter = <AllowedKeys extends string[]>(
   return colNames as any;
 
   function validate(cols: AllowedKeys) {
-    const bad_keys = cols.filter((col) => !all_fields.includes(col));
-    if (bad_keys && bad_keys.length) {
+    const bad_keys = cols.filter((col) => !all_cols.includes(col));
+    if (bad_keys.length) {
       throw "\nUnrecognised or illegal fields: " + bad_keys.join(", ");
     }
   }

@@ -10,12 +10,9 @@ import { testTableConfig } from "./testTableConfig";
 testPublishTypes();
 
 const isClientTest = process.env.TEST_TYPE === "client";
-const io = !isClientTest
-  ? undefined
-  : require("socket.io")(http, { path: "/teztz/s" });
-const ioWatchSchema = !isClientTest
-  ? undefined
-  : require("socket.io")(http, { path: "/teztz/sWatchSchema" });
+const io = !isClientTest ? undefined : require("socket.io")(http, { path: "/teztz/s" });
+const ioWatchSchema =
+  !isClientTest ? undefined : require("socket.io")(http, { path: "/teztz/sWatchSchema" });
 
 http.listen(3001);
 
@@ -31,9 +28,7 @@ export type { DBHandlerServer } from "prostgles-server/dist/Prostgles";
 let logs = [];
 
 export const log = (msg: string, extra?: any, trace?: boolean) => {
-  const msgs = msg.includes("show-logs")
-    ? logs
-    : ["(server): " + msg, extra].filter((v) => v);
+  const msgs = msg.includes("show-logs") ? logs : ["(server): " + msg, extra].filter((v) => v);
   if (trace) {
     console.trace(...msgs);
   } else {
@@ -55,9 +50,7 @@ type USER = {
   password: string;
   type: string;
 };
-const users: USER[] = [
-  { id: "1a", username: "john", password: "secret", type: "default" },
-];
+const users: USER[] = [{ id: "1a", username: "john", password: "secret", type: "default" }];
 
 process.on("unhandledRejection", (reason, p) => {
   console.trace("Unhandled Rejection at:", p, "reason:", reason);
@@ -107,11 +100,7 @@ function dd() {
     onLog: async (ev) => {
       logs.push(ev);
       logs = logs.slice(-10);
-      if (
-        ev.type === "debug" ||
-        ev.type === "connect" ||
-        ev.type === "disconnect"
-      ) {
+      if (ev.type === "debug" || ev.type === "connect" || ev.type === "disconnect") {
         // log("onLog", ev);
       }
     },
@@ -143,10 +132,7 @@ function dd() {
     onSocketConnect: ({ socket, db }) => {
       console.log("onSocketConnect", socket.id);
       if (isClientTest) {
-        log(
-          "Client connected -> console does not work. use log function. socket.id:",
-          socket.id,
-        );
+        log("Client connected -> console does not work. use log function. socket.id:", socket.id);
         socket.emit("start-test", { server_id: Math.random() });
         socket.on("log", async (data, cb) => {
           console.log("Client log ", data);
@@ -166,10 +152,6 @@ function dd() {
       if (isClientTest) {
         log("Client disconnected. socket.id:", socket.id);
       }
-    },
-
-    publishRawSQL: async (params) => {
-      return true; // Boolean(user && user.type === "admin")
     },
     auth: {
       sidKeyName: "token",
@@ -195,30 +177,24 @@ function dd() {
         return undefined;
       },
       login: async (loginData) => {
-        if (loginData.type !== "username")
-          throw "Only username login is supported";
+        if (loginData.type !== "username") throw "Only username login is supported";
         const { username, password } = loginData;
-        const u = users.find(
-          (u) => u.username === username && u.password === password,
-        );
-        if (!u)
-          throw (
-            "something went wrong: " + JSON.stringify({ username, password })
-          );
+        const u = users.find((u) => u.username === username && u.password === password);
+        if (!u) {
+          return { response: { success: false, code: "no-match" } };
+        }
         let s = sessions.find((s) => s.user_id === u.id);
         if (!s) {
           s = { id: "SID" + Date.now(), user_id: u.id };
           sessions.push(s);
         }
         log("Logged in!");
-        return { sid: s.id, expires: Infinity, onExpiration: "redirect" };
+        return { session: { sid: s.id, expires: Infinity, onExpiration: "redirect" } };
       },
       cacheSession: {
         getSession: async (sid) => {
           const s = sessions.find((s) => s.id === sid);
-          return s
-            ? { sid: s.id, expires: Infinity, onExpiration: "redirect" }
-            : undefined;
+          return s ? { sid: s.id, expires: Infinity, onExpiration: "redirect" } : undefined;
         },
       },
       expressConfig: {
@@ -246,6 +222,9 @@ function dd() {
       };
     },
     publish: testPublish,
+    publishRawSQL: async (params) => {
+      return true; // Boolean(user && user.type === "admin")
+    },
     joins: [
       {
         tables: ["items", "items2"],
@@ -269,12 +248,7 @@ function dd() {
       },
       {
         tables: ["items_multi", "items"],
-        on: [
-          { items0_id: "id" },
-          { items1_id: "id" },
-          { items2_id: "id" },
-          { items3_id: "id" },
-        ],
+        on: [{ items0_id: "id" }, { items1_id: "id" }, { items2_id: "id" }, { items3_id: "id" }],
         type: "many-many",
       },
     ],
@@ -293,7 +267,10 @@ function dd() {
               // "--inspect-brk",
               "dist/client/index.js",
             ],
-            { cwd: execPath, stdio: "inherit" },
+            {
+              cwd: execPath,
+              stdio: "inherit",
+            }
           );
 
           log("Waiting for client...");

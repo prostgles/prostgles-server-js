@@ -20,10 +20,7 @@ type AddSubResult = SubscriptionChannels & {
 /* The distinct list of {table_name, condition} must have a corresponding trigger in the database */
 export async function addSub(
   this: PubSubManager,
-  subscriptionParams: Omit<
-    AddSubscriptionParams,
-    "channel_name" | "parentSubParams"
-  >,
+  subscriptionParams: Omit<AddSubscriptionParams, "channel_name" | "parentSubParams">
 ): Promise<AddSubResult> {
   const {
     socket,
@@ -36,7 +33,7 @@ export async function addSub(
     viewOptions,
     table_info,
     throttleOpts,
-  } = subscriptionParams || {};
+  } = subscriptionParams;
   const table_name = table_info.name;
 
   if (!socket && !localFuncs) {
@@ -127,19 +124,15 @@ export async function addSub(
     socket.once(result.channelNameReady, () => {
       this.pushSubData(newSub);
     });
-    socket.once(
-      result.channelNameUnsubscribe,
-      (_data: any, cb: BasicCallback) => {
-        const res = "ok";
-        this.subs = this.subs.filter((s) => {
-          const isMatch =
-            s.socket?.id === socket.id && s.channel_name === channel_name;
-          return !isMatch;
-        });
-        removeListeners();
-        cb(null, { res });
-      },
-    );
+    socket.once(result.channelNameUnsubscribe, (_data: any, cb: BasicCallback) => {
+      const res = "ok";
+      this.subs = this.subs.filter((s) => {
+        const isMatch = s.socket?.id === socket.id && s.channel_name === channel_name;
+        return !isMatch;
+      });
+      removeListeners();
+      cb(null, { res });
+    });
   }
 
   this.subs.push(newSub);

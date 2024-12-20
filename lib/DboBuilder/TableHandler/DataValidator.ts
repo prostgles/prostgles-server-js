@@ -2,21 +2,19 @@ import {
   AnyObject,
   ColumnInfo,
   FieldFilter,
-  ValidatedColumnInfo,
   asName,
   getKeys,
   isEmpty,
   isObject,
   pickKeys,
-  unpatchText,
 } from "prostgles-types/dist";
-import { ValidateRowBasic } from "../../PublishParser/PublishParser";
 import { DBHandlerServer } from "../../Prostgles";
+import { ValidateRowBasic } from "../../PublishParser/PublishParser";
 import { asValue } from "../../PubSubManager/PubSubManager";
 import { LocalParams, TableSchemaColumn, pgp } from "../DboBuilder";
-import { TableHandler, ValidatedParams } from "./TableHandler";
 import { parseFunctionObject } from "../QueryBuilder/QueryBuilder";
 import { validateObj } from "../ViewHandler/ViewHandler";
+import { TableHandler, ValidatedParams } from "./TableHandler";
 
 type RowFieldDataPlain = {
   type: "plain";
@@ -58,10 +56,7 @@ export class DataValidator {
 
   parse = async (args: ParseDataArgs) => {
     const { command } = args;
-    const rowFieldData = await getValidatedRowFieldData(
-      args,
-      this.tableHandler,
-    );
+    const rowFieldData = await getValidatedRowFieldData(args, this.tableHandler);
     const parsedRowFieldData = await getParsedRowFieldData(rowFieldData, args);
     if (command === "update") {
       if (rowFieldData.some((rowParts) => rowParts.length === 0)) {
@@ -71,8 +66,7 @@ export class DataValidator {
 
     return {
       parsedRowFieldData,
-      getQuery: () =>
-        getQuery(command, parsedRowFieldData, this.tableHandler.escapedName),
+      getQuery: () => getQuery(command, parsedRowFieldData, this.tableHandler.escapedName),
     };
   };
 }
@@ -80,23 +74,20 @@ export class DataValidator {
 const getQuery = (
   type: "insert" | "update",
   parsedRowFieldData: ParsedRowFieldData[][],
-  escapedTableName: string,
+  escapedTableName: string
 ): string => {
   if (type === "insert") {
     const uniqueColumns = Array.from(
-      new Set(
-        parsedRowFieldData.flatMap((row) => row.map((r) => r.escapedCol)),
-      ),
+      new Set(parsedRowFieldData.flatMap((row) => row.map((r) => r.escapedCol)))
     );
     const values = parsedRowFieldData
       .map(
         (row) =>
-          `(${uniqueColumns.map((colName) => row.find((r) => r.escapedCol === colName)?.escapedVal ?? "DEFAULT")})`,
+          `(${uniqueColumns.map((colName) => row.find((r) => r.escapedCol === colName)?.escapedVal ?? "DEFAULT")})`
       )
       .join(",\n");
-    const whatToInsert = !uniqueColumns.length
-      ? "DEFAULT VALUES"
-      : `(${uniqueColumns}) VALUES ${values}`;
+    const whatToInsert =
+      !uniqueColumns.length ? "DEFAULT VALUES" : `(${uniqueColumns}) VALUES ${values}`;
     return `INSERT INTO ${escapedTableName} ${whatToInsert} `;
   } else {
     const query =
@@ -104,9 +95,7 @@ const getQuery = (
         .map((rowParts) => {
           return (
             `UPDATE ${escapedTableName} SET ` +
-            rowParts
-              .map((r) => `${r.escapedCol} = ${r.escapedVal} `)
-              .join(",\n")
+            rowParts.map((r) => `${r.escapedCol} = ${r.escapedVal} `).join(",\n")
           );
         })
         .join(";\n") + " ";
@@ -142,10 +131,7 @@ const getValidatedRow = ({
   if (!column_names.length) {
     throw "table column_names mising";
   }
-  const validatedAllowedColumns = tableHandler.parseFieldFilter(
-    allowedCols,
-    false,
-  );
+  const validatedAllowedColumns = tableHandler.parseFieldFilter(allowedCols, false);
 
   let finalRow = { ...row };
   if (removeDisallowedFields && !isEmpty(finalRow)) {
@@ -179,7 +165,7 @@ export const prepareNewData = async ({
   tableConfigurator,
   tableHandler,
 }: ValidatedParams) => {
-  const synced_field = (tableRules ?? {})?.sync?.synced_field;
+  const synced_field = (tableRules ?? {}).sync?.synced_field;
 
   /* Update synced_field if sync is on and missing */
   if (synced_field && !row[synced_field]) {
@@ -201,16 +187,8 @@ export const prepareNewData = async ({
       col,
       value: data[col],
     });
-    const colConfig = tableConfigurator?.getColumnConfig(
-      tableHandler.name,
-      col,
-    );
-    if (
-      colConfig &&
-      isObject(colConfig) &&
-      "isText" in colConfig &&
-      data[col]
-    ) {
+    const colConfig = tableConfigurator?.getColumnConfig(tableHandler.name, col);
+    if (colConfig && isObject(colConfig) && "isText" in colConfig && data[col]) {
       if (colConfig.lowerCased) {
         data[col] = data[col].toString().toLowerCase();
       }
@@ -235,7 +213,7 @@ export const prepareNewData = async ({
  */
 const getValidatedRowFieldData = async (
   { allowedCols, rows, validationOptions, dbTx, command }: ParseDataArgs,
-  tableHandler: TableHandler,
+  tableHandler: TableHandler
 ) => {
   if (!allowedCols.length && command === "update") {
     throw "allowedColumns cannot be empty";
@@ -255,7 +233,7 @@ const getValidatedRowFieldData = async (
         });
       }
       const keysAddedDuringValidate = Object.keys(row).filter(
-        (newKey) => !initialRowKeys.includes(newKey),
+        (newKey) => !initialRowKeys.includes(newKey)
       );
 
       const getColumn = (fieldName: string) => {
@@ -269,44 +247,42 @@ const getValidatedRowFieldData = async (
         return column;
       };
 
-      const rowPartValues = Object.entries(row).map(
-        ([fieldName, fieldValue]) => {
-          const column = getColumn(fieldName);
-          if (isObject(fieldValue)) {
-            // const textPatch = getTextPatch(column, fieldValue);
-            // if(textPatch){
-            //   return {
-            //     type: "plain",
-            //     column,
-            //     fieldValue: textPatch,
-            //   } satisfies RowFieldData;
-            // }
+      const rowPartValues = Object.entries(row).map(([fieldName, fieldValue]) => {
+        const column = getColumn(fieldName);
+        if (isObject(fieldValue)) {
+          // const textPatch = getTextPatch(column, fieldValue);
+          // if(textPatch){
+          //   return {
+          //     type: "plain",
+          //     column,
+          //     fieldValue: textPatch,
+          //   } satisfies RowFieldData;
+          // }
 
-            const [firstKey, ...otherkeys] = Object.keys(fieldValue);
-            const func =
-              firstKey && !otherkeys.length
-                ? convertionFuncs.some((f) => `$${f.name}` === firstKey)
-                : undefined;
-            if (func) {
-              const { funcName, args } = parseFunctionObject(fieldValue);
-              return {
-                type: "function",
-                column,
-                funcName,
-                args,
-              } satisfies RowFieldData;
-            }
+          const [firstKey, ...otherkeys] = Object.keys(fieldValue);
+          const func =
+            firstKey && !otherkeys.length ?
+              convertionFuncs.some((f) => `$${f.name}` === firstKey)
+            : undefined;
+          if (func) {
+            const { funcName, args } = parseFunctionObject(fieldValue);
+            return {
+              type: "function",
+              column,
+              funcName,
+              args,
+            } satisfies RowFieldData;
           }
-          return {
-            type: "plain",
-            column: getColumn(fieldName),
-            fieldValue,
-          } satisfies RowFieldData;
-        },
-      );
+        }
+        return {
+          type: "plain",
+          column: getColumn(fieldName),
+          fieldValue,
+        } satisfies RowFieldData;
+      });
 
       return rowPartValues;
-    }),
+    })
   );
 
   return rowFieldData;
@@ -320,7 +296,7 @@ const getTextPatch = async (c: TableSchemaColumn, fieldValue: any) => {
     !["from", "to"].find((key) => typeof fieldValue[key] !== "number")
   ) {
     const unrecProps = Object.keys(fieldValue).filter(
-      (k) => !["from", "to", "text", "md5"].includes(k),
+      (k) => !["from", "to", "text", "md5"].includes(k)
     );
     if (unrecProps.length) {
       throw "Unrecognised params in textPatch field: " + unrecProps.join(", ");
@@ -352,7 +328,7 @@ const getTextPatch = async (c: TableSchemaColumn, fieldValue: any) => {
 
 const getParsedRowFieldDataFunction = async (
   rowPart: RowFieldDataFunction,
-  args: ParseDataArgs,
+  args: ParseDataArgs
 ) => {
   const func = convertionFuncs.find((f) => `$${f.name}` === rowPart.funcName);
   if (!func) {
@@ -364,10 +340,7 @@ const getParsedRowFieldDataFunction = async (
   return func.getQuery(rowPart);
 };
 
-const getParsedRowFieldData = async (
-  rowFieldData: RowFieldData[][],
-  args: ParseDataArgs,
-) => {
+const getParsedRowFieldData = async (rowFieldData: RowFieldData[][], args: ParseDataArgs) => {
   const parsedRowFieldData = Promise.all(
     rowFieldData.map((rowParts) => {
       return Promise.all(
@@ -377,12 +350,8 @@ const getParsedRowFieldData = async (
             escapedVal = await getParsedRowFieldDataFunction(rowPart, args);
           } else {
             /** Prevent pg-promise formatting jsonb */
-            const colIsJSON = ["json", "jsonb"].includes(
-              rowPart.column.data_type,
-            );
-            escapedVal = pgp.as.format(colIsJSON ? "$1:json" : "$1", [
-              rowPart.fieldValue,
-            ]);
+            const colIsJSON = ["json", "jsonb"].includes(rowPart.column.data_type);
+            escapedVal = pgp.as.format(colIsJSON ? "$1:json" : "$1", [rowPart.fieldValue]);
           }
 
           /**
@@ -394,9 +363,9 @@ const getParsedRowFieldData = async (
             escapedCol: asName(rowPart.column.name),
             escapedVal,
           };
-        }),
+        })
       );
-    }),
+    })
   );
 
   return parsedRowFieldData;
@@ -426,12 +395,11 @@ const convertionFuncs: ConvertionFunc[] = [
           const argList = args.map((arg) => asValue(arg)).join(", ");
           return `${name}(${argList})`;
         },
-      }) satisfies ConvertionFunc,
+      }) satisfies ConvertionFunc
   ),
   {
     name: "to_timestamp",
-    getQuery: ({ args }) =>
-      `to_timestamp(${asValue(args[0])}::BIGINT/1000.0)::timestamp`,
+    getQuery: ({ args }) => `to_timestamp(${asValue(args[0])}::BIGINT/1000.0)::timestamp`,
   },
   {
     name: "merge",

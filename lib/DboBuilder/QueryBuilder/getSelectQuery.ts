@@ -18,13 +18,11 @@ export function getSelectQuery(
   viewHandler: ViewHandler,
   q: NewQuery,
   depth = 0,
-  selectParamsGroupBy: boolean,
+  selectParamsGroupBy: boolean
 ): string {
   const rootSelect = q.select
     .filter((s) => s.selected)
-    .map((s) =>
-      [s.getQuery(ROOT_TABLE_ALIAS), " AS ", asName(s.alias)].join(""),
-    );
+    .map((s) => [s.getQuery(ROOT_TABLE_ALIAS), " AS ", asName(s.alias)].join(""));
 
   const parsedJoins =
     q.joins?.flatMap((q2) => {
@@ -40,21 +38,21 @@ export function getSelectQuery(
     }) ?? [];
 
   const selectItems = rootSelect.concat(
-    parsedJoins?.map((join) => {
+    parsedJoins.map((join) => {
       const { joinAlias } = join;
       return `COALESCE(${asName(joinAlias)}.${join.resultAlias}, '[]') as ${asName(joinAlias)}`;
-    }) ?? [],
+    })
   );
 
   /** OR joins cannot be easily aggregated to one-many with the root table. Must group by root table id */
   const hasOrJoins = parsedJoins.some((j) => j.isOrJoin);
 
-  let joinCtes = !parsedJoins.length
-    ? []
+  let joinCtes =
+    !parsedJoins.length ?
+      []
     : [
         ...parsedJoins.flatMap((j, i) => {
-          const needsComma =
-            parsedJoins.length > 1 && i < parsedJoins.length - 1;
+          const needsComma = parsedJoins.length > 1 && i < parsedJoins.length - 1;
           return j.cteLines.concat(needsComma ? [","] : []);
         }),
       ];
@@ -94,11 +92,8 @@ export function getSelectQuery(
   return indentLinesToString(query);
 }
 
-const indentLine = (
-  numberOfSpaces: number,
-  str: string,
-  indentStr = "    ",
-): string => new Array(numberOfSpaces).fill(indentStr).join("") + str;
+const indentLine = (numberOfSpaces: number, str: string, indentStr = "    "): string =>
+  new Array(numberOfSpaces).fill(indentStr).join("") + str;
 type IndentLinesOpts = {
   numberOfSpaces?: number;
   indentStr?: string;
@@ -106,11 +101,7 @@ type IndentLinesOpts = {
 };
 export const indentLines = (
   strArr: (string | undefined | null)[],
-  {
-    numberOfSpaces = 2,
-    indentStr = " ",
-    appendCommas = false,
-  }: IndentLinesOpts = {},
+  { numberOfSpaces = 2, indentStr = " ", appendCommas = false }: IndentLinesOpts = {}
 ): string[] => {
   const nonEmptyLines = strArr.filter((v) => v);
 
@@ -126,7 +117,7 @@ const indentLinesToString = (
   strArr: (string | undefined | null)[],
   numberOfSpaces = 0,
   separator = " \n ",
-  indentStr = " ",
+  indentStr = " "
 ) => indentLines(strArr, { numberOfSpaces, indentStr }).join(separator);
 const getTableAlias = (q: NewQuery) =>
   !q.tableAlias ? q.table : `${q.tableAlias || ""}_${q.table}`;
@@ -134,9 +125,7 @@ export const getTableAliasAsName = (q: NewQuery) => asName(getTableAlias(q));
 
 export const getRootGroupBy = (q: NewQuery, selectParamsGroupBy?: boolean) => {
   const aggs = q.select.filter((s) => s.selected && s.type === "aggregation");
-  const nonAggs = q.select.filter(
-    (s) => s.selected && s.type !== "aggregation",
-  );
+  const nonAggs = q.select.filter((s) => s.selected && s.type !== "aggregation");
 
   if ((selectParamsGroupBy || aggs.length) && nonAggs.length) {
     /** Add ORDER BY items not included in root select */
@@ -149,9 +138,7 @@ export const getRootGroupBy = (q: NewQuery, selectParamsGroupBy?: boolean) => {
 
     return [
       `GROUP BY ${q.select
-        .map((s, i) =>
-          s.selected && s.type !== "aggregation" ? `${i + 1}` : undefined,
-        )
+        .map((s, i) => (s.selected && s.type !== "aggregation" ? `${i + 1}` : undefined))
         .concat(orderByItems)
         .filter(isDefined)
         .join(", ")} `,

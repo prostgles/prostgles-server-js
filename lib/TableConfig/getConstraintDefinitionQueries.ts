@@ -24,9 +24,6 @@ export const getConstraintDefinitionQueries = ({
 }: Args): ConstraintDef[] | undefined => {
   if ("constraints" in tableConf && tableConf.constraints) {
     const { constraints } = tableConf;
-    if (!constraints) {
-      return undefined;
-    }
 
     if (Array.isArray(constraints)) {
       return constraints.map((c) => ({
@@ -38,9 +35,7 @@ export const getConstraintDefinitionQueries = ({
       return constraintNames.map((constraintName) => {
         const _cnstr = constraints[constraintName]!;
         const constraintDef =
-          typeof _cnstr === "string"
-            ? _cnstr
-            : `${_cnstr.type} (${_cnstr.content})`;
+          typeof _cnstr === "string" ? _cnstr : `${_cnstr.type} (${_cnstr.content})`;
 
         /** Drop constraints with the same name */
         // const existingConstraint = constraints.some(c => c.conname === constraintName);
@@ -97,8 +92,7 @@ export const getColConstraintsQuery = ({
   `;
   if (table) query += `\nAND "table" = ${asValue(table)}`;
   if (column) query += `\nAND cols @> ARRAY[${asValue(column)}]`;
-  if (types?.length)
-    query += `\nAND type IN (${types.map((v) => asValue(v)).join(", ")})`;
+  if (types?.length) query += `\nAND type IN (${types.map((v) => asValue(v)).join(", ")})`;
   return query;
 };
 export const getColConstraints = ({

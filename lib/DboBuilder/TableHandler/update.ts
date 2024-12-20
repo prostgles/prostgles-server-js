@@ -7,10 +7,7 @@ import {
   getSerializedClientErrorFromPGError,
   withUserRLS,
 } from "../DboBuilder";
-import {
-  getInsertTableRules,
-  getReferenceColumnInserts,
-} from "../insertNestedRecords";
+import { getInsertTableRules, getReferenceColumnInserts } from "../insertNestedRecords";
 import { prepareNewData } from "./DataValidator";
 import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
 import { TableHandler } from "./TableHandler";
@@ -22,7 +19,7 @@ export async function update(
   _newData: AnyObject,
   params?: UpdateParams,
   tableRules?: TableRule,
-  localParams?: LocalParams,
+  localParams?: LocalParams
 ): Promise<AnyObject | void> {
   const ACTION = "update";
   const start = Date.now();
@@ -31,13 +28,7 @@ export async function update(
     const finalDBtx = this.getFinalDBtx(localParams);
     const wrapInTx = () =>
       this.dboBuilder.getTX((_dbtx) =>
-        _dbtx[this.name]?.[ACTION]?.(
-          filter,
-          _newData,
-          params,
-          tableRules,
-          localParams,
-        ),
+        _dbtx[this.name]?.[ACTION]?.(filter, _newData, params, tableRules, localParams)
       );
     const rule = tableRules?.[ACTION];
     if (rule?.postValidate && !finalDBtx) {
@@ -54,28 +45,18 @@ export async function update(
       }));
     }
 
-    const parsedRules = await this.parseUpdateRules(
-      filter,
-      params,
-      tableRules,
-      localParams,
-    );
+    const parsedRules = await this.parseUpdateRules(filter, params, tableRules, localParams);
     if (localParams?.testRule) {
       return parsedRules;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!newData || !Object.keys(newData).length) {
       throw "no update data provided\nEXPECTING db.table.update(filter, updateData, options)";
     }
 
-    const {
-      fields,
-      validateRow,
-      forcedData,
-      returningFields,
-      forcedFilter,
-      filterFields,
-    } = parsedRules;
+    const { fields, validateRow, forcedData, returningFields, forcedFilter, filterFields } =
+      parsedRules;
     const { removeDisallowedFields = false } = params || {};
     const { returnQuery = false } = localParams ?? {};
 
@@ -87,15 +68,10 @@ export async function update(
         multi: 1,
       };
       const good_params = Object.keys(good_paramsObj);
-      const bad_params = Object.keys(params).filter(
-        (k) => !good_params.includes(k),
-      );
-      if (bad_params && bad_params.length)
+      const bad_params = Object.keys(params).filter((k) => !good_params.includes(k));
+      if (bad_params.length)
         throw (
-          "Invalid params: " +
-          bad_params.join(", ") +
-          " \n Expecting: " +
-          good_params.join(", ")
+          "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ")
         );
     }
 
@@ -134,18 +110,13 @@ export async function update(
       }
       await Promise.all(
         nestedInserts.map(async (nestedInsert) => {
-          const nesedTableHandler = finalDBtx[nestedInsert.tableName] as
-            | TableHandler
-            | undefined;
+          const nesedTableHandler = finalDBtx[nestedInsert.tableName] as TableHandler | undefined;
           if (!nesedTableHandler)
             throw `nestedInsert Tablehandler not found for ${nestedInsert.tableName}`;
-          const refTableRules = !localParams
-            ? undefined
-            : await getInsertTableRules(
-                this,
-                nestedInsert.tableName,
-                localParams,
-              );
+          const refTableRules =
+            !localParams ? undefined : (
+              await getInsertTableRules(this, nestedInsert.tableName, localParams)
+            );
           const nestedLocalParams: LocalParams = {
             ...localParams,
             nestedInsert: {
@@ -160,7 +131,7 @@ export async function update(
             { returning: "*" },
             undefined,
             refTableRules,
-            nestedLocalParams,
+            nestedLocalParams
           );
           nestedInsertsResultsObj[nestedInsert.col] = nestedInsertResult;
 
@@ -169,7 +140,7 @@ export async function update(
             ...nestedInsert,
             result: nestedInsertResult,
           };
-        }),
+        })
       );
     }
 

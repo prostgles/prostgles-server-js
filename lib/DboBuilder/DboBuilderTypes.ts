@@ -26,9 +26,7 @@ import pg = require("pg-promise/typescript/pg-subset");
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 
 export type TableSchemaColumn = ColumnInfo & {
-  privileges: Partial<
-    Record<"INSERT" | "REFERENCES" | "SELECT" | "UPDATE", true>
-  >;
+  privileges: Partial<Record<"INSERT" | "REFERENCES" | "SELECT" | "UPDATE", true>>;
 };
 
 export type TableSchema = Pick<TableInfo, "uniqueColumnGroups"> & {
@@ -104,15 +102,10 @@ export type TableHandlers = {
   [key: string]: Partial<TableHandler>;
 };
 export type DbTxTableHandlers = {
-  [key: string]:
-    | Omit<Partial<TableHandler>, "dbTx">
-    | Omit<TableHandler, "dbTx">;
+  [key: string]: Omit<Partial<TableHandler>, "dbTx"> | Omit<TableHandler, "dbTx">;
 };
 
-export type DBHandlerServerExtra<
-  TH = TableHandlers,
-  WithTransactions = true,
-> = {
+export type DBHandlerServerExtra<TH = TableHandlers, WithTransactions = true> = {
   sql: SQLHandler;
 } & (WithTransactions extends true ? { tx: TX<TH> } : Record<string, never>);
 
@@ -165,18 +158,11 @@ export type PRGLIOSocket = {
     auth?: Record<string, any>;
   };
 
-  readonly on: (
-    channel: string,
-    params: any,
-    cb?: (err: any, res?: any) => void,
-  ) => any; // Promise<void>;
+  readonly on: (channel: string, params: any, cb?: (err: any, res?: any) => void) => any; // Promise<void>;
 
   readonly emit: (channel: string, message?: any, cb?: BasicCallback) => any;
 
-  readonly once: (
-    channel: string,
-    cb: (_data: any, cb: BasicCallback) => void,
-  ) => void;
+  readonly once: (channel: string, cb: (_data: any, cb: BasicCallback) => void) => void;
 
   readonly removeAllListeners: (channel: string) => void;
 
@@ -288,7 +274,7 @@ export type ValidatedTableRules = CommonTableRules & {
   /* All columns of the view/table. Includes computed fields as well */
   allColumns: FieldSpec[];
 
-  select: {
+  select?: {
     /* Fields you can select */
     fields: string[];
 
@@ -304,7 +290,7 @@ export type ValidatedTableRules = CommonTableRules & {
     /* Max limit allowed for each select. 1000 by default. If null then an unlimited select is allowed when providing { limit: null } */
     maxLimit: number | null;
   };
-  update: {
+  update?: {
     /* Fields you can update */
     fields: string[];
 
@@ -320,7 +306,7 @@ export type ValidatedTableRules = CommonTableRules & {
     /* Data applied to every update */
     forcedData: any;
   };
-  insert: {
+  insert?: {
     /* Fields you can insert */
     fields: string[];
 
@@ -330,7 +316,7 @@ export type ValidatedTableRules = CommonTableRules & {
     /* Data applied to every insert */
     forcedData: any;
   };
-  delete: {
+  delete?: {
     /* Fields to filter by when deleting */
     filterFields: string[];
 

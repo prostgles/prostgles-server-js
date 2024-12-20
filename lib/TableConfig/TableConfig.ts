@@ -56,7 +56,7 @@ type BaseTableDefinition<LANG_IDS = AnyObject> = {
      * The returned row must satisfy the table schema
      */
     getPreInsertRow?: (
-      args: GetPreInsertRowArgs,
+      args: GetPreInsertRowArgs
     ) => Promise<{ row: AnyObject; onInserted: Promise<void> }>;
   };
   triggers?: {
@@ -169,9 +169,7 @@ type MediaColumn = {
        * https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/accept
        */
       allowedContentType?: Record<
-        Partial<
-          "audio/*" | "video/*" | "image/*" | "text/*" | ALLOWED_CONTENT_TYPE
-        >,
+        Partial<"audio/*" | "video/*" | "image/*" | "text/*" | ALLOWED_CONTENT_TYPE>,
         1
       >;
     }
@@ -219,13 +217,7 @@ export type ColumnConfig<LANG_IDS = { en: 1 }> =
       | NamedJoinColumn
       | MediaColumn
       | (BaseColumn<LANG_IDS> &
-          (
-            | SQLDefColumn
-            | ReferencedColumn
-            | TextColumn
-            | JSONBColumnDef
-            | Enum
-          ))
+          (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef | Enum))
     >;
 
 export type ColumnConfigs<LANG_IDS = { en: 1 }> = {
@@ -239,9 +231,8 @@ export type ColumnConfigs<LANG_IDS = { en: 1 }> = {
 };
 
 type UnionKeys<T> = T extends T ? keyof T : never;
-type StrictUnionHelper<T, TAll> = T extends any
-  ? T & Partial<Record<Exclude<UnionKeys<TAll>, keyof T>, never>>
-  : never;
+type StrictUnionHelper<T, TAll> =
+  T extends any ? T & Partial<Record<Exclude<UnionKeys<TAll>, keyof T>, never>> : never;
 export type StrictUnion<T> = StrictUnionHelper<T, T>;
 
 export const CONSTRAINT_TYPES = ["PRIMARY KEY", "UNIQUE", "CHECK"] as const;
@@ -394,22 +385,16 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     }
   };
 
-  getColumnConfig = (
-    tableName: string,
-    colName: string,
-  ): ColumnConfig | undefined => {
-    const tconf = this.config?.[tableName];
+  getColumnConfig = (tableName: string, colName: string): ColumnConfig | undefined => {
+    const tconf = this.config[tableName];
     if (tconf && "columns" in tconf) {
       return tconf.columns?.[colName];
     }
     return undefined;
   };
 
-  getTableInfo = (params: {
-    tableName: string;
-    lang?: string;
-  }): TableInfo["info"] | undefined => {
-    const tconf = this.config?.[params.tableName];
+  getTableInfo = (params: { tableName: string; lang?: string }): TableInfo["info"] | undefined => {
+    const tconf = this.config[params.tableName];
 
     return {
       label: parseI18N<LANG_IDS, string>({
@@ -425,16 +410,13 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     col: string;
     table: string;
     lang?: string;
-  }):
-    | (ColExtraInfo & { label?: string } & Pick<ColumnInfo, "jsonbSchema">)
-    | undefined => {
+  }): (ColExtraInfo & { label?: string } & Pick<ColumnInfo, "jsonbSchema">) | undefined => {
     const colConf = this.getColumnConfig(params.table, params.col);
     let result: Partial<ReturnType<typeof this.getColInfo>> = undefined;
     if (colConf) {
       if (isObject(colConf)) {
         const { jsonbSchema, jsonbSchemaType, info } = colConf;
         result = {
-          ...(result ?? {}),
           ...info,
           ...((jsonbSchema || jsonbSchemaType) && {
             jsonbSchema: {
@@ -449,14 +431,14 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
          */
         if (colConf.label) {
           const { lang } = params;
-          const lbl = colConf?.label;
+          const lbl = colConf.label;
           if (["string", "object"].includes(typeof lbl)) {
             if (typeof lbl === "string") {
               result ??= {};
               result.label = lbl;
-            } else if (lang && (lbl?.[lang as "en"] || lbl?.en)) {
+            } else if (lang && (lbl[lang as "en"] || lbl.en)) {
               result ??= {};
-              result.label = lbl?.[lang as "en"] || lbl?.en;
+              result.label = lbl[lang as "en"] || lbl.en;
             }
           }
         }
@@ -478,12 +460,8 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     }
   };
 
-  getJoinInfo = (
-    sourceTable: string,
-    targetTable: string,
-  ): JoinInfo | undefined => {
+  getJoinInfo = (sourceTable: string, targetTable: string): JoinInfo | undefined => {
     if (
-      this.config &&
       sourceTable in this.config &&
       this.config[sourceTable] &&
       "columns" in this.config[sourceTable]!
@@ -513,9 +491,9 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
 
   getPreInsertRow = async (
     tableHandler: TableHandler,
-    args: Pick<GetPreInsertRowArgs, "localParams" | "row" | "validate" | "dbx">,
+    args: Pick<GetPreInsertRowArgs, "localParams" | "row" | "validate" | "dbx">
   ): Promise<AnyObject> => {
-    const tableHook = this.config?.[tableHandler.name]?.hooks?.getPreInsertRow;
+    const tableHook = this.config[tableHandler.name]?.hooks?.getPreInsertRow;
     if (tableHandler.is_media) {
       return uploadFile.bind(tableHandler)(args) as Promise<AnyObject>;
     }

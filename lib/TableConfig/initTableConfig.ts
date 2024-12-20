@@ -55,9 +55,8 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
     throw "pgp missing";
   }
 
-  const MAX_IDENTIFIER_LENGTH = +(
-    (await this.db.one("SHOW max_identifier_length;")) as any
-  ).max_identifier_length;
+  const MAX_IDENTIFIER_LENGTH = +((await this.db.one("SHOW max_identifier_length;")) as any)
+    .max_identifier_length;
   if (!Number.isFinite(MAX_IDENTIFIER_LENGTH))
     throw `Could not obtain a valid max_identifier_length`;
   const asName = (v: string) => {
@@ -81,9 +80,7 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
     `);
     migrations = { version, table: versionTableName };
     const maxVersion = +(
-      await this.db.oneOrNone(
-        `SELECT MAX(id) as v FROM ${asName(versionTableName)}`,
-      )
+      await this.db.oneOrNone(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`)
     ).v;
     const latestVersion = Number.isFinite(maxVersion) ? maxVersion : undefined;
 
@@ -91,7 +88,7 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
       const isLatest = (
         await this.db.oneOrNone(
           `SELECT table_config = \${table_config} as v FROM ${asName(versionTableName)} WHERE id = \${version}`,
-          { version, table_config: this.config },
+          { version, table_config: this.config }
         )
       ).v;
       if (isLatest) {
@@ -115,10 +112,7 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
   for (const [tableNameRaw, tableConf] of Object.entries(this.config)) {
     const tableName = asName(tableNameRaw);
 
-    if (
-      "isLookupTable" in tableConf &&
-      Object.keys(tableConf.isLookupTable?.values).length
-    ) {
+    if ("isLookupTable" in tableConf && Object.keys(tableConf.isLookupTable.values).length) {
       const { dropIfExists = false, dropIfExistsCascade = false } = tableConf;
       const isDropped = dropIfExists || dropIfExistsCascade;
 
@@ -128,24 +122,26 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
         queries.push(`DROP TABLE IF EXISTS ${tableName};`);
       }
 
-      const rows = Object.entries(tableConf.isLookupTable?.values).map(
-        ([id, otherColumns]) => ({ id, ...otherColumns }),
-      );
-      const lookupTableHandler = this.dbo?.[tableNameRaw];
+      const rows = Object.entries(tableConf.isLookupTable.values).map(([id, otherColumns]) => ({
+        id,
+        ...otherColumns,
+      }));
+      const lookupTableHandler = this.dbo[tableNameRaw];
       const columnNames = Object.keys(rows[0]!).filter((k) => k !== "id");
       if (isDropped || !lookupTableHandler) {
         queries.push(
           `CREATE TABLE IF NOT EXISTS ${tableName} (
             id  TEXT PRIMARY KEY
             ${columnNames.length ? ", " + columnNames.map((k) => asName(k) + " TEXT ").join(", ") : ""}
-          );`,
+          );`
         );
       }
       if (rows.length) {
-        const existingValues: { id: any }[] = !lookupTableHandler
-          ? []
+        const existingValues: { id: any }[] =
+          !lookupTableHandler ?
+            []
           : await this.db.any(
-              `SELECT id FROM ${tableName} WHERE id IN (${rows.map((r) => asValue(r.id)).join(", ")});`,
+              `SELECT id FROM ${tableName} WHERE id IN (${rows.map((r) => asValue(r.id)).join(", ")});`
             );
         rows
           .filter((r) => !existingValues.some((ev) => ev.id === r.id))
@@ -156,8 +152,8 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
               this.prostgles.pgp!.as.format(
                 `INSERT INTO ${tableName}  (${allColumns.map((t) => asName(t)).join(", ")})  ` +
                   " VALUES (${values:csv});",
-                { values },
-              ),
+                { values }
+              )
             );
           });
       }
@@ -177,14 +173,14 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
 
     /* isLookupTable table has already been created */
     const coldef =
-      "isLookupTable" in tableConf
-        ? undefined
-        : await getTableColumnQueries({
-            db: this.db,
-            tableConf,
-            tableHandler,
-            tableName,
-          });
+      "isLookupTable" in tableConf ? undefined : (
+        await getTableColumnQueries({
+          db: this.db,
+          tableConf,
+          tableHandler,
+          tableName,
+        })
+      );
 
     if (coldef) {
       queries.push(coldef.fullQuery);
@@ -220,9 +216,7 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
       currCons.forEach((c) => {
         if (
           !futureCons.some(
-            (nc) =>
-              nc.definition === c.definition &&
-              (!nc.isNamed || nc.name === c.name),
+            (nc) => nc.definition === c.definition && (!nc.isNamed || nc.name === c.name)
           )
         ) {
           queries.push(`${ALTER_TABLE_Q} DROP CONSTRAINT ${asName(c.name)};`);
@@ -234,9 +228,7 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
         if (c.name && !currCons.some((cc) => cc.name === c.name)) {
           const fc = futureCons.find((nc) => nc.name === c.name);
           if (fc) {
-            queries.push(
-              `${ALTER_TABLE_Q} ADD CONSTRAINT ${asName(c.name)} ${c.content};`,
-            );
+            queries.push(`${ALTER_TABLE_Q} ADD CONSTRAINT ${asName(c.name)} ${c.content};`);
           }
         }
       });
@@ -261,14 +253,8 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
       */
       const currIndexes = await getPGIndexes(this.db, tableName, "public");
       Object.entries(tableConf.indexes).forEach(
-        ([
-          indexName,
-          { columns, concurrently, replace, unique, using, where = "" },
-        ]) => {
-          if (
-            replace ||
-            (typeof replace !== "boolean" && tableConf.replaceUniqueIndexes)
-          ) {
+        ([indexName, { columns, concurrently, replace, unique, using, where = "" }]) => {
+          if (replace || (typeof replace !== "boolean" && tableConf.replaceUniqueIndexes)) {
             queries.push(`DROP INDEX IF EXISTS ${asName(indexName)};`);
           }
           if (!currIndexes.some((idx) => idx.indexname === indexName)) {
@@ -283,10 +269,10 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
                 where && `WHERE ${where}`,
               ]
                 .filter((v) => v)
-                .join(" ") + ";",
+                .join(" ") + ";"
             );
           }
-        },
+        }
       );
     }
 
@@ -303,7 +289,7 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
             ORDER BY event_object_table
           `,
         { tableName },
-        { returnType: "rows" },
+        { returnType: "rows" }
       )) as { trigger_name: string }[];
 
       // const existingTriggerFuncs = await this.dbo.sql!(`
@@ -338,24 +324,15 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
 
           const triggerActionNameParsed = asName(triggerActionName);
           if (isDropped) {
-            queries.push(
-              `DROP TRIGGER IF EXISTS ${triggerActionNameParsed} ON ${tableName};`,
-            );
+            queries.push(`DROP TRIGGER IF EXISTS ${triggerActionNameParsed} ON ${tableName};`);
           }
 
-          if (
-            isDropped ||
-            !existingTriggers.some((t) => t.trigger_name === triggerActionName)
-          ) {
+          if (isDropped || !existingTriggers.some((t) => t.trigger_name === triggerActionName)) {
             addFuncDef();
-            const newTableName =
-              action !== "delete" ? "NEW TABLE AS new_table" : "";
-            const oldTableName =
-              action !== "insert" ? "OLD TABLE AS old_table" : "";
+            const newTableName = action !== "delete" ? "NEW TABLE AS new_table" : "";
+            const oldTableName = action !== "insert" ? "OLD TABLE AS old_table" : "";
             const transitionTables =
-              trigger.forEach === "row"
-                ? ""
-                : `REFERENCING ${newTableName} ${oldTableName}`;
+              trigger.forEach === "row" ? "" : `REFERENCING ${newTableName} ${oldTableName}`;
             queries.push(`
                 CREATE TRIGGER ${triggerActionNameParsed}
                 ${trigger.type} ${action} ON ${tableName}
@@ -381,9 +358,7 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
       if (err.position) {
         const pos = +err.position;
         if (Number.isInteger(pos)) {
-          return Promise.reject(
-            err.toString() + "\n At:" + q.slice(pos - 50, pos + 50),
-          );
+          return Promise.reject(err.toString() + "\n At:" + q.slice(pos - 50, pos + 50));
         }
       }
 
@@ -393,10 +368,11 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
 
   if (migrations) {
     await this.db.any(
-      `INSERT INTO ${migrations.table}(id, table_config) VALUES (${asValue(migrations.version)}, ${asValue(this.config)}) ON CONFLICT DO NOTHING;`,
+      `INSERT INTO ${migrations.table}(id, table_config) VALUES (${asValue(migrations.version)}, ${asValue(this.config)}) ON CONFLICT DO NOTHING;`
     );
   }
   this.initialising = false;
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (changedSchema && !failedQueries.length) {
     if (!this.prevInitQueryHistory) {
       this.prevInitQueryHistory = queryHistory;

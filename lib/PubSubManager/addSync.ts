@@ -27,7 +27,7 @@ export async function addSync(this: PubSubManager, syncParams: AddSyncParams) {
       params,
       condition = "",
       throttle = 0,
-    } = syncParams || ({} as AddSyncParams);
+    } = syncParams;
     const conditionParsed = parseCondition(condition);
     if (!socket || !table_info) throw "socket or table_info missing";
 
@@ -49,8 +49,8 @@ export async function addSync(this: PubSubManager, syncParams: AddSyncParams) {
         id_fields,
         allow_delete,
         table_rules,
-        throttle: Math.max(throttle || 0, table_rules?.sync?.throttle || 0),
-        batch_size: table_rules?.sync?.batch_size || DEFAULT_SYNC_BATCH_SIZE,
+        throttle: Math.max(throttle || 0, table_rules.sync?.throttle || 0),
+        batch_size: table_rules.sync?.batch_size || DEFAULT_SYNC_BATCH_SIZE,
         socket_id: socket.id,
         is_sync: true,
         last_synced: 0,
@@ -63,7 +63,6 @@ export async function addSync(this: PubSubManager, syncParams: AddSyncParams) {
       };
 
       /* Only a sync per socket per table per condition allowed */
-      this.syncs ??= [];
       const existing = find(this.syncs, { socket_id: socket.id, channel_name });
       if (!existing) {
         this.syncs.push(newSync);
@@ -85,9 +84,7 @@ export async function addSync(this: PubSubManager, syncParams: AddSyncParams) {
           socket.removeAllListeners(unsyncChn);
           this.syncs = this.syncs.filter((s) => {
             const isMatch =
-              s.socket_id &&
-              s.socket_id === socket.id &&
-              s.channel_name === channel_name;
+              s.socket_id && s.socket_id === socket.id && s.channel_name === channel_name;
             return !isMatch;
           });
           cb(null, { res: "ok" });
@@ -131,11 +128,7 @@ export async function addSync(this: PubSubManager, syncParams: AddSyncParams) {
 
     upsertSync();
 
-    await this.addTrigger(
-      { table_name, condition: conditionParsed },
-      undefined,
-      socket,
-    );
+    await this.addTrigger({ table_name, condition: conditionParsed }, undefined, socket);
 
     return { result: channel_name };
   });

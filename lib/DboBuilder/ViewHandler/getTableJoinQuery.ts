@@ -23,11 +23,9 @@ export const getTableJoinQuery = ({
 
   const query = path
     .map(({ table, on }, i) => {
-      if (!on) throw "on missing";
       const tableName = table;
       const tableAlias = getTableAlias(table, i);
-      const prevTableAlias =
-        i === 0 ? rootTableAlias : getTableAlias(path[i - 1]!.table, i - 1);
+      const prevTableAlias = i === 0 ? rootTableAlias : getTableAlias(path[i - 1]!.table, i - 1);
 
       const onCondition = getJoinOnCondition({
         on,
@@ -46,41 +44,27 @@ export const getTableJoinQuery = ({
        * first path joins to target table through inner joins
        */
       const whereJoinCondition =
-        isLast && isExists
-          ? `WHERE (${getJoinOnCondition({
-              on: firstPath.on,
-              leftAlias: rootTableAlias,
-              rightAlias: getTableAlias(firstPath.table, 0),
-            })})`
-          : "";
+        isLast && isExists ?
+          `WHERE (${getJoinOnCondition({
+            on: firstPath.on,
+            leftAlias: rootTableAlias,
+            rightAlias: getTableAlias(firstPath.table, 0),
+          })})`
+        : "";
 
       const tableSelect =
-        isExists && isLast
-          ? [
-              `(`,
-              ` SELECT *`,
-              ` FROM ${tableName}`,
-              finalWhere ? `  WHERE ${finalWhere}` : "",
-              `)`,
-            ]
-              .filter((v) => v)
-              .join("\n")
-          : tableName;
+        isExists && isLast ?
+          [`(`, ` SELECT *`, ` FROM ${tableName}`, finalWhere ? `  WHERE ${finalWhere}` : "", `)`]
+            .filter((v) => v)
+            .join("\n")
+        : tableName;
       if (isExists && isFirst) {
-        return [
-          `SELECT 1`,
-          `FROM ${tableSelect} ${tableAlias}`,
-          whereJoinCondition,
-        ]
+        return [`SELECT 1`, `FROM ${tableSelect} ${tableAlias}`, whereJoinCondition]
           .filter((v) => v)
           .join("\n");
       }
 
-      return [
-        `${keyword} ${tableSelect} ${tableAlias}`,
-        ` ON ${onCondition}`,
-        whereJoinCondition,
-      ]
+      return [`${keyword} ${tableSelect} ${tableAlias}`, ` ON ${onCondition}`, whereJoinCondition]
         .filter((v) => v)
         .join("\n");
     })
@@ -112,7 +96,7 @@ export const getJoinOnCondition = ({
         .map(([leftCol, rightCol]) => {
           return `${leftAlias}.${getLeftColName(leftCol)} = ${rightAlias}.${getRightColName(rightCol)}`;
         })
-        .join(" AND "),
+        .join(" AND ")
     )
     .join(" OR ");
 };

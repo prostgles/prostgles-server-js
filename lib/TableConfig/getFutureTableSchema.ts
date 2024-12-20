@@ -2,11 +2,7 @@ import { asName } from "prostgles-types";
 import { pgp } from "../DboBuilder/DboBuilder";
 import { DB } from "../Prostgles";
 import { ColumnMinimalInfo, getTableColumns } from "./getColumnDefinitionQuery";
-import {
-  ColConstraint,
-  ConstraintDef,
-  getColConstraints,
-} from "./getConstraintDefinitionQueries";
+import { ColConstraint, ConstraintDef, getColConstraints } from "./getConstraintDefinitionQueries";
 
 type Args = {
   db: DB;
@@ -32,25 +28,23 @@ export const getFutureTableSchema = async ({
 
   let constraints: ColConstraint[] = [];
   let cols: ColumnMinimalInfo[] = [];
-  const ROLLBACK = "Rollback";
-  try {
-    const txMode = new TransactionMode({
-      tiLevel: isolationLevel.serializable,
-    });
-    await db.tx({ mode: txMode }, async (t) => {
-      /** To prevent deadlocks we use a random table name -> Not feasible because named constraints cannot be recreated without dropping the existing ones from actual table */
-      // const tableEsc = asName(tableName.slice(0, 12) + (await t.oneOrNone(`SELECT md5(now()::text) as md5`)).md5);
+  const txMode = new TransactionMode({
+    tiLevel: isolationLevel.serializable,
+  });
+  await db.tx({ mode: txMode }, async (t) => {
+    /** To prevent deadlocks we use a random table name -> Not feasible because named constraints cannot be recreated without dropping the existing ones from actual table */
+    // const tableEsc = asName(tableName.slice(0, 12) + (await t.oneOrNone(`SELECT md5(now()::text) as md5`)).md5);
 
-      const tableEsc = asName(tableName);
+    const tableEsc = asName(tableName);
 
-      const consQueries = constraintDefs
-        .map(
-          (c) =>
-            `ALTER TABLE ${tableEsc} ADD ${c.name ? ` CONSTRAINT ${asName(c.name)}` : ""} ${c.content};`,
-        )
-        .join("\n");
+    const consQueries = constraintDefs
+      .map(
+        (c) =>
+          `ALTER TABLE ${tableEsc} ADD ${c.name ? ` CONSTRAINT ${asName(c.name)}` : ""} ${c.content};`
+      )
+      .join("\n");
 
-      const query = `
+    const query = `
         DROP TABLE IF EXISTS ${tableEsc} CASCADE;
         CREATE TABLE ${tableEsc} (
           ${columnDefs.join(",\n")}
@@ -58,21 +52,13 @@ export const getFutureTableSchema = async ({
         ${consQueries}
       `;
 
-      await t.any(query);
+    await t.any(query);
 
-      constraints = await getColConstraints({ db: t, table: tableName });
-      cols = await getTableColumns({ db: t, table: tableName });
+    constraints = await getColConstraints({ db: t, table: tableName });
+    cols = await getTableColumns({ db: t, table: tableName });
 
-      /** Rollback */
-      return Promise.reject(new Error(ROLLBACK));
-    });
-  } catch (e: any) {
-    if (e instanceof Error && e.message === ROLLBACK) {
-      // Ignore
-    } else {
-      throw e;
-    }
-  }
+    return t.any("ROLLBACK");
+  });
 
   return { cols, constraints };
 };

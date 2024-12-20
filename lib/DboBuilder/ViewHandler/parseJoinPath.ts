@@ -61,9 +61,7 @@ export const parseJoinPath = ({
     }
   });
 
-  const missingPath = result.find(
-    (r) => !r.on.length || r.on.some((v) => !Object.keys(v).length),
-  );
+  const missingPath = result.find((r) => !r.on.length || r.on.some((v) => !Object.keys(v).length));
   if (missingPath) {
     throw `Missing join on condition for: ${missingPath.table}`;
   }
@@ -86,7 +84,7 @@ function getJoins(
   viewHandler: ViewHandler,
   source: string,
   path: JoinPath[],
-  { allowMultiOrJoin = true, getShortestJoin }: Opts = {},
+  { allowMultiOrJoin = true, getShortestJoin }: Opts = {}
 ): JoinInfo {
   const [lastItem] = path;
   if (!lastItem) {
@@ -102,13 +100,11 @@ function getJoins(
 
   /* Self join */
   if (source === target) {
-    const tableHandler = viewHandler.dboBuilder.tablesOrViews?.find(
-      (t) => t.name === source,
-    );
+    const tableHandler = viewHandler.dboBuilder.tablesOrViews?.find((t) => t.name === source);
     if (!tableHandler) throw `Table not found for joining ${source}`;
 
     const fcols = tableHandler.columns.filter((c) =>
-      c.references?.some(({ ftable }) => ftable === viewHandler.name),
+      c.references?.some(({ ftable }) => ftable === viewHandler.name)
     );
     if (!fcols.length) {
       throw `There is no self-join foreign key relationship for table ${JSON.stringify(target)}`;
@@ -116,9 +112,7 @@ function getJoins(
     let allOnJoins: [string, string][][] = [];
     fcols.forEach((fc) => {
       fc.references!.forEach(({ fcols, cols }) => {
-        const fieldArr = fcols.map(
-          (fcol, i) => [fcol, cols[i]!] as [string, string],
-        );
+        const fieldArr = fcols.map((fcol, i) => [fcol, cols[i]!] as [string, string]);
         allOnJoins.push(fieldArr);
       });
     });
@@ -126,7 +120,7 @@ function getJoins(
       ...allOnJoins,
       /** Reverse as well */
       ...allOnJoins.map((constraint) =>
-        constraint.map(([left, right]) => [right, left] as [string, string]),
+        constraint.map(([left, right]) => [right, left] as [string, string])
       ),
     ];
     return {
@@ -137,7 +131,7 @@ function getJoins(
           table: target,
           on: getValidOn(
             lastItem.on,
-            allOnJoins.map((v) => Object.fromEntries(v)),
+            allOnJoins.map((v) => Object.fromEntries(v))
           ),
         },
       ],
@@ -146,28 +140,27 @@ function getJoins(
   }
 
   /* Find the join path between tables */
-  const tableConfigJoinInfo =
-    viewHandler.dboBuilder?.prostgles?.tableConfigurator?.getJoinInfo(
-      source,
-      target,
-    );
+  const tableConfigJoinInfo = viewHandler.dboBuilder.prostgles.tableConfigurator?.getJoinInfo(
+    source,
+    target
+  );
   if (tableConfigJoinInfo) return tableConfigJoinInfo;
 
-  const actualPath = getShortestJoin
-    ? viewHandler.joinPaths
+  const actualPath =
+    getShortestJoin ?
+      viewHandler.joinPaths
         .find((j) => {
           return j.t1 === source && j.t2 === target;
         })
         ?.path.map((table) => ({ table, on: undefined }))
         .slice(1)
-    : viewHandler.joinPaths.find((j) => {
-          return (
-            j.path.join() ===
-            [{ table: source }, ...path].map((p) => p.table).join()
-          );
-        })
-      ? path
-      : undefined;
+    : (
+      viewHandler.joinPaths.find((j) => {
+        return j.path.join() === [{ table: source }, ...path].map((p) => p.table).join();
+      })
+    ) ?
+      path
+    : undefined;
 
   if (getShortestJoin && actualPath?.length && lastItem.on?.length) {
     actualPath[actualPath.length - 1]!.on = lastItem.on;
@@ -183,11 +176,9 @@ function getJoins(
     const prevTable = arr[i - 1]!;
     const t1 = i === 0 ? source : prevTable.table;
 
-    viewHandler.joins ??= viewHandler.dboBuilder.joins;
-
     /* Get join options */
     const join = viewHandler.joins.find(
-      (j) => j.tables.includes(t1) && j.tables.includes(tablePath.table),
+      (j) => j.tables.includes(t1) && j.tables.includes(tablePath.table)
     );
     if (!join) {
       throw `Joining ${t1} <-> ${tablePath} dissallowed or missing`;
@@ -226,10 +217,7 @@ function getJoins(
   };
 }
 
-const getValidOn = (
-  requested: JoinPath["on"],
-  possible: ParsedJoinPath["on"],
-) => {
+const getValidOn = (requested: JoinPath["on"], possible: ParsedJoinPath["on"]) => {
   if (!requested) {
     return possible.map((v) => Object.entries(v));
   }
@@ -238,7 +226,7 @@ const getValidOn = (
   }
   const isValid = requested.every((requestedConstraint) => {
     return possible.some((possibleConstraint) =>
-      conditionsMatch(possibleConstraint, requestedConstraint),
+      conditionsMatch(possibleConstraint, requestedConstraint)
     );
   });
 
@@ -249,14 +237,8 @@ const getValidOn = (
   return requested.map((v) => Object.entries(v));
 };
 
-const conditionsMatch = (
-  c1: Record<string, string>,
-  c2: Record<string, string>,
-) => {
+const conditionsMatch = (c1: Record<string, string>, c2: Record<string, string>) => {
   const keys1 = Object.keys(c1);
   const keys2 = Object.keys(c2);
-  return (
-    keys1.sort().join() === keys2.sort().join() &&
-    keys1.every((key) => c1[key] === c2[key])
-  );
+  return keys1.sort().join() === keys2.sort().join() && keys1.every((key) => c1[key] === c2[key]);
 };

@@ -82,12 +82,12 @@ export async function getSubscribeRelatedTables(
 
         /** If table has primary keys and they are all in this view then use only primary keys */
         if (
-          table?.pkey_columns?.every((pkey) =>
+          table.pkey_columns?.every((pkey) =>
             tableCols.some((c) => c.columnName === pkey),
           )
         ) {
           tableCols = tableCols.filter((c) =>
-            table?.pkey_columns?.includes(c.columnName!),
+            table.pkey_columns?.includes(c.columnName!),
           );
         } else {
           /** Exclude non comparable data types */

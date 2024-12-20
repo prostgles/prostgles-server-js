@@ -40,7 +40,6 @@ import {
 import { getTablesForSchemaPostgresSQL } from "./getTablesForSchemaPostgresSQL";
 import { prepareShortestJoinPaths } from "./prepareShortestJoinPaths";
 import { cacheDBTypes, runSQL } from "./runSQL";
-import { runClientTransactionStatement } from "./runTransaction";
 
 export * from "./DboBuilderTypes";
 export * from "./dboBuilderUtils";
@@ -167,9 +166,7 @@ export class DboBuilder {
 
   _joins?: Join[];
   get joins(): Join[] {
-    return clone(this._joins ?? []).filter(
-      (j) => j.tables[0] !== j.tables[1],
-    ) as Join[];
+    return clone(this._joins ?? []).filter((j) => j.tables[0] !== j.tables[1]) as Join[];
   }
 
   set joins(j: Join[]) {
@@ -181,8 +178,7 @@ export class DboBuilder {
   }
 
   prepareShortestJoinPaths = async () => {
-    const { joins, shortestJoinPaths, joinGraph } =
-      await prepareShortestJoinPaths(this);
+    const { joins, shortestJoinPaths, joinGraph } = await prepareShortestJoinPaths(this);
     this.joinGraph = joinGraph;
     this.joins = joins;
     this.shortestJoinPaths = shortestJoinPaths;
@@ -192,7 +188,7 @@ export class DboBuilder {
     query: string,
     params: any,
     options: SQLOptions | undefined,
-    localParams?: LocalParams,
+    localParams?: LocalParams
   ) => {
     return runSQL
       .bind(this)(query, params, options, localParams)
@@ -201,8 +197,8 @@ export class DboBuilder {
           getSerializedClientErrorFromPGError(error, {
             type: "sql",
             localParams,
-          }),
-        ),
+          })
+        )
       );
   };
 
@@ -215,7 +211,7 @@ export class DboBuilder {
       if (subscribeError) {
         console.error(
           "Could not initiate PubSubManager. Realtime data/Subscriptions will not work. Error: ",
-          subscribeError,
+          subscribeError
         );
         this.canSubscribe = false;
       } else {
@@ -226,7 +222,7 @@ export class DboBuilder {
     const start = Date.now();
     const tablesOrViewsReq = await getTablesForSchemaPostgresSQL(
       this,
-      this.prostgles.opts.schemaFilter,
+      this.prostgles.opts.schemaFilter
     );
     await this.prostgles.opts.onLog?.({
       type: "debug",
@@ -236,36 +232,30 @@ export class DboBuilder {
     });
     this.tablesOrViews = tablesOrViewsReq.result;
 
-    this.constraints = await getConstraints(
-      this.db,
-      this.prostgles.opts.schemaFilter,
-    );
+    this.constraints = await getConstraints(this.db, this.prostgles.opts.schemaFilter);
     await this.prepareShortestJoinPaths();
 
     this.dbo = {};
     this.tablesOrViews.map((tov) => {
-      const columnsForTypes = tov.columns
-        .slice(0)
-        .sort((a, b) => a.name.localeCompare(b.name));
+      const columnsForTypes = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
 
       const filterKeywords = Object.values(this.prostgles.keywords);
-      const $filterCol = columnsForTypes.find((c) =>
-        filterKeywords.includes(c.name),
-      );
+      const $filterCol = columnsForTypes.find((c) => filterKeywords.includes(c.name));
       if ($filterCol) {
         throw `DboBuilder init error: \n\nTable ${JSON.stringify(tov.name)} column ${JSON.stringify($filterCol.name)} is colliding with Prostgles filtering functionality ($filter keyword)
                 Please provide a replacement keyword name using the $filter_keyName init option. 
                 Alternatively you can rename the table column\n`;
       }
 
-      this.dbo[tov.escaped_identifier] = new (
-        tov.is_view ? ViewHandler : TableHandler
-      )(this.db, tov, this, undefined, this.shortestJoinPaths);
+      this.dbo[tov.escaped_identifier] = new (tov.is_view ? ViewHandler : TableHandler)(
+        this.db,
+        tov,
+        this,
+        undefined,
+        this.shortestJoinPaths
+      );
 
-      if (
-        this.shortestJoinPaths &&
-        this.shortestJoinPaths.find((jp) => [jp.t1, jp.t2].includes(tov.name))
-      ) {
+      if (this.shortestJoinPaths.find((jp) => [jp.t1, jp.t2].includes(tov.name))) {
         const table = tov.name;
 
         this.dbo.innerJoin ??= {};
@@ -293,9 +283,7 @@ export class DboBuilder {
     if (!this.dbo.sql) {
       this.dbo.sql = this.runSQL;
     } else {
-      console.warn(
-        `Could not create dbo.sql handler because there is already a table named "sql"`,
-      );
+      console.warn(`Could not create dbo.sql handler because there is already a table named "sql"`);
     }
 
     this.tsTypesDefinition = [
@@ -309,17 +297,15 @@ export class DboBuilder {
 
   getShortestJoinPath = (
     viewHandler: ViewHandler,
-    target: string,
+    target: string
   ): JoinPaths[number] | undefined => {
     const source = viewHandler.name;
     if (source === target) {
-      const joinPath = parseJoinPath({
+      parseJoinPath({
         rawPath: target,
         rootTable: source,
         viewHandler,
       });
-
-      if (!joinPath) return undefined;
 
       return {
         t1: source,
@@ -328,9 +314,7 @@ export class DboBuilder {
       };
     }
 
-    const jp = this.shortestJoinPaths.find(
-      (jp) => jp.t1 === source && jp.t2 === target,
-    );
+    const jp = this.shortestJoinPaths.find((jp) => jp.t1 === source && jp.t2 === target);
     return jp;
   };
 
@@ -339,13 +323,7 @@ export class DboBuilder {
       const dbTX: DbTxTableHandlers & Pick<DBHandlerServer, "sql"> = {};
       this.tablesOrViews?.map((tov) => {
         const handlerClass = tov.is_view ? ViewHandler : TableHandler;
-        dbTX[tov.name] = new handlerClass(
-          this.db,
-          tov,
-          this,
-          { t, dbTX },
-          this.shortestJoinPaths,
-        );
+        dbTX[tov.name] = new handlerClass(this.db, tov, this, { t, dbTX }, this.shortestJoinPaths);
       });
       dbTX.sql = (q, args, opts, localP) =>
         this.runSQL(q, args, opts, { tx: { dbTX, t }, ...(localP ?? {}) });
@@ -357,11 +335,4 @@ export class DboBuilder {
   };
 
   cacheDBTypes = cacheDBTypes.bind(this);
-
-  runClientTransactionStatement = (statement: string) => {
-    return runClientTransactionStatement(
-      statement,
-      this.prostgles.opts.dbConnection as any,
-    );
-  };
 }

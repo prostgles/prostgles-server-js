@@ -9,10 +9,7 @@ import { FileManager } from "./FileManager/FileManager";
 import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { OnInitReason, initProstgles } from "./initProstgles";
 import { makeSocketError, onSocketConnected } from "./onSocketConnected";
-import {
-  clientCanRunSqlRequest,
-  runClientSqlRequest,
-} from "./runClientRequest";
+import { clientCanRunSqlRequest, runClientSqlRequest } from "./runClientRequest";
 import pg = require("pg-promise/typescript/pg-subset");
 const { version } = require("../package.json");
 
@@ -30,33 +27,15 @@ import {
 export { DBHandlerServer };
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 
-import {
-  CHANNELS,
-  ClientSchema,
-  SQLRequest,
-  isObject,
-  omitKeys,
-  tryCatch,
-} from "prostgles-types";
+import { CHANNELS, ClientSchema, SQLRequest, isObject, omitKeys, tryCatch } from "prostgles-types";
 import { DBEventsManager } from "./DBEventsManager";
 import { PublishParser } from "./PublishParser/PublishParser";
-export {
-  getOrSetTransporter,
-  sendEmail,
-  verifySMTPConfig,
-} from "./Auth/sendEmail";
+export { getOrSetTransporter, sendEmail, verifySMTPConfig } from "./Auth/sendEmail";
 
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 export type DBorTx = DB | pgPromise.ITask<{}>;
 
-export const TABLE_METHODS = [
-  "update",
-  "find",
-  "findOne",
-  "insert",
-  "delete",
-  "upsert",
-] as const;
+export const TABLE_METHODS = ["update", "find", "findOne", "insert", "delete", "upsert"] as const;
 
 /*
     1. Connect to db
@@ -132,12 +111,10 @@ export class Prostgles {
   tableConfigurator?: TableConfigurator;
 
   isMedia(tableName: string) {
-    return this.opts?.fileTable?.tableName === tableName;
+    return this.opts.fileTable?.tableName === tableName;
   }
 
   constructor(params: ProstglesInitOptions) {
-    if (!params) throw "ProstglesInitOptions missing";
-
     const config: Record<keyof ProstglesInitOptions, 1> = {
       transactions: 1,
       joins: 1,
@@ -167,18 +144,16 @@ export class Prostgles {
       testRulesOnConnect: 1,
     };
     const unknownParams = Object.keys(params).filter(
-      (key: string) => !Object.keys(config).includes(key),
+      (key: string) => !Object.keys(config).includes(key)
     );
     if (unknownParams.length) {
-      console.error(
-        `Unrecognised ProstglesInitOptions params: ${unknownParams.join()}`,
-      );
+      console.error(`Unrecognised ProstglesInitOptions params: ${unknownParams.join()}`);
     }
 
     Object.assign(this.opts, params);
 
     /* set defaults */
-    if (this.opts?.fileTable) {
+    if (this.opts.fileTable) {
       this.opts.fileTable.tableName ??= "media";
     }
     this.opts.schemaFilter ??= { public: 1 };
@@ -191,8 +166,7 @@ export class Prostgles {
   destroyed = false;
 
   checkDb() {
-    if (!this.db || !this.db.connect)
-      throw "something went wrong getting a db connection";
+    if (!this.db || !(this.db as any).connect) throw "something went wrong getting a db connection";
   }
 
   getTSFileName() {
@@ -230,16 +204,11 @@ export class Prostgles {
       fs.readFile(fullPath, "utf8", function (err, data) {
         if (err || force || data !== fileContent) {
           fs.writeFileSync(fullPath, fileContent);
-          console.log(
-            "Prostgles: Created typescript schema definition file: \n " +
-              fileName,
-          );
+          console.log("Prostgles: Created typescript schema definition file: \n " + fileName);
         }
       });
     } else if (force) {
-      console.error(
-        "Schema changed. tsGeneratedTypesDir needs to be set to reload server",
-      );
+      console.error("Schema changed. tsGeneratedTypesDir needs to be set to reload server");
     }
   }
 
@@ -259,7 +228,6 @@ export class Prostgles {
     } else {
       this.dboBuilder = await DboBuilder.create(this);
     }
-    if (!this.dboBuilder) throw "this.dboBuilder";
     this.dbo = this.dboBuilder.dbo;
     await this.opts.onLog?.({
       type: "debug",
@@ -280,7 +248,10 @@ export class Prostgles {
 
   initAuthHandler = async () => {
     this.authHandler?.destroy();
-    this.authHandler = new AuthHandler(this as any);
+    if (!this.opts.auth) {
+      return;
+    }
+    this.authHandler = new AuthHandler(this);
     await this.authHandler.init();
   };
 
@@ -330,10 +301,7 @@ export class Prostgles {
         if (!cloudClient && !localConfig)
           throw "fileTable missing param: Must provide awsS3Config OR localConfig";
 
-        this.fileManager = new FileManager(
-          cloudClient || localConfig!,
-          imageOptions,
-        );
+        this.fileManager = new FileManager(cloudClient || localConfig!, imageOptions);
 
         try {
           await this.fileManager.init(this);
@@ -368,9 +336,7 @@ export class Prostgles {
       const result = await this.db
         ?.multi(fileContent)
         .then((data) => {
-          console.log(
-            "Prostgles: SQL file executed successfuly \n    -> " + filePath,
-          );
+          console.log("Prostgles: SQL file executed successfuly \n    -> " + filePath);
           return data;
         })
         .catch((err) => {
@@ -381,17 +347,14 @@ export class Prostgles {
           if (position && length && fileContent) {
             const startLine = Math.max(
                 0,
-                fileContent.substring(0, position).split("\n").length - 2,
+                fileContent.substring(0, position).split("\n").length - 2
               ),
               endLine = startLine + 3;
 
             errMsg += "\n\n";
             errMsg += lines
               .slice(startLine, endLine)
-              .map(
-                (txt, i) =>
-                  `${startLine + i + 1} ${i === 1 ? "->" : "  "} ${txt}`,
-              )
+              .map((txt, i) => `${startLine + i + 1} ${i === 1 ? "->" : "  "} ${txt}`)
               .join("\n");
             errMsg += "\n\n";
           }
@@ -418,7 +381,7 @@ export class Prostgles {
       this.opts.publishRawSQL,
       this.dbo,
       this.db!,
-      this,
+      this
     );
     this.publishParser = publishParser;
 
@@ -437,29 +400,22 @@ export class Prostgles {
     this.opts.io.removeAllListeners("connection");
     this.opts.io.on("connection", this.onSocketConnected);
     /** In some cases io will re-init with already connected sockets */
-    this.opts.io?.sockets.sockets.forEach((socket) =>
-      this.onSocketConnected(socket),
-    );
+    this.opts.io.sockets.sockets.forEach((socket) => this.onSocketConnected(socket));
   }
 
   onSocketConnected = onSocketConnected.bind(this);
 
-  getClientSchema = async (
-    clientReq: Pick<LocalParams, "socket" | "httpReq">,
-  ) => {
+  getClientSchema = async (clientReq: Pick<LocalParams, "socket" | "httpReq">) => {
     const result = await tryCatch(async () => {
-      const clientInfo = clientReq.socket
-        ? { type: "socket" as const, socket: clientReq.socket }
-        : clientReq.httpReq
-          ? { type: "http" as const, httpReq: clientReq.httpReq }
-          : undefined;
+      const clientInfo =
+        clientReq.socket ? { type: "socket" as const, socket: clientReq.socket }
+        : clientReq.httpReq ? { type: "http" as const, httpReq: clientReq.httpReq }
+        : undefined;
       if (!clientInfo) throw "Invalid client";
-      if (!this.authHandler) throw "this.authHandler missing";
-      const userData = await this.authHandler.getClientInfo(clientInfo);
+      // if (!this.authHandler) throw "this.authHandler missing";
+      const userData = await this.authHandler?.getClientInfo(clientInfo);
       const { publishParser } = this;
-      let fullSchema:
-        | Awaited<ReturnType<PublishParser["getSchemaFromPublish"]>>
-        | undefined;
+      let fullSchema: Awaited<ReturnType<PublishParser["getSchemaFromPublish"]>> | undefined;
       let publishValidationError;
 
       try {
@@ -470,16 +426,10 @@ export class Prostgles {
         });
       } catch (e) {
         publishValidationError = e;
-        console.error(
-          `\nProstgles Publish validation failed (after socket connected):\n    ->`,
-          e,
-        );
+        console.error(`\nProstgles Publish validation failed (after socket connected):\n    ->`, e);
       }
       let rawSQL = false;
-      if (
-        this.opts.publishRawSQL &&
-        typeof this.opts.publishRawSQL === "function"
-      ) {
+      if (this.opts.publishRawSQL && typeof this.opts.publishRawSQL === "function") {
         const { allowed } = await clientCanRunSqlRequest.bind(this)(clientInfo);
         rawSQL = allowed;
       }
@@ -493,10 +443,7 @@ export class Prostgles {
       if (this.opts.joins) {
         const _joinTables2 = this.dboBuilder
           .getAllJoinPaths()
-          .filter(
-            (jp) =>
-              ![jp.t1, jp.t2].find((t) => !schema[t] || !schema[t]?.findOne),
-          )
+          .filter((jp) => ![jp.t1, jp.t2].find((t) => !schema[t] || !schema[t]?.findOne))
           .map((jp) => [jp.t1, jp.t2].sort());
         _joinTables2.map((jt) => {
           if (!joinTables2.find((_jt) => _jt.join() === jt.join())) {
@@ -505,13 +452,11 @@ export class Prostgles {
         });
       }
 
-      const methods = await publishParser?.getAllowedMethods(
-        clientInfo,
-        userData,
-      );
+      const methods = await publishParser?.getAllowedMethods(clientInfo, userData);
 
-      const methodSchema: ClientSchema["methods"] = !methods
-        ? []
+      const methodSchema: ClientSchema["methods"] =
+        !methods ?
+          []
         : Object.entries(methods)
             .map(([methodName, method]) => {
               if (isObject(method) && "run" in method) {
@@ -528,7 +473,7 @@ export class Prostgles {
               return aName.localeCompare(bName);
             });
 
-      const { auth } = await this.authHandler.getClientAuth(clientReq);
+      const authInfo = await this.authHandler?.getClientAuth(clientReq);
 
       const clientSchema: ClientSchema = {
         schema,
@@ -537,11 +482,9 @@ export class Prostgles {
         rawSQL,
         joinTables: joinTables2,
         tableSchemaErrors,
-        auth,
+        auth: authInfo?.auth,
         version,
-        err: publishValidationError
-          ? "Server Error: User publish validation failed."
-          : undefined,
+        err: publishValidationError ? "Server Error: User publish validation failed." : undefined,
       };
 
       return {
@@ -550,8 +493,7 @@ export class Prostgles {
         userData,
       };
     });
-    const sid =
-      result.userData?.sid ?? this.authHandler?.getSIDNoError(clientReq);
+    const sid = result.userData?.sid ?? this.authHandler?.getSIDNoError(clientReq);
     await this.opts.onLog?.({
       type: "connect.getClientSchema",
       duration: result.duration,
@@ -575,7 +517,7 @@ export class Prostgles {
             { query, params, options }: SQLRequest,
             cb = (..._callback: any) => {
               /* Empty */
-            },
+            }
           ) => {
             runClientSqlRequest
               .bind(this)({
@@ -591,7 +533,7 @@ export class Prostgles {
               .catch((err) => {
                 makeSocketError(cb, err);
               });
-          },
+          }
         );
       }
       await this.dboBuilder.prostgles.opts.onLog?.({

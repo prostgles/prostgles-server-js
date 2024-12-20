@@ -1,10 +1,4 @@
-import {
-  AnyObject,
-  getKeys,
-  InsertParams,
-  isDefined,
-  isObject,
-} from "prostgles-types";
+import { AnyObject, getKeys, InsertParams, isDefined, isObject } from "prostgles-types";
 import { LocalParams, TableHandlers } from "./DboBuilder";
 import { TableRule } from "../PublishParser/PublishParser";
 import { omitKeys } from "../PubSubManager/PubSubManager";
@@ -22,7 +16,7 @@ type InsertNestedRecordsArgs = {
  */
 export async function insertNestedRecords(
   this: TableHandler,
-  { data, param2, tableRules, localParams = {} }: InsertNestedRecordsArgs,
+  { data, param2, tableRules, localParams = {} }: InsertNestedRecordsArgs
 ): Promise<{
   data?: AnyObject | AnyObject[];
   insertResult?: AnyObject | AnyObject[];
@@ -55,28 +49,25 @@ export async function insertNestedRecords(
    * Nested insert is not allowed for the file table
    * */
   const isMultiInsert = Array.isArray(data);
-  const hasNestedInserts = this.is_media
-    ? false
-    : (isMultiInsert ? data : [data]).some(
-        (d) =>
-          getExtraKeys(d).length || getReferenceColumnInserts(this, d).length,
-      );
+  const hasNestedInserts =
+    this.is_media ? false : (
+      (isMultiInsert ? data : [data]).some(
+        (d) => getExtraKeys(d).length || getReferenceColumnInserts(this, d).length
+      )
+    );
 
   /**
    * Make sure nested insert uses a transaction
    */
   const dbTX = this.getFinalDBtx(localParams);
-  const t = localParams?.tx?.t || this.tx?.t;
+  const t = localParams.tx?.t || this.tx?.t;
   if (hasNestedInserts && (!dbTX || !t)) {
     return {
       insertResult: await this.dboBuilder.getTX((dbTX, _t) =>
-        (dbTX[this.name] as TableHandler).insert(
-          data,
-          param2,
-          undefined,
-          tableRules,
-          { tx: { dbTX, t: _t }, ...localParams },
-        ),
+        (dbTX[this.name] as TableHandler).insert(data, param2, undefined, tableRules, {
+          tx: { dbTX, t: _t },
+          ...localParams,
+        })
       ),
     };
   }
@@ -114,7 +105,7 @@ export async function insertNestedRecords(
         if (colInserts.length) {
           for await (const colInsert of colInsertsResult) {
             const newLocalParams: LocalParams = {
-              ...(localParams ?? {}),
+              ...localParams,
               nestedInsert: {
                 depth: (localParams.nestedInsert?.depth ?? 0) + 1,
                 previousData: rootData,
@@ -127,7 +118,7 @@ export async function insertNestedRecords(
               dbTX,
               newLocalParams,
               colInsert.tableName,
-              row[colInsert.col],
+              row[colInsert.col]
             );
             if (
               !Array.isArray(colRows) ||
@@ -135,8 +126,7 @@ export async function insertNestedRecords(
               [null, undefined].includes(colRows[0]![colInsert.fcol])
             ) {
               throw new Error(
-                "Could not do nested column insert: Unexpected return " +
-                  JSON.stringify(colRows),
+                "Could not do nested column insert: Unexpected return " + JSON.stringify(colRows)
               );
             }
             colInsert.inserted = colRows;
@@ -151,7 +141,7 @@ export async function insertNestedRecords(
           { returning: "*" },
           undefined,
           tableRules,
-          localParams,
+          localParams
         );
         let returnData: AnyObject | undefined;
         const returning = param2?.returning;
@@ -159,16 +149,15 @@ export async function insertNestedRecords(
           returnData = {};
           const returningItems = await this.prepareReturning(
             returning,
-            this.parseFieldFilter(tableRules?.insert?.returningFields),
+            this.parseFieldFilter(tableRules?.insert?.returningFields)
           );
           returningItems
             .filter((s) => s.selected)
             .map((rs) => {
-              const colInsertResult = colInsertsResult.find(
-                ({ col }) => col === rs.columnName,
-              );
-              const inserted = colInsertResult?.singleInsert
-                ? colInsertResult.inserted?.[0]
+              const colInsertResult = colInsertsResult.find(({ col }) => col === rs.columnName);
+              const inserted =
+                colInsertResult?.singleInsert ?
+                  colInsertResult.inserted?.[0]
                 : colInsertResult?.inserted;
               returnData![rs.alias] = inserted ?? fullRootResult[rs.alias];
             });
@@ -176,47 +165,27 @@ export async function insertNestedRecords(
 
         await Promise.all(
           extraKeys.map(async (targetTable) => {
-            const childDataItems = Array.isArray(row[targetTable])
-              ? row[targetTable]
-              : [row[targetTable]];
+            const childDataItems =
+              Array.isArray(row[targetTable]) ? row[targetTable] : [row[targetTable]];
 
-            const childInsert = async (
-              cdata: AnyObject | AnyObject[],
-              tableName: string,
-            ) => {
-              return referencedInsert(
-                this,
-                dbTX,
-                localParams,
-                tableName,
-                cdata,
-              );
+            const childInsert = async (cdata: AnyObject | AnyObject[], tableName: string) => {
+              return referencedInsert(this, dbTX, localParams, tableName, cdata);
             };
 
             const joinPath = await getJoinPath(this, targetTable);
 
             const { path } = joinPath;
             const [tbl1, tbl2, tbl3] = path;
-            targetTableRules = await getInsertTableRules(
-              this,
-              targetTable,
-              localParams,
-            ); //  tbl3
+            targetTableRules = await getInsertTableRules(this, targetTable, localParams);
 
             const cols2 = this.dboBuilder.dbo[tbl2!]!.columns || [];
-            if (!this.dboBuilder.dbo[tbl2!])
-              throw "Invalid/disallowed table: " + tbl2;
-            const colsRefT1 = cols2?.filter((c) =>
-              c.references?.some(
-                (rc) => rc.cols.length === 1 && rc.ftable === tbl1,
-              ),
+            if (!this.dboBuilder.dbo[tbl2!]) throw "Invalid/disallowed table: " + tbl2;
+            const colsRefT1 = cols2.filter((c) =>
+              c.references?.some((rc) => rc.cols.length === 1 && rc.ftable === tbl1)
             );
 
             if (!path.length) {
-              throw (
-                "Nested inserts join path not found for " +
-                [this.name, targetTable]
-              );
+              throw "Nested inserts join path not found for " + [this.name, targetTable];
             } else if (path.length === 2) {
               if (targetTable !== tbl2) throw "Did not expect this";
 
@@ -233,32 +202,26 @@ export async function insertNestedRecords(
                   });
                   return result;
                 }),
-                targetTable,
+                targetTable
               );
             } else if (path.length === 3) {
               if (targetTable !== tbl3) throw "Did not expect this";
-              const colsRefT3 = cols2?.filter((c) =>
-                c.references?.some(
-                  (rc) => rc.cols.length === 1 && rc.ftable === tbl3,
-                ),
+              const colsRefT3 = cols2.filter((c) =>
+                c.references?.some((rc) => rc.cols.length === 1 && rc.ftable === tbl3)
               );
               if (!colsRefT1.length || !colsRefT3.length)
                 throw "Incorrectly referenced or missing columns for nested insert";
 
-              const fileTable =
-                this.dboBuilder.prostgles.fileManager?.tableName;
+              const fileTable = this.dboBuilder.prostgles.fileManager?.tableName;
               if (targetTable !== fileTable) {
                 throw "Only media allowed to have nested inserts more than 2 tables apart";
               }
 
               /* We expect tbl2 to have only 2 columns (media_id and foreign_id) */
               if (
-                !cols2 ||
                 !(
-                  cols2.filter((c) => c.references?.[0]?.ftable === fileTable)
-                    .length === 1 &&
-                  cols2.filter((c) => c.references?.[0]?.ftable === _this.name)
-                    .length === 1
+                  cols2.filter((c) => c.references?.[0]?.ftable === fileTable).length === 1 &&
+                  cols2.filter((c) => c.references?.[0]?.ftable === _this.name).length === 1
                 )
               ) {
                 console.log({
@@ -286,32 +249,23 @@ export async function insertNestedRecords(
                     tbl2Row[col.name] = t3Child[col.references![0]!.fcols[0]!];
                   });
                   colsRefT1.map((col) => {
-                    tbl2Row[col.name] =
-                      fullRootResult[col.references![0]!.fcols[0]!];
+                    tbl2Row[col.name] = fullRootResult[col.references![0]!.fcols[0]!];
                   });
 
                   await childInsert(tbl2Row, tbl2!); //.then(() => {});
-                }),
+                })
               );
             } else {
-              console.error(
-                JSON.stringify(
-                  { path, thisTable: this.name, targetTable },
-                  null,
-                  2,
-                ),
-              );
+              console.error(JSON.stringify({ path, thisTable: this.name, targetTable }, null, 2));
               throw "Unexpected path for Nested inserts";
             }
 
             /* Return also the nested inserted data */
-            if (targetTableRules && insertedChildren?.length && returning) {
+            if (insertedChildren.length && returning) {
               const targetTableHandler = dbTX![targetTable] as TableHandler;
               const targetReturning = await targetTableHandler.prepareReturning(
                 "*",
-                targetTableHandler.parseFieldFilter(
-                  targetTableRules?.insert?.returningFields,
-                ),
+                targetTableHandler.parseFieldFilter(targetTableRules.insert?.returningFields)
               );
               const clientTargetInserts = insertedChildren.map((d) => {
                 const _d = { ...d };
@@ -323,18 +277,16 @@ export async function insertNestedRecords(
               });
 
               returnData![targetTable] =
-                clientTargetInserts.length === 1
-                  ? clientTargetInserts[0]
-                  : clientTargetInserts;
+                clientTargetInserts.length === 1 ? clientTargetInserts[0] : clientTargetInserts;
             }
-          }),
+          })
         );
 
         return returnData;
       }
 
       return row;
-    }),
+    })
   );
 
   const result = isMultiInsert ? _data : _data[0];
@@ -347,38 +299,31 @@ export async function insertNestedRecords(
 export const getInsertTableRules = async (
   tableHandler: TableHandler,
   targetTable: string,
-  localParams: LocalParams,
+  localParams: LocalParams
 ) => {
-  const childRules =
-    await tableHandler.dboBuilder.publishParser?.getValidatedRequestRuleWusr({
-      tableName: targetTable,
-      command: "insert",
-      localParams,
-    });
-  if (!childRules || !childRules.insert)
-    throw "Dissallowed nested insert into table " + childRules;
+  const childRules = await tableHandler.dboBuilder.publishParser?.getValidatedRequestRuleWusr({
+    tableName: targetTable,
+    command: "insert",
+    localParams,
+  });
+  if (!childRules || !childRules.insert) throw "Dissallowed nested insert into table " + childRules;
   return childRules;
 };
 
 const getJoinPath = async (
   tableHandler: TableHandler,
-  targetTable: string,
+  targetTable: string
 ): Promise<{
   t1: string;
   t2: string;
   path: string[];
 }> => {
-  const jp = tableHandler.dboBuilder.getShortestJoinPath(
-    tableHandler,
-    targetTable,
-  );
+  const jp = tableHandler.dboBuilder.getShortestJoinPath(tableHandler, targetTable);
   if (!jp) {
     const pref =
-      tableHandler.dboBuilder.prostgles.opts.joins !== "inferred"
-        ? "Joins are not inferred! "
-        : "";
+      tableHandler.dboBuilder.prostgles.opts.joins !== "inferred" ? "Joins are not inferred! " : "";
     throw new Error(
-      `${pref}Could not find a single join path for the nested data ( sourceTable: ${tableHandler.name} targetTable: ${targetTable} ) `,
+      `${pref}Could not find a single join path for the nested data ( sourceTable: ${tableHandler.name} targetTable: ${targetTable} ) `
     );
   }
   return jp;
@@ -389,27 +334,16 @@ const referencedInsert = async (
   dbTX: TableHandlers | undefined,
   localParams: LocalParams,
   targetTable: string,
-  targetData: AnyObject | AnyObject[],
+  targetData: AnyObject | AnyObject[]
 ): Promise<AnyObject[]> => {
-  // const thisInfo = await tableHandler.getInfo();
   await getJoinPath(tableHandler, targetTable);
 
-  if (
-    !targetData ||
-    !dbTX?.[targetTable] ||
-    !("insert" in dbTX[targetTable]!)
-  ) {
-    throw new Error(
-      "childInsertErr: Table handler missing for referenced table: " +
-        targetTable,
-    );
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (!targetData || !dbTX?.[targetTable] || !("insert" in dbTX[targetTable]!)) {
+    throw new Error("childInsertErr: Table handler missing for referenced table: " + targetTable);
   }
 
-  const childRules = await getInsertTableRules(
-    tableHandler,
-    targetTable,
-    localParams,
-  );
+  const childRules = await getInsertTableRules(tableHandler, targetTable, localParams);
 
   // if (thisInfo.has_media === "one" && thisInfo.media_table_name === targetTable && Array.isArray(targetData) && targetData.length > 1) {
   //   throw "Constraint check fail: Cannot insert more than one record into " + JSON.stringify(targetTable);
@@ -420,8 +354,8 @@ const referencedInsert = async (
         .insert(m, { returning: "*" }, undefined, childRules, localParams)
         .catch((e) => {
           return Promise.reject(e);
-        }),
-    ),
+        })
+    )
   );
 };
 
@@ -443,13 +377,13 @@ type ReferenceColumnInsert<ExpectSingleInsert> = {
 export const getReferenceColumnInserts = <ExpectSingleInsert extends boolean>(
   tableHandler: TableHandler,
   parentRow: AnyObject,
-  expectSingleInsert?: ExpectSingleInsert,
+  expectSingleInsert?: ExpectSingleInsert
 ): ReferenceColumnInsert<ExpectSingleInsert>[] => {
   return Object.entries(parentRow)
     .map(([insertedFieldName, insertedFieldValue]) => {
       if (insertedFieldValue && isObject(insertedFieldValue)) {
         const insertedRefCol = tableHandler.columns.find(
-          (c) => c.name === insertedFieldName && c.references?.length,
+          (c) => c.name === insertedFieldName && c.references?.length
         );
         if (!insertedRefCol) return undefined;
         return {
@@ -466,9 +400,7 @@ export const getReferenceColumnInserts = <ExpectSingleInsert extends boolean>(
         throw "Cannot do a nested insert on column that references multiple tables";
       }
 
-      const referencesMultipleColumns = insertedRefColRef?.some(
-        (refs) => refs.fcols.length !== 1,
-      );
+      const referencesMultipleColumns = insertedRefColRef.some((refs) => refs.fcols.length !== 1);
       if (referencesMultipleColumns) {
         throw "Cannot do a nested insert on multi-column foreign key reference";
       }

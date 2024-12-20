@@ -196,7 +196,7 @@ export type PublishFullyTyped<Schema = void> = Schema extends DBSchema
     transactions: true,
     onReady: ({ dbo }) => {
       dbo.tdwa?.find!();
-      dbo.tx?.((t) => {
+      dbo.tx((t) => {
         t.dwa?.find!();
       });
     },

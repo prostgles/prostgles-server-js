@@ -18,22 +18,21 @@ export async function getTableRulesWithoutFileTable(
   this: PublishParser,
   { tableName, localParams }: DboTable,
   clientInfo?: AuthResult,
-  overridenPublish?: PublishObject,
+  overridenPublish?: PublishObject
 ): Promise<ParsedPublishTable | undefined> {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (!localParams || !tableName)
     throw {
       stack: ["getTableRules()"],
       message: "publish OR socket OR dbo OR tableName are missing",
     };
 
-  const _publish =
-    overridenPublish ?? (await this.getPublish(localParams, clientInfo));
+  const _publish = overridenPublish ?? (await this.getPublish(localParams, clientInfo));
 
   const raw_table_rules = _publish[tableName];
   if (
     !raw_table_rules ||
-    (isObject(raw_table_rules) &&
-      Object.values(raw_table_rules).every((v) => !v))
+    (isObject(raw_table_rules) && Object.values(raw_table_rules).every((v) => !v))
   ) {
     return undefined;
   }
@@ -41,18 +40,18 @@ export async function getTableRulesWithoutFileTable(
   let parsed_table: ParsedPublishTable = {};
 
   /* Get view or table specific rules */
-  const tHandler = this.dbo[tableName] as TableHandler | ViewHandler;
-  const is_view = tHandler.is_view;
-  /**
-   * Allow subscribing to a view if it has primary key columns from other tables
-   */
-  const canSubscribe = !is_view || tHandler.columns.some((c) => c.references);
+  const tHandler = this.dbo[tableName] as TableHandler | ViewHandler | undefined;
   if (!tHandler) {
     throw {
       stack: ["getTableRules()"],
       message: `${tableName} could not be found in dbo`,
     };
   }
+  const is_view = tHandler.is_view;
+  /**
+   * Allow subscribing to a view if it has primary key columns from other tables
+   */
+  const canSubscribe = !is_view || tHandler.columns.some((c) => c.references);
 
   const MY_RULES = RULE_TO_METHODS.filter((r) => {
     /** Check PG User privileges */
@@ -94,7 +93,7 @@ export async function getTableRulesWithoutFileTable(
     const allRuleKeys: (keyof PublishViewRule | keyof PublishTableRule)[] =
       getKeys(raw_table_rules);
     const dissallowedRuleKeys = allRuleKeys.filter(
-      (m) => !(raw_table_rules as PublishTableRule)[m],
+      (m) => !(raw_table_rules as PublishTableRule)[m]
     );
 
     MY_RULES.map((r) => {
@@ -109,9 +108,7 @@ export async function getTableRulesWithoutFileTable(
 
       /** Add no_limit values for implied/ fully allowed methods */
       if (
-        [true, "*"].includes(
-          (raw_table_rules as PublishTableRule)[r.rule] as any,
-        ) &&
+        [true, "*"].includes((raw_table_rules as PublishTableRule)[r.rule] as any) &&
         r.no_limits
       ) {
         parsed_table[r.rule] = Object.assign({}, r.no_limits) as any;
@@ -127,19 +124,15 @@ export async function getTableRulesWithoutFileTable(
       .forEach((method) => {
         const rule = parsed_table[method];
 
-        const rm = MY_RULES.find(
-          (r) =>
-            r.rule === method ||
-            (r.methods as readonly string[]).includes(method),
+        const ruleInfo = MY_RULES.find(
+          (r) => r.rule === method || (r.methods as readonly string[]).includes(method)
         );
-        if (!rm) {
+        if (!ruleInfo) {
           let extraInfo = "";
           if (
             is_view &&
             RULE_TO_METHODS.find(
-              (r) =>
-                (!is_view && r.rule === method) ||
-                (r.methods as any).includes(method),
+              (r) => r.table_only && (r.rule === method || (r.methods as any).includes(method))
             )
           ) {
             extraInfo = "You've specified table rules to a view\n";
@@ -149,9 +142,9 @@ export async function getTableRulesWithoutFileTable(
 
         /* Check RULES for invalid params */
         /* Methods do not have params -> They use them from rules */
-        if (method === rm.rule && isObject(rule)) {
+        if (method === ruleInfo.rule && isObject(rule)) {
           const method_params = Object.keys(rule);
-          const allowed_params = Object.keys(rm?.allowed_params);
+          const allowed_params = Object.keys(ruleInfo.allowed_params);
           const iparam = method_params.find((p) => !allowed_params.includes(p));
           if (iparam) {
             throw `Invalid setting in publish.${tableName}.${method} -> ${iparam}. \n Expecting any of: ${allowed_params.join(", ")}`;
@@ -187,29 +180,21 @@ export async function getTableRulesWithoutFileTable(
     throw "Unexpected publish";
   }
 
-  const getImpliedMethods = (
-    tableRules: ParsedPublishTable,
-  ): ParsedPublishTable => {
+  const getImpliedMethods = (tableRules: ParsedPublishTable): ParsedPublishTable => {
     const res = { ...tableRules };
 
     /* Add implied methods if not specifically dissallowed */
     MY_RULES.map((r) => {
       /** THIS IS A MESS -> some methods cannot be dissallowed (unsync, unsubscribe...) */
       r.methods.forEach((method) => {
-        const isAllowed =
-          tableRules[r.rule] && (tableRules as any)[method] === undefined;
+        const isAllowed = tableRules[r.rule] && (tableRules as any)[method] === undefined;
         if (isAllowed) {
           if (
             method === "updateBatch" &&
-            (!tableRules.update ||
-              tableRules.update.checkFilter ||
-              tableRules.update.postValidate)
+            (!tableRules.update || tableRules.update.checkFilter || tableRules.update.postValidate)
           ) {
             // not allowed
-          } else if (
-            method === "upsert" &&
-            (!tableRules.update || !tableRules.insert)
-          ) {
+          } else if (method === "upsert" && (!tableRules.update || !tableRules.insert)) {
             // not allowed
           } else {
             (res as any)[method] ??= true;

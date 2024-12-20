@@ -23,10 +23,7 @@ import { ExpressApp } from "../RestApi";
 
 export const HOUR = 3600 * 1000;
 
-export const asSQLIdentifier = async (
-  name: string,
-  db: DB,
-): Promise<string> => {
+export const asSQLIdentifier = async (name: string, db: DB): Promise<string> => {
   return (await db.one("select format('%I', $1) as name", [name]))?.name;
 };
 
@@ -54,9 +51,7 @@ export type FileUploadArgs = {
   contentType: string;
   file: string | Buffer | stream.PassThrough;
   onFinish: (
-    ...args:
-      | [error: Error, result: undefined]
-      | [error: undefined, result: UploadedCloudFile]
+    ...args: [error: Error, result: undefined] | [error: undefined, result: UploadedCloudFile]
   ) => void;
   onProgress?: (bytesUploaded: number) => void;
 };
@@ -64,10 +59,7 @@ export type CloudClient = {
   upload: (file: FileUploadArgs) => Promise<void>;
   downloadAsStream: (name: string) => Promise<stream.Readable>;
   delete: (fileName: string) => Promise<void>;
-  getSignedUrlForDownload: (
-    fileName: string,
-    expiresInSeconds: number,
-  ) => Promise<string>;
+  getSignedUrlForDownload: (fileName: string, expiresInSeconds: number) => Promise<string>;
 };
 
 export type LocalConfig = {
@@ -161,14 +153,11 @@ export class FileManager {
             }
           } else {
             console.error(
-              "FileManager checkInterval delayedDelete FAIL: Could not access file table tableHandler.delete()",
+              "FileManager checkInterval delayedDelete FAIL: Could not access file table tableHandler.delete()"
             );
           }
         },
-        Math.max(
-          10000,
-          (fullConfig.delayedDelete.checkIntervalHours || 0) * HOUR,
-        ),
+        Math.max(10000, (fullConfig.delayedDelete.checkIntervalHours || 0) * HOUR)
       );
     }
   }
@@ -187,7 +176,7 @@ export class FileManager {
 
   async deleteFile(name: string) {
     if (this.cloudClient) {
-      const res = await this.cloudClient?.delete(name);
+      const res = await this.cloudClient.delete(name);
       return res;
     } else if ("localFolderPath" in this.config) {
       const path = `${this.config.localFolderPath}/${name}`;
@@ -202,8 +191,7 @@ export class FileManager {
 
   getValidatedFileType = getValidatedFileType.bind(this);
 
-  getLocalFileUrl = (name: string) =>
-    this.fileRoute ? `${this.fileRoute}/${name}` : "";
+  getLocalFileUrl = (name: string) => (this.fileRoute ? `${this.fileRoute}/${name}` : "");
 
   checkFreeSpace = async (folderPath: string, fileSize = 0) => {
     if (!this.cloudClient && "localFolderPath" in this.config) {
@@ -229,8 +217,9 @@ export class FileManager {
     dissallowedExtensions?: Array<ALLOWED_EXTENSION>;
     imageOptions?: ImageOptions;
   }): Promise<UploadedItem> => {
-    const { item, imageOptions } = params;
-    const { name, data, content_type, extension } = item;
+    const { item } = params;
+    const { name, data, content_type } = item;
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!data) throw "No file provided";
     if (!name || typeof name !== "string") throw "Expecting a string name";
 
@@ -280,32 +269,24 @@ export class FileManager {
     return res;
   };
 
-  async getFileCloudDownloadURL(
-    fileName: string,
-    expiresInSecondsRaw: number = 30 * 60,
-  ) {
+  async getFileCloudDownloadURL(fileName: string, expiresInSecondsRaw: number = 30 * 60) {
     const expiresInSeconds = Math.max(1, Math.round(expiresInSecondsRaw));
-    return await this.cloudClient?.getSignedUrlForDownload(
-      fileName,
-      expiresInSeconds,
-    );
+    return await this.cloudClient?.getSignedUrlForDownload(fileName, expiresInSeconds);
   }
 
-  parseSQLIdentifier = async (name: string) =>
-    asSQLIdentifier(name, this.prostgles!.db!); //  this.prostgles.dbo.sql<"value">("select format('%I', $1)", [name], { returnType: "value" } )
+  parseSQLIdentifier = async (name: string) => asSQLIdentifier(name, this.prostgles!.db!); //  this.prostgles.dbo.sql<"value">("select format('%I', $1)", [name], { returnType: "value" } )
 
   getColInfo = (args: {
     tableName: string;
     colName: string;
   }): ValidatedColumnInfo["file"] | undefined => {
     const { colName, tableName } = args;
-    const tableConfig =
-      this.prostgles?.opts.fileTable?.referencedTables?.[tableName];
+    const tableConfig = this.prostgles?.opts.fileTable?.referencedTables?.[tableName];
     const isReferencingFileTable = this.dbo[tableName]?.columns?.some(
       (c) =>
         c.name === colName &&
         c.references &&
-        c.references?.some(({ ftable }) => ftable === this.tableName),
+        c.references.some(({ ftable }) => ftable === this.tableName)
     );
     const allowAllFiles = { acceptedContent: "*" } as const;
     if (isReferencingFileTable) {
@@ -320,15 +301,13 @@ export class FileManager {
   init = initFileManager.bind(this);
 
   destroy = () => {
-    removeExpressRoute(this.prostgles?.opts.fileTable?.expressApp, [
-      this.fileRouteExpress,
-    ]);
+    removeExpressRoute(this.prostgles?.opts.fileTable?.expressApp, [this.fileRouteExpress]);
   };
 }
 
 export const removeExpressRoute = (
   app: ExpressApp | undefined,
-  routePaths: (string | undefined)[],
+  routePaths: (string | undefined)[]
 ) => {
   const routes = app?._router?.stack;
   if (routes) {
@@ -340,10 +319,7 @@ export const removeExpressRoute = (
   }
 };
 
-export const removeExpressRouteByName = (
-  app: ExpressApp | undefined,
-  name: string,
-) => {
+export const removeExpressRouteByName = (app: ExpressApp | undefined, name: string) => {
   const routes = app?._router?.stack;
   if (routes) {
     routes.forEach((route, i) => {
@@ -355,17 +331,15 @@ export const removeExpressRouteByName = (
 };
 
 export const getFileTypeFromFilename = (
-  fileName: string,
-):
-  | { mime: ALLOWED_CONTENT_TYPE; ext: ALLOWED_EXTENSION | string }
-  | undefined => {
+  fileName: string
+): { mime: ALLOWED_CONTENT_TYPE; ext: ALLOWED_EXTENSION | string } | undefined => {
   const nameParts = fileName.split(".");
 
   if (nameParts.length < 2) return undefined;
 
   const nameExt = nameParts.at(-1)!.toLowerCase(),
     mime = getKeys(CONTENT_TYPE_TO_EXT).find((k) =>
-      (CONTENT_TYPE_TO_EXT[k] as readonly string[]).includes(nameExt),
+      (CONTENT_TYPE_TO_EXT[k] as readonly string[]).includes(nameExt)
     );
 
   if (!mime) return undefined;
@@ -381,7 +355,7 @@ export const getFileTypeFromFilename = (
 
 export const getFileType = async (
   file: Buffer | string,
-  fileName: string,
+  fileName: string
 ): Promise<{ mime: ALLOWED_CONTENT_TYPE; ext: ALLOWED_EXTENSION }> => {
   const { fileTypeFromBuffer } = await (eval('import("file-type")') as Promise<
     typeof import("file-type")
@@ -389,25 +363,20 @@ export const getFileType = async (
 
   const fileNameMime = getFileTypeFromFilename(fileName);
   if (!fileNameMime?.ext) throw new Error("File name must contain extenion");
-  const res = await fileTypeFromBuffer(
-    typeof file === "string" ? Buffer.from(file, "utf8") : file,
-  );
+  const res = await fileTypeFromBuffer(typeof file === "string" ? Buffer.from(file, "utf8") : file);
 
   if (!res) {
     /* Set correct/missing extension */
-    const nameExt = fileNameMime?.ext;
-    if (
-      ["xml", "txt", "csv", "tsv", "svg", "sql"].includes(nameExt) &&
-      fileNameMime.mime
-    ) {
+    const nameExt = fileNameMime.ext;
+    if (["xml", "txt", "csv", "tsv", "svg", "sql"].includes(nameExt)) {
       return fileNameMime as any;
     }
 
     throw new Error("Could not get the file type from file buffer");
   } else {
-    if (!res.ext || fileNameMime?.ext.toLowerCase() !== res.ext.toLowerCase()) {
+    if (fileNameMime.ext.toLowerCase() !== res.ext.toLowerCase()) {
       throw new Error(
-        `There is a mismatch between file name extension and actual buffer extension: ${fileNameMime?.ext} vs ${res.ext}`,
+        `There is a mismatch between file name extension and actual buffer extension: ${fileNameMime.ext} vs ${res.ext}`
       );
     }
   }

@@ -3,6 +3,7 @@ import {
   PG_COLUMN_UDT_DATA_TYPE,
   ValidatedColumnInfo,
   _PG_geometric,
+  isDefined,
   isObject,
 } from "prostgles-types";
 import { TableRule } from "../PublishParser/PublishParser";
@@ -15,8 +16,7 @@ import {
 import { TableHandler } from "./TableHandler/TableHandler";
 import { ViewHandler } from "./ViewHandler/ViewHandler";
 
-export const isTableHandler = (v: any): v is TableHandler =>
-  "parseUpdateRules" in v;
+export const isTableHandler = (v: any): v is TableHandler => "parseUpdateRules" in v;
 
 export async function getColumns(
   this: ViewHandler,
@@ -24,13 +24,13 @@ export async function getColumns(
   params?: { rule: "update"; filter: AnyObject },
   _param3?: undefined,
   tableRules?: TableRule,
-  localParams?: LocalParams,
+  localParams?: LocalParams
 ): Promise<ValidatedColumnInfo[]> {
   const start = Date.now();
   try {
-    const p = this.getValidatedRules(tableRules, localParams);
+    const rules = this.getValidatedRules(tableRules, localParams);
 
-    if (!p.getColumns) throw "Not allowed";
+    if (!rules.getColumns) throw "Not allowed";
 
     let dynamicUpdateFields = this.column_names;
 
@@ -38,6 +38,7 @@ export async function getColumns(
       if (
         !isObject(params) ||
         !isObject(params.filter) ||
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         params.rule !== "update"
       ) {
         throw (
@@ -46,29 +47,23 @@ export async function getColumns(
         );
       }
 
-      if (!tableRules?.update) {
+      if (!tableRules.update) {
         dynamicUpdateFields = [];
       } else {
         const { filter } = params;
-        const updateRules = await this.parseUpdateRules(
-          filter,
-          undefined,
-          tableRules,
-          localParams,
-        );
+        const updateRules = await this.parseUpdateRules(filter, undefined, tableRules, localParams);
         dynamicUpdateFields = updateRules.fields;
       }
     }
 
     const columns = this.columns
       .filter((c) => {
-        const { insert, select, update } = p || {};
+        const { insert, select, update } = rules;
 
-        return [
-          ...(insert?.fields || []),
-          ...(select?.fields || []),
-          ...(update?.fields || []),
-        ].includes(c.name);
+        return [insert, select, update]
+          .filter(isDefined)
+          .flatMap((rule) => rule.fields)
+          .includes(c.name);
       })
       .map((_c) => {
         const c = { ..._c };
@@ -82,24 +77,18 @@ export async function getColumns(
 
         delete (c as any).privileges;
 
-        const prostgles = this.dboBuilder?.prostgles;
+        const prostgles = this.dboBuilder.prostgles;
         const fileConfig = prostgles.fileManager?.getColInfo({
           colName: c.name,
           tableName: this.name,
         });
 
         /** Do not allow updates to file table unless it's to delete fields */
-        if (
-          prostgles.fileManager?.config &&
-          prostgles.fileManager.tableName === this.name
-        ) {
+        if (prostgles.fileManager?.config && prostgles.fileManager.tableName === this.name) {
           update = false;
         }
 
-        const nonOrderableUD_Types: PG_COLUMN_UDT_DATA_TYPE[] = [
-          ..._PG_geometric,
-          "xml" as any,
-        ];
+        const nonOrderableUD_Types: PG_COLUMN_UDT_DATA_TYPE[] = [..._PG_geometric, "xml" as any];
 
         const result: ValidatedColumnInfo = {
           ...c,
@@ -107,31 +96,23 @@ export async function getColumns(
           tsDataType: postgresToTsType(c.udt_name),
           insert:
             insert &&
-            Boolean(p.insert?.fields?.includes(c.name)) &&
+            !!rules.insert?.fields.includes(c.name) &&
             tableRules?.insert?.forcedData?.[c.name] === undefined &&
             c.is_updatable,
-          select: select && Boolean(p.select?.fields?.includes(c.name)),
+          select: select && !!rules.select?.fields.includes(c.name),
           orderBy:
             select &&
-            Boolean(
-              p.select?.fields && p.select.orderByFields.includes(c.name),
-            ) &&
+            !!rules.select?.orderByFields.includes(c.name) &&
             !nonOrderableUD_Types.includes(c.udt_name),
-          filter: Boolean(p.select?.filterFields?.includes(c.name)),
+          filter: !!rules.select?.filterFields.includes(c.name),
           update:
             update &&
-            Boolean(p.update?.fields?.includes(c.name)) &&
+            !!rules.update?.fields.includes(c.name) &&
             tableRules?.update?.forcedData?.[c.name] === undefined &&
             c.is_updatable &&
             dynamicUpdateFields.includes(c.name),
-          delete:
-            _delete &&
-            Boolean(
-              p.delete &&
-                p.delete.filterFields &&
-                p.delete.filterFields.includes(c.name),
-            ),
-          ...(prostgles?.tableConfigurator?.getColInfo({
+          delete: _delete && !!rules.delete?.filterFields.includes(c.name),
+          ...(prostgles.tableConfigurator?.getColInfo({
             table: this.name,
             col: c.name,
             lang,
@@ -169,10 +150,7 @@ export async function getColumns(
 function replaceNonAlphaNumeric(string: string, replacement = "_"): string {
   return string.replace(/[\W_]+/g, replacement);
 }
-function capitalizeFirstLetter(
-  string: string,
-  nonalpha_replacement?: string,
-): string {
+function capitalizeFirstLetter(string: string, nonalpha_replacement?: string): string {
   const str = replaceNonAlphaNumeric(string, nonalpha_replacement);
   return str.charAt(0).toUpperCase() + str.slice(1);
 }

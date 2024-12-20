@@ -53,7 +53,7 @@ export async function parseUpdateRules(
       tableRules.update);
 
     returningFields =
-      tableRules.update.returningFields ?? tableRules?.select?.fields ?? "";
+      tableRules.update.returningFields ?? tableRules.select?.fields ?? "";
 
     if (!returningFields && params?.returning) {
       throw "You are not allowed to return any fields from the update";

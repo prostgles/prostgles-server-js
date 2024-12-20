@@ -42,7 +42,7 @@ export function uploadStream(
           const now = Date.now();
           if (now - lastProgress > throttle) {
             lastProgress = now;
-            onProgress?.({ loaded, total: expectedSizeBytes ?? 0 });
+            onProgress({ loaded, total: expectedSizeBytes ?? 0 });
           }
         });
       }
@@ -54,7 +54,7 @@ export function uploadStream(
           try {
             content_length = fs.statSync(filePath).size;
 
-            onEnd?.({
+            onEnd({
               url,
               filePath,
               etag: `none`,

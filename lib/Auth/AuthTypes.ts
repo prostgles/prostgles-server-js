@@ -1,27 +1,27 @@
 import { Express, NextFunction, Request, Response } from "express";
-import {
-  AnyObject,
-  EmailLoginResponse,
-  EmailRegisterResponse,
-  FieldFilter,
-  IdentityProvider,
-  UserLike,
-} from "prostgles-types";
-import { DB } from "../Prostgles";
-import { DBOFullyTyped } from "../DBSchemaBuilder";
-import { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
+import Mail from "nodemailer/lib/mailer";
 import type { AuthenticateOptions } from "passport";
 import type {
-  StrategyOptions as GoogleStrategy,
-  Profile as GoogleProfile,
-} from "passport-google-oauth20";
-import type { StrategyOptions as GitHubStrategy, Profile as GitHubProfile } from "passport-github2";
-import type { MicrosoftStrategyOptions } from "passport-microsoft";
-import type {
-  StrategyOptions as FacebookStrategy,
   Profile as FacebookProfile,
+  StrategyOptions as FacebookStrategy,
 } from "passport-facebook";
-import Mail from "nodemailer/lib/mailer";
+import type { Profile as GitHubProfile, StrategyOptions as GitHubStrategy } from "passport-github2";
+import type {
+  Profile as GoogleProfile,
+  StrategyOptions as GoogleStrategy,
+} from "passport-google-oauth20";
+import type { MicrosoftStrategyOptions } from "passport-microsoft";
+import {
+  AnyObject,
+  FieldFilter,
+  IdentityProvider,
+  AuthResponse,
+  UserLike,
+  AuthRequest,
+} from "prostgles-types";
+import { DBOFullyTyped } from "../DBSchemaBuilder";
+import { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
+import { DB } from "../Prostgles";
 
 type Awaitable<T> = T | Promise<T>;
 
@@ -96,54 +96,55 @@ export type Email = {
 
 type EmailWithoutTo = Omit<Email, "to">;
 
-type EmailProvider =
+type MagicLinkAuthResponse =
+  | { response: AuthResponse.MagicLinkAuthFailure; email?: undefined }
+  | { response: AuthResponse.MagicLinkAuthSuccess; email: EmailWithoutTo };
+
+type PasswordRegisterResponse =
+  | { response: AuthResponse.PasswordRegisterFailure; email?: undefined }
+  | { response: AuthResponse.PasswordRegisterSuccess; email: EmailWithoutTo };
+
+export type EmailProvider =
   | {
       signupType: "withMagicLink";
-      onRegistered: (data: { username: string }) => Awaitable<EmailRegisterResponse>;
-      emailMagicLink: {
-        onSend: (data: {
-          email: string;
-          magicLinkPath: string;
-          clientInfo: LoginClientInfo;
-          req: ExpressReq;
-        }) => EmailWithoutTo | Promise<EmailWithoutTo>;
-        smtp: SMTPConfig;
-      };
+      onRegister: (data: {
+        email: string;
+        magicLinkUrlPath: string;
+        clientInfo: LoginClientInfo;
+        req: ExpressReq;
+      }) => Awaitable<MagicLinkAuthResponse>;
+      smtp: SMTPConfig;
     }
   | {
+      /**
+       * Users have to provide an email and a password.
+       * Account should be activated after email confirmation
+       */
       signupType: "withPassword";
-      onRegistered: (
-        data: { username: string; password: string },
-        clientInfo: LoginClientInfo
-      ) => Awaitable<EmailRegisterResponse>;
       /**
        * Defaults to 8
        */
       minPasswordLength?: number;
       /**
-       * If provided, the user will be required to confirm their email address
+       * Called when the user has registered
        */
-      emailConfirmation?: {
-        /**
-         * Called when the user has registered
-         */
-        onSend: (data: {
-          email: string;
-          password: string;
-          confirmationUrlPath: string;
-          clientInfo: LoginClientInfo;
-          req: ExpressReq;
-        }) => EmailWithoutTo | Promise<EmailWithoutTo>;
-        smtp: SMTPConfig;
-        /**
-         * Called after the user has clicked the URL to confirm their email address
-         */
-        onConfirmed: (data: {
-          confirmationCode: string;
-          clientInfo: LoginClientInfo;
-          req: ExpressReq;
-        }) => void | Promise<void>;
-      };
+      onRegister: (data: {
+        email: string;
+        password: string;
+        confirmationUrlPath: string;
+        clientInfo: LoginClientInfo;
+        req: ExpressReq;
+      }) => Awaitable<PasswordRegisterResponse>;
+      smtp: SMTPConfig;
+
+      /**
+       * Called after the user has clicked the URL to confirm their email address
+       */
+      onEmailConfirmation: (data: {
+        confirmationCode: string;
+        clientInfo: LoginClientInfo;
+        req: ExpressReq;
+      }) => void | Promise<void>;
     };
 
 export type AuthProviderUserData =
@@ -242,7 +243,7 @@ export type AuthResult<SU = SessionUser> =
   | {
       user?: undefined;
       clientUser?: undefined;
-      sid?: string;
+      sid?: string | undefined;
     }
   | undefined;
 
@@ -260,19 +261,6 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
   sidKeyName?: string;
 
   /**
-   * Response time rounding in milliseconds to prevent timing attacks on login. Login response time should always be a multiple of this value. Defaults to 500 milliseconds
-   */
-  responseThrottle?: number;
-
-  /**
-   * Will setup auth routes
-   *  /login
-   *  /logout
-   *  /magic-link/:id
-   */
-  expressConfig?: ExpressConfig<S, SUser>;
-
-  /**
    * undefined sid is allowed to enable public users
    */
   getUser: (
@@ -281,6 +269,14 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
     db: DB,
     client: AuthClientRequest & LoginClientInfo
   ) => Awaitable<AuthResult<SUser>>;
+
+  /**
+   * Will setup auth routes
+   *  /login
+   *  /logout
+   *  /magic-link/:id
+   */
+  expressConfig?: ExpressConfig<S, SUser>;
 
   login?: (
     params: LoginParams,
@@ -291,17 +287,34 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
   logout?: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<any>;
 
   /**
+   * Response time rounding in milliseconds to prevent timing attacks on login. Login response time should always be a multiple of this value. Defaults to 500 milliseconds
+   */
+  responseThrottle?: number;
+
+  /**
    * If provided then session info will be saved on socket.__prglCache and reused from there
    */
   cacheSession?: {
-    getSession: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession>;
+    getSession: (
+      sid: string | undefined,
+      dbo: DBOFullyTyped<S>,
+      db: DB
+    ) => Awaitable<BasicSession | undefined>;
   };
 };
 
-export type LoginResponse = BasicSession | Exclude<EmailLoginResponse, { success: true }>;
+export type LoginResponse =
+  | {
+      session: BasicSession;
+      response?: AuthResponse.PasswordLoginSuccess | AuthResponse.MagicLinkAuthSuccess;
+    }
+  | {
+      session?: undefined;
+      response: AuthResponse.PasswordLoginFailure | AuthResponse.MagicLinkAuthFailure;
+    };
 
 export type LoginParams =
-  | { type: "username"; username: string; password: string; [key: string]: any }
+  | ({ type: "username" } & AuthRequest.LoginData)
   | ({ type: "provider" } & AuthProviderUserData);
 
 type ExpressConfig<S, SUser extends SessionUser> = {
@@ -336,22 +349,25 @@ type ExpressConfig<S, SUser extends SessionUser> = {
    * Will be called after a GET request is authorised
    * This means that
    */
-  onGetRequestOK?: (req: ExpressReq, res: ExpressRes, params: AuthRequestParams<S, SUser>) => any;
+  onGetRequestOK?: (
+    req: ExpressReq,
+    res: ExpressRes,
+    params: AuthRequestParams<S, SUser>
+  ) => Awaitable<void>;
 
   /**
-   * If defined, will check the magic link id and log in the user and redirect to the returnUrl if set
+   * If defined, will enable GET /magic-link/:id route.
+   * Requests with valid magic link ids will be logged in and redirected to the returnUrl if set
    */
-  magicLinks?: {
-    /**
-     * Used in creating a session/logging in using a magic link
-     */
-    check: (
-      magicId: string,
-      dbo: DBOFullyTyped<S>,
-      db: DB,
-      client: LoginClientInfo
-    ) => Awaitable<BasicSession | undefined>;
-  };
+  onMagicLink?: (
+    magicId: string,
+    dbo: DBOFullyTyped<S>,
+    db: DB,
+    client: LoginClientInfo
+  ) => Awaitable<
+    | { session: BasicSession; response?: AuthResponse.MagicLinkAuthSuccess }
+    | { session?: undefined; response: AuthResponse.MagicLinkAuthFailure }
+  >;
 
   registrations?: AuthRegistrationConfig<S>;
 };

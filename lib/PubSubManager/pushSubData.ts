@@ -1,13 +1,7 @@
 import { parseLocalFuncs } from "../DboBuilder/ViewHandler/subscribe";
 import { log, PubSubManager, Subscription } from "./PubSubManager";
 
-export async function pushSubData(
-  this: PubSubManager,
-  sub: Subscription,
-  err?: any,
-) {
-  if (!sub) throw "pushSubData: invalid sub";
-
+export async function pushSubData(this: PubSubManager, sub: Subscription, err?: any) {
   const { socket_id, channel_name } = sub;
   if (!this.subs.some((s) => s.channel_name === channel_name)) {
     // Might be throttling a sub that was removed

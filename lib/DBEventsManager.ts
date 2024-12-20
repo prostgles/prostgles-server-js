@@ -1,7 +1,4 @@
-import {
-  PostgresNotifListenManager,
-  PrglNotifListener,
-} from "./PostgresNotifListenManager";
+import { PostgresNotifListenManager, PrglNotifListener } from "./PostgresNotifListenManager";
 import { DB, PGP } from "./Prostgles";
 import { getKeys, CHANNELS } from "prostgles-types";
 import { PRGLIOSocket } from "./DboBuilder/DboBuilder";
@@ -53,7 +50,7 @@ export class DBEventsManager {
   };
 
   onNotice = (notice: any) => {
-    if (this.notice && this.notice.sockets.length) {
+    if (this.notice.sockets.length) {
       this.notice.sockets.map((s) => {
         s.emit(this.notice.socketChannel, notice);
       });
@@ -68,7 +65,7 @@ export class DBEventsManager {
   async addNotify(
     query: string,
     socket?: PRGLIOSocket,
-    func?: any,
+    func?: any
   ): Promise<{
     socketChannel: string;
     socketUnsubChannel: string;
@@ -120,17 +117,10 @@ export class DBEventsManager {
         socketChannel,
         sockets: socket ? [socket] : [],
         localFuncs: func ? [func] : [],
-        notifMgr: await PostgresNotifListenManager.create(
-          this.db_pg,
-          this.onNotif,
-          channel,
-        ),
+        notifMgr: await PostgresNotifListenManager.create(this.db_pg, this.onNotif, channel),
       };
     } else {
-      if (
-        socket &&
-        !this.notifies[notifChannel]!.sockets.find((s) => s.id === socket.id)
-      ) {
+      if (socket && !this.notifies[notifChannel]!.sockets.find((s) => s.id === socket.id)) {
         this.notifies[notifChannel]!.sockets.push(socket);
       } else if (func) {
         this.notifies[notifChannel]!.localFuncs.push(func);
@@ -155,13 +145,9 @@ export class DBEventsManager {
     const notifChannel = channel && this.notifies[channel];
     if (notifChannel) {
       if (socket) {
-        notifChannel.sockets = notifChannel.sockets.filter(
-          (s) => s.id !== socket.id,
-        );
+        notifChannel.sockets = notifChannel.sockets.filter((s) => s.id !== socket.id);
       } else if (func) {
-        notifChannel.localFuncs = notifChannel.localFuncs.filter(
-          (f) => f !== func,
-        );
+        notifChannel.localFuncs = notifChannel.localFuncs.filter((f) => f !== func);
       }
 
       /* UNLISTEN if no listeners ?? */
@@ -169,15 +155,15 @@ export class DBEventsManager {
 
     if (socket) {
       getKeys(this.notifies).forEach((channel) => {
-        this.notifies[channel]!.sockets = this.notifies[
-          channel
-        ]!.sockets.filter((s) => s.id !== socket.id);
+        this.notifies[channel]!.sockets = this.notifies[channel]!.sockets.filter(
+          (s) => s.id !== socket.id
+        );
       });
     }
   }
 
   addNotice(socket: PRGLIOSocket) {
-    if (!socket || !socket.id) throw "Expecting a socket obj with id";
+    if (!socket.id) throw "Expecting a socket obj with id";
 
     if (!this.notice.sockets.find((s) => s.id === socket.id)) {
       this.notice.sockets.push(socket);
@@ -194,7 +180,7 @@ export class DBEventsManager {
   }
 
   removeNotice(socket: PRGLIOSocket) {
-    if (!socket || !socket.id) throw "Expecting a socket obj with id";
+    if (!socket.id) throw "Expecting a socket obj with id";
     this.notice.sockets = this.notice.sockets.filter((s) => s.id !== socket.id);
   }
 }

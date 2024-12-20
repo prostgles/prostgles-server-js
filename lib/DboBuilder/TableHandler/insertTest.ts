@@ -31,7 +31,7 @@ export async function insertTest(
 
     /* If no returning fields specified then take select fields as returning or the allowed insert fields */
     if (!returningFields)
-      returningFields = tableRules?.select?.fields || tableRules?.insert.fields;
+      returningFields = tableRules.select?.fields || tableRules.insert.fields;
 
     if (!fields)
       throw ` invalid insert rule for ${this.name} -> fields missing `;

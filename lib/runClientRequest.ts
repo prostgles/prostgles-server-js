@@ -1,10 +1,4 @@
-import {
-  AnyObject,
-  TableHandler,
-  UserLike,
-  getKeys,
-  pickKeys,
-} from "prostgles-types";
+import { AnyObject, TableHandler, UserLike, getKeys, pickKeys } from "prostgles-types";
 import { ExpressReq } from "./Auth/AuthTypes";
 import { LocalParams, PRGLIOSocket } from "./DboBuilder/DboBuilder";
 import { parseFieldFilter } from "./DboBuilder/ViewHandler/parseFieldFilter";
@@ -47,10 +41,7 @@ const TABLE_METHODS = {
   getColumns: 1,
   getInfo: 1,
   sync: 1,
-} as const satisfies Record<
-  keyof (TableHandler & Pick<TableHandlerServer, "sync">),
-  1
->;
+} as const satisfies Record<keyof (TableHandler & Pick<TableHandlerServer, "sync">), 1>;
 
 const TABLE_METHODS_KEYS = getKeys(TABLE_METHODS);
 const SOCKET_ONLY_COMMANDS = [
@@ -79,36 +70,29 @@ type TableMethodFunctionWithRulesAndLocalParams = (
   arg2: any,
   arg3: any,
   tableRule: TableRule,
-  localParams: LocalParams,
+  localParams: LocalParams
 ) => any;
 
 export const runClientRequest = async function (this: Prostgles, args: Args) {
   /* Channel name will only include client-sent params so we ignore table_rules enforced params */
   if (
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     (args.type === "socket" && !args.socket) ||
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     (args.type === "http" && !args.httpReq) ||
-    !this.authHandler ||
+    // !this.authHandler ||
     !this.publishParser ||
     !this.dbo
   ) {
     throw "socket/httpReq or authhandler missing";
   }
 
-  const {
-    tableName,
-    command: nonValidatedCommand,
-    param1,
-    param2,
-    param3,
-  } = args;
+  const { tableName, command: nonValidatedCommand, param1, param2, param3 } = args;
   if (!TABLE_METHODS_KEYS.some((v) => v === nonValidatedCommand)) {
     throw `Invalid command: ${nonValidatedCommand}. Expecting one of: ${TABLE_METHODS_KEYS};`;
   }
   const command = nonValidatedCommand as keyof TableHandler;
-  if (
-    args.type !== "socket" &&
-    SOCKET_ONLY_COMMANDS.some((v) => v === command)
-  ) {
+  if (args.type !== "socket" && SOCKET_ONLY_COMMANDS.some((v) => v === command)) {
     throw (
       "The following commands cannot be completed over a non-websocket connection: " +
       SOCKET_ONLY_COMMANDS
@@ -116,22 +100,25 @@ export const runClientRequest = async function (this: Prostgles, args: Args) {
   }
 
   const reqInfo = getReqInfoClient(args);
-  const clientInfo = await this.authHandler.getClientInfo(args);
+  const clientInfo = await this.authHandler?.getClientInfo(args);
   const validRules = await this.publishParser.getValidatedRequestRule(
     { tableName, command, localParams: reqInfo },
-    clientInfo,
+    clientInfo
   );
+
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (!validRules) {
     throw `Invalid OR disallowed request: ${tableName}.${command} `;
   }
 
-  const sessionUser: UserLike | undefined = !clientInfo?.user
-    ? undefined
+  const sessionUser: UserLike | undefined =
+    !clientInfo?.user ?
+      undefined
     : {
         ...parseFieldFilter(
           clientInfo.sessionFields ?? ([] as any),
           false,
-          Object.keys(clientInfo.user),
+          Object.keys(clientInfo.user)
         ),
         ...(pickKeys(clientInfo.user, ["id", "type"]) as UserLike),
       };
@@ -148,8 +135,7 @@ export const runClientRequest = async function (this: Prostgles, args: Args) {
     }
   }
   const tableHandler = this.dbo[tableName];
-  if (!tableHandler || !tableHandler.column_names)
-    throw `Invalid tableName ${tableName} provided`;
+  if (!tableHandler || !tableHandler.column_names) throw `Invalid tableName ${tableName} provided`;
 
   /**
    * satisfies check is used to ensure rules arguments are correctly passed to each method
@@ -158,23 +144,21 @@ export const runClientRequest = async function (this: Prostgles, args: Args) {
     | undefined
     | TableMethodFunctionWithRulesAndLocalParams;
   if (!tableCommand) throw `Invalid or disallowed command provided: ${command}`;
-  return (
-    this.dbo[tableName]![command] as TableMethodFunctionWithRulesAndLocalParams
-  )(param1, param2, param3, validRules, localParams);
+  return (this.dbo[tableName]![command] as TableMethodFunctionWithRulesAndLocalParams)(
+    param1,
+    param2,
+    param3,
+    validRules,
+    localParams
+  );
   // This approach is breaking context
   // const result = await (tableCommand as TableMethodFunctionWithRulesAndLocalParams)(param1, param2, param3, validRules, localParams);
   // return result;
 };
 
-export const clientCanRunSqlRequest = async function (
-  this: Prostgles,
-  args: ReqInfo,
-) {
+export const clientCanRunSqlRequest = async function (this: Prostgles, args: ReqInfo) {
   const reqInfo = getReqInfoClient(args);
-  if (
-    !this.opts.publishRawSQL ||
-    typeof this.opts.publishRawSQL !== "function"
-  ) {
+  if (!this.opts.publishRawSQL || typeof this.opts.publishRawSQL !== "function") {
     return { allowed: false, reqInfo };
   }
   const canRunSQL = async () => {
@@ -195,10 +179,7 @@ type ArgsSql = ReqInfo & {
   args?: AnyObject | any[];
   options?: any;
 };
-export const runClientSqlRequest = async function (
-  this: Prostgles,
-  params: ArgsSql,
-) {
+export const runClientSqlRequest = async function (this: Prostgles, params: ArgsSql) {
   const { allowed, reqInfo } = await clientCanRunSqlRequest.bind(this)(params);
   if (!allowed) {
     throw "Not allowed to execute sql";
@@ -212,10 +193,7 @@ type ArgsMethod = ReqInfo & {
   method: string;
   params?: any[];
 };
-export const runClientMethod = async function (
-  this: Prostgles,
-  reqArgs: ArgsMethod,
-) {
+export const runClientMethod = async function (this: Prostgles, reqArgs: ArgsMethod) {
   const reqInfo = getReqInfoClient(reqArgs);
   const { method, params = [] } = reqArgs;
   const methods = await this.publishParser?.getAllowedMethods(reqInfo);
@@ -226,10 +204,9 @@ export const runClientMethod = async function (
 
   const methodDef = methods[method]!;
   const onRun =
-    typeof methodDef === "function" ||
-    typeof (methodDef as any).then === "function"
-      ? (methodDef as (...args: any) => Promise<void>)
-      : methodDef.run;
+    typeof methodDef === "function" || typeof (methodDef as any).then === "function" ?
+      (methodDef as (...args: any) => Promise<void>)
+    : methodDef.run;
   const res = await onRun(...params);
   return res;
 };

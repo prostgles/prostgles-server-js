@@ -5,25 +5,18 @@ import {
   ValidatedWatchSchemaType,
   getValidatedWatchSchemaType,
 } from "./getValidatedWatchSchemaType";
-const COMMAND_FIRST_KEYWORDS = EVENT_TRIGGER_TAGS.map(
-  (tag) => tag.split(" ")[0]!,
-).filter(
-  (tag) => tag !== "SELECT",
+const COMMAND_FIRST_KEYWORDS = EVENT_TRIGGER_TAGS.map((tag) => tag.split(" ")[0]!).filter(
+  (tag) => tag !== "SELECT"
 ); /** SELECT INTO is not easily detectable with pg-node (command = "SELECT")  */
 
-const DB_FALLBACK_COMMANDS = Array.from(new Set(COMMAND_FIRST_KEYWORDS)).concat(
-  [
-    "DO", // Do statement
-    "COMMIT", // Transaction block
-  ],
-);
+const DB_FALLBACK_COMMANDS = Array.from(new Set(COMMAND_FIRST_KEYWORDS)).concat([
+  "DO", // Do statement
+  "COMMIT", // Transaction block
+]);
 
 export type VoidFunction = () => void;
 
-export type OnSchemaChangeCallback = (event: {
-  command: string;
-  query: string;
-}) => void;
+export type OnSchemaChangeCallback = (event: { command: string; query: string }) => void;
 
 export class SchemaWatch {
   dboBuilder: DboBuilder;
@@ -52,17 +45,12 @@ export class SchemaWatch {
   /**
    * Fallback for watchSchema in case of not a superuser (cannot add db event listener)
    */
-  onSchemaChangeFallback: OnSchemaChangeCallback | undefined = async ({
-    command,
-    query,
-  }) => {
+  onSchemaChangeFallback: OnSchemaChangeCallback | undefined = async ({ command, query }) => {
     if (
       typeof query === "string" &&
       query.includes(PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)
     ) {
-      log(
-        "Schema change event excluded from triggers due to EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID",
-      );
+      log("Schema change event excluded from triggers due to EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID");
       return;
     }
     if (
@@ -76,8 +64,7 @@ export class SchemaWatch {
   };
 
   onSchemaChange: OnSchemaChangeCallback | undefined = async (event) => {
-    const { watchSchema, onReady, tsGeneratedTypesDir } =
-      this.dboBuilder.prostgles.opts;
+    const { watchSchema, onReady, tsGeneratedTypesDir } = this.dboBuilder.prostgles.opts;
     if (watchSchema && this.dboBuilder.prostgles.loaded) {
       log("Schema changed");
       const { query, command } = event;
@@ -94,7 +81,7 @@ export class SchemaWatch {
           await this.dboBuilder.prostgles.refreshDBO();
           this.dboBuilder.prostgles.writeDBSchema(true);
         }
-      } else if (watchSchema) {
+      } else {
         /* Full re-init. Sockets must reconnect */
         console.log("watchSchema: Full re-initialisation", { query });
         this.dboBuilder.prostgles.init(onReady as any, {

@@ -1,16 +1,9 @@
-import { DBSchemaTable } from "prostgles-types";
-import type { AuthHandler, DBHandlerClient } from "./client";
 import { strict as assert } from "assert";
 import fs from "fs";
 import { describe, test } from "node:test";
+import type { DBHandlerClient } from "./client";
 
-export const clientFileTests = async (
-  db: DBHandlerClient,
-  auth: AuthHandler,
-  log: (...args: any[]) => any,
-  methods,
-  tableSchema: DBSchemaTable[],
-) => {
+export const clientFileTests = async (db: DBHandlerClient) => {
   await describe("clientFileTests", async () => {
     const fileFolder = `${__dirname}/../../server/dist/server/media/`;
     const getFiles = () =>
@@ -25,10 +18,13 @@ export const clientFileTests = async (
       REFERENCES "files" ("id")
       ON DELETE SET NULL
     `,
-      {},
+      {}
     );
     const initialFiles = await getFiles();
 
+    /**
+     * Although only users_public_info is published, file table should show because it is referenced by users_public_info
+     */
     await test("Files table is present", async () => {
       const files = await db.files.find!();
       assert.deepStrictEqual(files, []);
@@ -42,15 +38,13 @@ export const clientFileTests = async (
     await test("Insert file from nested insert", async () => {
       const nestedInsert = await db.users_public_info.insert!(
         { name: "somename.txt", avatar: file },
-        { returning: "*" },
+        { returning: "*" }
       );
       const files = await db.files.find!();
       assert.equal(files.length, 1);
       assert.equal(files[0].id, nestedInsert.avatar.id);
       assert.equal(files[0].original_name, file.name);
-      const initialFileStr = fs
-        .readFileSync(fileFolder + files[0].name)
-        .toString("utf8");
+      const initialFileStr = fs.readFileSync(fileFolder + files[0].name).toString("utf8");
       assert.equal(file.data.toString(), initialFileStr);
       insertedFile = files[0];
     });
@@ -60,10 +54,7 @@ export const clientFileTests = async (
         await db.files.insert!(file, { returning: "*" });
         throw "Should not be able to insert files directly";
       } catch (err) {
-        assert.equal(
-          err.message.startsWith("Direct inserts not allowed"),
-          true,
-        );
+        assert.equal(err.message.startsWith("Direct inserts not allowed"), true);
       }
     });
 
@@ -83,7 +74,7 @@ export const clientFileTests = async (
           .readFileSync(fileFolder + newFile.name)
           .toString("utf8")
           .toString(),
-        newData.data.toString(),
+        newData.data.toString()
       );
     });
 
@@ -97,12 +88,10 @@ export const clientFileTests = async (
       const d = await db.users_public_info.update!(
         { id: user?.id },
         { avatar: newData },
-        { returning: "*" },
+        { returning: "*" }
       );
       const avatarFile = await db.files.findOne!({ id: d?.at(0).avatar.id });
-      const initialFileStr = fs
-        .readFileSync(fileFolder + avatarFile!.name)
-        .toString("utf8");
+      const initialFileStr = fs.readFileSync(fileFolder + avatarFile!.name).toString("utf8");
       assert.equal(newData.data.toString(), initialFileStr);
     });
 

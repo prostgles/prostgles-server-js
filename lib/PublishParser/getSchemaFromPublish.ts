@@ -27,7 +27,7 @@ type Args = (
 
 export async function getSchemaFromPublish(
   this: PublishParser,
-  { userData, ...clientReq }: Args,
+  { userData, ...clientReq }: Args
 ): Promise<{
   schema: TableSchemaForClient;
   tables: DBSchemaTable[];
@@ -39,8 +39,7 @@ export async function getSchemaFromPublish(
 
   try {
     /* Publish tables and views based on socket */
-    const clientInfo =
-      userData ?? (await this.prostgles.authHandler?.getClientInfo(clientReq));
+    const clientInfo = userData ?? (await this.prostgles.authHandler?.getClientInfo(clientReq));
 
     let _publish: PublishObject | undefined;
     try {
@@ -50,15 +49,13 @@ export async function getSchemaFromPublish(
       throw err;
     }
 
-    if (_publish && Object.keys(_publish).length) {
+    if (Object.keys(_publish).length) {
       let txKey = "tx";
       if (!this.prostgles.opts.transactions) txKey = "";
       if (typeof this.prostgles.opts.transactions === "string")
         txKey = this.prostgles.opts.transactions;
 
-      const tableNames = Object.keys(_publish).filter(
-        (k) => !txKey || txKey !== k,
-      );
+      const tableNames = Object.keys(_publish).filter((k) => !txKey || txKey !== k);
 
       const fileTableName = this.prostgles.fileManager?.tableName;
       if (
@@ -66,11 +63,8 @@ export async function getSchemaFromPublish(
         this.dbo[fileTableName]?.is_media &&
         !tableNames.includes(fileTableName)
       ) {
-        const isReferenced = this.prostgles.dboBuilder.tablesOrViews?.some(
-          (t) =>
-            t.columns.some((c) =>
-              c.references?.some((r) => r.ftable === fileTableName),
-            ),
+        const isReferenced = this.prostgles.dboBuilder.tablesOrViews?.some((t) =>
+          t.columns.some((c) => c.references?.some((r) => r.ftable === fileTableName))
         );
         if (isReferenced) {
           tableNames.unshift(fileTableName);
@@ -89,7 +83,7 @@ export async function getSchemaFromPublish(
 
           const table_rules = await this.getTableRules(
             { localParams: clientReq, tableName },
-            clientInfo,
+            clientInfo
           );
 
           if (table_rules && Object.keys(table_rules).length) {
@@ -105,14 +99,7 @@ export async function getSchemaFromPublish(
 
             if (!this.prostgles.dboBuilder.canSubscribe) {
               methods = methods.filter(
-                (m) =>
-                  ![
-                    "subscribe",
-                    "subscribeOne",
-                    "sync",
-                    "unsubscribe",
-                    "unsync",
-                  ].includes(m),
+                (m) => !["subscribe", "subscribeOne", "sync", "unsubscribe", "unsync"].includes(m)
               );
             }
 
@@ -125,24 +112,21 @@ export async function getSchemaFromPublish(
                     tableSchema[method] = table_rules[method];
                   } else if ((table_rules as any)[method]) {
                     tableSchema[method] =
-                      method === "insert"
-                        ? pickKeys(table_rules.insert!, [
-                            "allowedNestedInserts",
-                          ])
-                        : {};
+                      method === "insert" ?
+                        pickKeys(table_rules.insert!, ["allowedNestedInserts"])
+                      : {};
 
                     /* Test for issues with the common table CRUD methods () */
                     if (TABLE_METHODS.includes(method as any)) {
                       try {
-                        const valid_table_command_rules =
-                          await this.getValidatedRequestRule(
-                            {
-                              tableName,
-                              command: method,
-                              localParams: clientReq,
-                            },
-                            clientInfo,
-                          );
+                        const valid_table_command_rules = await this.getValidatedRequestRule(
+                          {
+                            tableName,
+                            command: method,
+                            localParams: clientReq,
+                          },
+                          clientInfo
+                        );
                         if (this.prostgles.opts.testRulesOnConnect) {
                           await (this.dbo[tableName] as any)[method](
                             {},
@@ -153,10 +137,11 @@ export async function getSchemaFromPublish(
                               ...clientReq,
                               isRemoteRequest: true,
                               testRule: true,
-                            },
+                            }
                           );
                         }
                       } catch (e) {
+                        console.error(`${tableName}.${method}`, e);
                         tableSchemaErrors[tableName] ??= {};
                         tableSchemaErrors[tableName]![method] = {
                           error: "Internal publish error. Check server logs",
@@ -172,23 +157,24 @@ export async function getSchemaFromPublish(
                     if (method === "getInfo" || method === "getColumns") {
                       const tableRules = await this.getValidatedRequestRule(
                         { tableName, command: method, localParams: clientReq },
-                        clientInfo,
+                        clientInfo
                       );
                       const res = await (this.dbo[tableName] as any)[method](
                         undefined,
                         undefined,
                         undefined,
                         tableRules,
-                        { ...clientReq, isRemoteRequest: true },
+                        { ...clientReq, isRemoteRequest: true }
                       );
                       if (method === "getInfo") {
                         tableInfo = res;
+                        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
                       } else if (method === "getColumns") {
                         tableColumns = res;
                       }
                     }
                   }
-                }),
+                })
             );
 
             if (tableInfo && tableColumns) {
@@ -199,9 +185,7 @@ export async function getSchemaFromPublish(
               });
             }
           }
-
-          return true;
-        }),
+        })
       );
     }
   } catch (e) {

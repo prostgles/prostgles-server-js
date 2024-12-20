@@ -1,16 +1,6 @@
-import {
-  OrderBy,
-  asName,
-  isDefined,
-  isEmpty,
-  isObject,
-} from "prostgles-types/dist";
+import { OrderBy, asName, isDefined, isEmpty, isObject } from "prostgles-types/dist";
 import { SortItem } from "../DboBuilder";
-import {
-  NewQueryJoin,
-  SelectItemValidated,
-  asNameAlias,
-} from "../QueryBuilder/QueryBuilder";
+import { NewQueryJoin, SelectItemValidated, asNameAlias } from "../QueryBuilder/QueryBuilder";
 
 /* This relates only to SELECT */
 export const prepareSortItems = (
@@ -18,7 +8,7 @@ export const prepareSortItems = (
   allowed_cols: string[],
   tableAlias: string | undefined,
   select: SelectItemValidated[],
-  joinQueries: NewQueryJoin[],
+  joinQueries: NewQueryJoin[]
 ): SortItem[] => {
   if (!rawOrderBy) return [];
 
@@ -36,7 +26,7 @@ export const prepareSortItems = (
   } else if (Array.isArray(rawOrderBy)) {
     /* Order by is formed of a list of ascending field names */
     const _orderBy = rawOrderBy as any[];
-    if (_orderBy && !_orderBy.find((v) => typeof v !== "string")) {
+    if (!_orderBy.find((v) => typeof v !== "string")) {
       /* [string] */
       orderBy = _orderBy.map((key) => ({ key, asc: true }));
     } else if (_orderBy.find((v) => isObject(v) && !isEmpty(v))) {
@@ -44,13 +34,13 @@ export const prepareSortItems = (
     } else return throwErr(rawOrderBy);
   } else return throwErr(rawOrderBy);
 
-  if (!orderBy || !orderBy.length) return [];
+  if (!orderBy.length) return [];
 
   const validatedAggAliases = select
     .filter(
       (s) =>
         s.type !== "joinedColumn" &&
-        (!s.fields.length || s.fields.every((f) => allowed_cols.includes(f))),
+        (!s.fields.length || s.fields.every((f) => allowed_cols.includes(f)))
     )
     .map((s) => s.alias);
 
@@ -63,13 +53,13 @@ export const prepareSortItems = (
         joinAlias,
         key: `${joinAlias}.${selectItem.alias}`,
       };
-    }),
+    })
   );
   const bad_param = orderBy.find(
     ({ key }) =>
       !sortableNestedColumns.some((v) => v.key === key) &&
       !validatedAggAliases.includes(key) &&
-      !allowed_cols.includes(key),
+      !allowed_cols.includes(key)
   );
   if (bad_param) {
     throw "Invalid/disallowed orderBy fields or params: " + bad_param.key;
@@ -77,71 +67,62 @@ export const prepareSortItems = (
 
   const selectedAliases = select.filter((s) => s.selected).map((s) => s.alias);
 
-  const result: SortItem[] = orderBy.map(
-    ({ key, asc, nulls, nullEmpty = false }) => {
-      const nestedField = sortableNestedColumns.find((f) => f.key === key);
-      if (nestedField) {
-        const { table, selectItem, joinAlias } = nestedField;
+  const result: SortItem[] = orderBy.map(({ key, asc, nulls, nullEmpty = false }) => {
+    const nestedField = sortableNestedColumns.find((f) => f.key === key);
+    if (nestedField) {
+      const { table, selectItem, joinAlias } = nestedField;
 
-        const comparableDataTypeCast = ["uuid", "xml"].includes(
-          selectItem.column_udt_type ?? "",
-        )
-          ? "::TEXT"
-          : "";
-        const sortItemAlias = asName(
-          `prostgles_nested_sort_${selectItem.alias}`,
-        );
-
-        return {
-          key,
-          type: "query",
-          asc,
-          nulls,
-          nullEmpty,
-          nested: {
-            table,
-            joinAlias,
-            selectItemAlias: selectItem.alias,
-            isNumeric: selectItem.tsDataType === "number",
-            wrapperQuerySortItem: `${asc ? "MIN" : "MAX"}(${asNameAlias(selectItem.alias, joinAlias)}${comparableDataTypeCast}) as ${sortItemAlias}`,
-          },
-          fieldQuery: `${asName(joinAlias)}.${sortItemAlias + (asc ? "" : " DESC")} ${nulls ? `NULLS ${nulls === "last" ? "LAST" : "FIRST"}` : ""}`,
-        };
-      }
-      /* Order by column index when possible to bypass name collision when ordering by a computed column. 
-        (Postgres will sort by existing columns wheundefined possible) 
-    */
-
-      const index = selectedAliases.indexOf(key) + 1;
-      let colKey =
-        index > 0 && !nullEmpty
-          ? index
-          : [tableAlias, key].filter(isDefined).map(asName).join(".");
-      if (nullEmpty) {
-        colKey = `nullif(trim(${colKey}::text), '')`;
-      }
-
-      if (typeof colKey === "number") {
-        return {
-          key,
-          type: "position",
-          asc,
-          nulls,
-          nullEmpty,
-          fieldPosition: colKey,
-        };
-      }
+      const comparableDataTypeCast =
+        ["uuid", "xml"].includes(selectItem.column_udt_type ?? "") ? "::TEXT" : "";
+      const sortItemAlias = asName(`prostgles_nested_sort_${selectItem.alias}`);
 
       return {
         key,
         type: "query",
-        fieldQuery: colKey,
+        asc,
         nulls,
         nullEmpty,
-        asc,
+        nested: {
+          table,
+          joinAlias,
+          selectItemAlias: selectItem.alias,
+          isNumeric: selectItem.tsDataType === "number",
+          wrapperQuerySortItem: `${asc ? "MIN" : "MAX"}(${asNameAlias(selectItem.alias, joinAlias)}${comparableDataTypeCast}) as ${sortItemAlias}`,
+        },
+        fieldQuery: `${asName(joinAlias)}.${sortItemAlias + (asc ? "" : " DESC")} ${nulls ? `NULLS ${nulls === "last" ? "LAST" : "FIRST"}` : ""}`,
       };
-    },
-  );
+    }
+    /* Order by column index when possible to bypass name collision when ordering by a computed column. 
+        (Postgres will sort by existing columns wheundefined possible) 
+    */
+
+    const index = selectedAliases.indexOf(key) + 1;
+    let colKey =
+      index > 0 && !nullEmpty ? index : [tableAlias, key].filter(isDefined).map(asName).join(".");
+    if (nullEmpty) {
+      colKey = `nullif(trim(${colKey}::text), '')`;
+    }
+
+    if (typeof colKey === "number") {
+      return {
+        key,
+        type: "position",
+        asc,
+        nulls,
+        nullEmpty,
+        fieldPosition: colKey,
+      };
+    }
+
+    return {
+      key,
+      type: "query",
+      fieldQuery: colKey,
+      nulls,
+      nullEmpty,
+      asc,
+    };
+  });
 
   return result;
 };
@@ -160,7 +141,7 @@ const throwErr = (rawOrderBy: any) => {
 
 const parseOrderObj = (
   orderBy: any,
-  expectOne = false,
+  expectOne = false
 ): {
   key: string;
   asc: boolean;
@@ -170,10 +151,7 @@ const parseOrderObj = (
   if (!isObject(orderBy)) return throwErr(orderBy);
 
   const keys = Object.keys(orderBy);
-  if (
-    keys.length &&
-    keys.find((k) => ["key", "asc", "nulls", "nullEmpty"].includes(k))
-  ) {
+  if (keys.length && keys.find((k) => ["key", "asc", "nulls", "nullEmpty"].includes(k))) {
     const { key, asc, nulls, nullEmpty = false } = orderBy;
     if (
       !["string"].includes(typeof key) ||
@@ -203,9 +181,7 @@ const parseOrderObj = (
     return keys.map((key) => ({ key, asc: orderBy[key] === 1 }));
 
     /* { key2: "asc", key1: "desc" } */
-  } else if (
-    !Object.values(orderBy).find((v) => !["asc", "desc"].includes(<any>v))
-  ) {
+  } else if (!Object.values(orderBy).find((v) => !["asc", "desc"].includes(<any>v))) {
     return keys.map((key) => ({ key, asc: orderBy[key] === "asc" }));
   } else return throwErr(orderBy);
 };

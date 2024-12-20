@@ -2,8 +2,8 @@ import {
   AnyObject,
   AuthGuardLocation,
   AuthGuardLocationResponse,
-  CHANNELS,
   AuthSocketSchema,
+  CHANNELS,
 } from "prostgles-types";
 import { LocalParams, PRGLIOSocket } from "../DboBuilder/DboBuilder";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
@@ -11,7 +11,6 @@ import { removeExpressRoute } from "../FileManager/FileManager";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import {
   Auth,
-  AuthClientRequest,
   AuthResult,
   BasicSession,
   ExpressReq,
@@ -20,44 +19,29 @@ import {
   LoginParams,
   LoginResponse,
 } from "./AuthTypes";
-import { getSafeReturnURL } from "./getSafeReturnURL";
-import { setupAuthRoutes } from "./setupAuthRoutes";
 import { getProviders } from "./setAuthProviders";
+import { setupAuthRoutes } from "./setupAuthRoutes";
+import { getClientRequestIPsInfo } from "./utils/getClientRequestIPsInfo";
+import { getReturnUrl } from "./utils/getReturnUrl";
 
-export const HTTPCODES = {
-  AUTH_ERROR: 401,
+export const HTTP_FAIL_CODES = {
+  UNAUTHORIZED: 401,
   NOT_FOUND: 404,
   BAD_REQUEST: 400,
   INTERNAL_SERVER_ERROR: 500,
+  CONFLICT: 409,
+  TOO_MANY_REQUESTS: 429,
 } as const;
 
-export const getLoginClientInfo = <T extends AuthClientRequest>(req: T): T & LoginClientInfo => {
-  if (req.httpReq) {
-    const ip_address = req.httpReq.ip;
-    if (!ip_address) throw new Error("ip_address missing from req.httpReq");
-    const user_agent = req.httpReq.headers["user-agent"];
-    return {
-      ...req,
-      ip_address,
-      ip_address_remote: req.httpReq.connection.remoteAddress,
-      x_real_ip: req.httpReq.headers["x-real-ip"] as any,
-      user_agent,
-    };
-  } else {
-    return {
-      ...req,
-      ip_address: req.socket.handshake.address,
-      ip_address_remote: req.socket.request.connection.remoteAddress,
-      x_real_ip: req.socket.handshake.headers?.["x-real-ip"],
-      user_agent: req.socket.handshake.headers?.["user-agent"],
-    };
-  }
-};
+export const HTTP_SUCCESS_CODES = {
+  OK: 200,
+  CREATED: 201,
+} as const;
 
 export const AUTH_ROUTES_AND_PARAMS = {
   login: "/login",
   loginWithProvider: "/auth",
-  emailSignup: "/register",
+  emailRegistration: "/register",
   returnUrlParamName: "returnURL",
   sidKeyName: "session_id",
   logoutGetPath: "/logout",
@@ -70,25 +54,26 @@ export const AUTH_ROUTES_AND_PARAMS = {
 
 export class AuthHandler {
   protected prostgles: Prostgles;
-  protected opts?: Auth;
+  protected opts: Auth;
   dbo: DBHandlerServer;
   db: DB;
 
   constructor(prostgles: Prostgles) {
     this.prostgles = prostgles;
-    this.opts = prostgles.opts.auth as any;
-    if (!prostgles.dbo || !prostgles.db) throw "dbo or db missing";
+    if (!prostgles.opts.auth) throw new Error("prostgles.opts.auth missing");
+    this.opts = prostgles.opts.auth;
+    if (!prostgles.dbo || !prostgles.db) throw new Error("dbo or db missing");
     this.dbo = prostgles.dbo;
     this.db = prostgles.db;
   }
 
   get sidKeyName() {
-    return this.opts?.sidKeyName ?? AUTH_ROUTES_AND_PARAMS.sidKeyName;
+    return this.opts.sidKeyName ?? AUTH_ROUTES_AND_PARAMS.sidKeyName;
   }
 
   validateSid = (sid: string | undefined) => {
     if (!sid) return undefined;
-    if (typeof sid !== "string") throw "sid missing or not a string";
+    if (typeof sid !== "string") throw new Error("sid missing or not a string");
     return sid;
   };
 
@@ -105,7 +90,7 @@ export class AuthHandler {
   isUserRoute = (pathname: string) => {
     const { login, logoutGetPath, magicLinksRoute, loginWithProvider } = AUTH_ROUTES_AND_PARAMS;
     const pubRoutes = [
-      ...(this.opts?.expressConfig?.publicRoutes || []),
+      ...(this.opts.expressConfig?.publicRoutes || []),
       login,
       logoutGetPath,
       magicLinksRoute,
@@ -144,11 +129,11 @@ export class AuthHandler {
         //signed: true // Indicates if the cookie should be signed
         secure: true,
         sameSite: "strict" as const,
-        ...(this.opts?.expressConfig?.cookieOptions || {}),
+        ...(this.opts.expressConfig?.cookieOptions || {}),
       };
       const cookieData = sid;
       res.cookie(this.sidKeyName, cookieData, cookieOpts);
-      const successURL = this.getReturnUrl(req) || "/";
+      const successURL = getReturnUrl(req) || "/";
       res.redirect(successURL);
     } else {
       throw "no user or session";
@@ -156,10 +141,7 @@ export class AuthHandler {
   };
 
   getUser = async (clientReq: { httpReq: ExpressReq }): Promise<AuthResult> => {
-    if (!this.opts?.getUser) {
-      throw "this.opts.getUser missing";
-    }
-    const sid = clientReq.httpReq?.cookies?.[this.sidKeyName];
+    const sid = clientReq.httpReq.cookies?.[this.sidKeyName];
     if (!sid) return undefined;
 
     try {
@@ -168,7 +150,7 @@ export class AuthHandler {
           this.validateSid(sid),
           this.dbo as any,
           this.db,
-          getLoginClientInfo(clientReq)
+          getClientRequestIPsInfo(clientReq)
         );
       }, 50);
     } catch (err) {
@@ -179,25 +161,15 @@ export class AuthHandler {
 
   init = setupAuthRoutes.bind(this);
 
-  getReturnUrl = (req: ExpressReq) => {
-    const { returnUrlParamName } = AUTH_ROUTES_AND_PARAMS;
-    if (returnUrlParamName && req?.query?.[returnUrlParamName]) {
-      const returnURL = decodeURIComponent(req?.query?.[returnUrlParamName] as string);
-
-      return getSafeReturnURL(returnURL, returnUrlParamName);
-    }
-    return null;
-  };
-
   destroy = () => {
-    const app = this.opts?.expressConfig?.app;
+    const app = this.opts.expressConfig?.app;
     const {
       login,
       logoutGetPath,
       magicLinksExpressRoute,
       catchAll,
       loginWithProvider,
-      emailSignup,
+      emailRegistration: emailSignup,
       magicLinksRoute,
       confirmEmail,
       confirmEmailExpressRoute,
@@ -217,7 +189,7 @@ export class AuthHandler {
 
   throttledFunc = <T>(func: () => Promise<T>, throttle = 500): Promise<T> => {
     return new Promise(async (resolve, reject) => {
-      let result: any,
+      let result: T,
         error: any,
         finished = false;
 
@@ -248,30 +220,42 @@ export class AuthHandler {
     });
   };
 
-  loginThrottled = async (params: LoginParams, client: LoginClientInfo): Promise<LoginResponse> => {
-    if (!this.opts?.login) throw "Auth login config missing";
+  loginThrottledAndValidate = async (
+    params: LoginParams,
+    client: LoginClientInfo
+  ): Promise<LoginResponse> => {
+    if (!this.opts.login) throw "Auth login config missing";
     const { responseThrottle = 500 } = this.opts;
-
     return this.throttledFunc(async () => {
-      const result = await this.opts?.login?.(params, this.dbo as DBOFullyTyped, this.db, client);
-      const err = {
-        msg:
-          "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number } but got: " +
-          JSON.stringify(result),
-      };
+      const result = await this.opts.login?.(params, this.dbo as DBOFullyTyped, this.db, client);
 
-      if (!result) throw err;
-      if ("success" in result) throw result;
-      if (
-        (result && (typeof result.sid !== "string" || typeof result.expires !== "number")) ||
-        (!result && ![undefined, null].includes(result))
-      ) {
-        throw err;
+      const withServerError = (msg: string): LoginResponse => ({
+        response: {
+          success: false,
+          code: "something-went-wrong",
+          message: msg,
+        },
+      });
+      if (!result) {
+        return withServerError(
+          "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number }"
+        );
       }
-      if (result && result.expires < Date.now()) {
-        throw {
-          msg: "auth.login() is returning an expired session. Can only login with a session.expires greater than Date.now()",
-        };
+      if (result.session) {
+        const { sid, expires } = result.session;
+        if (!sid) {
+          return withServerError("Invalid sid");
+        }
+        if (sid && (typeof sid !== "string" || typeof expires !== "number")) {
+          return withServerError(
+            "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number }"
+          );
+        }
+        if (expires < Date.now()) {
+          return withServerError(
+            "auth.login() is returning an expired session. Can only login with a session.expires greater than Date.now()"
+          );
+        }
       }
 
       return result;
@@ -284,25 +268,22 @@ export class AuthHandler {
     loginParams: LoginParams
   ) => {
     const start = Date.now();
-    const loginResponse =
-      (await this.loginThrottled(loginParams, getLoginClientInfo({ httpReq: req }))) || {};
-    if ("success" in loginResponse) {
-      return res.status(HTTPCODES.AUTH_ERROR).json(loginResponse);
-    }
-    const { sid, expires } = loginResponse;
+    const loginResponse = await this.loginThrottledAndValidate(
+      loginParams,
+      getClientRequestIPsInfo({ httpReq: req })
+    );
     await this.prostgles.opts.onLog?.({
       type: "auth",
       command: "login",
+      success: !!loginResponse.session,
       duration: Date.now() - start,
-      sid,
+      sid: loginResponse.session?.sid,
       socketId: undefined,
     });
-
-    if (sid) {
-      this.setCookieAndGoToReturnURLIFSet({ sid, expires }, { req, res });
-    } else {
-      throw "Internal error: no user or session";
+    if (!loginResponse.session) {
+      return res.status(HTTP_FAIL_CODES.BAD_REQUEST).json(loginResponse.response);
     }
+    this.setCookieAndGoToReturnURLIFSet(loginResponse.session, { req, res });
   };
 
   /**
@@ -312,17 +293,15 @@ export class AuthHandler {
    *  query params
    * Based on sid names in auth
    */
-  getSID(localParams: LocalParams): string | undefined {
-    if (!this.opts) return undefined;
-
+  getSID(localParams: LocalParams | undefined): string | undefined {
     if (!localParams) return undefined;
     const { sidKeyName } = this;
     if (localParams.socket) {
       const { handshake } = localParams.socket;
-      const querySid = handshake?.auth?.[sidKeyName] || handshake?.query?.[sidKeyName];
+      const querySid = handshake.auth?.[sidKeyName] || handshake.query?.[sidKeyName];
       let rawSid = querySid;
       if (!rawSid) {
-        const cookie_str = localParams.socket?.handshake?.headers?.cookie;
+        const cookie_str = localParams.socket.handshake.headers?.cookie;
         const cookie = parseCookieStr(cookie_str);
         rawSid = cookie[sidKeyName];
       }
@@ -336,7 +315,7 @@ export class AuthHandler {
         }
         bearerSid = Buffer.from(base64Token, "base64").toString();
       }
-      return this.validateSid(bearerSid ?? localParams.httpReq?.cookies?.[sidKeyName]);
+      return this.validateSid(bearerSid ?? localParams.httpReq.cookies?.[sidKeyName]);
     } else throw "socket OR httpReq missing from localParams";
 
     function parseCookieStr(cookie_str: string | undefined): any {
@@ -367,50 +346,57 @@ export class AuthHandler {
     }
   };
 
-  async getClientInfo(localParams: Pick<LocalParams, "socket" | "httpReq">): Promise<AuthResult> {
-    if (!this.opts) return {};
-
+  /**
+   * For a given sid return the user data if available
+   */
+  async getClientInfo(
+    localParams: Pick<LocalParams, "socket" | "httpReq">
+  ): Promise<AuthResult<any>> {
+    /**
+     * Get cached session if available
+     */
     const getSession = this.opts.cacheSession?.getSession;
     const isSocket = "socket" in localParams;
-    if (isSocket) {
-      if (getSession && localParams.socket?.__prglCache) {
-        const { session, user, clientUser } = localParams.socket.__prglCache;
-        const isValid = this.isValidSocketSession(localParams.socket, session);
-        if (isValid) {
-          return {
-            sid: session.sid,
-            user,
-            clientUser,
-          };
-        } else
-          return {
-            sid: session.sid,
-          };
-      }
+    if (isSocket && getSession && localParams.socket?.__prglCache) {
+      const { session, user, clientUser } = localParams.socket.__prglCache;
+      const isValid = this.isValidSocketSession(localParams.socket, session);
+      if (isValid) {
+        return {
+          sid: session.sid,
+          user,
+          clientUser,
+        };
+      } else
+        return {
+          sid: session.sid,
+        };
     }
 
+    /**
+     * Get sid from request and fetch user data
+     */
     const authStart = Date.now();
-    const res = await this.throttledFunc(async () => {
-      const { getUser } = this.opts ?? {};
+    const clientInfo = await this.throttledFunc(async () => {
+      const { getUser } = this.opts;
 
-      if (getUser && localParams && (localParams.httpReq || localParams.socket)) {
+      if (localParams.httpReq || localParams.socket) {
         const sid = this.getSID(localParams);
         const clientReq =
           localParams.httpReq ? { httpReq: localParams.httpReq } : { socket: localParams.socket! };
         let user, clientUser;
         if (sid) {
-          const res = (await getUser(
+          const clientInfo = await getUser(
             sid,
             this.dbo as any,
             this.db,
-            getLoginClientInfo(clientReq)
-          )) as any;
-          user = res?.user;
-          clientUser = res?.clientUser;
+            getClientRequestIPsInfo(clientReq)
+          );
+          user = clientInfo?.user;
+          clientUser = clientInfo?.clientUser;
         }
         if (getSession && isSocket) {
           const session = await getSession(sid, this.dbo as any, this.db);
-          if (session?.expires && user && clientUser && localParams.socket) {
+          if (session && session.expires && user && clientUser && localParams.socket) {
             localParams.socket.__prglCache = {
               session,
               user,
@@ -430,23 +416,20 @@ export class AuthHandler {
       type: "auth",
       command: "getClientInfo",
       duration: Date.now() - authStart,
-      sid: res.sid,
+      sid: clientInfo.sid,
       socketId: localParams.socket?.id,
     });
-    return res;
+    return clientInfo;
   }
 
-  isValidSocketSession = (socket: PRGLIOSocket, session: BasicSession): boolean => {
+  isValidSocketSession = (socket: PRGLIOSocket, session: BasicSession | undefined): boolean => {
     const hasExpired = Boolean(session && session.expires <= Date.now());
-    if (
-      this.opts?.expressConfig?.publicRoutes &&
-      !this.opts.expressConfig?.disableSocketAuthGuard
-    ) {
+    if (this.opts.expressConfig?.publicRoutes && !this.opts.expressConfig.disableSocketAuthGuard) {
       const error = "Session has expired";
       if (hasExpired) {
-        if (session.onExpiration === "redirect")
+        if (session?.onExpiration === "redirect")
           socket.emit(CHANNELS.AUTHGUARD, {
-            shouldReload: session.onExpiration === "redirect",
+            shouldReload: true,
             error,
           });
         throw error;
@@ -459,10 +442,7 @@ export class AuthHandler {
     clientReq: Pick<LocalParams, "socket" | "httpReq">
   ): Promise<{ auth: AuthSocketSchema; userData: AuthResult }> => {
     let pathGuard = false;
-    if (
-      this.opts?.expressConfig?.publicRoutes &&
-      !this.opts.expressConfig?.disableSocketAuthGuard
-    ) {
+    if (this.opts.expressConfig?.publicRoutes && !this.opts.expressConfig.disableSocketAuthGuard) {
       pathGuard = true;
 
       if ("socket" in clientReq && clientReq.socket) {
@@ -478,7 +458,7 @@ export class AuthHandler {
           ) => {
             try {
               const { pathname, origin } =
-                typeof params === "string" ? JSON.parse(params) : params || {};
+                typeof params === "string" ? (JSON.parse(params) as AuthGuardLocation) : params;
               if (pathname && typeof pathname !== "string") {
                 console.warn("Invalid pathname provided for AuthGuardLocation: ", pathname);
               }
@@ -506,12 +486,12 @@ export class AuthHandler {
     }
 
     const userData = await this.getClientInfo(clientReq);
-    const { email } = this.opts?.expressConfig?.registrations ?? {};
+    const { email } = this.opts.expressConfig?.registrations ?? {};
     const auth: AuthSocketSchema = {
       providers: getProviders.bind(this)(),
       register: email && {
         type: email.signupType,
-        url: AUTH_ROUTES_AND_PARAMS.emailSignup,
+        url: AUTH_ROUTES_AND_PARAMS.emailRegistration,
       },
       user: userData?.clientUser,
       loginType: email?.signupType ?? "withPassword",

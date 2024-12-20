@@ -1,14 +1,9 @@
 import { AnyObject, getKeys, isObject } from "prostgles-types";
-import { LocalParams, Media } from "../DboBuilder";
-import {
-  TableRule,
-  ValidateRow,
-  ValidateRowBasic,
-} from "../../PublishParser/PublishParser";
+import { TableRule, ValidateRowBasic } from "../../PublishParser/PublishParser";
 import { omitKeys } from "../../PubSubManager/PubSubManager";
+import { LocalParams, Media } from "../DboBuilder";
 import { isFile, uploadFile } from "../uploadFile";
 import { TableHandler } from "./TableHandler";
-import { DBOFullyTyped } from "../../DBSchemaBuilder";
 
 type Args = {
   newData: AnyObject;
@@ -18,7 +13,7 @@ type Args = {
 };
 export const updateFile = async function (
   this: TableHandler,
-  { filter, newData, tableRules, localParams }: Args,
+  { filter, newData, tableRules, localParams }: Args
 ): Promise<{ newData: AnyObject }> {
   const rule = tableRules?.update;
 
@@ -28,31 +23,33 @@ export const updateFile = async function (
   if (localParams?.testRule) {
     return { newData: {} };
   }
-  const existingMediaId: string = !(
-    !filter ||
-    !isObject(filter) ||
-    getKeys(filter).join() !== "id" ||
-    typeof (filter as any).id !== "string"
-  )
-    ? (filter as any).id
+  const existingMediaId: string =
+    (
+      !(
+        !isObject(filter) ||
+        getKeys(filter).join() !== "id" ||
+        typeof (filter as any).id !== "string"
+      )
+    ) ?
+      (filter as any).id
     : undefined;
   if (!existingMediaId) {
     throw new Error(
-      `Updating the file table with file data can only be done by providing a single id filter. E.g. { id: "9ea4e23c-2b1a-4e33-8ec0-c15919bb45ec" } `,
+      `Updating the file table with file data can only be done by providing a single id filter. E.g. { id: "9ea4e23c-2b1a-4e33-8ec0-c15919bb45ec" } `
     );
   }
   if (!isFile(newData)) {
     throw new Error(
-      "Expecting { data: Buffer, name: string } but received " +
-        JSON.stringify(newData),
+      "Expecting { data: Buffer, name: string } but received " + JSON.stringify(newData)
     );
   }
 
   const fileManager = this.dboBuilder.prostgles.fileManager;
   if (!fileManager) throw new Error("fileManager missing");
   if (rule?.validate && !localParams) throw new Error("localParams missing");
-  const validate: ValidateRowBasic | undefined = rule?.validate
-    ? async (row) => {
+  const validate: ValidateRowBasic | undefined =
+    rule?.validate ?
+      async (row) => {
         return rule.validate!({
           update: row,
           filter,
@@ -63,7 +60,7 @@ export const updateFile = async function (
     : undefined;
 
   const existingFile: Media | undefined = await (
-    (localParams?.tx?.dbTX?.[this.name] as TableHandler) || this
+    (localParams?.tx?.dbTX[this.name] as TableHandler | undefined) || this
   ).findOne({ id: existingMediaId });
 
   if (!existingFile?.name) throw new Error("Existing file record not found");

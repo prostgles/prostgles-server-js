@@ -8,9 +8,7 @@ export const REALTIME_TRIGGER_CHECK_QUERY =
 
 export const tout = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
-export async function initPubSubManager(
-  this: PubSubManager,
-): Promise<PubSubManager | undefined> {
+export async function initPubSubManager(this: PubSubManager): Promise<PubSubManager | undefined> {
   if (!this.getIsDestroyed()) return undefined;
 
   const initQuery = await getPubSubManagerInitQuery.bind(this.dboBuilder)();
@@ -27,7 +25,6 @@ export async function initPubSubManager(
       /** Try to reduce race condition deadlocks due to multiple clients connecting at the same time */
       await tout(Math.random());
 
-      // await this.dboBuilder.runClientTransactionStatement(initQuery);// this.db.tx(t => t.any(initQuery));
       await this.db.tx((t) => t.any(initQuery));
       error = undefined;
       tries = 0;
@@ -52,20 +49,17 @@ export async function initPubSubManager(
     this.appInfoWasInserted = true;
     const check_frequency_ms = this.appCheckFrequencyMS;
     const watching_schema_tag_names =
-      this.dboBuilder.prostgles.schemaWatch?.type.watchType !== "NONE"
-        ? getWatchSchemaTagList(this.dboBuilder.prostgles.opts.watchSchema)
-        : null;
+      this.dboBuilder.prostgles.schemaWatch?.type.watchType !== "NONE" ?
+        getWatchSchemaTagList(this.dboBuilder.prostgles.opts.watchSchema)
+      : null;
     await this.db.one(
       "INSERT INTO prostgles.apps (id, check_frequency_ms, watching_schema_tag_names, application_name) \
       VALUES($1, $2, $3, current_setting('application_name')) \
       RETURNING *; ",
-      [this.appId, check_frequency_ms, watching_schema_tag_names],
+      [this.appId, check_frequency_ms, watching_schema_tag_names]
     );
 
-    const appRecord = await this.db.one(
-      "SELECT * FROM prostgles.apps WHERE id = $1",
-      [this.appId],
-    );
+    const appRecord = await this.db.one("SELECT * FROM prostgles.apps WHERE id = $1", [this.appId]);
     if (!appRecord || !appRecord.application_name?.includes(this.appId)) {
       throw `initPubSubManager error: App record with application_name containing appId (${this.appId}) not found`;
     }
@@ -79,7 +73,7 @@ export async function initPubSubManager(
   this.postgresNotifListenManager = new PostgresNotifListenManager(
     this.db,
     this.notifListener,
-    NOTIF_CHANNEL.getFull(this.appId),
+    NOTIF_CHANNEL.getFull(this.appId)
   );
 
   await this.initialiseEventTriggers();

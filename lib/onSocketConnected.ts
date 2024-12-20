@@ -36,11 +36,9 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
         });
       } catch (error) {
         const connectionError =
-          error instanceof Error
-            ? error.message
-            : typeof error === "string"
-              ? error
-              : JSON.stringify(error);
+          error instanceof Error ? error.message
+          : typeof error === "string" ? error
+          : JSON.stringify(error);
         socket.emit(CHANNELS.CONNECTION, { connectionError });
         socket.disconnect();
         return;
@@ -54,7 +52,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
         args: SocketRequestParams,
         cb = (..._callback: any[]) => {
           /* Empty */
-        },
+        }
       ) => {
         runClientRequest
           .bind(this)({ ...args, type: "socket", socket })
@@ -64,15 +62,13 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
           .catch((err) => {
             cb(err);
           });
-      },
+      }
     );
 
     socket.on("disconnect", () => {
       this.dbEventsManager?.removeNotice(socket);
       this.dbEventsManager?.removeNotify(undefined, socket);
-      this.connectedSockets = this.connectedSockets.filter(
-        (s) => s.id !== socket.id,
-      );
+      this.connectedSockets = this.connectedSockets.filter((s) => s.id !== socket.id);
       this.dboBuilder.queryStreamer.onDisconnect(socket.id);
       this.opts.onLog?.({
         type: "disconnect",
@@ -96,7 +92,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
         { method, params }: SocketMethodRequest,
         cb = (..._callback: any) => {
           /* Empty */
-        },
+        }
       ) => {
         runClientMethod
           .bind(this)({
@@ -111,7 +107,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
           .catch((err) => {
             makeSocketError(cb, err);
           });
-      },
+      }
     );
 
     this.pushSocketSchema(socket);

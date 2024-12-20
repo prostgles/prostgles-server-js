@@ -3,14 +3,14 @@ import { LocalParams, Media } from "./DboBuilder";
 import { ValidateRowBasic } from "../PublishParser/PublishParser";
 import { TableHandler } from "./TableHandler/TableHandler";
 
-export const isFile = (row: AnyObject) => {
+export const isFile = (row: any) => {
   return Boolean(
     row &&
       isObject(row) &&
       getKeys(row).sort().join() === ["name", "data"].sort().join() &&
       row.data &&
       (typeof row.data === "string" || Buffer.isBuffer(row.data)) &&
-      typeof row.name === "string",
+      typeof row.name === "string"
   );
 };
 
@@ -26,9 +26,9 @@ type UploadFileArgs = {
 
 export async function uploadFile(
   this: TableHandler,
-  { row, localParams, validate, mediaId }: UploadFileArgs,
+  { row, localParams, validate, mediaId }: UploadFileArgs
 ): Promise<Media> {
-  if (!this.dboBuilder.prostgles?.fileManager) throw "fileManager not set up";
+  if (!this.dboBuilder.prostgles.fileManager) throw "fileManager not set up";
 
   if (!isFile(row))
     throw (
@@ -39,26 +39,16 @@ export async function uploadFile(
     );
   const { data, name } = row;
 
-  const media_id =
-    mediaId ??
-    (await this.db.oneOrNone("SELECT gen_random_uuid() as name")).name;
+  const media_id = mediaId ?? (await this.db.oneOrNone("SELECT gen_random_uuid() as name")).name;
   const nestedInsert = localParams?.nestedInsert;
-  const type = await this.dboBuilder.prostgles.fileManager.getValidatedFileType(
-    {
-      file: data,
-      fileName: name,
-      tableName: nestedInsert?.previousTable,
-      colName: nestedInsert?.referencingColumn,
-    },
-  );
+  const type = await this.dboBuilder.prostgles.fileManager.getValidatedFileType({
+    file: data,
+    fileName: name,
+    tableName: nestedInsert?.previousTable,
+    colName: nestedInsert?.referencingColumn,
+  });
   const media_name = `${media_id}.${type.ext}`;
-  const parsedMediaKeys = [
-    "id",
-    "name",
-    "original_name",
-    "extension",
-    "content_type",
-  ] as const;
+  const parsedMediaKeys = ["id", "name", "original_name", "extension", "content_type"] as const;
   const media: Required<Pick<Media, (typeof parsedMediaKeys)[number]>> = {
     id: media_id,
     name: media_name,
@@ -80,21 +70,20 @@ export async function uploadFile(
     }
   }
 
-  const _media: Media =
-    await this.dboBuilder.prostgles.fileManager.uploadAsMedia({
-      item: {
-        data,
-        name: media.name ?? "????",
-        content_type: media.content_type as any,
-        extension: media.extension,
-      },
-      // imageCompression: {
-      //     inside: {
-      //         width: 1100,
-      //         height: 630
-      //     }
-      // }
-    });
+  const _media: Media = await this.dboBuilder.prostgles.fileManager.uploadAsMedia({
+    item: {
+      data,
+      name: media.name,
+      content_type: media.content_type as any,
+      extension: media.extension,
+    },
+    // imageCompression: {
+    //     inside: {
+    //         width: 1100,
+    //         height: 630
+    //     }
+    // }
+  });
 
   const mediaRow = {
     ...media,

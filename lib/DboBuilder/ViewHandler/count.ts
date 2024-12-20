@@ -22,7 +22,7 @@ export async function count(
   try {
     const result = await this.find(
       filter,
-      { select: selectParamsWithoutLimit?.select ?? "", limit: 0 },
+      { select: selectParamsWithoutLimit.select ?? "", limit: 0 },
       undefined,
       table_rules,
       localParams,

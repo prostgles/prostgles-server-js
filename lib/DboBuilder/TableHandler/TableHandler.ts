@@ -48,7 +48,7 @@ export class TableHandler extends ViewHandler {
     tableOrViewInfo: TableSchema,
     dboBuilder: DboBuilder,
     tx?: { t: pgPromise.ITask<{}>; dbTX: TableHandlers },
-    joinPaths?: JoinPaths,
+    joinPaths?: JoinPaths
   ) {
     super(db, tableOrViewInfo, dboBuilder, tx, joinPaths);
 
@@ -76,20 +76,14 @@ export class TableHandler extends ViewHandler {
     param2?: InsertParams,
     param3_unused?: undefined,
     tableRules?: TableRule,
-    _localParams?: LocalParams,
+    _localParams?: LocalParams
   ): Promise<any | any[] | boolean> {
-    return insert.bind(this)(
-      rowOrRows,
-      param2,
-      param3_unused,
-      tableRules,
-      _localParams,
-    );
+    return insert.bind(this)(rowOrRows, param2, param3_unused, tableRules, _localParams);
   }
 
   prepareReturning = async (
     returning: Select | undefined,
-    allowedFields: string[],
+    allowedFields: string[]
   ): Promise<SelectItem[]> => {
     const result: SelectItem[] = [];
     if (returning) {
@@ -98,9 +92,7 @@ export class TableHandler extends ViewHandler {
         allowedFields,
         allowedOrderByFields: allowedFields,
         computedFields: COMPUTED_FIELDS,
-        functions: FUNCTIONS.filter(
-          (f) => f.type === "function" && f.singleColArg,
-        ),
+        functions: FUNCTIONS.filter((f) => f.type === "function" && f.singleColArg),
         isView: this.is_view,
         columns: this.columns,
       });
@@ -122,15 +114,9 @@ export class TableHandler extends ViewHandler {
     params?: DeleteParams,
     param3_unused?: undefined,
     table_rules?: TableRule,
-    localParams?: LocalParams,
+    localParams?: LocalParams
   ): Promise<any> {
-    return _delete.bind(this)(
-      filter,
-      params,
-      param3_unused,
-      table_rules,
-      localParams,
-    );
+    return _delete.bind(this)(filter, params, param3_unused, table_rules, localParams);
   }
 
   remove(
@@ -138,7 +124,7 @@ export class TableHandler extends ViewHandler {
     params?: UpdateParams,
     param3_unused?: undefined,
     tableRules?: TableRule,
-    localParams?: LocalParams,
+    localParams?: LocalParams
   ) {
     return this.delete(filter, params, param3_unused, tableRules, localParams);
   }
@@ -151,7 +137,7 @@ export class TableHandler extends ViewHandler {
     params: { select?: FieldFilter },
     param3_unused: undefined,
     table_rules: TableRule,
-    localParams: LocalParams,
+    localParams: LocalParams
   ) {
     const start = Date.now();
     try {
@@ -159,50 +145,38 @@ export class TableHandler extends ViewHandler {
         throw "Cannot subscribe. PubSubManager not initiated";
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (!localParams) throw "Sync not allowed within the server code";
       const { socket } = localParams;
       if (!socket) throw "socket missing";
 
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (!table_rules || !table_rules.sync || !table_rules.select)
         throw "sync or select table rules missing";
 
       if (this.tx) throw "Sync not allowed within transactions";
 
       const ALLOWED_PARAMS = ["select"];
-      const invalidParams = Object.keys(params || {}).filter(
-        (k) => !ALLOWED_PARAMS.includes(k),
-      );
+      const invalidParams = Object.keys(params).filter((k) => !ALLOWED_PARAMS.includes(k));
       if (invalidParams.length)
-        throw (
-          "Invalid or dissallowed params found: " + invalidParams.join(", ")
-        );
+        throw "Invalid or dissallowed params found: " + invalidParams.join(", ");
 
       const { synced_field, allow_delete }: SyncRule = table_rules.sync;
 
       if (!table_rules.sync.id_fields.length || !synced_field) {
-        const err =
-          "INTERNAL ERROR: id_fields OR synced_field missing from publish";
+        const err = "INTERNAL ERROR: id_fields OR synced_field missing from publish";
         console.error(err);
         throw err;
       }
 
-      const id_fields = this.parseFieldFilter(
-        table_rules.sync.id_fields,
-        false,
-      );
+      const id_fields = this.parseFieldFilter(table_rules.sync.id_fields, false);
       const syncFields = [...id_fields, synced_field];
 
-      const allowedSelect = this.parseFieldFilter(
-        table_rules?.select.fields ?? false,
-      );
+      const allowedSelect = this.parseFieldFilter(table_rules.select.fields);
       if (syncFields.find((f) => !allowedSelect.includes(f))) {
         throw `INTERNAL ERROR: sync field missing from publish.${this.name}.select.fields`;
       }
-      const select = this.getAllowedSelectFields(
-        params?.select ?? "*",
-        allowedSelect,
-        false,
-      );
+      const select = this.getAllowedSelectFields(params.select ?? "*", allowedSelect, false);
       if (!select.length) throw "Empty select not allowed";
 
       /* Add sync fields if missing */
@@ -216,9 +190,9 @@ export class TableHandler extends ViewHandler {
         { select, limit: 0 },
         undefined,
         table_rules,
-        localParams,
+        localParams
       ).then(async (_isValid) => {
-        const { filterFields, forcedFilter } = table_rules?.select || {};
+        const { filterFields, forcedFilter } = table_rules.select || {};
         const condition = (
           await this.prepareWhere({
             select: undefined,

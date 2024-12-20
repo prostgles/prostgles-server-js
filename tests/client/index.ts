@@ -3,10 +3,7 @@ import io from "socket.io-client";
 
 import { AuthHandler } from "prostgles-client/dist/Auth";
 export { AuthHandler } from "prostgles-client/dist/Auth";
-import type {
-  DBHandlerClient,
-  MethodHandler,
-} from "prostgles-client/dist/prostgles";
+import type { DBHandlerClient, MethodHandler } from "prostgles-client/dist/prostgles";
 import { DBSchemaTable } from "prostgles-types";
 import { clientFileTests } from "../clientFileTests.spec";
 import { clientOnlyQueries } from "../clientOnlyQueries.spec";
@@ -18,13 +15,8 @@ export { DBHandlerClient } from "prostgles-client/dist/prostgles";
 
 const start = Date.now();
 const log = (msgOrObj: any, extra?: any) => {
-  const msg =
-    msgOrObj && typeof msgOrObj === "object"
-      ? JSON.stringify(msgOrObj)
-      : msgOrObj;
-  console.log(
-    ...[`(client) t+ ${Date.now() - start}ms ` + msg, extra].filter((v) => v),
-  );
+  const msg = msgOrObj && typeof msgOrObj === "object" ? JSON.stringify(msgOrObj) : msgOrObj;
+  console.log(...[`(client) t+ ${Date.now() - start}ms ` + msg, extra].filter((v) => v));
 };
 log("Started client...");
 
@@ -59,15 +51,15 @@ const tests: Record<string, ClientTestSpecV2> = {
     await useProstglesTest(db, getSocketOptions);
   },
   files: async ({ db, methods, tableSchema, auth }) => {
-    await clientFileTests(db, auth, log, methods, tableSchema);
+    await clientFileTests(db);
   },
   rest_api: async ({ db, methods, tableSchema, auth }) => {
     await clientRestApi(db, auth, log, methods, tableSchema, TEST_NAME);
   },
 };
 
-const test = tests[TEST_NAME];
-if (!test) {
+const testFileFunc = tests[TEST_NAME];
+if (!testFileFunc) {
   throw `Invalid TEST_NAME env var provided (${TEST_NAME}). Expecting one of: ${Object.keys(tests)}`;
 }
 
@@ -86,7 +78,7 @@ const stopTest = (args?: { err: any }) => {
       (cb) => {
         log("Stopping client...");
         if (err) console.trace(err);
-      },
+      }
     );
     setTimeout(() => {
       process.exit(err ? 1 : 0);
@@ -119,24 +111,18 @@ try {
             const onLog = (...args: any[]) => {
               socket.emit(
                 "log",
-                args
-                  .map((v) => (typeof v === "object" ? JSON.stringify(v) : v))
-                  .join(" "),
+                args.map((v) => (typeof v === "object" ? JSON.stringify(v) : v)).join(" ")
               );
             };
             //@ts-ignore
-            window.onerror = function myErrorHandler(
-              errorMsg,
-              url,
-              lineNumber,
-            ) {
+            window.onerror = function myErrorHandler(errorMsg, url, lineNumber) {
               console.error("Error occured: " + errorMsg);
               stopTest({ err: errorMsg });
               return false;
             };
             console.log = onLog;
           }
-          await test({ db, methods, tableSchema, auth, isReconnect });
+          await testFileFunc({ db, methods, tableSchema, auth, isReconnect });
 
           stopTest();
         } catch (err) {

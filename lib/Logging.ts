@@ -97,7 +97,7 @@ export namespace EventTypes {
   export type Auth = ClientInfo &
     DebugInfo & {
       type: "auth";
-    } & ({ command: "getClientInfo" } | { command: "login" });
+    } & ({ command: "getClientInfo" } | { command: "login"; success: boolean });
 
   export type Debug = DebugInfo &
     (

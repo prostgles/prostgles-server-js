@@ -1,10 +1,4 @@
-import {
-  AnyObject,
-  FieldFilter,
-  getKeys,
-  isDefined,
-  isObject,
-} from "prostgles-types/dist";
+import { AnyObject, FieldFilter, getKeys, isDefined, isObject } from "prostgles-types/dist";
 import { ViewHandler } from "./ViewHandler";
 import { ExistsFilterConfig, Filter, LocalParams } from "../DboBuilder";
 import { SelectItem } from "../QueryBuilder/QueryBuilder";
@@ -25,7 +19,7 @@ export type PrepareWhereParams = {
 
 export async function prepareWhere(
   this: ViewHandler,
-  params: PrepareWhereParams,
+  params: PrepareWhereParams
 ): Promise<{
   condition: string;
   where: string;
@@ -53,13 +47,10 @@ export async function prepareWhere(
   const parseFullFilter = async (
     f: any,
     parentFilter: any = null,
-    isForcedFilterBypass: boolean,
+    isForcedFilterBypass: boolean
   ): Promise<string> => {
     if (!f) throw "Invalid/missing group filter provided";
-    if (!isObject(f))
-      throw (
-        "\nInvalid filter\nExpecting an object but got -> " + JSON.stringify(f)
-      );
+    if (!isObject(f)) throw "\nInvalid filter\nExpecting an object but got -> " + JSON.stringify(f);
     let result = "";
     const keys = getKeys(f);
     if (!keys.length) {
@@ -73,20 +64,17 @@ export async function prepareWhere(
     }
 
     const { [$and_key]: $and, [$or_key]: $or } = f,
-      group: AnyObject[] = $and || $or;
+      group: AnyObject[] | undefined = $and || $or;
 
     if (group && group.length) {
       const operand = $and ? " AND " : " OR ";
       const conditions = (
         await Promise.all(
-          group.map(
-            async (gf) =>
-              await parseFullFilter(gf, group, isForcedFilterBypass),
-          ),
+          group.map(async (gf) => await parseFullFilter(gf, group, isForcedFilterBypass))
         )
       ).filter((c) => c);
 
-      if (conditions?.length) {
+      if (conditions.length) {
         if (conditions.length === 1) return conditions.join(operand);
         else return ` ( ${conditions.sort().join(operand)} ) `;
       }
@@ -95,9 +83,8 @@ export async function prepareWhere(
       const cond = await getCondition.bind(this)({
         filter: { ...f },
         select,
-        allowed_colnames: isForcedFilterBypass
-          ? this.column_names.slice(0)
-          : this.parseFieldFilter(filterFields),
+        allowed_colnames:
+          isForcedFilterBypass ? this.column_names.slice(0) : this.parseFieldFilter(filterFields),
         tableAlias,
         localParams: isForcedFilterBypass ? undefined : localParams,
         tableRules: isForcedFilterBypass ? undefined : tableRule,
@@ -110,14 +97,14 @@ export async function prepareWhere(
   };
 
   /* A forced filter condition will not check if the existsJoined filter tables have been published */
-  const forcedFilterCond = forcedFilter
-    ? await parseFullFilter(forcedFilter, null, true)
-    : undefined;
+  const forcedFilterCond =
+    forcedFilter ? await parseFullFilter(forcedFilter, null, true) : undefined;
   const filterCond = await parseFullFilter(filter, null, false);
   let cond = [forcedFilterCond, filterCond].filter((c) => c).join(" AND ");
 
-  const finalFilter = forcedFilter
-    ? {
+  const finalFilter =
+    forcedFilter ?
+      {
         [$and_key]: [forcedFilter, filter].filter(isDefined),
       }
     : { ...filter };

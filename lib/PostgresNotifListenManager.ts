@@ -26,14 +26,9 @@ export class PostgresNotifListenManager {
   static create = (
     db_pg: DB,
     notifListener: PrglNotifListener,
-    db_channel_name: string,
+    db_channel_name: string
   ): Promise<PostgresNotifListenManager> => {
-    const res = new PostgresNotifListenManager(
-      db_pg,
-      notifListener,
-      db_channel_name,
-      true,
-    );
+    const res = new PostgresNotifListenManager(db_pg, notifListener, db_channel_name, true);
     return res.init();
   };
 
@@ -41,9 +36,9 @@ export class PostgresNotifListenManager {
     db_pg: DB,
     notifListener: PrglNotifListener,
     db_channel_name: string,
-    noInit = false,
+    noInit = false
   ) {
-    if (!db_pg || !notifListener || !db_channel_name)
+    if (!db_channel_name)
       throw "PostgresNotifListenManager: db_pg OR notifListener OR db_channel_name MISSING";
     this.db_pg = db_pg;
     this.notifListener = notifListener;
@@ -64,14 +59,8 @@ export class PostgresNotifListenManager {
   }
 
   startListening() {
-    if (!this.db_pg || !this.notifListener)
-      throw "PostgresNotifListenManager: db_pg OR notifListener missing";
-
     return this.reconnect().catch((error) => {
-      console.log(
-        "PostgresNotifListenManager: Failed Initial Connection:",
-        error,
-      );
+      console.log("PostgresNotifListenManager: Failed Initial Connection:", error);
     });
   }
 
@@ -92,13 +81,7 @@ export class PostgresNotifListenManager {
     }
   };
 
-  reconnect(
-    delay: number | undefined = 0,
-    maxAttempts: number | undefined = 0,
-  ) {
-    if (!this.db_pg || !this.notifListener)
-      throw "db_pg OR notifListener missing";
-
+  reconnect(delay: number | undefined = 0, maxAttempts: number | undefined = 0) {
     if (this.destroyed) {
       return Promise.reject("Destroyed");
     }
@@ -109,7 +92,7 @@ export class PostgresNotifListenManager {
     const setListeners = (
         client: pg.IClient,
         notifListener: PrglNotifListener,
-        db_channel_name: string,
+        db_channel_name: string
       ) => {
         client.on("notification", notifListener);
         this.client = client;
@@ -117,13 +100,10 @@ export class PostgresNotifListenManager {
         return this.connection
           .none(
             `/* prostgles-server internal query used for subscriptions and schema hot reload */ \nLISTEN $1~`,
-            db_channel_name,
+            db_channel_name
           )
           .catch((error) => {
-            console.log(
-              "PostgresNotifListenManager: unexpected error: ",
-              error,
-            ); // unlikely to ever happen
+            console.log("PostgresNotifListenManager: unexpected error: ", error); // unlikely to ever happen
           });
       },
       removeListeners = (client: pg.IClient) => {
@@ -141,7 +121,7 @@ export class PostgresNotifListenManager {
           .catch(() => {
             // failed after 10 attempts
             console.log(
-              "PostgresNotifListenManager: Connection Lost Permanently. No more retryies",
+              "PostgresNotifListenManager: Connection Lost Permanently. No more retryies"
             );
             // process.exit(); // exiting the process
           });
@@ -154,11 +134,7 @@ export class PostgresNotifListenManager {
           .then((obj) => {
             this.connection = obj; // global connection is now available
             resolve(obj);
-            return setListeners(
-              obj.client,
-              this.notifListener,
-              this.db_channel_name,
-            );
+            return setListeners(obj.client, this.notifListener, this.db_channel_name);
           })
           .catch((error) => {
             /** Database was destroyed */

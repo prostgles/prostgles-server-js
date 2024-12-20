@@ -1,14 +1,6 @@
-import pgPromise, {
-  ParameterizedQuery as PQ,
-  ParameterizedQuery,
-} from "pg-promise";
+import pgPromise, { ParameterizedQuery as PQ, ParameterizedQuery } from "pg-promise";
 import pg from "pg-promise/typescript/pg-subset";
-import {
-  AnyObject,
-  SQLOptions,
-  SQLResult,
-  SQLResultInfo,
-} from "prostgles-types";
+import { AnyObject, SQLOptions, SQLResult, SQLResultInfo } from "prostgles-types";
 import { DB, Prostgles } from "../Prostgles";
 import { DboBuilder, LocalParams, pgp, postgresToTsType } from "./DboBuilder";
 
@@ -17,18 +9,16 @@ export async function runSQL(
   queryWithoutRLS: string,
   args: undefined | AnyObject | any[],
   options: SQLOptions | undefined,
-  localParams?: LocalParams,
+  localParams?: LocalParams
 ) {
   const queryWithRLS = queryWithoutRLS;
   if (
     queryWithRLS
-      ?.replace(/\s\s+/g, " ")
+      .replace(/\s\s+/g, " ")
       .toLowerCase()
       .includes("create extension pg_stat_statements")
   ) {
-    const { shared_preload_libraries } = await this.db.oneOrNone(
-      "SHOW shared_preload_libraries",
-    );
+    const { shared_preload_libraries } = await this.db.oneOrNone("SHOW shared_preload_libraries");
     if (!(shared_preload_libraries || "").includes("pg_stat_statements")) {
       throw (
         "This query will crash the server (pg_stat_statements must be loaded via shared_preload_libraries). Need to: \n ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements' \n" +
@@ -43,11 +33,7 @@ export async function runSQL(
     throw "Not allowed to run SQL";
   }
 
-  const {
-    returnType,
-    allowListen,
-    hasParams = true,
-  }: SQLOptions = options || ({} as SQLOptions);
+  const { returnType, allowListen, hasParams = true }: SQLOptions = options || ({} as SQLOptions);
   const { socket } = localParams || {};
 
   const db = localParams?.tx?.t || this.db;
@@ -71,16 +57,10 @@ export async function runSQL(
     }
   }
 
-  if (!db) {
-    throw "db is missing";
-  }
-
   let finalQuery: string | ParameterizedQuery = queryWithRLS + "";
   const isNotListenOrNotify =
     returnType === "arrayMode" &&
-    !["listen ", "notify "].find((c) =>
-      queryWithoutRLS.toLowerCase().trim().startsWith(c),
-    );
+    !["listen ", "notify "].find((c) => queryWithoutRLS.toLowerCase().trim().startsWith(c));
   if (isNotListenOrNotify) {
     finalQuery = new PQ({
       rowMode: "array",
@@ -92,16 +72,10 @@ export async function runSQL(
   let queryResult: pgPromise.IResultExt<AnyObject> | undefined;
 
   if (returnType === "default-with-rollback") {
-    const ROLLBACK = "Rollback";
-    await db
-      .tx(async (t) => {
-        queryResult = await t.result<AnyObject>(finalQuery, params);
-        /** Rollback */
-        return Promise.reject(new Error(ROLLBACK));
-      })
-      .catch((e) => {
-        if (!(e instanceof Error && e.message === ROLLBACK)) throw e;
-      });
+    await db.tx(async (t) => {
+      queryResult = await t.result<AnyObject>(finalQuery, params);
+      await t.none("ROLLBACK");
+    });
   } else {
     queryResult = await db.result<AnyObject>(finalQuery, params);
   }
@@ -112,7 +86,7 @@ export async function runSQL(
     queryWithoutRLS,
     queryResult,
     allowListen,
-    localParams,
+    localParams
   );
   if (listenHandlers) {
     return listenHandlers;
@@ -123,9 +97,9 @@ export async function runSQL(
   } else if (returnType === "row") {
     return rows[0];
   } else if (returnType === "value") {
-    return Object.values(rows?.[0] ?? {})?.[0];
+    return Object.values(rows[0] ?? {})[0];
   } else if (returnType === "values") {
-    return rows.map((r) => Object.values(r ?? {})[0]);
+    return rows.map((r) => Object.values(r)[0]);
   } else {
     const qres: SQLResult<typeof returnType> = {
       duration: 0,
@@ -141,7 +115,7 @@ const onSQLResult = async function (
   queryWithoutRLS: string,
   { command }: Omit<SQLResultInfo, "duration">,
   allowListen: boolean | undefined,
-  localParams?: LocalParams,
+  localParams?: LocalParams
 ) {
   this.prostgles.schemaWatch?.onSchemaChangeFallback?.({
     command,
@@ -152,13 +126,10 @@ const onSQLResult = async function (
     const { socket } = localParams || {};
     if (!allowListen)
       throw new Error(
-        `Your query contains a LISTEN command. Set { allowListen: true } to get subscription hooks. Or ignore this message`,
+        `Your query contains a LISTEN command. Set { allowListen: true } to get subscription hooks. Or ignore this message`
       );
     if (!socket) throw "Only allowed with client socket";
-    return await this.prostgles.dbEventsManager?.addNotify(
-      queryWithoutRLS,
-      socket,
-    );
+    return await this.prostgles.dbEventsManager?.addNotify(queryWithoutRLS, socket);
   }
 };
 
@@ -168,10 +139,8 @@ export async function cacheDBTypes(this: DboBuilder, force = false) {
     this.USER_TABLES = undefined;
     this.USER_TABLE_COLUMNS = undefined;
   }
-  this.DATA_TYPES ??=
-    (await this.db.any("SELECT oid, typname FROM pg_type")) ?? [];
-  this.USER_TABLES ??=
-    (await this.db.any(`
+  this.DATA_TYPES ??= await this.db.any("SELECT oid, typname FROM pg_type");
+  this.USER_TABLES ??= await this.db.any(`
     SELECT 
       relid, 
       relname, 
@@ -187,7 +156,7 @@ export async function cacheDBTypes(this: DboBuilder, force = false) {
     ) c
     ON t.relid = c.table_oid
     GROUP BY relid, relname, schemaname
-  `)) ?? [];
+  `);
   this.USER_TABLE_COLUMNS ??= await this.db.any(`
     SELECT t.relid, t.schemaname,t.relname, c.column_name, c.udt_name, c.ordinal_position
     FROM information_schema.columns c
@@ -197,35 +166,31 @@ export async function cacheDBTypes(this: DboBuilder, force = false) {
 }
 
 export function getDetailedFieldInfo(this: DboBuilder, fields: pg.IColumn[]) {
-  return (
-    fields?.map((f) => {
-      const dataType =
-          this.DATA_TYPES!.find((dt) => +dt.oid === +f.dataTypeID)?.typname ??
-          "text",
-        table = this.USER_TABLES!.find((t) => +t.relid === +f.tableID),
-        column = this.USER_TABLE_COLUMNS!.find(
-          (c) => +c.relid === +f.tableID && c.ordinal_position === f.columnID,
-        ),
-        tsDataType = postgresToTsType(dataType);
+  return fields.map((f) => {
+    const dataType = this.DATA_TYPES!.find((dt) => +dt.oid === +f.dataTypeID)?.typname ?? "text",
+      table = this.USER_TABLES!.find((t) => +t.relid === +f.tableID),
+      column = this.USER_TABLE_COLUMNS!.find(
+        (c) => +c.relid === +f.tableID && c.ordinal_position === f.columnID
+      ),
+      tsDataType = postgresToTsType(dataType);
 
-      return {
-        ...f,
-        tsDataType,
-        dataType,
-        udt_name: dataType,
-        tableName: table?.relname,
-        tableSchema: table?.schemaname,
-        columnName: column?.column_name,
-      };
-    }) ?? []
-  );
+    return {
+      ...f,
+      tsDataType,
+      dataType,
+      udt_name: dataType,
+      tableName: table?.relname,
+      tableSchema: table?.schemaname,
+      columnName: column?.column_name,
+    };
+  });
 }
 
 export const canRunSQL = async (
   prostgles: Prostgles,
-  localParams?: LocalParams,
+  localParams?: LocalParams
 ): Promise<boolean> => {
-  if (!localParams?.socket || !localParams?.httpReq) return true;
+  if (!localParams?.socket || !localParams.httpReq) return true;
 
   const { socket } = localParams;
   const publishParams = await prostgles.publishParser!.getPublishParams({
@@ -239,5 +204,5 @@ export const canRunSQL = async (
 export const canCreateTables = async (db: DB): Promise<boolean> => {
   return db
     .any(`SELECT has_database_privilege(current_database(), 'create') as yes`)
-    .then((rows) => rows?.[0].yes === true);
+    .then((rows) => rows[0].yes === true);
 };

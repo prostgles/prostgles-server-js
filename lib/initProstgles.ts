@@ -250,7 +250,7 @@ export const initProstgles = async function (
           }
         }
         this.fileManager?.destroy();
-        this.dboBuilder?.destroy();
+        this.dboBuilder.destroy();
         this.authHandler?.destroy();
         await this.tableConfigurator?.destroy();
         this.dbo = undefined;

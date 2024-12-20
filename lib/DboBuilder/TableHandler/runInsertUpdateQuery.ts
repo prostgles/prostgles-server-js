@@ -1,16 +1,6 @@
-import {
-  AnyObject,
-  asName,
-  FieldFilter,
-  InsertParams,
-  UpdateParams,
-} from "prostgles-types";
+import { AnyObject, asName, FieldFilter, InsertParams, UpdateParams } from "prostgles-types";
 import { InsertRule, UpdateRule } from "../../PublishParser/PublishParser";
-import {
-  getClientErrorFromPGError,
-  LocalParams,
-  withUserRLS,
-} from "../DboBuilder";
+import { getClientErrorFromPGError, LocalParams, withUserRLS } from "../DboBuilder";
 import { getSelectItemQuery, TableHandler } from "./TableHandler";
 
 type RunInsertUpdateQueryArgs = {
@@ -52,7 +42,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
 
   const returningSelectItems = await tableHandler.prepareReturning(
     params?.returning,
-    tableHandler.parseFieldFilter(returningFields),
+    tableHandler.parseFieldFilter(returningFields)
   );
   const { checkFilter, postValidate } = rule ?? {};
   let checkCondition = "WHERE FALSE";
@@ -122,7 +112,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
         localParams,
         view: tableHandler,
         allowedKeys: allowedFieldKeys,
-      }),
+      })
     );
   } else {
     result = await tableHandler.db
@@ -133,26 +123,25 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
           localParams,
           view: tableHandler,
           allowedKeys: allowedFieldKeys,
-        }),
+        })
       );
   }
 
   if (checkFilter && result.failed_check?.length) {
     throw new Error(
-      `Insert ${name} records failed the check condition: ${JSON.stringify(checkFilter, null, 2)}`,
+      `Insert ${name} records failed the check condition: ${JSON.stringify(checkFilter, null, 2)}`
     );
   }
 
   const finalDBtx = tableHandler.getFinalDBtx(localParams);
   if (postValidate) {
     if (!finalDBtx) throw new Error("Unexpected: no dbTX for postValidate");
-    if (!localParams)
-      throw new Error("Unexpected: no localParams for postValidate");
+    if (!localParams) throw new Error("Unexpected: no localParams for postValidate");
 
     const rows = result.modified ?? [];
     for await (const row of rows) {
       await postValidate({
-        row: row ?? {},
+        row: row,
         dbx: finalDBtx as any,
         localParams,
       });

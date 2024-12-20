@@ -27,7 +27,7 @@ export async function getCondition(
     localParams?: LocalParams;
     tableRules?: TableRule;
     isHaving?: boolean;
-  },
+  }
 ): Promise<{ exists: ExistsFilterConfig[]; condition: string }> {
   const {
     filter: rawFilter,
@@ -51,15 +51,9 @@ export async function getCondition(
     if (!Array.isArray(funcArgs)) {
       throw `A function filter must contain an array. E.g: { $funcFilterName: ["col1"] } \n but got: ${JSON.stringify(pickKeys(filter, [f.name]))} `;
     }
-    const fields = this.parseFieldFilter(
-      f.getFields(funcArgs),
-      true,
-      allowed_colnames,
-    );
+    const fields = this.parseFieldFilter(f.getFields(funcArgs), true, allowed_colnames);
 
-    const dissallowedCols = fields.filter(
-      (fname) => !allowed_colnames.includes(fname),
-    );
+    const dissallowedCols = fields.filter((fname) => !allowed_colnames.includes(fname));
     if (dissallowedCols.length) {
       throw `Invalid/disallowed columns found in function filter: ${dissallowedCols}`;
     }
@@ -69,7 +63,7 @@ export async function getCondition(
         allColumns: this.columns,
         allowedFields: allowed_colnames,
         tableAlias,
-      }),
+      })
     );
   });
 
@@ -78,9 +72,8 @@ export async function getCondition(
     existsCond = (
       await Promise.all(
         existsConfigs.map(
-          async (existsConfig) =>
-            await getExistsCondition.bind(this)(existsConfig, localParams),
-        ),
+          async (existsConfig) => await getExistsCondition.bind(this)(existsConfig, localParams)
+        )
       )
     ).join(" AND ");
   }
@@ -92,6 +85,7 @@ export async function getCondition(
   Object.keys(filter || {}).map((key) => {
     const compCol = computedFields.find((cf) => cf.name === key);
     if (compCol) {
+      if (!p.select) throw new Error("Computed column filter requires p.select.fields");
       computedColConditions.push(
         compCol.getQuery({
           tableAlias,
@@ -102,7 +96,7 @@ export async function getCondition(
           // ctidField: this.is_view? undefined : "ctid"
 
           ctidField: undefined,
-        }) + ` = ${pgp.as.format("$1", [(filter as any)[key]])}`,
+        }) + ` = ${pgp.as.format("$1", [(filter as any)[key]])}`
       );
       delete (filter as any)[key];
     }
@@ -129,9 +123,7 @@ export async function getCondition(
   /* Add remaining allowed fields */
   const remainingNonSelectedColumns: SelectItem[] = p.allColumns
     .filter(
-      (c) =>
-        allowed_colnames.includes(c.name) &&
-        !allowedSelect.find((s) => s.alias === c.name),
+      (c) => allowed_colnames.includes(c.name) && !allowedSelect.find((s) => s.alias === c.name)
     )
     .map((f) => ({
       type: f.type,
@@ -146,9 +138,7 @@ export async function getCondition(
       selected: false,
       getFields: () => [f.name],
       column_udt_type:
-        f.type === "column"
-          ? this.columns.find((c) => c.name === f.name)?.udt_name
-          : undefined,
+        f.type === "column" ? this.columns.find((c) => c.name === f.name)?.udt_name : undefined,
     }));
   allowedSelect = allowedSelect.concat(remainingNonSelectedColumns);
   const complexFilters: string[] = [];
@@ -174,7 +164,7 @@ export async function getCondition(
       k !== complexFilterKey &&
       !funcFilter.find((ek) => ek.name === k) &&
       !computedFields.find((cf) => cf.name === k) &&
-      !existsConfigs.find((ek) => ek.existType === k),
+      !existsConfigs.find((ek) => ek.existType === k)
   );
 
   const validFieldNames = allowedSelect.map((s) => s.alias);
@@ -184,9 +174,8 @@ export async function getCondition(
         (c) =>
           c === fName ||
           (fName.startsWith(c) &&
-            (fName.slice(c.length).includes("->") ||
-              fName.slice(c.length).includes("."))),
-      ),
+            (fName.slice(c.length).includes("->") || fName.slice(c.length).includes(".")))
+      )
   );
 
   if (invalidColumn) {
@@ -195,7 +184,7 @@ export async function getCondition(
     if (selItem?.type === "aggregation") {
       if (!params.isHaving) {
         throw new Error(
-          `Filtering by ${invalidColumn} is not allowed. Aggregations cannot be filtered. Use HAVING clause instead.`,
+          `Filtering by ${invalidColumn} is not allowed. Aggregations cannot be filtered. Use HAVING clause instead.`
         );
       } else {
         isComplexFilter = true;
@@ -220,11 +209,10 @@ export async function getCondition(
     filter: f,
     tableAlias,
     select: allowedSelect,
-    allowedColumnNames: !tableRules
-      ? this.column_names.slice(0)
-      : this.parseFieldFilter(
-          tableRules.select?.filterFields ?? tableRules.select?.fields,
-        ),
+    allowedColumnNames:
+      !tableRules ?
+        this.column_names.slice(0)
+      : this.parseFieldFilter(tableRules.select?.filterFields ?? tableRules.select?.fields),
   });
 
   let templates: string[] = [q].filter((q) => q);

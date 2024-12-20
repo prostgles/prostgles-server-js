@@ -120,7 +120,7 @@ export async function getFileTableRules(
       : {
           forcedFilter: {
             $or: forcedFilters.concat(
-              rule?.forcedFilter ? [rule?.forcedFilter] : [],
+              rule?.forcedFilter ? [rule.forcedFilter] : [],
             ),
           },
         };

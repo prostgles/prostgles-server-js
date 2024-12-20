@@ -18,12 +18,7 @@ import { isPlainObject, postgresToTsType, SortItem } from "../DboBuilder";
 
 import { ParsedJoinPath } from "../ViewHandler/parseJoinPath";
 import { ViewHandler } from "../ViewHandler/ViewHandler";
-import {
-  COMPUTED_FIELDS,
-  FieldSpec,
-  FunctionSpec,
-  parseFunction,
-} from "./Functions";
+import { COMPUTED_FIELDS, FieldSpec, FunctionSpec, parseFunction } from "./Functions";
 
 export type SelectItem = {
   getFields: (args?: any[]) => string[] | "*";
@@ -81,9 +76,7 @@ export const asNameAlias = (field: string, tableAlias?: string) => {
   return result;
 };
 
-export const parseFunctionObject = (
-  funcData: any,
-): { funcName: string; args: any[] } => {
+export const parseFunctionObject = (funcData: any): { funcName: string; args: any[] } => {
   const makeErr = (msg: string) =>
     `Function not specified correctly. Expecting { $funcName: ["columnName" | <value>, ...args] } object but got: ${JSON.stringify(funcData)} \n ${msg}`;
   if (!isObject(funcData)) throw makeErr("");
@@ -127,7 +120,7 @@ export class SelectItemBuilder {
     this.functions = params.functions;
     this.columns = params.columns;
     this.allowedFieldsIncludingComputed = this.allowedFields.concat(
-      this.computedFields ? this.computedFields.map((cf) => cf.name) : [],
+      this.computedFields.map((cf) => cf.name)
     );
     if (!this.allowedFields.length) {
       if (!this.columns.length) {
@@ -138,7 +131,7 @@ export class SelectItemBuilder {
 
     /* Check for conflicting computed column names */
     const conflictingCol = this.allFields.find((fieldName) =>
-      this.computedFields.find((cf) => cf.name === fieldName),
+      this.computedFields.find((cf) => cf.name === fieldName)
     );
     if (conflictingCol) {
       throw (
@@ -157,15 +150,10 @@ export class SelectItemBuilder {
     ];
 
     /** Not selected items can be part of the orderBy fields */
-    const allowedFields = isSelected
-      ? allowedSelectedFields
-      : allowedNonSelectedFields;
+    const allowedFields = isSelected ? allowedSelectedFields : allowedNonSelectedFields;
     if (!allowedFields.includes(f)) {
       throw (
-        "Field " +
-        f +
-        " is invalid or dissallowed. \nAllowed fields: " +
-        allowedFields.join(", ")
+        "Field " + f + " is invalid or dissallowed. \nAllowed fields: " + allowedFields.join(", ")
       );
     }
     return f;
@@ -183,11 +171,7 @@ export class SelectItemBuilder {
     this.select.push({ ...item, fields });
   };
 
-  private addFunction = (
-    func: FunctionSpec | string,
-    args: any[],
-    alias: string,
-  ) => {
+  private addFunction = (func: FunctionSpec | string, args: any[], alias: string) => {
     const funcDef = parseFunction({
       func,
       args,
@@ -248,11 +232,7 @@ export class SelectItemBuilder {
 
   parseUserSelect = async (
     userSelect: Select,
-    joinParse?: (
-      key: string,
-      val: JoinSelect,
-      throwErr: (msg: string) => any,
-    ) => any,
+    joinParse?: (key: string, val: JoinSelect, throwErr: (msg: string) => any) => any
   ) => {
     /* [col1, col2, col3] */
     if (Array.isArray(userSelect)) {
@@ -286,12 +266,7 @@ export class SelectItemBuilder {
             const val: any = userSelect[key as keyof typeof userSelect],
               throwErr = (extraErr = "") => {
                 console.trace(extraErr);
-                throw (
-                  "Unexpected select -> " +
-                  JSON.stringify({ [key]: val }) +
-                  "\n" +
-                  extraErr
-                );
+                throw "Unexpected select -> " + JSON.stringify({ [key]: val }) + "\n" + extraErr;
               };
 
             /* Included fields */
@@ -320,7 +295,7 @@ export class SelectItemBuilder {
                     this.checkField(key, true);
                   } catch (err) {
                     throwErr(
-                      ` Shorthand function notation error: the specifield column ( ${key} ) is invalid or dissallowed. \n Use correct column name or full aliased function notation, e.g.: -> { alias: { $func_name: ["column_name"] } } `,
+                      ` Shorthand function notation error: the specifield column ( ${key} ) is invalid or dissallowed. \n Use correct column name or full aliased function notation, e.g.: -> { alias: { $func_name: ["column_name"] } } `
                     );
                   }
                   funcName = val;
@@ -341,7 +316,7 @@ export class SelectItemBuilder {
                 await joinParse(key, val as JoinSelect, throwErr);
               }
             } else throwErr();
-          }),
+          })
         );
       }
     } else throw "Unexpected select -> " + JSON.stringify(userSelect);
