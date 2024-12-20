@@ -1,4 +1,4 @@
-import { RequestHandler, Response, Request } from "express";
+import { Request, Response } from "express";
 import { AuthResponse } from "prostgles-types";
 import { AUTH_ROUTES_AND_PARAMS, HTTP_FAIL_CODES } from "../AuthHandler";
 import type { AuthRegistrationConfig } from "../AuthTypes";
@@ -42,7 +42,7 @@ export const getRegisterRequestHandler = ({
     try {
       const { httpReq, ...clientInfo } = getClientRequestIPsInfo({ httpReq: req });
       const { smtp } = emailAuthConfig;
-      const registrationResult =
+      const errCodeOrResult =
         emailAuthConfig.signupType === "withPassword" ?
           await emailAuthConfig.onRegister({
             email: username,
@@ -57,6 +57,11 @@ export const getRegisterRequestHandler = ({
             clientInfo,
             req: httpReq,
           });
+
+      const registrationResult =
+        typeof errCodeOrResult === "string" ?
+          { email: undefined, response: { success: false as const, code: errCodeOrResult } }
+        : errCodeOrResult;
       if (!registrationResult.email) {
         return sendResponse(registrationResult.response);
       }

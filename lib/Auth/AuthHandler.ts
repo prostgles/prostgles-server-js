@@ -24,6 +24,7 @@ import { setupAuthRoutes } from "./setupAuthRoutes";
 import { getClientRequestIPsInfo } from "./utils/getClientRequestIPsInfo";
 import { getReturnUrl } from "./utils/getReturnUrl";
 
+export { getClientRequestIPsInfo };
 export const HTTP_FAIL_CODES = {
   UNAUTHORIZED: 401,
   NOT_FOUND: 404,
@@ -229,33 +230,27 @@ export class AuthHandler {
     return this.throttledFunc(async () => {
       const result = await this.opts.login?.(params, this.dbo as DBOFullyTyped, this.db, client);
 
-      const withServerError = (msg: string): LoginResponse => ({
-        response: {
-          success: false,
-          code: "something-went-wrong",
-          message: msg,
-        },
-      });
       if (!result) {
-        return withServerError(
-          "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number }"
-        );
+        return "server-error";
       }
-      if (result.session) {
-        const { sid, expires } = result.session;
-        if (!sid) {
-          return withServerError("Invalid sid");
-        }
-        if (sid && (typeof sid !== "string" || typeof expires !== "number")) {
-          return withServerError(
-            "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number }"
-          );
-        }
-        if (expires < Date.now()) {
-          return withServerError(
-            "auth.login() is returning an expired session. Can only login with a session.expires greater than Date.now()"
-          );
-        }
+      if (typeof result === "string") return result;
+
+      const { sid, expires } = result.session;
+      if (!sid) {
+        // return withServerError("Invalid sid");
+        return "server-error";
+      }
+      if (sid && (typeof sid !== "string" || typeof expires !== "number")) {
+        // return withServerError(
+        //   "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number }"
+        // );
+        return "server-error";
+      }
+      if (expires < Date.now()) {
+        // return withServerError(
+        //   "auth.login() is returning an expired session. Can only login with a session.expires greater than Date.now()"
+        // );
+        return "server-error";
       }
 
       return result;
@@ -268,10 +263,14 @@ export class AuthHandler {
     loginParams: LoginParams
   ) => {
     const start = Date.now();
-    const loginResponse = await this.loginThrottledAndValidate(
+    const errCodeOrSession = await this.loginThrottledAndValidate(
       loginParams,
       getClientRequestIPsInfo({ httpReq: req })
     );
+    const loginResponse =
+      typeof errCodeOrSession === "string" ?
+        { session: undefined, response: { success: false, code: errCodeOrSession } }
+      : errCodeOrSession;
     await this.prostgles.opts.onLog?.({
       type: "auth",
       command: "login",

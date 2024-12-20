@@ -194,9 +194,9 @@ prostgles<DBGeneratedSchema>({
 
     Name of the cookie or socket hadnshake query param that represents the session id.
     Defaults to "session_id"
-  - **responseThrottle** <span style="color: grey">optional</span> <span style="color: green;">number</span>
+  - **getUser** <span style="color: red">required</span> <span style="color: green;">(sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: AuthClientRequest & LoginClientInfo) =&gt; Awaitable&lt;AuthResult&lt;...&gt;&gt;</span>
 
-    Response time rounding in milliseconds to prevent timing attacks on login. Login response time should always be a multiple of this value. Defaults to 500 milliseconds
+    undefined sid is allowed to enable public users
   - **expressConfig** <span style="color: grey">optional</span> <span style="color: green;">ExpressConfig</span>
 
     Will setup auth routes
@@ -220,23 +220,24 @@ prostgles<DBGeneratedSchema>({
 
       Will attach a app.use listener and will expose getUser
       Used in UI for blocking access
-    - **onGetRequestOK** <span style="color: grey">optional</span> <span style="color: green;">((req: ExpressReq, res: ExpressRes, params: AuthRequestParams&lt;S, SUser&gt;) =&gt; any) | undefined</span>
+    - **onGetRequestOK** <span style="color: grey">optional</span> <span style="color: green;">((req: ExpressReq, res: ExpressRes, params: AuthRequestParams&lt;S, SUser&gt;) =&gt; Awaitable&lt;void&gt;) | undefined</span>
 
       Will be called after a GET request is authorised
       This means that
-    - **magicLinks** <span style="color: grey">optional</span> <span style="color: green;">{ check: (magicId: string, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: LoginClientInfo) =&gt; Awaitable&lt;BasicSession | undefined&gt;; } | undefined</span>
+    - **onMagicLink** <span style="color: grey">optional</span> <span style="color: green;">((magicId: string, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: LoginClientInfo) =&gt; Awaitable&lt;{ session: BasicSession; response?: AuthSuccess | undefined; } | { ...; }&gt;) | undefined</span>
 
-      If defined, will check the magic link id and log in the user and redirect to the returnUrl if set
+      If defined, will enable GET /magic-link/:id route.
+      Requests with valid magic link ids will be logged in and redirected to the returnUrl if set
     - **registrations** <span style="color: grey">optional</span> <span style="color: green;">AuthRegistrationConfig&lt;S&gt; | undefined</span>
-  - **getUser** <span style="color: red">required</span> <span style="color: green;">(sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: AuthClientRequest & LoginClientInfo) =&gt; Awaitable&lt;AuthResult&lt;...&gt;&gt;</span>
-
-    undefined sid is allowed to enable public users
   - **login** <span style="color: grey">optional</span> <span style="color: green;">(params: LoginParams, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: LoginClientInfo) =&gt; Awaitable&lt;LoginResponse&gt;</span>
   - **logout** <span style="color: grey">optional</span> <span style="color: green;">(sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; any</span>
-  - **cacheSession** <span style="color: grey">optional</span> <span style="color: green;">{ getSession: (sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; Awaitable&lt;BasicSession&gt;; }</span>
+  - **responseThrottle** <span style="color: grey">optional</span> <span style="color: green;">number</span>
+
+    Response time rounding in milliseconds to prevent timing attacks on login. Login response time should always be a multiple of this value. Defaults to 500 milliseconds
+  - **cacheSession** <span style="color: grey">optional</span> <span style="color: green;">{ getSession: (sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; Awaitable&lt;BasicSession | undefined&gt;; }</span>
 
     If provided then session info will be saved on socket.__prglCache and reused from there
-    - **getSession** <span style="color: red">required</span> <span style="color: green;">(sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; Awaitable&lt;BasicSession&gt;</span>
+    - **getSession** <span style="color: red">required</span> <span style="color: green;">(sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; Awaitable&lt;BasicSession | undefined&gt;</span>
 
 - **DEBUG_MODE** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
 

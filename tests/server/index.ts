@@ -181,7 +181,7 @@ function dd() {
         const { username, password } = loginData;
         const u = users.find((u) => u.username === username && u.password === password);
         if (!u) {
-          return { response: { success: false, code: "no-match" } };
+          return "no-match";
         }
         let s = sessions.find((s) => s.user_id === u.id);
         if (!s) {

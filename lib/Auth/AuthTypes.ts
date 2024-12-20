@@ -18,6 +18,7 @@ import {
   AuthResponse,
   UserLike,
   AuthRequest,
+  AuthFailure,
 } from "prostgles-types";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
@@ -97,11 +98,11 @@ export type Email = {
 type EmailWithoutTo = Omit<Email, "to">;
 
 type MagicLinkAuthResponse =
-  | { response: AuthResponse.MagicLinkAuthFailure; email?: undefined }
+  | AuthResponse.MagicLinkAuthFailure["code"]
   | { response: AuthResponse.MagicLinkAuthSuccess; email: EmailWithoutTo };
 
 type PasswordRegisterResponse =
-  | { response: AuthResponse.PasswordRegisterFailure; email?: undefined }
+  | AuthResponse.PasswordRegisterFailure["code"]
   | { response: AuthResponse.PasswordRegisterSuccess; email: EmailWithoutTo };
 
 export type EmailProvider =
@@ -144,7 +145,7 @@ export type EmailProvider =
         confirmationCode: string;
         clientInfo: LoginClientInfo;
         req: ExpressReq;
-      }) => void | Promise<void>;
+      }) => Awaitable<AuthFailure["code"] | AuthResponse.AuthSuccess>;
     };
 
 export type AuthProviderUserData =
@@ -308,10 +309,8 @@ export type LoginResponse =
       session: BasicSession;
       response?: AuthResponse.PasswordLoginSuccess | AuthResponse.MagicLinkAuthSuccess;
     }
-  | {
-      session?: undefined;
-      response: AuthResponse.PasswordLoginFailure | AuthResponse.MagicLinkAuthFailure;
-    };
+  | AuthResponse.PasswordLoginFailure["code"]
+  | AuthResponse.MagicLinkAuthFailure["code"];
 
 export type LoginParams =
   | ({ type: "username" } & AuthRequest.LoginData)
