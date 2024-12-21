@@ -139,7 +139,7 @@ prostgles<DBGeneratedSchema>({
   Data access rules applied to clients.
   By default, nothing is allowed.
 
-- **publishRawSQL** <span style="color: grey">optional</span> <span style="color: green;">(params: PublishParams&lt;S, SUser&gt;) =&gt; boolean | "*" | Promise&lt;boolean | "*"&gt;</span>
+- **publishRawSQL** <span style="color: grey">optional</span> <span style="color: green;">(params: PublishParams&lt;S, SUser&gt;) =&gt; Awaitable&lt;boolean | "*"&gt;</span>
 
   If defined and resolves to true then the connected client can run SQL queries
 
@@ -194,7 +194,7 @@ prostgles<DBGeneratedSchema>({
 
     Name of the cookie or socket hadnshake query param that represents the session id.
     Defaults to "session_id"
-  - **getUser** <span style="color: red">required</span> <span style="color: green;">(sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: AuthClientRequest & LoginClientInfo) =&gt; Awaitable&lt;AuthResult&lt;...&gt;&gt;</span>
+  - **getUser** <span style="color: red">required</span> <span style="color: green;">(sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: AuthClientRequest & LoginClientInfo) =&gt; Awaitable&lt;AuthResultOrError&lt;...&gt;&gt;</span>
 
     undefined sid is allowed to enable public users
   - **expressConfig** <span style="color: grey">optional</span> <span style="color: green;">ExpressConfig</span>

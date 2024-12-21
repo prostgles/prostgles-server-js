@@ -15,6 +15,7 @@ import {
   AuthClientRequest,
   AuthResult,
   AuthResultOrError,
+  AuthResultWithSID,
   BasicSession,
   ExpressReq,
   ExpressRes,
@@ -145,7 +146,7 @@ export class AuthHandler {
     }
   };
 
-  getUserAndHandleError = async (localParams: AuthClientRequest): Promise<AuthResult> => {
+  getUserAndHandleError = async (localParams: AuthClientRequest): Promise<AuthResultWithSID> => {
     const sid = this.getSID(localParams);
     if (!sid) return undefined;
     const handlerError = (code: AuthFailure["code"]) => {
@@ -170,7 +171,7 @@ export class AuthHandler {
         return handlerError(userOrErrorCode);
       }
 
-      return userOrErrorCode;
+      return { sid, ...userOrErrorCode };
     } catch (_err) {
       return handlerError("server-error");
     }

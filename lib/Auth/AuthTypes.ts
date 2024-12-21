@@ -263,7 +263,7 @@ export type AuthResultOrError<SU = SessionUser> = AuthFailure["code"] | AuthResu
 export type AuthRequestParams<S, SUser extends SessionUser> = {
   db: DB;
   dbo: DBOFullyTyped<S>;
-  getUser: () => Promise<AuthResultOrError<SUser>>;
+  getUser: () => Promise<AuthResultWithSID<SUser>>;
 };
 
 export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
