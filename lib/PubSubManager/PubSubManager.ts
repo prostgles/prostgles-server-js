@@ -60,7 +60,6 @@ export type SyncParams = {
   table_name: string;
   table_rules?: TableRule;
   synced_field: string;
-  allow_delete: boolean;
   id_fields: string[];
   batch_size: number;
   filter: object;

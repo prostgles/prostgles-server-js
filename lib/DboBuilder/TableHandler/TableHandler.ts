@@ -161,7 +161,7 @@ export class TableHandler extends ViewHandler {
       if (invalidParams.length)
         throw "Invalid or dissallowed params found: " + invalidParams.join(", ");
 
-      const { synced_field, allow_delete }: SyncRule = table_rules.sync;
+      const { synced_field }: SyncRule = table_rules.sync;
 
       if (!table_rules.sync.id_fields.length || !synced_field) {
         const err = "INTERNAL ERROR: id_fields OR synced_field missing from publish";
@@ -212,13 +212,13 @@ export class TableHandler extends ViewHandler {
             condition,
             id_fields,
             synced_field,
-            allow_delete,
+            // allow_delete,
             socket,
             table_rules,
             filter: { ...filter },
             params: { select },
           })
-          .then((channelName) => ({ channelName, id_fields, synced_field }));
+          .then(({ channelName }) => ({ channelName, id_fields, synced_field }));
       });
       await this._log({
         command: "sync",

@@ -72,7 +72,6 @@ export async function syncData(
     table_name,
     filter,
     table_rules,
-    allow_delete = false,
     params,
     synced_field,
     id_fields = [],
@@ -210,28 +209,28 @@ export async function syncData(
     },
     deleteData = async (deleted: AnyObject[]) => {
       // console.log("deleteData deleteData  deleteData " + deleted.length);
-      if (allow_delete) {
-        return Promise.all(
-          deleted.map(async (d) => {
-            const id_filter = pickKeys(d, id_fields);
-            try {
-              await (this.dbo[table_name] as TableHandler).delete(
-                id_filter,
-                undefined,
-                undefined,
-                table_rules
-              );
-              return 1;
-            } catch (e) {
-              console.error(e);
-            }
-            return 0;
-          })
-        );
-      } else {
-        console.warn("client tried to delete data without permission (allow_delete is false)");
-      }
-      return false;
+      // if (allow_delete) {
+      //   return Promise.all(
+      //     deleted.map(async (d) => {
+      //       const id_filter = pickKeys(d, id_fields);
+      //       try {
+      //         await (this.dbo[table_name] as TableHandler).delete(
+      //           id_filter,
+      //           undefined,
+      //           undefined,
+      //           table_rules
+      //         );
+      //         return 1;
+      //       } catch (e) {
+      //         console.error(e);
+      //       }
+      //       return 0;
+      //     })
+      //   );
+      // } else {
+      //   console.warn("client tried to delete data without permission (allow_delete is false)");
+      // }
+      // return false;
     },
     /**
      * Upserts the given client data where synced_field is higher than on server
@@ -463,8 +462,8 @@ export async function syncData(
       let inserted = 0,
         updated = 0,
         pushed = 0,
-        deleted = 0,
         total = 0;
+      const deleted = 0;
 
       // console.log("syncBatch", from_synced)
 
@@ -486,24 +485,25 @@ export async function syncData(
           throw " d";
         }
 
-        // console.log("allow_delete", table_rules.delete);
-        if (allow_delete && table_rules?.delete) {
-          const to_delete = serverData.filter((d) => {
-            return !clientData.find((c) => rowsIdsMatch(c, d));
-          });
-          await Promise.all(
-            to_delete.map((d) => {
-              deleted++;
-              return (this.dbo[table_name] as TableHandler).delete(
-                pickKeys(d, id_fields),
-                {},
-                undefined,
-                table_rules
-              );
-            })
-          );
-          serverData = await getServerData(min_synced, offset);
-        }
+        // TODO: Implement delete ensuring:
+        // 1. Delete is preformed only when clientData is fully synced (is kept in localStorage/IndexedDB OR is fully synced)
+        // if (allow_delete && table_rules?.delete) {
+        //   const to_delete = serverData.filter((d) => {
+        //     return !clientData.find((c) => rowsIdsMatch(c, d));
+        //   });
+        //   await Promise.all(
+        //     to_delete.map((d) => {
+        //       deleted++;
+        //       return (this.dbo[table_name] as TableHandler).delete(
+        //         pickKeys(d, id_fields),
+        //         {},
+        //         undefined,
+        //         table_rules
+        //       );
+        //     })
+        //   );
+        //   serverData = await getServerData(min_synced, offset);
+        // }
 
         const forClient = serverData.filter((s) => {
           return !clientData.find(

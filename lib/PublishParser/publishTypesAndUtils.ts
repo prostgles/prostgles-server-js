@@ -127,7 +127,7 @@ export const RULE_TO_METHODS = [
     no_limits: null,
     table_only: true,
     allowed_params: {
-      allow_delete: 1,
+      // allow_delete: 1,
       batch_size: 1,
       id_fields: 1,
       synced_field: 1,
@@ -379,7 +379,7 @@ export type SyncRule<Cols extends AnyObject = AnyObject> = {
   /**
    * EXPERIMENTAL. Disabled by default. If true then server will attempt to delete any records missing from client.
    */
-  allow_delete?: boolean;
+  // allow_delete?: boolean;
 
   /**
    * Throttle replication transmission in milliseconds. Defaults to 100

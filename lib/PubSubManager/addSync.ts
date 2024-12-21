@@ -1,4 +1,4 @@
-import { find, tryCatch } from "prostgles-types/dist/util";
+import { find, tryCatchV2 } from "prostgles-types/dist/util";
 import {
   AddSyncParams,
   BasicCallback,
@@ -11,17 +11,19 @@ import {
  * Returns a sync channel
  * A sync channel is unique per socket for each filter
  */
-export async function addSync(this: PubSubManager, syncParams: AddSyncParams) {
+export async function addSync(
+  this: PubSubManager,
+  syncParams: AddSyncParams
+): Promise<{ channelName: string }> {
   const sid = this.dboBuilder.prostgles.authHandler?.getSIDNoError({
     socket: syncParams.socket,
   });
-  const res = await tryCatch(async () => {
+  const res = await tryCatchV2(async () => {
     const {
       socket = null,
       table_info = null,
       table_rules,
       synced_field = null,
-      allow_delete = false,
       id_fields = [],
       filter = {},
       params,
@@ -32,7 +34,7 @@ export async function addSync(this: PubSubManager, syncParams: AddSyncParams) {
     if (!socket || !table_info) throw "socket or table_info missing";
 
     const { name: table_name } = table_info;
-    const channel_name = `${this.socketChannelPreffix}.${table_name}.${JSON.stringify(filter)}.sync`;
+    const channelName = `${this.socketChannelPreffix}.${table_name}.${JSON.stringify(filter)}.sync`;
 
     if (!synced_field) throw "synced_field missing from table_rules";
 
@@ -40,14 +42,13 @@ export async function addSync(this: PubSubManager, syncParams: AddSyncParams) {
 
     const upsertSync = () => {
       const newSync = {
-        channel_name,
+        channel_name: channelName,
         table_name,
         filter,
         condition: conditionParsed,
         synced_field,
         sid,
         id_fields,
-        allow_delete,
         table_rules,
         throttle: Math.max(throttle || 0, table_rules.sync?.throttle || 0),
         batch_size: table_rules.sync?.batch_size || DEFAULT_SYNC_BATCH_SIZE,
@@ -63,11 +64,11 @@ export async function addSync(this: PubSubManager, syncParams: AddSyncParams) {
       };
 
       /* Only a sync per socket per table per condition allowed */
-      const existing = find(this.syncs, { socket_id: socket.id, channel_name });
+      const existing = find(this.syncs, { socket_id: socket.id, channel_name: channelName });
       if (!existing) {
         this.syncs.push(newSync);
 
-        const unsyncChn = channel_name + "unsync";
+        const unsyncChn = channelName + "unsync";
         socket.removeAllListeners(unsyncChn);
         socket.once(unsyncChn, (_data: any, cb: BasicCallback) => {
           this._log({
@@ -80,18 +81,18 @@ export async function addSync(this: PubSubManager, syncParams: AddSyncParams) {
             connectedSocketIds: this.connectedSocketIds,
             duration: -1,
           });
-          socket.removeAllListeners(channel_name);
+          socket.removeAllListeners(channelName);
           socket.removeAllListeners(unsyncChn);
           this.syncs = this.syncs.filter((s) => {
             const isMatch =
-              s.socket_id && s.socket_id === socket.id && s.channel_name === channel_name;
+              s.socket_id && s.socket_id === socket.id && s.channel_name === channelName;
             return !isMatch;
           });
           cb(null, { res: "ok" });
         });
 
-        socket.removeAllListeners(channel_name);
-        socket.on(channel_name, (data: any, cb: BasicCallback) => {
+        socket.removeAllListeners(channelName);
+        socket.on(channelName, (data: any, cb: BasicCallback) => {
           if (!data) {
             cb({ err: "Unexpected request. Need data or onSyncRequest" });
             return;
@@ -130,7 +131,7 @@ export async function addSync(this: PubSubManager, syncParams: AddSyncParams) {
 
     await this.addTrigger({ table_name, condition: conditionParsed }, undefined, socket);
 
-    return { result: channel_name };
+    return { channelName };
   });
 
   await this._log({
@@ -145,7 +146,7 @@ export async function addSync(this: PubSubManager, syncParams: AddSyncParams) {
     sid,
   });
 
-  if (res.error !== undefined) throw res.error;
+  if (res.hasError) throw res.error;
 
-  return res.result;
+  return res.data;
 }
