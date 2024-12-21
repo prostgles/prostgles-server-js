@@ -117,6 +117,10 @@ export async function setupAuthRoutes(this: AuthHandler) {
       }
       return userOrCode;
     };
+    const isLoggedInUser = async () => {
+      const userInfo = await getUser();
+      return !!userInfo?.user;
+    };
     if (this.prostgles.restApi) {
       if (
         Object.values(this.prostgles.restApi.routes).some((restRoute) =>
@@ -144,7 +148,7 @@ export async function setupAuthRoutes(this: AuthHandler) {
        */
       if (this.isUserRoute(req.path)) {
         /* Check auth. Redirect to login if unauthorized */
-        const u = await getUser();
+        const u = await isLoggedInUser();
         if (!u) {
           res.redirect(
             `${AUTH_ROUTES_AND_PARAMS.login}?returnURL=${encodeURIComponent(req.originalUrl)}`
@@ -153,12 +157,15 @@ export async function setupAuthRoutes(this: AuthHandler) {
         }
 
         /* If authorized and going to returnUrl then redirect. Otherwise serve file */
-      } else if (returnURL && (await getUser())) {
+      } else if (returnURL && (await isLoggedInUser())) {
         res.redirect(returnURL);
         return;
 
         /** If Logged in and requesting login then redirect to main page */
-      } else if (this.matchesRoute(AUTH_ROUTES_AND_PARAMS.login, req.path) && (await getUser())) {
+      } else if (
+        this.matchesRoute(AUTH_ROUTES_AND_PARAMS.login, req.path) &&
+        (await isLoggedInUser())
+      ) {
         res.redirect("/");
         return;
       }
