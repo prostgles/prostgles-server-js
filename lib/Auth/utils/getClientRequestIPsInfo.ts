@@ -1,7 +1,9 @@
-import { AuthClientRequest, LoginClientInfo } from "../AuthTypes";
-export const getClientRequestIPsInfo = <T extends AuthClientRequest>(
-  req: T
-): T & LoginClientInfo => {
+import { PRGLIOSocket } from "../../DboBuilder/DboBuilderTypes";
+import { ExpressReq, LoginClientInfo } from "../AuthTypes";
+type ClientReq =
+  | { socket: PRGLIOSocket; httpReq?: undefined }
+  | { httpReq: ExpressReq; socket?: undefined };
+export const getClientRequestIPsInfo = <T extends ClientReq>(req: T): T & LoginClientInfo => {
   if (req.httpReq) {
     const ip_address = req.httpReq.ip;
     if (!ip_address) throw new Error("ip_address missing from req.httpReq");

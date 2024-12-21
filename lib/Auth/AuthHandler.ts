@@ -13,7 +13,6 @@ import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import {
   Auth,
   AuthClientRequest,
-  AuthResult,
   AuthResultOrError,
   AuthResultWithSID,
   BasicSession,
