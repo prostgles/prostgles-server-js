@@ -49,7 +49,7 @@ export async function getSchemaFromPublish(
       throw err;
     }
 
-    if (Object.keys(_publish).length) {
+    if (_publish && Object.keys(_publish).length) {
       let txKey = "tx";
       if (!this.prostgles.opts.transactions) txKey = "";
       if (typeof this.prostgles.opts.transactions === "string")

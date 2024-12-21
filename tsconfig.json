@@ -18,6 +18,7 @@
     "declaration": true,
     "skipLibCheck": true,
     "declarationMap": true,
+    "noImplicitAny": true
   },
   "exclude": [
     "dist"

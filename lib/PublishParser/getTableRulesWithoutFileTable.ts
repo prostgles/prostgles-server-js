@@ -22,14 +22,11 @@ export async function getTableRulesWithoutFileTable(
 ): Promise<ParsedPublishTable | undefined> {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (!localParams || !tableName)
-    throw {
-      stack: ["getTableRules()"],
-      message: "publish OR socket OR dbo OR tableName are missing",
-    };
+    throw new Error("publish OR socket OR dbo OR tableName are missing");
 
   const _publish = overridenPublish ?? (await this.getPublish(localParams, clientInfo));
 
-  const raw_table_rules = _publish[tableName];
+  const raw_table_rules = _publish?.[tableName];
   if (
     !raw_table_rules ||
     (isObject(raw_table_rules) && Object.values(raw_table_rules).every((v) => !v))

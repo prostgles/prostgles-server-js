@@ -1,3 +1,4 @@
+import { ProstglesInitOptions } from "../../dist/ProstglesTypes";
 import { DBGeneratedSchema } from "./DBGeneratedSchema";
 
 import { PublishFullyTyped } from "prostgles-server/dist/DBSchemaBuilder";
@@ -18,7 +19,7 @@ export const testPublishTypes = () => {
       },
       items3: "*",
     };
-    const p2: PublishFullyTyped<DBGeneratedSchema> = "*";
+    const p2: ProstglesInitOptions<DBGeneratedSchema>["publish"] = "*";
 
     const p11: PublishFullyTyped = {
       items: {
@@ -39,7 +40,7 @@ export const testPublishTypes = () => {
     //@ts-ignore
     const p1234: PublishFullyTyped = p1;
 
-    const p12: PublishFullyTyped = "*";
+    const p12: ProstglesInitOptions["publish"] = "*";
 
     const res: PublishFullyTyped = {
       shapes: "*",
@@ -63,12 +64,13 @@ export const testPublishTypes = () => {
       },
 
       items4: {
-        select: Math.random()
-          ? "*"
-          : {
+        select:
+          Math.random() ? "*" : (
+            {
               fields: { name: 0 },
               forcedFilter: { name: "abc" },
-            },
+            }
+          ),
         insert: "*",
         update: "*",
         delete: "*",

@@ -1,10 +1,4 @@
-import {
-  AnyObject,
-  DBSchema,
-  FullFilter,
-  Method,
-  RULE_METHODS,
-} from "prostgles-types";
+import { AnyObject, DBSchema, FullFilter, Method, RULE_METHODS } from "prostgles-types";
 import type { DBOFullyTyped, PublishFullyTyped } from "../DBSchemaBuilder";
 import {
   CommonTableRules,
@@ -15,11 +9,8 @@ import {
 } from "../DboBuilder/DboBuilder";
 import { DB, DBHandlerServer } from "../Prostgles";
 
-export type PublishMethods<
-  S = void,
-  SUser extends SessionUser = SessionUser,
-> = (
-  params: PublishParams<S, SUser>,
+export type PublishMethods<S = void, SUser extends SessionUser = SessionUser> = (
+  params: PublishParams<S, SUser>
 ) => { [key: string]: Method } | Promise<{ [key: string]: Method } | null>;
 
 export type Awaitable<T> = T | Promise<T>;
@@ -171,10 +162,7 @@ export type DeleteRequestData = {
   filter: object;
   returning: FieldFilter;
 };
-export type UpdateRequestDataOne<
-  R extends AnyObject,
-  S extends DBSchema | void = void,
-> = {
+export type UpdateRequestDataOne<R extends AnyObject, S extends DBSchema | void = void> = {
   filter: FullFilter<R, S>;
   data: Partial<R>;
   returning: FieldFilter<R>;
@@ -195,42 +183,28 @@ export type ValidateRowArgs<R = AnyObject, DBX = DBHandlerServer> = {
   dbx: DBX;
   localParams: LocalParams;
 };
-export type ValidateUpdateRowArgs<
-  U = Partial<AnyObject>,
-  F = Filter,
-  DBX = DBHandlerServer,
-> = {
+export type ValidateUpdateRowArgs<U = Partial<AnyObject>, F = Filter, DBX = DBHandlerServer> = {
   update: U;
   filter: F;
   dbx: DBX;
   localParams: LocalParams;
 };
 export type ValidateRow<R extends AnyObject = AnyObject, S = void> = (
-  args: ValidateRowArgs<R, DBOFullyTyped<S>>,
+  args: ValidateRowArgs<R, DBOFullyTyped<S>>
 ) => R | Promise<R>;
 export type PostValidateRow<R extends AnyObject = AnyObject, S = void> = (
-  args: ValidateRowArgs<R, DBOFullyTyped<S>>,
+  args: ValidateRowArgs<R, DBOFullyTyped<S>>
 ) => void | Promise<void>;
-export type PostValidateRowBasic = (
-  args: ValidateRowArgs,
-) => void | Promise<void>;
-export type ValidateRowBasic = (
-  args: ValidateRowArgs,
-) => AnyObject | Promise<AnyObject>;
-export type ValidateUpdateRow<
-  R extends AnyObject = AnyObject,
-  S extends DBSchema | void = void,
-> = (
-  args: ValidateUpdateRowArgs<Partial<R>, FullFilter<R, S>, DBOFullyTyped<S>>,
+export type PostValidateRowBasic = (args: ValidateRowArgs) => void | Promise<void>;
+export type ValidateRowBasic = (args: ValidateRowArgs) => AnyObject | Promise<AnyObject>;
+export type ValidateUpdateRow<R extends AnyObject = AnyObject, S extends DBSchema | void = void> = (
+  args: ValidateUpdateRowArgs<Partial<R>, FullFilter<R, S>, DBOFullyTyped<S>>
 ) => Partial<R> | Promise<Partial<R>>;
 export type ValidateUpdateRowBasic = (
-  args: ValidateUpdateRowArgs,
+  args: ValidateUpdateRowArgs
 ) => AnyObject | Promise<AnyObject>;
 
-export type SelectRule<
-  Cols extends AnyObject = AnyObject,
-  S extends DBSchema | void = void,
-> = {
+export type SelectRule<Cols extends AnyObject = AnyObject, S extends DBSchema | void = void> = {
   /**
    * Fields allowed to be selected.
    * Tip: Use false to exclude field
@@ -261,9 +235,7 @@ export type SelectRule<
   /**
    * Validation logic to check/update data for each request
    */
-  validate?(
-    args: SelectRequestData,
-  ): SelectRequestData | Promise<SelectRequestData>;
+  validate?(args: SelectRequestData): SelectRequestData | Promise<SelectRequestData>;
 };
 
 export type CommonInsertUpdateRule<
@@ -311,9 +283,7 @@ export type InsertRule<
    * Validation logic to check/update data after the insert.
    * Happens in the same transaction so upon throwing an error the record will be deleted (not committed)
    */
-  postValidate?: S extends DBSchema
-    ? PostValidateRow<Required<Cols>, S>
-    : PostValidateRowBasic;
+  postValidate?: S extends DBSchema ? PostValidateRow<Required<Cols>, S> : PostValidateRowBasic;
 
   /**
    * If defined then only nested inserts from these tables are allowed
@@ -365,23 +335,16 @@ export type UpdateRule<
   /**
    * Validation logic to check/update data for each request
    */
-  validate?: S extends DBSchema
-    ? ValidateUpdateRow<Cols, S>
-    : ValidateUpdateRowBasic;
+  validate?: S extends DBSchema ? ValidateUpdateRow<Cols, S> : ValidateUpdateRowBasic;
 
   /**
    * Validation logic to check/update data after the insert.
    * Happens in the same transaction so upon throwing an error the record will be deleted (not committed)
    */
-  postValidate?: S extends DBSchema
-    ? PostValidateRow<Required<Cols>, S>
-    : PostValidateRowBasic;
+  postValidate?: S extends DBSchema ? PostValidateRow<Required<Cols>, S> : PostValidateRowBasic;
 };
 
-export type DeleteRule<
-  Cols extends AnyObject = AnyObject,
-  S extends DBSchema | void = void,
-> = {
+export type DeleteRule<Cols extends AnyObject = AnyObject, S extends DBSchema | void = void> = {
   /**
    * Filter added to every query (e.g. user_id) to restrict access
    */
@@ -448,10 +411,7 @@ export type TableRule<
   sync?: SyncRule<RowType>;
   subscribe?: SubscribeRule;
 };
-export type PublishViewRule<
-  Col extends AnyObject = AnyObject,
-  S extends DBSchema | void = void,
-> = {
+export type PublishViewRule<Col extends AnyObject = AnyObject, S extends DBSchema | void = void> = {
   select?: SelectRule<Col, S> | PublishAllOrNothing;
   getColumns?: PublishAllOrNothing;
   getInfo?: PublishAllOrNothing;
@@ -495,19 +455,14 @@ export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
 export type RequestParams = { dbo?: DBHandlerServer; socket?: any };
 export type PublishAllOrNothing = boolean | "*" | null;
 export type PublishObject = {
-  [table_name: string]:
-    | PublishTableRule
-    | PublishViewRule
-    | PublishAllOrNothing;
+  [table_name: string]: PublishTableRule | PublishViewRule | PublishAllOrNothing;
 };
 export type ParsedPublishTables = {
   [table_name: string]: ParsedPublishTable;
 };
-export type PublishedResult<Schema = void> =
-  | PublishAllOrNothing
-  | PublishFullyTyped<Schema>;
+
+type PublishAllOrNothingRoot = Exclude<PublishAllOrNothing, boolean>;
+export type PublishedResult<Schema = void> = PublishAllOrNothingRoot | PublishFullyTyped<Schema>;
 export type Publish<Schema = void, SUser extends SessionUser = SessionUser> =
   | PublishedResult<Schema>
-  | ((
-      params: PublishParams<Schema, SUser>,
-    ) => Awaitable<PublishedResult<Schema>>);
+  | ((params: PublishParams<Schema, SUser>) => Awaitable<PublishedResult<Schema>>);

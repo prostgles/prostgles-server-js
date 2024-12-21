@@ -16,9 +16,11 @@ import {
   RULE_TO_METHODS,
   TableRule,
 } from "./publishTypesAndUtils";
+import { ProstglesInitOptions } from "../ProstglesTypes";
+import { PublishFullyTyped } from "../DBSchemaBuilder";
 
 export class PublishParser {
-  publish: any;
+  publish: ProstglesInitOptions["publish"];
   publishMethods?: PublishMethods<void, SessionUser> | undefined;
   publishRawSQL?: any;
   dbo: DBHandlerServer;
@@ -86,10 +88,11 @@ export class PublishParser {
 
   /**
    * Parses the first level of publish. (If false then nothing if * then all tables and views)
-   * @param socket
-   * @param user
    */
-  async getPublish(localParams: LocalParams, clientInfo?: AuthResult): Promise<PublishObject> {
+  async getPublish(
+    localParams: LocalParams,
+    clientInfo?: AuthResult
+  ): Promise<PublishFullyTyped | undefined> {
     const publishParams = await this.getPublishParams(localParams, clientInfo);
     const _publish = await applyParamsIfFunc(this.publish, publishParams);
 
@@ -101,7 +104,7 @@ export class PublishParser {
       return publish;
     }
 
-    return _publish;
+    return _publish || undefined;
   }
   async getValidatedRequestRuleWusr({
     tableName,
