@@ -7,8 +7,8 @@ export const clientFileTests = async (db: DBHandlerClient) => {
   await describe("clientFileTests", async () => {
     const fileFolder = `${__dirname}/../../server/dist/server/media/`;
     const getFiles = () =>
-      db.sql("SELECT id, original_name FROM files", {}, { returnType: "rows" });
-    await db.sql(
+      db.sql?.("SELECT id, original_name FROM files", {}, { returnType: "rows" });
+    await db.sql?.(
       `
       ALTER TABLE users_public_info 
       DROP CONSTRAINT "users_public_info_avatar_fkey";
@@ -23,7 +23,9 @@ export const clientFileTests = async (db: DBHandlerClient) => {
     const initialFiles = await getFiles();
 
     /**
-     * Although only users_public_info is published, file table should show because it is referenced by users_public_info
+     * Although only users_public_info is published,
+     * file table should show because it is referenced by users_public_info
+     * and show only show files that are referenced by users_public_info
      */
     await test("Files table is present", async () => {
       const files = await db.files.find!();
@@ -90,8 +92,8 @@ export const clientFileTests = async (db: DBHandlerClient) => {
         { avatar: newData },
         { returning: "*" }
       );
-      const avatarFile = await db.files.findOne!({ id: d?.at(0).avatar.id });
-      const initialFileStr = fs.readFileSync(fileFolder + avatarFile!.name).toString("utf8");
+      const avatarFile = await db.files.findOne?.({ id: d?.at(0)?.avatar.id });
+      const initialFileStr = fs.readFileSync(fileFolder + avatarFile?.name).toString("utf8");
       assert.equal(newData.data.toString(), initialFileStr);
     });
 
@@ -106,7 +108,7 @@ export const clientFileTests = async (db: DBHandlerClient) => {
       const files = await db.files.find!();
       assert.deepStrictEqual(files, []);
       const latestFiles = await getFiles();
-      assert.equal(initialFiles.length, latestFiles.length);
+      assert.equal(initialFiles?.length, latestFiles?.length);
     });
   });
 };

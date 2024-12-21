@@ -26,7 +26,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
     if (this.opts.onSocketConnect) {
       try {
         const getUser = async () => {
-          return await this.authHandler?.getClientInfo({ socket });
+          return await this.authHandler?.getUserFromRequest({ socket });
         };
         await this.opts.onSocketConnect({
           socket,
@@ -55,7 +55,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
         }
       ) => {
         runClientRequest
-          .bind(this)({ ...args, type: "socket", socket })
+          .bind(this)(args, { socket })
           .then((res) => {
             cb(null, res);
           })
@@ -79,7 +79,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
 
       if (this.opts.onSocketDisconnect) {
         const getUser = async () => {
-          return await this.authHandler?.getClientInfo({ socket });
+          return await this.authHandler?.getUserFromRequest({ socket });
         };
         this.opts.onSocketDisconnect({ socket, dbo: dbo as any, db, getUser });
       }
@@ -95,12 +95,15 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
         }
       ) => {
         runClientMethod
-          .bind(this)({
-            type: "socket",
-            socket,
-            method,
-            params,
-          })
+          .bind(this)(
+            {
+              method,
+              params,
+            },
+            {
+              socket,
+            }
+          )
           .then((res) => {
             cb(null, res);
           })

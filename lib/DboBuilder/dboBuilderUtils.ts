@@ -89,7 +89,9 @@ export function getSerializedClientErrorFromPGError(
   const isServerSideRequest = !args.localParams;
   //TODO: add a rawSQL check for HTTP requests
   const showFullError =
-    isServerSideRequest || args.type === "sql" || args.localParams?.socket?.prostgles?.rawSQL;
+    isServerSideRequest ||
+    args.type === "sql" ||
+    args.localParams?.clientReq?.socket?.prostgles?.rawSQL;
   if (showFullError) {
     return err;
   }

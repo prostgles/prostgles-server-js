@@ -173,12 +173,12 @@ export async function getNewQuery(
     }
 
     let isLocal = true;
-    if (localParams && (localParams.socket || localParams.httpReq)) {
+    if (localParams && localParams.clientReq) {
       isLocal = false;
       j_tableRules = await _this.dboBuilder.publishParser?.getValidatedRequestRuleWusr({
         tableName: jTable,
         command: "find",
-        localParams,
+        clientReq: localParams.clientReq,
       });
     }
 

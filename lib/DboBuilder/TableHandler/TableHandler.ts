@@ -146,8 +146,8 @@ export class TableHandler extends ViewHandler {
       }
 
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      if (!localParams) throw "Sync not allowed within the server code";
-      const { socket } = localParams;
+      if (!localParams.clientReq) throw "Sync not allowed within the server code";
+      const { socket } = localParams.clientReq;
       if (!socket) throw "socket missing";
 
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
@@ -212,7 +212,6 @@ export class TableHandler extends ViewHandler {
             condition,
             id_fields,
             synced_field,
-            // allow_delete,
             socket,
             table_rules,
             filter: { ...filter },

@@ -109,12 +109,12 @@ export class ViewHandler {
     error?: any;
   }) => {
     if (localParams?.noLog) {
-      if (localParams.socket || localParams.httpReq) {
+      if (localParams.clientReq) {
         throw new Error("noLog option is not allowed from a remote client");
       }
       return;
     }
-    const sid = this.dboBuilder.prostgles.authHandler?.getSIDNoError(localParams);
+    const sid = this.dboBuilder.prostgles.authHandler?.getSIDNoError(localParams?.clientReq);
     return this.dboBuilder.prostgles.opts.onLog?.({
       type: "table",
       command,
@@ -122,7 +122,7 @@ export class ViewHandler {
       error,
       txInfo: this.tx?.t.ctx,
       sid,
-      socketId: localParams?.socket?.id,
+      socketId: localParams?.clientReq?.socket?.id,
       tableName: this.name,
       data,
       localParams,
@@ -148,39 +148,40 @@ export class ViewHandler {
 
   validateViewRules = validateViewRules.bind(this);
 
-  getShortestJoin(
-    table1: string,
-    table2: string,
-    startAlias: number,
-    isInner = false
-  ): { query: string; toOne: boolean } {
-    const getJoinCondition = (
-      on: Record<string, string>[],
-      leftTable: string,
-      rightTable: string
-    ) => {
-      return on
-        .map((cond) =>
-          Object.keys(cond)
-            .map((lKey) => `${leftTable}.${lKey} = ${rightTable}.${cond[lKey]}`)
-            .join("\nAND ")
-        )
-        .join(" OR ");
-    };
+  // DEAD CODE?!
+  // getShortestJoin(
+  //   table1: string,
+  //   table2: string,
+  //   startAlias: number,
+  //   isInner = false
+  // ): { query: string; toOne: boolean } {
+  //   const getJoinCondition = (
+  //     on: Record<string, string>[],
+  //     leftTable: string,
+  //     rightTable: string
+  //   ) => {
+  //     return on
+  //       .map((cond) =>
+  //         Object.keys(cond)
+  //           .map((lKey) => `${leftTable}.${lKey} = ${rightTable}.${cond[lKey]}`)
+  //           .join("\nAND ")
+  //       )
+  //       .join(" OR ");
+  //   };
 
-    // let toOne = true;
-    const query = this.joins
-      .map(({ tables, on, type }, i) => {
-        if (type.split("-")[1] === "many") {
-          // toOne = false;
-        }
-        const tl = `tl${startAlias + i}`,
-          tr = `tr${startAlias + i}`;
-        return `FROM ${tables[0]} ${tl} ${isInner ? "INNER" : "LEFT"} JOIN ${tables[1]} ${tr} ON ${getJoinCondition(on, tl, tr)}`;
-      })
-      .join("\n");
-    return { query, toOne: false };
-  }
+  //   // let toOne = true;
+  //   const query = this.joins
+  //     .map(({ tables, on, type }, i) => {
+  //       if (type.split("-")[1] === "many") {
+  //         // toOne = false;
+  //       }
+  //       const tl = `tl${startAlias + i}`,
+  //         tr = `tr${startAlias + i}`;
+  //       return `FROM ${tables[0]} ${tl} ${isInner ? "INNER" : "LEFT"} JOIN ${tables[1]} ${tr} ON ${getJoinCondition(on, tl, tr)}`;
+  //     })
+  //     .join("\n");
+  //   return { query, toOne: false };
+  // }
 
   checkFilter(filter: any) {
     if (filter === null || (filter && !isObject(filter)))
@@ -192,7 +193,7 @@ export class ViewHandler {
   getColumns = getColumns.bind(this);
 
   getValidatedRules(tableRules?: TableRule, localParams?: LocalParams): ValidatedTableRules {
-    if (localParams?.socket && !tableRules) {
+    if (localParams?.clientReq?.socket && !tableRules) {
       throw "INTERNAL ERROR: Unexpected case -> localParams && !tableRules";
     }
 

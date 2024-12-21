@@ -16,25 +16,20 @@ import {
 
 export async function getTableRulesWithoutFileTable(
   this: PublishParser,
-  { tableName, localParams }: DboTable,
+  { tableName, clientReq }: DboTable,
   clientInfo?: AuthResult,
   overridenPublish?: PublishObject
 ): Promise<ParsedPublishTable | undefined> {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  if (!localParams || !tableName)
-    throw new Error("publish OR socket OR dbo OR tableName are missing");
+  if (!tableName) throw new Error("publish OR socket OR dbo OR tableName are missing");
 
-  const _publish = overridenPublish ?? (await this.getPublish(localParams, clientInfo));
+  const publish = overridenPublish ?? (clientReq && (await this.getPublish(clientReq, clientInfo)));
 
-  const raw_table_rules = _publish?.[tableName];
-  if (
-    !raw_table_rules ||
-    (isObject(raw_table_rules) && Object.values(raw_table_rules).every((v) => !v))
-  ) {
+  const rawTableRule = publish?.[tableName];
+  if (!rawTableRule || (isObject(rawTableRule) && Object.values(rawTableRule).every((v) => !v))) {
     return undefined;
   }
 
-  let parsed_table: ParsedPublishTable = {};
+  let parsedTableRule: ParsedPublishTable = {};
 
   /* Get view or table specific rules */
   const tHandler = this.dbo[tableName] as TableHandler | ViewHandler | undefined;
@@ -57,8 +52,8 @@ export async function getTableRulesWithoutFileTable(
 
     if (
       !pgUserIsAllowedThis &&
-      isObject(raw_table_rules) &&
-      (raw_table_rules as PublishTableRule)[r.sqlRule]
+      isObject(rawTableRule) &&
+      (rawTableRule as PublishTableRule)[r.sqlRule]
     ) {
       throw `Your postgres user is not allowed ${r.sqlRule} on table ${tableName}`;
     }
@@ -79,19 +74,16 @@ export async function getTableRulesWithoutFileTable(
   });
 
   /* All methods allowed. Add no limits for table rules */
-  if ([true, "*"].includes(raw_table_rules as any)) {
-    parsed_table = {};
+  if ([true, "*"].includes(rawTableRule as any)) {
+    parsedTableRule = {};
     MY_RULES.filter((r) => r.no_limits).forEach((r) => {
-      parsed_table[r.rule] = { ...(r.no_limits as object) } as any;
+      parsedTableRule[r.rule] = { ...(r.no_limits as object) } as any;
     });
 
     /** Specific rules allowed */
-  } else if (isObject(raw_table_rules) && getKeys(raw_table_rules).length) {
-    const allRuleKeys: (keyof PublishViewRule | keyof PublishTableRule)[] =
-      getKeys(raw_table_rules);
-    const dissallowedRuleKeys = allRuleKeys.filter(
-      (m) => !(raw_table_rules as PublishTableRule)[m]
-    );
+  } else if (isObject(rawTableRule) && getKeys(rawTableRule).length) {
+    const allRuleKeys: (keyof PublishViewRule | keyof PublishTableRule)[] = getKeys(rawTableRule);
+    const dissallowedRuleKeys = allRuleKeys.filter((m) => !(rawTableRule as PublishTableRule)[m]);
 
     MY_RULES.map((r) => {
       /** Unless specifically disabled these are allowed */
@@ -99,27 +91,24 @@ export async function getTableRulesWithoutFileTable(
         ["getInfo", "getColumns"].includes(r.rule) &&
         !dissallowedRuleKeys.includes(r.rule as any)
       ) {
-        parsed_table[r.rule] = r.no_limits as any;
+        parsedTableRule[r.rule] = r.no_limits as any;
         return;
       }
 
       /** Add no_limit values for implied/ fully allowed methods */
-      if (
-        [true, "*"].includes((raw_table_rules as PublishTableRule)[r.rule] as any) &&
-        r.no_limits
-      ) {
-        parsed_table[r.rule] = Object.assign({}, r.no_limits) as any;
+      if ([true, "*"].includes((rawTableRule as PublishTableRule)[r.rule] as any) && r.no_limits) {
+        parsedTableRule[r.rule] = Object.assign({}, r.no_limits) as any;
 
         /** Carry over detailed config */
-      } else if (isObject((raw_table_rules as any)[r.rule])) {
-        parsed_table[r.rule] = (raw_table_rules as any)[r.rule];
+      } else if (isObject((rawTableRule as any)[r.rule])) {
+        parsedTableRule[r.rule] = (rawTableRule as any)[r.rule];
       }
     });
 
     allRuleKeys
-      .filter((m) => parsed_table[m])
+      .filter((m) => parsedTableRule[m])
       .forEach((method) => {
-        const rule = parsed_table[method];
+        const rule = parsedTableRule[method];
 
         const ruleInfo = MY_RULES.find(
           (r) => r.rule === method || (r.methods as readonly string[]).includes(method)
@@ -150,15 +139,15 @@ export async function getTableRulesWithoutFileTable(
 
         /* Add default params (if missing) */
         if (method === "sync") {
-          if ([true, "*"].includes(parsed_table[method] as any)) {
+          if ([true, "*"].includes(parsedTableRule[method] as any)) {
             throw "Invalid sync rule. Expecting { id_fields: string[], synced_field: string } ";
           }
 
-          if (typeof parsed_table[method]?.throttle !== "number") {
-            parsed_table[method]!.throttle = 100;
+          if (typeof parsedTableRule[method]?.throttle !== "number") {
+            parsedTableRule[method]!.throttle = 100;
           }
-          if (typeof parsed_table[method]?.batch_size !== "number") {
-            parsed_table[method]!.batch_size = DEFAULT_SYNC_BATCH_SIZE;
+          if (typeof parsedTableRule[method]?.batch_size !== "number") {
+            parsedTableRule[method]!.batch_size = DEFAULT_SYNC_BATCH_SIZE;
           }
         }
 
@@ -168,8 +157,8 @@ export async function getTableRulesWithoutFileTable(
         if (method === "select" && !dissallowedRuleKeys.includes(subKey)) {
           const sr = MY_RULES.find((r) => r.rule === subKey);
           if (sr && canSubscribe) {
-            parsed_table[subKey] = { ...(sr.no_limits as SubscribeRule) };
-            parsed_table.subscribeOne = { ...(sr.no_limits as SubscribeRule) };
+            parsedTableRule[subKey] = { ...(sr.no_limits as SubscribeRule) };
+            parsedTableRule.subscribeOne = { ...(sr.no_limits as SubscribeRule) };
           }
         }
       });
@@ -203,7 +192,7 @@ export async function getTableRulesWithoutFileTable(
     return res;
   };
 
-  parsed_table = getImpliedMethods(parsed_table);
+  parsedTableRule = getImpliedMethods(parsedTableRule);
 
-  return parsed_table;
+  return parsedTableRule;
 }

@@ -1,7 +1,8 @@
 import { Method, getObjectEntries, isObject } from "prostgles-types";
-import { AuthResult, SessionUser } from "../Auth/AuthTypes";
-import { LocalParams } from "../DboBuilder/DboBuilder";
+import { AuthClientRequest, AuthResult, SessionUser } from "../Auth/AuthTypes";
+import { PublishFullyTyped } from "../DBSchemaBuilder";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
+import { ProstglesInitOptions } from "../ProstglesTypes";
 import { VoidFunction } from "../SchemaWatch/SchemaWatch";
 import { getFileTableRules } from "./getFileTableRules";
 import { getSchemaFromPublish } from "./getSchemaFromPublish";
@@ -16,8 +17,6 @@ import {
   RULE_TO_METHODS,
   TableRule,
 } from "./publishTypesAndUtils";
-import { ProstglesInitOptions } from "../ProstglesTypes";
-import { PublishFullyTyped } from "../DBSchemaBuilder";
 
 export class PublishParser {
   publish: ProstglesInitOptions["publish"];
@@ -27,44 +26,37 @@ export class PublishParser {
   db: DB;
   prostgles: Prostgles;
 
-  constructor(
-    publish: any,
-    publishMethods: PublishMethods<void, SessionUser> | undefined,
-    publishRawSQL: any,
-    dbo: DBHandlerServer,
-    db: DB,
-    prostgles: Prostgles
-  ) {
-    this.publish = publish;
-    this.publishMethods = publishMethods;
-    this.publishRawSQL = publishRawSQL;
+  constructor(prostgles: Prostgles) {
+    this.prostgles = prostgles;
+    this.publish = prostgles.opts.publish;
+    this.publishMethods = prostgles.opts.publishMethods;
+    this.publishRawSQL = prostgles.opts.publishRawSQL;
+    const { dbo, db } = prostgles;
+    if (!dbo || !db) throw "INTERNAL ERROR: dbo and/or db missing";
     this.dbo = dbo;
     this.db = db;
-    this.prostgles = prostgles;
-
-    if (!this.publish) throw "INTERNAL ERROR: dbo and/or publish missing";
   }
 
   async getPublishParams(
-    localParams: LocalParams,
+    clientReq: AuthClientRequest,
     clientInfo?: AuthResult
   ): Promise<PublishParams> {
     return {
-      ...(clientInfo || (await this.prostgles.authHandler?.getClientInfo(localParams))),
+      ...(clientInfo || (await this.prostgles.authHandler?.getUserFromRequest(clientReq))),
       dbo: this.dbo as any,
       db: this.db,
-      socket: localParams.socket!,
+      clientReq,
       tables: this.prostgles.dboBuilder.tables,
     };
   }
 
   async getAllowedMethods(
-    reqInfo: Pick<LocalParams, "httpReq" | "socket">,
-    userData?: AuthResult
+    clientReq: AuthClientRequest,
+    userData: AuthResult | undefined
   ): Promise<{ [key: string]: Method }> {
     const methods: { [key: string]: Method } = {};
 
-    const publishParams = await this.getPublishParams(reqInfo, userData);
+    const publishParams = await this.getPublishParams(clientReq, userData);
     const _methods = await applyParamsIfFunc(this.publishMethods, publishParams);
 
     if (_methods && Object.keys(_methods).length) {
@@ -90,10 +82,10 @@ export class PublishParser {
    * Parses the first level of publish. (If false then nothing if * then all tables and views)
    */
   async getPublish(
-    localParams: LocalParams,
-    clientInfo?: AuthResult
+    clientReq: AuthClientRequest,
+    clientInfo: AuthResult
   ): Promise<PublishFullyTyped | undefined> {
-    const publishParams = await this.getPublishParams(localParams, clientInfo);
+    const publishParams = await this.getPublishParams(clientReq, clientInfo);
     const _publish = await applyParamsIfFunc(this.publish, publishParams);
 
     if (_publish === "*") {
@@ -106,32 +98,30 @@ export class PublishParser {
 
     return _publish || undefined;
   }
+
   async getValidatedRequestRuleWusr({
     tableName,
     command,
-    localParams,
+    clientReq,
   }: DboTableCommand): Promise<TableRule> {
-    const clientInfo = await this.prostgles.authHandler!.getClientInfo(localParams);
-    const rules = await this.getValidatedRequestRule(
-      { tableName, command, localParams },
-      clientInfo
-    );
+    const clientInfo = await this.prostgles.authHandler?.getUserFromRequest(clientReq);
+    const rules = await this.getValidatedRequestRule({ tableName, command, clientReq }, clientInfo);
     return rules;
   }
 
   async getValidatedRequestRule(
-    { tableName, command, localParams }: DboTableCommand,
-    clientInfo?: AuthResult
+    { tableName, command, clientReq }: DboTableCommand,
+    clientInfo: AuthResult | undefined
   ): Promise<TableRule> {
     if (!command || !tableName) throw "command OR tableName are missing";
 
-    const rtm = RULE_TO_METHODS.find((rtms) => (rtms.methods as any).includes(command));
+    const rtm = RULE_TO_METHODS.find((rtms) => rtms.methods.some((v) => v === command));
     if (!rtm) {
       throw "Invalid command: " + command;
     }
 
     /* Must be local request -> allow everything */
-    if (!localParams.socket && !localParams.httpReq) {
+    if (!clientReq) {
       return RULE_TO_METHODS.reduce(
         (a, v) => ({
           ...a,
@@ -145,19 +135,19 @@ export class PublishParser {
     if (!this.publish) throw "publish is missing";
 
     /* Get any publish errors for socket */
-    const errorInfo = localParams.socket?.prostgles?.tableSchemaErrors[tableName]?.[command];
+    const errorInfo = clientReq.socket?.prostgles?.tableSchemaErrors[tableName]?.[command];
 
     if (errorInfo) throw errorInfo.error;
 
-    const table_rule = await this.getTableRules({ tableName, localParams }, clientInfo);
-    if (!table_rule)
+    const tableRule = await this.getTableRules({ tableName, clientReq }, clientInfo);
+    if (!tableRule)
       throw {
         stack: ["getValidatedRequestRule()"],
         message: "Invalid or disallowed table: " + tableName,
       };
 
     if (command === "upsert") {
-      if (!table_rule.update || !table_rule.insert) {
+      if (!tableRule.update || !tableRule.insert) {
         throw {
           stack: ["getValidatedRequestRule()"],
           message: `Invalid or disallowed command: upsert`,
@@ -165,8 +155,8 @@ export class PublishParser {
       }
     }
 
-    if (table_rule[rtm.rule]) {
-      return table_rule;
+    if (tableRule[rtm.rule]) {
+      return tableRule;
     } else
       throw {
         stack: ["getValidatedRequestRule()"],
@@ -176,14 +166,14 @@ export class PublishParser {
 
   async getTableRules(
     args: DboTable,
-    clientInfo?: AuthResult
+    clientInfo: AuthResult | undefined
   ): Promise<ParsedPublishTable | undefined> {
     if (this.dbo[args.tableName]?.is_media) {
       const fileTablePublishRules = await this.getTableRulesWithoutFileTable(args, clientInfo);
       const { rules } = await getFileTableRules.bind(this)(
         args.tableName,
         fileTablePublishRules,
-        args.localParams,
+        args.clientReq,
         clientInfo
       );
       return rules;

@@ -2,7 +2,7 @@ import { RequestHandler, Response } from "express";
 import { AuthResponse } from "prostgles-types";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { AUTH_ROUTES_AND_PARAMS, AuthHandler, HTTP_FAIL_CODES } from "./AuthHandler";
-import { AuthClientRequest, ExpressReq, ExpressRes, LoginParams } from "./AuthTypes";
+import { Auth, AuthClientRequest, ExpressReq, ExpressRes, LoginParams } from "./AuthTypes";
 import { setAuthProviders, upsertNamedExpressMiddleware } from "./setAuthProviders";
 import { getClientRequestIPsInfo } from "./utils/getClientRequestIPsInfo";
 import { getReturnUrl } from "./utils/getReturnUrl";
@@ -33,7 +33,7 @@ export async function setupAuthRoutes(this: AuthHandler) {
         req,
         res,
         next,
-        getUser: () => this.getUser({ httpReq: req }) as any,
+        getUser: () => this.getUserAndHandleError({ httpReq: req, res }),
         dbo: this.dbo as DBOFullyTyped,
         db: this.db,
       });
@@ -61,7 +61,7 @@ export async function setupAuthRoutes(this: AuthHandler) {
                 id,
                 this.dbo as any,
                 this.db,
-                getClientRequestIPsInfo({ httpReq: req })
+                getClientRequestIPsInfo({ httpReq: req, res })
               );
             });
             if (!response.session) {
@@ -108,8 +108,15 @@ export async function setupAuthRoutes(this: AuthHandler) {
 
   /* Redirect if not logged in and requesting non public content */
   app.get(AUTH_ROUTES_AND_PARAMS.catchAll, async (req: ExpressReq, res: ExpressRes, next) => {
-    const clientReq: AuthClientRequest = { httpReq: req };
-    const getUser = this.getUser;
+    const clientReq: AuthClientRequest = { httpReq: req, res };
+    const getUser = async () => {
+      const userOrCode = await this.getUserAndHandleError(clientReq);
+      if (typeof userOrCode === "string") {
+        res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({ success: false, code: userOrCode });
+        throw userOrCode;
+      }
+      return userOrCode;
+    };
     if (this.prostgles.restApi) {
       if (
         Object.values(this.prostgles.restApi.routes).some((restRoute) =>
@@ -137,7 +144,7 @@ export async function setupAuthRoutes(this: AuthHandler) {
        */
       if (this.isUserRoute(req.path)) {
         /* Check auth. Redirect to login if unauthorized */
-        const u = await getUser(clientReq);
+        const u = await getUser();
         if (!u) {
           res.redirect(
             `${AUTH_ROUTES_AND_PARAMS.login}?returnURL=${encodeURIComponent(req.originalUrl)}`
@@ -146,21 +153,18 @@ export async function setupAuthRoutes(this: AuthHandler) {
         }
 
         /* If authorized and going to returnUrl then redirect. Otherwise serve file */
-      } else if (returnURL && (await getUser(clientReq))) {
+      } else if (returnURL && (await getUser())) {
         res.redirect(returnURL);
         return;
 
         /** If Logged in and requesting login then redirect to main page */
-      } else if (
-        this.matchesRoute(AUTH_ROUTES_AND_PARAMS.login, req.path) &&
-        (await getUser(clientReq))
-      ) {
+      } else if (this.matchesRoute(AUTH_ROUTES_AND_PARAMS.login, req.path) && (await getUser())) {
         res.redirect("/");
         return;
       }
 
       onGetRequestOK?.(req, res, {
-        getUser: () => getUser(clientReq),
+        getUser,
         dbo: this.dbo as DBOFullyTyped,
         db: this.db,
       });
@@ -170,7 +174,7 @@ export async function setupAuthRoutes(this: AuthHandler) {
         typeof error === "string" ? error
         : error instanceof Error ? error.message
         : "";
-      res.status(HTTP_FAIL_CODES.UNAUTHORIZED).json({
+      res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({
         error:
           "Something went wrong when processing your request" +
           (errorMessage ? ": " + errorMessage : ""),

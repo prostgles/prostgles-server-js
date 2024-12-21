@@ -15,7 +15,7 @@ import {
   TableInfo as TInfo,
   UserLike,
 } from "prostgles-types";
-import { BasicSession, ExpressReq } from "../Auth/AuthTypes";
+import { AuthClientRequest, BasicSession } from "../Auth/AuthTypes";
 import { BasicCallback } from "../PubSubManager/PubSubManager";
 import { PublishAllOrNothing } from "../PublishParser/PublishParser";
 import { FieldSpec } from "./QueryBuilder/Functions";
@@ -105,21 +105,15 @@ export type DbTxTableHandlers = {
   [key: string]: Omit<Partial<TableHandler>, "dbTx"> | Omit<TableHandler, "dbTx">;
 };
 
-export type DBHandlerServerExtra<TH = TableHandlers, WithTransactions = true> = {
-  sql: SQLHandler;
-} & (WithTransactions extends true ? { tx: TX<TH> } : Record<string, never>);
+type SQLHandlerServer = SQLHandler<LocalParams>;
 
-// export type DBHandlerServer<TH = TableHandlers> =
-//   TH &
-//   Partial<DbJoinMaker> & {
-//     sql?: SQLHandler
-//   } & {
-//     tx?: TX<TH>
-//   }
+export type DBHandlerServerExtra<TH = TableHandlers, WithTransactions = true> = {
+  sql: SQLHandlerServer;
+} & (WithTransactions extends true ? { tx: TX<TH> } : Record<string, never>);
 
 export type DBHandlerServer<TH = TableHandlers> = TH &
   Partial<DbJoinMaker> & {
-    sql?: SQLHandler;
+    sql?: SQLHandlerServer;
   } & {
     tx?: TX<TH>;
   };
@@ -187,16 +181,15 @@ export type PRGLIOSocket = {
 };
 
 export type LocalParams = {
-  httpReq?: ExpressReq;
-  socket?: PRGLIOSocket;
-  func?: () => any;
+  // httpReq?: ExpressReq;
+  // socket?: PRGLIOSocket;
+  clientReq?: AuthClientRequest | undefined;
   isRemoteRequest?: {
     user?: UserLike | undefined;
   };
+  func?: () => any;
   testRule?: boolean;
   tableAlias?: string;
-  // subOne?: boolean;
-
   tx?: {
     dbTX: TableHandlers;
     t: pgPromise.ITask<{}>;
@@ -207,9 +200,18 @@ export type LocalParams = {
 
   returnQuery?: boolean | "noRLS" | "where-condition";
   returnNewQuery?: boolean;
-  /** Used for count/size queries */
+
+  /**
+   * Used for count/size queries
+   * */
   bypassLimit?: boolean;
 
+  /**
+   * Used to allow inserting linked data.
+   * For example, if we have users( id, name ) and user_emails( id, user_id, email )
+   * and we want to insert a user and an email in a single transaction we can just:
+   *    db.users.insert({ name: "John", emails: [{ email: "john@abc.com" }] })
+   */
   nestedInsert?: {
     depth: number;
     previousData: AnyObject;

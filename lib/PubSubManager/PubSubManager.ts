@@ -295,7 +295,7 @@ export class PubSubManager {
 
       await this.db
         .tx((t) => t.any(query))
-        .catch((e) => {
+        .catch((e: any) => {
           console.error("prepareTriggers failed: ", e);
           throw e;
         });
@@ -545,10 +545,10 @@ export class PubSubManager {
       socketId: socket?.id,
       state: !addedTrigger.tbl ? "fail" : "ok",
       error: addedTrigger.error,
-      sid: this.dboBuilder.prostgles.authHandler?.getSIDNoError({ socket }),
+      sid: socket && this.dboBuilder.prostgles.authHandler?.getSIDNoError({ socket }),
       tableName: addedTrigger.tbl ?? params.table_name,
       connectedSocketIds: this.dboBuilder.prostgles.connectedSockets.map((s) => s.id),
-      localParams: { socket },
+      localParams: socket && { clientReq: { socket } },
     });
 
     if (addedTrigger.error) throw addedTrigger.error;

@@ -1,12 +1,6 @@
 import { AnyObject, DBSchema, FullFilter, Method, RULE_METHODS } from "prostgles-types";
 import type { DBOFullyTyped, PublishFullyTyped } from "../DBSchemaBuilder";
-import {
-  CommonTableRules,
-  Filter,
-  LocalParams,
-  PRGLIOSocket,
-  TableOrViewInfo,
-} from "../DboBuilder/DboBuilder";
+import { CommonTableRules, Filter, LocalParams, TableOrViewInfo } from "../DboBuilder/DboBuilder";
 import { DB, DBHandlerServer } from "../Prostgles";
 
 export type PublishMethods<S = void, SUser extends SessionUser = SessionUser> = (
@@ -15,20 +9,13 @@ export type PublishMethods<S = void, SUser extends SessionUser = SessionUser> = 
 
 export type Awaitable<T> = T | Promise<T>;
 
-type Request = {
-  socket?: any;
-  httpReq?: any;
-};
-
-export type DboTable = Request & {
+export type DboTable = {
   tableName: string;
-  localParams: LocalParams;
+  clientReq: AuthClientRequest | undefined;
 };
-export type DboTableCommand = Request &
-  DboTable & {
-    command: string;
-    localParams: LocalParams;
-  };
+export type DboTableCommand = DboTable & {
+  command: string;
+};
 
 export const RULE_TO_METHODS = [
   {
@@ -147,8 +134,8 @@ export const RULE_TO_METHODS = [
 ] as const;
 
 import { FieldFilter, SelectParams } from "prostgles-types";
+import { AuthClientRequest, SessionUser } from "../Auth/AuthTypes";
 import { TableSchemaColumn } from "../DboBuilder/DboBuilderTypes";
-import { SessionUser } from "../Auth/AuthTypes";
 
 export type InsertRequestData = {
   data: object | object[];
@@ -449,7 +436,7 @@ export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
   dbo: DBOFullyTyped<S>;
   db: DB;
   user?: SUser["user"];
-  socket: PRGLIOSocket;
+  clientReq: AuthClientRequest;
   tables: DbTableInfo[];
 };
 export type RequestParams = { dbo?: DBHandlerServer; socket?: any };

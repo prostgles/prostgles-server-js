@@ -58,14 +58,14 @@ export class RestApi {
       schema: `${routePrefix}/schema`,
     };
     this.expressApp = expressApp;
-    expressApp.post(this.routes.db, jsonParser, this.onPost);
+    expressApp.post(this.routes.db, jsonParser, this.onPostTableCommand);
     expressApp.post(this.routes.sql, jsonParser, this.onPostSql);
     expressApp.post(this.routes.methods, jsonParser, this.onPostMethod);
     expressApp.post(this.routes.schema, jsonParser, this.onPostSchema);
   }
 
   destroy = () => {
-    this.expressApp.removeListener(this.routes.db, this.onPost);
+    this.expressApp.removeListener(this.routes.db, this.onPostTableCommand);
     this.expressApp.removeListener(this.routes.sql, this.onPostSql);
     this.expressApp.removeListener(this.routes.methods, this.onPostMethod);
   };
@@ -74,54 +74,62 @@ export class RestApi {
     const params = req.body || [];
 
     try {
-      const data = await runClientMethod.bind(this.prostgles)({
-        type: "http",
-        httpReq: req,
-        method,
-        params,
-      });
+      const data = await runClientMethod.bind(this.prostgles)(
+        {
+          method,
+          params,
+        },
+        {
+          res,
+          httpReq: req,
+        }
+      );
       res.json(data);
     } catch (rawError) {
       const error = getSerializedClientErrorFromPGError(rawError, {
         type: "method",
-        localParams: { httpReq: req },
+        localParams: { clientReq: { httpReq: req, res } },
       });
       res.status(400).json({ error });
     }
   };
   onPostSchema = async (req: ExpressReq, res: ExpressRes) => {
     try {
-      const data = await this.prostgles.getClientSchema({ httpReq: req });
+      const data = await this.prostgles.getClientSchema({ httpReq: req, res });
       res.json(data);
     } catch (rawError) {
       const error = getSerializedClientErrorFromPGError(rawError, {
         type: "method",
-        localParams: { httpReq: req },
+        localParams: { clientReq: { httpReq: req, res } },
       });
       res.status(400).json({ error });
     }
   };
   onPostSql = async (req: ExpressReq, res: ExpressRes) => {
-    const [query, args, options] = req.body || [];
+    const [query, params, options] = req.body || [];
     try {
-      const data = await runClientSqlRequest.bind(this.prostgles)({
-        type: "http",
-        httpReq: req,
-        query,
-        args,
-        options,
-      });
+      const data = await runClientSqlRequest.bind(this.prostgles)(
+        {
+          query,
+          params,
+          options,
+        },
+        {
+          res,
+          httpReq: req,
+        }
+      );
       res.json(data);
     } catch (rawError) {
       const error = getSerializedClientErrorFromPGError(rawError, {
         type: "sql",
-        localParams: { httpReq: req },
+        localParams: { clientReq: { httpReq: req, res } },
       });
       res.status(400).json({ error });
     }
   };
 
-  onPost = async (req: ExpressReq, res: ExpressRes) => {
+  onPostTableCommand = async (req: ExpressReq, res: ExpressRes) => {
     const { params } = req;
     const { tableName, command } = params;
     if (!tableName || typeof tableName !== "string") {
@@ -135,20 +143,24 @@ export class RestApi {
 
     try {
       const [param1, param2, param3] = req.body || [];
-      const data = await runClientRequest.bind(this.prostgles)({
-        type: "http",
-        httpReq: req,
-        tableName,
-        command,
-        param1,
-        param2,
-        param3,
-      });
+      const data = await runClientRequest.bind(this.prostgles)(
+        {
+          tableName,
+          command,
+          param1,
+          param2,
+          param3,
+        },
+        {
+          httpReq: req,
+          res,
+        }
+      );
       res.json(data);
     } catch (rawError) {
       const error = getSerializedClientErrorFromPGError(rawError, {
         type: "tableMethod",
-        localParams: { httpReq: req },
+        localParams: { clientReq: { httpReq: req, res } },
         view: this.prostgles.dboBuilder.dbo[tableName],
       });
       res.status(400).json({ error });

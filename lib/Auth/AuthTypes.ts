@@ -46,9 +46,10 @@ export type BasicSession = {
   /** On expired */
   onExpiration: "redirect" | "show_error";
 };
-export type AuthClientRequest =
-  | { socket: PRGLIOSocket; httpReq?: undefined }
-  | { httpReq: ExpressReq; socket?: undefined };
+
+type SocketClientRequest = { socket: PRGLIOSocket; httpReq?: undefined };
+type HttpClientRequest = { httpReq: ExpressReq; res: ExpressRes; socket?: undefined };
+export type AuthClientRequest = SocketClientRequest | HttpClientRequest;
 
 type ThirdPartyProviders = {
   facebook?: Pick<FacebookStrategy, "clientID" | "clientSecret"> & {
@@ -239,20 +240,30 @@ export type SessionUser<
   clientUser: ClientUser;
 };
 
-export type AuthResult<SU = SessionUser> =
-  | AuthFailure["code"]
+export type AuthResultWithSID<SU = SessionUser> =
   | (SU & { sid: string })
   | {
-      user?: undefined;
-      clientUser?: undefined;
       sid?: string | undefined;
+      user?: undefined;
+      sessionFields?: undefined;
+      clientUser?: undefined;
     }
   | undefined;
+
+export type AuthResult<SU = SessionUser> =
+  | SU
+  | {
+      user?: undefined;
+      sessionFields?: undefined;
+      clientUser?: undefined;
+    }
+  | undefined;
+export type AuthResultOrError<SU = SessionUser> = AuthFailure["code"] | AuthResult<SU>;
 
 export type AuthRequestParams<S, SUser extends SessionUser> = {
   db: DB;
   dbo: DBOFullyTyped<S>;
-  getUser: () => Promise<AuthResult<SUser>>;
+  getUser: () => Promise<AuthResultOrError<SUser>>;
 };
 
 export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
@@ -270,7 +281,7 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
     dbo: DBOFullyTyped<S>,
     db: DB,
     client: AuthClientRequest & LoginClientInfo
-  ) => Awaitable<AuthResult<SUser>>;
+  ) => Awaitable<AuthResultOrError<SUser>>;
 
   /**
    * Will setup auth routes

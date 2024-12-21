@@ -1,11 +1,7 @@
 import { FileColumnConfig } from "prostgles-types";
 import { Auth, AuthRequestParams, SessionUser } from "./Auth/AuthTypes";
 import { EventTriggerTagFilter } from "./Event_Trigger_Tags";
-import {
-  CloudClient,
-  ImageOptions,
-  LocalConfig,
-} from "./FileManager/FileManager";
+import { CloudClient, ImageOptions, LocalConfig } from "./FileManager/FileManager";
 import { DbConnection, OnReadyCallback } from "./initProstgles";
 import { EventInfo } from "./Logging";
 import { ExpressApp, RestApiConfig } from "./RestApi";
@@ -20,11 +16,7 @@ import pg from "pg-promise/typescript/pg-subset";
 import { AnyObject } from "prostgles-types";
 import type { Server } from "socket.io";
 import { DB } from "./Prostgles";
-import {
-  Publish,
-  PublishMethods,
-  PublishParams,
-} from "./PublishParser/PublishParser";
+import { Awaitable, Publish, PublishMethods, PublishParams } from "./PublishParser/PublishParser";
 
 /**
  * Allows uploading and downloading files.
@@ -102,12 +94,7 @@ export type FileTableConfig = {
   localConfig?: LocalConfig;
 };
 
-export const JOIN_TYPES = [
-  "one-many",
-  "many-one",
-  "one-one",
-  "many-many",
-] as const;
+export const JOIN_TYPES = ["one-many", "many-one", "one-one", "many-many"] as const;
 export type Join = {
   tables: [string, string];
   on: { [key: string]: string }[]; // Allow multi references to table
@@ -115,10 +102,7 @@ export type Join = {
 };
 type Joins = Join[] | "inferred";
 
-export type ProstglesInitOptions<
-  S = void,
-  SUser extends SessionUser = SessionUser,
-> = {
+export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUser> = {
   /**
    * Database connection details and options
    */
@@ -187,9 +171,7 @@ export type ProstglesInitOptions<
   /**
    * If defined and resolves to true then the connected client can run SQL queries
    */
-  publishRawSQL?(
-    params: PublishParams<S, SUser>,
-  ): (boolean | "*") | Promise<boolean | "*">;
+  publishRawSQL?(params: PublishParams<S, SUser>): Awaitable<boolean | "*">;
 
   /**
    * Server-side functions that can be invoked by the client
@@ -236,14 +218,14 @@ export type ProstglesInitOptions<
    * Use for connection verification. Will disconnect socket on any errors
    */
   onSocketConnect?: (
-    args: AuthRequestParams<S, SUser> & { socket: PRGLIOSocket },
+    args: AuthRequestParams<S, SUser> & { socket: PRGLIOSocket }
   ) => void | Promise<void>;
 
   /**
    * Called when a socket disconnects
    */
   onSocketDisconnect?: (
-    args: AuthRequestParams<S, SUser> & { socket: PRGLIOSocket },
+    args: AuthRequestParams<S, SUser> & { socket: PRGLIOSocket }
   ) => void | Promise<void>;
 
   /**
@@ -281,11 +263,7 @@ export type ProstglesInitOptions<
    * - `OnSchemaChangeCallback` - custom callback to be fired. Nothing else triggered
    * Useful for development
    */
-  watchSchema?:
-    | boolean
-    | EventTriggerTagFilter
-    | "hotReloadMode"
-    | OnSchemaChangeCallback;
+  watchSchema?: boolean | EventTriggerTagFilter | "hotReloadMode" | OnSchemaChangeCallback;
 
   /**
    * Called when a notice is received from the database
@@ -357,6 +335,6 @@ type OnMigrate = (args: {
   getConstraints: (
     table: string,
     column?: string,
-    types?: ColConstraint["type"][],
+    types?: ColConstraint["type"][]
   ) => Promise<ColConstraint[]>;
 }) => void;

@@ -1,5 +1,5 @@
 import * as fs from "fs";
-import { asName, tryCatch } from "prostgles-types";
+import { asName, tryCatch, tryCatchV2 } from "prostgles-types";
 import { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { canCreateTables } from "../DboBuilder/runSQL";
 import { Prostgles } from "../Prostgles";
@@ -24,7 +24,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
 
   const canCreate = await canCreateTables(this.db);
   const runQuery = async (q: string, debugInfo: string): Promise<void> => {
-    const res = await tryCatch(async () => {
+    const res = await tryCatchV2(async () => {
       if (!canCreate)
         throw "File table creation failed. Your postgres user does not have CREATE table privileges";
       await this.db.any(q);
@@ -35,7 +35,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
       ...res,
       data: { debugInfo },
     });
-    if (res.error) {
+    if (res.hasError) {
       throw res.error;
     }
   };
@@ -161,15 +161,19 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
           content_type: 1,
         },
       };
-      const media = await runClientRequest.bind(this.prostgles)({
-        type: "http",
-        httpReq: req,
-        command: "findOne",
-        tableName,
-        param1: { id },
-        param2: selectParams,
-        param3: undefined,
-      });
+      const media = await runClientRequest.bind(this.prostgles)(
+        {
+          command: "findOne",
+          tableName,
+          param1: { id },
+          param2: selectParams,
+          param3: undefined,
+        },
+        {
+          res,
+          httpReq: req,
+        }
+      );
 
       if (!media) {
         res.status(HTTP_FAIL_CODES.NOT_FOUND).send("File not found or not allowed");

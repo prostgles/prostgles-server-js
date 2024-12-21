@@ -1,27 +1,18 @@
 import {
   DBSchemaTable,
+  getKeys,
   MethodKey,
+  pickKeys,
   TableInfo,
   TableSchemaErrors,
   TableSchemaForClient,
-  getKeys,
-  pickKeys,
 } from "prostgles-types";
-import { AuthResult, ExpressReq } from "../Auth/AuthTypes";
-import { getErrorAsObject, PRGLIOSocket } from "../DboBuilder/DboBuilder";
-import { PublishObject, PublishParser } from "./PublishParser";
+import { AuthClientRequest, AuthResult } from "../Auth/AuthTypes";
+import { getErrorAsObject } from "../DboBuilder/DboBuilder";
 import { TABLE_METHODS } from "../Prostgles";
+import { PublishObject, PublishParser } from "./PublishParser";
 
-type Args = (
-  | {
-      socket: PRGLIOSocket;
-      httpReq?: undefined;
-    }
-  | {
-      httpReq: ExpressReq;
-      socket?: undefined;
-    }
-) & {
+type Args = AuthClientRequest & {
   userData: AuthResult | undefined;
 };
 
@@ -39,7 +30,8 @@ export async function getSchemaFromPublish(
 
   try {
     /* Publish tables and views based on socket */
-    const clientInfo = userData ?? (await this.prostgles.authHandler?.getClientInfo(clientReq));
+    const clientInfo =
+      userData ?? (await this.prostgles.authHandler?.getUserFromRequest(clientReq));
 
     let _publish: PublishObject | undefined;
     try {
@@ -81,10 +73,7 @@ export async function getSchemaFromPublish(
             throw errMsg;
           }
 
-          const table_rules = await this.getTableRules(
-            { localParams: clientReq, tableName },
-            clientInfo
-          );
+          const table_rules = await this.getTableRules({ clientReq, tableName }, clientInfo);
 
           if (table_rules && Object.keys(table_rules).length) {
             schema[tableName] = {};
@@ -117,13 +106,13 @@ export async function getSchemaFromPublish(
                       : {};
 
                     /* Test for issues with the common table CRUD methods () */
-                    if (TABLE_METHODS.includes(method as any)) {
+                    if (TABLE_METHODS.some((tm) => tm === method)) {
                       try {
                         const valid_table_command_rules = await this.getValidatedRequestRule(
                           {
                             tableName,
                             command: method,
-                            localParams: clientReq,
+                            clientReq,
                           },
                           clientInfo
                         );
@@ -156,7 +145,7 @@ export async function getSchemaFromPublish(
 
                     if (method === "getInfo" || method === "getColumns") {
                       const tableRules = await this.getValidatedRequestRule(
-                        { tableName, command: method, localParams: clientReq },
+                        { tableName, command: method, clientReq },
                         clientInfo
                       );
                       const res = await (this.dbo[tableName] as any)[method](

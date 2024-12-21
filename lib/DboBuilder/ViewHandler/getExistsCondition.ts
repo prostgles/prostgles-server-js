@@ -29,15 +29,15 @@ export async function getExistsCondition(
     tableAlias;
 
   /* Check if allowed to view data - forcedFilters will bypass this check through isForcedFilterBypass */
-  if (localParams?.isRemoteRequest && !localParams.socket && !localParams.httpReq) {
-    throw "Unexpected: localParams isRemoteRequest and missing socket/httpReq: ";
+  if (localParams?.isRemoteRequest && !localParams.clientReq) {
+    throw "Unexpected: localParams isRemoteRequest and missing clientReq";
   }
   const targetTable = eConfig.isJoined ? eConfig.parsedPath.at(-1)!.table : eConfig.targetTable;
-  if ((localParams?.socket || localParams?.httpReq) && this.dboBuilder.publishParser) {
+  if (localParams?.clientReq && this.dboBuilder.publishParser) {
     t2Rules = (await this.dboBuilder.publishParser.getValidatedRequestRuleWusr({
       tableName: targetTable,
       command: "find",
-      localParams,
+      clientReq: localParams.clientReq,
     })) as TableRule | undefined;
 
     if (!t2Rules || !t2Rules.select) throw "Dissallowed";

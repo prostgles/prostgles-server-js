@@ -23,8 +23,8 @@ export async function insert(
   const ACTION = "insert";
   const start = Date.now();
   try {
-    const { removeDisallowedFields = false } = insertParams || {};
-    const { returnQuery = false, nestedInsert } = localParams || {};
+    const { removeDisallowedFields = false } = insertParams ?? {};
+    const { returnQuery = false, nestedInsert } = localParams ?? {};
 
     const finalDBtx = this.getFinalDBtx(localParams);
     const rule = tableRules?.[ACTION];

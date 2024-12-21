@@ -3,12 +3,13 @@ import { LocalParams, TableHandlers } from "./DboBuilder";
 import { TableRule } from "../PublishParser/PublishParser";
 import { omitKeys } from "../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler/TableHandler";
+import { AuthClientRequest } from "../Auth/AuthTypes";
 
 type InsertNestedRecordsArgs = {
   data: AnyObject | AnyObject[];
   param2?: InsertParams;
-  tableRules?: TableRule;
-  localParams?: LocalParams;
+  tableRules: TableRule | undefined;
+  localParams: LocalParams | undefined;
 };
 
 /**
@@ -16,7 +17,7 @@ type InsertNestedRecordsArgs = {
  */
 export async function insertNestedRecords(
   this: TableHandler,
-  { data, param2, tableRules, localParams = {} }: InsertNestedRecordsArgs
+  { data, param2, tableRules, localParams }: InsertNestedRecordsArgs
 ): Promise<{
   data?: AnyObject | AnyObject[];
   insertResult?: AnyObject | AnyObject[];
@@ -60,7 +61,7 @@ export async function insertNestedRecords(
    * Make sure nested insert uses a transaction
    */
   const dbTX = this.getFinalDBtx(localParams);
-  const t = localParams.tx?.t || this.tx?.t;
+  const t = localParams?.tx?.t || this.tx?.t;
   if (hasNestedInserts && (!dbTX || !t)) {
     return {
       insertResult: await this.dboBuilder.getTX((dbTX, _t) =>
@@ -107,7 +108,7 @@ export async function insertNestedRecords(
             const newLocalParams: LocalParams = {
               ...localParams,
               nestedInsert: {
-                depth: (localParams.nestedInsert?.depth ?? 0) + 1,
+                depth: (localParams?.nestedInsert?.depth ?? 0) + 1,
                 previousData: rootData,
                 previousTable: this.name,
                 referencingColumn: colInsert.col,
@@ -165,8 +166,13 @@ export async function insertNestedRecords(
 
         await Promise.all(
           extraKeys.map(async (targetTable) => {
-            const childDataItems =
+            const childDataItems: AnyObject[] =
               Array.isArray(row[targetTable]) ? row[targetTable] : [row[targetTable]];
+
+            /** check */
+            if (childDataItems.some((d) => !isObject(d))) {
+              throw "Expected array of objects";
+            }
 
             const childInsert = async (cdata: AnyObject | AnyObject[], tableName: string) => {
               return referencedInsert(this, dbTX, localParams, tableName, cdata);
@@ -176,7 +182,7 @@ export async function insertNestedRecords(
 
             const { path } = joinPath;
             const [tbl1, tbl2, tbl3] = path;
-            targetTableRules = await getInsertTableRules(this, targetTable, localParams);
+            targetTableRules = await getInsertTableRules(this, targetTable, localParams?.clientReq);
 
             const cols2 = this.dboBuilder.dbo[tbl2!]!.columns || [];
             if (!this.dboBuilder.dbo[tbl2!]) throw "Invalid/disallowed table: " + tbl2;
@@ -299,12 +305,12 @@ export async function insertNestedRecords(
 export const getInsertTableRules = async (
   tableHandler: TableHandler,
   targetTable: string,
-  localParams: LocalParams
+  clientReq: AuthClientRequest | undefined
 ) => {
   const childRules = await tableHandler.dboBuilder.publishParser?.getValidatedRequestRuleWusr({
     tableName: targetTable,
     command: "insert",
-    localParams,
+    clientReq,
   });
   if (!childRules || !childRules.insert) throw "Dissallowed nested insert into table " + childRules;
   return childRules;
@@ -332,22 +338,18 @@ const getJoinPath = async (
 const referencedInsert = async (
   tableHandler: TableHandler,
   dbTX: TableHandlers | undefined,
-  localParams: LocalParams,
+  localParams: LocalParams | undefined,
   targetTable: string,
   targetData: AnyObject | AnyObject[]
 ): Promise<AnyObject[]> => {
   await getJoinPath(tableHandler, targetTable);
 
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  if (!targetData || !dbTX?.[targetTable] || !("insert" in dbTX[targetTable]!)) {
+  if (!dbTX?.[targetTable] || !("insert" in dbTX[targetTable]!)) {
     throw new Error("childInsertErr: Table handler missing for referenced table: " + targetTable);
   }
 
-  const childRules = await getInsertTableRules(tableHandler, targetTable, localParams);
+  const childRules = await getInsertTableRules(tableHandler, targetTable, localParams?.clientReq);
 
-  // if (thisInfo.has_media === "one" && thisInfo.media_table_name === targetTable && Array.isArray(targetData) && targetData.length > 1) {
-  //   throw "Constraint check fail: Cannot insert more than one record into " + JSON.stringify(targetTable);
-  // }
   return Promise.all(
     (Array.isArray(targetData) ? targetData : [targetData]).map((m) =>
       (dbTX![targetTable] as TableHandler)

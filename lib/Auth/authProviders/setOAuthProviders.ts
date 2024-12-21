@@ -56,7 +56,7 @@ export function setOAuthProviders(
 
     app.get(callbackPath, async (req, res) => {
       try {
-        const clientInfo = getClientRequestIPsInfo({ httpReq: req });
+        const clientInfo = getClientRequestIPsInfo({ httpReq: req, res });
         const db = this.db;
         const dbo = this.dbo as any;
         const args = { provider: providerName, req, res, clientInfo, db, dbo };

@@ -20,7 +20,6 @@ import TableConfigurator from "./TableConfig/TableConfig";
 import {
   DBHandlerServer,
   DboBuilder,
-  LocalParams,
   PRGLIOSocket,
   getErrorAsObject,
 } from "./DboBuilder/DboBuilder";
@@ -67,6 +66,7 @@ const DEFAULT_KEYWORDS = {
 
 import { randomUUID } from "crypto";
 import * as fs from "fs";
+import { AuthClientRequest } from "./Auth/AuthTypes";
 
 export class Prostgles {
   /**
@@ -383,14 +383,7 @@ export class Prostgles {
 
     if (!this.dbo) throw "dbo missing";
 
-    const publishParser = new PublishParser(
-      this.opts.publish,
-      this.opts.publishMethods,
-      this.opts.publishRawSQL,
-      this.dbo,
-      this.db!,
-      this
-    );
+    const publishParser = new PublishParser(this);
     this.publishParser = publishParser;
 
     if (!this.opts.io) return;
@@ -413,15 +406,14 @@ export class Prostgles {
 
   onSocketConnected = onSocketConnected.bind(this);
 
-  getClientSchema = async (clientReq: Pick<LocalParams, "socket" | "httpReq">) => {
+  getClientSchema = async (clientReq: AuthClientRequest) => {
     const result = await tryCatchV2(async () => {
       const clientInfo =
-        clientReq.socket ? { type: "socket" as const, socket: clientReq.socket }
-        : clientReq.httpReq ? { type: "http" as const, httpReq: clientReq.httpReq }
-        : undefined;
-      if (!clientInfo) throw "Invalid client";
+        clientReq.socket ?
+          { type: "socket" as const, ...clientReq }
+        : { type: "http" as const, ...clientReq };
 
-      const userData = await this.authHandler?.getClientInfo(clientInfo);
+      const userData = await this.authHandler?.getUserFromRequest(clientInfo);
       const { publishParser } = this;
       let fullSchema: Awaited<ReturnType<PublishParser["getSchemaFromPublish"]>> | undefined;
       let publishValidationError;
@@ -501,7 +493,7 @@ export class Prostgles {
         userData,
       };
     });
-    const sid = result.data?.userData?.sid ?? this.authHandler?.getSIDNoError(clientReq);
+    const sid = this.authHandler?.getSIDNoError(clientReq);
     await this.opts.onLog?.({
       type: "connect.getClientSchema",
       duration: result.duration,
@@ -522,19 +514,13 @@ export class Prostgles {
         socket.on(
           CHANNELS.SQL,
           async (
-            { query, params, options }: SQLRequest,
+            sqlRequestData: SQLRequest,
             cb = (..._callback: any) => {
               /* Empty */
             }
           ) => {
             runClientSqlRequest
-              .bind(this)({
-                type: "socket",
-                socket,
-                query,
-                args: params,
-                options,
-              })
+              .bind(this)(sqlRequestData, { socket })
               .then((res) => {
                 cb(null, res);
               })

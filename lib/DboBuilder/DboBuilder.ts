@@ -188,7 +188,7 @@ export class DboBuilder {
     query: string,
     params: any,
     options: SQLOptions | undefined,
-    localParams?: LocalParams
+    localParams: LocalParams | undefined
   ) => {
     return runSQL
       .bind(this)(query, params, options, localParams)
@@ -325,8 +325,12 @@ export class DboBuilder {
         const handlerClass = tov.is_view ? ViewHandler : TableHandler;
         dbTX[tov.name] = new handlerClass(this.db, tov, this, { t, dbTX }, this.shortestJoinPaths);
       });
-      dbTX.sql = (q, args, opts, localP) =>
-        this.runSQL(q, args, opts, { tx: { dbTX, t }, ...(localP ?? {}) });
+      dbTX.sql = (q, args, opts, localParams) => {
+        if (localParams?.tx) {
+          throw "Cannot run transaction within transaction";
+        }
+        return this.runSQL(q, args, opts, { ...localParams, tx: { dbTX, t } });
+      };
 
       return cb(dbTX, t);
     });

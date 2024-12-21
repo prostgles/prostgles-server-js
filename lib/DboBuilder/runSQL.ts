@@ -3,13 +3,14 @@ import pg from "pg-promise/typescript/pg-subset";
 import { AnyObject, SQLOptions, SQLResult, SQLResultInfo } from "prostgles-types";
 import { DB, Prostgles } from "../Prostgles";
 import { DboBuilder, LocalParams, pgp, postgresToTsType } from "./DboBuilder";
+import { AuthClientRequest } from "../Auth/AuthTypes";
 
 export async function runSQL(
   this: DboBuilder,
   queryWithoutRLS: string,
   args: undefined | AnyObject | any[],
   options: SQLOptions | undefined,
-  localParams?: LocalParams
+  localParams: LocalParams | undefined
 ) {
   const queryWithRLS = queryWithoutRLS;
   if (
@@ -29,17 +30,17 @@ export async function runSQL(
 
   await this.cacheDBTypes();
 
-  if (!(await canRunSQL(this.prostgles, localParams))) {
+  if (!(await canRunSQL(this.prostgles, localParams?.clientReq))) {
     throw "Not allowed to run SQL";
   }
 
   const { returnType, allowListen, hasParams = true }: SQLOptions = options || ({} as SQLOptions);
-  const { socket } = localParams || {};
+  const { socket } = localParams?.clientReq ?? {};
 
   const db = localParams?.tx?.t || this.db;
   if (returnType === "stream") {
     if (localParams?.tx) throw "Cannot use stream with localParams transaction";
-    if (!socket) throw "Only allowed with client socket";
+    if (!socket) throw "stream allowed only with client socket";
     const streamInfo = await this.queryStreamer.create({
       socket,
       query: pgp.as.format(queryWithRLS, args),
@@ -47,7 +48,7 @@ export async function runSQL(
     });
     return streamInfo;
   } else if (returnType === "noticeSubscription") {
-    if (!socket) throw "Only allowed with client socket";
+    if (!socket) throw "noticeSubscription allowed only with client socket";
     return await this.prostgles.dbEventsManager?.addNotice(socket);
   } else if (returnType === "statement") {
     try {
@@ -86,7 +87,7 @@ export async function runSQL(
     queryWithoutRLS,
     queryResult,
     allowListen,
-    localParams
+    localParams?.clientReq
   );
   if (listenHandlers) {
     return listenHandlers;
@@ -115,7 +116,7 @@ const onSQLResult = async function (
   queryWithoutRLS: string,
   { command }: Omit<SQLResultInfo, "duration">,
   allowListen: boolean | undefined,
-  localParams?: LocalParams
+  clientReq: AuthClientRequest | undefined
 ) {
   this.prostgles.schemaWatch?.onSchemaChangeFallback?.({
     command,
@@ -123,12 +124,12 @@ const onSQLResult = async function (
   });
 
   if (command === "LISTEN") {
-    const { socket } = localParams || {};
+    const { socket } = clientReq || {};
     if (!allowListen)
       throw new Error(
         `Your query contains a LISTEN command. Set { allowListen: true } to get subscription hooks. Or ignore this message`
       );
-    if (!socket) throw "Only allowed with client socket";
+    if (!socket) throw "LISTEN allowed only with client socket";
     return await this.prostgles.dbEventsManager?.addNotify(queryWithoutRLS, socket);
   }
 };
@@ -188,14 +189,11 @@ export function getDetailedFieldInfo(this: DboBuilder, fields: pg.IColumn[]) {
 
 export const canRunSQL = async (
   prostgles: Prostgles,
-  localParams?: LocalParams
+  clientReq: AuthClientRequest | undefined
 ): Promise<boolean> => {
-  if (!localParams?.socket || !localParams.httpReq) return true;
+  if (!clientReq) return true;
 
-  const { socket } = localParams;
-  const publishParams = await prostgles.publishParser!.getPublishParams({
-    socket,
-  });
+  const publishParams = await prostgles.publishParser!.getPublishParams(clientReq);
   //@ts-ignore
   const res = await prostgles.opts.publishRawSQL?.(publishParams);
   return Boolean((res && typeof res === "boolean") || res === "*");
@@ -204,5 +202,5 @@ export const canRunSQL = async (
 export const canCreateTables = async (db: DB): Promise<boolean> => {
   return db
     .any(`SELECT has_database_privilege(current_database(), 'create') as yes`)
-    .then((rows) => rows[0].yes === true);
+    .then((rows: { yes: boolean }[]) => rows[0]?.yes === true);
 };

@@ -1,6 +1,5 @@
 import { AnyObject, FullFilter, isDefined } from "prostgles-types";
-import { AuthResult } from "../Auth/AuthTypes";
-import { LocalParams } from "../DboBuilder/DboBuilder";
+import { AuthClientRequest, AuthResult } from "../Auth/AuthTypes";
 import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
 import { PublishParser } from "./PublishParser";
 import { ParsedPublishTable, UpdateRule } from "./publishTypesAndUtils";
@@ -17,8 +16,8 @@ export async function getFileTableRules(
   this: PublishParser,
   fileTableName: string,
   fileTablePublishRules: ParsedPublishTable | undefined,
-  localParams: LocalParams,
-  clientInfo: AuthResult | undefined,
+  clientReq: AuthClientRequest | undefined,
+  clientInfo: AuthResult | undefined
 ) {
   const forcedDeleteFilters: FullFilter<AnyObject, void>[] = [];
   const forcedSelectFilters: FullFilter<AnyObject, void>[] = [];
@@ -28,7 +27,7 @@ export async function getFileTableRules(
     ?.filter((t) => !t.is_view && t.name !== fileTableName)
     .map((t) => {
       const refCols = t.columns.filter((c) =>
-        c.references?.some((r) => r.ftable === fileTableName),
+        c.references?.some((r) => r.ftable === fileTableName)
       );
       if (!refCols.length) return undefined;
       return {
@@ -39,65 +38,46 @@ export async function getFileTableRules(
     })
     .filter(isDefined);
   if (referencedColumns?.length) {
-    for await (const {
-      tableName,
-      fileColumns,
-      allColumns,
-    } of referencedColumns) {
-      const table_rules = await this.getTableRules(
-        { localParams, tableName },
-        clientInfo,
-      );
-      if (table_rules) {
+    for await (const { tableName, fileColumns, allColumns } of referencedColumns) {
+      const tableRules = await this.getTableRules({ clientReq, tableName }, clientInfo);
+      if (tableRules) {
         fileColumns.map((column) => {
           const path = [{ table: tableName, on: [{ id: column }] }];
-          if (table_rules.delete) {
+          if (tableRules.delete) {
             forcedDeleteFilters.push({
               $existsJoined: {
                 path,
-                filter: table_rules.delete.forcedFilter ?? {},
+                filter: tableRules.delete.forcedFilter ?? {},
               },
             });
           }
-          if (table_rules.select) {
-            const parsedFields = parseFieldFilter(
-              table_rules.select.fields,
-              false,
-              allColumns,
-            );
+          if (tableRules.select) {
+            const parsedFields = parseFieldFilter(tableRules.select.fields, false, allColumns);
             /** Must be allowed to view this column */
             if (parsedFields.includes(column as any)) {
               forcedSelectFilters.push({
                 $existsJoined: {
                   path,
-                  filter: table_rules.select.forcedFilter ?? {},
+                  filter: tableRules.select.forcedFilter ?? {},
                 },
               });
             }
           }
-          if (table_rules.insert) {
-            const parsedFields = parseFieldFilter(
-              table_rules.insert.fields,
-              false,
-              allColumns,
-            );
+          if (tableRules.insert) {
+            const parsedFields = parseFieldFilter(tableRules.insert.fields, false, allColumns);
             /** Must be allowed to view this column */
             if (parsedFields.includes(column as any)) {
               allowedNestedInserts.push({ table: tableName, column });
             }
           }
-          if (table_rules.update) {
-            const parsedFields = parseFieldFilter(
-              table_rules.update.fields,
-              false,
-              allColumns,
-            );
+          if (tableRules.update) {
+            const parsedFields = parseFieldFilter(tableRules.update.fields, false, allColumns);
             /** Must be allowed to view this column */
             if (parsedFields.includes(column as any)) {
               forcedUpdateFilters.push({
                 $existsJoined: {
                   path,
-                  filter: table_rules.update.forcedFilter ?? {},
+                  filter: tableRules.update.forcedFilter ?? {},
                 },
               });
             }
@@ -113,15 +93,13 @@ export async function getFileTableRules(
 
   const getForcedFilter = (
     rule: Pick<UpdateRule, "forcedFilter"> | undefined,
-    forcedFilters: FullFilter<AnyObject, void>[],
+    forcedFilters: FullFilter<AnyObject, void>[]
   ) => {
-    return rule && !rule.forcedFilter
-      ? {}
+    return rule && !rule.forcedFilter ?
+        {}
       : {
           forcedFilter: {
-            $or: forcedFilters.concat(
-              rule?.forcedFilter ? [rule.forcedFilter] : [],
-            ),
+            $or: forcedFilters.concat(rule?.forcedFilter ? [rule.forcedFilter] : []),
           },
         };
   };
@@ -151,17 +129,15 @@ export async function getFileTableRules(
     fileTableRule.insert = {
       fields: "*",
       ...fileTablePublishRules?.insert,
-      allowedNestedInserts: fileTablePublishRules?.insert
-        ? undefined
-        : allowedNestedInserts,
+      allowedNestedInserts: fileTablePublishRules?.insert ? undefined : allowedNestedInserts,
     };
   }
 
   /** Add missing implied methods (getColumns, getInfo) */
   const rules = await this.getTableRulesWithoutFileTable.bind(this)(
-    { localParams, tableName: fileTableName },
+    { clientReq, tableName: fileTableName },
     clientInfo,
-    { [fileTableName]: fileTableRule },
+    { [fileTableName]: fileTableRule }
   );
   return { rules, allowedInserts: allowedNestedInserts };
 }

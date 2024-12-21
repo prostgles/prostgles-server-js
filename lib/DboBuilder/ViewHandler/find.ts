@@ -203,7 +203,7 @@ export const runQueryReturnType = async ({
         })
       );
   } else if (sqlTypes.some((v) => v === returnType)) {
-    if (!(await canRunSQL(handler.dboBuilder.prostgles, localParams))) {
+    if (!(await canRunSQL(handler.dboBuilder.prostgles, localParams?.clientReq))) {
       throw `Not allowed:  { returnType: ${JSON.stringify(returnType)} } requires execute sql privileges `;
     }
     if (returnType === "statement-no-rls") {

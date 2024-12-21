@@ -40,7 +40,7 @@ export const getRegisterRequestHandler = ({
       }
     }
     try {
-      const { httpReq, ...clientInfo } = getClientRequestIPsInfo({ httpReq: req });
+      const { httpReq, ...clientInfo } = getClientRequestIPsInfo({ httpReq: req, res });
       const { smtp } = emailAuthConfig;
       const errCodeOrResult =
         emailAuthConfig.signupType === "withPassword" ?

@@ -80,10 +80,7 @@ export const renderReactHookManual = async <H extends Hook>(rootArgs: {
   onEnd?: OnEnd<H>;
   onRender?: OnEnd<H>;
 }): Promise<{
-  setProps: (
-    props: Parameters<H>,
-    opts: { waitFor?: number; onEnd?: OnEnd<H> },
-  ) => void;
+  setProps: (props: Parameters<H>, opts: { waitFor?: number; onEnd?: OnEnd<H> }) => void;
   getResults: () => ReturnType<H>[];
 }> => {
   const { hook, onUnmount, renderDuration = 250, onEnd, onRender } = rootArgs;
@@ -127,19 +124,11 @@ export const renderReactHookManual = async <H extends Hook>(rootArgs: {
       onCompRender(result);
       return React.createElement("h1", null, `Hello`);
     };
-    root.render(
-      React.createElement(
-        BasicComponent,
-        { props: rootArgs.initialProps },
-        null,
-      ),
-    );
+    root.render(React.createElement(BasicComponent, { props: rootArgs.initialProps }, null));
   });
 };
 
-export const renderReactHook = (
-  rootArgs: RenderHookArgs,
-): Promise<RenderResult> => {
+export const renderReactHook = (rootArgs: RenderHookArgs): Promise<RenderResult> => {
   const {
     hook,
     props,
@@ -189,8 +178,8 @@ export const renderReactHook = (
       if (!resolved) {
         reject(
           new Error(
-            `Expected ${expectedRerenders} rerenders, got ${results.length}:\n${JSON.stringify(results)}`,
-          ),
+            `Expected ${expectedRerenders} rerenders, got ${results.length}:\n${JSON.stringify(results)}`
+          )
         );
       }
     }, timeout);

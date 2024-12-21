@@ -23,7 +23,7 @@ export const getConfirmEmailRequestHandler = (
       if (!id || typeof id !== "string") {
         return res.send({ success: false, code: "something-went-wrong", message: "Invalid code" });
       }
-      const { httpReq, ...clientInfo } = getClientRequestIPsInfo({ httpReq: req });
+      const { httpReq, ...clientInfo } = getClientRequestIPsInfo({ httpReq: req, res });
       await emailAuthConfig.onEmailConfirmation({
         confirmationCode: id,
         clientInfo,
