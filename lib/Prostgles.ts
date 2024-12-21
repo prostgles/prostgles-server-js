@@ -27,7 +27,15 @@ import {
 export { DBHandlerServer };
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 
-import { CHANNELS, ClientSchema, SQLRequest, isObject, omitKeys, tryCatch } from "prostgles-types";
+import {
+  CHANNELS,
+  ClientSchema,
+  SQLRequest,
+  isObject,
+  omitKeys,
+  tryCatch,
+  tryCatchV2,
+} from "prostgles-types";
 import { DBEventsManager } from "./DBEventsManager";
 import { PublishParser } from "./PublishParser/PublishParser";
 export { getOrSetTransporter, sendEmail, verifySMTPConfig } from "./Auth/sendEmail";
@@ -406,13 +414,13 @@ export class Prostgles {
   onSocketConnected = onSocketConnected.bind(this);
 
   getClientSchema = async (clientReq: Pick<LocalParams, "socket" | "httpReq">) => {
-    const result = await tryCatch(async () => {
+    const result = await tryCatchV2(async () => {
       const clientInfo =
         clientReq.socket ? { type: "socket" as const, socket: clientReq.socket }
         : clientReq.httpReq ? { type: "http" as const, httpReq: clientReq.httpReq }
         : undefined;
       if (!clientInfo) throw "Invalid client";
-      // if (!this.authHandler) throw "this.authHandler missing";
+
       const userData = await this.authHandler?.getClientInfo(clientInfo);
       const { publishParser } = this;
       let fullSchema: Awaited<ReturnType<PublishParser["getSchemaFromPublish"]>> | undefined;
@@ -493,16 +501,16 @@ export class Prostgles {
         userData,
       };
     });
-    const sid = result.userData?.sid ?? this.authHandler?.getSIDNoError(clientReq);
+    const sid = result.data?.userData?.sid ?? this.authHandler?.getSIDNoError(clientReq);
     await this.opts.onLog?.({
       type: "connect.getClientSchema",
       duration: result.duration,
       sid,
       socketId: clientReq.socket?.id,
-      error: result.error || result.publishValidationError,
+      error: result.error || result.data?.publishValidationError,
     });
     if (result.hasError) throw result.error;
-    return result.clientSchema;
+    return result.data.clientSchema;
   };
 
   pushSocketSchema = async (socket: PRGLIOSocket) => {

@@ -240,6 +240,7 @@ export type SessionUser<
 };
 
 export type AuthResult<SU = SessionUser> =
+  | AuthFailure["code"]
   | (SU & { sid: string })
   | {
       user?: undefined;

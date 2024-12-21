@@ -358,7 +358,7 @@ export class AuthHandler {
     const isSocket = "socket" in localParams;
     if (isSocket && getSession && localParams.socket?.__prglCache) {
       const { session, user, clientUser } = localParams.socket.__prglCache;
-      const isValid = this.isValidSocketSession(localParams.socket, session);
+      const isValid = this.isNonExpiredSocketSession(localParams.socket, session);
       if (isValid) {
         return {
           sid: session.sid,
@@ -390,6 +390,7 @@ export class AuthHandler {
             this.db,
             getClientRequestIPsInfo(clientReq)
           );
+          if (typeof clientInfo === "string") throw clientInfo;
           user = clientInfo?.user;
           clientUser = clientInfo?.clientUser;
         }
@@ -421,7 +422,10 @@ export class AuthHandler {
     return clientInfo;
   }
 
-  isValidSocketSession = (socket: PRGLIOSocket, session: BasicSession | undefined): boolean => {
+  isNonExpiredSocketSession = (
+    socket: PRGLIOSocket,
+    session: BasicSession | undefined
+  ): boolean => {
     const hasExpired = Boolean(session && session.expires <= Date.now());
     if (this.opts.expressConfig?.publicRoutes && !this.opts.expressConfig.disableSocketAuthGuard) {
       const error = "Session has expired";
