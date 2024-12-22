@@ -15,13 +15,12 @@ export async function getSidAndUserFromRequest(
    */
   const getSession = this.opts.cacheSession?.getSession;
   if (clientReq.socket && getSession && clientReq.socket.__prglCache) {
-    const { session, user, clientUser } = clientReq.socket.__prglCache;
+    const { session, ...userData } = clientReq.socket.__prglCache;
     const isValid = this.isNonExpiredSocketSession(clientReq.socket, session);
     if (isValid) {
       return {
+        ...userData,
         sid: session.sid,
-        user,
-        clientUser,
       };
     } else
       return {
@@ -47,9 +46,8 @@ export async function getSidAndUserFromRequest(
       const session = await getSession(sid, this.dbo as any, this.db);
       if (session && session.expires && clientInfo?.user) {
         clientReq.socket.__prglCache = {
+          ...clientInfo,
           session,
-          user: clientInfo.user,
-          clientUser: clientInfo.clientUser,
         };
       }
     }

@@ -230,6 +230,12 @@ export type SessionUser<
    * id and type values will be available in the prostgles.user session variable in postgres
    * */
   user: ServerUser;
+
+  /**
+   * If true, this is a public/non registered user that can login. Used in UI
+   */
+  isAnonymous?: boolean;
+
   /**
    * Controls which fields from user are available in postgres session variable
    */
@@ -240,14 +246,14 @@ export type SessionUser<
   clientUser: ClientUser;
 };
 
+type AllNeverAndOptional<T> = {
+  [P in keyof T]?: never;
+};
 export type AuthResultWithSID<SU = SessionUser> =
   | (SU & { sid: string })
-  | {
+  | (AllNeverAndOptional<SU> & {
       sid: string | undefined;
-      user?: never;
-      sessionFields?: never;
-      clientUser?: never;
-    };
+    });
 
 export type AuthResult<SU = SessionUser> = SU | undefined;
 export type AuthResultOrError<SU = SessionUser> = AuthFailure["code"] | AuthResult<SU>;

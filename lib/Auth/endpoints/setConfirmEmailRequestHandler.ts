@@ -35,6 +35,10 @@ export function setConfirmEmailRequestHandler(
           .status(HTTP_FAIL_CODES.BAD_REQUEST)
           .json({ success: false, code: "something-went-wrong" });
       }
+
+      /**
+       * This approach requires correct handling in setCatchAllRequestHandler to not redirect user.type=public res.redirect("/");
+       */
       if (response.redirect_to) {
         return res.redirect(response.redirect_to);
       }

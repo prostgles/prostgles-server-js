@@ -15,7 +15,7 @@ import {
   TableInfo as TInfo,
   UserLike,
 } from "prostgles-types";
-import { AuthClientRequest, BasicSession } from "../Auth/AuthTypes";
+import { AuthClientRequest, BasicSession, SessionUser } from "../Auth/AuthTypes";
 import { BasicCallback } from "../PubSubManager/PubSubManager";
 import { PublishAllOrNothing } from "../PublishParser/PublishParser";
 import { FieldSpec } from "./QueryBuilder/Functions";
@@ -170,9 +170,9 @@ export type PRGLIOSocket = {
   /** Used for session caching */
   __prglCache?: {
     session: BasicSession;
-    user: UserLike;
-    clientUser: UserLike;
-  };
+    // user: UserLike;
+    // clientUser: UserLike;
+  } & SessionUser;
 
   _user?: AnyObject;
 

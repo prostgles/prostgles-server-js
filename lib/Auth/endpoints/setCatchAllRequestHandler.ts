@@ -75,12 +75,12 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
         return;
 
         /** If Logged in and requesting login then redirect to main page */
-      } else if (
-        this.matchesRoute(AUTH_ROUTES_AND_PARAMS.login, req.path) &&
-        (await isLoggedInUser())
-      ) {
-        res.redirect("/");
-        return;
+      } else if (this.matchesRoute(AUTH_ROUTES_AND_PARAMS.login, req.path)) {
+        const { user, isAnonymous } = await getUser();
+        if (user && !isAnonymous) {
+          res.redirect("/");
+          return;
+        }
       }
 
       onGetRequestOK?.(req, res, {
