@@ -146,7 +146,7 @@ export type EmailProvider =
         confirmationCode: string;
         clientInfo: LoginClientInfo;
         req: ExpressReq;
-      }) => Awaitable<AuthFailure["code"] | AuthResponse.AuthSuccess>;
+      }) => Awaitable<AuthFailure["code"] | (AuthResponse.AuthSuccess & { redirect_to?: string })>;
     };
 
 export type AuthProviderUserData =

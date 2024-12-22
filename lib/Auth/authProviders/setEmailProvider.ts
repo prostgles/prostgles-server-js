@@ -21,6 +21,6 @@ export async function setEmailProvider(this: AuthHandler, app: e.Express) {
   setRegisterRequestHandler({ email, websiteUrl }, app);
 
   if (email.signupType === "withPassword") {
-    setConfirmEmailRequestHandler(email, app);
+    setConfirmEmailRequestHandler.bind(this)(email, app);
   }
 }

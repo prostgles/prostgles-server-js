@@ -196,7 +196,11 @@ prostgles<DBGeneratedSchema>({
     Defaults to "session_id"
   - **getUser** <span style="color: red">required</span> <span style="color: green;">(sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: AuthClientRequest & LoginClientInfo) =&gt; Awaitable&lt;AuthResultOrError&lt;...&gt;&gt;</span>
 
-    undefined sid is allowed to enable public users
+    Used in:
+    - WS AUTHGUARD - allows connected SPA client to check if on protected route and needs to reload to ne redirected to login
+    - PublishParams - userData and/or sid (in testing) are passed to the publish function
+    - auth.expressConfig.use - express middleware to get user data and
+       undefined sid is allowed to enable public users
   - **expressConfig** <span style="color: grey">optional</span> <span style="color: green;">ExpressConfig</span>
 
     Will setup auth routes

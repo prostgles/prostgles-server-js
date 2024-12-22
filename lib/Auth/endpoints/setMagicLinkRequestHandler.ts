@@ -7,6 +7,7 @@ import {
   getClientRequestIPsInfo,
   HTTP_FAIL_CODES,
 } from "../AuthHandler";
+import { DBOFullyTyped } from "../../DBSchemaBuilder";
 
 export function setMagicLinkRequestHandler(
   this: AuthHandler,
@@ -28,7 +29,7 @@ export function setMagicLinkRequestHandler(
         const response = await this.throttledFunc(async () => {
           return onMagicLink(
             id,
-            this.dbo as any,
+            this.dbo as DBOFullyTyped,
             this.db,
             getClientRequestIPsInfo({ httpReq: req, res })
           );
@@ -38,7 +39,7 @@ export function setMagicLinkRequestHandler(
         } else {
           this.setCookieAndGoToReturnURLIFSet(response.session, { req, res });
         }
-      } catch (e) {
+      } catch (_e) {
         res
           .status(HTTP_FAIL_CODES.UNAUTHORIZED)
           .json({ success: false, code: "something-went-wrong" });
