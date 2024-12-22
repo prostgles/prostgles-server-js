@@ -192,11 +192,10 @@ export const canRunSQL = async (
   clientReq: AuthClientRequest | undefined
 ): Promise<boolean> => {
   if (!clientReq) return true;
-
-  const publishParams = await prostgles.publishParser!.getPublishParams(clientReq);
-  //@ts-ignore
-  const res = await prostgles.opts.publishRawSQL?.(publishParams);
-  return Boolean((res && typeof res === "boolean") || res === "*");
+  const publishParams = await prostgles.publishParser?.getPublishParams(clientReq, undefined);
+  //@ts-ignore union type that is too complex to represent.
+  const publishResult = publishParams && (await prostgles.opts.publishRawSQL?.(publishParams));
+  return Boolean((publishResult && typeof publishResult === "boolean") || publishResult === "*");
 };
 
 export const canCreateTables = async (db: DB): Promise<boolean> => {

@@ -7,13 +7,13 @@ import {
   TableSchemaErrors,
   TableSchemaForClient,
 } from "prostgles-types";
-import { AuthClientRequest, AuthResult } from "../Auth/AuthTypes";
+import { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import { getErrorAsObject } from "../DboBuilder/DboBuilder";
 import { TABLE_METHODS } from "../Prostgles";
 import { PublishObject, PublishParser } from "./PublishParser";
 
 type Args = AuthClientRequest & {
-  userData: AuthResult | undefined;
+  userData: AuthResultWithSID | undefined;
 };
 
 export async function getSchemaFromPublish(
@@ -31,11 +31,11 @@ export async function getSchemaFromPublish(
   try {
     /* Publish tables and views based on socket */
     const clientInfo =
-      userData ?? (await this.prostgles.authHandler?.getUserFromRequest(clientReq));
+      userData ?? (await this.prostgles.authHandler?.getSidAndUserFromRequest(clientReq));
 
     let _publish: PublishObject | undefined;
     try {
-      _publish = await this.getPublish(clientReq, clientInfo);
+      _publish = await this.getPublishAsObject(clientReq, clientInfo);
     } catch (err) {
       console.error("Error within then Publish function ", err);
       throw err;

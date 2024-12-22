@@ -1,7 +1,7 @@
 import e from "express";
-import { AUTH_ROUTES_AND_PARAMS, AuthHandler } from "../AuthHandler";
-import { getConfirmEmailRequestHandler } from "../endpoints/getConfirmEmailRequestHandler";
-import { getRegisterRequestHandler } from "../endpoints/getRegisterRequestHandler";
+import { AuthHandler } from "../AuthHandler";
+import { setConfirmEmailRequestHandler } from "../endpoints/setConfirmEmailRequestHandler";
+import { setRegisterRequestHandler } from "../endpoints/setRegisterRequestHandler";
 import { getOrSetTransporter } from "../sendEmail";
 import { checkDmarc } from "../utils/checkDmarc";
 
@@ -18,12 +18,9 @@ export async function setEmailProvider(this: AuthHandler, app: e.Express) {
    */
   getOrSetTransporter(email.smtp);
 
-  app.post(
-    AUTH_ROUTES_AND_PARAMS.emailRegistration,
-    getRegisterRequestHandler({ email, websiteUrl })
-  );
+  setRegisterRequestHandler({ email, websiteUrl }, app);
 
   if (email.signupType === "withPassword") {
-    app.get(AUTH_ROUTES_AND_PARAMS.confirmEmailExpressRoute, getConfirmEmailRequestHandler(email));
+    setConfirmEmailRequestHandler(email, app);
   }
 }

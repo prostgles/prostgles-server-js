@@ -243,21 +243,13 @@ export type SessionUser<
 export type AuthResultWithSID<SU = SessionUser> =
   | (SU & { sid: string })
   | {
-      sid?: string | undefined;
-      user?: undefined;
-      sessionFields?: undefined;
-      clientUser?: undefined;
-    }
-  | undefined;
+      sid: string | undefined;
+      user?: never;
+      sessionFields?: never;
+      clientUser?: never;
+    };
 
-export type AuthResult<SU = SessionUser> =
-  | SU
-  | {
-      user?: undefined;
-      sessionFields?: undefined;
-      clientUser?: undefined;
-    }
-  | undefined;
+export type AuthResult<SU = SessionUser> = SU | undefined;
 export type AuthResultOrError<SU = SessionUser> = AuthFailure["code"] | AuthResult<SU>;
 
 export type AuthRequestParams<S, SUser extends SessionUser> = {
@@ -274,7 +266,11 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
   sidKeyName?: string;
 
   /**
-   * undefined sid is allowed to enable public users
+   * Used in:
+   * - WS AUTHGUARD - allows connected SPA client to check if on protected route and needs to reload to ne redirected to login
+   * - PublishParams - userData and/or sid (in testing) are passed to the publish function
+   * - auth.expressConfig.use - express middleware to get user data and
+   *    undefined sid is allowed to enable public users
    */
   getUser: (
     sid: string | undefined,
@@ -328,7 +324,7 @@ export type LoginParams =
   | ({ type: "username" } & AuthRequest.LoginData)
   | ({ type: "provider" } & AuthProviderUserData);
 
-type ExpressConfig<S, SUser extends SessionUser> = {
+export type ExpressConfig<S, SUser extends SessionUser> = {
   /**
    * Express app instance. If provided Prostgles will attempt to set sidKeyName to user cookie
    */

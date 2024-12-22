@@ -1,5 +1,5 @@
 import { AnyObject, FullFilter, isDefined } from "prostgles-types";
-import { AuthClientRequest, AuthResult } from "../Auth/AuthTypes";
+import { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
 import { PublishParser } from "./PublishParser";
 import { ParsedPublishTable, UpdateRule } from "./publishTypesAndUtils";
@@ -17,7 +17,7 @@ export async function getFileTableRules(
   fileTableName: string,
   fileTablePublishRules: ParsedPublishTable | undefined,
   clientReq: AuthClientRequest | undefined,
-  clientInfo: AuthResult | undefined
+  clientInfo: AuthResultWithSID | undefined
 ) {
   const forcedDeleteFilters: FullFilter<AnyObject, void>[] = [];
   const forcedSelectFilters: FullFilter<AnyObject, void>[] = [];

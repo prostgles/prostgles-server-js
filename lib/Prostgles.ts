@@ -413,7 +413,7 @@ export class Prostgles {
           { type: "socket" as const, ...clientReq }
         : { type: "http" as const, ...clientReq };
 
-      const userData = await this.authHandler?.getUserFromRequest(clientInfo);
+      const userData = await this.authHandler?.getSidAndUserFromRequest(clientInfo);
       const { publishParser } = this;
       let fullSchema: Awaited<ReturnType<PublishParser["getSchemaFromPublish"]>> | undefined;
       let publishValidationError;

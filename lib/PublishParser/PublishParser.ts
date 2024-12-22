@@ -1,6 +1,6 @@
 import { Method, getObjectEntries, isObject } from "prostgles-types";
-import { AuthClientRequest, AuthResult, SessionUser } from "../Auth/AuthTypes";
-import { PublishFullyTyped } from "../DBSchemaBuilder";
+import { AuthClientRequest, AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
+import { DBOFullyTyped, PublishFullyTyped } from "../DBSchemaBuilder";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import { ProstglesInitOptions } from "../ProstglesTypes";
 import { VoidFunction } from "../SchemaWatch/SchemaWatch";
@@ -39,11 +39,12 @@ export class PublishParser {
 
   async getPublishParams(
     clientReq: AuthClientRequest,
-    clientInfo?: AuthResult
+    clientInfo: AuthResultWithSID | undefined
   ): Promise<PublishParams> {
     return {
-      ...(clientInfo || (await this.prostgles.authHandler?.getUserFromRequest(clientReq))),
-      dbo: this.dbo as any,
+      sid: undefined,
+      ...(clientInfo ?? (await this.prostgles.authHandler?.getSidAndUserFromRequest(clientReq))),
+      dbo: this.dbo as DBOFullyTyped,
       db: this.db,
       clientReq,
       tables: this.prostgles.dboBuilder.tables,
@@ -52,7 +53,7 @@ export class PublishParser {
 
   async getAllowedMethods(
     clientReq: AuthClientRequest,
-    userData: AuthResult | undefined
+    userData: AuthResultWithSID | undefined
   ): Promise<{ [key: string]: Method }> {
     const methods: { [key: string]: Method } = {};
 
@@ -81,9 +82,9 @@ export class PublishParser {
   /**
    * Parses the first level of publish. (If false then nothing if * then all tables and views)
    */
-  async getPublish(
+  async getPublishAsObject(
     clientReq: AuthClientRequest,
-    clientInfo: AuthResult
+    clientInfo: AuthResultWithSID | undefined
   ): Promise<PublishFullyTyped | undefined> {
     const publishParams = await this.getPublishParams(clientReq, clientInfo);
     const _publish = await applyParamsIfFunc(this.publish, publishParams);
@@ -104,14 +105,15 @@ export class PublishParser {
     command,
     clientReq,
   }: DboTableCommand): Promise<TableRule> {
-    const clientInfo = await this.prostgles.authHandler?.getUserFromRequest(clientReq);
+    const clientInfo =
+      clientReq && (await this.prostgles.authHandler?.getSidAndUserFromRequest(clientReq));
     const rules = await this.getValidatedRequestRule({ tableName, command, clientReq }, clientInfo);
     return rules;
   }
 
   async getValidatedRequestRule(
     { tableName, command, clientReq }: DboTableCommand,
-    clientInfo: AuthResult | undefined
+    clientInfo: AuthResultWithSID | undefined
   ): Promise<TableRule> {
     if (!command || !tableName) throw "command OR tableName are missing";
 
@@ -166,10 +168,10 @@ export class PublishParser {
 
   async getTableRules(
     args: DboTable,
-    clientInfo: AuthResult | undefined
+    clientInfo: AuthResultWithSID | undefined
   ): Promise<ParsedPublishTable | undefined> {
+    const fileTablePublishRules = await this.getTableRulesWithoutFileTable(args, clientInfo);
     if (this.dbo[args.tableName]?.is_media) {
-      const fileTablePublishRules = await this.getTableRulesWithoutFileTable(args, clientInfo);
       const { rules } = await getFileTableRules.bind(this)(
         args.tableName,
         fileTablePublishRules,
@@ -179,7 +181,7 @@ export class PublishParser {
       return rules;
     }
 
-    return await this.getTableRulesWithoutFileTable(args, clientInfo);
+    return fileTablePublishRules;
   }
 
   getTableRulesWithoutFileTable = getTableRulesWithoutFileTable.bind(this);

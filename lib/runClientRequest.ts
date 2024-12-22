@@ -1,12 +1,4 @@
-import {
-  AnyObject,
-  SQLOptions,
-  SQLRequest,
-  TableHandler,
-  UserLike,
-  getKeys,
-  pickKeys,
-} from "prostgles-types";
+import { SQLRequest, TableHandler, UserLike, getKeys, pickKeys } from "prostgles-types";
 import { AuthClientRequest } from "./Auth/AuthTypes";
 import { LocalParams } from "./DboBuilder/DboBuilder";
 import { TableHandler as TableHandlerServer } from "./DboBuilder/TableHandler/TableHandler";
@@ -77,7 +69,7 @@ export const runClientRequest = async function (
     );
   }
 
-  const clientInfo = await this.authHandler?.getUserFromRequest(clientReq);
+  const clientInfo = await this.authHandler?.getSidAndUserFromRequest(clientReq);
   const validRules = await this.publishParser.getValidatedRequestRule(
     { tableName, command, clientReq },
     clientInfo
@@ -147,7 +139,7 @@ export const clientCanRunSqlRequest = async function (
     if (!this.authHandler) {
       throw "authHandler missing";
     }
-    const publishParams = await this.publishParser?.getPublishParams(clientReq);
+    const publishParams = await this.publishParser?.getPublishParams(clientReq, undefined);
     const res = publishParams && (await this.opts.publishRawSQL?.(publishParams));
     return Boolean((res && typeof res === "boolean") || res === "*");
   };

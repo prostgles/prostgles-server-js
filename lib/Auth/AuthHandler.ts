@@ -13,7 +13,7 @@ import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import {
   Auth,
   AuthClientRequest,
-  AuthResultOrError,
+  AuthResult,
   AuthResultWithSID,
   BasicSession,
   ExpressReq,
@@ -26,7 +26,7 @@ import { getProviders } from "./setAuthProviders";
 import { setupAuthRoutes } from "./setupAuthRoutes";
 import { getClientRequestIPsInfo } from "./utils/getClientRequestIPsInfo";
 import { getReturnUrl } from "./utils/getReturnUrl";
-import { getUserFromRequest } from "./utils/getUserFromRequest";
+import { getSidAndUserFromRequest } from "./utils/getSidAndUserFromRequest";
 
 export { getClientRequestIPsInfo };
 export const HTTP_FAIL_CODES = {
@@ -58,8 +58,8 @@ export const AUTH_ROUTES_AND_PARAMS = {
 } as const;
 
 export class AuthHandler {
-  protected prostgles: Prostgles;
-  protected opts: Auth;
+  protected readonly prostgles: Prostgles;
+  protected readonly opts: Auth;
   dbo: DBHandlerServer;
   db: DB;
 
@@ -147,7 +147,7 @@ export class AuthHandler {
 
   getUserAndHandleError = async (localParams: AuthClientRequest): Promise<AuthResultWithSID> => {
     const sid = this.getSID(localParams);
-    if (!sid) return undefined;
+    if (!sid) return { sid };
     const handlerError = (code: AuthFailure["code"]) => {
       if (localParams.httpReq) {
         localParams.res
@@ -160,7 +160,7 @@ export class AuthHandler {
       const userOrErrorCode = await this.throttledFunc(async () => {
         return this.opts.getUser(
           this.validateSid(sid),
-          this.dbo as any,
+          this.dbo as DBOFullyTyped,
           this.db,
           getClientRequestIPsInfo(localParams)
         );
@@ -169,8 +169,12 @@ export class AuthHandler {
       if (typeof userOrErrorCode === "string") {
         return handlerError(userOrErrorCode);
       }
-
-      return { sid, ...userOrErrorCode };
+      if (sid && userOrErrorCode?.user) {
+        return { sid, ...userOrErrorCode };
+      }
+      return {
+        sid,
+      };
     } catch (_err) {
       return handlerError("server-error");
     }
@@ -362,7 +366,13 @@ export class AuthHandler {
     }
   };
 
-  getUserFromRequest = getUserFromRequest.bind(this);
+  getUserFromRequest = async (clientReq: AuthClientRequest): Promise<AuthResult> => {
+    const sidAndUser = await this.getSidAndUserFromRequest(clientReq);
+    if (sidAndUser.sid && sidAndUser.user) {
+      return sidAndUser;
+    }
+  };
+  getSidAndUserFromRequest = getSidAndUserFromRequest.bind(this);
 
   isNonExpiredSocketSession = (
     socket: PRGLIOSocket,
@@ -385,12 +395,15 @@ export class AuthHandler {
 
   getClientAuth = async (
     clientReq: AuthClientRequest
-  ): Promise<{ auth: AuthSocketSchema; userData: AuthResultOrError }> => {
+  ): Promise<{ auth: AuthSocketSchema; userData: AuthResultWithSID }> => {
     let pathGuard = false;
     if (this.opts.expressConfig?.publicRoutes && !this.opts.expressConfig.disableSocketAuthGuard) {
       pathGuard = true;
 
-      if ("socket" in clientReq && clientReq.socket) {
+      /**
+       * Due to SPA nature of some clients, we need to check if the connected client ends up on a protected route
+       */
+      if (clientReq.socket) {
         const { socket } = clientReq;
         socket.removeAllListeners(CHANNELS.AUTHGUARD);
         socket.on(
@@ -415,7 +428,7 @@ export class AuthHandler {
                 pathname &&
                 typeof pathname === "string" &&
                 this.isUserRoute(pathname) &&
-                !(await this.getUserFromRequest({ socket }))?.user
+                !(await this.getUserFromRequest({ socket }))
               ) {
                 cb(null, { shouldReload: true });
               } else {
@@ -430,7 +443,7 @@ export class AuthHandler {
       }
     }
 
-    const userData = await this.getUserFromRequest(clientReq);
+    const userData = await this.getSidAndUserFromRequest(clientReq);
     const { email } = this.opts.expressConfig?.registrations ?? {};
     const auth: AuthSocketSchema = {
       providers: getProviders.bind(this)(),
@@ -438,7 +451,7 @@ export class AuthHandler {
         type: email.signupType,
         url: AUTH_ROUTES_AND_PARAMS.emailRegistration,
       },
-      user: userData?.clientUser,
+      user: userData.clientUser,
       loginType: email?.signupType ?? "withPassword",
       pathGuard,
     };

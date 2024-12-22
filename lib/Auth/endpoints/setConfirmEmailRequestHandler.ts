@@ -1,16 +1,18 @@
 import type { Request, Response } from "express";
 import { AuthResponse } from "prostgles-types";
-import { HTTP_FAIL_CODES } from "../AuthHandler";
+import { AUTH_ROUTES_AND_PARAMS, HTTP_FAIL_CODES } from "../AuthHandler";
 import { AuthRegistrationConfig } from "../AuthTypes";
 import { getClientRequestIPsInfo } from "../utils/getClientRequestIPsInfo";
+import e from "express";
 
-export const getConfirmEmailRequestHandler = (
+export const setConfirmEmailRequestHandler = (
   emailAuthConfig: Extract<
     Required<AuthRegistrationConfig<void>>["email"],
     { signupType: "withPassword" }
-  >
+  >,
+  app: e.Express
 ) => {
-  return async (
+  const requestHandler = async (
     req: Request,
     res: Response<
       | AuthResponse.PasswordRegisterSuccess
@@ -36,4 +38,6 @@ export const getConfirmEmailRequestHandler = (
         .json({ success: false, code: "server-error", message: "Failed to confirm email" });
     }
   };
+
+  app.get(AUTH_ROUTES_AND_PARAMS.confirmEmailExpressRoute, requestHandler);
 };

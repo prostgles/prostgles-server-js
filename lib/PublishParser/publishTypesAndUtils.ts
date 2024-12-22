@@ -432,7 +432,7 @@ export type DbTableInfo = {
   columns: TableSchemaColumn[];
 };
 export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
-  sid?: string;
+  sid: string | undefined;
   dbo: DBOFullyTyped<S>;
   db: DB;
   user?: SUser["user"];

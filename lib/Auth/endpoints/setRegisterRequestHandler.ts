@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import e, { Request, Response } from "express";
 import { AuthResponse } from "prostgles-types";
 import { AUTH_ROUTES_AND_PARAMS, HTTP_FAIL_CODES } from "../AuthHandler";
 import type { AuthRegistrationConfig } from "../AuthTypes";
@@ -11,10 +11,13 @@ type ReturnType =
   | AuthResponse.PasswordRegisterFailure
   | AuthResponse.PasswordRegisterSuccess;
 
-export const getRegisterRequestHandler = ({
-  email: emailAuthConfig,
-  websiteUrl,
-}: Required<Pick<AuthRegistrationConfig<void>, "email" | "websiteUrl">>) => {
+export const setRegisterRequestHandler = (
+  {
+    email: emailAuthConfig,
+    websiteUrl,
+  }: Required<Pick<AuthRegistrationConfig<void>, "email" | "websiteUrl">>,
+  app: e.Express
+) => {
   const registerRequestHandler = async (req: Request, res: Response<ReturnType>) => {
     const { username, password } = req.body;
     const sendResponse = (response: ReturnType) => {
@@ -84,5 +87,5 @@ export const getRegisterRequestHandler = ({
     }
   };
 
-  return registerRequestHandler;
+  app.post(AUTH_ROUTES_AND_PARAMS.emailRegistration, registerRequestHandler);
 };

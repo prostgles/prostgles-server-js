@@ -3,6 +3,7 @@ import type { Prostgles, TABLE_METHODS } from "./Prostgles";
 import { PRGLIOSocket } from "./DboBuilder/DboBuilderTypes";
 import { runClientMethod, runClientRequest } from "./runClientRequest";
 import { getErrorAsObject } from "./DboBuilder/dboBuilderUtils";
+import { DBOFullyTyped } from "./DBSchemaBuilder";
 
 export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
   if (this.destroyed) {
@@ -26,11 +27,12 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
     if (this.opts.onSocketConnect) {
       try {
         const getUser = async () => {
-          return await this.authHandler?.getUserFromRequest({ socket });
+          if (!this.authHandler) throw "authHandler missing";
+          return await this.authHandler.getSidAndUserFromRequest({ socket });
         };
         await this.opts.onSocketConnect({
           socket,
-          dbo: dbo as any,
+          dbo: dbo as DBOFullyTyped,
           db,
           getUser,
         });
@@ -79,9 +81,10 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
 
       if (this.opts.onSocketDisconnect) {
         const getUser = async () => {
-          return await this.authHandler?.getUserFromRequest({ socket });
+          if (!this.authHandler) throw "authHandler missing";
+          return await this.authHandler.getSidAndUserFromRequest({ socket });
         };
-        this.opts.onSocketDisconnect({ socket, dbo: dbo as any, db, getUser });
+        this.opts.onSocketDisconnect({ socket, dbo: dbo as DBOFullyTyped, db, getUser });
       }
     });
 

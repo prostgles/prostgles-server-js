@@ -1,21 +1,22 @@
+import { DBOFullyTyped } from "../../DBSchemaBuilder";
 import { AuthHandler, getClientRequestIPsInfo } from "../AuthHandler";
 import { AuthClientRequest, AuthResultWithSID } from "../AuthTypes";
 
 /**
- * For a given sid return the user data if available
+ * For a given sid return the user data if available using the auth handler's getUser method.
+ * Use socket session cache if configured in Auth
  */
-export async function getUserFromRequest(
+export async function getSidAndUserFromRequest(
   this: AuthHandler,
-  maybeClientReq: AuthClientRequest | undefined
+  clientReq: AuthClientRequest
 ): Promise<AuthResultWithSID> {
-  if (!maybeClientReq) return undefined;
   /**
    * Get cached session if available
    */
   const getSession = this.opts.cacheSession?.getSession;
-  if (maybeClientReq.socket && getSession && maybeClientReq.socket.__prglCache) {
-    const { session, user, clientUser } = maybeClientReq.socket.__prglCache;
-    const isValid = this.isNonExpiredSocketSession(maybeClientReq.socket, session);
+  if (clientReq.socket && getSession && clientReq.socket.__prglCache) {
+    const { session, user, clientUser } = clientReq.socket.__prglCache;
+    const isValid = this.isNonExpiredSocketSession(clientReq.socket, session);
     if (isValid) {
       return {
         sid: session.sid,
@@ -35,17 +36,17 @@ export async function getUserFromRequest(
   const result = await this.throttledFunc(async () => {
     const { getUser } = this.opts;
 
-    const sid = this.getSID(maybeClientReq);
+    const sid = this.getSID(clientReq);
     const clientInfoOrErr =
       !sid ? undefined : (
-        await getUser(sid, this.dbo as any, this.db, getClientRequestIPsInfo(maybeClientReq))
+        await getUser(sid, this.dbo as DBOFullyTyped, this.db, getClientRequestIPsInfo(clientReq))
       );
     if (typeof clientInfoOrErr === "string") throw clientInfoOrErr;
     const clientInfo = clientInfoOrErr;
-    if (getSession && maybeClientReq.socket) {
+    if (getSession && clientReq.socket) {
       const session = await getSession(sid, this.dbo as any, this.db);
       if (session && session.expires && clientInfo?.user) {
-        maybeClientReq.socket.__prglCache = {
+        clientReq.socket.__prglCache = {
           session,
           user: clientInfo.user,
           clientUser: clientInfo.clientUser,
@@ -58,14 +59,14 @@ export async function getUserFromRequest(
     }
 
     return { sid };
-  }, 5);
+  }, 100);
 
   await this.prostgles.opts.onLog?.({
     type: "auth",
     command: "getClientInfo",
     duration: Date.now() - authStart,
     sid: result.sid,
-    socketId: maybeClientReq.socket?.id,
+    socketId: clientReq.socket?.id,
   });
   return result;
 }

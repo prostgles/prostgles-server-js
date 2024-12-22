@@ -1,5 +1,5 @@
 import { getKeys, isObject } from "prostgles-types";
-import { AuthResult } from "../Auth/AuthTypes";
+import { AuthResult, AuthResultWithSID } from "../Auth/AuthTypes";
 import { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { ViewHandler } from "../DboBuilder/ViewHandler/ViewHandler";
 import { DEFAULT_SYNC_BATCH_SIZE } from "../PubSubManager/PubSubManager";
@@ -17,12 +17,13 @@ import {
 export async function getTableRulesWithoutFileTable(
   this: PublishParser,
   { tableName, clientReq }: DboTable,
-  clientInfo?: AuthResult,
+  clientInfo: AuthResultWithSID | undefined,
   overridenPublish?: PublishObject
 ): Promise<ParsedPublishTable | undefined> {
   if (!tableName) throw new Error("publish OR socket OR dbo OR tableName are missing");
 
-  const publish = overridenPublish ?? (clientReq && (await this.getPublish(clientReq, clientInfo)));
+  const publish =
+    overridenPublish ?? (clientReq && (await this.getPublishAsObject(clientReq, clientInfo)));
 
   const rawTableRule = publish?.[tableName];
   if (!rawTableRule || (isObject(rawTableRule) && Object.values(rawTableRule).every((v) => !v))) {
