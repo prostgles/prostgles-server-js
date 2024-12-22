@@ -28,7 +28,7 @@ import {
   WAL,
 } from "prostgles-types";
 
-import { find, pickKeys, tryCatch } from "prostgles-types/dist/util";
+import { find, pickKeys, tryCatch, tryCatchV2 } from "prostgles-types/dist/util";
 import { LocalFuncs, getOnDataFunc, matchesLocalFuncs } from "../DboBuilder/ViewHandler/subscribe";
 import { EVENT_TRIGGER_TAGS } from "../Event_Trigger_Tags";
 import { EventTypes } from "../Logging";
@@ -183,7 +183,7 @@ export class PubSubManager {
   }
 
   dboBuilder: DboBuilder;
-  _triggers?: Record<string, string[]>;
+  _triggers: Record<string, string[]> | undefined;
   sockets: AnyObject = {};
 
   subs: Subscription[] = [];
@@ -408,7 +408,7 @@ export class PubSubManager {
   get connectedSocketIds() {
     return this.dboBuilder.prostgles.connectedSockets.map((s) => s.id);
   }
-  _log = (params: EventTypes.Sync) => {
+  _log = (params: EventTypes.Sync | EventTypes.SyncOrSub) => {
     return this.dboBuilder.prostgles.opts.onLog?.({ ...params });
   };
 
@@ -473,7 +473,7 @@ export class PubSubManager {
     viewOptions: ViewSubscriptionOptions | undefined,
     socket: PRGLIOSocket | undefined
   ) {
-    const addedTrigger = await tryCatch(async () => {
+    const addedTrigger = await tryCatchV2(async () => {
       const { table_name } = { ...params };
       let { condition } = { ...params };
       if (!table_name) throw "MISSING table_name";
@@ -538,17 +538,18 @@ export class PubSubManager {
     });
 
     await this._log({
-      type: "sync",
+      type: "syncOrSub",
       command: "addTrigger",
-      condition: addedTrigger.cond ?? params.condition,
+      condition: addedTrigger.data?.cond ?? params.condition,
       duration: addedTrigger.duration,
       socketId: socket?.id,
-      state: !addedTrigger.tbl ? "fail" : "ok",
+      state: !addedTrigger.data?.tbl ? "fail" : "ok",
       error: addedTrigger.error,
       sid: socket && this.dboBuilder.prostgles.authHandler?.getSIDNoError({ socket }),
-      tableName: addedTrigger.tbl ?? params.table_name,
+      tableName: addedTrigger.data?.tbl ?? params.table_name,
       connectedSocketIds: this.dboBuilder.prostgles.connectedSockets.map((s) => s.id),
       localParams: socket && { clientReq: { socket } },
+      triggers: this._triggers,
     });
 
     if (addedTrigger.error) throw addedTrigger.error;
@@ -624,6 +625,8 @@ export const NOTIF_TYPE = {
   data_trigger_change: "data_watch_triggers_have_changed",
   schema: "schema_has_changed",
 } as const;
+
+export type NotifTypeName = (typeof NOTIF_TYPE)[keyof typeof NOTIF_TYPE];
 export const NOTIF_CHANNEL = {
   preffix: "prostgles_" as const,
   getFull: (appID: string | undefined) => {

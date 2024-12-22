@@ -1,10 +1,7 @@
-import { log, NOTIF_TYPE, pickKeys, PubSubManager } from "./PubSubManager";
+import { log, NOTIF_TYPE, NotifTypeName, pickKeys, PubSubManager } from "./PubSubManager";
 
 /* Relay relevant data to relevant subscriptions */
-export async function notifListener(
-  this: PubSubManager,
-  data: { payload: string },
-) {
+export async function notifListener(this: PubSubManager, data: { payload: string }) {
   const str = data.payload;
 
   if (!str) {
@@ -13,9 +10,26 @@ export async function notifListener(
   }
 
   const dataArr = str.split(PubSubManager.DELIMITER);
-  const notifType = dataArr[0];
+  const notifType = dataArr[0] as NotifTypeName;
 
   log(str);
+
+  const commonLog = {
+    triggers: this._triggers,
+    sid: undefined,
+    connectedSocketIds: this.connectedSocketIds,
+    socketId: undefined,
+    duration: 0,
+    tableName: dataArr[1] ?? "",
+    dataArr,
+    notifType,
+  };
+
+  await this._log({
+    type: "syncOrSub",
+    command: "notifListener",
+    ...commonLog,
+  });
 
   if (notifType === NOTIF_TYPE.schema) {
     if (this.dboBuilder.prostgles.schemaWatch?.onSchemaChange) {
@@ -41,6 +55,7 @@ export async function notifListener(
     return;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (notifType !== NOTIF_TYPE.data) {
     console.error("Unexpected notif type: ", notifType);
     return;
@@ -57,14 +72,12 @@ export async function notifListener(
     throw "table_name undef";
   }
 
-  const tableTriggerConditions = this._triggers?.[table_name]?.map(
-    (condition, idx) => ({
-      idx,
-      condition,
-      subs: this.getTriggerSubs(table_name, condition),
-      syncs: this.getSyncs(table_name, condition),
-    }),
-  );
+  const tableTriggerConditions = this._triggers?.[table_name]?.map((condition, idx) => ({
+    idx,
+    condition,
+    subs: this.getTriggerSubs(table_name, condition),
+    syncs: this.getSyncs(table_name, condition),
+  }));
   let state: "error" | "no-triggers" | "ok" | "invalid_condition_ids" = "ok";
 
   // const triggers = await this.db.any("SELECT * FROM prostgles.triggers WHERE table_name = $1 AND id IN ($2:csv)", [table_name, condition_ids_str.split(",").map(v => +v)]);
@@ -81,10 +94,7 @@ export async function notifListener(
     tableTriggerConditions.map(({ condition }) => {
       const subs = this.getTriggerSubs(table_name, condition);
       subs.map((s) => {
-        this.pushSubData(
-          s,
-          pref + ". Check server logs. Schema might have changed",
-        );
+        this.pushSubData(s, pref + ". Check server logs. Schema might have changed");
       });
     });
 
@@ -92,7 +102,7 @@ export async function notifListener(
   } else if (condition_ids?.every((id) => Number.isInteger(id))) {
     state = "ok";
     const firedTableConditions = tableTriggerConditions.filter(({ idx }) =>
-      condition_ids.includes(idx),
+      condition_ids.includes(idx)
     );
     const orphanedTableConditions = condition_ids.filter((condId) => {
       const tc = tableTriggerConditions.at(condId);
@@ -116,7 +126,7 @@ export async function notifListener(
             AND at.condition = t.condition
           ) 
           `,
-          [table_name, orphanedTableConditions, this.appId],
+          [table_name, orphanedTableConditions, this.appId]
         )
         .then(() => {
           this.refreshTriggers();
@@ -130,7 +140,7 @@ export async function notifListener(
       log(
         "notifListener",
         subs.map((s) => s.channel_name),
-        syncs.map((s) => s.channel_name),
+        syncs.map((s) => s.channel_name)
       );
 
       syncs.map((s) => {
@@ -143,15 +153,12 @@ export async function notifListener(
           (trg) =>
             this.dbo[trg.table_name] &&
             sub.is_ready &&
-            ((sub.socket_id && this.sockets[sub.socket_id]) || sub.localFuncs),
-        ),
+            ((sub.socket_id && this.sockets[sub.socket_id]) || sub.localFuncs)
+        )
       );
       activeAndReadySubs.forEach((sub) => {
         const { throttle = 0, throttleOpts } = sub;
-        if (
-          !throttleOpts?.skipFirst &&
-          sub.last_throttled <= Date.now() - throttle
-        ) {
+        if (!throttleOpts?.skipFirst && sub.last_throttled <= Date.now() - throttle) {
           sub.last_throttled = Date.now();
 
           /* It is assumed the policy was checked before this point */
@@ -174,17 +181,17 @@ export async function notifListener(
   }
 
   await this._log({
-    type: "sync",
-    command: "notifListener",
+    ...commonLog,
+    type: "syncOrSub",
+    command: "notifListener.Finished",
     state,
-    tableName: table_name,
     op_name,
     condition_ids_str,
     tableTriggers: this._triggers?.[table_name],
     tableSyncs: JSON.stringify(
       this.syncs
         .filter((s) => s.table_name === table_name)
-        .map((s) => pickKeys(s, ["condition", "socket_id"])),
+        .map((s) => pickKeys(s, ["condition", "socket_id"]))
     ),
     connectedSocketIds: this.connectedSocketIds,
   });

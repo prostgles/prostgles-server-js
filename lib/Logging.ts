@@ -1,6 +1,7 @@
 import { AnyObject, ClientSchema } from "prostgles-types";
 import { LocalParams } from "./DboBuilder/DboBuilder";
 import { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
+import { NOTIF_TYPE, NotifTypeName } from "./PubSubManager/PubSubManager";
 
 type ClientInfo = {
   socketId: string | undefined;
@@ -23,7 +24,7 @@ export namespace EventTypes {
       localParams: LocalParams | undefined;
     };
 
-  type SyncOneClient = ClientInfo &
+  export type Sync = ClientInfo &
     DebugInfo & {
       type: "sync";
       tableName: string;
@@ -42,13 +43,6 @@ export namespace EventTypes {
           socketId: string;
         }
       | {
-          command: "addTrigger";
-          state: "ok" | "fail";
-          /** If no socket id then it's a local subscribe */
-          socketId: string | undefined;
-          condition: string;
-        }
-      | {
           command: "addSync" | "unsync";
           socketId: string;
           condition: string;
@@ -61,21 +55,36 @@ export namespace EventTypes {
           connectedSocketIds: string[];
         }
     );
-  export type SyncMultiClient = {
-    type: "sync";
-    tableName: string;
-    localParams?: LocalParams;
-    connectedSocketIds: string[];
-  } & {
-    command: "notifListener";
-    op_name: string | undefined;
-    condition_ids_str: string | undefined;
-    tableTriggers: string[] | undefined;
-    tableSyncs: string;
-    state: "ok" | "error" | "no-triggers" | "invalid_condition_ids";
-  };
 
-  export type Sync = SyncOneClient | SyncMultiClient;
+  export type SyncOrSub = ClientInfo &
+    DebugInfo & {
+      type: "syncOrSub";
+      tableName: string;
+      localParams?: LocalParams;
+      connectedSocketIds: string[];
+      triggers: Record<string, string[]> | undefined;
+    } & (
+      | {
+          command: "addTrigger";
+          state: "ok" | "fail";
+          /** If no socket id then it's a local subscribe */
+          socketId: string | undefined;
+          condition: string;
+        }
+      | {
+          command: "notifListener";
+          notifType: NotifTypeName;
+          dataArr: any[];
+        }
+      | {
+          command: "notifListener.Finished";
+          op_name: string | undefined;
+          condition_ids_str: string | undefined;
+          tableTriggers: string[] | undefined;
+          tableSyncs: string;
+          state: "ok" | "error" | "no-triggers" | "invalid_condition_ids";
+        }
+    );
 
   export type Connection =
     | (ClientInfo & {
@@ -134,7 +143,7 @@ export type EventInfo =
   | EventTypes.Table
   | EventTypes.Method
   | EventTypes.Sync
-  | EventTypes.SyncMultiClient
+  | EventTypes.SyncOrSub
   | EventTypes.Connection
   | EventTypes.Debug;
 
