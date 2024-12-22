@@ -130,6 +130,17 @@ export async function addSub(
         const isMatch = s.socket?.id === socket.id && s.channel_name === channel_name;
         return !isMatch;
       });
+      this._log({
+        type: "syncOrSub",
+        command: "unsubscribe",
+        channel_name,
+        socketId: socket.id,
+        duration: 0,
+        triggers: this._triggers,
+        connectedSocketIds: this.connectedSocketIds,
+        sid: socket.id,
+        tableName: table_name,
+      });
       removeListeners();
       cb(null, { res });
     });

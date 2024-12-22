@@ -194,6 +194,13 @@ export class PubSubManager {
   private constructor(dboBuilder: DboBuilder) {
     this.dboBuilder = dboBuilder;
 
+    this._log({
+      type: "syncOrSub",
+      command: "postgresNotifListenManager.create",
+      duration: 0,
+      connectedSocketIds: this.connectedSocketIds,
+      triggers: this._triggers,
+    });
     log("Created PubSubManager");
   }
   appCheckFrequencyMS = 10 * 1000;
@@ -205,9 +212,14 @@ export class PubSubManager {
     if (this.appCheck) {
       clearInterval(this.appCheck);
     }
-    this.subs = [];
-    this.syncs = [];
     this.postgresNotifListenManager?.destroy();
+    this._log({
+      type: "syncOrSub",
+      command: "postgresNotifListenManager.destroy",
+      duration: 0,
+      connectedSocketIds: this.connectedSocketIds,
+      triggers: this._triggers,
+    });
   };
 
   getIsDestroyed = () => {
@@ -409,7 +421,10 @@ export class PubSubManager {
     return this.dboBuilder.prostgles.connectedSockets.map((s) => s.id);
   }
   _log = (params: EventTypes.Sync | EventTypes.SyncOrSub) => {
-    return this.dboBuilder.prostgles.opts.onLog?.({ ...params });
+    return this.dboBuilder.prostgles.opts.onLog?.({
+      ...params,
+      connectedSocketIds: this.connectedSocketIds,
+    });
   };
 
   syncTimeout?: ReturnType<typeof setTimeout>;

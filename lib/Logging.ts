@@ -1,7 +1,6 @@
-import { AnyObject, ClientSchema } from "prostgles-types";
+import { AnyObject, ClientSchema, TableHandler } from "prostgles-types";
 import { LocalParams } from "./DboBuilder/DboBuilder";
-import { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
-import { NOTIF_TYPE, NotifTypeName } from "./PubSubManager/PubSubManager";
+import { NotifTypeName } from "./PubSubManager/PubSubManager";
 
 type ClientInfo = {
   socketId: string | undefined;
@@ -18,7 +17,7 @@ export namespace EventTypes {
     DebugInfo & {
       type: "table";
       tableName: string;
-      command: keyof TableHandler;
+      command: keyof TableHandler | "sync";
       txInfo: AnyObject | undefined;
       data: AnyObject;
       localParams: LocalParams | undefined;
@@ -34,7 +33,6 @@ export namespace EventTypes {
       | {
           command: "syncData";
           source: "client" | "trigger";
-          connectedSocketIds: string[];
           lr: string;
         }
       | {
@@ -52,37 +50,55 @@ export namespace EventTypes {
           socketId: string;
           remainingSyncs: string;
           remainingSubs: string;
-          connectedSocketIds: string[];
         }
     );
 
-  export type SyncOrSub = ClientInfo &
-    DebugInfo & {
-      type: "syncOrSub";
-      tableName: string;
-      localParams?: LocalParams;
-      connectedSocketIds: string[];
-      triggers: Record<string, string[]> | undefined;
-    } & (
-      | {
+  type SyncOrSubWithClientInfo = ClientInfo & {
+    tableName: string;
+    localParams?: LocalParams;
+  };
+  export type SyncOrSub = DebugInfo & {
+    type: "syncOrSub";
+    connectedSocketIds: string[];
+    triggers: Record<string, string[]> | undefined;
+  } & (
+      | (SyncOrSubWithClientInfo & {
           command: "addTrigger";
           state: "ok" | "fail";
           /** If no socket id then it's a local subscribe */
           socketId: string | undefined;
           condition: string;
-        }
-      | {
+        })
+      | (SyncOrSubWithClientInfo & {
+          command: "unsubscribe";
+          channel_name: string;
+        })
+      | (SyncOrSubWithClientInfo & {
           command: "notifListener";
           notifType: NotifTypeName;
           dataArr: any[];
-        }
-      | {
+        })
+      | (SyncOrSubWithClientInfo & {
           command: "notifListener.Finished";
           op_name: string | undefined;
           condition_ids_str: string | undefined;
           tableTriggers: string[] | undefined;
           tableSyncs: string;
           state: "ok" | "error" | "no-triggers" | "invalid_condition_ids";
+        })
+      | {
+          command: "pushSubData";
+          channel_name: string;
+          state:
+            | "sub_not_found"
+            | "error"
+            | "Emiting to socket"
+            | "pushed to local client"
+            | "no client to push data to"
+            | "fetch data error";
+        }
+      | {
+          command: "postgresNotifListenManager.create" | "postgresNotifListenManager.destroy";
         }
     );
 
