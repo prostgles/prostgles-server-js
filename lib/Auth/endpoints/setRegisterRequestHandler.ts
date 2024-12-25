@@ -4,6 +4,7 @@ import { AUTH_ROUTES_AND_PARAMS, HTTP_FAIL_CODES } from "../AuthHandler";
 import type { AuthRegistrationConfig } from "../AuthTypes";
 import { sendEmail } from "../sendEmail";
 import { getClientRequestIPsInfo } from "../utils/getClientRequestIPsInfo";
+import { parseLoginData } from "./setLoginRequestHandler";
 
 type ReturnType =
   | AuthResponse.MagicLinkAuthFailure
@@ -19,7 +20,13 @@ export const setRegisterRequestHandler = (
   app: e.Express
 ) => {
   const registerRequestHandler = async (req: Request, res: Response<ReturnType>) => {
-    const { username, password } = req.body;
+    const dataOrError = parseLoginData(req.body);
+    if ("error" in dataOrError) {
+      return res
+        .status(HTTP_FAIL_CODES.BAD_REQUEST)
+        .json({ success: false, code: "something-went-wrong", message: dataOrError.error });
+    }
+    const { username, password } = dataOrError;
     const sendResponse = (response: ReturnType) => {
       if (response.success) {
         res.json(response);
@@ -27,12 +34,12 @@ export const setRegisterRequestHandler = (
         res.status(HTTP_FAIL_CODES.BAD_REQUEST).json(response);
       }
     };
-    if (!username || typeof username !== "string") {
+    if (!username) {
       return sendResponse({ success: false, code: "username-missing" });
     }
     if (emailAuthConfig.signupType === "withPassword") {
       const { minPasswordLength = 8 } = emailAuthConfig;
-      if (typeof password !== "string") {
+      if (!password) {
         return sendResponse({ success: false, code: "password-missing" });
       } else if (password.length < minPasswordLength) {
         return sendResponse({
@@ -47,13 +54,14 @@ export const setRegisterRequestHandler = (
       const { smtp } = emailAuthConfig;
       const errCodeOrResult =
         emailAuthConfig.signupType === "withPassword" ?
-          await emailAuthConfig.onRegister({
-            email: username,
-            password,
-            confirmationUrlPath: `${websiteUrl}${AUTH_ROUTES_AND_PARAMS.confirmEmail}`,
-            clientInfo,
-            req: httpReq,
-          })
+          !password ? "weak-password"
+          : await emailAuthConfig.onRegister({
+              email: username,
+              password,
+              confirmationUrlPath: `${websiteUrl}${AUTH_ROUTES_AND_PARAMS.confirmEmail}`,
+              clientInfo,
+              req: httpReq,
+            })
         : await emailAuthConfig.onRegister({
             email: username,
             magicLinkUrlPath: `${websiteUrl}${AUTH_ROUTES_AND_PARAMS.magicLinksRoute}`,

@@ -39,7 +39,7 @@ export function setLoginRequestHandler(this: AuthHandler, app: e.Express) {
   });
 }
 
-const parseLoginData = (bodyData: any): AuthRequest.LoginData | { error: string } => {
+export const parseLoginData = (bodyData: any): AuthRequest.LoginData | { error: string } => {
   const loginData: AuthRequest.LoginData = {
     username: "",
     remember_me: !!bodyData?.remember_me,
