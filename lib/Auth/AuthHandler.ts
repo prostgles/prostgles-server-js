@@ -3,6 +3,7 @@ import {
   AuthFailure,
   AuthGuardLocation,
   AuthGuardLocationResponse,
+  AuthResponse,
   AuthSocketSchema,
   CHANNELS,
 } from "prostgles-types";
@@ -27,6 +28,8 @@ import { setupAuthRoutes } from "./setupAuthRoutes";
 import { getClientRequestIPsInfo } from "./utils/getClientRequestIPsInfo";
 import { getReturnUrl } from "./utils/getReturnUrl";
 import { getSidAndUserFromRequest } from "./utils/getSidAndUserFromRequest";
+import type { Response } from "express";
+import { LoginResponseHandler } from "./endpoints/setLoginRequestHandler";
 
 export { getClientRequestIPsInfo };
 export const HTTP_FAIL_CODES = {
@@ -109,7 +112,7 @@ export class AuthHandler {
 
   setCookieAndGoToReturnURLIFSet = (
     cookie: { sid: string; expires: number },
-    r: { req: ExpressReq; res: ExpressRes }
+    r: { req: ExpressReq; res: LoginResponseHandler }
   ) => {
     const { sid, expires } = cookie;
     const { res, req } = r;
@@ -279,7 +282,7 @@ export class AuthHandler {
 
   loginThrottledAndSetCookie = async (
     req: ExpressReq,
-    res: ExpressRes,
+    res: LoginResponseHandler,
     loginParams: LoginParams
   ) => {
     const start = Date.now();
@@ -289,7 +292,10 @@ export class AuthHandler {
     );
     const loginResponse =
       typeof errCodeOrSession === "string" ?
-        { session: undefined, response: { success: false, code: errCodeOrSession } }
+        {
+          session: undefined,
+          response: { success: false, code: errCodeOrSession } as const,
+        }
       : errCodeOrSession;
     await this.prostgles.opts.onLog?.({
       type: "auth",

@@ -1,23 +1,20 @@
-import e, { Response } from "express";
-import { ExpressConfig, ExpressReq, SessionUser } from "../AuthTypes";
-import { AuthResponse } from "prostgles-types";
+import e from "express";
+import { DBOFullyTyped } from "../../DBSchemaBuilder";
 import {
   AUTH_ROUTES_AND_PARAMS,
   AuthHandler,
   getClientRequestIPsInfo,
   HTTP_FAIL_CODES,
 } from "../AuthHandler";
-import { DBOFullyTyped } from "../../DBSchemaBuilder";
+import { ExpressConfig, ExpressReq, SessionUser } from "../AuthTypes";
+import { LoginResponseHandler } from "./setLoginRequestHandler";
 
 export function setMagicLinkRequestHandler(
   this: AuthHandler,
   onMagicLink: Required<ExpressConfig<void, SessionUser>>["onMagicLink"],
   app: e.Express
 ) {
-  const result = async (
-    req: ExpressReq,
-    res: Response<AuthResponse.MagicLinkAuthFailure | AuthResponse.MagicLinkAuthSuccess>
-  ) => {
+  const result = async (req: ExpressReq, res: LoginResponseHandler) => {
     const { id } = req.params;
 
     if (typeof id !== "string" || !id) {

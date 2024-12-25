@@ -80,9 +80,9 @@ export function setOAuthProviders(
               });
             } else {
               this.loginThrottledAndSetCookie(req, res, {
+                ...authInfo,
                 type: "provider",
                 provider: providerName,
-                ...authInfo,
               }).catch((e: any) => {
                 res.status(500).json(getErrorAsObject(e));
               });

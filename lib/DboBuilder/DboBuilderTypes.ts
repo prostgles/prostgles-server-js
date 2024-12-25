@@ -168,11 +168,9 @@ export type PRGLIOSocket = {
   };
 
   /** Used for session caching */
-  __prglCache?: {
+  __prglCache?: SessionUser & {
     session: BasicSession;
-    // user: UserLike;
-    // clientUser: UserLike;
-  } & SessionUser;
+  };
 
   _user?: AnyObject;
 

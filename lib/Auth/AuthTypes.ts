@@ -13,12 +13,12 @@ import type {
 import type { MicrosoftStrategyOptions } from "passport-microsoft";
 import {
   AnyObject,
+  AuthFailure,
+  AuthRequest,
+  AuthResponse,
   FieldFilter,
   IdentityProvider,
-  AuthResponse,
   UserLike,
-  AuthRequest,
-  AuthFailure,
 } from "prostgles-types";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
@@ -327,7 +327,11 @@ export type LoginResponse =
   | AuthResponse.MagicLinkAuthFailure["code"];
 
 export type LoginParams =
-  | ({ type: "username" } & AuthRequest.LoginData)
+  | ({
+      type: "username";
+      signupType: undefined | EmailProvider["signupType"];
+      magicLinkUrlPath: undefined | string;
+    } & AuthRequest.LoginData)
   | ({ type: "provider" } & AuthProviderUserData);
 
 export type ExpressConfig<S, SUser extends SessionUser> = {

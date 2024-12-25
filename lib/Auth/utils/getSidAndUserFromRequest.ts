@@ -43,7 +43,7 @@ export async function getSidAndUserFromRequest(
     if (typeof clientInfoOrErr === "string") throw clientInfoOrErr;
     const clientInfo = clientInfoOrErr;
     if (getSession && clientReq.socket) {
-      const session = await getSession(sid, this.dbo as any, this.db);
+      const session = await getSession(sid, this.dbo as DBOFullyTyped, this.db);
       if (session && session.expires && clientInfo?.user) {
         clientReq.socket.__prglCache = {
           ...clientInfo,
