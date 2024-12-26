@@ -2,11 +2,9 @@ import { Email, SMTPConfig } from "./AuthTypes";
 import * as nodemailer from "nodemailer";
 import * as aws from "@aws-sdk/client-ses";
 import SESTransport from "nodemailer/lib/ses-transport";
+import { checkDmarc } from "./utils/checkDmarc";
 
-type SESTransporter = nodemailer.Transporter<
-  SESTransport.SentMessageInfo,
-  SESTransport.Options
->;
+type SESTransporter = nodemailer.Transporter<SESTransport.SentMessageInfo, SESTransport.Options>;
 type SMTPTransporter = nodemailer.Transporter<
   nodemailer.SentMessageInfo,
   nodemailer.TransportOptions
@@ -19,9 +17,36 @@ const transporterCache: Map<string, Transporter> = new Map();
  * Allows sending emails using nodemailer default config or AWS SES
  * https://www.nodemailer.com/transports/ses/
  */
-export const sendEmail = (smptConfig: SMTPConfig, email: Email) => {
+const sendEmail = (smptConfig: SMTPConfig, email: Email) => {
   const transporter = getOrSetTransporter(smptConfig);
   return send(transporter, email);
+};
+
+/**
+ * Verifies DMARC and that the website has a valid DMARC records
+ */
+const emailSenderCache: Map<string, boolean> = new Map();
+export const getEmailSender = async (smptConfig: SMTPConfig, websiteUrl: string) => {
+  const result = {
+    sendEmail: (email: Email) => sendEmail(smptConfig, email),
+  };
+  const configStr = JSON.stringify({ smptConfig, websiteUrl });
+  if (emailSenderCache.has(configStr)) {
+    return result;
+  }
+  if (!websiteUrl) {
+    throw new Error("websiteUrl is required for email registrations");
+  }
+  await checkDmarc(websiteUrl);
+
+  await verifySMTPConfig(smptConfig);
+
+  /**
+   * Setup nodemailer transporters
+   */
+  getOrSetTransporter(smptConfig);
+  emailSenderCache.set(configStr, true);
+  return result;
 };
 
 /**
@@ -29,8 +54,7 @@ export const sendEmail = (smptConfig: SMTPConfig, email: Email) => {
  */
 export const getOrSetTransporter = (smptConfig: SMTPConfig) => {
   const configStr = JSON.stringify(smptConfig);
-  const transporter =
-    transporterCache.get(configStr) ?? getTransporter(smptConfig);
+  const transporter = transporterCache.get(configStr) ?? getTransporter(smptConfig);
   if (!transporterCache.has(configStr)) {
     transporterCache.set(configStr, transporter);
   }

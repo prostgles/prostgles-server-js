@@ -1,35 +1,24 @@
-import {
-  AnyObject,
-  AuthFailure,
-  AuthGuardLocation,
-  AuthGuardLocationResponse,
-  AuthResponse,
-  AuthSocketSchema,
-  CHANNELS,
-} from "prostgles-types";
+import { AnyObject, AuthResponse, CHANNELS } from "prostgles-types";
 import { PRGLIOSocket } from "../DboBuilder/DboBuilder";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { removeExpressRoute } from "../FileManager/FileManager";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import {
-  Auth,
+  AuthConfig,
   AuthClientRequest,
   AuthResult,
   AuthResultWithSID,
   BasicSession,
   ExpressReq,
-  ExpressRes,
-  LoginClientInfo,
-  LoginParams,
-  LoginResponse,
 } from "./AuthTypes";
-import { getProviders } from "./setAuthProviders";
+import { LoginResponseHandler } from "./endpoints/setLoginRequestHandler";
+import { getClientAuth } from "./getClientAuth";
+import { login } from "./login";
 import { setupAuthRoutes } from "./setupAuthRoutes";
 import { getClientRequestIPsInfo } from "./utils/getClientRequestIPsInfo";
 import { getReturnUrl } from "./utils/getReturnUrl";
 import { getSidAndUserFromRequest } from "./utils/getSidAndUserFromRequest";
-import type { Response } from "express";
-import { LoginResponseHandler } from "./endpoints/setLoginRequestHandler";
+import { throttledReject } from "./utils/throttledReject";
 
 export { getClientRequestIPsInfo };
 export const HTTP_FAIL_CODES = {
@@ -48,7 +37,7 @@ export const HTTP_SUCCESS_CODES = {
 
 export const AUTH_ROUTES_AND_PARAMS = {
   login: "/login",
-  loginWithProvider: "/auth",
+  loginWithProvider: "/oauth",
   emailRegistration: "/register",
   returnUrlParamName: "returnURL",
   sidKeyName: "session_id",
@@ -62,7 +51,7 @@ export const AUTH_ROUTES_AND_PARAMS = {
 
 export class AuthHandler {
   protected readonly prostgles: Prostgles;
-  protected readonly opts: Auth;
+  protected readonly opts: AuthConfig;
   dbo: DBHandlerServer;
   db: DB;
 
@@ -98,7 +87,7 @@ export class AuthHandler {
   isUserRoute = (pathname: string) => {
     const { login, logoutGetPath, magicLinksRoute, loginWithProvider } = AUTH_ROUTES_AND_PARAMS;
     const pubRoutes = [
-      ...(this.opts.expressConfig?.publicRoutes || []),
+      ...(this.opts.loginSignupConfig?.publicRoutes || []),
       login,
       logoutGetPath,
       magicLinksRoute,
@@ -116,42 +105,43 @@ export class AuthHandler {
   ) => {
     const { sid, expires } = cookie;
     const { res, req } = r;
-    if (sid) {
-      const maxAgeOneDay = 60 * 60 * 24; // 24 hours;
-      type CD = { maxAge: number } | { expires: Date };
-      let cookieDuration: CD = {
-        maxAge: maxAgeOneDay,
-      };
-      if (expires && Number.isFinite(expires) && !isNaN(+new Date(expires))) {
-        // const maxAge = (+new Date(expires)) - Date.now();
-        cookieDuration = { expires: new Date(expires) };
-        const days = (+cookieDuration.expires - Date.now()) / (24 * 60 * 60e3);
-        if (days >= 400) {
-          console.warn(`Cookie expiration is higher than the Chrome 400 day limit: ${days}days`);
-        }
-      }
-
-      const cookieOpts = {
-        ...cookieDuration,
-        httpOnly: true, // The cookie only accessible by the web server
-        //signed: true // Indicates if the cookie should be signed
-        secure: true,
-        sameSite: "strict" as const,
-        ...(this.opts.expressConfig?.cookieOptions || {}),
-      };
-      const cookieData = sid;
-      res.cookie(this.sidKeyName, cookieData, cookieOpts);
-      const successURL = getReturnUrl(req) || "/";
-      res.redirect(successURL);
-    } else {
-      throw "no user or session";
+    if (!sid) {
+      throw "no sid";
     }
+
+    const maxAgeOneDay = 60 * 60 * 24; // 24 hours;
+    type CD = { maxAge: number } | { expires: Date };
+    let cookieDuration: CD = {
+      maxAge: maxAgeOneDay,
+    };
+
+    if (expires && Number.isFinite(expires) && !isNaN(+new Date(expires))) {
+      cookieDuration = { expires: new Date(expires) };
+      const days = (+cookieDuration.expires - Date.now()) / (24 * 60 * 60e3);
+      if (days >= 400) {
+        console.warn(`Cookie expiration is higher than the Chrome 400 day limit: ${days}days`);
+      }
+    }
+
+    const cookieOpts = {
+      ...cookieDuration,
+      // The cookie only accessible by the web server
+      httpOnly: true,
+      //signed: true
+      secure: true,
+      sameSite: "strict" as const,
+      ...(this.opts.loginSignupConfig?.cookieOptions ?? {}),
+    };
+    const cookieData = sid;
+    res.cookie(this.sidKeyName, cookieData, cookieOpts);
+    const successURL = getReturnUrl(req) || "/";
+    res.redirect(successURL);
   };
 
   getUserAndHandleError = async (localParams: AuthClientRequest): Promise<AuthResultWithSID> => {
     const sid = this.getSID(localParams);
     if (!sid) return { sid };
-    const handlerError = (code: AuthFailure["code"]) => {
+    const handlerError = (code: AuthResponse.AuthFailure["code"]) => {
       if (localParams.httpReq) {
         localParams.res
           .status(HTTP_FAIL_CODES.BAD_REQUEST)
@@ -160,7 +150,7 @@ export class AuthHandler {
       throw code;
     };
     try {
-      const userOrErrorCode = await this.throttledFunc(async () => {
+      const userOrErrorCode = await throttledReject(async () => {
         return this.opts.getUser(
           this.validateSid(sid),
           this.dbo as DBOFullyTyped,
@@ -186,7 +176,7 @@ export class AuthHandler {
   init = setupAuthRoutes.bind(this);
 
   destroy = () => {
-    const app = this.opts.expressConfig?.app;
+    const app = this.opts.loginSignupConfig?.app;
     const {
       login,
       logoutGetPath,
@@ -211,111 +201,13 @@ export class AuthHandler {
     ]);
   };
 
-  throttledFunc = <T>(func: () => Promise<T>, throttle = 500): Promise<T> => {
-    return new Promise(async (resolve, reject) => {
-      let result: T,
-        error: any,
-        finished = false;
-
-      /**
-       * Throttle reject response times to prevent timing attacks
-       */
-      const interval = setInterval(() => {
-        if (finished) {
-          clearInterval(interval);
-          if (error) {
-            reject(error);
-          } else {
-            resolve(result);
-          }
-        }
-      }, throttle);
-
-      try {
-        result = await func();
-        resolve(result);
-        clearInterval(interval);
-      } catch (err) {
-        console.log(err);
-        error = err;
-      }
-
-      finished = true;
-    });
-  };
-
-  loginThrottledAndValidate = async (
-    params: LoginParams,
-    client: LoginClientInfo
-  ): Promise<LoginResponse> => {
-    if (!this.opts.login) throw "Auth login config missing";
-    const { responseThrottle = 500 } = this.opts;
-    return this.throttledFunc(async () => {
-      const result = await this.opts.login?.(params, this.dbo as DBOFullyTyped, this.db, client);
-
-      if (!result) {
-        return "server-error";
-      }
-      if (typeof result === "string") return result;
-
-      const { sid, expires } = result.session;
-      if (!sid) {
-        // return withServerError("Invalid sid");
-        return "server-error";
-      }
-      if (sid && (typeof sid !== "string" || typeof expires !== "number")) {
-        // return withServerError(
-        //   "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number }"
-        // );
-        return "server-error";
-      }
-      if (expires < Date.now()) {
-        // return withServerError(
-        //   "auth.login() is returning an expired session. Can only login with a session.expires greater than Date.now()"
-        // );
-        return "server-error";
-      }
-
-      return result;
-    }, responseThrottle);
-  };
-
-  loginThrottledAndSetCookie = async (
-    req: ExpressReq,
-    res: LoginResponseHandler,
-    loginParams: LoginParams
-  ) => {
-    const start = Date.now();
-    const errCodeOrSession = await this.loginThrottledAndValidate(
-      loginParams,
-      getClientRequestIPsInfo({ httpReq: req, res })
-    );
-    const loginResponse =
-      typeof errCodeOrSession === "string" ?
-        {
-          session: undefined,
-          response: { success: false, code: errCodeOrSession } as const,
-        }
-      : errCodeOrSession;
-    await this.prostgles.opts.onLog?.({
-      type: "auth",
-      command: "login",
-      success: !!loginResponse.session,
-      duration: Date.now() - start,
-      sid: loginResponse.session?.sid,
-      socketId: undefined,
-    });
-    if (!loginResponse.session) {
-      return res.status(HTTP_FAIL_CODES.BAD_REQUEST).json(loginResponse.response);
-    }
-    this.setCookieAndGoToReturnURLIFSet(loginResponse.session, { req, res });
-  };
+  login = login.bind(this);
 
   /**
    * Will return first sid value found in:
-   *  Bearer header
-   *  http cookie
-   *  query params
+   *  - Bearer header
+   *  - http cookie
+   *  - query params
    * Based on sid names in auth
    */
   getSID(maybeClientReq: AuthClientRequest | undefined): string | undefined {
@@ -385,7 +277,10 @@ export class AuthHandler {
     session: BasicSession | undefined
   ): boolean => {
     const hasExpired = Boolean(session && session.expires <= Date.now());
-    if (this.opts.expressConfig?.publicRoutes && !this.opts.expressConfig.disableSocketAuthGuard) {
+    if (
+      this.opts.loginSignupConfig?.publicRoutes &&
+      !this.opts.loginSignupConfig.disableSocketAuthGuard
+    ) {
       const error = "Session has expired";
       if (hasExpired) {
         if (session?.onExpiration === "redirect")
@@ -399,68 +294,5 @@ export class AuthHandler {
     return Boolean(session && !hasExpired);
   };
 
-  getClientAuth = async (
-    clientReq: AuthClientRequest
-  ): Promise<{ auth: AuthSocketSchema; userData: AuthResultWithSID }> => {
-    let pathGuard = false;
-    if (this.opts.expressConfig?.publicRoutes && !this.opts.expressConfig.disableSocketAuthGuard) {
-      pathGuard = true;
-
-      /**
-       * Due to SPA nature of some clients, we need to check if the connected client ends up on a protected route
-       */
-      if (clientReq.socket) {
-        const { socket } = clientReq;
-        socket.removeAllListeners(CHANNELS.AUTHGUARD);
-        socket.on(
-          CHANNELS.AUTHGUARD,
-          async (
-            params: AuthGuardLocation,
-            cb = (_err: any, _res?: AuthGuardLocationResponse) => {
-              /** EMPTY */
-            }
-          ) => {
-            try {
-              const { pathname, origin } =
-                typeof params === "string" ? (JSON.parse(params) as AuthGuardLocation) : params;
-              if (pathname && typeof pathname !== "string") {
-                console.warn("Invalid pathname provided for AuthGuardLocation: ", pathname);
-              }
-
-              /** These origins  */
-              const IGNORED_API_ORIGINS = ["file://"];
-              if (
-                !IGNORED_API_ORIGINS.includes(origin) &&
-                pathname &&
-                typeof pathname === "string" &&
-                this.isUserRoute(pathname) &&
-                !(await this.getUserFromRequest({ socket }))
-              ) {
-                cb(null, { shouldReload: true });
-              } else {
-                cb(null, { shouldReload: false });
-              }
-            } catch (err) {
-              console.error("AUTHGUARD err: ", err);
-              cb(err);
-            }
-          }
-        );
-      }
-    }
-
-    const userData = await this.getSidAndUserFromRequest(clientReq);
-    const { email } = this.opts.expressConfig?.registrations ?? {};
-    const auth: AuthSocketSchema = {
-      providers: getProviders.bind(this)(),
-      register: email && {
-        type: email.signupType,
-        url: AUTH_ROUTES_AND_PARAMS.emailRegistration,
-      },
-      user: userData.clientUser,
-      loginType: email?.signupType ?? "withPassword",
-      pathGuard,
-    };
-    return { auth, userData };
-  };
+  getClientAuth = getClientAuth.bind(this);
 }

@@ -2,30 +2,43 @@ import { RequestHandler } from "express";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { AuthHandler } from "./AuthHandler";
 import { setCatchAllRequestHandler } from "./endpoints/setCatchAllRequestHandler";
+import { setConfirmEmailRequestHandler } from "./endpoints/setConfirmEmailRequestHandler";
 import { setLoginRequestHandler } from "./endpoints/setLoginRequestHandler";
 import { setMagicLinkRequestHandler } from "./endpoints/setMagicLinkRequestHandler";
-import { setAuthProviders, upsertNamedExpressMiddleware } from "./setAuthProviders";
+import { setOAuthRequestHandlers } from "./endpoints/setOAuthRequestHandlers";
+import { setRegisterRequestHandler } from "./endpoints/setRegisterRequestHandler";
+import { upsertNamedExpressMiddleware } from "./utils/upsertNamedExpressMiddleware";
 
 export async function setupAuthRoutes(this: AuthHandler) {
-  const { login, expressConfig } = this.opts;
-
-  if (!login) {
-    throw "Invalid auth: Provide { sidKeyName: string } ";
-  }
+  const { loginSignupConfig } = this.opts;
 
   if (this.sidKeyName === "sid") {
     throw "sidKeyName cannot be 'sid' due to collision with socket.io";
   }
 
-  if (!expressConfig) {
+  if (!loginSignupConfig) {
     return;
   }
-  const { app, publicRoutes = [], onMagicLink, use } = expressConfig;
+  const {
+    app,
+    publicRoutes = [],
+    onMagicLink,
+    use,
+    loginWithOAuth,
+    signupWithEmailAndPassword,
+  } = loginSignupConfig;
   if (publicRoutes.find((r) => typeof r !== "string" || !r)) {
     throw "Invalid or empty string provided within publicRoutes ";
   }
 
-  await setAuthProviders.bind(this)(expressConfig);
+  if (signupWithEmailAndPassword) {
+    setRegisterRequestHandler(signupWithEmailAndPassword, app);
+    setConfirmEmailRequestHandler.bind(this)(signupWithEmailAndPassword, app);
+  }
+
+  if (loginWithOAuth) {
+    await setOAuthRequestHandlers.bind(this)(app, loginWithOAuth);
+  }
 
   if (use) {
     const prostglesUseMiddleware: RequestHandler = (req, res, next) => {

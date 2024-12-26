@@ -9,7 +9,7 @@ import {
   ViewHandler,
 } from "prostgles-types";
 import prostgles from ".";
-import { Auth } from "./Auth/AuthTypes";
+import { AuthConfig } from "./Auth/AuthTypes";
 import { DboBuilder, escapeTSNames, postgresToTsType } from "./DboBuilder/DboBuilder";
 import {
   PublishAllOrNothing,
@@ -164,7 +164,7 @@ export type PublishFullyTyped<Schema = void> =
     },
   });
 
-  const _auth: Auth = {
+  const _auth: AuthConfig = {
     sidKeyName: "sid_token",
     getUser: async (sid, db, _db) => {
       db.dwadaw?.find;

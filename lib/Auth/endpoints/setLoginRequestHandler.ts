@@ -1,20 +1,18 @@
 import e, { Response } from "express";
+import { AuthRequest, AuthResponse, isDefined, isObject } from "prostgles-types";
 import { AUTH_ROUTES_AND_PARAMS, AuthHandler, HTTP_FAIL_CODES } from "../AuthHandler";
-import { BasicSession, LoginParams } from "../AuthTypes";
-import { AuthFailure, AuthRequest, AuthResponse, isDefined, isObject } from "prostgles-types";
+import { LoginParams } from "../AuthTypes";
 
 export type LoginResponseHandler = Response<
-  | {
-      session: BasicSession;
-      response?: AuthResponse.PasswordLoginSuccess | AuthResponse.MagicLinkAuthSuccess;
-    }
-  | AuthFailure
+  | AuthResponse.OAuthRegisterSuccess
+  | AuthResponse.OAuthRegisterFailure
+  | AuthResponse.PasswordLoginSuccess
   | AuthResponse.PasswordLoginFailure
   | AuthResponse.MagicLinkAuthFailure
+  | AuthResponse.MagicLinkAuthSuccess
 >;
 
 export function setLoginRequestHandler(this: AuthHandler, app: e.Express) {
-  const { registrations } = this.opts.expressConfig ?? {};
   app.post(AUTH_ROUTES_AND_PARAMS.login, async (req, res: LoginResponseHandler) => {
     const loginData = parseLoginData(req.body);
     if ("error" in loginData) {
@@ -25,14 +23,10 @@ export function setLoginRequestHandler(this: AuthHandler, app: e.Express) {
     try {
       const loginParams: LoginParams = {
         ...loginData,
-        magicLinkUrlPath:
-          registrations?.websiteUrl &&
-          `${registrations.websiteUrl}/${AUTH_ROUTES_AND_PARAMS.magicLinksRoute}`,
-        signupType: registrations?.email?.signupType,
         type: "username",
       };
 
-      await this.loginThrottledAndSetCookie(req, res, loginParams);
+      await this.login(req, res, loginParams);
     } catch (_error) {
       res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({ success: false, code: "server-error" });
     }

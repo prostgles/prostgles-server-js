@@ -6,15 +6,16 @@ import {
   getClientRequestIPsInfo,
   HTTP_FAIL_CODES,
 } from "../AuthHandler";
-import { ExpressConfig, ExpressReq, SessionUser } from "../AuthTypes";
+import { LoginSignupConfig, ExpressReq, SessionUser } from "../AuthTypes";
 import { LoginResponseHandler } from "./setLoginRequestHandler";
+import { throttledReject } from "../utils/throttledReject";
 
 export function setMagicLinkRequestHandler(
   this: AuthHandler,
-  onMagicLink: Required<ExpressConfig<void, SessionUser>>["onMagicLink"],
+  onMagicLink: Required<LoginSignupConfig<void, SessionUser>>["onMagicLink"],
   app: e.Express
 ) {
-  const result = async (req: ExpressReq, res: LoginResponseHandler) => {
+  const handler = async (req: ExpressReq, res: LoginResponseHandler) => {
     const { id } = req.params;
 
     if (typeof id !== "string" || !id) {
@@ -23,7 +24,7 @@ export function setMagicLinkRequestHandler(
         .json({ success: false, code: "something-went-wrong", message: "Invalid magic link" });
     } else {
       try {
-        const response = await this.throttledFunc(async () => {
+        const response = await throttledReject(async () => {
           return onMagicLink(
             id,
             this.dbo as DBOFullyTyped,
@@ -43,6 +44,5 @@ export function setMagicLinkRequestHandler(
       }
     }
   };
-  app.get(AUTH_ROUTES_AND_PARAMS.magicLinksExpressRoute, result);
-  return result;
+  app.get(AUTH_ROUTES_AND_PARAMS.magicLinksExpressRoute, handler);
 }

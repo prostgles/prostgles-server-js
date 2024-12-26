@@ -176,34 +176,35 @@ function dd() {
         }
         return undefined;
       },
-      login: async (loginData) => {
-        if (loginData.type !== "username") throw "Only username login is supported";
-        const { username, password } = loginData;
-        const u = users.find((u) => u.username === username && u.password === password);
-        if (!u) {
-          return "no-match";
-        }
-        let s = sessions.find((s) => s.user_id === u.id);
-        if (!s) {
-          s = { id: "SID" + Date.now(), user_id: u.id };
-          sessions.push(s);
-        }
-        log("Logged in!");
-        return { session: { sid: s.id, expires: Infinity, onExpiration: "redirect" } };
-      },
       cacheSession: {
         getSession: async (sid) => {
           const s = sessions.find((s) => s.id === sid);
           return s ? { sid: s.id, expires: Infinity, onExpiration: "redirect" } : undefined;
         },
       },
-      expressConfig: {
+      loginSignupConfig: {
         app,
+        login: async (loginData) => {
+          if (loginData.type !== "username") throw "Only username login is supported";
+          const { username, password } = loginData;
+          const u = users.find((u) => u.username === username && u.password === password);
+          if (!u) {
+            return "no-match";
+          }
+          let s = sessions.find((s) => s.user_id === u.id);
+          if (!s) {
+            s = { id: "SID" + Date.now(), user_id: u.id };
+            sessions.push(s);
+          }
+          log("Logged in!");
+          return { session: { sid: s.id, expires: Infinity, onExpiration: "redirect" } };
+        },
+        logout: async (sid) => {},
         onGetRequestOK(req, res, params) {
           log(req.originalUrl);
           res.sendFile(path.join(__dirname, "../../index.html"));
         },
-        registrations: {
+        loginWithOAuth: {
           websiteUrl: "http://localhost:3001",
           OAuthProviders: {
             github: {
@@ -211,7 +212,7 @@ function dd() {
               clientSecret: "GITHUB",
             },
           },
-          onProviderLoginStart: async () => ({ ok: true }),
+          onProviderLoginStart: async () => ({ success: true }),
           onProviderLoginFail: console.error,
         },
       },

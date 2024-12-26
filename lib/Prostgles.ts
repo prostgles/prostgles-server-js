@@ -37,7 +37,7 @@ import {
 } from "prostgles-types";
 import { DBEventsManager } from "./DBEventsManager";
 import { PublishParser } from "./PublishParser/PublishParser";
-export { getOrSetTransporter, sendEmail, verifySMTPConfig } from "./Auth/sendEmail";
+export { getOrSetTransporter, getEmailSender, verifySMTPConfig } from "./Auth/sendEmail";
 
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 export type DBorTx = DB | pgPromise.ITask<{}>;

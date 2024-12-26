@@ -13,12 +13,12 @@ import type {
 import type { MicrosoftStrategyOptions } from "passport-microsoft";
 import {
   AnyObject,
-  AuthFailure,
   AuthRequest,
   AuthResponse,
   FieldFilter,
   IdentityProvider,
   UserLike,
+  AuthSocketSchema,
 } from "prostgles-types";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
@@ -96,58 +96,43 @@ export type Email = {
   attachments?: { filename: string; content: string }[] | Mail.Attachment[];
 };
 
-type EmailWithoutTo = Omit<Email, "to">;
-
-type MagicLinkAuthResponse =
-  | AuthResponse.MagicLinkAuthFailure["code"]
-  | { response: AuthResponse.MagicLinkAuthSuccess; email: EmailWithoutTo };
-
 type PasswordRegisterResponse =
-  | AuthResponse.PasswordRegisterFailure["code"]
-  | { response: AuthResponse.PasswordRegisterSuccess; email: EmailWithoutTo };
+  | AuthResponse.PasswordRegisterFailure
+  | AuthResponse.PasswordRegisterSuccess;
 
-export type EmailProvider =
-  | {
-      signupType: "withMagicLink";
-      onRegister: (data: {
-        email: string;
-        magicLinkUrlPath: string;
-        clientInfo: LoginClientInfo;
-        req: ExpressReq;
-      }) => Awaitable<MagicLinkAuthResponse>;
-      smtp: SMTPConfig;
-    }
-  | {
-      /**
-       * Users have to provide an email and a password.
-       * Account should be activated after email confirmation
-       */
-      signupType: "withPassword";
-      /**
-       * Defaults to 8
-       */
-      minPasswordLength?: number;
-      /**
-       * Called when the user has registered
-       */
-      onRegister: (data: {
-        email: string;
-        password: string;
-        confirmationUrlPath: string;
-        clientInfo: LoginClientInfo;
-        req: ExpressReq;
-      }) => Awaitable<PasswordRegisterResponse>;
-      smtp: SMTPConfig;
+/**
+ * Users have to provide an email and a password.
+ * Account should be activated after email confirmation
+ */
+export type SignupWithEmailAndPassword = {
+  /**
+   * Defaults to 8
+   */
+  minPasswordLength?: number;
 
-      /**
-       * Called after the user has clicked the URL to confirm their email address
-       */
-      onEmailConfirmation: (data: {
-        confirmationCode: string;
-        clientInfo: LoginClientInfo;
-        req: ExpressReq;
-      }) => Awaitable<AuthFailure["code"] | (AuthResponse.AuthSuccess & { redirect_to?: string })>;
-    };
+  /**
+   * Called when the user has registered
+   */
+  onRegister: (data: {
+    email: string;
+    /**
+     * Password after validation
+     */
+    password: string;
+    clientInfo: LoginClientInfo;
+    confirmationUrlPath: string;
+    req: ExpressReq;
+  }) => Awaitable<PasswordRegisterResponse>;
+
+  /**
+   * Called after the user has clicked the URL to confirm their email address
+   */
+  onEmailConfirmation: (data: {
+    confirmationCode: string;
+    clientInfo: LoginClientInfo;
+    req: ExpressReq;
+  }) => Awaitable<AuthResponse.AuthFailure | (AuthResponse.AuthSuccess & { redirect_to?: string })>;
+};
 
 export type AuthProviderUserData =
   | {
@@ -185,10 +170,8 @@ export type RegistrationData =
     }
   | AuthProviderUserData;
 
-export type AuthRegistrationConfig<S> = {
-  email?: EmailProvider;
-
-  OAuthProviders?: ThirdPartyProviders;
+export type LoginWithOAuthConfig<S> = {
+  OAuthProviders: ThirdPartyProviders;
 
   /**
    * Required for social login callback
@@ -205,7 +188,9 @@ export type AuthRegistrationConfig<S> = {
     req: ExpressReq;
     res: ExpressRes;
     clientInfo: LoginClientInfo;
-  }) => Promise<{ error: string } | { ok: true }>;
+  }) => Promise<
+    AuthResponse.OAuthRegisterSuccess | AuthResponse.OAuthRegisterFailure | AuthResponse.AuthFailure
+  >;
 
   /**
    * Used to identify abuse
@@ -256,7 +241,7 @@ export type AuthResultWithSID<SU = SessionUser> =
     });
 
 export type AuthResult<SU = SessionUser> = SU | undefined;
-export type AuthResultOrError<SU = SessionUser> = AuthFailure["code"] | AuthResult<SU>;
+export type AuthResultOrError<SU = SessionUser> = AuthResponse.AuthFailure["code"] | AuthResult<SU>;
 
 export type AuthRequestParams<S, SUser extends SessionUser> = {
   db: DB;
@@ -264,7 +249,7 @@ export type AuthRequestParams<S, SUser extends SessionUser> = {
   getUser: () => Promise<AuthResultWithSID<SUser>>;
 };
 
-export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
+export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
   /**
    * Name of the cookie or socket hadnshake query param that represents the session id.
    * Defaults to "session_id"
@@ -291,15 +276,7 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
    *  /logout
    *  /magic-link/:id
    */
-  expressConfig?: ExpressConfig<S, SUser>;
-
-  login?: (
-    params: LoginParams,
-    dbo: DBOFullyTyped<S>,
-    db: DB,
-    client: LoginClientInfo
-  ) => Awaitable<LoginResponse>;
-  logout?: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<any>;
+  loginSignupConfig?: LoginSignupConfig<S, SUser>;
 
   /**
    * Response time rounding in milliseconds to prevent timing attacks on login. Login response time should always be a multiple of this value. Defaults to 500 milliseconds
@@ -321,20 +298,23 @@ export type Auth<S = void, SUser extends SessionUser = SessionUser> = {
 export type LoginResponse =
   | {
       session: BasicSession;
-      response?: AuthResponse.PasswordLoginSuccess | AuthResponse.MagicLinkAuthSuccess;
+      response?: AuthResponse.PasswordLoginSuccess | AuthResponse.OAuthRegisterSuccess;
     }
+  | {
+      session?: undefined;
+      response: AuthResponse.MagicLinkAuthSuccess;
+    }
+  | AuthResponse.OAuthRegisterFailure["code"]
   | AuthResponse.PasswordLoginFailure["code"]
   | AuthResponse.MagicLinkAuthFailure["code"];
 
 export type LoginParams =
   | ({
       type: "username";
-      signupType: undefined | EmailProvider["signupType"];
-      magicLinkUrlPath: undefined | string;
     } & AuthRequest.LoginData)
-  | ({ type: "provider" } & AuthProviderUserData);
+  | ({ type: "OAuth" } & AuthProviderUserData);
 
-export type ExpressConfig<S, SUser extends SessionUser> = {
+export type LoginSignupConfig<S, SUser extends SessionUser> = {
   /**
    * Express app instance. If provided Prostgles will attempt to set sidKeyName to user cookie
    */
@@ -386,7 +366,27 @@ export type ExpressConfig<S, SUser extends SessionUser> = {
     | { session?: undefined; response: AuthResponse.MagicLinkAuthFailure }
   >;
 
-  registrations?: AuthRegistrationConfig<S>;
+  signupWithEmailAndPassword?: SignupWithEmailAndPassword;
+
+  loginWithOAuth?: LoginWithOAuthConfig<S>;
+
+  /**
+   * Used to hint to the client which login mode is available
+   * Defaults to username and password
+   */
+  localLoginMode?: AuthSocketSchema["loginType"];
+
+  /**
+   * If provided then the user will be able to login with a username and password
+   */
+  login: (
+    params: LoginParams,
+    dbo: DBOFullyTyped<S>,
+    db: DB,
+    client: LoginClientInfo
+  ) => Awaitable<LoginResponse>;
+
+  logout: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<void>;
 };
 
 type ExpressMiddleware<S, SUser extends SessionUser> = (

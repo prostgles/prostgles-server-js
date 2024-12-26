@@ -1,3 +1,4 @@
+import e from "express";
 import * as passport from "passport";
 import { Strategy as FacebookStrategy } from "passport-facebook";
 import { Strategy as GitHubStrategy } from "passport-github2";
@@ -5,19 +6,21 @@ import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Strategy as MicrosoftStrategy } from "passport-microsoft";
 import { getObjectEntries, isEmpty } from "prostgles-types";
 import { getErrorAsObject } from "../../DboBuilder/dboBuilderUtils";
-import { AUTH_ROUTES_AND_PARAMS, AuthHandler } from "../AuthHandler";
+import { DBOFullyTyped } from "../../DBSchemaBuilder";
+import { AUTH_ROUTES_AND_PARAMS, AuthHandler, HTTP_FAIL_CODES } from "../AuthHandler";
+import { LoginWithOAuthConfig } from "../AuthTypes";
 import { getClientRequestIPsInfo } from "../utils/getClientRequestIPsInfo";
-import { AuthRegistrationConfig } from "../AuthTypes";
-import { upsertNamedExpressMiddleware } from "../setAuthProviders";
-import e from "express";
+import { upsertNamedExpressMiddleware } from "../utils/upsertNamedExpressMiddleware";
+import { LoginResponseHandler } from "./setLoginRequestHandler";
 
-export function setOAuthProviders(
+export function setOAuthRequestHandlers(
   this: AuthHandler,
   app: e.Express,
-  registrations: AuthRegistrationConfig<void>
+  loginWithOAuthConfig: LoginWithOAuthConfig<void>
 ) {
-  const { onProviderLoginFail, onProviderLoginStart, websiteUrl, OAuthProviders } = registrations;
-  if (!OAuthProviders || isEmpty(OAuthProviders)) {
+  const { onProviderLoginFail, onProviderLoginStart, websiteUrl, OAuthProviders } =
+    loginWithOAuthConfig;
+  if (isEmpty(OAuthProviders)) {
     return;
   }
 
@@ -54,15 +57,15 @@ export function setOAuthProviders(
       passport.authenticate(providerName, authOpts ?? {})
     );
 
-    app.get(callbackPath, async (req, res) => {
+    app.get(callbackPath, async (req, res: LoginResponseHandler) => {
       try {
         const clientInfo = getClientRequestIPsInfo({ httpReq: req, res });
         const db = this.db;
-        const dbo = this.dbo as any;
+        const dbo = this.dbo as DBOFullyTyped;
         const args = { provider: providerName, req, res, clientInfo, db, dbo };
         const startCheck = await onProviderLoginStart?.(args);
-        if (startCheck && "error" in startCheck) {
-          res.status(500).json({ error: startCheck.error });
+        if (onProviderLoginStart && !startCheck?.success) {
+          res.status(HTTP_FAIL_CODES.BAD_REQUEST).json(startCheck);
           return;
         }
         passport.authenticate(
@@ -75,22 +78,26 @@ export function setOAuthProviders(
           async (error: any, _profile: any, authInfo: any) => {
             if (error) {
               await onProviderLoginFail?.({ ...args, error });
-              res.status(500).json({
-                error: "Failed to login with provider",
+              res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({
+                success: false,
+                code: "provider-issue",
+                message: "Failed to login with provider",
               });
             } else {
-              this.loginThrottledAndSetCookie(req, res, {
+              this.login(req, res, {
                 ...authInfo,
                 type: "provider",
                 provider: providerName,
               }).catch((e: any) => {
-                res.status(500).json(getErrorAsObject(e));
+                res.status(HTTP_FAIL_CODES.INTERNAL_SERVER_ERROR).json(getErrorAsObject(e));
               });
             }
           }
         )(req, res);
       } catch (_e) {
-        res.status(500).json({ error: "Something went wrong" });
+        res
+          .status(HTTP_FAIL_CODES.INTERNAL_SERVER_ERROR)
+          .json({ code: "server-error", success: false });
       }
     });
   });

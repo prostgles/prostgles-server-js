@@ -3,14 +3,19 @@ import { AuthClientRequest } from "../AuthTypes";
 import { AUTH_ROUTES_AND_PARAMS, AuthHandler, HTTP_FAIL_CODES } from "../AuthHandler";
 import { getReturnUrl } from "../utils/getReturnUrl";
 import { DBOFullyTyped } from "../../DBSchemaBuilder";
+import { throttledReject } from "../utils/throttledReject";
 
 export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
   const onLogout = async (req: Request, res: Response) => {
     const sid = this.validateSid(req.cookies?.[this.sidKeyName]);
     if (sid) {
       try {
-        await this.throttledFunc(() => {
-          return this.opts.logout?.(req.cookies?.[this.sidKeyName], this.dbo as any, this.db);
+        await throttledReject(async () => {
+          return this.opts.loginSignupConfig?.logout(
+            req.cookies?.[this.sidKeyName],
+            this.dbo as DBOFullyTyped,
+            this.db
+          );
         });
       } catch (err) {
         console.error(err);
@@ -20,7 +25,7 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
   };
 
   const requestHandler: RequestHandler = async (req, res, next) => {
-    const { onGetRequestOK } = this.opts.expressConfig ?? {};
+    const { onGetRequestOK } = this.opts.loginSignupConfig ?? {};
     const clientReq: AuthClientRequest = { httpReq: req, res };
     const getUser = async () => {
       const userOrCode = await this.getUserAndHandleError(clientReq);
@@ -103,5 +108,4 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
   };
 
   app.get(AUTH_ROUTES_AND_PARAMS.catchAll, requestHandler);
-  return requestHandler;
 }

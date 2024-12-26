@@ -1,5 +1,5 @@
 import { FileColumnConfig } from "prostgles-types";
-import { Auth, AuthRequestParams, SessionUser } from "./Auth/AuthTypes";
+import { AuthConfig, AuthRequestParams, SessionUser } from "./Auth/AuthTypes";
 import { EventTriggerTagFilter } from "./Event_Trigger_Tags";
 import { CloudClient, ImageOptions, LocalConfig } from "./FileManager/FileManager";
 import { DbConnection, OnReadyCallback } from "./initProstgles";
@@ -232,7 +232,7 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
    * Auth configuration.
    * Supports email and OAuth strategies
    */
-  auth?: Auth<S, SUser>;
+  auth?: AuthConfig<S, SUser>;
 
   /**
    * Used internally for debugging
