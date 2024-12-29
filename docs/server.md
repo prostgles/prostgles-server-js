@@ -186,7 +186,7 @@ prostgles<DBGeneratedSchema>({
 
   Called when a socket disconnects
 
-- **auth** <span style="color: grey">optional</span> <span style="color: green;">Auth</span>
+- **auth** <span style="color: grey">optional</span> <span style="color: green;">AuthConfig</span>
 
   Auth configuration.
   Supports email and OAuth strategies
@@ -201,7 +201,7 @@ prostgles<DBGeneratedSchema>({
     - PublishParams - userData and/or sid (in testing) are passed to the publish function
     - auth.expressConfig.use - express middleware to get user data and
        undefined sid is allowed to enable public users
-  - **expressConfig** <span style="color: grey">optional</span> <span style="color: green;">ExpressConfig</span>
+  - **loginSignupConfig** <span style="color: grey">optional</span> <span style="color: green;">LoginSignupConfig</span>
 
     Will setup auth routes
      /login
@@ -232,9 +232,16 @@ prostgles<DBGeneratedSchema>({
 
       If defined, will enable GET /magic-link/:id route.
       Requests with valid magic link ids will be logged in and redirected to the returnUrl if set
-    - **registrations** <span style="color: grey">optional</span> <span style="color: green;">AuthRegistrationConfig&lt;S&gt; | undefined</span>
-  - **login** <span style="color: grey">optional</span> <span style="color: green;">(params: LoginParams, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: LoginClientInfo) =&gt; Awaitable&lt;LoginResponse&gt;</span>
-  - **logout** <span style="color: grey">optional</span> <span style="color: green;">(sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; any</span>
+    - **signupWithEmailAndPassword** <span style="color: grey">optional</span> <span style="color: green;">SignupWithEmailAndPassword | undefined</span>
+    - **loginWithOAuth** <span style="color: grey">optional</span> <span style="color: green;">LoginWithOAuthConfig&lt;S&gt; | undefined</span>
+    - **localLoginMode** <span style="color: grey">optional</span> <span style="color: green;">LocalLoginMode | undefined</span>
+
+      Used to hint to the client which login mode is available
+      Defaults to username and password
+    - **login** <span style="color: red">required</span> <span style="color: green;">(params: LoginParams, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: LoginClientInfo) =&gt; Awaitable&lt;LoginResponse&gt;</span>
+
+      If provided then the user will be able to login with a username and password
+    - **logout** <span style="color: red">required</span> <span style="color: green;">(sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; Awaitable&lt;void&gt;</span>
   - **responseThrottle** <span style="color: grey">optional</span> <span style="color: green;">number</span>
 
     Response time rounding in milliseconds to prevent timing attacks on login. Login response time should always be a multiple of this value. Defaults to 500 milliseconds

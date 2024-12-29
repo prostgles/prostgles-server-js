@@ -45,7 +45,7 @@ export const setRegisterRequestHandler = async (
       });
     }
     try {
-      const { httpReq, ...clientInfo } = getClientRequestIPsInfo({ httpReq: req, res });
+      const { httpReq, ...clientInfo } = getClientRequestIPsInfo({ httpReq: req });
       const result = await onRegister({
         email: username,
         password,
