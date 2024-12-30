@@ -49,8 +49,12 @@ export const setRegisterRequestHandler = async (
       const result = await onRegister({
         email: username,
         password,
-        getConfirmationUrl: ({ code, websiteUrl }) =>
-          `${websiteUrl}/${AUTH_ROUTES_AND_PARAMS.confirmEmail}?email=${username}&code=${code}`,
+        getConfirmationUrl: ({ code, websiteUrl }) => {
+          const confirmationUrl = new URL(`${websiteUrl}${AUTH_ROUTES_AND_PARAMS.confirmEmail}`);
+          confirmationUrl.searchParams.set("email", username);
+          confirmationUrl.searchParams.set("code", code);
+          return confirmationUrl.toString();
+        },
         clientInfo,
         req,
       });
