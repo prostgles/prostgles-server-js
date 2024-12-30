@@ -150,6 +150,7 @@ export class AuthHandler {
         : codeOrError;
       if (localParams.httpReq) {
         localParams.res.status(HTTP_FAIL_CODES.BAD_REQUEST).json(error);
+        return { sid: undefined };
       }
       throw error.code;
     };
