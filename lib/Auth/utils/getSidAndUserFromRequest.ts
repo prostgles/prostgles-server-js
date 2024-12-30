@@ -39,7 +39,13 @@ export async function getSidAndUserFromRequest(
     const sid = this.getSID(clientReq);
     const clientInfoOrErr =
       !sid ? undefined : (
-        await getUser(sid, this.dbo as DBOFullyTyped, this.db, getClientRequestIPsInfo(clientReq))
+        await getUser(
+          sid,
+          this.dbo as DBOFullyTyped,
+          this.db,
+          getClientRequestIPsInfo(clientReq),
+          clientReq
+        )
       );
     if (clientInfoOrErr && (typeof clientInfoOrErr === "string" || "success" in clientInfoOrErr))
       throw clientInfoOrErr;

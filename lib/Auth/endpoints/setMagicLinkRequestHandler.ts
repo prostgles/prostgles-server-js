@@ -29,7 +29,7 @@ export function setMagicLinkRequestHandler(
             id,
             this.dbo as DBOFullyTyped,
             this.db,
-            getClientRequestIPsInfo({ httpReq: req, res })
+            getClientRequestIPsInfo({ httpReq: req })
           );
         });
         if (!response.session) {

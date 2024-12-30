@@ -20,12 +20,12 @@ export function setConfirmEmailRequestHandler(
       if (!id || typeof id !== "string") {
         return res.send({ success: false, code: "something-went-wrong", message: "Invalid code" });
       }
-      const { httpReq, ...clientInfo } = getClientRequestIPsInfo({ httpReq: req, res });
+      const clientInfo = getClientRequestIPsInfo({ httpReq: req });
       const response = await throttledReject(async () =>
         emailAuthConfig.onEmailConfirmation({
           confirmationCode: id,
           clientInfo,
-          req: httpReq,
+          req,
         })
       );
       if (!response.success) {

@@ -45,13 +45,13 @@ export const setRegisterRequestHandler = async (
       });
     }
     try {
-      const { httpReq, ...clientInfo } = getClientRequestIPsInfo({ httpReq: req });
+      const clientInfo = getClientRequestIPsInfo({ httpReq: req });
       const result = await onRegister({
         email: username,
         password,
         confirmationUrlPath: AUTH_ROUTES_AND_PARAMS.confirmEmail,
         clientInfo,
-        req: httpReq,
+        req,
       });
       return sendResponse(result);
     } catch {

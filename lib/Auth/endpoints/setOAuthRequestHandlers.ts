@@ -59,7 +59,7 @@ export function setOAuthRequestHandlers(
 
     app.get(callbackPath, async (req, res: LoginResponseHandler) => {
       try {
-        const clientInfo = getClientRequestIPsInfo({ httpReq: req, res });
+        const clientInfo = getClientRequestIPsInfo({ httpReq: req });
         const db = this.db;
         const dbo = this.dbo as DBOFullyTyped;
         const args = { provider: providerName, req, res, clientInfo, db, dbo };

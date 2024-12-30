@@ -160,7 +160,8 @@ export class AuthHandler {
           this.validateSid(sid),
           this.dbo as DBOFullyTyped,
           this.db,
-          getClientRequestIPsInfo(localParams)
+          getClientRequestIPsInfo(localParams),
+          localParams
         );
       }, 50);
 

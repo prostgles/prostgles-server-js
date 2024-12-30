@@ -275,7 +275,8 @@ export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
     sid: string | undefined,
     dbo: DBOFullyTyped<S>,
     db: DB,
-    client: AuthClientRequest & LoginClientInfo
+    client: LoginClientInfo,
+    reqInfo: AuthClientRequest
   ) => Awaitable<AuthResultOrError<SUser>>;
 
   /**
