@@ -45,7 +45,7 @@ export const AUTH_ROUTES_AND_PARAMS = {
   magicLinksRoute: "/magic-link",
   magicLinksExpressRoute: "/magic-link/:id",
   confirmEmail: "/confirm-email",
-  confirmEmailExpressRoute: "/confirm-email/:id",
+  confirmEmailExpressRoute: "/confirm-email",
   catchAll: "*",
 } as const;
 

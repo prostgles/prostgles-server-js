@@ -194,7 +194,7 @@ prostgles<DBGeneratedSchema>({
 
     Name of the cookie or socket hadnshake query param that represents the session id.
     Defaults to "session_id"
-  - **getUser** <span style="color: red">required</span> <span style="color: green;">(sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: AuthClientRequest & LoginClientInfo) =&gt; Awaitable&lt;AuthResultOrError&lt;...&gt;&gt;</span>
+  - **getUser** <span style="color: red">required</span> <span style="color: green;">(sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: LoginClientInfo, reqInfo: AuthClientRequest) =&gt; Awaitable&lt;...&gt;</span>
 
     Used in:
     - WS AUTHGUARD - allows connected SPA client to check if on protected route and needs to reload to ne redirected to login

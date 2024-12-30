@@ -125,7 +125,7 @@ export type SignupWithEmailAndPassword = {
      */
     password: string;
     clientInfo: LoginClientInfo;
-    confirmationUrlPath: string;
+    getConfirmationUrl: (data: { code: string; websiteUrl: string }) => string;
     req: ExpressReq;
   }) => Awaitable<PasswordRegisterResponse>;
 
@@ -133,7 +133,8 @@ export type SignupWithEmailAndPassword = {
    * Called after the user has clicked the URL to confirm their email address
    */
   onEmailConfirmation: (data: {
-    confirmationCode: string;
+    email: string;
+    code: string;
     clientInfo: LoginClientInfo;
     req: ExpressReq;
   }) => Awaitable<AuthResponse.AuthFailure | (AuthResponse.AuthSuccess & { redirect_to?: string })>;

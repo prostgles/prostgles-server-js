@@ -15,15 +15,27 @@ export function setConfirmEmailRequestHandler(
     req: Request,
     res: Response<AuthResponse.AuthFailure | AuthResponse.AuthSuccess>
   ) => {
-    const { id } = req.params;
+    const { email, code } = req.query;
     try {
-      if (!id || typeof id !== "string") {
-        return res.send({ success: false, code: "something-went-wrong", message: "Invalid code" });
+      if (!email || typeof email !== "string") {
+        return res.send({
+          success: false,
+          code: "something-went-wrong",
+          message: "Email query param missing/invalid",
+        });
+      }
+      if (!code || typeof code !== "string") {
+        return res.send({
+          success: false,
+          code: "something-went-wrong",
+          message: "Email confirmation code query param missing/invalid",
+        });
       }
       const clientInfo = getClientRequestIPsInfo({ httpReq: req });
       const response = await throttledReject(async () =>
         emailAuthConfig.onEmailConfirmation({
-          confirmationCode: id,
+          code,
+          email,
           clientInfo,
           req,
         })
