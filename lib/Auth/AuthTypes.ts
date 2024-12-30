@@ -66,6 +66,10 @@ type ThirdPartyProviders = {
   };
 };
 
+type TLSConfig = {
+  rejectUnauthorized?: boolean;
+  servername?: string;
+};
 export type SMTPConfig =
   | {
       type: "smtp";
@@ -74,6 +78,7 @@ export type SMTPConfig =
       secure: boolean;
       user: string;
       pass: string;
+      tls?: TLSConfig;
     }
   | {
       type: "aws-ses";

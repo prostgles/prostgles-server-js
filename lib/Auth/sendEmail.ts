@@ -88,12 +88,13 @@ const getTransporter = (smptConfig: SMTPConfig) => {
       sendingRate,
     });
   } else {
-    const { user, pass, host, port, secure } = smptConfig;
+    const { user, pass, host, port, secure, tls } = smptConfig;
     transporter = nodemailer.createTransport({
       host,
       port,
       secure,
       auth: { user, pass },
+      tls,
     });
   }
 
