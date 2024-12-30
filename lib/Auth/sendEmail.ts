@@ -104,17 +104,18 @@ const getTransporter = (smptConfig: SMTPConfig) => {
 const send = (transporter: Transporter, email: Email) => {
   return new Promise((resolve, reject) => {
     const doSend = () => {
-      if (transporter.isIdle()) {
-        transporter.sendMail(email, (err, info) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(info);
-          }
-        });
-      }
+      transporter.sendMail(email, (err, info) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(info);
+        }
+      });
     };
-    if (transporter.isIdle()) {
+    /**
+     * Local transporters used in testing ("smtp-server") don't have isIdle method
+     */
+    if (transporter.isIdle() || !(transporter.transporter as any).isIdle) {
       doSend();
     } else {
       transporter.once("idle", doSend);
