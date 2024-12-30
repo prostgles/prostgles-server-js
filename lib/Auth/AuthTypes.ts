@@ -75,7 +75,7 @@ export type SMTPConfig =
       type: "smtp";
       host: string;
       port: number;
-      secure: boolean;
+      secure?: boolean;
       user: string;
       pass: string;
       tls?: TLSConfig;
