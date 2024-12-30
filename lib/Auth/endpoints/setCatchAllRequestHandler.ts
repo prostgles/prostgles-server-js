@@ -28,12 +28,7 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
     const { onGetRequestOK } = this.opts.loginSignupConfig ?? {};
     const clientReq: AuthClientRequest = { httpReq: req, res };
     const getUser = async () => {
-      const userOrCode = await this.getUserAndHandleError(clientReq);
-      if (typeof userOrCode === "string") {
-        res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({ success: false, code: userOrCode });
-        throw userOrCode;
-      }
-      return userOrCode;
+      return this.getUserAndHandleError(clientReq);
     };
     const isLoggedInUser = async () => {
       const userInfo = await getUser();
