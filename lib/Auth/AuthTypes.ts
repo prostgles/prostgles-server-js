@@ -241,7 +241,10 @@ export type AuthResultWithSID<SU = SessionUser> =
     });
 
 export type AuthResult<SU = SessionUser> = SU | undefined;
-export type AuthResultOrError<SU = SessionUser> = AuthResponse.AuthFailure["code"] | AuthResult<SU>;
+export type AuthResultOrError<SU = SessionUser> =
+  | AuthResponse.AuthFailure
+  | AuthResponse.AuthFailure["code"]
+  | AuthResult<SU>;
 
 export type AuthRequestParams<S, SUser extends SessionUser> = {
   db: DB;

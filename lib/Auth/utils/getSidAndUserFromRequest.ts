@@ -41,7 +41,8 @@ export async function getSidAndUserFromRequest(
       !sid ? undefined : (
         await getUser(sid, this.dbo as DBOFullyTyped, this.db, getClientRequestIPsInfo(clientReq))
       );
-    if (typeof clientInfoOrErr === "string") throw clientInfoOrErr;
+    if (clientInfoOrErr && (typeof clientInfoOrErr === "string" || "success" in clientInfoOrErr))
+      throw clientInfoOrErr;
     const clientInfo = clientInfoOrErr;
     if (getSession && clientReq.socket) {
       const session = await getSession(sid, this.dbo as DBOFullyTyped, this.db);
