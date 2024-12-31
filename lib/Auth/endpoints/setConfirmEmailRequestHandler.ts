@@ -13,7 +13,10 @@ export function setConfirmEmailRequestHandler(
 ) {
   const requestHandler = async (
     req: Request,
-    res: Response<AuthResponse.AuthFailure | AuthResponse.AuthSuccess>
+    res: Response<
+      | AuthResponse.PasswordRegisterEmailConfirmationSuccess
+      | AuthResponse.PasswordRegisterEmailConfirmationFailure
+    >
   ) => {
     const { email, code } = req.query;
     try {

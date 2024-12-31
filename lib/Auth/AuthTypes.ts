@@ -137,7 +137,10 @@ export type SignupWithEmailAndPassword = {
     code: string;
     clientInfo: LoginClientInfo;
     req: ExpressReq;
-  }) => Awaitable<AuthResponse.AuthFailure | (AuthResponse.AuthSuccess & { redirect_to?: string })>;
+  }) => Awaitable<
+    | AuthResponse.PasswordRegisterEmailConfirmationFailure
+    | (AuthResponse.PasswordRegisterEmailConfirmationSuccess & { redirect_to?: string })
+  >;
 };
 
 export type AuthProviderUserData =
