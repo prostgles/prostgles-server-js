@@ -6,9 +6,9 @@ import {
   getClientRequestIPsInfo,
   HTTP_FAIL_CODES,
 } from "../AuthHandler";
-import { LoginSignupConfig, ExpressReq, SessionUser } from "../AuthTypes";
+import { ExpressReq, LoginSignupConfig, SessionUser } from "../AuthTypes";
+import { throttledAuthCall } from "../utils/throttledReject";
 import { LoginResponseHandler } from "./setLoginRequestHandler";
-import { throttledReject } from "../utils/throttledReject";
 
 export function setMagicLinkRequestHandler(
   this: AuthHandler,
@@ -24,7 +24,7 @@ export function setMagicLinkRequestHandler(
         .json({ success: false, code: "something-went-wrong", message: "Invalid magic link" });
     } else {
       try {
-        const response = await throttledReject(async () => {
+        const response = await throttledAuthCall(async () => {
           return onMagicLink(
             id,
             this.dbo as DBOFullyTyped,

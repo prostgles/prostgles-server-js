@@ -1,8 +1,8 @@
-import { AuthHandler, getClientRequestIPsInfo, HTTP_FAIL_CODES } from "./AuthHandler";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
+import { AuthHandler, getClientRequestIPsInfo, HTTP_FAIL_CODES } from "./AuthHandler";
 import { ExpressReq, LoginParams } from "./AuthTypes";
 import { LoginResponseHandler } from "./endpoints/setLoginRequestHandler";
-import { throttledReject } from "./utils/throttledReject";
+import { throttledAuthCall } from "./utils/throttledReject";
 
 export async function login(
   this: AuthHandler,
@@ -13,7 +13,7 @@ export async function login(
   const start = Date.now();
   const { responseThrottle = 500 } = this.opts;
 
-  const errCodeOrSession = await throttledReject(async () => {
+  const errCodeOrSession = await throttledAuthCall(async () => {
     const { login } = this.opts.loginSignupConfig ?? {};
     if (!login) {
       console.error("Auth login config missing");

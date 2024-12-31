@@ -4,7 +4,7 @@ import { AuthResponse } from "prostgles-types";
 import { AUTH_ROUTES_AND_PARAMS, AuthHandler, HTTP_FAIL_CODES } from "../AuthHandler";
 import { SignupWithEmailAndPassword } from "../AuthTypes";
 import { getClientRequestIPsInfo } from "../utils/getClientRequestIPsInfo";
-import { throttledReject } from "../utils/throttledReject";
+import { throttledAuthCall } from "../utils/throttledReject";
 
 export function setConfirmEmailRequestHandler(
   this: AuthHandler,
@@ -32,7 +32,7 @@ export function setConfirmEmailRequestHandler(
         });
       }
       const clientInfo = getClientRequestIPsInfo({ httpReq: req });
-      const response = await throttledReject(async () =>
+      const response = await throttledAuthCall(async () =>
         emailAuthConfig.onEmailConfirmation({
           code,
           email,

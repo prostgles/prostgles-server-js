@@ -4,8 +4,8 @@ import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { removeExpressRoute } from "../FileManager/FileManager";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import {
-  AuthConfig,
   AuthClientRequest,
+  AuthConfig,
   AuthResult,
   AuthResultWithSID,
   BasicSession,
@@ -18,7 +18,7 @@ import { setupAuthRoutes } from "./setupAuthRoutes";
 import { getClientRequestIPsInfo } from "./utils/getClientRequestIPsInfo";
 import { getReturnUrl } from "./utils/getReturnUrl";
 import { getSidAndUserFromRequest } from "./utils/getSidAndUserFromRequest";
-import { throttledReject } from "./utils/throttledReject";
+import { throttledAuthCall } from "./utils/throttledReject";
 
 export { getClientRequestIPsInfo };
 export const HTTP_FAIL_CODES = {
@@ -155,7 +155,7 @@ export class AuthHandler {
       throw error.code;
     };
     try {
-      const userOrErrorCode = await throttledReject(async () => {
+      const userOrErrorCode = await throttledAuthCall(async () => {
         return this.opts.getUser(
           this.validateSid(sid),
           this.dbo as DBOFullyTyped,

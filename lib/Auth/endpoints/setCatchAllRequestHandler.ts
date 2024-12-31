@@ -1,8 +1,8 @@
-import e, { RequestHandler, Request, Response } from "express";
-import { AuthClientRequest } from "../AuthTypes";
-import { AUTH_ROUTES_AND_PARAMS, AuthHandler, HTTP_FAIL_CODES } from "../AuthHandler";
-import { getReturnUrl } from "../utils/getReturnUrl";
+import e, { Request, RequestHandler, Response } from "express";
 import { DBOFullyTyped } from "../../DBSchemaBuilder";
+import { AUTH_ROUTES_AND_PARAMS, AuthHandler, HTTP_FAIL_CODES } from "../AuthHandler";
+import { AuthClientRequest } from "../AuthTypes";
+import { getReturnUrl } from "../utils/getReturnUrl";
 import { throttledReject } from "../utils/throttledReject";
 
 export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {

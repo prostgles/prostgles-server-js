@@ -1,7 +1,7 @@
 import { DBOFullyTyped } from "../../DBSchemaBuilder";
 import { AuthHandler, getClientRequestIPsInfo } from "../AuthHandler";
 import { AuthClientRequest, AuthResultWithSID } from "../AuthTypes";
-import { throttledReject } from "./throttledReject";
+import { throttledAuthCall } from "./throttledReject";
 
 /**
  * For a given sid return the user data if available using the auth handler's getUser method.
@@ -33,7 +33,7 @@ export async function getSidAndUserFromRequest(
    * Get sid from request and fetch user data
    */
   const authStart = Date.now();
-  const result = await throttledReject(async () => {
+  const result = await throttledAuthCall(async () => {
     const { getUser } = this.opts;
 
     const sid = this.getSID(clientReq);
