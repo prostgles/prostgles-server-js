@@ -1,6 +1,6 @@
 import { RequestHandler } from "express";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
-import { AuthHandler } from "./AuthHandler";
+import { AuthHandler, HTTP_FAIL_CODES } from "./AuthHandler";
 import { setCatchAllRequestHandler } from "./endpoints/setCatchAllRequestHandler";
 import { setConfirmEmailRequestHandler } from "./endpoints/setConfirmEmailRequestHandler";
 import { setLoginRequestHandler } from "./endpoints/setLoginRequestHandler";
@@ -46,7 +46,14 @@ export async function setupAuthRoutes(this: AuthHandler) {
         req,
         res,
         next,
-        getUser: () => this.getUserAndHandleError({ httpReq: req, res }),
+        getUser: async () => {
+          const userOrErr = await this.getUserOrError({ httpReq: req, res });
+          if (userOrErr.error) {
+            res.status(HTTP_FAIL_CODES.BAD_REQUEST).json(userOrErr.error);
+            throw userOrErr.error;
+          }
+          return userOrErr;
+        },
         dbo: this.dbo as DBOFullyTyped,
         db: this.db,
       });

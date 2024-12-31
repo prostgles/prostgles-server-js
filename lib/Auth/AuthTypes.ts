@@ -244,9 +244,10 @@ type AllNeverAndOptional<T> = {
   [P in keyof T]?: never;
 };
 export type AuthResultWithSID<SU = SessionUser> =
-  | (SU & { sid: string })
+  | (SU & { sid: string; error?: undefined })
   | (AllNeverAndOptional<SU> & {
       sid: string | undefined;
+      error?: AuthResponse.AuthFailure;
     });
 
 export type AuthResult<SU = SessionUser> = SU | undefined;

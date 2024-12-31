@@ -28,7 +28,7 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
     const { onGetRequestOK } = this.opts.loginSignupConfig ?? {};
     const clientReq: AuthClientRequest = { httpReq: req, res };
     const getUser = async () => {
-      return this.getUserAndHandleError(clientReq);
+      return this.getUserOrError(clientReq);
     };
     const isLoggedInUser = async () => {
       const userInfo = await getUser();
@@ -76,7 +76,11 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
 
         /** If Logged in and requesting login then redirect to main page */
       } else if (this.matchesRoute(AUTH_ROUTES_AND_PARAMS.login, req.path)) {
-        const { user, isAnonymous } = await getUser();
+        const { user, isAnonymous, error } = await getUser();
+        if (error) {
+          res.status(HTTP_FAIL_CODES.BAD_REQUEST).json(error);
+          return;
+        }
         if (user && !isAnonymous) {
           res.redirect("/");
           return;

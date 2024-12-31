@@ -138,22 +138,29 @@ export class AuthHandler {
     res.redirect(successURL);
   };
 
-  getUserAndHandleError = async (localParams: AuthClientRequest): Promise<AuthResultWithSID> => {
+  getUserOrError = async (localParams: AuthClientRequest): Promise<AuthResultWithSID> => {
     const sid = this.getSID(localParams);
     if (!sid) return { sid };
-    const handlerError = (
-      codeOrError: AuthResponse.AuthFailure["code"] | AuthResponse.AuthFailure
-    ) => {
-      const error =
-        typeof codeOrError === "string" ?
-          { success: false, code: codeOrError, message: codeOrError }
-        : codeOrError;
-      if (localParams.httpReq) {
-        localParams.res.status(HTTP_FAIL_CODES.BAD_REQUEST).json(error);
-        return { sid: undefined };
-      }
-      throw error.code;
+
+    const isError = (
+      dataOrError: any
+    ): dataOrError is AuthResponse.AuthFailure["code"] | AuthResponse.AuthFailure => {
+      return typeof dataOrError === "string" || (dataOrError && "success" in dataOrError);
     };
+    // const handlerError = (
+    //   codeOrError: AuthResponse.AuthFailure["code"] | AuthResponse.AuthFailure
+    // ) => {
+    //   const error =
+    //     typeof codeOrError === "string" ?
+    //       { success: false, code: codeOrError, message: codeOrError }
+    //     : codeOrError;
+    //   if (localParams.httpReq) {
+    //     localParams.res.status(HTTP_FAIL_CODES.BAD_REQUEST).json(error);
+    //     return { sid: undefined };
+    //   }
+    //   throw error.code;
+    // };
+
     try {
       const userOrErrorCode = await throttledAuthCall(async () => {
         return this.opts.getUser(
@@ -165,12 +172,23 @@ export class AuthHandler {
         );
       }, 50);
 
-      if (
-        userOrErrorCode &&
-        (typeof userOrErrorCode === "string" || "success" in userOrErrorCode)
-      ) {
-        return handlerError(userOrErrorCode);
+      if (isError(userOrErrorCode)) {
+        const error: AuthResponse.AuthFailure | undefined =
+          typeof userOrErrorCode === "string" ?
+            { success: false, code: userOrErrorCode }
+          : userOrErrorCode;
+
+        return {
+          sid,
+          error,
+        };
       }
+      // if (
+      //   userOrErrorCode &&
+      //   (typeof userOrErrorCode === "string" || "success" in userOrErrorCode)
+      // ) {
+      //   return handlerError(userOrErrorCode);
+      // }
       if (sid && userOrErrorCode?.user) {
         return { sid, ...userOrErrorCode };
       }
@@ -178,7 +196,11 @@ export class AuthHandler {
         sid,
       };
     } catch (_err) {
-      return handlerError("server-error");
+      // return handlerError("server-error");
+      return {
+        sid,
+        error: { success: false, code: "server-error" },
+      };
     }
   };
 
