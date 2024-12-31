@@ -1,11 +1,11 @@
 import * as fs from "fs";
-import { asName, tryCatch, tryCatchV2 } from "prostgles-types";
+import { asName, tryCatchV2 } from "prostgles-types";
+import { HTTP_FAIL_CODES } from "../Auth/AuthHandler";
 import { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { canCreateTables } from "../DboBuilder/runSQL";
 import { Prostgles } from "../Prostgles";
-import { FileManager, HOUR, LocalConfig } from "./FileManager";
 import { runClientRequest } from "../runClientRequest";
-import { HTTP_FAIL_CODES } from "../Auth/AuthHandler";
+import { FileManager, HOUR, LocalConfig } from "./FileManager";
 
 export async function initFileManager(this: FileManager, prg: Prostgles) {
   this.prostgles = prg;
