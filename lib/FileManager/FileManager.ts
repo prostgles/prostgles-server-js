@@ -309,23 +309,27 @@ export const removeExpressRoute = (
   app: ExpressApp | undefined,
   routePaths: (string | undefined)[]
 ) => {
-  const routes = app?._router?.stack;
+  let routes = app?._router?.stack;
   if (routes) {
-    routes.forEach((route, i) => {
+    routes = routes.filter((route, i) => {
       if (routePaths.filter(isDefined).includes(route.route?.path as any)) {
-        routes.splice(i, 1);
+        // routes.splice(i, 1);
+        return false;
       }
+      return true;
     });
   }
 };
 
 export const removeExpressRouteByName = (app: ExpressApp | undefined, name: string) => {
-  const routes = app?._router?.stack;
+  let routes = app?._router?.stack;
   if (routes) {
-    routes.forEach((route, i) => {
+    routes = routes.filter((route, i) => {
       if (route.name === name) {
-        routes.splice(i, 1);
+        // routes.splice(i, 1);
+        return false;
       }
+      return true;
     });
   }
 };

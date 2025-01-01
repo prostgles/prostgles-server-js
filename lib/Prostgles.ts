@@ -338,7 +338,7 @@ export class Prostgles {
   init = initProstgles.bind(this);
 
   async runSQLFile(filePath: string) {
-    const res = await tryCatch(async () => {
+    const res = await tryCatchV2(async () => {
       const fileContent = await this.getFileText(filePath); //.then(console.log);
 
       const result = await this.db
@@ -374,7 +374,7 @@ export class Prostgles {
 
     await this.opts.onLog?.({ type: "debug", command: "runSQLFile", ...res });
     if (res.error !== undefined) throw res.error;
-    return res.success;
+    return res.data?.success;
   }
 
   connectedSockets: PRGLIOSocket[] = [];

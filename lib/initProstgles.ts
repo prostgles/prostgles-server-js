@@ -164,7 +164,7 @@ export const initProstgles = async function (
         console.trace("Prostgles: Instance is destroyed");
       }
       onReady({
-        dbo: this.dbo as any,
+        dbo: this.dbo!,
         db: this.db,
         tables: this.dboBuilder.tables,
         reason,
