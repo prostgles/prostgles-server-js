@@ -309,9 +309,9 @@ export const removeExpressRoute = (
   app: ExpressApp | undefined,
   routePaths: (string | undefined)[]
 ) => {
-  let routes = app?._router?.stack;
+  const routes = app?._router?.stack;
   if (routes) {
-    routes = routes.filter((route, i) => {
+    app._router!.stack = routes.filter((route, i) => {
       if (routePaths.filter(isDefined).includes(route.route?.path as any)) {
         // routes.splice(i, 1);
         return false;
@@ -322,9 +322,9 @@ export const removeExpressRoute = (
 };
 
 export const removeExpressRouteByName = (app: ExpressApp | undefined, name: string) => {
-  let routes = app?._router?.stack;
+  const routes = app?._router?.stack;
   if (routes) {
-    routes = routes.filter((route, i) => {
+    app._router!.stack = routes.filter((route, i) => {
       if (route.name === name) {
         // routes.splice(i, 1);
         return false;
