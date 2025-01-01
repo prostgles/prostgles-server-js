@@ -23,6 +23,7 @@ import { DBGeneratedSchema } from "./DBGeneratedSchema";
 
 import type { DBOFullyTyped } from "prostgles-server/dist/DBSchemaBuilder";
 import { spawn } from "child_process";
+import { isDefined } from "prostgles-types";
 export type { DBHandlerServer } from "prostgles-server/dist/Prostgles";
 
 let logs = [];
@@ -56,6 +57,7 @@ process.on("unhandledRejection", (reason, p) => {
   console.trace("Unhandled Rejection at:", p, "reason:", reason);
   process.exit(1);
 });
+
 /**
  * To create a superuser in linux:
  *    sudo su - postgres
