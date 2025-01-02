@@ -14,11 +14,11 @@ export type LoginResponseHandler = Response<
 
 export function setLoginRequestHandler(this: AuthHandler, app: e.Express) {
   app.post(AUTH_ROUTES_AND_PARAMS.login, async (req, res: LoginResponseHandler) => {
-    const loginData = parseLoginData(req.body);
-    if ("error" in loginData) {
+    const [error, loginData] = parseLoginData(req.body);
+    if (error || !loginData) {
       return res
         .status(HTTP_FAIL_CODES.BAD_REQUEST)
-        .json({ success: false, code: "something-went-wrong", message: loginData.error });
+        .json({ success: false, code: "something-went-wrong", message: error });
     }
     try {
       const loginParams: LoginParams = {
@@ -33,7 +33,9 @@ export function setLoginRequestHandler(this: AuthHandler, app: e.Express) {
   });
 }
 
-export const parseLoginData = (bodyData: any): AuthRequest.LoginData | { error: string } => {
+export const parseLoginData = (
+  bodyData: any
+): [string, undefined] | [undefined, AuthRequest.LoginData] => {
   const loginData: AuthRequest.LoginData = {
     username: "",
     remember_me: !!bodyData?.remember_me,
@@ -46,7 +48,7 @@ export const parseLoginData = (bodyData: any): AuthRequest.LoginData | { error: 
     }
     if (prop === "username") {
       if (!isDefined(valOrError)) {
-        return { error: "username error: Expected non-empty string" };
+        return ["username error: Expected non-empty string"];
       }
       loginData[prop] = valOrError;
     } else {
@@ -54,7 +56,7 @@ export const parseLoginData = (bodyData: any): AuthRequest.LoginData | { error: 
     }
   });
 
-  return loginData;
+  return [undefined, loginData];
 };
 
 const getStringOrUndefined = (

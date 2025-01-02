@@ -18,13 +18,13 @@ export const setRegisterRequestHandler = async (
   app: e.Express
 ) => {
   const registerRequestHandler = async (req: Request, res: RegisterResponseHandler) => {
-    const dataOrError = parseLoginData(req.body);
-    if ("error" in dataOrError) {
+    const [error, data] = parseLoginData(req.body);
+    if (error || !data) {
       return res
         .status(HTTP_FAIL_CODES.BAD_REQUEST)
-        .json({ success: false, code: "something-went-wrong", message: dataOrError.error });
+        .json({ success: false, code: "something-went-wrong", message: error });
     }
-    const { username, password } = dataOrError;
+    const { username, password } = data;
     const sendResponse = (response: ReturnType) => {
       if (response.success) {
         res.json(response);
@@ -59,7 +59,8 @@ export const setRegisterRequestHandler = async (
         req,
       });
       return sendResponse(result);
-    } catch {
+    } catch (error) {
+      console.error("Failed to send email", error);
       return sendResponse({
         success: false,
         code: "server-error",
