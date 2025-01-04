@@ -74,16 +74,6 @@ export class AuthHandler {
     return sid;
   };
 
-  matchesRoute = (route: string | undefined, clientFullRoute: string) => {
-    return (
-      route &&
-      clientFullRoute &&
-      (route === clientFullRoute ||
-        (clientFullRoute.startsWith(route) &&
-          ["/", "?", "#"].includes(clientFullRoute[route.length] ?? "")))
-    );
-  };
-
   isUserRoute = (pathname: string) => {
     const { login, logoutGetPath, magicLinksRoute, loginWithProvider } = AUTH_ROUTES_AND_PARAMS;
     const pubRoutes = [
@@ -95,7 +85,7 @@ export class AuthHandler {
     ].filter((publicRoute) => publicRoute);
 
     return !pubRoutes.some((publicRoute) => {
-      return this.matchesRoute(publicRoute, pathname);
+      return matchesRoute(publicRoute, pathname);
     });
   };
 
@@ -198,6 +188,7 @@ export class AuthHandler {
       confirmEmail,
       confirmEmailExpressRoute,
     } = AUTH_ROUTES_AND_PARAMS;
+
     removeExpressRoute(app, [
       login,
       logoutGetPath,
@@ -306,3 +297,13 @@ export class AuthHandler {
 
   getClientAuth = getClientAuth.bind(this);
 }
+
+export const matchesRoute = (shorterRoute: string | undefined, longerRoute: string) => {
+  return (
+    shorterRoute &&
+    longerRoute &&
+    (shorterRoute === longerRoute ||
+      (longerRoute.startsWith(shorterRoute) &&
+        ["/", "?", "#"].includes(longerRoute[shorterRoute.length] ?? "")))
+  );
+};

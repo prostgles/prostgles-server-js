@@ -92,6 +92,10 @@ const getOAuthProviders = (
     if (config?.clientID) {
       result[providerName] = {
         url: `${AUTH_ROUTES_AND_PARAMS.loginWithProvider}/${providerName}`,
+        ...(providerName === "customOAuth" && {
+          displayName: OAuthProviders.customOAuth?.displayName,
+          displayIconPath: OAuthProviders.customOAuth?.displayIconPath,
+        }),
       };
     }
   });

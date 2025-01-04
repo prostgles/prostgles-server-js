@@ -1,4 +1,4 @@
-import { RequestHandler } from "express";
+import e, { RequestHandler } from "express";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { AuthHandler, HTTP_FAIL_CODES } from "./AuthHandler";
 import { setCatchAllRequestHandler } from "./endpoints/setCatchAllRequestHandler";
@@ -8,6 +8,7 @@ import { setMagicLinkRequestHandler } from "./endpoints/setMagicLinkRequestHandl
 import { setOAuthRequestHandlers } from "./endpoints/setOAuthRequestHandlers";
 import { setRegisterRequestHandler } from "./endpoints/setRegisterRequestHandler";
 import { upsertNamedExpressMiddleware } from "./utils/upsertNamedExpressMiddleware";
+import { removeExpressRoute } from "../FileManager/FileManager";
 
 export async function setupAuthRoutes(this: AuthHandler) {
   const { loginSignupConfig } = this.opts;

@@ -8,11 +8,11 @@ import { getObjectEntries, isEmpty } from "prostgles-types";
 import { getErrorAsObject } from "../../DboBuilder/dboBuilderUtils";
 import { DBOFullyTyped } from "../../DBSchemaBuilder";
 import { AUTH_ROUTES_AND_PARAMS, AuthHandler, HTTP_FAIL_CODES } from "../AuthHandler";
-import { LoginWithOAuthConfig } from "../AuthTypes";
+import { AuthProviderUserData, LoginWithOAuthConfig } from "../AuthTypes";
 import { getClientRequestIPsInfo } from "../utils/getClientRequestIPsInfo";
 import { upsertNamedExpressMiddleware } from "../utils/upsertNamedExpressMiddleware";
 import { LoginResponseHandler } from "./setLoginRequestHandler";
-
+import OAuth2Strategy from "passport-oauth2";
 export function setOAuthRequestHandlers(
   this: AuthHandler,
   app: e.Express,
@@ -37,6 +37,7 @@ export function setOAuthRequestHandlers(
       providerName === "google" ? GoogleStrategy
       : providerName === "github" ? GitHubStrategy
       : providerName === "facebook" ? FacebookStrategy
+      : providerName === "customOAuth" ? OAuth2Strategy
       : MicrosoftStrategy;
     const callbackPath = `${AUTH_ROUTES_AND_PARAMS.loginWithProvider}/${providerName}/callback`;
     passport.use(
@@ -52,10 +53,8 @@ export function setOAuthRequestHandlers(
       )
     );
 
-    app.get(
-      `${AUTH_ROUTES_AND_PARAMS.loginWithProvider}/${providerName}`,
-      passport.authenticate(providerName, authOpts ?? {})
-    );
+    const authPath = `${AUTH_ROUTES_AND_PARAMS.loginWithProvider}/${providerName}`;
+    app.get(authPath, passport.authenticate(providerName, authOpts ?? {}));
 
     app.get(callbackPath, async (req, res: LoginResponseHandler) => {
       try {
@@ -75,7 +74,7 @@ export function setOAuthRequestHandlers(
             failureRedirect: "/login",
             failWithError: true,
           },
-          async (error: any, _profile: any, authInfo: any) => {
+          async (error: any, _profile: any, authInfo: AuthProviderUserData) => {
             if (error) {
               await onProviderLoginFail?.({ ...args, error });
               res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({
@@ -86,8 +85,8 @@ export function setOAuthRequestHandlers(
             } else {
               this.login(req, res, {
                 ...authInfo,
-                type: "provider",
-                provider: providerName,
+                type: "OAuth",
+                provider: providerName as "customOAuth",
               }).catch((e: any) => {
                 res.status(HTTP_FAIL_CODES.INTERNAL_SERVER_ERROR).json(getErrorAsObject(e));
               });

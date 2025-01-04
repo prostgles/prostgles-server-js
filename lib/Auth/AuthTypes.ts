@@ -23,6 +23,7 @@ import {
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
 import { DB } from "../Prostgles";
+import OAuth2Strategy from "passport-oauth2";
 
 type Awaitable<T> = T | Promise<T>;
 
@@ -51,7 +52,7 @@ type SocketClientRequest = { socket: PRGLIOSocket; httpReq?: undefined };
 type HttpClientRequest = { httpReq: ExpressReq; res: ExpressRes; socket?: undefined };
 export type AuthClientRequest = SocketClientRequest | HttpClientRequest;
 
-type ThirdPartyProviders = {
+export type ThirdPartyProviders = {
   facebook?: Pick<FacebookStrategy, "clientID" | "clientSecret"> & {
     authOpts?: AuthenticateOptions;
   };
@@ -63,6 +64,11 @@ type ThirdPartyProviders = {
   };
   microsoft?: Pick<MicrosoftStrategyOptions, "clientID" | "clientSecret"> & {
     authOpts?: AuthenticateOptions;
+  };
+  customOAuth?: OAuth2Strategy.StrategyOptions & {
+    authOpts?: AuthenticateOptions;
+    displayName?: string;
+    displayIconPath?: string;
   };
 };
 
@@ -164,6 +170,12 @@ export type AuthProviderUserData =
     }
   | {
       provider: "microsoft";
+      profile: any;
+      accessToken: string;
+      refreshToken: string;
+    }
+  | {
+      provider: "customOAuth";
       profile: any;
       accessToken: string;
       refreshToken: string;

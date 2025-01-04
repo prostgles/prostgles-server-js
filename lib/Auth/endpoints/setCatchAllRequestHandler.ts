@@ -1,6 +1,6 @@
 import e, { Request, RequestHandler, Response } from "express";
 import { DBOFullyTyped } from "../../DBSchemaBuilder";
-import { AUTH_ROUTES_AND_PARAMS, AuthHandler, HTTP_FAIL_CODES } from "../AuthHandler";
+import { AUTH_ROUTES_AND_PARAMS, AuthHandler, HTTP_FAIL_CODES, matchesRoute } from "../AuthHandler";
 import { AuthClientRequest } from "../AuthTypes";
 import { getReturnUrl } from "../utils/getReturnUrl";
 import { throttledReject } from "../utils/throttledReject";
@@ -37,7 +37,7 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
     if (this.prostgles.restApi) {
       if (
         Object.values(this.prostgles.restApi.routes).some((restRoute) =>
-          this.matchesRoute(restRoute.split("/:")[0], req.path)
+          matchesRoute(restRoute.split("/:")[0], req.path)
         )
       ) {
         next();
@@ -47,12 +47,12 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
     try {
       const returnURL = getReturnUrl(req);
 
-      if (this.matchesRoute(AUTH_ROUTES_AND_PARAMS.logoutGetPath, req.path)) {
+      if (matchesRoute(AUTH_ROUTES_AND_PARAMS.logoutGetPath, req.path)) {
         await onLogout(req, res);
         return;
       }
 
-      if (this.matchesRoute(AUTH_ROUTES_AND_PARAMS.loginWithProvider, req.path)) {
+      if (matchesRoute(AUTH_ROUTES_AND_PARAMS.loginWithProvider, req.path)) {
         next();
         return;
       }
@@ -75,7 +75,7 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
         return;
 
         /** If Logged in and requesting login then redirect to main page */
-      } else if (this.matchesRoute(AUTH_ROUTES_AND_PARAMS.login, req.path)) {
+      } else if (matchesRoute(AUTH_ROUTES_AND_PARAMS.login, req.path)) {
         const { user, isAnonymous, error } = await getUser();
         if (error) {
           res.status(HTTP_FAIL_CODES.BAD_REQUEST).json(error);

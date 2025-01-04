@@ -20,6 +20,7 @@ import { getValidatedFileType } from "./getValidatedFileType";
 import { upload } from "./upload";
 import { uploadStream } from "./uploadStream";
 import { ExpressApp } from "../RestApi";
+import { matchesRoute } from "../Auth/AuthHandler";
 
 export const HOUR = 3600 * 1000;
 
@@ -307,13 +308,18 @@ export class FileManager {
 
 export const removeExpressRoute = (
   app: ExpressApp | undefined,
-  routePaths: (string | undefined)[]
+  _routePaths: (string | undefined)[],
+  method?: "get" | "post" | "put" | "delete"
 ) => {
   const routes = app?._router?.stack;
+  const routePaths = _routePaths.filter(isDefined);
   if (routes) {
     app._router!.stack = routes.filter((route) => {
       const path = route.route?.path;
-      if (path && routePaths.filter(isDefined).includes(path)) {
+      if (
+        routePaths.some((routePath) => matchesRoute(path, routePath)) &&
+        (!method || route.route?.methods?.[method])
+      ) {
         return false;
       }
       return true;
