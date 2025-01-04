@@ -64,7 +64,7 @@ export async function getSidAndUserFromRequest(
       return { sid, ...clientInfo };
     }
 
-    return { sid };
+    return { sid, preferredLogin: !clientInfo?.user ? clientInfo?.preferredLogin : undefined };
   }, 100);
 
   await this.prostgles.opts.onLog?.({

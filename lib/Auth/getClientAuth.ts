@@ -73,6 +73,7 @@ export async function getClientAuth(
       minPasswordLength: signupWithEmailAndPassword.minPasswordLength ?? 8,
       url: AUTH_ROUTES_AND_PARAMS.emailRegistration,
     },
+    preferredLogin: userData.preferredLogin,
     user: userData.clientUser,
     loginType: localLoginMode ?? (login ? "email+password" : undefined),
     pathGuard,

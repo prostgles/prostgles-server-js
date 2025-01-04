@@ -19,6 +19,7 @@ import {
   IdentityProvider,
   UserLike,
   AuthSocketSchema,
+  ClientSchema,
 } from "prostgles-types";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
@@ -256,13 +257,19 @@ type AllNeverAndOptional<T> = {
   [P in keyof T]?: never;
 };
 export type AuthResultWithSID<SU = SessionUser> =
-  | (SU & { sid: string; error?: undefined })
+  | (SU & { sid: string; error?: undefined; preferredLogin?: undefined })
   | (AllNeverAndOptional<SU> & {
       sid: string | undefined;
       error?: AuthResponse.AuthFailure;
+      preferredLogin?: NonNullable<ClientSchema["auth"]>["preferredLogin"];
     });
 
-export type AuthResult<SU = SessionUser> = SU | undefined;
+export type AuthResult<SU = SessionUser> =
+  | SU
+  | undefined
+  | (AllNeverAndOptional<SU> & {
+      preferredLogin?: NonNullable<ClientSchema["auth"]>["preferredLogin"];
+    });
 export type AuthResultOrError<SU = SessionUser> =
   | AuthResponse.AuthFailure
   | AuthResponse.AuthFailure["code"]
