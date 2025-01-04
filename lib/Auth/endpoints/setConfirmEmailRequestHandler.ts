@@ -61,5 +61,5 @@ export function setConfirmEmailRequestHandler(
     }
   };
 
-  app.get(AUTH_ROUTES_AND_PARAMS.confirmEmailExpressRoute, requestHandler);
+  app.get(AUTH_ROUTES_AND_PARAMS.confirmEmail, requestHandler);
 }

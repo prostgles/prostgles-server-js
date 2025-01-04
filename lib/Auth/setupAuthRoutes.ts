@@ -4,11 +4,10 @@ import { AuthHandler, HTTP_FAIL_CODES } from "./AuthHandler";
 import { setCatchAllRequestHandler } from "./endpoints/setCatchAllRequestHandler";
 import { setConfirmEmailRequestHandler } from "./endpoints/setConfirmEmailRequestHandler";
 import { setLoginRequestHandler } from "./endpoints/setLoginRequestHandler";
-import { setMagicLinkRequestHandler } from "./endpoints/setMagicLinkRequestHandler";
+import { setMagicLinkOrOTPRequestHandler } from "./endpoints/setMagicLinkOrOTPRequestHandler";
 import { setOAuthRequestHandlers } from "./endpoints/setOAuthRequestHandlers";
 import { setRegisterRequestHandler } from "./endpoints/setRegisterRequestHandler";
 import { upsertNamedExpressMiddleware } from "./utils/upsertNamedExpressMiddleware";
-import { removeExpressRoute } from "../FileManager/FileManager";
 
 export async function setupAuthRoutes(this: AuthHandler) {
   const { loginSignupConfig } = this.opts;
@@ -23,7 +22,7 @@ export async function setupAuthRoutes(this: AuthHandler) {
   const {
     app,
     publicRoutes = [],
-    onMagicLink,
+    onMagicLinkOrOTP,
     use,
     loginWithOAuth,
     signupWithEmailAndPassword,
@@ -62,8 +61,8 @@ export async function setupAuthRoutes(this: AuthHandler) {
     upsertNamedExpressMiddleware(app, prostglesUseMiddleware, "prostglesUseMiddleware");
   }
 
-  if (onMagicLink) {
-    setMagicLinkRequestHandler.bind(this)(onMagicLink, app);
+  if (onMagicLinkOrOTP) {
+    setMagicLinkOrOTPRequestHandler.bind(this)(onMagicLinkOrOTP, app);
   }
 
   setLoginRequestHandler.bind(this)(app);

@@ -341,6 +341,10 @@ export type LoginResponse =
   | AuthResponse.PasswordLoginFailure["code"]
   | AuthResponse.MagicLinkAuthFailure["code"];
 
+export type MagicLinkOrOTPData =
+  | { type: "magic-link"; magicId: string }
+  | { type: "otp"; code: string; email: string };
+
 export type LoginParams =
   | ({
       type: "username";
@@ -389,14 +393,17 @@ export type LoginSignupConfig<S, SUser extends SessionUser> = {
    * If defined, will enable GET /magic-link/:id route.
    * Requests with valid magic link ids will be logged in and redirected to the returnUrl if set
    */
-  onMagicLink?: (
-    magicId: string,
+  onMagicLinkOrOTP?: (
+    data: MagicLinkOrOTPData,
     dbo: DBOFullyTyped<S>,
     db: DB,
     client: LoginClientInfo
   ) => Awaitable<
-    | { session: BasicSession; response?: AuthResponse.MagicLinkAuthSuccess }
-    | { session?: undefined; response: AuthResponse.MagicLinkAuthFailure }
+    | { session: BasicSession; response?: AuthResponse.AuthSuccess }
+    | {
+        session?: undefined;
+        response: AuthResponse.MagicLinkAuthFailure | AuthResponse.CodeVerificationFailure;
+      }
   >;
 
   signupWithEmailAndPassword?: SignupWithEmailAndPassword;

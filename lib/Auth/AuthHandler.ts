@@ -45,7 +45,6 @@ export const AUTH_ROUTES_AND_PARAMS = {
   magicLinksRoute: "/magic-link",
   magicLinksExpressRoute: "/magic-link/:id",
   confirmEmail: "/confirm-email",
-  confirmEmailExpressRoute: "/confirm-email",
   catchAll: "*",
 } as const;
 
@@ -183,10 +182,9 @@ export class AuthHandler {
       magicLinksExpressRoute,
       catchAll,
       loginWithProvider,
-      emailRegistration: emailSignup,
+      emailRegistration,
       magicLinksRoute,
       confirmEmail,
-      confirmEmailExpressRoute,
     } = AUTH_ROUTES_AND_PARAMS;
 
     removeExpressRoute(app, [
@@ -195,10 +193,9 @@ export class AuthHandler {
       magicLinksExpressRoute,
       catchAll,
       loginWithProvider,
-      emailSignup,
+      emailRegistration,
       magicLinksRoute,
       confirmEmail,
-      confirmEmailExpressRoute,
     ]);
   };
 

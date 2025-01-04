@@ -10,6 +10,7 @@ export type LoginResponseHandler = Response<
   | AuthResponse.PasswordLoginFailure
   | AuthResponse.MagicLinkAuthFailure
   | AuthResponse.MagicLinkAuthSuccess
+  | AuthResponse.CodeVerificationFailure
 >;
 
 export function setLoginRequestHandler(this: AuthHandler, app: e.Express) {
