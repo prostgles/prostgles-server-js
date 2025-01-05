@@ -43,7 +43,7 @@ export const AUTH_ROUTES_AND_PARAMS = {
   sidKeyName: "session_id",
   logout: "/logout",
   magicLinks: "/magic-link",
-  magicLinksIdParam: "/magic-link/:id",
+  magicLinkWithId: "/magic-link/:id",
   catchAll: "*",
 } as const;
 
@@ -183,7 +183,7 @@ export class AuthHandler {
     const {
       login,
       logout,
-      magicLinksIdParam,
+      magicLinkWithId: magicLinksIdParam,
       catchAll,
       loginWithProvider,
       emailRegistration,

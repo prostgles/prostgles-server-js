@@ -50,7 +50,8 @@ export function setMagicLinkOrOTPRequestHandler(
         .json({ success: false, code: "something-went-wrong" });
     }
   };
-  app.get(AUTH_ROUTES_AND_PARAMS.magicLinksIdParam, (req, res: MagicLinkResponseHandler) => {
+
+  app.get(AUTH_ROUTES_AND_PARAMS.magicLinkWithId, (req, res: MagicLinkResponseHandler) => {
     const { id } = req.params;
 
     if (typeof id !== "string" || !id) {
@@ -60,6 +61,39 @@ export function setMagicLinkOrOTPRequestHandler(
     }
     return handler(req, res, { type: "magic-link", magicId: id });
   });
+
+  app.get(AUTH_ROUTES_AND_PARAMS.magicLinks, (req, res: MagicLinkResponseHandler) => {
+    const { id, code, email } = req.query;
+
+    const noCode = typeof code !== "string" || !code;
+    const noEmail = typeof email !== "string" || !email;
+    if (typeof id !== "string" || !id) {
+      if (noCode && noEmail) {
+        return res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({
+          success: false,
+          code: "something-went-wrong",
+          message: "Invalid magic link. Must provide id or email and code",
+        });
+      }
+      if (noCode) {
+        return res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({
+          success: false,
+          code: "invalid-otp-code",
+          message: "Invalid or empty code",
+        });
+      }
+      if (noEmail) {
+        return res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({
+          success: false,
+          code: "invalid-email",
+          message: "Invalid or empty email",
+        });
+      }
+      return handler(req, res, { type: "otp", code, email });
+    }
+    return handler(req, res, { type: "magic-link", magicId: id });
+  });
+
   app.post(AUTH_ROUTES_AND_PARAMS.magicLinks, (req, res: MagicLinkResponseHandler) => {
     const { code, email } = req.body;
 
