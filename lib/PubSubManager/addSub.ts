@@ -111,7 +111,7 @@ export async function addSub(
      * Socket clients are not affected as they need to confirm they are ready to receive data
      */
     result.sendFirstData = () => {
-      this.pushSubData(newSub);
+      void this.pushSubData(newSub);
     };
   } else if (socket) {
     const removeListeners = () => {
@@ -122,7 +122,7 @@ export async function addSub(
     removeListeners();
 
     socket.once(result.channelNameReady, () => {
-      this.pushSubData(newSub);
+      void this.pushSubData(newSub);
     });
     socket.once(result.channelNameUnsubscribe, (_data: any, cb: BasicCallback) => {
       const res = "ok";
@@ -130,7 +130,7 @@ export async function addSub(
         const isMatch = s.socket?.id === socket.id && s.channel_name === channel_name;
         return !isMatch;
       });
-      this._log({
+      void this._log({
         type: "syncOrSub",
         command: "unsubscribe",
         channel_name,

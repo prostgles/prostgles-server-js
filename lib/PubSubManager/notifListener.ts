@@ -94,7 +94,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     tableTriggerConditions.map(({ condition }) => {
       const subs = this.getTriggerSubs(table_name, condition);
       subs.map((s) => {
-        this.pushSubData(s, pref + ". Check server logs. Schema might have changed");
+        void this.pushSubData(s, pref + ". Check server logs. Schema might have changed");
       });
     });
 
@@ -129,7 +129,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
           [table_name, orphanedTableConditions, this.appId]
         )
         .then(() => {
-          this.refreshTriggers();
+          return this.refreshTriggers();
         })
         .catch((e) => {
           console.error("Error deleting orphaned triggers", e);
@@ -144,7 +144,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
       );
 
       syncs.map((s) => {
-        this.syncData(s, undefined, "trigger");
+        void this.syncData(s, undefined, "trigger");
       });
 
       /* Throttle the subscriptions */
@@ -162,14 +162,14 @@ export async function notifListener(this: PubSubManager, data: { payload: string
           sub.last_throttled = Date.now();
 
           /* It is assumed the policy was checked before this point */
-          this.pushSubData(sub);
+          void this.pushSubData(sub);
         } else if (!sub.is_throttling) {
           log("throttling sub");
           sub.is_throttling = setTimeout(() => {
             log("throttling finished. pushSubData...");
             sub.is_throttling = null;
             sub.last_throttled = Date.now();
-            this.pushSubData(sub);
+            void this.pushSubData(sub);
           }, throttle);
         }
       });

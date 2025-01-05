@@ -10,18 +10,16 @@ export function uploadStream(
   onProgress?: OnProgress,
   onError?: (error: any) => void,
   onEnd?: (item: UploadedItem) => void,
-  expectedSizeBytes?: number,
+  expectedSizeBytes?: number
 ) {
   const passThrough = new stream.PassThrough();
 
   if (!this.cloudClient && "localFolderPath" in this.config) {
     try {
-      this.checkFreeSpace(this.config.localFolderPath, expectedSizeBytes).catch(
-        (err) => {
-          onError?.(err);
-          passThrough.end();
-        },
-      );
+      this.checkFreeSpace(this.config.localFolderPath, expectedSizeBytes).catch((err) => {
+        onError?.(err);
+        passThrough.end();
+      });
       const url = this.getLocalFileUrl(name);
       fs.mkdirSync(this.config.localFolderPath, { recursive: true });
       const filePath = path.resolve(`${this.config.localFolderPath}/${name}`);
@@ -71,7 +69,7 @@ export function uploadStream(
       onError?.(err);
     }
   } else {
-    this.upload(passThrough, name, mime, onProgress).then(onEnd).catch(onError);
+    void this.upload(passThrough, name, mime, onProgress).then(onEnd).catch(onError);
   }
 
   return passThrough;

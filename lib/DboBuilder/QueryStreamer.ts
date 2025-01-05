@@ -55,18 +55,18 @@ export class QueryStreamer {
     this.db = dboBuilder.db;
     const setAdminClient = () => {
       this.adminClient = this.getConnection(undefined, { keepAlive: true });
-      this.adminClient.connect();
+      return this.adminClient.connect();
     };
     this.adminClient = this.getConnection(
       (error) => {
         if (error.message?.includes("database") && error.message?.includes("does not exist"))
           return;
         console.log("Admin client error. Reconnecting...", error);
-        setAdminClient();
+        void setAdminClient();
       },
       { keepAlive: true }
     );
-    this.adminClient.connect();
+    void this.adminClient.connect();
   }
 
   getConnection = (onError: ((err: any) => void) | undefined, extraOptions?: pg.ClientConfig) => {
@@ -84,7 +84,7 @@ export class QueryStreamer {
     Object.values(socketQueries).forEach(({ client, stop }) => {
       stop?.();
       /** end does not stop active query?! */
-      client?.end();
+      void client?.end();
     });
     delete this.socketQueries[socketId];
   };
@@ -165,7 +165,7 @@ export class QueryStreamer {
         client ??
         this.getConnection((err) => {
           socketQuery.onError(err);
-          currentClient.end();
+          void currentClient.end();
         });
       this.socketQueries[socketId]![id]!.client = currentClient;
       try {
@@ -188,7 +188,7 @@ export class QueryStreamer {
         this.socketQueries[socketId]![id]!.cursor = cursor;
         let streamLimitReached = false;
         let reachedEnd = false;
-        (async () => {
+        void (async () => {
           try {
             let rowChunk: any[] = [];
             let rowsSent = 0;
@@ -216,9 +216,9 @@ export class QueryStreamer {
 
             if (!query.options?.persistStreamConnection) {
               delete this.socketQueries[socketId]?.[id];
-              currentClient.end();
+              void currentClient.end();
             }
-            cursor.close();
+            void cursor.close();
           } catch (error: any) {
             streamState = "errored";
             if (error.message === "cannot insert multiple commands into a prepared statement") {
@@ -258,7 +258,7 @@ export class QueryStreamer {
       if (!queryClient) return;
       if (opts?.terminate) {
         setTimeout(() => {
-          queryClient.end();
+          void queryClient.end();
         }, 4e3);
       }
       try {

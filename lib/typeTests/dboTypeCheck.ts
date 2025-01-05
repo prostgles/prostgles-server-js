@@ -37,7 +37,7 @@ export const testDboTypes = () => {
         orderBy: {
           id: 1,
         },
-      },
+      }
     );
 
     r[0]?.id;
@@ -46,34 +46,34 @@ export const testDboTypes = () => {
     r[0]?.bad_col;
 
     const tr2 = {} as ViewHandler<DBSchema2["tr2"]["columns"], DBSchema2>;
-    tr2.find(
+    void tr2.find(
       {},
       {
         select: { id: 1 },
         orderBy: { tr1_id: 1 },
-      },
+      }
     );
 
-    tr2.find(
+    void tr2.find(
       {},
       {
         //@ts-expect-error
         select: { bad_col: 1 },
-      },
+      }
     );
 
-    tr2.find(
+    void tr2.find(
       {},
       {
         //@ts-expect-error
         orderBy: { bad_col: 1 },
-      },
+      }
     );
 
-    (await db.items2.find(
-      {},
-      { select: { items_id: 1 }, returnType: "values" },
-    )) satisfies (number | null)[];
+    (await db.items2.find({}, { select: { items_id: 1 }, returnType: "values" })) satisfies (
+      | number
+      | null
+    )[];
 
     const publish: Publish<DBGeneratedSchema> = {
       items: {

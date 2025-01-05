@@ -1,7 +1,7 @@
 import e, { Request, Response } from "express";
 import { AuthResponse } from "prostgles-types";
 import { AUTH_ROUTES_AND_PARAMS, HTTP_FAIL_CODES } from "../AuthHandler";
-import type { SignupWithEmailAndPassword } from "../AuthTypes";
+import type { SignupWithEmail } from "../AuthTypes";
 import { getClientRequestIPsInfo } from "../utils/getClientRequestIPsInfo";
 import { parseLoginData } from "./setLoginRequestHandler";
 
@@ -13,8 +13,8 @@ type ReturnType =
 
 type RegisterResponseHandler = Response<ReturnType>;
 
-export const setRegisterRequestHandler = async (
-  { onRegister, minPasswordLength = 8 }: SignupWithEmailAndPassword,
+export const setRegisterRequestHandler = (
+  { onRegister, minPasswordLength = 8 }: SignupWithEmail,
   app: e.Express
 ) => {
   const registerRequestHandler = async (req: Request, res: RegisterResponseHandler) => {
@@ -50,7 +50,7 @@ export const setRegisterRequestHandler = async (
         email: username,
         password,
         getConfirmationUrl: ({ code, websiteUrl }) => {
-          const confirmationUrl = new URL(`${websiteUrl}${AUTH_ROUTES_AND_PARAMS.confirmEmail}`);
+          const confirmationUrl = new URL(`${websiteUrl}${AUTH_ROUTES_AND_PARAMS.magicLinks}`);
           confirmationUrl.searchParams.set("email", username);
           confirmationUrl.searchParams.set("code", code);
           return confirmationUrl.toString();

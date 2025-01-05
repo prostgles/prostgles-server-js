@@ -161,7 +161,7 @@ export class DboBuilder {
   };
 
   destroy() {
-    this._pubSubManager?.destroy();
+    return this._pubSubManager?.destroy();
   }
 
   _joins?: Join[];

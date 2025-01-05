@@ -3,15 +3,15 @@ import { AuthRequest, AuthResponse, isDefined, isObject } from "prostgles-types"
 import { AUTH_ROUTES_AND_PARAMS, AuthHandler, HTTP_FAIL_CODES } from "../AuthHandler";
 import { LoginParams } from "../AuthTypes";
 
-export type LoginResponseHandler = Response<
+export type LoginResponse =
   | AuthResponse.OAuthRegisterSuccess
   | AuthResponse.OAuthRegisterFailure
   | AuthResponse.PasswordLoginSuccess
   | AuthResponse.PasswordLoginFailure
   | AuthResponse.MagicLinkAuthFailure
   | AuthResponse.MagicLinkAuthSuccess
-  | AuthResponse.CodeVerificationFailure
->;
+  | AuthResponse.CodeVerificationFailure;
+export type LoginResponseHandler = Response<LoginResponse>;
 
 export function setLoginRequestHandler(this: AuthHandler, app: e.Express) {
   app.post(AUTH_ROUTES_AND_PARAMS.login, async (req, res: LoginResponseHandler) => {

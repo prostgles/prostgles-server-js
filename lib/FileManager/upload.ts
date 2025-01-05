@@ -1,9 +1,4 @@
-import {
-  FileManager,
-  LocalConfig,
-  OnProgress,
-  UploadedItem,
-} from "./FileManager";
+import { FileManager, LocalConfig, OnProgress, UploadedItem } from "./FileManager";
 import * as stream from "stream";
 import * as fs from "fs";
 
@@ -12,7 +7,7 @@ export async function upload(
   file: Buffer | string | stream.PassThrough,
   name: string,
   mime: string,
-  onProgress?: OnProgress,
+  onProgress?: OnProgress
 ): Promise<UploadedItem> {
   return new Promise(async (resolve, reject) => {
     if (!file) {
@@ -43,7 +38,7 @@ export async function upload(
       }
     } else {
       let content_length = 0;
-      this.cloudClient.upload({
+      void this.cloudClient.upload({
         fileName: name,
         contentType: mime,
         file,

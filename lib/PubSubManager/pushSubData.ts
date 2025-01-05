@@ -8,7 +8,7 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
   const onLog = (
     state: Extract<EventTypes.SyncOrSub, { type: "syncOrSub"; command: "pushSubData" }>["state"]
   ) => {
-    this._log({
+    void this._log({
       type: "syncOrSub",
       command: "pushSubData",
       channel_name: sub.channel_name,

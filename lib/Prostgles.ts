@@ -392,7 +392,7 @@ export class Prostgles {
     if (this.connectedSockets.length) {
       this.connectedSockets.forEach((s) => {
         s.emit(CHANNELS.SCHEMA_CHANGED);
-        this.pushSocketSchema(s);
+        void this.pushSocketSchema(s);
       });
       return;
     }

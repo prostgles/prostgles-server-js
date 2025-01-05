@@ -1,8 +1,7 @@
-import e, { RequestHandler } from "express";
+import { RequestHandler } from "express";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { AuthHandler, HTTP_FAIL_CODES } from "./AuthHandler";
 import { setCatchAllRequestHandler } from "./endpoints/setCatchAllRequestHandler";
-import { setConfirmEmailRequestHandler } from "./endpoints/setConfirmEmailRequestHandler";
 import { setLoginRequestHandler } from "./endpoints/setLoginRequestHandler";
 import { setMagicLinkOrOTPRequestHandler } from "./endpoints/setMagicLinkOrOTPRequestHandler";
 import { setOAuthRequestHandlers } from "./endpoints/setOAuthRequestHandlers";
@@ -25,7 +24,7 @@ export async function setupAuthRoutes(this: AuthHandler) {
     onMagicLinkOrOTP,
     use,
     loginWithOAuth,
-    signupWithEmailAndPassword,
+    signupWithEmail: signupWithEmailAndPassword,
   } = loginSignupConfig;
   if (publicRoutes.find((r) => typeof r !== "string" || !r)) {
     throw "Invalid or empty string provided within publicRoutes ";
@@ -33,7 +32,6 @@ export async function setupAuthRoutes(this: AuthHandler) {
 
   if (signupWithEmailAndPassword) {
     setRegisterRequestHandler(signupWithEmailAndPassword, app);
-    setConfirmEmailRequestHandler.bind(this)(signupWithEmailAndPassword, app);
   }
 
   if (loginWithOAuth) {
@@ -42,7 +40,7 @@ export async function setupAuthRoutes(this: AuthHandler) {
 
   if (use) {
     const prostglesUseMiddleware: RequestHandler = (req, res, next) => {
-      use({
+      void use({
         req,
         res,
         next,

@@ -72,7 +72,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
       this.dbEventsManager?.removeNotify(undefined, socket);
       this.connectedSockets = this.connectedSockets.filter((s) => s.id !== socket.id);
       this.dboBuilder.queryStreamer.onDisconnect(socket.id);
-      this.opts.onLog?.({
+      void this.opts.onLog?.({
         type: "disconnect",
         sid: this.authHandler?.getSID({ socket }),
         socketId: socket.id,
@@ -84,7 +84,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
           if (!this.authHandler) throw "authHandler missing";
           return await this.authHandler.getSidAndUserFromRequest({ socket });
         };
-        this.opts.onSocketDisconnect({ socket, dbo: dbo as DBOFullyTyped, db, getUser });
+        void this.opts.onSocketDisconnect({ socket, dbo: dbo as DBOFullyTyped, db, getUser });
       }
     });
 
@@ -116,7 +116,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
       }
     );
 
-    this.pushSocketSchema(socket);
+    await this.pushSocketSchema(socket);
   } catch (e) {
     console.trace("setSocketEvents: ", e);
   }

@@ -148,7 +148,7 @@ export type PublishFullyTyped<Schema = void> =
   ddb.dwad?.delete;
 
   //@ts-ignore
-  prostgles({
+  void prostgles({
     dbConnection: 1 as any,
     publish: async (params) => {
       const _rows = await params.dbo.dwadwa?.find?.({});
@@ -157,9 +157,9 @@ export type PublishFullyTyped<Schema = void> =
     },
     transactions: true,
     onReady: ({ dbo }) => {
-      dbo.tdwa?.find!();
-      dbo.tx((t) => {
-        t.dwa?.find!();
+      void dbo.tdwa?.find!();
+      void dbo.tx((t) => {
+        void t.dwa?.find!();
       });
     },
   });
@@ -192,13 +192,13 @@ export type PublishFullyTyped<Schema = void> =
   const _test: DBSchema = c;
   const dbt: DBOFullyTyped<S> = 1 as any;
 
-  dbt.tx!((t) => {
-    t.tbl1.delete();
+  void dbt.tx!((t) => {
+    void t.tbl1.delete();
   });
 
   const db: DBHandlerServer = 1 as any;
-  db.tx!((t) => {
-    t.wadwa?.find!();
+  void db.tx!((t) => {
+    void t.wadwa?.find!();
   });
 
   const _publish = (): PublishFullyTyped<S> => {
@@ -244,7 +244,7 @@ export type PublishFullyTyped<Schema = void> =
 
     const p: PublishParams<undefined> = 1 as any;
 
-    p.dbo.dwadaw?.find?.();
+    void p.dbo.dwadaw?.find?.();
 
     return res;
   };

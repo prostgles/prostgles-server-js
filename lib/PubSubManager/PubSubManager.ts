@@ -194,7 +194,7 @@ export class PubSubManager {
   private constructor(dboBuilder: DboBuilder) {
     this.dboBuilder = dboBuilder;
 
-    this._log({
+    void this._log({
       type: "syncOrSub",
       command: "postgresNotifListenManager.create",
       duration: 0,
@@ -207,13 +207,13 @@ export class PubSubManager {
   appCheck?: ReturnType<typeof setInterval>;
 
   destroyed = false;
-  destroy = () => {
+  destroy = async () => {
     this.destroyed = true;
     if (this.appCheck) {
       clearInterval(this.appCheck);
     }
-    this.postgresNotifListenManager?.destroy();
-    this._log({
+    await this.postgresNotifListenManager?.destroy();
+    await this._log({
       type: "syncOrSub",
       command: "postgresNotifListenManager.destroy",
       duration: 0,
@@ -393,7 +393,7 @@ export class PubSubManager {
 
         delete this.sockets[socket.id];
 
-        this._log({
+        void this._log({
           type: "sync",
           command: "upsertSocket.disconnect",
           tableName: "",

@@ -27,7 +27,7 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
     }
     q = `/* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ \n\n` + q;
     queryHistory.push(q);
-    this.prostgles.opts.onLog?.({
+    await this.prostgles.opts.onLog?.({
       type: "debug",
       command: "TableConfig.runQueries.start",
       data: { q },
@@ -39,7 +39,7 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
       failedQueries.push({ query: q, error: err });
       return Promise.reject(err);
     });
-    this.prostgles.opts.onLog?.({
+    await this.prostgles.opts.onLog?.({
       type: "debug",
       command: "TableConfig.runQueries.end",
       duration: Date.now() - now,
@@ -377,7 +377,7 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
     if (!this.prevInitQueryHistory) {
       this.prevInitQueryHistory = queryHistory;
     } else if (this.prevInitQueryHistory.join() !== queryHistory.join()) {
-      this.prostgles.init(this.prostgles.opts.onReady as any, {
+      void this.prostgles.init(this.prostgles.opts.onReady as any, {
         type: "TableConfig",
       });
     } else {
@@ -389,5 +389,5 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
   }
 
   await this.prostgles.refreshDBO();
-  this.setTableOnMounts();
+  await this.setTableOnMounts();
 };

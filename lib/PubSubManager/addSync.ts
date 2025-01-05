@@ -1,4 +1,4 @@
-import { find, tryCatchV2 } from "prostgles-types/dist/util";
+import { find, tryCatchV2 } from "prostgles-types";
 import {
   AddSyncParams,
   BasicCallback,
@@ -69,7 +69,7 @@ export async function addSync(
         const unsyncChn = channelName + "unsync";
         socket.removeAllListeners(unsyncChn);
         socket.once(unsyncChn, (_data: any, cb: BasicCallback) => {
-          this._log({
+          void this._log({
             type: "sync",
             command: "unsync",
             socketId: socket.id,
@@ -113,7 +113,7 @@ export async function addSync(
           */
 
           if (data.onSyncRequest) {
-            this.syncData(newSync, data.onSyncRequest, "client");
+            void this.syncData(newSync, data.onSyncRequest, "client");
           } else {
             console.error("Unexpected sync request data from client: ", data);
           }

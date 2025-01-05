@@ -69,7 +69,7 @@ export class SchemaWatch {
       log("Schema changed");
       const { query, command } = event;
 
-      this.dboBuilder.cacheDBTypes(true);
+      void this.dboBuilder.cacheDBTypes(true);
       if (typeof watchSchema === "function") {
         /* Only call the provided func */
         watchSchema(event);
@@ -84,7 +84,7 @@ export class SchemaWatch {
       } else {
         /* Full re-init. Sockets must reconnect */
         console.log("watchSchema: Full re-initialisation", { query });
-        this.dboBuilder.prostgles.init(onReady as any, {
+        void this.dboBuilder.prostgles.init(onReady as any, {
           type: "schema change",
           query,
           command,

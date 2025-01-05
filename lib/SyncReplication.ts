@@ -572,7 +572,7 @@ export async function syncData(
         /**
          * After all data was inserted request SyncInfo from client and sync again if necessary
          */
-        this.syncData(sync, undefined, source);
+        void this.syncData(sync, undefined, source);
       },
     });
   }
@@ -584,7 +584,7 @@ export async function syncData(
       this.syncTimeout = setTimeout(() => {
         this.syncTimeout = undefined;
         // console.log("SYNC FROM TIMEOUT")
-        this.syncData(sync, undefined, source);
+        void this.syncData(sync, undefined, source);
       }, throttle);
     }
     // console.log("SYNC THROTTLE")

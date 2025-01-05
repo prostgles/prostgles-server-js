@@ -1,21 +1,33 @@
-import e from "express";
+import e, { type Response } from "express";
 import { DBOFullyTyped } from "../../DBSchemaBuilder";
 import {
   AUTH_ROUTES_AND_PARAMS,
   AuthHandler,
   getClientRequestIPsInfo,
   HTTP_FAIL_CODES,
+  HTTP_SUCCESS_CODES,
 } from "../AuthHandler";
 import { ExpressReq, LoginSignupConfig, MagicLinkOrOTPData, SessionUser } from "../AuthTypes";
 import { throttledAuthCall } from "../utils/throttledReject";
-import { LoginResponseHandler } from "./setLoginRequestHandler";
+import { LoginResponse } from "./setLoginRequestHandler";
+import { AuthResponse } from "prostgles-types";
+
+type MagicLinkResponseHandler = Response<
+  | LoginResponse
+  | AuthResponse.PasswordRegisterEmailConfirmationSuccess
+  | AuthResponse.PasswordRegisterEmailConfirmationFailure
+>;
 
 export function setMagicLinkOrOTPRequestHandler(
   this: AuthHandler,
   onMagicLink: Required<LoginSignupConfig<void, SessionUser>>["onMagicLinkOrOTP"],
   app: e.Express
 ) {
-  const handler = async (req: ExpressReq, res: LoginResponseHandler, data: MagicLinkOrOTPData) => {
+  const handler = async (
+    req: ExpressReq,
+    res: MagicLinkResponseHandler,
+    data: MagicLinkOrOTPData
+  ) => {
     try {
       const response = await throttledAuthCall(async () => {
         return onMagicLink(
@@ -26,17 +38,19 @@ export function setMagicLinkOrOTPRequestHandler(
         );
       });
       if (!response.session) {
-        res.status(HTTP_FAIL_CODES.UNAUTHORIZED).json(response.response);
+        res
+          .status(response.response?.success ? HTTP_SUCCESS_CODES.OK : HTTP_FAIL_CODES.UNAUTHORIZED)
+          .json(response.response);
       } else {
         this.setCookieAndGoToReturnURLIFSet(response.session, { req, res });
       }
     } catch (_e) {
       res
-        .status(HTTP_FAIL_CODES.UNAUTHORIZED)
+        .status(HTTP_FAIL_CODES.BAD_REQUEST)
         .json({ success: false, code: "something-went-wrong" });
     }
   };
-  app.get(AUTH_ROUTES_AND_PARAMS.magicLinksExpressRoute, (req, res: LoginResponseHandler) => {
+  app.get(AUTH_ROUTES_AND_PARAMS.magicLinksIdParam, (req, res: MagicLinkResponseHandler) => {
     const { id } = req.params;
 
     if (typeof id !== "string" || !id) {
@@ -46,18 +60,18 @@ export function setMagicLinkOrOTPRequestHandler(
     }
     return handler(req, res, { type: "magic-link", magicId: id });
   });
-  app.post(AUTH_ROUTES_AND_PARAMS.magicLinksRoute, (req, res: LoginResponseHandler) => {
+  app.post(AUTH_ROUTES_AND_PARAMS.magicLinks, (req, res: MagicLinkResponseHandler) => {
     const { code, email } = req.body;
 
     if (typeof code !== "string" || !code) {
       res
         .status(HTTP_FAIL_CODES.BAD_REQUEST)
-        .json({ success: false, code: "invalid-otp-code", message: "Invalid code" });
+        .json({ success: false, code: "invalid-otp-code", message: "Invalid or empty code" });
     }
     if (typeof email !== "string" || !email) {
       res
         .status(HTTP_FAIL_CODES.BAD_REQUEST)
-        .json({ success: false, code: "something-went-wrong", message: "Invalid email" });
+        .json({ success: false, code: "invalid-email", message: "Invalid or empty email" });
     }
     return handler(req, res, { type: "otp", code, email });
   });

@@ -64,8 +64,12 @@ export async function getClientAuth(
   }
 
   const userData = await this.getSidAndUserFromRequest(clientReq);
-  const { loginWithOAuth, signupWithEmailAndPassword, localLoginMode, login } =
-    this.opts.loginSignupConfig ?? {};
+  const {
+    loginWithOAuth,
+    signupWithEmail: signupWithEmailAndPassword,
+    localLoginMode,
+    login,
+  } = this.opts.loginSignupConfig ?? {};
 
   const auth: AuthSocketSchema = {
     providers: getOAuthProviders(loginWithOAuth),

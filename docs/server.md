@@ -228,7 +228,7 @@ prostgles<DBGeneratedSchema>({
 
       Will be called after a GET request is authorised
       This means that
-    - **onMagicLink** <span style="color: grey">optional</span> <span style="color: green;">((magicId: string, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: LoginClientInfo) =&gt; Awaitable&lt;{ session: BasicSession; response?: MagicLinkAuthSuccess | undefined; } | { ...; }&gt;) | undefined</span>
+    - **onMagicLinkOrOTP** <span style="color: grey">optional</span> <span style="color: green;">((data: MagicLinkOrOTPData, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: LoginClientInfo) =&gt; Awaitable&lt;{ session: BasicSession; response?: AuthSuccess | undefined; } | { ...; }&gt;) | undefined</span>
 
       If defined, will enable GET /magic-link/:id route.
       Requests with valid magic link ids will be logged in and redirected to the returnUrl if set

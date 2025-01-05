@@ -152,7 +152,7 @@ export const find = async function (
     });
     return result;
   } catch (e) {
-    this._log({
+    await this._log({
       command,
       localParams,
       data: { filter, selectParams },

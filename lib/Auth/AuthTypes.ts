@@ -113,25 +113,37 @@ type PasswordRegisterResponse =
   | AuthResponse.PasswordRegisterSuccess;
 
 /**
- * Users have to provide an email and a password.
+ * Users have to provide an email and optionally a password.
  * Account should be activated after email confirmation
  */
-export type SignupWithEmailAndPassword = {
+export type SignupWithEmail = {
   /**
    * Defaults to 8
    */
   minPasswordLength?: number;
 
   /**
-   * Called when the user has registered
+   * If true, the user will have to provide a password
+   */
+  requirePassword?: boolean;
+
+  /**
+   * Called when the user has registered.
    */
   onRegister: (data: {
     email: string;
+
     /**
-     * Password after validation
+     * Password after validation.
+     * Will be empty if requirePassword is false
      */
     password: string;
     clientInfo: LoginClientInfo;
+
+    /**
+     * Returns a URL that the user can click or enter the verification code to confirm their email address.
+     * Will point to /magic-link/:email:code by default
+     */
     getConfirmationUrl: (data: { code: string; websiteUrl: string }) => string;
     req: ExpressReq;
   }) => Awaitable<PasswordRegisterResponse>;
@@ -289,11 +301,12 @@ export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
   sidKeyName?: string;
 
   /**
+   * Required to allow self-managed or managed (by setting up loginSignupConfig) authentication.
    * Used in:
-   * - WS AUTHGUARD - allows connected SPA client to check if on protected route and needs to reload to ne redirected to login
-   * - PublishParams - userData and/or sid (in testing) are passed to the publish function
+   * - publish - userData and/or sid (in testing) are passed to the publish function
    * - auth.expressConfig.use - express middleware to get user data and
    *    undefined sid is allowed to enable public users
+   * - websocket authguard - allows connected SPA client to check if on protected route and needs to reload to ne redirected to login
    */
   getUser: (
     sid: string | undefined,
@@ -390,8 +403,12 @@ export type LoginSignupConfig<S, SUser extends SessionUser> = {
   ) => Awaitable<void>;
 
   /**
-   * If defined, will enable GET /magic-link/:id route.
-   * Requests with valid magic link ids will be logged in and redirected to the returnUrl if set
+   * If defined, will enable:
+   * - GET /magic-link/:id route.
+   * - POST /magic-link { email, code } route.
+   * Successfull requests that return a session will be logged in
+   * and redirected to the returnUrl if set.
+   * Otherwise just the response will be sent
    */
   onMagicLinkOrOTP?: (
     data: MagicLinkOrOTPData,
@@ -399,14 +416,17 @@ export type LoginSignupConfig<S, SUser extends SessionUser> = {
     db: DB,
     client: LoginClientInfo
   ) => Awaitable<
-    | { session: BasicSession; response?: AuthResponse.AuthSuccess }
+    | {
+        session: BasicSession | undefined;
+        response?: AuthResponse.AuthSuccess | AuthResponse.PasswordRegisterEmailConfirmationSuccess;
+      }
     | {
         session?: undefined;
         response: AuthResponse.MagicLinkAuthFailure | AuthResponse.CodeVerificationFailure;
       }
   >;
 
-  signupWithEmailAndPassword?: SignupWithEmailAndPassword;
+  signupWithEmail?: SignupWithEmail;
 
   loginWithOAuth?: LoginWithOAuthConfig<S>;
 
@@ -417,7 +437,8 @@ export type LoginSignupConfig<S, SUser extends SessionUser> = {
   localLoginMode?: AuthSocketSchema["loginType"];
 
   /**
-   * If provided then the user will be able to login with a username and password
+   * If provided then the user will be able to login with a username and/or password
+   * through the POST /login route.
    */
   login: (
     params: LoginParams,

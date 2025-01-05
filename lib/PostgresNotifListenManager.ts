@@ -44,7 +44,7 @@ export class PostgresNotifListenManager {
     this.notifListener = notifListener;
     this.db_channel_name = db_channel_name;
 
-    if (!noInit) this.init();
+    if (!noInit) void this.init();
   }
 
   async init(): Promise<PostgresNotifListenManager> {
@@ -68,7 +68,7 @@ export class PostgresNotifListenManager {
   destroy = async () => {
     this.destroyed = true;
     await this.stopListening();
-    this.connection?.done();
+    await this.connection?.done();
     this.connection = undefined;
   };
 
@@ -77,7 +77,7 @@ export class PostgresNotifListenManager {
       try {
         await this.connection?.none("UNLISTEN $1~", [this.db_channel_name]);
         await this.client?.query("UNLISTEN $1~", [this.db_channel_name]);
-      } catch (error) {}
+      } catch {}
     }
   };
 

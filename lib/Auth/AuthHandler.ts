@@ -41,10 +41,9 @@ export const AUTH_ROUTES_AND_PARAMS = {
   emailRegistration: "/register",
   returnUrlParamName: "returnURL",
   sidKeyName: "session_id",
-  logoutGetPath: "/logout",
-  magicLinksRoute: "/magic-link",
-  magicLinksExpressRoute: "/magic-link/:id",
-  confirmEmail: "/confirm-email",
+  logout: "/logout",
+  magicLinks: "/magic-link",
+  magicLinksIdParam: "/magic-link/:id",
   catchAll: "*",
 } as const;
 
@@ -74,11 +73,16 @@ export class AuthHandler {
   };
 
   isUserRoute = (pathname: string) => {
-    const { login, logoutGetPath, magicLinksRoute, loginWithProvider } = AUTH_ROUTES_AND_PARAMS;
+    const {
+      login,
+      logout: logoutRoute,
+      magicLinks: magicLinksRoute,
+      loginWithProvider,
+    } = AUTH_ROUTES_AND_PARAMS;
     const pubRoutes = [
       ...(this.opts.loginSignupConfig?.publicRoutes || []),
       login,
-      logoutGetPath,
+      logoutRoute,
       magicLinksRoute,
       loginWithProvider,
     ].filter((publicRoute) => publicRoute);
@@ -178,24 +182,22 @@ export class AuthHandler {
     const app = this.opts.loginSignupConfig?.app;
     const {
       login,
-      logoutGetPath,
-      magicLinksExpressRoute,
+      logout,
+      magicLinksIdParam,
       catchAll,
       loginWithProvider,
       emailRegistration,
-      magicLinksRoute,
-      confirmEmail,
+      magicLinks,
     } = AUTH_ROUTES_AND_PARAMS;
 
     removeExpressRoute(app, [
       login,
-      logoutGetPath,
-      magicLinksExpressRoute,
+      logout,
+      magicLinksIdParam,
       catchAll,
       loginWithProvider,
       emailRegistration,
-      magicLinksRoute,
-      confirmEmail,
+      magicLinks,
     ]);
   };
 

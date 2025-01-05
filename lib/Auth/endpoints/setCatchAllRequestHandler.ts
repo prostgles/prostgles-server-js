@@ -24,7 +24,7 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
     res.redirect("/");
   };
 
-  const requestHandler: RequestHandler = async (req, res, next) => {
+  const requestHandlerCatchAll: RequestHandler = async (req, res, next) => {
     const { onGetRequestOK } = this.opts.loginSignupConfig ?? {};
     const clientReq: AuthClientRequest = { httpReq: req, res };
     const getUser = async () => {
@@ -47,7 +47,7 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
     try {
       const returnURL = getReturnUrl(req);
 
-      if (matchesRoute(AUTH_ROUTES_AND_PARAMS.logoutGetPath, req.path)) {
+      if (matchesRoute(AUTH_ROUTES_AND_PARAMS.logout, req.path) && req.method === "POST") {
         await onLogout(req, res);
         return;
       }
@@ -56,6 +56,7 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
         next();
         return;
       }
+
       /**
        * Requesting a User route
        */
@@ -87,7 +88,7 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
         }
       }
 
-      onGetRequestOK?.(req, res, {
+      await onGetRequestOK?.(req, res, {
         getUser,
         dbo: this.dbo as DBOFullyTyped,
         db: this.db,
@@ -106,5 +107,5 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
     }
   };
 
-  app.get(AUTH_ROUTES_AND_PARAMS.catchAll, requestHandler);
+  app.get(AUTH_ROUTES_AND_PARAMS.catchAll, requestHandlerCatchAll);
 }
