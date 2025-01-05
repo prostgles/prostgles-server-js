@@ -14,7 +14,7 @@ type ReturnType =
 type RegisterResponseHandler = Response<ReturnType>;
 
 export const setRegisterRequestHandler = (
-  { onRegister, minPasswordLength = 8 }: SignupWithEmail,
+  { onRegister, minPasswordLength = 8, requirePassword }: SignupWithEmail,
   app: e.Express
 ) => {
   const registerRequestHandler = async (req: Request, res: RegisterResponseHandler) => {
@@ -24,7 +24,7 @@ export const setRegisterRequestHandler = (
         .status(HTTP_FAIL_CODES.BAD_REQUEST)
         .json({ success: false, code: "something-went-wrong", message: error });
     }
-    const { username, password } = data;
+    const { username, password = "" } = data;
     const sendResponse = (response: ReturnType) => {
       if (response.success) {
         res.json(response);
@@ -35,7 +35,7 @@ export const setRegisterRequestHandler = (
     if (!username) {
       return sendResponse({ success: false, code: "username-missing" });
     }
-    if (!password) {
+    if (!password && requirePassword) {
       return sendResponse({ success: false, code: "password-missing" });
     } else if (password.length < minPasswordLength) {
       return sendResponse({

@@ -196,11 +196,12 @@ prostgles<DBGeneratedSchema>({
     Defaults to "session_id"
   - **getUser** <span style="color: red">required</span> <span style="color: green;">(sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: LoginClientInfo, reqInfo: AuthClientRequest) =&gt; Awaitable&lt;...&gt;</span>
 
+    Required to allow self-managed or managed (by setting up loginSignupConfig) authentication.
     Used in:
-    - WS AUTHGUARD - allows connected SPA client to check if on protected route and needs to reload to ne redirected to login
-    - PublishParams - userData and/or sid (in testing) are passed to the publish function
+    - publish - userData and/or sid (in testing) are passed to the publish function
     - auth.expressConfig.use - express middleware to get user data and
        undefined sid is allowed to enable public users
+    - websocket authguard - allows connected SPA client to check if on protected route and needs to reload to ne redirected to login
   - **loginSignupConfig** <span style="color: grey">optional</span> <span style="color: green;">LoginSignupConfig</span>
 
     Will setup auth routes
@@ -228,11 +229,15 @@ prostgles<DBGeneratedSchema>({
 
       Will be called after a GET request is authorised
       This means that
-    - **onMagicLinkOrOTP** <span style="color: grey">optional</span> <span style="color: green;">((data: MagicLinkOrOTPData, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: LoginClientInfo) =&gt; Awaitable&lt;{ session: BasicSession; response?: AuthSuccess | undefined; } | { ...; }&gt;) | undefined</span>
+    - **onMagicLinkOrOTP** <span style="color: grey">optional</span> <span style="color: green;">((data: MagicLinkOrOTPData, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: LoginClientInfo) =&gt; Awaitable&lt;{ session: BasicSession | undefined; response?: AuthSuccess | ... 1 more ... | undefined; } | { ...; }&gt;) | undefined</span>
 
-      If defined, will enable GET /magic-link/:id route.
-      Requests with valid magic link ids will be logged in and redirected to the returnUrl if set
-    - **signupWithEmailAndPassword** <span style="color: grey">optional</span> <span style="color: green;">SignupWithEmailAndPassword | undefined</span>
+      If defined, will enable:
+      - GET /magic-link/:id route.
+      - POST /magic-link { email, code } route.
+      Successfull requests that return a session will be logged in
+      and redirected to the returnUrl if set.
+      Otherwise just the response will be sent
+    - **signupWithEmail** <span style="color: grey">optional</span> <span style="color: green;">SignupWithEmail | undefined</span>
     - **loginWithOAuth** <span style="color: grey">optional</span> <span style="color: green;">LoginWithOAuthConfig&lt;S&gt; | undefined</span>
     - **localLoginMode** <span style="color: grey">optional</span> <span style="color: green;">LocalLoginMode | undefined</span>
 
@@ -240,7 +245,8 @@ prostgles<DBGeneratedSchema>({
       Defaults to username and password
     - **login** <span style="color: red">required</span> <span style="color: green;">(params: LoginParams, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: LoginClientInfo) =&gt; Awaitable&lt;LoginResponse&gt;</span>
 
-      If provided then the user will be able to login with a username and password
+      If provided then the user will be able to login with a username and/or password
+      through the POST /login route.
     - **logout** <span style="color: red">required</span> <span style="color: green;">(sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; Awaitable&lt;void&gt;</span>
   - **responseThrottle** <span style="color: grey">optional</span> <span style="color: green;">number</span>
 

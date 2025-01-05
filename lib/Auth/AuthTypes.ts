@@ -147,19 +147,6 @@ export type SignupWithEmail = {
     getConfirmationUrl: (data: { code: string; websiteUrl: string }) => string;
     req: ExpressReq;
   }) => Awaitable<PasswordRegisterResponse>;
-
-  /**
-   * Called after the user has clicked the URL to confirm their email address
-   */
-  onEmailConfirmation: (data: {
-    email: string;
-    code: string;
-    clientInfo: LoginClientInfo;
-    req: ExpressReq;
-  }) => Awaitable<
-    | AuthResponse.PasswordRegisterEmailConfirmationFailure
-    | (AuthResponse.PasswordRegisterEmailConfirmationSuccess & { redirect_to?: string })
-  >;
 };
 
 export type AuthProviderUserData =
