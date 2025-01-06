@@ -7,6 +7,7 @@ import { setMagicLinkOrOTPRequestHandler } from "./endpoints/setMagicLinkOrOTPRe
 import { setOAuthRequestHandlers } from "./endpoints/setOAuthRequestHandlers";
 import { setRegisterRequestHandler } from "./endpoints/setRegisterRequestHandler";
 import { upsertNamedExpressMiddleware } from "./utils/upsertNamedExpressMiddleware";
+import { setLogoutRequestHandler } from "./endpoints/setLogoutRequestHandler";
 
 export async function setupAuthRoutes(this: AuthHandler) {
   const { loginSignupConfig } = this.opts;
@@ -67,4 +68,6 @@ export async function setupAuthRoutes(this: AuthHandler) {
 
   /* Redirect if not logged in and requesting non public content */
   setCatchAllRequestHandler.bind(this)(app);
+
+  setLogoutRequestHandler.bind(this)(app);
 }

@@ -25,6 +25,7 @@ import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
 import { DB } from "../Prostgles";
 import OAuth2Strategy from "passport-oauth2";
+import { AUTH_ROUTES_AND_PARAMS } from "./AuthHandler";
 
 type Awaitable<T> = T | Promise<T>;
 
@@ -342,9 +343,19 @@ export type LoginResponse =
   | AuthResponse.MagicLinkAuthFailure["code"];
 
 export type MagicLinkOrOTPData =
-  | { type: "magic-link"; magicId: string }
+  | { type: "magic-link"; id: string }
   | { type: "otp"; code: string; email: string };
 
+export const getMagicLinkUrl = (websiteUrl: string, data: MagicLinkOrOTPData) => {
+  if (data.type === "magic-link") {
+    return `${AUTH_ROUTES_AND_PARAMS.magicLinkWithId}/${data.id}`;
+  }
+  const { code, email } = data;
+  const confirmationUrl = new URL(`${websiteUrl}${AUTH_ROUTES_AND_PARAMS.magicLinks}`);
+  confirmationUrl.searchParams.set("email", email);
+  confirmationUrl.searchParams.set("code", code);
+  return confirmationUrl.toString();
+};
 export type LoginParams =
   | ({
       type: "username";

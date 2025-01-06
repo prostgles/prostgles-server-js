@@ -1,7 +1,7 @@
 import e, { Request, Response } from "express";
 import { AuthResponse } from "prostgles-types";
 import { AUTH_ROUTES_AND_PARAMS, HTTP_FAIL_CODES } from "../AuthHandler";
-import type { SignupWithEmail } from "../AuthTypes";
+import { getMagicLinkUrl, type SignupWithEmail } from "../AuthTypes";
 import { getClientRequestIPsInfo } from "../utils/getClientRequestIPsInfo";
 import { parseLoginData } from "./setLoginRequestHandler";
 
@@ -49,12 +49,8 @@ export const setRegisterRequestHandler = (
       const result = await onRegister({
         email: username,
         password,
-        getConfirmationUrl: ({ code, websiteUrl }) => {
-          const confirmationUrl = new URL(`${websiteUrl}${AUTH_ROUTES_AND_PARAMS.magicLinks}`);
-          confirmationUrl.searchParams.set("email", username);
-          confirmationUrl.searchParams.set("code", code);
-          return confirmationUrl.toString();
-        },
+        getConfirmationUrl: ({ code, websiteUrl }) =>
+          getMagicLinkUrl(websiteUrl, { type: "otp", code, email: username }),
         clientInfo,
         req,
       });

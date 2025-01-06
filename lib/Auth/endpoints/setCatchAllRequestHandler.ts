@@ -1,29 +1,10 @@
-import e, { Request, RequestHandler, Response } from "express";
+import e, { RequestHandler } from "express";
 import { DBOFullyTyped } from "../../DBSchemaBuilder";
 import { AUTH_ROUTES_AND_PARAMS, AuthHandler, HTTP_FAIL_CODES, matchesRoute } from "../AuthHandler";
 import { AuthClientRequest } from "../AuthTypes";
 import { getReturnUrl } from "../utils/getReturnUrl";
-import { throttledReject } from "../utils/throttledReject";
 
 export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
-  const onLogout = async (req: Request, res: Response) => {
-    const sid = this.validateSid(req.cookies?.[this.sidKeyName]);
-    if (sid) {
-      try {
-        await throttledReject(async () => {
-          return this.opts.loginSignupConfig?.logout(
-            req.cookies?.[this.sidKeyName],
-            this.dbo as DBOFullyTyped,
-            this.db
-          );
-        });
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    res.redirect("/");
-  };
-
   const requestHandlerCatchAll: RequestHandler = async (req, res, next) => {
     const { onGetRequestOK } = this.opts.loginSignupConfig ?? {};
     const clientReq: AuthClientRequest = { httpReq: req, res };
@@ -46,11 +27,6 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
     }
     try {
       const returnURL = getReturnUrl(req);
-
-      if (matchesRoute(AUTH_ROUTES_AND_PARAMS.logout, req.path) && req.method === "POST") {
-        await onLogout(req, res);
-        return;
-      }
 
       if (matchesRoute(AUTH_ROUTES_AND_PARAMS.loginWithProvider, req.path)) {
         next();

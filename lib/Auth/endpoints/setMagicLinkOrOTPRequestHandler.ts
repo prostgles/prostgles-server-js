@@ -59,7 +59,7 @@ export function setMagicLinkOrOTPRequestHandler(
         .status(HTTP_FAIL_CODES.BAD_REQUEST)
         .json({ success: false, code: "invalid-magic-link", message: "Invalid magic link" });
     }
-    return handler(req, res, { type: "magic-link", magicId: id });
+    return handler(req, res, { type: "magic-link", id: id });
   });
 
   app.get(AUTH_ROUTES_AND_PARAMS.magicLinks, (req, res: MagicLinkResponseHandler) => {
@@ -91,7 +91,7 @@ export function setMagicLinkOrOTPRequestHandler(
       }
       return handler(req, res, { type: "otp", code, email });
     }
-    return handler(req, res, { type: "magic-link", magicId: id });
+    return handler(req, res, { type: "magic-link", id: id });
   });
 
   app.post(AUTH_ROUTES_AND_PARAMS.magicLinks, (req, res: MagicLinkResponseHandler) => {
