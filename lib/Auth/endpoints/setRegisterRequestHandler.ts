@@ -50,7 +50,7 @@ export const setRegisterRequestHandler = (
         email: username,
         password,
         getConfirmationUrl: ({ code, websiteUrl }) =>
-          getMagicLinkUrl(websiteUrl, { type: "otp", code, email: username }),
+          getMagicLinkUrl(websiteUrl, { type: "otp", code, email: username, returnToken: false }),
         clientInfo,
         req,
       });

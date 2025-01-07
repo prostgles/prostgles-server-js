@@ -62,61 +62,61 @@ export function setMagicLinkOrOTPRequestHandler(
         .status(HTTP_FAIL_CODES.BAD_REQUEST)
         .json({ success: false, code: "invalid-magic-link", message: "Invalid magic link" });
     }
-    return handler(req, res, { type: "magic-link", id: id });
+    return handler(req, res, { type: "magic-link", id, returnToken: false });
   });
 
   app.get(AUTH_ROUTES_AND_PARAMS.magicLinks, (req, res: MagicLinkResponseHandler) => {
-    const { id, code, email, returnToken = false } = req.query;
-
-    if (typeof returnToken !== "boolean") {
-      return res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({
-        success: false,
-        code: "something-went-wrong",
-        message: "Invalid magic link request. Must provide returnToken must be of type boolean",
-      });
-    }
-    const noCode = typeof code !== "string" || !code;
-    const noEmail = typeof email !== "string" || !email;
-    if (typeof id !== "string" || !id) {
-      if (noCode && noEmail) {
-        return res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({
-          success: false,
-          code: "something-went-wrong",
-          message: "Invalid magic link. Must provide id or email and code",
-        });
-      }
-      if (noCode) {
-        return res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({
-          success: false,
-          code: "invalid-otp-code",
-          message: "Invalid or empty code",
-        });
-      }
-      if (noEmail) {
-        return res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({
-          success: false,
-          code: "invalid-email",
-          message: "Invalid or empty email",
-        });
-      }
-      return handler(req, res, { type: "otp", code, email, returnToken });
-    }
-    return handler(req, res, { type: "magic-link", id, returnToken });
+    const data = parseMagicLinkOrOTPData(res, req.query);
+    if (!data) return;
+    return handler(req, res, data);
   });
 
   app.post(AUTH_ROUTES_AND_PARAMS.magicLinks, (req, res: MagicLinkResponseHandler) => {
-    const { code, email } = req.body;
-
-    if (typeof code !== "string" || !code) {
-      res
-        .status(HTTP_FAIL_CODES.BAD_REQUEST)
-        .json({ success: false, code: "invalid-otp-code", message: "Invalid or empty code" });
-    }
-    if (typeof email !== "string" || !email) {
-      res
-        .status(HTTP_FAIL_CODES.BAD_REQUEST)
-        .json({ success: false, code: "invalid-email", message: "Invalid or empty email" });
-    }
-    return handler(req, res, { type: "otp", code, email });
+    const data = parseMagicLinkOrOTPData(res, req.body);
+    if (!data) return;
+    return handler(req, res, data);
   });
 }
+
+const parseMagicLinkOrOTPData = (res: Response, data: any): MagicLinkOrOTPData | undefined => {
+  const { id, code, email, returnToken = false } = data;
+
+  if (typeof returnToken !== "boolean") {
+    res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({
+      success: false,
+      code: "something-went-wrong",
+      message: "Invalid magic link request. Must provide returnToken must be of type boolean",
+    });
+    return;
+  }
+  const noCode = typeof code !== "string" || !code;
+  const noEmail = typeof email !== "string" || !email;
+  if (typeof id !== "string" || !id) {
+    if (noCode && noEmail) {
+      res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({
+        success: false,
+        code: "something-went-wrong",
+        message: "Invalid magic link. Must provide id or email and code",
+      });
+      return;
+    }
+    if (noCode) {
+      res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({
+        success: false,
+        code: "invalid-otp-code",
+        message: "Invalid or empty code",
+      });
+      return;
+    }
+    if (noEmail) {
+      res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({
+        success: false,
+        code: "invalid-email",
+        message: "Invalid or empty email",
+      });
+      return;
+    }
+    return { type: "otp", code, email, returnToken };
+  }
+  return { type: "magic-link", id, returnToken };
+};
