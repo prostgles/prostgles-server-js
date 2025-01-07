@@ -48,7 +48,7 @@ export const parseLoginData = (
       return valOrError;
     }
     if (prop === "username") {
-      if (!isDefined(valOrError)) {
+      if (!isDefined(valOrError) || !valOrError) {
         return ["username error: Expected non-empty string"];
       }
       loginData[prop] = valOrError;
