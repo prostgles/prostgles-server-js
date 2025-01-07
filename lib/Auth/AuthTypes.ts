@@ -343,8 +343,8 @@ export type LoginResponse =
   | AuthResponse.MagicLinkAuthFailure["code"];
 
 export type MagicLinkOrOTPData =
-  | { type: "magic-link"; id: string }
-  | { type: "otp"; code: string; email: string };
+  | { type: "magic-link"; id: string; returnToken?: boolean }
+  | { type: "otp"; code: string; email: string; returnToken?: boolean };
 
 export const getMagicLinkUrl = (websiteUrl: string, data: MagicLinkOrOTPData) => {
   if (data.type === "magic-link") {

@@ -42,6 +42,9 @@ export function setMagicLinkOrOTPRequestHandler(
           .status(response.response?.success ? HTTP_SUCCESS_CODES.OK : HTTP_FAIL_CODES.UNAUTHORIZED)
           .json(response.response);
       } else {
+        if (data.returnToken) {
+          return res.json({ success: true, token: response.session.sid });
+        }
         this.setCookieAndGoToReturnURLIFSet(response.session, { req, res });
       }
     } catch (_e) {
@@ -63,8 +66,15 @@ export function setMagicLinkOrOTPRequestHandler(
   });
 
   app.get(AUTH_ROUTES_AND_PARAMS.magicLinks, (req, res: MagicLinkResponseHandler) => {
-    const { id, code, email } = req.query;
+    const { id, code, email, returnToken = false } = req.query;
 
+    if (typeof returnToken !== "boolean") {
+      return res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({
+        success: false,
+        code: "something-went-wrong",
+        message: "Invalid magic link request. Must provide returnToken must be of type boolean",
+      });
+    }
     const noCode = typeof code !== "string" || !code;
     const noEmail = typeof email !== "string" || !email;
     if (typeof id !== "string" || !id) {
@@ -89,9 +99,9 @@ export function setMagicLinkOrOTPRequestHandler(
           message: "Invalid or empty email",
         });
       }
-      return handler(req, res, { type: "otp", code, email });
+      return handler(req, res, { type: "otp", code, email, returnToken });
     }
-    return handler(req, res, { type: "magic-link", id: id });
+    return handler(req, res, { type: "magic-link", id, returnToken });
   });
 
   app.post(AUTH_ROUTES_AND_PARAMS.magicLinks, (req, res: MagicLinkResponseHandler) => {

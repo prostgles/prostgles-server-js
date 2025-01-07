@@ -94,17 +94,17 @@ export class AuthHandler {
 
   setCookieAndGoToReturnURLIFSet = (
     cookie: { sid: string; expires: number },
-    r: { req: ExpressReq; res: LoginResponseHandler }
+    requestHandler: { req: ExpressReq; res: LoginResponseHandler }
   ) => {
     const { sid, expires } = cookie;
-    const { res, req } = r;
+    const { res, req } = requestHandler;
     if (!sid) {
       throw "no sid";
     }
 
     const maxAgeOneDay = 60 * 60 * 24; // 24 hours;
-    type CD = { maxAge: number } | { expires: Date };
-    let cookieDuration: CD = {
+    type CookieExpirationOptions = { maxAge: number } | { expires: Date };
+    let cookieDuration: CookieExpirationOptions = {
       maxAge: maxAgeOneDay,
     };
 
