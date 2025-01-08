@@ -72,11 +72,11 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     throw "table_name undef";
   }
 
-  const tableTriggerConditions = this._triggers?.[table_name]?.map((condition, idx) => ({
+  const tableTriggerConditions = this._triggers?.[table_name]?.map((cond, idx) => ({
     idx,
-    condition,
-    subs: this.getTriggerSubs(table_name, condition),
-    syncs: this.getSyncs(table_name, condition),
+    ...cond,
+    subs: this.getTriggerSubs(table_name, cond.condition),
+    syncs: this.getSyncs(table_name, cond.condition),
   }));
   let state: "error" | "no-triggers" | "ok" | "invalid_condition_ids" = "ok";
 
@@ -109,31 +109,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
       return !tc || (tc.subs.length === 0 && tc.syncs.length === 0);
     });
     if (orphanedTableConditions.length) {
-      this.db
-        .any(
-          `
-          /* Delete removed subscriptions */
-          /* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
-          DELETE FROM prostgles.app_triggers at
-          WHERE EXISTS (
-            SELECT 1
-            FROM prostgles.v_triggers t
-            WHERE t.table_name = $1 
-            AND t.c_id IN ($2:csv) 
-            AND t.app_id = $3
-            AND at.app_id = t.app_id
-            AND at.table_name = t.table_name
-            AND at.condition = t.condition
-          ) 
-          `,
-          [table_name, orphanedTableConditions, this.appId]
-        )
-        .then(() => {
-          return this.refreshTriggers();
-        })
-        .catch((e) => {
-          console.error("Error deleting orphaned triggers", e);
-        });
+      void this.deleteOrphanedTriggers.bind(this)(table_name);
     }
 
     firedTableConditions.map(({ subs, syncs }) => {

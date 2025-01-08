@@ -3,7 +3,6 @@ import { TableRule } from "../../PublishParser/PublishParser";
 import {
   Filter,
   LocalParams,
-  getClientErrorFromPGError,
   getErrorAsObject,
   getSerializedClientErrorFromPGError,
 } from "../DboBuilder";

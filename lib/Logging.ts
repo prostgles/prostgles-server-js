@@ -1,6 +1,6 @@
 import { AnyObject, ClientSchema, TableHandler } from "prostgles-types";
 import { LocalParams } from "./DboBuilder/DboBuilder";
-import { NotifTypeName } from "./PubSubManager/PubSubManager";
+import { NotifTypeName, PubSubManagerTriggers } from "./PubSubManager/PubSubManager";
 
 type ClientInfo = {
   socketId: string | undefined;
@@ -60,7 +60,7 @@ export namespace EventTypes {
   export type SyncOrSub = DebugInfo & {
     type: "syncOrSub";
     connectedSocketIds: string[];
-    triggers: Record<string, string[]> | undefined;
+    triggers: PubSubManagerTriggers | undefined;
   } & (
       | (SyncOrSubWithClientInfo & {
           command: "addTrigger";
@@ -82,7 +82,7 @@ export namespace EventTypes {
           command: "notifListener.Finished";
           op_name: string | undefined;
           condition_ids_str: string | undefined;
-          tableTriggers: string[] | undefined;
+          tableTriggers: PubSubManagerTriggers[string] | undefined;
           tableSyncs: string;
           state: "ok" | "error" | "no-triggers" | "invalid_condition_ids";
         })
@@ -99,6 +99,10 @@ export namespace EventTypes {
         }
       | {
           command: "postgresNotifListenManager.create" | "postgresNotifListenManager.destroy";
+        }
+      | {
+          command: "refreshTriggers";
+          oldTriggers: PubSubManagerTriggers;
         }
     );
 
