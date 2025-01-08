@@ -72,12 +72,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     throw "table_name undef";
   }
 
-  const tableTriggerConditions = this._triggers?.[table_name]?.map((cond, idx) => ({
-    idx,
-    ...cond,
-    subs: this.getTriggerSubs(table_name, cond.condition),
-    syncs: this.getSyncs(table_name, cond.condition),
-  }));
+  const tableTriggerConditions = this.getTriggerInfo(table_name);
   let state: "error" | "no-triggers" | "ok" | "invalid_condition_ids" = "ok";
 
   // const triggers = await this.db.any("SELECT * FROM prostgles.triggers WHERE table_name = $1 AND id IN ($2:csv)", [table_name, condition_ids_str.split(",").map(v => +v)]);

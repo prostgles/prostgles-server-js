@@ -276,6 +276,16 @@ export class PubSubManager {
 
   notifListener = notifListener.bind(this);
 
+  getTriggerInfo = (tableName: string) => {
+    const tableTriggerConditions = this._triggers?.[tableName]?.map((cond, idx) => ({
+      idx,
+      ...cond,
+      subs: this.getTriggerSubs(tableName, cond.condition),
+      syncs: this.getSyncs(tableName, cond.condition),
+    }));
+    return tableTriggerConditions;
+  };
+
   getSubData = async (
     sub: Subscription
   ): Promise<{ data: any[]; err?: undefined } | { data?: undefined; err: any }> => {
