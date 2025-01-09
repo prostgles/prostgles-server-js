@@ -158,7 +158,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     state,
     op_name,
     condition_ids_str,
-    tableTriggers: this._triggers?.[table_name],
+    tableTriggers: this._triggers[table_name],
     tableSyncs: JSON.stringify(
       this.syncs
         .filter((s) => s.table_name === table_name)

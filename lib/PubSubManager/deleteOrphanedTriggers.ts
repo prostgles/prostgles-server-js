@@ -5,6 +5,7 @@ export async function deleteOrphanedTriggers(this: PubSubManager, tableName: str
     (c) => c.subs.length || c.syncs.length
   );
 
+  const activeConditionHashes = activeConditions.map((c) => c.hash);
   this.db
     .any(
       `
@@ -15,14 +16,14 @@ export async function deleteOrphanedTriggers(this: PubSubManager, tableName: str
           SELECT 1
           FROM prostgles.v_triggers t
           WHERE t.table_name = $1  
-          AND t.condition_hash NOT IN ($2:csv)
+          ${activeConditionHashes.length ? "AND t.condition_hash NOT IN ($2:csv)" : ""}
           AND t.app_id = $3
           AND at.app_id = t.app_id
           AND at.table_name = t.table_name
           AND at.condition = t.condition
         ) 
         `,
-      [tableName, activeConditions.map((c) => c.hash), this.appId]
+      [tableName, activeConditionHashes, this.appId]
     )
     .then(() => {
       return this.refreshTriggers();

@@ -185,7 +185,12 @@ export class PubSubManager {
   }
 
   dboBuilder: DboBuilder;
-  _triggers: PubSubManagerTriggers | undefined;
+
+  /**
+   * Triggers used for sync/sub that reflect prostgles.app_triggers.
+   * Updated through refreshTriggers()
+   */
+  _triggers: PubSubManagerTriggers = {};
   sockets: AnyObject = {};
 
   subs: Subscription[] = [];
@@ -277,7 +282,7 @@ export class PubSubManager {
   notifListener = notifListener.bind(this);
 
   getTriggerInfo = (tableName: string) => {
-    const tableTriggerConditions = this._triggers?.[tableName]?.map((cond, idx) => ({
+    const tableTriggerConditions = this._triggers[tableName]?.map((cond, idx) => ({
       idx,
       ...cond,
       subs: this.getTriggerSubs(tableName, cond.condition),

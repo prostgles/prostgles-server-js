@@ -74,7 +74,7 @@ const prostglesClient = prostgles<DBGeneratedSchema>
 
 The following table/view methods are available on the client.
 
-## useSync<span style="opacity: 0.6;">(basicFilter: EqualityFilter, syncOptions: SyncOptions): AsyncResult</span>
+## useSync<span style="opacity: 0.6;">(basicFilter: EqualityFilter, syncOptions: SyncOptions, hookOptions?: HookOptions): AsyncResult</span>
 Retrieves rows matching the filter and keeps them in sync
 - use { handlesOnData: true } to get optimistic updates method: $update
 - any changes to the row using the $update method will be reflected instantly
@@ -89,6 +89,10 @@ Retrieves rows matching the filter and keeps them in sync
     
     Example: `{ department: 'd1', name: 'abc' }` would match records where department is 'd1' AND name is 'abc'.
   - **syncOptions** <span style="color: red">required</span> <span style="color: green;">SyncOptions</span>
+  - **hookOptions** <span style="color: grey">optional</span> <span style="color: green;">HookOptions</span>
+    - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
+
+      Used to prevent the hook from fetching data
 #### Return type
 #### <span style="color: green;">AsyncResult</span>
 
@@ -160,7 +164,7 @@ Retrieves rows matching the filter and keeps them in sync
   - **$cloneSync** <span style="color: red">required</span> <span style="color: green;">CloneSync</span>
   - **$cloneMultiSync** <span style="color: red">required</span> <span style="color: green;">CloneMultiSync</span>
 
-## useSyncOne<span style="opacity: 0.6;">(basicFilter: EqualityFilter, syncOptions: SyncOneOptions): AsyncResult</span>
+## useSyncOne<span style="opacity: 0.6;">(basicFilter: EqualityFilter, syncOptions: SyncOneOptions, hookOptions?: HookOptions): AsyncResult</span>
 Retrieves the first row matching the filter and keeps it in sync
 - use { handlesOnData: true } to get optimistic updates method: $update
 - any changes to the row using the $update method will be reflected instantly
@@ -194,6 +198,10 @@ Retrieves the first row matching the filter and keeps it in sync
     - **patchJSON** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
     - **onReady** <span style="color: grey">optional</span> <span style="color: green;">() =&gt; void</span>
     - **handlesOnData** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
+  - **hookOptions** <span style="color: grey">optional</span> <span style="color: green;">HookOptions</span>
+    - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
+
+      Used to prevent the hook from fetching data
 #### Return type
 #### <span style="color: green;">AsyncResult</span>
 
@@ -208,7 +216,7 @@ Retrieves the first row matching the filter and keeps it in sync
 
 
 
-## useSubscribe<span style="opacity: 0.6;">(filter?: FullFilter, options?: SubscribeParams): AsyncResult</span>
+## useSubscribe<span style="opacity: 0.6;">(filter?: FullFilter, options?: SubscribeParams, hookOptions?: HookOptions): AsyncResult</span>
 Retrieves a list of matching records from the view/table and subscribes to changes
 #### Parameters
 
@@ -270,6 +278,10 @@ Retrieves a list of matching records from the view/table and subscribes to chang
 
         False by default.
         If true then the first value will be emitted at the end of the interval. Instant otherwise
+  - **hookOptions** <span style="color: grey">optional</span> <span style="color: green;">HookOptions</span>
+    - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
+
+      Used to prevent the hook from fetching data
 #### Return type
 #### <span style="color: green;">AsyncResult</span>
 
@@ -278,7 +290,7 @@ Retrieves a list of matching records from the view/table and subscribes to chang
   - isLoading: true when data is being fetched (initially or on subsequent filter/option changes)
   - error: any error that occurred
 
-## useSubscribeOne<span style="opacity: 0.6;">(filter?: FullFilter, options?: SubscribeParams): AsyncResult</span>
+## useSubscribeOne<span style="opacity: 0.6;">(filter?: FullFilter, options?: SubscribeParams, hookOptions?: HookOptions): AsyncResult</span>
 Retrieves a matching record from the view/table and subscribes to changes
 #### Parameters
 
@@ -340,6 +352,10 @@ Retrieves a matching record from the view/table and subscribes to changes
 
         False by default.
         If true then the first value will be emitted at the end of the interval. Instant otherwise
+  - **hookOptions** <span style="color: grey">optional</span> <span style="color: green;">HookOptions</span>
+    - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
+
+      Used to prevent the hook from fetching data
 #### Return type
 #### <span style="color: green;">AsyncResult</span>
 
@@ -348,7 +364,7 @@ Retrieves a matching record from the view/table and subscribes to changes
   - isLoading: true when data is being fetched (initially or on subsequent filter/option changes)
   - error: any error that occurred
 
-## useFind<span style="opacity: 0.6;">(filter?: FullFilter, selectParams?: SelectParams): AsyncResult</span>
+## useFind<span style="opacity: 0.6;">(filter?: FullFilter, selectParams?: SelectParams, hookOptions?: HookOptions): AsyncResult</span>
 Retrieves a list of matching records from the view/table
 #### Parameters
 
@@ -402,6 +418,10 @@ Retrieves a list of matching records from the view/table
     - **having** <span style="color: grey">optional</span> <span style="color: green;">FullFilter</span>
 
       Filter applied after any aggregations (group by)
+  - **hookOptions** <span style="color: grey">optional</span> <span style="color: green;">HookOptions</span>
+    - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
+
+      Used to prevent the hook from fetching data
 #### Return type
 #### <span style="color: green;">AsyncResult</span>
 
@@ -410,7 +430,7 @@ Retrieves a list of matching records from the view/table
   - isLoading: true when data is being fetched (initially or on subsequent filter/option changes)
   - error: any error that occurred
 
-## useFindOne<span style="opacity: 0.6;">(filter?: FullFilter, selectParams?: SelectParams): AsyncResult</span>
+## useFindOne<span style="opacity: 0.6;">(filter?: FullFilter, selectParams?: SelectParams, hookOptions?: HookOptions): AsyncResult</span>
 Retrieves first matching record from the view/table
 #### Parameters
 
@@ -464,6 +484,10 @@ Retrieves first matching record from the view/table
     - **having** <span style="color: grey">optional</span> <span style="color: green;">FullFilter</span>
 
       Filter applied after any aggregations (group by)
+  - **hookOptions** <span style="color: grey">optional</span> <span style="color: green;">HookOptions</span>
+    - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
+
+      Used to prevent the hook from fetching data
 #### Return type
 #### <span style="color: green;">AsyncResult</span>
 
@@ -472,7 +496,7 @@ Retrieves first matching record from the view/table
   - isLoading: true when data is being fetched (initially or on subsequent filter/option changes)
   - error: any error that occurred
 
-## useCount<span style="opacity: 0.6;">(filter?: FullFilter, selectParams?: SelectParams): AsyncResult</span>
+## useCount<span style="opacity: 0.6;">(filter?: FullFilter, selectParams?: SelectParams, hookOptions?: HookOptions): AsyncResult</span>
 Returns the total number of rows matching the filter
 #### Parameters
 
@@ -526,6 +550,10 @@ Returns the total number of rows matching the filter
     - **having** <span style="color: grey">optional</span> <span style="color: green;">FullFilter</span>
 
       Filter applied after any aggregations (group by)
+  - **hookOptions** <span style="color: grey">optional</span> <span style="color: green;">HookOptions</span>
+    - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
+
+      Used to prevent the hook from fetching data
 #### Return type
 #### <span style="color: green;">AsyncResult</span>
 
@@ -534,7 +562,7 @@ Returns the total number of rows matching the filter
   - isLoading: true when data is being fetched (initially or on subsequent filter/option changes)
   - error: any error that occurred
 
-## useSize<span style="opacity: 0.6;">(filter?: FullFilter, selectParams?: SelectParams): AsyncResult</span>
+## useSize<span style="opacity: 0.6;">(filter?: FullFilter, selectParams?: SelectParams, hookOptions?: HookOptions): AsyncResult</span>
 Returns result size in bits matching the filter and selectParams
 #### Parameters
 
@@ -588,6 +616,10 @@ Returns result size in bits matching the filter and selectParams
     - **having** <span style="color: grey">optional</span> <span style="color: green;">FullFilter</span>
 
       Filter applied after any aggregations (group by)
+  - **hookOptions** <span style="color: grey">optional</span> <span style="color: green;">HookOptions</span>
+    - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
+
+      Used to prevent the hook from fetching data
 #### Return type
 #### <span style="color: green;">AsyncResult</span>
 

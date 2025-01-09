@@ -20,7 +20,6 @@ export async function refreshTriggers(this: PubSubManager) {
 
   this._triggers = {};
   triggers.map((t) => {
-    this._triggers ??= {};
     this._triggers[t.table_name] ??= [];
     if (!this._triggers[t.table_name]?.map((t) => t.condition).includes(t.condition)) {
       this._triggers[t.table_name]?.push({ condition: t.condition, hash: t.condition_hash });
