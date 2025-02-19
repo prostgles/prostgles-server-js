@@ -267,9 +267,12 @@ export class PubSubManager {
     if (matchingSubIdx > -1) {
       this.subs.splice(matchingSubIdx, 1);
     } else {
-      console.error("Could not unsubscribe. Subscription might not have initialised yet", {
-        channelName,
-      });
+      console.error(
+        "Could not unsubscribe localFunc. Subscription might not have initialised yet",
+        {
+          channelName,
+        }
+      );
     }
   }
 

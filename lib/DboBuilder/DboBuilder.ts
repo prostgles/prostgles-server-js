@@ -287,8 +287,7 @@ export class DboBuilder {
     }
 
     this.tsTypesDefinition = [
-      `/* SCHEMA DEFINITON. Table names have been altered to work with Typescript */`,
-      `/* DBO Definition */`,
+      `/* Schema definition generated prostgles-server */`,
       getDBSchema(this),
     ].join("\n");
 

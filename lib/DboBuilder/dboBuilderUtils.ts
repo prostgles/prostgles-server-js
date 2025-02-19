@@ -34,7 +34,26 @@ export const getErrorAsObject = (rawError: any, includeStack = false) => {
     return { message: rawError };
   }
   if (rawError instanceof Error) {
-    const result = JSON.parse(JSON.stringify(rawError, Object.getOwnPropertyNames(rawError)));
+    const safeStringify = (obj: any) => {
+      const seen = new WeakSet();
+      return JSON.stringify(obj, (key, value) => {
+        if (typeof value === "object" && value !== null) {
+          if (seen.has(value)) {
+            return "[Circular]";
+          }
+          seen.add(value);
+        }
+        return value;
+      });
+    };
+    const errorObj = Object.getOwnPropertyNames(rawError).reduce(
+      (acc, key) => ({
+        ...acc,
+        [key]: (rawError as AnyObject)[key],
+      }),
+      {} as AnyObject
+    );
+    const result = JSON.parse(safeStringify(errorObj));
     if (!includeStack) {
       return omitKeys(result, ["stack"]);
     }
@@ -43,6 +62,11 @@ export const getErrorAsObject = (rawError: any, includeStack = false) => {
 
   return rawError;
 };
+
+const circularError = new Error("Circular error data");
+//@ts-ignore
+circularError.someProp = circularError;
+getErrorAsObject(circularError);
 
 type GetSerializedClientErrorFromPGErrorArgs =
   | {
