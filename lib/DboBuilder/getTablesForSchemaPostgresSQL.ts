@@ -5,97 +5,8 @@ import { DBorTx } from "../Prostgles";
 import { clone } from "../utils";
 import { TableSchema, TableSchemaColumn } from "./DboBuilderTypes";
 import { ProstglesInitOptions } from "../ProstglesTypes";
-
-const getMaterialViews = (db: DBorTx, schema: ProstglesInitOptions["schemaFilter"]) => {
-  const { sql, schemaNames } = getSchemaFilter(schema);
-
-  const query = `
-    SELECT 
-      c.oid,
-      schema,
-      escaped_identifier,
-      true as is_view,
-      true as is_mat_view,
-      obj_description(c.oid) as comment,
-      c.table_name as name,
-      definition as view_definition,
-      jsonb_build_object(
-        'insert', FALSE,
-        'select', TRUE,
-        'update', FALSE,
-        'delete', FALSE
-      ) as privileges,
-      json_agg(json_build_object(
-        'name', column_name,
-        'table_oid', c.oid,
-        'is_pkey', false,
-        'data_type', data_type,
-        'udt_name', udt_name,
-        'element_udt_name',
-            CASE WHEN LEFT(udt_name, 1) = '_' 
-            THEN RIGHT(udt_name, -1) END,
-        'element_type',
-            CASE WHEN RIGHT(data_type, 2) = '[]' 
-            THEN LEFT(data_type, -2) END,
-        'is_nullable', nullable,
-        'is_generated', true,
-        'references', null,
-        'has_default', false,
-        'column_default', null,
-        'is_updatable', false,
-        'privileges', $$ { "SELECT": true } $$::jsonb
-      )) as columns
-    FROM pg_catalog.pg_matviews m
-    INNER JOIN (
-      SELECT 
-        t.oid,
-        CASE WHEN current_schema() = s.nspname 
-            THEN format('%I', t.relname) 
-            ELSE format('%I.%I', s.nspname, t.relname) 
-          END as escaped_identifier,
-        t.relname as table_name,
-        s.nspname as schema,
-        a.attname as column_name,
-        pg_catalog.format_type(a.atttypid, a.atttypmod) as data_type,
-        typname as udt_name,
-        a.attnotnull as nullable,
-        a.attnum as ordinal_position,
-        col_description(t.oid, attnum) as comment
-      FROM pg_catalog.pg_attribute a
-        JOIN pg_catalog.pg_class t on a.attrelid = t.oid
-        JOIN pg_catalog.pg_namespace s on t.relnamespace = s.oid
-        JOIN pg_catalog.pg_type pt ON pt.oid = a.atttypid
-      WHERE a.attnum > 0 
-        AND NOT a.attisdropped
-        AND relkind = 'm'
-      ORDER BY a.attnum
-    ) c
-    ON matviewname = table_name
-    AND schemaname = schema
-    WHERE schema ${sql}
-    GROUP BY c.oid, escaped_identifier, c.table_name, schema, definition
-  `;
-
-  /** TODO: check privileges 
-
-
-
-select 
-    coalesce(nullif(s[1], ''), 'public') as grantee, 
-    s[2] as privileges
-from 
-    pg_class c
-    join pg_namespace n on n.oid = relnamespace
-    join pg_roles r on r.oid = relowner,
-    unnest(coalesce(relacl::text[], format('{%s=arwdDxt/%s}', rolname, rolname)::text[])) acl, 
-    regexp_split_to_array(acl, '=|/') s
-where nspname = 'public' and relname = 'test_view';
-
-
-  */
-
-  return db.any(query, { schemaNames });
-};
+import { getFkeys } from "./getFkeys";
+import { getMaterialViews } from "./getMaterialViews";
 
 export const getSchemaFilter = (schema: ProstglesInitOptions["schemaFilter"] = { public: 1 }) => {
   const schemaNames = Object.keys(schema);
@@ -111,7 +22,7 @@ export const getSchemaFilter = (schema: ProstglesInitOptions["schemaFilter"] = {
 };
 
 // TODO: Add a onSocketConnect timeout for this query.
-// Reason: this query gets blocked by prostgles.app_triggers from PubSubManager.addTrigger in some cases (pg_dump locks that table)
+//  Reason: this query gets blocked by prostgles.app_triggers from PubSubManager.addTrigger in some cases (pg_dump locks that table)
 export async function getTablesForSchemaPostgresSQL(
   { db, runSQL }: DboBuilder,
   schema: ProstglesInitOptions["schemaFilter"]
@@ -125,49 +36,10 @@ export async function getTablesForSchemaPostgresSQL(
     /**
      * Multiple queries to reduce load on low power machines
      */
-    const getFkeys = await tryCatch(async () => {
-      const fkeys: {
-        oid: number;
-        ftable: string;
-        cols: string[];
-        fcols: string[];
-      }[] = await t.any(
-        `
-      WITH pg_class_schema AS (
-        SELECT  c.oid, c.relname, nspname as schema
-            ,CASE WHEN current_schema() = nspname 
-              THEN format('%I', c.relname) 
-              ELSE format('%I.%I', nspname, c.relname) 
-            END as escaped_identifier
-        FROM pg_catalog.pg_class AS c
-        LEFT JOIN pg_catalog.pg_namespace AS ns
-          ON c.relnamespace = ns.oid
-        WHERE nspname ${sql}
-      ), fk AS (
-        SELECT conrelid as oid
-          , escaped_identifier as ftable
-          , array_agg(DISTINCT c1.attname::text) as cols
-          , array_agg(DISTINCT c2.attname::text) as fcols
-        FROM pg_catalog.pg_constraint c
-        INNER JOIN pg_class_schema pc
-          ON confrelid = pc.oid
-        LEFT JOIN pg_attribute c1
-        ON c1.attrelid = c.conrelid and ARRAY[c1.attnum] <@ c.conkey
-        LEFT JOIN pg_attribute c2
-        ON c2.attrelid = c.confrelid and ARRAY[c2.attnum] <@ c.confkey
-        WHERE contype = 'f'
-        GROUP BY conrelid,  conname, pc.escaped_identifier
-      )
-      SELECT * FROM  fk
-      `,
-        { schemaNames }
-      );
-
-      return { fkeys };
-    });
-    if (getFkeys.error !== undefined) {
-      throw getFkeys.error;
-    }
+    const {
+      data: { fkeys },
+      duration: fkeysResponseDuration,
+    } = await getFkeys(t, { sql, schemaNames });
 
     const uniqueColsReq = await tryCatchV2(async () => {
       const res = (await t.any(`
@@ -206,9 +78,9 @@ export async function getTablesForSchemaPostgresSQL(
       throw uniqueColsReq.error;
     }
 
-    const badFkey = getFkeys.fkeys!.find((r) => r.fcols.includes(null as any));
+    const badFkey = fkeys.find((r) => r.fcols.includes(null as any));
     if (badFkey) {
-      throw `Invalid table column schema. Null or empty fcols for ${JSON.stringify(getFkeys.fkeys)}`;
+      throw `Invalid table column schema. Null or empty fcols for ${JSON.stringify(fkeys)}`;
     }
 
     const getTVColumns = await tryCatch(async () => {
@@ -377,9 +249,7 @@ export async function getTablesForSchemaPostgresSQL(
         table.privileges.update =
           allowAllIfNoColumns ?? table.columns.some((c) => c.privileges.UPDATE);
         table.columns = table.columns.map((c) => {
-          const refs = getFkeys.fkeys!.filter(
-            (fc) => fc.oid === table.oid && fc.cols.includes(c.name)
-          );
+          const refs = fkeys.filter((fc) => fc.oid === table.oid && fc.cols.includes(c.name));
           if (refs.length)
             c.references = refs.map((_ref) => {
               const ref = { ..._ref };
@@ -469,7 +339,7 @@ export async function getTablesForSchemaPostgresSQL(
         matv: getMaterialViewsReq.duration,
         columns: getTVColumns.duration,
         tablesAndViews: getTablesAndViews.duration,
-        fkeys: getFkeys.duration,
+        fkeys: fkeysResponseDuration,
         getHyperTbls: getHyperTablesReq.duration,
         viewParentTbls: getViewParentTables.duration,
       },
