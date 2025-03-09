@@ -1,4 +1,11 @@
-import { AnyObject, getKeys, InsertParams, isDefined, isObject } from "prostgles-types";
+import {
+  AnyObject,
+  getKeys,
+  getPossibleNestedInsert,
+  InsertParams,
+  isDefined,
+  isObject,
+} from "prostgles-types";
 import { LocalParams, TableHandlers } from "./DboBuilder";
 import { TableRule } from "../PublishParser/PublishParser";
 import { omitKeys } from "../PubSubManager/PubSubManager";
@@ -387,44 +394,24 @@ export const getReferenceColumnInserts = <ExpectSingleInsert extends boolean>(
         const insertedRefCol = tableHandler.columns.find(
           (c) => c.name === insertedFieldName && c.references?.length
         );
-        const refs = insertedRefCol?.references ?? [];
-        const [firstRef, ...otherRefs] = refs;
-        if (!firstRef) return undefined;
-
-        /** If references multiple tables check if only one reference points to pkeys */
-        if (otherRefs.length) {
-          const { dbo } = tableHandler.dboBuilder;
-          const pkeyRefs = refs.filter(({ ftable, fcols }) => {
-            return (
-              fcols.length === 1 &&
-              fcols.every((fcol) => {
-                return dbo[ftable]?.columns?.find((c) => c.name === fcol && c.is_pkey);
-              })
-            );
-          });
-          const [pkeyRef, ...otherPkeyRefs] = pkeyRefs;
-          if (!pkeyRef || otherPkeyRefs.length) {
-            throw "Cannot do a nested insert on column that references multiple tables. Expecting only one reference to a single primary key fcol";
-          }
-          return {
+        if (!insertedRefCol) return undefined;
+        const insertedFieldRef = getPossibleNestedInsert(
+          insertedRefCol,
+          tableHandler.dboBuilder.tablesOrViews ?? [],
+          false
+        );
+        return (
+          insertedFieldRef && {
             insertedFieldName,
-            insertedFieldRef: pkeyRef,
-          };
-        }
-        return {
-          insertedFieldName,
-          insertedFieldRef: firstRef,
-        };
+            insertedFieldRef,
+          }
+        );
       }
 
       return undefined;
     })
     .filter(isDefined)
     .map(({ insertedFieldName, insertedFieldRef }) => {
-      if (insertedFieldRef.fcols.length !== 1) {
-        throw "Cannot do a nested insert on multi-column foreign key reference";
-      }
-
       const singleInsert = !Array.isArray(parentRow[insertedFieldName]);
       if (expectSingleInsert && !singleInsert) {
         throw "Expected singleInsert";
