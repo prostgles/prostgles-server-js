@@ -235,7 +235,7 @@ type StrictUnionHelper<T, TAll> =
   T extends any ? T & Partial<Record<Exclude<UnionKeys<TAll>, keyof T>, never>> : never;
 export type StrictUnion<T> = StrictUnionHelper<T, T>;
 
-export const CONSTRAINT_TYPES = ["PRIMARY KEY", "UNIQUE", "CHECK"] as const;
+export const CONSTRAINT_TYPES = ["PRIMARY KEY", "UNIQUE", "CHECK", "FOREIGN KEY"] as const;
 export type TableDefinition<LANG_IDS> = {
   onMount?: (params: {
     dbo: DBHandlerServer;

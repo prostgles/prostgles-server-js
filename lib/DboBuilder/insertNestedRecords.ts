@@ -387,36 +387,54 @@ export const getReferenceColumnInserts = <ExpectSingleInsert extends boolean>(
         const insertedRefCol = tableHandler.columns.find(
           (c) => c.name === insertedFieldName && c.references?.length
         );
-        if (!insertedRefCol) return undefined;
+        const refs = insertedRefCol?.references ?? [];
+        const [firstRef, ...otherRefs] = refs;
+        if (!firstRef) return undefined;
+
+        /** If references multiple tables check if only one reference points to pkeys */
+        if (otherRefs.length) {
+          const { dbo } = tableHandler.dboBuilder;
+          const pkeyRefs = refs.filter(({ ftable, fcols }) => {
+            return (
+              fcols.length === 1 &&
+              fcols.every((fcol) => {
+                return dbo[ftable]?.columns?.find((c) => c.name === fcol && c.is_pkey);
+              })
+            );
+          });
+          const [pkeyRef, ...otherPkeyRefs] = pkeyRefs;
+          if (!pkeyRef || otherPkeyRefs.length) {
+            throw "Cannot do a nested insert on column that references multiple tables. Expecting only one reference to a single primary key fcol";
+          }
+          return {
+            insertedFieldName,
+            insertedFieldRef: pkeyRef,
+          };
+        }
         return {
-          insertedRefCol,
-          insertedRefColRef: insertedRefCol.references!,
+          insertedFieldName,
+          insertedFieldRef: firstRef,
         };
       }
 
       return undefined;
     })
     .filter(isDefined)
-    .map(({ insertedRefCol, insertedRefColRef }) => {
-      if (insertedRefColRef.length !== 1) {
-        throw "Cannot do a nested insert on column that references multiple tables";
-      }
-
-      const referencesMultipleColumns = insertedRefColRef.some((refs) => refs.fcols.length !== 1);
-      if (referencesMultipleColumns) {
+    .map(({ insertedFieldName, insertedFieldRef }) => {
+      if (insertedFieldRef.fcols.length !== 1) {
         throw "Cannot do a nested insert on multi-column foreign key reference";
       }
 
-      const singleInsert = !Array.isArray(parentRow[insertedRefCol.name]);
+      const singleInsert = !Array.isArray(parentRow[insertedFieldName]);
       if (expectSingleInsert && !singleInsert) {
         throw "Expected singleInsert";
       }
       const res = {
-        tableName: insertedRefCol.references![0]!.ftable!,
-        col: insertedRefCol.name,
-        fcol: insertedRefCol.references![0]!.fcols[0]!,
+        tableName: insertedFieldRef.ftable,
+        col: insertedFieldName,
+        fcol: insertedFieldRef.fcols[0]!,
         singleInsert,
-        data: parentRow[insertedRefCol.name],
+        data: parentRow[insertedFieldName],
       };
       return res;
     })
