@@ -72,12 +72,12 @@ export async function insert(
       if (this.column_names.includes(ftable))
         throw `requiredNestedInserts.ftable is clashing with existing column: ${ftable}`;
       rows.forEach((row, rowId) => {
-        const nestedInsert = row[ftable];
+        const nestedInsert = row[ftable] as unknown;
         const nestedInsertRows =
           isObject(nestedInsert) ? [nestedInsert]
           : Array.isArray(nestedInsert) ? nestedInsert
           : [];
-        if (!nestedInsert.length) {
+        if (!nestedInsertRows.length) {
           throw `Missing required nested insert on rowId ${rowId} for ftable: ${ftable}`;
         }
         if (maxRows && nestedInsertRows.length > maxRows) {

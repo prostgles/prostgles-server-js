@@ -43,10 +43,11 @@ Retrieves the table/view info
 
     Additional table info provided through TableConfig
     - **label** <span style="color: grey">optional</span> <span style="color: green;">string</span>
-  - **uniqueColumnGroups** <span style="color: red">required</span> <span style="color: green;">string[][] | undefined</span>
-
-    List of unique column indexes/constraints.
-    Column groups where at least a column is not allowed to be viewed (selected) are omitted.
+  - **uniqueColumnGroups** <span style="color: grey">optional</span> <span style="color: green;">string</span>
+  - **requiredNestedInserts** <span style="color: grey">optional</span> <span style="color: green;">RequiredNestedInsert</span>
+    - **ftable** <span style="color: red">required</span> <span style="color: green;">string</span>
+    - **minRows** <span style="color: grey">optional</span> <span style="color: green;">number</span>
+    - **maxRows** <span style="color: grey">optional</span> <span style="color: green;">number</span>
 
 ## getColumns<span style="opacity: 0.6;">(lang?: string, params?: GetColumnsParams): Promise&lt;ValidatedColumnInfo[]&gt;</span>
 Retrieves columns metadata of the table/view
