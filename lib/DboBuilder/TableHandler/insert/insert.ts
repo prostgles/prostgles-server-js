@@ -1,16 +1,16 @@
 import { AnyObject, InsertParams, asName, isObject } from "prostgles-types";
-import { TableRule, ValidateRowBasic } from "../../PublishParser/PublishParser";
+import { TableRule, ValidateRowBasic } from "../../../PublishParser/PublishParser";
 import {
   LocalParams,
   getErrorAsObject,
   getSerializedClientErrorFromPGError,
   withUserRLS,
-} from "../DboBuilder";
-import { insertNestedRecords } from "../insertNestedRecords";
-import { prepareNewData } from "./DataValidator";
-import { TableHandler } from "./TableHandler";
-import { insertTest } from "./insertTest";
-import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
+} from "../../DboBuilder";
+import { insertNestedRecords } from "./insertNestedRecords";
+import { prepareNewData } from "../DataValidator";
+import { TableHandler } from "../TableHandler";
+import { insertTest } from "../insertTest";
+import { runInsertUpdateQuery } from "../runInsertUpdateQuery";
 
 export async function insert(
   this: TableHandler,

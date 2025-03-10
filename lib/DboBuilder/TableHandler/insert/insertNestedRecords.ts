@@ -6,11 +6,11 @@ import {
   isDefined,
   isObject,
 } from "prostgles-types";
-import { LocalParams, TableHandlers } from "./DboBuilder";
-import { TableRule } from "../PublishParser/PublishParser";
-import { omitKeys } from "../PubSubManager/PubSubManager";
-import { TableHandler } from "./TableHandler/TableHandler";
-import { AuthClientRequest } from "../Auth/AuthTypes";
+import { LocalParams, TableHandlers } from "../../DboBuilder";
+import { TableRule } from "../../../PublishParser/PublishParser";
+import { omitKeys } from "../../../PubSubManager/PubSubManager";
+import { TableHandler } from "../TableHandler";
+import { AuthClientRequest } from "../../../Auth/AuthTypes";
 
 type InsertNestedRecordsArgs = {
   data: AnyObject | AnyObject[];
@@ -109,6 +109,7 @@ export async function insertNestedRecords(
           ...ci,
           inserted: undefined as AnyObject[] | undefined,
         }));
+
         /** Insert referenced first and then populate root data with referenced keys */
         if (colInserts.length) {
           for await (const colInsert of colInsertsResult) {
@@ -144,11 +145,20 @@ export async function insertNestedRecords(
           }
         }
 
+        /** Remove requiredNestedInserts check before doing the actual insert */
+        const tableRulesWithoutRequiredInsert = structuredClone(tableRules);
+        if (tableRulesWithoutRequiredInsert?.insert?.requiredNestedInserts) {
+          tableRulesWithoutRequiredInsert.insert.requiredNestedInserts =
+            tableRulesWithoutRequiredInsert.insert.requiredNestedInserts.filter(
+              ({ ftable }) => !extraKeys.includes(ftable)
+            );
+        }
+
         const fullRootResult = await _this.insert(
           rootData,
           { returning: "*" },
           undefined,
-          tableRules,
+          tableRulesWithoutRequiredInsert,
           localParams
         );
         let returnData: AnyObject | undefined;

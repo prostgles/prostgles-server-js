@@ -26,7 +26,7 @@ import { SelectItem, SelectItemBuilder } from "../QueryBuilder/QueryBuilder";
 import { JoinPaths, ViewHandler } from "../ViewHandler/ViewHandler";
 import { DataValidator } from "./DataValidator";
 import { _delete } from "./delete";
-import { insert } from "./insert";
+import { insert } from "./insert/insert";
 import { update } from "./update";
 import { updateBatch } from "./updateBatch";
 import { upsert } from "./upsert";

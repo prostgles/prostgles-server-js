@@ -7,7 +7,7 @@ import {
   getSerializedClientErrorFromPGError,
   withUserRLS,
 } from "../DboBuilder";
-import { getInsertTableRules, getReferenceColumnInserts } from "../insertNestedRecords";
+import { getInsertTableRules, getReferenceColumnInserts } from "./insert/insertNestedRecords";
 import { prepareNewData } from "./DataValidator";
 import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
 import { TableHandler } from "./TableHandler";
