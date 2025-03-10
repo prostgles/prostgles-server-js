@@ -9,7 +9,7 @@ export async function getInfo(
   param2?: any,
   param3?: any,
   tableRules?: TableRule,
-  localParams?: LocalParams,
+  localParams?: LocalParams
 ): Promise<TInfo> {
   const p = this.getValidatedRules(tableRules, localParams);
   if (!p.getInfo) {
@@ -31,9 +31,8 @@ export async function getInfo(
     data: { lang },
     duration: 0,
   });
-  const allowedFieldsToSelect = this.parseFieldFilter(
-    tableRules?.select?.fields,
-  );
+  const allowedFieldsToSelect = this.parseFieldFilter(tableRules?.select?.fields);
+  const { requiredNestedInserts, allowedNestedInserts } = tableRules?.insert ?? {};
   return {
     oid: this.tableOrViewInfo.oid,
     comment: this.tableOrViewInfo.comment,
@@ -41,18 +40,17 @@ export async function getInfo(
       tableName: this.name,
       lang,
     }),
-    isFileTable: !this.is_media
-      ? undefined
-      : {
-          allowedNestedInserts: tableRules?.insert?.allowedNestedInserts,
-        },
+    isFileTable:
+      !this.is_media ? undefined : (
+        {
+          allowedNestedInserts,
+        }
+      ),
     isView: this.is_view,
     hasFiles: Boolean(
       !this.is_media &&
         fileTableName &&
-        this.columns.some((c) =>
-          c.references?.some((r) => r.ftable === fileTableName),
-        ),
+        this.columns.some((c) => c.references?.some((r) => r.ftable === fileTableName))
     ),
     fileTableName,
     dynamicRules: {
@@ -62,7 +60,8 @@ export async function getInfo(
      * Only show column groups that are fully allowed to be selected by the user
      */
     uniqueColumnGroups: this.tableOrViewInfo.uniqueColumnGroups?.filter(
-      (g) => !localParams || g.every((c) => allowedFieldsToSelect.includes(c)),
+      (g) => !localParams || g.every((c) => allowedFieldsToSelect.includes(c))
     ),
+    ...(requiredNestedInserts && { requiredNestedInserts }),
   };
 }

@@ -8,6 +8,8 @@ import {
 import { getFutureTableSchema } from "./getFutureTableSchema";
 import { getTableColumnQueries } from "./getTableColumnQueries";
 import { getPGIndexes } from "./getPGIndexes";
+import { runMigrations } from "./runMigrations";
+import { getMigrationQueries } from "./getMigrationQueries";
 
 export const initTableConfig = async function (this: TableConfigurator<any>) {
   let changedSchema = false;
@@ -67,46 +69,7 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
     return _asName(v);
   };
 
-  let migrations: { version: number; table: string } | undefined;
-  if (this.prostgles.opts.tableConfigMigrations) {
-    const {
-      onMigrate,
-      version,
-      versionTableName = "schema_version",
-    } = this.prostgles.opts.tableConfigMigrations;
-    await this.db.any(`
-      /* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
-      CREATE TABLE IF NOT EXISTS ${asName(versionTableName)}(id NUMERIC PRIMARY KEY, table_config JSONB NOT NULL)
-    `);
-    migrations = { version, table: versionTableName };
-    const maxVersion = +(
-      await this.db.oneOrNone(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`)
-    ).v;
-    const latestVersion = Number.isFinite(maxVersion) ? maxVersion : undefined;
-
-    if (latestVersion === version) {
-      const isLatest = (
-        await this.db.oneOrNone(
-          `SELECT table_config = \${table_config} as v FROM ${asName(versionTableName)} WHERE id = \${version}`,
-          { version, table_config: this.config }
-        )
-      ).v;
-      if (isLatest) {
-        /**
-         * If the table config is the same as the latest version then we can skip all schema checks and changes
-         */
-        return;
-      }
-    }
-    if (latestVersion !== undefined && latestVersion < version) {
-      await onMigrate({
-        db: this.db,
-        oldVersion: latestVersion,
-        getConstraints: (table, col, types) =>
-          getColConstraints({ db: this.db, table, column: col, types }),
-      });
-    }
-  }
+  const migrations = await runMigrations.bind(this)({ asName });
 
   /* Create lookup tables */
   for (const [tableNameRaw, tableConf] of Object.entries(this.config)) {

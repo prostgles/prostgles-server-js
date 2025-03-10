@@ -13,7 +13,7 @@ type Args = {
 
 /**
  * Given a table name, column definitions and constraint definitions,
- * returns structured resulting column definitions and constraints of the table
+ * returns resulting column definitions and constraints of the table
  */
 export const getFutureTableSchema = async ({
   columnDefs,

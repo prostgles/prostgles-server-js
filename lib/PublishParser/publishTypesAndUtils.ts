@@ -1,4 +1,4 @@
-import { AnyObject, DBSchema, FullFilter, Method, RULE_METHODS } from "prostgles-types";
+import { AnyObject, DBSchema, FullFilter, Method, RULE_METHODS, TableInfo } from "prostgles-types";
 import type { DBOFullyTyped, PublishFullyTyped } from "../DBSchemaBuilder";
 import { CommonTableRules, Filter, LocalParams, TableOrViewInfo } from "../DboBuilder/DboBuilder";
 import { DB, DBHandlerServer } from "../Prostgles";
@@ -51,6 +51,7 @@ export const RULE_TO_METHODS = [
       returningFields: 1,
       validate: 1,
       allowedNestedInserts: 1,
+      requiredNestedInserts: 1,
     } satisfies Record<keyof InsertRule, 1>,
     hint: ` expecting "*" | true | { fields: string | string[] | {}  }`,
   },
@@ -280,6 +281,8 @@ export type InsertRule<
     table: string;
     column: string;
   }[];
+
+  requiredNestedInserts?: TableInfo["requiredNestedInserts"];
 };
 
 export type UpdateRule<

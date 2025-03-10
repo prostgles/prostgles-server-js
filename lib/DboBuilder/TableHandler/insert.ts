@@ -28,7 +28,8 @@ export async function insert(
 
     const finalDBtx = this.getFinalDBtx(localParams);
     const rule = tableRules?.[ACTION];
-    const { postValidate, checkFilter, validate, allowedNestedInserts } = rule ?? {};
+    const { postValidate, checkFilter, validate, allowedNestedInserts, requiredNestedInserts } =
+      rule ?? {};
 
     /** Post validate and checkFilter require a transaction dbo handler because they happen after the insert */
     if (postValidate || checkFilter) {
@@ -64,12 +65,35 @@ export async function insert(
         throw `Direct inserts not allowed. Only nested inserts from these tables: ${JSON.stringify(allowedNestedInserts)} `;
       }
     }
+    const isMultiInsert = Array.isArray(rowOrRows);
+    const rows = isMultiInsert ? rowOrRows : [rowOrRows];
+
+    requiredNestedInserts?.forEach(({ ftable, maxRows, minRows }) => {
+      if (this.column_names.includes(ftable))
+        throw `requiredNestedInserts.ftable is clashing with existing column: ${ftable}`;
+      rows.forEach((row, rowId) => {
+        const nestedInsert = row[ftable];
+        const nestedInsertRows =
+          isObject(nestedInsert) ? [nestedInsert]
+          : Array.isArray(nestedInsert) ? nestedInsert
+          : [];
+        if (!nestedInsert.length) {
+          throw `Missing required nested insert on rowId ${rowId} for ftable: ${ftable}`;
+        }
+        if (maxRows && nestedInsertRows.length > maxRows) {
+          throw `Max rows exceeded for nested insert on rowId ${rowId} for ftable: ${ftable}`;
+        }
+        if (minRows && nestedInsertRows.length < minRows) {
+          throw `Min rows not met for nested insert on rowId ${rowId} for ftable: ${ftable}`;
+        }
+      });
+    });
+
     validateInsertParams(insertParams);
 
-    const isMultiInsert = Array.isArray(rowOrRows);
     const preValidatedRows = await Promise.all(
-      (isMultiInsert ? rowOrRows : [rowOrRows]).map(async (nonValidated) => {
-        const { preValidate, validate } = tableRules?.insert ?? {};
+      rows.map(async (nonValidated) => {
+        const { preValidate, validate } = rule ?? {};
         const { tableConfigurator } = this.dboBuilder.prostgles;
         if (!tableConfigurator) throw "tableConfigurator missing";
         let row = await tableConfigurator.getPreInsertRow(this, {
