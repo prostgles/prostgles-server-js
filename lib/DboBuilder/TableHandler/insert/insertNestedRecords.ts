@@ -145,20 +145,22 @@ export async function insertNestedRecords(
           }
         }
 
-        /** Remove requiredNestedInserts check before doing the actual insert */
-        const tableRulesWithoutRequiredInsert = structuredClone(tableRules);
-        if (tableRulesWithoutRequiredInsert?.insert?.requiredNestedInserts) {
-          tableRulesWithoutRequiredInsert.insert.requiredNestedInserts =
-            tableRulesWithoutRequiredInsert.insert.requiredNestedInserts.filter(
-              ({ ftable }) => !extraKeys.includes(ftable)
-            );
-        }
-
         const fullRootResult = await _this.insert(
           rootData,
           { returning: "*" },
           undefined,
-          tableRulesWithoutRequiredInsert,
+          /** Remove requiredNestedInserts check before doing the actual insert */
+          tableRules?.insert?.requiredNestedInserts ?
+            {
+              ...tableRules,
+              insert: {
+                ...tableRules.insert,
+                requiredNestedInserts: tableRules.insert.requiredNestedInserts.filter(
+                  ({ ftable }) => !extraKeys.includes(ftable)
+                ),
+              },
+            }
+          : tableRules,
           localParams
         );
         let returnData: AnyObject | undefined;
