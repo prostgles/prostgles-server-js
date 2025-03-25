@@ -37,6 +37,7 @@ export async function _delete(
       forcedFilter = tableRules.delete.forcedFilter;
       filterFields = tableRules.delete.filterFields;
       returningFields = tableRules.delete.returningFields;
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       validate = tableRules.delete.validate;
 
       if (!returningFields) returningFields = tableRules.select?.fields;

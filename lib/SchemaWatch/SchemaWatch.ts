@@ -45,7 +45,7 @@ export class SchemaWatch {
   /**
    * Fallback for watchSchema in case of not a superuser (cannot add db event listener)
    */
-  onSchemaChangeFallback: OnSchemaChangeCallback | undefined = async ({ command, query }) => {
+  onSchemaChangeFallback: OnSchemaChangeCallback | undefined = ({ command, query }) => {
     if (
       typeof query === "string" &&
       query.includes(PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)

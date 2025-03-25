@@ -36,7 +36,7 @@ export const getErrorAsObject = (rawError: any, includeStack = false) => {
   if (rawError instanceof Error) {
     const safeStringify = (obj: any) => {
       const seen = new WeakSet();
-      return JSON.stringify(obj, (key, value) => {
+      return JSON.stringify(obj, (key, value: any) => {
         if (typeof value === "object" && value !== null) {
           if (seen.has(value)) {
             return "[Circular]";

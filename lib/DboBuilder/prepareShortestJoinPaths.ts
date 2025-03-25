@@ -36,7 +36,7 @@ export async function prepareShortestJoinPaths(dboBuilder: DboBuilder): Promise<
 
     // Validate joins
     try {
-      const tovNames = dboBuilder.tablesOrViews!.map((t) => t.name);
+      const tovNames = dboBuilder.tablesOrViews.map((t) => t.name);
 
       // 2 find incorrect tables
       const missing = joins.flatMap((j) => j.tables).find((t) => !tovNames.includes(t));
@@ -60,7 +60,7 @@ export async function prepareShortestJoinPaths(dboBuilder: DboBuilder): Promise<
 
             const tov = dboBuilder.tablesOrViews!.find((_t) => _t.name === t);
             if (!tov) throw "Table not found: " + t;
-            const m1 = f.filter((k) => !tov!.columns.map((c) => c.name).includes(k));
+            const m1 = f.filter((k) => !tov.columns.map((c) => c.name).includes(k));
             if (m1.length) {
               throw `Table ${t}(${tov.columns.map((c) => c.name).join()}) has no fields named: ${m1.join()}`;
             }
@@ -77,7 +77,7 @@ export async function prepareShortestJoinPaths(dboBuilder: DboBuilder): Promise<
 
       const it = joins.find((j) => !JOIN_TYPES.includes(j.type));
       if (it) throw "Incorrect join type for: " + JSON.stringify(it, null, 2) + expected_types;
-    } catch (e) {
+    } catch (e: any) {
       const errMsg =
         ((joinConfig as any) === "inferred" ? "INFERRED " : "") +
         "JOINS VALIDATION ERROR \n-> " +
@@ -94,11 +94,11 @@ export async function prepareShortestJoinPaths(dboBuilder: DboBuilder): Promise<
 
       if (t1 === t2) return;
 
-      joinGraph![t1] ??= {};
-      joinGraph![t1]![t2] = 1;
+      joinGraph[t1] ??= {};
+      joinGraph[t1]![t2] = 1;
 
-      joinGraph![t2] ??= {};
-      joinGraph![t2]![t1] = 1;
+      joinGraph[t2] ??= {};
+      joinGraph[t2]![t1] = 1;
     });
     const tables = Array.from(new Set(joins.flatMap((t) => t.tables)));
     const shortestJoinPaths: JoinPaths = [];
@@ -154,7 +154,7 @@ const arrayValuesMatch = <T>(arr1: T[], arr2: T[]): boolean => {
   return arr1.slice().sort().join() === arr2.slice().sort().join();
 };
 
-async function getInferredJoins2(schema: TableSchema[]): Promise<Join[]> {
+function getInferredJoins2(schema: TableSchema[]): Join[] {
   const joins: Join[] = [];
   const upsertJoin = (
     t1: string,

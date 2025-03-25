@@ -2,9 +2,9 @@ import { SQLResult, asName } from "prostgles-types";
 import { omitKeys, tryCatch, tryCatchV2 } from "prostgles-types/dist/util";
 import { DboBuilder } from "../DboBuilder/DboBuilder";
 import { DBorTx } from "../Prostgles";
+import { ProstglesInitOptions } from "../ProstglesTypes";
 import { clone } from "../utils";
 import { TableSchema, TableSchemaColumn } from "./DboBuilderTypes";
-import { ProstglesInitOptions } from "../ProstglesTypes";
 import { getFkeys } from "./getFkeys";
 import { getMaterialViews } from "./getMaterialViews";
 
@@ -42,7 +42,12 @@ export async function getTablesForSchemaPostgresSQL(
     } = await getFkeys(t, { sql, schemaNames });
 
     const uniqueColsReq = await tryCatchV2(async () => {
-      const res = (await t.any(`
+      const res: {
+        table_name: string;
+        table_schema: string;
+        index_name: string;
+        column_names: string[];
+      }[] = await t.any(`
         select
             t.relname as table_name,
             (SELECT pnm.nspname FROM pg_catalog.pg_namespace pnm WHERE pnm.oid =  i.relnamespace) as table_schema,
@@ -64,12 +69,7 @@ export async function getTablesForSchemaPostgresSQL(
         order by
             t.relname,
             i.relname;
-      `)) as {
-        table_name: string;
-        table_schema: string;
-        index_name: string;
-        column_names: string[];
-      }[];
+      `);
 
       return res;
     });
@@ -78,7 +78,7 @@ export async function getTablesForSchemaPostgresSQL(
       throw uniqueColsReq.error;
     }
 
-    const badFkey = fkeys.find((r) => r.fcols.includes(null as any));
+    const badFkey = fkeys.find((r) => r.fcols.find((fc) => typeof fc !== "string"));
     if (badFkey) {
       throw `Invalid table column schema. Null or empty fcols for ${JSON.stringify(fkeys)}`;
     }
@@ -203,17 +203,14 @@ export async function getTablesForSchemaPostgresSQL(
         --GROUP BY t.table_schema, t.table_name, t.is_view, t.view_definition, t.oid
         ORDER BY schema, name
         `;
-      const tablesAndViews = ((await t.any(query, { schemaNames })) as TableSchema[]).map(
-        (table) => {
-          table.columns = clone(getTVColumns.columns)
-            .filter((c) => c.table_oid === table.oid)
-            .map((c) => omitKeys(c, ["table_oid"]));
-          table.parent_tables =
-            getViewParentTables.parent_tables?.find((vr) => vr.oid === table.oid)?.table_names ??
-            [];
-          return table;
-        }
-      );
+      const tablesAndViews = (await t.any(query, { schemaNames })).map((table: TableSchema) => {
+        table.columns = clone(getTVColumns.columns)
+          .filter((c) => c.table_oid === table.oid)
+          .map((c) => omitKeys(c, ["table_oid"]));
+        table.parent_tables =
+          getViewParentTables.parent_tables?.find((vr) => vr.oid === table.oid)?.table_names ?? [];
+        return table;
+      });
       return { tablesAndViews };
     });
     if (getTablesAndViews.error || !getTablesAndViews.tablesAndViews) {
@@ -354,7 +351,9 @@ export async function getTablesForSchemaPostgresSQL(
  */
 const getHyperTables = async (db: DBorTx): Promise<string[] | undefined> => {
   const schema = "_timescaledb_catalog";
-  const res = await db.oneOrNone(
+  const res: {
+    exists: boolean;
+  } | null = await db.oneOrNone(
     "SELECT EXISTS( \
       SELECT * \
       FROM information_schema.tables \
@@ -364,7 +363,7 @@ const getHyperTables = async (db: DBorTx): Promise<string[] | undefined> => {
     );",
     { schema }
   );
-  if (res.exists) {
+  if (res?.exists) {
     const tables: { table_name: string }[] = await db.any(
       "SELECT table_name FROM " + asName(schema) + ".hypertable;"
     );

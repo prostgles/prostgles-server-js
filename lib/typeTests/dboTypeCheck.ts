@@ -83,7 +83,7 @@ export const testDboTypes = () => {
             //@ts-expect-error
             bad_col: 1,
           },
-          validate: async (row) => ({
+          validate: (row) => ({
             ...row,
             h: [""],
           }),

@@ -173,15 +173,15 @@ const parseOrderObj = (
     );
   }
   /* { key2: true, key1: false } */
-  if (!Object.values(orderBy).find((v) => ![true, false].includes(<any>v))) {
+  if (!Object.values(orderBy).find((v) => ![true, false].includes(v))) {
     return keys.map((key) => ({ key, asc: Boolean(orderBy[key]) }));
 
     /* { key2: -1, key1: 1 } */
-  } else if (!Object.values(orderBy).find((v) => ![-1, 1].includes(<any>v))) {
+  } else if (!Object.values(orderBy).find((v) => ![-1, 1].includes(v))) {
     return keys.map((key) => ({ key, asc: orderBy[key] === 1 }));
 
     /* { key2: "asc", key1: "desc" } */
-  } else if (!Object.values(orderBy).find((v) => !["asc", "desc"].includes(<any>v))) {
+  } else if (!Object.values(orderBy).find((v) => !["asc", "desc"].includes(v))) {
     return keys.map((key) => ({ key, asc: orderBy[key] === "asc" }));
   } else return throwErr(orderBy);
 };

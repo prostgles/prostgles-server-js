@@ -1,18 +1,17 @@
 import {
-  asName as _asName,
-  AnyObject,
-  TableInfo,
-  ALLOWED_EXTENSION,
   ALLOWED_CONTENT_TYPE,
+  ALLOWED_EXTENSION,
+  AnyObject,
+  ColumnInfo,
   isObject,
   JSONB,
-  ColumnInfo,
+  TableInfo,
 } from "prostgles-types";
-import { isPlainObject, JoinInfo, LocalParams } from "../DboBuilder/DboBuilder";
-import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
-import { InsertRule, ValidateRowArgs } from "../PublishParser/PublishParser";
+import { JoinInfo, LocalParams } from "../DboBuilder/DboBuilder";
 import { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { uploadFile } from "../DboBuilder/uploadFile";
+import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
+import { InsertRule, ValidateRowArgs } from "../PublishParser/PublishParser";
 import { initTableConfig } from "./initTableConfig";
 
 type ColExtraInfo = {
@@ -21,21 +20,18 @@ type ColExtraInfo = {
   hint?: string;
 };
 
-export type I18N_Config<LANG_IDS> = {
-  [lang_id in keyof LANG_IDS]: string;
-};
+type LangToTranslation = Record<string, string>;
 
-export const parseI18N = <LANG_IDS, Def extends string | undefined>(params: {
-  config?: I18N_Config<LANG_IDS> | string;
-  lang?: keyof LANG_IDS | string;
-  defaultLang: keyof LANG_IDS | string;
-  defaultValue: Def;
-}): Def | string => {
+export const parseI18N = <Config extends LangToTranslation>(params: {
+  config?: Config | string;
+  lang?: string;
+  defaultLang: string;
+  defaultValue: string | undefined;
+}): undefined | string => {
   const { config, lang, defaultLang, defaultValue } = params;
   if (config) {
-    if (isPlainObject(config)) {
-      //@ts-ignore
-      return config[lang] ?? config[defaultLang];
+    if (isObject(config)) {
+      return config[lang ?? defaultLang] ?? config[defaultLang];
     } else if (typeof config === "string") {
       return config;
     }
@@ -44,9 +40,9 @@ export const parseI18N = <LANG_IDS, Def extends string | undefined>(params: {
   return defaultValue;
 };
 
-type BaseTableDefinition<LANG_IDS = AnyObject> = {
+type BaseTableDefinition = {
   info?: {
-    label?: string | I18N_Config<LANG_IDS>;
+    label?: string | LangToTranslation;
   };
   dropIfExistsCascade?: boolean;
   dropIfExists?: boolean;
@@ -138,12 +134,7 @@ type TextColumn = BaseColumnTypes & {
   lowerCased?: boolean;
 };
 
-export type JSONBColumnDef = (BaseColumnTypes & {
-  /**
-   * If the new schema CHECK fails old rows the update old rows using this function
-   */
-  // onMigrationFail?: <T>(failedRow: T) => AnyObject | Promise<AnyObject>;
-}) &
+export type JSONBColumnDef = BaseColumnTypes &
   (
     | {
         jsonbSchema: JSONB.JSONBSchema;
@@ -333,17 +324,17 @@ type GetPreInsertRowArgs = Omit<ValidateRowArgs, "localParams"> & {
  * Helper utility to create lookup tables for TEXT columns
  */
 export type TableConfig<LANG_IDS = { en: 1 }> = {
-  [table_name: string]: BaseTableDefinition<LANG_IDS> &
+  [table_name: string]: BaseTableDefinition &
     (TableDefinition<LANG_IDS> | LookupTableDefinition<LANG_IDS>);
 };
 
 /**
  * Will be run between initSQL and fileTable
  */
-export default class TableConfigurator<LANG_IDS = { en: 1 }> {
+export default class TableConfigurator {
   instanceId = Date.now() + Math.random();
 
-  config: TableConfig<LANG_IDS> = {};
+  config: TableConfig = {};
   get dbo(): DBHandlerServer {
     if (!this.prostgles.dbo) throw "this.prostgles.dbo missing";
     return this.prostgles.dbo;
@@ -355,12 +346,12 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
   prostgles: Prostgles;
 
   constructor(prostgles: Prostgles) {
-    this.config = (prostgles.opts.tableConfig as any) ?? {};
+    this.config = prostgles.opts.tableConfig ?? {};
     this.prostgles = prostgles;
   }
 
   destroy = async () => {
-    for await (const { onUnmount } of Object.values(this.tableOnMounts)) {
+    for (const { onUnmount } of Object.values(this.tableOnMounts)) {
       try {
         await onUnmount();
       } catch (error) {
@@ -369,7 +360,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     }
   };
 
-  tableOnMounts: Record<string, { onUnmount: () => void }> = {};
+  tableOnMounts: Record<string, { onUnmount: () => void | Promise<void> }> = {};
   setTableOnMounts = async () => {
     this.tableOnMounts = {};
     for (const [tableName, tableConfig] of Object.entries(this.config)) {
@@ -397,7 +388,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     const tconf = this.config[params.tableName];
 
     return {
-      label: parseI18N<LANG_IDS, string>({
+      label: parseI18N({
         config: tconf?.info?.label,
         lang: params.lang,
         defaultLang: "en",
@@ -448,7 +439,7 @@ export default class TableConfigurator<LANG_IDS = { en: 1 }> {
     return result;
   };
 
-  checkColVal = (params: { col: string; table: string; value: any }): void => {
+  checkColVal = (params: { col: string; table: string; value?: number | string }): void => {
     const conf = this.getColInfo(params);
     if (conf) {
       const { value } = params;

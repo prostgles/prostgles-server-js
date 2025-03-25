@@ -8,10 +8,7 @@ type InsertTestArgs = {
   tableRules: TableRule | undefined;
   localParams: LocalParams | undefined;
 };
-export async function insertTest(
-  this: TableHandler,
-  { localParams, tableRules }: InsertTestArgs,
-) {
+export async function insertTest(this: TableHandler, { localParams, tableRules }: InsertTestArgs) {
   const { testRule } = localParams || {};
 
   const ACTION = "insert";
@@ -30,11 +27,9 @@ export async function insertTest(
     fields = tableRules[ACTION].fields;
 
     /* If no returning fields specified then take select fields as returning or the allowed insert fields */
-    if (!returningFields)
-      returningFields = tableRules.select?.fields || tableRules.insert.fields;
+    if (!returningFields) returningFields = tableRules.select?.fields || tableRules.insert.fields;
 
-    if (!fields)
-      throw ` invalid insert rule for ${this.name} -> fields missing `;
+    if (!fields) throw ` invalid insert rule for ${this.name} -> fields missing `;
 
     /* Safely test publish rules */
     if (testRule) {
@@ -56,14 +51,13 @@ export async function insertTest(
         if (keys.length) {
           const dataCols = keys.filter((k) => this.column_names.includes(k));
           const nestedInsertCols = keys.filter(
-            (k) =>
-              !this.column_names.includes(k) && this.dboBuilder.dbo[k]?.insert,
+            (k) => !this.column_names.includes(k) && this.dboBuilder.dbo[k]?.insert
           );
           if (nestedInsertCols.length) {
             throw `Nested insert not supported for forcedData rule: ${nestedInsertCols}`;
           }
           const badCols = keys.filter(
-            (k) => !dataCols.includes(k) && !nestedInsertCols.includes(k),
+            (k) => !dataCols.includes(k) && !nestedInsertCols.includes(k)
           );
           if (badCols.length) {
             throw `Invalid columns found in forced filter: ${badCols.join(", ")}`;
@@ -76,7 +70,7 @@ export async function insertTest(
                     (k) =>
                       asValue(forcedData![k]) +
                       "::" +
-                      this.columns.find((c) => c.name === k)!.udt_name,
+                      this.columns.find((c) => c.name === k)!.udt_name
                   )
                   .join(", ") +
                 ")",
@@ -85,10 +79,10 @@ export async function insertTest(
               "EXPLAIN INSERT INTO " +
                 this.escapedName +
                 " (${colNames:raw}) SELECT * FROM ( VALUES ${values:raw} ) t WHERE FALSE;",
-              { colNames, values },
+              { colNames, values }
             );
             await this.db.any(query);
-          } catch (e) {
+          } catch (e: any) {
             throw (
               "\nissue with forcedData: \nVALUE: " +
               JSON.stringify(forcedData, null, 2) +

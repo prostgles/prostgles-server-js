@@ -89,7 +89,7 @@ export class QueryStreamer {
     delete this.socketQueries[socketId];
   };
 
-  create = async (query: ClientStreamedRequest): Promise<SocketSQLStreamServer> => {
+  create = (query: ClientStreamedRequest): SocketSQLStreamServer => {
     const { socket, persistConnection } = query;
     const socketId = socket.id;
     const id = getSetShortSocketId(socketId);
@@ -298,7 +298,7 @@ export class QueryStreamer {
 
             await startStream(persistedClient.client, {
               ...query,
-              query: _data!.query!,
+              query: _data!.query,
             });
           } else {
             await startStream(undefined, query);

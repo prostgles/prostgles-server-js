@@ -14,10 +14,10 @@ import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
 import { DB } from "../Prostgles";
 import { addSync } from "./addSync";
 import { addTrigger } from "./addTrigger";
+import { deleteOrphanedTriggers } from "./deleteOrphanedTriggers";
 import { initialiseEventTriggers } from "./initialiseEventTriggers";
 import { initPubSubManager } from "./initPubSubManager";
 import { refreshTriggers } from "./refreshTriggers";
-import { deleteOrphanedTriggers } from "./deleteOrphanedTriggers";
 
 import * as pgPromise from "pg-promise";
 import pg from "pg-promise/typescript/pg-subset";
@@ -47,6 +47,7 @@ export const DEFAULT_SYNC_BATCH_SIZE = 50;
 
 export const log = (...args: any[]) => {
   if (process.env.TEST_TYPE) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     console.log(...args);
   }
 };
@@ -191,7 +192,7 @@ export class PubSubManager {
    * Updated through refreshTriggers()
    */
   _triggers: PubSubManagerTriggers = {};
-  sockets: AnyObject = {};
+  sockets: Record<string, PRGLIOSocket> = {};
 
   subs: Subscription[] = [];
   syncs: SyncParams[] = [];

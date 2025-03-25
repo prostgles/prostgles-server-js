@@ -40,7 +40,7 @@ export type ClientExpressData = ClientSyncInfo & {
 };
 
 function getNumbers(numberArr: (null | undefined | string | number)[]): number[] {
-  return numberArr.filter((v) => v !== null && v !== undefined && Number.isFinite(+v)) as any;
+  return numberArr.filter((v) => v !== null && v !== undefined && Number.isFinite(+v)) as number[];
 }
 
 /**
@@ -150,7 +150,7 @@ export async function syncData(
           offset: offset || 0,
           limit: batch_size,
         };
-        socket.emit(channel_name, { onPullRequest }, async (resp?: { data?: AnyObject[] }) => {
+        socket.emit(channel_name, { onPullRequest }, (resp?: { data?: AnyObject[] }) => {
           if (resp && resp.data && Array.isArray(resp.data)) {
             // console.log({ onPullRequest, resp }, socket._user)
             resolve(sortClientData(resp.data));

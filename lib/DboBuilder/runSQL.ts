@@ -41,7 +41,7 @@ export async function runSQL(
   if (returnType === "stream") {
     if (localParams?.tx) throw "Cannot use stream with localParams transaction";
     if (!socket) throw "stream allowed only with client socket";
-    const streamInfo = await this.queryStreamer.create({
+    const streamInfo = this.queryStreamer.create({
       socket,
       query: pgp.as.format(queryWithRLS, args),
       options,
@@ -49,12 +49,12 @@ export async function runSQL(
     return streamInfo;
   } else if (returnType === "noticeSubscription") {
     if (!socket) throw "noticeSubscription allowed only with client socket";
-    return await this.prostgles.dbEventsManager?.addNotice(socket);
+    return this.prostgles.dbEventsManager?.addNotice(socket);
   } else if (returnType === "statement") {
     try {
       return pgp.as.format(queryWithoutRLS, args);
-    } catch (err) {
-      throw (err as any).toString();
+    } catch (err: any) {
+      throw err.toString();
     }
   }
 

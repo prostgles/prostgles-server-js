@@ -1,6 +1,6 @@
 import { PubSubManager } from "./PubSubManager";
 
-export async function deleteOrphanedTriggers(this: PubSubManager, tableName: string) {
+export function deleteOrphanedTriggers(this: PubSubManager, tableName: string) {
   const activeConditions = (this.getTriggerInfo(tableName) ?? []).filter(
     (c) => c.subs.length || c.syncs.length
   );

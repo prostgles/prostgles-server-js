@@ -39,7 +39,7 @@ export async function getCondition(
     isHaving,
   } = params;
 
-  const filter = { ...(rawFilter as any) } as any;
+  const filter = { ...(rawFilter) };
 
   const existsConfigs = getExistsFilters(filter, this);
 
@@ -96,9 +96,9 @@ export async function getCondition(
           // ctidField: this.is_view? undefined : "ctid"
 
           ctidField: undefined,
-        }) + ` = ${pgp.as.format("$1", [(filter as any)[key]])}`
+        }) + ` = ${pgp.as.format("$1", [(filter)[key]])}`
       );
-      delete (filter as any)[key];
+      delete (filter)[key];
     }
   });
 

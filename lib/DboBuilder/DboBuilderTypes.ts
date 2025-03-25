@@ -92,10 +92,10 @@ export type Media = {
 export type ParsedMedia = Required<Pick<Media, "extension" | "content_type">>;
 
 export type TxCB<TH = DbTxTableHandlers> = {
-  (t: TH & Pick<DBHandlerServer, "sql">, _t: pgPromise.ITask<{}>): any | void;
+  (t: TH & Pick<DBHandlerServer, "sql">, _t: pgPromise.ITask<{}>): any;
 };
 export type TX<TH = TableHandlers> = {
-  (t: TxCB<TH>): Promise<any | void>;
+  (t: TxCB<TH>): Promise<any>;
 };
 
 export type TableHandlers = {

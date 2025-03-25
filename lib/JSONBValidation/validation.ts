@@ -15,9 +15,14 @@ export function validate<T>(obj: T, key: keyof T, rawFieldType: JSONB.FieldType)
   if ("type" in fieldType && fieldType.type) {
     if (typeof fieldType.type !== "string") {
       getKeys(fieldType.type).forEach((subKey) => {
-        validate(val, subKey as any, (fieldType.type as JSONB.ObjectType["type"])[subKey]!);
+        validate(
+          val,
+          subKey as keyof typeof val,
+          (fieldType.type as JSONB.ObjectType["type"])[subKey]!
+        );
       });
     }
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string, @typescript-eslint/restrict-plus-operands
     err += fieldType.type;
     if (fieldType.type === "boolean" && typeof val !== fieldType.type) throw new Error(err);
     if (fieldType.type === "string" && typeof val !== fieldType.type) throw new Error(err);

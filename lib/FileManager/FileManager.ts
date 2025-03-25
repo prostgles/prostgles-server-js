@@ -341,7 +341,7 @@ export const removeExpressRouteByName = (app: ExpressApp | undefined, name: stri
 
 export const getFileTypeFromFilename = (
   fileName: string
-): { mime: ALLOWED_CONTENT_TYPE; ext: ALLOWED_EXTENSION | string } | undefined => {
+): { mime: ALLOWED_CONTENT_TYPE; ext: ALLOWED_EXTENSION } | undefined => {
   const nameParts = fileName.split(".");
 
   if (nameParts.length < 2) return undefined;

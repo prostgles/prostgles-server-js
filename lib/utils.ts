@@ -4,7 +4,7 @@ export const clone = <T extends any[] | Record<string, any>>(obj: T): T => {
     return structuredClone(obj);
   }
 
-  return JSON.parse(JSON.stringify(obj));
+  return JSON.parse(JSON.stringify(obj)) as T;
 };
 
 export const sleep = function (ms: number) {

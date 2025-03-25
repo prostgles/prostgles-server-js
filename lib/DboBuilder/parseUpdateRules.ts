@@ -1,9 +1,4 @@
-import {
-  AnyObject,
-  FieldFilter,
-  isDefined,
-  UpdateParams,
-} from "prostgles-types";
+import { AnyObject, FieldFilter, isDefined, UpdateParams } from "prostgles-types";
 import { Filter, LocalParams } from "./DboBuilder";
 import {
   TableRule,
@@ -23,7 +18,7 @@ export async function parseUpdateRules(
   filter: Filter,
   params?: UpdateParams,
   tableRules?: TableRule,
-  localParams?: LocalParams,
+  localParams?: LocalParams
 ): Promise<{
   fields: string[];
   validateRow?: ValidateRowBasic;
@@ -49,11 +44,9 @@ export async function parseUpdateRules(
 
   if (tableRules) {
     if (!tableRules.update) throw "update rules missing for " + this.name;
-    ({ forcedFilter, forcedData, fields, filterFields, validate } =
-      tableRules.update);
+    ({ forcedFilter, forcedData, fields, filterFields, validate } = tableRules.update);
 
-    returningFields =
-      tableRules.update.returningFields ?? tableRules.select?.fields ?? "";
+    returningFields = tableRules.update.returningFields ?? tableRules.select?.fields ?? "";
 
     if (!returningFields && params?.returning) {
       throw "You are not allowed to return any fields from the update";
@@ -79,10 +72,7 @@ export async function parseUpdateRules(
        * updates must target records from a specific dynamicFields.filter or not match any dynamicFields.filter
        */
       if (testRule) {
-        for await (const [
-          dfIndex,
-          dfRule,
-        ] of tableRules.update.dynamicFields.entries()) {
+        for await (const [dfIndex, dfRule] of tableRules.update.dynamicFields.entries()) {
           /**
            * Validated filter and fields
            */
@@ -94,9 +84,7 @@ export async function parseUpdateRules(
             tableRule: tableRules,
           });
           if (!condition.where) {
-            throw (
-              "dynamicFields.filter cannot be empty: " + JSON.stringify(dfRule)
-            );
+            throw "dynamicFields.filter cannot be empty: " + JSON.stringify(dfRule);
           }
           await this.validateViewRules({
             fields: dfRule.fields,
@@ -110,17 +98,9 @@ export async function parseUpdateRules(
           await this.find(dfRule.filter, { limit: 0 });
 
           /** Ensure dynamicFields filters do not overlap */
-          for await (const [
-            _dfIndex,
-            _dfRule,
-          ] of tableRules.update.dynamicFields.entries()) {
+          for await (const [_dfIndex, _dfRule] of tableRules.update.dynamicFields.entries()) {
             if (dfIndex !== _dfIndex) {
-              if (
-                await this.findOne(
-                  { $and: [dfRule.filter, _dfRule.filter] },
-                  { select: "" },
-                )
-              ) {
+              if (await this.findOne({ $and: [dfRule.filter, _dfRule.filter] }, { select: "" })) {
                 throw `dynamicFields.filter cannot overlap each other. \n
                                 Overlapping dynamicFields rules:
                                     ${JSON.stringify(dfRule)} 
@@ -134,14 +114,10 @@ export async function parseUpdateRules(
       }
 
       /** Pick dynamicFields.fields if matching filter */
-      let matchedRule:
-        | Required<UpdateRule>["dynamicFields"][number]
-        | undefined;
-      for await (const dfRule of tableRules.update.dynamicFields) {
+      let matchedRule: Required<UpdateRule>["dynamicFields"][number] | undefined;
+      for (const dfRule of tableRules.update.dynamicFields) {
         const match = await this.findOne({
-          $and: ([finalUpdateFilter, dfRule.filter] as AnyObject[]).filter(
-            isDefined,
-          ),
+          $and: ([finalUpdateFilter, dfRule.filter] as AnyObject[]).filter(isDefined),
         });
 
         if (match) {
@@ -202,7 +178,7 @@ export async function parseUpdateRules(
           ).getQuery();
           const query = updateQ + " WHERE FALSE ";
           await this.db.any("EXPLAIN " + query);
-        } catch (e) {
+        } catch (e: any) {
           throw (
             " issue with forcedData: \nVALUE: " +
             JSON.stringify(forcedData, null, 2) +

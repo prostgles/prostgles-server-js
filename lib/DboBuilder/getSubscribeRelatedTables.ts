@@ -128,7 +128,7 @@ export async function getSubscribeRelatedTables(
           `);
 
             const relatedTableSubscription = {
-              tableName: tableName!,
+              tableName: tableName,
               tableNameEscaped,
               condition: fullCondition,
             };
@@ -215,7 +215,7 @@ export async function getSubscribeRelatedTables(
         tableName: relatedTableName,
         tableNameEscaped: asName(relatedTableName),
         condition: (
-          await relatedTableOrViewHandler!.prepareWhere!({
+          await relatedTableOrViewHandler.prepareWhere!({
             select: undefined,
             filter: {
               $existsJoined: {

@@ -40,14 +40,14 @@ type ParsedJoin =
   | { type: "simple"; params: SimpleJoinSelect }
   | { type?: undefined; error: string };
 
-const parseJoinSelect = (joinParams: string | JoinSelect): ParsedJoin => {
-  if (!joinParams) {
+const parseJoinSelect = (joinParams: JoinSelect): ParsedJoin => {
+  if (!(joinParams as string)) {
     return {
       error: "Empty join params",
     };
   }
   if (typeof joinParams === "string") {
-    if (joinParams !== "*") {
+    if ((joinParams as string) !== "*") {
       throw "Join select can be * or { field: 1 }";
     }
     return {

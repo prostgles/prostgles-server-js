@@ -1,17 +1,17 @@
-import { asName as _asName } from "prostgles-types";
+import { asName as _asName, type AnyObject } from "prostgles-types";
 import { PubSubManager, asValue, log } from "../PubSubManager/PubSubManager";
+import type { OnReadyCallbackBasic } from "../initProstgles";
 import TableConfigurator from "./TableConfig";
 import {
   getColConstraints,
   getConstraintDefinitionQueries,
 } from "./getConstraintDefinitionQueries";
 import { getFutureTableSchema } from "./getFutureTableSchema";
-import { getTableColumnQueries } from "./getTableColumnQueries";
 import { getPGIndexes } from "./getPGIndexes";
+import { getTableColumnQueries } from "./getTableColumnQueries";
 import { runMigrations } from "./runMigrations";
-import { getMigrationQueries } from "./getMigrationQueries";
 
-export const initTableConfig = async function (this: TableConfigurator<any>) {
+export const initTableConfig = async function (this: TableConfigurator) {
   let changedSchema = false;
   const failedQueries: { query: string; error: any }[] = [];
   this.initialising = true;
@@ -57,7 +57,7 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
     throw "pgp missing";
   }
 
-  const MAX_IDENTIFIER_LENGTH = +((await this.db.one("SHOW max_identifier_length;")) as any)
+  const MAX_IDENTIFIER_LENGTH = +(await this.db.one("SHOW max_identifier_length;"))
     .max_identifier_length;
   if (!Number.isFinite(MAX_IDENTIFIER_LENGTH))
     throw `Could not obtain a valid max_identifier_length`;
@@ -314,14 +314,15 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
 
     try {
       await runQueries(queries);
-    } catch (err: any) {
+    } catch (errRaw: any) {
+      const err = errRaw as AnyObject;
       this.initialising = false;
 
       console.error("TableConfig error: ", err);
       if (err.position) {
         const pos = +err.position;
         if (Number.isInteger(pos)) {
-          return Promise.reject(err.toString() + "\n At:" + q.slice(pos - 50, pos + 50));
+          return Promise.reject((err as Error).toString() + "\n At:" + q.slice(pos - 50, pos + 50));
         }
       }
 
@@ -340,7 +341,7 @@ export const initTableConfig = async function (this: TableConfigurator<any>) {
     if (!this.prevInitQueryHistory) {
       this.prevInitQueryHistory = queryHistory;
     } else if (this.prevInitQueryHistory.join() !== queryHistory.join()) {
-      void this.prostgles.init(this.prostgles.opts.onReady as any, {
+      void this.prostgles.init(this.prostgles.opts.onReady as OnReadyCallbackBasic, {
         type: "TableConfig",
       });
     } else {

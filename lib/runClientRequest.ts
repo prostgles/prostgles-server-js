@@ -1,4 +1,11 @@
-import { SQLRequest, TableHandler, UserLike, getKeys, pickKeys } from "prostgles-types";
+import {
+  SQLRequest,
+  TableHandler,
+  UserLike,
+  getKeys,
+  pickKeys,
+  type AnyObject,
+} from "prostgles-types";
 import { AuthClientRequest } from "./Auth/AuthTypes";
 import { LocalParams } from "./DboBuilder/DboBuilder";
 import { TableHandler as TableHandlerServer } from "./DboBuilder/TableHandler/TableHandler";
@@ -65,7 +72,7 @@ export const runClientRequest = async function (
   if (!clientReq.socket && SOCKET_ONLY_COMMANDS.some((v) => v === command)) {
     throw (
       "The following commands cannot be completed over a non-websocket connection: " +
-      SOCKET_ONLY_COMMANDS
+      SOCKET_ONLY_COMMANDS.join(", ")
     );
   }
 
@@ -119,7 +126,7 @@ export const runClientRequest = async function (
     param3,
     validRules,
     localParams
-  );
+  ) as AnyObject | undefined;
   // This approach is breaking context
   // const result = await (tableCommand as TableMethodFunctionWithRulesAndLocalParams)(param1, param2, param3, validRules, localParams);
   // return result;
@@ -174,13 +181,16 @@ export const runClientMethod = async function (
   const { method, params = [] } = reqArgs;
   const methods = await this.publishParser?.getAllowedMethods(clientReq, undefined);
 
-  if (!methods || !methods[method]) {
+  const methodDef = methods?.[method];
+  if (!methods || !methodDef) {
     throw "Disallowed/missing method " + JSON.stringify(method);
   }
 
-  const methodDef = methods[method]!;
   const onRun =
-    typeof methodDef === "function" || typeof (methodDef as any).then === "function" ?
+    (
+      typeof methodDef === "function" ||
+      typeof (methodDef as unknown as Promise<void>).then === "function"
+    ) ?
       (methodDef as (...args: any) => Promise<void>)
     : methodDef.run;
   const res = await onRun(...params);

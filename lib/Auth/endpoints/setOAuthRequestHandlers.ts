@@ -46,7 +46,7 @@ export function setOAuthRequestHandlers(
           ...config,
           callbackURL: `${websiteUrl}${callbackPath}`,
         },
-        async (accessToken, refreshToken, profile, done) => {
+        (accessToken, refreshToken, profile, done) => {
           // This callback is where you would normally store or retrieve user info from the database
           return done(null, profile, { accessToken, refreshToken, profile });
         }

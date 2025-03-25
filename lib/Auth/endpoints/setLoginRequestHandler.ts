@@ -6,7 +6,6 @@ import { LoginParams } from "../AuthTypes";
 export type LoginResponse =
   | AuthResponse.OAuthRegisterSuccess
   | AuthResponse.OAuthRegisterFailure
-  | AuthResponse.PasswordLoginSuccess
   | AuthResponse.PasswordLoginFailure
   | AuthResponse.MagicLinkAuthFailure
   | AuthResponse.MagicLinkAuthSuccess

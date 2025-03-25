@@ -376,8 +376,8 @@ let PostGIS_Funcs: FunctionSpec[] = (
       geomQ = `ST_GeomFromText(${asValue(text)})`;
     } else if ([lat, lng].every((v) => Number.isFinite(v))) {
       geomQ = `ST_Point(${asValue(lng)}, ${asValue(lat)})`;
-    } else if (isPlainObject(geojson)) {
-      geomQ = `ST_GeomFromGeoJSON(${geojson})`;
+    } else if (isObject(geojson)) {
+      geomQ = `ST_GeomFromGeoJSON(${asValue(geojson)})`;
     } else mErr();
 
     if (Number.isFinite(srid)) {
@@ -938,7 +938,9 @@ export const FUNCTIONS: FunctionSpec[] = [
           const trunc = args[2];
           const allowedTruncs = ["second", "minute", "hour", "day", "month", "year"];
           if (trunc && !allowedTruncs.includes(trunc))
-            throw new Error("Incorrect trunc provided. Allowed values: " + allowedTruncs);
+            throw new Error(
+              "Incorrect trunc provided. Allowed values: " + allowedTruncs.join(", ")
+            );
           if (funcName === "difference" && validColCount !== 2)
             throw new Error("Must have two column names");
           if (![1, 2].includes(validColCount)) throw new Error("Must have one or two column names");

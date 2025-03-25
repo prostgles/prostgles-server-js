@@ -46,7 +46,7 @@ export const getExistsFilters = (
         }
         const res: ExistsFilterConfig = {
           isJoined: false,
-          existType: key as EXISTS_KEY,
+          existType: key,
           targetTableFilter: filterValue[firstKey],
           targetTable: firstKey,
         };
@@ -70,7 +70,7 @@ export const getExistsFilters = (
 
       return {
         isJoined: true,
-        existType: key as EXISTS_KEY,
+        existType: key,
         path,
         parsedPath: parseJoinPath({
           rawPath: path,

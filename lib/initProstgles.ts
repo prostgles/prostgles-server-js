@@ -121,7 +121,7 @@ export const initProstgles = async function (
   }
   this.checkDb();
 
-  const db = this.db!;
+  const db = this.db;
   const pgp = this.pgp!;
 
   /* 2. Execute any SQL file if provided */
@@ -175,7 +175,7 @@ export const initProstgles = async function (
 
     this.loaded = true;
     return {
-      db: this.dbo! as any,
+      db: this.dbo as DBOFullyTyped,
       _db: db,
       pgp,
       io: this.opts.io,
@@ -249,7 +249,7 @@ export const initProstgles = async function (
     };
   } catch (e: any) {
     console.trace(e);
-    throw "init issues: " + e.toString();
+    throw "init issues: " + (e as Error).toString();
   }
 };
 

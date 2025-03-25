@@ -332,7 +332,7 @@ export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
 export type LoginResponse =
   | {
       session: BasicSession;
-      response?: AuthResponse.PasswordLoginSuccess | AuthResponse.OAuthRegisterSuccess;
+      response?: AuthResponse.PasswordLoginSuccess  ;
     }
   | {
       session?: undefined;

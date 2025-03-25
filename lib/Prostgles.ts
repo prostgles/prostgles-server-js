@@ -241,7 +241,7 @@ export class Prostgles {
     return this.dbo;
   };
 
-  initRestApi = async () => {
+  initRestApi = () => {
     if (this.opts.restApi) {
       this.restApi = new RestApi({ prostgles: this, ...this.opts.restApi });
     } else {
@@ -374,7 +374,7 @@ export class Prostgles {
   }
 
   connectedSockets: PRGLIOSocket[] = [];
-  async setSocketEvents() {
+  setSocketEvents() {
     this.checkDb();
 
     if (!this.dbo) throw "dbo missing";
@@ -397,7 +397,9 @@ export class Prostgles {
     this.opts.io.removeAllListeners("connection");
     this.opts.io.on("connection", this.onSocketConnected);
     /** In some cases io will re-init with already connected sockets */
-    this.opts.io.sockets.sockets.forEach((socket) => this.onSocketConnected(socket));
+    this.opts.io.sockets.sockets.forEach((socket) => {
+      void this.onSocketConnected(socket);
+    });
   }
 
   onSocketConnected = onSocketConnected.bind(this);
@@ -509,7 +511,7 @@ export class Prostgles {
         socket.removeAllListeners(CHANNELS.SQL);
         socket.on(
           CHANNELS.SQL,
-          async (
+          (
             sqlRequestData: SQLRequest,
             cb = (..._callback: any) => {
               /* Empty */
@@ -533,7 +535,7 @@ export class Prostgles {
         data: { socketId: socket.id, clientSchema },
       });
       socket.emit(CHANNELS.SCHEMA, clientSchema);
-    } catch (err) {
+    } catch (err: any) {
       socket.emit(CHANNELS.SCHEMA, { err: getErrorAsObject(err) });
     }
   };
@@ -541,6 +543,6 @@ export class Prostgles {
 
 export async function getIsSuperUser(db: DB): Promise<boolean> {
   return db
-    .oneOrNone("select usesuper from pg_user where usename = CURRENT_USER;")
-    .then((r) => r.usesuper);
+    .oneOrNone<{ usesuper: boolean }>("select usesuper from pg_user where usename = CURRENT_USER;")
+    .then((r) => !!r?.usesuper);
 }

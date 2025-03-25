@@ -166,7 +166,7 @@ export class DboBuilder {
 
   _joins?: Join[];
   get joins(): Join[] {
-    return clone(this._joins ?? []).filter((j) => j.tables[0] !== j.tables[1]) as Join[];
+    return clone(this._joins ?? []).filter((j) => j.tables[0] !== j.tables[1]);
   }
 
   set joins(j: Join[]) {

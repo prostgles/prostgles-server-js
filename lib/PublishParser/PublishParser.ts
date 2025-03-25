@@ -30,6 +30,7 @@ export class PublishParser {
     this.prostgles = prostgles;
     this.publish = prostgles.opts.publish;
     this.publishMethods = prostgles.opts.publishMethods;
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     this.publishRawSQL = prostgles.opts.publishRawSQL;
     const { dbo, db } = prostgles;
     if (!dbo || !db) throw "INTERNAL ERROR: dbo and/or db missing";

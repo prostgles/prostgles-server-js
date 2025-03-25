@@ -210,7 +210,7 @@ export async function insertNestedRecords(
             );
 
             if (!path.length) {
-              throw "Nested inserts join path not found for " + [this.name, targetTable];
+              throw "Nested inserts join path not found for " + [this.name, targetTable].join(", ");
             } else if (path.length === 2) {
               if (targetTable !== tbl2) throw "Did not expect this";
 
@@ -331,18 +331,19 @@ export const getInsertTableRules = async (
     command: "insert",
     clientReq,
   });
-  if (!childRules || !childRules.insert) throw "Dissallowed nested insert into table " + childRules;
+  if (!childRules || !childRules.insert)
+    throw "Dissallowed nested insert into table " + targetTable;
   return childRules;
 };
 
-const getJoinPath = async (
+const getJoinPath = (
   tableHandler: TableHandler,
   targetTable: string
-): Promise<{
+): {
   t1: string;
   t2: string;
   path: string[];
-}> => {
+} => {
   const jp = tableHandler.dboBuilder.getShortestJoinPath(tableHandler, targetTable);
   if (!jp) {
     const pref =
@@ -361,7 +362,7 @@ const referencedInsert = async (
   targetTable: string,
   targetData: AnyObject | AnyObject[]
 ): Promise<AnyObject[]> => {
-  await getJoinPath(tableHandler, targetTable);
+  getJoinPath(tableHandler, targetTable);
 
   if (!dbTX?.[targetTable] || !("insert" in dbTX[targetTable]!)) {
     throw new Error("childInsertErr: Table handler missing for referenced table: " + targetTable);
@@ -371,7 +372,7 @@ const referencedInsert = async (
 
   return Promise.all(
     (Array.isArray(targetData) ? targetData : [targetData]).map((m) =>
-      (dbTX![targetTable] as TableHandler)
+      (dbTX[targetTable] as TableHandler)
         .insert(m, { returning: "*" }, undefined, childRules, localParams)
         .catch((e) => {
           return Promise.reject(e);

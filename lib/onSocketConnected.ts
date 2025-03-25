@@ -50,7 +50,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
     socket.removeAllListeners(CHANNELS.DEFAULT);
     socket.on(
       CHANNELS.DEFAULT,
-      async (
+      (
         args: SocketRequestParams,
         cb = (..._callback: any[]) => {
           /* Empty */
@@ -91,7 +91,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
     socket.removeAllListeners(CHANNELS.METHOD);
     socket.on(
       CHANNELS.METHOD,
-      async (
+      (
         { method, params }: SocketMethodRequest,
         cb = (..._callback: any) => {
           /* Empty */

@@ -133,7 +133,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
     if (!selItem) {
       return mErr(
         "Bad filter. Could not match to a column or alias or dot notation" +
-          select?.map((s) => s.alias)
+          select?.map((s) => s.alias).join(", ")
       );
     }
 
@@ -257,7 +257,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       return leftQ + " = " + parseRightVal(rightF);
     }
 
-    let filterValue = rightF[filterOperand];
+    let filterValue: string | null | number | Date | any[] = rightF[filterOperand];
     const ALLOWED_FUNCS = [...GeomFilter_Funcs, ...TextFilter_FullTextSearchFilterKeys] as const;
     let funcName: undefined | (typeof ALLOWED_FUNCS)[number];
     let funcArgs: undefined | any[];
@@ -319,6 +319,8 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
     } else if (["<=", "$lte"].includes(filterOperand)) {
       return leftQ + " <= " + parseRightVal(filterValue);
     } else if (["$in"].includes(filterOperand)) {
+      if (filterValue !== null && !Array.isArray(filterValue))
+        return mErr("In filter expects an array");
       if (!filterValue?.length) {
         return " FALSE ";
       }
@@ -334,6 +336,8 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       }
       return [c1, c2].filter((c) => c).join(" OR ");
     } else if (["$nin"].includes(filterOperand)) {
+      if (filterValue !== null && !Array.isArray(filterValue))
+        return mErr("In filter expects an array");
       if (!filterValue?.length) {
         return " TRUE ";
       }

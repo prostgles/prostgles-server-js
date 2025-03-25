@@ -19,7 +19,7 @@ export async function insert(
   param3_unused?: undefined,
   tableRules?: TableRule,
   localParams?: LocalParams
-): Promise<any | any[] | boolean> {
+): Promise<any> {
   const ACTION = "insert";
   const start = Date.now();
   try {

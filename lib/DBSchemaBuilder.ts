@@ -166,7 +166,7 @@ export type PublishFullyTyped<Schema = void> =
 
   const _auth: AuthConfig = {
     sidKeyName: "sid_token",
-    getUser: async (sid, db, _db) => {
+    getUser: (sid, db, _db) => {
       db.dwadaw?.find;
       return 1 as any;
     },
@@ -192,7 +192,7 @@ export type PublishFullyTyped<Schema = void> =
   const _test: DBSchema = c;
   const dbt: DBOFullyTyped<S> = 1 as any;
 
-  void dbt.tx!((t) => {
+  void dbt.tx((t) => {
     void t.tbl1.delete();
   });
 

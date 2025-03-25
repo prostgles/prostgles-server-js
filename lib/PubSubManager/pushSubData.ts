@@ -30,7 +30,7 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
   if (err) {
     onLog("error");
     if (socket_id) {
-      this.sockets[socket_id].emit(channel_name, { err });
+      this.sockets[socket_id]?.emit(channel_name, { err });
     }
     return true;
   }
@@ -44,7 +44,7 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
       if (socket_id && this.sockets[socket_id]) {
         log("Pushed " + data.length + " records to sub");
         onLog("Emiting to socket");
-        this.sockets[socket_id].emit(channel_name, { data }, () => {
+        this.sockets[socket_id]?.emit(channel_name, { data }, () => {
           resolve(data);
         });
         /* TO DO: confirm receiving data or server will unsubscribe
@@ -62,7 +62,7 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
       onLog("fetch data error");
       const errObj = { _err_msg: err.toString(), err };
       if (socket_id && this.sockets[socket_id]) {
-        this.sockets[socket_id].emit(channel_name, { err: errObj });
+        this.sockets[socket_id]?.emit(channel_name, { err: errObj });
       } else if (localFuncs) {
         if (!localFuncs.onError) {
           console.error("Uncaught subscription error", err);

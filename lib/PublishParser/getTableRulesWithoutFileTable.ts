@@ -119,7 +119,9 @@ export async function getTableRulesWithoutFileTable(
           if (
             is_view &&
             RULE_TO_METHODS.find(
-              (r) => r.table_only && (r.rule === method || (r.methods as any).includes(method))
+              (r) =>
+                r.table_only &&
+                (r.rule === method || (r.methods as readonly string[]).includes(method))
             )
           ) {
             extraInfo = "You've specified table rules to a view\n";
@@ -153,7 +155,7 @@ export async function getTableRulesWithoutFileTable(
         }
 
         /* Enable subscribe if not explicitly disabled OR if VIEW with referenced tables */
-        const subKey = "subscribe" as const;
+        const subKey = "subscribe";
 
         if (method === "select" && !dissallowedRuleKeys.includes(subKey)) {
           const sr = MY_RULES.find((r) => r.rule === subKey);

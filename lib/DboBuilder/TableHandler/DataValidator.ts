@@ -57,7 +57,7 @@ export class DataValidator {
   parse = async (args: ParseDataArgs) => {
     const { command } = args;
     const rowFieldData = await getValidatedRowFieldData(args, this.tableHandler);
-    const parsedRowFieldData = await getParsedRowFieldData(rowFieldData, args);
+    const parsedRowFieldData = getParsedRowFieldData(rowFieldData, args);
     if (command === "update") {
       if (rowFieldData.some((rowParts) => rowParts.length === 0)) {
         throw "Empty row. No data provided for update";
@@ -156,7 +156,7 @@ const getValidatedRow = ({
  * prepareFieldValues(): Apply forcedData, remove disallowed columns, validate against allowed columns
  * tableConfigurator?.checkColVal(): Validate column min/max/isText/lowerCased/trimmed values
  */
-export const prepareNewData = async ({
+export const prepareNewData = ({
   row,
   forcedData,
   allowedFields,
@@ -288,7 +288,7 @@ const getValidatedRowFieldData = async (
   return rowFieldData;
 };
 
-const getTextPatch = async (c: TableSchemaColumn, fieldValue: any) => {
+const getTextPatch = (c: TableSchemaColumn, fieldValue: any) => {
   if (
     c.data_type === "text" &&
     fieldValue &&
@@ -326,10 +326,7 @@ const getTextPatch = async (c: TableSchemaColumn, fieldValue: any) => {
   return undefined;
 };
 
-const getParsedRowFieldDataFunction = async (
-  rowPart: RowFieldDataFunction,
-  args: ParseDataArgs
-) => {
+const getParsedRowFieldDataFunction = (rowPart: RowFieldDataFunction, args: ParseDataArgs) => {
   const func = convertionFuncs.find((f) => `$${f.name}` === rowPart.funcName);
   if (!func) {
     throw `Unknown function: ${rowPart.funcName}. Expecting one of: ${convertionFuncs.map((f) => f.name).join(", ")}`;
@@ -340,33 +337,29 @@ const getParsedRowFieldDataFunction = async (
   return func.getQuery(rowPart);
 };
 
-const getParsedRowFieldData = async (rowFieldData: RowFieldData[][], args: ParseDataArgs) => {
-  const parsedRowFieldData = Promise.all(
-    rowFieldData.map((rowParts) => {
-      return Promise.all(
-        rowParts.map(async (rowPart) => {
-          let escapedVal: string;
-          if (rowPart.type === "function") {
-            escapedVal = await getParsedRowFieldDataFunction(rowPart, args);
-          } else {
-            /** Prevent pg-promise formatting jsonb */
-            const colIsJSON = ["json", "jsonb"].includes(rowPart.column.data_type);
-            escapedVal = pgp.as.format(colIsJSON ? "$1:json" : "$1", [rowPart.fieldValue]);
-          }
+const getParsedRowFieldData = (rowFieldData: RowFieldData[][], args: ParseDataArgs) => {
+  const parsedRowFieldData = rowFieldData.map((rowParts) => {
+    return rowParts.map((rowPart) => {
+      let escapedVal: string;
+      if (rowPart.type === "function") {
+        escapedVal = getParsedRowFieldDataFunction(rowPart, args);
+      } else {
+        /** Prevent pg-promise formatting jsonb */
+        const colIsJSON = ["json", "jsonb"].includes(rowPart.column.data_type);
+        escapedVal = pgp.as.format(colIsJSON ? "$1:json" : "$1", [rowPart.fieldValue]);
+      }
 
-          /**
-           * Cast to type to avoid array errors (they do not cast automatically)
-           */
-          escapedVal += `::${rowPart.column.udt_name}`;
+      /**
+       * Cast to type to avoid array errors (they do not cast automatically)
+       */
+      escapedVal += `::${rowPart.column.udt_name}`;
 
-          return {
-            escapedCol: asName(rowPart.column.name),
-            escapedVal,
-          };
-        })
-      );
-    })
-  );
+      return {
+        escapedCol: asName(rowPart.column.name),
+        escapedVal,
+      };
+    });
+  });
 
   return parsedRowFieldData;
 };

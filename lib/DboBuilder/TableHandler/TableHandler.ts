@@ -52,6 +52,7 @@ export class TableHandler extends ViewHandler {
   ) {
     super(db, tableOrViewInfo, dboBuilder, tx, joinPaths);
 
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     this.remove = this.delete;
 
     this.dataValidator = new DataValidator(this);
@@ -77,7 +78,7 @@ export class TableHandler extends ViewHandler {
     param3_unused?: undefined,
     tableRules?: TableRule,
     _localParams?: LocalParams
-  ): Promise<any | any[] | boolean> {
+  ): Promise<any> {
     return insert.bind(this)(rowOrRows, param2, param3_unused, tableRules, _localParams);
   }
 

@@ -181,7 +181,7 @@ function getJoins(
       (j) => j.tables.includes(t1) && j.tables.includes(tablePath.table)
     );
     if (!join) {
-      throw `Joining ${t1} <-> ${tablePath} dissallowed or missing`;
+      throw `Joining ${t1} <-> ${tablePath.table} dissallowed or missing`;
     }
     const isLtr = join.tables[0] === t1;
     const joinOn = isLtr ? join.on : reverseJoinOn(join.on);

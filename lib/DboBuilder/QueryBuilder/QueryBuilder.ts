@@ -76,14 +76,14 @@ export const asNameAlias = (field: string, tableAlias?: string) => {
   return result;
 };
 
-export const parseFunctionObject = (funcData: any): { funcName: string; args: any[] } => {
+export const parseFunctionObject = (funcData: unknown): { funcName: string; args: any[] } => {
   const makeErr = (msg: string) =>
     `Function not specified correctly. Expecting { $funcName: ["columnName" | <value>, ...args] } object but got: ${JSON.stringify(funcData)} \n ${msg}`;
   if (!isObject(funcData)) throw makeErr("");
   const keys = getKeys(funcData);
   if (keys.length !== 1) throw makeErr("");
   const funcName = keys[0]!;
-  const args = funcData[funcName];
+  const args = funcData[funcName] as unknown;
   if (!args || !Array.isArray(args)) {
     throw makeErr("Arguments missing or invalid");
   }
@@ -251,8 +251,8 @@ export class SelectItemBuilder {
         selectValues = Object.values(userSelect);
 
       /* Cannot include and exclude at the same time */
-      if (selectValues.filter((v) => [0, false].includes(v)).length) {
-        if (selectValues.filter((v) => ![0, false].includes(v)).length) {
+      if (selectValues.filter((v) => [0, false].includes(v as number)).length) {
+        if (selectValues.filter((v) => ![0, false].includes(v as number)).length) {
           throw "\nCannot include and exclude fields at the same time";
         }
 
@@ -263,14 +263,14 @@ export class SelectItemBuilder {
       } else {
         await Promise.all(
           selectKeys.map(async (key) => {
-            const val: any = userSelect[key as keyof typeof userSelect],
-              throwErr = (extraErr = "") => {
-                console.trace(extraErr);
-                throw "Unexpected select -> " + JSON.stringify({ [key]: val }) + "\n" + extraErr;
-              };
+            const val: unknown = userSelect[key as keyof typeof userSelect];
+            const throwErr = (extraErr = "") => {
+              console.trace(extraErr);
+              throw "Unexpected select -> " + JSON.stringify({ [key]: val }) + "\n" + extraErr;
+            };
 
             /* Included fields */
-            if ([1, true].includes(val)) {
+            if ([1, true].includes(val as number | boolean)) {
               if (key === "*") {
                 this.allowedFields.map((key) => this.addColumn(key, true));
               } else {

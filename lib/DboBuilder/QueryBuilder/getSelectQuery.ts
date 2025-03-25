@@ -7,8 +7,8 @@ import { getJoinQuery } from "./getJoinQuery";
 /**
  * Used to prevent single row nested results in case of OR join conditions
  */
-export const ROOT_TABLE_ROW_NUM_ID = "prostgles_root_table_row_id" as const;
-export const ROOT_TABLE_ALIAS = "prostgles_root_table_alias" as const;
+export const ROOT_TABLE_ROW_NUM_ID = "prostgles_root_table_row_id";
+export const ROOT_TABLE_ALIAS = "prostgles_root_table_alias";
 
 /**
  * Creating the text query from the NewQuery spec

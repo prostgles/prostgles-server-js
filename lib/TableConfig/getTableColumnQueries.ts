@@ -1,9 +1,9 @@
-import { getKeys, asName as _asName, isObject, asName, getObjectEntries } from "prostgles-types";
-import { DB, DBHandlerServer } from "../Prostgles";
+import { asName, getKeys, getObjectEntries, isObject } from "prostgles-types";
 import { validate_jsonb_schema_sql } from "../JSONBValidation/validate_jsonb_schema_sql";
+import { DB, DBHandlerServer } from "../Prostgles";
 import { getColumnDefinitionQuery, getTableColumns } from "./getColumnDefinitionQuery";
-import { TableConfig } from "./TableConfig";
 import { getFutureTableSchema } from "./getFutureTableSchema";
+import { TableConfig } from "./TableConfig";
 
 type Args = {
   db: DB;
@@ -41,6 +41,7 @@ export const getTableColumnQueries = async ({
   }
 
   const hasJSONBValidation = getKeys(tableConf.columns).some((c) => {
+    // eslint-disable-next-line security/detect-object-injection
     const cConf = tableConf.columns?.[c];
     return cConf && isObject(cConf) && (cConf.jsonbSchema || cConf.jsonbSchemaType);
   });

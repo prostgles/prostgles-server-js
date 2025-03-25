@@ -1,6 +1,0 @@
-node_modules
-dist
-examples
-**/*.d.ts
-tests
-docs
