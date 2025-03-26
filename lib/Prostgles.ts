@@ -260,7 +260,7 @@ export class Prostgles {
   };
 
   initTableConfig = async (reason: OnInitReason) => {
-    const res = await tryCatch(async () => {
+    const res = await tryCatchV2(async () => {
       if (this.tableConfigurator?.initialising) {
         console.error("TableConfigurator WILL deadlock", { reason });
       }
@@ -291,6 +291,7 @@ export class Prostgles {
       type: "debug",
       command: "initTableConfig",
       ...res,
+      data: {},
     });
     if (res.hasError) throw res.error;
     return res.data;

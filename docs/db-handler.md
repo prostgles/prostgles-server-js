@@ -122,7 +122,7 @@ Retrieves columns metadata of the table/view
     A check constraint will use this schema for runtime data validation and apropriate TS types will be generated
   - **file** <span style="color: grey">optional</span> <span style="color: green;">FileColumnConfig</span>
 
-    If degined then this column is referencing the file table
+    If defined then this column is referencing the file table
     Extracted from FileTable config
     Used in SmartForm
   - **tsDataType** <span style="color: red">required</span> <span style="color: green;">"string" | "number" | "boolean" | "any" | "number[]" | "boolean[]" | "string[]" | "any[]"</span>
