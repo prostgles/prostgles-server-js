@@ -165,7 +165,7 @@ prostgles<DBGeneratedSchema>({
 
 - **sqlFilePath** <span style="color: grey">optional</span> <span style="color: green;">string</span>
 
-  Path to a SQL file that will be executed on startup (but before onReady)
+  Path to a SQL file that will be executed on startup (but before onReady).
 
 - **transactions** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
 
@@ -323,11 +323,8 @@ prostgles<DBGeneratedSchema>({
     Express server instance
   - **referencedTables** <span style="color: grey">optional</span> <span style="color: green;">{ [tableName: string]: { type: "column"; referenceColumns: Record&lt;string, FileColumnConfig&gt;; }; }</span>
 
-    Used to specify which tables will have a file column and allowed file types.
-    
-    Specifying referencedTables will:
-     1. create a column in that table called media
-     2. create a lookup table lookup_media_{referencedTable} that joins referencedTable to the media table
+    Specifying referencedTables with referenceColumns allows restricting the
+    allowed file types that can be inserted and referenced in the specified tables.
   - **imageOptions** <span style="color: grey">optional</span> <span style="color: green;">ImageOptions</span>
     - **keepMetadata** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
     - **compression** <span style="color: grey">optional</span> <span style="color: green;">ImageCompressionOptions | undefined</span>
@@ -366,13 +363,14 @@ prostgles<DBGeneratedSchema>({
 
     If false then prostgles won't start on any tableConfig error
     true by default
-  - **version** <span style="color: red">required</span> <span style="color: green;">number</span>
-
-    Version number that must be increased on each schema change.
   - **versionTableName** <span style="color: grey">optional</span> <span style="color: green;">string</span>
 
     Table that will contain the schema version number and the tableConfig
     Defaults to schema_version
+  - **version** <span style="color: red">required</span> <span style="color: green;">number</span>
+
+    Current schema version number.
+    Must increase on each schema change.
   - **onMigrate** <span style="color: red">required</span> <span style="color: green;">OnMigrate</span>
 
     Script executed before tableConfig is loaded and IF an older schema_version is present.

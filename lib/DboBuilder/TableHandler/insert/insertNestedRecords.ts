@@ -130,16 +130,17 @@ export async function insertNestedRecords(
               row[colInsert.insertedFieldName] as AnyObject | AnyObject[]
             );
             const [colRow, ...otherColRows] = colRows;
-            if (
-              !Array.isArray(colRows) ||
-              !colRow ||
-              otherColRows.length ||
-              colInsert.insertedFieldRef.fcols.some((fcol) =>
-                [null, undefined].includes(colRow[fcol])
-              )
-            ) {
+            if (!Array.isArray(colRows) || !colRow || otherColRows.length) {
+              const someFcolsAreNullOrUndefined =
+                colRow &&
+                colInsert.insertedFieldRef.fcols.some((fcol) => [undefined].includes(colRow[fcol]));
               throw new Error(
-                "Could not do nested column insert: Unexpected return " + JSON.stringify(colRows)
+                [
+                  "Could not do nested column insert: ",
+                  someFcolsAreNullOrUndefined ?
+                    "Some fcols values are undefined"
+                  : "Unexpected return " + JSON.stringify(colRows),
+                ].join("\n")
               );
             }
             colInsert.inserted = colRows;
