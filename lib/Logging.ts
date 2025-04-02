@@ -133,6 +133,7 @@ export namespace EventTypes {
       | {
           type: "debug";
           command:
+            | "applyTableConfig"
             | "initFileTable"
             | "initTableConfig"
             | "runSQLFile"

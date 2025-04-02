@@ -5,6 +5,7 @@ import {
   InsertParams,
   isDefined,
   isObject,
+  type ColumnInfo,
 } from "prostgles-types";
 import { LocalParams, TableHandlers } from "../../DboBuilder";
 import { TableRule } from "../../../PublishParser/PublishParser";
@@ -57,11 +58,10 @@ export async function insertNestedRecords(
    * Nested insert is not allowed for the file table
    * */
   const isMultiInsert = Array.isArray(data);
+  const insertedRows = (isMultiInsert ? data : [data]) as AnyObject[];
   const hasNestedInserts =
     this.is_media ? false : (
-      (isMultiInsert ? data : [data]).some(
-        (d) => getExtraKeys(d).length || getReferenceColumnInserts(this, d).length
-      )
+      insertedRows.some((d) => getExtraKeys(d).length || getReferenceColumnInserts(this, d).length)
     );
 
   /**
@@ -81,7 +81,7 @@ export async function insertNestedRecords(
   }
 
   const _data = await Promise.all(
-    (isMultiInsert ? data : [data]).map(async (row) => {
+    insertedRows.map(async (row) => {
       // const { preValidate, validate } = tableRules?.insert ?? {};
       // const { tableConfigurator } = this.dboBuilder.prostgles;
       // if(!tableConfigurator) throw "tableConfigurator missing";
@@ -98,7 +98,7 @@ export async function insertNestedRecords(
         /* Ensure we're using the same transaction */
         const _this = this.tx ? this : (dbTX![this.name] as TableHandler);
 
-        const omitedKeys = extraKeys.concat(colInserts.map((c) => c.col));
+        const omitedKeys = extraKeys.concat(colInserts.map((c) => c.insertedFieldName));
 
         const rootData: AnyObject = omitKeys(row, omitedKeys);
 
@@ -112,14 +112,14 @@ export async function insertNestedRecords(
 
         /** Insert referenced first and then populate root data with referenced keys */
         if (colInserts.length) {
-          for await (const colInsert of colInsertsResult) {
+          for (const colInsert of colInsertsResult) {
             const newLocalParams: LocalParams = {
               ...localParams,
               nestedInsert: {
                 depth: (localParams?.nestedInsert?.depth ?? 0) + 1,
                 previousData: rootData,
                 previousTable: this.name,
-                referencingColumn: colInsert.col,
+                referencingColumn: colInsert.insertedFieldName,
               },
             };
             const colRows = await referencedInsert(
@@ -127,12 +127,16 @@ export async function insertNestedRecords(
               dbTX,
               newLocalParams,
               colInsert.tableName,
-              row[colInsert.col]
+              row[colInsert.insertedFieldName] as AnyObject | AnyObject[]
             );
+            const [colRow, ...otherColRows] = colRows;
             if (
               !Array.isArray(colRows) ||
-              colRows.length !== 1 ||
-              [null, undefined].includes(colRows[0]![colInsert.fcol])
+              !colRow ||
+              otherColRows.length ||
+              colInsert.insertedFieldRef.fcols.some((fcol) =>
+                [null, undefined].includes(colRow[fcol])
+              )
             ) {
               throw new Error(
                 "Could not do nested column insert: Unexpected return " + JSON.stringify(colRows)
@@ -140,12 +144,16 @@ export async function insertNestedRecords(
             }
             colInsert.inserted = colRows;
 
-            const foreignKey = colRows[0]![colInsert.fcol];
-            rootData[colInsert.col] = foreignKey;
+            colInsert.insertedFieldRef.fcols.map((fcol, idx) => {
+              const col = colInsert.insertedFieldRef.cols[idx];
+              if (!col) throw "Invalid column name for colInsert.insertedFieldRef.cols";
+              const foreignKey = colRow[fcol] as string | number;
+              rootData[col] = foreignKey;
+            });
           }
         }
 
-        const fullRootResult = await _this.insert(
+        const fullRootResult = (await _this.insert(
           rootData,
           { returning: "*" },
           undefined,
@@ -162,7 +170,7 @@ export async function insertNestedRecords(
             }
           : tableRules,
           localParams
-        );
+        )) as AnyObject;
         let returnData: AnyObject | undefined;
         const returning = param2?.returning;
         if (returning) {
@@ -174,7 +182,9 @@ export async function insertNestedRecords(
           returningItems
             .filter((s) => s.selected)
             .map((rs) => {
-              const colInsertResult = colInsertsResult.find(({ col }) => col === rs.columnName);
+              const colInsertResult = colInsertsResult.find(
+                ({ insertedFieldName }) => insertedFieldName === rs.columnName
+              );
               const inserted =
                 colInsertResult?.singleInsert ?
                   colInsertResult.inserted?.[0]
@@ -185,8 +195,10 @@ export async function insertNestedRecords(
 
         await Promise.all(
           extraKeys.map(async (targetTable) => {
-            const childDataItems: AnyObject[] =
-              Array.isArray(row[targetTable]) ? row[targetTable] : [row[targetTable]];
+            const childDataItems = (
+              Array.isArray(row[targetTable]) ?
+                row[targetTable]
+              : [row[targetTable]]) as AnyObject[];
 
             /** check */
             if (childDataItems.some((d) => !isObject(d))) {
@@ -197,7 +209,7 @@ export async function insertNestedRecords(
               return referencedInsert(this, dbTX, localParams, tableName, cdata);
             };
 
-            const joinPath = await getJoinPath(this, targetTable);
+            const joinPath = getJoinPath(this, targetTable);
 
             const { path } = joinPath;
             const [tbl1, tbl2, tbl3] = path;
@@ -371,20 +383,20 @@ const referencedInsert = async (
   const childRules = await getInsertTableRules(tableHandler, targetTable, localParams?.clientReq);
 
   return Promise.all(
-    (Array.isArray(targetData) ? targetData : [targetData]).map((m) =>
+    ((Array.isArray(targetData) ? targetData : [targetData]) as AnyObject[]).map((m) =>
       (dbTX[targetTable] as TableHandler)
         .insert(m, { returning: "*" }, undefined, childRules, localParams)
         .catch((e) => {
           return Promise.reject(e);
         })
     )
-  );
+  ) as Promise<AnyObject[]>;
 };
 
 type ReferenceColumnInsert<ExpectSingleInsert> = {
   tableName: string;
-  col: string;
-  fcol: string;
+  insertedFieldName: string;
+  insertedFieldRef: Required<ColumnInfo>["references"][number];
   singleInsert: boolean;
   data: ExpectSingleInsert extends true ? AnyObject : AnyObject | AnyObject[];
 };
@@ -431,10 +443,11 @@ export const getReferenceColumnInserts = <ExpectSingleInsert extends boolean>(
       }
       const res = {
         tableName: insertedFieldRef.ftable,
-        col: insertedFieldName,
-        fcol: insertedFieldRef.fcols[0]!,
+        insertedFieldName,
+        insertedFieldRef,
         singleInsert,
-        data: parentRow[insertedFieldName],
+        data: parentRow[insertedFieldName] as typeof singleInsert extends true ? AnyObject
+        : AnyObject[],
       };
       return res;
     })

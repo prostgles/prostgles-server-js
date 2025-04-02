@@ -72,7 +72,7 @@ export async function parseUpdateRules(
        * updates must target records from a specific dynamicFields.filter or not match any dynamicFields.filter
        */
       if (testRule) {
-        for await (const [dfIndex, dfRule] of tableRules.update.dynamicFields.entries()) {
+        for (const [dfIndex, dfRule] of tableRules.update.dynamicFields.entries()) {
           /**
            * Validated filter and fields
            */
@@ -98,7 +98,7 @@ export async function parseUpdateRules(
           await this.find(dfRule.filter, { limit: 0 });
 
           /** Ensure dynamicFields filters do not overlap */
-          for await (const [_dfIndex, _dfRule] of tableRules.update.dynamicFields.entries()) {
+          for (const [_dfIndex, _dfRule] of tableRules.update.dynamicFields.entries()) {
             if (dfIndex !== _dfIndex) {
               if (await this.findOne({ $and: [dfRule.filter, _dfRule.filter] }, { select: "" })) {
                 throw `dynamicFields.filter cannot overlap each other. \n

@@ -1,4 +1,4 @@
-import { asName as _asName, type AnyObject } from "prostgles-types";
+import { asName as _asName, tryCatchV2, type AnyObject } from "prostgles-types";
 import { PubSubManager, asValue, log } from "../PubSubManager/PubSubManager";
 import type { OnReadyCallbackBasic } from "../initProstgles";
 import TableConfigurator from "./TableConfig";
@@ -10,11 +10,33 @@ import { getFutureTableSchema } from "./getFutureTableSchema";
 import { getPGIndexes } from "./getPGIndexes";
 import { getTableColumnQueries } from "./getTableColumnQueries";
 import { runMigrations } from "./runMigrations";
+import { applyTableConfig } from "./applyTableConfig";
 
 export const initTableConfig = async function (this: TableConfigurator) {
+  this.initialising = true;
+
+  // WIP - applyTableConfig
+  // const res = await tryCatchV2(async () => {
+  //   await applyTableConfig(this.prostgles);
+  // });
+  // await this.prostgles.opts.onLog?.({
+  //   type: "debug",
+  //   command: "applyTableConfig",
+  //   duration: res.duration,
+  //   error: res.error,
+  // });
+  // if (res.error) throw res.error;
+  // await this.prostgles.refreshDBO();
+  // if (!this.prostgles.dbo?.api_table) {
+  //   console.error(res);
+  //   throw "why?";
+  // }
+  // await this.setTableOnMounts();
+  // this.initialising = false;
+  // if (Math.random() < 2) return;
+
   let changedSchema = false;
   const failedQueries: { query: string; error: any }[] = [];
-  this.initialising = true;
   const queryHistory: string[] = [];
   let queries: string[] = [];
   const makeQuery = (q: string[]) =>
@@ -36,6 +58,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
       duration: -1,
     });
     const now = Date.now();
+    console.warn("Running queries: ", q);
     await this.db.multi(q).catch((err) => {
       log({ err, q });
       failedQueries.push({ query: q, error: err });
@@ -69,7 +92,9 @@ export const initTableConfig = async function (this: TableConfigurator) {
     return _asName(v);
   };
 
-  const migrations = await runMigrations.bind(this)({ asName });
+  const migrations = await this.db.tx(async (t) => {
+    return runMigrations(t, this.prostgles.opts, { asName });
+  });
 
   /* Create lookup tables */
   for (const [tableNameRaw, tableConf] of Object.entries(this.config)) {

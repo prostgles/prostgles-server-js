@@ -139,7 +139,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
     if (!localParams) throw new Error("Unexpected: no localParams for postValidate");
 
     const rows = result.modified ?? [];
-    for await (const row of rows) {
+    for (const row of rows) {
       await postValidate({
         row: row,
         dbx: finalDBtx as any,

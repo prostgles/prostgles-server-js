@@ -92,7 +92,7 @@ export async function addSub(
   this.upsertSocket(socket);
 
   if (viewOptions) {
-    for await (const relatedTable of viewOptions.relatedTables) {
+    for (const relatedTable of viewOptions.relatedTables) {
       const relatedSub = {
         table_name: relatedTable.tableName,
         condition: parseCondition(relatedTable.condition),

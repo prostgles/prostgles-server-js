@@ -16,6 +16,7 @@ import {
   PublishParams,
   PublishTableRule,
   PublishViewRule,
+  type PublishObject,
 } from "./PublishParser/PublishParser";
 import { getJSONBSchemaTSTypes } from "./JSONBValidation/validation";
 import { DBHandlerServer, TableSchemaColumn, TX } from "./DboBuilder/DboBuilderTypes";
@@ -131,7 +132,7 @@ export type PublishFullyTyped<Schema = void> =
             PublishViewRule<Schema[tov_name]["columns"], Schema>
           : PublishTableRule<Schema[tov_name]["columns"], Schema>);
     }
-  : Record<string, PublishViewRule | PublishTableRule | PublishAllOrNothing>;
+  : PublishObject;
 
 /** Type checks */
 () => {

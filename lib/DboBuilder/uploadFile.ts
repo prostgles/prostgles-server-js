@@ -3,7 +3,7 @@ import { LocalParams, Media } from "./DboBuilder";
 import { ValidateRowBasic } from "../PublishParser/PublishParser";
 import { TableHandler } from "./TableHandler/TableHandler";
 
-export const isFile = (row: any) => {
+export const isFile = (row: any): row is { data: Buffer; name: string } => {
   return Boolean(
     row &&
       isObject(row) &&
@@ -39,7 +39,8 @@ export async function uploadFile(
     );
   const { data, name } = row;
 
-  const media_id = mediaId ?? (await this.db.oneOrNone("SELECT gen_random_uuid() as name")).name;
+  const media_id =
+    mediaId ?? (await this.db.one<{ name: string }>("SELECT gen_random_uuid() as name")).name;
   const nestedInsert = localParams?.nestedInsert;
   const type = await this.dboBuilder.prostgles.fileManager.getValidatedFileType({
     file: data,
@@ -66,7 +67,7 @@ export async function uploadFile(
     });
     const missingKeys = parsedMediaKeys.filter((k) => !parsedMedia[k]);
     if (missingKeys.length) {
-      throw `Some keys are missing from file insert validation: ${missingKeys}`;
+      throw `Some keys are missing from file insert validation: ${missingKeys.join(", ")}`;
     }
   }
 
@@ -74,7 +75,7 @@ export async function uploadFile(
     item: {
       data,
       name: media.name,
-      content_type: media.content_type as any,
+      content_type: media.content_type,
       extension: media.extension,
     },
     // imageCompression: {

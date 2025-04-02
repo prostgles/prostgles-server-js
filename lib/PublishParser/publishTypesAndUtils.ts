@@ -444,9 +444,10 @@ export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
 };
 export type RequestParams = { dbo?: DBHandlerServer; socket?: any };
 export type PublishAllOrNothing = boolean | "*" | null;
-export type PublishObject = {
-  [table_name: string]: PublishTableRule | PublishViewRule | PublishAllOrNothing;
-};
+export type PublishObject = Record<
+  string,
+  PublishTableRule | PublishViewRule | PublishAllOrNothing
+>;
 export type ParsedPublishTables = {
   [table_name: string]: ParsedPublishTable;
 };

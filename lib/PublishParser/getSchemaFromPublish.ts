@@ -10,7 +10,7 @@ import {
 import { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import { getErrorAsObject } from "../DboBuilder/DboBuilder";
 import { TABLE_METHODS } from "../Prostgles";
-import { PublishObject, PublishParser } from "./PublishParser";
+import { type PublishObject, PublishParser } from "./PublishParser";
 
 type Args = AuthClientRequest & {
   userData: AuthResultWithSID | undefined;

@@ -29,23 +29,23 @@ export function escapeTSNames(str: string, capitalize = false): string {
   return JSON.stringify(res);
 }
 
+const safeStringify = (obj: AnyObject) => {
+  const seen = new WeakSet();
+  return JSON.stringify(obj, (key, value: any) => {
+    if (typeof value === "object" && value !== null) {
+      if (seen.has(value)) {
+        return "[Circular]";
+      }
+      seen.add(value);
+    }
+    return value;
+  });
+};
 export const getErrorAsObject = (rawError: any, includeStack = false) => {
   if (["string", "boolean", "number"].includes(typeof rawError)) {
     return { message: rawError };
   }
   if (rawError instanceof Error) {
-    const safeStringify = (obj: any) => {
-      const seen = new WeakSet();
-      return JSON.stringify(obj, (key, value: any) => {
-        if (typeof value === "object" && value !== null) {
-          if (seen.has(value)) {
-            return "[Circular]";
-          }
-          seen.add(value);
-        }
-        return value;
-      });
-    };
     const errorObj = Object.getOwnPropertyNames(rawError).reduce(
       (acc, key) => ({
         ...acc,

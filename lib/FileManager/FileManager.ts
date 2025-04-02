@@ -25,7 +25,7 @@ import { matchesRoute } from "../Auth/AuthHandler";
 export const HOUR = 3600 * 1000;
 
 export const asSQLIdentifier = async (name: string, db: DB): Promise<string> => {
-  return (await db.one("select format('%I', $1) as name", [name]))?.name;
+  return (await db.one<{ name: string }>("select format('%I', $1) as name", [name])).name;
 };
 
 export type OnProgress = (progress: { total: number; loaded: number }) => void;
@@ -140,23 +140,25 @@ export class FileManager {
     const fullConfig = this.prostgles?.opts.fileTable;
     if (fullConfig?.delayedDelete) {
       this.checkInterval = setInterval(
-        async () => {
-          const fileTable = fullConfig.tableName;
-          const daysDelay = fullConfig.delayedDelete?.deleteAfterNDays ?? 0;
-          if (fileTable && this.dbo[fileTable]?.delete && daysDelay) {
-            const filesToDelete =
-              (await this.dbo[fileTable]?.find?.({
-                deleted_from_storage: null,
-                deleted: { ">": Date.now() - daysDelay * HOUR * 24 },
-              })) ?? [];
-            for await (const file of filesToDelete) {
-              await this.deleteFile(file.name);
+        () => {
+          void (async () => {
+            const fileTable = fullConfig.tableName;
+            const daysDelay = fullConfig.delayedDelete?.deleteAfterNDays ?? 0;
+            if (fileTable && this.dbo[fileTable]?.delete && daysDelay) {
+              const filesToDelete =
+                (await this.dbo[fileTable]?.find?.({
+                  deleted_from_storage: null,
+                  deleted: { ">": Date.now() - daysDelay * HOUR * 24 },
+                })) ?? [];
+              for (const file of filesToDelete) {
+                await this.deleteFile(file.name);
+              }
+            } else {
+              console.error(
+                "FileManager checkInterval delayedDelete FAIL: Could not access file table tableHandler.delete()"
+              );
             }
-          } else {
-            console.error(
-              "FileManager checkInterval delayedDelete FAIL: Could not access file table tableHandler.delete()"
-            );
-          }
+          })();
         },
         Math.max(10000, (fullConfig.delayedDelete.checkIntervalHours || 0) * HOUR)
       );
@@ -272,7 +274,7 @@ export class FileManager {
 
   async getFileCloudDownloadURL(fileName: string, expiresInSecondsRaw: number = 30 * 60) {
     const expiresInSeconds = Math.max(1, Math.round(expiresInSecondsRaw));
-    return await this.cloudClient?.getSignedUrlForDownload(fileName, expiresInSeconds);
+    return await this.cloudClient!.getSignedUrlForDownload(fileName, expiresInSeconds);
   }
 
   parseSQLIdentifier = async (name: string) => asSQLIdentifier(name, this.prostgles!.db!); //  this.prostgles.dbo.sql<"value">("select format('%I', $1)", [name], { returnType: "value" } )

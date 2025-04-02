@@ -24,13 +24,13 @@ export const getSchemaFilter = (schema: ProstglesInitOptions["schemaFilter"] = {
 // TODO: Add a onSocketConnect timeout for this query.
 //  Reason: this query gets blocked by prostgles.app_triggers from PubSubManager.addTrigger in some cases (pg_dump locks that table)
 export async function getTablesForSchemaPostgresSQL(
-  { db, runSQL }: DboBuilder,
-  schema: ProstglesInitOptions["schemaFilter"]
+  { db, runSQL }: Pick<DboBuilder, "db" | "runSQL">,
+  schemaFilter: ProstglesInitOptions["schemaFilter"]
 ): Promise<{
   result: TableSchema[];
   durations: Record<string, number>;
 }> {
-  const { sql, schemaNames } = getSchemaFilter(schema);
+  const { sql, schemaNames } = getSchemaFilter(schemaFilter);
 
   return db.tx(async (t) => {
     /**
@@ -218,7 +218,7 @@ export async function getTablesForSchemaPostgresSQL(
     }
 
     const getMaterialViewsReq = await tryCatch(async () => {
-      const materialViews = await getMaterialViews(t, schema);
+      const materialViews = await getMaterialViews(t, schemaFilter);
       return { materialViews };
     });
     if (getMaterialViewsReq.error || !getMaterialViewsReq.materialViews) {
@@ -259,14 +259,14 @@ export async function getTablesForSchemaPostgresSQL(
 
         /** Get view reference cols (based on parent table) */
         let viewFCols: Pick<TableSchemaColumn, "name" | "references">[] = [];
-        if (table.is_view) {
+        if (table.is_view && table.view_definition) {
           try {
             const view_definition =
-              table.view_definition?.endsWith(";") ?
+              table.view_definition.endsWith(";") ?
                 table.view_definition.slice(0, -1)
               : table.view_definition;
             const { fields } = (await runSQL(
-              `SELECT * FROM \n ( ${view_definition!} \n) t LIMIT 0`,
+              `SELECT * FROM \n ( ${view_definition} \n) t LIMIT 0`,
               {},
               {},
               undefined

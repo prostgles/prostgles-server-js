@@ -1,21 +1,82 @@
 import * as fs from "fs";
 import { asName, tryCatchV2 } from "prostgles-types";
 import { HTTP_FAIL_CODES } from "../Auth/AuthHandler";
+import type { Media } from "../DboBuilder/DboBuilderTypes";
 import { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { canCreateTables } from "../DboBuilder/runSQL";
 import { Prostgles } from "../Prostgles";
+import type { SchemaRelatedOptions } from "../TableConfig/getCreateSchemaQueries";
 import { runClientRequest } from "../runClientRequest";
 import { FileManager, HOUR, LocalConfig } from "./FileManager";
 
+export const getFileManagerSchema = ({
+  fileTable,
+  tableConfig,
+}: Pick<SchemaRelatedOptions, "fileTable" | "tableConfig">) => {
+  if (!fileTable) {
+    return;
+  }
+  const { tableName: fileTableName = "files", referencedTables = {} } = fileTable;
+  if (tableConfig?.[fileTableName]) {
+    throw new Error(
+      `FileManager table name (${fileTableName}) is reserved. Please use a different name in tableConfig`
+    );
+  }
+  const fileTableQuery = `
+    CREATE EXTENSION IF NOT EXISTS pgcrypto;
+    CREATE TABLE IF NOT EXISTS ${asName(fileTableName)} (
+      name                  TEXT NOT NULL,
+      extension             TEXT NOT NULL,
+      content_type          TEXT NOT NULL,
+      content_length        BIGINT NOT NULL DEFAULT 0,
+      added                 TIMESTAMP NOT NULL DEFAULT NOW(),
+      url                   TEXT NOT NULL,
+      id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      original_name         TEXT NOT NULL,
+      description           TEXT,
+      cloud_url             TEXT,
+      signed_url            TEXT,
+      signed_url_expires    BIGINT,
+      etag                  TEXT,
+      deleted               BIGINT,
+      deleted_from_storage  BIGINT,
+      UNIQUE(id),
+      UNIQUE(name)
+  );`;
+
+  const referencedTablesQueries = Object.entries(referencedTables)
+    .flatMap(([refTable, refTableConfig]) => {
+      return Object.entries(refTableConfig.referenceColumns).map(([colName]) => {
+        const tConf = tableConfig?.[refTable];
+        const columnConfig = tConf && "columns" in tConf && tConf.columns?.[colName];
+        /** This is a bit hacky. TODO: setup file columns only in tableConfig */
+        if (columnConfig) {
+          return `ALTER TABLE ${asName(refTable)} ADD FOREIGN KEY (${asName(colName)}) REFERENCES ${asName(fileTableName)} (id) ;`;
+        }
+        return `ALTER TABLE ${asName(refTable)} ADD COLUMN ${asName(colName)} UUID REFERENCES ${asName(fileTableName)} (id);`;
+      });
+    })
+    .sort();
+
+  return {
+    fileTable,
+    fileTableName,
+    fileTableQuery,
+    referencedTables,
+    referencedTablesQueries,
+    queries: [fileTableQuery, ...referencedTablesQueries],
+  };
+};
+
 export async function initFileManager(this: FileManager, prg: Prostgles) {
   this.prostgles = prg;
-
-  const { fileTable } = prg.opts;
-  if (!fileTable) {
-    throw "fileTable missing";
-  }
-  const { tableName = "files", referencedTables = {} } = fileTable;
-  this.tableName = tableName;
+  const schema = getFileManagerSchema({
+    fileTable: prg.opts.fileTable,
+    tableConfig: prg.opts.tableConfig,
+  });
+  if (!schema) throw "No fileTable config found in prostgles options";
+  const { fileTable, fileTableQuery, referencedTables, fileTableName } = schema;
+  this.tableName = fileTableName;
 
   const maxBfSizeMB = (prg.opts.io?.engine.opts.maxHttpBufferSize || 1e6) / 1e6;
   console.log(
@@ -42,54 +103,29 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
   /**
    * 1. Create media table
    */
-  if (!this.dbo[tableName]) {
-    await runQuery(
-      `
-      CREATE EXTENSION IF NOT EXISTS pgcrypto;
-      CREATE TABLE IF NOT EXISTS ${asName(tableName)} (
-        name                  TEXT NOT NULL,
-        extension             TEXT NOT NULL,
-        content_type          TEXT NOT NULL,
-        content_length        BIGINT NOT NULL DEFAULT 0,
-        added                 TIMESTAMP NOT NULL DEFAULT NOW(),
-        url                   TEXT NOT NULL,
-        id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        original_name         TEXT NOT NULL,
-        description           TEXT,
-        cloud_url             TEXT,
-        signed_url            TEXT,
-        signed_url_expires    BIGINT,
-        etag                  TEXT,
-        deleted               BIGINT,
-        deleted_from_storage  BIGINT,
-        UNIQUE(id),
-        UNIQUE(name)
-    )`,
-      `Create fileTable ${asName(tableName)}`
-    );
+  if (!this.dbo[fileTableName]) {
+    await runQuery(fileTableQuery, `Create fileTable ${asName(fileTableName)}`);
     await prg.refreshDBO();
   }
 
   /**
    * 2. Create media lookup tables
    */
-  for (const refTable in referencedTables) {
+  for (const [refTable, tableConfig] of Object.entries(referencedTables)) {
     if (!this.dbo[refTable]) {
       throw `Referenced table (${refTable}) from fileTable.referencedTables prostgles init config does not exist`;
     }
     const cols = await (this.dbo[refTable] as TableHandler).getColumns();
 
-    const tableConfig = referencedTables[refTable]!;
-
     for (const [colName] of Object.entries(tableConfig.referenceColumns)) {
       const existingCol = cols.find((c) => c.name === colName);
       if (existingCol) {
-        if (existingCol.references?.some(({ ftable }) => ftable === tableName)) {
+        if (existingCol.references?.some(({ ftable }) => ftable === fileTableName)) {
           // All ok
         } else {
           if (existingCol.udt_name === "uuid") {
             try {
-              const query = `ALTER TABLE ${asName(refTable)} ADD FOREIGN KEY (${asName(colName)}) REFERENCES ${asName(tableName)} (id) ;`;
+              const query = `ALTER TABLE ${asName(refTable)} ADD FOREIGN KEY (${asName(colName)}) REFERENCES ${asName(fileTableName)} (id) ;`;
               const msg = `Referenced file column ${refTable} (${colName}) exists but is not referencing file table. Add REFERENCE constraint...\n${query}`;
               await runQuery(query, msg);
             } catch (e) {
@@ -99,12 +135,12 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
             }
           } else {
             console.error(
-              `Referenced file column ${refTable} (${colName}) exists but is not of required type (UUID). Choose a different column name or ALTER the existing column to match the type and the data found in file table ${tableName}(id)`
+              `Referenced file column ${refTable} (${colName}) exists but is not of required type (UUID). Choose a different column name or ALTER the existing column to match the type and the data found in file table ${fileTableName}(id)`
             );
           }
         }
       } else {
-        const query = `ALTER TABLE ${asName(refTable)} ADD COLUMN ${asName(colName)} UUID REFERENCES ${asName(tableName)} (id);`;
+        const query = `ALTER TABLE ${asName(refTable)} ADD COLUMN ${asName(colName)} UUID REFERENCES ${asName(fileTableName)} (id);`;
         // const createColumn = async () => {
         //   try {
         //     const msg = `Create referenced file column ${refTable} (${colName})...\n${query}`;
@@ -126,7 +162,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
   /**
    * 4. Serve media through express
    */
-  const { fileServeRoute = `/${tableName}`, expressApp: app } = fileTable;
+  const { fileServeRoute = `/${fileTableName}`, expressApp: app } = fileTable;
 
   if (fileServeRoute.endsWith("/")) {
     throw `fileServeRoute must not end with a '/'`;
@@ -134,14 +170,13 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
   this.fileRoute = fileServeRoute;
 
   app.get(this.fileRouteExpress, async (req, res) => {
-    if (!this.dbo[tableName]) {
+    const mediaTableHandler = this.dbo[fileTableName] as unknown as TableHandler | undefined;
+    if (!mediaTableHandler) {
       res
         .status(HTTP_FAIL_CODES.INTERNAL_SERVER_ERROR)
-        .json(`Internal error: media table (${tableName}) not valid`);
+        .json(`Internal error: media table (${fileTableName}) not valid`);
       return false;
     }
-
-    const mediaTable = this.dbo[tableName] as unknown as TableHandler;
 
     try {
       const { name } = req.params;
@@ -161,10 +196,10 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
           content_type: 1,
         },
       };
-      const media = await runClientRequest.bind(this.prostgles)(
+      const media = (await runClientRequest.bind(this.prostgles)(
         {
           command: "findOne",
-          tableName,
+          tableName: fileTableName,
           param1: { id },
           param2: selectParams,
           param3: undefined,
@@ -173,7 +208,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
           res,
           httpReq: req,
         }
-      );
+      )) as Required<Media> | undefined;
 
       if (!media) {
         res.status(HTTP_FAIL_CODES.NOT_FOUND).send("File not found or not allowed");
@@ -187,7 +222,10 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
         const EXPIRES = Date.now() + HOUR;
         if (!url || expires < EXPIRES) {
           url = await this.getFileCloudDownloadURL(media.name, 60 * 60);
-          await mediaTable.update({ name }, { signed_url: url, signed_url_expires: EXPIRES });
+          await mediaTableHandler.update(
+            { name },
+            { signed_url: url, signed_url_expires: EXPIRES }
+          );
         }
 
         res.redirect(url);

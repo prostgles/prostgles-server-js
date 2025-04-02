@@ -38,7 +38,7 @@ export async function getFileTableRules(
     })
     .filter(isDefined);
   if (referencedColumns?.length) {
-    for await (const { tableName, fileColumns, allColumns } of referencedColumns) {
+    for (const { tableName, fileColumns, allColumns } of referencedColumns) {
       const tableRules = await this.getTableRules({ clientReq, tableName }, clientInfo);
       if (tableRules) {
         fileColumns.map((column) => {

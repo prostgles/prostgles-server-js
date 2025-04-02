@@ -1,6 +1,6 @@
 import { Method, getObjectEntries, isObject } from "prostgles-types";
 import { AuthClientRequest, AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
-import { DBOFullyTyped, PublishFullyTyped } from "../DBSchemaBuilder";
+import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import { ProstglesInitOptions } from "../ProstglesTypes";
 import { VoidFunction } from "../SchemaWatch/SchemaWatch";
@@ -12,7 +12,7 @@ import {
   DboTableCommand,
   ParsedPublishTable,
   PublishMethods,
-  PublishObject,
+  type PublishObject,
   PublishParams,
   RULE_TO_METHODS,
   TableRule,
@@ -86,7 +86,7 @@ export class PublishParser {
   async getPublishAsObject(
     clientReq: AuthClientRequest,
     clientInfo: AuthResultWithSID | undefined
-  ): Promise<PublishFullyTyped | undefined> {
+  ): Promise<PublishObject | undefined> {
     const publishParams = await this.getPublishParams(clientReq, clientInfo);
     const _publish = await applyParamsIfFunc(this.publish, publishParams);
 

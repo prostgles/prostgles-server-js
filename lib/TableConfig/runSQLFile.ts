@@ -1,0 +1,45 @@
+import { tryCatchV2 } from "prostgles-types";
+import { getFileText, type Prostgles } from "../Prostgles";
+
+export const runSQLFile = async (prostgles: Prostgles) => {
+  const {
+    db,
+    opts: { sqlFilePath, onLog },
+  } = prostgles;
+  if (!sqlFilePath) return;
+  if (!db) throw "db missing";
+  const res = await tryCatchV2(async () => {
+    const fileContent = await getFileText(sqlFilePath);
+
+    const result = await db.multi(fileContent).catch((err) => {
+      const posInfo = getQueryErrorPositionInfo(err, fileContent);
+      console.error("Prostgles: Error running SQL file ", sqlFilePath, posInfo);
+      return Promise.reject(err);
+    });
+    return { success: result.length };
+  });
+
+  await onLog?.({ type: "debug", command: "runSQLFile", ...res });
+  if (res.error !== undefined) {
+    throw res.error;
+  } else {
+    console.log("Prostgles: SQL file executed successfuly ", sqlFilePath);
+  }
+  return res.data?.success;
+};
+
+export const getQueryErrorPositionInfo = (err: any, _fileContent?: string) => {
+  const { position, length, query } = err as { position: number; length: number; query: string },
+    fileContent = _fileContent || query,
+    lines = fileContent.split("\n");
+
+  if (position && length && fileContent) {
+    const startLine = Math.max(0, fileContent.substring(0, position).split("\n").length - 2),
+      endLine = startLine + 3;
+
+    return lines
+      .slice(startLine, endLine)
+      .map((txt, i) => `${startLine + i + 1} ${i === 1 ? "->" : "  "} ${txt}`)
+      .join("\n");
+  }
+};

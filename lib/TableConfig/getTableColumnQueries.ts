@@ -1,4 +1,4 @@
-import { asName, getKeys, getObjectEntries, isObject } from "prostgles-types";
+import { asName, getKeys, getObjectEntries, isDefined, isObject } from "prostgles-types";
 import { validate_jsonb_schema_sql } from "../JSONBValidation/validate_jsonb_schema_sql";
 import { DB, DBHandlerServer } from "../Prostgles";
 import { getColumnDefinitionQuery, getTableColumns } from "./getColumnDefinitionQuery";

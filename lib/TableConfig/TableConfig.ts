@@ -117,7 +117,7 @@ type SQLDefColumn = {
 };
 
 export type BaseColumnTypes = {
-  defaultValue?: any;
+  defaultValue?: string | number | boolean | Record<string, any>;
   nullable?: boolean;
 };
 
@@ -227,6 +227,11 @@ type StrictUnionHelper<T, TAll> =
 export type StrictUnion<T> = StrictUnionHelper<T, T>;
 
 export const CONSTRAINT_TYPES = ["PRIMARY KEY", "UNIQUE", "CHECK", "FOREIGN KEY"] as const;
+
+/**
+ * Each column definition cannot reference to tables that appear later in the table definition.
+ * These references should be specified in constraints property
+ */
 export type TableDefinition<LANG_IDS> = {
   onMount?: (params: {
     dbo: DBHandlerServer;
@@ -334,7 +339,9 @@ export type TableConfig<LANG_IDS = { en: 1 }> = {
 export default class TableConfigurator {
   instanceId = Date.now() + Math.random();
 
-  config: TableConfig = {};
+  get config() {
+    return this.prostgles.opts.tableConfig ?? {};
+  }
   get dbo(): DBHandlerServer {
     if (!this.prostgles.dbo) throw "this.prostgles.dbo missing";
     return this.prostgles.dbo;
@@ -346,7 +353,6 @@ export default class TableConfigurator {
   prostgles: Prostgles;
 
   constructor(prostgles: Prostgles) {
-    this.config = prostgles.opts.tableConfig ?? {};
     this.prostgles = prostgles;
   }
 

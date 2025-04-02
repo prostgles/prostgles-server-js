@@ -1,5 +1,6 @@
 import type { DboBuilder } from "../DboBuilder/DboBuilder";
 import { EVENT_TRIGGER_TAGS } from "../Event_Trigger_Tags";
+import type { OnReadyCallbackBasic } from "../initProstgles";
 import { PubSubManager, log } from "../PubSubManager/PubSubManager";
 import {
   ValidatedWatchSchemaType,
@@ -84,7 +85,7 @@ export class SchemaWatch {
       } else {
         /* Full re-init. Sockets must reconnect */
         console.log("watchSchema: Full re-initialisation", { query });
-        void this.dboBuilder.prostgles.init(onReady as any, {
+        void this.dboBuilder.prostgles.init(onReady as OnReadyCallbackBasic, {
           type: "schema change",
           query,
           command,

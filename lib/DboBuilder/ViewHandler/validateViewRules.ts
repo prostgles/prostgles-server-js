@@ -11,16 +11,9 @@ export async function validateViewRules(
     forcedFilter?: AnyObject;
     dynamicFields?: UpdateRule["dynamicFields"];
     rule: "update" | "select" | "insert" | "delete";
-  },
+  }
 ) {
-  const {
-    fields,
-    filterFields,
-    returningFields,
-    forcedFilter,
-    dynamicFields,
-    rule,
-  } = args;
+  const { fields, filterFields, returningFields, forcedFilter, dynamicFields, rule } = args;
 
   /* Safely test publish rules */
   if (fields) {
@@ -75,7 +68,7 @@ export async function validateViewRules(
     }
   }
   if (dynamicFields) {
-    for await (const dfieldRule of dynamicFields) {
+    for (const dfieldRule of dynamicFields) {
       try {
         const { fields, filter } = dfieldRule;
         this.parseFieldFilter(fields);

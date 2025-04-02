@@ -99,7 +99,7 @@ export const clientFileTests = async (db: DBHandlerClient) => {
 
     await test("Can delete only allowed files directly", async () => {
       const users = await db.users_public_info.find!();
-      for await (const user of users) {
+      for (const user of users) {
         await db.files.delete!({ id: user.avatar.id });
         await db.users_public_info.delete!({ id: user.id });
       }

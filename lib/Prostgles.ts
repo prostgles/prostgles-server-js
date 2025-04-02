@@ -25,6 +25,8 @@ import {
 } from "./DboBuilder/DboBuilder";
 export { DBHandlerServer };
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
+export { getEmailSender, getOrSetTransporter, verifySMTPConfig } from "./Auth/sendEmail";
+export { applyTableConfig } from "./TableConfig/applyTableConfig";
 
 import {
   CHANNELS,
@@ -32,12 +34,10 @@ import {
   SQLRequest,
   isObject,
   omitKeys,
-  tryCatch,
   tryCatchV2,
 } from "prostgles-types";
 import { DBEventsManager } from "./DBEventsManager";
 import { PublishParser } from "./PublishParser/PublishParser";
-export { getOrSetTransporter, getEmailSender, verifySMTPConfig } from "./Auth/sendEmail";
 
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 export type DBorTx = DB | pgPromise.ITask<{}>;
@@ -178,20 +178,11 @@ export class Prostgles {
   }
 
   getTSFileName() {
-    const fileName = "DBGeneratedSchema.d.ts"; //`dbo_${this.schema}_types.ts`;
+    const fileName = "DBGeneratedSchema.d.ts";
     const _dir = this.opts.tsGeneratedTypesDir || "";
     const dir = _dir.endsWith("/") ? _dir : `${_dir}/`;
     const fullPath = dir + fileName;
     return { fileName, fullPath };
-  }
-
-  private getFileText(fullPath: string, _format = "utf8"): Promise<string> {
-    return new Promise((resolve, reject) => {
-      fs.readFile(fullPath, "utf8", function (err, data) {
-        if (err) reject(err);
-        else resolve(data);
-      });
-    });
   }
 
   getTSFileContent = () => {
@@ -299,7 +290,7 @@ export class Prostgles {
 
   /* Create media table if required */
   initFileTable = async () => {
-    const res = await tryCatch(async () => {
+    const res = await tryCatchV2(async () => {
       if (this.opts.fileTable) {
         const { cloudClient, localConfig, imageOptions } = this.opts.fileTable;
         await this.refreshDBO();
@@ -315,7 +306,7 @@ export class Prostgles {
           this.fileManager = undefined;
         }
       } else {
-        await this.fileManager?.destroy();
+        this.fileManager?.destroy();
         this.fileManager = undefined;
       }
       await this.refreshDBO();
@@ -333,46 +324,6 @@ export class Prostgles {
   isSuperUser = false;
 
   init = initProstgles.bind(this);
-
-  async runSQLFile(filePath: string) {
-    const res = await tryCatchV2(async () => {
-      const fileContent = await this.getFileText(filePath); //.then(console.log);
-
-      const result = await this.db
-        ?.multi(fileContent)
-        .then((data) => {
-          console.log("Prostgles: SQL file executed successfuly \n    -> " + filePath);
-          return data;
-        })
-        .catch((err) => {
-          const { position, length } = err,
-            lines = fileContent.split("\n");
-          let errMsg = filePath + " error: ";
-
-          if (position && length && fileContent) {
-            const startLine = Math.max(
-                0,
-                fileContent.substring(0, position).split("\n").length - 2
-              ),
-              endLine = startLine + 3;
-
-            errMsg += "\n\n";
-            errMsg += lines
-              .slice(startLine, endLine)
-              .map((txt, i) => `${startLine + i + 1} ${i === 1 ? "->" : "  "} ${txt}`)
-              .join("\n");
-            errMsg += "\n\n";
-          }
-          console.error(errMsg, err);
-          return Promise.reject(err);
-        });
-      return { success: result?.length };
-    });
-
-    await this.opts.onLog?.({ type: "debug", command: "runSQLFile", ...res });
-    if (res.error !== undefined) throw res.error;
-    return res.data?.success;
-  }
 
   connectedSockets: PRGLIOSocket[] = [];
   setSocketEvents() {
@@ -547,3 +498,13 @@ export async function getIsSuperUser(db: DB): Promise<boolean> {
     .oneOrNone<{ usesuper: boolean }>("select usesuper from pg_user where usename = CURRENT_USER;")
     .then((r) => !!r?.usesuper);
 }
+
+export const getFileText = (fullPath: string, _format = "utf8"): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    fs.readFile(fullPath, "utf8", function (err, data) {
+      if (err) reject(err);
+      else resolve(data);
+    });
+  });
+};

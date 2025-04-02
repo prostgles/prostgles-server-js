@@ -7,7 +7,7 @@ import { PublishParser } from "./PublishParser";
 import {
   DboTable,
   ParsedPublishTable,
-  PublishObject,
+  type PublishObject,
   PublishTableRule,
   PublishViewRule,
   RULE_TO_METHODS,

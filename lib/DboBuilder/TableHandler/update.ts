@@ -123,19 +123,23 @@ export async function update(
               depth: 1,
               previousData: nData,
               previousTable: this.name,
-              referencingColumn: nestedInsert.col,
+              referencingColumn: nestedInsert.insertedFieldName,
             },
           };
-          const nestedInsertResult = await nesedTableHandler.insert(
+          const nestedInsertResult = (await nesedTableHandler.insert(
             nestedInsert.data,
             { returning: "*" },
             undefined,
             refTableRules,
             nestedLocalParams
-          );
-          nestedInsertsResultsObj[nestedInsert.col] = nestedInsertResult;
+          )) as AnyObject;
+          nestedInsertsResultsObj[nestedInsert.insertedFieldName] = nestedInsertResult;
 
-          nData[nestedInsert.col] = nestedInsertResult[nestedInsert.fcol];
+          nestedInsert.insertedFieldRef.fcols.forEach((fcol, idx) => {
+            const col = nestedInsert.insertedFieldRef.cols[idx];
+            if (!col) throw `col not found for ${nestedInsert.insertedFieldName}`;
+            nData[col] = nestedInsertResult[fcol];
+          });
           return {
             ...nestedInsert,
             result: nestedInsertResult,

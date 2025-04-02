@@ -8,6 +8,7 @@ import { ProstglesInitOptions } from "./ProstglesTypes";
 import { DbTableInfo, PublishParser } from "./PublishParser/PublishParser";
 import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { sleep } from "./utils";
+import { runSQLFile } from "./TableConfig/runSQLFile";
 
 /**
  * Database connection details
@@ -124,16 +125,13 @@ export const initProstgles = async function (
   const db = this.db;
   const pgp = this.pgp!;
 
-  /* 2. Execute any SQL file if provided */
-  if (this.opts.sqlFilePath) {
-    await this.runSQLFile(this.opts.sqlFilePath);
-  }
-
   try {
+    /* 2. Execute any SQL file if provided */
+    await runSQLFile(this);
     await this.refreshDBO();
     await this.initTableConfig(reason);
     await this.initFileTable();
-    await this.initRestApi();
+    this.initRestApi();
 
     this.schemaWatch = await SchemaWatch.create(this.dboBuilder);
 
@@ -149,7 +147,7 @@ export const initProstgles = async function (
       this.dboBuilder.publishParser = this.publishParser;
 
       /* 4. Set publish and auth listeners */
-      await this.setSocketEvents();
+      this.setSocketEvents();
     } else if (this.opts.auth) {
       throw "Auth config does not work without publish";
     }
@@ -191,7 +189,7 @@ export const initProstgles = async function (
           await this.initFileTable();
         }
         if ("restApi" in newOpts) {
-          await this.initRestApi();
+          this.initRestApi();
         }
         if ("tableConfig" in newOpts) {
           await this.initTableConfig({ type: "prgl.update", newOpts });

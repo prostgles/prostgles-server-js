@@ -67,15 +67,12 @@ export type FileTableConfig = {
   expressApp: ExpressApp;
 
   /**
-   * Used to specify which tables will have a file column and allowed file types.
-   *
-   * Specifying referencedTables will:
-   *  1. create a column in that table called media
-   *  2. create a lookup table lookup_media_{referencedTable} that joins referencedTable to the media table
+   * Specifying referencedTables with referenceColumns allows restricting the
+   * allowed file types that can be inserted and referenced in the specified tables.
    */
   referencedTables?: {
     [tableName: string]: /**
-     * Will try to create (if necessary) these columns which will reference files_table(id)
+     * Will ensure these columns reference files_table(id)
      * Prostgles UI will use these hints (obtained through tableHandler.getInfo())
      * */
     { type: "column"; referenceColumns: Record<string, FileColumnConfig> };
@@ -198,7 +195,7 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
   schemaFilter?: Record<string, 1> | Record<string, 0>;
 
   /**
-   * Path to a SQL file that will be executed on startup (but before onReady)
+   * Path to a SQL file that will be executed on startup (but before onReady).
    */
   sqlFilePath?: string;
 
@@ -305,7 +302,7 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
   onLog?: (evt: EventInfo) => Promise<void>;
 };
 
-type TableConfigMigrations = {
+export type TableConfigMigrations = {
   /**
    * If false then prostgles won't start on any tableConfig error
    * true by default
@@ -313,14 +310,16 @@ type TableConfigMigrations = {
   silentFail?: boolean;
 
   /**
-   * Version number that must be increased on each schema change.
-   */
-  version: number;
-
-  /** Table that will contain the schema version number and the tableConfig
+   * Table that will contain the schema version number and the tableConfig
    * Defaults to schema_version
    */
   versionTableName?: string;
+
+  /**
+   * Current schema version number.
+   * Must increase on each schema change.
+   */
+  version: number;
 
   /**
    * Script executed before tableConfig is loaded and IF an older schema_version is present.
@@ -330,11 +329,11 @@ type TableConfigMigrations = {
 };
 
 type OnMigrate = (args: {
-  db: DB;
+  db: pgPromise.ITask<{}>;
   oldVersion: number | undefined;
   getConstraints: (
     table: string,
     column?: string,
     types?: ColConstraint["type"][]
   ) => Promise<ColConstraint[]>;
-}) => void;
+}) => void | Promise<void>;
