@@ -67,7 +67,10 @@ const getPropertyValidationError = (
   if (type) {
     if (typeof type !== "string") {
       for (const [subKey, subSchema] of getObjectEntries(type)) {
-        return getPropertyValidationError(subKey, val, subSchema, [...path, subKey]);
+        const error = getPropertyValidationError(subKey, val, subSchema, [...path, key]);
+        if (error) {
+          return error;
+        }
       }
       return;
     }
