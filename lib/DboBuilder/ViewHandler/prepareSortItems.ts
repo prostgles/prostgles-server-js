@@ -1,7 +1,10 @@
 import { OrderBy, asName, isDefined, isEmpty, isObject } from "prostgles-types/dist";
 import { SortItem } from "../DboBuilder";
 import { NewQueryJoin, SelectItemValidated, asNameAlias } from "../QueryBuilder/QueryBuilder";
-import { validateValueUsingJSONBSchema } from "../../JSONBValidation/validation";
+import {
+  getJSONBObjectSchemaValidationError,
+  validateJSONBObjectAgainstSchema,
+} from "../../JSONBValidation/JSONBValidation";
 
 /* This relates only to SELECT */
 export const prepareSortItems = (
@@ -156,26 +159,26 @@ const parseOrderObj = (
 
   const keys = Object.keys(orderBy);
   if (typeof orderBy.key === "string") {
-    try {
-      if (
-        validateValueUsingJSONBSchema(
-          {
-            key: "string",
-            asc: { enum: [1, -1, false, true], optional: true },
-            nulls: { enum: ["first", "last"], optional: true },
-            nullEmpty: { type: "boolean", optional: true },
-          } as const,
-          orderBy
-        )
-      ) {
-        const { key, asc = true, nulls, nullEmpty = false } = orderBy;
-        return [{ key, asc: asc === true || asc === 1, nulls, nullEmpty }];
-      }
-    } catch {}
-    throw [
-      `Invalid orderBy option (${JSON.stringify(orderBy, null, 2)})`,
-      `Expecting { key: string, asc?: boolean, nulls?: 'first' | 'last' | null | undefined, nullEmpty?: boolean } `,
-    ].join("\n");
+    const { error, data } = getJSONBObjectSchemaValidationError(
+      {
+        key: "string",
+        asc: { enum: [1, -1, false, true], optional: true },
+        nulls: { enum: ["first", "last"], optional: true },
+        nullEmpty: { type: "boolean", optional: true },
+      } as const,
+      orderBy,
+      "orderBy"
+    );
+    if (data) {
+      const { key, asc = true, nulls, nullEmpty = false } = data;
+      return [{ key, asc: asc === true || asc === 1, nulls, nullEmpty }];
+    } else {
+      throw [
+        error,
+        `Invalid orderBy option (${JSON.stringify(orderBy, null, 2)})`,
+        `Expecting { key: string, asc?: boolean, nulls?: 'first' | 'last' | null | undefined, nullEmpty?: boolean }`,
+      ].join("\n");
+    }
   }
 
   if (expectOne && keys.length > 1) {

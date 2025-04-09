@@ -18,7 +18,7 @@ import {
   PublishViewRule,
   type PublishObject,
 } from "./PublishParser/PublishParser";
-import { getJSONBSchemaTSTypes } from "./JSONBValidation/validation";
+import { getJSONBSchemaTSTypes } from "./JSONBValidation/getJSONBSchemaTSTypes";
 import { DBHandlerServer, TableSchemaColumn, TX } from "./DboBuilder/DboBuilderTypes";
 
 export const getDBSchema = (dboBuilder: DboBuilder): string => {

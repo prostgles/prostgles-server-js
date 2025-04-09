@@ -1,103 +1,7 @@
-import { getKeys, isEmpty, isObject, JSONB, TableSchema } from "prostgles-types";
+import { getKeys, isObject, type JSONB, type TableSchema } from "prostgles-types";
 import { postgresToTsType } from "../DboBuilder/DboBuilder";
 import { asValue } from "../PubSubManager/PubSubManager";
-
-const getFieldTypeObj = (rawFieldType: JSONB.FieldType): JSONB.FieldTypeObj => {
-  if (typeof rawFieldType === "string") return { type: rawFieldType };
-
-  return rawFieldType;
-};
-
-type DataType = JSONB.FieldTypeObj["type"];
-type ElementType<T extends DataType> = T extends `${infer E}[]` ? E : never;
-type ArrayTypes = Extract<DataType, `${string}[]`>;
-type NonArrayTypes = Extract<Exclude<DataType, ArrayTypes>, string>;
-const PRIMITIVE_VALIDATORS: Record<NonArrayTypes, (val: any) => boolean> = {
-  string: (val) => typeof val === "string",
-  number: (val) => typeof val === "number" && Number.isFinite(val),
-  integer: (val) => typeof val === "number" && Number.isInteger(val),
-  boolean: (val) => typeof val === "boolean",
-  time: (val) => typeof val === "string",
-  timestamp: (val) => typeof val === "string",
-  any: (val) => typeof val !== "function" && typeof val !== "symbol",
-  Date: (val) => typeof val === "string",
-  Lookup: () => {
-    throw new Error("Lookup type is not supported for validation");
-  },
-};
-const PRIMITIVE_VALIDATORS_KEYS = getKeys(PRIMITIVE_VALIDATORS);
-const getElementType = <T extends DataType>(type: T): undefined | ElementType<T> => {
-  if (typeof type === "string" && type.endsWith("[]")) {
-    const elementType = type.slice(0, -2);
-    if (!PRIMITIVE_VALIDATORS_KEYS.includes(elementType as NonArrayTypes)) {
-      throw new Error(`Unknown array field type ${type}`);
-    }
-    return elementType as ElementType<T>;
-  }
-};
-
-const getValidator = (type: Extract<DataType, string>) => {
-  const elem = getElementType(type);
-  if (elem) {
-    const validator = PRIMITIVE_VALIDATORS[elem];
-    return {
-      isArray: true,
-      validator: (v: any) => Array.isArray(v) && v.every((v) => validator(v)),
-    };
-  }
-  const validator = PRIMITIVE_VALIDATORS[type as NonArrayTypes];
-  if (!(validator as any)) {
-    throw new Error(`Unknown field type ${type}`);
-  }
-  return { isArray: false, validator };
-};
-
-const validateProperty = (key: string, val: any, rawFieldType: JSONB.FieldType): boolean => {
-  let err = `The provided value for ${JSON.stringify(key)} is of invalid type. Expecting `;
-  const fieldType = getFieldTypeObj(rawFieldType);
-  const { type, allowedValues, nullable, optional } = fieldType;
-  if (nullable && val === null) return true;
-  if (optional && val === undefined) return true;
-  if (allowedValues) {
-    throw new Error(`Allowed values are not supported for validation`);
-  }
-  if (type) {
-    if (typeof type !== "string") {
-      getKeys(type).forEach((subKey) => {
-        validateProperty(subKey, val, (fieldType.type as JSONB.ObjectType["type"])[subKey]!);
-      });
-      return true;
-    }
-    err += fieldType.type;
-
-    const { validator } = getValidator(type);
-    const isValid = validator(val);
-    if (!isValid) {
-      throw new Error(err);
-    }
-    return true;
-  }
-  if (fieldType.enum) {
-    err += `on of: ${fieldType.enum.join(", ")}`;
-    if (!fieldType.enum.includes(val)) throw new Error(err);
-    return true;
-  }
-  throw new Error(`Could not validate field type: ${JSON.stringify(fieldType)}`);
-};
-
-export const validateValueUsingJSONBSchema = <S extends JSONB.ObjectType["type"]>(
-  schema: S,
-  obj: any,
-  objName?: string,
-  optional = false
-): obj is JSONB.GetObjectType<S> => {
-  if (obj === undefined && !optional) throw new Error(`Expecting ${objName} to be defined`);
-  if (!isObject(obj)) {
-    throw new Error(`Expecting ${objName} to be an object`);
-  }
-  Object.entries(schema).forEach(([k, objSchema]) => validateProperty(k, obj[k], objSchema));
-  return true;
-};
+import { getFieldTypeObj } from "./JSONBValidation";
 
 type ColOpts = { nullable?: boolean };
 
@@ -219,7 +123,11 @@ export function getJSONBSchemaTSTypes(
     } else throw "Unexpected getSchemaTSTypes: " + JSON.stringify({ fieldType, schema }, null, 2);
   };
 
-  return getFieldType({ ...(schema as any), nullable: colOpts.nullable }, undefined, outerLeading);
+  return getFieldType(
+    { ...(schema as JSONB.FieldTypeObj), nullable: colOpts.nullable },
+    undefined,
+    outerLeading
+  );
 }
 
 const isValidIdentifier = (str: string) => {
