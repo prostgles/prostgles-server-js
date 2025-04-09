@@ -133,7 +133,7 @@ export async function insertNestedRecords(
             if (!Array.isArray(colRows) || !colRow || otherColRows.length) {
               const someFcolsAreNullOrUndefined =
                 colRow &&
-                colInsert.insertedFieldRef.fcols.some((fcol) => [undefined].includes(colRow[fcol]));
+                colInsert.insertedFieldRef.fcols.some((fcol) => colRow[fcol] === undefined);
               throw new Error(
                 [
                   "Could not do nested column insert: ",

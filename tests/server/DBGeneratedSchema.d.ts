@@ -394,6 +394,27 @@ export type DBGeneratedSchema = {
       id: string;
     };
   };
+  table_name3434: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id: number;
+    };
+  };
+  table_name3434cccc: {
+    is_view: false;
+    select: true;
+    insert: true;
+    update: true;
+    delete: true;
+    columns: {
+      id?: null | number;
+      id2?: null | number;
+    };
+  };
   tjson: {
     is_view: false;
     select: true;

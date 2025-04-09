@@ -1,6 +1,6 @@
 import path from "path";
 import prostgles from "prostgles-server";
-import { DBGeneratedSchema } from "./DBoGenerated";
+import { DBGeneratedSchema } from "./DBGeneratedSchema";
 
 prostgles<DBGeneratedSchema>({
   dbConnection: {
@@ -17,15 +17,17 @@ prostgles<DBGeneratedSchema>({
           jsonbSchemaType: {
             showIntro: { type: "boolean", optional: true },
             theme: { enum: ["light", "dark", "auto"], optional: true },
-            two_factor_auth: { oneOf: [{ type: { enum: ["app"] } }] },
+            two_factor_auth: { oneOf: [{ enum: ["app"] }] },
           },
         },
       },
     },
   },
-  onReady: async (db) => {
-    const user = await db.users.findOne({ id: 123 });
+  onReady: async ({ dbo }) => {
+    const user = await dbo.users.findOne({ id: 123 });
 
-    // user.preferences.theme =
+    user?.preferences.theme === "dark";
+    //@ts-expect-error
+    user?.status === "actived";
   },
 });

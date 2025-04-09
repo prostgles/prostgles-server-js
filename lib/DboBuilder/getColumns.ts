@@ -5,6 +5,7 @@ import {
   _PG_geometric,
   isDefined,
   isObject,
+  omitKeys,
 } from "prostgles-types";
 import { TableRule } from "../PublishParser/PublishParser";
 import {
@@ -56,7 +57,7 @@ export async function getColumns(
       }
     }
 
-    const columns = this.columns
+    const columns: ValidatedColumnInfo[] = this.columns
       .filter((c) => {
         const { insert, select, update } = rules;
 
@@ -75,8 +76,6 @@ export async function getColumns(
         const _delete = !!this.tableOrViewInfo.privileges.delete;
         let update = !!c.privileges.UPDATE;
 
-        delete (c as any).privileges;
-
         const prostgles = this.dboBuilder.prostgles;
         const fileConfig = prostgles.fileManager?.getColInfo({
           colName: c.name,
@@ -88,10 +87,10 @@ export async function getColumns(
           update = false;
         }
 
-        const nonOrderableUD_Types: PG_COLUMN_UDT_DATA_TYPE[] = [..._PG_geometric, "xml" as any];
+        const nonOrderableUD_Types: string[] = [..._PG_geometric, "xml"];
 
         const result: ValidatedColumnInfo = {
-          ...c,
+          ...omitKeys(c, ["privileges"]),
           label,
           tsDataType: postgresToTsType(c.udt_name),
           insert:

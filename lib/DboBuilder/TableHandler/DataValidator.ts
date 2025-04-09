@@ -402,8 +402,8 @@ const convertionFuncs: ConvertionFunc[] = [
     getQuery: ({ args, column }) => {
       if (!args.length) throw "merge function requires at least one argument";
       const argVals = args.map((arg) => asValue(arg));
-      const argList = argVals.join(" || ");
-      return `COALESCE(${asName(column.name)}, ${argVals.join(", ")}) || ${argList}`;
+      const mergedArgs = argVals.join(" || ");
+      return `COALESCE(${asName(column.name)}, ${argVals.join(", ")}) || ${mergedArgs}`;
     },
   },
 ];

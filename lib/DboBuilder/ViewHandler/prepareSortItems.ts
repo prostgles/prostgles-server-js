@@ -1,6 +1,7 @@
 import { OrderBy, asName, isDefined, isEmpty, isObject } from "prostgles-types/dist";
 import { SortItem } from "../DboBuilder";
 import { NewQueryJoin, SelectItemValidated, asNameAlias } from "../QueryBuilder/QueryBuilder";
+import { validateValueUsingJSONBSchema } from "../../JSONBValidation/validation";
 
 /* This relates only to SELECT */
 export const prepareSortItems = (
@@ -135,6 +136,7 @@ const throwErr = (rawOrderBy: any) => {
         { key2: false, \"nested.key2\": false, key1: true } \
         { key1: 1, key2: -1 } \
         [{ key1: true }, { key2: false }] \
+        { key: 'colName', asc: true, nulls: 'first', nullEmpty: true } \
         [{ key: 'colName', asc: true, nulls: 'first', nullEmpty: true }]"
   );
 };
@@ -148,21 +150,32 @@ const parseOrderObj = (
   nulls?: "first" | "last";
   nullEmpty?: boolean;
 }[] => {
-  if (!isObject(orderBy)) return throwErr(orderBy);
+  if (!isObject(orderBy)) {
+    return throwErr(orderBy);
+  }
 
   const keys = Object.keys(orderBy);
-  if (keys.length && keys.find((k) => ["key", "asc", "nulls", "nullEmpty"].includes(k))) {
-    const { key, asc, nulls, nullEmpty = false } = orderBy;
-    if (
-      !["string"].includes(typeof key) ||
-      !["boolean"].includes(typeof asc) ||
-      !["first", "last", undefined, null].includes(nulls) ||
-      !["boolean"].includes(typeof nullEmpty)
-    ) {
-      throw `Invalid orderBy option (${JSON.stringify(orderBy, null, 2)}) \n 
-                      Expecting { key: string, asc?: boolean, nulls?: 'first' | 'last' | null | undefined, nullEmpty?: boolean } `;
-    }
-    return [{ key, asc, nulls, nullEmpty }];
+  if (typeof orderBy.key === "string") {
+    try {
+      if (
+        validateValueUsingJSONBSchema(
+          {
+            key: "string",
+            asc: { enum: [1, -1, false, true], optional: true },
+            nulls: { enum: ["first", "last"], optional: true },
+            nullEmpty: { type: "boolean", optional: true },
+          } as const,
+          orderBy
+        )
+      ) {
+        const { key, asc = true, nulls, nullEmpty = false } = orderBy;
+        return [{ key, asc: asc === true || asc === 1, nulls, nullEmpty }];
+      }
+    } catch {}
+    throw [
+      `Invalid orderBy option (${JSON.stringify(orderBy, null, 2)})`,
+      `Expecting { key: string, asc?: boolean, nulls?: 'first' | 'last' | null | undefined, nullEmpty?: boolean } `,
+    ].join("\n");
   }
 
   if (expectOne && keys.length > 1) {
