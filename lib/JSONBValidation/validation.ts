@@ -21,7 +21,7 @@ const PRIMITIVE_VALIDATORS: Record<NonArrayTypes, (val: any) => boolean> = {
   timestamp: (val) => typeof val === "string",
   any: (val) => typeof val !== "function" && typeof val !== "symbol",
   Date: (val) => typeof val === "string",
-  Lookup: (val) => {
+  Lookup: () => {
     throw new Error("Lookup type is not supported for validation");
   },
 };
@@ -55,11 +55,13 @@ const getValidator = (type: Extract<DataType, string>) => {
 const validateProperty = (key: string, val: any, rawFieldType: JSONB.FieldType): boolean => {
   let err = `The provided value for ${JSON.stringify(key)} is of invalid type. Expecting `;
   const fieldType = getFieldTypeObj(rawFieldType);
-  if ("type" in fieldType && fieldType.type) {
-    const { type, allowedValues, nullable, optional } = fieldType;
-    if (allowedValues) {
-      throw new Error(`Allowed values are not supported for validation`);
-    }
+  const { type, allowedValues, nullable, optional } = fieldType;
+  if (nullable && val === null) return true;
+  if (optional && val === undefined) return true;
+  if (allowedValues) {
+    throw new Error(`Allowed values are not supported for validation`);
+  }
+  if (type) {
     if (typeof type !== "string") {
       getKeys(type).forEach((subKey) => {
         validateProperty(subKey, val, (fieldType.type as JSONB.ObjectType["type"])[subKey]!);
@@ -68,8 +70,6 @@ const validateProperty = (key: string, val: any, rawFieldType: JSONB.FieldType):
     }
     err += fieldType.type;
 
-    if (nullable && val === null) return true;
-    if (optional && val === undefined) return true;
     const { validator } = getValidator(type);
     const isValid = validator(val);
     if (!isValid) {
@@ -91,7 +91,7 @@ export const validateValueUsingJSONBSchema = <S extends JSONB.ObjectType["type"]
   objName?: string,
   optional = false
 ): obj is JSONB.GetObjectType<S> => {
-  if (isEmpty(schema) && !optional) throw new Error(`Expecting ${objName} to be defined`);
+  if (obj === undefined && !optional) throw new Error(`Expecting ${objName} to be defined`);
   if (!isObject(obj)) {
     throw new Error(`Expecting ${objName} to be an object`);
   }
