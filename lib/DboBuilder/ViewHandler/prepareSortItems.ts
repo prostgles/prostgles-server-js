@@ -162,16 +162,23 @@ const parseOrderObj = (
     const { error, data } = getJSONBObjectSchemaValidationError(
       {
         key: "string",
-        asc: { enum: [1, -1, false, true], optional: true },
-        nulls: { enum: ["first", "last"], optional: true },
-        nullEmpty: { type: "boolean", optional: true },
+        asc: { enum: [1, -1, false, true, null], optional: true },
+        nulls: { enum: ["first", "last", null], optional: true },
+        nullEmpty: { enum: [false, true, null], optional: true },
       } as const,
       orderBy,
       "orderBy"
     );
     if (data) {
       const { key, asc = true, nulls, nullEmpty = false } = data;
-      return [{ key, asc: asc === true || asc === 1, nulls, nullEmpty }];
+      return [
+        {
+          key,
+          asc: asc === true || asc === 1,
+          nulls: nulls || undefined,
+          nullEmpty: nullEmpty || undefined,
+        },
+      ];
     } else {
       throw [
         error,

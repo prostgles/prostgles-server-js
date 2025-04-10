@@ -293,7 +293,6 @@ const getNestedSelectFields = ({ q, firstJoinTableAlias, _joinFields }: GetSelec
     type: "computed",
     selected: false,
     alias: NESTED_ROWID_FIELD_NAME,
-    // getFields: () => [],
     fields: [],
     getQuery,
     query: getQuery(firstJoinTableAlias),

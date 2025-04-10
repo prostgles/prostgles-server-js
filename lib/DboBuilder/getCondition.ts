@@ -139,7 +139,6 @@ export async function getCondition(
               columnName: undefined,
             }),
           fields: [f.name],
-          // getFields: () => [f.name],
           getQuery: (tableAlias) =>
             f.getQuery({
               tableAlias,
