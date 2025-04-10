@@ -7,7 +7,7 @@ import {
   isObject,
   omitKeys,
 } from "prostgles-types";
-import { TableRule } from "../PublishParser/PublishParser";
+import { ParsedTableRule } from "../PublishParser/PublishParser";
 import {
   LocalParams,
   getErrorAsObject,
@@ -24,7 +24,7 @@ export async function getColumns(
   lang?: string,
   params?: { rule: "update"; filter: AnyObject },
   _param3?: undefined,
-  tableRules?: TableRule,
+  tableRules?: ParsedTableRule,
   localParams?: LocalParams
 ): Promise<ValidatedColumnInfo[]> {
   const start = Date.now();

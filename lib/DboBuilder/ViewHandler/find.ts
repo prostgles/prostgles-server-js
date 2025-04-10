@@ -1,5 +1,5 @@
 import { SelectParams, isObject } from "prostgles-types";
-import { TableRule } from "../../PublishParser/PublishParser";
+import { ParsedTableRule } from "../../PublishParser/PublishParser";
 import {
   Filter,
   LocalParams,
@@ -20,7 +20,7 @@ export const find = async function (
   filter?: Filter,
   selectParams?: SelectParams,
   _?: undefined,
-  tableRules?: TableRule,
+  tableRules?: ParsedTableRule,
   localParams?: LocalParams
 ): Promise<any[]> {
   const start = Date.now();
@@ -56,9 +56,7 @@ export const find = async function (
         having: 1,
       } satisfies Record<keyof SelectParams, 1>);
 
-      const invalidParams = Object.keys(selectParams).filter(
-        (k) => !validParamNames.includes(k as any)
-      );
+      const invalidParams = Object.keys(selectParams).filter((k) => !validParamNames.includes(k));
       if (invalidParams.length)
         throw (
           "Invalid params: " +

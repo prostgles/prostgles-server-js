@@ -1,5 +1,5 @@
 import { SelectParams } from "prostgles-types";
-import { TableRule } from "../../PublishParser/publishTypesAndUtils";
+import { ParsedTableRule } from "../../PublishParser/publishTypesAndUtils";
 import { Filter, LocalParams } from "../DboBuilderTypes";
 import {
   getErrorAsObject,
@@ -12,8 +12,8 @@ export async function size(
   _filter?: Filter,
   selectParams?: SelectParams,
   param3_unused?: undefined,
-  table_rules?: TableRule,
-  localParams?: LocalParams,
+  table_rules?: ParsedTableRule,
+  localParams?: LocalParams
 ): Promise<string> {
   const filter = _filter || {};
   const start = Date.now();
@@ -23,7 +23,7 @@ export async function size(
       { ...selectParams, limit: 2 },
       undefined,
       table_rules,
-      localParams,
+      localParams
     ).then(async (_allowed) => {
       const q: string = (await this.find(
         filter,
@@ -33,7 +33,7 @@ export async function size(
         },
         undefined,
         table_rules,
-        { ...localParams, returnQuery: "noRLS", bypassLimit: true },
+        { ...localParams, returnQuery: "noRLS", bypassLimit: true }
       )) as any;
       const query = withUserRLS(
         localParams,
@@ -42,7 +42,7 @@ export async function size(
             FROM (
               ${q}
             ) prgl_size_query
-          `,
+          `
       );
 
       return (this.tx?.t || this.db).one(query).then(({ size }) => size || "0");

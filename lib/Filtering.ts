@@ -13,7 +13,7 @@ import {
   isEmpty,
   isObject,
 } from "prostgles-types";
-import { SelectItem } from "./DboBuilder/QueryBuilder/QueryBuilder";
+import { SelectItem, type SelectItemValidated } from "./DboBuilder/QueryBuilder/QueryBuilder";
 import { pgp } from "./DboBuilder/DboBuilderTypes";
 
 export const FILTER_OPERANDS = [
@@ -53,7 +53,7 @@ export const FILTER_OPERAND_TO_SQL_OPERAND = Object.fromEntries(
  */
 type ParseFilterItemArgs = {
   filter: FullFilter<void, void> | undefined;
-  select: SelectItem[] | undefined;
+  select: SelectItemValidated[] | undefined;
   tableAlias: string | undefined;
   allowedColumnNames: string[];
 };
@@ -91,22 +91,24 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
 
   const fKey: string = fKeys[0]!;
 
-  let selItem: SelectItem | undefined;
+  let selItem: SelectItemValidated | undefined;
   if (select) {
     selItem = select.find((s) => fKey === s.alias);
   }
   let rightF: FilterDataType<any> = (_f as any)[fKey];
 
-  const validateSelectedItemFilter = (selectedItem: SelectItem | undefined) => {
-    const fields = selectedItem?.getFields();
-    if (Array.isArray(fields) && fields.length > 1) {
+  const validateSelectedItemFilter = (selectedItem: SelectItemValidated | undefined) => {
+    const fields = selectedItem?.fields;
+    if (Array.isArray(fields) && fields.length) {
       const dissallowedFields = fields.filter((fname) => !allowedColumnNames.includes(fname));
       if (dissallowedFields.length) {
-        throw new Error(`Invalid/disallowed columns found in filter: ${dissallowedFields}`);
+        throw new Error(
+          `Invalid/disallowed columns found in filter: ${dissallowedFields.join(", ")}`
+        );
       }
     }
   };
-  const getLeftQ = (selItm: SelectItem) => {
+  const getLeftQ = (selItm: SelectItemValidated) => {
     validateSelectedItemFilter(selItem);
     if (selItm.type === "function" || selItm.type === "aggregation") return selItm.getQuery();
     return selItm.getQuery(tableAlias);
@@ -416,7 +418,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
 
 type ParseRightValOpts = {
   expect?: "csv" | "array" | "json" | "jsonb";
-  selectItem: SelectItem | undefined;
+  selectItem: SelectItemValidated | undefined;
 };
 export const parseFilterRightValue = (val: any, { expect, selectItem }: ParseRightValOpts) => {
   const asValue = (v: any) => pgp.as.format("$1", [v]);

@@ -21,7 +21,7 @@ import { ViewHandler } from "../ViewHandler/ViewHandler";
 import { COMPUTED_FIELDS, FieldSpec, FunctionSpec, parseFunction } from "./Functions";
 
 export type SelectItem = {
-  getFields: (args?: any[]) => string[] | "*";
+  getFields: (args: any[]) => string[] | "*";
   getQuery: (tableAlias?: string) => string;
   columnPGDataType?: string;
   column_udt_type?: PG_COLUMN_UDT_DATA_TYPE;
@@ -36,9 +36,12 @@ export type SelectItem = {
   | {
       type: "function" | "aggregation" | "joinedColumn" | "computed";
       columnName?: undefined;
+      // args: any[];
+      // getFields: (args: any[]) => string[] | "*";
+      // columnNames: string[];
     }
 );
-export type SelectItemValidated = SelectItem & { fields: string[] };
+export type SelectItemValidated = Omit<SelectItem, "getFields"> & { fields: string[] };
 export type WhereOptions = Awaited<ReturnType<ViewHandler["prepareWhere"]>>;
 export type NewQueryRoot = {
   /**
@@ -49,7 +52,7 @@ export type NewQueryRoot = {
   /**
    * Contains user selection and all the allowed columns. Allowed columns not selected are marked with  selected: false
    */
-  select: SelectItem[];
+  select: SelectItemValidated[];
 
   table: string;
   where: string;
@@ -100,7 +103,6 @@ export class SelectItemBuilder {
   private computedFields: FieldSpec[];
   private functions: FunctionSpec[];
   private allowedFieldsIncludingComputed: string[];
-  private isView: boolean;
   private columns: ColumnInfo[];
 
   constructor(params: {
@@ -116,7 +118,6 @@ export class SelectItemBuilder {
     this.allowedFields = params.allowedFields;
     this.allowedOrderByFields = params.allowedOrderByFields;
     this.computedFields = params.computedFields;
-    this.isView = params.isView;
     this.functions = params.functions;
     this.columns = params.columns;
     this.allowedFieldsIncludingComputed = this.allowedFields.concat(
@@ -159,11 +160,10 @@ export class SelectItemBuilder {
     return f;
   };
 
-  private addItem = (item: SelectItem) => {
-    let fields = item.getFields();
-    // console.trace(fields)
-    if (fields === "*") fields = this.allowedFields.slice(0);
-    fields.map((f) => this.checkField(f, item.selected));
+  private addItem = (item: SelectItemValidated) => {
+    const { fields } = item;
+
+    fields.forEach((f) => this.checkField(f, item.selected));
 
     if (this.select.find((s) => s.alias === item.alias)) {
       throw `Cannot specify duplicate columns ( ${item.alias} ). Perhaps you're using "*" with column names?`;
@@ -179,10 +179,11 @@ export class SelectItemBuilder {
       allowedFields: this.allowedFieldsIncludingComputed,
     });
 
+    const fieldFilter = funcDef.getFields(args);
     this.addItem({
       type: funcDef.type,
       alias,
-      getFields: () => funcDef.getFields(args),
+      fields: fieldFilter === "*" ? this.allowedFields : fieldFilter,
       getQuery: (tableAlias?: string) =>
         funcDef.getQuery({
           allColumns: this.columns,
@@ -225,7 +226,7 @@ export class SelectItemBuilder {
       tsDataType: colDef && postgresToTsType(colDef.udt_name),
       alias,
       getQuery: (tableAlias) => asNameAlias(fieldName, tableAlias),
-      getFields: () => [fieldName],
+      fields: [fieldName],
       selected,
     });
   };
@@ -293,7 +294,7 @@ export class SelectItemBuilder {
                   /* Shorthand notation -> it is expected that the key is the column name used as the only argument */
                   try {
                     this.checkField(key, true);
-                  } catch (err) {
+                  } catch {
                     throwErr(
                       ` Shorthand function notation error: the specifield column ( ${key} ) is invalid or dissallowed. \n Use correct column name or full aliased function notation, e.g.: -> { alias: { $func_name: ["column_name"] } } `
                     );

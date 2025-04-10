@@ -610,7 +610,6 @@ export const clientOnlyQueries = async (
       });
     };
 
-    /* TODO: SECURITY */
     log("auth.user:", auth.user);
 
     assert.equal(auth.loginType, "email+password", "auth.login.withPassword should be defined");

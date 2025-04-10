@@ -1,14 +1,8 @@
-import {
-  Publish,
-  PublishTableRule,
-} from "prostgles-server/dist/PublishParser/PublishParser";
+import { Publish, PublishTableRule } from "prostgles-server/dist/PublishParser/PublishParser";
 import { DBGeneratedSchema } from "./DBGeneratedSchema";
 import type { PublishFullyTyped } from "prostgles-server/dist/DBSchemaBuilder";
 
-export const testPublish: Publish<DBGeneratedSchema> = async ({
-  user,
-  sid,
-}) => {
+export const testPublish: Publish<DBGeneratedSchema> = async ({ user, sid }) => {
   if (sid === "noAuth") {
     return {
       planes: {
@@ -73,13 +67,15 @@ export const testPublish: Publish<DBGeneratedSchema> = async ({
     },
 
     items4: {
-      select: user
-        ? "*"
-        : {
+      select:
+        user ? "*" : (
+          {
             fields: { name: 0 },
+            filterFields: "*",
             orderByFields: { added: 1 },
             forcedFilter: { name: "abc" },
-          },
+          }
+        ),
       insert: "*",
       update: "*",
       delete: "*",
@@ -115,13 +111,9 @@ export const testPublish: Publish<DBGeneratedSchema> = async ({
         },
         postValidate: async ({ row, dbx: dboTx }) => {
           /** Records must exist in this transaction */
-          const exists = await dboTx.sql(
-            "SELECT * FROM insert_rules WHERE id = ${id}",
-            row,
-            {
-              returnType: "row",
-            },
-          );
+          const exists = await dboTx.sql("SELECT * FROM insert_rules WHERE id = ${id}", row, {
+            returnType: "row",
+          });
           const existsd = await dboTx.insert_rules.findOne({ id: row.id });
           if (row.id !== exists.id || row.id !== existsd.id) {
             console.error("postValidate failed");

@@ -8,7 +8,7 @@ import {
   type ColumnInfo,
 } from "prostgles-types";
 import { LocalParams, TableHandlers } from "../../DboBuilder";
-import { TableRule } from "../../../PublishParser/PublishParser";
+import { ParsedTableRule } from "../../../PublishParser/PublishParser";
 import { omitKeys } from "../../../PubSubManager/PubSubManager";
 import { TableHandler } from "../TableHandler";
 import { AuthClientRequest } from "../../../Auth/AuthTypes";
@@ -16,7 +16,7 @@ import { AuthClientRequest } from "../../../Auth/AuthTypes";
 type InsertNestedRecordsArgs = {
   data: AnyObject | AnyObject[];
   param2?: InsertParams;
-  tableRules: TableRule | undefined;
+  tableRules: ParsedTableRule | undefined;
   localParams: LocalParams | undefined;
 };
 
@@ -103,7 +103,7 @@ export async function insertNestedRecords(
         const rootData: AnyObject = omitKeys(row, omitedKeys);
 
         let insertedChildren: AnyObject[];
-        let targetTableRules: TableRule;
+        let targetTableRules: ParsedTableRule;
 
         const colInsertsResult = colInserts.map((ci) => ({
           ...ci,

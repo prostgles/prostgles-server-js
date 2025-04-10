@@ -15,7 +15,8 @@ import {
   type PublishObject,
   PublishParams,
   RULE_TO_METHODS,
-  TableRule,
+  ParsedTableRule,
+  parsePublishTableRule,
 } from "./publishTypesAndUtils";
 
 export class PublishParser {
@@ -105,7 +106,7 @@ export class PublishParser {
     tableName,
     command,
     clientReq,
-  }: DboTableCommand): Promise<TableRule> {
+  }: DboTableCommand): Promise<ParsedTableRule> {
     const clientInfo =
       clientReq && (await this.prostgles.authHandler?.getSidAndUserFromRequest(clientReq));
     const rules = await this.getValidatedRequestRule({ tableName, command, clientReq }, clientInfo);
@@ -115,7 +116,7 @@ export class PublishParser {
   async getValidatedRequestRule(
     { tableName, command, clientReq }: DboTableCommand,
     clientInfo: AuthResultWithSID | undefined
-  ): Promise<TableRule> {
+  ): Promise<ParsedTableRule> {
     if (!command || !tableName) throw "command OR tableName are missing";
 
     const rtm = RULE_TO_METHODS.find((rtms) => rtms.methods.some((v) => v === command));
@@ -170,19 +171,19 @@ export class PublishParser {
   async getTableRules(
     args: DboTable,
     clientInfo: AuthResultWithSID | undefined
-  ): Promise<ParsedPublishTable | undefined> {
+  ): Promise<ParsedTableRule | undefined> {
     const fileTablePublishRules = await this.getTableRulesWithoutFileTable(args, clientInfo);
     if (this.dbo[args.tableName]?.is_media) {
-      const { rules } = await getFileTableRules.bind(this)(
+      const { rules: fileTableRules } = await getFileTableRules.bind(this)(
         args.tableName,
         fileTablePublishRules,
         args.clientReq,
         clientInfo
       );
-      return rules;
+      return parsePublishTableRule(fileTableRules);
     }
 
-    return fileTablePublishRules;
+    return parsePublishTableRule(fileTablePublishRules);
   }
 
   getTableRulesWithoutFileTable = getTableRulesWithoutFileTable.bind(this);

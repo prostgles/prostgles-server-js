@@ -1,5 +1,5 @@
 import { AnyObject, SubscribeParams, SubscriptionChannels } from "prostgles-types";
-import { TableRule } from "../../PublishParser/PublishParser";
+import { ParsedTableRule } from "../../PublishParser/PublishParser";
 import {
   Filter,
   LocalParams,
@@ -51,7 +51,7 @@ async function subscribe(
   filter: Filter,
   params: SubscribeParams,
   localFuncs: undefined,
-  table_rules: TableRule | undefined,
+  table_rules: ParsedTableRule | undefined,
   localParams: LocalParams
 ): Promise<SubscriptionChannels>;
 async function subscribe(
@@ -59,7 +59,7 @@ async function subscribe(
   filter: Filter,
   params: SubscribeParams,
   localFuncs?: LocalFuncs,
-  table_rules?: TableRule,
+  table_rules?: ParsedTableRule,
   localParams?: LocalParams
 ): Promise<{ unsubscribe: () => any } | SubscriptionChannels> {
   const start = Date.now();

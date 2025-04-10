@@ -9,7 +9,7 @@ import {
   UpdateParams,
 } from "prostgles-types";
 import { DB } from "../../Prostgles";
-import { SyncRule, TableRule } from "../../PublishParser/PublishParser";
+import { SyncRule, ParsedTableRule } from "../../PublishParser/PublishParser";
 import TableConfigurator from "../../TableConfig/TableConfig";
 import {
   DboBuilder,
@@ -22,7 +22,7 @@ import {
 import type { TableSchema } from "../DboBuilderTypes";
 import { parseUpdateRules } from "../parseUpdateRules";
 import { COMPUTED_FIELDS, FUNCTIONS } from "../QueryBuilder/Functions";
-import { SelectItem, SelectItemBuilder } from "../QueryBuilder/QueryBuilder";
+import { SelectItemBuilder, type SelectItemValidated } from "../QueryBuilder/QueryBuilder";
 import { JoinPaths, ViewHandler } from "../ViewHandler/ViewHandler";
 import { DataValidator } from "./DataValidator";
 import { _delete } from "./delete";
@@ -35,7 +35,7 @@ export type ValidatedParams = {
   row: AnyObject;
   forcedData?: AnyObject;
   allowedFields?: FieldFilter;
-  tableRules?: TableRule;
+  tableRules?: ParsedTableRule;
   removeDisallowedFields: boolean;
   tableConfigurator: TableConfigurator | undefined;
   tableHandler: TableHandler;
@@ -76,7 +76,7 @@ export class TableHandler extends ViewHandler {
     rowOrRows: AnyObject | AnyObject[],
     param2?: InsertParams,
     param3_unused?: undefined,
-    tableRules?: TableRule,
+    tableRules?: ParsedTableRule,
     _localParams?: LocalParams
   ): Promise<any> {
     return insert.bind(this)(rowOrRows, param2, param3_unused, tableRules, _localParams);
@@ -85,8 +85,8 @@ export class TableHandler extends ViewHandler {
   prepareReturning = async (
     returning: Select | undefined,
     allowedFields: string[]
-  ): Promise<SelectItem[]> => {
-    const result: SelectItem[] = [];
+  ): Promise<SelectItemValidated[]> => {
+    const result: SelectItemValidated[] = [];
     if (returning) {
       const sBuilder = new SelectItemBuilder({
         allFields: this.column_names.slice(0),
@@ -105,7 +105,7 @@ export class TableHandler extends ViewHandler {
     return result;
   };
 
-  makeReturnQuery(items?: SelectItem[]) {
+  makeReturnQuery(items?: SelectItemValidated[]) {
     if (items?.length) return " RETURNING " + getSelectItemQuery(items);
     return "";
   }
@@ -114,7 +114,7 @@ export class TableHandler extends ViewHandler {
     filter?: Filter,
     params?: DeleteParams,
     param3_unused?: undefined,
-    table_rules?: TableRule,
+    table_rules?: ParsedTableRule,
     localParams?: LocalParams
   ): Promise<any> {
     return _delete.bind(this)(filter, params, param3_unused, table_rules, localParams);
@@ -124,7 +124,7 @@ export class TableHandler extends ViewHandler {
     filter: Filter,
     params?: UpdateParams,
     param3_unused?: undefined,
-    tableRules?: TableRule,
+    tableRules?: ParsedTableRule,
     localParams?: LocalParams
   ) {
     return this.delete(filter, params, param3_unused, tableRules, localParams);
@@ -137,7 +137,7 @@ export class TableHandler extends ViewHandler {
     filter: Filter,
     params: { select?: FieldFilter },
     param3_unused: undefined,
-    table_rules: TableRule,
+    table_rules: ParsedTableRule,
     localParams: LocalParams
   ) {
     const start = Date.now();
@@ -270,5 +270,5 @@ export class TableHandler extends ViewHandler {
   }
 }
 
-export const getSelectItemQuery = (items: SelectItem[]) =>
+export const getSelectItemQuery = (items: SelectItemValidated[]) =>
   items.map((s) => s.getQuery() + " AS " + asName(s.alias)).join(", ");

@@ -82,7 +82,7 @@ export const RULE_TO_METHODS = [
     rule: "select",
     sqlRule: "select",
     methods: RULE_METHODS.select,
-    no_limits: <SelectRule>{ fields: "*", filterFields: "*" },
+    no_limits: <SelectRule>{ fields: "*" },
     table_only: false,
     allowed_params: {
       fields: 1,
@@ -216,7 +216,7 @@ export type SelectRule<Cols extends AnyObject = AnyObject, S extends DBSchema | 
   forcedFilter?: FullFilter<Cols, S>;
 
   /**
-   * Fields user can filter by
+   * Fields user can filter by. If undefined will use the fields (allowed to be selected)
    * */
   filterFields?: FieldFilter<Cols>;
 
@@ -384,7 +384,13 @@ export type SyncRule<Cols extends AnyObject = AnyObject> = {
 export type SubscribeRule = {
   throttle?: number;
 };
-
+/**
+ * Required but possibly undefined type
+ * */
+export type Required_ish<T> = {
+  [K in keyof Required<T>]: T[K];
+};
+export type WithRequired<T, K extends keyof T> = T & { [P in K]-?: NonNullable<T[P]> };
 export type ViewRule<S extends AnyObject = AnyObject> = CommonTableRules & {
   /**
    * What can be read from the table
@@ -401,6 +407,57 @@ export type TableRule<
   sync?: SyncRule<RowType>;
   subscribe?: SubscribeRule;
 };
+
+export type ParsedViewRule<S extends AnyObject = AnyObject> = CommonTableRules & {
+  /**
+   * What can be read from the table
+   */
+  select?: WithRequired<SelectRule<S>, "filterFields" | "orderByFields">;
+};
+export type ParsedTableRule<
+  RowType extends AnyObject = AnyObject,
+  S extends DBSchema | void = void,
+> = ParsedViewRule<RowType> & {
+  insert?: WithRequired<InsertRule<RowType, S>, "returningFields">;
+  update?: WithRequired<UpdateRule<RowType, S>, "filterFields" | "returningFields">;
+  delete?: WithRequired<DeleteRule<RowType, S>, "returningFields">;
+  sync?: SyncRule<RowType>;
+  subscribe?: SubscribeRule;
+};
+
+export const parsePublishTableRule = <R extends ParsedPublishTable>(tableRules: R | undefined) => {
+  const selectRules: ParsedTableRule["select"] | undefined = tableRules?.select && {
+    ...tableRules.select,
+    /**
+     * Unless specified. Filtering should be allowed on fields the user can select
+     */
+    filterFields: tableRules.select.filterFields ?? tableRules.select.fields,
+    orderByFields: tableRules.select.orderByFields ?? tableRules.select.fields,
+  };
+
+  const parsedTableRules: ParsedTableRule | undefined = tableRules && {
+    ...tableRules,
+    select: selectRules,
+    insert: tableRules.insert && {
+      ...tableRules.insert,
+      returningFields:
+        tableRules.insert.returningFields ?? selectRules?.fields ?? tableRules.insert.fields,
+    },
+    update: tableRules.update && {
+      ...tableRules.update,
+      filterFields: tableRules.update.filterFields ?? selectRules?.filterFields ?? [],
+      returningFields:
+        tableRules.update.returningFields ?? selectRules?.fields ?? tableRules.update.fields,
+    },
+    delete: tableRules.delete && {
+      ...tableRules.delete,
+      returningFields:
+        tableRules.delete.returningFields ?? selectRules?.fields ?? tableRules.delete.filterFields,
+    },
+  };
+  return parsedTableRules;
+};
+
 export type PublishViewRule<Col extends AnyObject = AnyObject, S extends DBSchema | void = void> = {
   select?: SelectRule<Col, S> | PublishAllOrNothing;
   getColumns?: PublishAllOrNothing;

@@ -6,54 +6,49 @@ import { renderReactHook } from "./renderReactHook";
 
 export const clientHooks = async (
   db: DBHandlerClient,
-  getSocketOptions: (watchSchema?: boolean) => AnyObject,
+  getSocketOptions: (watchSchema?: boolean) => AnyObject
 ) => {
   const resultLoading = { data: undefined, isLoading: true, error: undefined };
   await describe("React hooks", async (t) => {
     const defaultFilter = { name: "abc" };
     await Promise.all(
-      ["useFind", "useSubscribe", "useFindOne", "useSubscribeOne"].map(
-        async (hookName) => {
-          await test(hookName, async (t) => {
-            const expectsOne = hookName.includes("One");
-            const options = {
-              select: { added: "$Mon" },
-              limit: expectsOne ? undefined : 1,
-            };
-            const expectedData = expectsOne
-              ? { added: "Dec" }
-              : [{ added: "Dec" }];
-            const { rerender, results } = await renderReactHook({
-              hook: db.items4[hookName]!,
-              props: [{ name: "abc" }, options],
-              expectedRerenders: 2,
-            });
-
-            assert.deepStrictEqual(results, [
-              resultLoading,
-              { data: expectedData, isLoading: false, error: undefined },
-            ]);
-
-            const { results: errorResults } = await rerender({
-              props: [{ named: "error" }, options],
-              expectedRerenders: 2,
-            });
-
-            assert.deepStrictEqual(errorResults, [
-              resultLoading,
-              {
-                data: undefined,
-                isLoading: false,
-                error: {
-                  message:
-                    "Table: items4 -> disallowed/inexistent columns in filter: named \n" +
-                    '  Expecting one of: added, "id", "public", "name"',
-                },
-              },
-            ]);
+      ["useFind", "useSubscribe", "useFindOne", "useSubscribeOne"].map(async (hookName) => {
+        await test(hookName, async (t) => {
+          const expectsOne = hookName.includes("One");
+          const options = {
+            select: { added: "$Mon" },
+            limit: expectsOne ? undefined : 1,
+          };
+          const expectedData = expectsOne ? { added: "Dec" } : [{ added: "Dec" }];
+          const { rerender, results } = await renderReactHook({
+            hook: db.items4[hookName]!,
+            props: [{ name: "abc" }, options],
+            expectedRerenders: 2,
           });
-        },
-      ),
+
+          assert.deepStrictEqual(results, [
+            resultLoading,
+            { data: expectedData, isLoading: false, error: undefined },
+          ]);
+
+          const { results: errorResults } = await rerender({
+            props: [{ named: "error" }, options],
+            expectedRerenders: 2,
+          });
+
+          assert.deepStrictEqual(errorResults, [
+            resultLoading,
+            {
+              data: undefined,
+              isLoading: false,
+              error: {
+                message:
+                  'items4.named is invalid/disallowed for filtering. Allowed columns: added, "id", "public", "name"',
+              },
+            },
+          ]);
+        });
+      })
     );
 
     await Promise.all(
@@ -88,7 +83,7 @@ export const clientHooks = async (
           // New results
           assert.deepStrictEqual(noResults, [resultLoading, result2]);
         });
-      }),
+      })
     );
 
     await test("useCount planes", async (t) => {
@@ -153,10 +148,7 @@ export const clientHooks = async (
       const lastData = lastResult?.data;
       assert.equal(lastData.length, 1);
       const lastDataItem = lastData[0];
-      assert.deepStrictEqual(
-        pickKeys(lastDataItem, Object.keys(plane0)),
-        plane0,
-      );
+      assert.deepStrictEqual(pickKeys(lastDataItem, Object.keys(plane0)), plane0);
 
       // Update item
       db.planes.update({ id: 0 }, { x: 230 });
@@ -171,7 +163,7 @@ export const clientHooks = async (
           undefined, // TODO - should be defined and 20
           20,
           230,
-        ],
+        ]
       );
 
       // // Rerender with different filter

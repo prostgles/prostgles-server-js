@@ -6,27 +6,24 @@ import {
   SelectParams,
   SubscribeParams,
   asName,
-  isEmpty,
   isObject,
 } from "prostgles-types";
 import { TableEvent } from "../../Logging";
 import { DB } from "../../Prostgles";
 import { Join } from "../../ProstglesTypes";
-import { TableRule } from "../../PublishParser/PublishParser";
+import { ParsedTableRule } from "../../PublishParser/PublishParser";
 import { Graph } from "../../shortestPath";
 import {
   DboBuilder,
   Filter,
   LocalParams,
   TableHandlers,
-  ValidatedTableRules,
   escapeTSNames,
   getSerializedClientErrorFromPGError,
   postgresToTsType,
 } from "../DboBuilder";
 import { TableSchema } from "../DboBuilderTypes";
-import { COMPUTED_FIELDS, FieldSpec } from "../QueryBuilder/Functions";
-import { asNameAlias } from "../QueryBuilder/QueryBuilder";
+import { getValidatedRules } from "../TableRules/getValidatedRules";
 import { getColumns } from "../getColumns";
 import { count } from "./count";
 import { find } from "./find";
@@ -192,182 +189,15 @@ export class ViewHandler {
 
   getColumns = getColumns.bind(this);
 
-  getValidatedRules(tableRules?: TableRule, localParams?: LocalParams): ValidatedTableRules {
-    if (localParams?.clientReq?.socket && !tableRules) {
-      throw "INTERNAL ERROR: Unexpected case -> localParams && !tableRules";
-    }
+  getValidatedRules = getValidatedRules.bind(this);
 
-    /* Computed fields are allowed only if select is allowed */
-    const allColumns: FieldSpec[] = this.column_names
-      .slice(0)
-      .map(
-        (fieldName) =>
-          ({
-            type: "column",
-            name: fieldName,
-            getQuery: ({ tableAlias }) => asNameAlias(fieldName, tableAlias),
-            selected: false,
-          }) as FieldSpec
-      )
-      .concat(
-        COMPUTED_FIELDS.map((c) => ({
-          type: c.type,
-          name: c.name,
-          getQuery: ({ tableAlias, allowedFields }) =>
-            c.getQuery({
-              allowedFields,
-              ctidField: undefined,
-              allColumns: this.columns,
-
-              /* CTID not available in AFTER trigger */
-              // ctidField: this.is_view? undefined : "ctid",
-              tableAlias,
-            }),
-          selected: false,
-        }))
-      );
-
-    if (tableRules) {
-      if (isEmpty(tableRules))
-        throw "INTERNAL ERROR: Unexpected case -> Empty table rules for " + this.name;
-      const throwFieldsErr = (
-          command: "select" | "update" | "delete" | "insert",
-          fieldType = "fields"
-        ) => {
-          throw `Invalid publish.${this.name}.${command} rule -> ${fieldType} setting is missing.\nPlease specify allowed ${fieldType} in this format: "*" | { col_name: false } | { col1: true, col2: true }`;
-        },
-        getFirstSpecified = (...fieldParams: (FieldFilter | undefined)[]): string[] => {
-          const firstValid = fieldParams.find((fp) => fp !== undefined);
-          return this.parseFieldFilter(firstValid);
-        };
-
-      const res: ValidatedTableRules = {
-        allColumns,
-        getColumns: tableRules.getColumns ?? true,
-        getInfo: tableRules.getColumns ?? true,
-      };
-
-      if (tableRules.select) {
-        if (!tableRules.select.fields) return throwFieldsErr("select");
-
-        let maxLimit: number | null = null;
-        if (
-          !localParams?.bypassLimit &&
-          tableRules.select.maxLimit !== undefined &&
-          tableRules.select.maxLimit !== maxLimit
-        ) {
-          const ml = tableRules.select.maxLimit;
-          if (!Number.isInteger(ml) || ml < 0)
-            throw (
-              ` Invalid publish.${this.name}.select.maxLimit -> expecting   a positive integer OR null    but got ` +
-              ml
-            );
-          maxLimit = ml;
-        }
-
-        const fields = this.parseFieldFilter(tableRules.select.fields);
-        res.select = {
-          fields,
-          orderByFields:
-            tableRules.select.orderByFields ?
-              this.parseFieldFilter(tableRules.select.orderByFields)
-            : fields,
-          forcedFilter: { ...tableRules.select.forcedFilter },
-          filterFields: this.parseFieldFilter(tableRules.select.filterFields),
-          maxLimit,
-        };
-      }
-
-      if (tableRules.update) {
-        if (!tableRules.update.fields) return throwFieldsErr("update");
-
-        res.update = {
-          fields: this.parseFieldFilter(tableRules.update.fields),
-          forcedData: { ...tableRules.update.forcedData },
-          forcedFilter: { ...tableRules.update.forcedFilter },
-          returningFields: getFirstSpecified(
-            tableRules.update.returningFields,
-            tableRules.select?.fields,
-            tableRules.update.fields
-          ),
-          filterFields: this.parseFieldFilter(tableRules.update.filterFields),
-        };
-      }
-
-      if (tableRules.insert) {
-        if (!tableRules.insert.fields) return throwFieldsErr("insert");
-
-        res.insert = {
-          fields: this.parseFieldFilter(tableRules.insert.fields),
-          forcedData: { ...tableRules.insert.forcedData },
-          returningFields: getFirstSpecified(
-            tableRules.insert.returningFields,
-            tableRules.select?.fields,
-            tableRules.insert.fields
-          ),
-        };
-      }
-
-      if (tableRules.delete) {
-        if (!tableRules.delete.filterFields) return throwFieldsErr("delete", "filterFields");
-
-        res.delete = {
-          forcedFilter: { ...tableRules.delete.forcedFilter },
-          filterFields: this.parseFieldFilter(tableRules.delete.filterFields),
-          returningFields: getFirstSpecified(
-            tableRules.delete.returningFields,
-            tableRules.select?.fields,
-            tableRules.delete.filterFields
-          ),
-        };
-      }
-
-      if (!tableRules.select && !tableRules.update && !tableRules.delete && !tableRules.insert) {
-        if ([null, false].includes(tableRules.getInfo as any)) res.getInfo = false;
-        if ([null, false].includes(tableRules.getColumns as any)) res.getColumns = false;
-      }
-
-      return res;
-    } else {
-      const allCols = this.column_names.slice(0);
-      return {
-        allColumns,
-        getColumns: true,
-        getInfo: true,
-        select: {
-          fields: allCols,
-          filterFields: allCols,
-          orderByFields: allCols,
-          forcedFilter: {},
-          maxLimit: null,
-        },
-        update: {
-          fields: allCols,
-          filterFields: allCols,
-          forcedFilter: {},
-          forcedData: {},
-          returningFields: allCols,
-        },
-        insert: {
-          fields: allCols,
-          forcedData: {},
-          returningFields: allCols,
-        },
-        delete: {
-          filterFields: allCols,
-          forcedFilter: {},
-          returningFields: allCols,
-        },
-      };
-    }
-  }
   find = find.bind(this);
 
   async findOne(
     filter?: Filter,
     selectParams?: SelectParams,
     _param3_unused?: undefined,
-    table_rules?: TableRule,
+    table_rules?: ParsedTableRule,
     localParams?: LocalParams
   ): Promise<any> {
     try {
@@ -409,7 +239,7 @@ export class ViewHandler {
     filter: Filter,
     params: SubscribeParams,
     localFuncs: undefined,
-    table_rules: TableRule | undefined,
+    table_rules: ParsedTableRule | undefined,
     localParams: LocalParams
   ): Promise<string>;
 
@@ -417,7 +247,7 @@ export class ViewHandler {
     filter: Filter,
     params: SubscribeParams,
     localFuncs?: LocalFuncs,
-    table_rules?: TableRule,
+    table_rules?: ParsedTableRule,
     localParams?: LocalParams
   ): Promise<{ unsubscribe: () => any } | string> {
     //@ts-ignore
@@ -441,14 +271,14 @@ export class ViewHandler {
     filter: Filter,
     params: SubscribeParams,
     localFunc: undefined,
-    table_rules: TableRule,
+    table_rules: ParsedTableRule,
     localParams: LocalParams
   ): Promise<string>;
   subscribeOne(
     filter: Filter,
     params: SubscribeParams = {},
     localFunc?: (item: AnyObject) => any,
-    table_rules?: TableRule,
+    table_rules?: ParsedTableRule,
     localParams?: LocalParams
   ): Promise<string | { unsubscribe: () => any }> {
     //@ts-ignore

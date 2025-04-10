@@ -1,6 +1,6 @@
 import pgPromise from "pg-promise";
 import { AnyObject, DeleteParams, FieldFilter } from "prostgles-types";
-import { DeleteRule, TableRule } from "../../PublishParser/PublishParser";
+import { DeleteRule, ParsedTableRule } from "../../PublishParser/PublishParser";
 import {
   Filter,
   LocalParams,
@@ -17,7 +17,7 @@ export async function _delete(
   filter?: Filter,
   params?: DeleteParams,
   param3_unused?: undefined,
-  tableRules?: TableRule,
+  tableRules?: ParsedTableRule,
   localParams?: LocalParams
 ): Promise<any> {
   const start = Date.now();

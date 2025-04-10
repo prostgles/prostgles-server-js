@@ -1,5 +1,5 @@
 import { AnyObject, InsertParams, asName, isObject } from "prostgles-types";
-import { TableRule, ValidateRowBasic } from "../../../PublishParser/PublishParser";
+import { ParsedTableRule, ValidateRowBasic } from "../../../PublishParser/PublishParser";
 import {
   LocalParams,
   getErrorAsObject,
@@ -17,7 +17,7 @@ export async function insert(
   rowOrRows: AnyObject | AnyObject[] = {},
   insertParams?: InsertParams,
   param3_unused?: undefined,
-  tableRules?: TableRule,
+  tableRules?: ParsedTableRule,
   localParams?: LocalParams
 ): Promise<any> {
   const ACTION = "insert";

@@ -1,13 +1,13 @@
 import { AnyObject, FieldFilter, isDefined, UpdateParams } from "prostgles-types";
-import { Filter, LocalParams } from "./DboBuilder";
 import {
-  TableRule,
   UpdateRule,
   ValidateRowBasic,
   ValidateUpdateRowBasic,
+  type ParsedTableRule,
 } from "../PublishParser/PublishParser";
-import { TableHandler } from "./TableHandler/TableHandler";
+import { Filter, LocalParams } from "./DboBuilder";
 import { prepareNewData } from "./TableHandler/DataValidator";
+import { TableHandler } from "./TableHandler/TableHandler";
 
 /**
  * 1) Check if publish is valid
@@ -17,7 +17,7 @@ export async function parseUpdateRules(
   this: TableHandler,
   filter: Filter,
   params?: UpdateParams,
-  tableRules?: TableRule,
+  tableRules?: ParsedTableRule,
   localParams?: LocalParams
 ): Promise<{
   fields: string[];
@@ -46,7 +46,7 @@ export async function parseUpdateRules(
     if (!tableRules.update) throw "update rules missing for " + this.name;
     ({ forcedFilter, forcedData, fields, filterFields, validate } = tableRules.update);
 
-    returningFields = tableRules.update.returningFields ?? tableRules.select?.fields ?? "";
+    returningFields = tableRules.update.returningFields;
 
     if (!returningFields && params?.returning) {
       throw "You are not allowed to return any fields from the update";

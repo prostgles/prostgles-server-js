@@ -9,7 +9,7 @@ import {
   isEmpty,
   omitKeys,
 } from "prostgles-types";
-import { TableRule } from "../../PublishParser/PublishParser";
+import { ParsedTableRule } from "../../PublishParser/PublishParser";
 import { Filter, LocalParams, ValidatedTableRules } from "../DboBuilder";
 import { ViewHandler } from "../ViewHandler/ViewHandler";
 import { parseJoinPath } from "../ViewHandler/parseJoinPath";
@@ -93,7 +93,7 @@ export async function getNewQuery(
   filter: Filter,
   selectParams: SelectParams & { alias?: string } = {},
   param3_unused = null,
-  tableRules: TableRule | undefined,
+  tableRules: ParsedTableRule | undefined,
   localParams: LocalParams | undefined
 ): Promise<NewQuery> {
   const { columns } = _this;
@@ -126,7 +126,7 @@ export async function getNewQuery(
     const j_selectParams: SelectParams = {};
     let j_filter: Filter = {},
       j_isLeftJoin = true,
-      j_tableRules: TableRule | undefined;
+      j_tableRules: ParsedTableRule | undefined;
     const j_alias = fTable;
 
     const parsedJoin = parseJoinSelect(_joinParams);

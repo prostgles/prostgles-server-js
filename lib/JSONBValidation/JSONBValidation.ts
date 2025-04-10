@@ -65,7 +65,7 @@ const getPropertyValidationError = (
     throw new Error(`Allowed values are not supported for validation`);
   }
   if (type) {
-    if (typeof type !== "string") {
+    if (isObject(type)) {
       for (const [subKey, subSchema] of getObjectEntries(type)) {
         const error = getPropertyValidationError(subKey, val, subSchema, [...path, key]);
         if (error) {

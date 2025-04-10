@@ -1,6 +1,6 @@
 import { strict as assert } from "assert";
 import type { DBHandlerClient, AuthHandler } from "./client";
-import { DBSchemaTable } from "prostgles-types";
+import { DBSchemaTable, omitKeys } from "prostgles-types";
 import { describe, test } from "node:test";
 
 export const clientRestApi = async (
@@ -9,28 +9,17 @@ export const clientRestApi = async (
   log: (...args: any[]) => any,
   methods,
   tableSchema: DBSchemaTable[],
-  token: string,
+  token: string
 ) => {
   await describe("clientRestApi", async () => {
     const rest = async (
-      {
-        tableName,
-        command,
-        noAuth,
-      }: { tableName: string; command: string; noAuth?: boolean },
+      { tableName, command, noAuth }: { tableName: string; command: string; noAuth?: boolean },
       ...params: any[]
-    ) =>
-      post(
-        { path: `db/${tableName}/${command}`, noAuth, token },
-        ...(params ?? []),
-      );
+    ) => post({ path: `db/${tableName}/${command}`, noAuth, token }, ...(params ?? []));
     const dbRest = (tableName: string, command: string, ...params: any[]) =>
       rest({ tableName, command }, ...(params ?? []));
-    const dbRestNoAuth = (
-      tableName: string,
-      command: string,
-      ...params: any[]
-    ) => rest({ tableName, command, noAuth: true }, ...(params ?? []));
+    const dbRestNoAuth = (tableName: string, command: string, ...params: any[]) =>
+      rest({ tableName, command, noAuth: true }, ...(params ?? []));
     const sqlRest = (query: string, ...params: any[]) =>
       post({ path: `db/sql`, token }, query, ...(params ?? []));
     const sqlMethods = (methodName: string, ...params: any[]) =>
@@ -42,7 +31,17 @@ export const clientRestApi = async (
       await db.planes.insert?.(dataFilter);
       const item = await db.planes.findOne?.(dataFilter);
       const itemR = await dbRest("planes", "findOne", dataFilter);
-      const itemRNA = await dbRestNoAuth("planes", "findOne", dataFilter);
+      /** last_updated excluded from select.fields and select.filterFields */
+      assert.deepStrictEqual(
+        await dbRestNoAuth("planes", "findOne", dataFilter).catch((error) => error),
+        {
+          error: {
+            message:
+              'planes.last_updated is invalid/disallowed for filtering. Allowed columns: "id", "x", "y", "flight_number"',
+          },
+        }
+      );
+      const itemRNA = await dbRestNoAuth("planes", "findOne", { id: dataFilter.id });
       assert.deepStrictEqual(item, itemR);
       const { last_updated, ...allowedData } = item!;
       assert.deepStrictEqual(allowedData, itemRNA);
@@ -69,7 +68,7 @@ export const clientRestApi = async (
             assert.deepStrictEqual(tbl.columns, restCols);
             assert.deepStrictEqual(tbl.info, info);
           }
-        }),
+        })
       );
 
       const two22 = await sqlMethods("get", {});

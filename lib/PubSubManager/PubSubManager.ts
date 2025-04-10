@@ -34,7 +34,7 @@ import {
 import { find, pickKeys } from "prostgles-types/dist/util";
 import { LocalFuncs, getOnDataFunc, matchesLocalFuncs } from "../DboBuilder/ViewHandler/subscribe";
 import { EventTypes } from "../Logging";
-import { TableRule } from "../PublishParser/PublishParser";
+import { ParsedTableRule } from "../PublishParser/PublishParser";
 import { syncData } from "../SyncReplication";
 import { addSub } from "./addSub";
 import { notifListener } from "./notifListener";
@@ -59,7 +59,7 @@ export type SyncParams = {
   sid: string | undefined;
   channel_name: string;
   table_name: string;
-  table_rules?: TableRule;
+  table_rules?: ParsedTableRule;
   synced_field: string;
   id_fields: string[];
   batch_size: number;
@@ -78,7 +78,7 @@ export type SyncParams = {
 export type AddSyncParams = {
   socket: PRGLIOSocket;
   table_info: TableInfo;
-  table_rules: TableRule;
+  table_rules: ParsedTableRule;
   synced_field: string;
   allow_delete?: boolean;
   id_fields: string[];
@@ -122,7 +122,7 @@ export type SubscriptionParams = Pick<SubscribeParams, "throttle" | "throttleOpt
   table_info: TableOrViewInfo;
 
   /* Used as input */
-  table_rules?: TableRule;
+  table_rules?: ParsedTableRule;
   filter: object;
   params: SelectParams;
 

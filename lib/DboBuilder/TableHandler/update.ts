@@ -1,5 +1,5 @@
 import { AnyObject, UpdateParams } from "prostgles-types";
-import { TableRule } from "../../PublishParser/PublishParser";
+import { ParsedTableRule } from "../../PublishParser/PublishParser";
 import {
   Filter,
   LocalParams,
@@ -18,7 +18,7 @@ export async function update(
   filter: Filter,
   _newData: AnyObject,
   params?: UpdateParams,
-  tableRules?: TableRule,
+  tableRules?: ParsedTableRule,
   localParams?: LocalParams
 ): Promise<AnyObject | void> {
   const ACTION = "update";

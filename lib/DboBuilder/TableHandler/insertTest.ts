@@ -1,11 +1,11 @@
 import { AnyObject, asName, FieldFilter, FullFilter } from "prostgles-types";
 import { LocalParams, pgp } from "../DboBuilder";
-import { TableRule } from "../../PublishParser/PublishParser";
+import { ParsedTableRule } from "../../PublishParser/PublishParser";
 import { asValue } from "../../PubSubManager/PubSubManager";
 import { TableHandler } from "./TableHandler";
 
 type InsertTestArgs = {
-  tableRules: TableRule | undefined;
+  tableRules: ParsedTableRule | undefined;
   localParams: LocalParams | undefined;
 };
 export async function insertTest(this: TableHandler, { localParams, tableRules }: InsertTestArgs) {

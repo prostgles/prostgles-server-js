@@ -1,5 +1,5 @@
 import { TableInfo as TInfo } from "prostgles-types/dist";
-import { TableRule } from "../../PublishParser/PublishParser";
+import { ParsedTableRule } from "../../PublishParser/PublishParser";
 import { LocalParams } from "../DboBuilder";
 import { ViewHandler } from "./ViewHandler";
 
@@ -8,7 +8,7 @@ export async function getInfo(
   lang?: string,
   param2?: any,
   param3?: any,
-  tableRules?: TableRule,
+  tableRules?: ParsedTableRule,
   localParams?: LocalParams
 ): Promise<TInfo> {
   const p = this.getValidatedRules(tableRules, localParams);

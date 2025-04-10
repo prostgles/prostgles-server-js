@@ -1,7 +1,7 @@
 import { AnyObject, EXISTS_KEY, EXISTS_KEYS, FieldFilter, asName } from "prostgles-types";
 import { LocalParams, ExistsFilterConfig } from "../DboBuilder";
 import { ViewHandler } from "./ViewHandler";
-import { TableRule } from "../../PublishParser/PublishParser";
+import { ParsedTableRule } from "../../PublishParser/PublishParser";
 import { TableHandler } from "../TableHandler/TableHandler";
 import { getTableJoinQuery } from "./getTableJoinQuery";
 
@@ -23,7 +23,7 @@ export async function getExistsCondition(
     };
   }
 
-  let t2Rules: TableRule | undefined = undefined,
+  let t2Rules: ParsedTableRule | undefined = undefined,
     forcedFilter: AnyObject | undefined,
     filterFields: FieldFilter | undefined,
     tableAlias;
@@ -38,7 +38,7 @@ export async function getExistsCondition(
       tableName: targetTable,
       command: "find",
       clientReq: localParams.clientReq,
-    })) as TableRule | undefined;
+    })) as ParsedTableRule | undefined;
 
     if (!t2Rules || !t2Rules.select) throw "Dissallowed";
     ({ forcedFilter, filterFields } = t2Rules.select);

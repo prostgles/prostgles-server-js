@@ -5,7 +5,7 @@ import {
   reverseParsedPath,
   SubscribeParams,
 } from "prostgles-types";
-import { TableRule } from "../PublishParser/PublishParser";
+import { ParsedTableRule } from "../PublishParser/PublishParser";
 import { log, ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
 import { Filter, getSerializedClientErrorFromPGError, LocalParams } from "./DboBuilder";
 import { NewQuery } from "./QueryBuilder/QueryBuilder";
@@ -14,7 +14,7 @@ import { ViewHandler } from "./ViewHandler/ViewHandler";
 type Args = {
   selectParams: Omit<SubscribeParams, "throttle">;
   filter: Filter;
-  table_rules: TableRule<AnyObject, void> | undefined;
+  table_rules: ParsedTableRule<AnyObject, void> | undefined;
   localParams: LocalParams | undefined;
   newQuery: NewQuery;
 };

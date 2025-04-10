@@ -1,5 +1,5 @@
 import { AnyObject, UpdateParams } from "prostgles-types";
-import { TableRule } from "../../PublishParser/publishTypesAndUtils";
+import { ParsedTableRule } from "../../PublishParser/publishTypesAndUtils";
 import { Filter, LocalParams } from "../DboBuilderTypes";
 import { getErrorAsObject, getSerializedClientErrorFromPGError } from "../dboBuilderUtils";
 import { TableHandler } from "./TableHandler";
@@ -9,7 +9,7 @@ export const upsert = async function (
   filter: Filter,
   newData: AnyObject,
   params?: UpdateParams,
-  table_rules?: TableRule,
+  table_rules?: ParsedTableRule,
   localParams?: LocalParams
 ): Promise<any> {
   const start = Date.now();

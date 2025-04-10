@@ -1,5 +1,5 @@
 import { SelectParams } from "prostgles-types";
-import { TableRule } from "../../PublishParser/publishTypesAndUtils";
+import { ParsedTableRule } from "../../PublishParser/publishTypesAndUtils";
 import { Filter, LocalParams } from "../DboBuilder";
 import {
   getErrorAsObject,
@@ -13,8 +13,8 @@ export async function count(
   _filter?: Filter,
   selectParams?: SelectParams,
   _param3_unused?: undefined,
-  table_rules?: TableRule,
-  localParams?: LocalParams,
+  table_rules?: ParsedTableRule,
+  localParams?: LocalParams
 ): Promise<number> {
   const filter = _filter || {};
   const { limit: _limit, ...selectParamsWithoutLimit } = selectParams ?? {};
@@ -25,15 +25,13 @@ export async function count(
       { select: selectParamsWithoutLimit.select ?? "", limit: 0 },
       undefined,
       table_rules,
-      localParams,
+      localParams
     ).then(async (_allowed) => {
-      const findQuery = (await this.find(
-        filter,
-        selectParamsWithoutLimit,
-        undefined,
-        table_rules,
-        { ...localParams, returnQuery: "noRLS", bypassLimit: true },
-      )) as unknown as string;
+      const findQuery = (await this.find(filter, selectParamsWithoutLimit, undefined, table_rules, {
+        ...localParams,
+        returnQuery: "noRLS",
+        bypassLimit: true,
+      })) as unknown as string;
       const query = [
         withUserRLS(localParams, ""),
         "SELECT COUNT(*)",

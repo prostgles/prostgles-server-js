@@ -1,5 +1,5 @@
 import { AnyObject, getKeys, isObject } from "prostgles-types";
-import { TableRule, ValidateRowBasic } from "../../PublishParser/PublishParser";
+import { ParsedTableRule, ValidateRowBasic } from "../../PublishParser/PublishParser";
 import { omitKeys } from "../../PubSubManager/PubSubManager";
 import { LocalParams, Media } from "../DboBuilder";
 import { isFile, uploadFile } from "../uploadFile";
@@ -8,7 +8,7 @@ import { TableHandler } from "./TableHandler";
 type Args = {
   newData: AnyObject;
   filter: AnyObject;
-  tableRules: TableRule | undefined;
+  tableRules: ParsedTableRule | undefined;
   localParams: LocalParams | undefined;
 };
 export const updateFile = async function (

@@ -5,12 +5,9 @@ import {
   NewQueryJoin,
   SelectItem,
   asNameAlias,
+  type SelectItemValidated,
 } from "./QueryBuilder";
-import {
-  ROOT_TABLE_ALIAS,
-  ROOT_TABLE_ROW_NUM_ID,
-  indentLines,
-} from "./getSelectQuery";
+import { ROOT_TABLE_ALIAS, ROOT_TABLE_ROW_NUM_ID, indentLines } from "./getSelectQuery";
 import { ViewHandler } from "../ViewHandler/ViewHandler";
 import { getJoinOnCondition } from "../ViewHandler/getTableJoinQuery";
 import { prepareOrderByQuery } from "../DboBuilder";
@@ -41,7 +38,7 @@ export const NESTED_ROWID_FIELD_NAME = "prostgles_rowid_field";
 const getJoinTable = (
   tableName: string,
   pathIndex: number,
-  isLastTableAlias: string | undefined,
+  isLastTableAlias: string | undefined
 ) => {
   const rawAlias = isLastTableAlias ?? `p${pathIndex}  ${tableName}`;
   return {
@@ -73,10 +70,7 @@ type GetJoinQueryResult = {
   ) target_table
   ON ...condition
  */
-export const getJoinQuery = (
-  viewHandler: ViewHandler,
-  { q1, q2 }: Args,
-): GetJoinQueryResult => {
+export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoinQueryResult => {
   const paths = parseJoinPath({
     rootTable: q1.table,
     rawPath: q2.joinPath,
@@ -90,14 +84,14 @@ export const getJoinQuery = (
 
   const firstJoinTablePath = paths[0]!;
   const firstJoinTableJoinFields = firstJoinTablePath.on.flatMap((condObj) =>
-    Object.entries(condObj).map(([source, target]) => target),
+    Object.entries(condObj).map(([source, target]) => target)
   );
   const { rootSelectItems, jsonAggLimit } = getNestedSelectFields({
     q: q2,
     firstJoinTableAlias: getJoinTable(
       firstJoinTablePath.table,
       0,
-      paths.length === 1 ? targetTableAliasRaw : undefined,
+      paths.length === 1 ? targetTableAliasRaw : undefined
     ).rawAlias,
     _joinFields: firstJoinTableJoinFields,
   });
@@ -112,19 +106,12 @@ export const getJoinQuery = (
     getRightColName: (col) => getJoinCol(col).alias,
   });
 
-  const joinFields = rootSelectItems
-    .filter((s) => s.isJoinCol)
-    .map((s) => s.alias);
+  const joinFields = rootSelectItems.filter((s) => s.isJoinCol).map((s) => s.alias);
   const selectedFields = rootSelectItems
     .filter((s) => s.selected)
     .map((s) => asNameAlias(s.alias, targetTableAliasRaw));
-  const rootNestedSort = q1.orderByItems.filter(
-    (d) => d.nested?.joinAlias === q2.joinAlias,
-  );
-  const jsonAggSort = prepareOrderByQuery(
-    q2.orderByItems,
-    targetTableAliasRaw,
-  ).join(", ");
+  const rootNestedSort = q1.orderByItems.filter((d) => d.nested?.joinAlias === q2.joinAlias);
+  const jsonAggSort = prepareOrderByQuery(q2.orderByItems, targetTableAliasRaw).join(", ");
   const jsonAgg = `json_agg((SELECT x FROM (SELECT ${selectedFields}) as x )${jsonAggSort}) ${jsonAggLimit} as ${JSON_AGG_FIELD_NAME}`;
 
   const { innerQuery } = getInnerJoinQuery({
@@ -148,34 +135,26 @@ export const getJoinQuery = (
         jsonAgg,
         ...rootNestedSort.map((d) => d.nested!.wrapperQuerySortItem),
       ],
-      { appendCommas: true },
+      { appendCommas: true }
     ),
     `FROM (`,
     ...indentLines(innerQuery),
     `) ${targetTableAlias}`,
-    ...(isOrJoin
-      ? [`LEFT JOIN ${q1.table} ${ROOT_TABLE_ALIAS}`, `ON ${joinCondition}`]
-      : []),
+    ...(isOrJoin ? [`LEFT JOIN ${q1.table} ${ROOT_TABLE_ALIAS}`, `ON ${joinCondition}`] : []),
     `GROUP BY ${isOrJoin ? rootTableIdField : requiredJoinFields}`,
   ];
 
   /**
    * This is done to prevent join cte names clashing with actual table names
    */
-  const targetTableAliasTempRename = asName(
-    `${targetTableAlias}_prostgles_join_temp_rename`,
-  );
-  const cteLines = [
-    `${targetTableAliasTempRename} AS (`,
-    ...indentLines(wrappingQuery),
-    `)`,
-  ];
+  const targetTableAliasTempRename = asName(`${targetTableAlias}_prostgles_join_temp_rename`);
+  const cteLines = [`${targetTableAliasTempRename} AS (`, ...indentLines(wrappingQuery), `)`];
 
   const joinLines = [
     `${joinType} JOIN ( SELECT * FROM ${targetTableAliasTempRename} ) as ${targetTableAlias}`,
-    isOrJoin
-      ? `ON ${targetTableAlias}.${ROOT_TABLE_ROW_NUM_ID} = ${rootTableIdField}`
-      : `ON ${joinCondition}`,
+    isOrJoin ?
+      `ON ${targetTableAlias}.${ROOT_TABLE_ROW_NUM_ID} = ${rootTableIdField}`
+    : `ON ${joinCondition}`,
   ];
 
   return {
@@ -210,20 +189,16 @@ const getInnerJoinQuery = ({
     const targetQueryExtraQueries: string[] = [];
 
     const prevTable = getJoinTable(
-      !i
-        ? q1.tableAlias
-          ? asName(q1.tableAlias)
-          : q1.table
-        : paths[i - 1]!.table,
+      !i ?
+        q1.tableAlias ?
+          asName(q1.tableAlias)
+        : q1.table
+      : paths[i - 1]!.table,
       i - 1,
-      undefined,
+      undefined
     );
 
-    const table = getJoinTable(
-      path.table,
-      i,
-      isLast ? targetTableAliasRaw : undefined,
-    );
+    const table = getJoinTable(path.table, i, isLast ? targetTableAliasRaw : undefined);
 
     if (isLast) {
       if (q2.where) {
@@ -235,13 +210,11 @@ const getInnerJoinQuery = ({
       if (aggs.length) {
         const groupByFields = rootSelectItems
           .map((c, i) =>
-            c.isJoinCol || (c.selected && c.type !== "aggregation")
-              ? `${i + 1}`
-              : undefined,
+            c.isJoinCol || (c.selected && c.type !== "aggregation") ? `${i + 1}` : undefined
           )
           .filter(isDefined);
         if (groupByFields.length) {
-          targetQueryExtraQueries.push(`GROUP BY ${groupByFields}`);
+          targetQueryExtraQueries.push(`GROUP BY ${groupByFields.join(", ")}`);
         }
         if (q2.having) {
           targetQueryExtraQueries.push(`HAVING ${q2.having}`);
@@ -256,7 +229,7 @@ const getInnerJoinQuery = ({
         `  /* Join fields + select */`,
         ...indentLines(
           rootSelectItems.map((s) => s.query),
-          { appendCommas: true },
+          { appendCommas: true }
         ),
         `FROM ${table.name} ${table.alias}`,
         ...targetQueryExtraQueries,
@@ -283,15 +256,11 @@ type GetSelectFieldsArgs = {
   _joinFields: string[];
 };
 
-export type SelectItemNested = SelectItem & {
+export type SelectItemNested = SelectItemValidated & {
   query: string;
   isJoinCol: boolean;
 };
-const getNestedSelectFields = ({
-  q,
-  firstJoinTableAlias,
-  _joinFields,
-}: GetSelectFieldsArgs) => {
+const getNestedSelectFields = ({ q, firstJoinTableAlias, _joinFields }: GetSelectFieldsArgs) => {
   const targetTableAlias = q.tableAlias || q.table;
 
   const requiredJoinFields = Array.from(new Set(_joinFields));
@@ -306,13 +275,14 @@ const getNestedSelectFields = ({
       requiredJoinFields.map((f) => ({
         type: "column",
         columnName: f,
+        fields: [f],
         alias: f,
         getFields: () => [f],
         getQuery: (tableAlias) => asNameAlias(f, tableAlias),
         selected: false,
         isJoinCol: true,
         query: `${asName(firstJoinTableAlias)}.${getJoinCol(f).rootSelect}`,
-      })),
+      }))
     );
 
   const getQuery = (tableAlias?: string) => {
@@ -323,7 +293,8 @@ const getNestedSelectFields = ({
     type: "computed",
     selected: false,
     alias: NESTED_ROWID_FIELD_NAME,
-    getFields: () => [],
+    // getFields: () => [],
+    fields: [],
     getQuery,
     query: getQuery(firstJoinTableAlias),
     isJoinCol: false,
@@ -331,8 +302,6 @@ const getNestedSelectFields = ({
 
   return {
     rootSelectItems,
-    jsonAggLimit: q.limit
-      ? `FILTER (WHERE ${NESTED_ROWID_FIELD_NAME} <= ${q.limit})`
-      : "",
+    jsonAggLimit: q.limit ? `FILTER (WHERE ${NESTED_ROWID_FIELD_NAME} <= ${q.limit})` : "",
   };
 };

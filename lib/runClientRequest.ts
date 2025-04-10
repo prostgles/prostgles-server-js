@@ -12,7 +12,7 @@ import { TableHandler as TableHandlerServer } from "./DboBuilder/TableHandler/Ta
 import { parseFieldFilter } from "./DboBuilder/ViewHandler/parseFieldFilter";
 import { canRunSQL } from "./DboBuilder/runSQL";
 import { Prostgles } from "./Prostgles";
-import { TableRule } from "./PublishParser/publishTypesAndUtils";
+import { ParsedTableRule } from "./PublishParser/publishTypesAndUtils";
 
 const TABLE_METHODS = {
   find: 1,
@@ -50,7 +50,7 @@ type TableMethodFunctionWithRulesAndLocalParams = (
   arg1: any,
   arg2: any,
   arg3: any,
-  tableRule: TableRule,
+  tableRule: ParsedTableRule,
   localParams: LocalParams
 ) => any;
 

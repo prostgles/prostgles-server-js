@@ -1,5 +1,5 @@
 import { AnyObject, UpdateParams } from "prostgles-types";
-import { TableRule } from "../../PublishParser/PublishParser";
+import { ParsedTableRule } from "../../PublishParser/PublishParser";
 import {
   Filter,
   LocalParams,
@@ -15,8 +15,8 @@ export async function updateBatch(
   updates: [Filter, AnyObject][],
   params?: UpdateParams,
   _?: undefined,
-  tableRules?: TableRule,
-  localParams?: LocalParams,
+  tableRules?: ParsedTableRule,
+  localParams?: LocalParams
 ): Promise<any> {
   const start = Date.now();
   try {
@@ -31,11 +31,11 @@ export async function updateBatch(
           data,
           { ...(params ?? {}), returning: undefined },
           tableRules,
-          { ...(localParams ?? {}), returnQuery: "noRLS" },
+          { ...(localParams ?? {}), returnQuery: "noRLS" }
         )) as unknown as string;
 
         return query;
-      }),
+      })
     );
     const queries = [withUserRLS(localParams, ""), ...updateQueries];
 
@@ -60,7 +60,7 @@ export async function updateBatch(
           localParams,
           view: this,
           allowedKeys: [],
-        }),
+        })
       );
 
     await this._log({
