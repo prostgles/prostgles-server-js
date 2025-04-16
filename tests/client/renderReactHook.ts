@@ -186,4 +186,4 @@ export const renderReactHook = (rootArgs: RenderHookArgs): Promise<RenderResult>
   });
 };
 
-export const tout = (ms: number) => new Promise((res) => setTimeout(res, ms));
+const tout = (ms: number) => new Promise((res) => setTimeout(res, ms));
