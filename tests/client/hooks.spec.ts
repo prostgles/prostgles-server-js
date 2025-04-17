@@ -1,13 +1,10 @@
 import { strict as assert } from "assert";
 import { describe, test } from "node:test";
-import { AnyObject, pickKeys } from "prostgles-types";
+import { pickKeys } from "prostgles-types";
 import type { DBHandlerClient } from "./index";
 import { renderReactHook } from "./renderReactHook";
 
-export const clientHooks = async (
-  db: DBHandlerClient,
-  getSocketOptions: (watchSchema?: boolean) => AnyObject
-) => {
+export const clientHooks = async (db: DBHandlerClient) => {
   const resultLoading = { data: undefined, isLoading: true, error: undefined };
   await describe("React hooks", async (t) => {
     const defaultFilter = { name: "abc" };
@@ -187,3 +184,5 @@ export const clientHooks = async (
     });
   });
 };
+
+const tout = (ms) => new Promise((res) => setTimeout(res, ms));

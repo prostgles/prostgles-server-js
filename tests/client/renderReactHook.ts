@@ -67,7 +67,9 @@ const resetBasicComponent = () => {
   };
   root.render(React.createElement(OtherBasicComponent, { props: {} }, null));
 };
+
 type OnEnd<H extends Hook> = (results: ReturnType<H>[]) => Promise<void> | void;
+
 export const renderReactHookManual = async <H extends Hook>(rootArgs: {
   hook: H;
   initialProps: Parameters<H>;
@@ -80,8 +82,9 @@ export const renderReactHookManual = async <H extends Hook>(rootArgs: {
   onEnd?: OnEnd<H>;
   onRender?: OnEnd<H>;
 }): Promise<{
-  setProps: (props: Parameters<H>, opts: { waitFor?: number; onEnd?: OnEnd<H> }) => void;
+  setProps: (props: Parameters<H>, opts?: { waitFor?: number; onEnd?: OnEnd<H> }) => void;
   getResults: () => ReturnType<H>[];
+  unmount: () => void;
 }> => {
   const { hook, onUnmount, renderDuration = 250, onEnd, onRender } = rootArgs;
   let lastRenderWaitTimeout: NodeJS.Timeout | null = null;
@@ -109,6 +112,9 @@ export const renderReactHookManual = async <H extends Hook>(rootArgs: {
             await onEnd?.(results);
           },
           getResults: () => results,
+          unmount: () => {
+            resetBasicComponent();
+          },
         });
       }, renderDuration);
     };

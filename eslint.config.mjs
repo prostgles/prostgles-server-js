@@ -22,13 +22,7 @@ export default tseslint.config(
   },
   {
     files: ["**/*.js", "**/*.ts"],
-    extends: [
-      // "eslint:recommended",
-      // "plugin:@typescript-eslint/recommended",
-      tseslint.configs.recommendedTypeChecked,
-      // tsEslint.configs.recommended,
-      // pluginSecurity.configs.recommended,
-    ],
+    extends: [tseslint.configs.recommendedTypeChecked],
     rules: {
       "no-cond-assign": "error",
       "@typescript-eslint/no-namespace": "off",
@@ -67,46 +61,3 @@ export default tseslint.config(
     },
   }
 );
-// module.exports = {
-//   languageOptions: {
-//     ecmaVersion: "latest",
-//     sourceType: "module",
-//     project: "./tsconfig.json",
-//     allowImportExportEverywhere: true,
-//     parser: "@typescript-eslint/parser",
-//   },
-//   plugins: { "@typescript-eslint": tsEslint },
-//   extends: [
-//     // "eslint:recommended",
-//     // "plugin:@typescript-eslint/recommended",
-//     js.configs.recommended,
-//     // tsEslint.configs.recommended,
-//     // pluginSecurity.configs.recommended,
-//   ],
-//   rules: {
-//     "no-cond-assign": "error",
-//     "@typescript-eslint/no-namespace": "off",
-//     "@typescript-eslint/no-explicit-any": "off",
-//     "@typescript-eslint/no-non-null-assertion": "off",
-//     "@typescript-eslint/ban-types": "off",
-//     "@typescript-eslint/ban-ts-comment": "off",
-//     "@typescript-eslint/no-unused-expressions": "off",
-//     "@typescript-eslint/no-require-imports": "off",
-//     "@typescript-eslint/no-empty-object-type": "off",
-//     "no-async-promise-executor": "off",
-//     "@typescript-eslint/no-var-requires": "off",
-//     "@typescript-eslint/no-unnecessary-condition": "error",
-//     "@typescript-eslint/no-floating-promises": "error",
-//     "no-unused-vars": "off",
-//     "no-empty": "off",
-//     "@typescript-eslint/no-unused-vars": [
-//       "warn",
-//       {
-//         argsIgnorePattern: "^_",
-//         varsIgnorePattern: "^_",
-//         caughtErrorsIgnorePattern: "^_",
-//       },
-//     ],
-//   },
-//   ignores: ["node_modules", "dist", "examples", "**/*.d.ts", "tests", "docs"],
-// };

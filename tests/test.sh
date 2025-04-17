@@ -1,6 +1,7 @@
 #!/bin/bash
 cd client
 npm run build
+npm run testBasicHooks
 cd ../server
 
 if [ $# -eq 0 ]; then

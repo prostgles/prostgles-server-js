@@ -10,6 +10,7 @@ import { clientOnlyQueries } from "../clientOnlyQueries.spec";
 import { clientRestApi } from "../clientRestApi.spec";
 import { isomorphicQueries } from "../isomorphicQueries.spec";
 import { clientHooks } from "./hooks.spec";
+import * as _ from "./basicHooks.spec";
 import { newly_created_table, useProstglesTest } from "./useProstgles.spec";
 export { DBHandlerClient } from "prostgles-client/dist/prostgles";
 
@@ -45,7 +46,7 @@ const tests: Record<string, ClientTestSpecV2> = {
     await db.sql(`DROP TABLE IF EXISTS ${newly_created_table}`);
     await isomorphicQueries(db, log);
     await clientOnlyQueries(db, auth, log, methods, tableSchema, TEST_NAME);
-    await clientHooks(db, getSocketOptions);
+    await clientHooks(db);
   },
   useProstgles: async ({ db }) => {
     await useProstglesTest(db, getSocketOptions);
