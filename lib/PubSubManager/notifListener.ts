@@ -135,7 +135,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
           /* It is assumed the policy was checked before this point */
           void this.pushSubData(sub);
         } else if (!sub.is_throttling) {
-          log("throttling sub");
+          log("throttling sub for", throttle, "ms");
           sub.is_throttling = setTimeout(() => {
             log("throttling finished. pushSubData...");
             sub.is_throttling = null;

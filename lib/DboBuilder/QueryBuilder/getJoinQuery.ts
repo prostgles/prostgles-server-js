@@ -79,12 +79,15 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
     addShortestJoinIfMissing: true,
   });
 
+  if (q2.joins?.length) {
+    throw new Error("Nested joins not supported yet");
+  }
   const targetTableAliasRaw = q2.tableAlias || q2.table;
   const targetTableAlias = asName(targetTableAliasRaw);
 
   const firstJoinTablePath = paths[0]!;
   const firstJoinTableJoinFields = firstJoinTablePath.on.flatMap((condObj) =>
-    Object.entries(condObj).map(([source, target]) => target)
+    Object.entries(condObj).map(([_source, target]) => target)
   );
   const { rootSelectItems, jsonAggLimit } = getNestedSelectFields({
     q: q2,
@@ -112,7 +115,7 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
     .map((s) => asNameAlias(s.alias, targetTableAliasRaw));
   const rootNestedSort = q1.orderByItems.filter((d) => d.nested?.joinAlias === q2.joinAlias);
   const jsonAggSort = prepareOrderByQuery(q2.orderByItems, targetTableAliasRaw).join(", ");
-  const jsonAgg = `json_agg((SELECT x FROM (SELECT ${selectedFields}) as x )${jsonAggSort}) ${jsonAggLimit} as ${JSON_AGG_FIELD_NAME}`;
+  const jsonAgg = `json_agg((SELECT x FROM (SELECT ${selectedFields.join(", ")}) as x )${jsonAggSort}) ${jsonAggLimit} as ${JSON_AGG_FIELD_NAME}`;
 
   const { innerQuery } = getInnerJoinQuery({
     paths,
@@ -141,7 +144,7 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
     ...indentLines(innerQuery),
     `) ${targetTableAlias}`,
     ...(isOrJoin ? [`LEFT JOIN ${q1.table} ${ROOT_TABLE_ALIAS}`, `ON ${joinCondition}`] : []),
-    `GROUP BY ${isOrJoin ? rootTableIdField : requiredJoinFields}`,
+    `GROUP BY ${isOrJoin ? rootTableIdField : requiredJoinFields.join(", ")}`,
   ];
 
   /**
@@ -286,7 +289,7 @@ const getNestedSelectFields = ({ q, firstJoinTableAlias, _joinFields }: GetSelec
     );
 
   const getQuery = (tableAlias?: string) => {
-    const partitionBy = `PARTITION BY ${requiredJoinFields.map((f) => asNameAlias(f, tableAlias))}`;
+    const partitionBy = `PARTITION BY ${requiredJoinFields.map((f) => asNameAlias(f, tableAlias)).join(", ")}`;
     return `ROW_NUMBER() OVER(${partitionBy}) AS ${NESTED_ROWID_FIELD_NAME}`;
   };
   rootSelectItems.push({
