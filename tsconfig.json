@@ -20,6 +20,9 @@
     "declarationMap": true, 
     "noImplicitAny": true
   },
+  "include": [
+    "lib/**/*.spec.ts"
+  ],
   "exclude": [
     "dist"
   ]

@@ -1,6 +1,9 @@
 //@ts-ignore
 import type { DBHandlerServer } from "../dist/DboBuilder";
 import { test, describe } from "node:test";
+import { getJSONBObjectSchemaValidationError } from "../dist/JSONBValidation/JSONBValidation";
+import type { JSONB } from "prostgles-types";
+import { strict as assert } from "assert";
 
 export const serverOnlyQueries = async (db: DBHandlerServer) => {
   await describe("Server Only Queries", async () => {
@@ -24,10 +27,7 @@ export const serverOnlyQueries = async (db: DBHandlerServer) => {
       await db.api_table.findOne!({ id: 1 });
       const newRow = await db.api_table.insert!({}, { returning: "*" });
       if (newRow.col1 !== null) {
-        throw (
-          "api_table onMount failed: col1 missing. Got: " +
-          JSON.stringify(newRow)
-        );
+        throw "api_table onMount failed: col1 missing. Got: " + JSON.stringify(newRow);
       }
     });
   });

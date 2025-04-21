@@ -66,8 +66,11 @@ const getPropertyValidationError = (
   }
   if (type) {
     if (isObject(type)) {
+      if (!isObject(val)) {
+        return `${[...path, key].join(".")} is of invalid type. Expecting object`;
+      }
       for (const [subKey, subSchema] of getObjectEntries(type)) {
-        const error = getPropertyValidationError(subKey, val, subSchema, [...path, key]);
+        const error = getPropertyValidationError(subKey, val[subKey], subSchema, [...path, key]);
         if (error) {
           return error;
         }
@@ -83,8 +86,13 @@ const getPropertyValidationError = (
     }
     return;
   }
+
   if (fieldType.enum) {
-    err += `on of: ${fieldType.enum.join(", ")}`;
+    const otherOptions = [];
+    if (fieldType.nullable) otherOptions.push(null);
+    if (fieldType.optional) otherOptions.push(undefined);
+    err += `one of: ${JSON.stringify([...fieldType.enum, ...otherOptions]).slice(1, -1)}`;
+
     if (!fieldType.enum.includes(val)) return err;
     return;
   }
