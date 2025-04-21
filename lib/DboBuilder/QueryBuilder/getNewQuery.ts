@@ -125,8 +125,7 @@ export async function getNewQuery(
   await sBuilder.parseUserSelect(userSelect, async (fTable, _joinParams, throwErr) => {
     const j_selectParams: SelectParams = {};
     let j_filter: Filter = {},
-      j_isLeftJoin = true,
-      j_tableRules: ParsedTableRule | undefined;
+      j_isLeftJoin = true;
     const j_alias = fTable;
 
     const parsedJoin = parseJoinSelect(_joinParams);
@@ -160,36 +159,37 @@ export async function getNewQuery(
       j_selectParams.select = parsedJoin.params;
     }
 
-    const jTable =
+    const joinTableName =
       parsedJoin.type === "simple" ? fTable
       : typeof j_path === "string" ? j_path
       : j_path.at(-1)?.table;
-    if (!jTable) {
+    if (!joinTableName) {
       throw "jTable missing";
     }
-    const _thisJoinedTable: any = _this.dboBuilder.dbo[jTable];
-    if (!_thisJoinedTable) {
-      throw `Joined table ${JSON.stringify(jTable)} is disallowed or inexistent \nOr you've forgot to put the function arguments into an array`;
+    const joinTableHandler = _this.dboBuilder.dbo[joinTableName] as ViewHandler | undefined;
+    if (!joinTableHandler) {
+      throw `Joined table ${JSON.stringify(joinTableName)} is disallowed or inexistent \nOr you forgot to put the function arguments into an array`;
     }
 
+    let joinTableRules: ParsedTableRule | undefined;
     let isLocal = true;
     if (localParams && localParams.clientReq) {
       isLocal = false;
-      j_tableRules = await _this.dboBuilder.publishParser?.getValidatedRequestRuleWusr({
-        tableName: jTable,
+      joinTableRules = await _this.dboBuilder.publishParser?.getValidatedRequestRuleWusr({
+        tableName: joinTableName,
         command: "find",
         clientReq: localParams.clientReq,
       });
     }
 
-    const isAllowedAccessToTable = isLocal || j_tableRules;
+    const isAllowedAccessToTable = isLocal || joinTableRules;
     if (isAllowedAccessToTable) {
       const joinQuery: NewQuery = await getNewQuery(
-        _thisJoinedTable,
+        joinTableHandler,
         j_filter,
         { ...j_selectParams, alias: j_alias },
         param3_unused,
-        j_tableRules,
+        joinTableRules,
         localParams
       );
       joinQuery.isLeftJoin = j_isLeftJoin;

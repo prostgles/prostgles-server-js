@@ -171,9 +171,6 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
   };
 };
 
-/**
- * prepares the
- */
 const getInnerJoinQuery = ({
   paths,
   q1,
@@ -292,15 +289,18 @@ const getNestedSelectFields = ({ q, firstJoinTableAlias, _joinFields }: GetSelec
     const partitionBy = `PARTITION BY ${requiredJoinFields.map((f) => asNameAlias(f, tableAlias)).join(", ")}`;
     return `ROW_NUMBER() OVER(${partitionBy}) AS ${NESTED_ROWID_FIELD_NAME}`;
   };
-  rootSelectItems.push({
-    type: "computed",
-    selected: false,
-    alias: NESTED_ROWID_FIELD_NAME,
-    fields: [],
-    getQuery,
-    query: getQuery(firstJoinTableAlias),
-    isJoinCol: false,
-  });
+
+  if (q.limit) {
+    rootSelectItems.push({
+      type: "computed",
+      selected: false,
+      alias: NESTED_ROWID_FIELD_NAME,
+      fields: [],
+      getQuery,
+      query: getQuery(firstJoinTableAlias),
+      isJoinCol: false,
+    });
+  }
 
   return {
     rootSelectItems,
