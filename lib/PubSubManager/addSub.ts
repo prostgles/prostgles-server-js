@@ -1,4 +1,6 @@
 import { SubscriptionChannels } from "prostgles-types";
+import { VoidFunction } from "../SchemaWatch/SchemaWatch";
+import { tout } from "./initPubSubManager";
 import {
   BasicCallback,
   parseCondition,
@@ -6,7 +8,6 @@ import {
   Subscription,
   SubscriptionParams,
 } from "./PubSubManager";
-import { VoidFunction } from "../SchemaWatch/SchemaWatch";
 
 type AddSubscriptionParams = SubscriptionParams & {
   condition: string;
@@ -27,12 +28,11 @@ export async function addSub(
     localFuncs,
     table_rules,
     filter = {},
-    params = {},
+    selectParams = {},
     condition = "",
-    throttle = 0, //subOne = false,
     viewOptions,
     table_info,
-    throttleOpts,
+    subscribeOptions,
   } = subscriptionParams;
   const table_name = table_info.name;
 
@@ -43,16 +43,7 @@ export async function addSub(
     throw "addSub: cannot have socket AND func";
   }
 
-  let validated_throttle = subscriptionParams.throttle || 10;
-  const pubThrottle = table_rules?.subscribe?.throttle || 0;
-  if (pubThrottle && Number.isInteger(pubThrottle) && pubThrottle > 0) {
-    validated_throttle = pubThrottle;
-  }
-  if (throttle && Number.isInteger(throttle) && throttle >= pubThrottle) {
-    validated_throttle = throttle;
-  }
-
-  const channel_name = `${this.socketChannelPreffix}.${table_name}.${JSON.stringify(filter)}.${JSON.stringify(params)}.${"m"}.sub`;
+  const channel_name = `${this.socketChannelPreffix}.${table_name}.${JSON.stringify(filter)}.${JSON.stringify(selectParams)}.${"m"}.sub`;
   const mainTrigger = {
     table_name: table_name,
     condition: parseCondition(condition),
@@ -63,16 +54,16 @@ export async function addSub(
     channel_name,
     filter,
     localFuncs,
-    params,
-    last_throttled: 0,
+    selectParams: selectParams,
+    lastPushed: 0,
     socket,
-    throttleOpts,
+    subscribeOptions,
     table_info,
     is_ready: true,
     is_throttling: false,
     socket_id: socket?.id,
     table_rules,
-    throttle: validated_throttle,
+
     triggers: [mainTrigger],
   };
 
@@ -105,14 +96,21 @@ export async function addSub(
     }
   }
 
+  const { skipFirst, throttleOpts, throttle } = subscribeOptions;
+  const sendFirstData = async () => {
+    if (skipFirst) return;
+    if (throttleOpts?.skipFirst && throttle) {
+      await tout(throttle);
+    }
+    void this.pushSubData(newSub);
+  };
+
   if (localFuncs) {
     /**
      * Must ensure sub will start sending data after all triggers are set up.
      * Socket clients are not affected as they need to confirm they are ready to receive data
      */
-    result.sendFirstData = () => {
-      void this.pushSubData(newSub);
-    };
+    result.sendFirstData = sendFirstData;
   } else if (socket) {
     const removeListeners = () => {
       socket.removeAllListeners(channel_name);
@@ -121,9 +119,7 @@ export async function addSub(
     };
     removeListeners();
 
-    socket.once(result.channelNameReady, () => {
-      void this.pushSubData(newSub);
-    });
+    socket.once(result.channelNameReady, sendFirstData);
     socket.once(result.channelNameUnsubscribe, (_data: any, cb: BasicCallback) => {
       const res = "ok";
       this.subs = this.subs.filter((s) => {

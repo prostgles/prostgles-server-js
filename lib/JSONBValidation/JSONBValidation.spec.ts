@@ -45,7 +45,7 @@ void describe("JSONBValidation", async () => {
     assert.deepStrictEqual(
       getJSONBObjectSchemaValidationError(schema.type, { ...obj, age: 22.2 }, "test"),
       {
-        error: "age is of invalid type. Expecting integer",
+        error: "age is of invalid type. Expecting null | integer",
       }
     );
     assert.deepStrictEqual(
@@ -64,7 +64,7 @@ void describe("JSONBValidation", async () => {
         { ...obj, address: { ...obj.address, street_number: 22.22 } },
         "test"
       ),
-      { error: "address.street_number is of invalid type. Expecting integer" }
+      { error: "address.street_number is of invalid type. Expecting undefined | integer" }
     );
     assert.deepStrictEqual(
       getJSONBObjectSchemaValidationError(
@@ -88,7 +88,42 @@ void describe("JSONBValidation", async () => {
         { ...obj, address: { ...obj.address, t: 2 } },
         "test"
       ),
-      { error: 'address.t is of invalid type. Expecting one of: "a","b","c",null' }
+      { error: 'address.t is of invalid type. Expecting undefined | "a" | "b" | "c"' }
+    );
+  });
+  await test("getJSONBObjectSchemaValidationError oneOf record", () => {
+    assert.deepStrictEqual(
+      getJSONBObjectSchemaValidationError(
+        {
+          d: { record: { keysEnum: ["a", "b"], values: "boolean" } },
+          o: { optional: true, oneOf: ["number", "string[]"] },
+        },
+        { d: { a: true, b: 1 } },
+        "test"
+      ),
+      { error: "d.b is of invalid type. Expecting boolean" }
+    );
+    assert.deepStrictEqual(
+      getJSONBObjectSchemaValidationError(
+        {
+          d: { record: { keysEnum: ["a", "b"], values: "boolean" } },
+          o: { optional: true, oneOf: ["number", "string[]"] },
+        },
+        { d: { a: true, b: true }, o: false },
+        "test"
+      ),
+      { error: "o is of invalid type. Expecting undefined | number | string[]" }
+    );
+    assert.deepStrictEqual(
+      getJSONBObjectSchemaValidationError(
+        {
+          d: { record: { keysEnum: ["a", "b"], values: "boolean" } },
+          o: { optional: true, oneOf: ["number", "string[]"] },
+        },
+        { d: { a: true, b: true }, o: ["str"] },
+        "test"
+      ),
+      { data: { d: { a: true, b: true }, o: ["str"] } }
     );
   });
 });

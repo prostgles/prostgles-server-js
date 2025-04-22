@@ -1,4 +1,4 @@
-import { getKeys, getObjectEntries, isObject, JSONB } from "prostgles-types";
+import { getKeys, getObjectEntries, isEmpty, isObject, JSONB } from "prostgles-types";
 
 export const getFieldTypeObj = (rawFieldType: JSONB.FieldType): JSONB.FieldTypeObj => {
   if (typeof rawFieldType === "string") return { type: rawFieldType };
@@ -51,36 +51,35 @@ const getValidator = (type: Extract<DataType, string>) => {
 };
 
 const getPropertyValidationError = (
-  key: string,
-  val: any,
+  value: any,
   rawFieldType: JSONB.FieldType,
   path: string[] = []
 ): string | undefined => {
-  let err = `${[...path, key].join(".")} is of invalid type. Expecting `;
+  const err = `${path.join(".")} is of invalid type. Expecting ${getTypeDescription(rawFieldType).replaceAll("\n", "")}`;
   const fieldType = getFieldTypeObj(rawFieldType);
+
   const { type, allowedValues, nullable, optional } = fieldType;
-  if (nullable && val === null) return;
-  if (optional && val === undefined) return;
+  if (nullable && value === null) return;
+  if (optional && value === undefined) return;
   if (allowedValues) {
     throw new Error(`Allowed values are not supported for validation`);
   }
   if (type) {
     if (isObject(type)) {
-      if (!isObject(val)) {
-        return `${[...path, key].join(".")} is of invalid type. Expecting object`;
+      if (!isObject(value)) {
+        return err;
       }
       for (const [subKey, subSchema] of getObjectEntries(type)) {
-        const error = getPropertyValidationError(subKey, val[subKey], subSchema, [...path, key]);
-        if (error) {
+        const error = getPropertyValidationError(value[subKey], subSchema, [...path, subKey]);
+        if (error !== undefined) {
           return error;
         }
       }
       return;
     }
-    err += type;
 
     const { validator } = getValidator(type);
-    const isValid = validator(val);
+    const isValid = validator(value);
     if (!isValid) {
       return err;
     }
@@ -91,12 +90,100 @@ const getPropertyValidationError = (
     const otherOptions = [];
     if (fieldType.nullable) otherOptions.push(null);
     if (fieldType.optional) otherOptions.push(undefined);
-    err += `one of: ${JSON.stringify([...fieldType.enum, ...otherOptions]).slice(1, -1)}`;
+    // err += `one of: ${JSON.stringify([...fieldType.enum, ...otherOptions]).slice(1, -1)}`;
 
-    if (!fieldType.enum.includes(val)) return err;
+    if (!fieldType.enum.includes(value)) return err;
+    return;
+  }
+  if (fieldType.oneOf) {
+    if (!fieldType.oneOf.length) {
+      return err + "to not be empty";
+    }
+    let firstError: string | undefined;
+    const validMember = fieldType.oneOf.find((member) => {
+      const error = getPropertyValidationError(value, member, path);
+      firstError ??= error;
+      return error === undefined;
+    });
+    if (validMember) {
+      return;
+    }
+    return err;
+  }
+  if (fieldType.record) {
+    const { keysEnum, partial, values: valuesSchema } = fieldType.record;
+    if (!isObject(value)) {
+      return err + "object";
+    }
+    if (partial && isEmpty(value)) {
+      return;
+    }
+    const valueKeys = getKeys(value);
+    const missingKey = partial ? undefined : keysEnum?.find((key) => !valueKeys.includes(key));
+    if (missingKey !== undefined) {
+      return `${err} to have key ${missingKey}`;
+    }
+    const extraKeys = valueKeys.filter((key) => !keysEnum?.includes(key));
+    if (extraKeys.length) {
+      return `${err} has extra keys: ${extraKeys}`;
+    }
+    if (valuesSchema) {
+      for (const [propKey, propValue] of Object.entries(value)) {
+        const valError = getPropertyValidationError(propValue, valuesSchema, [...path, propKey]);
+        if (valError !== undefined) {
+          return `${valError}`;
+        }
+      }
+    }
     return;
   }
   return `Could not validate field type: ${JSON.stringify(fieldType)}`;
+};
+
+const getTypeDescription = (schema: JSONB.FieldType): string => {
+  const schemaObj = getFieldTypeObj(schema);
+  const { type, nullable, optional, oneOf, record } = schemaObj;
+  const allowedTypes: any[] = [];
+  if (nullable) allowedTypes.push("null");
+  if (optional) allowedTypes.push("undefined");
+  if (typeof type === "string") {
+    allowedTypes.push(type);
+  } else if (type) {
+    if (isObject(type)) {
+      const keyOpts: string[] = [];
+      Object.entries(type).forEach(([key, value]) => {
+        keyOpts.push(`${key}: ${getTypeDescription(value)}`);
+      });
+      allowedTypes.push(`{ ${keyOpts.join("; ")} }`);
+    }
+  }
+  schemaObj.enum?.forEach((v) => {
+    if (v === null) {
+      allowedTypes.push("null");
+    } else if (v === undefined) {
+      allowedTypes.push("undefined");
+    } else if (typeof v === "string") {
+      allowedTypes.push(JSON.stringify(v));
+    } else {
+      allowedTypes.push(v);
+    }
+  });
+  oneOf?.forEach((v) => {
+    const type = getTypeDescription(v);
+    allowedTypes.push(type);
+  });
+  if (record) {
+    const { keysEnum, partial, values } = record;
+    const optional = partial ? "?" : "";
+    const valueType = !values ? "any" : getTypeDescription(values);
+    if (keysEnum) {
+      allowedTypes.push(`{ [${keysEnum.join(" | ")}]${optional}: ${valueType} }`);
+    } else {
+      allowedTypes.push(`{ [key: string]${optional}: ${valueType} }`);
+    }
+  }
+
+  return allowedTypes.join(" | ");
 };
 
 export const getJSONBObjectSchemaValidationError = <S extends JSONB.ObjectType["type"]>(
@@ -110,7 +197,7 @@ export const getJSONBObjectSchemaValidationError = <S extends JSONB.ObjectType["
     return { error: `Expecting ${objName} to be an object` };
   }
   for (const [k, objSchema] of Object.entries(schema)) {
-    const error = getPropertyValidationError(k, obj[k], objSchema);
+    const error = getPropertyValidationError(obj[k], objSchema, [k]);
     if (error) {
       return { error };
     }

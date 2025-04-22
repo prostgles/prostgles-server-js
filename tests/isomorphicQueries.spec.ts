@@ -681,12 +681,18 @@ export const isomorphicQueries = async (
         "subscribeOne with throttle",
         async (resolve, reject) => {
           await db.various.insert!({ id: 99 });
-          const start = Date.now(); // name: "zz3zz"
+          const start = Date.now();
+          const pushed: number[] = [];
           const sub = await db.various.subscribeOne!(
             { id: 99 },
             { throttle: 1700 },
             async (item) => {
               const now = Date.now();
+              pushed.push(now - start);
+              if (pushed.length && pushed[0] > 400) {
+                reject("First item run should not be throttled", pushed);
+                return;
+              }
               if (item && item.name === "zz3zz2" && now - start > 1600 && now - start < 1800) {
                 await db.various.delete!({ name: "zz3zz2" });
                 sub.unsubscribe();
@@ -699,6 +705,109 @@ export const isomorphicQueries = async (
         },
         { timeout: 4000 }
       );
+    });
+
+    await test("subscribeOne with throttle skipFirst: true", async () => {
+      await tryRunP(
+        "subscribeOne with throttle skipFirst: true",
+        async (resolve, reject) => {
+          const filter = { id: 99 };
+          const start = Date.now();
+          const pushed: number[] = [];
+          const sub = await db.various.subscribeOne!(
+            filter,
+            { throttle: 1700, throttleOpts: { skipFirst: true } },
+            async (item) => {
+              const now = Date.now();
+              pushed.push(now - start);
+              if (pushed.length) {
+                if (pushed[0] < 1700) {
+                  reject("First item run should be throttled" + pushed[0], pushed);
+                } else {
+                  await sub.unsubscribe();
+                  resolve(true);
+                }
+              }
+            }
+          );
+          await db.various.insert!(filter);
+        },
+        { timeout: 4000 }
+      );
+    });
+
+    await test("subscribeOne without skipFirst", async () => {
+      let runs = 0;
+      const filter = { id: 199 };
+      const sub = await db.various.subscribeOne!(filter, { skipFirst: true }, async () => {
+        runs++;
+      });
+      await db.various.insert!(filter);
+      await tout(500);
+      assert.equal(runs, 1);
+      await db.various.delete!(filter);
+      await tout(500);
+      assert.equal(runs, 2);
+      await sub.unsubscribe();
+    });
+
+    await test("subscribeOne with skipFirst: true", async () => {
+      let runs = 0;
+      const filter = { id: 199 };
+      const sub = await db.various.subscribeOne!(filter, { skipFirst: true }, async () => {
+        runs++;
+      });
+      await tout(500);
+      assert.equal(runs, 0);
+      await db.various.insert!(filter);
+      await tout(500);
+      assert.equal(runs, 1);
+      await db.various.delete!(filter);
+      await tout(500);
+      assert.equal(runs, 2);
+      await sub.unsubscribe();
+    });
+
+    await test("subscribeOne actions: { insert: true }", async () => {
+      let runs = 0;
+      const filter = { id: 199 };
+      const sub = await db.various.subscribeOne!(
+        filter,
+        { actions: { insert: true } },
+        async () => {
+          runs++;
+        }
+      );
+      await tout(500);
+      assert.deepStrictEqual(runs, 1);
+      await db.various.insert!(filter);
+      await tout(500);
+      assert.equal(runs, 2);
+      await db.various.delete!(filter);
+      await tout(500);
+      assert.equal(runs, 2);
+      await sub.unsubscribe();
+    });
+    await test("subscribeOne actions: { insert: false }", async () => {
+      let runs = 0;
+      const filter = { id: 199 };
+      const sub = await db.various.subscribeOne!(
+        filter,
+        { actions: { insert: false } },
+        async () => {
+          runs++;
+        }
+      );
+      await tout(500);
+      assert.deepStrictEqual(runs, 1);
+      await db.various.insert!(filter);
+      await tout(500);
+      assert.equal(runs, 1);
+      await db.various.delete!(filter);
+      assert.equal(await db.various.count!(filter), 0);
+      await tout(500);
+      assert.equal(runs, 2);
+      await sub.unsubscribe();
     });
 
     await test("JSON filtering", async () => {

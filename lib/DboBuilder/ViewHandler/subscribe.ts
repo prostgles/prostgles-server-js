@@ -2,13 +2,14 @@ import { AnyObject, SubscribeParams, SubscriptionChannels } from "prostgles-type
 import { ParsedTableRule } from "../../PublishParser/PublishParser";
 import {
   Filter,
-  LocalParams,
   getErrorAsObject,
   getSerializedClientErrorFromPGError,
+  LocalParams,
 } from "../DboBuilder";
 import { getSubscribeRelatedTables } from "../getSubscribeRelatedTables";
 import { NewQuery } from "../QueryBuilder/QueryBuilder";
 import { ViewHandler } from "./ViewHandler";
+import { getValidatedSubscribeOptions } from "./getValidatedSubscribeOptions";
 
 type OnData = (items: AnyObject[]) => any;
 export type LocalFuncs =
@@ -80,7 +81,7 @@ async function subscribe(
       throw " Cannot have localFunc AND socket ";
     }
 
-    const { throttle = 0, throttleOpts, ...selectParams } = params;
+    const { throttle, throttleOpts, skipFirst, actions, ...selectParams } = params;
 
     /** Ensure request is valid */
     await this.find(filter, { ...selectParams, limit: 0 }, undefined, table_rules, localParams);
@@ -107,10 +108,12 @@ async function subscribe(
       condition: newQuery.whereOpts.condition,
       table_name: this.name,
       filter: { ...filter },
-      params: { ...selectParams },
-      throttle,
-      throttleOpts,
-      last_throttled: 0,
+      selectParams: { ...selectParams },
+      subscribeOptions: getValidatedSubscribeOptions(
+        { actions, skipFirst, throttle, throttleOpts },
+        table_rules?.subscribe
+      ),
+      lastPushed: 0,
     } as const;
 
     const pubSubManager = await this.dboBuilder.getPubSubManager();

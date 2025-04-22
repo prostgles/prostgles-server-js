@@ -35,6 +35,7 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
     return true;
   }
 
+  sub.lastPushed = Date.now();
   return new Promise(async (resolve, reject) => {
     /* TODO: Retire subOne -> it's redundant */
 
@@ -57,7 +58,6 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
       } else {
         onLog("no client to push data to");
       }
-      // sub.last_throttled = Date.now();
     } else {
       onLog("fetch data error");
       const errObj = { _err_msg: err.toString(), err };

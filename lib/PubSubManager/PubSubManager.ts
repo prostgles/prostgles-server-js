@@ -29,6 +29,7 @@ import {
   SelectParams,
   SubscribeParams,
   WAL,
+  type SubscribeOptions,
 } from "prostgles-types";
 
 import { find, pickKeys } from "prostgles-types/dist/util";
@@ -109,7 +110,7 @@ export type ViewSubscriptionOptions = (
   }[];
 };
 
-export type SubscriptionParams = Pick<SubscribeParams, "throttle" | "throttleOpts"> & {
+export type SubscriptionParams = {
   socket_id?: string;
   channel_name: string;
 
@@ -124,22 +125,23 @@ export type SubscriptionParams = Pick<SubscribeParams, "throttle" | "throttleOpt
   /* Used as input */
   table_rules?: ParsedTableRule;
   filter: object;
-  params: SelectParams;
+  selectParams: SelectParams;
+  subscribeOptions: SubscribeOptions;
 
   localFuncs?: LocalFuncs;
   socket: PRGLIOSocket | undefined;
 
-  last_throttled: number;
+  lastPushed: number;
   is_throttling?: any;
   is_ready?: boolean;
 };
 
 export type Subscription = Pick<
   SubscriptionParams,
-  | "throttle"
+  | "selectParams"
+  | "subscribeOptions"
   | "is_throttling"
-  | "last_throttled"
-  | "throttleOpts"
+  | "lastPushed"
   | "channel_name"
   | "is_ready"
   | "localFuncs"
@@ -147,7 +149,6 @@ export type Subscription = Pick<
   | "socket_id"
   | "table_info"
   | "filter"
-  | "params"
   | "table_rules"
 > & {
   triggers: {
@@ -298,7 +299,7 @@ export class PubSubManager {
   getSubData = async (
     sub: Subscription
   ): Promise<{ data: any[]; err?: undefined } | { data?: undefined; err: any }> => {
-    const { table_info, filter, params, table_rules } = sub; //, subOne = false
+    const { table_info, filter, selectParams: params, table_rules } = sub; //, subOne = false
     const { name: table_name } = table_info;
 
     if (!this.dbo[table_name]?.find) {

@@ -1,3 +1,4 @@
+import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
 import { log, NOTIF_TYPE, NotifTypeName, pickKeys, PubSubManager } from "./PubSubManager";
 
 /* Relay relevant data to relevant subscriptions */
@@ -128,10 +129,22 @@ export async function notifListener(this: PubSubManager, data: { payload: string
         )
       );
       activeAndReadySubs.forEach((sub) => {
-        const { throttle = 0, throttleOpts } = sub;
-        if (!throttleOpts?.skipFirst && sub.last_throttled <= Date.now() - throttle) {
-          sub.last_throttled = Date.now();
+        const { throttle = 0, throttleOpts, actions } = sub.subscribeOptions;
 
+        const commandLowerCase = (op_name?.toLowerCase() || "insert") as keyof NonNullable<
+          typeof actions
+        >;
+
+        const actionIsIgnored =
+          actions &&
+          !parseFieldFilter(actions, false, ["insert", "update", "delete"]).includes(
+            commandLowerCase as any
+          );
+        if (actionIsIgnored) {
+          return;
+        }
+
+        if (!throttleOpts?.skipFirst && sub.lastPushed <= Date.now() - throttle) {
           /* It is assumed the policy was checked before this point */
           void this.pushSubData(sub);
         } else if (!sub.is_throttling) {
@@ -139,7 +152,6 @@ export async function notifListener(this: PubSubManager, data: { payload: string
           sub.is_throttling = setTimeout(() => {
             log("throttling finished. pushSubData...");
             sub.is_throttling = null;
-            sub.last_throttled = Date.now();
             void this.pushSubData(sub);
           }, throttle);
         }
