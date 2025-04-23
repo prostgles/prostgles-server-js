@@ -1,9 +1,10 @@
 import * as pgp from "pg-promise";
-import { PubSubManager } from "./PubSubManager";
+import { type PubSubManager } from "./PubSubManager";
 import { getIsSuperUser } from "../Prostgles";
 import { EVENT_TRIGGER_TAGS } from "../Event_Trigger_Tags";
 import { DELETE_DISCONNECTED_APPS_QUERY } from "./orphanTriggerCheck";
 import { DB_OBJ_NAMES } from "./getPubSubManagerInitQuery";
+import { EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "./PubSubManagerUtils";
 
 const asValue = (v: any) => pgp.as.format("$1", [v]);
 
@@ -27,7 +28,7 @@ export async function initialiseEventTriggers(this: PubSubManager) {
         BEGIN;--  ISOLATION LEVEL SERIALIZABLE;
         
         /**                                 
-         * ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
+         * ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
          *  Drop stale triggers
          * */
         DO

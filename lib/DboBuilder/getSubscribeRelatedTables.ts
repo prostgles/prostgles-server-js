@@ -6,10 +6,11 @@ import {
   SubscribeParams,
 } from "prostgles-types";
 import { ParsedTableRule } from "../PublishParser/PublishParser";
-import { log, ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
+import { ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
 import { Filter, getSerializedClientErrorFromPGError, LocalParams } from "./DboBuilder";
 import { NewQuery } from "./QueryBuilder/QueryBuilder";
 import { ViewHandler } from "./ViewHandler/ViewHandler";
+import { log } from "../PubSubManager/PubSubManagerUtils";
 
 type Args = {
   selectParams: Omit<SubscribeParams, "throttle">;

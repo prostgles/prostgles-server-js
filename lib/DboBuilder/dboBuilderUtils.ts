@@ -11,9 +11,9 @@ import {
   getKeys,
   isObject,
   omitKeys,
+  pickKeys,
 } from "prostgles-types";
 import { DB } from "../Prostgles";
-import { pickKeys } from "../PubSubManager/PubSubManager";
 import { LocalParams, SortItem, pgp } from "./DboBuilderTypes";
 import { asNameAlias } from "./QueryBuilder/QueryBuilder";
 import { ViewHandler } from "./ViewHandler/ViewHandler";

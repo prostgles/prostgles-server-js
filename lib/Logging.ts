@@ -1,6 +1,7 @@
 import { AnyObject, ClientSchema, TableHandler } from "prostgles-types";
 import { LocalParams } from "./DboBuilder/DboBuilder";
-import { NotifTypeName, PubSubManagerTriggers } from "./PubSubManager/PubSubManager";
+import { PubSubManagerTriggers } from "./PubSubManager/PubSubManager";
+import type { NotifTypeName } from "./PubSubManager/PubSubManagerUtils";
 
 type ClientInfo = {
   socketId: string | undefined;

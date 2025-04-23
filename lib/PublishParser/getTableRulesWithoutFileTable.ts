@@ -2,7 +2,7 @@ import { getKeys, isObject } from "prostgles-types";
 import { AuthResultWithSID } from "../Auth/AuthTypes";
 import { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { ViewHandler } from "../DboBuilder/ViewHandler/ViewHandler";
-import { DEFAULT_SYNC_BATCH_SIZE } from "../PubSubManager/PubSubManager";
+import { DEFAULT_SYNC_BATCH_SIZE } from "../PubSubManager/PubSubManagerUtils";
 import { PublishParser } from "./PublishParser";
 import {
   DboTable,

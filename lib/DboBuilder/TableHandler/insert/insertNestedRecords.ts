@@ -5,11 +5,11 @@ import {
   InsertParams,
   isDefined,
   isObject,
+  omitKeys,
   type ColumnInfo,
 } from "prostgles-types";
 import { LocalParams, TableHandlers } from "../../DboBuilder";
 import { ParsedTableRule } from "../../../PublishParser/PublishParser";
-import { omitKeys } from "../../../PubSubManager/PubSubManager";
 import { TableHandler } from "../TableHandler";
 import { AuthClientRequest } from "../../../Auth/AuthTypes";
 

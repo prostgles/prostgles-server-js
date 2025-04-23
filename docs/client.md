@@ -270,9 +270,16 @@ Retrieves a list of matching records from the view/table and subscribes to chang
     - **having** <span style="color: grey">optional</span> <span style="color: green;">FullFilter</span>
 
       Filter applied after any aggregations (group by)
+    - **skipFirst** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
+
+      If true then the first value will not be emitted
+    - **actions** <span style="color: grey">optional</span> <span style="color: green;">Partial</span>
+
+      Controls which actions will trigger the subscription.
+      If not provided then all actions will be triggered
     - **throttle** <span style="color: grey">optional</span> <span style="color: green;">number</span>
 
-      If true then the subscription will be throttled to the provided number of milliseconds
+      If provided then the subscription will be throttled to the provided number of milliseconds
     - **throttleOpts** <span style="color: grey">optional</span> <span style="color: green;">{ skipFirst?: boolean | undefined; }</span>
       - **skipFirst** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
 
@@ -344,9 +351,16 @@ Retrieves a matching record from the view/table and subscribes to changes
     - **having** <span style="color: grey">optional</span> <span style="color: green;">FullFilter</span>
 
       Filter applied after any aggregations (group by)
+    - **skipFirst** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
+
+      If true then the first value will not be emitted
+    - **actions** <span style="color: grey">optional</span> <span style="color: green;">Partial</span>
+
+      Controls which actions will trigger the subscription.
+      If not provided then all actions will be triggered
     - **throttle** <span style="color: grey">optional</span> <span style="color: green;">number</span>
 
-      If true then the subscription will be throttled to the provided number of milliseconds
+      If provided then the subscription will be throttled to the provided number of milliseconds
     - **throttleOpts** <span style="color: grey">optional</span> <span style="color: green;">{ skipFirst?: boolean | undefined; }</span>
       - **skipFirst** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
 

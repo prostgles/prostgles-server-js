@@ -1,5 +1,9 @@
-import { asName as _asName, tryCatchV2, type AnyObject } from "prostgles-types";
-import { PubSubManager, asValue, log } from "../PubSubManager/PubSubManager";
+import { asName as _asName, type AnyObject } from "prostgles-types";
+import {
+  asValue,
+  EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID,
+  log,
+} from "../PubSubManager/PubSubManagerUtils";
 import type { OnReadyCallbackBasic } from "../initProstgles";
 import TableConfigurator from "./TableConfig";
 import {
@@ -10,7 +14,6 @@ import { getFutureTableSchema } from "./getFutureTableSchema";
 import { getPGIndexes } from "./getPGIndexes";
 import { getTableColumnQueries } from "./getTableColumnQueries";
 import { runMigrations } from "./runMigrations";
-import { applyTableConfig } from "./applyTableConfig";
 
 export const initTableConfig = async function (this: TableConfigurator) {
   this.initialising = true;
@@ -49,7 +52,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
     if (!_queries.some((q) => q.trim().length)) {
       return 0;
     }
-    q = `/* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ \n\n` + q;
+    q = `/* ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ \n\n` + q;
     queryHistory.push(q);
     await this.prostgles.opts.onLog?.({
       type: "debug",

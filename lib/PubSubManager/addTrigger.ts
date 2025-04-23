@@ -1,7 +1,8 @@
 import { tryCatchV2 } from "prostgles-types";
-import { asValue, PubSubManager, ViewSubscriptionOptions } from "./PubSubManager";
+import { type PubSubManager, ViewSubscriptionOptions } from "./PubSubManager";
 import * as crypto from "crypto";
 import { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
+import { asValue, EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "./PubSubManagerUtils";
 
 export async function addTrigger(
   this: PubSubManager,
@@ -31,7 +32,7 @@ export async function addTrigger(
     await this.db.tx((t) =>
       t.any(`
       BEGIN WORK;
-      /* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
+      /* ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
       /* why is this lock level needed? */
       --LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
 

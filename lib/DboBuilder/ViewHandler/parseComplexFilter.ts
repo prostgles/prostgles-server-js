@@ -7,7 +7,7 @@ import {
 import { FUNCTIONS, parseFunction } from "../QueryBuilder/Functions";
 import { asNameAlias, parseFunctionObject } from "../QueryBuilder/QueryBuilder";
 import { TableSchemaColumn } from "../DboBuilderTypes";
-import { asValue } from "../../PubSubManager/PubSubManager";
+import { asValue } from "../../PubSubManager/PubSubManagerUtils";
 
 const allowedComparators = FILTER_OPERANDS; //[">", "<", "=", "<=", ">=", "<>", "!="]
 type Args = {
@@ -73,32 +73,26 @@ export const parseComplexFilter = ({
   const leftVal = getFuncQuery(leftFilter);
   let result = leftVal;
   if (comparator) {
-    if (
-      typeof comparator !== "string" ||
-      !allowedComparators.includes(comparator as any)
-    ) {
+    if (typeof comparator !== "string" || !allowedComparators.includes(comparator as any)) {
       throw `Invalid $filter. comparator ${JSON.stringify(comparator)} is not valid. Expecting one of: ${allowedComparators}`;
     }
     if (!rightFilterOrValue) {
       throw "Invalid $filter. Expecting a value or function after the comparator";
     }
-    const maybeValidComparator =
-      comparator as keyof typeof FILTER_OPERAND_TO_SQL_OPERAND;
+    const maybeValidComparator = comparator as keyof typeof FILTER_OPERAND_TO_SQL_OPERAND;
     const sqlOperand = FILTER_OPERAND_TO_SQL_OPERAND[maybeValidComparator];
     if (!sqlOperand) {
       throw `Invalid $filter. comparator ${comparator} is not valid. Expecting one of: ${allowedComparators}`;
     }
 
-    let rightVal = isObject(rightFilterOrValue)
-      ? getFuncQuery(rightFilterOrValue)
+    let rightVal =
+      isObject(rightFilterOrValue) ?
+        getFuncQuery(rightFilterOrValue)
       : parseFilterRightValue(rightFilterOrValue, {
           selectItem: undefined,
           expect: ["$in", "$nin"].includes(comparator) ? "csv" : undefined,
         });
-    if (
-      maybeValidComparator === "$between" ||
-      maybeValidComparator === "$notBetween"
-    ) {
+    if (maybeValidComparator === "$between" || maybeValidComparator === "$notBetween") {
       if (!Array.isArray(rightVal) || rightVal.length !== 2) {
         throw "Between filter expects an array of two values";
       }

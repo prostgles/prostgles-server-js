@@ -1,13 +1,8 @@
 import { SubscriptionChannels } from "prostgles-types";
 import { VoidFunction } from "../SchemaWatch/SchemaWatch";
 import { tout } from "./initPubSubManager";
-import {
-  BasicCallback,
-  parseCondition,
-  PubSubManager,
-  Subscription,
-  SubscriptionParams,
-} from "./PubSubManager";
+import { BasicCallback, PubSubManager, Subscription, SubscriptionParams } from "./PubSubManager";
+import { parseCondition } from "./PubSubManagerUtils";
 
 type AddSubscriptionParams = SubscriptionParams & {
   condition: string;

@@ -10,7 +10,7 @@ import {
 } from "prostgles-types/dist";
 import { DBHandlerServer } from "../../Prostgles";
 import { ValidateRowBasic } from "../../PublishParser/PublishParser";
-import { asValue } from "../../PubSubManager/PubSubManager";
+import { asValue } from "../../PubSubManager/PubSubManagerUtils";
 import { LocalParams, TableSchemaColumn, pgp } from "../DboBuilder";
 import { parseFunctionObject } from "../QueryBuilder/QueryBuilder";
 import { validateObj } from "../ViewHandler/ViewHandler";

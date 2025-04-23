@@ -1,6 +1,5 @@
-import { AnyObject, getKeys, isObject } from "prostgles-types";
+import { AnyObject, getKeys, isObject, omitKeys } from "prostgles-types";
 import { ParsedTableRule, ValidateRowBasic } from "../../PublishParser/PublishParser";
-import { omitKeys } from "../../PubSubManager/PubSubManager";
 import { LocalParams, Media } from "../DboBuilder";
 import { isFile, uploadFile } from "../uploadFile";
 import { TableHandler } from "./TableHandler";

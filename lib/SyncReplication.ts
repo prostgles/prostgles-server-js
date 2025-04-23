@@ -1,6 +1,7 @@
-import { PubSubManager, SyncParams, pickKeys, omitKeys, log } from "./PubSubManager/PubSubManager";
-import { OrderBy, WAL, AnyObject, SyncBatchParams } from "prostgles-types";
+import { AnyObject, OrderBy, SyncBatchParams, WAL, omitKeys, pickKeys } from "prostgles-types";
 import { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
+import { PubSubManager, SyncParams } from "./PubSubManager/PubSubManager";
+import { log } from "./PubSubManager/PubSubManagerUtils";
 
 export type ClientSyncInfo = Partial<{
   c_fr: AnyObject;

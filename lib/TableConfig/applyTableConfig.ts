@@ -1,6 +1,6 @@
 import type { ProstglesError } from "prostgles-types";
 import { type Prostgles } from "../Prostgles";
-import { PubSubManager } from "../PubSubManager/PubSubManager";
+import { EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "../PubSubManager/PubSubManagerUtils";
 import { getSchemaDiffQueries } from "./getSchemaDiffQueries";
 import { getSchemaForTableConfig } from "./getSchemaForTableConfig";
 import { getTableConfigSchemaQueries } from "./getTableConfigSchemaQueries";
@@ -30,7 +30,7 @@ import { getSchemaUtils } from "./tableConfigSchemaUtils";
  */
 
 export const applyTableConfig = async (prostgles: Prostgles, commit = false) => {
-  const NO_RELOAD = `/* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ \n\n`;
+  const NO_RELOAD = `/* ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ \n\n`;
   const utils = await getSchemaUtils(prostgles);
   const { db } = utils;
   const { fileTable, tableConfig, tableConfigMigrations, onLog, sqlFilePath } = prostgles.opts;

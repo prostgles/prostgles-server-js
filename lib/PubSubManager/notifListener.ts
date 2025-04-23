@@ -1,5 +1,7 @@
+import { pickKeys } from "prostgles-types";
 import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
-import { log, NOTIF_TYPE, NotifTypeName, pickKeys, PubSubManager } from "./PubSubManager";
+import { PubSubManager } from "./PubSubManager";
+import { DELIMITER, log, NOTIF_TYPE, type NotifTypeName } from "./PubSubManagerUtils";
 
 /* Relay relevant data to relevant subscriptions */
 export async function notifListener(this: PubSubManager, data: { payload: string }) {
@@ -10,7 +12,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     return;
   }
 
-  const dataArr = str.split(PubSubManager.DELIMITER);
+  const dataArr = str.split(DELIMITER);
   const notifType = dataArr[0] as NotifTypeName;
 
   log(str);

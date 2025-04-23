@@ -1,6 +1,6 @@
 import type pgPromise from "pg-promise";
 import type { ProstglesInitOptions } from "../ProstglesTypes";
-import { PubSubManager } from "../PubSubManager/PubSubManager";
+import { EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "../PubSubManager/PubSubManagerUtils";
 import { getColConstraints } from "./getConstraintDefinitionQueries";
 
 export async function runMigrations(
@@ -15,7 +15,7 @@ export async function runMigrations(
 
   const { onMigrate, version, versionTableName = "schema_version" } = tableConfigMigrations;
   await t.any(`
-      /* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
+      /* ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
       CREATE TABLE IF NOT EXISTS ${asName(versionTableName)}(id NUMERIC PRIMARY KEY, table_config JSONB NOT NULL)
     `);
   const migrations = { version, table: versionTableName };

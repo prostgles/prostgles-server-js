@@ -1,6 +1,6 @@
 import { getKeys, isObject, type JSONB, type TableSchema } from "prostgles-types";
 import { postgresToTsType } from "../DboBuilder/DboBuilder";
-import { asValue } from "../PubSubManager/PubSubManager";
+import { asValue } from "../PubSubManager/PubSubManagerUtils";
 import { getFieldTypeObj } from "./JSONBValidation";
 
 type ColOpts = { nullable?: boolean };

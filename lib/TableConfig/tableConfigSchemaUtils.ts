@@ -1,6 +1,6 @@
 import { asName as _asName } from "prostgles-types";
 import type { Prostgles } from "../Prostgles";
-import { PubSubManager, log } from "../PubSubManager/PubSubManager";
+import { EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID, log } from "../PubSubManager/PubSubManagerUtils";
 
 const makeQuery = (q: string[]) =>
   q
@@ -21,7 +21,7 @@ export const getSchemaUtils = async (prostgles: Pick<Prostgles, "db" | "opts">) 
     if (!_queries.some((q) => q.trim().length)) {
       return 0;
     }
-    q = `/* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ \n\n` + q;
+    q = `/* ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ \n\n` + q;
     queryHistory.push(q);
     await opts.onLog?.({
       type: "debug",

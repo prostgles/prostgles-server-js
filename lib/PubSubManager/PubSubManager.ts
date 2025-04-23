@@ -19,20 +19,16 @@ import { initialiseEventTriggers } from "./initialiseEventTriggers";
 import { initPubSubManager } from "./initPubSubManager";
 import { refreshTriggers } from "./refreshTriggers";
 
-import * as pgPromise from "pg-promise";
-import pg from "pg-promise/typescript/pg-subset";
-
 import {
   AnyObject,
   CHANNELS,
   FieldFilter,
   SelectParams,
-  SubscribeParams,
   WAL,
   type SubscribeOptions,
 } from "prostgles-types";
 
-import { find, pickKeys } from "prostgles-types/dist/util";
+import { find, pickKeys } from "prostgles-types";
 import { LocalFuncs, getOnDataFunc, matchesLocalFuncs } from "../DboBuilder/ViewHandler/subscribe";
 import { EventTypes } from "../Logging";
 import { ParsedTableRule } from "../PublishParser/PublishParser";
@@ -40,18 +36,7 @@ import { syncData } from "../SyncReplication";
 import { addSub } from "./addSub";
 import { notifListener } from "./notifListener";
 import { pushSubData } from "./pushSubData";
-
-type PGP = pgPromise.IMain<{}, pg.IClient>;
-export const pgp: PGP = pgPromise({});
-export const asValue = (v: any) => pgp.as.format("$1", [v]);
-export const DEFAULT_SYNC_BATCH_SIZE = 50;
-
-export const log = (...args: any[]) => {
-  if (process.env.TEST_TYPE) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    console.log(...args);
-  }
-};
+import { log } from "./PubSubManagerUtils";
 
 export type BasicCallback = (err?: any, res?: any) => void;
 
@@ -164,11 +149,6 @@ export type PubSubManagerTriggers = Record<string, { condition: string; hash: st
  * Used to facilitate table subscribe and sync
  */
 export class PubSubManager {
-  static DELIMITER = "|$prstgls$|" as const;
-
-  static EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID =
-    "prostgles internal query that should be excluded from schema watch " as const;
-
   public static create = async (dboBuilder: DboBuilder) => {
     const instance = new PubSubManager(dboBuilder);
     const result = await initPubSubManager.bind(instance)();
@@ -403,21 +383,6 @@ export class PubSubManager {
   addTrigger = addTrigger.bind(this);
 }
 
-export const NOTIF_TYPE = {
-  data: "data_has_changed",
-  data_trigger_change: "data_watch_triggers_have_changed",
-  schema: "schema_has_changed",
-} as const;
-
-export type NotifTypeName = (typeof NOTIF_TYPE)[keyof typeof NOTIF_TYPE];
-export const NOTIF_CHANNEL = {
-  preffix: "prostgles_" as const,
-  getFull: (appID: string | undefined) => {
-    if (!appID) throw "No appID";
-    return NOTIF_CHANNEL.preffix + appID;
-  },
-};
-
 function debounce<Params extends any[]>(
   func: (...args: Params) => any,
   timeout: number
@@ -430,8 +395,3 @@ function debounce<Params extends any[]>(
     }, timeout);
   };
 }
-
-export const parseCondition = (condition: string): string =>
-  condition && condition.trim().length ? condition : "TRUE";
-
-export { omitKeys, pickKeys } from "prostgles-types";

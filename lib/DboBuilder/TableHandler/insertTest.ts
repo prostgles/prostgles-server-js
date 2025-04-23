@@ -1,7 +1,7 @@
 import { AnyObject, asName, FieldFilter, FullFilter } from "prostgles-types";
 import { LocalParams, pgp } from "../DboBuilder";
 import { ParsedTableRule } from "../../PublishParser/PublishParser";
-import { asValue } from "../../PubSubManager/PubSubManager";
+import { asValue } from "../../PubSubManager/PubSubManagerUtils";
 import { TableHandler } from "./TableHandler";
 
 type InsertTestArgs = {

@@ -1,4 +1,5 @@
 import { PubSubManager } from "./PubSubManager";
+import { EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "./PubSubManagerUtils";
 import { REALTIME_TRIGGER_CHECK_QUERY } from "./initPubSubManager";
 
 /**
@@ -32,7 +33,7 @@ export const getAppCheckQuery = () => `
   /* 
     ${queryIdentifier}
     ${REALTIME_TRIGGER_CHECK_QUERY} 
-    ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
+    ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID}
   */
   IF
     /* prostgles schema must exist */

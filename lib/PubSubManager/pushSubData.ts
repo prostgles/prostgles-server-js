@@ -1,6 +1,7 @@
 import { parseLocalFuncs } from "../DboBuilder/ViewHandler/subscribe";
 import { EventTypes } from "../Logging";
-import { log, PubSubManager, Subscription } from "./PubSubManager";
+import { type PubSubManager, Subscription } from "./PubSubManager";
+import { log } from "./PubSubManagerUtils";
 
 export async function pushSubData(this: PubSubManager, sub: Subscription, err?: any) {
   const { socket_id, channel_name } = sub;

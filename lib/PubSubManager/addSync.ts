@@ -1,11 +1,6 @@
 import { find, tryCatchV2 } from "prostgles-types";
-import {
-  AddSyncParams,
-  BasicCallback,
-  DEFAULT_SYNC_BATCH_SIZE,
-  PubSubManager,
-  parseCondition,
-} from "./PubSubManager";
+import { AddSyncParams, BasicCallback, PubSubManager } from "./PubSubManager";
+import { DEFAULT_SYNC_BATCH_SIZE, parseCondition } from "./PubSubManagerUtils";
 
 /**
  * Returns a sync channel

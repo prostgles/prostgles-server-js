@@ -1,5 +1,5 @@
 import { isDefined, isEqual } from "prostgles-types";
-import { asValue } from "../PubSubManager/PubSubManager";
+import { asValue } from "../PubSubManager/PubSubManagerUtils";
 import { type SchemaInfo } from "./getSchemaForTableConfig";
 
 /**

@@ -1,7 +1,7 @@
 import type { DboBuilder } from "../DboBuilder/DboBuilder";
 import { EVENT_TRIGGER_TAGS } from "../Event_Trigger_Tags";
 import type { OnReadyCallbackBasic } from "../initProstgles";
-import { PubSubManager, log } from "../PubSubManager/PubSubManager";
+import { EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID, log } from "../PubSubManager/PubSubManagerUtils";
 import {
   ValidatedWatchSchemaType,
   getValidatedWatchSchemaType,
@@ -47,10 +47,7 @@ export class SchemaWatch {
    * Fallback for watchSchema in case of not a superuser (cannot add db event listener)
    */
   onSchemaChangeFallback: OnSchemaChangeCallback | undefined = ({ command, query }) => {
-    if (
-      typeof query === "string" &&
-      query.includes(PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)
-    ) {
+    if (typeof query === "string" && query.includes(EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)) {
       log("Schema change event excluded from triggers due to EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID");
       return;
     }

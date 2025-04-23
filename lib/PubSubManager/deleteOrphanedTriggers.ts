@@ -1,4 +1,5 @@
 import { PubSubManager } from "./PubSubManager";
+import { EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "./PubSubManagerUtils";
 
 export function deleteOrphanedTriggers(this: PubSubManager, tableName: string) {
   const activeConditions = (this.getTriggerInfo(tableName) ?? []).filter(
@@ -10,7 +11,7 @@ export function deleteOrphanedTriggers(this: PubSubManager, tableName: string) {
     .any(
       `
         /* Delete removed subscriptions */
-        /* ${PubSubManager.EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
+        /* ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
         DELETE FROM prostgles.app_triggers at
         WHERE EXISTS (
           SELECT 1
