@@ -49,7 +49,8 @@ export function setupAuthRoutes(this: AuthHandler) {
       );
 
       if (errorInfo) {
-        res.status(HTTP_FAIL_CODES.BAD_REQUEST).json(errorInfo);
+        const { error, httpCode } = errorInfo;
+        res.status(httpCode).json({ error });
         return;
       }
       next();
