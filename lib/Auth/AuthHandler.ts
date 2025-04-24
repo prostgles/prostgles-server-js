@@ -138,7 +138,7 @@ export class AuthHandler {
     const isError = (
       dataOrError: any
     ): dataOrError is AuthResponse.AuthFailure["code"] | AuthResponse.AuthFailure => {
-      return typeof dataOrError === "string" || (dataOrError && "success" in dataOrError);
+      return Boolean(typeof dataOrError === "string" || (dataOrError && "success" in dataOrError));
     };
     try {
       const userOrErrorCode = await throttledAuthCall(async () => {
@@ -208,14 +208,16 @@ export class AuthHandler {
    *  - Bearer header
    *  - http cookie
    *  - query params
-   * Based on sid names in auth
+   * Based on sidKeyName from auth
    */
   getSID(maybeClientReq: AuthClientRequest | undefined): string | undefined {
     if (!maybeClientReq) return undefined;
     const { sidKeyName } = this;
     if (maybeClientReq.socket) {
       const { handshake } = maybeClientReq.socket;
-      const querySid = handshake.auth?.[sidKeyName] || handshake.query?.[sidKeyName];
+      const querySid = (handshake.auth?.[sidKeyName] || handshake.query?.[sidKeyName]) as
+        | string
+        | undefined;
       let rawSid = querySid;
       if (!rawSid) {
         const cookie_str = maybeClientReq.socket.handshake.headers?.cookie;
@@ -234,21 +236,6 @@ export class AuthHandler {
         bearerSid = Buffer.from(base64Token, "base64").toString();
       }
       return this.validateSid(bearerSid ?? maybeClientReq.httpReq.cookies?.[sidKeyName]);
-    }
-
-    function parseCookieStr(cookie_str: string | undefined): any {
-      if (!cookie_str || typeof cookie_str !== "string") {
-        return {};
-      }
-
-      return cookie_str
-        .replace(/\s/g, "")
-        .split(";")
-        .reduce<AnyObject>((prev, current) => {
-          const [name, value] = current.split("=");
-          prev[name!] = value;
-          return prev;
-        }, {});
     }
   }
 
@@ -305,4 +292,19 @@ export const matchesRoute = (shorterRoute: string | undefined, longerRoute: stri
       (longerRoute.startsWith(shorterRoute) &&
         ["/", "?", "#"].includes(longerRoute[shorterRoute.length] ?? "")))
   );
+};
+
+const parseCookieStr = (cookie_str: string | undefined): Record<string, string> => {
+  if (!cookie_str || typeof cookie_str !== "string") {
+    return {};
+  }
+
+  return cookie_str
+    .replace(/\s/g, "")
+    .split(";")
+    .reduce<AnyObject>((prev, current) => {
+      const [name, value] = current.split("=");
+      prev[name!] = value;
+      return prev;
+    }, {});
 };

@@ -11,15 +11,15 @@ export const getClientRequestIPsInfo = <T extends ClientReq>(req: T): LoginClien
     return {
       ip_address,
       ip_address_remote: req.httpReq.connection.remoteAddress,
-      x_real_ip: req.httpReq.headers["x-real-ip"] as any,
+      x_real_ip: req.httpReq.headers["x-real-ip"] as string | undefined,
       user_agent,
     };
   } else {
     return {
       ip_address: req.socket.handshake.address,
       ip_address_remote: req.socket.request.connection.remoteAddress,
-      x_real_ip: req.socket.handshake.headers?.["x-real-ip"],
-      user_agent: req.socket.handshake.headers?.["user-agent"],
+      x_real_ip: req.socket.handshake.headers?.["x-real-ip"] as string | undefined,
+      user_agent: req.socket.handshake.headers?.["user-agent"] as string | undefined,
     };
   }
 };

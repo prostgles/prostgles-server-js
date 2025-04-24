@@ -4,6 +4,7 @@ import { PRGLIOSocket } from "./DboBuilder/DboBuilderTypes";
 import { runClientMethod, runClientRequest } from "./runClientRequest";
 import { getErrorAsObject } from "./DboBuilder/dboBuilderUtils";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
+import { getClientRequestIPsInfo } from "./Auth/AuthHandler";
 
 export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
   if (this.destroyed) {
@@ -24,6 +25,21 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
     if (!this.db || !this.dbo) throw new Error("db/dbo missing");
     const { dbo, db } = this;
 
+    const { onUseOrSocketConnected } = this.opts.auth ?? {};
+    const { authHandler } = this;
+    if (onUseOrSocketConnected) {
+      if (!authHandler) throw "authHandler missing";
+      const errorInfo = await onUseOrSocketConnected(
+        authHandler.getSID({ socket }),
+        getClientRequestIPsInfo({ socket }),
+        { socket }
+      );
+      if (errorInfo) {
+        socket.emit(CHANNELS.CONNECTION, { error: errorInfo.error });
+        socket.disconnect();
+        return;
+      }
+    }
     if (this.opts.onSocketConnect) {
       try {
         const getUser = async () => {
@@ -43,6 +59,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
           : JSON.stringify(error);
         socket.emit(CHANNELS.CONNECTION, { connectionError });
         socket.disconnect();
+
         return;
       }
     }

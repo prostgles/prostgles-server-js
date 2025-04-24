@@ -289,6 +289,15 @@ export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
   sidKeyName?: string;
 
   /**
+   * Awaited before any auth actions. Failure will stop the auth process
+   */
+  onUseOrSocketConnected?: (
+    sid: string | undefined,
+    client: LoginClientInfo,
+    reqInfo: AuthClientRequest
+  ) => Awaitable<void | { error: string; httpCode: 400 | 401 | 403 }>;
+
+  /**
    * Required to allow self-managed or managed (by setting up loginSignupConfig) authentication.
    * Used in:
    * - publish - userData and/or sid (in testing) are passed to the publish function

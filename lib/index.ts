@@ -1,4 +1,5 @@
 import { SessionUser } from "./Auth/AuthTypes";
+import type { OnReadyCallbackBasic } from "./initProstgles";
 import { Prostgles } from "./Prostgles";
 import { ProstglesInitOptions } from "./ProstglesTypes";
 
@@ -6,9 +7,9 @@ import { testDboTypes } from "./typeTests/dboTypeCheck";
 testDboTypes();
 
 function prostgles<S = void, SUser extends SessionUser = SessionUser>(
-  params: ProstglesInitOptions<S, SUser>,
+  params: ProstglesInitOptions<S, SUser>
 ) {
-  const prgl = new Prostgles(params as any);
-  return prgl.init(params.onReady as any, { type: "init" });
+  const prgl = new Prostgles(params as ProstglesInitOptions);
+  return prgl.init(params.onReady as OnReadyCallbackBasic, { type: "init" });
 }
 export = prostgles;

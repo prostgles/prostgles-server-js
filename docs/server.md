@@ -251,10 +251,10 @@ prostgles<DBGeneratedSchema>({
   - **responseThrottle** <span style="color: grey">optional</span> <span style="color: green;">number</span>
 
     Response time rounding in milliseconds to prevent timing attacks on login. Login response time should always be a multiple of this value. Defaults to 500 milliseconds
-  - **cacheSession** <span style="color: grey">optional</span> <span style="color: green;">{ getSession: (sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; Awaitable&lt;BasicSession | undefined&gt;; }</span>
+  - **cacheSession** <span style="color: grey">optional</span> <span style="color: green;">{ getSession: (sid: string, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; Awaitable&lt;BasicSession | undefined&gt;; }</span>
 
     If provided then session info will be saved on socket.__prglCache and reused from there
-    - **getSession** <span style="color: red">required</span> <span style="color: green;">(sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; Awaitable&lt;BasicSession | undefined&gt;</span>
+    - **getSession** <span style="color: red">required</span> <span style="color: green;">(sid: string, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; Awaitable&lt;BasicSession | undefined&gt;</span>
 
 - **DEBUG_MODE** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
 

@@ -11,7 +11,7 @@ import { OnInitReason, initProstgles } from "./initProstgles";
 import { makeSocketError, onSocketConnected } from "./onSocketConnected";
 import { clientCanRunSqlRequest, runClientSqlRequest } from "./runClientRequest";
 import pg = require("pg-promise/typescript/pg-subset");
-const { version } = require("../package.json");
+const version = (require("../package.json") as { version: string }).version;
 
 import type { ProstglesInitOptions } from "./ProstglesTypes";
 import { RestApi } from "./RestApi";
@@ -196,8 +196,10 @@ export class Prostgles {
     if (this.opts.tsGeneratedTypesDir) {
       const { fullPath, fileName } = this.getTSFileName();
       const fileContent = this.getTSFileContent();
+      // eslint-disable-next-line security/detect-non-literal-fs-filename
       fs.readFile(fullPath, "utf8", function (err, data) {
         if (err || force || data !== fileContent) {
+          // eslint-disable-next-line security/detect-non-literal-fs-filename
           fs.writeFileSync(fullPath, fileContent);
           console.log("Prostgles: Created typescript schema definition file: \n " + fileName);
         }
@@ -241,13 +243,13 @@ export class Prostgles {
     }
   };
 
-  initAuthHandler = async () => {
+  initAuthHandler = () => {
     this.authHandler?.destroy();
     if (!this.opts.auth) {
       return;
     }
     this.authHandler = new AuthHandler(this);
-    await this.authHandler.init();
+    this.authHandler.init();
   };
 
   initTableConfig = async (reason: OnInitReason) => {

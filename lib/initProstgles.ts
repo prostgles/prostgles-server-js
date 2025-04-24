@@ -141,7 +141,7 @@ export const initProstgles = async function (
       }
 
       /* 3.9 Check auth config */
-      await this.initAuthHandler();
+      this.initAuthHandler();
 
       this.publishParser = new PublishParser(this);
       this.dboBuilder.publishParser = this.publishParser;
@@ -198,7 +198,7 @@ export const initProstgles = async function (
           await this.refreshDBO();
         }
         if ("auth" in newOpts) {
-          await this.initAuthHandler();
+          this.initAuthHandler();
         }
 
         if (isEmpty(newOpts)) return;
@@ -208,9 +208,11 @@ export const initProstgles = async function (
          * While others also affect the server and onReady should be called
          */
         if (
-          getKeys(newOpts).every((updatedKey) => clientOnlyUpdateKeys.includes(updatedKey as any))
+          getKeys(newOpts).every((updatedKey) =>
+            clientOnlyUpdateKeys.some((key) => key === updatedKey)
+          )
         ) {
-          await this.setSocketEvents();
+          this.setSocketEvents();
         } else {
           await this.init(onReady, { type: "prgl.update", newOpts });
         }

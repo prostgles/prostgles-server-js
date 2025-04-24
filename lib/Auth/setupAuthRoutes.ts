@@ -1,16 +1,16 @@
 import { RequestHandler } from "express";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
-import { AuthHandler, HTTP_FAIL_CODES } from "./AuthHandler";
+import { AuthHandler, getClientRequestIPsInfo, HTTP_FAIL_CODES } from "./AuthHandler";
 import { setCatchAllRequestHandler } from "./endpoints/setCatchAllRequestHandler";
 import { setLoginRequestHandler } from "./endpoints/setLoginRequestHandler";
+import { setLogoutRequestHandler } from "./endpoints/setLogoutRequestHandler";
 import { setMagicLinkOrOTPRequestHandler } from "./endpoints/setMagicLinkOrOTPRequestHandler";
 import { setOAuthRequestHandlers } from "./endpoints/setOAuthRequestHandlers";
 import { setRegisterRequestHandler } from "./endpoints/setRegisterRequestHandler";
 import { upsertNamedExpressMiddleware } from "./utils/upsertNamedExpressMiddleware";
-import { setLogoutRequestHandler } from "./endpoints/setLogoutRequestHandler";
 
-export async function setupAuthRoutes(this: AuthHandler) {
-  const { loginSignupConfig } = this.opts;
+export function setupAuthRoutes(this: AuthHandler) {
+  const { loginSignupConfig, onUseOrSocketConnected } = this.opts;
 
   if (this.sidKeyName === "sid") {
     throw "sidKeyName cannot be 'sid' due to collision with socket.io";
@@ -36,7 +36,25 @@ export async function setupAuthRoutes(this: AuthHandler) {
   }
 
   if (loginWithOAuth) {
-    await setOAuthRequestHandlers.bind(this)(app, loginWithOAuth);
+    setOAuthRequestHandlers.bind(this)(app, loginWithOAuth);
+  }
+
+  if (onUseOrSocketConnected) {
+    const prostglesUseMiddleware: RequestHandler = async (req, res, next) => {
+      const reqInfo = { httpReq: req, res };
+      const errorInfo = await onUseOrSocketConnected(
+        this.getSIDNoError(reqInfo),
+        getClientRequestIPsInfo(reqInfo),
+        reqInfo
+      );
+
+      if (errorInfo) {
+        res.status(HTTP_FAIL_CODES.BAD_REQUEST).json(errorInfo);
+        return;
+      }
+      next();
+    };
+    upsertNamedExpressMiddleware(app, prostglesUseMiddleware, "prostglesonUseOrSocketConnected");
   }
 
   if (use) {
@@ -57,7 +75,7 @@ export async function setupAuthRoutes(this: AuthHandler) {
         db: this.db,
       });
     };
-    upsertNamedExpressMiddleware(app, prostglesUseMiddleware, "prostglesUseMiddleware");
+    upsertNamedExpressMiddleware(app, prostglesUseMiddleware, "prostglesUse");
   }
 
   if (onMagicLinkOrOTP) {
