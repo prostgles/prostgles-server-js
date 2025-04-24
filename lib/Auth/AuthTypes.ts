@@ -321,18 +321,14 @@ export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
    * If provided then session info will be saved on socket.__prglCache and reused from there
    */
   cacheSession?: {
-    getSession: (
-      sid: string | undefined,
-      dbo: DBOFullyTyped<S>,
-      db: DB
-    ) => Awaitable<BasicSession | undefined>;
+    getSession: (sid: string, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession | undefined>;
   };
 };
 
 export type LoginResponse =
   | {
       session: BasicSession;
-      response?: AuthResponse.PasswordLoginSuccess  ;
+      response?: AuthResponse.PasswordLoginSuccess;
     }
   | {
       session?: undefined;

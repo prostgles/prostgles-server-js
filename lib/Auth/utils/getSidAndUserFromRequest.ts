@@ -14,8 +14,8 @@ export async function getSidAndUserFromRequest(
   /**
    * Get cached session if available
    */
-  const getSession = this.opts.cacheSession?.getSession;
-  if (clientReq.socket && getSession && clientReq.socket.__prglCache) {
+  const getSessionForCaching = this.opts.cacheSession?.getSession;
+  if (clientReq.socket && getSessionForCaching && clientReq.socket.__prglCache) {
     const { session, ...userData } = clientReq.socket.__prglCache;
     const isValid = this.isNonExpiredSocketSession(clientReq.socket, session);
     if (isValid) {
@@ -50,8 +50,8 @@ export async function getSidAndUserFromRequest(
     if (clientInfoOrErr && (typeof clientInfoOrErr === "string" || "success" in clientInfoOrErr))
       throw clientInfoOrErr;
     const clientInfo = clientInfoOrErr;
-    if (getSession && clientReq.socket) {
-      const session = await getSession(sid, this.dbo as DBOFullyTyped, this.db);
+    if (getSessionForCaching && clientReq.socket && sid) {
+      const session = await getSessionForCaching(sid, this.dbo as DBOFullyTyped, this.db);
       if (session && session.expires && clientInfo?.user) {
         clientReq.socket.__prglCache = {
           ...clientInfo,
