@@ -5,7 +5,7 @@ import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import { AuthClientRequest, AuthConfig, AuthResult, BasicSession, ExpressReq } from "./AuthTypes";
 import { LoginResponseHandler } from "./endpoints/setLoginRequestHandler";
 import { getClientAuth } from "./getClientAuth";
-import { login } from "./login";
+import { getBasicSessionErrorCode, login } from "./login";
 import { setupAuthRoutes } from "./setupAuthRoutes";
 import { getClientRequestIPsInfo } from "./utils/getClientRequestIPsInfo";
 import { getReturnUrl } from "./utils/getReturnUrl";
@@ -83,6 +83,22 @@ export class AuthHandler {
     return !pubRoutes.some((publicRoute) => {
       return matchesRoute(publicRoute, pathname);
     });
+  };
+
+  validateSessionAndSetCookie = (
+    cookie: { sid: string; expires: number },
+    requestHandler: { req: ExpressReq; res: LoginResponseHandler }
+  ) => {
+    const sessionErrorCode = getBasicSessionErrorCode(cookie);
+    if (sessionErrorCode) {
+      const { res } = requestHandler;
+      res.status(HTTP_FAIL_CODES.UNAUTHORIZED).json({
+        success: false,
+        code: sessionErrorCode,
+      });
+      return;
+    }
+    return this.setCookieAndGoToReturnURLIFSet(cookie, requestHandler);
   };
 
   setCookieAndGoToReturnURLIFSet = (
@@ -203,12 +219,6 @@ export class AuthHandler {
     }
   };
 
-  getUserFromRequest = async (clientReq: AuthClientRequest): Promise<AuthResult> => {
-    const sidAndUser = await this.getSidAndUserFromRequest(clientReq);
-    if (sidAndUser.sid && sidAndUser.user) {
-      return sidAndUser;
-    }
-  };
   getSidAndUserFromRequest = getSidAndUserFromRequest.bind(this);
 
   isNonExpiredSocketSession = (

@@ -5,14 +5,20 @@ import {
   CHANNELS,
   getObjectEntries,
   isEmpty,
+  isObject,
 } from "prostgles-types";
-import { AuthClientRequest, LoginWithOAuthConfig, AuthResultWithSID } from "./AuthTypes";
+import {
+  AuthClientRequest,
+  LoginWithOAuthConfig,
+  AuthResultWithSID,
+  type AuthResult,
+} from "./AuthTypes";
 import { AUTH_ROUTES_AND_PARAMS, AuthHandler } from "./AuthHandler";
 
 export async function getClientAuth(
   this: AuthHandler,
   clientReq: AuthClientRequest
-): Promise<{ auth: AuthSocketSchema; userData: AuthResultWithSID }> {
+): Promise<{ auth: AuthSocketSchema; userData: AuthResultWithSID } | "new-session-redirect"> {
   let pathGuard = false;
   const {
     loginWithOAuth,
@@ -30,6 +36,12 @@ export async function getClientAuth(
      * Due to SPA nature of some clients, we need to check if the connected client ends up on a protected route
      */
     if (clientReq.socket) {
+      const getUserFromRequest = async (clientReq: AuthClientRequest): Promise<AuthResult> => {
+        const sidAndUser = await this.getSidAndUserFromRequest(clientReq);
+        if (isObject(sidAndUser) && sidAndUser.sid && sidAndUser.user) {
+          return sidAndUser;
+        }
+      };
       const { socket } = clientReq;
       socket.removeAllListeners(CHANNELS.AUTHGUARD);
       socket.on(
@@ -54,7 +66,7 @@ export async function getClientAuth(
               pathname &&
               typeof pathname === "string" &&
               this.isUserRoute(pathname) &&
-              !(await this.getUserFromRequest({ socket }))
+              !(await getUserFromRequest({ socket }))
             ) {
               cb(null, { shouldReload: true });
             } else {
@@ -70,7 +82,9 @@ export async function getClientAuth(
   }
 
   const userData = await this.getSidAndUserFromRequest(clientReq);
-
+  if (userData === "new-session-redirect") {
+    return userData;
+  }
   const auth: AuthSocketSchema = {
     providers: getOAuthProviders(loginWithOAuth),
     signupWithEmailAndPassword: signupWithEmailAndPassword && {

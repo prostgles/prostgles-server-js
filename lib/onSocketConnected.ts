@@ -15,6 +15,15 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
   this.connectedSockets.push(socket);
 
   try {
+    const getUser = async () => {
+      if (!this.authHandler) throw "authHandler missing";
+      const res = await this.authHandler.getSidAndUserFromRequest({ socket });
+      if (res === "new-session-redirect") {
+        throw "new-session-redirect";
+      }
+      return res;
+    };
+
     await this.opts.onLog?.({
       type: "connect",
       sid: this.authHandler?.getValidatedSid({ socket }),
@@ -35,17 +44,15 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
         { socket }
       );
       if (errorInfo) {
-        socket.emit(CHANNELS.CONNECTION, { error: errorInfo.error });
+        socket.emit(CHANNELS.CONNECTION, {
+          error: "error" in errorInfo ? errorInfo.error : "New session setup",
+        });
         socket.disconnect();
         return;
       }
     }
     if (this.opts.onSocketConnect) {
       try {
-        const getUser = async () => {
-          if (!this.authHandler) throw "authHandler missing";
-          return await this.authHandler.getSidAndUserFromRequest({ socket });
-        };
         await this.opts.onSocketConnect({
           socket,
           dbo: dbo as DBOFullyTyped,
@@ -97,10 +104,6 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
       });
 
       if (this.opts.onSocketDisconnect) {
-        const getUser = async () => {
-          if (!this.authHandler) throw "authHandler missing";
-          return await this.authHandler.getSidAndUserFromRequest({ socket });
-        };
         void this.opts.onSocketDisconnect({ socket, dbo: dbo as DBOFullyTyped, db, getUser });
       }
     });

@@ -297,13 +297,15 @@ export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
   sidKeyName?: string;
 
   /**
-   * Awaited before any auth actions. Failure will stop the auth process
+   * Awaited before any auth actions.
+   * If session is returned then will set cookie and redirect
+   * Failure will stop the auth process
    */
   onUseOrSocketConnected?: (
     sid: string | undefined,
     client: LoginClientInfo,
     reqInfo: AuthClientRequest
-  ) => Awaitable<void | { error: string; httpCode: 400 | 401 | 403 }>;
+  ) => Awaitable<void | { error: string; httpCode: 400 | 401 | 403 } | { session: BasicSession }>;
 
   /**
    * Required to allow self-managed or managed (by setting up loginSignupConfig) authentication.

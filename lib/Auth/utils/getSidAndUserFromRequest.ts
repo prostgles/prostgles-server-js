@@ -1,7 +1,9 @@
+import { isObject } from "prostgles-types";
 import { DBOFullyTyped } from "../../DBSchemaBuilder";
 import { AuthHandler, getClientRequestIPsInfo } from "../AuthHandler";
 import { AuthClientRequest, AuthResultWithSID } from "../AuthTypes";
 import { throttledAuthCall } from "./throttledReject";
+import type { GetUserOrRedirected } from "./handleGetUser";
 
 /**
  * For a given sid return the user data if available using the auth handler's getUser method.
@@ -11,7 +13,7 @@ import { throttledAuthCall } from "./throttledReject";
 export async function getSidAndUserFromRequest(
   this: AuthHandler,
   clientReq: AuthClientRequest
-): Promise<AuthResultWithSID> {
+): Promise<GetUserOrRedirected> {
   /**
    * Get cached session if available
    */
@@ -71,14 +73,14 @@ export async function getSidAndUserFromRequest(
   //   return { sid, preferredLogin: !clientInfo?.user ? clientInfo?.preferredLogin : undefined };
   // }, 100);
   const result = await this.handleGetUser(clientReq);
-  if (result.error) {
+  if (isObject(result) && result.error) {
     throw result.error;
   }
   await this.prostgles.opts.onLog?.({
     type: "auth",
     command: "getClientInfo",
     duration: Date.now() - authStart,
-    sid: result.sid,
+    sid: isObject(result) ? result.sid : undefined,
     socketId: clientReq.socket?.id,
   });
   return result;

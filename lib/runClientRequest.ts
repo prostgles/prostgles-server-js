@@ -77,6 +77,9 @@ export const runClientRequest = async function (
   }
 
   const clientInfo = await this.authHandler?.getSidAndUserFromRequest(clientReq);
+  if (clientInfo === "new-session-redirect") {
+    throw clientInfo;
+  }
   const validRules = await this.publishParser.getValidatedRequestRule(
     { tableName, command, clientReq },
     clientInfo

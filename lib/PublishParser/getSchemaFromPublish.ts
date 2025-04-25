@@ -38,7 +38,9 @@ export async function getSchemaFromPublish(
     /* Publish tables and views based on socket */
     const clientInfo =
       userData ?? (await this.prostgles.authHandler?.getSidAndUserFromRequest(clientReq));
-
+    if (clientInfo === "new-session-redirect") {
+      throw "new-session-redirect";
+    }
     let _publish: PublishObject | undefined;
     try {
       _publish = await this.getPublishAsObject(clientReq, clientInfo);

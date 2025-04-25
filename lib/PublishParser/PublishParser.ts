@@ -10,12 +10,11 @@ import { getTableRulesWithoutFileTable } from "./getTableRulesWithoutFileTable";
 import {
   DboTable,
   DboTableCommand,
-  ParsedPublishTable,
+  ParsedTableRule,
   PublishMethods,
   type PublishObject,
   PublishParams,
   RULE_TO_METHODS,
-  ParsedTableRule,
   parsePublishTableRule,
 } from "./publishTypesAndUtils";
 
@@ -43,9 +42,14 @@ export class PublishParser {
     clientReq: AuthClientRequest,
     clientInfo: AuthResultWithSID | undefined
   ): Promise<PublishParams> {
+    const _clientInfo =
+      clientInfo ?? (await this.prostgles.authHandler?.getSidAndUserFromRequest(clientReq));
+    if (_clientInfo === "new-session-redirect") {
+      throw "new-session-redirect";
+    }
     return {
       sid: undefined,
-      ...(clientInfo ?? (await this.prostgles.authHandler?.getSidAndUserFromRequest(clientReq))),
+      ..._clientInfo,
       dbo: this.dbo as DBOFullyTyped,
       db: this.db,
       clientReq,
@@ -109,6 +113,9 @@ export class PublishParser {
   }: DboTableCommand): Promise<ParsedTableRule> {
     const clientInfo =
       clientReq && (await this.prostgles.authHandler?.getSidAndUserFromRequest(clientReq));
+    if (clientInfo === "new-session-redirect") {
+      throw "new-session-redirect";
+    }
     const rules = await this.getValidatedRequestRule({ tableName, command, clientReq }, clientInfo);
     return rules;
   }

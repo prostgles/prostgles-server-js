@@ -42,15 +42,21 @@ export function setupAuthRoutes(this: AuthHandler) {
   if (onUseOrSocketConnected) {
     const prostglesUseMiddleware: RequestHandler = async (req, res, next) => {
       const reqInfo = { httpReq: req, res };
-      const errorInfo = await onUseOrSocketConnected(
+      const errorInfoOrSession = await onUseOrSocketConnected(
         this.getSIDNoError(reqInfo),
         getClientRequestIPsInfo(reqInfo),
         reqInfo
       );
 
-      if (errorInfo) {
-        const { error, httpCode } = errorInfo;
+      if (errorInfoOrSession && "error" in errorInfoOrSession) {
+        const { error, httpCode } = errorInfoOrSession;
         res.status(httpCode).json({ error });
+        return;
+      }
+
+      if (errorInfoOrSession && "session" in errorInfoOrSession) {
+        const { session } = errorInfoOrSession;
+        this.validateSessionAndSetCookie(session, { req, res });
         return;
       }
       next();
@@ -66,6 +72,9 @@ export function setupAuthRoutes(this: AuthHandler) {
         next,
         getUser: async () => {
           const userOrErr = await this.getUserOrError({ httpReq: req, res });
+          if (userOrErr === "new-session-redirect") {
+            throw "new-session-redirect";
+          }
           if (userOrErr.error) {
             res.status(HTTP_FAIL_CODES.BAD_REQUEST).json(userOrErr.error);
             throw userOrErr.error;

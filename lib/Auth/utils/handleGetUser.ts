@@ -1,14 +1,15 @@
+import { AuthResponse, isObject } from "prostgles-types";
 import type { DBOFullyTyped } from "../../DBSchemaBuilder";
-import { tout } from "../../PubSubManager/initPubSubManager";
 import { getClientRequestIPsInfo, type AuthHandler } from "../AuthHandler";
 import type { AuthClientRequest, AuthResultOrError, AuthResultWithSID } from "../AuthTypes";
 import { throttledAuthCall } from "./throttledReject";
-import { AuthResponse, isObject } from "prostgles-types";
+
+export type GetUserOrRedirected = AuthResultWithSID | "new-session-redirect";
 
 export async function handleGetUserThrottled(
   this: AuthHandler,
   clientReq: AuthClientRequest
-): Promise<AuthResultWithSID> {
+): Promise<GetUserOrRedirected> {
   const getSessionForCaching = this.opts.cacheSession?.getSession;
   const result = await throttledAuthCall(async () => {
     const clientInfoOrErr = await this.opts.getUser(
@@ -31,13 +32,8 @@ export async function handleGetUserThrottled(
       if (!("httpReq" in clientReq) || !clientReq.httpReq)
         throw "httpReq missing. new-session not implemented for sockets.";
       const { httpReq, res } = clientReq;
-      this.setCookieAndGoToReturnURLIFSet(clientInfo.session, { req: httpReq, res });
-      /** Wait for refresh */
-      await tout(200);
-      return {
-        error: { success: false, code: "something-went-wrong" },
-        sid: this.getValidatedSid(clientReq),
-      } satisfies AuthResultWithSID;
+      this.validateSessionAndSetCookie(clientInfo.session, { req: httpReq, res });
+      return "new-session-redirect" as const;
     }
 
     const sid = this.getValidatedSid(clientReq);

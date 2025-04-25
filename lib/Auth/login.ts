@@ -1,6 +1,6 @@
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { AuthHandler, getClientRequestIPsInfo, HTTP_FAIL_CODES } from "./AuthHandler";
-import { ExpressReq, LoginParams } from "./AuthTypes";
+import { ExpressReq, LoginParams, type BasicSession } from "./AuthTypes";
 import { LoginResponseHandler } from "./endpoints/setLoginRequestHandler";
 import { throttledAuthCall } from "./utils/throttledReject";
 
@@ -30,22 +30,9 @@ export async function login(
       return result;
     }
 
-    const { sid, expires } = result.session;
-    if (!sid) {
-      console.error("Invalid sid");
-      return "server-error";
-    }
-    if (sid && (typeof sid !== "string" || typeof expires !== "number")) {
-      console.error(
-        "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number }"
-      );
-      return "server-error";
-    }
-    if (expires < Date.now()) {
-      console.error(
-        "auth.login() is returning an expired session. Can only login with a session.expires greater than Date.now()"
-      );
-      return "server-error";
+    const sessionErrorCode = getBasicSessionErrorCode(result.session);
+    if (sessionErrorCode) {
+      return sessionErrorCode;
     }
 
     return result;
@@ -76,3 +63,23 @@ export async function login(
   }
   this.setCookieAndGoToReturnURLIFSet(loginResponse.session, { req, res });
 }
+
+export const getBasicSessionErrorCode = (session: Pick<BasicSession, "expires" | "sid">) => {
+  const { sid, expires } = session;
+  if (!sid) {
+    console.error("Invalid sid");
+    return "server-error";
+  }
+  if (sid && (typeof sid !== "string" || typeof expires !== "number")) {
+    console.error(
+      "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number }"
+    );
+    return "server-error";
+  }
+  if (expires < Date.now()) {
+    console.error(
+      "auth.login() is returning an expired session. Can only login with a session.expires greater than Date.now()"
+    );
+    return "server-error";
+  }
+};

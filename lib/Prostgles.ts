@@ -367,6 +367,9 @@ export class Prostgles {
         : { type: "http" as const, ...clientReq };
 
       const userData = await this.authHandler?.getSidAndUserFromRequest(clientInfo);
+      if (userData === "new-session-redirect") {
+        throw "new-session-redirect";
+      }
       const { publishParser } = this;
       let fullSchema: Awaited<ReturnType<PublishParser["getSchemaFromPublish"]>> | undefined;
       let publishValidationError;
@@ -427,6 +430,9 @@ export class Prostgles {
             });
 
       const authInfo = await this.authHandler?.getClientAuth(clientReq);
+      if (authInfo === "new-session-redirect") {
+        throw "new-session-redirect";
+      }
 
       const clientSchema: ClientSchema = {
         schema,

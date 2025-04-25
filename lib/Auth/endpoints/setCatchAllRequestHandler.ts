@@ -7,31 +7,35 @@ import { getReturnUrl } from "../utils/getReturnUrl";
 export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
   const requestHandlerCatchAll: RequestHandler = async (req, res, next) => {
     const { onGetRequestOK } = this.opts.loginSignupConfig ?? {};
-    const clientReq: AuthClientRequest = { httpReq: req, res };
-    const getUser = async () => {
-      return this.getUserOrError(clientReq);
-    };
-    const isLoggedInUser = async () => {
-      const userInfo = await getUser();
-      return !!userInfo.user;
-    };
-    if (this.prostgles.restApi) {
-      if (
-        Object.values(this.prostgles.restApi.routes).some((restRoute) =>
-          matchesRoute(restRoute.split("/:")[0], req.path)
-        )
-      ) {
-        next();
-        return;
-      }
+    if (
+      this.prostgles.restApi &&
+      Object.values(this.prostgles.restApi.routes).some((restRoute) =>
+        matchesRoute(restRoute.split("/:")[0], req.path)
+      )
+    ) {
+      next();
+      return;
     }
+    if (matchesRoute(AUTH_ROUTES_AND_PARAMS.loginWithProvider, req.path)) {
+      next();
+      return;
+    }
+    let newSessionRedirect = false as boolean;
     try {
+      const clientReq: AuthClientRequest = { httpReq: req, res };
+      const getUser = async () => {
+        const res = await this.getUserOrError(clientReq);
+        if (res === "new-session-redirect") {
+          newSessionRedirect = true;
+          throw "new-session-redirect";
+        }
+        return res;
+      };
+      const isLoggedInUser = async () => {
+        const userInfo = await getUser();
+        return !!userInfo.user;
+      };
       const returnURL = getReturnUrl(req);
-
-      if (matchesRoute(AUTH_ROUTES_AND_PARAMS.loginWithProvider, req.path)) {
-        next();
-        return;
-      }
 
       /**
        * Requesting a User route
@@ -75,6 +79,7 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
         typeof error === "string" ? error
         : error instanceof Error ? error.message
         : "";
+      if (newSessionRedirect) return;
       res.status(HTTP_FAIL_CODES.BAD_REQUEST).json({
         error:
           "Something went wrong when processing your request" +

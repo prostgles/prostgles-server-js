@@ -3,7 +3,7 @@ import { DBOFullyTyped } from "../../DBSchemaBuilder";
 import type { AuthHandler } from "../AuthHandler";
 import { AuthClientRequest, AuthResultWithSID } from "../AuthTypes";
 import { getClientRequestIPsInfo } from "../utils/getClientRequestIPsInfo";
-import { isAuthError } from "./handleGetUser";
+import { isAuthError, type GetUserOrRedirected } from "./handleGetUser";
 import { throttledAuthCall } from "./throttledReject";
 
 /**
@@ -14,7 +14,7 @@ import { throttledAuthCall } from "./throttledReject";
 export async function getUserOrError(
   this: AuthHandler,
   clientReq: AuthClientRequest
-): Promise<AuthResultWithSID> {
+): Promise<GetUserOrRedirected> {
   // const sid = this.getValidatedSid(clientReq);
   // if (!sid) return { sid };
 
