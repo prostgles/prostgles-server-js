@@ -14,10 +14,16 @@ export async function getClientAuth(
   clientReq: AuthClientRequest
 ): Promise<{ auth: AuthSocketSchema; userData: AuthResultWithSID }> {
   let pathGuard = false;
-  if (
-    this.opts.loginSignupConfig?.publicRoutes &&
-    !this.opts.loginSignupConfig.disableSocketAuthGuard
-  ) {
+  const {
+    loginWithOAuth,
+    signupWithEmail: signupWithEmailAndPassword,
+    localLoginMode,
+    login,
+    publicRoutes,
+    disableSocketAuthGuard,
+  } = this.opts.loginSignupConfig ?? {};
+
+  if (publicRoutes && !disableSocketAuthGuard) {
     pathGuard = true;
 
     /**
@@ -64,12 +70,6 @@ export async function getClientAuth(
   }
 
   const userData = await this.getSidAndUserFromRequest(clientReq);
-  const {
-    loginWithOAuth,
-    signupWithEmail: signupWithEmailAndPassword,
-    localLoginMode,
-    login,
-  } = this.opts.loginSignupConfig ?? {};
 
   const auth: AuthSocketSchema = {
     providers: getOAuthProviders(loginWithOAuth),

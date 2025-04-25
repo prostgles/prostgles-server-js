@@ -38,8 +38,8 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
        */
       if (this.isUserRoute(req.path)) {
         /* Check auth. Redirect to login if unauthorized */
-        const u = await isLoggedInUser();
-        if (!u) {
+        const isLoggedIn = await isLoggedInUser();
+        if (!isLoggedIn) {
           res.redirect(
             `${AUTH_ROUTES_AND_PARAMS.login}?returnURL=${encodeURIComponent(req.originalUrl)}`
           );

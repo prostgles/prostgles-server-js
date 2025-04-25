@@ -1,16 +1,8 @@
-import { AnyObject, AuthResponse, CHANNELS } from "prostgles-types";
+import { AnyObject, CHANNELS } from "prostgles-types";
 import { PRGLIOSocket } from "../DboBuilder/DboBuilder";
-import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { removeExpressRoute } from "../FileManager/FileManager";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
-import {
-  AuthClientRequest,
-  AuthConfig,
-  AuthResult,
-  AuthResultWithSID,
-  BasicSession,
-  ExpressReq,
-} from "./AuthTypes";
+import { AuthClientRequest, AuthConfig, AuthResult, BasicSession, ExpressReq } from "./AuthTypes";
 import { LoginResponseHandler } from "./endpoints/setLoginRequestHandler";
 import { getClientAuth } from "./getClientAuth";
 import { login } from "./login";
@@ -18,7 +10,8 @@ import { setupAuthRoutes } from "./setupAuthRoutes";
 import { getClientRequestIPsInfo } from "./utils/getClientRequestIPsInfo";
 import { getReturnUrl } from "./utils/getReturnUrl";
 import { getSidAndUserFromRequest } from "./utils/getSidAndUserFromRequest";
-import { throttledAuthCall } from "./utils/throttledReject";
+import { getUserOrError } from "./utils/getUserOrError";
+import { handleGetUserThrottled } from "./utils/handleGetUser";
 
 export { getClientRequestIPsInfo };
 export const HTTP_FAIL_CODES = {
@@ -130,51 +123,8 @@ export class AuthHandler {
     const successURL = getReturnUrl(req) || "/";
     res.redirect(successURL);
   };
-
-  getUserOrError = async (localParams: AuthClientRequest): Promise<AuthResultWithSID> => {
-    const sid = this.getSID(localParams);
-    if (!sid) return { sid };
-
-    const isError = (
-      dataOrError: any
-    ): dataOrError is AuthResponse.AuthFailure["code"] | AuthResponse.AuthFailure => {
-      return Boolean(typeof dataOrError === "string" || (dataOrError && "success" in dataOrError));
-    };
-    try {
-      const userOrErrorCode = await throttledAuthCall(async () => {
-        return this.opts.getUser(
-          this.validateSid(sid),
-          this.dbo as DBOFullyTyped,
-          this.db,
-          getClientRequestIPsInfo(localParams),
-          localParams
-        );
-      }, 50);
-
-      if (isError(userOrErrorCode)) {
-        const error: AuthResponse.AuthFailure | undefined =
-          typeof userOrErrorCode === "string" ?
-            { success: false, code: userOrErrorCode }
-          : userOrErrorCode;
-
-        return {
-          sid,
-          error,
-        };
-      }
-      if (sid && userOrErrorCode?.user) {
-        return { sid, ...userOrErrorCode };
-      }
-      return {
-        sid,
-      };
-    } catch (_err) {
-      return {
-        sid,
-        error: { success: false, code: "server-error" },
-      };
-    }
-  };
+  handleGetUser = handleGetUserThrottled.bind(this);
+  getUserOrError = getUserOrError.bind(this);
 
   init = setupAuthRoutes.bind(this);
 
@@ -210,7 +160,7 @@ export class AuthHandler {
    *  - query params
    * Based on sidKeyName from auth
    */
-  getSID(maybeClientReq: AuthClientRequest | undefined): string | undefined {
+  getValidatedSid(maybeClientReq: AuthClientRequest | undefined): string | undefined {
     if (!maybeClientReq) return undefined;
     const { sidKeyName } = this;
     if (maybeClientReq.socket) {
@@ -225,18 +175,20 @@ export class AuthHandler {
         rawSid = cookie[sidKeyName];
       }
       return this.validateSid(rawSid);
-    } else {
-      const [tokenType, base64Token] =
-        maybeClientReq.httpReq.headers.authorization?.split(" ") ?? [];
-      let bearerSid: string | undefined;
-      if (tokenType && base64Token) {
-        if (tokenType.trim() !== "Bearer") {
-          throw "Only Bearer Authorization header allowed";
-        }
-        bearerSid = Buffer.from(base64Token, "base64").toString();
-      }
-      return this.validateSid(bearerSid ?? maybeClientReq.httpReq.cookies?.[sidKeyName]);
     }
+
+    const [tokenType, base64Token] = maybeClientReq.httpReq.headers.authorization?.split(" ") ?? [];
+    let bearerSid: string | undefined;
+    if (tokenType && base64Token) {
+      if (tokenType.trim() !== "Bearer") {
+        throw "Only Bearer Authorization header allowed";
+      }
+      bearerSid = Buffer.from(base64Token, "base64").toString();
+    }
+    return this.validateSid(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      bearerSid ?? (maybeClientReq.httpReq.cookies?.[sidKeyName] as string | undefined)
+    );
   }
 
   /**
@@ -245,7 +197,7 @@ export class AuthHandler {
   getSIDNoError = (clientReq: AuthClientRequest | undefined): string | undefined => {
     if (!clientReq) return undefined;
     try {
-      return this.getSID(clientReq);
+      return this.getValidatedSid(clientReq);
     } catch {
       return undefined;
     }
@@ -284,14 +236,11 @@ export class AuthHandler {
   getClientAuth = getClientAuth.bind(this);
 }
 
-export const matchesRoute = (shorterRoute: string | undefined, longerRoute: string) => {
-  return (
-    shorterRoute &&
-    longerRoute &&
-    (shorterRoute === longerRoute ||
-      (longerRoute.startsWith(shorterRoute) &&
-        ["/", "?", "#"].includes(longerRoute[shorterRoute.length] ?? "")))
-  );
+export const matchesRoute = (baseRoute: string | undefined, fullRoute: string) => {
+  if (!baseRoute || !fullRoute) return false;
+  if (baseRoute === fullRoute) return true;
+  const nextChar = fullRoute[baseRoute.length] ?? "";
+  return fullRoute.startsWith(baseRoute) && ["/", "?", "#"].includes(nextChar);
 };
 
 const parseCookieStr = (cookie_str: string | undefined): Record<string, string> => {

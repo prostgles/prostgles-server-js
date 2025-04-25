@@ -273,7 +273,15 @@ export type AuthResult<SU = SessionUser> =
 export type AuthResultOrError<SU = SessionUser> =
   | AuthResponse.AuthFailure
   | AuthResponse.AuthFailure["code"]
-  | AuthResult<SU>;
+  | AuthResult<SU>
+  | {
+      type: "new-session";
+
+      /**
+       * If provided must login the user. Used for passwordless admin and public users
+       */
+      session: BasicSession;
+    };
 
 export type AuthRequestParams<S, SUser extends SessionUser> = {
   db: DB;

@@ -1,20 +1,26 @@
 import {
   DBSchemaTable,
   getKeys,
+  includes,
+  isEmpty,
+  isObject,
   MethodKey,
   pickKeys,
   TableInfo,
   TableSchemaErrors,
   TableSchemaForClient,
+  type AnyObject,
 } from "prostgles-types";
 import { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import { getErrorAsObject } from "../DboBuilder/DboBuilder";
+import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { TABLE_METHODS } from "../Prostgles";
 import { type PublishObject, PublishParser } from "./PublishParser";
 
 type Args = AuthClientRequest & {
   userData: AuthResultWithSID | undefined;
 };
+const SUBSCRIBE_METHODS = ["subscribe", "subscribeOne", "sync", "unsubscribe", "unsync"] as const;
 
 export async function getSchemaFromPublish(
   this: PublishParser,
@@ -64,115 +70,110 @@ export async function getSchemaFromPublish(
       }
       await Promise.all(
         tableNames.map(async (tableName) => {
+          const { canSubscribe, tablesOrViews } = this.prostgles.dboBuilder;
           if (!this.dbo[tableName]) {
             const errMsg = [
               `Table ${tableName} does not exist`,
-              `Expecting one of: ${JSON.stringify(this.prostgles.dboBuilder.tablesOrViews?.map((tov) => tov.name))}`,
-              `DBO tables: ${JSON.stringify(Object.keys(this.dbo).filter((k) => (this.dbo[k] as any).find))}`,
+              `Expecting one of: ${JSON.stringify(tablesOrViews?.map((tov) => tov.name))}`,
             ].join("\n");
             throw errMsg;
           }
 
-          const table_rules = await this.getTableRules({ clientReq, tableName }, clientInfo);
+          const tableRules = await this.getTableRules({ clientReq, tableName }, clientInfo);
 
-          if (table_rules && Object.keys(table_rules).length) {
-            schema[tableName] = {};
-            const tableSchema = schema[tableName]!;
-            let methods: MethodKey[] = [];
-            let tableInfo: TableInfo | undefined;
-            let tableColumns: DBSchemaTable["columns"] | undefined;
+          if (!tableRules || isEmpty(tableRules)) return;
+          if (!isObject(tableRules)) {
+            throw `Invalid tableRules for table ${tableName}. Expecting an object`;
+          }
 
-            if (typeof table_rules === "object") {
-              methods = getKeys(table_rules) as any;
-            }
+          schema[tableName] = {};
+          const tableSchema = schema[tableName]!;
+          const methods = getKeys(tableRules).filter(
+            (m) => canSubscribe || !includes(SUBSCRIBE_METHODS, m)
+          );
+          let tableInfo: TableInfo | undefined;
+          let tableColumns: DBSchemaTable["columns"] | undefined;
 
-            if (!this.prostgles.dboBuilder.canSubscribe) {
-              methods = methods.filter(
-                (m) => !["subscribe", "subscribeOne", "sync", "unsubscribe", "unsync"].includes(m)
-              );
-            }
+          await Promise.all(
+            methods
+              .filter((m) => m !== "select")
+              .map(async (method) => {
+                if (method === "sync") {
+                  /* Pass sync info */
+                  tableSchema[method] = tableRules[method];
+                } else if (includes(getKeys(tableRules), method) && tableRules[method]) {
+                  //@ts-ignore
+                  tableSchema[method] =
+                    method === "insert" ?
+                      pickKeys(tableRules[method]!, ["allowedNestedInserts"])
+                    : ({} as AnyObject);
 
-            await Promise.all(
-              methods
-                .filter((m) => m !== ("select" as any))
-                .map(async (method) => {
-                  if (method === "sync" && table_rules[method]) {
-                    /* Pass sync info */
-                    tableSchema[method] = table_rules[method];
-                  } else if ((table_rules as any)[method]) {
-                    tableSchema[method] =
-                      method === "insert" ?
-                        pickKeys(table_rules.insert!, ["allowedNestedInserts"])
-                      : {};
-
-                    /* Test for issues with the common table CRUD methods () */
-                    if (TABLE_METHODS.some((tm) => tm === method)) {
-                      try {
-                        const valid_table_command_rules = await this.getValidatedRequestRule(
-                          {
-                            tableName,
-                            command: method,
-                            clientReq,
-                          },
-                          clientInfo
-                        );
-                        if (this.prostgles.opts.testRulesOnConnect) {
-                          await (this.dbo[tableName] as any)[method](
-                            {},
-                            {},
-                            {},
-                            valid_table_command_rules,
-                            {
-                              ...clientReq,
-                              isRemoteRequest: true,
-                              testRule: true,
-                            }
-                          );
-                        }
-                      } catch (e) {
-                        console.error(`${tableName}.${method}`, e);
-                        tableSchemaErrors[tableName] ??= {};
-                        tableSchemaErrors[tableName]![method] = {
-                          error: "Internal publish error. Check server logs",
-                        };
-
-                        throw {
-                          ...getErrorAsObject(e),
-                          publish_path: `publish.${tableName}.${method}: \n   -> ${e}`,
-                        };
-                      }
-                    }
-
-                    if (method === "getInfo" || method === "getColumns") {
-                      const tableRules = await this.getValidatedRequestRule(
-                        { tableName, command: method, clientReq },
+                  /* Test for issues with the common table CRUD methods () */
+                  if (includes(TABLE_METHODS, method)) {
+                    try {
+                      const parsedTableRule = await this.getValidatedRequestRule(
+                        {
+                          tableName,
+                          command: method,
+                          clientReq,
+                        },
                         clientInfo
                       );
-                      const res = await (this.dbo[tableName] as any)[method](
-                        undefined,
-                        undefined,
-                        undefined,
-                        tableRules,
-                        { ...clientReq, isRemoteRequest: true }
-                      );
-                      if (method === "getInfo") {
-                        tableInfo = res;
-                        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-                      } else if (method === "getColumns") {
-                        tableColumns = res;
+                      if (this.prostgles.opts.testRulesOnConnect) {
+                        await (this.dbo[tableName] as TableHandler)[method](
+                          {},
+                          {},
+                          undefined,
+                          parsedTableRule,
+                          {
+                            ...clientReq,
+                            isRemoteRequest: {},
+                            testRule: true,
+                          }
+                        );
                       }
+                    } catch (e) {
+                      console.error(`${tableName}.${method}`, e);
+                      tableSchemaErrors[tableName] ??= {};
+                      tableSchemaErrors[tableName]![method] = {
+                        error: "Internal publish error. Check server logs",
+                      };
+
+                      throw {
+                        ...getErrorAsObject(e),
+                        publish_path: `publish.${tableName}.${method}: \n   -> ${e}`,
+                      };
                     }
                   }
-                })
-            );
 
-            if (tableInfo && tableColumns) {
-              tables.push({
-                name: tableName,
-                info: tableInfo,
-                columns: tableColumns,
-              });
-            }
+                  if (method === "getInfo" || method === "getColumns") {
+                    const tableRules = await this.getValidatedRequestRule(
+                      { tableName, command: method, clientReq },
+                      clientInfo
+                    );
+                    const res = await (this.dbo[tableName] as TableHandler)[method](
+                      undefined,
+                      undefined,
+                      undefined,
+                      tableRules,
+                      { ...clientReq, isRemoteRequest: {} }
+                    );
+                    if (method === "getInfo") {
+                      tableInfo = res as TableInfo;
+                    } else {
+                      tableColumns = res as DBSchemaTable["columns"];
+                    }
+                  }
+                }
+              })
+          );
+
+          if (tableInfo && tableColumns) {
+            tables.push({
+              name: tableName,
+              info: tableInfo,
+              columns: tableColumns,
+            });
           }
         })
       );

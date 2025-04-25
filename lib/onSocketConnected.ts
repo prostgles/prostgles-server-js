@@ -17,7 +17,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
   try {
     await this.opts.onLog?.({
       type: "connect",
-      sid: this.authHandler?.getSID({ socket }),
+      sid: this.authHandler?.getValidatedSid({ socket }),
       socketId: socket.id,
       connectedSocketIds: this.connectedSockets.map((s) => s.id),
     });
@@ -30,7 +30,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
     if (onUseOrSocketConnected) {
       if (!authHandler) throw "authHandler missing";
       const errorInfo = await onUseOrSocketConnected(
-        authHandler.getSID({ socket }),
+        authHandler.getValidatedSid({ socket }),
         getClientRequestIPsInfo({ socket }),
         { socket }
       );
@@ -91,7 +91,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
       this.dboBuilder.queryStreamer.onDisconnect(socket.id);
       void this.opts.onLog?.({
         type: "disconnect",
-        sid: this.authHandler?.getSID({ socket }),
+        sid: this.authHandler?.getValidatedSid({ socket }),
         socketId: socket.id,
         connectedSocketIds: this.connectedSockets.map((s) => s.id),
       });

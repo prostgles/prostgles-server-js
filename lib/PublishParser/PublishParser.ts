@@ -159,13 +159,14 @@ export class PublishParser {
       }
     }
 
-    if (tableRule[rtm.rule]) {
-      return tableRule;
-    } else
+    if (!tableRule[rtm.rule]) {
       throw {
         stack: ["getValidatedRequestRule()"],
         message: `Invalid or disallowed command: ${tableName}.${command}`,
       };
+    }
+
+    return tableRule;
   }
 
   async getTableRules(
