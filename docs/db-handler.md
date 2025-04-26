@@ -330,7 +330,7 @@ Retrieves a list of matching records from the view/table and subscribes to chang
     Column or filter issues are thrown during the subscribe call
 #### Return type
 #### <span style="color: green;">SubscriptionHandler</span>
-  - **unsubscribe** <span style="color: red">required</span> <span style="color: green;">() =&gt; Promise&lt;any&gt;</span>
+  - **unsubscribe** <span style="color: red">required</span> <span style="color: green;">() =&gt; Promise&lt;void&gt;</span>
   - **filter** <span style="color: red">required</span> <span style="color: green;">{} | FullFilter&lt;void, void&gt;</span>
 
 ## subscribeOne<span style="opacity: 0.6;">(filter: FullFilter, params: SelectParams, onData: SubscribeOneCallback, onError?: SubscribeOnError): Promise&lt;SubscriptionHandler&gt;</span>
@@ -396,7 +396,7 @@ Retrieves first matching record from the view/table and subscribes to changes
     Column or filter issues are thrown during the subscribe call
 #### Return type
 #### <span style="color: green;">SubscriptionHandler</span>
-  - **unsubscribe** <span style="color: red">required</span> <span style="color: green;">() =&gt; Promise&lt;any&gt;</span>
+  - **unsubscribe** <span style="color: red">required</span> <span style="color: green;">() =&gt; Promise&lt;void&gt;</span>
   - **filter** <span style="color: red">required</span> <span style="color: green;">{} | FullFilter&lt;void, void&gt;</span>
 
 ## count<span style="opacity: 0.6;">(filter?: FullFilter, selectParams?: SelectParams): Promise&lt;number&gt;</span>

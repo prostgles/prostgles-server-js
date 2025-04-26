@@ -7,11 +7,14 @@ import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { getClientRequestIPsInfo } from "./Auth/AuthHandler";
 
 export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
+  if (!this.db || !this.dbo) throw new Error("db/dbo missing");
   if (this.destroyed) {
     console.log("Socket connected to destroyed instance");
     socket.disconnect();
     return;
   }
+
+  const { dbo, db } = this;
   this.connectedSockets.push(socket);
 
   try {
@@ -19,10 +22,31 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
       if (!this.authHandler) throw "authHandler missing";
       const res = await this.authHandler.getSidAndUserFromRequest({ socket });
       if (res === "new-session-redirect") {
+        socket.emit(CHANNELS.AUTHGUARD, {
+          shouldReload: true,
+          error: res,
+        });
         throw "new-session-redirect";
       }
       return res;
     };
+
+    socket.on("disconnect", () => {
+      this.dbEventsManager?.removeNotice(socket);
+      this.dbEventsManager?.removeNotify(undefined, socket);
+      this.connectedSockets = this.connectedSockets.filter((s) => s.id !== socket.id);
+      this.dboBuilder.queryStreamer.onDisconnect(socket.id);
+      void this.opts.onLog?.({
+        type: "disconnect",
+        sid: this.authHandler?.getValidatedSid({ socket }),
+        socketId: socket.id,
+        connectedSocketIds: this.connectedSockets.map((s) => s.id),
+      });
+
+      if (this.opts.onSocketDisconnect) {
+        void this.opts.onSocketDisconnect({ socket, dbo: dbo as DBOFullyTyped, db, getUser });
+      }
+    });
 
     await this.opts.onLog?.({
       type: "connect",
@@ -30,9 +54,6 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
       socketId: socket.id,
       connectedSocketIds: this.connectedSockets.map((s) => s.id),
     });
-
-    if (!this.db || !this.dbo) throw new Error("db/dbo missing");
-    const { dbo, db } = this;
 
     const { onUseOrSocketConnected } = this.opts.auth ?? {};
     const { authHandler } = this;
@@ -90,23 +111,6 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
           });
       }
     );
-
-    socket.on("disconnect", () => {
-      this.dbEventsManager?.removeNotice(socket);
-      this.dbEventsManager?.removeNotify(undefined, socket);
-      this.connectedSockets = this.connectedSockets.filter((s) => s.id !== socket.id);
-      this.dboBuilder.queryStreamer.onDisconnect(socket.id);
-      void this.opts.onLog?.({
-        type: "disconnect",
-        sid: this.authHandler?.getValidatedSid({ socket }),
-        socketId: socket.id,
-        connectedSocketIds: this.connectedSockets.map((s) => s.id),
-      });
-
-      if (this.opts.onSocketDisconnect) {
-        void this.opts.onSocketDisconnect({ socket, dbo: dbo as DBOFullyTyped, db, getUser });
-      }
-    });
 
     socket.removeAllListeners(CHANNELS.METHOD);
     socket.on(
