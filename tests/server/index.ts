@@ -57,38 +57,6 @@ process.on("unhandledRejection", (reason, p) => {
   process.exit(1);
 });
 
-// DEBUGGING setAuth hot reload
-// const handler1 = async (req, res) => {
-//   await new Promise((res) => setTimeout(res, 1000));
-//   console.log("handler1");
-//   // res.send("handler1");
-// };
-// const handler2 = async (req, res) => {
-//   await new Promise((res) => setTimeout(res, 1000));
-//   console.log("handler2");
-//   // res.send("handler2");
-// };
-
-// // const removeExpressRoute = (app, routePaths: (string | undefined)[]) => {
-// //   const routes = app?._router?.stack;
-// //   if (routes) {
-// //     routes.forEach((route, i) => {
-// //       if (routePaths.filter(isDefined).includes(route.route?.path as any)) {
-// //         routes.splice(i, 1);
-// //       }
-// //     });
-// //   }
-// // };
-// app.get("/hehe", handler1);
-// (async () => {
-//   fetch("http://localhost:3001/hehe");
-//   await new Promise((res) => setTimeout(res, 555));
-//   removeExpressRoute(app, ["/hehe"]);
-//   app.get("/hehe", handler2);
-//   await fetch("http://localhost:3001/hehe");
-//   debugger;
-// })();
-
 /**
  * To create a superuser in linux:
  *    sudo su - postgres

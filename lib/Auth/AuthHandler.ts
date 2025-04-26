@@ -13,7 +13,7 @@ import { getSidAndUserFromRequest } from "./utils/getSidAndUserFromRequest";
 import { getUserOrError } from "./utils/getUserOrError";
 import { handleGetUserThrottled } from "./utils/handleGetUser";
 
-export { getClientRequestIPsInfo };
+export { getClientRequestIPsInfo, removeExpressRoute };
 export const HTTP_FAIL_CODES = {
   UNAUTHORIZED: 401,
   NOT_FOUND: 404,
