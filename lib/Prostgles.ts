@@ -502,7 +502,7 @@ export class Prostgles {
   };
 }
 
-export async function getIsSuperUser(db: DB): Promise<boolean> {
+export async function getIsSuperUser(db: DBorTx): Promise<boolean> {
   return db
     .oneOrNone<{ usesuper: boolean }>("select usesuper from pg_user where usename = CURRENT_USER;")
     .then((r) => !!r?.usesuper);

@@ -381,6 +381,6 @@ prostgles<DBGeneratedSchema>({
     Script executed before tableConfig is loaded and IF an older schema_version is present.
     Any data conflicting with the new schema changes should be resolved here.
 
-- **onLog** <span style="color: grey">optional</span> <span style="color: green;">(evt: EventInfo) =&gt; Promise&lt;void&gt;</span>
+- **onLog** <span style="color: grey">optional</span> <span style="color: green;">(evt: EventInfo) =&gt; void | Promise&lt;void&gt;</span>
 
   Usefull for logging or debugging
