@@ -194,9 +194,11 @@ prostgles<DBGeneratedSchema>({
 
     Name of the cookie or socket hadnshake query param that represents the session id.
     Defaults to "session_id"
-  - **onUseOrSocketConnected** <span style="color: grey">optional</span> <span style="color: green;">(sid: string | undefined, client: LoginClientInfo, reqInfo: AuthClientRequest) =&gt; Awaitable&lt;void | { error: string; httpCode: 400 | 401 | 403; }&gt;</span>
+  - **onUseOrSocketConnected** <span style="color: grey">optional</span> <span style="color: green;">(sid: string | undefined, client: LoginClientInfo, reqInfo: AuthClientRequest) =&gt; Awaitable&lt;void | { error: string; httpCode: 400 | 401 | 403; } | { ...; }&gt;</span>
 
-    Awaited before any auth actions. Failure will stop the auth process
+    Awaited before any auth actions.
+    If session is returned then will set cookie and redirect
+    Failure will stop the auth process
   - **getUser** <span style="color: red">required</span> <span style="color: green;">(sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: LoginClientInfo, reqInfo: AuthClientRequest) =&gt; Awaitable&lt;...&gt;</span>
 
     Required to allow self-managed or managed (by setting up loginSignupConfig) authentication.

@@ -299,7 +299,7 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
   /**
    * Usefull for logging or debugging
    */
-  onLog?: (evt: EventInfo) => Promise<void>;
+  onLog?: (evt: EventInfo) => Promise<void> | void;
 };
 
 export type TableConfigMigrations = {
