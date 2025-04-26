@@ -277,7 +277,8 @@ export class DboBuilder {
       // if (typeof this.prostgles.opts.transactions === "string")
       //   txKey = this.prostgles.opts.transactions;
 
-      (this.dbo[txKey] as unknown as TX) = (cb: TxCB) => this.getTX(cb);
+      (this.dbo[txKey] as unknown as TX) = (cb: TxCB) =>
+        this.getTX(cb as TxCB<DbTxTableHandlers, any>);
     }
 
     if (!this.dbo.sql) {
@@ -318,7 +319,7 @@ export class DboBuilder {
   };
 
   getTX = async (cb: TxCB) => {
-    const transaction = await this.db.tx((t) => {
+    return this.db.tx((t) => {
       const dbTX: DbTxTableHandlers & Pick<DBHandlerServer, "sql"> = {};
       this.tablesOrViews?.map((tov) => {
         const handlerClass = tov.is_view ? ViewHandler : TableHandler;
@@ -333,8 +334,6 @@ export class DboBuilder {
 
       return cb(dbTX, t);
     });
-
-    return transaction;
   };
 
   cacheDBTypes = cacheDBTypes.bind(this);

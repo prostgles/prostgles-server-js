@@ -28,6 +28,13 @@ export const testDboTypes = () => {
     dbo1.w?.find;
 
     const db = {} as DBOFullyTyped<DBGeneratedSchema>;
+
+    /** db.tx return type works as expected */
+    const txRes = await db.tx((dbTx) => {
+      return "test" as const;
+    });
+    txRes satisfies "test";
+
     db.items2.find;
 
     const r = await db.items2.find(

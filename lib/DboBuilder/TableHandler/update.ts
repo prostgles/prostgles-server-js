@@ -6,6 +6,7 @@ import {
   getErrorAsObject,
   getSerializedClientErrorFromPGError,
   withUserRLS,
+  type TableHandlers,
 } from "../DboBuilder";
 import { getInsertTableRules, getReferenceColumnInserts } from "./insert/insertNestedRecords";
 import { prepareNewData } from "./DataValidator";
@@ -28,7 +29,13 @@ export async function update(
     const finalDBtx = this.getFinalDBtx(localParams);
     const wrapInTx = () =>
       this.dboBuilder.getTX((_dbtx) =>
-        _dbtx[this.name]?.[ACTION]?.(filter, _newData, params, tableRules, localParams)
+        (_dbtx[this.name] as Partial<typeof this> | undefined)?.[ACTION]?.(
+          filter,
+          _newData,
+          params,
+          tableRules,
+          localParams
+        )
       );
     const rule = tableRules?.[ACTION];
     if (rule?.postValidate && !finalDBtx) {
