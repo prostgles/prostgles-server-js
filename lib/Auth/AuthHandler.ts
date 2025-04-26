@@ -1,6 +1,6 @@
 import { AnyObject, CHANNELS } from "prostgles-types";
 import { PRGLIOSocket } from "../DboBuilder/DboBuilder";
-import { removeExpressRoute } from "../FileManager/FileManager";
+import { removeExpressRoute } from "./utils/removeExpressRoute";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import { AuthClientRequest, AuthConfig, BasicSession, ExpressReq } from "./AuthTypes";
 import { LoginResponseHandler } from "./endpoints/setLoginRequestHandler";
@@ -37,7 +37,7 @@ export const AUTH_ROUTES_AND_PARAMS = {
   logout: "/logout",
   magicLinks: "/magic-link",
   magicLinkWithId: "/magic-link/:id",
-  catchAll: "*splat",
+  catchAll: "*", //v5 "*splat"
 } as const;
 
 export class AuthHandler {

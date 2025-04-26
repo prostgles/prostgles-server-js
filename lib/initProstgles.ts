@@ -9,6 +9,7 @@ import { DbTableInfo, PublishParser } from "./PublishParser/PublishParser";
 import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { sleep } from "./utils";
 import { runSQLFile } from "./TableConfig/runSQLFile";
+import { removeExpressRoutesTest } from "./Auth/utils/removeExpressRoute";
 
 /**
  * Database connection details
@@ -79,6 +80,13 @@ export const initProstgles = async function (
   reason: OnInitReason
 ): Promise<InitResult> {
   this.loaded = false;
+  const expressApp =
+    this.opts.fileTable?.expressApp ??
+    this.opts.restApi?.expressApp ??
+    this.opts.auth?.loginSignupConfig?.app;
+
+  /** Crucial in ensuring the runtime version of express works as expected */
+  if (expressApp) await removeExpressRoutesTest(expressApp);
 
   if (!this.db) {
     let existingAppName = "";

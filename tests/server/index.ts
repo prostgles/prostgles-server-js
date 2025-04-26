@@ -1,11 +1,11 @@
-import path from "path";
 import express from "express";
+import path from "path";
 import prostgles from "prostgles-server";
-const app = express();
-const http = require("http").createServer(app);
 import { testPublishTypes } from "./publishTypeCheck";
 import { testPublish } from "./testPublish";
 import { testTableConfig } from "./testTableConfig";
+const app = express();
+const http = require("http").createServer(app);
 
 testPublishTypes();
 
@@ -21,8 +21,8 @@ import { serverOnlyQueries } from "../serverOnlyQueries.spec";
 
 import { DBGeneratedSchema } from "./DBGeneratedSchema";
 
-import type { DBOFullyTyped } from "prostgles-server/dist/DBSchemaBuilder";
 import { spawn } from "child_process";
+import type { DBOFullyTyped } from "prostgles-server/dist/DBSchemaBuilder";
 export type { DBHandlerServer } from "prostgles-server/dist/Prostgles";
 
 let logs = [];
@@ -110,6 +110,7 @@ function dd() {
   if (!dbo) return;
   dbo.tbl.find;
 }
+
 (async () => {
   if (isClientTest && process.env.TEST_NAME === "useProstgles") {
     await prostgles<DBGeneratedSchema>({

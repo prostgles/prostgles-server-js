@@ -4,23 +4,22 @@ import * as stream from "stream";
 // import * as sharp from "sharp";
 import checkDiskSpace from "check-disk-space";
 
-import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import {
   ALLOWED_CONTENT_TYPE,
   ALLOWED_EXTENSION,
   CONTENT_TYPE_TO_EXT,
   getKeys,
-  isDefined,
   ValidatedColumnInfo,
 } from "prostgles-types";
+import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 
 import * as path from "path";
-import { initFileManager } from "./initFileManager";
+import { removeExpressRoute } from "../Auth/utils/removeExpressRoute";
+import { ExpressApp } from "../RestApi";
 import { getValidatedFileType } from "./getValidatedFileType";
+import { initFileManager } from "./initFileManager";
 import { upload } from "./upload";
 import { uploadStream } from "./uploadStream";
-import { ExpressApp } from "../RestApi";
-import { matchesRoute } from "../Auth/AuthHandler";
 
 export const HOUR = 3600 * 1000;
 
@@ -307,27 +306,6 @@ export class FileManager {
     removeExpressRoute(this.prostgles?.opts.fileTable?.expressApp, [this.fileRouteExpress]);
   };
 }
-
-export const removeExpressRoute = (
-  app: ExpressApp | undefined,
-  _routePaths: (string | undefined)[],
-  method?: "get" | "post" | "put" | "delete"
-) => {
-  const routes = app?._router?.stack;
-  const routePaths = _routePaths.filter(isDefined);
-  if (routes) {
-    app._router!.stack = routes.filter((route) => {
-      const path = route.route?.path;
-      if (
-        routePaths.some((routePath) => matchesRoute(path, routePath)) &&
-        (!method || route.route?.methods?.[method])
-      ) {
-        return false;
-      }
-      return true;
-    });
-  }
-};
 
 export const removeExpressRouteByName = (app: ExpressApp | undefined, name: string) => {
   const routes = app?._router?.stack;

@@ -1,9 +1,6 @@
 //@ts-ignore
-import type { DBHandlerServer } from "../dist/DboBuilder";
-import { test, describe } from "node:test";
-import { getJSONBObjectSchemaValidationError } from "../dist/JSONBValidation/JSONBValidation";
-import type { JSONB } from "prostgles-types";
-import { strict as assert } from "assert";
+import { describe, test } from "node:test";
+import type { DBHandlerServer } from "../dist/Prostgles";
 
 export const serverOnlyQueries = async (db: DBHandlerServer) => {
   await describe("Server Only Queries", async () => {

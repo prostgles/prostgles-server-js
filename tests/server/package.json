@@ -13,7 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^5.1.0",
+    "express": "^4.21.2",
     "prostgles-server": "file:../.."
   },
   "devDependencies": {

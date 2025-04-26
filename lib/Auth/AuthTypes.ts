@@ -281,6 +281,7 @@ export type AuthResultOrError<SU = SessionUser> =
        * If provided must login the user. Used for passwordless admin and public users
        */
       session: BasicSession;
+      reqInfo: HttpClientRequest;
     };
 
 export type AuthRequestParams<S, SUser extends SessionUser> = {
