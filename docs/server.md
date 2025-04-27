@@ -206,7 +206,7 @@ prostgles<DBGeneratedSchema>({
     - publish - userData and/or sid (in testing) are passed to the publish function
     - auth.expressConfig.use - express middleware to get user data and
        undefined sid is allowed to enable public users
-    - websocket authguard - allows connected SPA client to check if on protected route and needs to reload to ne redirected to login
+    - websocket authguard - when session expires tells the client to reload to be redirected to login
   - **loginSignupConfig** <span style="color: grey">optional</span> <span style="color: green;">LoginSignupConfig</span>
 
     Will setup auth routes

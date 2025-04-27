@@ -325,9 +325,6 @@ export class Prostgles {
     } = this;
     if (!dbo) throw "dbo missing";
 
-    const publishParser = new PublishParser(this);
-    this.publishParser = publishParser;
-
     if (!io) return;
 
     /* Already initialised. Only reconnect sockets */
@@ -340,29 +337,29 @@ export class Prostgles {
     }
 
     const { authHandler } = this;
-    if (authHandler) {
-      let redirected = false;
-      io.engine.use(((req, res, next) => {
-        console.log(req.cookies);
-        if (!redirected) {
-          redirected = true;
-          // this.authHandler?.setCookieAndGoToReturnURLIFSet(
-          //   { expires: Date.now() + 221000, sid: "heehe" },
-          //   { req, res }
-          // );
-          // Set cookie manually on raw HTTP response
-          const cookieStr = `${this.authHandler?.sidKeyName}=hehehe; Path=/; Expires=${new Date(Date.now() + 221000).toUTCString()}; HttpOnly`;
-          res.setHeader("Set-Cookie", cookieStr);
+    // if (authHandler) {
+    //   let redirected = false;
+    //   io.engine.use(((req, res, next) => {
+    //     console.log(req.cookies);
+    //     if (!redirected) {
+    //       redirected = true;
+    //       // this.authHandler?.setCookieAndGoToReturnURLIFSet(
+    //       //   { expires: Date.now() + 221000, sid: "heehe" },
+    //       //   { req, res }
+    //       // );
+    //       // Set cookie manually on raw HTTP response
+    //       const cookieStr = `${this.authHandler?.sidKeyName}=hehehe; Path=/; Expires=${new Date(Date.now() + 221000).toUTCString()}; HttpOnly`;
+    //       res.setHeader("Set-Cookie", cookieStr);
 
-          // Handle redirection
-          res.statusCode = 302;
-          res.setHeader("Location", "/");
-          res.end();
-          return;
-        }
-        next();
-      }) satisfies RequestHandler);
-    }
+    //       // Handle redirection
+    //       res.statusCode = 302;
+    //       res.setHeader("Location", "/");
+    //       res.end();
+    //       return;
+    //     }
+    //     next();
+    //   }) satisfies RequestHandler);
+    // }
 
     /* Initialise */
     io.removeAllListeners("connection");
