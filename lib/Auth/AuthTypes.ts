@@ -22,14 +22,14 @@ import {
   ClientSchema,
 } from "prostgles-types";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
-import { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
+import { PRGLIOSocket, type CachedSession } from "../DboBuilder/DboBuilderTypes";
 import { DB } from "../Prostgles";
 import OAuth2Strategy from "passport-oauth2";
 import { AUTH_ROUTES_AND_PARAMS } from "./AuthHandler";
 
 type Awaitable<T> = T | Promise<T>;
 
-export type ExpressReq = Request;
+export type ExpressReq = Request & CachedSession;
 export type ExpressRes = Response;
 
 export type LoginClientInfo = {
@@ -314,7 +314,7 @@ export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
    * - publish - userData and/or sid (in testing) are passed to the publish function
    * - auth.expressConfig.use - express middleware to get user data and
    *    undefined sid is allowed to enable public users
-   * - websocket authguard - allows connected SPA client to check if on protected route and needs to reload to ne redirected to login
+   * - websocket authguard - when session expires tells the client to reload to be redirected to login
    */
   getUser: (
     sid: string | undefined,

@@ -1,4 +1,4 @@
-import { AnyObject, FullFilter, isDefined } from "prostgles-types";
+import { AnyObject, FullFilter, includes, isDefined } from "prostgles-types";
 import { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
 import { PublishParser } from "./PublishParser";
@@ -54,7 +54,7 @@ export async function getFileTableRules(
           if (tableRules.select) {
             const parsedFields = parseFieldFilter(tableRules.select.fields, false, allColumns);
             /** Must be allowed to view this column */
-            if (parsedFields.includes(column as any)) {
+            if (includes(parsedFields, column)) {
               forcedSelectFilters.push({
                 $existsJoined: {
                   path,
@@ -66,14 +66,14 @@ export async function getFileTableRules(
           if (tableRules.insert) {
             const parsedFields = parseFieldFilter(tableRules.insert.fields, false, allColumns);
             /** Must be allowed to view this column */
-            if (parsedFields.includes(column as any)) {
+            if (includes(parsedFields, column)) {
               allowedNestedInserts.push({ table: tableName, column });
             }
           }
           if (tableRules.update) {
             const parsedFields = parseFieldFilter(tableRules.update.fields, false, allColumns);
             /** Must be allowed to view this column */
-            if (parsedFields.includes(column as any)) {
+            if (includes(parsedFields, column)) {
               forcedUpdateFilters.push({
                 $existsJoined: {
                   path,

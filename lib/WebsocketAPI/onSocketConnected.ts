@@ -1,10 +1,11 @@
 import { AnyObject, CHANNELS } from "prostgles-types";
-import type { Prostgles, TABLE_METHODS } from "./Prostgles";
-import { PRGLIOSocket } from "./DboBuilder/DboBuilderTypes";
-import { runClientMethod, runClientRequest } from "./runClientRequest";
-import { getErrorAsObject } from "./DboBuilder/dboBuilderUtils";
-import { DBOFullyTyped } from "./DBSchemaBuilder";
-import { getClientRequestIPsInfo } from "./Auth/AuthHandler";
+import type { Prostgles, TABLE_METHODS } from "../Prostgles";
+import { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
+import { runClientMethod, runClientRequest } from "../runClientRequest";
+import { getErrorAsObject } from "../DboBuilder/dboBuilderUtils";
+import { DBOFullyTyped } from "../DBSchemaBuilder";
+import { getClientRequestIPsInfo } from "../Auth/AuthHandler";
+import type { AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
 
 export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
   if (!this.db || !this.dbo) throw new Error("db/dbo missing");
@@ -18,8 +19,8 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
   this.connectedSockets.push(socket);
 
   try {
-    const getUser = async () => {
-      if (!this.authHandler) throw "authHandler missing";
+    const getUser = async (): Promise<AuthResultWithSID<SessionUser>> => {
+      if (!this.authHandler) return { sid: undefined, user: undefined };
       const res = await this.authHandler.getSidAndUserFromRequest({ socket });
       if (res === "new-session-redirect") {
         socket.emit(CHANNELS.AUTHGUARD, {

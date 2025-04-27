@@ -15,7 +15,6 @@ import pgPromise from "pg-promise";
 import pg from "pg-promise/typescript/pg-subset";
 import { AnyObject } from "prostgles-types";
 import type { Server } from "socket.io";
-import { DB } from "./Prostgles";
 import { Awaitable, Publish, PublishMethods, PublishParams } from "./PublishParser/PublishParser";
 
 /**

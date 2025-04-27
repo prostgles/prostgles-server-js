@@ -6,39 +6,26 @@
 import * as pgPromise from "pg-promise";
 import { AuthHandler } from "./Auth/AuthHandler";
 import { FileManager } from "./FileManager/FileManager";
-import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { OnInitReason, initProstgles } from "./initProstgles";
-import { makeSocketError, onSocketConnected } from "./onSocketConnected";
-import { clientCanRunSqlRequest, runClientSqlRequest } from "./runClientRequest";
+import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
+import { getClientSchema } from "./WebsocketAPI/getClientSchema";
+import { onSocketConnected } from "./WebsocketAPI/onSocketConnected";
 import pg = require("pg-promise/typescript/pg-subset");
-const version = (require("../package.json") as { version: string }).version;
 
 import type { ProstglesInitOptions } from "./ProstglesTypes";
 import { RestApi } from "./RestApi";
 import TableConfigurator from "./TableConfig/TableConfig";
 
-import {
-  DBHandlerServer,
-  DboBuilder,
-  PRGLIOSocket,
-  getErrorAsObject,
-} from "./DboBuilder/DboBuilder";
+import { DBHandlerServer, DboBuilder, PRGLIOSocket } from "./DboBuilder/DboBuilder";
 export { DBHandlerServer };
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 export { getEmailSender, getOrSetTransporter, verifySMTPConfig } from "./Auth/sendEmail";
 export { applyTableConfig } from "./TableConfig/applyTableConfig";
 
-import {
-  CHANNELS,
-  ClientSchema,
-  SQLRequest,
-  includes,
-  isObject,
-  omitKeys,
-  tryCatchV2,
-} from "prostgles-types";
+import { CHANNELS, tryCatchV2 } from "prostgles-types";
 import { DBEventsManager } from "./DBEventsManager";
 import { PublishParser } from "./PublishParser/PublishParser";
+import { pushSocketSchema } from "./WebsocketAPI/pushSocketSchema";
 
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 export type DBorTx = DB | pgPromise.ITask<{}>;
@@ -66,8 +53,8 @@ const DEFAULT_KEYWORDS = {
 };
 
 import { randomUUID } from "crypto";
+import type { RequestHandler } from "express";
 import * as fs from "fs";
-import { AuthClientRequest } from "./Auth/AuthTypes";
 
 export class Prostgles {
   /**
@@ -332,12 +319,16 @@ export class Prostgles {
   setSocketEvents() {
     this.checkDb();
 
-    if (!this.dbo) throw "dbo missing";
+    const {
+      dbo,
+      opts: { io },
+    } = this;
+    if (!dbo) throw "dbo missing";
 
     const publishParser = new PublishParser(this);
     this.publishParser = publishParser;
 
-    if (!this.opts.io) return;
+    if (!io) return;
 
     /* Already initialised. Only reconnect sockets */
     if (this.connectedSockets.length) {
@@ -348,158 +339,43 @@ export class Prostgles {
       return;
     }
 
+    const { authHandler } = this;
+    if (authHandler) {
+      let redirected = false;
+      io.engine.use(((req, res, next) => {
+        console.log(req.cookies);
+        if (!redirected) {
+          redirected = true;
+          // this.authHandler?.setCookieAndGoToReturnURLIFSet(
+          //   { expires: Date.now() + 221000, sid: "heehe" },
+          //   { req, res }
+          // );
+          // Set cookie manually on raw HTTP response
+          const cookieStr = `${this.authHandler?.sidKeyName}=hehehe; Path=/; Expires=${new Date(Date.now() + 221000).toUTCString()}; HttpOnly`;
+          res.setHeader("Set-Cookie", cookieStr);
+
+          // Handle redirection
+          res.statusCode = 302;
+          res.setHeader("Location", "/");
+          res.end();
+          return;
+        }
+        next();
+      }) satisfies RequestHandler);
+    }
+
     /* Initialise */
-    this.opts.io.removeAllListeners("connection");
-    this.opts.io.on("connection", this.onSocketConnected);
+    io.removeAllListeners("connection");
+    io.on("connection", this.onSocketConnected);
     /** In some cases io will re-init with already connected sockets */
-    this.opts.io.sockets.sockets.forEach((socket) => {
+    io.sockets.sockets.forEach((socket) => {
       void this.onSocketConnected(socket);
     });
   }
 
   onSocketConnected = onSocketConnected.bind(this);
-
-  getClientSchema = async (clientReq: AuthClientRequest) => {
-    const result = await tryCatchV2(async () => {
-      const clientInfo =
-        clientReq.socket ?
-          { type: "socket" as const, ...clientReq }
-        : { type: "http" as const, ...clientReq };
-
-      const userData = await this.authHandler?.getSidAndUserFromRequest(clientInfo);
-      if (userData === "new-session-redirect") {
-        throw "new-session-redirect";
-      }
-      const { publishParser } = this;
-      let fullSchema: Awaited<ReturnType<PublishParser["getSchemaFromPublish"]>> | undefined;
-      let publishValidationError;
-
-      try {
-        if (!publishParser) throw "publishParser undefined";
-        fullSchema = await publishParser.getSchemaFromPublish({
-          ...clientInfo,
-          userData,
-        });
-      } catch (e) {
-        publishValidationError = e;
-        console.error(`\nProstgles Publish validation failed (after socket connected):\n    ->`, e);
-      }
-      let rawSQL = false;
-      if (this.opts.publishRawSQL && typeof this.opts.publishRawSQL === "function") {
-        const { allowed } = await clientCanRunSqlRequest.bind(this)(clientInfo);
-        rawSQL = allowed;
-      }
-
-      const { schema, tables, tableSchemaErrors } = fullSchema ?? {
-        schema: {},
-        tables: [],
-        tableSchemaErrors: {},
-      };
-      const joinTables2: string[][] = [];
-      if (this.opts.joins) {
-        const _joinTables2 = this.dboBuilder
-          .getAllJoinPaths()
-          .filter((jp) => ![jp.t1, jp.t2].find((t) => !schema[t] || !schema[t]?.findOne))
-          .map((jp) => [jp.t1, jp.t2].sort());
-        _joinTables2.map((jt) => {
-          if (!joinTables2.find((_jt) => _jt.join() === jt.join())) {
-            joinTables2.push(jt);
-          }
-        });
-      }
-
-      const methods = await publishParser?.getAllowedMethods(clientInfo, userData);
-
-      const methodSchema: ClientSchema["methods"] =
-        !methods ?
-          []
-        : Object.entries(methods)
-            .map(([methodName, method]) => {
-              if (isObject(method) && "run" in method) {
-                return {
-                  name: methodName,
-                  ...omitKeys(method, ["run"]),
-                };
-              }
-              return methodName;
-            })
-            .sort((a, b) => {
-              const aName = isObject(a) ? a.name : a;
-              const bName = isObject(b) ? b.name : b;
-              return aName.localeCompare(bName);
-            });
-
-      const authInfo = await this.authHandler?.getClientAuth(clientReq);
-      if (authInfo === "new-session-redirect") {
-        throw "new-session-redirect";
-      }
-
-      const clientSchema: ClientSchema = {
-        schema,
-        methods: methodSchema,
-        tableSchema: tables,
-        rawSQL,
-        joinTables: joinTables2,
-        tableSchemaErrors,
-        auth: authInfo?.auth,
-        version,
-        err: publishValidationError ? "Server Error: User publish validation failed." : undefined,
-      };
-
-      return {
-        publishValidationError,
-        clientSchema,
-        userData,
-      };
-    });
-    const sid = this.authHandler?.getSIDNoError(clientReq);
-    await this.opts.onLog?.({
-      type: "connect.getClientSchema",
-      duration: result.duration,
-      sid,
-      socketId: clientReq.socket?.id,
-      error: result.error || result.data?.publishValidationError,
-    });
-    if (result.hasError) throw result.error;
-    return result.data.clientSchema;
-  };
-
-  pushSocketSchema = async (socket: PRGLIOSocket) => {
-    try {
-      const clientSchema = await this.getClientSchema({ socket });
-      socket.prostgles = clientSchema;
-      if (clientSchema.rawSQL) {
-        socket.removeAllListeners(CHANNELS.SQL);
-        socket.on(
-          CHANNELS.SQL,
-          (
-            sqlRequestData: SQLRequest,
-            cb = (..._callback: any) => {
-              /* Empty */
-            }
-          ) => {
-            runClientSqlRequest
-              .bind(this)(sqlRequestData, { socket })
-              .then((res) => {
-                cb(null, res);
-              })
-              .catch((err) => {
-                makeSocketError(cb, err);
-              });
-          }
-        );
-      }
-      await this.dboBuilder.prostgles.opts.onLog?.({
-        type: "debug",
-        command: "pushSocketSchema",
-        duration: -1,
-        data: { socketId: socket.id, clientSchema },
-      });
-      socket.emit(CHANNELS.SCHEMA, clientSchema);
-    } catch (err: any) {
-      socket.emit(CHANNELS.SCHEMA, { err: getErrorAsObject(err) });
-    }
-  };
+  getClientSchema = getClientSchema.bind(this);
+  pushSocketSchema = pushSocketSchema.bind(this);
 }
 
 export async function getIsSuperUser(db: DBorTx): Promise<boolean> {

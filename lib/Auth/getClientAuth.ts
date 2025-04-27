@@ -86,6 +86,7 @@ export async function getClientAuth(
     return userData;
   }
   const auth: AuthSocketSchema = {
+    //@ts-ignore
     providers: getOAuthProviders(loginWithOAuth),
     signupWithEmailAndPassword: signupWithEmailAndPassword && {
       minPasswordLength: signupWithEmailAndPassword.minPasswordLength ?? 8,

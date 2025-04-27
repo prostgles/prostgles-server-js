@@ -86,7 +86,9 @@ export const initProstgles = async function (
     this.opts.auth?.loginSignupConfig?.app;
 
   /** Crucial in ensuring the runtime version of express works as expected */
-  if (expressApp) await removeExpressRoutesTest(expressApp);
+  if (expressApp) {
+    await removeExpressRoutesTest(expressApp);
+  }
 
   if (!this.db) {
     let existingAppName = "";
@@ -104,7 +106,7 @@ export const initProstgles = async function (
         const url = new URL(connString);
         existingAppName =
           url.searchParams.get("application_name") ?? url.searchParams.get("ApplicationName") ?? "";
-      } catch (e) {}
+      } catch {}
     }
 
     const conObj =
@@ -115,7 +117,8 @@ export const initProstgles = async function (
 
     /* 1. Connect to db */
     const { db, pgp } = getDbConnection({
-      ...this.opts,
+      onQuery: this.opts.onQuery,
+      DEBUG_MODE: this.opts.DEBUG_MODE,
       dbConnection: { ...conObj, application_name },
       onNotice: (notice) => {
         if (this.opts.onNotice) this.opts.onNotice(notice);

@@ -7,11 +7,11 @@ import { isPlainObject } from "../DboBuilder";
  * @param {boolean} allow_empty - allow empty select. defaults to true
  */
 export const parseFieldFilter = <AllowedKeys extends string[]>(
-  fieldParams: FieldFilter<Record<AllowedKeys[number], any>> = "*",
+  fieldParams: FieldFilter<Record<AllowedKeys[number] | string, 1>> = "*",
   allow_empty = true,
   all_cols: AllowedKeys
 ): AllowedKeys | [""] => {
-  let colNames: AllowedKeys = [] as any;
+  let colNames: string[] = [];
   const initialParams = JSON.stringify(fieldParams);
 
   if (fieldParams) {
@@ -82,7 +82,7 @@ export const parseFieldFilter = <AllowedKeys extends string[]>(
       if (disallowed.length) {
         return all_cols.filter((col) => !disallowed.includes(col)) as typeof all_cols;
       } else {
-        return [...allowed] as any;
+        return [...allowed] as AllowedKeys | [""];
       }
     } else {
       throw (
@@ -93,9 +93,9 @@ export const parseFieldFilter = <AllowedKeys extends string[]>(
 
     validate(colNames);
   }
-  return colNames as any;
+  return colNames as AllowedKeys | [""];
 
-  function validate(cols: AllowedKeys) {
+  function validate(cols: string[]) {
     const bad_keys = cols.filter((col) => !all_cols.includes(col));
     if (bad_keys.length) {
       throw "\nUnrecognised or illegal fields: " + bad_keys.join(", ");

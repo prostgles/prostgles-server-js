@@ -139,6 +139,15 @@ export type TableOrViewInfo = TableInfo &
     is_view: boolean;
   };
 
+export type CachedSessionData = {
+  userData: Omit<SessionUser, "session">;
+  session: BasicSession;
+};
+
+export type CachedSession = {
+  __prglCache?: CachedSessionData;
+};
+
 export type PRGLIOSocket = {
   readonly id: string;
 
@@ -167,17 +176,11 @@ export type PRGLIOSocket = {
     connection: { remoteAddress?: string };
   };
 
-  /** Used for session caching */
-  __prglCache?: {
-    userData: Omit<SessionUser, "session">;
-    session: BasicSession;
-  };
-
   _user?: AnyObject;
 
   /** Used for publish error caching */
   prostgles?: ClientSchema;
-};
+} & CachedSession;
 
 export type LocalParams = {
   // httpReq?: ExpressReq;

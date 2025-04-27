@@ -1,4 +1,4 @@
-import { pickKeys } from "prostgles-types";
+import { includes, pickKeys } from "prostgles-types";
 import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
 import { PubSubManager } from "./PubSubManager";
 import { DELIMITER, log, NOTIF_TYPE, type NotifTypeName } from "./PubSubManagerUtils";
@@ -139,8 +139,9 @@ export async function notifListener(this: PubSubManager, data: { payload: string
 
         const actionIsIgnored =
           actions &&
-          !parseFieldFilter(actions, false, ["insert", "update", "delete"]).includes(
-            commandLowerCase as any
+          !includes(
+            parseFieldFilter(actions, false, ["insert", "update", "delete"]),
+            commandLowerCase
           );
         if (actionIsIgnored) {
           return;

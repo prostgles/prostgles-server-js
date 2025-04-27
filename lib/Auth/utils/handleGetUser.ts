@@ -6,11 +6,34 @@ import { throttledAuthCall } from "./throttledReject";
 
 export type GetUserOrRedirected = AuthResultWithSID | "new-session-redirect";
 
+/**
+ * For a given request return the user data if available using the auth handler's getUser method.
+ * Use cache data if configured in Auth
+ * Used in Publish Parser and AuthHandler
+ */
 export async function handleGetUserThrottled(
   this: AuthHandler,
   clientReq: AuthClientRequest
 ): Promise<GetUserOrRedirected> {
   const getSessionForCaching = this.opts.cacheSession?.getSession;
+
+  /** Get cached session if available */
+  const __prglCache =
+    !this.opts.cacheSession ? undefined : (clientReq.httpReq ?? clientReq.socket).__prglCache;
+  if (clientReq.socket && __prglCache) {
+    const { userData, session } = __prglCache;
+    const isValid = this.isNonExpiredSocketSession(clientReq.socket, session);
+    if (isValid) {
+      return {
+        ...userData,
+        sid: session.sid,
+      };
+    } else
+      return {
+        sid: session.sid,
+      };
+  }
+
   const result = await throttledAuthCall(async () => {
     const clientInfoOrErr = await this.opts.getUser(
       this.getValidatedSid(clientReq),
@@ -36,14 +59,20 @@ export async function handleGetUserThrottled(
       return "new-session-redirect" as const;
     }
 
+    /** Set cached session data */
     const sid = this.getValidatedSid(clientReq);
-    if (getSessionForCaching && clientReq.socket && sid) {
+    if (getSessionForCaching && sid) {
       const session = await getSessionForCaching(sid, this.dbo as DBOFullyTyped, this.db);
       if (session && session.expires && clientInfo?.user) {
-        clientReq.socket.__prglCache = {
+        const __prglCache = {
           userData: clientInfo,
           session,
         };
+        if (clientReq.socket) {
+          clientReq.socket.__prglCache = __prglCache;
+        } else {
+          clientReq.httpReq.__prglCache = __prglCache;
+        }
       }
     }
 

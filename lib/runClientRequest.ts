@@ -5,6 +5,7 @@ import {
   getKeys,
   pickKeys,
   type AnyObject,
+  type FieldFilter,
 } from "prostgles-types";
 import { AuthClientRequest } from "./Auth/AuthTypes";
 import { LocalParams } from "./DboBuilder/DboBuilder";
@@ -95,9 +96,10 @@ export const runClientRequest = async function (
       undefined
     : {
         ...parseFieldFilter(
-          clientInfo.sessionFields ?? ([] as any),
+          //@ts-ignore
+          clientInfo.sessionFields ?? [],
           false,
-          Object.keys(clientInfo.user)
+          getKeys(clientInfo.user)
         ),
         ...(pickKeys(clientInfo.user, ["id", "type"]) as UserLike),
       };

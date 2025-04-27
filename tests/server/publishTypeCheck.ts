@@ -1,4 +1,4 @@
-import { ProstglesInitOptions } from "../../dist/ProstglesTypes";
+import { ProstglesInitOptions } from "prostgles-server/dist/ProstglesTypes";
 import { DBGeneratedSchema } from "./DBGeneratedSchema";
 
 import { PublishFullyTyped } from "prostgles-server/dist/DBSchemaBuilder";
