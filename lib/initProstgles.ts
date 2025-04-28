@@ -25,8 +25,8 @@ export type DbConnectionOpts = pg.IDefaults;
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 
-export type UpdateableOptions = Pick<
-  ProstglesInitOptions,
+export type UpdateableOptions<S = void, SUser extends SessionUser = SessionUser> = Pick<
+  ProstglesInitOptions<S, SUser>,
   "fileTable" | "restApi" | "tableConfig" | "schemaFilter" | "auth"
 >;
 export type OnInitReason =
@@ -68,7 +68,7 @@ export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
    * Generated database public schema TS types for all tables and views
    */
   getTSSchema: () => string;
-  update: (newOpts: UpdateableOptions) => Promise<void>;
+  update: (newOpts: UpdateableOptions<S, SUser>) => Promise<void>;
   restart: () => Promise<InitResult<S, SUser>>;
   options: ProstglesInitOptions<S, SUser>;
 };
