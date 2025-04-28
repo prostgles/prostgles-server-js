@@ -59,7 +59,7 @@ export type OnReadyCallback<S = void> = (params: OnReadyParams<S>) => any;
 export type OnReadyCallbackBasic = (params: OnReadyParamsBasic) => any;
 
 export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
-  db: DBOFullyTyped;
+  db: DBOFullyTyped<S>;
   _db: DB;
   pgp: PGP;
   io: ProstglesInitOptions<S, SUser>["io"];
