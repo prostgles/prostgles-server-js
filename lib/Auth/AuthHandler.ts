@@ -9,13 +9,13 @@ import { getClientRequestIPsInfo } from "./utils/getClientRequestIPsInfo";
 import { getSidAndUserFromRequest } from "./utils/getSidAndUserFromRequest";
 import { getUserOrError } from "./utils/getUserOrError";
 import { handleGetUserThrottled } from "./utils/handleGetUser";
-import { removeExpressRoute } from "./utils/removeExpressRoute";
+import { removeExpressRoute, removeExpressRoutesTest } from "./utils/removeExpressRoute";
 import {
   setCookieAndGoToReturnURLIFSet,
   validateSessionAndSetCookie,
 } from "./utils/setCookieAndGoToReturnURLIFSet";
 
-export { getClientRequestIPsInfo, removeExpressRoute };
+export { getClientRequestIPsInfo, removeExpressRoute, removeExpressRoutesTest };
 export const HTTP_FAIL_CODES = {
   UNAUTHORIZED: 401,
   NOT_FOUND: 404,
