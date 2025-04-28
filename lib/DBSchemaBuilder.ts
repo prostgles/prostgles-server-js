@@ -94,14 +94,14 @@ export type DBGeneratedSchema = {
 `;
 };
 
-type ServerViewHandler<
+export type ServerViewHandler<
   T extends AnyObject = AnyObject,
   Schema extends DBSchema | void = void,
-> = ViewHandler<T, Schema> & { is_view: boolean };
-type ServerTableHandler<
+> = ViewHandler<T, Schema> & { is_view: true };
+export type ServerTableHandler<
   T extends AnyObject = AnyObject,
   Schema extends DBSchema | void = void,
-> = TableHandler<T, Schema> & { is_view: boolean };
+> = TableHandler<T, Schema> & { is_view: false };
 
 export type DBTableHandlersFromSchema<Schema = void> =
   Schema extends DBSchema ?
