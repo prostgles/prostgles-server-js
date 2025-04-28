@@ -336,7 +336,7 @@ export class Prostgles {
       return;
     }
 
-    const { authHandler } = this;
+    // const { authHandler } = this;
     // if (authHandler) {
     //   let redirected = false;
     //   io.engine.use(((req, res, next) => {

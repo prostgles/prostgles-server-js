@@ -1,8 +1,8 @@
 import prostgles from "prostgles-client";
 import io from "socket.io-client";
 
-import { AuthHandler } from "prostgles-client/dist/Auth";
-export { AuthHandler } from "prostgles-client/dist/Auth";
+import { AuthHandler } from "prostgles-client/dist/getAuthHandler";
+export { AuthHandler } from "prostgles-client/dist/getAuthHandler";
 import type { DBHandlerClient, MethodHandler } from "prostgles-client/dist/prostgles";
 import { DBSchemaTable } from "prostgles-types";
 import { clientFileTests } from "../clientFileTests.spec";

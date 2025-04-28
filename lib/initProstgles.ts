@@ -61,7 +61,7 @@ export type InitResult = {
   db: DBOFullyTyped;
   _db: DB;
   pgp: PGP;
-  io?: any;
+  io: ProstglesInitOptions["io"];
   destroy: () => Promise<boolean>;
   /**
    * Generated database public schema TS types for all tables and views
