@@ -10,6 +10,7 @@ import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { sleep } from "./utils";
 import { runSQLFile } from "./TableConfig/runSQLFile";
 import { removeExpressRoutesTest } from "./Auth/utils/removeExpressRoute";
+import type { SessionUser } from "./Auth/AuthTypes";
 
 /**
  * Database connection details
@@ -57,19 +58,19 @@ export type OnReadyParams<S> = OnReadyParamsCommon & {
 export type OnReadyCallback<S = void> = (params: OnReadyParams<S>) => any;
 export type OnReadyCallbackBasic = (params: OnReadyParamsBasic) => any;
 
-export type InitResult = {
+export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
   db: DBOFullyTyped;
   _db: DB;
   pgp: PGP;
-  io: ProstglesInitOptions["io"];
+  io: ProstglesInitOptions<S, SUser>["io"];
   destroy: () => Promise<boolean>;
   /**
    * Generated database public schema TS types for all tables and views
    */
   getTSSchema: () => string;
   update: (newOpts: UpdateableOptions) => Promise<void>;
-  restart: () => Promise<InitResult>;
-  options: ProstglesInitOptions;
+  restart: () => Promise<InitResult<S, SUser>>;
+  options: ProstglesInitOptions<S, SUser>;
 };
 
 const clientOnlyUpdateKeys = ["auth"] as const satisfies (keyof UpdateableOptions)[];
@@ -183,7 +184,8 @@ export const initProstgles = async function (
     }
 
     this.loaded = true;
-    return {
+    //@ts-ignore
+    const initResult: InitResult = {
       db: this.dbo as DBOFullyTyped,
       _db: db,
       pgp,
@@ -258,6 +260,8 @@ export const initProstgles = async function (
         return true;
       },
     };
+
+    return initResult;
   } catch (e: any) {
     console.trace(e);
     throw "init issues: " + (e as Error).toString();

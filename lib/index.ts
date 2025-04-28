@@ -1,5 +1,5 @@
 import { SessionUser } from "./Auth/AuthTypes";
-import type { OnReadyCallbackBasic } from "./initProstgles";
+import type { InitResult, OnReadyCallbackBasic } from "./initProstgles";
 import { Prostgles } from "./Prostgles";
 import { ProstglesInitOptions } from "./ProstglesTypes";
 
@@ -10,6 +10,8 @@ function prostgles<S = void, SUser extends SessionUser = SessionUser>(
   params: ProstglesInitOptions<S, SUser>
 ) {
   const prgl = new Prostgles(params as ProstglesInitOptions);
-  return prgl.init(params.onReady as OnReadyCallbackBasic, { type: "init" });
+  return prgl.init(params.onReady as OnReadyCallbackBasic, { type: "init" }) as Promise<
+    InitResult<S, SUser>
+  >;
 }
 export = prostgles;

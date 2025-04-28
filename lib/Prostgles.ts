@@ -53,7 +53,6 @@ const DEFAULT_KEYWORDS = {
 };
 
 import { randomUUID } from "crypto";
-import type { RequestHandler } from "express";
 import * as fs from "fs";
 
 export class Prostgles {
