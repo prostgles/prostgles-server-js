@@ -71,7 +71,9 @@ export async function addSub(
 
   const [matchingSub] = this.getClientSubs(newSub);
   if (matchingSub) {
-    console.error("Trying to add a duplicate sub for: ", channel_name);
+    console.error(
+      `Trying to add a duplicate ${localFuncs ? "local" : "socket"} sub for: ${channel_name}`
+    );
     return result;
   }
 
