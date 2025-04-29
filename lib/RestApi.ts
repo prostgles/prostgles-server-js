@@ -1,11 +1,12 @@
 import * as bodyParser from "body-parser";
 import { Express } from "express";
-import { HTTP_FAIL_CODES } from "./Auth/AuthHandler";
+import { HTTP_FAIL_CODES, removeExpressRoute } from "./Auth/AuthHandler";
 import { ExpressReq, ExpressRes } from "./Auth/AuthTypes";
 import { getSerializedClientErrorFromPGError } from "./DboBuilder/DboBuilder";
 import { Prostgles } from "./Prostgles";
 import { runClientMethod, runClientRequest, runClientSqlRequest } from "./runClientRequest";
 import { VoidFunction } from "./SchemaWatch/SchemaWatch";
+import { isDefined } from "prostgles-types";
 const jsonParser = bodyParser.json();
 
 export type ExpressApp = {
@@ -37,7 +38,7 @@ export type RestApiConfig = {
   /**
    * Defaults to "/api"
    */
-  routePrefix: string;
+  path?: string;
 };
 
 export class RestApi {
@@ -49,13 +50,18 @@ export class RestApi {
     schema: string;
   };
   expressApp: Express;
-  constructor({ expressApp, routePrefix, prostgles }: RestApiConfig & { prostgles: Prostgles }) {
+  path = "/api";
+  constructor({ expressApp, path, prostgles }: RestApiConfig & { prostgles: Prostgles }) {
+    if (isDefined(path) && !path.trim()) {
+      throw new Error("path cannot be empty");
+    }
+    this.path = path || "/api";
     this.prostgles = prostgles;
     this.routes = {
-      db: `${routePrefix}/db/:tableName/:command`,
-      sql: `${routePrefix}/db/sql`,
-      methods: `${routePrefix}/methods/:method`,
-      schema: `${routePrefix}/schema`,
+      db: `${path}/db/:tableName/:command`,
+      sql: `${path}/db/sql`,
+      methods: `${path}/methods/:method`,
+      schema: `${path}/schema`,
     };
     this.expressApp = expressApp;
     expressApp.post(this.routes.db, jsonParser, this.onPostTableCommand);
@@ -68,6 +74,7 @@ export class RestApi {
     this.expressApp.removeListener(this.routes.db, this.onPostTableCommand);
     this.expressApp.removeListener(this.routes.sql, this.onPostSql);
     this.expressApp.removeListener(this.routes.methods, this.onPostMethod);
+    removeExpressRoute(this.expressApp, [this.path]);
   };
   onPostMethod = async (req: ExpressReq, res: ExpressRes) => {
     const { method = "" } = req.params;

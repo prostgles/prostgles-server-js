@@ -42,7 +42,7 @@ export type FileTableConfig = {
   /**
    * GET path used in serving media. defaults to /${tableName}
    */
-  fileServeRoute?: string;
+  fileServePath?: string;
 
   /**
    * If defined the the files will not be deleted immediately

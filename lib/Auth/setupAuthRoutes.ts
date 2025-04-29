@@ -1,6 +1,5 @@
 import { RequestHandler } from "express";
-import { DBOFullyTyped } from "../DBSchemaBuilder";
-import { AuthHandler, getClientRequestIPsInfo, HTTP_FAIL_CODES } from "./AuthHandler";
+import { AuthHandler, getClientRequestIPsInfo } from "./AuthHandler";
 import { setCatchAllRequestHandler } from "./endpoints/setCatchAllRequestHandler";
 import { setLoginRequestHandler } from "./endpoints/setLoginRequestHandler";
 import { setLogoutRequestHandler } from "./endpoints/setLogoutRequestHandler";
@@ -23,7 +22,6 @@ export function setupAuthRoutes(this: AuthHandler) {
     app,
     publicRoutes = [],
     onMagicLinkOrOTP,
-    use,
     loginWithOAuth,
     signupWithEmail: signupWithEmailAndPassword,
   } = loginSignupConfig;
@@ -56,36 +54,11 @@ export function setupAuthRoutes(this: AuthHandler) {
 
       if (errorInfoOrSession && "session" in errorInfoOrSession) {
         const { session } = errorInfoOrSession;
-        this.validateSessionAndSetCookie(session, { req, res });
-        return;
+        return this.validateSessionAndSetCookie(session, { req, res });
       }
       next();
     };
     upsertNamedExpressMiddleware(app, prostglesUseMiddleware, "prostglesonUseOrSocketConnected");
-  }
-
-  if (use) {
-    const prostglesUseMiddleware: RequestHandler = (req, res, next) => {
-      void use({
-        req,
-        res,
-        next,
-        getUser: async () => {
-          const userOrErr = await this.getUserOrError({ httpReq: req, res });
-          if (userOrErr === "new-session-redirect") {
-            throw "new-session-redirect";
-          }
-          if (userOrErr.error) {
-            res.status(HTTP_FAIL_CODES.BAD_REQUEST).json(userOrErr.error);
-            throw userOrErr.error;
-          }
-          return userOrErr;
-        },
-        dbo: this.dbo as DBOFullyTyped,
-        db: this.db,
-      });
-    };
-    upsertNamedExpressMiddleware(app, prostglesUseMiddleware, "prostglesUse");
   }
 
   if (onMagicLinkOrOTP) {

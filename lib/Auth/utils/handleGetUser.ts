@@ -3,6 +3,7 @@ import type { DBOFullyTyped } from "../../DBSchemaBuilder";
 import { getClientRequestIPsInfo, type AuthHandler } from "../AuthHandler";
 import type { AuthClientRequest, AuthResultOrError, AuthResultWithSID } from "../AuthTypes";
 import { throttledAuthCall } from "./throttledReject";
+import type { LoginResponseHandler } from "../endpoints/setLoginRequestHandler";
 
 export type GetUserOrRedirected = AuthResultWithSID | "new-session-redirect";
 
@@ -52,10 +53,14 @@ export async function handleGetUserThrottled(
     const clientInfo = clientInfoOrErr;
 
     if (clientInfo && "type" in clientInfo) {
-      if (!("httpReq" in clientReq) || !clientReq.httpReq)
+      if (!("httpReq" in clientReq) || !clientReq.httpReq) {
         throw "httpReq missing. new-session not implemented for sockets.";
+      }
       const { httpReq, res } = clientReq;
-      this.validateSessionAndSetCookie(clientInfo.session, { req: httpReq, res });
+      this.validateSessionAndSetCookie(clientInfo.session, {
+        req: httpReq,
+        res: res as LoginResponseHandler,
+      });
       return "new-session-redirect" as const;
     }
 

@@ -128,7 +128,7 @@ function dd() {
     // DEBUG_MODE: true,
     restApi: {
       expressApp: app,
-      routePrefix: "/api",
+      path: "/api",
     },
 
     onSocketConnect: ({ socket, db }) => {

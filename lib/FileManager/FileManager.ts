@@ -122,11 +122,10 @@ export class FileManager {
 
   tableName?: string;
 
-  fileRoute?: string;
+  path?: string;
   get fileRouteExpress() {
-    return this.fileRoute + "/:name";
+    return this.path + "/:name";
   }
-  private checkInterval?: NodeJS.Timeout;
 
   constructor(config: FileManager["config"], imageOptions?: ImageOptions) {
     this.config = config;
@@ -138,7 +137,7 @@ export class FileManager {
 
     const fullConfig = this.prostgles?.opts.fileTable;
     if (fullConfig?.delayedDelete) {
-      this.checkInterval = setInterval(
+      setInterval(
         () => {
           void (async () => {
             const fileTable = fullConfig.tableName;
@@ -193,7 +192,7 @@ export class FileManager {
 
   getValidatedFileType = getValidatedFileType.bind(this);
 
-  getLocalFileUrl = (name: string) => (this.fileRoute ? `${this.fileRoute}/${name}` : "");
+  getLocalFileUrl = (name: string) => (this.path ? `${this.path}/${name}` : "");
 
   checkFreeSpace = async (folderPath: string, fileSize = 0) => {
     if (!this.cloudClient && "localFolderPath" in this.config) {

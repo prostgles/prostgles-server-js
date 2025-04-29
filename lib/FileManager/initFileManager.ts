@@ -162,12 +162,12 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
   /**
    * 4. Serve media through express
    */
-  const { fileServeRoute = `/${fileTableName}`, expressApp: app } = fileTable;
+  const { fileServePath: fileServeRoute = `/${fileTableName}`, expressApp: app } = fileTable;
 
   if (fileServeRoute.endsWith("/")) {
     throw `fileServeRoute must not end with a '/'`;
   }
-  this.fileRoute = fileServeRoute;
+  this.path = fileServeRoute;
 
   app.get(this.fileRouteExpress, async (req, res) => {
     const mediaTableHandler = this.dbo[fileTableName] as unknown as TableHandler | undefined;

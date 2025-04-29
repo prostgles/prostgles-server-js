@@ -3,20 +3,18 @@ import { DBOFullyTyped } from "../../DBSchemaBuilder";
 import { AUTH_ROUTES_AND_PARAMS, AuthHandler, HTTP_FAIL_CODES, matchesRoute } from "../AuthHandler";
 import { AuthClientRequest } from "../AuthTypes";
 import { getReturnUrl } from "../utils/getReturnUrl";
+import { isDefined } from "prostgles-types";
 
 export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
   const requestHandlerCatchAll: RequestHandler = async (req, res, next) => {
     const { onGetRequestOK } = this.opts.loginSignupConfig ?? {};
-    if (
-      this.prostgles.restApi &&
-      Object.values(this.prostgles.restApi.routes).some((restRoute) =>
-        matchesRoute(restRoute.split("/:")[0], req.path)
-      )
-    ) {
-      next();
-      return;
-    }
-    if (matchesRoute(AUTH_ROUTES_AND_PARAMS.loginWithProvider, req.path)) {
+    const { restApi, fileManager, authHandler } = this.prostgles;
+    const pathsHandledByProstgles = [
+      restApi?.path,
+      fileManager?.path,
+      authHandler && AUTH_ROUTES_AND_PARAMS.loginWithProvider,
+    ].filter(isDefined);
+    if (pathsHandledByProstgles.some((path) => matchesRoute(path, req.path))) {
       next();
       return;
     }
@@ -38,7 +36,7 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
       const returnURL = getReturnUrl(req);
 
       /**
-       * Requesting a User route
+       * Requesting a User route (must be logged in)
        */
       if (this.isUserRoute(req.path)) {
         /* Check auth. Redirect to login if unauthorized */
@@ -50,12 +48,18 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
           return;
         }
 
-        /* If authorized and going to returnUrl then redirect. Otherwise serve file */
+        /**
+         * If authorized and going to returnUrl then redirect. Otherwise serve file
+         * */
       } else if (returnURL && (await isLoggedInUser())) {
         res.redirect(returnURL);
         return;
 
-        /** If Logged in and requesting login then redirect to main page */
+        /**
+         * Visiting login:
+         * 1) If logged in and not anonymous then redirect to main page
+         * 2) If logged in and anonymous then allow visiting /login (it will be caught earlier by new-session-redirect)
+         * */
       } else if (matchesRoute(AUTH_ROUTES_AND_PARAMS.login, req.path)) {
         const { user, isAnonymous, error } = await getUser();
         if (error) {

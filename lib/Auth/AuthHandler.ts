@@ -7,8 +7,7 @@ import { login } from "./login";
 import { setupAuthRoutes } from "./setupAuthRoutes";
 import { getClientRequestIPsInfo } from "./utils/getClientRequestIPsInfo";
 import { getSidAndUserFromRequest } from "./utils/getSidAndUserFromRequest";
-import { getUserOrError } from "./utils/getUserOrError";
-import { handleGetUserThrottled } from "./utils/handleGetUser";
+import { handleGetUserThrottled, type GetUserOrRedirected } from "./utils/handleGetUser";
 import { removeExpressRoute, removeExpressRoutesTest } from "./utils/removeExpressRoute";
 import {
   setCookieAndGoToReturnURLIFSet,
@@ -90,7 +89,22 @@ export class AuthHandler {
   setCookieAndGoToReturnURLIFSet = setCookieAndGoToReturnURLIFSet.bind(this);
   validateSessionAndSetCookie = validateSessionAndSetCookie.bind(this);
   handleGetUser = handleGetUserThrottled.bind(this);
-  getUserOrError = getUserOrError.bind(this);
+
+  /**
+   * Used by:
+   *  - setCatchAllRequestHandler
+   *  - loginSignupConfig.use
+   */
+  getUserOrError = async (clientReq: AuthClientRequest): Promise<GetUserOrRedirected> => {
+    try {
+      return this.handleGetUser(clientReq);
+    } catch (_err) {
+      return {
+        sid: this.getValidatedSid(clientReq),
+        error: { success: false, code: "server-error" },
+      };
+    }
+  };
 
   init = setupAuthRoutes.bind(this);
 
@@ -196,7 +210,7 @@ export class AuthHandler {
   getClientAuth = getClientAuth.bind(this);
 }
 
-export const matchesRoute = (baseRoute: string | undefined, fullRoute: string) => {
+export const matchesRoute = (baseRoute: string, fullRoute: string) => {
   if (!baseRoute || !fullRoute) return false;
   if (baseRoute === fullRoute) return true;
   const nextChar = fullRoute[baseRoute.length] ?? "";

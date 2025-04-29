@@ -1,4 +1,4 @@
-import { Express, NextFunction, Request, Response } from "express";
+import { Express, Request, Response } from "express";
 import Mail from "nodemailer/lib/mailer";
 import type { AuthenticateOptions } from "passport";
 import type {
@@ -11,20 +11,20 @@ import type {
   StrategyOptions as GoogleStrategy,
 } from "passport-google-oauth20";
 import type { MicrosoftStrategyOptions } from "passport-microsoft";
+import OAuth2Strategy from "passport-oauth2";
 import {
   AnyObject,
   AuthRequest,
   AuthResponse,
+  AuthSocketSchema,
+  ClientSchema,
   FieldFilter,
   IdentityProvider,
   UserLike,
-  AuthSocketSchema,
-  ClientSchema,
 } from "prostgles-types";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { PRGLIOSocket, type CachedSession } from "../DboBuilder/DboBuilderTypes";
 import { DB } from "../Prostgles";
-import OAuth2Strategy from "passport-oauth2";
 import { AUTH_ROUTES_AND_PARAMS } from "./AuthHandler";
 
 type Awaitable<T> = T | Promise<T>;
@@ -401,12 +401,6 @@ export type LoginSignupConfig<S, SUser extends SessionUser> = {
   publicRoutes?: string[];
 
   /**
-   * Will attach a app.use listener and will expose getUser
-   * Used in UI for blocking access
-   */
-  use?: ExpressMiddleware<S, SUser>;
-
-  /**
    * Will be called after a GET request is authorised
    * This means that
    */
@@ -463,11 +457,3 @@ export type LoginSignupConfig<S, SUser extends SessionUser> = {
 
   logout: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<void>;
 };
-
-type ExpressMiddleware<S, SUser extends SessionUser> = (
-  args: {
-    req: ExpressReq;
-    res: ExpressRes;
-    next: NextFunction;
-  } & AuthRequestParams<S, SUser>
-) => void | Promise<void>;

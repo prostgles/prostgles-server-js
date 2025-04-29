@@ -12,13 +12,12 @@ export const removeExpressRoute = (
   if (routes) {
     app._router!.stack = routes.filter((route) => {
       const path = route.route?.path;
-      if (
-        routePaths.some((routePath) => matchesRoute(path, routePath)) &&
-        (!method || route.route?.methods?.[method])
-      ) {
-        return false;
-      }
-      return true;
+      const matchesForRemoval =
+        path &&
+        routePaths.some((routePath) => matchesRoute(routePath, path)) &&
+        (!method || route.route?.methods?.[method]);
+
+      return !matchesForRemoval;
     });
   }
 };
