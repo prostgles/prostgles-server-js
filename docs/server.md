@@ -124,7 +124,7 @@ prostgles<DBGeneratedSchema>({
   - **expressApp** <span style="color: red">required</span> <span style="color: green;">Express</span>
 
     Express server instance
-  - **routePrefix** <span style="color: red">required</span> <span style="color: green;">string</span>
+  - **path** <span style="color: grey">optional</span> <span style="color: green;">string</span>
 
     Defaults to "/api"
 
@@ -226,10 +226,6 @@ prostgles<DBGeneratedSchema>({
 
       If provided, any client requests to NOT these routes (or their subroutes) will be redirected to loginRoute (if logged in) and then redirected back to the initial route after logging in
       If logged in the user is allowed to access these routes
-    - **use** <span style="color: grey">optional</span> <span style="color: green;">ExpressMiddleware&lt;S, SUser&gt; | undefined</span>
-
-      Will attach a app.use listener and will expose getUser
-      Used in UI for blocking access
     - **onGetRequestOK** <span style="color: grey">optional</span> <span style="color: green;">((req: ExpressReq, res: ExpressRes, params: AuthRequestParams&lt;S, SUser&gt;) =&gt; Awaitable&lt;void&gt;) | undefined</span>
 
       Will be called after a GET request is authorised
@@ -309,7 +305,7 @@ prostgles<DBGeneratedSchema>({
 
     Name of the table that will contain the file metadata.
     Defaults to "files"
-  - **fileServeRoute** <span style="color: grey">optional</span> <span style="color: green;">string</span>
+  - **fileServePath** <span style="color: grey">optional</span> <span style="color: green;">string</span>
 
     GET path used in serving media. defaults to /${tableName}
   - **delayedDelete** <span style="color: grey">optional</span> <span style="color: green;">{ deleteAfterNDays: number; checkIntervalHours?: number | undefined; }</span>

@@ -1,3 +1,4 @@
+import { includes } from "prostgles-types";
 import { AUTH_ROUTES_AND_PARAMS, HTTP_FAIL_CODES, type AuthHandler } from "../AuthHandler";
 import type { ExpressReq } from "../AuthTypes";
 import type { LoginResponseHandler } from "../endpoints/setLoginRequestHandler";
@@ -5,12 +6,10 @@ import { getBasicSessionErrorCode } from "../login";
 import { getReturnUrl } from "./getReturnUrl";
 import { getSafeReturnURL } from "./getSafeReturnURL";
 
-export type NewSessionRedirect = "isAnonimous" | "normalUser";
 export function validateSessionAndSetCookie(
   this: AuthHandler,
   cookie: { sid: string; expires: number },
   requestHandler: { req: ExpressReq; res: LoginResponseHandler }
-  // newSessionRedirect: NewSessionRedirect | undefined
 ) {
   const sessionErrorCode = getBasicSessionErrorCode(cookie);
   if (sessionErrorCode) {
@@ -28,7 +27,6 @@ export function setCookieAndGoToReturnURLIFSet(
   this: AuthHandler,
   cookie: { sid: string; expires: number },
   requestHandler: { req: ExpressReq; res: LoginResponseHandler }
-  // newSessionRedirect: NewSessionRedirect | undefined
 ) {
   const { sid, expires } = cookie;
   const { res, req } = requestHandler;
@@ -69,13 +67,7 @@ export function setCookieAndGoToReturnURLIFSet(
     req.originalUrl,
     AUTH_ROUTES_AND_PARAMS.returnUrlParamName
   );
-  if (safeOriginalUrl) {
-    // if (safeOriginalUrl === AUTH_ROUTES_AND_PARAMS.login) {
-    //   if (newSessionRedirect === "isAnonimous") {
-    //     return res.redirect(AUTH_ROUTES_AND_PARAMS.login);
-    //   }
-    // } else {
-    // }
+  if (safeOriginalUrl && !includes([AUTH_ROUTES_AND_PARAMS.magicLinks], safeOriginalUrl)) {
     return res.redirect(safeOriginalUrl);
   }
   return res.redirect("/");

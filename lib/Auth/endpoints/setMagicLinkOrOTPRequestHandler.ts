@@ -79,6 +79,7 @@ export function setMagicLinkOrOTPRequestHandler(
 }
 
 const parseMagicLinkOrOTPData = (res: Response, data: any): MagicLinkOrOTPData | undefined => {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const { id, code, email, returnToken = false } = data;
 
   if (typeof returnToken !== "boolean") {
