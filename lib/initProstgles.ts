@@ -1,6 +1,6 @@
 import * as pgPromise from "pg-promise";
 import pg from "pg-promise/typescript/pg-subset";
-import { getKeys, isEmpty } from "prostgles-types";
+import { getKeys, isEmpty, isEqual } from "prostgles-types";
 import { DBEventsManager } from "./DBEventsManager";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { DBHandlerServer, Prostgles, getIsSuperUser } from "./Prostgles";
@@ -159,7 +159,7 @@ export const initProstgles = async function (
       this.dboBuilder.publishParser = this.publishParser;
 
       /* 4. Set publish and auth listeners */
-      this.setSocketEvents();
+      this.setupSocketIO();
     } else if (this.opts.auth) {
       throw "Auth config does not work without publish";
     }
@@ -193,10 +193,18 @@ export const initProstgles = async function (
       getTSSchema: this.getTSFileContent,
       options: this.opts,
       update: async (newOpts) => {
+        let optsHaveChanged = false as boolean;
         getKeys(newOpts).forEach((k) => {
-          //@ts-ignore
-          this.opts[k] = newOpts[k];
+          if (!isEqual(this.opts[k], newOpts[k])) {
+            optsHaveChanged = true;
+            //@ts-ignore
+            this.opts[k] = newOpts[k];
+          }
         });
+        if (!optsHaveChanged) {
+          console.warn("No options changed");
+          return;
+        }
 
         if ("fileTable" in newOpts) {
           await this.initFileTable();
@@ -225,7 +233,7 @@ export const initProstgles = async function (
             clientOnlyUpdateKeys.some((key) => key === updatedKey)
           )
         ) {
-          this.setSocketEvents();
+          this.setupSocketIO();
         } else {
           await this.init(onReady, { type: "prgl.update", newOpts });
         }

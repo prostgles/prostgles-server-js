@@ -315,7 +315,7 @@ export class Prostgles {
   init = initProstgles.bind(this);
 
   connectedSockets: PRGLIOSocket[] = [];
-  setSocketEvents() {
+  setupSocketIO() {
     this.checkDb();
 
     const {
@@ -334,31 +334,6 @@ export class Prostgles {
       });
       return;
     }
-
-    // const { authHandler } = this;
-    // if (authHandler) {
-    //   let redirected = false;
-    //   io.engine.use(((req, res, next) => {
-    //     console.log(req.cookies);
-    //     if (!redirected) {
-    //       redirected = true;
-    //       // this.authHandler?.setCookieAndGoToReturnURLIFSet(
-    //       //   { expires: Date.now() + 221000, sid: "heehe" },
-    //       //   { req, res }
-    //       // );
-    //       // Set cookie manually on raw HTTP response
-    //       const cookieStr = `${this.authHandler?.sidKeyName}=hehehe; Path=/; Expires=${new Date(Date.now() + 221000).toUTCString()}; HttpOnly`;
-    //       res.setHeader("Set-Cookie", cookieStr);
-
-    //       // Handle redirection
-    //       res.statusCode = 302;
-    //       res.setHeader("Location", "/");
-    //       res.end();
-    //       return;
-    //     }
-    //     next();
-    //   }) satisfies RequestHandler);
-    // }
 
     /* Initialise */
     io.removeAllListeners("connection");

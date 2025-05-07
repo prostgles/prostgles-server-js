@@ -67,7 +67,7 @@ export const runClientRequest = async function (
 
   const { tableName, command: nonValidatedCommand, param1, param2, param3 } = args;
   if (!TABLE_METHODS_KEYS.some((v) => v === nonValidatedCommand)) {
-    throw `Invalid command: ${nonValidatedCommand}. Expecting one of: ${TABLE_METHODS_KEYS};`;
+    throw `Invalid command: ${nonValidatedCommand}. Expecting one of: ${TABLE_METHODS_KEYS.join(", ")};`;
   }
   const command = nonValidatedCommand as keyof TableHandler;
   if (!clientReq.socket && SOCKET_ONLY_COMMANDS.some((v) => v === command)) {

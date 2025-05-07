@@ -59,7 +59,9 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
     const { onUseOrSocketConnected } = this.opts.auth ?? {};
     const { authHandler } = this;
     if (onUseOrSocketConnected) {
-      if (!authHandler) throw "authHandler missing";
+      if (!authHandler) {
+        throw "authHandler missing";
+      }
       const errorInfo = await onUseOrSocketConnected(
         authHandler.getValidatedSid({ socket }),
         getClientRequestIPsInfo({ socket }),

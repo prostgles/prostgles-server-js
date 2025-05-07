@@ -14,7 +14,7 @@ import {
   Select,
   ValidatedColumnInfo,
 } from "prostgles-types";
-import { isPlainObject, postgresToTsType, SortItem } from "../DboBuilder";
+import { postgresToTsType, SortItem } from "../DboBuilder";
 
 import { ParsedJoinPath } from "../ViewHandler/parseJoinPath";
 import { ViewHandler } from "../ViewHandler/ViewHandler";
@@ -247,7 +247,7 @@ export class SelectItemBuilder {
       return [];
     } else if (userSelect === "*") {
       this.allowedFields.map((key) => this.addColumn(key, true));
-    } else if (isPlainObject(userSelect) && !isEmpty(userSelect)) {
+    } else if (isObject(userSelect) && !isEmpty(userSelect)) {
       const selectKeys = Object.keys(userSelect),
         selectValues = Object.values(userSelect);
 
@@ -285,7 +285,7 @@ export class SelectItemBuilder {
             */
               if (
                 (typeof val === "string" && val !== "*") ||
-                (isPlainObject(val) &&
+                (isObject(val) &&
                   Object.keys(val).length === 1 &&
                   Array.isArray(Object.values(val)[0]))
               ) {
@@ -320,6 +320,11 @@ export class SelectItemBuilder {
           })
         );
       }
-    } else throw "Unexpected select -> " + JSON.stringify(userSelect);
+    } else {
+      if (isEmpty(userSelect)) {
+        throw "Unexpected empty object select";
+      }
+      throw "Unexpected select -> " + JSON.stringify(userSelect);
+    }
   };
 }
