@@ -69,7 +69,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     throw "notifListener: dataArr length < 3";
   }
 
-  const [_, table_name, op_name, condition_ids_str, changed_columns_str = "[]"] = dataArr;
+  const [_, table_name, op_name, condition_ids_str, changed_columns_str = ""] = dataArr;
   const condition_ids = condition_ids_str?.split(",").map((v) => +v);
 
   if (!table_name) {
@@ -134,7 +134,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
       const { data: changedColValidation } = tryCatchV2(() =>
         getJSONBObjectSchemaValidationError(
           { cols: "string[]" },
-          { cols: JSON.parse(changed_columns_str || "[]") as string[] },
+          { cols: JSON.parse(`[${changed_columns_str}]`) as string[] },
           "cols"
         )
       );
