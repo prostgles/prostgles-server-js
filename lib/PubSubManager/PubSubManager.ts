@@ -37,6 +37,7 @@ import { addSub } from "./addSub";
 import { notifListener } from "./notifListener";
 import { pushSubData } from "./pushSubData";
 import { log } from "./PubSubManagerUtils";
+import type { NewQuery } from "../DboBuilder/QueryBuilder/QueryBuilder";
 
 export type BasicCallback = (err?: any, res?: any) => void;
 
@@ -112,6 +113,7 @@ export type SubscriptionParams = {
   filter: object;
   selectParams: SelectParams;
   subscribeOptions: SubscribeOptions;
+  newQuery: NewQuery;
 
   localFuncs?: LocalFuncs;
   socket: PRGLIOSocket | undefined;
@@ -135,6 +137,7 @@ export type Subscription = Pick<
   | "table_info"
   | "filter"
   | "table_rules"
+  | "newQuery"
 > & {
   triggers: {
     table_name: string;

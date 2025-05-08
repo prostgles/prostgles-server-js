@@ -60,8 +60,11 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
       [this.appId, check_frequency_ms, watching_schema_tag_names]
     );
 
-    const appRecord = await this.db.one("SELECT * FROM prostgles.apps WHERE id = $1", [this.appId]);
-    if (!appRecord || !appRecord.application_name?.includes(this.appId)) {
+    const appRecord = await this.db.one<{ application_name: string | null }>(
+      "SELECT * FROM prostgles.apps WHERE id = $1",
+      [this.appId]
+    );
+    if (!appRecord.application_name?.includes(this.appId)) {
       throw `initPubSubManager error: App record with application_name containing appId (${this.appId}) not found`;
     }
 

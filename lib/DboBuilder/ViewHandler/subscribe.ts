@@ -86,13 +86,13 @@ async function subscribe(
     /** Ensure request is valid */
     await this.find(filter, { ...selectParams, limit: 0 }, undefined, table_rules, localParams);
 
-    const newQuery: NewQuery = (await this.find(
+    const newQuery = (await this.find(
       filter,
       { ...selectParams, limit: 0 },
       undefined,
       table_rules,
       { ...localParams, returnNewQuery: true }
-    )) as any;
+    )) as unknown as NewQuery;
     const viewOptions = await getSubscribeRelatedTables.bind(this)({
       filter,
       selectParams,
@@ -114,6 +114,7 @@ async function subscribe(
         table_rules?.subscribe
       ),
       lastPushed: 0,
+      newQuery,
     } as const;
 
     const pubSubManager = await this.dboBuilder.getPubSubManager();

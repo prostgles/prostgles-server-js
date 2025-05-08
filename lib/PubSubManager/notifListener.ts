@@ -1,7 +1,8 @@
-import { includes, pickKeys } from "prostgles-types";
+import { includes, pickKeys, tryCatchV2 } from "prostgles-types";
 import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
 import { PubSubManager } from "./PubSubManager";
 import { DELIMITER, log, NOTIF_TYPE, type NotifTypeName } from "./PubSubManagerUtils";
+import { getJSONBObjectSchemaValidationError } from "../JSONBValidation/JSONBValidation";
 
 /* Relay relevant data to relevant subscriptions */
 export async function notifListener(this: PubSubManager, data: { payload: string }) {
@@ -68,7 +69,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     throw "notifListener: dataArr length < 3";
   }
 
-  const [_, table_name, op_name, condition_ids_str] = dataArr;
+  const [_, table_name, op_name, condition_ids_str, changed_columns_str = "[]"] = dataArr;
   const condition_ids = condition_ids_str?.split(",").map((v) => +v);
 
   if (!table_name) {
@@ -130,9 +131,23 @@ export async function notifListener(this: PubSubManager, data: { payload: string
             ((sub.socket_id && this.sockets[sub.socket_id]) || sub.localFuncs)
         )
       );
+      const { data: changedColValidation } = tryCatchV2(() =>
+        getJSONBObjectSchemaValidationError(
+          { cols: "string[]" },
+          { cols: JSON.parse(changed_columns_str || "[]") as string[] },
+          "cols"
+        )
+      );
+      const changedColumns = changedColValidation?.data?.cols;
+
       activeAndReadySubs.forEach((sub) => {
         const { throttle = 0, throttleOpts, actions } = sub.subscribeOptions;
-
+        if (changedColumns?.length) {
+          const subFieldsHaveChanged = changedColumns.some((changedColumn) =>
+            sub.newQuery.select.some((f) => f.fields.includes(changedColumn))
+          );
+          if (!subFieldsHaveChanged) return;
+        }
         const commandLowerCase = (op_name?.toLowerCase() || "insert") as keyof NonNullable<
           typeof actions
         >;
