@@ -177,7 +177,7 @@ IF TG_OP = 'UPDATE' THEN
     FROM prostgles.v_triggers 
     LEFT JOIN LATERAL jsonb_object_keys(columns_info ->'tracked_columns') col 
     ON TRUE
-    WHERE table_name = escaped_table;
+    WHERE table_name = escaped_table
   )
   SELECT cols
   INTO tracked_columns
@@ -198,7 +198,7 @@ IF TG_OP = 'UPDATE' THEN
         $c$
           WITH changed AS (
             SELECT column_name
-            FROM unnest(%L) as column_name
+            FROM unnest(%L::_TEXT) as column_name
             WHERE EXISTS (
               SELECT 1 
               FROM old_table o 
@@ -227,7 +227,7 @@ IF TG_OP = 'UPDATE' THEN
       END IF;
 
     END IF;  
-    
+
   END IF;
 END IF;
 
