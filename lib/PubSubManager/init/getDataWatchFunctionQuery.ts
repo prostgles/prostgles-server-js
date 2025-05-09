@@ -31,9 +31,7 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
  
             DECLARE _columns_info JSONB := NULL;
 
-            DECLARE changed_columns _TEXT := NULL;
-
-            DECLARE tracked_columns _TEXT := NULL;
+            DECLARE changed_columns _TEXT := NULL; 
 
             BEGIN
  
@@ -171,21 +169,14 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
 const CHANGED_COLUMNS_CHECK = `
 -- Determine changed columns for UPDATE operations
 IF TG_OP = 'UPDATE' THEN
-
-  WITH cte1 AS (
-    SELECT array_agg(DISTINCT col) AS cols
-    FROM prostgles.v_triggers 
-    LEFT JOIN LATERAL jsonb_object_keys(columns_info ->'tracked_columns') col 
-    ON TRUE
+ 
+  IF NOT EXISTS (
+    SELECT 1
+    FROM prostgles.v_triggers  
     WHERE table_name = escaped_table
-  )
-  SELECT cols
-  INTO tracked_columns
-  FROM cte1
-  /* If any value is null it means that specific condition is tracking all columns so we need to check them all */
-  WHERE array_position(cols, null) IS NULL;
-
-  IF tracked_columns IS NOT NULL THEN
+    /* If any value is null it means some condition is tracking all columns so we need to check them all */
+    AND columns_info IS NULL
+  ) THEN
 
     SELECT columns_info
     INTO _columns_info
@@ -198,7 +189,7 @@ IF TG_OP = 'UPDATE' THEN
         $c$
           WITH changed AS (
             SELECT column_name
-            FROM unnest(%L::_TEXT) as column_name
+            FROM jsonb_object_keys(%L) as column_name
             WHERE EXISTS (
               SELECT 1 
               FROM old_table o 
@@ -210,7 +201,7 @@ IF TG_OP = 'UPDATE' THEN
           SELECT array_agg(column_name) 
           FROM changed;
         $c$,
-        tracked_columns,
+        _columns_info->'tracked_columns',
         _columns_info->>'join_condition',
         _columns_info->>'where_statement'
       );
@@ -221,10 +212,6 @@ IF TG_OP = 'UPDATE' THEN
 
       /* It is possible to get no changes */
       changed_columns := COALESCE(changed_columns, '{}');
-    
-      IF NOT starts_with(changed_columns::TEXT, '{')  THEN
-        RAISE EXCEPTION 'changed_columns is not a JSON array: %', changed_columns;
-      END IF;
 
     END IF;  
 
