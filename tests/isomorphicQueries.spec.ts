@@ -602,19 +602,15 @@ export const isomorphicQueries = async (
       assert.equal(validTriggers.length, 3, "3 Triggers should exist but be disabled");
       assert.equal(validTriggers.filter((t) => t.enabled).length, 0);
     };
-    await test("subscribe skipChangedColumnsCheck", async () => {
+    await test("subscribe skipChangedColumnsCheck false by default = sub should not fire if selected data did not change", async () => {
       const filter = { id: 99 };
       await db.various.delete!(filter);
       await db.various.insert!(filter);
       let runs = 0;
-      const sub = await db.various.subscribe!(
-        filter,
-        { select: { name: 1 }, skipChangedColumnsCheck: false },
-        async (d) => {
-          log(JSON.stringify(d));
-          runs++;
-        }
-      );
+      const sub = await db.various.subscribe!(filter, { select: { name: 1 } }, async (d) => {
+        log(JSON.stringify(d));
+        runs++;
+      });
       await db.various.update!(filter, { name: "zz3zz1" });
       await tout(200);
       assert.equal(runs, 2);
@@ -627,6 +623,33 @@ export const isomorphicQueries = async (
       await db.various.delete!(filter);
       await tout(200);
       assert.equal(runs, 3);
+      await sub.unsubscribe();
+    });
+    await test("subscribe skipChangedColumnsCheck true", async () => {
+      const filter = { id: 99 };
+      await db.various.delete!(filter);
+      await db.various.insert!(filter);
+      let runs = 0;
+      const sub = await db.various.subscribe!(
+        filter,
+        { select: { name: 1 }, skipChangedColumnsCheck: true },
+        async (d) => {
+          log(JSON.stringify(d));
+          runs++;
+        }
+      );
+      await db.various.update!(filter, { name: "zz3zz1" });
+      await tout(200);
+      assert.equal(runs, 2);
+      await db.various.update!(filter, { name: "zz3zz1" });
+      await tout(200);
+      assert.equal(runs, 3);
+      await db.various.update!(filter, { tsv: "hehe" });
+      await tout(200);
+      assert.equal(runs, 4);
+      await db.various.delete!(filter);
+      await tout(200);
+      assert.equal(runs, 5);
       await sub.unsubscribe();
     });
 

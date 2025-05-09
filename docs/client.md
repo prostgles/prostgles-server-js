@@ -277,6 +277,9 @@ Retrieves a list of matching records from the view/table and subscribes to chang
 
       Controls which actions will trigger the subscription.
       If not provided then all actions will be triggered
+    - **skipChangedColumnsCheck** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
+
+      If true then the subscription will be triggered without first checking if selected column values have changed
     - **throttle** <span style="color: grey">optional</span> <span style="color: green;">number</span>
 
       If provided then the subscription will be throttled to the provided number of milliseconds
@@ -358,6 +361,9 @@ Retrieves a matching record from the view/table and subscribes to changes
 
       Controls which actions will trigger the subscription.
       If not provided then all actions will be triggered
+    - **skipChangedColumnsCheck** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
+
+      If true then the subscription will be triggered without first checking if selected column values have changed
     - **throttle** <span style="color: grey">optional</span> <span style="color: green;">number</span>
 
       If provided then the subscription will be throttled to the provided number of milliseconds
