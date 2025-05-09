@@ -157,7 +157,12 @@ const getColumnsInfo = (
           .filter((c) => !c.is_pkey && tracked_columns.includes(c.name))
           .map(
             (c) =>
-              `column_name = ${asValue(c.name)} AND n.${asName(c.name)}${c.cast_to} IS DISTINCT FROM o.${asName(c.name)}${c.cast_to}`
+              `column_name = ${asValue(c.name)} AND (ROW(${cols
+                .filter((c) => c.is_pkey)
+                .map((c) => `n.${asName(c.name)}`)
+                .join(
+                  ", "
+                )}) IS NULL OR n.${asName(c.name)}${c.cast_to} IS DISTINCT FROM o.${asName(c.name)}${c.cast_to})`
           )
           .join(" OR \n"),
       };

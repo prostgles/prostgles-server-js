@@ -32,6 +32,9 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
             DECLARE _columns_info JSONB := NULL;
 
             DECLARE changed_columns _TEXT := NULL;
+
+            DECLARE tracked_columns _TEXT := NULL;
+
             BEGIN
  
                 escaped_table := concat_ws('.', CASE WHEN TG_TABLE_SCHEMA <> CURRENT_SCHEMA THEN format('%I', TG_TABLE_SCHEMA) END, format('%I', TG_TABLE_NAME));
@@ -169,46 +172,63 @@ const CHANGED_COLUMNS_CHECK = `
 -- Determine changed columns for UPDATE operations
 IF TG_OP = 'UPDATE' THEN
 
-  SELECT columns_info
-  INTO _columns_info
-  FROM prostgles.v_triggers
-  WHERE table_name = escaped_table
-  AND columns_info IS NOT NULL;
- 
-  IF _columns_info IS NOT NULL THEN
-    query := format(
-      $c$
-        WITH changed AS (
-          SELECT column_name
-          FROM jsonb_object_keys(%L) as column_name
-          WHERE EXISTS (
-            SELECT 1 
-            FROM old_table o 
-            LEFT JOIN new_table n 
-            ON %s 
-            WHERE %s
-          )
-        )
-        SELECT array_agg(column_name) 
-        FROM changed;
-      $c$,
-      _columns_info->>'tracked_columns',
-      _columns_info->>'join_condition',
-      _columns_info->>'where_statement'
-    );
+  WITH cte1 AS (
+    SELECT array_agg(DISTINCT col) AS cols
+    FROM prostgles.v_triggers 
+    LEFT JOIN LATERAL jsonb_object_keys(columns_info ->'tracked_columns') col 
+    ON TRUE
+    WHERE table_name = escaped_table;
+  )
+  SELECT cols
+  INTO tracked_columns
+  FROM cte1
+  /* If any value is null it means that specific condition is tracking all columns so we need to check them all */
+  WHERE array_position(cols, null) IS NULL;
 
-    BEGIN
-      EXECUTE query INTO changed_columns;
-    END;
+  IF tracked_columns IS NOT NULL THEN
 
-    /* It is possible to get no changes */
-    changed_columns := COALESCE(changed_columns, '{}');
+    SELECT columns_info
+    INTO _columns_info
+    FROM prostgles.v_triggers
+    WHERE table_name = escaped_table
+    AND columns_info IS NOT NULL;
   
-    IF NOT starts_with(changed_columns::TEXT, '{')  THEN
-      RAISE EXCEPTION 'changed_columns is not a JSON array: %', changed_columns;
-    END IF;
+    IF _columns_info IS NOT NULL THEN
+      query := format(
+        $c$
+          WITH changed AS (
+            SELECT column_name
+            FROM unnest(%L) as column_name
+            WHERE EXISTS (
+              SELECT 1 
+              FROM old_table o 
+              LEFT JOIN new_table n 
+              ON %s 
+              WHERE %s
+            )
+          )
+          SELECT array_agg(column_name) 
+          FROM changed;
+        $c$,
+        tracked_columns,
+        _columns_info->>'join_condition',
+        _columns_info->>'where_statement'
+      );
 
-  END IF;  
+      BEGIN
+        EXECUTE query INTO changed_columns;
+      END;
+
+      /* It is possible to get no changes */
+      changed_columns := COALESCE(changed_columns, '{}');
+    
+      IF NOT starts_with(changed_columns::TEXT, '{')  THEN
+        RAISE EXCEPTION 'changed_columns is not a JSON array: %', changed_columns;
+      END IF;
+
+    END IF;  
+    
+  END IF;
 END IF;
 
 `;
