@@ -121,10 +121,6 @@ const getColumnsInfo = (
   { tracked_columns, table_name }: AddTriggerParams,
   tableHandler: Partial<TableHandler>
 ) => {
-  if (tracked_columns && !tracked_columns.length) {
-    throw "tracked_columns cannot be defined and empty";
-  }
-
   let hasPkey = false as boolean;
   const cols = tableHandler.columns?.map((c) => {
     hasPkey = hasPkey || c.is_pkey;
