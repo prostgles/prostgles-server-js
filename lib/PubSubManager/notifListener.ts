@@ -1,8 +1,7 @@
-import { includes, pickKeys, tryCatchV2 } from "prostgles-types";
+import { includes, pickKeys } from "prostgles-types";
 import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
 import { PubSubManager } from "./PubSubManager";
 import { DELIMITER, log, NOTIF_TYPE, type NotifTypeName } from "./PubSubManagerUtils";
-import { getJSONBObjectSchemaValidationError } from "../JSONBValidation/JSONBValidation";
 
 /* Relay relevant data to relevant subscriptions */
 export async function notifListener(this: PubSubManager, data: { payload: string }) {
@@ -69,8 +68,10 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     throw "notifListener: dataArr length < 3";
   }
 
-  const [_, table_name, op_name, condition_ids_str, changed_columns_str = ""] = dataArr;
-  const condition_ids = condition_ids_str?.split(",").map((v) => +v);
+  const [_, table_name, op_name, condition_ids_str, raw_changed_columns_str = ""] = dataArr;
+  const changedColumns =
+    !raw_changed_columns_str ? undefined : raw_changed_columns_str.slice(1, -1).split(",");
+  const conditionIds = condition_ids_str?.split(",").map((v) => +v);
 
   if (!table_name) {
     throw "table_name undef";
@@ -78,9 +79,6 @@ export async function notifListener(this: PubSubManager, data: { payload: string
 
   const tableTriggerConditions = this.getTriggerInfo(table_name);
   let state: "error" | "no-triggers" | "ok" | "invalid_condition_ids" = "ok";
-
-  // const triggers = await this.db.any("SELECT * FROM prostgles.triggers WHERE table_name = $1 AND id IN ($2:csv)", [table_name, condition_ids_str.split(",").map(v => +v)]);
-  // const conditions: string[] = triggers.map(t => t.condition);
 
   if (!tableTriggerConditions?.length) {
     state = "no-triggers";
@@ -98,12 +96,12 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     });
 
     /* Trigger ok */
-  } else if (condition_ids?.every((id) => Number.isInteger(id))) {
+  } else if (conditionIds?.every((id) => Number.isInteger(id))) {
     state = "ok";
     const firedTableConditions = tableTriggerConditions.filter(({ idx }) =>
-      condition_ids.includes(idx)
+      conditionIds.includes(idx)
     );
-    const orphanedTableConditions = condition_ids.filter((condId) => {
+    const orphanedTableConditions = conditionIds.filter((condId) => {
       const tc = tableTriggerConditions.at(condId);
       return !tc || (tc.subs.length === 0 && tc.syncs.length === 0);
     });
@@ -131,33 +129,26 @@ export async function notifListener(this: PubSubManager, data: { payload: string
             ((sub.socket_id && this.sockets[sub.socket_id]) || sub.localFuncs)
         )
       );
-      const { data: changedColValidation } = tryCatchV2(() =>
-        getJSONBObjectSchemaValidationError(
-          { cols: "string[]" },
-          { cols: JSON.parse(`[${changed_columns_str}]`) as string[] },
-          "cols"
-        )
-      );
-      const changedColumns = changedColValidation?.data?.cols;
 
       activeAndReadySubs.forEach((sub) => {
-        const { throttle = 0, throttleOpts, actions } = sub.subscribeOptions;
-        if (changedColumns?.length) {
+        const operation = (op_name?.toLowerCase() || "insert") as keyof NonNullable<typeof actions>;
+        const { tracked_columns, subscribeOptions } = sub;
+        const { throttle = 0, throttleOpts, actions, skipChangedColumnsCheck } = subscribeOptions;
+        if (
+          !skipChangedColumnsCheck &&
+          changedColumns &&
+          operation === "update" &&
+          tracked_columns
+        ) {
           const subFieldsHaveChanged = changedColumns.some((changedColumn) =>
-            sub.newQuery.select.some((f) => f.fields.includes(changedColumn))
+            tracked_columns.includes(changedColumn)
           );
           if (!subFieldsHaveChanged) return;
         }
-        const commandLowerCase = (op_name?.toLowerCase() || "insert") as keyof NonNullable<
-          typeof actions
-        >;
 
         const actionIsIgnored =
           actions &&
-          !includes(
-            parseFieldFilter(actions, false, ["insert", "update", "delete"]),
-            commandLowerCase
-          );
+          !includes(parseFieldFilter(actions, false, ["insert", "update", "delete"]), operation);
         if (actionIsIgnored) {
           return;
         }

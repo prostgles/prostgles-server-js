@@ -1,6 +1,6 @@
 import { PubSubManager } from "./PubSubManager";
 import { EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "./PubSubManagerUtils";
-import { REALTIME_TRIGGER_CHECK_QUERY } from "./initPubSubManager";
+import { REALTIME_TRIGGER_CHECK_QUERY } from "./init/initPubSubManager";
 
 /**
  * Schema and Data watch triggers (DB_OBJ_NAMES.schema_watch_func, DB_OBJ_NAMES.data_watch_func)

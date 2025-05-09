@@ -13,10 +13,10 @@ import {
 import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
 import { DB } from "../Prostgles";
 import { addSync } from "./addSync";
-import { addTrigger } from "./addTrigger";
+import { addTrigger, type AddTriggerParams } from "./addTrigger";
 import { deleteOrphanedTriggers } from "./deleteOrphanedTriggers";
+import { initPubSubManager } from "./init/initPubSubManager";
 import { initialiseEventTriggers } from "./initialiseEventTriggers";
-import { initPubSubManager } from "./initPubSubManager";
 import { refreshTriggers } from "./refreshTriggers";
 
 import {
@@ -35,9 +35,8 @@ import { ParsedTableRule } from "../PublishParser/PublishParser";
 import { syncData } from "../SyncReplication";
 import { addSub } from "./addSub";
 import { notifListener } from "./notifListener";
-import { pushSubData } from "./pushSubData";
 import { log } from "./PubSubManagerUtils";
-import type { NewQuery } from "../DboBuilder/QueryBuilder/QueryBuilder";
+import { pushSubData } from "./pushSubData";
 
 export type BasicCallback = (err?: any, res?: any) => void;
 
@@ -101,7 +100,7 @@ export type SubscriptionParams = {
   channel_name: string;
 
   /**
-   * If this is a view then an array with all related tables will be
+   * If this is a view then all related tables will be added triggers
    * */
   viewOptions?: ViewSubscriptionOptions;
   parentSubParams: Omit<SubscriptionParams, "parentSubParams"> | undefined;
@@ -113,7 +112,7 @@ export type SubscriptionParams = {
   filter: object;
   selectParams: SelectParams;
   subscribeOptions: SubscribeOptions;
-  newQuery: NewQuery;
+  tracked_columns: string[] | undefined;
 
   localFuncs?: LocalFuncs;
   socket: PRGLIOSocket | undefined;
@@ -137,13 +136,9 @@ export type Subscription = Pick<
   | "table_info"
   | "filter"
   | "table_rules"
-  | "newQuery"
+  | "tracked_columns"
 > & {
-  triggers: {
-    table_name: string;
-    condition: string;
-    is_related: boolean;
-  }[];
+  triggers: AddTriggerParams[];
 };
 
 export type PubSubManagerTriggers = Record<string, { condition: string; hash: string }[]>;

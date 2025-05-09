@@ -1,12 +1,19 @@
-import { tryCatchV2 } from "prostgles-types";
+import { asName, pickKeys, tryCatchV2 } from "prostgles-types";
 import { type PubSubManager, ViewSubscriptionOptions } from "./PubSubManager";
 import * as crypto from "crypto";
 import { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
 import { asValue, EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "./PubSubManagerUtils";
+import { udtNamesWithoutEqualityComparison } from "./init/getDataWatchFunctionQuery";
+import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 
+export type AddTriggerParams = {
+  table_name: string;
+  condition: string;
+  tracked_columns: string[] | undefined;
+};
 export async function addTrigger(
   this: PubSubManager,
-  params: { table_name: string; condition: string },
+  params: AddTriggerParams,
   viewOptions: ViewSubscriptionOptions | undefined,
   socket: PRGLIOSocket | undefined
 ) {
@@ -14,7 +21,6 @@ export async function addTrigger(
     const { table_name } = { ...params };
     let { condition } = { ...params };
     if (!table_name) throw "MISSING table_name";
-
     if (!condition || !condition.trim().length) {
       condition = "TRUE";
     }
@@ -28,6 +34,11 @@ export async function addTrigger(
       cond: asValue(condition),
       condHash: asValue(crypto.createHash("md5").update(condition).digest("hex")),
     };
+
+    const tableHandler = this.dbo[table_name];
+    if (!tableHandler) {
+      throw `Cannot add trigger. Tablehandler for ${table_name} not found`;
+    }
 
     await this.db.tx((t) =>
       t.any(`
@@ -52,7 +63,8 @@ export async function addTrigger(
         condition_hash, 
         app_id, 
         related_view_name, 
-        related_view_def
+        related_view_def,
+        columns_info
       ) 
       VALUES (
         ${trgVals.tbl}, 
@@ -60,9 +72,20 @@ export async function addTrigger(
         ${trgVals.condHash},
         ${asValue(this.appId)}, 
         ${asValue(viewOptions?.viewName ?? null)}, 
-        ${asValue(viewOptions?.definition ?? null)}
+        ${asValue(viewOptions?.definition ?? null)},
+        ${asValue(getColumnsInfo(params, tableHandler))}
       )
-      ON CONFLICT DO NOTHING;
+      ON CONFLICT (app_id, table_name, condition_hash)
+      DO UPDATE  /* upsert tracked_columns where necessary */
+        SET columns_info = CASE WHEN EXCLUDED.columns_info IS NOT NULL THEN 
+          jsonb_set(
+            prostgles.app_triggers.columns_info, 
+            '{tracked_columns}', 
+            prostgles.app_triggers.columns_info->'tracked_columns' || EXCLUDED.columns_info->'tracked_columns'
+          ) 
+        END 
+      WHERE prostgles.app_triggers.columns_info IS NOT NULL
+      ;
 
       COMMIT WORK;
     `)
@@ -93,3 +116,51 @@ export async function addTrigger(
 
   return addedTrigger;
 }
+
+const getColumnsInfo = (
+  { tracked_columns, table_name }: AddTriggerParams,
+  tableHandler: Partial<TableHandler>
+) => {
+  if (tracked_columns && !tracked_columns.length) {
+    throw "tracked_columns cannot be defined and empty";
+  }
+
+  let hasPkey = false as boolean;
+  const cols = tableHandler.columns?.map((c) => {
+    hasPkey = hasPkey || c.is_pkey;
+    return {
+      ...pickKeys(c, ["name", "is_pkey"]),
+      cast_to: udtNamesWithoutEqualityComparison.includes(c.udt_name) ? "::TEXT" : "",
+    };
+  });
+  tracked_columns?.forEach((colName) => {
+    if (!cols?.some((c) => c.name === colName)) {
+      throw `tracked_columns ${colName} not found in table ${table_name}`;
+    }
+  });
+  const columns_info =
+    !hasPkey || !cols || !tracked_columns?.length || tracked_columns.length === cols.length ?
+      null
+    : {
+        join_condition: cols
+          .filter((c) => c.is_pkey)
+          .map((c) => `n.${asName(c.name)} = o.${asName(c.name)}`)
+          .join(" AND "),
+        tracked_columns: tracked_columns.reduce(
+          (acc, colName) => ({
+            ...acc,
+            [colName]: 1,
+          }),
+          {} as Record<string, number>
+        ),
+        where_statement: cols
+          .filter((c) => !c.is_pkey && tracked_columns.includes(c.name))
+          .map(
+            (c) =>
+              `column_name = ${asValue(c.name)} AND n.${asName(c.name)}${c.cast_to} IS DISTINCT FROM o.${asName(c.name)}${c.cast_to}`
+          )
+          .join(" OR \n"),
+      };
+
+  return columns_info;
+};

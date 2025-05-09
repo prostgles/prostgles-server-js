@@ -6,10 +6,9 @@ import {
   getErrorAsObject,
   getSerializedClientErrorFromPGError,
   withUserRLS,
-  type TableHandlers,
 } from "../DboBuilder";
-import { getInsertTableRules, getReferenceColumnInserts } from "./insert/insertNestedRecords";
 import { prepareNewData } from "./DataValidator";
+import { getInsertTableRules, getReferenceColumnInserts } from "./insert/insertNestedRecords";
 import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
 import { TableHandler } from "./TableHandler";
 import { updateFile } from "./updateFile";
@@ -82,7 +81,7 @@ export async function update(
         );
     }
 
-    const { data, allowedCols } = await prepareNewData({
+    const { data, allowedCols } = prepareNewData({
       row: newData,
       forcedData,
       allowedFields: fields,

@@ -1,9 +1,9 @@
 import { isDefined, isObject } from "prostgles-types";
-import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
-import { getWatchSchemaTagList } from "../SchemaWatch/getWatchSchemaTagList";
-import { type PubSubManager } from "./PubSubManager";
+import { PostgresNotifListenManager } from "../../PostgresNotifListenManager";
+import { getWatchSchemaTagList } from "../../SchemaWatch/getWatchSchemaTagList";
+import { type PubSubManager } from "../PubSubManager";
 import { getPubSubManagerInitQuery } from "./getPubSubManagerInitQuery";
-import { asValue, NOTIF_CHANNEL } from "./PubSubManagerUtils";
+import { asValue, NOTIF_CHANNEL } from "../PubSubManagerUtils";
 export const REALTIME_TRIGGER_CHECK_QUERY =
   "prostgles-server internal query used to manage realtime triggers";
 

@@ -81,7 +81,8 @@ async function subscribe(
       throw " Cannot have localFunc AND socket ";
     }
 
-    const { throttle, throttleOpts, skipFirst, actions, ...selectParams } = params;
+    const { throttle, throttleOpts, skipFirst, actions, skipChangedColumnsCheck, ...selectParams } =
+      params;
 
     /** Ensure request is valid */
     await this.find(filter, { ...selectParams, limit: 0 }, undefined, table_rules, localParams);
@@ -101,6 +102,7 @@ async function subscribe(
       newQuery,
     });
 
+    const tracked_columns = newQuery.select.filter((s) => s.selected).flatMap((c) => c.fields);
     const commonSubOpts = {
       table_info: this.tableOrViewInfo,
       viewOptions,
@@ -110,11 +112,11 @@ async function subscribe(
       filter: { ...filter },
       selectParams: { ...selectParams },
       subscribeOptions: getValidatedSubscribeOptions(
-        { actions, skipFirst, throttle, throttleOpts },
+        { actions, skipFirst, throttle, throttleOpts, skipChangedColumnsCheck },
         table_rules?.subscribe
       ),
       lastPushed: 0,
-      newQuery,
+      tracked_columns,
     } as const;
 
     const pubSubManager = await this.dboBuilder.getPubSubManager();

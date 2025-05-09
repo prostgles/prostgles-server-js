@@ -122,7 +122,11 @@ export async function addSync(
 
     upsertSync();
 
-    await this.addTrigger({ table_name, condition: conditionParsed }, undefined, socket);
+    await this.addTrigger(
+      { table_name, condition: conditionParsed, tracked_columns: undefined },
+      undefined,
+      socket
+    );
 
     return { channelName };
   });

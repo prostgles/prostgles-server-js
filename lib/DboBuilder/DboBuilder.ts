@@ -7,8 +7,12 @@ import {
   PG_COLUMN_UDT_DATA_TYPE,
   SQLOptions,
   getJoinHandlers,
+  getSerialisableError,
   isDefined,
+  omitKeys,
   tryCatch,
+  tryCatchV2,
+  type AnyObject,
 } from "prostgles-types";
 import { getDBSchema } from "../DBSchemaBuilder";
 import { DB, Prostgles } from "../Prostgles";
@@ -40,6 +44,7 @@ import {
 import { getTablesForSchemaPostgresSQL } from "./getTablesForSchemaPostgresSQL";
 import { prepareShortestJoinPaths } from "./prepareShortestJoinPaths";
 import { cacheDBTypes, runSQL } from "./runSQL";
+import { getQueryErrorPositionInfo } from "../TableConfig/runSQLFile";
 
 export * from "./DboBuilderTypes";
 export * from "./dboBuilderUtils";
@@ -109,9 +114,13 @@ export class DboBuilder {
       if (!canExecute)
         throw "PubSubManager based subscriptions not possible: Cannot run EXECUTE statements on this connection";
 
-      const { pubSubManager, error, hasError } = await tryCatch(async () => {
+      const {
+        data: pubSubManager,
+        error,
+        hasError,
+      } = await tryCatchV2(async () => {
         const pubSubManager = await PubSubManager.create(this);
-        return { pubSubManager };
+        return pubSubManager;
       });
       this._pubSubManager = pubSubManager;
       if (hasError || !this._pubSubManager) {
@@ -119,8 +128,9 @@ export class DboBuilder {
           type: "debug",
           command: "PubSubManager.create",
           duration: 0,
-          error: getErrorAsObject(error),
+          error: getSerialisableError(error),
         });
+        console.error("Could not create PubSubManager", getQueryErrorPositionInfo(error));
         throw "Could not create this._pubSubManager check logs";
       }
     }

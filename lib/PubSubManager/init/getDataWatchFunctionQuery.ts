@@ -1,7 +1,12 @@
-import { DB_OBJ_NAMES } from "../getPubSubManagerInitQuery";
+import { DB_OBJ_NAMES } from "./getPubSubManagerInitQuery";
 import { getAppCheckQuery } from "../orphanTriggerCheck";
 import { asValue, DELIMITER, NOTIF_CHANNEL, NOTIF_TYPE } from "../PubSubManagerUtils";
 
+/**
+ * Error:
+ * could not identify an equality operator for type json', code: '42883'
+ */
+export const udtNamesWithoutEqualityComparison = ["json", "xml"];
 export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
   return `
   
@@ -11,7 +16,7 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
             DECLARE t_ids TEXT[];
             DECLARE c_ids INTEGER[];  
             DECLARE err_c_ids INTEGER[]; 
-            DECLARE unions TEXT := '';          
+            DECLARE condition_checks_union_query TEXT := '';          
             DECLARE query TEXT := '';            
             DECLARE v_trigger RECORD;
             DECLARE has_errors BOOLEAN := FALSE;
@@ -23,38 +28,15 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
             DECLARE view_def_query TEXT := '';   
 
             DECLARE escaped_table  TEXT;
+ 
+            DECLARE _columns_info JSONB := NULL;
 
-            DECLARE changed_columns TEXT := NULL;
-
+            DECLARE changed_columns _TEXT := NULL;
             BEGIN
-
-                --PERFORM pg_notify('debug', concat_ws(' ', 'TABLE', TG_TABLE_NAME, TG_OP));
-            
-
-                -- Determine changed columns for UPDATE operations
-                IF TG_OP = 'UPDATE' THEN
-                  WITH cols AS (
-                    SELECT column_name::text 
-                    FROM information_schema.columns 
-                    WHERE table_schema = TG_TABLE_SCHEMA 
-                    AND table_name = TG_TABLE_NAME
-                  ),
-                  changed AS (
-                    SELECT column_name
-                    FROM cols
-                    WHERE EXISTS (
-                      SELECT 1 FROM new_table n 
-                      JOIN old_table o ON TRUE 
-                      WHERE n.* IS DISTINCT FROM o.*
-                      LIMIT 1
-                    )
-                  )
-                  SELECT string_agg(column_name, ',') INTO changed_columns
-                  FROM changed;
-                END IF;
-
-
+ 
                 escaped_table := concat_ws('.', CASE WHEN TG_TABLE_SCHEMA <> CURRENT_SCHEMA THEN format('%I', TG_TABLE_SCHEMA) END, format('%I', TG_TABLE_NAME));
+            
+                ${CHANGED_COLUMNS_CHECK}
 
                 SELECT string_agg(
                   format(
@@ -63,7 +45,7 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
                         SELECT 1 
                         FROM %s 
                         WHERE %s 
-                      ) THEN %s::text END AS t_ids 
+                      ) THEN %s::text END AS t_id
                     $c$, 
                     table_name, 
                     condition, 
@@ -71,13 +53,13 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
                   ),
                   E' UNION \n ' 
                 ) 
-                INTO unions
+                INTO condition_checks_union_query
                 FROM prostgles.v_triggers
                 WHERE table_name = escaped_table; 
 
 
-                /* unions = 'old_table union new_table' or any one of the tables */
-                IF unions IS NOT NULL THEN
+                /* condition_checks_union_query = 'old_table union new_table' or any one of the tables */
+                IF condition_checks_union_query IS NOT NULL THEN
 
                     SELECT  
                       format(
@@ -103,33 +85,31 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
                       || 
                       format(
                         $c$
-                            SELECT ARRAY_AGG(DISTINCT t.t_ids)
+                            SELECT ARRAY_AGG(DISTINCT t.t_id)
                             FROM ( 
                               %s 
                             ) t
                         $c$, 
-                        unions
+                        condition_checks_union_query
                       )
                     INTO query; 
 
-                    BEGIN
-                      EXECUTE query INTO t_ids;
+                    BEGIN 
+                      EXECUTE query INTO t_ids; 
 
-                      --RAISE NOTICE 'trigger fired ok';
+                      EXCEPTION WHEN OTHERS THEN
+                        
+                        has_errors := TRUE;
 
-                    EXCEPTION WHEN OTHERS THEN
-                      
-                      has_errors := TRUE;
-
-                      GET STACKED DIAGNOSTICS 
-                        err_text = MESSAGE_TEXT,
-                        err_detail = PG_EXCEPTION_DETAIL,
-                        err_hint = PG_EXCEPTION_HINT;
+                        GET STACKED DIAGNOSTICS 
+                          err_text = MESSAGE_TEXT,
+                          err_detail = PG_EXCEPTION_DETAIL,
+                          err_hint = PG_EXCEPTION_HINT;
 
                     END;
 
                     --RAISE NOTICE 'has_errors: % ', has_errors;
-                    --RAISE NOTICE 'unions: % , cids: %', unions, c_ids;
+                    --RAISE NOTICE 'condition_checks_union_query: % , cids: %', condition_checks_union_query, c_ids;
 
                     IF (t_ids IS NOT NULL OR has_errors) THEN
 
@@ -153,7 +133,7 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
                                   THEN concat_ws('; ', 'error', err_text, err_detail, err_hint, 'query: ' || query ) 
                                   ELSE COALESCE(v_trigger.cids, '') 
                                 END,
-                                COALESCE(changed_columns, '')
+                                COALESCE(changed_columns::TEXT, '')
                                 ${debugMode ? ", COALESCE(current_query(), 'current_query ??'), ' ', query" : ""}
                               ), 7999/4) -- Some chars are 2bytes -> 'Ω'
                             );
@@ -181,3 +161,53 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
 
   `;
 };
+
+const CHANGED_COLUMNS_CHECK = `
+
+
+-- Determine changed columns for UPDATE operations
+IF TG_OP = 'UPDATE' THEN
+
+  SELECT columns_info
+  INTO _columns_info
+  FROM prostgles.v_triggers
+  WHERE table_name = escaped_table
+  AND columns_info IS NOT NULL;
+ 
+  IF _columns_info IS NOT NULL THEN
+    query := format(
+      $c$
+        WITH changed AS (
+          SELECT column_name
+          FROM jsonb_object_keys(%L) as column_name
+          WHERE EXISTS (
+            SELECT 1 
+            FROM old_table o 
+            LEFT JOIN new_table n 
+            ON %s 
+            WHERE %s
+          )
+        )
+        SELECT array_agg(column_name) 
+        FROM changed;
+      $c$,
+      _columns_info->>'tracked_columns',
+      _columns_info->>'join_condition',
+      _columns_info->>'where_statement'
+    );
+
+    BEGIN
+      EXECUTE query INTO changed_columns;
+    END;
+
+    /* It is possible to get no changes */
+    changed_columns := COALESCE(changed_columns, '{}');
+  
+    IF NOT starts_with(changed_columns::TEXT, '{')  THEN
+      RAISE EXCEPTION 'changed_columns is not a JSON array: %', changed_columns;
+    END IF;
+
+  END IF;  
+END IF;
+
+`;

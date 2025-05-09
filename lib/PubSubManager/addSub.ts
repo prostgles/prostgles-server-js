@@ -1,8 +1,9 @@
 import { SubscriptionChannels } from "prostgles-types";
 import { VoidFunction } from "../SchemaWatch/SchemaWatch";
-import { tout } from "./initPubSubManager";
+import { tout } from "./init/initPubSubManager";
 import { BasicCallback, PubSubManager, Subscription, SubscriptionParams } from "./PubSubManager";
 import { parseCondition } from "./PubSubManagerUtils";
+import type { AddTriggerParams } from "./addTrigger";
 
 type AddSubscriptionParams = SubscriptionParams & {
   condition: string;
@@ -28,7 +29,7 @@ export async function addSub(
     viewOptions,
     table_info,
     subscribeOptions,
-    newQuery,
+    tracked_columns,
   } = subscriptionParams;
   const table_name = table_info.name;
 
@@ -39,12 +40,12 @@ export async function addSub(
     throw "addSub: cannot have socket AND func";
   }
 
-  const channel_name = `${this.socketChannelPreffix}.${table_name}.${JSON.stringify(filter)}.${JSON.stringify(selectParams)}.${"m"}.sub`;
+  const channel_name = `${this.socketChannelPreffix}.${table_name}.${JSON.stringify(filter)}.${JSON.stringify(selectParams)}.m.sub`;
   const mainTrigger = {
     table_name: table_name,
     condition: parseCondition(condition),
-    is_related: false,
-  } as const;
+    tracked_columns,
+  } satisfies AddTriggerParams;
 
   const newSub: Subscription = {
     channel_name,
@@ -59,7 +60,7 @@ export async function addSub(
     is_throttling: false,
     socket_id: socket?.id,
     table_rules,
-    newQuery,
+    tracked_columns,
     triggers: [mainTrigger],
   };
 
@@ -85,8 +86,8 @@ export async function addSub(
       const relatedSub = {
         table_name: relatedTable.tableName,
         condition: parseCondition(relatedTable.condition),
-        is_related: true,
-      } as const;
+        tracked_columns: undefined,
+      } satisfies AddTriggerParams;
 
       newSub.triggers.push(relatedSub);
 
@@ -142,7 +143,7 @@ export async function addSub(
 
   this.subs.push(newSub);
 
-  /** A view does not have triggers. Only related triggers */
+  /** A view will not have triggers. Related tables are added triggers instead */
   if (table_info.is_view) {
     if (!viewOptions?.relatedTables.length) {
       throw "PubSubManager: view parent_tables missing";

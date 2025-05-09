@@ -28,8 +28,17 @@ export const runSQLFile = async (prostgles: Prostgles) => {
   return res.data?.success;
 };
 
-export const getQueryErrorPositionInfo = (err: any, _fileContent?: string) => {
-  const { position, length, query } = err as { position: number; length: number; query: string },
+/**
+ * Given an sql error, return the lines of the query that caused the error.
+ */
+export const getQueryErrorPositionInfo = (err: any, _fileContent?: string): string | undefined => {
+  const { position, length, query, internalPosition, internalQuery } = err as {
+      position: number;
+      length: number;
+      query: string;
+      internalPosition?: string;
+      internalQuery?: string;
+    },
     fileContent = _fileContent || query,
     lines = fileContent.split("\n");
 
@@ -41,5 +50,13 @@ export const getQueryErrorPositionInfo = (err: any, _fileContent?: string) => {
       .slice(startLine, endLine)
       .map((txt, i) => `${startLine + i + 1} ${i === 1 ? "->" : "  "} ${txt}`)
       .join("\n");
+  }
+
+  if (internalPosition && internalQuery) {
+    return getQueryErrorPositionInfo({
+      query: internalQuery,
+      position: parseInt(internalPosition),
+      length: internalQuery.length,
+    });
   }
 };

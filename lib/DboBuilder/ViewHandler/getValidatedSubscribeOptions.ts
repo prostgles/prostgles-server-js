@@ -16,6 +16,7 @@ export const getValidatedSubscribeOptions = (
         optional: true,
       },
       skipFirst: { type: "boolean", optional: true },
+      skipChangedColumnsCheck: { type: "boolean", optional: true },
       actions: {
         oneOf: [
           {
@@ -48,7 +49,13 @@ export const getValidatedSubscribeOptions = (
   }
 
   const publishedThrottle = subscribeRule?.throttle || 0;
-  const { actions, throttleOpts, skipFirst, throttle = publishedThrottle } = data;
+  const {
+    actions,
+    throttleOpts,
+    skipFirst,
+    throttle = publishedThrottle,
+    skipChangedColumnsCheck,
+  } = data;
   if (actions && isEmpty(actions)) {
     throw `addSub: actions cannot be empty`;
   }
@@ -68,5 +75,6 @@ export const getValidatedSubscribeOptions = (
     skipFirst,
     throttle,
     throttleOpts,
+    skipChangedColumnsCheck,
   };
 };

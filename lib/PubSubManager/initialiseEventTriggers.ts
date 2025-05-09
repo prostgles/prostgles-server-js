@@ -3,7 +3,7 @@ import { type PubSubManager } from "./PubSubManager";
 import { getIsSuperUser } from "../Prostgles";
 import { EVENT_TRIGGER_TAGS } from "../Event_Trigger_Tags";
 import { DELETE_DISCONNECTED_APPS_QUERY } from "./orphanTriggerCheck";
-import { DB_OBJ_NAMES } from "./getPubSubManagerInitQuery";
+import { DB_OBJ_NAMES } from "./init/getPubSubManagerInitQuery";
 import { EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "./PubSubManagerUtils";
 
 const asValue = (v: any) => pgp.as.format("$1", [v]);

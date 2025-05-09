@@ -34,12 +34,14 @@ export async function getSubscribeRelatedTables(
     /** TODO: this needs to be memoized on schema fetch */
     const viewName = this.name;
     const viewNameEscaped = this.escapedName;
-    const { current_schema } = await this.db.oneOrNone("SELECT current_schema");
+    const { current_schema } = await this.db.one<{ current_schema: string }>(
+      "SELECT current_schema"
+    );
 
     /** Get list of used columns and their parent tables */
-    let { def } = (await this.db.oneOrNone("SELECT pg_get_viewdef(${viewName}) as def", {
+    let { def } = await this.db.one<{ def: string }>("SELECT pg_get_viewdef(${viewName}) as def", {
       viewName,
-    })) as { def: string };
+    });
     def = def.trim();
     if (def.endsWith(";")) {
       def = def.slice(0, -1);
@@ -53,7 +55,8 @@ export async function getSubscribeRelatedTables(
     }
     const { fields } = await this.dboBuilder.dbo.sql!(
       `SELECT * FROM ( \n ${def} \n ) prostgles_subscribe_view_definition LIMIT 0`,
-      {}
+      {},
+      { returnType: "default-with-rollback" }
     );
     const tableColumns = fields.filter((f) => f.tableName && f.columnName);
 
@@ -96,7 +99,7 @@ export async function getSubscribeRelatedTables(
             )`;
 
           try {
-            const { count } = await this.db.oneOrNone(`
+            const { count } = await this.db.one<{ count: number }>(`
             WITH ${asName(tableName)} AS (
               SELECT * 
               FROM ${asName(tableName)}

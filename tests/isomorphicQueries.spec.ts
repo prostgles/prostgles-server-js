@@ -602,16 +602,41 @@ export const isomorphicQueries = async (
       assert.equal(validTriggers.length, 3, "3 Triggers should exist but be disabled");
       assert.equal(validTriggers.filter((t) => t.enabled).length, 0);
     };
+    await test("subscribe skipChangedColumnsCheck", async () => {
+      const filter = { id: 99 };
+      await db.various.delete!(filter);
+      await db.various.insert!(filter);
+      let runs = 0;
+      const sub = await db.various.subscribe!(
+        filter,
+        { select: { name: 1 }, skipChangedColumnsCheck: false },
+        async (d) => {
+          log(JSON.stringify(d));
+          runs++;
+        }
+      );
+      await db.various.update!(filter, { name: "zz3zz1" });
+      await tout(200);
+      assert.equal(runs, 2);
+      await db.various.update!(filter, { name: "zz3zz1" });
+      await tout(200);
+      assert.equal(runs, 2); // No change
+      await db.various.update!(filter, { tsv: "hehe" });
+      await tout(200);
+      assert.equal(runs, 2); // Still no change to the selected data
+      await db.various.delete!(filter);
+      await tout(200);
+      assert.equal(runs, 3);
+      await sub.unsubscribe();
+    });
 
     await test("subscribe", async () => {
       await tryRunP(
         "subscribe",
         async (resolve, reject) => {
           await db.various.insert!({ id: 99 });
-          const sub = await db.various.subscribe!({ id: 99 }, {}, async (items) => {
-            const item = items[0];
-
-            if (item && item.name === "zz3zz3") {
+          const sub = await db.various.subscribe!({ id: 99 }, {}, async ([item]) => {
+            if (item?.name === "zz3zz3") {
               await db.various.delete!({ name: "zz3zz3" });
               await testToEnsureTriggersAreDisabled(sub, "various");
               resolve(true);

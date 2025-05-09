@@ -1,16 +1,16 @@
 import { tryCatchV2 } from "prostgles-types";
-import { DboBuilder } from "../DboBuilder/DboBuilder";
-import { pgp } from "../DboBuilder/DboBuilderTypes";
+import { DboBuilder } from "../../DboBuilder/DboBuilder";
+import { pgp } from "../../DboBuilder/DboBuilderTypes";
 import {
   asValue,
   DELIMITER,
   EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID,
   NOTIF_CHANNEL,
   NOTIF_TYPE,
-} from "./PubSubManagerUtils";
-import { getAppCheckQuery } from "./orphanTriggerCheck";
-import { version } from "../../package.json";
-import { getDataWatchFunctionQuery } from "./init/getDataWatchFunctionQuery";
+} from "../PubSubManagerUtils";
+import { getAppCheckQuery } from "../orphanTriggerCheck";
+import { version } from "../../../package.json";
+import { getDataWatchFunctionQuery } from "./getDataWatchFunctionQuery";
 
 export const DB_OBJ_NAMES = {
   trigger_add_remove_func: "prostgles.trigger_add_remove_func",
@@ -197,8 +197,8 @@ BEGIN
           condition       TEXT NOT NULL,
           condition_hash  TEXT NOT NULL,
           
-          /** If defined, will check the provided fields for changes */
-          fields          _TEXT ,
+          /** If defined, will check which columns changed which will then be used in the sub notification logic */
+          columns_info    JSONB ,
 
           /* The view from the root subscription, found in the condition.
               We need this because old_table/new_table data is not reflected in the view inside the AFTER trigger
@@ -337,25 +337,28 @@ BEGIN
                                     COMMENT ON TRIGGER %1$I ON %2$s IS 'Prostgles internal trigger used to notify when data in the table changed';
                                   */
                               $q$,  
-                              'prostgles_triggers_' || trw.table_name || '_insert', trw.table_name                                                
-                          ) || format(
+                              'prostgles_triggers_' || trw.table_name || '_insert', 
+                              trw.table_name                                                
+                          ) ||
+                          format(
                               $q$ 
-                                  ${createTriggerQuery}
-                                  AFTER UPDATE ON %2$s
-                                  REFERENCING OLD TABLE AS old_table NEW TABLE AS new_table
-                                  FOR EACH STATEMENT EXECUTE PROCEDURE ${DB_OBJ_NAMES.data_watch_func}();
-                                  --COMMENT ON TRIGGER %1$I ON %2$s IS 'Prostgles internal trigger used to notify when data in the table changed';
+                                ${createTriggerQuery}
+                                AFTER UPDATE ON %2$s
+                                REFERENCING OLD TABLE AS old_table NEW TABLE AS new_table
+                                FOR EACH STATEMENT EXECUTE PROCEDURE ${DB_OBJ_NAMES.data_watch_func}();
                               $q$,  
-                              'prostgles_triggers_' || trw.table_name || '_update', trw.table_name   
-                          ) || format(
+                              'prostgles_triggers_' || trw.table_name || '_update', 
+                              trw.table_name   
+                          ) || 
+                          format(
                               $q$ 
                                   ${createTriggerQuery}
                                   AFTER DELETE ON %2$s
                                   REFERENCING OLD TABLE AS old_table
-                                  FOR EACH STATEMENT EXECUTE PROCEDURE ${DB_OBJ_NAMES.data_watch_func}();
-                                  --COMMENT ON TRIGGER %1$I ON %2$s IS 'Prostgles internal trigger used to notify when data in the table changed';
+                                  FOR EACH STATEMENT EXECUTE PROCEDURE ${DB_OBJ_NAMES.data_watch_func}(); 
                               $q$,
-                              'prostgles_triggers_' || trw.table_name || '_delete', trw.table_name  
+                              'prostgles_triggers_' || trw.table_name || '_delete', 
+                              trw.table_name  
                           );
                         END IF;
 
