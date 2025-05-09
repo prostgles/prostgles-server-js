@@ -162,9 +162,10 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
   `;
 };
 
+/**
+ * TODO: check columns for specific t_id trigger conditions
+ */
 const CHANGED_COLUMNS_CHECK = `
-
-
 -- Determine changed columns for UPDATE operations
 IF TG_OP = 'UPDATE' THEN
 

@@ -70,7 +70,9 @@ export async function notifListener(this: PubSubManager, data: { payload: string
 
   const [_, table_name, op_name, condition_ids_str, raw_changed_columns_str = ""] = dataArr;
   const changedColumns =
-    !raw_changed_columns_str ? undefined : raw_changed_columns_str.slice(1, -1).split(",");
+    !raw_changed_columns_str ? undefined
+    : raw_changed_columns_str === "{}" ? []
+    : raw_changed_columns_str.slice(1, -1).split(",");
   const conditionIds = condition_ids_str?.split(",").map((v) => +v);
 
   if (!table_name) {
