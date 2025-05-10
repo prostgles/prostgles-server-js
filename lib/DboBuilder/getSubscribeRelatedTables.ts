@@ -21,8 +21,8 @@ type Args = {
 };
 
 /**
- * When subscribing to a view: we identify underlying tables to subscribe to them
- * When subscribing to a table: we identify joined tables to subscribe to them
+ * When subscribing to a view: identify underlying tables to subscribe to them
+ * When subscribing to a table: identify joined tables to subscribe to them
  */
 export async function getSubscribeRelatedTables(
   this: ViewHandler,
@@ -216,8 +216,9 @@ export async function getSubscribeRelatedTables(
     }
     for (const e of newQuery.whereOpts.exists.filter((e) => e.isJoined)) {
       if (!e.isJoined) throw `Not possible`;
-      const targetTable = e.parsedPath.at(-1)!.table;
-      await pushRelatedTable(targetTable, e.parsedPath);
+      for (const [index, pathItem] of e.parsedPath.entries()) {
+        await pushRelatedTable(pathItem.table, e.parsedPath.slice(0, index + 1));
+      }
     }
     if (!viewOptions.relatedTables.length) {
       viewOptions = undefined;

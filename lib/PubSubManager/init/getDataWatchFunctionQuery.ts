@@ -219,3 +219,119 @@ IF TG_OP = 'UPDATE' THEN
 END IF;
 
 `;
+
+/**
+ * Given:
+ * 1. two transition tables (old_table and new_table)
+ * 2. a list of primary keys
+ * 3. a list of trigger conditions and their tracked columns
+ *
+ * Identify which conditions which columns have changed for each condition.
+ *  - If a condition is met in only one of the transition tables, it is considered that all columns changed for that condition
+ *  - If a condition is met in both transition tables, we need to check which columns have changed
+ */
+const CHANGED_COLUMNS_CHECK_V2 = `
+WITH 
+old_table AS (
+  SELECT 10 as id, 'A' as status, 100 as val, 'user@example.com' as email UNION ALL
+  SELECT 1 as id, 'a' as status, 0 as val, '@dw1' as email -- Original data for other conditions
+),
+new_table AS (
+  SELECT 10 as id, 'B' as status, 200 as val, 'user_new@example.com' as email UNION ALL
+  SELECT 1 as id, 'a' as status, 0 as val, '@dw12' as email -- Original data for other conditions
+),
+unioned_tables AS (
+  SELECT *, 'old' as "ctid" FROM old_table UNION ALL 
+  SELECT *, 'old' as "ctid" FROM new_table 
+),
+changed_conditions AS (
+  SELECT o.*, cond
+  FROM unioned_tables o
+  LEFT JOIN UNNEST(ARRAY[
+    CASE WHEN id = 1 THEN 'cond_id_1' END, -- Original condition
+    CASE WHEN status = 'B' AND id = 10 THEN 'cond_status_B_for_id_10' END -- Condition specific to new state of updated row
+  ]) cond
+    ON TRUE 
+),
+result AS (
+  SELECT o.*, n.*, conds, cc
+  FROM unioned_tables o
+  LEFT JOIN UNNEST(ARRAY[
+    CASE WHEN id = 1 THEN 'cond_id_1' END, -- Original condition
+    CASE WHEN status = 'B' AND id = 10 THEN 'cond_status_B_for_id_10' END -- Condition specific to new state of updated row
+  ]) conds
+    ON TRUE 
+  /**
+  * Join only to records AND conditions that exist in both tables. 
+  * This will inevitably show which columns changed for matching rows. 
+  * Non matching rows will show that all columns changed 
+  */
+  LEFT JOIN   (
+    SELECT * 
+    FROM unioned_tables ut
+    WHERE EXISTS (
+      SELECT 1
+      FROM old_table _ot
+      LEFT JOIN UNNEST(ARRAY[
+        CASE WHEN id = 1 THEN 'cond_id_1' END, -- Original condition
+        CASE WHEN status = 'B' AND id = 10 THEN 'cond_status_B_for_id_10' END -- Condition specific to new state of updated row
+      ]) conds2
+        ON TRUE 
+      WHERE _ot.id = ut.id
+      AND conds2 IS NOT NULL
+    )
+    AND EXISTS (
+      select 1
+      from new_table _nt
+      LEFT JOIN UNNEST(ARRAY[
+        CASE WHEN id = 1 THEN 'cond_id_1' END, -- Original condition
+        CASE WHEN status = 'B' AND id = 10 THEN 'cond_status_B_for_id_10' END -- Condition specific to new state of updated row
+      ]) conds2
+        ON TRUE 
+      WHERE _nt.id = ut.id
+      AND conds2 IS NOT NULL
+    )
+  ) n
+    ON o.id = n.id  
+  LEFT JOIN UNNEST(ARRAY[
+    CASE WHEN ROW(n.*) IS NULL OR o.id IS DISTINCT FROM n.id THEN 'id' END ,
+    CASE WHEN ROW(n.*) IS NULL OR o.status IS DISTINCT FROM n.status THEN 'status' END  ,
+    CASE WHEN ROW(n.*) IS NULL OR o.email IS DISTINCT FROM n.email THEN 'email' END  
+  ]) cc
+    ON TRUE 
+  WHERE conds IS NOT NULL
+  AND cc IS NOT NULL
+)
+-- SELECT *
+-- FROM result
+SELECT   conds
+, array_agg(DISTINCT cc)
+FROM result
+GROUP BY 1
+`;
+
+/**
+ * Test cases:
+ * 
+  1. Condition not present in both tables (cond B). 
+      Expected result:
+      - cond_id_1: [email] 
+      - cond_status_B_for_id_10: [id, email, status]
+ 
+WITH 
+old_table AS (
+  SELECT 10 as id, 'A' as status, 100 as val, 'user@example.com' as email UNION ALL
+  SELECT 1 as id, 'a' as status, 0 as val, '@dw1' as email -- Original data for other conditions
+),
+new_table AS (
+  SELECT 10 as id, 'B' as status, 200 as val, 'user_new@example.com' as email UNION ALL
+  SELECT 1 as id, 'a' as status, 0 as val, '@dw12' as email -- Original data for other conditions
+),
+
+LEFT JOIN UNNEST(ARRAY[
+  CASE WHEN id = 1 THEN 'cond_id_1' END, -- Original condition
+  CASE WHEN status = 'B' AND id = 10 THEN 'cond_status_B_for_id_10' END -- Condition specific to new state of updated row
+]) conds
+  ON TRUE 
+
+ */

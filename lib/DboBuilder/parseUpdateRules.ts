@@ -144,7 +144,7 @@ export async function parseUpdateRules(
       });
       if (forcedData) {
         try {
-          const { data, allowedCols } = await prepareNewData({
+          const { data, allowedCols } = prepareNewData({
             row: forcedData,
             forcedData: undefined,
             allowedFields: "*",
