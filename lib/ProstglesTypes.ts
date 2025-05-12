@@ -240,6 +240,10 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
    * Useful for logging or debugging
    */
   onQuery?: (error: any, ctx: pgPromise.IEventContext<pg.IClient>) => void;
+  /**
+   * Called when a connection error is received from the database
+   */
+  onConnectionError?: (error: Error, ctx: pgPromise.IEventContext<pg.IClient>) => void;
 
   /**
    * What schema change watcher to use when watchSchema is enabled:

@@ -17,7 +17,10 @@ const DB_FALLBACK_COMMANDS = Array.from(new Set(COMMAND_FIRST_KEYWORDS)).concat(
 
 export type VoidFunction = () => void;
 
-export type OnSchemaChangeCallback = (event: { command: string; query: string }) => void;
+export type OnSchemaChangeCallback = (event: {
+  command: string | undefined;
+  query: string;
+}) => void;
 
 export class SchemaWatch {
   dboBuilder: DboBuilder;
@@ -54,7 +57,7 @@ export class SchemaWatch {
     if (
       this.type.watchType !== "prostgles_queries" ||
       !this.onSchemaChange ||
-      !DB_FALLBACK_COMMANDS.includes(command)
+      (command && !DB_FALLBACK_COMMANDS.includes(command))
     )
       return;
 

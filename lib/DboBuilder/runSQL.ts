@@ -19,8 +19,10 @@ export async function runSQL(
       .toLowerCase()
       .includes("create extension pg_stat_statements")
   ) {
-    const { shared_preload_libraries } = await this.db.oneOrNone("SHOW shared_preload_libraries");
-    if (!(shared_preload_libraries || "").includes("pg_stat_statements")) {
+    const row = await this.db.oneOrNone<{
+      shared_preload_libraries: string | null;
+    }>("SHOW shared_preload_libraries");
+    if (!row?.shared_preload_libraries?.includes("pg_stat_statements")) {
       throw (
         "This query will crash the server (pg_stat_statements must be loaded via shared_preload_libraries). Need to: \n ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements' \n" +
         " AND restart server: \n    (linux) sudo service postgresql restart\n   (mac) brew services restart postgres\n "
@@ -98,8 +100,10 @@ export async function runSQL(
   } else if (returnType === "row") {
     return rows[0];
   } else if (returnType === "value") {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return Object.values(rows[0] ?? {})[0];
   } else if (returnType === "values") {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return rows.map((r) => Object.values(r)[0]);
   } else {
     const qres: SQLResult<typeof returnType> = {

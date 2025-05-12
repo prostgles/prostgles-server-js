@@ -131,6 +131,7 @@ export class Prostgles {
       watchSchemaType: 1,
       fileTable: 1,
       onQuery: 1,
+      onConnectionError: 1,
       tableConfig: 1,
       tableConfigMigrations: 1,
       onNotice: 1,

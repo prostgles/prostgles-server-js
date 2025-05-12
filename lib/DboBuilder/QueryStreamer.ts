@@ -30,7 +30,7 @@ type StreamedQuery = ClientStreamedRequest & {
   onError: (error: any) => void;
 };
 type Info = {
-  command: string;
+  command: string | undefined;
   fields: any[];
   rowCount: number;
   duration: number;
