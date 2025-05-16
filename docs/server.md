@@ -266,6 +266,10 @@ prostgles<DBGeneratedSchema>({
   Callback called when a query is executed.
   Useful for logging or debugging
 
+- **onConnectionError** <span style="color: grey">optional</span> <span style="color: green;">(error: Error, ctx: IEventContext&lt;IClient&gt;) =&gt; void</span>
+
+  Called when a connection error is received from the database
+
 - **watchSchemaType** <span style="color: grey">optional</span> <span style="color: green;">"DDL_trigger" | "prostgles_queries" | undefined</span>
 
   What schema change watcher to use when watchSchema is enabled:
