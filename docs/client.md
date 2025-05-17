@@ -93,6 +93,9 @@ Retrieves rows matching the filter and keeps them in sync
     - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
 
       Used to prevent the hook from fetching data
+    - **deps** <span style="color: grey">optional</span> <span style="color: green;">any[] | undefined</span>
+
+      Used to trigger re-fetching
 #### Return type
 #### <span style="color: green;">AsyncResult</span>
 
@@ -202,6 +205,9 @@ Retrieves the first row matching the filter and keeps it in sync
     - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
 
       Used to prevent the hook from fetching data
+    - **deps** <span style="color: grey">optional</span> <span style="color: green;">any[] | undefined</span>
+
+      Used to trigger re-fetching
 #### Return type
 #### <span style="color: green;">AsyncResult</span>
 
@@ -292,6 +298,9 @@ Retrieves a list of matching records from the view/table and subscribes to chang
     - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
 
       Used to prevent the hook from fetching data
+    - **deps** <span style="color: grey">optional</span> <span style="color: green;">any[] | undefined</span>
+
+      Used to trigger re-fetching
 #### Return type
 #### <span style="color: green;">AsyncResult</span>
 
@@ -376,6 +385,9 @@ Retrieves a matching record from the view/table and subscribes to changes
     - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
 
       Used to prevent the hook from fetching data
+    - **deps** <span style="color: grey">optional</span> <span style="color: green;">any[] | undefined</span>
+
+      Used to trigger re-fetching
 #### Return type
 #### <span style="color: green;">AsyncResult</span>
 
@@ -442,6 +454,9 @@ Retrieves a list of matching records from the view/table
     - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
 
       Used to prevent the hook from fetching data
+    - **deps** <span style="color: grey">optional</span> <span style="color: green;">any[] | undefined</span>
+
+      Used to trigger re-fetching
 #### Return type
 #### <span style="color: green;">AsyncResult</span>
 
@@ -508,6 +523,9 @@ Retrieves first matching record from the view/table
     - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
 
       Used to prevent the hook from fetching data
+    - **deps** <span style="color: grey">optional</span> <span style="color: green;">any[] | undefined</span>
+
+      Used to trigger re-fetching
 #### Return type
 #### <span style="color: green;">AsyncResult</span>
 
@@ -574,6 +592,9 @@ Returns the total number of rows matching the filter
     - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
 
       Used to prevent the hook from fetching data
+    - **deps** <span style="color: grey">optional</span> <span style="color: green;">any[] | undefined</span>
+
+      Used to trigger re-fetching
 #### Return type
 #### <span style="color: green;">AsyncResult</span>
 
@@ -640,6 +661,9 @@ Returns result size in bits matching the filter and selectParams
     - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
 
       Used to prevent the hook from fetching data
+    - **deps** <span style="color: grey">optional</span> <span style="color: green;">any[] | undefined</span>
+
+      Used to trigger re-fetching
 #### Return type
 #### <span style="color: green;">AsyncResult</span>
 
