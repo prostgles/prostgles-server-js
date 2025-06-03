@@ -95,12 +95,14 @@ const getPropertyValidationError = (
     if (!fieldType.enum.includes(value)) return err;
     return;
   }
-  if (fieldType.oneOf) {
-    if (!fieldType.oneOf.length) {
+
+  const oneOf = fieldType.oneOf ?? fieldType.oneOfType?.map((type) => ({ type }));
+  if (oneOf) {
+    if (!oneOf.length) {
       return err + "to not be empty";
     }
     let firstError: string | undefined;
-    const validMember = fieldType.oneOf.find((member) => {
+    const validMember = oneOf.find((member) => {
       const error = getPropertyValidationError(value, member, path);
       firstError ??= error;
       return error === undefined;
@@ -137,7 +139,7 @@ const getPropertyValidationError = (
     }
     return;
   }
-  return `Could not validate field type: ${JSON.stringify(fieldType)}`;
+  return `Could not validate field type. Some logic might be missing: ${JSON.stringify(fieldType)}`;
 };
 
 const getTypeDescription = (schema: JSONB.FieldType): string => {
