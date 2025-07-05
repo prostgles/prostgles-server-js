@@ -9,10 +9,7 @@ import {
   getJoinHandlers,
   getSerialisableError,
   isDefined,
-  omitKeys,
-  tryCatch,
   tryCatchV2,
-  type AnyObject,
 } from "prostgles-types";
 import { getDBSchema } from "../DBSchemaBuilder";
 import { DB, Prostgles } from "../Prostgles";
@@ -20,13 +17,13 @@ import { Join } from "../ProstglesTypes";
 import { PubSubManager } from "../PubSubManager/PubSubManager";
 import { getCreatePubSubManagerError } from "../PubSubManager/getCreatePubSubManagerError";
 import { DbTableInfo, PublishParser } from "../PublishParser/PublishParser";
+import { getQueryErrorPositionInfo } from "../TableConfig/runSQLFile";
 import { Graph } from "../shortestPath";
 import { clone } from "../utils";
 import {
   DBHandlerServer,
   DbTxTableHandlers,
   LocalParams,
-  TX,
   TableSchema,
   TxCB,
 } from "./DboBuilderTypes";
@@ -38,13 +35,11 @@ import {
   PGConstraint,
   getCanExecute,
   getConstraints,
-  getErrorAsObject,
   getSerializedClientErrorFromPGError,
 } from "./dboBuilderUtils";
 import { getTablesForSchemaPostgresSQL } from "./getTablesForSchemaPostgresSQL";
 import { prepareShortestJoinPaths } from "./prepareShortestJoinPaths";
 import { cacheDBTypes, runSQL } from "./runSQL";
-import { getQueryErrorPositionInfo } from "../TableConfig/runSQLFile";
 
 export * from "./DboBuilderTypes";
 export * from "./dboBuilderUtils";
@@ -284,11 +279,11 @@ export class DboBuilder {
 
     if (this.prostgles.opts.transactions) {
       const txKey = "tx";
-      // if (typeof this.prostgles.opts.transactions === "string")
-      //   txKey = this.prostgles.opts.transactions;
 
-      (this.dbo[txKey] as unknown as TX) = (cb: TxCB) =>
-        this.getTX(cb as TxCB<DbTxTableHandlers, any>);
+      //@ts-ignore
+      this.dbo[txKey] = <R, TH extends DbTxTableHandlers & Pick<DBHandlerServer, "sql">>(
+        cb: TxCB<Promise<R>, TH>
+      ) => this.getTX(cb);
     }
 
     if (!this.dbo.sql) {
@@ -328,7 +323,9 @@ export class DboBuilder {
     return jp;
   };
 
-  getTX = async (cb: TxCB) => {
+  getTX = async <R, TH extends DbTxTableHandlers & Pick<DBHandlerServer, "sql">>(
+    cb: TxCB<Promise<R> | R, TH>
+  ) => {
     return this.db.tx((t) => {
       const dbTX: DbTxTableHandlers & Pick<DBHandlerServer, "sql"> = {};
       this.tablesOrViews?.map((tov) => {
@@ -342,7 +339,7 @@ export class DboBuilder {
         return this.runSQL(q, args, opts, { ...localParams, tx: { dbTX, t } });
       };
 
-      return cb(dbTX, t);
+      return cb(dbTX as TH, t);
     });
   };
 

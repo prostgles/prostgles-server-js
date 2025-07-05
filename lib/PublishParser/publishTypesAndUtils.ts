@@ -353,7 +353,7 @@ export type DeleteRule<Cols extends AnyObject = AnyObject, S extends DBSchema | 
   /**
    * Validation logic to check/update data for each request
    */
-  validate?(...args: any[]): Awaitable<void>; // UpdateRequestData<Cols>;
+  validate?(filter: FullFilter<Cols, S>): Awaitable<void>; // UpdateRequestData<Cols>;
 };
 export type SyncRule<Cols extends AnyObject = AnyObject> = {
   /**

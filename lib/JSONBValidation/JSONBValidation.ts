@@ -144,7 +144,8 @@ const getPropertyValidationError = (
 
 const getTypeDescription = (schema: JSONB.FieldType): string => {
   const schemaObj = getFieldTypeObj(schema);
-  const { type, nullable, optional, oneOf, record } = schemaObj;
+  const { type, nullable, optional, record } = schemaObj;
+  const oneOf = schemaObj.oneOf ?? schemaObj.oneOfType?.map((type) => ({ type }));
   const allowedTypes: any[] = [];
   if (nullable) allowedTypes.push("null");
   if (optional) allowedTypes.push("undefined");

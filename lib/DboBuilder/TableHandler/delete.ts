@@ -81,10 +81,7 @@ export async function _delete(
       tableRule: tableRules,
     });
     queryWithoutRLS += filterOpts.where;
-    if (validate) {
-      const _filter = filterOpts.filter;
-      await validate(_filter);
-    }
+    await validate?.(filterOpts.filter);
 
     let returningQuery = "";
     if (returning) {
