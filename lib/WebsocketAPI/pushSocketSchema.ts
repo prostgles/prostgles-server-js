@@ -1,9 +1,8 @@
-import { CHANNELS, type SQLRequest } from "prostgles-types";
+import { CHANNELS, getSerialisableError, type SQLRequest } from "prostgles-types";
 import type { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
 import { Prostgles } from "../Prostgles";
 import { runClientSqlRequest } from "../runClientRequest";
 import { makeSocketError } from "./onSocketConnected";
-import { getErrorAsObject } from "../DboBuilder/dboBuilderUtils";
 export async function pushSocketSchema(this: Prostgles, socket: PRGLIOSocket) {
   try {
     const clientSchema = await this.getClientSchema({ socket });
@@ -37,6 +36,6 @@ export async function pushSocketSchema(this: Prostgles, socket: PRGLIOSocket) {
     });
     socket.emit(CHANNELS.SCHEMA, clientSchema);
   } catch (err: any) {
-    socket.emit(CHANNELS.SCHEMA, { err: getErrorAsObject(err) });
+    socket.emit(CHANNELS.SCHEMA, { err: getSerialisableError(err) });
   }
 }

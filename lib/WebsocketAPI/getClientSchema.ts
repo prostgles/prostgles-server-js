@@ -30,11 +30,7 @@ export async function getClientSchema(this: Prostgles, clientReq: AuthClientRequ
       publishValidationError = e;
       console.error(`\nProstgles Publish validation failed (after socket connected):\n    ->`, e);
     }
-    let rawSQL = false;
-    if (this.opts.publishRawSQL && typeof this.opts.publishRawSQL === "function") {
-      const { allowed } = await clientCanRunSqlRequest.bind(this)(clientInfo);
-      rawSQL = allowed;
-    }
+    const { allowed: rawSQL } = await clientCanRunSqlRequest.bind(this)(clientInfo);
 
     const { schema, tables, tableSchemaErrors } = fullSchema ?? {
       schema: {},

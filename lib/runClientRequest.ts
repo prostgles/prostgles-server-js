@@ -5,7 +5,6 @@ import {
   getKeys,
   pickKeys,
   type AnyObject,
-  type FieldFilter,
 } from "prostgles-types";
 import { AuthClientRequest } from "./Auth/AuthTypes";
 import { LocalParams } from "./DboBuilder/DboBuilder";

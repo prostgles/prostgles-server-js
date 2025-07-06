@@ -1,9 +1,10 @@
-import { Method, getObjectEntries, isObject } from "prostgles-types";
+import { Method, getObjectEntries, isObject, type ClientSchema } from "prostgles-types";
 import { AuthClientRequest, AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import { ProstglesInitOptions } from "../ProstglesTypes";
 import { VoidFunction } from "../SchemaWatch/SchemaWatch";
+import { getClientHandlers } from "../WebsocketAPI/getClientHandlers";
 import { getFileTableRules } from "./getFileTableRules";
 import { getSchemaFromPublish } from "./getSchemaFromPublish";
 import { getTableRulesWithoutFileTable } from "./getTableRulesWithoutFileTable";
@@ -54,6 +55,7 @@ export class PublishParser {
       db: this.db,
       clientReq,
       tables: this.prostgles.dboBuilder.tables,
+      getClientDBHandlers: () => getClientHandlers(this.prostgles, clientReq),
     };
   }
 

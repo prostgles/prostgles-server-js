@@ -137,6 +137,7 @@ export const RULE_TO_METHODS = [
 import { FieldFilter, SelectParams } from "prostgles-types";
 import { AuthClientRequest, SessionUser } from "../Auth/AuthTypes";
 import { TableSchemaColumn } from "../DboBuilder/DboBuilderTypes";
+import type { ClientHandlers, getClientHandlers } from "../WebsocketAPI/getClientHandlers";
 
 export type InsertRequestData = {
   data: object | object[];
@@ -498,6 +499,7 @@ export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
   user?: SUser["user"];
   clientReq: AuthClientRequest;
   tables: DbTableInfo[];
+  getClientDBHandlers: () => Promise<ClientHandlers<S>>;
 };
 export type RequestParams = { dbo?: DBHandlerServer; socket?: any };
 export type PublishAllOrNothing = boolean | "*" | null;

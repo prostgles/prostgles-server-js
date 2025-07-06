@@ -4,7 +4,6 @@ import {
   includes,
   isEmpty,
   isObject,
-  MethodKey,
   pickKeys,
   TableInfo,
   TableSchemaErrors,
