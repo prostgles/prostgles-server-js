@@ -16,21 +16,20 @@ export const getClientHandlers = async <S = void>(
   prostgles: Prostgles,
   clientReq: AuthClientRequest
 ): Promise<{
-  clientDb: Omit<DBOFullyTyped<S>, "tx">;
+  clientDb: DBOFullyTyped<S, false>;
   clientMethods: Record<string, Method>;
 }> => {
   const clientSchema =
     clientReq.socket?.prostgles ?? (await getClientSchema.bind(prostgles)(clientReq));
-  const sql: SQLHandler | undefined = ((query: string, params?: any, options?: SQLOptions) =>
+  const sql: SQLHandler | undefined = ((query: string, params?: unknown, options?: SQLOptions) =>
     runClientSqlRequest.bind(prostgles)({ query, params, options }, clientReq)) as SQLHandler;
   const tableHandlers = Object.fromEntries(
     prostgles.dboBuilder.tablesOrViews!.map((table) => {
       const methods = table.is_view ? viewMethods : [...viewMethods, ...tableMethods];
       const handlers = Object.fromEntries(
         methods.map((command) => {
-          const method = (param1: any, param2: any, param3: any) =>
+          const method = (param1: unknown, param2: unknown, param3: unknown) =>
             runClientRequest.bind(prostgles)(
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               { command, tableName: table.name, param1, param2, param3 },
               clientReq
             );
@@ -43,7 +42,7 @@ export const getClientHandlers = async <S = void>(
   const clientDb = {
     ...tableHandlers,
     sql,
-  } as DBOFullyTyped<S>;
+  } as DBOFullyTyped<S, false>;
 
   const clientMethods: Record<string, Method> = Object.fromEntries(
     clientSchema.methods.map((method) => {

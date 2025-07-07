@@ -120,8 +120,11 @@ export type DBHandlerServerExtra<
 } & Partial<DbJoinMaker> &
   (WithTransactions extends true ? { tx: TX<TH> } : Record<string, never>);
 
-export type DBOFullyTyped<Schema = void> = DBTableHandlersFromSchema<Schema> &
-  DBHandlerServerExtra<DBTableHandlersFromSchema<Schema>>;
+export type DBOFullyTyped<
+  Schema = void,
+  WithTransactions = true,
+> = DBTableHandlersFromSchema<Schema> &
+  DBHandlerServerExtra<DBTableHandlersFromSchema<Schema>, WithTransactions>;
 
 export type PublishFullyTyped<Schema = void> =
   Schema extends DBSchema ?
