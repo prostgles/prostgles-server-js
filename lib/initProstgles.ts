@@ -1,16 +1,17 @@
 import * as pgPromise from "pg-promise";
 import pg from "pg-promise/typescript/pg-subset";
 import { getKeys, isEmpty, isEqual } from "prostgles-types";
+import type { AuthClientRequest, SessionUser } from "./Auth/AuthTypes";
+import { removeExpressRoutesTest } from "./Auth/utils/removeExpressRoute";
 import { DBEventsManager } from "./DBEventsManager";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { DBHandlerServer, Prostgles, getIsSuperUser } from "./Prostgles";
 import { ProstglesInitOptions } from "./ProstglesTypes";
 import { DbTableInfo, PublishParser } from "./PublishParser/PublishParser";
 import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
-import { sleep } from "./utils";
 import { runSQLFile } from "./TableConfig/runSQLFile";
-import { removeExpressRoutesTest } from "./Auth/utils/removeExpressRoute";
-import type { SessionUser } from "./Auth/AuthTypes";
+import { sleep } from "./utils";
+import { getClientHandlers } from "./WebsocketAPI/getClientHandlers";
 
 /**
  * Database connection details
@@ -71,6 +72,7 @@ export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
   update: (newOpts: UpdateableOptions<S, SUser>) => Promise<void>;
   restart: () => Promise<InitResult<S, SUser>>;
   options: ProstglesInitOptions<S, SUser>;
+  getClientDBHandlers: (clientReq: AuthClientRequest) => ReturnType<typeof getClientHandlers<S>>;
 };
 
 const clientOnlyUpdateKeys = ["auth"] as const satisfies (keyof UpdateableOptions)[];
@@ -268,6 +270,7 @@ export const initProstgles = async function (
         await sleep(1000);
         return true;
       },
+      getClientDBHandlers: (clientReq: AuthClientRequest) => getClientHandlers(this, clientReq),
     };
 
     return initResult;
