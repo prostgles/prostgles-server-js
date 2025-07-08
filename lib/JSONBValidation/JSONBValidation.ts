@@ -142,8 +142,8 @@ const getPropertyValidationError = (
     if (missingKey !== undefined) {
       return `${err} to have key ${missingKey}`;
     }
-    const extraKeys = valueKeys.filter((key) => !keysEnum?.includes(key));
-    if (extraKeys.length) {
+    const extraKeys = keysEnum && valueKeys.filter((key) => !keysEnum.includes(key));
+    if (extraKeys?.length) {
       return `${err} has extra keys: ${extraKeys}`;
     }
     if (valuesSchema) {
