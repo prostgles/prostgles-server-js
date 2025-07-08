@@ -39,8 +39,15 @@ export const getClientHandlers = async <S = void>(
       return [table.name, handlers];
     })
   );
+
+  const txNotAllowed: {} = {
+    tx: () => {
+      throw new Error("Transactions are not allowed in client handlers");
+    },
+  };
   const clientDb = {
     ...tableHandlers,
+    ...txNotAllowed,
     sql,
   } as DBOFullyTyped<S, false>;
 

@@ -28,9 +28,52 @@ export const getJSONBTSTypes = (
 ): string => {
   const fieldType = getFieldTypeObj(rawFieldType);
   const nullType = fieldType.nullable ? `null | ` : "";
+  if (fieldType.lookup) {
+    const l = fieldType.lookup;
+    if (l.type === "data-def") {
+      return `${fieldType.nullable ? `null |` : ""} ${getJSONBTSTypes(tables, {
+        type: {
+          table: "string",
+          column: "string",
+          filter: { record: {}, optional: true },
+          isArray: { type: "boolean", optional: true },
+          searchColumns: { type: "string[]", optional: true },
+          isFullRow: {
+            optional: true,
+            type: {
+              displayColumns: { type: "string[]", optional: true },
+            },
+          },
+          showInRowCard: { optional: true, record: {} },
+        },
+      })}`;
+    }
 
-  /** Primitives */
-  if (typeof fieldType.type === "string") {
+    const isSChema = l.type === "schema";
+    let type =
+      isSChema ?
+        l.object === "table" ?
+          "string"
+        : `{ "table": string; "column": string; }`
+      : "";
+    if (!isSChema) {
+      const cols = tables.find((t) => t.name === l.table)?.columns;
+      if (!l.isFullRow) {
+        type = postgresToTsType(cols?.find((c) => c.name === l.column)?.udt_name ?? "text");
+      } else {
+        type =
+          !cols ? "any" : (
+            `{ ${cols.map((c) => `${JSON.stringify(c.name)}: ${c.is_nullable ? "null | " : ""} ${postgresToTsType(c.udt_name)}; `).join(" ")} }`
+          );
+      }
+    }
+    return `${fieldType.nullable ? `null | ` : ""}${type}${l.isArray ? "[]" : ""}`;
+  } else if (typeof fieldType.type === "string") {
+    if (fieldType.type.toLowerCase().includes("lookup")) {
+      throw new Error(`getJSONBTSTypes: Lookup type not handled correctly`);
+    }
+
+    /** Primitives */
     const correctType = fieldType.type
       .replace("integer", "number")
       .replace("time", "string")
@@ -87,46 +130,6 @@ export const getJSONBTSTypes = (
     // TODO: ensure props with undefined values are not allowed in the TS type (strict union)
     const getRecord = (v: string) => (partial ? `Partial<Record<${v}>>` : `Record<${v}>`);
     return `${fieldType.nullable ? `null |` : ""} ${getRecord(`${keysEnum?.map((v) => asValue(v)).join(" | ") ?? "string"}, ${!values ? "any" : getJSONBTSTypes(tables, values, true, undefined, depth + 1)}`)}`;
-  } else if (fieldType.lookup) {
-    const l = fieldType.lookup;
-    if (l.type === "data-def") {
-      return `${fieldType.nullable ? `null |` : ""} ${getJSONBTSTypes(tables, {
-        type: {
-          table: "string",
-          column: "string",
-          filter: { record: {}, optional: true },
-          isArray: { type: "boolean", optional: true },
-          searchColumns: { type: "string[]", optional: true },
-          isFullRow: {
-            optional: true,
-            type: {
-              displayColumns: { type: "string[]", optional: true },
-            },
-          },
-          showInRowCard: { optional: true, record: {} },
-        },
-      })}`;
-    }
-
-    const isSChema = l.type === "schema";
-    let type =
-      isSChema ?
-        l.object === "table" ?
-          "string"
-        : `{ "table": string; "column": string; }`
-      : "";
-    if (!isSChema) {
-      const cols = tables.find((t) => t.name === l.table)?.columns;
-      if (!l.isFullRow) {
-        type = postgresToTsType(cols?.find((c) => c.name === l.column)?.udt_name ?? "text");
-      } else {
-        type =
-          !cols ? "any" : (
-            `{ ${cols.map((c) => `${JSON.stringify(c.name)}: ${c.is_nullable ? "null | " : ""} ${postgresToTsType(c.udt_name)}; `).join(" ")} }`
-          );
-      }
-    }
-    return `${fieldType.nullable ? `null | ` : ""}${type}${l.isArray ? "[]" : ""}`;
   } else throw "Unexpected getSchemaTSTypes: " + JSON.stringify({ fieldType }, null, 2);
 };
 
