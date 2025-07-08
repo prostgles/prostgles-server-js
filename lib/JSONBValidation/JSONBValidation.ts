@@ -110,6 +110,7 @@ const getPropertyValidationError = (
     if (error !== undefined) {
       return `${err}. Error at index ${path.length > 0 ? path.join(".") + "." : ""}\n\n${error}`;
     }
+    return;
   }
 
   const oneOf = fieldType.oneOf ?? fieldType.oneOfType?.map((type) => ({ type }));
