@@ -1,4 +1,4 @@
-import { getKeys, getObjectEntries, isEmpty, isObject, JSONB } from "prostgles-types";
+import { getKeys, getObjectEntries, isDefined, isEmpty, isObject, JSONB } from "prostgles-types";
 
 export const getFieldTypeObj = (rawFieldType: JSONB.FieldType): JSONB.FieldTypeObj => {
   if (typeof rawFieldType === "string") return { type: rawFieldType };
@@ -94,6 +94,22 @@ const getPropertyValidationError = (
 
     if (!fieldType.enum.includes(value)) return err;
     return;
+  }
+
+  const arrayOf =
+    fieldType.arrayOf ?? (fieldType.arrayOfType ? { type: fieldType.arrayOfType } : undefined);
+  if (arrayOf) {
+    if (!Array.isArray(value)) {
+      return err + " to be an array";
+    }
+    const error = value
+      .map((element, i) => {
+        return getPropertyValidationError(element, arrayOf, [...path, `${i}`]);
+      })
+      .filter(isDefined)[0];
+    if (error !== undefined) {
+      return `${err}. Error at index ${path.length > 0 ? path.join(".") + "." : ""}\n\n${error}`;
+    }
   }
 
   const oneOf = fieldType.oneOf ?? fieldType.oneOfType?.map((type) => ({ type }));
