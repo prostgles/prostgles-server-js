@@ -13,6 +13,7 @@ import {
   DboTableCommand,
   ParsedTableRule,
   PublishMethods,
+  type PublishMethodsV2,
   type PublishObject,
   PublishParams,
   RULE_TO_METHODS,
@@ -21,7 +22,10 @@ import {
 
 export class PublishParser {
   publish: ProstglesInitOptions["publish"];
-  publishMethods?: PublishMethods<void, SessionUser> | undefined;
+  publishMethods:
+    | PublishMethods<void, SessionUser>
+    | PublishMethodsV2<void, SessionUser>
+    | undefined;
   publishRawSQL?: any;
   dbo: DBHandlerServer;
   db: DB;
@@ -59,6 +63,13 @@ export class PublishParser {
     };
   }
 
+  get publishMethodsV2() {
+    const { publishMethods } = this;
+    if (typeof publishMethods !== "function" && isObject(publishMethods)) {
+      return publishMethods;
+    }
+  }
+
   async getAllowedMethods(
     clientReq: AuthClientRequest,
     userData: AuthResultWithSID | undefined
@@ -66,23 +77,31 @@ export class PublishParser {
     const methods: { [key: string]: Method } = {};
 
     const publishParams = await this.getPublishParams(clientReq, userData);
-    const _methods = await applyParamsIfFunc(this.publishMethods, publishParams);
-
-    if (_methods && Object.keys(_methods).length) {
-      getObjectEntries(_methods).map(([key, method]) => {
-        const isFuncLike = (maybeFunc: VoidFunction | Promise<void> | Promise<any>) =>
-          typeof maybeFunc === "function" || typeof maybeFunc.then === "function";
-        if (
-          isFuncLike(method as Extract<Method, Promise<any>>) ||
-          // @ts-ignore
-          (isObject(method) && isFuncLike(method.run))
-        ) {
-          methods[key] = _methods[key]!;
-        } else {
-          throw `invalid publishMethods item -> ${key} \n Expecting a function or promise`;
+    const v2Methods = this.publishMethodsV2;
+    if (v2Methods) {
+      for (const [name, method] of Object.entries(v2Methods)) {
+        if (await method.isAllowed(publishParams)) {
+          methods[name] = method;
         }
-      });
+      }
+      return methods;
     }
+
+    const _methods = await applyParamsIfFunc(this.publishMethods, publishParams);
+    if (!_methods) return methods;
+    getObjectEntries(_methods).map(([key, method]) => {
+      const isFuncLike = (maybeFunc: VoidFunction | Promise<void> | Promise<any>) =>
+        typeof maybeFunc === "function" || typeof maybeFunc.then === "function";
+      if (
+        isFuncLike(method as Extract<Method, Promise<any>>) ||
+        // @ts-ignore
+        (isObject(method) && isFuncLike(method.run))
+      ) {
+        methods[key] = _methods[key]!;
+      } else {
+        throw `invalid publishMethods item -> ${key} \n Expecting a function or promise`;
+      }
+    });
 
     return methods;
   }

@@ -41,7 +41,7 @@ export default tseslint.config(
       "no-empty": "off",
       "security/detect-object-injection": "off",
       "@typescript-eslint/only-throw-error": "off",
-      "@typescript-eslint/restrict-template-expressions": "warn",
+      "@typescript-eslint/restrict-template-expressions": ["warn", { allowArray: true }],
       "@typescript-eslint/no-misused-promises": ["warn", { checksVoidReturn: false }],
       "@typescript-eslint/no-unsafe-assignment": "warn",
       "@typescript-eslint/no-unsafe-argument": "warn",

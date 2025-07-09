@@ -7,9 +7,11 @@ import {
   PG_COLUMN_UDT_DATA_TYPE,
   SQLOptions,
   getJoinHandlers,
+  getObjectEntries,
   getSerialisableError,
   isDefined,
   tryCatchV2,
+  type JSONB,
 } from "prostgles-types";
 import { getDBSchema } from "../DBSchemaBuilder";
 import { DB, Prostgles } from "../Prostgles";
@@ -40,6 +42,7 @@ import {
 import { getTablesForSchemaPostgresSQL } from "./getTablesForSchemaPostgresSQL";
 import { prepareShortestJoinPaths } from "./prepareShortestJoinPaths";
 import { cacheDBTypes, runSQL } from "./runSQL";
+import { getJSONBTSTypes } from "../JSONBValidation/getJSONBSchemaTSTypes";
 
 export * from "./DboBuilderTypes";
 export * from "./dboBuilderUtils";
@@ -292,9 +295,30 @@ export class DboBuilder {
       console.warn(`Could not create dbo.sql handler because there is already a table named "sql"`);
     }
 
+    let functionTypes = "";
+    const v2Methods = this.prostgles.publishParser?.publishMethodsV2;
+    if (v2Methods) {
+      const methodDefinitions = getObjectEntries(v2Methods).map(([name, method]) => {
+        const argumentTypes = getJSONBTSTypes(this.tablesOrViews ?? [], {
+          type: method.input as JSONB.ObjectType["type"],
+        });
+        const returnType =
+          !method.output ? "unknown" : (
+            getJSONBTSTypes(this.tablesOrViews ?? [], {
+              type: method.output as JSONB.ObjectType["type"],
+            })
+          );
+        return `  ${name}: (args: ${argumentTypes}) => Promise<${returnType}>`;
+      });
+      if (methodDefinitions.length) {
+        functionTypes = ["\n", `export type DBMethods = { `, ...methodDefinitions, `}`].join("\n");
+      }
+    }
+
     this.tsTypesDefinition = [
       `/* Schema definition generated prostgles-server */`,
       getDBSchema(this),
+      functionTypes,
     ].join("\n");
 
     return this.dbo;

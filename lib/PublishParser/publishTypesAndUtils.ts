@@ -1,4 +1,12 @@
-import { AnyObject, DBSchema, FullFilter, Method, RULE_METHODS, TableInfo } from "prostgles-types";
+import {
+  AnyObject,
+  DBSchema,
+  FullFilter,
+  Method,
+  RULE_METHODS,
+  TableInfo,
+  type MethodFullDef,
+} from "prostgles-types";
 import type { DBOFullyTyped, PublishFullyTyped } from "../DBSchemaBuilder";
 import { CommonTableRules, Filter, LocalParams, TableOrViewInfo } from "../DboBuilder/DboBuilder";
 import { DB, DBHandlerServer } from "../Prostgles";
@@ -6,6 +14,12 @@ import { DB, DBHandlerServer } from "../Prostgles";
 export type PublishMethods<S = void, SUser extends SessionUser = SessionUser> = (
   params: PublishParams<S, SUser>
 ) => { [key: string]: Method } | Promise<{ [key: string]: Method } | null>;
+
+export type PublishMethodsV2<S = void, SUser extends SessionUser = SessionUser> = {
+  [key: string]: MethodFullDef & {
+    isAllowed: (params: PublishParams<S, SUser>) => boolean | Promise<boolean>;
+  };
+};
 
 export type Awaitable<T> = T | Promise<T>;
 
@@ -137,7 +151,7 @@ export const RULE_TO_METHODS = [
 import { FieldFilter, SelectParams } from "prostgles-types";
 import { AuthClientRequest, SessionUser } from "../Auth/AuthTypes";
 import { TableSchemaColumn } from "../DboBuilder/DboBuilderTypes";
-import type { ClientHandlers, getClientHandlers } from "../WebsocketAPI/getClientHandlers";
+import type { ClientHandlers } from "../WebsocketAPI/getClientHandlers";
 
 export type InsertRequestData = {
   data: object | object[];
