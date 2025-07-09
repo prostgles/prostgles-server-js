@@ -311,10 +311,17 @@ export class DboBuilder {
               type: method.output as JSONB.ObjectType["type"],
             })
           );
-        return `  ${JSON.stringify(name)}: (args: ${removeSemicolon(argumentTypes)}) => Promise<${removeSemicolon(returnType)}>`;
+        return `  ${JSON.stringify(name)}: (args: ${removeSemicolon(argumentTypes)}, ctx: MethodContext<DBHandler, DB, User>) => Promise<${removeSemicolon(returnType)}>`;
       });
       if (methodDefinitions.length) {
-        functionTypes = ["\n", `export type DBMethods = { `, ...methodDefinitions, `}`].join("\n");
+        const ctxTypes = `type MethodContext<DBHandler, DB, User> = { db: DB; dbo: DBHandler<DBGeneratedSchema>; user: User };`;
+        functionTypes = [
+          ctxTypes,
+          "\n",
+          `export type DBMethods<DBHandler, DB = any, User = { id: string; type: string }> = { `,
+          ...methodDefinitions,
+          `}`,
+        ].join("\n");
       }
     }
 

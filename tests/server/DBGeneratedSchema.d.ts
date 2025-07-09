@@ -553,9 +553,10 @@ export type DBGeneratedSchema = {
   
 }
 
+type MethodContext<DBHandler, DB, User> = { db: DB; dbo: DBHandler<DBGeneratedSchema>; user: User };
 
 
-export type DBMethods = { 
-  "myfunc": (args: {    arg1: number;  }) => Promise<void>
-  "myfuncWithReturn": (args: {    arg1: number;  }) => Promise<{    out: number;  }>
+export type DBMethods<DBHandler, DB = any, User = { id: string; type: string }> = { 
+  "myfunc": (args: {    arg1: number;  }, ctx: MethodContext<DBHandler, DB, User>) => Promise<void>
+  "myfuncWithReturn": (args: {    arg1: number;  }, ctx: MethodContext<DBHandler, DB, User>) => Promise<{    out: number;  }>
 }
