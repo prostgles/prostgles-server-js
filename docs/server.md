@@ -143,7 +143,7 @@ prostgles<DBGeneratedSchema>({
 
   If defined and resolves to true then the connected client can run SQL queries
 
-- **publishMethods** <span style="color: grey">optional</span> <span style="color: green;">PublishMethods</span>
+- **publishMethods** <span style="color: grey">optional</span> <span style="color: green;">PublishMethods&lt;S, SUser&gt; | PublishMethodsV2&lt;S, SUser&gt; | undefined</span>
 
   Server-side functions that can be invoked by the client
 

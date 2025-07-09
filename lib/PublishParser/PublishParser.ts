@@ -65,9 +65,7 @@ export class PublishParser {
 
   get publishMethodsV2() {
     const { publishMethods } = this;
-    if (typeof publishMethods !== "function" && isObject(publishMethods)) {
-      return publishMethods;
-    }
+    return getV2Methods(publishMethods);
   }
 
   async getAllowedMethods(
@@ -240,3 +238,9 @@ function applyParamsIfFunc<T>(
   //@ts-ignore
   return maybeFunc;
 }
+
+export const getV2Methods = (publishMethods: ProstglesInitOptions["publishMethods"]) => {
+  if (typeof publishMethods !== "function" && isObject(publishMethods)) {
+    return publishMethods;
+  }
+};

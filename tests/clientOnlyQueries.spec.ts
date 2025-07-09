@@ -382,8 +382,8 @@ export const clientOnlyQueries = async (
       return new Promise(async (resolveTest, rejectTest) => {
         try {
           /* DB_HANDLER */
-          const t222 = await methods.get();
-          assert.equal(t222, 222, "methods.get() failed");
+          const t222 = await methods.myfunc.run();
+          assert.equal(t222, 222, "methods.myfunc() failed");
 
           /* RAWSQL */
           await tryRun("SQL Full result", async () => {

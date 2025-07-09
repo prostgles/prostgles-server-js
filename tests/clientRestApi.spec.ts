@@ -22,7 +22,7 @@ export const clientRestApi = async (
       rest({ tableName, command, noAuth: true }, ...(params ?? []));
     const sqlRest = (query: string, ...params: any[]) =>
       post({ path: `db/sql`, token }, query, ...(params ?? []));
-    const sqlMethods = (methodName: string, ...params: any[]) =>
+    const dbMethod = (methodName: string, ...params: any[]) =>
       post({ path: `methods/${methodName}`, token }, ...(params ?? []));
 
     await test("Rest api test", async () => {
@@ -71,7 +71,7 @@ export const clientRestApi = async (
         })
       );
 
-      const two22 = await sqlMethods("get", {});
+      const two22 = await dbMethod("myfunc", {});
       assert.equal(two22, 222);
     });
   });

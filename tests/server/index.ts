@@ -219,10 +219,18 @@ function dd() {
         },
       },
     },
-    publishMethods: async (params) => {
-      return {
-        get: () => 222,
-      };
+    publishMethods: {
+      myfunc: {
+        input: { arg1: { type: "number" } },
+        run: () => 222,
+        isAllowed: () => true,
+      },
+      myfuncWithReturn: {
+        input: { arg1: { type: "number" } },
+        output: { out: { type: "number" } },
+        run: () => 222,
+        isAllowed: () => true,
+      },
     },
     publish: testPublish,
     publishRawSQL: async (params) => {
