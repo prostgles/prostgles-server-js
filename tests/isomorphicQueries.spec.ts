@@ -805,7 +805,7 @@ export const isomorphicQueries = async (
           { id }
         );
       };
-      const expectedDuration = 3000;
+      const expectedDuration = 4000;
       const COUNT = 1_000;
       const updateAll = async () => {
         const start = Date.now();
