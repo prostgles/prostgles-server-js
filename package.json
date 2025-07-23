@@ -1,6 +1,6 @@
 {
   "name": "prostgles-server",
-  "version": "4.2.317",
+  "version": "4.2.318",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -68,11 +68,11 @@
     "@types/pg": "^8.15.1",
     "@types/pg-cursor": "^2.7.2",
     "@types/sharp": "^0.30.4",
-    "eslint": "^9.22.0",
+    "eslint": "^9.31.0",
     "eslint-plugin-security": "^3.0.1",
     "prettier": "^3.4.2",
     "socket.io": "^4.8.1",
     "typescript": "^5.3.3",
-    "typescript-eslint": "^8.26.1"
+    "typescript-eslint": "^8.38.0"
   }
 }

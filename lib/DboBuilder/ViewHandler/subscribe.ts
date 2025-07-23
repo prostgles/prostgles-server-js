@@ -146,7 +146,7 @@ async function subscribe(
 
       const unsubscribe = async () => {
         const pubSubManager = await this.dboBuilder.getPubSubManager();
-        pubSubManager.removeLocalSub(channelName, localFuncs);
+        pubSubManager.removeSubscription(channelName, { type: "local", localFuncs });
       };
       await this._log({
         command: "subscribe",

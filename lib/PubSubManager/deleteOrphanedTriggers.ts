@@ -1,32 +1,33 @@
 import { PubSubManager } from "./PubSubManager";
-import { EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "./PubSubManagerUtils";
+import { asValue, EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID, log } from "./PubSubManagerUtils";
 
-export function deleteOrphanedTriggers(this: PubSubManager, tableName: string) {
-  const activeConditions = (this.getTriggerInfo(tableName) ?? []).filter(
-    (c) => c.subs.length || c.syncs.length
-  );
+export function deleteOrphanedTriggers(this: PubSubManager, tableNames: string[]) {
+  const conditions = tableNames.map((tableName) => {
+    const activeTriggers = this.getActiveTriggers(tableName);
+    const activeConditionHashes = activeTriggers.map((c) => c.hash);
+    return `(at.table_name = ${asValue(tableName)} ${activeConditionHashes.length ? `AND at.condition_hash NOT IN (${asValue(activeConditionHashes, ":csv")})` : ""})`;
+  });
 
-  const activeConditionHashes = activeConditions.map((c) => c.hash);
-  this.db
+  // log("deleteOrphanedTriggers", { appId: this.appId, conditions });
+  return this.db
     .any(
       `
         /* Delete removed subscriptions */
         /* ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
         DELETE FROM prostgles.app_triggers at
-        WHERE EXISTS (
-          SELECT 1
-          FROM prostgles.v_triggers t
-          WHERE t.table_name = $1  
-          ${activeConditionHashes.length ? "AND t.condition_hash NOT IN ($2:csv)" : ""}
-          AND t.app_id = $3
-          AND at.app_id = t.app_id
-          AND at.table_name = t.table_name
-          AND at.condition = t.condition
-        ) 
+        WHERE at.app_id = \${appId}
+        AND ( ${conditions.join(" OR ")} )
+        --RETURNING *
         `,
-      [tableName, activeConditionHashes, this.appId]
+      { appId: this.appId }
     )
-    .then(() => {
+    .then(async (_rows) => {
+      // log("Orphaned triggers deleted", _rows.length);
+      // const wtf = await this.db.any(
+      //   `SELECT * FROM prostgles.app_triggers WHERE app_id = \${appId}`,
+      //   { appId: this.appId }
+      // );
+      // log("Current app_triggers", wtf);
       return this.refreshTriggers();
     })
     .catch((e) => {

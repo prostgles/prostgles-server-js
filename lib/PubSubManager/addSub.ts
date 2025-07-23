@@ -121,10 +121,7 @@ export async function addSub(
     socket.once(result.channelNameReady, sendFirstData);
     socket.once(result.channelNameUnsubscribe, (_data: any, cb: BasicCallback) => {
       const res = "ok";
-      this.subs = this.subs.filter((s) => {
-        const isMatch = s.socket?.id === socket.id && s.channel_name === channel_name;
-        return !isMatch;
-      });
+      this.removeSubscription(channel_name, { type: "ws", socket });
       void this._log({
         type: "syncOrSub",
         command: "unsubscribe",

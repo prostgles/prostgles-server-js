@@ -1,19 +1,37 @@
 import { strict as assert } from "assert";
 import * as fs from "fs";
-import { DBOFullyTyped } from "../dist/DBSchemaBuilder";
-import type { DBHandlerClient } from "./client";
 import {
-  test,
   //@ts-ignore
   describe,
+  test,
 } from "node:test";
 import { SubscriptionHandler, pickKeys } from "prostgles-types";
+import { DBOFullyTyped } from "../dist/DBSchemaBuilder";
+import type { DBHandlerClient } from "./client";
 
 export const isomorphicQueries = async (
   db: DBOFullyTyped | DBHandlerClient,
   log: (msg: string, extra?: any) => void
 ) => {
   log("Starting isomorphic queries");
+
+  const expectNoTriggers = async () => {
+    await tout(2500); // this should be higher than the 1k timeout in deleteOrphanedTriggers
+    const currentTriggers = await db.sql!(
+      `
+        SELECT table_name, condition, c_id, inserted, id, condition_hash, app_id 
+        FROM prostgles.v_triggers
+      `,
+      {},
+      { returnType: "rows" }
+    );
+    assert.equal(
+      currentTriggers.length,
+      0,
+      `No triggers should be active but found ${JSON.stringify(currentTriggers)}`
+    );
+  };
+
   const isServer = !!(db.items as any).dboBuilder;
   await describe("Isomorphic queries", async () => {
     await test("Deleting stale data", async () => {
@@ -602,52 +620,54 @@ export const isomorphicQueries = async (
       assert.equal(validTriggers.length, 3, "3 Triggers should exist but be disabled");
       assert.equal(validTriggers.filter((t) => t.enabled).length, 0);
     };
+
+    const variousId99 = { id: 99 };
     await test("subscribe skipChangedColumnsCheck false by default = sub should not fire if selected data did not change", async () => {
-      const filter = { id: 99 };
-      await db.various.delete!(filter);
-      await db.various.insert!(filter);
+      await db.various.delete!(variousId99);
+      await db.various.insert!(variousId99);
       let runs = 0;
-      const sub = await db.various.subscribe!(filter, { select: { name: 1 } }, async (d) => {
+      const sub = await db.various.subscribe!(variousId99, { select: { name: 1 } }, async (d) => {
         log(JSON.stringify(d));
         runs++;
       });
-      await db.various.update!(filter, { name: "zz3zz1" });
+      await db.various.update!(variousId99, { name: "zz3zz1" });
       await tout(200);
       assert.equal(runs, 2);
-      await db.various.update!(filter, { name: "zz3zz1" });
+      await db.various.update!(variousId99, { name: "zz3zz1" });
       await tout(200);
       assert.equal(runs, 2); // No change
-      await db.various.update!(filter, { tsv: "hehe" });
+      await db.various.update!(variousId99, { tsv: "hehe" });
       await tout(200);
       assert.equal(runs, 2); // Still no change to the selected data
-      await db.various.delete!(filter);
+      await db.various.delete!(variousId99);
       await tout(200);
       assert.equal(runs, 3);
       await sub.unsubscribe();
     });
+
     await test("subscribe skipChangedColumnsCheck true", async () => {
-      const filter = { id: 99 };
-      await db.various.delete!(filter);
-      await db.various.insert!(filter);
+      await db.various.delete!(variousId99);
+      await db.various.insert!(variousId99);
+      await expectNoTriggers();
       let runs = 0;
       const sub = await db.various.subscribe!(
-        filter,
+        variousId99,
         { select: { name: 1 }, skipChangedColumnsCheck: true },
         async (d) => {
           log(JSON.stringify(d));
           runs++;
         }
       );
-      await db.various.update!(filter, { name: "zz3zz1" });
+      await db.various.update!(variousId99, { name: "zz3zz1" });
       await tout(200);
       assert.equal(runs, 2);
-      await db.various.update!(filter, { name: "zz3zz1" });
+      await db.various.update!(variousId99, { name: "zz3zz1" });
       await tout(200);
       assert.equal(runs, 3);
-      await db.various.update!(filter, { tsv: "hehe" });
+      await db.various.update!(variousId99, { tsv: "hehe" });
       await tout(200);
       assert.equal(runs, 4);
-      await db.various.delete!(filter);
+      await db.various.delete!(variousId99);
       await tout(200);
       assert.equal(runs, 5);
       await sub.unsubscribe();
@@ -657,17 +677,17 @@ export const isomorphicQueries = async (
       await tryRunP(
         "subscribe",
         async (resolve, reject) => {
-          await db.various.insert!({ id: 99 });
-          const sub = await db.various.subscribe!({ id: 99 }, {}, async ([item]) => {
+          await db.various.insert!(variousId99);
+          const sub = await db.various.subscribe!(variousId99, {}, async ([item]) => {
             if (item?.name === "zz3zz3") {
               await db.various.delete!({ name: "zz3zz3" });
               await testToEnsureTriggersAreDisabled(sub, "various");
               resolve(true);
             }
           });
-          await db.various.update!({ id: 99 }, { name: "zz3zz1" });
-          await db.various.update!({ id: 99 }, { name: "zz3zz2" });
-          await db.various.update!({ id: 99 }, { name: "zz3zz3" });
+          await db.various.update!(variousId99, { name: "zz3zz1" });
+          await db.various.update!(variousId99, { name: "zz3zz2" });
+          await db.various.update!(variousId99, { name: "zz3zz3" });
         },
         { timeout: 4000 }
       );
@@ -705,7 +725,7 @@ export const isomorphicQueries = async (
         let callbacksFired = {};
         const subscriptions = await Promise.all(
           [1, 2, 3, 4, 5].map(async (subId) => {
-            const handler = await db.various.subscribe!({ id: 99 }, {}, async (items) => {
+            const handler = await db.various.subscribe!(variousId99, {}, async (items) => {
               callbacksFired[subId] = true;
             });
 
@@ -724,15 +744,128 @@ export const isomorphicQueries = async (
       });
     });
 
+    /**
+     * LISTEN/NOTIFY does this:
+     *   "AccessExclusiveLock on object 0 of class 1262 of database 0" lock is acquired
+     *   during COMMIT queries when a transaction has previously issued a NOTIFY
+     *
+     * Source code comment:
+     *    Serialize writers by acquiring a special lock that we hold till
+     *    after commit.  This ensures that queue entries appear in commit
+     *    order, and in particular that there are never uncommitted queue
+     *    entries ahead of committed ones, so an uncommitted transaction
+     *    can't block delivery of deliverable notifications.
+     *
+     *    We use a heavyweight lock so that it'll automatically be released
+     *    after either commit or abort.  This also allows deadlocks to be
+     *    detected, though really a deadlock shouldn't be possible here.
+     */
+    await test("subscriptions do not serialize transactions", async () => {
+      await db.sql!(`SET log_lock_waits = on;`);
+      await db.sql!(`SET lock_timeout = '10ms';`);
+
+      await expectNoTriggers();
+      const checkLocks = async () => {
+        const locks = await db.sql!(
+          `
+          WITH locks AS (
+            SELECT pid, pg_blocking_pids(pid) as blocking_pids, wait_event, wait_event_type, query, 
+            (
+              SELECT query FROM pg_stat_activity pa
+              WHERE pa.pid = ANY(pg_blocking_pids(l.pid))
+              LIMIT 1
+            ) as blocking_query
+            FROM pg_stat_activity l
+            WHERE cardinality(pg_blocking_pids(pid)) > 0
+          )
+          SELECT *
+          FROM locks l 
+        `,
+          {},
+          { returnType: "rows" }
+        );
+        if (locks.length) {
+          log("Locks: " + JSON.stringify(locks));
+        }
+        return locks;
+      };
+      const updateInTx = async (id: number) => {
+        await db.various.insert!({ id, name: `slowtx${id}` }, { returning: "*" });
+        checkLocks();
+        await db.sql!(
+          `
+          BEGIN;
+            UPDATE various
+            SET name = 'slowtx${id}'
+            WHERE id = \${id};
+          SELECT pg_sleep(0.01);
+          COMMIT;
+
+        `,
+          { id }
+        );
+      };
+      const expectedDuration = 3000;
+      const COUNT = 1_000;
+      const updateAll = async () => {
+        const start = Date.now();
+        await Promise.all(Array.from({ length: COUNT }, (_, i) => i + 1000).map(updateInTx));
+        const duration = Date.now() - start;
+        log("updateAll done in " + duration);
+        await db.various.delete!({ id: { ">": 100 } });
+        return duration;
+      };
+      const duration1 = await updateAll();
+      const duration11 = await updateAll();
+      assert.equal(
+        duration1 < expectedDuration,
+        true,
+        `Update should take less than ${expectedDuration} seconds but took ${duration1}`
+      );
+      const callOffsets: number[] = [];
+      const start = Date.now();
+      const sub = await db.various.subscribe!({ id: { ">": -1 } }, {}, async (_items) => {
+        callOffsets.push(Date.now() - start);
+      });
+      const duration2 = await updateAll();
+      await tout(2000);
+      assert.equal(
+        duration2 < expectedDuration,
+        true,
+        `Update should take less than ${expectedDuration} seconds but took ${duration2}`
+      );
+      assert.equal(callOffsets.length, 2 + COUNT * 2);
+      //TODO: throttle notify to reduce this
+      const allowedPercentage = 1;
+      assert.equal(
+        duration2 < duration1 + duration1 * allowedPercentage,
+        true,
+        `duration2 should be within ${allowedPercentage * 100}% of duration1 but got ` +
+          duration2 +
+          " vs " +
+          duration1 +
+          " duration11: " +
+          duration11
+      );
+      // const offetsHigherThanExpected = callOffsets.filter((offset) => offset > expectedDuration);
+      // assert.equal(
+      //   offetsHigherThanExpected.length,
+      //   0,
+      //   `Offsets should not be higher than ${expectedDuration}ms but found: ${offetsHigherThanExpected}`
+      // );
+      await sub.unsubscribe();
+      await db.sql!(`SET log_lock_waits = default;`);
+    });
+
     await test("subscribeOne with throttle", async () => {
       await tryRunP(
         "subscribeOne with throttle",
         async (resolve, reject) => {
-          await db.various.insert!({ id: 99 });
+          await db.various.insert!(variousId99);
           const start = Date.now();
           const pushed: number[] = [];
           const sub = await db.various.subscribeOne!(
-            { id: 99 },
+            variousId99,
             { throttle: 1700 },
             async (item) => {
               const now = Date.now();
@@ -748,8 +881,8 @@ export const isomorphicQueries = async (
               }
             }
           );
-          await db.various.update!({ id: 99 }, { name: "zz3zz1" });
-          await db.various.update!({ id: 99 }, { name: "zz3zz2" });
+          await db.various.update!(variousId99, { name: "zz3zz1" });
+          await db.various.update!(variousId99, { name: "zz3zz2" });
         },
         { timeout: 4000 }
       );
@@ -759,11 +892,10 @@ export const isomorphicQueries = async (
       await tryRunP(
         "subscribeOne with throttle skipFirst: true",
         async (resolve, reject) => {
-          const filter = { id: 99 };
           const start = Date.now();
           const pushed: number[] = [];
           const sub = await db.various.subscribeOne!(
-            filter,
+            variousId99,
             { throttle: 1700, throttleOpts: { skipFirst: true } },
             async (item) => {
               const now = Date.now();
@@ -778,7 +910,7 @@ export const isomorphicQueries = async (
               }
             }
           );
-          await db.various.insert!(filter);
+          await db.various.insert!(variousId99);
         },
         { timeout: 4000 }
       );
@@ -1911,14 +2043,15 @@ export function tryRunP(
   func: (resolve: any, reject: any) => any,
   opts?: { log?: Function; timeout?: number }
 ) {
+  const timeoutMs = opts?.timeout || 7000;
   return new Promise(async (rv, rj) => {
     const testTimeout =
-      Number.isFinite(opts?.timeout) ?
+      Number.isFinite(timeoutMs) ?
         setTimeout(() => {
-          const errMsg = `${desc} failed. Reason: Timout reached: ${opts!.timeout}ms`;
+          const errMsg = `${desc} failed. Reason: Timout reached: ${timeoutMs}ms`;
           opts?.log?.(errMsg);
           rj(errMsg);
-        }, opts!.timeout)
+        }, timeoutMs)
       : undefined;
     try {
       await func(rv, rj);

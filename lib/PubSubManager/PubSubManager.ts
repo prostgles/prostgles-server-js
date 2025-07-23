@@ -239,13 +239,25 @@ export class PubSubManager {
     return subs;
   }
 
-  removeLocalSub(channelName: string, localFuncs: LocalFuncs) {
+  removeSubscription = (
+    channelName: string,
+    subInfo: { type: "local"; localFuncs: LocalFuncs } | { type: "ws"; socket: PRGLIOSocket }
+  ) => {
     const matchingSubIdx = this.subs.findIndex(
       (s) =>
-        s.channel_name === channelName && getOnDataFunc(localFuncs) === getOnDataFunc(s.localFuncs)
+        s.channel_name === channelName &&
+        (subInfo.type === "local" ?
+          getOnDataFunc(subInfo.localFuncs) === getOnDataFunc(s.localFuncs)
+        : subInfo.socket.id === s.socket?.id)
     );
     if (matchingSubIdx > -1) {
+      const tableName = this.subs[matchingSubIdx]!.table_info.name;
+      const oldActiveTriggers = this.getActiveTriggers(tableName);
       this.subs.splice(matchingSubIdx, 1);
+      const newActiveTriggers = this.getActiveTriggers(tableName);
+      if (newActiveTriggers.length < oldActiveTriggers.length) {
+        this.deleteOrphanedTriggers(tableName);
+      }
     } else {
       console.error(
         "Could not unsubscribe localFunc. Subscription might not have initialised yet",
@@ -254,7 +266,7 @@ export class PubSubManager {
         }
       );
     }
-  }
+  };
 
   getSyncs(table_name: string, condition: string) {
     return this.syncs.filter(
@@ -272,6 +284,12 @@ export class PubSubManager {
       syncs: this.getSyncs(tableName, cond.condition),
     }));
     return tableTriggerConditions;
+  };
+  getActiveTriggers = (tableName: string) => {
+    const activeTriggers = (this.getTriggerInfo(tableName) ?? []).filter(
+      (c) => c.subs.length || c.syncs.length
+    );
+    return activeTriggers;
   };
 
   getSubData = async (
@@ -374,22 +392,29 @@ export class PubSubManager {
    *  */
   refreshTriggers = refreshTriggers.bind(this);
 
-  deleteOrphanedTriggers = debounce(deleteOrphanedTriggers.bind(this), 1000);
+  /** Throttle trigger deletes */
+  deletingOrphanedTriggers:
+    | {
+        tableNames: string[];
+        timeout: NodeJS.Timeout;
+      }
+    | undefined;
+  deleteOrphanedTriggers = (latestTableName: string) => {
+    this.deletingOrphanedTriggers ??= {
+      tableNames: [latestTableName],
+      timeout: setTimeout(() => {
+        const tableNames = this.deletingOrphanedTriggers!.tableNames;
+        this.deletingOrphanedTriggers = undefined;
+        void deleteOrphanedTriggers.bind(this)(tableNames);
+      }, 1000),
+    };
+
+    if (!this.deletingOrphanedTriggers.tableNames.includes(latestTableName)) {
+      this.deletingOrphanedTriggers.tableNames.push(latestTableName);
+    }
+  };
 
   addingTrigger: any;
   addTriggerPool?: Record<string, string[]> = undefined;
   addTrigger = addTrigger.bind(this);
-}
-
-function debounce<Params extends any[]>(
-  func: (...args: Params) => any,
-  timeout: number
-): (...args: Params) => void {
-  let timer: NodeJS.Timeout;
-  return (...args: Params) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      func(...args);
-    }, timeout);
-  };
 }
