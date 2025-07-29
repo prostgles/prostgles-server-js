@@ -3,5 +3,5 @@ import { generateClientDocs } from "./generateClientDocs";
 
 (async () => {
   await generateServerDocs();
-  await generateClientDocs();
+  await generateClientDocs(3);
 })();

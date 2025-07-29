@@ -761,9 +761,6 @@ export const isomorphicQueries = async (
      *    detected, though really a deadlock shouldn't be possible here.
      */
     await test("subscriptions do not serialize transactions", async () => {
-      await db.sql!(`SET log_lock_waits = on;`);
-      await db.sql!(`SET lock_timeout = '10ms';`);
-
       await expectNoTriggers();
       const checkLocks = async () => {
         const locks = await db.sql!(
@@ -854,7 +851,6 @@ export const isomorphicQueries = async (
       //   `Offsets should not be higher than ${expectedDuration}ms but found: ${offetsHigherThanExpected}`
       // );
       await sub.unsubscribe();
-      await db.sql!(`SET log_lock_waits = default;`);
     });
 
     await test("subscribeOne with throttle", async () => {

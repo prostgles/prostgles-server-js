@@ -1,100 +1,17 @@
-# Overview
-Prostgles allows connecting to a PostgreSQL database to get a realtime view of the data and schema changes. 
-By configuring "tsGeneratedTypesDir" the database schema types are generated automatically allowing full end-to-end type safety
-### Installation
-To install the package, run:
-```bash
-npm install prostgles-server
-```
-### Configuration
-To get started, you need to provide a configuration object to the server.
-
-Minimal configuration:
-```typescript
-import prostgles from "prostgles-server";
-import { DBGeneratedSchema } from "./DBGeneratedSchema";
-prostgles<DBGeneratedSchema>({
-  dbConnection: {
-    host: "localhost",
-    port: 5432,
-    database: "postgres"
-    user: process.env.PRGL_USER,
-    password: process.env.PRGL_PWD
-  },
-  tsGeneratedTypesDir: __dirname,
-  onReady: async ({ dbo }) => {
-    try {
-      await dbo.items.insert({ name: "a" });
-      console.log(await dbo.items.find());
-    } catch(err) {
-      console.error(err)
-    }
-  },
-});
-```
-
-To allow clients to connect an express server with socket.io needs to be configured:
-```typescript
-import prostgles from "prostgles-server";
-import { DBGeneratedSchema } from "./DBGeneratedSchema";
-import express from "express";
-import path from "path";
-import http from "http";
-import { Server } from "socket.io";
-
-const app = express();
-const httpServer = http.createServer(app);
-httpServer.listen(30009);
-const io = new Server(httpServer, {
-  path: "/prgl-api",
-});
-
-prostgles<DBGeneratedSchema>({
-  dbConnection: {
-    host: "localhost",
-    port: 5432,
-    database: "postgres"
-    user: process.env.PRGL_USER,
-    password: process.env.PRGL_PWD
-  },
-  io,
-  publish: () => {
-    return {
-      items: "*",
-    }
-  },
-  tsGeneratedTypesDir: __dirname,
-  onReady: async ({ dbo }) => {
-    try {
-      await dbo.items.insert({ name: "a" });
-      console.log(await dbo.items.find());
-    } catch(err) {
-      console.error(err)
-    }
-  },
-});
-```
 ### Configuration options
+
 - **dbConnection** <span style="color: red">required</span> <span style="color: green;">DbConnection</span>
 
-  Database connection details and options
-
-- **onReady** <span style="color: red">required</span> <span style="color: green;">OnReadyCallback</span>
+  Database connection details and options,- **onReady** <span style="color: red">required</span> <span style="color: green;">OnReadyCallback</span>
 
   Called when the prostgles server is ready to accept connections.
-  It waits for auth, tableConfig and other async configurations to complete before executing
-
-- **tsGeneratedTypesDir** <span style="color: grey">optional</span> <span style="color: green;">string</span>
+  It waits for auth, tableConfig and other async configurations to complete before executing,- **tsGeneratedTypesDir** <span style="color: grey">optional</span> <span style="color: green;">string</span>
 
   Path to the directory where the generated types (`DBGeneratedSchema.d.ts`) will be saved.
   This file exports a `DBGeneratedSchema` type which contains types for the database tables and
-  can be used as a generic type input for the prostgles instances to ensure type safety
+  can be used as a generic type input for the prostgles instances to ensure type safety,- **io** <span style="color: grey">optional</span> <span style="color: green;">Server&lt;DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any&gt; | undefined</span>
 
-- **io** <span style="color: grey">optional</span> <span style="color: green;">Server&lt;DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any&gt; | undefined</span>
-
-  Socket.IO server instance object required to allow clients to connect through websockets
-
-- **restApi** <span style="color: grey">optional</span> <span style="color: green;">RestApiConfig</span>
+  Socket.IO server instance object required to allow clients to connect through websockets,- **restApi** <span style="color: grey">optional</span> <span style="color: green;">RestApiConfig</span>
 
   Rest API configuration.
   The REST API allows interacting with the database similarly to the websocket connection.
@@ -126,48 +43,30 @@ prostgles<DBGeneratedSchema>({
     Express server instance
   - **path** <span style="color: grey">optional</span> <span style="color: green;">string</span>
 
-    Defaults to "/api"
-
-- **disableRealtime** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
+    Defaults to "/api",- **disableRealtime** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
 
   If true then schema watch, subscriptions and syncs will be disabled.
   No `prostgles` schema will be created which is needed for the realtime features.
-  This is useful when you want to connect to a database and prevent any changes to the schema
-
-- **publish** <span style="color: grey">optional</span> <span style="color: green;">Publish</span>
+  This is useful when you want to connect to a database and prevent any changes to the schema,- **publish** <span style="color: grey">optional</span> <span style="color: green;">Publish</span>
 
   Data access rules applied to clients.
-  By default, nothing is allowed.
+  By default, nothing is allowed.,- **publishRawSQL** <span style="color: grey">optional</span> <span style="color: green;">(params: PublishParams&lt;S, SUser&gt;) =&gt; Awaitable&lt;boolean | "*"&gt;</span>
 
-- **publishRawSQL** <span style="color: grey">optional</span> <span style="color: green;">(params: PublishParams&lt;S, SUser&gt;) =&gt; Awaitable&lt;boolean | "*"&gt;</span>
+  If defined and resolves to true then the connected client can run SQL queries,- **publishMethods** <span style="color: grey">optional</span> <span style="color: green;">PublishMethods&lt;S, SUser&gt; | PublishMethodsV2&lt;S, SUser&gt; | undefined</span>
 
-  If defined and resolves to true then the connected client can run SQL queries
-
-- **publishMethods** <span style="color: grey">optional</span> <span style="color: green;">PublishMethods&lt;S, SUser&gt; | PublishMethodsV2&lt;S, SUser&gt; | undefined</span>
-
-  Server-side functions that can be invoked by the client
-
-- **testRulesOnConnect** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
+  Server-side functions that can be invoked by the client,- **testRulesOnConnect** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
 
   If true then will test all table methods on each socket connect.
-  Not recommended for production
-
-- **joins** <span style="color: grey">optional</span> <span style="color: green;">Joins</span>
+  Not recommended for production,- **joins** <span style="color: grey">optional</span> <span style="color: green;">Joins</span>
 
   Allows defining table relationships that can then be used in filters and data inserts:
    - `infered` - uses the foreign keys to infer the joins
-   - `Join[]` - specifies the joins manually
-
-- **schemaFilter** <span style="color: grey">optional</span> <span style="color: green;">Record&lt;string, 1&gt; | Record&lt;string, 0&gt; | undefined</span>
+   - `Join[]` - specifies the joins manually,- **schemaFilter** <span style="color: grey">optional</span> <span style="color: green;">Record&lt;string, 1&gt; | Record&lt;string, 0&gt; | undefined</span>
 
   If defined then the specified schemas are included/excluded from the prostgles schema.
-  By default only current_schema() is included.
+  By default only current_schema() is included.,- **sqlFilePath** <span style="color: grey">optional</span> <span style="color: green;">string</span>
 
-- **sqlFilePath** <span style="color: grey">optional</span> <span style="color: green;">string</span>
-
-  Path to a SQL file that will be executed on startup (but before onReady).
-
-- **transactions** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
+  Path to a SQL file that will be executed on startup (but before onReady).,- **transactions** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
 
   If true then will allow transactions on the server through the db.tx method:
   ```typescript
@@ -175,18 +74,12 @@ prostgles<DBGeneratedSchema>({
      await t.items.insert({ name: "a" });
      throw new Error("rollback");
    })
-  ```
-
-- **onSocketConnect** <span style="color: grey">optional</span> <span style="color: green;">(args: AuthRequestParams&lt;S, SUser&gt; & { socket: PRGLIOSocket; }) =&gt; void | Promise&lt;void&gt;</span>
+  ```,- **onSocketConnect** <span style="color: grey">optional</span> <span style="color: green;">(args: AuthRequestParams&lt;S, SUser&gt; & { socket: PRGLIOSocket; }) =&gt; void | Promise&lt;void&gt;</span>
 
   Called when a socket connects
-  Use for connection verification. Will disconnect socket on any errors
+  Use for connection verification. Will disconnect socket on any errors,- **onSocketDisconnect** <span style="color: grey">optional</span> <span style="color: green;">(args: AuthRequestParams&lt;S, SUser&gt; & { socket: PRGLIOSocket; }) =&gt; void | Promise&lt;void&gt;</span>
 
-- **onSocketDisconnect** <span style="color: grey">optional</span> <span style="color: green;">(args: AuthRequestParams&lt;S, SUser&gt; & { socket: PRGLIOSocket; }) =&gt; void | Promise&lt;void&gt;</span>
-
-  Called when a socket disconnects
-
-- **auth** <span style="color: grey">optional</span> <span style="color: green;">AuthConfig</span>
+  Called when a socket disconnects,- **auth** <span style="color: grey">optional</span> <span style="color: green;">AuthConfig</span>
 
   Auth configuration.
   Supports email and OAuth strategies
@@ -255,28 +148,18 @@ prostgles<DBGeneratedSchema>({
   - **cacheSession** <span style="color: grey">optional</span> <span style="color: green;">{ getSession: (sid: string, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; Awaitable&lt;BasicSession | undefined&gt;; }</span>
 
     If provided then session info will be saved on socket.__prglCache and reused from there
-    - **getSession** <span style="color: red">required</span> <span style="color: green;">(sid: string, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; Awaitable&lt;BasicSession | undefined&gt;</span>
+    - **getSession** <span style="color: red">required</span> <span style="color: green;">(sid: string, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; Awaitable&lt;BasicSession | undefined&gt;</span>,- **DEBUG_MODE** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
 
-- **DEBUG_MODE** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
-
-  Used internally for debugging
-
-- **onQuery** <span style="color: grey">optional</span> <span style="color: green;">(error: any, ctx: IEventContext&lt;IClient&gt;) =&gt; void</span>
+  Used internally for debugging,- **onQuery** <span style="color: grey">optional</span> <span style="color: green;">(error: any, ctx: IEventContext&lt;IClient&gt;) =&gt; void</span>
 
   Callback called when a query is executed.
-  Useful for logging or debugging
+  Useful for logging or debugging,- **onConnectionError** <span style="color: grey">optional</span> <span style="color: green;">(error: Error, ctx: IEventContext&lt;IClient&gt;) =&gt; void</span>
 
-- **onConnectionError** <span style="color: grey">optional</span> <span style="color: green;">(error: Error, ctx: IEventContext&lt;IClient&gt;) =&gt; void</span>
-
-  Called when a connection error is received from the database
-
-- **watchSchemaType** <span style="color: grey">optional</span> <span style="color: green;">"DDL_trigger" | "prostgles_queries" | undefined</span>
+  Called when a connection error is received from the database,- **watchSchemaType** <span style="color: grey">optional</span> <span style="color: green;">"DDL_trigger" | "prostgles_queries" | undefined</span>
 
   What schema change watcher to use when watchSchema is enabled:
   - `"DDL_trigger"` - (default) - Use a database event trigger for schema changes. Requires superuser.
-  - `"prostgles_queries"` - Check db.sql() initiated queries for schema changes. Any other queries are ignored.
-
-- **watchSchema** <span style="color: grey">optional</span> <span style="color: green;">boolean | EventTriggerTagFilter | "hotReloadMode" | OnSchemaChangeCallback | undefined</span>
+  - `"prostgles_queries"` - Check db.sql() initiated queries for schema changes. Any other queries are ignored.,- **watchSchema** <span style="color: grey">optional</span> <span style="color: green;">boolean | EventTriggerTagFilter | "hotReloadMode" | OnSchemaChangeCallback | undefined</span>
 
   Reloads schema on schema change.
   Either calls the provided callback or triggers "onReady" on both the server
@@ -286,13 +169,9 @@ prostgles<DBGeneratedSchema>({
   - `EventTriggerTagFilter` - same as `true` but only on specified events
   - `"hotReloadMode"` - only rewrites `DBGeneratedSchema.d.ts`. Used in development when server restarts on file change.
   - `OnSchemaChangeCallback` - custom callback to be fired. Nothing else triggered
-  Useful for development
+  Useful for development,- **onNotice** <span style="color: grey">optional</span> <span style="color: green;">(notice: AnyObject, message?: string | undefined) =&gt; void</span>
 
-- **onNotice** <span style="color: grey">optional</span> <span style="color: green;">(notice: AnyObject, message?: string | undefined) =&gt; void</span>
-
-  Called when a notice is received from the database
-
-- **fileTable** <span style="color: grey">optional</span> <span style="color: green;">FileTableConfig</span>
+  Called when a notice is received from the database,- **fileTable** <span style="color: grey">optional</span> <span style="color: green;">FileTableConfig</span>
 
   Enables file storage and serving.
   Currently supports saving files locally or to AWS S3.
@@ -351,16 +230,12 @@ prostgles<DBGeneratedSchema>({
     - **minFreeBytes** <span style="color: grey">optional</span> <span style="color: green;">number</span>
 
       Minimum amount of free bytes available to allow saving files
-      Defaults to 100MB
-
-- **tableConfig** <span style="color: grey">optional</span> <span style="color: green;">TableConfig</span>
+      Defaults to 100MB,- **tableConfig** <span style="color: grey">optional</span> <span style="color: green;">TableConfig</span>
 
   Define tables through a JSON-schema like object.
   Allows adding runtime JSONB validation and type safety.
   Should be used with caution because it tends to revert any changes
-  made to the database schema through SQL queries
-
-- **tableConfigMigrations** <span style="color: grey">optional</span> <span style="color: green;">TableConfigMigrations</span>
+  made to the database schema through SQL queries,- **tableConfigMigrations** <span style="color: grey">optional</span> <span style="color: green;">TableConfigMigrations</span>
 
   Migration logic used when the new tableConfig version is higher than the one in the database.
   By default server will fail to start if the tableConfig schema changes cannot be applied without errors
@@ -379,8 +254,6 @@ prostgles<DBGeneratedSchema>({
   - **onMigrate** <span style="color: red">required</span> <span style="color: green;">OnMigrate</span>
 
     Script executed before tableConfig is loaded and IF an older schema_version is present.
-    Any data conflicting with the new schema changes should be resolved here.
-
-- **onLog** <span style="color: grey">optional</span> <span style="color: green;">(evt: EventInfo) =&gt; void | Promise&lt;void&gt;</span>
+    Any data conflicting with the new schema changes should be resolved here.,- **onLog** <span style="color: grey">optional</span> <span style="color: green;">(evt: EventInfo) =&gt; void | Promise&lt;void&gt;</span>
 
   Usefull for logging or debugging

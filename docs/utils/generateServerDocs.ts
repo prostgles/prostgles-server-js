@@ -10,7 +10,7 @@ const docsFolder = `${__dirname}/../../`;
 
 export const generateServerDocs = () => {
   const serverFilePath = path.resolve(
-    `${testFolderPath}/server/node_modules/prostgles-server/dist/ProstglesTypes.d.ts`, // "ProstglesInitOptions",
+    `${testFolderPath}/server/node_modules/prostgles-server/dist/ProstglesTypes.d.ts` // "ProstglesInitOptions",
   );
   const {
     resolvedTypes: [ProstglesInitOptions],
@@ -38,16 +38,16 @@ export const generateServerDocs = () => {
   if (!ProstglesInitOptions || !prostglesInitOpts)
     throw new Error("ProstglesInitOptions not found");
 
-  const configurationPropsMarkdown = getObjectEntries(
-    prostglesInitOpts.properties,
-  ).map(([propName, prop]) => {
-    return renderTsType(prop, 0, { name: propName, optional: prop.optional });
-  });
+  const configurationPropsMarkdown = getObjectEntries(prostglesInitOpts.properties).map(
+    ([propName, prop]) => {
+      return renderTsType(prop, 0, { name: propName, optional: prop.optional });
+    }
+  );
 
   const docs = [
     `# Overview`,
     `Prostgles allows connecting to a PostgreSQL database to get a realtime view of the data and schema changes. `,
-    `By configuring "tsGeneratedTypesDir" the database schema types are generated automatically allowing full end-to-end type safety`,
+    `By configuring \`tsGeneratedTypesDir\` the database schema types are generated automatically allowing full end-to-end type safety`,
     `### Installation`,
     `To install the package, run:`,
     `\`\`\`bash`,
@@ -121,9 +121,12 @@ export const generateServerDocs = () => {
     `  },`,
     `});`,
     `\`\`\``,
-    `### Configuration options`,
-    configurationPropsMarkdown.join("\n\n"),
   ].join("\n");
 
-  fs.writeFileSync(`${docsFolder}server.md`, docs, { encoding: "utf-8" });
+  fs.writeFileSync(`${docsFolder}01_Server_Setup.md`, docs, { encoding: "utf-8" });
+  fs.writeFileSync(
+    `${docsFolder}02_Server_Configuration.md`,
+    [`### Configuration options`, configurationPropsMarkdown].join("\n\n"),
+    { encoding: "utf-8" }
+  );
 };

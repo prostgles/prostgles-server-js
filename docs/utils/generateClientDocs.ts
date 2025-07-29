@@ -9,9 +9,9 @@ import { renderTsType } from "./renderTsType";
 const testFolderPath = `${__dirname}/../../../tests/`;
 const docsFolder = `${__dirname}/../../`;
 
-export const generateClientDocs = async () => {
+export const generateClientDocs = async (fromIndex: number) => {
   const clientFilePath = path.resolve(
-    `${testFolderPath}/client/node_modules/prostgles-client/dist/prostgles.d.ts`,
+    `${testFolderPath}/client/node_modules/prostgles-client/dist/prostgles.d.ts`
   );
   const excludedTypes = [
     "FullFilter",
@@ -51,24 +51,21 @@ export const generateClientDocs = async () => {
 
   const isomorphicMd = getMethodsDocs(
     getObjectEntries(tableHandler.properties).filter(
-      ([methodName]) => isomotphicMethodNames[methodName],
-    ),
+      ([methodName]) => isomotphicMethodNames[methodName]
+    )
   );
   const clientMd = getMethodsDocs(
     getObjectEntries(tableHandler.properties).filter(
-      ([methodName]) => !isomotphicMethodNames[methodName],
-    ),
+      ([methodName]) => !isomotphicMethodNames[methodName]
+    )
   );
-
-  const result = [
-    `# Isomorphic Methods`,
-    ``,
-    `The following table/view methods are available on the client and server db object`,
-    ``,
-    isomorphicMd.join("\n\n"),
-  ].join("\n");
-
-  fs.writeFileSync(`${docsFolder}db-handler.md`, result, { encoding: "utf-8" });
+  // const result = [
+  //   `# Isomorphic Methods`,
+  //   ``,
+  //   `The following table/view methods are available on the client and server db object`,
+  //   ``,
+  //   isomorphicMd.join("\n\n"),
+  // ].join("\n");
 
   const InitOptions = resolvedTypes[1] as TS_Object; // (typeof import("./clientTypes").definitions)[1];
 
@@ -118,10 +115,38 @@ export const generateClientDocs = async () => {
     ``,
     `# Client-only Methods`,
     ``,
-    `The following table/view methods are available on the client.`,
+    `The following table/view methods are available on client-side only.`,
     ``,
-    clientMd.join("\n\n"),
+    clientMd
+      .map((v) => v.split(" ")[1]?.split("<")[0])
+      .filter((v) => v)
+      .join(", "),
   ].join("\n");
 
-  fs.writeFileSync(`${docsFolder}client.md`, docs, { encoding: "utf-8" });
+  fs.writeFileSync(`${docsFolder}${toTwoDigit(fromIndex)}_Client_Setup.md`, docs, {
+    encoding: "utf-8",
+  });
+
+  clientMd.forEach((methodContent, i) => {
+    if (!methodContent) return;
+    const methodName = methodContent.split(" ")[1]!.split("<")[0];
+    fs.writeFileSync(
+      `${docsFolder}${toTwoDigit(i + fromIndex + 1)}_${methodName}.md`,
+      `> Available on client only\n\n` + methodContent,
+      { encoding: "utf-8" }
+    );
+  });
+
+  isomorphicMd.forEach((methodContent, i) => {
+    const methodName = methodContent.split(" ")[1]!.split("<")[0];
+    fs.writeFileSync(
+      `${docsFolder}${toTwoDigit(i + fromIndex + 1 + clientMd.length)}_${methodName}.md`,
+      methodContent,
+      { encoding: "utf-8" }
+    );
+  });
+};
+
+const toTwoDigit = (num: number) => {
+  return num.toString().padStart(2, "0");
 };
