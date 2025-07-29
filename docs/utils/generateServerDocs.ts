@@ -124,6 +124,7 @@ export const generateServerDocs = () => {
   ].join("\n");
 
   fs.writeFileSync(`${docsFolder}01_Server_Setup.md`, docs, { encoding: "utf-8" });
+
   fs.writeFileSync(
     `${docsFolder}02_Server_Configuration.md`,
     [`### Configuration options`, configurationPropsMarkdown.join("\n")].join("\n\n"),
