@@ -59,13 +59,6 @@ export const generateClientDocs = async (fromIndex: number) => {
       ([methodName]) => !isomotphicMethodNames[methodName]
     )
   );
-  // const result = [
-  //   `# Isomorphic Methods`,
-  //   ``,
-  //   `The following table/view methods are available on the client and server db object`,
-  //   ``,
-  //   isomorphicMd.join("\n\n"),
-  // ].join("\n");
 
   const InitOptions = resolvedTypes[1] as TS_Object; // (typeof import("./clientTypes").definitions)[1];
 
