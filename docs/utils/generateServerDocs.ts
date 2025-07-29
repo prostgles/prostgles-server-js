@@ -123,10 +123,10 @@ export const generateServerDocs = () => {
     `\`\`\``,
   ].join("\n");
 
-  fs.writeFileSync(`${docsFolder}01_Server_Setup.md`, docs, { encoding: "utf-8" });
+  fs.writeFileSync(`${docsFolder}01_Server_setup.md`, docs, { encoding: "utf-8" });
 
   fs.writeFileSync(
-    `${docsFolder}02_Server_Configuration.md`,
+    `${docsFolder}02_Server_configuration.md`,
     [`### Configuration options`, configurationPropsMarkdown.join("\n")].join("\n\n"),
     { encoding: "utf-8" }
   );

@@ -116,7 +116,7 @@ export const generateClientDocs = async (fromIndex: number) => {
       .join(", "),
   ].join("\n");
 
-  fs.writeFileSync(`${docsFolder}${toTwoDigit(fromIndex)}_Client_Setup.md`, docs, {
+  fs.writeFileSync(`${docsFolder}${toTwoDigit(fromIndex)}_Client_setup.md`, docs, {
     encoding: "utf-8",
   });
 
