@@ -1,7 +1,13 @@
-import { OrderBy, asName, isDefined, isEmpty, isObject } from "prostgles-types/dist";
+import {
+  OrderBy,
+  asName,
+  getJSONBObjectSchemaValidationError,
+  isDefined,
+  isEmpty,
+  isObject,
+} from "prostgles-types/dist";
 import { SortItem } from "../DboBuilder";
 import { NewQueryJoin, SelectItemValidated, asNameAlias } from "../QueryBuilder/QueryBuilder";
-import { getJSONBObjectSchemaValidationError } from "../../JSONBValidation/JSONBValidation";
 
 /* This relates only to SELECT */
 export const prepareSortItems = (

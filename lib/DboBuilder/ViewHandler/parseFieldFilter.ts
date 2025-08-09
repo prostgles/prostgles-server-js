@@ -25,13 +25,13 @@ export const parseFieldFilter = <AllowedKeys extends string[]>(
     /* string[] */
     if (Array.isArray(fieldParams) && !fieldParams.find((f) => typeof f !== "string")) {
       /* 
-          ["*"] 
+        ["*"] 
       */
       if (fieldParams[0] === "*") {
         return all_cols.slice(0) as typeof all_cols;
 
         /* 
-            [""] 
+          [""] 
         */
       } else if (fieldParams[0] === "") {
         if (allow_empty) {
@@ -40,7 +40,7 @@ export const parseFieldFilter = <AllowedKeys extends string[]>(
           throw "Empty value not allowed";
         }
         /* 
-            ["field1", "field2", "field3"] 
+          ["field1", "field2", "field3"] 
         */
       } else {
         colNames = fieldParams.slice(0) as AllowedKeys;
@@ -51,7 +51,7 @@ export const parseFieldFilter = <AllowedKeys extends string[]>(
           { field1: false, field2: false } = all fields except field1 and field2
       */
     } else if (isPlainObject(fieldParams)) {
-      if (!getKeys(fieldParams).length) {
+      if (!getKeys(fieldParams as Record<string, any>).length) {
         return [] as unknown as typeof all_cols; //all_fields.slice(0) as typeof all_fields;
       }
 

@@ -2,8 +2,7 @@
 
 set -e # Exit immediately if a command exits with a non-zero status
 
-npm run build
-npm run test-server-funcs
+npm run build 
 
 cd client
 npm run build

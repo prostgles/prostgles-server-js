@@ -1,5 +1,9 @@
-import { isDefined, isEmpty, type SubscribeOptions } from "prostgles-types";
-import { getJSONBObjectSchemaValidationError } from "../../JSONBValidation/JSONBValidation";
+import {
+  getJSONBObjectSchemaValidationError,
+  isDefined,
+  isEmpty,
+  type SubscribeOptions,
+} from "prostgles-types";
 import { type Required_ish, type SubscribeRule } from "../../PublishParser/PublishParser";
 
 export const getValidatedSubscribeOptions = (

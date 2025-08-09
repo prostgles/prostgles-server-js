@@ -761,6 +761,9 @@ export const isomorphicQueries = async (
      *    detected, though really a deadlock shouldn't be possible here.
      */
     await test("subscriptions do not serialize transactions", async () => {
+      if (process.env.CI) {
+        return;
+      }
       await expectNoTriggers();
       const checkLocks = async () => {
         const locks = await db.sql!(

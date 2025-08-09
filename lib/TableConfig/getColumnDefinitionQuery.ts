@@ -1,7 +1,7 @@
 import { asName, pickKeys } from "prostgles-types";
 import { DB } from "../Prostgles";
 import { asValue } from "../PubSubManager/PubSubManagerUtils";
-import { VALIDATE_SCHEMA_FUNCNAME } from "../JSONBValidation/validate_jsonb_schema_sql";
+import { VALIDATE_SCHEMA_FUNCNAME } from "../JSONBSchemaValidation/validateJSONBSchemaSQL";
 import { BaseColumnTypes, ColumnConfig } from "./TableConfig";
 import pgPromise from "pg-promise";
 

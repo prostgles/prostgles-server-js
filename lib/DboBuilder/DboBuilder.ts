@@ -6,6 +6,7 @@
 import {
   PG_COLUMN_UDT_DATA_TYPE,
   SQLOptions,
+  getJSONBTSTypes,
   getJoinHandlers,
   getObjectEntries,
   getSerialisableError,
@@ -42,7 +43,6 @@ import {
 import { getTablesForSchemaPostgresSQL } from "./getTablesForSchemaPostgresSQL";
 import { prepareShortestJoinPaths } from "./prepareShortestJoinPaths";
 import { cacheDBTypes, runSQL } from "./runSQL";
-import { getJSONBTSTypes } from "../JSONBValidation/getJSONBSchemaTSTypes";
 
 export * from "./DboBuilderTypes";
 export * from "./dboBuilderUtils";
@@ -198,9 +198,11 @@ export class DboBuilder {
     options: SQLOptions | undefined,
     localParams: LocalParams | undefined
   ) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return runSQL
       .bind(this)(query, params, options, localParams)
       .catch((error) =>
+        // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
         Promise.reject(
           getSerializedClientErrorFromPGError(error, {
             type: "sql",

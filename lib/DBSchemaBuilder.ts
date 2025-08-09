@@ -2,6 +2,7 @@ import {
   AnyObject,
   DbJoinMaker,
   DBSchema,
+  getJSONBSchemaTSTypes,
   isObject,
   JSONB,
   SQLHandler,
@@ -18,7 +19,6 @@ import {
   PublishViewRule,
   type PublishObject,
 } from "./PublishParser/PublishParser";
-import { getJSONBSchemaTSTypes } from "./JSONBValidation/getJSONBSchemaTSTypes";
 import { DBHandlerServer, TableSchemaColumn, TX } from "./DboBuilder/DboBuilderTypes";
 
 export const getDBSchema = (dboBuilder: DboBuilder): string => {
@@ -139,21 +139,21 @@ export type PublishFullyTyped<Schema = void> =
 
 /** Type checks */
 () => {
-  const ddb: DBOFullyTyped = 1 as any;
+  const ddb = {} as DBOFullyTyped;
   ddb.dwad?.insert;
   ddb.dwad?.delete;
 
-  const d: DBOFullyTyped<undefined> = 1 as any;
+  const d = {} as DBOFullyTyped<undefined>;
   d.dwad?.insert;
   d.dwad?.delete;
 
-  const p: PublishParams = 1 as any;
+  const p = {} as PublishParams;
   p.dbo.dwad?.insert;
   ddb.dwad?.delete;
 
   //@ts-ignore
   void prostgles({
-    dbConnection: 1 as any,
+    dbConnection: "",
     publish: async (params) => {
       const _rows = await params.dbo.dwadwa?.find?.({});
 
@@ -172,7 +172,7 @@ export type PublishFullyTyped<Schema = void> =
     sidKeyName: "sid_token",
     getUser: (sid, db, _db) => {
       db.dwadaw?.find;
-      return 1 as any;
+      return {};
     },
   };
 
@@ -192,15 +192,15 @@ export type PublishFullyTyped<Schema = void> =
   };
 
   /** Test the created schema */
-  const c: S = 1 as any;
+  const c = {} as S;
   const _test: DBSchema = c;
-  const dbt: DBOFullyTyped<S> = 1 as any;
+  const dbt = {} as DBOFullyTyped<S>;
 
   void dbt.tx((t) => {
     void t.tbl1.delete();
   });
 
-  const db: DBHandlerServer = 1 as any;
+  const db = {} as DBHandlerServer;
   void db.tx!((t) => {
     void t.wadwa?.find!();
   });
@@ -246,7 +246,7 @@ export type PublishFullyTyped<Schema = void> =
     };
     const _res1: PublishFullyTyped = r;
 
-    const p: PublishParams<undefined> = 1 as any;
+    const p = {} as PublishParams<undefined>;
 
     void p.dbo.dwadaw?.find?.();
 
