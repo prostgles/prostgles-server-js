@@ -38,11 +38,14 @@ export async function insertNestedRecords(
       if (this.is_media) {
         return !this.column_names.concat(MEDIA_COL_NAMES).includes(fieldName);
       } else if (!this.columns.find((c) => c.name === fieldName)) {
-        if (!isObject(row[fieldName]) && !Array.isArray(row[fieldName])) {
+        if (
+          !isObject(row[fieldName]) &&
+          !Array.isArray(row[fieldName]) &&
+          row[fieldName] !== undefined
+        ) {
           throw new Error("Invalid/Dissalowed field in data: " + fieldName);
         } else if (!this.dboBuilder.dbo[fieldName]) {
           return false;
-          // throw new Error("Invalid/Dissalowed nested insert table name in data: " + fieldName)
         }
         return true;
       }
