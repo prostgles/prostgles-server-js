@@ -506,6 +506,11 @@ export type DbTableInfo = {
   info: TableOrViewInfo;
   columns: TableSchemaColumn[];
 };
+export type PermissionScope = {
+  sql?: true;
+  tables?: Record<string, Partial<Record<"select" | "update" | "delete" | "insert", true>>>;
+  methods?: Record<string, true>;
+};
 export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
   sid: string | undefined;
   dbo: DBOFullyTyped<S>;
@@ -513,7 +518,12 @@ export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
   user?: SUser["user"];
   clientReq: AuthClientRequest;
   tables: DbTableInfo[];
-  getClientDBHandlers: () => Promise<ClientHandlers<S>>;
+  getClientDBHandlers: (
+    /**
+     * Used to filter permissions
+     */
+    scope: PermissionScope | undefined
+  ) => Promise<ClientHandlers<S>>;
 };
 export type RequestParams = { dbo?: DBHandlerServer; socket?: any };
 export type PublishAllOrNothing = boolean | "*" | null;

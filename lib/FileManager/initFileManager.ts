@@ -207,7 +207,8 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
         {
           res,
           httpReq: req,
-        }
+        },
+        undefined
       )) as Required<Media> | undefined;
 
       if (!media) {

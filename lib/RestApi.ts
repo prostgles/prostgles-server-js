@@ -102,7 +102,7 @@ export class RestApi {
   };
   onPostSchema = async (req: ExpressReq, res: ExpressRes) => {
     try {
-      const data = await this.prostgles.getClientSchema({ httpReq: req, res });
+      const data = await this.prostgles.getClientSchema({ httpReq: req, res }, undefined);
       res.json(data);
     } catch (rawError) {
       const error = getSerializedClientErrorFromPGError(rawError, {
@@ -161,7 +161,8 @@ export class RestApi {
         {
           httpReq: req,
           res,
-        }
+        },
+        undefined
       );
       res.json(data);
     } catch (rawError) {

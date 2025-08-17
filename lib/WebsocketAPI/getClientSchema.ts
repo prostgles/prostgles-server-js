@@ -1,11 +1,15 @@
 import { isObject, omitKeys, tryCatchV2, type ClientSchema } from "prostgles-types";
 import type { AuthClientRequest } from "../Auth/AuthTypes";
 import { Prostgles } from "../Prostgles";
-import type { PublishParser } from "../PublishParser/PublishParser";
+import type { PermissionScope, PublishParser } from "../PublishParser/PublishParser";
 import { clientCanRunSqlRequest } from "../runClientRequest";
-const version = (require("../../package.json") as { version: string }).version;
+import { version } from "../../package.json";
 
-export async function getClientSchema(this: Prostgles, clientReq: AuthClientRequest) {
+export async function getClientSchema(
+  this: Prostgles,
+  clientReq: AuthClientRequest,
+  scope: PermissionScope | undefined
+) {
   const result = await tryCatchV2(async () => {
     const clientInfo =
       clientReq.socket ?
@@ -22,10 +26,13 @@ export async function getClientSchema(this: Prostgles, clientReq: AuthClientRequ
 
     try {
       if (!publishParser) throw "publishParser undefined";
-      fullSchema = await publishParser.getSchemaFromPublish({
-        ...clientInfo,
-        userData,
-      });
+      fullSchema = await publishParser.getSchemaFromPublish(
+        {
+          ...clientInfo,
+          userData,
+        },
+        scope
+      );
     } catch (e) {
       publishValidationError = e;
       console.error(`\nProstgles Publish validation failed (after socket connected):\n    ->`, e);

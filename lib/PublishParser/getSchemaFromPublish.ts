@@ -14,7 +14,7 @@ import { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import { getErrorAsObject } from "../DboBuilder/DboBuilder";
 import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { TABLE_METHODS } from "../Prostgles";
-import { type PublishObject, PublishParser } from "./PublishParser";
+import { type PermissionScope, type PublishObject, PublishParser } from "./PublishParser";
 
 type Args = AuthClientRequest & {
   userData: AuthResultWithSID | undefined;
@@ -23,7 +23,8 @@ const SUBSCRIBE_METHODS = ["subscribe", "subscribeOne", "sync", "unsubscribe", "
 
 export async function getSchemaFromPublish(
   this: PublishParser,
-  { userData, ...clientReq }: Args
+  { userData, ...clientReq }: Args,
+  scope: PermissionScope | undefined
 ): Promise<{
   schema: TableSchemaForClient;
   tables: DBSchemaTable[];
@@ -118,7 +119,8 @@ export async function getSchemaFromPublish(
                           command: method,
                           clientReq,
                         },
-                        clientInfo
+                        clientInfo,
+                        scope
                       );
                       if (this.prostgles.opts.testRulesOnConnect) {
                         await (this.dbo[tableName] as TableHandler)[method](
@@ -150,7 +152,8 @@ export async function getSchemaFromPublish(
                   if (method === "getInfo" || method === "getColumns") {
                     const tableRules = await this.getValidatedRequestRule(
                       { tableName, command: method, clientReq },
-                      clientInfo
+                      clientInfo,
+                      scope
                     );
                     const res = await (this.dbo[tableName] as TableHandler)[method](
                       undefined,

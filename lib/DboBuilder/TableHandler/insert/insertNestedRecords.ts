@@ -99,7 +99,7 @@ export async function insertNestedRecords(
         const colInserts = getReferenceColumnInserts(this, row);
 
         /* Ensure we're using the same transaction */
-        const _this = this.tx ? this : (dbTX![this.name] as TableHandler);
+        const tableHandler = this.tx ? this : (dbTX![this.name] as TableHandler);
 
         const omitedKeys = extraKeys.concat(colInserts.map((c) => c.insertedFieldName));
 
@@ -126,7 +126,7 @@ export async function insertNestedRecords(
               },
             };
             const colRows = await referencedInsert(
-              _this,
+              tableHandler,
               dbTX,
               newLocalParams,
               colInsert.tableName,
@@ -157,7 +157,7 @@ export async function insertNestedRecords(
           }
         }
 
-        const fullRootResult = (await _this.insert(
+        const fullRootResult = (await tableHandler.insert(
           rootData,
           { returning: "*" },
           undefined,
@@ -235,7 +235,7 @@ export async function insertNestedRecords(
               }
 
               insertedChildren = await childInsert(
-                childDataItems.map((d: AnyObject) => {
+                childDataItems.map((d) => {
                   const result = { ...d };
                   colsRefT1.map((col) => {
                     result[col.references![0]!.cols[0]!] =
@@ -262,14 +262,14 @@ export async function insertNestedRecords(
               if (
                 !(
                   cols2.filter((c) => c.references?.[0]?.ftable === fileTable).length === 1 &&
-                  cols2.filter((c) => c.references?.[0]?.ftable === _this.name).length === 1
+                  cols2.filter((c) => c.references?.[0]?.ftable === tableHandler.name).length === 1
                 )
               ) {
                 console.log({
                   tbl1,
                   tbl2,
                   tbl3,
-                  name: _this.name,
+                  name: tableHandler.name,
                   tthisName: this.name,
                 });
                 throw (
@@ -293,7 +293,7 @@ export async function insertNestedRecords(
                     tbl2Row[col.name] = fullRootResult[col.references![0]!.fcols[0]!];
                   });
 
-                  await childInsert(tbl2Row, tbl2!); //.then(() => {});
+                  await childInsert(tbl2Row, tbl2!);
                 })
               );
             } else {

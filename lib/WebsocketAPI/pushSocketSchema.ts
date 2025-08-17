@@ -5,7 +5,7 @@ import { runClientSqlRequest } from "../runClientRequest";
 import { makeSocketError } from "./onSocketConnected";
 export async function pushSocketSchema(this: Prostgles, socket: PRGLIOSocket) {
   try {
-    const clientSchema = await this.getClientSchema({ socket });
+    const clientSchema = await this.getClientSchema({ socket }, undefined);
     socket.prostgles = clientSchema;
     if (clientSchema.rawSQL) {
       socket.removeAllListeners(CHANNELS.SQL);

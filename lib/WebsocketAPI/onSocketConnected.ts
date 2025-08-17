@@ -105,7 +105,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
         }
       ) => {
         runClientRequest
-          .bind(this)(args, { socket })
+          .bind(this)(args, { socket }, undefined)
           .then((res) => {
             cb(null, res);
           })

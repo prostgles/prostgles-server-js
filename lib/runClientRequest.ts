@@ -12,7 +12,7 @@ import { TableHandler as TableHandlerServer } from "./DboBuilder/TableHandler/Ta
 import { parseFieldFilter } from "./DboBuilder/ViewHandler/parseFieldFilter";
 import { canRunSQL } from "./DboBuilder/runSQL";
 import { Prostgles } from "./Prostgles";
-import { ParsedTableRule } from "./PublishParser/publishTypesAndUtils";
+import { ParsedTableRule, type PermissionScope } from "./PublishParser/publishTypesAndUtils";
 
 const TABLE_METHODS = {
   find: 1,
@@ -57,7 +57,8 @@ type TableMethodFunctionWithRulesAndLocalParams = (
 export const runClientRequest = async function (
   this: Prostgles,
   args: Args,
-  clientReq: AuthClientRequest
+  clientReq: AuthClientRequest,
+  scope: PermissionScope | undefined
 ) {
   /* Channel name will only include client-sent params so we ignore table_rules enforced params */
   if (!this.publishParser || !this.dbo) {
@@ -82,7 +83,8 @@ export const runClientRequest = async function (
   }
   const validRules = await this.publishParser.getValidatedRequestRule(
     { tableName, command, clientReq },
-    clientInfo
+    clientInfo,
+    scope
   );
 
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
@@ -151,8 +153,8 @@ export const clientCanRunSqlRequest = async function (
       throw "authHandler missing";
     }
     const publishParams = await this.publishParser?.getPublishParams(clientReq, undefined);
-    const res = publishParams && (await this.opts.publishRawSQL?.(publishParams));
-    return Boolean((res && typeof res === "boolean") || res === "*");
+    const allowedToRunSQL = publishParams && (await this.opts.publishRawSQL?.(publishParams));
+    return allowedToRunSQL === true || allowedToRunSQL === "*";
   };
 
   const allowed = await canRunSQL();

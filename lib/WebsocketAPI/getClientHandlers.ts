@@ -11,16 +11,18 @@ import type { DBOFullyTyped } from "../DBSchemaBuilder";
 import type { Prostgles } from "../Prostgles";
 import { runClientMethod, runClientRequest, runClientSqlRequest } from "../runClientRequest";
 import { getClientSchema } from "./getClientSchema";
+import type { PermissionScope } from "../PublishParser/publishTypesAndUtils";
 
 export const getClientHandlers = async <S = void>(
   prostgles: Prostgles,
-  clientReq: AuthClientRequest
+  clientReq: AuthClientRequest,
+  scope: PermissionScope | undefined
 ): Promise<{
   clientDb: DBOFullyTyped<S, false>;
   clientMethods: Record<string, Method>;
 }> => {
   const clientSchema =
-    clientReq.socket?.prostgles ?? (await getClientSchema.bind(prostgles)(clientReq));
+    clientReq.socket?.prostgles ?? (await getClientSchema.bind(prostgles)(clientReq, scope));
   const sql: SQLHandler | undefined = ((query: string, params?: unknown, options?: SQLOptions) =>
     runClientSqlRequest.bind(prostgles)({ query, params, options }, clientReq)) as SQLHandler;
   const tableHandlers = Object.fromEntries(
@@ -31,7 +33,8 @@ export const getClientHandlers = async <S = void>(
           const method = (param1: unknown, param2: unknown, param3: unknown) =>
             runClientRequest.bind(prostgles)(
               { command, tableName: table.name, param1, param2, param3 },
-              clientReq
+              clientReq,
+              scope
             );
           return [command, method];
         })
@@ -48,17 +51,25 @@ export const getClientHandlers = async <S = void>(
   const clientDb = {
     ...tableHandlers,
     ...txNotAllowed,
-    sql,
+    sql:
+      scope && !scope.sql ?
+        () => {
+          throw new Error("SQL is dissallowed by PermissionScope");
+        }
+      : sql,
   } as DBOFullyTyped<S, false>;
 
   const clientMethods: Record<string, Method> = Object.fromEntries(
     clientSchema.methods.map((method) => {
       const methodName = typeof method === "string" ? method : method.name;
-      return [
-        methodName,
-        (...params: any[]) =>
-          runClientMethod.bind(prostgles)({ method: methodName, params }, clientReq),
-      ];
+      const methodHandler =
+        scope && !scope.methods?.[methodName] ?
+          () => {
+            throw new Error(`Method ${methodName} is not allowed by PermissionScope`);
+          }
+        : (...params: any[]) =>
+            runClientMethod.bind(prostgles)({ method: methodName, params }, clientReq);
+      return [methodName, methodHandler];
     })
   );
 

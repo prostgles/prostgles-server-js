@@ -7,7 +7,7 @@ import { DBEventsManager } from "./DBEventsManager";
 import { DBOFullyTyped } from "./DBSchemaBuilder";
 import { DBHandlerServer, Prostgles, getIsSuperUser } from "./Prostgles";
 import { ProstglesInitOptions } from "./ProstglesTypes";
-import { DbTableInfo, PublishParser } from "./PublishParser/PublishParser";
+import { DbTableInfo, PublishParser, type PermissionScope } from "./PublishParser/PublishParser";
 import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { runSQLFile } from "./TableConfig/runSQLFile";
 import { sleep } from "./utils";
@@ -72,7 +72,10 @@ export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
   update: (newOpts: UpdateableOptions<S, SUser>) => Promise<void>;
   restart: () => Promise<InitResult<S, SUser>>;
   options: ProstglesInitOptions<S, SUser>;
-  getClientDBHandlers: (clientReq: AuthClientRequest) => ReturnType<typeof getClientHandlers<S>>;
+  getClientDBHandlers: (
+    clientReq: AuthClientRequest,
+    tablePermissions: PermissionScope | undefined
+  ) => ReturnType<typeof getClientHandlers<S>>;
 };
 
 const clientOnlyUpdateKeys = ["auth"] as const satisfies (keyof UpdateableOptions)[];
@@ -270,7 +273,10 @@ export const initProstgles = async function (
         await sleep(1000);
         return true;
       },
-      getClientDBHandlers: (clientReq: AuthClientRequest) => getClientHandlers(this, clientReq),
+      getClientDBHandlers: (
+        clientReq: AuthClientRequest,
+        tablePermissions: PermissionScope | undefined
+      ) => getClientHandlers(this, clientReq, tablePermissions),
     };
 
     return initResult;

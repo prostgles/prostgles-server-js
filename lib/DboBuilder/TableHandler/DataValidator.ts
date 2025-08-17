@@ -1,6 +1,5 @@
 import {
   AnyObject,
-  ColumnInfo,
   FieldFilter,
   asName,
   getKeys,
@@ -288,43 +287,43 @@ const getValidatedRowFieldData = async (
   return rowFieldData;
 };
 
-const getTextPatch = (c: TableSchemaColumn, fieldValue: any) => {
-  if (
-    c.data_type === "text" &&
-    fieldValue &&
-    isObject(fieldValue) &&
-    !["from", "to"].find((key) => typeof fieldValue[key] !== "number")
-  ) {
-    const unrecProps = Object.keys(fieldValue).filter(
-      (k) => !["from", "to", "text", "md5"].includes(k)
-    );
-    if (unrecProps.length) {
-      throw "Unrecognised params in textPatch field: " + unrecProps.join(", ");
-    }
-    const patchedTextData: {
-      fieldName: string;
-      from: number;
-      to: number;
-      text: string;
-      md5: string;
-    } = {
-      ...fieldValue,
-      fieldName: c.name,
-    } as any;
+// const getTextPatch = (c: TableSchemaColumn, fieldValue: any) => {
+//   if (
+//     c.data_type === "text" &&
+//     fieldValue &&
+//     isObject(fieldValue) &&
+//     !["from", "to"].find((key) => typeof fieldValue[key] !== "number")
+//   ) {
+//     const unrecProps = Object.keys(fieldValue).filter(
+//       (k) => !["from", "to", "text", "md5"].includes(k)
+//     );
+//     if (unrecProps.length) {
+//       throw "Unrecognised params in textPatch field: " + unrecProps.join(", ");
+//     }
+//     const patchedTextData: {
+//       fieldName: string;
+//       from: number;
+//       to: number;
+//       text: string;
+//       md5: string;
+//     } = {
+//       ...fieldValue,
+//       fieldName: c.name,
+//     } as any;
 
-    // if (tableRules && !tableRules.select) throw "Select needs to be permitted to patch data";
-    // const rows = await this.find(filter, { select: patchedTextData.reduce((a, v) => ({ ...a, [v.fieldName]: 1 }), {}) }, undefined, tableRules);
+//     // if (tableRules && !tableRules.select) throw "Select needs to be permitted to patch data";
+//     // const rows = await this.find(filter, { select: patchedTextData.reduce((a, v) => ({ ...a, [v.fieldName]: 1 }), {}) }, undefined, tableRules);
 
-    // if (rows.length !== 1) {
-    //   throw "Cannot patch data within a filter that affects more/less than 1 row";
-    // }
-    // return unpatchText(rows[0][p.fieldName], patchedTextData);
-    const rawValue = `OVERLAY(${asName(c.name)} PLACING ${asValue(patchedTextData.text)} FROM ${asValue(patchedTextData.from)} FOR ${asValue(patchedTextData.to - patchedTextData.from + 1)})`;
-    return rawValue;
-  }
+//     // if (rows.length !== 1) {
+//     //   throw "Cannot patch data within a filter that affects more/less than 1 row";
+//     // }
+//     // return unpatchText(rows[0][p.fieldName], patchedTextData);
+//     const rawValue = `OVERLAY(${asName(c.name)} PLACING ${asValue(patchedTextData.text)} FROM ${asValue(patchedTextData.from)} FOR ${asValue(patchedTextData.to - patchedTextData.from + 1)})`;
+//     return rawValue;
+//   }
 
-  return undefined;
-};
+//   return undefined;
+// };
 
 const getParsedRowFieldDataFunction = (rowPart: RowFieldDataFunction, args: ParseDataArgs) => {
   const func = convertionFuncs.find((f) => `$${f.name}` === rowPart.funcName);
@@ -407,88 +406,3 @@ const convertionFuncs: ConvertionFunc[] = [
     },
   },
 ];
-
-export class ColSet {
-  opts: {
-    columns: ColumnInfo[];
-    tableName: string;
-    colNames: string[];
-  };
-
-  constructor(columns: ColumnInfo[], tableName: string) {
-    this.opts = { columns, tableName, colNames: columns.map((c) => c.name) };
-  }
-
-  // private async getRow(data: any, allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRow | undefined, command: "update" | "insert", localParams: LocalParams | undefined): Promise<ParsedRowFieldData[]> {
-  //   const badCol = allowedCols.find(c => !this.opts.colNames.includes(c))
-  //   if (!allowedCols || badCol) {
-  //     throw "Missing or unexpected columns: " + badCol;
-  //   }
-
-  //   if (command === "update" && isEmpty(data)) {
-  //     throw "No data provided for update";
-  //   }
-
-  //   let row = pickKeys(data, allowedCols);
-  //   if (validate) {
-  //     if (!localParams) throw "localParams missing"
-  //     row = await validate({ row, dbx: dbTx, localParams });
-  //   }
-
-  //   return Object.entries(row).map(([fieldName, fieldValue]) => {
-  //     const col = this.opts.columns.find(c => c.name === fieldName);
-  //     if (!col) throw "Unexpected missing col name";
-
-  //     /**
-  //      * Add conversion functions for PostGIS data
-  //      */
-  //     let escapedVal = "";
-  //     if ((col.udt_name === "geometry" || col.udt_name === "geography") && isObject(fieldValue)) {
-
-  //       const dataKeys = Object.keys(fieldValue);
-  //       const funcName = dataKeys[0]!;
-  //       const func = convertionFuncs.find(f => f.name === funcName);
-  //       const funcArgs = fieldValue?.[funcName]
-  //       if (dataKeys.length !== 1 || !func || !Array.isArray(funcArgs)) {
-  //         throw `Expecting only one function key (${convertionFuncs.join(", ")}) \nwith an array of arguments \n within column (${fieldName}) data but got: ${JSON.stringify(fieldValue)} \nExample: { geo_col: { ST_GeomFromText: ["POINT(-71.064544 42.28787)", 4326] } }`;
-  //       }
-  //       escapedVal = func.getQuery(funcArgs);
-  //     } else if (col.udt_name === "text") {
-
-  //     } else {
-  //       /** Prevent pg-promise formatting jsonb */
-  //       const colIsJSON = ["json", "jsonb"].includes(col.data_type);
-  //       escapedVal = pgp.as.format(colIsJSON ? "$1:json" : "$1", [fieldValue])
-  //     }
-
-  //     /**
-  //      * Cast to type to avoid array errors (they do not cast automatically)
-  //      */
-  //     escapedVal += `::${col.udt_name}`
-
-  //     return {
-  //       escapedCol: asName(fieldName),
-  //       escapedVal,
-  //     }
-  //   });
-
-  // }
-
-  // async getInsertQuery(data: AnyObject[], allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRowBasic | undefined, localParams: LocalParams | undefined) {
-  //   const inserts = (await Promise.all(data.map(async d => {
-  //     const rowParts = await this.getRow(d, allowedCols, dbTx, validate, "insert", localParams);
-  //     return Object.fromEntries(rowParts.map(rp => [rp.escapedCol, rp.escapedVal]));
-  //   })));
-  //   const uniqueColumns = Array.from(new Set(inserts.flatMap(row => Object.keys(row))))
-  //   const values = inserts.map(row => `(${uniqueColumns.map(colName => row[colName] ?? 'DEFAULT')})`).join(",\n");
-  //   const whatToInsert = !uniqueColumns.length ? "DEFAULT VALUES" : `(${uniqueColumns}) VALUES ${values}`
-  //   return `INSERT INTO ${this.opts.tableName} ${whatToInsert} `;
-  // }
-  // async getUpdateQuery(data: AnyObject | AnyObject[], allowedCols: string[], dbTx: DBHandlerServer, validate: ValidateRowBasic | undefined, localParams: LocalParams | undefined): Promise<string> {
-  //   const res = (await Promise.all((Array.isArray(data) ? data : [data]).map(async d => {
-  //     const rowParts = await this.getRow(d, allowedCols, dbTx, validate, "update", localParams);
-  //     return `UPDATE ${this.opts.tableName} SET ` + rowParts.map(r => `${r.escapedCol} = ${r.escapedVal} `).join(",\n")
-  //   }))).join(";\n") + " ";
-  //   return res;
-  // }
-}

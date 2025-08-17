@@ -1,4 +1,4 @@
-import { Method, getObjectEntries, isObject, type ClientSchema } from "prostgles-types";
+import { Method, getObjectEntries, isObject } from "prostgles-types";
 import { AuthClientRequest, AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
 import { DBOFullyTyped } from "../DBSchemaBuilder";
 import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
@@ -13,11 +13,12 @@ import {
   DboTableCommand,
   ParsedTableRule,
   PublishMethods,
-  type PublishMethodsV2,
-  type PublishObject,
   PublishParams,
   RULE_TO_METHODS,
   parsePublishTableRule,
+  type PublishMethodsV2,
+  type PublishObject,
+  type PermissionScope,
 } from "./publishTypesAndUtils";
 
 export class PublishParser {
@@ -59,7 +60,8 @@ export class PublishParser {
       db: this.db,
       clientReq,
       tables: this.prostgles.dboBuilder.tables,
-      getClientDBHandlers: () => getClientHandlers(this.prostgles, clientReq),
+      getClientDBHandlers: (scope: PermissionScope | undefined) =>
+        getClientHandlers(this.prostgles, clientReq, scope),
     };
   }
 
@@ -135,19 +137,31 @@ export class PublishParser {
     if (clientInfo === "new-session-redirect") {
       throw "new-session-redirect";
     }
-    const rules = await this.getValidatedRequestRule({ tableName, command, clientReq }, clientInfo);
+    const rules = await this.getValidatedRequestRule(
+      { tableName, command, clientReq },
+      clientInfo,
+      undefined
+    );
     return rules;
   }
 
   async getValidatedRequestRule(
     { tableName, command, clientReq }: DboTableCommand,
-    clientInfo: AuthResultWithSID | undefined
+    clientInfo: AuthResultWithSID | undefined,
+    scope: PermissionScope | undefined
   ): Promise<ParsedTableRule> {
     if (!command || !tableName) throw "command OR tableName are missing";
 
-    const rtm = RULE_TO_METHODS.find((rtms) => rtms.methods.some((v) => v === command));
-    if (!rtm) {
+    const rule = RULE_TO_METHODS.find((rtms) => rtms.methods.some((v) => v === command));
+    if (!rule) {
       throw "Invalid command: " + command;
+    }
+
+    if (scope) {
+      const tableScope = scope.tables;
+      if (!tableScope?.[tableName] || !tableScope[tableName]?.[rule.sqlRule]) {
+        throw `Invalid or disallowed command: ${tableName}.${command}. The PermissionsScope does not allow this command.`;
+      }
     }
 
     /* Must be local request -> allow everything */
@@ -185,7 +199,7 @@ export class PublishParser {
       }
     }
 
-    if (!tableRule[rtm.rule]) {
+    if (!tableRule[rule.rule]) {
       throw {
         stack: ["getValidatedRequestRule()"],
         message: `Invalid or disallowed command: ${tableName}.${command}`,

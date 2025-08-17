@@ -1,16 +1,11 @@
-import { AnyObject, InsertParams, asName, isObject } from "prostgles-types";
+import { AnyObject, InsertParams, asName, getSerialisableError, isObject } from "prostgles-types";
 import { ParsedTableRule, ValidateRowBasic } from "../../../PublishParser/PublishParser";
-import {
-  LocalParams,
-  getErrorAsObject,
-  getSerializedClientErrorFromPGError,
-  withUserRLS,
-} from "../../DboBuilder";
-import { insertNestedRecords } from "./insertNestedRecords";
+import { LocalParams, getSerializedClientErrorFromPGError, withUserRLS } from "../../DboBuilder";
 import { prepareNewData } from "../DataValidator";
 import { TableHandler } from "../TableHandler";
 import { insertTest } from "../insertTest";
 import { runInsertUpdateQuery } from "../runInsertUpdateQuery";
+import { insertNestedRecords } from "./insertNestedRecords";
 
 export async function insert(
   this: TableHandler,
@@ -66,7 +61,7 @@ export async function insert(
       }
     }
     const isMultiInsert = Array.isArray(rowOrRows);
-    const rows = isMultiInsert ? rowOrRows : [rowOrRows];
+    const rows = isMultiInsert ? (rowOrRows as AnyObject[]) : [rowOrRows];
 
     requiredNestedInserts?.forEach(({ ftable, maxRows, minRows }) => {
       if (this.column_names.includes(ftable))
@@ -106,7 +101,7 @@ export async function insert(
           if (!localParams) throw "localParams missing for insert preValidate";
           row = await preValidate({
             row,
-            dbx: (this.tx?.dbTX || this.dboBuilder.dbo) as any,
+            dbx: this.tx?.dbTX || this.dboBuilder.dbo,
             localParams,
           });
         }
@@ -133,29 +128,28 @@ export async function insert(
 
     const pkeyNames = this.columns.filter((c) => c.is_pkey).map((c) => c.name);
     const getInsertQuery = async (_rows: AnyObject[]) => {
-      const validatedData = await Promise.all(
-        _rows.map(async (_row) => {
-          const row = { ..._row };
+      const validatedData = _rows.map((_row) => {
+        const row = { ..._row };
 
-          if (!isObject(row)) {
-            throw (
-              "\nInvalid insert data provided. Expected an object but received: " +
-              JSON.stringify(row)
-            );
-          }
+        if (!isObject(row)) {
+          throw (
+            "\nInvalid insert data provided. Expected an object but received: " +
+            JSON.stringify(row)
+          );
+        }
 
-          const { data: validatedRow, allowedCols } = await prepareNewData({
-            row,
-            forcedData,
-            allowedFields: fields,
-            tableRules,
-            removeDisallowedFields,
-            tableConfigurator: this.dboBuilder.prostgles.tableConfigurator,
-            tableHandler: this,
-          });
-          return { validatedRow, allowedCols };
-        })
-      );
+        const { data: validatedRow, allowedCols } = prepareNewData({
+          row,
+          forcedData,
+          allowedFields: fields,
+          tableRules,
+          removeDisallowedFields,
+          tableConfigurator: this.dboBuilder.prostgles.tableConfigurator,
+          tableHandler: this,
+        });
+        return { validatedRow, allowedCols };
+      });
+
       const validatedRows = validatedData.map((d) => d.validatedRow);
       const allowedCols = Array.from(new Set(validatedData.flatMap((d) => d.allowedCols)));
       const dbTx = finalDBtx || this.dboBuilder.dbo;
@@ -163,7 +157,7 @@ export async function insert(
         validate: validate as ValidateRowBasic,
         localParams,
       };
-      // const query = await this.colSet.getInsertQuery(validatedRows, allowedCols, dbTx, validate, localParams);
+
       const query = (
         await this.dataValidator.parse({
           command: "insert",
@@ -234,7 +228,7 @@ export async function insert(
       localParams,
       data: { rowOrRows, param2: insertParams },
       duration: Date.now() - start,
-      error: getErrorAsObject(e),
+      error: getSerialisableError(e),
     });
     throw getSerializedClientErrorFromPGError(e, {
       type: "tableMethod",
