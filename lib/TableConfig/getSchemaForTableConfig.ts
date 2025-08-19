@@ -41,6 +41,9 @@ export const getSchemaForTableConfig = async (t: pgPromise.ITask<{}>) => {
           column_name: string;
           column_name_escaped: string;
           column_default: string | null;
+          character_maximum_length: number | null;
+          numeric_precision: number | null;
+          numeric_scale: number | null;
           udt_name: string;
           is_nullable: boolean;
           ordinal_position: number;
@@ -74,6 +77,9 @@ export const getSchemaForTableConfig = async (t: pgPromise.ITask<{}>) => {
           udt_name,
           is_nullable = 'YES' as is_nullable,
           column_default,
+          character_maximum_length, 
+          numeric_precision, 
+          numeric_scale,
           c.ordinal_position
         FROM
           information_schema.columns c
@@ -130,7 +136,7 @@ export const getSchemaForTableConfig = async (t: pgPromise.ITask<{}>) => {
         AND t.table_schema = nsp.nspname
     ) con ON TRUE
     LEFT JOIN LATERAL (
-      SELECT jsonb_agg(to_jsonb(c.*)) as indexes
+      SELECT jsonb_agg(jsonb_strip_nulls(to_jsonb(c.*))) as indexes
       FROM (SELECT indexname, indexdef FROM pg_indexes)
       WHERE t.table_schema = schemaname 
       AND t.table_name = tablename

@@ -74,7 +74,7 @@ export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
   options: ProstglesInitOptions<S, SUser>;
   getClientDBHandlers: (
     clientReq: AuthClientRequest,
-    tablePermissions: PermissionScope | undefined
+    scope: PermissionScope | undefined
   ) => ReturnType<typeof getClientHandlers<S>>;
 };
 
@@ -273,10 +273,8 @@ export const initProstgles = async function (
         await sleep(1000);
         return true;
       },
-      getClientDBHandlers: (
-        clientReq: AuthClientRequest,
-        tablePermissions: PermissionScope | undefined
-      ) => getClientHandlers(this, clientReq, tablePermissions),
+      getClientDBHandlers: (clientReq: AuthClientRequest, scope: PermissionScope | undefined) =>
+        getClientHandlers(this, clientReq, scope),
     };
 
     return initResult;
