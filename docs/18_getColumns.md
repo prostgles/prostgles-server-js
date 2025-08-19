@@ -59,6 +59,9 @@ Retrieves columns metadata of the table/view
   - **column_default** <span style="color: grey">optional</span> <span style="color: green;">any</span>
 
     Column default value
+  - **character_maximum_length** <span style="color: grey">optional</span> <span style="color: green;">number | null | undefined</span>
+  - **numeric_precision** <span style="color: grey">optional</span> <span style="color: green;">number | null | undefined</span>
+  - **numeric_scale** <span style="color: grey">optional</span> <span style="color: green;">number | null | undefined</span>
   - **min** <span style="color: grey">optional</span> <span style="color: green;">string | number | undefined</span>
 
     Extracted from tableConfig
