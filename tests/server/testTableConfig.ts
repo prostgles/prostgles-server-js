@@ -134,15 +134,15 @@ export const testTableConfig: TableConfig<{ en: 1; fr: 1 }> = {
     columns: {
       id: "UUID",
       col1: {
+        nullable: true,
         references: {
           tableName: "lookup_col1",
-          nullable: true,
         },
       },
       col2: {
+        nullable: true,
         references: {
           tableName: "lookup_col1",
-          nullable: true,
         },
       },
     },

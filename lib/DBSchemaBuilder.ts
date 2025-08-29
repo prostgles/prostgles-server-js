@@ -57,13 +57,25 @@ export const getDBSchema = (dboBuilder: DboBuilder): string => {
               "      ",
               dboBuilder.tablesOrViews ?? []
             );
-          } else if (isObject(colConf) && "enum" in colConf) {
-            if (!colConf.enum) throw "colConf.enum missing";
-            const types = colConf.enum.map((t) => (typeof t === "number" ? t : JSON.stringify(t)));
-            if (colConf.nullable) {
-              types.unshift("null");
+          } else if (isObject(colConf)) {
+            const addEnumTypes = (enumVals: any[] | readonly any[], nullable: boolean) => {
+              const types = enumVals.map((t) => (typeof t === "number" ? t : JSON.stringify(t)));
+              if (nullable) {
+                types.unshift("null");
+              }
+              type = types.join(" | ");
+            };
+            if ("enum" in colConf) {
+              if (!colConf.enum) throw "colConf.enum missing";
+              addEnumTypes(colConf.enum, !!colConf.nullable);
+            } else if ("references" in colConf && colConf.references) {
+              const tc =
+                dboBuilder.prostgles.tableConfigurator?.config[colConf.references.tableName];
+              if (tc && "isLookupTable" in tc) {
+                const enumValus = Object.keys(tc.isLookupTable.values);
+                addEnumTypes(enumValus, !!colConf.nullable);
+              }
             }
-            type = types.join(" | ");
           }
         }
         /**

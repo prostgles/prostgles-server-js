@@ -10,11 +10,13 @@ import {
   TextFilterKeys,
   TextFilter_FullTextSearchFilterKeys,
   getKeys,
+  includes,
+  isDefined,
   isEmpty,
   isObject,
 } from "prostgles-types";
-import { SelectItem, type SelectItemValidated } from "./DboBuilder/QueryBuilder/QueryBuilder";
 import { pgp } from "./DboBuilder/DboBuilderTypes";
+import { type SelectItemValidated } from "./DboBuilder/QueryBuilder/QueryBuilder";
 
 export const FILTER_OPERANDS = [
   ...TextFilterKeys,
@@ -247,19 +249,19 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
   /* Matching sel item */
   if (isObject(rightF)) {
     const filterKeys = Object.keys(rightF);
-    let filterOperand: (typeof FILTER_OPERANDS)[number] = filterKeys[0] as any;
+    let filterOperand = filterKeys[0] as (typeof FILTER_OPERANDS)[number];
 
     /** JSON cannot be compared so we'll cast it to TEXT */
-    if (selItem.column_udt_type === "json" || TextFilterKeys.includes(filterOperand as any)) {
+    if (selItem.column_udt_type === "json" || includes(TextFilterKeys, filterOperand)) {
       leftQ += "::TEXT ";
     }
 
     /** It's an object key which means it's an equality comparison against a json object */
-    if (selItem.column_udt_type?.startsWith("json") && !FILTER_OPERANDS.includes(filterOperand)) {
+    if (selItem.column_udt_type?.startsWith("json") && !includes(FILTER_OPERANDS, filterOperand)) {
       return leftQ + " = " + parseRightVal(rightF);
     }
 
-    let filterValue: string | null | number | Date | any[] = rightF[filterOperand];
+    let filterValue = rightF[filterOperand] as string | null | number | Date | any[];
     const ALLOWED_FUNCS = [...GeomFilter_Funcs, ...TextFilter_FullTextSearchFilterKeys] as const;
     let funcName: undefined | (typeof ALLOWED_FUNCS)[number];
     let funcArgs: undefined | any[];
@@ -273,7 +275,10 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       filterValue = Object.entries(rightF)
         .map(([k, v]) => `${v}${k}`)
         .join(" ");
-    } else if (filterKeys.length !== 1 && selItem.column_udt_type !== "jsonb") {
+    } else if (
+      (filterKeys.length !== 1 || !isDefined(filterOperand)) &&
+      selItem.column_udt_type !== "jsonb"
+    ) {
       return mErr("Bad filter. Expecting one key only");
     } else if (isObject(filterValue) && !(filterValue instanceof Date)) {
       /**
@@ -282,7 +287,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
        */
       const filterValueKeys = Object.keys(filterValue);
       funcName = filterValueKeys[0] as any;
-      if (ALLOWED_FUNCS.includes(funcName as any)) {
+      if (includes(ALLOWED_FUNCS, funcName)) {
         funcArgs = filterValue[funcName as any];
       } else {
         funcName = undefined;
@@ -291,9 +296,9 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
 
     /** st_makeenvelope */
     if (
-      GeomFilterKeys.includes(filterOperand as any) &&
+      includes(GeomFilterKeys, filterOperand) &&
       funcName &&
-      GeomFilter_Funcs.includes(funcName as any)
+      includes(GeomFilter_Funcs, funcName)
     ) {
       /**
        * If leftQ is geography then:

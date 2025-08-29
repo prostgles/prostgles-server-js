@@ -519,8 +519,8 @@ export type DBGeneratedSchema = {
     update: true;
     delete: true;
     columns: {
-      col1?: null | string;
-      col2?: null | string;
+      col1?: null | "a" | "b"
+      col2?: null | "a" | "b"
       id?: null | string;
     };
   };

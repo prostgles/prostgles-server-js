@@ -40,6 +40,8 @@ export const getColumnDefinitionQuery = async ({
         { jsonbSchema: undefined, jsonbSchemaType: colConf.jsonbSchemaType }
       : undefined;
 
+    const defaultValueSQL =
+      colConf.defaultValue !== undefined ? ` DEFAULT ${asValue(colConf.defaultValue)}` : "";
     if (jsonbSchema) {
       const jsonbSchemaStr =
         asValue({
@@ -67,8 +69,13 @@ export const getColumnDefinitionQuery = async ({
 
       return `${getColTypeDef(colConf, "JSONB")} CHECK(${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${colNameEsc}, ${asValue({ table, column })} ))`;
     } else if ("references" in colConf && colConf.references) {
-      const { tableName: lookupTable, columnName: lookupCol = "id" } = colConf.references;
-      return `${getColTypeDef(colConf.references, "TEXT")} REFERENCES ${lookupTable} (${lookupCol}) `;
+      const {
+        tableName: lookupTable,
+        columnName: lookupCol = "id",
+        onDelete,
+        onUpdate,
+      } = colConf.references;
+      return `${getColTypeDef(colConf, "TEXT")} ${defaultValueSQL} REFERENCES ${lookupTable} (${lookupCol}) ${onDelete ? ` ON DELETE ${onDelete}` : ""} ${onUpdate ? ` ON UPDATE ${onUpdate}` : ""}`;
     } else if ("sqlDefinition" in colConf && colConf.sqlDefinition) {
       return `${colConf.sqlDefinition} `;
     } else if ("isText" in colConf && colConf.isText) {
@@ -88,7 +95,7 @@ export const getColumnDefinitionQuery = async ({
       if (!colConf.enum?.length) throw new Error("colConf.enum Must not be empty");
       const type = colConf.enum.every((v) => Number.isFinite(v)) ? "NUMERIC" : "TEXT";
       const checks = colConf.enum.map((v) => `${colNameEsc} = ${asValue(v)}`).join(" OR ");
-      return `${type} ${colConf.nullable ? "" : "NOT NULL"} ${"defaultValue" in colConf ? ` DEFAULT ${asValue(colConf.defaultValue)}` : ""} CHECK(${checks})`;
+      return `${type} ${colConf.nullable ? "" : "NOT NULL"} ${defaultValueSQL} CHECK(${checks})`;
     } else {
       return undefined;
       // throw "Unknown column config: " + JSON.stringify(colConf);

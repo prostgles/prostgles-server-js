@@ -1,6 +1,7 @@
 import {
   asName,
   ColumnInfo,
+  includes,
   isEmpty,
   isObject,
   PG_COLUMN_UDT_DATA_TYPE,
@@ -205,7 +206,7 @@ const JSON_Funcs: FunctionSpec[] = [
     type: "function",
     getFields: ([column]) => column,
     getQuery: ({ args: [colName, jsonPath, ...otherArgs], tableAlias, allowedFields }) => {
-      if (!allowedFields.includes(colName)) {
+      if (!includes(allowedFields, colName)) {
         throw `Unexpected: column ${colName} not found`;
       }
       if (!jsonPath || typeof jsonPath !== "string") {

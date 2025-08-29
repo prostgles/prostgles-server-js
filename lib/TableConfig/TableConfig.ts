@@ -169,16 +169,18 @@ type MediaColumn = {
     }
 );
 
-type ReferencedColumn = {
+type ReferencedColumn = BaseColumnTypes & {
   /**
    * Will create a lookup table that this column will reference
    */
-  references?: BaseColumnTypes & {
+  references?: {
     tableName: string;
     /**
      * Defaults to id
      */
     columnName?: string;
+    onDelete?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION" | "SET DEFAULT";
+    onUpdate?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION" | "SET DEFAULT";
   };
 };
 
