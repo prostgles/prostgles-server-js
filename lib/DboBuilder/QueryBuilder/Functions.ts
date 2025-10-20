@@ -926,14 +926,15 @@ export const FUNCTIONS: FunctionSpec[] = [
    * Interval funcs
    * (col1, col2?, trunc )
    * */
-  ...["age", "ageNow", "difference"].map(
+  ...(["age", "ageNow", "difference"] as const).map(
     (funcName) =>
       ({
         name: "$" + funcName,
         type: "function",
         numArgs: 2,
         singleColArg: true,
-        getFields: (args: any[]) => args.slice(0, 2).filter((a) => typeof a === "string"), // Filtered because the second arg is optional
+        // Filtered because the second arg is optional
+        getFields: (args: any[]) => args.slice(0, 2).filter((a) => typeof a === "string"),
         getQuery: ({ args, tableAlias, allColumns }) => {
           const validColCount = args.slice(0, 2).filter((a) => typeof a === "string").length;
           const trunc = args[2];

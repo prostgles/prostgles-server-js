@@ -508,7 +508,7 @@ export type DbTableInfo = {
 };
 export type PermissionScope = {
   sql?: true;
-  tables?: Record<string, Partial<Record<"select" | "update" | "delete" | "insert", true>>>;
+  tables?: Record<string, Partial<Record<"select" | "update" | "delete" | "insert", boolean>>>;
   methods?: Record<string, true>;
 };
 export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
