@@ -1,5 +1,6 @@
 import {
   getKeys,
+  type AnyObject,
   type Method,
   type SQLHandler,
   type SQLOptions,
@@ -48,15 +49,21 @@ export const getClientHandlers = async <S = void>(
       throw new Error("Transactions are not allowed in client handlers");
     },
   };
+  const sqlPermission = scope?.sql;
+  const sqlHandlerRolledBack = (query: string, params?: AnyObject, options?: SQLOptions) =>
+    sql(query, params, { ...options, returnType: "default-with-rollback" });
+  const sqlHandler =
+    !sqlPermission ?
+      () => {
+        throw new Error("SQL is dissallowed by PermissionScope");
+      }
+    : sqlPermission === "commited" ? sql
+    : sqlHandlerRolledBack;
+
   const clientDb = {
     ...tableHandlers,
     ...txNotAllowed,
-    sql:
-      scope && !scope.sql ?
-        () => {
-          throw new Error("SQL is dissallowed by PermissionScope");
-        }
-      : sql,
+    sql: sqlHandler,
   } as DBOFullyTyped<S, false>;
 
   const clientMethods: Record<string, Method> = Object.fromEntries(

@@ -507,9 +507,9 @@ export type DbTableInfo = {
   columns: TableSchemaColumn[];
 };
 export type PermissionScope = {
-  sql?: true;
+  sql?: "commited" | "rolledback";
   tables?: Record<string, Partial<Record<"select" | "update" | "delete" | "insert", boolean>>>;
-  methods?: Record<string, true>;
+  methods?: Record<string, boolean>;
 };
 export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
   sid: string | undefined;

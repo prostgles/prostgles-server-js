@@ -133,13 +133,7 @@ export const runClientRequest = async function (
     validRules,
     localParams
   ) as AnyObject | undefined;
-  // This approach is breaking context
-  // const result = await (tableCommand as TableMethodFunctionWithRulesAndLocalParams)(param1, param2, param3, validRules, localParams);
-  // return result;
 };
-
-// const getReqInfoClient = <A extends AuthClientRequest>(args: A): AuthClientRequest =>
-//   args.httpReq ? { res: args.res, httpReq: args.httpReq } : { socket: args.socket };
 
 export const clientCanRunSqlRequest = async function (
   this: Prostgles,
