@@ -301,14 +301,13 @@ export async function syncData(
             total: data.length,
           };
         })
-        .catch((err) => {
+        .catch((err: any) => {
           console.trace(
-            "Something went wrong with syncing to server: \n ->",
-            err,
+            "Something went wrong with syncing to server: " + err.message,
             data.length,
             id_fields
           );
-          return Promise.reject("Something went wrong with syncing to server: ");
+          return Promise.reject(new Error("Something went wrong with syncing to server: "));
         });
 
       await this._log({
