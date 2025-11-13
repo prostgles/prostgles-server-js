@@ -681,6 +681,21 @@ export const FUNCTIONS: FunctionSpec[] = [
     },
   },
   {
+    name: "$column",
+    description: ` :[column_name] -> Returns the column value as is`,
+    type: "function",
+    numArgs: 1,
+    singleColArg: false,
+    getFields: (args: any[]) => [args[0]],
+    getQuery: ({ allowedFields, args, tableAlias }) => {
+      const aliasedColumnName = args[0];
+      if (!aliasedColumnName) {
+        throw `$column: column_name is required`;
+      }
+      return pgp.as.format(asNameAlias(aliasedColumnName, tableAlias));
+    },
+  },
+  {
     name: "$unnest_words",
     description: ` :[column_name] -> Splits string at spaces`,
     type: "function",

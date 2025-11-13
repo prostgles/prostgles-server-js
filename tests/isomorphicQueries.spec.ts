@@ -1101,6 +1101,19 @@ export const isomorphicQueries = async (
         { name: "b", count: "1" },
       ]);
     });
+    await test("Column alias func", async () => {
+      const res = await db.items.find!(
+        {},
+        {
+          select: { label: { $column: ["name"] }, count: { $countAll: [] } },
+          orderBy: { count: -1 },
+        }
+      );
+      assert.deepStrictEqual(res, [
+        { label: "a", count: "2" },
+        { label: "b", count: "1" },
+      ]);
+    });
     await test("Order by colliding alias name", async () => {
       const res = await db.items.find!(
         {},
