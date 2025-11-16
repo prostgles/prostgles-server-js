@@ -1,5 +1,5 @@
-import { SQLResult, asName } from "prostgles-types";
-import { omitKeys, tryCatchV2 } from "prostgles-types/dist/util";
+import { SQLResult, asName, type ValidatedColumnInfo } from "prostgles-types";
+import { isDefined, omitKeys, tryCatchV2 } from "prostgles-types/dist/util";
 import { DboBuilder } from "../DboBuilder/DboBuilder";
 import { DBorTx } from "../Prostgles";
 import { ProstglesInitOptions } from "../ProstglesTypes";
@@ -250,11 +250,11 @@ export async function getTablesForSchemaPostgresSQL(
       console.error(getHyperTablesReq.error);
     }
 
-    let result = getTablesAndViews.data!.tablesAndViews.concat(
+    let tableSchemaList = getTablesAndViews.data!.tablesAndViews.concat(
       getMaterialViewsReq.data!.materialViews
     );
-    result = await Promise.all(
-      result.map(async (table) => {
+    tableSchemaList = await Promise.all(
+      tableSchemaList.map(async (table) => {
         table.name = table.escaped_identifier;
         /** This is used to prevent bug of table schema not sent */
         const allowAllIfNoColumns = !table.columns.length ? true : undefined;
@@ -277,42 +277,64 @@ export async function getTablesForSchemaPostgresSQL(
         });
 
         /** Get view reference cols (based on parent table) */
-        let viewFCols: Pick<TableSchemaColumn, "name" | "references">[] = [];
+        const viewReferenceColumns: Pick<TableSchemaColumn, "name" | "references">[] = [];
         if (table.is_view && table.view_definition) {
           try {
             const view_definition =
               table.view_definition.endsWith(";") ?
                 table.view_definition.slice(0, -1)
               : table.view_definition;
-            const { fields } = (await runSQL(
+            const { fields: viewFieldsWithInfo } = (await runSQL(
               `SELECT * FROM \n ( ${view_definition} \n) t LIMIT 0`,
               {},
               {},
               undefined
             )) as SQLResult<undefined>;
-            const ftables = result.filter((r) => fields.some((f) => f.tableID === r.oid));
-            ftables.forEach((ft) => {
-              const fFields = fields.filter((f) => f.tableID === ft.oid);
-              const pkeys = ft.columns.filter((c) => c.is_pkey);
-              const fFieldPK = fFields.filter((ff) => pkeys.some((p) => p.name === ff.columnName));
-              const refCols =
-                pkeys.length && fFieldPK.length === pkeys.length ?
-                  fFieldPK
-                : fFields.filter((ff) => !["json", "jsonb", "xml"].includes(ff.udt_name));
-              const _fcols: typeof viewFCols = refCols.map((ff) => {
-                const d: Pick<TableSchemaColumn, "name" | "references"> = {
-                  name: ff.columnName!,
-                  references: [
-                    {
-                      ftable: ft.name,
-                      fcols: [ff.columnName!],
-                      cols: [ff.name],
-                    },
-                  ],
+            const viewTables = tableSchemaList.filter((r) =>
+              viewFieldsWithInfo.some((f) => f.tableID === r.oid)
+            );
+            viewTables.forEach((viewTable) => {
+              const viewTableColumnsUsed = viewFieldsWithInfo
+                .map(({ columnName, ...col }) => {
+                  if (!columnName || col.tableID !== viewTable.oid) return;
+                  return {
+                    ...col,
+                    columnName,
+                  };
+                })
+                .filter(isDefined);
+              const viewTablePKeys = viewTable.columns.filter((c) => c.is_pkey);
+              const viewTableColumnsUsedPKeys = viewTableColumnsUsed.filter((ff) =>
+                viewTablePKeys.some((p) => p.name === ff.columnName)
+              );
+
+              const addReferences = (referenceCols: typeof viewTableColumnsUsedPKeys) => {
+                const reference: { ftable: string; fcols: string[]; cols: string[] } = {
+                  ftable: viewTable.name,
+                  cols: [],
+                  fcols: [],
                 };
-                return d;
-              });
-              viewFCols = [...viewFCols, ..._fcols];
+                referenceCols.forEach(({ name: viewColumnName, columnName: tableColumnName }) => {
+                  reference.cols.push(viewColumnName);
+                  reference.fcols.push(tableColumnName);
+                });
+                reference.cols.forEach((colName) => {
+                  viewReferenceColumns.push({
+                    name: colName,
+                    references: [reference],
+                  });
+                });
+              };
+              const canTransferPKeys =
+                viewTablePKeys.length && viewTableColumnsUsedPKeys.length === viewTablePKeys.length;
+              if (canTransferPKeys) {
+                addReferences(viewTableColumnsUsedPKeys);
+              } else {
+                const comparableColumns = viewTableColumnsUsed.filter(
+                  (ff) => !["json", "jsonb", "xml"].includes(ff.udt_name)
+                );
+                addReferences(comparableColumns);
+              }
             });
           } catch (err) {
             console.error(err);
@@ -333,7 +355,7 @@ export async function getTablesForSchemaPostgresSQL(
               : null;
           }
 
-          const viewFCol = viewFCols.find((fc) => fc.name === col.name);
+          const viewFCol = viewReferenceColumns.find((fc) => fc.name === col.name);
           if (viewFCol) {
             col.references = viewFCol.references;
           }
@@ -351,7 +373,7 @@ export async function getTablesForSchemaPostgresSQL(
     );
 
     const res = {
-      result,
+      result: tableSchemaList,
       durations: {
         matv: getMaterialViewsReq.duration,
         columns: getTVColumns.duration,
