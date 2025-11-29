@@ -1,5 +1,5 @@
-import { DBorTx } from "../Prostgles";
-import { ProstglesInitOptions } from "../ProstglesTypes";
+import { DBorTx } from "../../Prostgles";
+import { ProstglesInitOptions } from "../../ProstglesTypes";
 import { getSchemaFilter } from "./getTablesForSchemaPostgresSQL";
 
 export const getMaterialViews = (db: DBorTx, schema: ProstglesInitOptions["schemaFilter"]) => {

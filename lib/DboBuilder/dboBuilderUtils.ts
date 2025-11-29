@@ -17,7 +17,7 @@ import { DB } from "../Prostgles";
 import { LocalParams, SortItem, pgp } from "./DboBuilderTypes";
 import { asNameAlias } from "./QueryBuilder/QueryBuilder";
 import { ViewHandler } from "./ViewHandler/ViewHandler";
-import { getSchemaFilter } from "./getTablesForSchemaPostgresSQL";
+import { getSchemaFilter } from "./schema/getTablesForSchemaPostgresSQL";
 
 import { ProstglesInitOptions } from "../ProstglesTypes";
 import { sqlErrCodeToMsg } from "./sqlErrCodeToMsg";

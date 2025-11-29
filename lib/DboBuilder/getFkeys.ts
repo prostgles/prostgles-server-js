@@ -1,6 +1,6 @@
 import type pgPromise from "pg-promise";
 import { tryCatchV2 } from "prostgles-types";
-import type { getSchemaFilter } from "./getTablesForSchemaPostgresSQL";
+import type { getSchemaFilter } from "./schema/getTablesForSchemaPostgresSQL";
 
 export const getFkeys = async (
   t: pgPromise.ITask<{}>,

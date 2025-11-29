@@ -40,7 +40,7 @@ import {
   getConstraints,
   getSerializedClientErrorFromPGError,
 } from "./dboBuilderUtils";
-import { getTablesForSchemaPostgresSQL } from "./getTablesForSchemaPostgresSQL";
+import { getTablesForSchemaPostgresSQL } from "./schema/getTablesForSchemaPostgresSQL";
 import { prepareShortestJoinPaths } from "./prepareShortestJoinPaths";
 import { cacheDBTypes, runSQL } from "./runSQL";
 

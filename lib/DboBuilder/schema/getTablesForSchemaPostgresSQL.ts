@@ -1,12 +1,13 @@
-import { SQLResult, asName, type ValidatedColumnInfo } from "prostgles-types";
-import { isDefined, omitKeys, tryCatchV2 } from "prostgles-types/dist/util";
-import { DboBuilder } from "../DboBuilder/DboBuilder";
-import { DBorTx } from "../Prostgles";
-import { ProstglesInitOptions } from "../ProstglesTypes";
-import { clone } from "../utils";
-import { TableSchema, TableSchemaColumn } from "./DboBuilderTypes";
-import { getFkeys } from "./getFkeys";
+import { asName, tryCatchV2 } from "prostgles-types";
+import { omitKeys } from "prostgles-types/dist/util";
+import { DBorTx } from "../../Prostgles";
+import { ProstglesInitOptions } from "../../ProstglesTypes";
+import { clone } from "../../utils";
+import { DboBuilder } from "../DboBuilder";
+import { TableSchema, TableSchemaColumn } from "../DboBuilderTypes";
+import { getFkeys } from "../getFkeys";
 import { getMaterialViews } from "./getMaterialViews";
+import { getViewReferenceColumns } from "./getViewReferenceColumns";
 
 export const getSchemaFilter = (schema: ProstglesInitOptions["schemaFilter"] = { public: 1 }) => {
   const schemaNames = Object.keys(schema);
@@ -277,69 +278,7 @@ export async function getTablesForSchemaPostgresSQL(
         });
 
         /** Get view reference cols (based on parent table) */
-        const viewReferenceColumns: Pick<TableSchemaColumn, "name" | "references">[] = [];
-        if (table.is_view && table.view_definition) {
-          try {
-            const view_definition =
-              table.view_definition.endsWith(";") ?
-                table.view_definition.slice(0, -1)
-              : table.view_definition;
-            const { fields: viewFieldsWithInfo } = (await runSQL(
-              `SELECT * FROM \n ( ${view_definition} \n) t LIMIT 0`,
-              {},
-              {},
-              undefined
-            )) as SQLResult<undefined>;
-            const viewTables = tableSchemaList.filter((r) =>
-              viewFieldsWithInfo.some((f) => f.tableID === r.oid)
-            );
-            viewTables.forEach((viewTable) => {
-              const viewTableColumnsUsed = viewFieldsWithInfo
-                .map(({ columnName, ...col }) => {
-                  if (!columnName || col.tableID !== viewTable.oid) return;
-                  return {
-                    ...col,
-                    columnName,
-                  };
-                })
-                .filter(isDefined);
-              const viewTablePKeys = viewTable.columns.filter((c) => c.is_pkey);
-              const viewTableColumnsUsedPKeys = viewTableColumnsUsed.filter((ff) =>
-                viewTablePKeys.some((p) => p.name === ff.columnName)
-              );
-
-              const addReferences = (referenceCols: typeof viewTableColumnsUsedPKeys) => {
-                const reference: { ftable: string; fcols: string[]; cols: string[] } = {
-                  ftable: viewTable.name,
-                  cols: [],
-                  fcols: [],
-                };
-                referenceCols.forEach(({ name: viewColumnName, columnName: tableColumnName }) => {
-                  reference.cols.push(viewColumnName);
-                  reference.fcols.push(tableColumnName);
-                });
-                reference.cols.forEach((colName) => {
-                  viewReferenceColumns.push({
-                    name: colName,
-                    references: [reference],
-                  });
-                });
-              };
-              const canTransferPKeys =
-                viewTablePKeys.length && viewTableColumnsUsedPKeys.length === viewTablePKeys.length;
-              if (canTransferPKeys) {
-                addReferences(viewTableColumnsUsedPKeys);
-              } else {
-                const comparableColumns = viewTableColumnsUsed.filter(
-                  (ff) => !["json", "jsonb", "xml"].includes(ff.udt_name)
-                );
-                addReferences(comparableColumns);
-              }
-            });
-          } catch (err) {
-            console.error(err);
-          }
-        }
+        const viewReferenceColumns = await getViewReferenceColumns(table, tableSchemaList, runSQL);
 
         table.columns = table.columns.map((col) => {
           if (col.has_default) {
@@ -355,7 +294,7 @@ export async function getTablesForSchemaPostgresSQL(
               : null;
           }
 
-          const viewFCol = viewReferenceColumns.find((fc) => fc.name === col.name);
+          const viewFCol = viewReferenceColumns?.find((fc) => fc.name === col.name);
           if (viewFCol) {
             col.references = viewFCol.references;
           }
