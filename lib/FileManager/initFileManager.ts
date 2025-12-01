@@ -234,10 +234,6 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
               signed_url_expires: EXPIRES,
             }
           );
-          // await mediaTableHandler.update!(
-          //   { id: media.id },
-          //   { signed_url: url, signed_url_expires: EXPIRES }
-          // );
         }
 
         res.redirect(url);
