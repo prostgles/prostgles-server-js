@@ -8,6 +8,7 @@ import { Prostgles } from "../Prostgles";
 import type { SchemaRelatedOptions } from "../TableConfig/getCreateSchemaQueries";
 import { runClientRequest } from "../runClientRequest";
 import { FileManager, HOUR, LocalConfig } from "./FileManager";
+import { join } from "path";
 
 export const getFileManagerSchema = ({
   fileTable,
@@ -224,14 +225,14 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
         if (!url || expires < EXPIRES) {
           url = await this.getFileCloudDownloadURL(media.name, 60 * 60);
           await mediaTableHandler.update(
-            { name },
+            { id: media.id },
             { signed_url: url, signed_url_expires: EXPIRES }
           );
         }
 
         res.redirect(url);
       } else {
-        const pth = `${(this.config as LocalConfig).localFolderPath}/${media.name}`;
+        const pth = join((this.config as LocalConfig).localFolderPath, media.name);
         if (!fs.existsSync(pth)) {
           throw new Error("File not found");
         }
