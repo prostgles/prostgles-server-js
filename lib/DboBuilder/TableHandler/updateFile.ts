@@ -1,4 +1,4 @@
-import { AnyObject, getKeys, isObject, omitKeys } from "prostgles-types";
+import { AnyObject, getJSONBObjectSchemaValidationError, omitKeys } from "prostgles-types";
 import { ParsedTableRule, ValidateRowBasic } from "../../PublishParser/PublishParser";
 import { LocalParams, Media } from "../DboBuilder";
 import { isFile, uploadFile } from "../uploadFile";
@@ -22,16 +22,13 @@ export const updateFile = async function (
   if (localParams?.testRule) {
     return { newData: {} };
   }
-  const existingMediaId: string =
-    (
-      !(
-        !isObject(filter) ||
-        getKeys(filter).join() !== "id" ||
-        typeof (filter as any).id !== "string"
-      )
-    ) ?
-      (filter as any).id
-    : undefined;
+
+  const { data } = getJSONBObjectSchemaValidationError(
+    { id: { optional: true, type: "string" } },
+    filter,
+    "filter"
+  );
+  const existingMediaId = data?.id;
   if (!existingMediaId) {
     throw new Error(
       `Updating the file table with file data can only be done by providing a single id filter. E.g. { id: "9ea4e23c-2b1a-4e33-8ec0-c15919bb45ec" } `
@@ -52,7 +49,7 @@ export const updateFile = async function (
         return rule.validate!({
           update: row,
           filter,
-          dbx: (this.tx?.dbTX || this.dboBuilder.dbo) as any,
+          dbx: this.tx?.dbTX || this.dboBuilder.dbo,
           localParams: localParams!,
         });
       }

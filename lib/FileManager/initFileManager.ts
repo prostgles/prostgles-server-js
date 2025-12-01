@@ -171,11 +171,11 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
   this.path = fileServeRoute;
 
   app.get(this.fileRouteExpress, async (req, res) => {
-    const mediaTableHandler = this.dbo[fileTableName] as unknown as TableHandler | undefined;
+    const mediaTableHandler = this.dbo[fileTableName];
     if (!mediaTableHandler) {
       res
         .status(HTTP_FAIL_CODES.INTERNAL_SERVER_ERROR)
-        .json(`Internal error: media table (${fileTableName}) not valid`);
+        .json(`Internal error: media table (${fileTableName}) not valid or not allowed`);
       return false;
     }
 
@@ -224,20 +224,30 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
         const EXPIRES = Date.now() + HOUR;
         if (!url || expires < EXPIRES) {
           url = await this.getFileCloudDownloadURL(media.name, 60 * 60);
-          await mediaTableHandler.update(
-            { id: media.id },
-            { signed_url: url, signed_url_expires: EXPIRES }
+
+          await this.db.any(
+            "UPDATE ${fileTableName:name} SET signed_url = ${signed_url}, signed_url_expires = ${signed_url_expires} WHERE id = ${id}",
+            {
+              fileTableName,
+              id: media.id,
+              signed_url: url,
+              signed_url_expires: EXPIRES,
+            }
           );
+          // await mediaTableHandler.update!(
+          //   { id: media.id },
+          //   { signed_url: url, signed_url_expires: EXPIRES }
+          // );
         }
 
         res.redirect(url);
       } else {
-        const pth = join((this.config as LocalConfig).localFolderPath, media.name);
-        if (!fs.existsSync(pth)) {
+        const localFilePath = join((this.config as LocalConfig).localFolderPath, media.name);
+        if (!fs.existsSync(localFilePath)) {
           throw new Error("File not found");
         }
         res.contentType(media.content_type);
-        res.sendFile(pth);
+        res.sendFile(localFilePath);
       }
     } catch (e) {
       console.log(e);
