@@ -1,39 +1,60 @@
 import { isDefined } from "prostgles-types";
 import type { ExpressApp } from "../../RestApi";
 import { matchesRoute } from "../AuthHandler";
+import { Express } from "express";
+
+const getRouter = (app: ExpressApp | Express) => {
+  const router = (app._router || app.router) as ExpressApp["_router"] | undefined;
+  if (typeof router === "string") {
+    throw new Error("app.router is a string");
+  }
+  const stack = router?.stack;
+
+  if (!stack) {
+    throw new Error("app._router or app.router is missing");
+  }
+  return {
+    getStack: () => {
+      const { stack } = router;
+      if (!stack) {
+        throw new Error("app._router.stack or app.router.stack is missing");
+      }
+      return stack;
+    },
+    router,
+  };
+};
 
 export const removeExpressRoute = (
-  app: ExpressApp | undefined,
+  app: ExpressApp | Express | undefined,
   _routePaths: (string | undefined)[],
   method?: "get" | "post" | "put" | "delete"
 ) => {
-  const routes = app?._router?.stack;
+  if (!app) return;
   const routePaths = _routePaths.filter(isDefined);
-  if (routes) {
-    app._router!.stack = routes.filter((route) => {
-      const path = route.route?.path;
-      const matchesForRemoval =
-        path &&
-        routePaths.some((routePath) => matchesRoute(routePath, path)) &&
-        (!method || route.route?.methods?.[method]);
+  const { router, getStack } = getRouter(app);
+  const newRoutes = getStack().filter((route) => {
+    const path = route.route?.path;
+    const matchesForRemoval =
+      path &&
+      routePaths.some((routePath) => matchesRoute(routePath, path)) &&
+      (!method || route.route?.methods?.[method]);
 
-      return !matchesForRemoval;
-    });
-  }
+    return !matchesForRemoval;
+  });
+  router.stack = newRoutes;
 };
 
-let testedApp: ExpressApp | undefined;
-export const removeExpressRoutesTest = async (app: ExpressApp) => {
+let testedApp: ExpressApp | Express | undefined;
+export const removeExpressRoutesTest = async (app: ExpressApp | Express) => {
   if (testedApp) return;
   app.get("/removeExpressRoute", (req, res) => {
     res.json({ v: 1 });
   });
-  if (!app._router?.stack) {
-    throw "removeExpressRoutesTest failed app._router.stack is missing";
-  }
-  const currentRoutes = app._router.stack.slice(0);
+  const { getStack } = getRouter(app);
+  const currentRoutes = getStack().slice(0);
   removeExpressRoute(app, ["/removeExpressRoute"]);
-  if (app._router.stack.length !== currentRoutes.length - 1) {
+  if (getStack().length !== currentRoutes.length - 1) {
     throw "removeExpressRoutesTest failed app._router.stack length is not correct";
   }
   /** Full test */

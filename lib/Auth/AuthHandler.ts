@@ -38,7 +38,7 @@ export const AUTH_ROUTES_AND_PARAMS = {
   logout: "/logout",
   magicLinks: "/magic-link",
   magicLinkWithId: "/magic-link/:id",
-  catchAll: "*", //v5 "*splat"
+  catchAll: "*splat", //v5 "*splat" //v4 "*"
 } as const;
 
 export class AuthHandler {

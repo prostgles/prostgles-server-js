@@ -9,25 +9,28 @@ import { VoidFunction } from "./SchemaWatch/SchemaWatch";
 import { isDefined } from "prostgles-types";
 const jsonParser = bodyParser.json();
 
-export type ExpressApp = {
-  _router?: {
-    stack?: {
-      name: string;
-      handle: VoidFunction;
-      path: undefined;
-      keys?: any[];
-      route?: {
-        path?: string;
-        methods?: {
-          get?: boolean;
-          post?: boolean;
-          put?: boolean;
-          delete?: boolean;
-        };
+type ExpressInternalRouter = {
+  stack?: {
+    name: string;
+    handle: VoidFunction;
+    path: undefined;
+    keys?: any[];
+    route?: {
+      path?: string;
+      methods?: {
+        get?: boolean;
+        post?: boolean;
+        put?: boolean;
+        delete?: boolean;
       };
-    }[];
-  };
-} & Omit<Express, "_router">;
+    };
+  }[];
+};
+
+export type ExpressApp = {
+  _router?: ExpressInternalRouter;
+  router?: ExpressInternalRouter;
+} & Omit<Express, "_router" | "router">;
 
 export type RestApiConfig = {
   /**
@@ -49,7 +52,7 @@ export class RestApi {
     methods: string;
     schema: string;
   };
-  expressApp: Express;
+  expressApp: ExpressApp;
   path = "/api";
   constructor({ expressApp, path, prostgles }: RestApiConfig & { prostgles: Prostgles }) {
     if (isDefined(path) && !path.trim()) {
@@ -63,7 +66,7 @@ export class RestApi {
       methods: `${path}/methods/:method`,
       schema: `${path}/schema`,
     };
-    this.expressApp = expressApp;
+    this.expressApp = expressApp as ExpressApp;
     expressApp.post(this.routes.db, jsonParser, this.onPostTableCommand);
     expressApp.post(this.routes.sql, jsonParser, this.onPostSql);
     expressApp.post(this.routes.methods, jsonParser, this.onPostMethod);

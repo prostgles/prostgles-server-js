@@ -8,6 +8,7 @@ import { ExpressApp, RestApiConfig } from "./RestApi";
 import { OnSchemaChangeCallback } from "./SchemaWatch/SchemaWatch";
 import { ColConstraint } from "./TableConfig/getConstraintDefinitionQueries";
 import { TableConfig } from "./TableConfig/TableConfig";
+import { Express } from "express";
 
 import { PRGLIOSocket } from "./DboBuilder/DboBuilder";
 
@@ -69,7 +70,7 @@ export type FileTableConfig = {
   /**
    * Express server instance
    */
-  expressApp: ExpressApp;
+  expressApp: ExpressApp | Express;
 
   /**
    * Specifying referencedTables with referenceColumns allows restricting the
