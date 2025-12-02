@@ -225,7 +225,7 @@
     - **checkIntervalHours** <span style="color: grey">optional</span> <span style="color: green;">number</span>
 
       How freuquently the files will be checked for deletion delay
-  - **expressApp** <span style="color: red">required</span> <span style="color: green;">ExpressApp</span>
+  - **expressApp** <span style="color: red">required</span> <span style="color: green;">Express | ExpressApp</span>
 
     Express server instance
   - **referencedTables** <span style="color: grey">optional</span> <span style="color: green;">{ [tableName: string]: { type: "column"; referenceColumns: Record&lt;string, FileColumnConfig&gt;; }; }</span>

@@ -5,6 +5,7 @@ import { testPublishTypes } from "./publishTypeCheck";
 import { testPublish } from "./testPublish";
 import { testTableConfig } from "./testTableConfig";
 const app = express();
+app.use(express.json());
 const http = require("http").createServer(app);
 
 testPublishTypes();

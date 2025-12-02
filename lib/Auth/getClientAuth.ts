@@ -22,7 +22,7 @@ export async function getClientAuth(
   let pathGuard = false;
   const {
     loginWithOAuth,
-    signupWithEmail: signupWithEmailAndPassword,
+    signupWithEmail,
     localLoginMode,
     login,
     publicRoutes,
@@ -88,8 +88,8 @@ export async function getClientAuth(
   const auth: AuthSocketSchema = {
     //@ts-ignore
     providers: getOAuthProviders(loginWithOAuth),
-    signupWithEmailAndPassword: signupWithEmailAndPassword && {
-      minPasswordLength: signupWithEmailAndPassword.minPasswordLength ?? 8,
+    signupWithEmailAndPassword: signupWithEmail && {
+      minPasswordLength: signupWithEmail.minPasswordLength ?? 8,
       url: AUTH_ROUTES_AND_PARAMS.emailRegistration,
     },
     preferredLogin: userData.preferredLogin,

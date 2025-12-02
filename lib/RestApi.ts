@@ -1,4 +1,3 @@
-import * as bodyParser from "body-parser";
 import { Express } from "express";
 import { HTTP_FAIL_CODES, removeExpressRoute } from "./Auth/AuthHandler";
 import { ExpressReq, ExpressRes } from "./Auth/AuthTypes";
@@ -7,7 +6,6 @@ import { Prostgles } from "./Prostgles";
 import { runClientMethod, runClientRequest, runClientSqlRequest } from "./runClientRequest";
 import { VoidFunction } from "./SchemaWatch/SchemaWatch";
 import { isDefined } from "prostgles-types";
-const jsonParser = bodyParser.json();
 
 type ExpressInternalRouter = {
   stack?: {
@@ -67,10 +65,12 @@ export class RestApi {
       schema: `${path}/schema`,
     };
     this.expressApp = expressApp as ExpressApp;
-    expressApp.post(this.routes.db, jsonParser, this.onPostTableCommand);
-    expressApp.post(this.routes.sql, jsonParser, this.onPostSql);
-    expressApp.post(this.routes.methods, jsonParser, this.onPostMethod);
-    expressApp.post(this.routes.schema, jsonParser, this.onPostSchema);
+    /** Must check if json parser is loaded */
+
+    expressApp.post(this.routes.db, this.onPostTableCommand);
+    expressApp.post(this.routes.sql, this.onPostSql);
+    expressApp.post(this.routes.methods, this.onPostMethod);
+    expressApp.post(this.routes.schema, this.onPostSchema);
   }
 
   destroy = () => {

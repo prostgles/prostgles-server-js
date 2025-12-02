@@ -23,14 +23,14 @@ export function setupAuthRoutes(this: AuthHandler) {
     publicRoutes = [],
     onMagicLinkOrOTP,
     loginWithOAuth,
-    signupWithEmail: signupWithEmailAndPassword,
+    signupWithEmail,
   } = loginSignupConfig;
   if (publicRoutes.find((r) => typeof r !== "string" || !r)) {
     throw "Invalid or empty string provided within publicRoutes ";
   }
 
-  if (signupWithEmailAndPassword) {
-    setRegisterRequestHandler(signupWithEmailAndPassword, app);
+  if (signupWithEmail) {
+    setRegisterRequestHandler(signupWithEmail, app);
   }
 
   if (loginWithOAuth) {
