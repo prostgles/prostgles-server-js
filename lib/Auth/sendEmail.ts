@@ -115,7 +115,10 @@ const send = (transporter: Transporter, email: Email) => {
     /**
      * Local transporters used in testing ("smtp-server") don't have isIdle method
      */
-    if (transporter.isIdle() || !(transporter.transporter as any).isIdle) {
+    if (
+      transporter.isIdle() ||
+      !("isIdle" in transporter.transporter && transporter.transporter.isIdle)
+    ) {
       doSend();
     } else {
       transporter.once("idle", doSend);
