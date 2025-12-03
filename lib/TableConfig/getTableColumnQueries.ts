@@ -1,7 +1,7 @@
-import { asName, getKeys, getObjectEntries, isDefined, isObject } from "prostgles-types";
+import { asName, getKeys, getObjectEntries, isObject } from "prostgles-types";
 import { validate_jsonb_schema_sql } from "../JSONBSchemaValidation/validateJSONBSchemaSQL";
 import type { DB, DBHandlerServer } from "../Prostgles";
-import { getColumnDefinitionQuery, getTableColumns } from "./getColumnDefinitionQuery";
+import { getColumnSQLDefinitionQuery, getTableColumns } from "./getColumnSQLDefinitionQuery";
 import { getFutureTableSchema } from "./getFutureTableSchema";
 import type { TableConfig } from "./TableConfig";
 
@@ -65,7 +65,7 @@ export const getTableColumnQueries = async ({
 
   for (const [colName, colConf] of columns) {
     /* Get column definition */
-    const colDef = await getColumnDefinitionQuery({
+    const colDef = await getColumnSQLDefinitionQuery({
       colConf,
       column: colName.toString(),
       db,

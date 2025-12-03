@@ -521,7 +521,7 @@ export type DBGeneratedSchema = {
     columns: {
       col1?: null | "a" | "b"
       col2?: null | "a" | "b"
-      col3?: "a" | "b"
+      col3?: null | "a" | "b"
       id?: null | string;
     };
   };

@@ -17,7 +17,7 @@ type Args = {
 /**
  * Column create statement for a given config
  */
-export const getColumnDefinitionQuery = async ({
+export const getColumnSQLDefinitionQuery = async ({
   colConf: colConfRaw,
   column,
   escapedColumnName,

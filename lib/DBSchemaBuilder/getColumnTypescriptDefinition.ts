@@ -49,12 +49,13 @@ export const getDataType = ({
   tableOrView: TableSchema;
   column: TableSchema["columns"][number];
 }) => {
+  const { is_nullable } = column;
   const typeFromUdtName: string =
-    (column.is_nullable ? "null | " : "") + getColTypeForDBSchema(column.udt_name) + ";";
+    (is_nullable ? "null | " : "") + getColTypeForDBSchema(column.udt_name) + ";";
 
-  const buildEnumTypeDefinition = (enumVals: any[] | readonly any[], nullable: boolean) => {
+  const buildEnumTypeDefinition = (enumVals: any[] | readonly any[]) => {
     const types = enumVals.map((t) => (typeof t === "number" ? t : JSON.stringify(t)));
-    if (nullable) {
+    if (is_nullable) {
       types.unshift("null");
     }
     return types.join(" | ");
@@ -63,7 +64,7 @@ export const getDataType = ({
   const tableConfig = config && config[tableOrView.name];
   if (tableConfig && "isLookupTable" in tableConfig && column.is_pkey) {
     const enumValus = Object.keys(tableConfig.isLookupTable.values);
-    return buildEnumTypeDefinition(enumValus, !!column.is_nullable);
+    return buildEnumTypeDefinition(enumValus);
   }
 
   const colConf = config && getColumnConfig(config, tableOrView.name, column.name);
@@ -81,7 +82,7 @@ export const getDataType = ({
 
   if ("enum" in colConf) {
     if (!colConf.enum) throw "colConf.enum missing";
-    return buildEnumTypeDefinition(colConf.enum, !!colConf.nullable);
+    return buildEnumTypeDefinition(colConf.enum);
   }
 
   /** When referencing a isLookupTable table we add the isLookupTable.values as enums */
@@ -99,7 +100,7 @@ export const getDataType = ({
           .find(isDefined);
     if (lookupTableConfig && "isLookupTable" in lookupTableConfig) {
       const enumValus = Object.keys(lookupTableConfig.isLookupTable.values);
-      return buildEnumTypeDefinition(enumValus, !!colConf.nullable);
+      return buildEnumTypeDefinition(enumValus);
     }
   }
 

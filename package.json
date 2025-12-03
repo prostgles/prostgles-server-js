@@ -1,6 +1,6 @@
 {
   "name": "prostgles-server",
-  "version": "4.2.344",
+  "version": "4.2.345",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

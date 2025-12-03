@@ -2,7 +2,7 @@ import { as } from "pg-promise";
 import { isDefined } from "prostgles-types";
 import { getFileManagerSchema } from "../FileManager/initFileManager";
 import type { DB } from "../initProstgles";
-import { getColumnDefinitionQuery } from "./getColumnDefinitionQuery";
+import { getColumnSQLDefinitionQuery } from "./getColumnSQLDefinitionQuery";
 import { getConstraintDefinitionQueries } from "./getConstraintDefinitionQueries";
 import { tableConfigWithMigrations, type SchemaRelatedOptions } from "./getCreateSchemaQueries";
 import type { TableConfig } from "./TableConfig";
@@ -135,7 +135,7 @@ const getTableQueries = async (
     const colDefs: Record<string, string> = {};
     for (const [column, colConf] of Object.entries(columns)) {
       const escapedColumnName = escapedTableNameMapObj[column];
-      const colDef = await getColumnDefinitionQuery({
+      const colDef = await getColumnSQLDefinitionQuery({
         column,
         escapedColumnName,
         colConf,

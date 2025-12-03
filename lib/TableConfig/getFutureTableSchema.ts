@@ -1,9 +1,9 @@
 import { asName } from "prostgles-types";
 import { pgp } from "../DboBuilder/DboBuilder";
 import type { DB } from "../Prostgles";
-import type { ColumnMinimalInfo} from "./getColumnDefinitionQuery";
-import { getTableColumns } from "./getColumnDefinitionQuery";
-import type { ColConstraint, ConstraintDef} from "./getConstraintDefinitionQueries";
+import type { ColumnMinimalInfo } from "./getColumnSQLDefinitionQuery";
+import { getTableColumns } from "./getColumnSQLDefinitionQuery";
+import type { ColConstraint, ConstraintDef } from "./getConstraintDefinitionQueries";
 import { getColConstraints } from "./getConstraintDefinitionQueries";
 
 type Args = {
