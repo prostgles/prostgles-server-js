@@ -9,6 +9,7 @@ import { clientFileTests } from "../clientFileTests.spec";
 import { clientOnlyQueries } from "../clientOnlyQueries.spec";
 import { clientRestApi } from "../clientRestApi.spec";
 import { isomorphicQueries } from "../isomorphicQueries.spec";
+import { isomorphicQueriesTyped } from "../isomorphicQueriesTyped.spec";
 import { clientHooks } from "./hooks.spec";
 import * as _ from "./basicHooks.spec";
 import { newly_created_table, useProstglesTest } from "./useProstgles.spec";
@@ -45,6 +46,11 @@ const tests: Record<string, ClientTestSpecV2> = {
   main: async ({ db, methods, tableSchema, auth }) => {
     await db.sql(`DROP TABLE IF EXISTS ${newly_created_table}`);
     await isomorphicQueries(db, log);
+    await isomorphicQueriesTyped(
+      //@ts-ignore
+      db,
+      log
+    );
     await clientOnlyQueries(db, auth, log, methods, tableSchema, TEST_NAME);
     await clientHooks(db);
   },

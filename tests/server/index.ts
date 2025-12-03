@@ -97,7 +97,7 @@ function dd() {
     dbConnection,
     sqlFilePath: path.join(__dirname + "/../../init.sql"),
     io,
-    tsGeneratedTypesDir: path.join(__dirname + "/../../"),
+    tsGeneratedTypesDir: path.join(__dirname + "/../../../"),
     transactions: true,
     schemaFilter: { public: 1, prostgles_test: 1 },
     onLog: async (ev) => {

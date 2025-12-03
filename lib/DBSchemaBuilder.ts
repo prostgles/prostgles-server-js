@@ -3,6 +3,7 @@ import {
   DbJoinMaker,
   DBSchema,
   getJSONBSchemaTSTypes,
+  isDefined,
   isObject,
   JSONB,
   SQLHandler,
@@ -68,11 +69,22 @@ export const getDBSchema = (dboBuilder: DboBuilder): string => {
             if ("enum" in colConf) {
               if (!colConf.enum) throw "colConf.enum missing";
               addEnumTypes(colConf.enum, !!colConf.nullable);
-            } else if ("references" in colConf && colConf.references) {
-              const tc =
-                dboBuilder.prostgles.tableConfigurator?.config[colConf.references.tableName];
-              if (tc && "isLookupTable" in tc) {
-                const enumValus = Object.keys(tc.isLookupTable.values);
+              /** When referencing a isLookupTable table we add the isLookupTable.values as enums */
+            } else if (("references" in colConf && colConf.references) || c.references?.length) {
+              const { tableConfigurator } = dboBuilder.prostgles;
+              const lookupTableConfig =
+                colConf.references ?
+                  tableConfigurator?.config[colConf.references.tableName]
+                : c.references
+                    ?.map((ref) => {
+                      const refTableConfig = tableConfigurator?.config[ref.ftable];
+                      if (refTableConfig && "isLookupTable" in refTableConfig) {
+                        return refTableConfig;
+                      }
+                    })
+                    .find(isDefined);
+              if (lookupTableConfig && "isLookupTable" in lookupTableConfig) {
+                const enumValus = Object.keys(lookupTableConfig.isLookupTable.values);
                 addEnumTypes(enumValus, !!colConf.nullable);
               }
             }

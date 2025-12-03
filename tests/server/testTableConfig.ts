@@ -145,6 +145,9 @@ export const testTableConfig: TableConfig<{ en: 1; fr: 1 }> = {
           tableName: "lookup_col1",
         },
       },
+      col3: {
+        sqlDefinition: "TEXT REFERENCES lookup_col1",
+      },
     },
   },
   api_table: {
