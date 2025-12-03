@@ -2,12 +2,13 @@ import * as fs from "fs";
 import { asName, tryCatchV2 } from "prostgles-types";
 import { HTTP_FAIL_CODES } from "../Auth/AuthHandler";
 import type { Media } from "../DboBuilder/DboBuilderTypes";
-import { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
+import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { canCreateTables } from "../DboBuilder/runSQL";
-import { Prostgles } from "../Prostgles";
+import type { Prostgles } from "../Prostgles";
 import type { SchemaRelatedOptions } from "../TableConfig/getCreateSchemaQueries";
 import { runClientRequest } from "../runClientRequest";
-import { FileManager, HOUR, LocalConfig } from "./FileManager";
+import type { FileManager, LocalConfig } from "./FileManager";
+import { HOUR } from "./FileManager";
 import { join } from "path";
 
 export const getFileManagerSchema = ({

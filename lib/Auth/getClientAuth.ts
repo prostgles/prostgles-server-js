@@ -1,19 +1,22 @@
-import {
+import type {
   AuthGuardLocation,
   AuthGuardLocationResponse,
-  AuthSocketSchema,
+  AuthSocketSchema} from "prostgles-types";
+import {
   CHANNELS,
   getObjectEntries,
   isEmpty,
   isObject,
 } from "prostgles-types";
-import {
+import type {
   AuthClientRequest,
   LoginWithOAuthConfig,
-  AuthResultWithSID,
+  AuthResultWithSID} from "./AuthTypes";
+import {
   type AuthResult,
 } from "./AuthTypes";
-import { AUTH_ROUTES_AND_PARAMS, AuthHandler } from "./AuthHandler";
+import type { AuthHandler } from "./AuthHandler";
+import { AUTH_ROUTES_AND_PARAMS } from "./AuthHandler";
 
 export async function getClientAuth(
   this: AuthHandler,

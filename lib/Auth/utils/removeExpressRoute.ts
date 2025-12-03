@@ -1,7 +1,7 @@
 import { isDefined } from "prostgles-types";
 import type { ExpressApp } from "../../RestApi";
-import { matchesRoute } from "../AuthHandler";
-import { Express } from "express";
+import type { Express } from "express";
+import { matchesRoute } from "./matchesRoute";
 
 const getRouter = (app: ExpressApp | Express) => {
   const router = (app._router || app.router) as ExpressApp["_router"] | undefined;

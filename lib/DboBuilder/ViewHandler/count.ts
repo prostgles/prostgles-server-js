@@ -1,12 +1,12 @@
-import { SelectParams } from "prostgles-types";
-import { ParsedTableRule } from "../../PublishParser/publishTypesAndUtils";
-import { Filter, LocalParams } from "../DboBuilder";
+import type { SelectParams } from "prostgles-types";
+import type { ParsedTableRule } from "../../PublishParser/publishTypesAndUtils";
+import type { Filter, LocalParams } from "../DboBuilder";
 import {
   getErrorAsObject,
   getSerializedClientErrorFromPGError,
   withUserRLS,
 } from "../dboBuilderUtils";
-import { ViewHandler } from "./ViewHandler";
+import type { ViewHandler } from "./ViewHandler";
 
 export async function count(
   this: ViewHandler,

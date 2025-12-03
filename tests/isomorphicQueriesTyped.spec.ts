@@ -1,14 +1,10 @@
-import test, {
-  //@ts-ignore
-  describe,
-} from "node:test";
-import { DBOFullyTyped } from "../dist/DBSchemaBuilder";
+import test, { describe } from "node:test";
+import { DBOFullyTyped } from "../dist/DBSchemaBuilder/DBSchemaBuilder";
 import type { DBHandlerClient } from "./client";
 import type { DBGeneratedSchema } from "./DBGeneratedSchema";
 
 export const isomorphicQueriesTyped = async (
-  db: DBOFullyTyped<DBGeneratedSchema> | DBHandlerClient<DBGeneratedSchema>,
-  log: (msg: string, extra?: any) => void
+  db: DBOFullyTyped<DBGeneratedSchema> | DBHandlerClient<DBGeneratedSchema>
 ) => {
   await describe("isomorphic typed queries", async () => {
     await test("isLookupTable DB Types from colConf", async () => {
@@ -42,6 +38,24 @@ export const isomorphicQueriesTyped = async (
           // col3 is typed to ftable values
         }
         if (col3 === "a") {
+          // col3 is typed to ftable values
+        }
+      }
+    });
+
+    await test("isLookupTable pkey column itself is typed", async () => {
+      const row = await db.lookup_col1?.findOne?.({});
+      if (row) {
+        const { id } = row;
+        //@ts-expect-error
+        if (id !== "z") {
+          // col3 is typed to ftable values
+        }
+        //@ts-expect-error
+        if (id === 2) {
+          // col3 is typed to ftable values
+        }
+        if (id === "a") {
           // col3 is typed to ftable values
         }
       }

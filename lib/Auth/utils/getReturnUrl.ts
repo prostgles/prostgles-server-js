@@ -1,5 +1,5 @@
 import { AUTH_ROUTES_AND_PARAMS } from "../AuthHandler";
-import { ExpressReq } from "../AuthTypes";
+import type { ExpressReq } from "../AuthTypes";
 import { getSafeReturnURL } from "./getSafeReturnURL";
 
 export const getReturnUrl = (req: ExpressReq) => {

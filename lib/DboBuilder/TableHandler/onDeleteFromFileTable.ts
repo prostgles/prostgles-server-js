@@ -1,6 +1,8 @@
-import { AnyObject, asName, pickKeys } from "prostgles-types";
-import { LocalParams, type Media } from "../DboBuilder";
-import { TableHandler } from "./TableHandler";
+import type { AnyObject} from "prostgles-types";
+import { asName, pickKeys } from "prostgles-types";
+import type { LocalParams} from "../DboBuilder";
+import { type Media } from "../DboBuilder";
+import type { TableHandler } from "./TableHandler";
 
 type OnDeleteFromFileTableArgs = {
   localParams: LocalParams | undefined;

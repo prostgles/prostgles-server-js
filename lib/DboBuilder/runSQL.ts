@@ -1,9 +1,13 @@
-import pgPromise, { ParameterizedQuery as PQ, ParameterizedQuery } from "pg-promise";
-import pg from "pg-promise/typescript/pg-subset";
-import { AnyObject, SQLOptions, SQLResult, SQLResultInfo } from "prostgles-types";
-import { DB, Prostgles } from "../Prostgles";
-import { DboBuilder, LocalParams, pgp, postgresToTsType } from "./DboBuilder";
-import { AuthClientRequest } from "../Auth/AuthTypes";
+import type { ParameterizedQuery } from "pg-promise";
+import type pgPromise from "pg-promise";
+import { ParameterizedQuery as PQ } from "pg-promise";
+import type pg from "pg-promise/typescript/pg-subset";
+import type { AnyObject, SQLOptions, SQLResult, SQLResultInfo} from "prostgles-types";
+import { postgresToTsType } from "prostgles-types";
+import type { DB, Prostgles } from "../Prostgles";
+import type { DboBuilder, LocalParams} from "./DboBuilder";
+import { pgp } from "./DboBuilder";
+import type { AuthClientRequest } from "../Auth/AuthTypes";
 
 export async function runSQL(
   this: DboBuilder,

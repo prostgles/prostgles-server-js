@@ -1,6 +1,6 @@
 import { isObject } from "prostgles-types";
-import { AuthHandler } from "../AuthHandler";
-import { AuthClientRequest } from "../AuthTypes";
+import type { AuthHandler } from "../AuthHandler";
+import type { AuthClientRequest } from "../AuthTypes";
 import type { GetUserOrRedirected } from "./handleGetUser";
 
 export async function getSidAndUserFromRequest(

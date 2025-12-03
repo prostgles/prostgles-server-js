@@ -1,8 +1,9 @@
-import { AnyObject, EXISTS_KEY, EXISTS_KEYS, FieldFilter, asName } from "prostgles-types";
-import { LocalParams, ExistsFilterConfig } from "../DboBuilder";
-import { ViewHandler } from "./ViewHandler";
-import { ParsedTableRule } from "../../PublishParser/PublishParser";
-import { TableHandler } from "../TableHandler/TableHandler";
+import type { AnyObject, EXISTS_KEY, FieldFilter} from "prostgles-types";
+import { EXISTS_KEYS, asName } from "prostgles-types";
+import type { LocalParams, ExistsFilterConfig } from "../DboBuilder";
+import type { ViewHandler } from "./ViewHandler";
+import type { ParsedTableRule } from "../../PublishParser/PublishParser";
+import type { TableHandler } from "../TableHandler/TableHandler";
 import { getTableJoinQuery } from "./getTableJoinQuery";
 
 export async function getExistsCondition(

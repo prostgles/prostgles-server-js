@@ -1,5 +1,5 @@
-import { Express, Request, Response } from "express";
-import Mail from "nodemailer/lib/mailer";
+import type { Express, Request, Response } from "express";
+import type Mail from "nodemailer/lib/mailer";
 import type { AuthenticateOptions } from "passport";
 import type {
   Profile as FacebookProfile,
@@ -11,8 +11,8 @@ import type {
   StrategyOptions as GoogleStrategy,
 } from "passport-google-oauth20";
 import type { MicrosoftStrategyOptions } from "passport-microsoft";
-import OAuth2Strategy from "passport-oauth2";
-import {
+import type OAuth2Strategy from "passport-oauth2";
+import type {
   AnyObject,
   AuthRequest,
   AuthResponse,
@@ -22,9 +22,10 @@ import {
   IdentityProvider,
   UserLike,
 } from "prostgles-types";
-import { DBOFullyTyped } from "../DBSchemaBuilder";
-import { PRGLIOSocket, type CachedSession } from "../DboBuilder/DboBuilderTypes";
-import { DB } from "../Prostgles";
+import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
+import type { PRGLIOSocket} from "../DboBuilder/DboBuilderTypes";
+import { type CachedSession } from "../DboBuilder/DboBuilderTypes";
+import type { DB } from "../Prostgles";
 import { AUTH_ROUTES_AND_PARAMS } from "./AuthHandler";
 
 type Awaitable<T> = T | Promise<T>;

@@ -1,9 +1,10 @@
-import { AnyObject, CHANNELS } from "prostgles-types";
+import type { AnyObject} from "prostgles-types";
+import { CHANNELS } from "prostgles-types";
 import type { Prostgles, TABLE_METHODS } from "../Prostgles";
-import { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
+import type { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
 import { runClientMethod, runClientRequest } from "../runClientRequest";
 import { getErrorAsObject } from "../DboBuilder/dboBuilderUtils";
-import { DBOFullyTyped } from "../DBSchemaBuilder";
+import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import { getClientRequestIPsInfo } from "../Auth/AuthHandler";
 import type { AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
 

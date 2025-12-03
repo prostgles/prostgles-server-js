@@ -1,17 +1,18 @@
 import { getKeys, isObject } from "prostgles-types";
-import { AuthResultWithSID } from "../Auth/AuthTypes";
-import { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
-import { ViewHandler } from "../DboBuilder/ViewHandler/ViewHandler";
+import type { AuthResultWithSID } from "../Auth/AuthTypes";
+import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
+import type { ViewHandler } from "../DboBuilder/ViewHandler/ViewHandler";
 import { DEFAULT_SYNC_BATCH_SIZE } from "../PubSubManager/PubSubManagerUtils";
-import { PublishParser } from "./PublishParser";
-import {
+import type { PublishParser } from "./PublishParser";
+import type {
   DboTable,
   ParsedPublishTable,
-  type PublishObject,
   PublishTableRule,
   PublishViewRule,
-  RULE_TO_METHODS,
-  SubscribeRule,
+  SubscribeRule} from "./publishTypesAndUtils";
+import {
+  type PublishObject,
+  RULE_TO_METHODS
 } from "./publishTypesAndUtils";
 
 export async function getTableRulesWithoutFileTable(

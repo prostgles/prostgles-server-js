@@ -1,4 +1,4 @@
-import { FileManager, OnProgress, UploadedItem } from "./FileManager";
+import type { FileManager, OnProgress, UploadedItem } from "./FileManager";
 import * as fs from "fs";
 import * as stream from "stream";
 import * as path from "path";

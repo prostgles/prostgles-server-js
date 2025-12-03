@@ -1,7 +1,7 @@
 import { tryCatch, tryCatchV2 } from "prostgles-types";
 import { getPubSubManagerInitQuery } from "./init/getPubSubManagerInitQuery";
 import { getCanExecute } from "../DboBuilder/dboBuilderUtils";
-import { DboBuilder } from "../DboBuilder/DboBuilder";
+import type { DboBuilder } from "../DboBuilder/DboBuilder";
 
 export const getCreatePubSubManagerError = async (
   dboBuilder: DboBuilder

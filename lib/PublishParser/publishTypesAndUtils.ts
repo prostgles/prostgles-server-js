@@ -1,15 +1,10 @@
 import {
-  AnyObject,
-  DBSchema,
-  FullFilter,
-  Method,
   RULE_METHODS,
-  TableInfo,
   type MethodFullDef,
 } from "prostgles-types";
-import type { DBOFullyTyped, PublishFullyTyped } from "../DBSchemaBuilder";
-import { CommonTableRules, Filter, LocalParams, TableOrViewInfo } from "../DboBuilder/DboBuilder";
-import { DB, DBHandlerServer } from "../Prostgles";
+import type { DBOFullyTyped, PublishFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
+import type { CommonTableRules, Filter, LocalParams, TableOrViewInfo } from "../DboBuilder/DboBuilder";
+import type { DB, DBHandlerServer } from "../Prostgles";
 
 export type PublishMethods<S = void, SUser extends SessionUser = SessionUser> = (
   params: PublishParams<S, SUser>
@@ -148,9 +143,14 @@ export const RULE_TO_METHODS = [
   },
 ] as const;
 
-import { FieldFilter, SelectParams } from "prostgles-types";
-import { AuthClientRequest, SessionUser } from "../Auth/AuthTypes";
-import { TableSchemaColumn } from "../DboBuilder/DboBuilderTypes";
+import type { FieldFilter, SelectParams ,
+  AnyObject,
+  DBSchema,
+  FullFilter,
+  Method,
+  TableInfo} from "prostgles-types";
+import type { AuthClientRequest, SessionUser } from "../Auth/AuthTypes";
+import type { TableSchemaColumn } from "../DboBuilder/DboBuilderTypes";
 import type { ClientHandlers } from "../WebsocketAPI/getClientHandlers";
 
 export type InsertRequestData = {

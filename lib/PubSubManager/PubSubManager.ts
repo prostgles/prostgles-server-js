@@ -3,15 +3,15 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import {
+import type {
   DBHandlerServer,
   DboBuilder,
   PRGLIOSocket,
   TableInfo,
   TableOrViewInfo,
 } from "../DboBuilder/DboBuilder";
-import { PostgresNotifListenManager } from "../PostgresNotifListenManager";
-import { DB } from "../Prostgles";
+import type { PostgresNotifListenManager } from "../PostgresNotifListenManager";
+import type { DB } from "../Prostgles";
 import { addSync } from "./addSync";
 import { addTrigger, type AddTriggerParams } from "./addTrigger";
 import { deleteOrphanedTriggers } from "./deleteOrphanedTriggers";
@@ -19,19 +19,21 @@ import { initPubSubManager } from "./init/initPubSubManager";
 import { initialiseEventTriggers } from "./initialiseEventTriggers";
 import { refreshTriggers } from "./refreshTriggers";
 
-import {
+import type {
   AnyObject,
-  CHANNELS,
   FieldFilter,
   SelectParams,
-  WAL,
+  WAL} from "prostgles-types";
+import {
+  CHANNELS,
   type SubscribeOptions,
 } from "prostgles-types";
 
 import { find, pickKeys } from "prostgles-types";
-import { LocalFuncs, getOnDataFunc, matchesLocalFuncs } from "../DboBuilder/ViewHandler/subscribe";
-import { EventTypes } from "../Logging";
-import { ParsedTableRule } from "../PublishParser/PublishParser";
+import type { LocalFuncs} from "../DboBuilder/ViewHandler/subscribe";
+import { getOnDataFunc, matchesLocalFuncs } from "../DboBuilder/ViewHandler/subscribe";
+import type { EventTypes } from "../Logging";
+import type { ParsedTableRule } from "../PublishParser/PublishParser";
 import { syncData } from "../SyncReplication";
 import { addSub } from "./addSub";
 import { notifListener } from "./notifListener";

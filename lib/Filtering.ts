@@ -1,9 +1,10 @@
+import type {
+  FilterDataType,
+  FullFilter} from "prostgles-types";
 import {
   BetweenFilterKeys,
   CompareFilterKeys,
   CompareInFilterKeys,
-  FilterDataType,
-  FullFilter,
   GeomFilterKeys,
   GeomFilter_Funcs,
   JsonbFilterKeys,

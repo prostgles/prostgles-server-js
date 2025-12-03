@@ -1,9 +1,10 @@
 import { isEmpty, type FieldFilter } from "prostgles-types";
-import type { ParsedTableRule, TableRule } from "../../PublishParser/publishTypesAndUtils";
+import type { ParsedTableRule } from "../../PublishParser/publishTypesAndUtils";
 import type { LocalParams, ValidatedTableRules } from "../DboBuilderTypes";
-import { COMPUTED_FIELDS, type FieldSpec } from "../QueryBuilder/Functions";
-import { asNameAlias } from "../QueryBuilder/QueryBuilder";
+import type { FieldSpec } from "../QueryBuilder/Functions/Functions";
 import type { ViewHandler } from "../ViewHandler/ViewHandler";
+import { COMPUTED_FIELDS } from "../QueryBuilder/Functions/COMPUTED_FIELDS";
+import { asNameAlias } from "../../utils/asNameAlias";
 
 export function getValidatedRules(
   this: ViewHandler,

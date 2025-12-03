@@ -48,8 +48,7 @@ const tests: Record<string, ClientTestSpecV2> = {
     await isomorphicQueries(db, log);
     await isomorphicQueriesTyped(
       //@ts-ignore
-      db,
-      log
+      db
     );
     await clientOnlyQueries(db, auth, log, methods, tableSchema, TEST_NAME);
     await clientHooks(db);

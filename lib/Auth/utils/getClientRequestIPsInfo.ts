@@ -1,5 +1,5 @@
-import { PRGLIOSocket } from "../../DboBuilder/DboBuilderTypes";
-import { ExpressReq, LoginClientInfo } from "../AuthTypes";
+import type { PRGLIOSocket } from "../../DboBuilder/DboBuilderTypes";
+import type { ExpressReq, LoginClientInfo } from "../AuthTypes";
 type ClientReq =
   | { socket: PRGLIOSocket; httpReq?: undefined }
   | { httpReq: ExpressReq; socket?: undefined };

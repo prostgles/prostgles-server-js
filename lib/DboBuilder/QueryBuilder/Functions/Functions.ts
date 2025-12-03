@@ -1,78 +1,16 @@
+import type { ColumnInfo, PG_COLUMN_UDT_DATA_TYPE } from "prostgles-types";
 import {
   asName,
-  ColumnInfo,
   includes,
   isEmpty,
   isObject,
-  PG_COLUMN_UDT_DATA_TYPE,
   TextFilter_FullTextSearchFilterKeys,
+  postgresToTsType,
 } from "prostgles-types";
-import { isPlainObject, pgp, postgresToTsType } from "../DboBuilder";
-import { parseFieldFilter } from "../ViewHandler/parseFieldFilter";
-import { asNameAlias } from "./QueryBuilder";
-
-export const parseFunction = (funcData: {
-  func: string | FunctionSpec;
-  args: any[];
-  functions: FunctionSpec[];
-  allowedFields: string[];
-}): FunctionSpec => {
-  const { func, args, functions, allowedFields } = funcData;
-
-  /* Function is computed column. No checks needed */
-  if (typeof func !== "string") {
-    const computedCol = COMPUTED_FIELDS.find((c) => c.name === func.name);
-    if (!computedCol)
-      throw `Unexpected function: computed column spec not found for ${JSON.stringify(func.name)}`;
-    return func;
-  }
-
-  const funcName = func;
-  const makeErr = (msg: string): string => {
-    return `Issue with function ${JSON.stringify({ [funcName]: args })}: \n${msg}`;
-  };
-
-  /* Find function */
-  const funcDef = functions.find((f) => f.name === funcName);
-
-  if (!funcDef) {
-    const sf = functions
-      .filter((f) => f.name.toLowerCase().slice(1).startsWith(funcName.toLowerCase()))
-      .sort((a, b) => a.name.length - b.name.length);
-    const hint =
-      sf.length ?
-        `. \n Maybe you meant: \n | ${sf.map((s) => s.name + " " + (s.description || "")).join("    \n | ")}  ?`
-      : "";
-    throw "\n Function " + funcName + " does not exist or is not allowed " + hint;
-  }
-
-  /* Validate fields */
-  const fields = funcDef.getFields(args);
-  if (fields !== "*") {
-    fields.forEach((fieldKey) => {
-      if (typeof fieldKey !== "string" || !allowedFields.includes(fieldKey)) {
-        throw makeErr(
-          `getFields() => field name ${JSON.stringify(fieldKey)} is invalid or disallowed`
-        );
-      }
-    });
-    if ((funcDef.minCols ?? 0) > fields.length) {
-      throw makeErr(`Less columns provided than necessary (minCols=${funcDef.minCols})`);
-    }
-  }
-
-  if (
-    funcDef.numArgs &&
-    funcDef.minCols !== 0 &&
-    fields !== "*" &&
-    Array.isArray(fields) &&
-    !fields.length
-  ) {
-    throw `\n Function "${funcDef.name}" expects at least a field name but has not been provided with one`;
-  }
-
-  return funcDef;
-};
+import { parseFieldFilter } from "../../ViewHandler/parseFieldFilter";
+import * as pgPromise from "pg-promise";
+import { asNameAlias } from "../../../utils/asNameAlias";
+const pgp = pgPromise();
 
 type GetQueryArgs = {
   allColumns: ColumnInfo[];
@@ -284,7 +222,7 @@ const FTS_Funcs: FunctionSpec[] =
       const searchTypes = TextFilter_FullTextSearchFilterKeys;
 
       /* { to_tsquery: 'search term' } */
-      if (isPlainObject(qVal)) {
+      if (isObject(qVal)) {
         const keys = Object.keys(qVal);
         if (!keys.length) throw "Bad arg";
         if (keys.length !== 1 || !searchTypes.includes(keys[0] as any))
@@ -1272,40 +1210,6 @@ export const FUNCTIONS: FunctionSpec[] = [
       return `round( ( ( MAX(${col}) - MIN(${col}) )::float/MIN(${col}) ) * 100, 2)`;
     },
   } as FunctionSpec,
-];
-
-/* The difference between a function and computed field is that the computed field does not require any arguments */
-export const COMPUTED_FIELDS: FieldSpec[] = [
-  /**
-   * Used instead of row id. Must be used as a last resort. Use all non pseudo or domain data type columns first!
-   */
-  {
-    name: "$rowhash",
-    type: "computed",
-    // description: ` order hash of row content  `,
-    getQuery: ({ allowedFields, tableAlias, ctidField }) => {
-      return (
-        "md5(" +
-        allowedFields
-
-          /* CTID not available in AFTER trigger */
-          // .concat(ctidField? [ctidField] : [])
-          .sort()
-          .map((f) => asNameAlias(f, tableAlias))
-          .map((f) => `md5(coalesce(${f}::text, 'dd'))`)
-          .join(" || ") +
-        `)`
-      );
-    },
-  },
-  // ,{
-  //   name: "ctid",
-  //   type: "computed",
-  //   // description: ` order hash of row content  `,
-  //   getQuery: ({ allowedFields, tableAlias, ctidField }) => {
-  //     return asNameAlias("ctid", tableAlias);
-  //   }
-  // }
 ];
 
 /*

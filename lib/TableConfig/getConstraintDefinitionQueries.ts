@@ -1,8 +1,8 @@
-import pgPromise from "pg-promise";
+import type pgPromise from "pg-promise";
 import { asName } from "prostgles-types";
-import { DB } from "../Prostgles";
+import type { DB } from "../Prostgles";
 import { asValue } from "../PubSubManager/PubSubManagerUtils";
-import { TableConfig } from "./TableConfig";
+import type { TableConfig } from "./TableConfig";
 
 type Args = {
   tableName: string;

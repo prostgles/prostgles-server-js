@@ -1,8 +1,9 @@
-import { AnyObject, getJSONBObjectSchemaValidationError, omitKeys } from "prostgles-types";
-import { ParsedTableRule, ValidateRowBasic } from "../../PublishParser/PublishParser";
-import { LocalParams, Media } from "../DboBuilder";
+import type { AnyObject} from "prostgles-types";
+import { getJSONBObjectSchemaValidationError, omitKeys } from "prostgles-types";
+import type { ParsedTableRule, ValidateRowBasic } from "../../PublishParser/PublishParser";
+import type { LocalParams, Media } from "../DboBuilder";
 import { isFile, uploadFile } from "../uploadFile";
-import { TableHandler } from "./TableHandler";
+import type { TableHandler } from "./TableHandler";
 
 type Args = {
   newData: AnyObject;

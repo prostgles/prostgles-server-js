@@ -1,6 +1,6 @@
 import { Publish, PublishTableRule } from "prostgles-server/dist/PublishParser/PublishParser";
-import { DBGeneratedSchema } from "./DBGeneratedSchema";
-import type { PublishFullyTyped } from "prostgles-server/dist/DBSchemaBuilder";
+import { DBGeneratedSchema } from "../DBGeneratedSchema";
+import type { PublishFullyTyped } from "prostgles-server/dist/DBSchemaBuilder/DBSchemaBuilder";
 
 export const testPublish: Publish<DBGeneratedSchema> = async ({ user, sid }) => {
   if (sid === "noAuth") {

@@ -1,7 +1,10 @@
-import e, { Response } from "express";
-import { AuthRequest, AuthResponse, isDefined, isObject } from "prostgles-types";
-import { AUTH_ROUTES_AND_PARAMS, AuthHandler, HTTP_FAIL_CODES } from "../AuthHandler";
-import { LoginParams } from "../AuthTypes";
+import type { Response } from "express";
+import type e from "express";
+import type { AuthRequest, AuthResponse} from "prostgles-types";
+import { isDefined, isObject } from "prostgles-types";
+import type { AuthHandler} from "../AuthHandler";
+import { AUTH_ROUTES_AND_PARAMS, HTTP_FAIL_CODES } from "../AuthHandler";
+import type { LoginParams } from "../AuthTypes";
 
 export type LoginResponse =
   | AuthResponse.OAuthRegisterSuccess

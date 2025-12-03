@@ -1,6 +1,6 @@
 import { includes, pickKeys } from "prostgles-types";
 import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
-import { PubSubManager } from "./PubSubManager";
+import type { PubSubManager } from "./PubSubManager";
 import { DELIMITER, log, NOTIF_TYPE, type NotifTypeName } from "./PubSubManagerUtils";
 
 /* Relay relevant data to relevant subscriptions */

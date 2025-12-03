@@ -1,17 +1,18 @@
-import {
+import type {
   AnyObject,
+  InsertParams} from "prostgles-types";
+import {
   getKeys,
   getPossibleNestedInsert,
-  InsertParams,
   isDefined,
   isObject,
   omitKeys,
   type ColumnInfo,
 } from "prostgles-types";
-import { LocalParams, TableHandlers } from "../../DboBuilder";
-import { ParsedTableRule } from "../../../PublishParser/PublishParser";
-import { TableHandler } from "../TableHandler";
-import { AuthClientRequest } from "../../../Auth/AuthTypes";
+import type { LocalParams, TableHandlers } from "../../DboBuilder";
+import type { ParsedTableRule } from "../../../PublishParser/PublishParser";
+import type { TableHandler } from "../TableHandler";
+import type { AuthClientRequest } from "../../../Auth/AuthTypes";
 
 type InsertNestedRecordsArgs = {
   data: AnyObject | AnyObject[];

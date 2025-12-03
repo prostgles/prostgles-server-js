@@ -1,6 +1,6 @@
-import { AnyObject, ClientSchema, TableHandler } from "prostgles-types";
-import { LocalParams } from "./DboBuilder/DboBuilder";
-import { PubSubManagerTriggers } from "./PubSubManager/PubSubManager";
+import type { AnyObject, ClientSchema, TableHandler } from "prostgles-types";
+import type { LocalParams } from "./DboBuilder/DboBuilder";
+import type { PubSubManagerTriggers } from "./PubSubManager/PubSubManager";
 import type { NotifTypeName } from "./PubSubManager/PubSubManagerUtils";
 
 type ClientInfo = {

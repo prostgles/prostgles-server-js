@@ -1,8 +1,9 @@
-import { AnyObject, UpdateParams } from "prostgles-types";
-import { ParsedTableRule } from "../../PublishParser/PublishParser";
-import {
+import type { AnyObject, UpdateParams } from "prostgles-types";
+import type { ParsedTableRule } from "../../PublishParser/PublishParser";
+import type {
   Filter,
-  LocalParams,
+  LocalParams} from "../DboBuilder";
+import {
   getErrorAsObject,
   getSerializedClientErrorFromPGError,
   withUserRLS,
@@ -10,7 +11,7 @@ import {
 import { prepareNewData } from "./DataValidator";
 import { getInsertTableRules, getReferenceColumnInserts } from "./insert/insertNestedRecords";
 import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
-import { TableHandler } from "./TableHandler";
+import type { TableHandler } from "./TableHandler";
 import { updateFile } from "./updateFile";
 
 export async function update(

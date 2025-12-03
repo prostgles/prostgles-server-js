@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as pgPromise from "pg-promise";
-import {
+import type {
   AnyObject,
   ClientSchema,
   ColumnInfo,
@@ -15,12 +15,12 @@ import {
   TableInfo as TInfo,
   UserLike,
 } from "prostgles-types";
-import { AuthClientRequest, BasicSession, SessionUser } from "../Auth/AuthTypes";
-import { BasicCallback } from "../PubSubManager/PubSubManager";
-import { PublishAllOrNothing } from "../PublishParser/PublishParser";
-import { FieldSpec } from "./QueryBuilder/Functions";
-import { TableHandler } from "./TableHandler/TableHandler";
-import { ParsedJoinPath } from "./ViewHandler/parseJoinPath";
+import type { AuthClientRequest, BasicSession, SessionUser } from "../Auth/AuthTypes";
+import type { BasicCallback } from "../PubSubManager/PubSubManager";
+import type { PublishAllOrNothing } from "../PublishParser/PublishParser";
+import type { FieldSpec } from "./QueryBuilder/Functions/Functions";
+import type { TableHandler } from "./TableHandler/TableHandler";
+import type { ParsedJoinPath } from "./ViewHandler/parseJoinPath";
 import pg = require("pg-promise/typescript/pg-subset");
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;

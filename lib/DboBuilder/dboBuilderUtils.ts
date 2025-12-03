@@ -3,31 +3,18 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import {
-  AnyObject,
-  PG_COLUMN_UDT_DATA_TYPE,
-  ProstglesError,
-  TS_PG_Types,
-  getKeys,
-  isObject,
-  omitKeys,
-  pickKeys,
-} from "prostgles-types";
-import { DB } from "../Prostgles";
-import { LocalParams, SortItem, pgp } from "./DboBuilderTypes";
-import { asNameAlias } from "./QueryBuilder/QueryBuilder";
-import { ViewHandler } from "./ViewHandler/ViewHandler";
+import type { AnyObject, ProstglesError } from "prostgles-types";
+import { asNameAlias } from "../utils/asNameAlias";
+import { isObject, omitKeys, pickKeys } from "prostgles-types";
+import type { DB } from "../Prostgles";
+import type { LocalParams, SortItem } from "./DboBuilderTypes";
+import { pgp } from "./DboBuilderTypes";
 import { getSchemaFilter } from "./schema/getTablesForSchemaPostgresSQL";
+import type { ViewHandler } from "./ViewHandler/ViewHandler";
 
-import { ProstglesInitOptions } from "../ProstglesTypes";
+import type { ProstglesInitOptions } from "../ProstglesTypes";
 import { sqlErrCodeToMsg } from "./sqlErrCodeToMsg";
-import { TableHandler } from "./TableHandler/TableHandler";
-export function escapeTSNames(str: string, capitalize = false): string {
-  let res = str;
-  res = (capitalize ? str[0]?.toUpperCase() : str[0]) + str.slice(1);
-  if (canBeUsedAsIsInTypescript(res)) return res;
-  return JSON.stringify(res);
-}
+import type { TableHandler } from "./TableHandler/TableHandler";
 
 const safeStringify = (obj: AnyObject) => {
   const seen = new WeakSet();
@@ -214,23 +201,6 @@ export const getConstraints = async (
   );
 };
 
-/**
- * @deprecated
- * use isObject
- */
-export function isPlainObject(o: any): o is Record<string, any> {
-  return Object(o) === o && Object.getPrototypeOf(o) === Object.prototype;
-}
-
-export function postgresToTsType(udt_data_type: PG_COLUMN_UDT_DATA_TYPE): keyof typeof TS_PG_Types {
-  return (
-    getKeys(TS_PG_Types).find((k) => {
-      // @ts-ignore
-      return TS_PG_Types[k].includes(udt_data_type);
-    }) ?? "any"
-  );
-}
-
 export const prepareOrderByQuery = (items: SortItem[], tableAlias?: string): string[] => {
   if (!items.length) return [];
   return [
@@ -269,10 +239,3 @@ export const withUserRLS = (localParams: LocalParams | undefined, query: string)
 
   return [firstQuery, query].join("\n");
 };
-
-function canBeUsedAsIsInTypescript(str: string): boolean {
-  if (!str) return false;
-  const isAlphaNumericOrUnderline = str.match(/^[a-z0-9_]+$/i);
-  const startsWithCharOrUnderscore = str[0]?.match(/^[a-z_]+$/i);
-  return Boolean(isAlphaNumericOrUnderline && startsWithCharOrUnderscore);
-}

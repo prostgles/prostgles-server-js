@@ -1,8 +1,9 @@
-import { AnyObject, FullFilter, includes, isDefined } from "prostgles-types";
-import { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
+import type { AnyObject, FullFilter} from "prostgles-types";
+import { includes, isDefined } from "prostgles-types";
+import type { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
-import { PublishParser } from "./PublishParser";
-import { ParsedPublishTable, UpdateRule } from "./publishTypesAndUtils";
+import type { PublishParser } from "./PublishParser";
+import type { ParsedPublishTable, UpdateRule } from "./publishTypesAndUtils";
 
 /**
  * Permissions for referencedTables columns are propagated to the file table (even if file table has no permissions)

@@ -1,7 +1,7 @@
-import { SubscriptionChannels } from "prostgles-types";
-import { VoidFunction } from "../SchemaWatch/SchemaWatch";
+import type { SubscriptionChannels } from "prostgles-types";
+import type { VoidFunction } from "../SchemaWatch/SchemaWatch";
 import { tout } from "./init/initPubSubManager";
-import { BasicCallback, PubSubManager, Subscription, SubscriptionParams } from "./PubSubManager";
+import type { BasicCallback, PubSubManager, Subscription, SubscriptionParams } from "./PubSubManager";
 import { parseCondition } from "./PubSubManagerUtils";
 import type { AddTriggerParams } from "./addTrigger";
 

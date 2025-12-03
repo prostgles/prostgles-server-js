@@ -1,8 +1,10 @@
-import { AnyObject, asName, FieldFilter, FullFilter } from "prostgles-types";
-import { LocalParams, pgp } from "../DboBuilder";
-import { ParsedTableRule } from "../../PublishParser/PublishParser";
+import type { AnyObject, FieldFilter, FullFilter } from "prostgles-types";
+import { asName } from "prostgles-types";
+import type { LocalParams} from "../DboBuilder";
+import { pgp } from "../DboBuilder";
+import type { ParsedTableRule } from "../../PublishParser/PublishParser";
 import { asValue } from "../../PubSubManager/PubSubManagerUtils";
-import { TableHandler } from "./TableHandler";
+import type { TableHandler } from "./TableHandler";
 
 type InsertTestArgs = {
   tableRules: ParsedTableRule | undefined;

@@ -1,13 +1,15 @@
-import { AnyObject, FieldFilter, isDefined, UpdateParams } from "prostgles-types";
-import {
+import type { AnyObject, FieldFilter, UpdateParams } from "prostgles-types";
+import { isDefined } from "prostgles-types";
+import type {
   UpdateRule,
   ValidateRowBasic,
-  ValidateUpdateRowBasic,
+  ValidateUpdateRowBasic} from "../PublishParser/PublishParser";
+import {
   type ParsedTableRule,
 } from "../PublishParser/PublishParser";
-import { Filter, LocalParams } from "./DboBuilder";
+import type { Filter, LocalParams } from "./DboBuilder";
 import { prepareNewData } from "./TableHandler/DataValidator";
-import { TableHandler } from "./TableHandler/TableHandler";
+import type { TableHandler } from "./TableHandler/TableHandler";
 
 /**
  * 1) Check if publish is valid

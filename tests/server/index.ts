@@ -20,10 +20,10 @@ http.listen(3001);
 import { isomorphicQueries } from "../isomorphicQueries.spec";
 import { serverOnlyQueries } from "../serverOnlyQueries.spec";
 
-import { DBGeneratedSchema } from "./DBGeneratedSchema";
+import { DBGeneratedSchema } from "../DBGeneratedSchema";
 
 import { spawn } from "child_process";
-import type { DBOFullyTyped } from "prostgles-server/dist/DBSchemaBuilder";
+import type { DBOFullyTyped } from "../../dist/DBSchemaBuilder/DBSchemaBuilder";
 export type { DBHandlerServer } from "prostgles-server/dist/Prostgles";
 
 let logs = [];

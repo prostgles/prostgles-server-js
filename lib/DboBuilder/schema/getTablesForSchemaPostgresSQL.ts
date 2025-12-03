@@ -1,10 +1,10 @@
 import { asName, tryCatchV2 } from "prostgles-types";
 import { omitKeys } from "prostgles-types/dist/util";
-import { DBorTx } from "../../Prostgles";
-import { ProstglesInitOptions } from "../../ProstglesTypes";
-import { clone } from "../../utils";
-import { DboBuilder } from "../DboBuilder";
-import { TableSchema, TableSchemaColumn } from "../DboBuilderTypes";
+import type { DBorTx } from "../../Prostgles";
+import type { ProstglesInitOptions } from "../../ProstglesTypes";
+import { clone } from "../../utils/utils";
+import type { DboBuilder } from "../DboBuilder";
+import type { TableSchema, TableSchemaColumn } from "../DboBuilderTypes";
 import { getFkeys } from "../getFkeys";
 import { getMaterialViews } from "./getMaterialViews";
 import { getViewReferenceColumns } from "./getViewReferenceColumns";

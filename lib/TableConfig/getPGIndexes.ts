@@ -1,4 +1,4 @@
-import { DB } from "../Prostgles";
+import type { DB } from "../Prostgles";
 
 type PGIndex = {
   schemaname: string;

@@ -6,7 +6,7 @@ import { getColumnDefinitionQuery } from "./getColumnDefinitionQuery";
 import { getConstraintDefinitionQueries } from "./getConstraintDefinitionQueries";
 import { tableConfigWithMigrations, type SchemaRelatedOptions } from "./getCreateSchemaQueries";
 import type { TableConfig } from "./TableConfig";
-import { getSchemaUtils } from "./tableConfigSchemaUtils";
+import type { getSchemaUtils } from "./tableConfigSchemaUtils";
 
 export const getTableConfigSchemaQueries = async (
   opts: SchemaRelatedOptions,

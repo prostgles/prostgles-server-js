@@ -1,7 +1,8 @@
-import { AnyObject, CHANNELS } from "prostgles-types";
-import { PRGLIOSocket } from "../DboBuilder/DboBuilder";
-import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
-import { AuthClientRequest, AuthConfig, BasicSession } from "./AuthTypes";
+import type { AnyObject } from "prostgles-types";
+import { CHANNELS } from "prostgles-types";
+import type { PRGLIOSocket } from "../DboBuilder/DboBuilder";
+import type { DB, DBHandlerServer, Prostgles } from "../Prostgles";
+import type { AuthClientRequest, AuthConfig, BasicSession } from "./AuthTypes";
 import { getClientAuth } from "./getClientAuth";
 import { login } from "./login";
 import { setupAuthRoutes } from "./setupAuthRoutes";
@@ -13,6 +14,7 @@ import {
   setCookieAndGoToReturnURLIFSet,
   validateSessionAndSetCookie,
 } from "./utils/setCookieAndGoToReturnURLIFSet";
+import { matchesRoute } from "./utils/matchesRoute";
 
 export { getClientRequestIPsInfo, removeExpressRoute, removeExpressRoutesTest };
 export const HTTP_FAIL_CODES = {
@@ -209,13 +211,6 @@ export class AuthHandler {
 
   getClientAuth = getClientAuth.bind(this);
 }
-
-export const matchesRoute = (baseRoute: string, fullRoute: string) => {
-  if (!baseRoute || !fullRoute) return false;
-  if (baseRoute === fullRoute) return true;
-  const nextChar = fullRoute[baseRoute.length] ?? "";
-  return fullRoute.startsWith(baseRoute) && ["/", "?", "#"].includes(nextChar);
-};
 
 const parseCookieStr = (cookie_str: string | undefined): Record<string, string> => {
   if (!cookie_str || typeof cookie_str !== "string") {

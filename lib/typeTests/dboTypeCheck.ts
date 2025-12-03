@@ -1,8 +1,8 @@
-import { ViewHandler } from "prostgles-types";
-import type { DBOFullyTyped } from "../DBSchemaBuilder";
+import type { ViewHandler } from "prostgles-types";
+import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { DBHandlerServer } from "../DboBuilder/DboBuilder";
-import { Publish } from "../PublishParser/PublishParser";
-import { DBGeneratedSchema } from "./DBoGenerated";
+import type { Publish } from "../PublishParser/PublishParser";
+import type { DBGeneratedSchema } from "./DBoGenerated";
 
 type DBSchema2 = {
   tr2: {

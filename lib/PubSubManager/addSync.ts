@@ -1,5 +1,5 @@
 import { find, tryCatchV2 } from "prostgles-types";
-import { AddSyncParams, BasicCallback, PubSubManager } from "./PubSubManager";
+import type { AddSyncParams, BasicCallback, PubSubManager } from "./PubSubManager";
 import { DEFAULT_SYNC_BATCH_SIZE, parseCondition } from "./PubSubManagerUtils";
 
 /**

@@ -1,19 +1,21 @@
-import { Method, getObjectEntries, isObject } from "prostgles-types";
-import { AuthClientRequest, AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
-import { DBOFullyTyped } from "../DBSchemaBuilder";
-import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
-import { ProstglesInitOptions } from "../ProstglesTypes";
-import { VoidFunction } from "../SchemaWatch/SchemaWatch";
+import type { Method} from "prostgles-types";
+import { getObjectEntries, isObject } from "prostgles-types";
+import type { AuthClientRequest, AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
+import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
+import type { DB, DBHandlerServer, Prostgles } from "../Prostgles";
+import type { ProstglesInitOptions } from "../ProstglesTypes";
+import type { VoidFunction } from "../SchemaWatch/SchemaWatch";
 import { getClientHandlers } from "../WebsocketAPI/getClientHandlers";
 import { getFileTableRules } from "./getFileTableRules";
 import { getSchemaFromPublish } from "./getSchemaFromPublish";
 import { getTableRulesWithoutFileTable } from "./getTableRulesWithoutFileTable";
-import {
+import type {
   DboTable,
   DboTableCommand,
   ParsedTableRule,
   PublishMethods,
-  PublishParams,
+  PublishParams} from "./publishTypesAndUtils";
+import {
   RULE_TO_METHODS,
   parsePublishTableRule,
   type PublishMethodsV2,

@@ -1,5 +1,5 @@
 import { tryCatchV2 } from "prostgles-types";
-import { DboBuilder } from "../../DboBuilder/DboBuilder";
+import type { DboBuilder } from "../../DboBuilder/DboBuilder";
 import { pgp } from "../../DboBuilder/DboBuilderTypes";
 import {
   asValue,

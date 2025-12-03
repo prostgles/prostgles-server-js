@@ -1,21 +1,16 @@
 import * as fs from "fs";
-import * as stream from "stream";
+import type * as stream from "stream";
 
 // import * as sharp from "sharp";
 import checkDiskSpace from "check-disk-space";
 
-import {
-  ALLOWED_CONTENT_TYPE,
-  ALLOWED_EXTENSION,
-  CONTENT_TYPE_TO_EXT,
-  getKeys,
-  ValidatedColumnInfo,
-} from "prostgles-types";
-import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
+import type { ALLOWED_CONTENT_TYPE, ALLOWED_EXTENSION, ValidatedColumnInfo } from "prostgles-types";
+import { CONTENT_TYPE_TO_EXT, getKeys } from "prostgles-types";
+import type { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 
 import * as path from "path";
 import { removeExpressRoute } from "../Auth/utils/removeExpressRoute";
-import { ExpressApp } from "../RestApi";
+import type { ExpressApp } from "../RestApi";
 import { getValidatedFileType } from "./getValidatedFileType";
 import { initFileManager } from "./initFileManager";
 import { upload } from "./upload";
@@ -306,18 +301,6 @@ export class FileManager {
   };
 }
 
-export const removeExpressRouteByName = (app: ExpressApp | undefined, name: string) => {
-  const routes = app?._router?.stack;
-  if (routes) {
-    app._router!.stack = routes.filter((route) => {
-      if (route.name === name) {
-        return false;
-      }
-      return true;
-    });
-  }
-};
-
 export const getFileTypeFromFilename = (
   fileName: string
 ): { mime: ALLOWED_CONTENT_TYPE; ext: ALLOWED_EXTENSION } | undefined => {
@@ -346,6 +329,7 @@ export const getFileType = async (
   fileName: string
 ): Promise<{ mime: ALLOWED_CONTENT_TYPE; ext: ALLOWED_EXTENSION }> => {
   const { fileTypeFromBuffer } = await (eval('import("file-type")') as Promise<
+    // eslint-disable-next-line @typescript-eslint/consistent-type-imports
     typeof import("file-type")
   >);
 

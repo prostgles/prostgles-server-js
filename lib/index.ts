@@ -1,7 +1,7 @@
-import { SessionUser } from "./Auth/AuthTypes";
+import type { SessionUser } from "./Auth/AuthTypes";
 import type { InitResult, OnReadyCallbackBasic } from "./initProstgles";
 import { Prostgles } from "./Prostgles";
-import { ProstglesInitOptions } from "./ProstglesTypes";
+import type { ProstglesInitOptions } from "./ProstglesTypes";
 
 import { testDboTypes } from "./typeTests/dboTypeCheck";
 testDboTypes();

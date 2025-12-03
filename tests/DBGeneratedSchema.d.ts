@@ -250,7 +250,7 @@ export type DBGeneratedSchema = {
     delete: true;
     columns: {
       description?: null | string;
-      id: string;
+      id: "a" | "b"
     };
   };
   newly_created_table: {

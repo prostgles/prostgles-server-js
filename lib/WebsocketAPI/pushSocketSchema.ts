@@ -1,6 +1,6 @@
 import { CHANNELS, getSerialisableError, type SQLRequest } from "prostgles-types";
 import type { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
-import { Prostgles } from "../Prostgles";
+import type { Prostgles } from "../Prostgles";
 import { runClientSqlRequest } from "../runClientRequest";
 import { makeSocketError } from "./onSocketConnected";
 export async function pushSocketSchema(this: Prostgles, socket: PRGLIOSocket) {

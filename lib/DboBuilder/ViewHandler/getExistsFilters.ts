@@ -1,6 +1,7 @@
-import { EXISTS_KEY, EXISTS_KEYS, getKeys } from "prostgles-types";
-import { ExistsFilterConfig } from "../DboBuilder";
-import { ViewHandler } from "./ViewHandler";
+import type { EXISTS_KEY} from "prostgles-types";
+import { EXISTS_KEYS, getKeys } from "prostgles-types";
+import type { ExistsFilterConfig } from "../DboBuilder";
+import type { ViewHandler } from "./ViewHandler";
 import { parseJoinPath } from "./parseJoinPath";
 
 export const getExistsFilters = (

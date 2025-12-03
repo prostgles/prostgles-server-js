@@ -1,14 +1,15 @@
-import { AnyObject, SubscribeParams, SubscriptionChannels } from "prostgles-types";
-import { ParsedTableRule } from "../../PublishParser/PublishParser";
-import {
+import type { AnyObject, SubscribeParams, SubscriptionChannels } from "prostgles-types";
+import type { ParsedTableRule } from "../../PublishParser/PublishParser";
+import type {
   Filter,
+  LocalParams} from "../DboBuilder";
+import {
   getErrorAsObject,
-  getSerializedClientErrorFromPGError,
-  LocalParams,
+  getSerializedClientErrorFromPGError
 } from "../DboBuilder";
 import { getSubscribeRelatedTables } from "../getSubscribeRelatedTables";
-import { NewQuery } from "../QueryBuilder/QueryBuilder";
-import { ViewHandler } from "./ViewHandler";
+import type { NewQuery } from "../QueryBuilder/QueryBuilder";
+import type { ViewHandler } from "./ViewHandler";
 import { getValidatedSubscribeOptions } from "./getValidatedSubscribeOptions";
 
 type OnData = (items: AnyObject[]) => any;

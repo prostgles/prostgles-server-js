@@ -5,7 +5,7 @@ import {
   log,
 } from "../PubSubManager/PubSubManagerUtils";
 import type { OnReadyCallbackBasic } from "../initProstgles";
-import TableConfigurator from "./TableConfig";
+import type TableConfigurator from "./TableConfig";
 import {
   getColConstraints,
   getConstraintDefinitionQueries,

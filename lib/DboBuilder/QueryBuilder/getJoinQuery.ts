@@ -1,16 +1,13 @@
 import { isDefined, asName } from "prostgles-types";
-import { ParsedJoinPath, parseJoinPath } from "../ViewHandler/parseJoinPath";
-import {
-  NewQuery,
-  NewQueryJoin,
-  SelectItem,
-  asNameAlias,
-  type SelectItemValidated,
-} from "./QueryBuilder";
+import type { ParsedJoinPath } from "../ViewHandler/parseJoinPath";
+import { parseJoinPath } from "../ViewHandler/parseJoinPath";
+import type { NewQuery, NewQueryJoin } from "./QueryBuilder";
+import { type SelectItemValidated } from "./QueryBuilder";
 import { ROOT_TABLE_ALIAS, ROOT_TABLE_ROW_NUM_ID, indentLines } from "./getSelectQuery";
-import { ViewHandler } from "../ViewHandler/ViewHandler";
+import type { ViewHandler } from "../ViewHandler/ViewHandler";
 import { getJoinOnCondition } from "../ViewHandler/getTableJoinQuery";
 import { prepareOrderByQuery } from "../DboBuilder";
+import { asNameAlias } from "../../utils/asNameAlias";
 
 type Args = {
   q1: NewQuery;

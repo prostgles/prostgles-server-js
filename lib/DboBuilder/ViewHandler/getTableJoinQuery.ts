@@ -1,5 +1,5 @@
 import { asName } from "prostgles-types";
-import { ParsedJoinPath } from "./parseJoinPath";
+import type { ParsedJoinPath } from "./parseJoinPath";
 
 type getTableJoinsArgs = {
   rootTableAlias: string;

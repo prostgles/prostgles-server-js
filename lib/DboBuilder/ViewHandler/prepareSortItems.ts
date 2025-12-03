@@ -1,13 +1,14 @@
+import type { OrderBy } from "prostgles-types/dist";
 import {
-  OrderBy,
   asName,
   getJSONBObjectSchemaValidationError,
   isDefined,
   isEmpty,
   isObject,
 } from "prostgles-types/dist";
-import { SortItem } from "../DboBuilder";
-import { NewQueryJoin, SelectItemValidated, asNameAlias } from "../QueryBuilder/QueryBuilder";
+import type { SortItem } from "../DboBuilder";
+import type { NewQueryJoin, SelectItemValidated } from "../QueryBuilder/QueryBuilder";
+import { asNameAlias } from "../../utils/asNameAlias";
 
 /* This relates only to SELECT */
 export const prepareSortItems = (

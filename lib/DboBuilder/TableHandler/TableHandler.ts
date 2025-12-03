@@ -1,35 +1,31 @@
-import pgPromise from "pg-promise";
-import {
+import type pgPromise from "pg-promise";
+import type {
   AnyObject,
-  asName,
   DeleteParams,
   FieldFilter,
   InsertParams,
   Select,
   UpdateParams,
 } from "prostgles-types";
-import { DB } from "../../Prostgles";
-import { SyncRule, ParsedTableRule } from "../../PublishParser/PublishParser";
-import TableConfigurator from "../../TableConfig/TableConfig";
-import {
-  DboBuilder,
-  Filter,
-  getErrorAsObject,
-  getSerializedClientErrorFromPGError,
-  LocalParams,
-  TableHandlers,
-} from "../DboBuilder";
+import { asName } from "prostgles-types";
+import type { DB } from "../../Prostgles";
+import type { SyncRule, ParsedTableRule } from "../../PublishParser/PublishParser";
+import type TableConfigurator from "../../TableConfig/TableConfig";
+import type { DboBuilder, Filter, LocalParams, TableHandlers } from "../DboBuilder";
+import { getErrorAsObject, getSerializedClientErrorFromPGError } from "../DboBuilder";
 import type { TableSchema } from "../DboBuilderTypes";
 import { parseUpdateRules } from "../parseUpdateRules";
-import { COMPUTED_FIELDS, FUNCTIONS } from "../QueryBuilder/Functions";
+import { FUNCTIONS } from "../QueryBuilder/Functions/Functions";
 import { SelectItemBuilder, type SelectItemValidated } from "../QueryBuilder/QueryBuilder";
-import { JoinPaths, ViewHandler } from "../ViewHandler/ViewHandler";
+import type { JoinPaths } from "../ViewHandler/ViewHandler";
+import { ViewHandler } from "../ViewHandler/ViewHandler";
 import { DataValidator } from "./DataValidator";
 import { _delete } from "./delete";
 import { insert } from "./insert/insert";
 import { update } from "./update";
 import { updateBatch } from "./updateBatch";
 import { upsert } from "./upsert";
+import { COMPUTED_FIELDS } from "../QueryBuilder/Functions/COMPUTED_FIELDS";
 
 export type ValidatedParams = {
   row: AnyObject;

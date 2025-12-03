@@ -1,19 +1,21 @@
-import {
+import type {
   AnyObject,
-  FieldFilter,
+  FieldFilter} from "prostgles-types/dist";
+import {
   asName,
   getKeys,
   isEmpty,
   isObject,
   pickKeys,
 } from "prostgles-types/dist";
-import { DBHandlerServer } from "../../Prostgles";
-import { ValidateRowBasic } from "../../PublishParser/PublishParser";
+import type { DBHandlerServer } from "../../Prostgles";
+import type { ValidateRowBasic } from "../../PublishParser/PublishParser";
 import { asValue } from "../../PubSubManager/PubSubManagerUtils";
-import { LocalParams, TableSchemaColumn, pgp } from "../DboBuilder";
+import type { LocalParams, TableSchemaColumn} from "../DboBuilder";
+import { pgp } from "../DboBuilder";
 import { parseFunctionObject } from "../QueryBuilder/QueryBuilder";
 import { validateObj } from "../ViewHandler/ViewHandler";
-import { TableHandler, ValidatedParams } from "./TableHandler";
+import type { TableHandler, ValidatedParams } from "./TableHandler";
 
 type RowFieldDataPlain = {
   type: "plain";

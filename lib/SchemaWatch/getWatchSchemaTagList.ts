@@ -1,6 +1,6 @@
 import { getKeys, isObject } from "prostgles-types";
 import { EVENT_TRIGGER_TAGS } from "../Event_Trigger_Tags";
-import { ProstglesInitOptions } from "../ProstglesTypes";
+import type { ProstglesInitOptions } from "../ProstglesTypes";
 
 export const getWatchSchemaTagList = (
   watchSchema: ProstglesInitOptions["watchSchema"],

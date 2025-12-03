@@ -1,7 +1,7 @@
 import { ProstglesInitOptions } from "prostgles-server/dist/ProstglesTypes";
-import { DBGeneratedSchema } from "./DBGeneratedSchema";
+import { DBGeneratedSchema } from "../DBGeneratedSchema";
 
-import { PublishFullyTyped } from "prostgles-server/dist/DBSchemaBuilder";
+import { PublishFullyTyped } from "prostgles-server/dist/DBSchemaBuilder/DBSchemaBuilder";
 export const testPublishTypes = () => {
   () => {
     const p1: PublishFullyTyped<DBGeneratedSchema> = {

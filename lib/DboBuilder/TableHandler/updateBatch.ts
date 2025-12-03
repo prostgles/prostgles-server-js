@@ -1,14 +1,15 @@
-import { AnyObject, UpdateParams } from "prostgles-types";
-import { ParsedTableRule } from "../../PublishParser/PublishParser";
-import {
+import type { AnyObject, UpdateParams } from "prostgles-types";
+import type { ParsedTableRule } from "../../PublishParser/PublishParser";
+import type {
   Filter,
-  LocalParams,
+  LocalParams} from "../DboBuilder";
+import {
   getClientErrorFromPGError,
   getErrorAsObject,
   getSerializedClientErrorFromPGError,
   withUserRLS,
 } from "../DboBuilder";
-import { TableHandler } from "./TableHandler";
+import type { TableHandler } from "./TableHandler";
 
 export async function updateBatch(
   this: TableHandler,

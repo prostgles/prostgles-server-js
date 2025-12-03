@@ -1,7 +1,8 @@
 import { asName, pickKeys, tryCatchV2 } from "prostgles-types";
-import { type PubSubManager, ViewSubscriptionOptions } from "./PubSubManager";
+import type { ViewSubscriptionOptions } from "./PubSubManager";
+import { type PubSubManager } from "./PubSubManager";
 import * as crypto from "crypto";
-import { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
+import type { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
 import { asValue, EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "./PubSubManagerUtils";
 import { udtNamesWithoutEqualityComparison } from "./init/getDataWatchFunctionQuery";
 import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";

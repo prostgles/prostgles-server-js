@@ -1,9 +1,9 @@
 import { asName, pickKeys } from "prostgles-types";
-import { DB } from "../Prostgles";
+import type { DB } from "../Prostgles";
 import { asValue } from "../PubSubManager/PubSubManagerUtils";
 import { VALIDATE_SCHEMA_FUNCNAME } from "../JSONBSchemaValidation/validateJSONBSchemaSQL";
-import { BaseColumnTypes, ColumnConfig } from "./TableConfig";
-import pgPromise from "pg-promise";
+import type { BaseColumnTypes, ColumnConfig } from "./TableConfig";
+import type pgPromise from "pg-promise";
 
 type Args = {
   column: string;

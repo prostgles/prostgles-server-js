@@ -1,20 +1,22 @@
-import {
+import type {
   DBSchemaTable,
+  TableInfo,
+  TableSchemaErrors,
+  TableSchemaForClient} from "prostgles-types";
+import {
   getKeys,
   includes,
   isEmpty,
   isObject,
   pickKeys,
-  TableInfo,
-  TableSchemaErrors,
-  TableSchemaForClient,
   type AnyObject,
 } from "prostgles-types";
-import { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
+import type { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import { getErrorAsObject } from "../DboBuilder/DboBuilder";
 import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { TABLE_METHODS } from "../Prostgles";
-import { type PermissionScope, type PublishObject, PublishParser } from "./PublishParser";
+import type { PublishParser } from "./PublishParser";
+import { type PermissionScope, type PublishObject } from "./PublishParser";
 
 type Args = AuthClientRequest & {
   userData: AuthResultWithSID | undefined;

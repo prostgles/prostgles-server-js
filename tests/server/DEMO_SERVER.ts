@@ -1,6 +1,6 @@
 import path from "path";
 import prostgles from "prostgles-server";
-import { DBGeneratedSchema } from "./DBGeneratedSchema";
+import { DBGeneratedSchema } from "../DBGeneratedSchema";
 
 prostgles<DBGeneratedSchema>({
   dbConnection: {

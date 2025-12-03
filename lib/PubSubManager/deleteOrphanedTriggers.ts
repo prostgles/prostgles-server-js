@@ -1,4 +1,4 @@
-import { PubSubManager } from "./PubSubManager";
+import type { PubSubManager } from "./PubSubManager";
 import { asValue, EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID, log } from "./PubSubManagerUtils";
 
 export function deleteOrphanedTriggers(this: PubSubManager, tableNames: string[]) {

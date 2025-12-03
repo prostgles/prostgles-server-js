@@ -25,6 +25,7 @@ export default tseslint.config(
     extends: [tseslint.configs.recommendedTypeChecked],
     rules: {
       "no-cond-assign": "error",
+      "@typescript-eslint/consistent-type-imports": "error",
       "@typescript-eslint/no-namespace": "off",
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-non-null-assertion": "off",

@@ -1,18 +1,19 @@
 import * as pg from "pg";
-import CursorType from "pg-cursor";
-import {
-  CHANNELS,
+import type CursorType from "pg-cursor";
+import type {
   SQLOptions,
   SocketSQLStreamPacket,
-  SocketSQLStreamServer,
+  SocketSQLStreamServer} from "prostgles-types";
+import {
+  CHANNELS,
   omitKeys,
   pickKeys,
 } from "prostgles-types";
-import { BasicCallback } from "../PubSubManager/PubSubManager";
-import { VoidFunction } from "../SchemaWatch/SchemaWatch";
-import { DB } from "../initProstgles";
-import { DboBuilder } from "./DboBuilder";
-import { PRGLIOSocket } from "./DboBuilderTypes";
+import type { BasicCallback } from "../PubSubManager/PubSubManager";
+import type { VoidFunction } from "../SchemaWatch/SchemaWatch";
+import type { DB } from "../initProstgles";
+import type { DboBuilder } from "./DboBuilder";
+import type { PRGLIOSocket } from "./DboBuilderTypes";
 import { getErrorAsObject, getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
 import { getDetailedFieldInfo } from "./runSQL";
 const Cursor: typeof CursorType = require("pg-cursor");

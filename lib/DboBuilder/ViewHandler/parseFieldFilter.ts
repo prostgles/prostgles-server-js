@@ -1,5 +1,5 @@
-import { FieldFilter, getKeys } from "prostgles-types";
-import { isPlainObject } from "../DboBuilder";
+import type { FieldFilter } from "prostgles-types";
+import { getKeys, includes, isObject } from "prostgles-types";
 
 /**
  * Filter string array
@@ -23,7 +23,14 @@ export const parseFieldFilter = <AllowedKeys extends string[]>(
     }
 
     /* string[] */
-    if (Array.isArray(fieldParams) && !fieldParams.find((f) => typeof f !== "string")) {
+    if (Array.isArray(fieldParams)) {
+      if (fieldParams.find((f) => typeof f !== "string")) {
+        throw (
+          " Invalid field filter array.\nExpecting array of strings. \n Received ->  " +
+          initialParams
+        );
+      }
+
       /* 
         ["*"] 
       */
@@ -50,9 +57,9 @@ export const parseFieldFilter = <AllowedKeys extends string[]>(
           { field1: true, field2: true } = only field1 and field2
           { field1: false, field2: false } = all fields except field1 and field2
       */
-    } else if (isPlainObject(fieldParams)) {
+    } else if (isObject(fieldParams)) {
       if (!getKeys(fieldParams as Record<string, any>).length) {
-        return [] as unknown as typeof all_cols; //all_fields.slice(0) as typeof all_fields;
+        return [] as unknown as typeof all_cols;
       }
 
       const keys = getKeys(
@@ -72,7 +79,13 @@ export const parseFieldFilter = <AllowedKeys extends string[]>(
 
       keys.forEach((key) => {
         const allowedVals = [true, false, 0, 1];
-        if (!allowedVals.includes((fieldParams as any)[key]))
+        if (
+          !includes(
+            allowedVals,
+            //@ts-ignore
+            fieldParams[key]
+          )
+        )
           throw `Invalid field selection value for: { ${key}: ${(fieldParams as any)[key]} }. \n Allowed values: ${allowedVals.join(" OR ")}`;
       });
 

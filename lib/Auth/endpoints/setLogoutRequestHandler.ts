@@ -1,6 +1,8 @@
-import e, { Request, Response } from "express";
-import { DBOFullyTyped } from "../../DBSchemaBuilder";
-import { AUTH_ROUTES_AND_PARAMS, AuthHandler } from "../AuthHandler";
+import type { Request, Response } from "express";
+import type e from "express";
+import type { DBOFullyTyped } from "../../DBSchemaBuilder/DBSchemaBuilder";
+import type { AuthHandler } from "../AuthHandler";
+import { AUTH_ROUTES_AND_PARAMS } from "../AuthHandler";
 import { throttledReject } from "../utils/throttledReject";
 
 export function setLogoutRequestHandler(this: AuthHandler, app: e.Express) {

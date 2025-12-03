@@ -1,7 +1,9 @@
-import { DBOFullyTyped } from "../DBSchemaBuilder";
-import { AuthHandler, getClientRequestIPsInfo, HTTP_FAIL_CODES } from "./AuthHandler";
-import { ExpressReq, LoginParams, type BasicSession } from "./AuthTypes";
-import { LoginResponseHandler } from "./endpoints/setLoginRequestHandler";
+import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
+import type { AuthHandler} from "./AuthHandler";
+import { getClientRequestIPsInfo, HTTP_FAIL_CODES } from "./AuthHandler";
+import type { ExpressReq, LoginParams} from "./AuthTypes";
+import { type BasicSession } from "./AuthTypes";
+import type { LoginResponseHandler } from "./endpoints/setLoginRequestHandler";
 import { throttledAuthCall } from "./utils/throttledReject";
 
 export async function login(

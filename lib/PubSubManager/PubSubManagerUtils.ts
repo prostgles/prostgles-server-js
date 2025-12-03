@@ -1,5 +1,5 @@
 import * as pgPromise from "pg-promise";
-import pg from "pg-promise/typescript/pg-subset";
+import type pg from "pg-promise/typescript/pg-subset";
 
 export const NOTIF_TYPE = {
   data: "data_has_changed",

@@ -1,6 +1,6 @@
-import { AnyObject, FieldFilter } from "prostgles-types/dist";
-import { UpdateRule } from "../../PublishParser/PublishParser";
-import { ViewHandler } from "./ViewHandler";
+import type { AnyObject, FieldFilter } from "prostgles-types/dist";
+import type { UpdateRule } from "../../PublishParser/PublishParser";
+import type { ViewHandler } from "./ViewHandler";
 
 export async function validateViewRules(
   this: ViewHandler,

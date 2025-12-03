@@ -1,21 +1,18 @@
-import {
+import type {
   AnyObject,
-  PG_COLUMN_UDT_DATA_TYPE,
-  ValidatedColumnInfo,
+  ValidatedColumnInfo} from "prostgles-types";
+import {
   _PG_geometric,
   isDefined,
   isObject,
   omitKeys,
-} from "prostgles-types";
-import { ParsedTableRule } from "../PublishParser/PublishParser";
-import {
-  LocalParams,
-  getErrorAsObject,
-  getSerializedClientErrorFromPGError,
   postgresToTsType,
-} from "./DboBuilder";
-import { TableHandler } from "./TableHandler/TableHandler";
-import { ViewHandler } from "./ViewHandler/ViewHandler";
+} from "prostgles-types";
+import type { ParsedTableRule } from "../PublishParser/PublishParser";
+import type { LocalParams} from "./DboBuilder";
+import { getErrorAsObject, getSerializedClientErrorFromPGError } from "./DboBuilder";
+import type { TableHandler } from "./TableHandler/TableHandler";
+import type { ViewHandler } from "./ViewHandler/ViewHandler";
 
 export const isTableHandler = (v: any): v is TableHandler => "parseUpdateRules" in v;
 

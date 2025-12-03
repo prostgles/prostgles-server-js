@@ -1,5 +1,6 @@
-import { AuthResponse, isObject } from "prostgles-types";
-import type { DBOFullyTyped } from "../../DBSchemaBuilder";
+import type { AuthResponse} from "prostgles-types";
+import { isObject } from "prostgles-types";
+import type { DBOFullyTyped } from "../../DBSchemaBuilder/DBSchemaBuilder";
 import { getClientRequestIPsInfo, type AuthHandler } from "../AuthHandler";
 import type { AuthClientRequest, AuthResultOrError, AuthResultWithSID } from "../AuthTypes";
 import { throttledAuthCall } from "./throttledReject";

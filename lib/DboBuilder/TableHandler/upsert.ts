@@ -1,8 +1,8 @@
-import { AnyObject, UpdateParams } from "prostgles-types";
-import { ParsedTableRule } from "../../PublishParser/publishTypesAndUtils";
-import { Filter, LocalParams } from "../DboBuilderTypes";
+import type { AnyObject, UpdateParams } from "prostgles-types";
+import type { ParsedTableRule } from "../../PublishParser/publishTypesAndUtils";
+import type { Filter, LocalParams } from "../DboBuilderTypes";
 import { getErrorAsObject, getSerializedClientErrorFromPGError } from "../dboBuilderUtils";
-import { TableHandler } from "./TableHandler";
+import type { TableHandler } from "./TableHandler";
 
 export const upsert = async function (
   this: TableHandler,

@@ -1,4 +1,4 @@
-import e from "express";
+import type e from "express";
 import * as passport from "passport";
 import { Strategy as FacebookStrategy } from "passport-facebook";
 import { Strategy as GitHubStrategy } from "passport-github2";
@@ -6,12 +6,13 @@ import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Strategy as MicrosoftStrategy } from "passport-microsoft";
 import { getObjectEntries, isEmpty } from "prostgles-types";
 import { getErrorAsObject } from "../../DboBuilder/dboBuilderUtils";
-import { DBOFullyTyped } from "../../DBSchemaBuilder";
-import { AUTH_ROUTES_AND_PARAMS, AuthHandler, HTTP_FAIL_CODES } from "../AuthHandler";
-import { AuthProviderUserData, LoginWithOAuthConfig } from "../AuthTypes";
+import type { DBOFullyTyped } from "../../DBSchemaBuilder/DBSchemaBuilder";
+import type { AuthHandler} from "../AuthHandler";
+import { AUTH_ROUTES_AND_PARAMS, HTTP_FAIL_CODES } from "../AuthHandler";
+import type { AuthProviderUserData, LoginWithOAuthConfig } from "../AuthTypes";
 import { getClientRequestIPsInfo } from "../utils/getClientRequestIPsInfo";
 import { upsertNamedExpressMiddleware } from "../utils/upsertNamedExpressMiddleware";
-import { LoginResponseHandler } from "./setLoginRequestHandler";
+import type { LoginResponseHandler } from "./setLoginRequestHandler";
 import OAuth2Strategy from "passport-oauth2";
 export function setOAuthRequestHandlers(
   this: AuthHandler,

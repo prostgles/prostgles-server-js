@@ -1,9 +1,9 @@
 import { asName, getKeys, getObjectEntries, isDefined, isObject } from "prostgles-types";
 import { validate_jsonb_schema_sql } from "../JSONBSchemaValidation/validateJSONBSchemaSQL";
-import { DB, DBHandlerServer } from "../Prostgles";
+import type { DB, DBHandlerServer } from "../Prostgles";
 import { getColumnDefinitionQuery, getTableColumns } from "./getColumnDefinitionQuery";
 import { getFutureTableSchema } from "./getFutureTableSchema";
-import { TableConfig } from "./TableConfig";
+import type { TableConfig } from "./TableConfig";
 
 type Args = {
   db: DB;

@@ -1,15 +1,17 @@
-import {
+import type {
   AnyObject,
-  asName,
   ParsedJoinPath,
-  reverseParsedPath,
-  SubscribeParams,
+  SubscribeParams} from "prostgles-types";
+import {
+  asName,
+  reverseParsedPath
 } from "prostgles-types";
-import { ParsedTableRule } from "../PublishParser/PublishParser";
-import { ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
-import { Filter, getSerializedClientErrorFromPGError, LocalParams } from "./DboBuilder";
-import { NewQuery } from "./QueryBuilder/QueryBuilder";
-import { ViewHandler } from "./ViewHandler/ViewHandler";
+import type { ParsedTableRule } from "../PublishParser/PublishParser";
+import type { ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
+import type { Filter, LocalParams } from "./DboBuilder";
+import { getSerializedClientErrorFromPGError } from "./DboBuilder";
+import type { NewQuery } from "./QueryBuilder/QueryBuilder";
+import type { ViewHandler } from "./ViewHandler/ViewHandler";
 import { log } from "../PubSubManager/PubSubManagerUtils";
 
 type Args = {

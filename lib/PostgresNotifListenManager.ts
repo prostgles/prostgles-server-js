@@ -3,9 +3,9 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { DB } from "./Prostgles";
-import pg from "pg-promise/typescript/pg-subset";
-import pgPromise from "pg-promise";
+import type { DB } from "./Prostgles";
+import type pg from "pg-promise/typescript/pg-subset";
+import type pgPromise from "pg-promise";
 
 export type PrglNotifListener = (args: {
   length: number;

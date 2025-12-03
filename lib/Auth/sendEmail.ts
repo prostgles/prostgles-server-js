@@ -1,7 +1,7 @@
-import { Email, SMTPConfig } from "./AuthTypes";
+import type { Email, SMTPConfig } from "./AuthTypes";
 import * as nodemailer from "nodemailer";
 import * as aws from "@aws-sdk/client-ses";
-import SESTransport from "nodemailer/lib/ses-transport";
+import type SESTransport from "nodemailer/lib/ses-transport";
 import { checkDmarc } from "./utils/checkDmarc";
 
 type SESTransporter = nodemailer.Transporter<SESTransport.SentMessageInfo, SESTransport.Options>;

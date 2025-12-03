@@ -1,5 +1,6 @@
-import { RequestHandler } from "express";
-import { AuthHandler, getClientRequestIPsInfo } from "./AuthHandler";
+import type { RequestHandler } from "express";
+import type { AuthHandler} from "./AuthHandler";
+import { getClientRequestIPsInfo } from "./AuthHandler";
 import { setCatchAllRequestHandler } from "./endpoints/setCatchAllRequestHandler";
 import { setLoginRequestHandler } from "./endpoints/setLoginRequestHandler";
 import { setLogoutRequestHandler } from "./endpoints/setLogoutRequestHandler";

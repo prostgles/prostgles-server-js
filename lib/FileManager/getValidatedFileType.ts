@@ -1,12 +1,14 @@
+import type {
+  ALLOWED_CONTENT_TYPE} from "prostgles-types";
 import {
-  ALLOWED_CONTENT_TYPE,
   ALLOWED_EXTENSION,
   CONTENT_TYPE_TO_EXT,
   getKeys,
   isObject,
 } from "prostgles-types";
 import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
-import { FileManager, getFileType, getFileTypeFromFilename } from "./FileManager";
+import type { FileManager} from "./FileManager";
+import { getFileType, getFileTypeFromFilename } from "./FileManager";
 
 type Args = {
   file: Buffer | string;

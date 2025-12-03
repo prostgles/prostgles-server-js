@@ -2,8 +2,9 @@ import type { DboBuilder } from "../DboBuilder/DboBuilder";
 import { EVENT_TRIGGER_TAGS } from "../Event_Trigger_Tags";
 import type { OnReadyCallbackBasic } from "../initProstgles";
 import { EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID, log } from "../PubSubManager/PubSubManagerUtils";
+import type {
+  ValidatedWatchSchemaType} from "./getValidatedWatchSchemaType";
 import {
-  ValidatedWatchSchemaType,
   getValidatedWatchSchemaType,
 } from "./getValidatedWatchSchemaType";
 const COMMAND_FIRST_KEYWORDS = EVENT_TRIGGER_TAGS.map((tag) => tag.split(" ")[0]!).filter(

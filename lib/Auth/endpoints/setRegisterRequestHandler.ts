@@ -1,5 +1,6 @@
-import e, { Request, Response } from "express";
-import { AuthResponse } from "prostgles-types";
+import type { Request, Response } from "express";
+import type e from "express";
+import type { AuthResponse } from "prostgles-types";
 import { AUTH_ROUTES_AND_PARAMS, HTTP_FAIL_CODES } from "../AuthHandler";
 import { getMagicLinkUrl, type SignupWithEmail } from "../AuthTypes";
 import { getClientRequestIPsInfo } from "../utils/getClientRequestIPsInfo";

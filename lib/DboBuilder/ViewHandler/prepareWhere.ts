@@ -1,9 +1,10 @@
-import { AnyObject, FieldFilter, getKeys, isDefined, isObject } from "prostgles-types/dist";
-import { ParsedTableRule } from "../../PublishParser/PublishParser";
-import { ExistsFilterConfig, Filter, LocalParams } from "../DboBuilder";
+import type { AnyObject, FieldFilter} from "prostgles-types/dist";
+import { getKeys, isDefined, isObject } from "prostgles-types/dist";
+import type { ParsedTableRule } from "../../PublishParser/PublishParser";
+import type { ExistsFilterConfig, Filter, LocalParams } from "../DboBuilder";
 import { getCondition } from "../getCondition";
 import { type SelectItemValidated } from "../QueryBuilder/QueryBuilder";
-import { ViewHandler } from "./ViewHandler";
+import type { ViewHandler } from "./ViewHandler";
 
 export type PrepareWhereParams = {
   filter?: Filter;

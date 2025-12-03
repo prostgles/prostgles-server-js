@@ -1,10 +1,10 @@
-import { Express } from "express";
+import type { Express } from "express";
 import { HTTP_FAIL_CODES, removeExpressRoute } from "./Auth/AuthHandler";
-import { ExpressReq, ExpressRes } from "./Auth/AuthTypes";
+import type { ExpressReq, ExpressRes } from "./Auth/AuthTypes";
 import { getSerializedClientErrorFromPGError } from "./DboBuilder/DboBuilder";
-import { Prostgles } from "./Prostgles";
+import type { Prostgles } from "./Prostgles";
 import { runClientMethod, runClientRequest, runClientSqlRequest } from "./runClientRequest";
-import { VoidFunction } from "./SchemaWatch/SchemaWatch";
+import type { VoidFunction } from "./SchemaWatch/SchemaWatch";
 import { isDefined } from "prostgles-types";
 
 type ExpressInternalRouter = {

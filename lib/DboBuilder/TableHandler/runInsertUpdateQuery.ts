@@ -1,7 +1,10 @@
-import { AnyObject, asName, FieldFilter, InsertParams, UpdateParams } from "prostgles-types";
-import { InsertRule, UpdateRule } from "../../PublishParser/PublishParser";
-import { getClientErrorFromPGError, LocalParams, withUserRLS } from "../DboBuilder";
-import { getSelectItemQuery, TableHandler } from "./TableHandler";
+import type { AnyObject, FieldFilter, InsertParams, UpdateParams } from "prostgles-types";
+import { asName } from "prostgles-types";
+import type { InsertRule, UpdateRule } from "../../PublishParser/PublishParser";
+import type { LocalParams} from "../DboBuilder";
+import { getClientErrorFromPGError, withUserRLS } from "../DboBuilder";
+import type { TableHandler } from "./TableHandler";
+import { getSelectItemQuery } from "./TableHandler";
 
 type RunInsertUpdateQueryArgs = {
   tableHandler: TableHandler;

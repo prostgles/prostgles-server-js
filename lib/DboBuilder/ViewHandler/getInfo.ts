@@ -1,7 +1,7 @@
-import { TableInfo as TInfo } from "prostgles-types/dist";
-import { ParsedTableRule } from "../../PublishParser/PublishParser";
-import { LocalParams } from "../DboBuilder";
-import { ViewHandler } from "./ViewHandler";
+import type { TableInfo as TInfo } from "prostgles-types/dist";
+import type { ParsedTableRule } from "../../PublishParser/PublishParser";
+import type { LocalParams } from "../DboBuilder";
+import type { ViewHandler } from "./ViewHandler";
 
 export async function getInfo(
   this: ViewHandler,

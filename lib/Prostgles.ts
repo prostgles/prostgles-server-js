@@ -3,11 +3,12 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import * as pgPromise from "pg-promise";
+import type * as pgPromise from "pg-promise";
 import { AuthHandler } from "./Auth/AuthHandler";
 import { FileManager } from "./FileManager/FileManager";
-import { OnInitReason, initProstgles } from "./initProstgles";
-import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
+import type { OnInitReason} from "./initProstgles";
+import { initProstgles } from "./initProstgles";
+import type { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { getClientSchema } from "./WebsocketAPI/getClientSchema";
 import { onSocketConnected } from "./WebsocketAPI/onSocketConnected";
 import pg = require("pg-promise/typescript/pg-subset");
@@ -16,15 +17,16 @@ import type { ProstglesInitOptions } from "./ProstglesTypes";
 import { RestApi } from "./RestApi";
 import TableConfigurator from "./TableConfig/TableConfig";
 
-import { DBHandlerServer, DboBuilder, PRGLIOSocket } from "./DboBuilder/DboBuilder";
+import type { PRGLIOSocket } from "./DboBuilder/DboBuilder";
+import { DBHandlerServer, DboBuilder } from "./DboBuilder/DboBuilder";
 export { DBHandlerServer };
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 export { getEmailSender, getOrSetTransporter, verifySMTPConfig } from "./Auth/sendEmail";
 export { applyTableConfig } from "./TableConfig/applyTableConfig";
 
 import { CHANNELS, tryCatchV2 } from "prostgles-types";
-import { DBEventsManager } from "./DBEventsManager";
-import { PublishParser } from "./PublishParser/PublishParser";
+import type { DBEventsManager } from "./DBEventsManager";
+import type { PublishParser } from "./PublishParser/PublishParser";
 import { pushSocketSchema } from "./WebsocketAPI/pushSocketSchema";
 
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;

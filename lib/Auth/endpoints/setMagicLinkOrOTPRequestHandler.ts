@@ -1,16 +1,18 @@
-import e, { type Response } from "express";
-import { DBOFullyTyped } from "../../DBSchemaBuilder";
+import type e from "express";
+import { type Response } from "express";
+import type { DBOFullyTyped } from "../../DBSchemaBuilder/DBSchemaBuilder";
+import type {
+  AuthHandler} from "../AuthHandler";
 import {
   AUTH_ROUTES_AND_PARAMS,
-  AuthHandler,
   getClientRequestIPsInfo,
   HTTP_FAIL_CODES,
   HTTP_SUCCESS_CODES,
 } from "../AuthHandler";
-import { ExpressReq, LoginSignupConfig, MagicLinkOrOTPData, SessionUser } from "../AuthTypes";
+import type { ExpressReq, LoginSignupConfig, MagicLinkOrOTPData, SessionUser } from "../AuthTypes";
 import { throttledAuthCall } from "../utils/throttledReject";
-import { LoginResponse } from "./setLoginRequestHandler";
-import { AuthResponse } from "prostgles-types";
+import type { LoginResponse } from "./setLoginRequestHandler";
+import type { AuthResponse } from "prostgles-types";
 
 type MagicLinkResponseHandler = Response<
   | LoginResponse

@@ -1,8 +1,10 @@
-import { SelectParams, isObject } from "prostgles-types";
-import { ParsedTableRule } from "../../PublishParser/PublishParser";
-import {
+import type { SelectParams} from "prostgles-types";
+import { isObject } from "prostgles-types";
+import type { ParsedTableRule } from "../../PublishParser/PublishParser";
+import type {
   Filter,
-  LocalParams,
+  LocalParams} from "../DboBuilder";
+import {
   getClientErrorFromPGError,
   getErrorAsObject,
   getSerializedClientErrorFromPGError,
@@ -10,10 +12,10 @@ import {
 } from "../DboBuilder";
 import { getNewQuery } from "../QueryBuilder/getNewQuery";
 import { getSelectQuery } from "../QueryBuilder/getSelectQuery";
-import { NewQuery } from "../QueryBuilder/QueryBuilder";
+import type { NewQuery } from "../QueryBuilder/QueryBuilder";
 import { canRunSQL } from "../runSQL";
-import { TableHandler } from "../TableHandler/TableHandler";
-import { ViewHandler } from "./ViewHandler";
+import type { TableHandler } from "../TableHandler/TableHandler";
+import type { ViewHandler } from "./ViewHandler";
 
 export const find = async function (
   this: ViewHandler,

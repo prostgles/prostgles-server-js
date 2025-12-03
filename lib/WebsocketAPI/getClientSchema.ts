@@ -1,6 +1,6 @@
 import { isObject, omitKeys, tryCatchV2, type ClientSchema } from "prostgles-types";
 import type { AuthClientRequest } from "../Auth/AuthTypes";
-import { Prostgles } from "../Prostgles";
+import type { Prostgles } from "../Prostgles";
 import type { PermissionScope, PublishParser } from "../PublishParser/PublishParser";
 import { clientCanRunSqlRequest } from "../runClientRequest";
 import { version } from "../../package.json";

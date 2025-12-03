@@ -1,16 +1,18 @@
 import * as pgPromise from "pg-promise";
-import pg from "pg-promise/typescript/pg-subset";
+import type pg from "pg-promise/typescript/pg-subset";
 import { getKeys, isEmpty, isEqual } from "prostgles-types";
 import type { AuthClientRequest, SessionUser } from "./Auth/AuthTypes";
 import { removeExpressRoutesTest } from "./Auth/utils/removeExpressRoute";
 import { DBEventsManager } from "./DBEventsManager";
-import { DBOFullyTyped } from "./DBSchemaBuilder";
-import { DBHandlerServer, Prostgles, getIsSuperUser } from "./Prostgles";
-import { ProstglesInitOptions } from "./ProstglesTypes";
-import { DbTableInfo, PublishParser, type PermissionScope } from "./PublishParser/PublishParser";
+import type { DBOFullyTyped } from "./DBSchemaBuilder/DBSchemaBuilder";
+import type { DBHandlerServer, Prostgles } from "./Prostgles";
+import { getIsSuperUser } from "./Prostgles";
+import type { ProstglesInitOptions } from "./ProstglesTypes";
+import type { DbTableInfo } from "./PublishParser/PublishParser";
+import { PublishParser, type PermissionScope } from "./PublishParser/PublishParser";
 import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { runSQLFile } from "./TableConfig/runSQLFile";
-import { sleep } from "./utils";
+import { sleep } from "./utils/utils";
 import { getClientHandlers } from "./WebsocketAPI/getClientHandlers";
 
 /**

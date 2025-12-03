@@ -1,17 +1,18 @@
-import {
+import type {
   ALLOWED_CONTENT_TYPE,
   ALLOWED_EXTENSION,
   AnyObject,
   ColumnInfo,
-  isObject,
   JSONB,
-  TableInfo,
+  TableInfo} from "prostgles-types";
+import {
+  isObject
 } from "prostgles-types";
-import { JoinInfo, LocalParams } from "../DboBuilder/DboBuilder";
-import { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
+import type { JoinInfo, LocalParams } from "../DboBuilder/DboBuilder";
+import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { uploadFile } from "../DboBuilder/uploadFile";
-import { DB, DBHandlerServer, Prostgles } from "../Prostgles";
-import { InsertRule, ValidateRowArgs } from "../PublishParser/PublishParser";
+import type { DB, DBHandlerServer, Prostgles } from "../Prostgles";
+import type { InsertRule, ValidateRowArgs } from "../PublishParser/PublishParser";
 import { initTableConfig } from "./initTableConfig";
 
 type ColExtraInfo = {

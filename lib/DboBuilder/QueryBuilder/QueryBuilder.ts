@@ -3,22 +3,22 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import {
-  asName,
+import type {
   ColumnInfo,
-  getKeys,
-  isEmpty,
-  isObject,
   JoinSelect,
   PG_COLUMN_UDT_DATA_TYPE,
   Select,
   ValidatedColumnInfo,
 } from "prostgles-types";
-import { postgresToTsType, SortItem } from "../DboBuilder";
+import { getKeys, isEmpty, isObject, postgresToTsType } from "prostgles-types";
+import type { SortItem } from "../DboBuilder";
 
-import { ParsedJoinPath } from "../ViewHandler/parseJoinPath";
-import { ViewHandler } from "../ViewHandler/ViewHandler";
-import { COMPUTED_FIELDS, FieldSpec, FunctionSpec, parseFunction } from "./Functions";
+import type { ParsedJoinPath } from "../ViewHandler/parseJoinPath";
+import type { ViewHandler } from "../ViewHandler/ViewHandler";
+import type { FieldSpec, FunctionSpec } from "./Functions/Functions";
+import { COMPUTED_FIELDS } from "./Functions/COMPUTED_FIELDS";
+import { parseFunction } from "./Functions/parseFunction";
+import { asNameAlias } from "../../utils/asNameAlias";
 
 export type SelectItem = {
   getFields: (args: any[]) => string[] | "*";
@@ -71,12 +71,6 @@ export type NewQueryJoin = NewQuery & {
 };
 export type NewQuery = NewQueryRoot & {
   joins?: NewQueryJoin[];
-};
-
-export const asNameAlias = (field: string, tableAlias?: string) => {
-  const result = asName(field);
-  if (tableAlias) return asName(tableAlias) + "." + result;
-  return result;
 };
 
 export const parseFunctionObject = (funcData: unknown): { funcName: string; args: any[] } => {

@@ -1,8 +1,10 @@
-import { DboBuilder } from "../DboBuilder/DboBuilder";
-import { JOIN_TYPES, Join } from "../ProstglesTypes";
-import { Graph, findShortestPath } from "../shortestPath";
-import { TableSchema } from "./DboBuilderTypes";
-import { JoinPaths } from "./ViewHandler/ViewHandler";
+import type { DboBuilder } from "../DboBuilder/DboBuilder";
+import type { Join } from "../ProstglesTypes";
+import { JOIN_TYPES } from "../ProstglesTypes";
+import type { Graph} from "../shortestPath";
+import { findShortestPath } from "../shortestPath";
+import type { TableSchema } from "./DboBuilderTypes";
+import type { JoinPaths } from "./ViewHandler/ViewHandler";
 
 type Result = {
   joinGraph?: Graph | undefined;

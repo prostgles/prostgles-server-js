@@ -1,28 +1,20 @@
-import * as pgPromise from "pg-promise";
-import {
+import type * as pgPromise from "pg-promise";
+import type {
   AnyObject,
   ColumnInfo,
   FieldFilter,
   SelectParams,
   SubscribeParams,
-  asName,
-  isObject,
 } from "prostgles-types";
-import { TableEvent } from "../../Logging";
-import { DB } from "../../Prostgles";
-import { Join } from "../../ProstglesTypes";
-import { ParsedTableRule } from "../../PublishParser/PublishParser";
-import { Graph } from "../../shortestPath";
-import {
-  DboBuilder,
-  Filter,
-  LocalParams,
-  TableHandlers,
-  escapeTSNames,
-  getSerializedClientErrorFromPGError,
-  postgresToTsType,
-} from "../DboBuilder";
-import { TableSchema } from "../DboBuilderTypes";
+import { asName, isObject, postgresToTsType } from "prostgles-types";
+import type { TableEvent } from "../../Logging";
+import type { DB } from "../../Prostgles";
+import type { Join } from "../../ProstglesTypes";
+import type { ParsedTableRule } from "../../PublishParser/PublishParser";
+import type { Graph } from "../../shortestPath";
+import type { DboBuilder, Filter, LocalParams, TableHandlers } from "../DboBuilder";
+import { getSerializedClientErrorFromPGError } from "../DboBuilder";
+import type { TableSchema } from "../DboBuilderTypes";
 import { getValidatedRules } from "../TableRules/getValidatedRules";
 import { getColumns } from "../getColumns";
 import { count } from "./count";
@@ -31,8 +23,10 @@ import { getInfo } from "./getInfo";
 import { parseFieldFilter } from "./parseFieldFilter";
 import { prepareWhere } from "./prepareWhere";
 import { size } from "./size";
-import { LocalFuncs, subscribe } from "./subscribe";
+import type { LocalFuncs } from "./subscribe";
+import { subscribe } from "./subscribe";
 import { validateViewRules } from "./validateViewRules";
+import { escapeTSNames } from "../../utils/utils";
 
 export type JoinPaths = {
   t1: string;

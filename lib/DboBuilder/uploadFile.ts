@@ -1,7 +1,8 @@
-import { AnyObject, getKeys, isObject } from "prostgles-types";
-import { LocalParams, Media } from "./DboBuilder";
-import { ValidateRowBasic } from "../PublishParser/PublishParser";
-import { TableHandler } from "./TableHandler/TableHandler";
+import type { AnyObject} from "prostgles-types";
+import { getKeys, isObject } from "prostgles-types";
+import type { LocalParams, Media } from "./DboBuilder";
+import type { ValidateRowBasic } from "../PublishParser/PublishParser";
+import type { TableHandler } from "./TableHandler/TableHandler";
 
 export const isFile = (row: any): row is { data: Buffer; name: string } => {
   return Boolean(

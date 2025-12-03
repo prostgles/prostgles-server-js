@@ -1,15 +1,16 @@
-import pgPromise from "pg-promise";
-import { AnyObject, DeleteParams, FieldFilter } from "prostgles-types";
-import { DeleteRule, ParsedTableRule } from "../../PublishParser/PublishParser";
-import {
+import type pgPromise from "pg-promise";
+import type { AnyObject, DeleteParams, FieldFilter } from "prostgles-types";
+import type { DeleteRule, ParsedTableRule } from "../../PublishParser/PublishParser";
+import type {
   Filter,
-  LocalParams,
+  LocalParams} from "../DboBuilder";
+import {
   getErrorAsObject,
   getSerializedClientErrorFromPGError,
   withUserRLS,
 } from "../DboBuilder";
 import { runQueryReturnType } from "../ViewHandler/find";
-import { TableHandler } from "./TableHandler";
+import type { TableHandler } from "./TableHandler";
 import { onDeleteFromFileTable } from "./onDeleteFromFileTable";
 
 export async function _delete(

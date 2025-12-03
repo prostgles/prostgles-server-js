@@ -1,8 +1,10 @@
-import { AnyObject, InsertParams, asName, getSerialisableError, isObject } from "prostgles-types";
-import { ParsedTableRule, ValidateRowBasic } from "../../../PublishParser/PublishParser";
-import { LocalParams, getSerializedClientErrorFromPGError, withUserRLS } from "../../DboBuilder";
+import type { AnyObject, InsertParams } from "prostgles-types";
+import { asName, getSerialisableError, isObject } from "prostgles-types";
+import type { ParsedTableRule, ValidateRowBasic } from "../../../PublishParser/PublishParser";
+import type { LocalParams } from "../../DboBuilder";
+import { getSerializedClientErrorFromPGError, withUserRLS } from "../../DboBuilder";
 import { prepareNewData } from "../DataValidator";
-import { TableHandler } from "../TableHandler";
+import type { TableHandler } from "../TableHandler";
 import { insertTest } from "../insertTest";
 import { runInsertUpdateQuery } from "../runInsertUpdateQuery";
 import { insertNestedRecords } from "./insertNestedRecords";
@@ -272,13 +274,3 @@ const validateInsertParams = (params: InsertParams | undefined) => {
       throw "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ");
   }
 };
-
-// const removeBuffers = (o: any) => {
-//   if(isPlainObject(o)){
-//     return JSON.stringify(getKeys(o).reduce((a, k) => {
-//       const value = o[k]
-//       return { ...a, [k]: Buffer.isBuffer(value)? `Buffer[${value.byteLength}][...REMOVED]` : value
-//     }
-//   }, {}));
-//   }
-// }

@@ -1,9 +1,12 @@
-import e, { RequestHandler } from "express";
-import { DBOFullyTyped } from "../../DBSchemaBuilder";
-import { AUTH_ROUTES_AND_PARAMS, AuthHandler, HTTP_FAIL_CODES, matchesRoute } from "../AuthHandler";
-import { AuthClientRequest } from "../AuthTypes";
-import { getReturnUrl } from "../utils/getReturnUrl";
+import type e from "express";
+import type { RequestHandler } from "express";
 import { isDefined } from "prostgles-types";
+import type { DBOFullyTyped } from "../../DBSchemaBuilder/DBSchemaBuilder";
+import type { AuthHandler } from "../AuthHandler";
+import { AUTH_ROUTES_AND_PARAMS, HTTP_FAIL_CODES } from "../AuthHandler";
+import type { AuthClientRequest } from "../AuthTypes";
+import { getReturnUrl } from "../utils/getReturnUrl";
+import { matchesRoute } from "../utils/matchesRoute";
 
 export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
   const requestHandlerCatchAll: RequestHandler = async (req, res, next) => {

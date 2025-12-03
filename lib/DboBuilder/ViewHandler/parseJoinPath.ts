@@ -1,5 +1,6 @@
-import { JoinPath, RawJoinPath, reverseJoinOn } from "prostgles-types";
-import { ViewHandler } from "./ViewHandler";
+import type { JoinPath, RawJoinPath} from "prostgles-types";
+import { reverseJoinOn } from "prostgles-types";
+import type { ViewHandler } from "./ViewHandler";
 
 type parseJoinPathArgs = {
   rawPath: RawJoinPath;
@@ -69,7 +70,7 @@ export const parseJoinPath = ({
   return result;
 };
 
-import { JoinInfo } from "../DboBuilder";
+import type { JoinInfo } from "../DboBuilder";
 
 type Opts = {
   allowMultiOrJoin?: boolean;

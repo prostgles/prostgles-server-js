@@ -8,7 +8,7 @@ import {
   type ViewHandler,
 } from "prostgles-types";
 import type { AuthClientRequest } from "../Auth/AuthTypes";
-import type { DBOFullyTyped } from "../DBSchemaBuilder";
+import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { Prostgles } from "../Prostgles";
 import { runClientMethod, runClientRequest, runClientSqlRequest } from "../runClientRequest";
 import { getClientSchema } from "./getClientSchema";

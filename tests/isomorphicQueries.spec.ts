@@ -6,7 +6,7 @@ import {
   test,
 } from "node:test";
 import { SubscriptionHandler, pickKeys } from "prostgles-types";
-import { DBOFullyTyped } from "../dist/DBSchemaBuilder";
+import { DBOFullyTyped } from "../dist/DBSchemaBuilder/DBSchemaBuilder";
 import type { DBHandlerClient } from "./client";
 
 export const isomorphicQueries = async (

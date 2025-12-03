@@ -1,4 +1,4 @@
-import { FileManager, LocalConfig, OnProgress, UploadedItem } from "./FileManager";
+import type { FileManager, LocalConfig, OnProgress, UploadedItem } from "./FileManager";
 import * as stream from "stream";
 import * as fs from "fs";
 

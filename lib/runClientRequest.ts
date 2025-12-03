@@ -1,18 +1,20 @@
-import {
+import type {
   SQLRequest,
   TableHandler,
-  UserLike,
+  UserLike} from "prostgles-types";
+import {
   getKeys,
   pickKeys,
   type AnyObject,
 } from "prostgles-types";
-import { AuthClientRequest } from "./Auth/AuthTypes";
-import { LocalParams } from "./DboBuilder/DboBuilder";
-import { TableHandler as TableHandlerServer } from "./DboBuilder/TableHandler/TableHandler";
+import type { AuthClientRequest } from "./Auth/AuthTypes";
+import type { LocalParams } from "./DboBuilder/DboBuilder";
+import type { TableHandler as TableHandlerServer } from "./DboBuilder/TableHandler/TableHandler";
 import { parseFieldFilter } from "./DboBuilder/ViewHandler/parseFieldFilter";
 import { canRunSQL } from "./DboBuilder/runSQL";
-import { Prostgles } from "./Prostgles";
-import { ParsedTableRule, type PermissionScope } from "./PublishParser/publishTypesAndUtils";
+import type { Prostgles } from "./Prostgles";
+import type { ParsedTableRule} from "./PublishParser/publishTypesAndUtils";
+import { type PermissionScope } from "./PublishParser/publishTypesAndUtils";
 
 const TABLE_METHODS = {
   find: 1,
