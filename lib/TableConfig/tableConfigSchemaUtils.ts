@@ -50,12 +50,11 @@ export const getSchemaUtils = async (prostgles: Pick<Prostgles, "db" | "opts">) 
   const MAX_IDENTIFIER_LENGTH = +(
     await db.one<{ max_identifier_length: number }>("SHOW max_identifier_length;")
   ).max_identifier_length;
-
   if (!Number.isFinite(MAX_IDENTIFIER_LENGTH))
     throw `Could not obtain a valid max_identifier_length`;
   const asName = (v: string) => {
-    if (v.length > MAX_IDENTIFIER_LENGTH - 1) {
-      throw `The identifier name provided (${v}) is longer than the allowed limit (max_identifier_length - 1 = ${MAX_IDENTIFIER_LENGTH - 1} characters )\n Longest allowed: ${_asName(v.slice(0, MAX_IDENTIFIER_LENGTH - 1))} `;
+    if (v.length > MAX_IDENTIFIER_LENGTH) {
+      throw `The identifier name provided (${v}) is longer than the allowed limit (max_identifier_length = ${MAX_IDENTIFIER_LENGTH} characters )\n Longest allowed: ${_asName(v.slice(0, MAX_IDENTIFIER_LENGTH))} `;
     }
 
     return _asName(v);

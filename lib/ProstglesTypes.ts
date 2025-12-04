@@ -6,7 +6,7 @@ import type { DbConnection, OnReadyCallback } from "./initProstgles";
 import type { EventInfo } from "./Logging";
 import type { ExpressApp, RestApiConfig } from "./RestApi";
 import type { OnSchemaChangeCallback } from "./SchemaWatch/SchemaWatch";
-import type { ColConstraint } from "./TableConfig/getConstraintDefinitionQueries";
+import type { PGConstraint } from "./TableConfig/fetchTableConstraints";
 import type { TableConfig } from "./TableConfig/TableConfig";
 import type { Express } from "express";
 
@@ -20,10 +20,9 @@ import type {
   Awaitable,
   Publish,
   PublishMethods,
-  PublishParams} from "./PublishParser/PublishParser";
-import {
-  type PublishMethodsV2,
+  PublishParams,
 } from "./PublishParser/PublishParser";
+import { type PublishMethodsV2 } from "./PublishParser/PublishParser";
 
 /**
  * Allows uploading and downloading files.
@@ -345,6 +344,6 @@ type OnMigrate = (args: {
   getConstraints: (
     table: string,
     column?: string,
-    types?: ColConstraint["type"][]
-  ) => Promise<ColConstraint[]>;
+    types?: PGConstraint["type"][]
+  ) => Promise<PGConstraint[]>;
 }) => void | Promise<void>;

@@ -1,7 +1,7 @@
 import type pgPromise from "pg-promise";
 import type { ProstglesInitOptions } from "../ProstglesTypes";
 import { EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "../PubSubManager/PubSubManagerUtils";
-import { getColConstraints } from "./getConstraintDefinitionQueries";
+import { fetchTableConstraints } from "./fetchTableConstraints";
 
 export async function runMigrations(
   t: pgPromise.ITask<{}>,
@@ -43,7 +43,7 @@ export async function runMigrations(
       db: t,
       oldVersion: latestVersion,
       getConstraints: (table, col, types) =>
-        getColConstraints({ db: t, table, column: col, types }),
+        fetchTableConstraints({ db: t, table, column: col, types }),
     });
   }
 

@@ -2,7 +2,7 @@ import type pgPromise from "pg-promise";
 import { asName } from "prostgles-types";
 import type { DB } from "../initProstgles";
 import type { ProstglesInitOptions, TableConfigMigrations } from "../ProstglesTypes";
-import { getColConstraints } from "./getConstraintDefinitionQueries";
+import { fetchTableConstraints } from "./fetchTableConstraints";
 import type { TableConfig } from "./TableConfig";
 export type RequiredUndefined<T> = {
   [K in keyof Required<T>]: T[K];
@@ -115,7 +115,7 @@ const getMigration = async (
           db: t,
           oldVersion: latestVersion,
           getConstraints: (table, col, types) =>
-            getColConstraints({ db: t, table, column: col, types }),
+            fetchTableConstraints({ db: t, table, column: col, types }),
         });
 
         return {

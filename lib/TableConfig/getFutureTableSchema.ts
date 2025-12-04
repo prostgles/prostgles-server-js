@@ -3,8 +3,8 @@ import { pgp } from "../DboBuilder/DboBuilder";
 import type { DB } from "../Prostgles";
 import type { ColumnMinimalInfo } from "./getColumnSQLDefinitionQuery";
 import { getTableColumns } from "./getColumnSQLDefinitionQuery";
-import type { ColConstraint, ConstraintDef } from "./getConstraintDefinitionQueries";
-import { getColConstraints } from "./getConstraintDefinitionQueries";
+import type { ConstraintDef } from "./getConstraintDefinitionQueries";
+import { type PGConstraint, fetchTableConstraints } from "./fetchTableConstraints";
 
 type Args = {
   db: DB;
@@ -23,12 +23,12 @@ export const getFutureTableSchema = async ({
   constraintDefs = [],
   db,
 }: Args): Promise<{
-  constraints: ColConstraint[];
+  constraints: PGConstraint[];
   cols: ColumnMinimalInfo[];
 }> => {
   const { TransactionMode, isolationLevel } = pgp.txMode;
 
-  let constraints: ColConstraint[] = [];
+  let constraints: PGConstraint[] = [];
   let cols: ColumnMinimalInfo[] = [];
   const txMode = new TransactionMode({
     tiLevel: isolationLevel.serializable,
@@ -56,7 +56,7 @@ export const getFutureTableSchema = async ({
 
     await t.any(query);
 
-    constraints = await getColConstraints({ db: t, table: tableName });
+    constraints = await fetchTableConstraints({ db: t, table: tableName });
     cols = await getTableColumns({ db: t, table: tableName });
 
     return t.any("ROLLBACK");
