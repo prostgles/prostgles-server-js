@@ -7,7 +7,7 @@ import { Strategy as MicrosoftStrategy } from "passport-microsoft";
 import { getObjectEntries, isEmpty } from "prostgles-types";
 import { getErrorAsObject } from "../../DboBuilder/dboBuilderUtils";
 import type { DBOFullyTyped } from "../../DBSchemaBuilder/DBSchemaBuilder";
-import type { AuthHandler} from "../AuthHandler";
+import type { AuthHandler } from "../AuthHandler";
 import { AUTH_ROUTES_AND_PARAMS, HTTP_FAIL_CODES } from "../AuthHandler";
 import type { AuthProviderUserData, LoginWithOAuthConfig } from "../AuthTypes";
 import { getClientRequestIPsInfo } from "../utils/getClientRequestIPsInfo";
@@ -89,7 +89,10 @@ export function setOAuthRequestHandlers(
                 type: "OAuth",
                 provider: providerName as "customOAuth",
               }).catch((e: any) => {
-                res.status(HTTP_FAIL_CODES.INTERNAL_SERVER_ERROR).json(getErrorAsObject(e));
+                res.status(HTTP_FAIL_CODES.INTERNAL_SERVER_ERROR).json(
+                  //@ts-ignore
+                  getErrorAsObject(e)
+                );
               });
             }
           }

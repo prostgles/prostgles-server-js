@@ -62,7 +62,7 @@ export async function getClientSchema(
     const methodSchema: ClientSchema["methods"] =
       !methods ?
         []
-      : Object.entries(methods)
+      : Array.from(methods.entries())
           .map(([methodName, method]) => {
             if (isObject(method) && "run" in method) {
               return {

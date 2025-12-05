@@ -1,4 +1,4 @@
-import type { Method} from "prostgles-types";
+import type { Method } from "prostgles-types";
 import { getObjectEntries, isObject } from "prostgles-types";
 import type { AuthClientRequest, AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
@@ -14,7 +14,8 @@ import type {
   DboTableCommand,
   ParsedTableRule,
   PublishMethods,
-  PublishParams} from "./publishTypesAndUtils";
+  PublishParams,
+} from "./publishTypesAndUtils";
 import {
   RULE_TO_METHODS,
   parsePublishTableRule,
@@ -72,18 +73,15 @@ export class PublishParser {
     return getV2Methods(publishMethods);
   }
 
-  async getAllowedMethods(
-    clientReq: AuthClientRequest,
-    userData: AuthResultWithSID | undefined
-  ): Promise<{ [key: string]: Method }> {
-    const methods: { [key: string]: Method } = {};
+  async getAllowedMethods(clientReq: AuthClientRequest, userData: AuthResultWithSID | undefined) {
+    const methods: Map<string, Method> = new Map();
 
     const publishParams = await this.getPublishParams(clientReq, userData);
     const v2Methods = this.publishMethodsV2;
     if (v2Methods) {
       for (const [name, method] of Object.entries(v2Methods)) {
         if (await method.isAllowed(publishParams)) {
-          methods[name] = method;
+          methods.set(name, method);
         }
       }
       return methods;
@@ -92,6 +90,9 @@ export class PublishParser {
     const _methods = await applyParamsIfFunc(this.publishMethods, publishParams);
     if (!_methods) return methods;
     getObjectEntries(_methods).map(([key, method]) => {
+      if (typeof key !== "string") {
+        throw `invalid publishMethods key -> ${String(key)} \n Expecting a string`;
+      }
       const isFuncLike = (maybeFunc: VoidFunction | Promise<void> | Promise<any>) =>
         typeof maybeFunc === "function" || typeof maybeFunc.then === "function";
       if (
@@ -99,7 +100,7 @@ export class PublishParser {
         // @ts-ignore
         (isObject(method) && isFuncLike(method.run))
       ) {
-        methods[key] = _methods[key]!;
+        methods.set(key, method);
       } else {
         throw `invalid publishMethods item -> ${key} \n Expecting a function or promise`;
       }

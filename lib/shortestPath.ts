@@ -25,7 +25,7 @@ export const findShortestPath = (
   // establish object for recording distances from the start node
   let distances: AnyObject = {};
   distances[endNode] = "Infinity";
-  distances = Object.assign(distances, graph[startNode]);
+  distances = { ...distances, ...graph[startNode] };
 
   // track paths
   const parents: AnyObject = { endNode: null };

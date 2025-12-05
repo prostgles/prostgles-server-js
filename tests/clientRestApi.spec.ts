@@ -5,9 +5,6 @@ import { describe, test } from "node:test";
 
 export const clientRestApi = async (
   db: DBHandlerClient,
-  auth: AuthHandler,
-  log: (...args: any[]) => any,
-  methods,
   tableSchema: DBSchemaTable[],
   token: string
 ) => {
@@ -73,6 +70,34 @@ export const clientRestApi = async (
 
       const two22 = await dbMethod("myfunc", {});
       assert.equal(two22, 222);
+    });
+
+    await test("Rest api security", async () => {
+      const sensitiveKeys = ["constructor", "__proto__", "prototype"];
+      for (const key of sensitiveKeys) {
+        const res = await dbRest(key, "find", {}).catch((error) => error);
+        assert.deepStrictEqual(res, {
+          error: { message: `tableName ${key} is invalid or not allowed` },
+        });
+
+        const res1 = await dbRest("planes", "find", JSON.parse(`{"${key}": {}}`)).catch(
+          (error) => error
+        );
+        assert.deepStrictEqual(
+          res1,
+
+          {
+            error: {
+              message: `planes.${key} is invalid/disallowed for filtering. Allowed columns: "id", "x", "y", "flight_number", "last_updated"`,
+            },
+          }
+        );
+
+        const methodRes = await dbMethod(key, {}).catch((error) => error);
+        assert.deepStrictEqual(methodRes, {
+          error: { message: `Disallowed/missing method "${key}"` },
+        });
+      }
     });
   });
 };

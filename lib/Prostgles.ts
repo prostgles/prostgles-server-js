@@ -6,7 +6,7 @@
 import type * as pgPromise from "pg-promise";
 import { AuthHandler } from "./Auth/AuthHandler";
 import { FileManager } from "./FileManager/FileManager";
-import type { OnInitReason} from "./initProstgles";
+import type { OnInitReason } from "./initProstgles";
 import { initProstgles } from "./initProstgles";
 import type { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { getClientSchema } from "./WebsocketAPI/getClientSchema";
@@ -148,7 +148,7 @@ export class Prostgles {
       console.error(`Unrecognised ProstglesInitOptions params: ${unknownParams.join()}`);
     }
 
-    Object.assign(this.opts, params);
+    this.opts = { ...this.opts, ...params };
 
     /* set defaults */
     if (this.opts.fileTable) {
@@ -164,7 +164,12 @@ export class Prostgles {
   destroyed = false;
 
   checkDb() {
-    if (!this.db || !(this.db as any).connect) throw "something went wrong getting a db connection";
+    if (
+      !this.db ||
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      !this.db.connect
+    )
+      throw "something went wrong getting a db connection";
   }
 
   getTSFileName() {

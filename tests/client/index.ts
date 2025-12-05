@@ -56,11 +56,11 @@ const tests: Record<string, ClientTestSpecV2> = {
   useProstgles: async ({ db }) => {
     await useProstglesTest(db, getSocketOptions);
   },
-  files: async ({ db, methods, tableSchema, auth }) => {
+  files: async ({ db }) => {
     await clientFileTests(db);
   },
-  rest_api: async ({ db, methods, tableSchema, auth }) => {
-    await clientRestApi(db, auth, log, methods, tableSchema, TEST_NAME);
+  rest_api: async ({ db, tableSchema }) => {
+    await clientRestApi(db, tableSchema, TEST_NAME);
   },
 };
 

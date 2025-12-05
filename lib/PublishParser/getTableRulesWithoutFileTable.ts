@@ -9,11 +9,9 @@ import type {
   ParsedPublishTable,
   PublishTableRule,
   PublishViewRule,
-  SubscribeRule} from "./publishTypesAndUtils";
-import {
-  type PublishObject,
-  RULE_TO_METHODS
+  SubscribeRule,
 } from "./publishTypesAndUtils";
+import { type PublishObject, RULE_TO_METHODS } from "./publishTypesAndUtils";
 
 export async function getTableRulesWithoutFileTable(
   this: PublishParser,
@@ -21,7 +19,7 @@ export async function getTableRulesWithoutFileTable(
   clientInfo: AuthResultWithSID | undefined,
   overridenPublish?: PublishObject
 ): Promise<ParsedPublishTable | undefined> {
-  if (!tableName) throw new Error("publish OR socket OR dbo OR tableName are missing");
+  if (!tableName) throw new Error("tableName is missing in getTableRules");
 
   const publish =
     overridenPublish ?? (clientReq && (await this.getPublishAsObject(clientReq, clientInfo)));

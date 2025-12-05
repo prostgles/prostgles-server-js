@@ -78,6 +78,8 @@ export class DboBuilder {
 
   dbo: DBHandlerServer;
 
+  dboMap: Map<string, TableHandler | ViewHandler> = new Map();
+
   /**
    * Undefined if cannot create table triggers
    */
@@ -151,6 +153,7 @@ export class DboBuilder {
     if (!this.prostgles.db) throw "db missing";
     this.db = this.prostgles.db;
     this.dbo = {} as unknown as DBHandlerServer;
+    this.dboMap = new Map();
     this.queryStreamer = new QueryStreamer(this);
   }
 
@@ -259,13 +262,15 @@ export class DboBuilder {
                 Alternatively you can rename the table column\n`;
       }
 
-      this.dbo[tov.escaped_identifier] = new (tov.is_view ? ViewHandler : TableHandler)(
+      const tableHandler = new (tov.is_view ? ViewHandler : TableHandler)(
         this.db,
         tov,
         this,
         undefined,
         this.shortestJoinPaths
       );
+      this.dbo[tov.escaped_identifier] = tableHandler;
+      this.dboMap.set(tov.name, tableHandler);
 
       if (this.shortestJoinPaths.find((jp) => [jp.t1, jp.t2].includes(tov.name))) {
         const table = tov.name;

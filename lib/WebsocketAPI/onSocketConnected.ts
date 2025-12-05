@@ -1,5 +1,5 @@
-import type { AnyObject} from "prostgles-types";
-import { CHANNELS } from "prostgles-types";
+import type { AnyObject } from "prostgles-types";
+import { CHANNELS, getSerialisableError, isObject } from "prostgles-types";
 import type { Prostgles, TABLE_METHODS } from "../Prostgles";
 import type { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
 import { runClientMethod, runClientRequest } from "../runClientRequest";
@@ -151,7 +151,8 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
 }
 
 export function makeSocketError(cb: (err: AnyObject) => void, err: any) {
-  cb(getErrorAsObject(err));
+  const serializedError = getSerialisableError(err);
+  cb(isObject(serializedError) ? serializedError : { serializedError });
 }
 
 type SocketRequestParams = {

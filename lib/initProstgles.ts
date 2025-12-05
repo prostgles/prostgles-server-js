@@ -367,10 +367,6 @@ const getDbConnection = function ({
   pgp.pg.types.setTypeParser(pgp.pg.types.builtins.TIMESTAMPTZ, (v) => v); // timestamp with time zone
   pgp.pg.types.setTypeParser(pgp.pg.types.builtins.DATE, (v) => v); // date
 
-  // if (dbOptions) {
-  //   Object.assign(pgp.pg.defaults, dbOptions);
-  // }
-
   return {
     db: pgp(dbConnection),
     pgp,

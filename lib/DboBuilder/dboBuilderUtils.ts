@@ -5,7 +5,7 @@
 
 import type { AnyObject, ProstglesError } from "prostgles-types";
 import { asNameAlias } from "../utils/asNameAlias";
-import { isObject, omitKeys, pickKeys } from "prostgles-types";
+import { getSerialisableError, isObject, omitKeys, pickKeys } from "prostgles-types";
 import type { DB } from "../Prostgles";
 import type { LocalParams, SortItem } from "./DboBuilderTypes";
 import { pgp } from "./DboBuilderTypes";
@@ -16,38 +16,12 @@ import type { ProstglesInitOptions } from "../ProstglesTypes";
 import { sqlErrCodeToMsg } from "./sqlErrCodeToMsg";
 import type { TableHandler } from "./TableHandler/TableHandler";
 
-const safeStringify = (obj: AnyObject) => {
-  const seen = new WeakSet();
-  return JSON.stringify(obj, (key, value: any) => {
-    if (typeof value === "object" && value !== null) {
-      if (seen.has(value)) {
-        return "[Circular]";
-      }
-      seen.add(value);
-    }
-    return value;
-  });
-};
-export const getErrorAsObject = (rawError: any, includeStack = false) => {
-  if (["string", "boolean", "number"].includes(typeof rawError)) {
-    return { message: rawError };
+export const getErrorAsObject = (rawError: any) => {
+  const serializedError = getSerialisableError(rawError);
+  if (isObject(serializedError) && !Array.isArray(serializedError)) {
+    return omitKeys(serializedError, ["stack"]);
   }
-  if (rawError instanceof Error) {
-    const errorObj = Object.getOwnPropertyNames(rawError).reduce(
-      (acc, key) => ({
-        ...acc,
-        [key]: (rawError as AnyObject)[key],
-      }),
-      {} as AnyObject
-    );
-    const result = JSON.parse(safeStringify(errorObj));
-    if (!includeStack) {
-      return omitKeys(result, ["stack"]);
-    }
-    return result;
-  }
-
-  return rawError;
+  return { message: serializedError };
 };
 
 const circularError = new Error("Circular error data");

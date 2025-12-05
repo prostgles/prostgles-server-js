@@ -1,8 +1,6 @@
-import type {
-  SQLRequest,
-  TableHandler,
-  UserLike} from "prostgles-types";
+import type { SQLRequest, TableHandler, UserLike } from "prostgles-types";
 import {
+  getJSONBObjectSchemaValidationError,
   getKeys,
   pickKeys,
   type AnyObject,
@@ -13,7 +11,7 @@ import type { TableHandler as TableHandlerServer } from "./DboBuilder/TableHandl
 import { parseFieldFilter } from "./DboBuilder/ViewHandler/parseFieldFilter";
 import { canRunSQL } from "./DboBuilder/runSQL";
 import type { Prostgles } from "./Prostgles";
-import type { ParsedTableRule} from "./PublishParser/publishTypesAndUtils";
+import type { ParsedTableRule } from "./PublishParser/publishTypesAndUtils";
 import { type PermissionScope } from "./PublishParser/publishTypesAndUtils";
 
 const TABLE_METHODS = {
@@ -41,11 +39,11 @@ const SOCKET_ONLY_COMMANDS = [
 ] as const satisfies typeof TABLE_METHODS_KEYS;
 
 type Args = {
-  tableName: string;
-  command: string;
-  param1: any;
-  param2: any;
-  param3: any;
+  tableName: unknown;
+  command: unknown;
+  param1: unknown;
+  param2: unknown;
+  param3: unknown;
 };
 
 type TableMethodFunctionWithRulesAndLocalParams = (
@@ -58,7 +56,7 @@ type TableMethodFunctionWithRulesAndLocalParams = (
 
 export const runClientRequest = async function (
   this: Prostgles,
-  args: Args,
+  nonValidatedArgs: Args,
   clientReq: AuthClientRequest,
   scope: PermissionScope | undefined
 ) {
@@ -67,16 +65,31 @@ export const runClientRequest = async function (
     throw "socket/httpReq or authhandler missing";
   }
 
-  const { tableName, command: nonValidatedCommand, param1, param2, param3 } = args;
-  if (!TABLE_METHODS_KEYS.some((v) => v === nonValidatedCommand)) {
-    throw `Invalid command: ${nonValidatedCommand}. Expecting one of: ${TABLE_METHODS_KEYS.join(", ")};`;
+  const validation = getJSONBObjectSchemaValidationError(
+    {
+      tableName: { type: "string" },
+      command: { enum: TABLE_METHODS_KEYS },
+      param1: { type: "any", optional: true },
+      param2: { type: "any", optional: true },
+      param3: { type: "any", optional: true },
+    },
+    nonValidatedArgs,
+    "tableName"
+  );
+  if (validation.error !== undefined) {
+    throw validation.error;
   }
-  const command = nonValidatedCommand as keyof TableHandler;
+  const { tableName, command, param1, param2, param3 } = validation.data;
+
   if (!clientReq.socket && SOCKET_ONLY_COMMANDS.some((v) => v === command)) {
     throw (
       "The following commands cannot be completed over a non-websocket connection: " +
       SOCKET_ONLY_COMMANDS.join(", ")
     );
+  }
+
+  if (!this.dboBuilder.dboMap.has(tableName)) {
+    throw `tableName ${tableName} is invalid or not allowed`;
   }
 
   const clientInfo = await this.authHandler?.getSidAndUserFromRequest(clientReq);
@@ -159,7 +172,7 @@ export const clientCanRunSqlRequest = async function (
 
 export const runClientSqlRequest = async function (
   this: Prostgles,
-  reqData: SQLRequest,
+  unvalidatedArgs: SQLRequest,
   clientReq: AuthClientRequest
 ) {
   const { allowed } = await clientCanRunSqlRequest.bind(this)(clientReq);
@@ -167,23 +180,48 @@ export const runClientSqlRequest = async function (
     throw "Not allowed to execute sql";
   }
   if (!this.dbo?.sql) throw "Internal error: sql handler missing";
+  const validation = getJSONBObjectSchemaValidationError(
+    {
+      query: { type: "string" },
+      params: { type: "any", optional: true },
+      options: { type: "any", optional: true },
+    },
+    unvalidatedArgs,
+    "query"
+  );
+  if (validation.error !== undefined) {
+    throw validation.error;
+  }
+  const reqData = validation.data;
   const { query, params, options } = reqData;
   return this.dbo.sql(query, params, options, { clientReq });
 };
 
 type ArgsMethod = {
-  method: string;
+  method: unknown;
   params?: any[];
 };
 export const runClientMethod = async function (
   this: Prostgles,
-  reqArgs: ArgsMethod,
+  unvalidatedArgs: ArgsMethod,
   clientReq: AuthClientRequest
 ) {
+  const validation = getJSONBObjectSchemaValidationError(
+    {
+      method: { type: "string" },
+      params: { type: "any[]", optional: true },
+    },
+    unvalidatedArgs,
+    "method"
+  );
+  if (validation.error !== undefined) {
+    throw validation.error;
+  }
+  const reqArgs = validation.data;
   const { method, params = [] } = reqArgs;
   const methods = await this.publishParser?.getAllowedMethods(clientReq, undefined);
 
-  const methodDef = methods?.[method];
+  const methodDef = methods?.get(method);
   if (!methods || !methodDef) {
     throw "Disallowed/missing method " + JSON.stringify(method);
   }

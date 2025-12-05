@@ -1,14 +1,7 @@
 import * as pg from "pg";
 import type CursorType from "pg-cursor";
-import type {
-  SQLOptions,
-  SocketSQLStreamPacket,
-  SocketSQLStreamServer} from "prostgles-types";
-import {
-  CHANNELS,
-  omitKeys,
-  pickKeys,
-} from "prostgles-types";
+import type { SQLOptions, SocketSQLStreamPacket, SocketSQLStreamServer } from "prostgles-types";
+import { CHANNELS, omitKeys, pickKeys } from "prostgles-types";
 import type { BasicCallback } from "../PubSubManager/PubSubManager";
 import type { VoidFunction } from "../SchemaWatch/SchemaWatch";
 import type { DB } from "../initProstgles";
@@ -307,7 +300,7 @@ export class QueryStreamer {
           cb(processID);
         } catch (err) {
           console.error(err);
-          cb(processID, getErrorAsObject(err) ?? "Something went wrong");
+          cb(processID, getErrorAsObject(err));
         }
         runCount++;
       }
