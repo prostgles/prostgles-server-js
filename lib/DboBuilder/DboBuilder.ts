@@ -269,7 +269,7 @@ export class DboBuilder {
         undefined,
         this.shortestJoinPaths
       );
-      this.dbo[tov.escaped_identifier] = tableHandler;
+      this.dbo[tov.name] = tableHandler;
       this.dboMap.set(tov.name, tableHandler);
 
       if (this.shortestJoinPaths.find((jp) => [jp.t1, jp.t2].includes(tov.name))) {

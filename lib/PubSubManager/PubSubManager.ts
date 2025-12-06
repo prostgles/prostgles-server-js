@@ -19,18 +19,11 @@ import { initPubSubManager } from "./init/initPubSubManager";
 import { initialiseEventTriggers } from "./initialiseEventTriggers";
 import { refreshTriggers } from "./refreshTriggers";
 
-import type {
-  AnyObject,
-  FieldFilter,
-  SelectParams,
-  WAL} from "prostgles-types";
-import {
-  CHANNELS,
-  type SubscribeOptions,
-} from "prostgles-types";
+import type { AnyObject, FieldFilter, SelectParams, WAL } from "prostgles-types";
+import { CHANNELS, type SubscribeOptions } from "prostgles-types";
 
 import { find, pickKeys } from "prostgles-types";
-import type { LocalFuncs} from "../DboBuilder/ViewHandler/subscribe";
+import type { LocalFuncs } from "../DboBuilder/ViewHandler/subscribe";
 import { getOnDataFunc, matchesLocalFuncs } from "../DboBuilder/ViewHandler/subscribe";
 import type { EventTypes } from "../Logging";
 import type { ParsedTableRule } from "../PublishParser/PublishParser";

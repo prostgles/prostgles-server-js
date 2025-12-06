@@ -227,6 +227,7 @@ export async function getTablesForSchemaPostgresSQL(
         table.parent_tables =
           getViewParentTables.data?.parent_tables.find((vr) => vr.oid === table.oid)?.table_names ??
           [];
+
         return table;
       });
       return { tablesAndViews };

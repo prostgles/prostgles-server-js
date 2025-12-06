@@ -726,7 +726,7 @@ export const isomorphicQueries = async (
 
     await test("parallel subscriptions", async () => {
       await tryRunP("parallel subscriptions", async (resolve, reject) => {
-        let callbacksFired = {};
+        let callbacksFired: Record<string, true> = {};
         const subscriptions = await Promise.all(
           [1, 2, 3, 4, 5].map(async (subId) => {
             const handler = await db.various.subscribe!(variousId99, {}, async (items) => {

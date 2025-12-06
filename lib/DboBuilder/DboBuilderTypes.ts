@@ -38,6 +38,15 @@ export type TableSchema = Pick<TableInfo, "uniqueColumnGroups"> & {
   columns: TableSchemaColumn[];
   is_view: boolean;
   view_definition: string | null;
+  view_related_tables:
+    | {
+        tableName: string;
+        refColumns: {
+          viewColumn: string;
+          tableColumn: string;
+        }[];
+      }[]
+    | undefined;
   parent_tables: string[];
   privileges: {
     insert: boolean;
